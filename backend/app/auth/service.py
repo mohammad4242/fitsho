@@ -52,6 +52,9 @@ def register_user(
     except IntegrityError as error:
         db.rollback()
         raise EmailAlreadyRegisteredError from error
+    except SQLAlchemyError:
+        db.rollback()
+        raise
     return AuthResult(user=user, raw_token=raw_token)
 
 
