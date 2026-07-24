@@ -7,6 +7,7 @@ const en = {
       email: "Email",
       password: "Password",
       loading: "Preparing Fitsho…",
+      retry: "Try again",
     },
     brandPanel: {
       eyebrow: "Smart training & nutrition coach",

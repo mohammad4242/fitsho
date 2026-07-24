@@ -1,6 +1,8 @@
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Self
+from urllib.parse import urlsplit
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +15,18 @@ class Settings(BaseSettings):
     session_ttl_seconds: int = 60 * 60 * 24 * 7
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @model_validator(mode="after")
+    def enforce_production_cookie_contract(self) -> Self:
+        if self.app_env != "production":
+            return self
+        if urlsplit(self.frontend_origin).scheme != "https":
+            raise ValueError("Production requires an HTTPS frontend origin")
+        if not self.cookie_secure:
+            raise ValueError("Production requires secure cookies")
+        if self.session_cookie_name != "__Host-fitsho_session":
+            raise ValueError("Production requires the __Host-fitsho_session cookie name")
+        return self
 
 
 @lru_cache

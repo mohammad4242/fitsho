@@ -5,7 +5,7 @@ import { useAuth } from "./AuthContext";
 
 export function ProtectedRoute() {
   const { t } = useTranslation();
-  const { user, loading } = useAuth();
+  const { user, loading, startupError, retryStartup } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -13,6 +13,17 @@ export function ProtectedRoute() {
       <main className="loading-screen" aria-live="polite">
         <span className="loading-mark" aria-hidden="true" />
         <p>{t("common.loading")}</p>
+      </main>
+    );
+  }
+
+  if (startupError) {
+    return (
+      <main className="loading-screen" role="alert">
+        <p>{t("errors.network")}</p>
+        <button className="retry-button" type="button" onClick={retryStartup}>
+          {t("common.retry")}
+        </button>
       </main>
     );
   }

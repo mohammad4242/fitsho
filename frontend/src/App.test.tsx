@@ -11,6 +11,8 @@ const auth = vi.hoisted(() => ({
       created_at: string;
     },
     loading: false,
+    startupError: false,
+    retryStartup: vi.fn(),
     login: vi.fn(),
     register: vi.fn(),
     logout: vi.fn(),
@@ -26,9 +28,28 @@ import { AppRoutes } from "./App";
 beforeEach(() => {
   auth.value.user = null;
   auth.value.loading = false;
+  auth.value.startupError = false;
+  auth.value.retryStartup.mockReset();
   auth.value.login.mockReset();
   auth.value.register.mockReset();
   auth.value.logout.mockReset();
+});
+
+it("shows a retry action when the initial session check is unavailable", async () => {
+  auth.value.startupError = true;
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={["/dashboard"]}>
+      <AppRoutes />
+    </MemoryRouter>,
+  );
+
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "ارتباط با سرور برقرار نشد",
+  );
+  await user.click(screen.getByRole("button", { name: "تلاش دوباره" }));
+
+  expect(auth.value.retryStartup).toHaveBeenCalledOnce();
 });
 
 it("redirects a guest away from the protected dashboard", async () => {

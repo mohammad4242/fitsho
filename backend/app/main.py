@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
@@ -27,6 +28,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"detail": "Service temporarily unavailable"},
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(
+        _request: Request,
+        error: RequestValidationError,
+    ) -> JSONResponse:
+        safe_errors = [
+            {
+                "type": item["type"],
+                "loc": item["loc"],
+                "msg": item["msg"],
+            }
+            for item in error.errors()
+        ]
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content={"detail": safe_errors},
         )
 
     app.include_router(auth_router)

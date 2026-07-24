@@ -40,3 +40,9 @@ def clear_session_cookie(response: Response, settings: Settings) -> None:
         samesite="lax",
         path="/",
     )
+
+
+def session_cookie_deletion_header(settings: Settings) -> str:
+    response = Response()
+    clear_session_cookie(response, settings)
+    return response.headers["set-cookie"]

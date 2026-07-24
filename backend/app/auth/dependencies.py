@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.auth.cookies import session_cookie_deletion_header
 from app.auth.models import User
 from app.auth.service import user_for_session
 from app.config import Settings, get_settings
@@ -28,5 +29,6 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
+            headers={"Set-Cookie": session_cookie_deletion_header(settings)},
         )
     return user

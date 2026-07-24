@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -14,6 +15,8 @@ import type { Credentials, User } from "./types";
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
+  startupError: boolean;
+  retryStartup: () => void;
   register: (credentials: Credentials) => Promise<void>;
   login: (credentials: Credentials) => Promise<void>;
   logout: () => Promise<void>;
@@ -24,43 +27,64 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [startupError, setStartupError] = useState(false);
+  const [startupAttempt, setStartupAttempt] = useState(0);
+  const requestGeneration = useRef(0);
 
   useEffect(() => {
+    const generation = ++requestGeneration.current;
     let active = true;
+    setLoading(true);
+    setStartupError(false);
     api
       .getCurrentUser()
       .then((currentUser) => {
-        if (active) {
+        if (active && generation === requestGeneration.current) {
           setUser(currentUser);
         }
       })
       .catch(() => {
-        if (active) {
-          setUser(null);
+        if (active && generation === requestGeneration.current) {
+          setStartupError(true);
         }
       })
       .finally(() => {
-        if (active) {
+        if (active && generation === requestGeneration.current) {
           setLoading(false);
         }
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [startupAttempt]);
+
+  const cancelStartupRequest = () => {
+    requestGeneration.current += 1;
+    setLoading(false);
+    setStartupError(false);
+  };
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       loading,
-      register: async (credentials) => setUser(await api.register(credentials)),
-      login: async (credentials) => setUser(await api.login(credentials)),
+      startupError,
+      retryStartup: () => setStartupAttempt((attempt) => attempt + 1),
+      register: async (credentials) => {
+        cancelStartupRequest();
+        setUser(await api.register(credentials));
+      },
+      login: async (credentials) => {
+        cancelStartupRequest();
+        setUser(await api.login(credentials));
+      },
       logout: async () => {
+        cancelStartupRequest();
         await api.logout();
         setUser(null);
       },
     }),
-    [loading, user],
+    [loading, startupError, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

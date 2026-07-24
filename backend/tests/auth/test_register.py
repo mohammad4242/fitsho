@@ -41,13 +41,16 @@ def test_register_rejects_duplicate_email(client: TestClient) -> None:
 
 
 def test_register_rejects_invalid_input(client: TestClient) -> None:
+    rejected_password = "secret7"
     response = client.post(
         "/api/v1/auth/register",
         headers={"Origin": "http://localhost:5173"},
-        json={"email": "invalid", "password": "short"},
+        json={"email": "invalid", "password": rejected_password},
     )
 
     assert response.status_code == 422
+    assert rejected_password not in response.text
+    assert all("input" not in error for error in response.json()["detail"])
 
 
 def test_register_rejects_untrusted_or_missing_origin(client: TestClient) -> None:

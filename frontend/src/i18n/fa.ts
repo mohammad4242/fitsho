@@ -7,6 +7,7 @@ const fa = {
       email: "ایمیل",
       password: "رمز عبور",
       loading: "در حال آماده‌سازی فیتشو…",
+      retry: "تلاش دوباره",
     },
     brandPanel: {
       eyebrow: "مربی هوشمند تمرین و تغذیه",

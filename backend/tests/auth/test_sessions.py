@@ -59,7 +59,10 @@ def test_login_uses_generic_error_for_unknown_email_and_wrong_password(
 def test_me_rejects_missing_and_forged_sessions(client: TestClient) -> None:
     assert client.get("/api/v1/auth/me").status_code == 401
     client.cookies.set("fitsho_session", "forged")
-    assert client.get("/api/v1/auth/me").status_code == 401
+    forged = client.get("/api/v1/auth/me")
+
+    assert forged.status_code == 401
+    assert "Max-Age=0" in forged.headers["set-cookie"]
 
 
 def test_expired_session_is_deleted(client: TestClient, db: Session) -> None:
@@ -72,7 +75,10 @@ def test_expired_session_is_deleted(client: TestClient, db: Session) -> None:
     stored.expires_at = datetime.now(UTC) - timedelta(seconds=1)
     db.commit()
 
-    assert client.get("/api/v1/auth/me").status_code == 401
+    expired = client.get("/api/v1/auth/me")
+
+    assert expired.status_code == 401
+    assert "Max-Age=0" in expired.headers["set-cookie"]
     assert db.get(AuthSession, stored.id) is None
 
 

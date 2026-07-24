@@ -441,6 +441,17 @@ html[dir="ltr"] .primary-button span:last-child {
   animation: spin 700ms linear infinite;
 }
 
+.retry-button {
+  min-height: 3rem;
+  padding-inline: 1.4rem;
+  border: 0;
+  border-radius: 0.8rem;
+  color: var(--paper);
+  background: var(--petrol-900);
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .dashboard-shell {
   min-height: 100svh;
   padding: 1.3rem clamp(1rem, 4vw, 4rem) 4rem;
