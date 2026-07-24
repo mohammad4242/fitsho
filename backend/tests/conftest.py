@@ -4,8 +4,13 @@ import sys
 from collections.abc import Iterator
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+
+from app.config import Settings, get_settings
+from app.database.session import get_db
+from app.main import create_app
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
@@ -37,3 +42,29 @@ def db() -> Iterator[Session]:
         transaction.rollback()
         connection.close()
         engine.dispose()
+
+
+@pytest.fixture
+def test_settings() -> Settings:
+    return Settings(
+        database_url=TEST_DATABASE_URL,
+        frontend_origin="http://localhost:5173",
+        app_env="test",
+        cookie_secure=False,
+        session_cookie_name="fitsho_session",
+        session_ttl_seconds=604800,
+    )
+
+
+@pytest.fixture
+def client(db: Session, test_settings: Settings) -> Iterator[TestClient]:
+    app = create_app(test_settings)
+
+    def override_db() -> Iterator[Session]:
+        yield db
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_settings] = lambda: test_settings
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
