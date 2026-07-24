@@ -20,12 +20,26 @@ class Settings(BaseSettings):
     def enforce_production_cookie_contract(self) -> Self:
         if self.app_env != "production":
             return self
-        if urlsplit(self.frontend_origin).scheme != "https":
+        origin = urlsplit(self.frontend_origin)
+        if origin.scheme != "https":
             raise ValueError("Production requires an HTTPS frontend origin")
+        if origin.hostname is None:
+            raise ValueError("Production requires a complete frontend origin")
+        if (
+            origin.username is not None
+            or origin.password is not None
+            or origin.path not in {"", "/"}
+            or origin.query
+            or origin.fragment
+        ):
+            raise ValueError(
+                "Production requires an origin without credentials, path, query, or fragment"
+            )
         if not self.cookie_secure:
             raise ValueError("Production requires secure cookies")
         if self.session_cookie_name != "__Host-fitsho_session":
             raise ValueError("Production requires the __Host-fitsho_session cookie name")
+        self.frontend_origin = f"https://{origin.netloc}"
         return self
 
 
