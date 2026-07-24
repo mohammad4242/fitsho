@@ -21,6 +21,8 @@ React
 TypeScript
 Vite
 React Router
+react-i18next
+i18next
 pytest
 HTTPX
 Vitest
@@ -48,6 +50,23 @@ docs/superpowers/specs/2026-07-24-authentication-design.md
 - هر تغییر رفتاری با چرخه آزمایش ناموفق، پیاده‌سازی حداقلی و آزمایش موفق انجام شود.
 - تغییرات موجود کاربر در فایل راهنما و سایر فایل‌های نامرتبط حفظ شوند.
 - هر وظیفه یک ثبت مستقل و قابل بازبینی داشته باشد.
+
+## Approved bilingual interface amendment
+
+این اصلاحیه بر جزئیات قدیمی وظیفه‌های ششم تا هشتم اولویت دارد:
+
+- زبان پیش‌فرض فارسی است و تغییر کامل میان فارسی و انگلیسی فراهم می‌شود.
+- انتخاب زبان در فضای محلی مرورگر باقی می‌ماند؛ هیچ داده احراز هویت آنجا ذخیره
+  نمی‌شود.
+- زبان و جهت عنصر اصلی سند با هر تغییر هم‌زمان به‌روز می‌شوند.
+- متن‌ها در فایل‌های ترجمه مستقل قرار می‌گیرند و اجزای نمایشی متن ثابت ندارند.
+- هویت بصری «مربی روزانه» و رنگ‌های مصوب سند طراحی اجرا می‌شوند.
+- صفحه ورود و ثبت‌نام در نمایشگر بزرگ دو پنل و در موبایل تک‌ستونه است.
+- داشبورد فقط داده واقعی حساب و نشست را نشان می‌دهد و داده تمرینی ساختگی ندارد.
+- قلم‌های فارسی و لاتین از بسته‌های محلی پروژه بارگذاری می‌شوند؛ شبکه توزیع محتوای
+  بیرونی استفاده نمی‌شود.
+- حرکت به یک ورود هماهنگ محدود است و ترجیح کاهش حرکت رعایت می‌شود.
+- آزمایش‌ها تغییر زبان، جهت سند و باقی‌ماندن انتخاب زبان را نیز پوشش می‌دهند.
 
 ---
 
@@ -130,7 +149,12 @@ frontend/src/features/auth/RegisterPage.tsx
 frontend/src/features/auth/RegisterPage.test.tsx
 frontend/src/features/auth/LoginPage.tsx
 frontend/src/features/auth/LoginPage.test.tsx
+frontend/src/i18n/index.ts
+frontend/src/i18n/fa.ts
+frontend/src/i18n/en.ts
 frontend/src/pages/DashboardPage.tsx
+frontend/src/shared/LanguageSwitcher.tsx
+frontend/src/shared/LanguageSwitcher.test.tsx
 frontend/src/App.test.tsx
 ```
 
