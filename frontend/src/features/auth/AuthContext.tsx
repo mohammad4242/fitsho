@@ -1,3 +1,4 @@
+/* oxlint-disable react/only-export-components -- provider and its hook form one public boundary */
 import {
   createContext,
   type ReactNode,
