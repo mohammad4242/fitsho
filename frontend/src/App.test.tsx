@@ -19,8 +19,22 @@ const auth = vi.hoisted(() => ({
   },
 }));
 
+const profile = vi.hoisted(() => ({
+  value: {
+    profile: null,
+    status: "idle" as "idle" | "loading" | "missing" | "ready" | "error",
+    retryProfile: vi.fn(),
+    createProfile: vi.fn(),
+    updateProfile: vi.fn(),
+  },
+}));
+
 vi.mock("./features/auth/AuthContext", () => ({
   useAuth: () => auth.value,
+}));
+
+vi.mock("./features/profile/ProfileContext", () => ({
+  useProfile: () => profile.value,
 }));
 
 import { AppRoutes } from "./App";
@@ -33,6 +47,8 @@ beforeEach(() => {
   auth.value.login.mockReset();
   auth.value.register.mockReset();
   auth.value.logout.mockReset();
+  profile.value.status = "idle";
+  profile.value.retryProfile.mockReset();
 });
 
 it("shows a retry action when the initial session check is unavailable", async () => {
@@ -70,7 +86,10 @@ it("shows the real account and logs the user out", async () => {
     email: "member@example.com",
     created_at: "2026-07-24T00:00:00Z",
   };
-  auth.value.logout.mockResolvedValue(undefined);
+  profile.value.status = "ready";
+  auth.value.logout.mockImplementation(async () => {
+    auth.value.user = null;
+  });
   const user = userEvent.setup();
   render(
     <MemoryRouter initialEntries={["/dashboard"]}>

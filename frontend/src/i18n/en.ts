@@ -39,6 +39,11 @@ const en = {
       noAccount: "New to Fitsho?",
       registerLink: "Create account",
     },
+    onboarding: {
+      eyebrow: "Start personalizing",
+      title: "Build your fitness profile",
+      intro: "In three short steps, we will collect your basics, goal, and training schedule.",
+    },
     errors: {
       mismatch: "Passwords do not match.",
       invalidCredentials: "The email or password is incorrect.",
