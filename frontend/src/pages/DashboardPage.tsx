@@ -53,6 +53,20 @@ export function DashboardPage() {
           </div>
         </section>
 
+        <Link className="catalog-dashboard-card" to="/exercises">
+          <div className="catalog-dashboard-card__copy">
+            <p className="eyebrow">{t("dashboard.catalogEyebrow")}</p>
+            <h2>{t("dashboard.catalogTitle")}</h2>
+            <p>{t("dashboard.catalogBody")}</p>
+          </div>
+          <div className="catalog-dashboard-card__visual" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <strong>{t("dashboard.catalogAction")}</strong>
+        </Link>
+
         <Link className="next-step-card profile-card-link" to="/profile">
           <div className="next-step-card__copy">
             <p className="eyebrow">{t("dashboard.nextEyebrow")}</p>

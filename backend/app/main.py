@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.auth.router import router as auth_router
 from app.config import Settings, get_settings
+from app.exercises.router import router as exercises_router
 from app.profile.router import router as profile_router
 
 
@@ -51,6 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(auth_router)
     app.include_router(profile_router)
+    app.include_router(exercises_router)
     return app
 
 

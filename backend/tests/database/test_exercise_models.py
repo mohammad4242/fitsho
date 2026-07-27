@@ -1,0 +1,207 @@
+from uuid import uuid4
+
+import pytest
+from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.exercises.models import Exercise
+
+
+def make_exercise(slug: str = "push-up") -> Exercise:
+    from app.exercises.enums import BodyRegion, Difficulty, MediaType, MuscleGroup
+
+    return Exercise(
+        slug=slug,
+        name_en="Push-Up",
+        name_fa="شنا سوئدی",
+        body_region=BodyRegion.UPPER_BODY,
+        primary_muscle=MuscleGroup.CHEST,
+        difficulty=Difficulty.BEGINNER,
+        instructions_en=[
+            "Brace your trunk.",
+            "Lower your chest with control.",
+            "Press back to the start.",
+        ],
+        instructions_fa=[
+            "میان‌تنه را ثابت نگه دار.",
+            "سینه را کنترل‌شده پایین ببر.",
+            "به وضعیت شروع برگرد.",
+        ],
+        safety_notes_en=["Keep your neck neutral."],
+        safety_notes_fa=["گردن را در وضعیت خنثی نگه دار."],
+        media_path="/exercises/exercise-placeholder.svg",
+        media_type=MediaType.PLACEHOLDER,
+        media_license="Fitsho original",
+        media_attribution="Fitsho",
+    )
+
+
+def test_exercise_stores_controlled_catalog_data(db: Session) -> None:
+    from app.exercises.enums import Equipment, MuscleGroup
+    from app.exercises.models import (
+        Exercise,
+        ExerciseEquipment,
+        ExerciseSecondaryMuscle,
+    )
+
+    exercise = make_exercise()
+    exercise.secondary_muscles.append(ExerciseSecondaryMuscle(muscle=MuscleGroup.TRICEPS))
+    exercise.equipment_items.extend(
+        [
+            ExerciseEquipment(equipment=Equipment.BODYWEIGHT),
+            ExerciseEquipment(equipment=Equipment.BENCH),
+        ]
+    )
+    db.add(exercise)
+    db.flush()
+    db.expire(exercise, ["secondary_muscles", "equipment_items"])
+
+    stored = db.scalar(select(Exercise).where(Exercise.slug == "push-up"))
+
+    assert stored is not None
+    assert stored.name_fa == "شنا سوئدی"
+    assert [item.muscle.value for item in stored.secondary_muscles] == ["triceps"]
+    assert [item.equipment.value for item in stored.equipment_items] == [
+        "bench",
+        "bodyweight",
+    ]
+    assert stored.is_active is True
+
+
+def test_exercise_stores_lower_back_as_a_core_muscle(db: Session) -> None:
+    from app.exercises.enums import BodyRegion, MuscleGroup
+    from app.exercises.models import Exercise
+
+    exercise = make_exercise("back-extension")
+    exercise.body_region = BodyRegion.CORE
+    exercise.primary_muscle = MuscleGroup.LOWER_BACK
+    db.add(exercise)
+    db.flush()
+
+    stored = db.scalar(select(Exercise).where(Exercise.slug == "back-extension"))
+
+    assert stored is not None
+    assert stored.body_region is BodyRegion.CORE
+    assert stored.primary_muscle is MuscleGroup.LOWER_BACK
+
+
+def test_exercise_slug_is_unique(db: Session) -> None:
+    db.add_all([make_exercise(), make_exercise()])
+
+    with pytest.raises(IntegrityError) as error:
+        db.flush()
+
+    assert "uq_exercises_slug" in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("column", "invalid_value", "constraint_name"),
+    [
+        ("body_region", "arms", "ck_exercises_body_region_values"),
+        ("primary_muscle", "forearms", "ck_exercises_primary_muscle_values"),
+        ("primary_muscle", "core_stability", "ck_exercises_primary_muscle_values"),
+        ("difficulty", "expert", "ck_exercises_difficulty_values"),
+        ("media_type", "youtube", "ck_exercises_media_type_values"),
+    ],
+)
+def test_exercise_database_rejects_invalid_controlled_values(
+    db: Session,
+    column: str,
+    invalid_value: str,
+    constraint_name: str,
+) -> None:
+    values = {
+        "id": uuid4(),
+        "slug": f"invalid-{column}",
+        "body_region": "upper_body",
+        "primary_muscle": "chest",
+        "difficulty": "beginner",
+        "media_type": "placeholder",
+    }
+    values[column] = invalid_value
+
+    with pytest.raises(IntegrityError) as error:
+        db.execute(
+            text(
+                """
+                INSERT INTO exercises (
+                    id, slug, name_en, name_fa, body_region, primary_muscle,
+                    difficulty, instructions_en, instructions_fa,
+                    safety_notes_en, safety_notes_fa, media_path, media_type
+                ) VALUES (
+                    :id, :slug, 'Push-Up', 'شنا سوئدی', :body_region,
+                    :primary_muscle, :difficulty, '["Step one", "Step two", "Step three"]',
+                    '["گام یک", "گام دو", "گام سه"]', '["Use control"]',
+                    '["حرکت را کنترل کن"]', '/exercises/exercise-placeholder.svg',
+                    :media_type
+                )
+                """
+            ),
+            values,
+        )
+
+    assert constraint_name in str(error.value)
+
+
+def test_exercise_database_rejects_invalid_equipment(db: Session) -> None:
+    exercise = make_exercise()
+    db.add(exercise)
+    db.flush()
+
+    with pytest.raises(IntegrityError) as error:
+        db.execute(
+            text(
+                """
+                INSERT INTO exercise_equipment (exercise_id, equipment)
+                VALUES (:exercise_id, 'kettlebell')
+                """
+            ),
+            {"exercise_id": exercise.id},
+        )
+
+    assert "ck_exercise_equipment_equipment_values" in str(error.value)
+
+
+def test_exercise_database_rejects_duplicate_associations(db: Session) -> None:
+    from app.exercises.enums import Equipment, MuscleGroup
+    from app.exercises.models import ExerciseEquipment, ExerciseSecondaryMuscle
+
+    exercise = make_exercise()
+    exercise.secondary_muscles.extend(
+        [
+            ExerciseSecondaryMuscle(muscle=MuscleGroup.TRICEPS),
+            ExerciseSecondaryMuscle(muscle=MuscleGroup.TRICEPS),
+        ]
+    )
+    exercise.equipment_items.extend(
+        [
+            ExerciseEquipment(equipment=Equipment.BODYWEIGHT),
+            ExerciseEquipment(equipment=Equipment.BODYWEIGHT),
+        ]
+    )
+    db.add(exercise)
+
+    with pytest.raises(IntegrityError):
+        db.flush()
+
+
+def test_exercise_database_rejects_self_alternative(db: Session) -> None:
+    from app.exercises.models import ExerciseAlternative
+
+    exercise = make_exercise()
+    db.add(exercise)
+    db.flush()
+    db.add(
+        ExerciseAlternative(
+            exercise_id=exercise.id,
+            alternative_exercise_id=exercise.id,
+            reason_en="Use the same exercise.",
+            reason_fa="همان حرکت را استفاده کن.",
+        )
+    )
+
+    with pytest.raises(IntegrityError) as error:
+        db.flush()
+
+    assert "ck_exercise_alternatives_distinct_exercises" in str(error.value)

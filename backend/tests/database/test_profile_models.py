@@ -20,7 +20,7 @@ from app.profile.models import BodyMeasurement, UserProfile
 def test_body_measurement_model_defines_weight_range_constraint() -> None:
     constraints = {
         constraint.name: str(constraint.sqltext)
-        for constraint in BodyMeasurement.__table__.constraints
+        for constraint in BodyMeasurement.__table__.constraints  # type: ignore[attr-defined]
         if isinstance(constraint, CheckConstraint)
     }
 

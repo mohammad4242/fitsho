@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 
+import type { ExerciseCategories, ExerciseDetail, PaginatedExercises } from "./features/exercises/types";
+
 const auth = vi.hoisted(() => ({
   value: {
     user: null as null | {
@@ -46,6 +48,12 @@ const profile = vi.hoisted(() => ({
   },
 }));
 
+const exerciseApi = vi.hoisted(() => ({
+  getExerciseCategories: vi.fn(),
+  getExercises: vi.fn(),
+  getExercise: vi.fn(),
+}));
+
 vi.mock("./features/auth/AuthContext", () => ({
   useAuth: () => auth.value,
 }));
@@ -54,7 +62,49 @@ vi.mock("./features/profile/ProfileContext", () => ({
   useProfile: () => profile.value,
 }));
 
+vi.mock("./features/exercises/api", () => exerciseApi);
+
 import { AppRoutes } from "./App";
+
+const exerciseCategories: ExerciseCategories = {
+  body_regions: [
+    { value: "upper_body", name_en: "Upper Body", name_fa: "بالاتنه" },
+    { value: "lower_body", name_en: "Lower Body", name_fa: "پایین‌تنه" },
+    { value: "core", name_en: "Core", name_fa: "میان‌تنه" },
+  ],
+  upper_body: [{ value: "chest", name_en: "Chest", name_fa: "سینه" }],
+  lower_body: [],
+  core: [],
+};
+
+const emptyExercisePage: PaginatedExercises = {
+  items: [],
+  page: 1,
+  page_size: 12,
+  total: 0,
+  total_pages: 0,
+};
+
+const exerciseDetail: ExerciseDetail = {
+  id: "018f0000-0000-7000-8000-000000000001",
+  slug: "dumbbell-bench-press",
+  name_en: "Dumbbell Bench Press",
+  name_fa: "پرس سینه دمبل",
+  body_region: "upper_body",
+  primary_muscle: "chest",
+  secondary_muscles: ["triceps"],
+  equipment: ["dumbbell", "bench"],
+  difficulty: "intermediate",
+  instructions_en: ["Press the dumbbells upward."],
+  instructions_fa: ["دمبل‌ها را به بالا پرس کن."],
+  safety_notes_en: ["Keep the shoulders supported."],
+  safety_notes_fa: ["شانه‌ها را ثابت نگه دار."],
+  media_path: "/exercises/upper-body/chest/dumbbell-bench-press.gif",
+  media_type: "gif",
+  media_source_url: null,
+  media_license: "Project owner supplied and authorized",
+  media_attribution: "Provided by Fitsho project owner",
+};
 
 beforeEach(() => {
   auth.value.user = null;
@@ -67,6 +117,12 @@ beforeEach(() => {
   profile.value.status = "idle";
   profile.value.profile = null;
   profile.value.retryProfile.mockReset();
+  exerciseApi.getExerciseCategories.mockReset();
+  exerciseApi.getExercises.mockReset();
+  exerciseApi.getExercise.mockReset();
+  exerciseApi.getExerciseCategories.mockResolvedValue(exerciseCategories);
+  exerciseApi.getExercises.mockResolvedValue(emptyExercisePage);
+  exerciseApi.getExercise.mockResolvedValue(exerciseDetail);
 });
 
 it("shows a retry action when the initial session check is unavailable", async () => {
@@ -181,3 +237,99 @@ it("renders the protected profile route for a member with a profile", async () =
     await screen.findByRole("heading", { name: "پروفایل ورزشی" }),
   ).toBeInTheDocument();
 });
+
+it.each(["/exercises", "/exercises/dumbbell-bench-press"])(
+  "redirects a guest from %s to login",
+  async (path) => {
+    renderRoute(path);
+
+    expect(
+      await screen.findByRole("heading", { name: "ادامهٔ مسیر از همین‌جا" }),
+    ).toBeInTheDocument();
+  },
+);
+
+it.each(["/exercises", "/exercises/dumbbell-bench-press"])(
+  "redirects a member without a profile from %s to onboarding",
+  async (path) => {
+    auth.value.user = member;
+    profile.value.status = "missing";
+    renderRoute(path);
+
+    expect(
+      await screen.findByRole("heading", { name: "پروفایل ورزشی‌ات را بساز" }),
+    ).toBeInTheDocument();
+  },
+);
+
+it("renders the catalog route for a ready member", async () => {
+  setReadyMember();
+  renderRoute("/exercises");
+
+  expect(
+    await screen.findByRole("heading", { name: "کتابخانه حرکات" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "حرکات" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+});
+
+it("renders detail with active exercise navigation for a ready member", async () => {
+  setReadyMember();
+  renderRoute("/exercises/dumbbell-bench-press");
+
+  expect(
+    await screen.findByRole("heading", { name: "پرس سینه دمبل" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "حرکات" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+});
+
+it("links the dashboard exercise card to the catalog", async () => {
+  setReadyMember();
+  renderRoute("/dashboard");
+
+  expect(
+    screen.getByRole("link", { name: /مرور کتابخانه حرکات/ }),
+  ).toHaveAttribute("href", "/exercises");
+});
+
+const member = {
+  id: "1",
+  email: "member@example.com",
+  created_at: "2026-07-24T00:00:00Z",
+};
+
+function setReadyMember() {
+  auth.value.user = member;
+  profile.value.status = "ready";
+  profile.value.profile = {
+    user_id: "1",
+    display_name: "Mohammad",
+    birth_date: "2000-05-14",
+    sex: "male",
+    height_cm: 178,
+    current_weight_kg: 76.5,
+    weight_measured_at: "2026-07-27T12:00:00Z",
+    fitness_goal: "build_muscle",
+    experience_level: "beginner",
+    training_days_per_week: 3,
+    training_location: "gym",
+    home_training_setup: null,
+    session_duration_minutes: 60,
+    physical_limitations: null,
+    created_at: "2026-07-27T12:00:00Z",
+    updated_at: "2026-07-27T12:00:00Z",
+  };
+}
+
+function renderRoute(path: string) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <AppRoutes />
+    </MemoryRouter>,
+  );
+}

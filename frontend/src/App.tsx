@@ -4,6 +4,8 @@ import { AuthProvider } from "./features/auth/AuthContext";
 import { LoginPage } from "./features/auth/LoginPage";
 import { ProtectedRoute } from "./features/auth/ProtectedRoute";
 import { RegisterPage } from "./features/auth/RegisterPage";
+import { ExerciseCatalogPage } from "./features/exercises/ExerciseCatalogPage";
+import { ExerciseDetailPage } from "./features/exercises/ExerciseDetailPage";
 import { OnboardingPage } from "./features/profile/OnboardingPage";
 import { ProfilePage } from "./features/profile/ProfilePage";
 import { ProfileProvider } from "./features/profile/ProfileContext";
@@ -28,6 +30,8 @@ export function AppRoutes() {
         <Route element={<CompletedProfileRoute />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/exercises" element={<ExerciseCatalogPage />} />
+          <Route path="/exercises/:slug" element={<ExerciseDetailPage />} />
         </Route>
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

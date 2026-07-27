@@ -6,6 +6,7 @@ from alembic import context
 from app.auth import models  # noqa: F401
 from app.config import get_settings
 from app.database.base import Base
+from app.exercises import models as exercise_models  # noqa: F401
 from app.profile import models as profile_models  # noqa: F401
 
 config = context.config
