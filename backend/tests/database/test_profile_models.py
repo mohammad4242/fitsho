@@ -2,13 +2,25 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import CheckConstraint, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.profile.enums import ExperienceLevel, FitnessGoal, Sex
 from app.profile.models import BodyMeasurement, UserProfile
+
+
+def test_body_measurement_model_defines_weight_range_constraint() -> None:
+    constraints = {
+        constraint.name: str(constraint.sqltext)
+        for constraint in BodyMeasurement.__table__.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+
+    assert constraints["ck_body_measurements_weight_kg_range"] == (
+        "weight_kg BETWEEN 20 AND 500"
+    )
 
 
 def make_user(db: Session, email: str) -> User:

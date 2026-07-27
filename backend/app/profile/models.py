@@ -95,7 +95,13 @@ class UserProfile(Base):
 
 class BodyMeasurement(Base):
     __tablename__ = "body_measurements"
-    __table_args__ = (Index("ix_body_measurements_user_id_measured_at", "user_id", "measured_at"),)
+    __table_args__ = (
+        CheckConstraint(
+            "weight_kg BETWEEN 20 AND 500",
+            name="ck_body_measurements_weight_kg_range",
+        ),
+        Index("ix_body_measurements_user_id_measured_at", "user_id", "measured_at"),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(
