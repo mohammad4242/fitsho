@@ -39,6 +39,9 @@ const createdProfile: Profile = {
   fitness_goal: "build_muscle",
   experience_level: "beginner",
   training_days_per_week: 3,
+  training_location: "gym",
+  home_training_setup: null,
+  session_duration_minutes: 60,
   physical_limitations: null,
   created_at: "2026-07-27T12:00:00Z",
   updated_at: "2026-07-27T12:00:00Z",
@@ -89,6 +92,8 @@ async function reachExperienceStep(
 async function completeExperienceFields(user: UserEvent) {
   await user.selectOptions(screen.getByLabelText("سطح تجربه"), "beginner");
   await user.type(screen.getByLabelText("روزهای تمرین در هفته"), "3");
+  await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "gym");
+  await user.selectOptions(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"), "60");
 }
 
 beforeEach(async () => {
@@ -169,6 +174,35 @@ it("advances after valid body and goal values", async () => {
   expect(screen.getByLabelText("سطح تجربه")).toBeInTheDocument();
 });
 
+it("shows home setup only for home training and clears it after switching to gym", async () => {
+  profileContext.createProfile.mockResolvedValue(createdProfile);
+  const user = userEvent.setup();
+  renderOnboarding();
+  await reachExperienceStep(user);
+  await user.selectOptions(screen.getByLabelText("سطح تجربه"), "beginner");
+  await user.type(screen.getByLabelText("روزهای تمرین در هفته"), "3");
+
+  expect(
+    screen.queryByLabelText("برای تمرین در خانه چه امکاناتی داری؟"),
+  ).not.toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "home");
+  await user.selectOptions(
+    screen.getByLabelText("برای تمرین در خانه چه امکاناتی داری؟"),
+    "dumbbells_available",
+  );
+  await user.selectOptions(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"), "60");
+  await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "gym");
+
+  expect(
+    screen.queryByLabelText("برای تمرین در خانه چه امکاناتی داری؟"),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "ساخت پروفایل" }));
+  await waitFor(() => expect(profileContext.createProfile).toHaveBeenCalledOnce());
+  expect(profileContext.createProfile).toHaveBeenCalledWith(
+    expect.objectContaining({ training_location: "gym", home_training_setup: null }),
+  );
+});
+
 it("returns to step two with entered values preserved", async () => {
   const user = userEvent.setup();
   renderOnboarding();
@@ -221,6 +255,9 @@ it("submits one normalized typed profile payload", async () => {
     fitness_goal: "build_muscle",
     experience_level: "beginner",
     training_days_per_week: 3,
+    training_location: "gym",
+    home_training_setup: null,
+    session_duration_minutes: 60,
     physical_limitations: "knee pain",
   });
 });
@@ -278,10 +315,15 @@ it("disables back and submit controls while creation is pending", async () => {
 });
 
 it("renders the onboarding structure in English", async () => {
-  await i18n.changeLanguage("en");
+  const user = userEvent.setup();
   renderOnboarding();
+  await reachExperienceStep(user);
+  await i18n.changeLanguage("en");
 
   expect(screen.getByRole("heading", { name: "Build your fitness profile" })).toBeInTheDocument();
-  expect(screen.getByText("Step 1 of 3")).toBeInTheDocument();
-  expect(screen.getByLabelText("Display name")).toBeInTheDocument();
+  expect(screen.getByText("Step 3 of 3")).toBeInTheDocument();
+  expect(screen.getByLabelText("Where do you train?")).toBeInTheDocument();
+  expect(
+    screen.getByLabelText("How much time do you usually have for each workout?"),
+  ).toBeInTheDocument();
 });

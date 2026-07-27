@@ -20,6 +20,9 @@ const validValues: ProfileFormValues = {
   fitness_goal: "build_muscle",
   experience_level: "beginner",
   training_days_per_week: "3",
+  training_location: "gym",
+  home_training_setup: "",
+  session_duration_minutes: "60",
   physical_limitations: "",
 };
 
@@ -34,6 +37,9 @@ const profile: Profile = {
   fitness_goal: "build_muscle",
   experience_level: "beginner",
   training_days_per_week: 3,
+  training_location: "gym",
+  home_training_setup: null,
+  session_duration_minutes: 60,
   physical_limitations: null,
   created_at: "2026-07-27T12:00:00Z",
   updated_at: "2026-07-27T12:00:00Z",
@@ -114,6 +120,31 @@ describe("profile validation", () => {
     ).toEqual({ physical_limitations: "limitationsLength" });
   });
 
+  it("requires a home setup only for home training and accepts supported durations", () => {
+    expect(
+      validateStep(
+        { ...validValues, training_location: "home", home_training_setup: "" },
+        3,
+        today,
+      ),
+    ).toEqual({ home_training_setup: "required" });
+    expect(
+      validateStep({ ...validValues, session_duration_minutes: "50" }, 3, today),
+    ).toEqual({ session_duration_minutes: "sessionDurationInvalid" });
+    expect(
+      validateStep(
+        {
+          ...validValues,
+          training_location: "home",
+          home_training_setup: "dumbbells_available",
+          session_duration_minutes: "90",
+        },
+        3,
+        today,
+      ),
+    ).toEqual({});
+  });
+
   it("catches failures from every validation step", () => {
     expect(
       validateAll(
@@ -151,6 +182,9 @@ describe("profile validation", () => {
       fitness_goal: "build_muscle",
       experience_level: "beginner",
       training_days_per_week: 3,
+      training_location: "gym",
+      home_training_setup: null,
+      session_duration_minutes: 60,
       physical_limitations: null,
     });
   });
@@ -167,5 +201,23 @@ describe("profile validation", () => {
         profile,
       ),
     ).toEqual({ display_name: "Mo", current_weight_kg: 75.25 });
+  });
+
+  it("serializes workout preference changes", () => {
+    expect(
+      toProfilePatch(
+        {
+          ...validValues,
+          training_location: "home",
+          home_training_setup: "bodyweight_only",
+          session_duration_minutes: "75",
+        },
+        profile,
+      ),
+    ).toEqual({
+      training_location: "home",
+      home_training_setup: "bodyweight_only",
+      session_duration_minutes: 75,
+    });
   });
 });

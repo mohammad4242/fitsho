@@ -59,6 +59,9 @@ const fa = {
         fitnessGoal: "هدف ورزشی",
         experience: "سطح تجربه",
         trainingDays: "روزهای تمرین در هفته",
+        trainingLocation: "کجا تمرین می‌کنی؟",
+        homeTrainingSetup: "برای تمرین در خانه چه امکاناتی داری؟",
+        sessionDuration: "معمولاً برای هر جلسه چقدر زمان داری؟",
         limitations: "محدودیت‌های جسمی (اختیاری)",
       },
       hints: {
@@ -84,6 +87,21 @@ const fa = {
           intermediate: "متوسط",
           advanced: "پیشرفته",
         },
+        trainingLocation: {
+          home: "خانه",
+          gym: "باشگاه",
+        },
+        homeTrainingSetup: {
+          bodyweight_only: "فقط وزن بدن",
+          dumbbells_available: "دمبل دارم",
+        },
+        sessionDuration: {
+          30: "۳۰ دقیقه",
+          45: "۴۵ دقیقه",
+          60: "۶۰ دقیقه",
+          75: "۷۵ دقیقه",
+          90: "۹۰ دقیقه",
+        },
       },
       actions: {
         next: "ادامه",
@@ -100,6 +118,7 @@ const fa = {
         weightRange: "وزن باید بین ۲۰ تا ۵۰۰ کیلوگرم باشد.",
         weightPrecision: "وزن حداکثر دو رقم اعشار داشته باشد.",
         trainingDaysRange: "روزهای تمرین باید بین ۱ تا ۷ باشد.",
+        sessionDurationInvalid: "زمان جلسه باید یکی از گزینه‌های موجود باشد.",
         limitationsLength: "محدودیت‌ها حداکثر ۱۰۰۰ نویسه است.",
       },
     },

@@ -19,3 +19,13 @@ class ExperienceLevel(StrEnum):
     BEGINNER = "beginner"
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"
+
+
+class TrainingLocation(StrEnum):
+    HOME = "home"
+    GYM = "gym"
+
+
+class HomeTrainingSetup(StrEnum):
+    BODYWEIGHT_ONLY = "bodyweight_only"
+    DUMBBELLS_AVAILABLE = "dumbbells_available"

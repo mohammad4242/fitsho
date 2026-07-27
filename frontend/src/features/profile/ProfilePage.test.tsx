@@ -57,6 +57,9 @@ const savedProfile: Profile = {
   fitness_goal: "build_muscle",
   experience_level: "beginner",
   training_days_per_week: 3,
+  training_location: "home",
+  home_training_setup: "dumbbells_available",
+  session_duration_minutes: 75,
   physical_limitations: "Knee pain",
   created_at: "2026-07-27T12:00:00Z",
   updated_at: "2026-07-27T12:00:00Z",
@@ -104,6 +107,13 @@ it("renders every saved profile value in editable controls", () => {
   expect(screen.getByLabelText("هدف ورزشی")).toHaveValue("build_muscle");
   expect(screen.getByLabelText("سطح تجربه")).toHaveValue("beginner");
   expect(screen.getByLabelText("روزهای تمرین در هفته")).toHaveValue(3);
+  expect(screen.getByLabelText("کجا تمرین می‌کنی؟")).toHaveValue("home");
+  expect(
+    screen.getByLabelText("برای تمرین در خانه چه امکاناتی داری؟"),
+  ).toHaveValue("dumbbells_available");
+  expect(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟")).toHaveValue(
+    "75",
+  );
   expect(screen.getByLabelText("محدودیت‌های جسمی (اختیاری)")).toHaveValue(
     "Knee pain",
   );
@@ -187,6 +197,32 @@ it("sends null when physical limitations are cleared", async () => {
   await waitFor(() =>
     expect(context.updateProfile).toHaveBeenCalledWith({
       physical_limitations: null,
+    }),
+  );
+});
+
+it("clears home setup and serializes the workout preference edit", async () => {
+  context.updateProfile.mockResolvedValue({
+    ...savedProfile,
+    training_location: "gym",
+    home_training_setup: null,
+    session_duration_minutes: 90,
+  });
+  const user = userEvent.setup();
+  renderProfilePage();
+
+  await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "gym");
+  expect(
+    screen.queryByLabelText("برای تمرین در خانه چه امکاناتی داری؟"),
+  ).not.toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"), "90");
+  await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
+
+  await waitFor(() =>
+    expect(context.updateProfile).toHaveBeenCalledWith({
+      training_location: "gym",
+      home_training_setup: null,
+      session_duration_minutes: 90,
     }),
   );
 });

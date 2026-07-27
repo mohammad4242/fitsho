@@ -21,6 +21,9 @@ def upgrade() -> None:
         sa.Column("fitness_goal", sa.String(length=15), nullable=False),
         sa.Column("experience_level", sa.String(length=12), nullable=False),
         sa.Column("training_days_per_week", sa.SmallInteger(), nullable=False),
+        sa.Column("training_location", sa.String(length=4), nullable=False),
+        sa.Column("home_training_setup", sa.String(length=19), nullable=True),
+        sa.Column("session_duration_minutes", sa.SmallInteger(), nullable=False),
         sa.Column("physical_limitations", sa.Text(), nullable=True),
         sa.Column(
             "created_at",
@@ -60,6 +63,24 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "experience_level IN ('beginner', 'intermediate', 'advanced')",
             name="ck_user_profiles_experience_level_values",
+        ),
+        sa.CheckConstraint(
+            "training_location IN ('home', 'gym')",
+            name="ck_user_profiles_training_location_values",
+        ),
+        sa.CheckConstraint(
+            "home_training_setup IS NULL OR "
+            "home_training_setup IN ('bodyweight_only', 'dumbbells_available')",
+            name="ck_user_profiles_home_training_setup_values",
+        ),
+        sa.CheckConstraint(
+            "session_duration_minutes IN (30, 45, 60, 75, 90)",
+            name="ck_user_profiles_session_duration_values",
+        ),
+        sa.CheckConstraint(
+            "(training_location = 'home' AND home_training_setup IS NOT NULL) OR "
+            "(training_location = 'gym' AND home_training_setup IS NULL)",
+            name="ck_user_profiles_training_setup_consistency",
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("user_id"),

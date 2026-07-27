@@ -5,7 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.profile.enums import TrainingLocation
 from app.profile.exceptions import (
+    InvalidWorkoutSetupError,
     ProfileAlreadyExistsError,
     ProfileInvariantError,
     ProfileNotFoundError,
@@ -34,6 +36,9 @@ def create_profile(
         fitness_goal=payload.fitness_goal,
         experience_level=payload.experience_level,
         training_days_per_week=payload.training_days_per_week,
+        training_location=payload.training_location,
+        home_training_setup=payload.home_training_setup,
+        session_duration_minutes=payload.session_duration_minutes,
         physical_limitations=payload.physical_limitations,
     )
     measurement = BodyMeasurement(
@@ -93,6 +98,14 @@ def update_profile(
 
     supplied_fields = payload.model_dump(exclude_unset=True)
     supplied_weight = supplied_fields.pop("current_weight_kg", None)
+
+    final_location = supplied_fields.get("training_location", profile.training_location)
+    final_home_setup = supplied_fields.get("home_training_setup", profile.home_training_setup)
+    if final_location == TrainingLocation.GYM:
+        supplied_fields["home_training_setup"] = None
+    elif final_home_setup is None:
+        raise InvalidWorkoutSetupError
+
     for field_name, value in supplied_fields.items():
         setattr(profile, field_name, value)
 

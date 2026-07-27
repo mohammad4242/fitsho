@@ -8,6 +8,7 @@ from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.database.session import get_db
 from app.profile.exceptions import (
+    InvalidWorkoutSetupError,
     ProfileAlreadyExistsError,
     ProfileInvariantError,
     ProfileNotFoundError,
@@ -40,6 +41,9 @@ def to_response(snapshot: ProfileSnapshot) -> ProfileResponse:
         fitness_goal=profile.fitness_goal,
         experience_level=profile.experience_level,
         training_days_per_week=profile.training_days_per_week,
+        training_location=profile.training_location,
+        home_training_setup=profile.home_training_setup,
+        session_duration_minutes=profile.session_duration_minutes,
         physical_limitations=profile.physical_limitations,
         created_at=profile.created_at,
         updated_at=profile.updated_at,
@@ -87,6 +91,11 @@ def update(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Fitness profile not found",
+        ) from None
+    except InvalidWorkoutSetupError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Home training setup is required for home training",
         ) from None
     except ProfileInvariantError:
         raise HTTPException(

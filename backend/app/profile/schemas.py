@@ -1,10 +1,19 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.profile.enums import ExperienceLevel, FitnessGoal, Sex
+from app.profile.enums import (
+    ExperienceLevel,
+    FitnessGoal,
+    HomeTrainingSetup,
+    Sex,
+    TrainingLocation,
+)
+
+SessionDurationMinutes = Literal[30, 45, 60, 75, 90]
 
 
 def calculate_age(birth_date: date, today: date) -> int:
@@ -29,6 +38,9 @@ class ProfileCreate(BaseModel):
     fitness_goal: FitnessGoal
     experience_level: ExperienceLevel
     training_days_per_week: int = Field(ge=1, le=7)
+    training_location: TrainingLocation
+    home_training_setup: HomeTrainingSetup | None = None
+    session_duration_minutes: SessionDurationMinutes
     physical_limitations: str | None = Field(default=None, max_length=1000)
 
     @field_validator("display_name", "physical_limitations", mode="before")
@@ -50,6 +62,14 @@ class ProfileCreate(BaseModel):
             raise ValueError("Age must be between 18 and 100 years")
         return birth_date
 
+    @model_validator(mode="after")
+    def normalize_workout_setup(self) -> "ProfileCreate":
+        if self.training_location == TrainingLocation.GYM:
+            self.home_training_setup = None
+        elif self.home_training_setup is None:
+            raise ValueError("Home training setup is required for home training")
+        return self
+
 
 class ProfileUpdate(BaseModel):
     display_name: str | None = Field(default=None, min_length=2, max_length=80)
@@ -66,6 +86,9 @@ class ProfileUpdate(BaseModel):
     fitness_goal: FitnessGoal | None = None
     experience_level: ExperienceLevel | None = None
     training_days_per_week: int | None = Field(default=None, ge=1, le=7)
+    training_location: TrainingLocation | None = None
+    home_training_setup: HomeTrainingSetup | None = None
+    session_duration_minutes: SessionDurationMinutes | None = None
     physical_limitations: str | None = Field(default=None, max_length=1000)
 
     @field_validator("display_name", "physical_limitations", mode="before")
@@ -95,9 +118,13 @@ class ProfileUpdate(BaseModel):
         if not self.model_fields_set:
             raise ValueError("At least one profile field is required")
 
-        required_fields = self.model_fields_set - {"physical_limitations"}
+        required_fields = self.model_fields_set - {"home_training_setup", "physical_limitations"}
         if any(getattr(self, field_name) is None for field_name in required_fields):
             raise ValueError("Profile fields cannot be null")
+        if self.training_location == TrainingLocation.GYM:
+            self.home_training_setup = None
+        elif self.training_location == TrainingLocation.HOME and self.home_training_setup is None:
+            raise ValueError("Home training setup is required for home training")
         return self
 
 
@@ -115,5 +142,8 @@ class ProfileResponse(BaseModel):
     physical_limitations: str | None
     created_at: datetime
     updated_at: datetime
+    training_location: TrainingLocation
+    home_training_setup: HomeTrainingSetup | None
+    session_duration_minutes: SessionDurationMinutes
 
     model_config = ConfigDict(from_attributes=True)

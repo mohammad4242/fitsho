@@ -1,11 +1,15 @@
-import type {
-  ExperienceLevel,
-  FitnessGoal,
-  Profile,
-  ProfileFormValues,
-  ProfileInput,
-  ProfilePatch,
-  Sex,
+import {
+  sessionDurations,
+  type ExperienceLevel,
+  type FitnessGoal,
+  type HomeTrainingSetup,
+  type Profile,
+  type ProfileFormValues,
+  type ProfileInput,
+  type ProfilePatch,
+  type SessionDurationMinutes,
+  type Sex,
+  type TrainingLocation,
 } from "./types";
 
 export type ProfileValidationCode =
@@ -17,6 +21,7 @@ export type ProfileValidationCode =
   | "weightRange"
   | "weightPrecision"
   | "trainingDaysRange"
+  | "sessionDurationInvalid"
   | "limitationsLength";
 
 export type ProfileValidationErrors = Partial<
@@ -134,6 +139,25 @@ function validateStepThree(values: ProfileFormValues): ProfileValidationErrors {
     errors.training_days_per_week = "trainingDaysRange";
   }
 
+  if (values.training_location === "") {
+    errors.training_location = "required";
+  }
+  if (
+    values.training_location === "home" &&
+    values.home_training_setup === ""
+  ) {
+    errors.home_training_setup = "required";
+  }
+
+  const sessionDuration = values.session_duration_minutes.trim();
+  if (sessionDuration === "") {
+    errors.session_duration_minutes = "required";
+  } else if (
+    !sessionDurations.some((duration) => duration === Number(sessionDuration))
+  ) {
+    errors.session_duration_minutes = "sessionDurationInvalid";
+  }
+
   if (values.physical_limitations.trim().length > 1000) {
     errors.physical_limitations = "limitationsLength";
   }
@@ -175,6 +199,14 @@ export function toProfileInput(values: ProfileFormValues): ProfileInput {
     fitness_goal: values.fitness_goal as FitnessGoal,
     experience_level: values.experience_level as ExperienceLevel,
     training_days_per_week: Number(values.training_days_per_week.trim()),
+    training_location: values.training_location as TrainingLocation,
+    home_training_setup:
+      values.training_location === "home"
+        ? (values.home_training_setup as HomeTrainingSetup)
+        : null,
+    session_duration_minutes: Number(
+      values.session_duration_minutes,
+    ) as SessionDurationMinutes,
     physical_limitations: values.physical_limitations.trim() || null,
   };
 }
@@ -189,6 +221,9 @@ export function profileToFormValues(profile: Profile): ProfileFormValues {
     fitness_goal: profile.fitness_goal,
     experience_level: profile.experience_level,
     training_days_per_week: String(profile.training_days_per_week),
+    training_location: profile.training_location,
+    home_training_setup: profile.home_training_setup ?? "",
+    session_duration_minutes: String(profile.session_duration_minutes),
     physical_limitations: profile.physical_limitations ?? "",
   };
 }
@@ -223,6 +258,15 @@ export function toProfilePatch(
   }
   if (input.training_days_per_week !== currentProfile.training_days_per_week) {
     patch.training_days_per_week = input.training_days_per_week;
+  }
+  if (input.training_location !== currentProfile.training_location) {
+    patch.training_location = input.training_location;
+  }
+  if (input.home_training_setup !== currentProfile.home_training_setup) {
+    patch.home_training_setup = input.home_training_setup;
+  }
+  if (input.session_duration_minutes !== currentProfile.session_duration_minutes) {
+    patch.session_duration_minutes = input.session_duration_minutes;
   }
   if (input.physical_limitations !== currentProfile.physical_limitations) {
     patch.physical_limitations = input.physical_limitations;

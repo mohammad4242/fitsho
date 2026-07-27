@@ -18,7 +18,13 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
-from app.profile.enums import ExperienceLevel, FitnessGoal, Sex
+from app.profile.enums import (
+    ExperienceLevel,
+    FitnessGoal,
+    HomeTrainingSetup,
+    Sex,
+    TrainingLocation,
+)
 
 
 class UserProfile(Base):
@@ -36,6 +42,15 @@ class UserProfile(Base):
         CheckConstraint(
             "physical_limitations IS NULL OR char_length(physical_limitations) <= 1000",
             name="ck_user_profiles_limitations_length",
+        ),
+        CheckConstraint(
+            "session_duration_minutes IN (30, 45, 60, 75, 90)",
+            name="ck_user_profiles_session_duration_values",
+        ),
+        CheckConstraint(
+            "(training_location = 'home' AND home_training_setup IS NOT NULL) OR "
+            "(training_location = 'gym' AND home_training_setup IS NULL)",
+            name="ck_user_profiles_training_setup_consistency",
         ),
     )
 
@@ -79,6 +94,32 @@ class UserProfile(Base):
         nullable=False,
     )
     training_days_per_week: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    training_location: Mapped[TrainingLocation] = mapped_column(
+        Enum(
+            TrainingLocation,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=lambda members: [member.value for member in members],
+            name="ck_user_profiles_training_location_values",
+        ),
+        nullable=False,
+    )
+    home_training_setup: Mapped[HomeTrainingSetup | None] = mapped_column(
+        Enum(
+            HomeTrainingSetup,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=lambda members: [member.value for member in members],
+            name="ck_user_profiles_home_training_setup_values",
+        ),
+        nullable=True,
+    )
+    session_duration_minutes: Mapped[int] = mapped_column(
+        SmallInteger,
+        nullable=False,
+    )
     physical_limitations: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

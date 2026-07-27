@@ -17,6 +17,9 @@ def valid_payload() -> dict[str, object]:
         "fitness_goal": "build_muscle",
         "experience_level": "beginner",
         "training_days_per_week": 3,
+        "training_location": "gym",
+        "home_training_setup": None,
+        "session_duration_minutes": 60,
         "physical_limitations": "   ",
     }
 
@@ -49,6 +52,9 @@ def test_calculate_age_handles_birthday_boundary() -> None:
         ("sex", "unknown"),
         ("fitness_goal", "bulk"),
         ("experience_level", "expert"),
+        ("training_location", "outdoors"),
+        ("home_training_setup", "barbell"),
+        ("session_duration_minutes", 50),
     ],
 )
 def test_profile_create_rejects_invalid_values(field: str, value: object) -> None:
@@ -116,3 +122,33 @@ def test_profile_update_normalizes_supplied_text() -> None:
 
     assert update.display_name == "Mohammad"
     assert update.physical_limitations == "Knee pain"
+
+
+def test_home_profile_requires_training_setup() -> None:
+    payload = {**valid_payload(), "training_location": "home", "home_training_setup": None}
+
+    with pytest.raises(ValidationError, match="Home training setup is required"):
+        ProfileCreate.model_validate(payload)
+
+
+def test_gym_profile_normalizes_home_training_setup_to_none() -> None:
+    payload = {
+        **valid_payload(),
+        "training_location": "gym",
+        "home_training_setup": "dumbbells_available",
+    }
+
+    profile = ProfileCreate.model_validate(payload)
+
+    assert profile.home_training_setup is None
+
+
+def test_profile_update_normalizes_home_setup_for_gym() -> None:
+    update = ProfileUpdate.model_validate(
+        {
+            "training_location": "gym",
+            "home_training_setup": "bodyweight_only",
+        }
+    )
+
+    assert update.home_training_setup is None

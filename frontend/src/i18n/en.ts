@@ -59,6 +59,9 @@ const en = {
         fitnessGoal: "Fitness goal",
         experience: "Experience level",
         trainingDays: "Training days per week",
+        trainingLocation: "Where do you train?",
+        homeTrainingSetup: "What equipment do you have for training at home?",
+        sessionDuration: "How much time do you usually have for each workout?",
         limitations: "Physical limitations (optional)",
       },
       hints: {
@@ -84,6 +87,21 @@ const en = {
           intermediate: "Intermediate",
           advanced: "Advanced",
         },
+        trainingLocation: {
+          home: "Home",
+          gym: "Gym",
+        },
+        homeTrainingSetup: {
+          bodyweight_only: "Bodyweight only",
+          dumbbells_available: "I have dumbbells",
+        },
+        sessionDuration: {
+          30: "30 minutes",
+          45: "45 minutes",
+          60: "60 minutes",
+          75: "75 minutes",
+          90: "90 minutes",
+        },
       },
       actions: {
         next: "Continue",
@@ -100,6 +118,7 @@ const en = {
         weightRange: "Weight must be between 20 and 500 kilograms.",
         weightPrecision: "Weight can have at most two decimal places.",
         trainingDaysRange: "Training days must be between 1 and 7.",
+        sessionDurationInvalid: "Choose one of the available session durations.",
         limitationsLength: "Limitations can have at most 1,000 characters.",
       },
     },

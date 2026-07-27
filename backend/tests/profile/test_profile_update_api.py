@@ -18,6 +18,9 @@ VALID_PROFILE = {
     "fitness_goal": "build_muscle",
     "experience_level": "beginner",
     "training_days_per_week": 3,
+    "training_location": "home",
+    "home_training_setup": "dumbbells_available",
+    "session_duration_minutes": 60,
     "physical_limitations": None,
 }
 
@@ -110,6 +113,48 @@ def test_patch_clears_limitations_with_null(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json()["physical_limitations"] is None
+
+
+def test_patch_switching_to_gym_clears_home_training_setup(
+    client: TestClient,
+    db: Session,
+) -> None:
+    user_id = register(client)
+    create_profile(client)
+
+    response = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={"training_location": "gym"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["training_location"] == "gym"
+    assert response.json()["home_training_setup"] is None
+    profile = db.get(UserProfile, user_id)
+    assert profile is not None
+    assert profile.home_training_setup is None
+
+
+def test_patch_switching_to_home_requires_setup(client: TestClient) -> None:
+    register(client)
+    create_profile(client)
+    assert (
+        client.patch(
+            "/api/v1/profile",
+            headers=ORIGIN,
+            json={"training_location": "gym"},
+        ).status_code
+        == 200
+    )
+
+    response = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={"training_location": "home"},
+    )
+
+    assert response.status_code == 422
 
 
 def test_patch_returns_404_for_missing_profile(client: TestClient) -> None:

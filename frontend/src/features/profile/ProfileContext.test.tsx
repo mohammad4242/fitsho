@@ -30,6 +30,9 @@ const profileInput: ProfileInput = {
   fitness_goal: "build_muscle",
   experience_level: "beginner",
   training_days_per_week: 3,
+  training_location: "gym",
+  home_training_setup: null,
+  session_duration_minutes: 60,
   physical_limitations: null,
 };
 

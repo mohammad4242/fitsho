@@ -7,7 +7,10 @@ import type {
 import {
   experienceLevels,
   fitnessGoals,
+  homeTrainingSetups,
+  sessionDurations,
   sexes,
+  trainingLocations,
   type ProfileFormValues,
 } from "./types";
 
@@ -264,6 +267,105 @@ export function ExperienceFields({
         <FieldError
           field="training_days_per_week"
           error={errors.training_days_per_week}
+        />
+      </div>
+
+      <div className="profile-field">
+        <label htmlFor="profile-training-location">
+          {t("onboarding.fields.trainingLocation")}
+        </label>
+        <select
+          id="profile-training-location"
+          name="training_location"
+          autoComplete="off"
+          required
+          value={values.training_location}
+          aria-invalid={errors.training_location !== undefined}
+          aria-describedby={describedBy(
+            "training_location",
+            errors.training_location,
+          )}
+          onChange={(event) => onChange("training_location", event.target.value)}
+        >
+          <option value="" disabled>
+            {t("onboarding.options.select")}
+          </option>
+          {trainingLocations.map((location) => (
+            <option key={location} value={location}>
+              {t(`onboarding.options.trainingLocation.${location}`)}
+            </option>
+          ))}
+        </select>
+        <FieldError field="training_location" error={errors.training_location} />
+      </div>
+
+      {values.training_location === "home" && (
+        <div className="profile-field">
+          <label htmlFor="profile-home-training-setup">
+            {t("onboarding.fields.homeTrainingSetup")}
+          </label>
+          <select
+            id="profile-home-training-setup"
+            name="home_training_setup"
+            autoComplete="off"
+            required
+            value={values.home_training_setup}
+            aria-invalid={errors.home_training_setup !== undefined}
+            aria-describedby={describedBy(
+              "home_training_setup",
+              errors.home_training_setup,
+            )}
+            onChange={(event) =>
+              onChange("home_training_setup", event.target.value)
+            }
+          >
+            <option value="" disabled>
+              {t("onboarding.options.select")}
+            </option>
+            {homeTrainingSetups.map((setup) => (
+              <option key={setup} value={setup}>
+                {t(`onboarding.options.homeTrainingSetup.${setup}`)}
+              </option>
+            ))}
+          </select>
+          <FieldError
+            field="home_training_setup"
+            error={errors.home_training_setup}
+          />
+        </div>
+      )}
+
+      <div className="profile-field">
+        <label htmlFor="profile-session-duration">
+          {t("onboarding.fields.sessionDuration")}
+        </label>
+        <select
+          id="profile-session-duration"
+          name="session_duration_minutes"
+          autoComplete="off"
+          required
+          value={values.session_duration_minutes}
+          aria-invalid={errors.session_duration_minutes !== undefined}
+          aria-describedby={describedBy(
+            "session_duration_minutes",
+            errors.session_duration_minutes,
+          )}
+          onChange={(event) =>
+            onChange("session_duration_minutes", event.target.value)
+          }
+        >
+          <option value="" disabled>
+            {t("onboarding.options.select")}
+          </option>
+          {sessionDurations.map((duration) => (
+            <option key={duration} value={duration}>
+              {t(`onboarding.options.sessionDuration.${duration}`)}
+            </option>
+          ))}
+        </select>
+        <FieldError
+          field="session_duration_minutes"
+          error={errors.session_duration_minutes}
         />
       </div>
 

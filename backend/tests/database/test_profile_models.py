@@ -7,7 +7,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
-from app.profile.enums import ExperienceLevel, FitnessGoal, Sex
+from app.profile.enums import (
+    ExperienceLevel,
+    FitnessGoal,
+    HomeTrainingSetup,
+    Sex,
+    TrainingLocation,
+)
 from app.profile.models import BodyMeasurement, UserProfile
 
 
@@ -38,6 +44,9 @@ def make_profile(user: User) -> UserProfile:
         fitness_goal=FitnessGoal.IMPROVE_FITNESS,
         experience_level=ExperienceLevel.BEGINNER,
         training_days_per_week=3,
+        training_location=TrainingLocation.HOME,
+        home_training_setup=HomeTrainingSetup.BODYWEIGHT_ONLY,
+        session_duration_minutes=60,
         physical_limitations=None,
     )
 
@@ -91,6 +100,7 @@ def test_deleting_user_cascades_profile_and_measurements(db: Session) -> None:
         ("height_cm", 251, "ck_user_profiles_height_cm_range"),
         ("training_days_per_week", 0, "ck_user_profiles_training_days_range"),
         ("training_days_per_week", 8, "ck_user_profiles_training_days_range"),
+        ("session_duration_minutes", 50, "ck_user_profiles_session_duration_values"),
         ("physical_limitations", "x" * 1001, "ck_user_profiles_limitations_length"),
     ],
 )
@@ -133,6 +143,8 @@ def test_weight_range_constraint_rejects_invalid_values(
         ("sex", "ck_user_profiles_sex_values"),
         ("fitness_goal", "ck_user_profiles_fitness_goal_values"),
         ("experience_level", "ck_user_profiles_experience_level_values"),
+        ("training_location", "ck_user_profiles_training_location_values"),
+        ("home_training_setup", "ck_user_profiles_home_training_setup_values"),
     ],
 )
 def test_profile_enum_constraints_reject_invalid_database_values(
@@ -148,9 +160,12 @@ def test_profile_enum_constraints_reject_invalid_database_values(
         "fitness_goal": FitnessGoal.IMPROVE_FITNESS.value,
         "experience_level": ExperienceLevel.BEGINNER.value,
         "training_days_per_week": 3,
+        "training_location": TrainingLocation.HOME.value,
+        "home_training_setup": HomeTrainingSetup.BODYWEIGHT_ONLY.value,
+        "session_duration_minutes": 60,
         "physical_limitations": None,
     }
-    values[column] = "invalid"
+    values[column] = "park" if column == "training_location" else "invalid"
 
     with pytest.raises(IntegrityError) as error:
         db.execute(
@@ -158,10 +173,12 @@ def test_profile_enum_constraints_reject_invalid_database_values(
                 """
                 INSERT INTO user_profiles (
                     user_id, display_name, birth_date, sex, height_cm, fitness_goal,
-                    experience_level, training_days_per_week, physical_limitations
+                    experience_level, training_days_per_week, training_location,
+                    home_training_setup, session_duration_minutes, physical_limitations
                 ) VALUES (
                     :user_id, :display_name, :birth_date, :sex, :height_cm, :fitness_goal,
-                    :experience_level, :training_days_per_week, :physical_limitations
+                    :experience_level, :training_days_per_week, :training_location,
+                    :home_training_setup, :session_duration_minutes, :physical_limitations
                 )
                 """
             ),
@@ -169,3 +186,26 @@ def test_profile_enum_constraints_reject_invalid_database_values(
         )
 
     assert constraint_name in str(error.value)
+
+
+def test_profile_database_requires_home_setup_and_rejects_it_for_gym(db: Session) -> None:
+    home_user = make_user(db, "home-without-setup@example.com")
+    home_profile = make_profile(home_user)
+    home_profile.home_training_setup = None
+    db.add(home_profile)
+
+    with pytest.raises(IntegrityError) as home_error:
+        db.flush()
+
+    assert "ck_user_profiles_training_setup_consistency" in str(home_error.value)
+    db.rollback()
+
+    gym_user = make_user(db, "gym-with-setup@example.com")
+    gym_profile = make_profile(gym_user)
+    gym_profile.training_location = TrainingLocation.GYM
+    db.add(gym_profile)
+
+    with pytest.raises(IntegrityError) as gym_error:
+        db.flush()
+
+    assert "ck_user_profiles_training_setup_consistency" in str(gym_error.value)

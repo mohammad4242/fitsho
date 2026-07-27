@@ -54,15 +54,26 @@ function ReadyProfilePage({
   }, [errors]);
 
   function updateValue(field: keyof ProfileFormValues, value: string) {
-    setValues((current) => ({ ...current, [field]: value }));
+    const clearsHomeSetup = field === "training_location" && value === "gym";
+    setValues((current) => ({
+      ...current,
+      [field]: value,
+      ...(clearsHomeSetup ? { home_training_setup: "" } : {}),
+    }));
     setStatus("idle");
     setSaveError(false);
     setErrors((current) => {
-      if (current[field] === undefined) {
+      if (
+        current[field] === undefined &&
+        (!clearsHomeSetup || current.home_training_setup === undefined)
+      ) {
         return current;
       }
       const next = { ...current };
       delete next[field];
+      if (clearsHomeSetup) {
+        delete next.home_training_setup;
+      }
       return next;
     });
   }

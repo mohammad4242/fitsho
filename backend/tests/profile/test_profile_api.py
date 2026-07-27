@@ -18,6 +18,9 @@ VALID_PROFILE = {
     "fitness_goal": "build_muscle",
     "experience_level": "beginner",
     "training_days_per_week": 3,
+    "training_location": "gym",
+    "home_training_setup": None,
+    "session_duration_minutes": 60,
     "physical_limitations": None,
 }
 
@@ -50,11 +53,85 @@ def test_create_profile_atomically_stores_profile_and_initial_weight(
     assert response.status_code == 201
     assert response.json()["display_name"] == "Mohammad"
     assert response.json()["current_weight_kg"] == 76.5
+    assert response.json()["training_location"] == "gym"
+    assert response.json()["home_training_setup"] is None
+    assert response.json()["session_duration_minutes"] == 60
     assert db.get(UserProfile, user_id) is not None
     measurements = db.scalars(
         select(BodyMeasurement).where(BodyMeasurement.user_id == user_id)
     ).all()
     assert len(measurements) == 1
+
+
+@pytest.mark.parametrize(
+    "home_training_setup",
+    ["bodyweight_only", "dumbbells_available"],
+)
+def test_create_home_profile_stores_selected_setup(
+    client: TestClient,
+    db: Session,
+    home_training_setup: str,
+) -> None:
+    user_id = register(client, f"{home_training_setup}@example.com")
+    response = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={
+            **VALID_PROFILE,
+            "training_location": "home",
+            "home_training_setup": home_training_setup,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["home_training_setup"] == home_training_setup
+    profile = db.get(UserProfile, user_id)
+    assert profile is not None
+    assert profile.home_training_setup.value == home_training_setup
+
+
+def test_create_home_profile_rejects_missing_setup(client: TestClient) -> None:
+    register(client, "missing-home-setup@example.com")
+
+    response = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={
+            **VALID_PROFILE,
+            "training_location": "home",
+            "home_training_setup": None,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_gym_profile_discards_home_setup(client: TestClient, db: Session) -> None:
+    user_id = register(client, "gym-normalization@example.com")
+
+    response = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={**VALID_PROFILE, "home_training_setup": "bodyweight_only"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["home_training_setup"] is None
+    profile = db.get(UserProfile, user_id)
+    assert profile is not None
+    assert profile.home_training_setup is None
+
+
+def test_create_profile_rejects_unsupported_session_duration(client: TestClient) -> None:
+    register(client, "invalid-duration@example.com")
+
+    response = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={**VALID_PROFILE, "session_duration_minutes": 50},
+    )
+
+    assert response.status_code == 422
 
 
 def test_get_profile_returns_404_until_onboarding_is_complete(client: TestClient) -> None:

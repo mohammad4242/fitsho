@@ -8,3 +8,7 @@ class ProfileNotFoundError(Exception):
 
 class ProfileInvariantError(Exception):
     pass
+
+
+class InvalidWorkoutSetupError(Exception):
+    pass

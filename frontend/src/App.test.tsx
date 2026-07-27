@@ -32,6 +32,9 @@ const profile = vi.hoisted(() => ({
       fitness_goal: "build_muscle";
       experience_level: "beginner";
       training_days_per_week: number;
+      training_location: "gym";
+      home_training_setup: null;
+      session_duration_minutes: 60;
       physical_limitations: null;
       created_at: string;
       updated_at: string;
@@ -113,6 +116,9 @@ it("shows the real account and logs the user out", async () => {
     fitness_goal: "build_muscle",
     experience_level: "beginner",
     training_days_per_week: 3,
+    training_location: "gym",
+    home_training_setup: null,
+    session_duration_minutes: 60,
     physical_limitations: null,
     created_at: "2026-07-27T12:00:00Z",
     updated_at: "2026-07-27T12:00:00Z",
@@ -157,6 +163,9 @@ it("renders the protected profile route for a member with a profile", async () =
     fitness_goal: "build_muscle",
     experience_level: "beginner",
     training_days_per_week: 3,
+    training_location: "gym",
+    home_training_setup: null,
+    session_duration_minutes: 60,
     physical_limitations: null,
     created_at: "2026-07-27T12:00:00Z",
     updated_at: "2026-07-27T12:00:00Z",
