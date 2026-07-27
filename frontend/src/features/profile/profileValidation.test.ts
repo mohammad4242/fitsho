@@ -95,6 +95,12 @@ describe("profile validation", () => {
     });
   });
 
+  it("requires the fitness goal on the body and goal step", () => {
+    expect(validateStep({ ...validValues, fitness_goal: "" }, 2, today)).toEqual({
+      fitness_goal: "required",
+    });
+  });
+
   it("catches invalid training days and overlong limitations", () => {
     expect(validateStep({ ...validValues, training_days_per_week: "0" }, 3, today)).toEqual({
       training_days_per_week: "trainingDaysRange",

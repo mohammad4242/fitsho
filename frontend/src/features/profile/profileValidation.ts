@@ -111,14 +111,14 @@ function validateStepTwo(values: ProfileFormValues): ProfileValidationErrors {
       errors.current_weight_kg = "weightRange";
     }
   }
+  if (values.fitness_goal === "") {
+    errors.fitness_goal = "required";
+  }
   return errors;
 }
 
 function validateStepThree(values: ProfileFormValues): ProfileValidationErrors {
   const errors: ProfileValidationErrors = {};
-  if (values.fitness_goal === "") {
-    errors.fitness_goal = "required";
-  }
   if (values.experience_level === "") {
     errors.experience_level = "required";
   }

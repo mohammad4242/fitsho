@@ -1,0 +1,225 @@
+.onboarding-flow {
+  padding-block: 0.5rem;
+}
+
+.profile-progress {
+  margin-block: 1.7rem 1.2rem;
+}
+
+.profile-progress__count {
+  margin: 0 0 0.8rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.profile-progress ol {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-progress ol::before {
+  position: absolute;
+  inset-block-start: 1rem;
+  inset-inline: 1rem;
+  height: 2px;
+  background: var(--line);
+  content: "";
+}
+
+.profile-progress li {
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.profile-progress li > span {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper);
+  font-size: 0.75rem;
+  font-weight: 850;
+}
+
+.profile-progress li > strong {
+  max-width: 9ch;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.profile-progress li.is-active {
+  color: var(--petrol-900);
+}
+
+.profile-progress li.is-active > span {
+  border-color: var(--turquoise-dark);
+  color: var(--paper);
+  background: var(--turquoise-dark);
+  box-shadow: 0 0 0 4px rgb(56 183 165 / 12%);
+}
+
+.profile-progress li[aria-current="step"] > span {
+  border-color: var(--persimmon);
+  background: var(--persimmon);
+}
+
+.profile-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.profile-fieldset {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 1.35rem;
+  border: 1px solid var(--line);
+  border-radius: 1.4rem 1.4rem 0.35rem 1.4rem;
+  background: rgb(255 255 255 / 86%);
+  box-shadow: 0 1rem 2.5rem rgb(18 51 50 / 7%);
+}
+
+.profile-fieldset legend {
+  padding-inline: 0.45rem;
+  color: var(--petrol-950);
+  font-size: 1.05rem;
+  font-weight: 850;
+}
+
+.profile-field,
+.profile-field > div {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.profile-field--paired {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.profile-field label {
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 760;
+}
+
+.profile-field input,
+.profile-field select,
+.profile-field textarea {
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  color: var(--ink);
+  background: var(--paper);
+  font: inherit;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.profile-field textarea {
+  min-height: 6.5rem;
+  resize: vertical;
+  line-height: 1.65;
+}
+
+.profile-field input:hover,
+.profile-field select:hover,
+.profile-field textarea:hover {
+  border-color: #a9bfba;
+}
+
+.profile-field input:focus,
+.profile-field select:focus,
+.profile-field textarea:focus {
+  border-color: var(--turquoise-dark);
+  box-shadow: 0 0 0 4px rgb(56 183 165 / 12%);
+  outline: none;
+}
+
+.profile-field input:focus-visible,
+.profile-field select:focus-visible,
+.profile-field textarea:focus-visible,
+.secondary-button:focus-visible {
+  outline: 3px solid var(--saffron);
+  outline-offset: 3px;
+}
+
+.profile-field [aria-invalid="true"] {
+  border-color: var(--persimmon);
+}
+
+.profile-field__hint,
+.profile-field__error {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+.profile-field__hint {
+  color: var(--muted);
+}
+
+.profile-field__error {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.profile-actions .primary-button {
+  flex: 1;
+  margin: 0;
+}
+
+.secondary-button {
+  min-height: 3.65rem;
+  padding-inline: 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem 0.9rem 0.9rem 0.2rem;
+  color: var(--petrol-900);
+  background: var(--paper);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.secondary-button:hover:not(:disabled) {
+  border-color: var(--turquoise-dark);
+}
+
+.secondary-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+@media (max-width: 420px) {
+  .profile-fieldset {
+    padding: 1rem;
+  }
+
+  .profile-field--paired {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-progress li > strong {
+    font-size: 0.62rem;
+  }
+}

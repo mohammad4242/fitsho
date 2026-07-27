@@ -92,6 +92,7 @@ describe("profile route matrix", () => {
       await screen.findByRole("heading", { name: "پروفایل ورزشی‌ات را بساز" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/سه مرحله/)).toBeInTheDocument();
+    expect(screen.getByLabelText("نام نمایشی")).toBeInTheDocument();
   });
 
   it.each(["/onboarding", "/login"])(
