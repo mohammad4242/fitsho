@@ -21,7 +21,21 @@ const auth = vi.hoisted(() => ({
 
 const profile = vi.hoisted(() => ({
   value: {
-    profile: null,
+    profile: null as null | {
+      user_id: string;
+      display_name: string;
+      birth_date: string;
+      sex: "male";
+      height_cm: number;
+      current_weight_kg: number;
+      weight_measured_at: string;
+      fitness_goal: "build_muscle";
+      experience_level: "beginner";
+      training_days_per_week: number;
+      physical_limitations: null;
+      created_at: string;
+      updated_at: string;
+    },
     status: "idle" as "idle" | "loading" | "missing" | "ready" | "error",
     retryProfile: vi.fn(),
     createProfile: vi.fn(),
@@ -48,6 +62,7 @@ beforeEach(() => {
   auth.value.register.mockReset();
   auth.value.logout.mockReset();
   profile.value.status = "idle";
+  profile.value.profile = null;
   profile.value.retryProfile.mockReset();
 });
 
@@ -87,6 +102,21 @@ it("shows the real account and logs the user out", async () => {
     created_at: "2026-07-24T00:00:00Z",
   };
   profile.value.status = "ready";
+  profile.value.profile = {
+    user_id: "1",
+    display_name: "Mohammad",
+    birth_date: "2000-05-14",
+    sex: "male",
+    height_cm: 178,
+    current_weight_kg: 76.5,
+    weight_measured_at: "2026-07-27T12:00:00Z",
+    fitness_goal: "build_muscle",
+    experience_level: "beginner",
+    training_days_per_week: 3,
+    physical_limitations: null,
+    created_at: "2026-07-27T12:00:00Z",
+    updated_at: "2026-07-27T12:00:00Z",
+  };
   auth.value.logout.mockImplementation(async () => {
     auth.value.user = null;
   });
@@ -98,10 +128,47 @@ it("shows the real account and logs the user out", async () => {
   );
 
   expect(screen.getByText("member@example.com")).toBeInTheDocument();
+  expect(
+    screen.getByRole("link", { name: /ویرایش پروفایل/ }),
+  ).toHaveAttribute("href", "/profile");
   await user.click(screen.getByRole("button", { name: "خروج" }));
 
   expect(auth.value.logout).toHaveBeenCalledOnce();
   expect(
     await screen.findByRole("heading", { name: "ادامهٔ مسیر از همین‌جا" }),
+  ).toBeInTheDocument();
+});
+
+it("renders the protected profile route for a member with a profile", async () => {
+  auth.value.user = {
+    id: "1",
+    email: "member@example.com",
+    created_at: "2026-07-24T00:00:00Z",
+  };
+  profile.value.status = "ready";
+  profile.value.profile = {
+    user_id: "1",
+    display_name: "Mohammad",
+    birth_date: "2000-05-14",
+    sex: "male",
+    height_cm: 178,
+    current_weight_kg: 76.5,
+    weight_measured_at: "2026-07-27T12:00:00Z",
+    fitness_goal: "build_muscle",
+    experience_level: "beginner",
+    training_days_per_week: 3,
+    physical_limitations: null,
+    created_at: "2026-07-27T12:00:00Z",
+    updated_at: "2026-07-27T12:00:00Z",
+  };
+
+  render(
+    <MemoryRouter initialEntries={["/profile"]}>
+      <AppRoutes />
+    </MemoryRouter>,
+  );
+
+  expect(
+    await screen.findByRole("heading", { name: "پروفایل ورزشی" }),
   ).toBeInTheDocument();
 });

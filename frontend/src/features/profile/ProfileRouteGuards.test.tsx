@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Profile } from "./types";
+
 const contexts = vi.hoisted(() => ({
   auth: {
     user: null as null | {
@@ -18,7 +20,7 @@ const contexts = vi.hoisted(() => ({
     logout: vi.fn(),
   },
   profile: {
-    profile: null,
+    profile: null as Profile | null,
     status: "idle" as "idle" | "loading" | "missing" | "ready" | "error",
     retryProfile: vi.fn(),
     createProfile: vi.fn(),
@@ -42,6 +44,22 @@ const member = {
   created_at: "2026-07-24T00:00:00Z",
 };
 
+const readyProfile: Profile = {
+  user_id: "1",
+  display_name: "Mohammad",
+  birth_date: "2000-05-14",
+  sex: "male",
+  height_cm: 178,
+  current_weight_kg: 76.5,
+  weight_measured_at: "2026-07-27T12:00:00Z",
+  fitness_goal: "build_muscle",
+  experience_level: "beginner",
+  training_days_per_week: 3,
+  physical_limitations: null,
+  created_at: "2026-07-27T12:00:00Z",
+  updated_at: "2026-07-27T12:00:00Z",
+};
+
 function renderRoute(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -54,6 +72,7 @@ beforeEach(() => {
   contexts.auth.user = null;
   contexts.auth.loading = false;
   contexts.auth.startupError = false;
+  contexts.profile.profile = null;
   contexts.profile.status = "idle";
   contexts.profile.retryProfile.mockReset();
 });
@@ -100,10 +119,11 @@ describe("profile route matrix", () => {
     async (path) => {
       contexts.auth.user = member;
       contexts.profile.status = "ready";
+      contexts.profile.profile = readyProfile;
       renderRoute(path);
 
       expect(
-        await screen.findByRole("heading", { name: "حسابت آماده است" }),
+        await screen.findByRole("heading", { name: "سلام، Mohammad" }),
       ).toBeInTheDocument();
     },
   );

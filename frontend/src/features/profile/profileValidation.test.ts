@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  profileToFormValues,
   toProfileInput,
   toProfilePatch,
   validateAll,
@@ -152,6 +153,10 @@ describe("profile validation", () => {
       training_days_per_week: 3,
       physical_limitations: null,
     });
+  });
+
+  it("converts a saved profile into editable string values", () => {
+    expect(profileToFormValues(profile)).toEqual(validValues);
   });
 
   it("catches emitting unchanged fields or omitting changed fields in patches", () => {

@@ -5,6 +5,7 @@ import { LoginPage } from "./features/auth/LoginPage";
 import { ProtectedRoute } from "./features/auth/ProtectedRoute";
 import { RegisterPage } from "./features/auth/RegisterPage";
 import { OnboardingPage } from "./features/profile/OnboardingPage";
+import { ProfilePage } from "./features/profile/ProfilePage";
 import { ProfileProvider } from "./features/profile/ProfileContext";
 import {
   CompletedProfileRoute,
@@ -26,6 +27,7 @@ export function AppRoutes() {
         </Route>
         <Route element={<CompletedProfileRoute />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

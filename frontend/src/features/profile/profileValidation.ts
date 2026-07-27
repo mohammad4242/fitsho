@@ -179,6 +179,20 @@ export function toProfileInput(values: ProfileFormValues): ProfileInput {
   };
 }
 
+export function profileToFormValues(profile: Profile): ProfileFormValues {
+  return {
+    display_name: profile.display_name,
+    birth_date: profile.birth_date,
+    sex: profile.sex,
+    height_cm: String(profile.height_cm),
+    current_weight_kg: String(profile.current_weight_kg),
+    fitness_goal: profile.fitness_goal,
+    experience_level: profile.experience_level,
+    training_days_per_week: String(profile.training_days_per_week),
+    physical_limitations: profile.physical_limitations ?? "",
+  };
+}
+
 export function toProfilePatch(
   values: ProfileFormValues,
   currentProfile: Profile,
