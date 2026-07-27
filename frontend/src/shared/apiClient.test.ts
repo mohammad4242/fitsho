@@ -18,9 +18,28 @@ it("always includes cookies and JSON headers", async () => {
     "/api/test",
     expect.objectContaining({
       credentials: "include",
-      headers: expect.objectContaining({ "Content-Type": "application/json" }),
     }),
   );
+  const [, init] = vi.mocked(fetch).mock.calls[0];
+  expect(new Headers(init?.headers).get("Content-Type")).toBe("application/json");
+});
+
+it("preserves headers supplied as a Headers instance", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+
+  await request("/api/test", {
+    headers: new Headers({ Authorization: "Bearer token" }),
+  });
+
+  const [, init] = vi.mocked(fetch).mock.calls[0];
+  const headers = new Headers(init?.headers);
+  expect(headers.get("Authorization")).toBe("Bearer token");
+  expect(headers.get("Content-Type")).toBe("application/json");
 });
 
 it("maps HTTP failures and empty success responses", async () => {
