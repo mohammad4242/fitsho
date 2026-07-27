@@ -19,6 +19,7 @@ const user: User = {
   id: "018f0000-0000-7000-8000-000000000001",
   email: "member@example.com",
   created_at: "2026-07-24T00:00:00Z",
+  is_admin: false,
 };
 
 const profileInput: ProfileInput = {

@@ -53,6 +53,21 @@ def test_register_rejects_invalid_input(client: TestClient) -> None:
     assert all("input" not in error for error in response.json()["detail"])
 
 
+def test_register_rejects_admin_status(client: TestClient, db: Session) -> None:
+    response = client.post(
+        "/api/v1/auth/register",
+        headers={"Origin": "http://localhost:5173"},
+        json={
+            "email": "escalation@example.com",
+            "password": "long password",
+            "is_admin": True,
+        },
+    )
+
+    assert response.status_code == 422
+    assert db.scalar(select(User).where(User.email == "escalation@example.com")) is None
+
+
 def test_register_rejects_untrusted_or_missing_origin(client: TestClient) -> None:
     payload = {"email": "origin@example.com", "password": "long password"}
 

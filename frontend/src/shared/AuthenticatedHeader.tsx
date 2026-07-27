@@ -55,6 +55,16 @@ export function AuthenticatedHeader() {
             >
               {t("header.profile")}
             </Link>
+            {user.is_admin && (
+              <Link
+                to="/admin/exercises"
+                aria-current={
+                  location.pathname.startsWith("/admin/exercises") ? "page" : undefined
+                }
+              >
+                {t("header.adminExercises")}
+              </Link>
+            )}
           </nav>
           <LanguageSwitcher />
           <button

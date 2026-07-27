@@ -1,0 +1,96 @@
+import { afterEach, expect, it, vi } from "vitest";
+
+import { createAdminExercise, getAdminExercises } from "./api";
+import type { AdminExercise, AdminExerciseCreate, PaginatedAdminExercises } from "./types";
+
+const created: AdminExercise = {
+  id: "018f0000-0000-7000-8000-000000000001",
+  slug: "incline-push-up",
+  name_en: "Incline Push Up",
+  name_fa: "شنا سوئدی شیب‌دار",
+  body_region: "upper_body",
+  primary_muscle: "chest",
+  secondary_muscles: ["shoulders"],
+  equipment: ["bench", "bodyweight"],
+  difficulty: "beginner",
+  instructions_en: ["Brace", "Lower", "Press"],
+  instructions_fa: ["منقبض", "پایین", "بالا"],
+  safety_notes_en: ["Keep aligned"],
+  safety_notes_fa: ["هم‌راستا بمانید"],
+  media_path: "/exercises/exercise-placeholder.svg",
+  media_type: "placeholder",
+  media_source_url: null,
+  media_license: null,
+  media_attribution: null,
+  is_active: true,
+  created_at: "2026-07-27T12:00:00Z",
+  updated_at: "2026-07-27T12:00:00Z",
+};
+
+const input: AdminExerciseCreate = {
+  slug: created.slug,
+  name_en: created.name_en,
+  name_fa: created.name_fa,
+  body_region: created.body_region,
+  primary_muscle: created.primary_muscle,
+  secondary_muscles: created.secondary_muscles,
+  equipment: created.equipment,
+  difficulty: created.difficulty,
+  instructions_en: created.instructions_en,
+  instructions_fa: created.instructions_fa,
+  safety_notes_en: created.safety_notes_en,
+  safety_notes_fa: created.safety_notes_fa,
+  media_source_url: null,
+  media_license: null,
+  media_attribution: null,
+  is_active: true,
+};
+
+afterEach(() => vi.restoreAllMocks());
+
+it("lists admin exercises with inactive filter support", async () => {
+  const page: PaginatedAdminExercises = {
+    items: [created],
+    page: 1,
+    page_size: 20,
+    total: 1,
+    total_pages: 1,
+  };
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(page));
+
+  await expect(getAdminExercises({ is_active: false, search: "push up" })).resolves.toEqual(
+    page,
+  );
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/admin/exercises?is_active=false&search=push+up",
+    expect.objectContaining({ credentials: "include" }),
+  );
+});
+
+it("creates an exercise as multipart metadata with an optional media file", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify(created), {
+      status: 201,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+  const media = new File(["GIF89a"], "demo.gif", { type: "image/gif" });
+
+  await expect(createAdminExercise(input, media)).resolves.toEqual(created);
+
+  const [path, init] = vi.mocked(fetch).mock.calls[0];
+  expect(path).toBe("/api/v1/admin/exercises");
+  expect(init?.method).toBe("POST");
+  expect(init?.body).toBeInstanceOf(FormData);
+  const body = init?.body as FormData;
+  expect(JSON.parse(String(body.get("payload")))).toEqual(input);
+  expect(body.get("media")).toBe(media);
+  expect(new Headers(init?.headers).has("Content-Type")).toBe(false);
+});
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}

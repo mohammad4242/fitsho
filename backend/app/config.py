@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal, Self
 from urllib.parse import urlsplit
 
@@ -13,6 +14,13 @@ class Settings(BaseSettings):
     cookie_secure: bool = True
     session_cookie_name: str = "__Host-fitsho_session"
     session_ttl_seconds: int = 60 * 60 * 24 * 7
+    media_root: Path = Path("var/media")
+    media_public_path: str = "/media"
+    media_max_bytes: int = 20 * 1024 * 1024
+    media_max_video_duration_seconds: float = 20.0
+    media_read_chunk_bytes: int = 1024 * 1024
+    ffprobe_path: str = "ffprobe"
+    ffprobe_timeout_seconds: float = 5.0
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

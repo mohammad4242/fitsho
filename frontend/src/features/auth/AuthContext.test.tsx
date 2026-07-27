@@ -29,6 +29,7 @@ it("loads the current user on startup", async () => {
     id: "1",
     email: "user@example.com",
     created_at: "2026-07-24T00:00:00Z",
+    is_admin: false,
   });
 
   render(
@@ -68,6 +69,7 @@ it("ignores a stale startup response after a successful login", async () => {
     id: "2",
     email: "member@example.com",
     created_at: "2026-07-24T00:00:00Z",
+    is_admin: false,
   });
   const user = userEvent.setup();
 

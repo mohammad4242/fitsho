@@ -13,6 +13,7 @@ dependencies = [
   "psycopg[binary]>=3,<4",
   "pwdlib[argon2]>=0.2,<1",
   "pydantic-settings>=2,<3",
+  "python-multipart>=0.0.18,<1",
   "sqlalchemy>=2,<3",
   "uvicorn[standard]>=0.30,<1",
 ]

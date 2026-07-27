@@ -141,8 +141,10 @@ def test_seed_is_idempotent_and_restores_seed_owned_fields(db: Session) -> None:
         media_license="Fitsho original",
         media_attribution="Fitsho",
     )
+    custom.equipment_items.append(ExerciseEquipment(equipment=Equipment.BODYWEIGHT))
     db.add(custom)
     db.commit()
+    custom_id = custom.id
 
     second = seed_exercises(db)
     db.expire_all()
@@ -166,7 +168,11 @@ def test_seed_is_idempotent_and_restores_seed_owned_fields(db: Session) -> None:
         Equipment.DUMBBELL,
         Equipment.BENCH,
     }
-    assert db.scalar(select(Exercise).where(Exercise.slug == custom.slug)) is not None
+    preserved_custom = db.scalar(select(Exercise).where(Exercise.slug == custom.slug))
+    assert preserved_custom is not None
+    assert preserved_custom.id == custom_id
+    assert preserved_custom.media_path == "/exercises/exercise-placeholder.svg"
+    assert {item.equipment for item in preserved_custom.equipment_items} == {Equipment.BODYWEIGHT}
     assert db.scalar(select(func.count()).select_from(Exercise)) == 18
     assert db.scalar(select(func.count()).select_from(ExerciseAlternative)) == 1
 

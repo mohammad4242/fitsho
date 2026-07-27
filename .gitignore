@@ -10,4 +10,6 @@ __pycache__/
 htmlcov/
 node_modules/
 dist/
+*.egg-info/
+backend/var/media/
 *.py[cod]

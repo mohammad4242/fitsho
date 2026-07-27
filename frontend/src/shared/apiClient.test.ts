@@ -64,7 +64,25 @@ it("uses the generic message for structured validation details", async () => {
     }),
   );
 
-  await expect(request("/api/validation-error")).rejects.toEqual(
-    new ApiError(422, "Request failed"),
+  await expect(request("/api/validation-error")).rejects.toMatchObject({
+    status: 422,
+    message: "Request failed",
+    details: [{ msg: "Invalid value" }],
+  });
+});
+
+it("lets the browser set the multipart boundary for FormData", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }),
   );
+  const body = new FormData();
+  body.set("payload", "{}");
+
+  await request("/api/upload", { method: "POST", body });
+
+  const [, init] = vi.mocked(fetch).mock.calls[0];
+  expect(new Headers(init?.headers).has("Content-Type")).toBe(false);
 });

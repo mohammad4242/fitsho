@@ -2,8 +2,10 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.admin.router import router as admin_router
 from app.auth.router import router as auth_router
 from app.config import Settings, get_settings
 from app.exercises.router import router as exercises_router
@@ -12,6 +14,7 @@ from app.profile.router import router as profile_router
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     active_settings = settings or get_settings()
+    active_settings.media_root.mkdir(parents=True, exist_ok=True)
     app = FastAPI(title="Fitsho API")
     app.dependency_overrides[get_settings] = lambda: active_settings
     app.add_middleware(
@@ -53,6 +56,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(profile_router)
     app.include_router(exercises_router)
+    app.include_router(admin_router)
+    app.mount(
+        active_settings.media_public_path,
+        StaticFiles(directory=active_settings.media_root),
+        name="exercise-media",
+    )
     return app
 
 
