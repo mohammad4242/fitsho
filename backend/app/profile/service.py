@@ -44,9 +44,10 @@ def create_profile(
     try:
         db.flush()
         db.add(measurement)
-        db.commit()
+        db.flush()
         db.refresh(profile)
         db.refresh(measurement)
+        db.commit()
     except IntegrityError as error:
         db.rollback()
         raise ProfileAlreadyExistsError from error
