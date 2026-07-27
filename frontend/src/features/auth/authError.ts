@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 
-import { ApiError } from "./types";
+import { ApiError } from "../../shared/apiClient";
 
 export function authErrorMessage(error: unknown, t: TFunction): string {
   if (error instanceof TypeError) {

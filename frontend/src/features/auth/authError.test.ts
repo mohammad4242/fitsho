@@ -1,8 +1,8 @@
 import { expect, it } from "vitest";
 
 import i18n from "../../i18n";
+import { ApiError } from "../../shared/apiClient";
 import { authErrorMessage } from "./authError";
-import { ApiError } from "./types";
 
 it("maps an unauthorized API error to a localized message", () => {
   expect(
