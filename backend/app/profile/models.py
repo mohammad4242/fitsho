@@ -28,9 +28,7 @@ class UserProfile(Base):
             "char_length(btrim(display_name)) BETWEEN 2 AND 80",
             name="ck_user_profiles_display_name_length",
         ),
-        CheckConstraint(
-            "height_cm BETWEEN 100 AND 250", name="ck_user_profiles_height_cm_range"
-        ),
+        CheckConstraint("height_cm BETWEEN 100 AND 250", name="ck_user_profiles_height_cm_range"),
         CheckConstraint(
             "training_days_per_week BETWEEN 1 AND 7",
             name="ck_user_profiles_training_days_range",

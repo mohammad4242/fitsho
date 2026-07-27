@@ -52,30 +52,32 @@ def test_patch_updates_stable_fields_and_appends_changed_weight(
     assert response.status_code == 200
     assert response.json()["display_name"] == "New Name"
     assert response.json()["current_weight_kg"] == 75.25
-    assert db.scalar(
-        select(func.count()).select_from(BodyMeasurement).where(
-            BodyMeasurement.user_id == user_id
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(BodyMeasurement)
+            .where(BodyMeasurement.user_id == user_id)
         )
-    ) == 2
+        == 2
+    )
 
 
 def test_patch_same_weight_is_idempotent(client: TestClient, db: Session) -> None:
     user_id = register(client)
     create_profile(client)
 
-    first = client.patch(
-        "/api/v1/profile", headers=ORIGIN, json={"current_weight_kg": 76.5}
-    )
-    second = client.patch(
-        "/api/v1/profile", headers=ORIGIN, json={"current_weight_kg": 76.5}
-    )
+    first = client.patch("/api/v1/profile", headers=ORIGIN, json={"current_weight_kg": 76.5})
+    second = client.patch("/api/v1/profile", headers=ORIGIN, json={"current_weight_kg": 76.5})
 
     assert first.status_code == second.status_code == 200
-    assert db.scalar(
-        select(func.count()).select_from(BodyMeasurement).where(
-            BodyMeasurement.user_id == user_id
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(BodyMeasurement)
+            .where(BodyMeasurement.user_id == user_id)
         )
-    ) == 1
+        == 1
+    )
 
 
 def test_patch_rejects_empty_body(client: TestClient) -> None:
@@ -113,18 +115,14 @@ def test_patch_clears_limitations_with_null(client: TestClient) -> None:
 def test_patch_returns_404_for_missing_profile(client: TestClient) -> None:
     register(client)
 
-    response = client.patch(
-        "/api/v1/profile", headers=ORIGIN, json={"display_name": "New Name"}
-    )
+    response = client.patch("/api/v1/profile", headers=ORIGIN, json={"display_name": "New Name"})
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Fitness profile not found"}
 
 
 def test_patch_requires_authenticated_user(client: TestClient) -> None:
-    response = client.patch(
-        "/api/v1/profile", headers=ORIGIN, json={"display_name": "New Name"}
-    )
+    response = client.patch("/api/v1/profile", headers=ORIGIN, json={"display_name": "New Name"})
 
     assert response.status_code == 401
 
@@ -179,8 +177,11 @@ def test_patch_commit_failure_rolls_back_profile_and_new_measurement(
     profile = db.get(UserProfile, user_id)
     assert profile is not None
     assert profile.display_name == "Mohammad"
-    assert db.scalar(
-        select(func.count()).select_from(BodyMeasurement).where(
-            BodyMeasurement.user_id == user_id
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(BodyMeasurement)
+            .where(BodyMeasurement.user_id == user_id)
         )
-    ) == 1
+        == 1
+    )

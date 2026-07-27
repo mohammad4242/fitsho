@@ -79,9 +79,7 @@ def update_profile(
     user_id: UUID,
     payload: ProfileUpdate,
 ) -> ProfileSnapshot:
-    profile = db.scalar(
-        select(UserProfile).where(UserProfile.user_id == user_id).with_for_update()
-    )
+    profile = db.scalar(select(UserProfile).where(UserProfile.user_id == user_id).with_for_update())
     if profile is None:
         raise ProfileNotFoundError
 

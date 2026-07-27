@@ -46,7 +46,4 @@ def test_refresh_failure_rolls_back_profile_and_measurement(
     assert response.status_code == 503
     assert response.json() == {"detail": "Service temporarily unavailable"}
     assert db.get(UserProfile, user_id) is None
-    assert (
-        db.scalar(select(BodyMeasurement).where(BodyMeasurement.user_id == user_id))
-        is None
-    )
+    assert db.scalar(select(BodyMeasurement).where(BodyMeasurement.user_id == user_id)) is None

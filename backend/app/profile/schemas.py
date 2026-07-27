@@ -8,8 +8,10 @@ from app.profile.enums import ExperienceLevel, FitnessGoal, Sex
 
 
 def calculate_age(birth_date: date, today: date) -> int:
-    return today.year - birth_date.year - (
-        (today.month, today.day) < (birth_date.month, birth_date.day)
+    return (
+        today.year
+        - birth_date.year
+        - ((today.month, today.day) < (birth_date.month, birth_date.day))
     )
 
 

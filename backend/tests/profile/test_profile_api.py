@@ -67,10 +67,7 @@ def test_get_profile_returns_404_until_onboarding_is_complete(client: TestClient
 
 def test_profile_endpoints_require_authentication(client: TestClient) -> None:
     assert client.get("/api/v1/profile").status_code == 401
-    assert (
-        client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE).status_code
-        == 401
-    )
+    assert client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE).status_code == 401
 
 
 def test_create_profile_rejects_duplicate_and_untrusted_origin(client: TestClient) -> None:

@@ -18,9 +18,7 @@ def test_body_measurement_model_defines_weight_range_constraint() -> None:
         if isinstance(constraint, CheckConstraint)
     }
 
-    assert constraints["ck_body_measurements_weight_kg_range"] == (
-        "weight_kg BETWEEN 20 AND 500"
-    )
+    assert constraints["ck_body_measurements_weight_kg_range"] == ("weight_kg BETWEEN 20 AND 500")
 
 
 def make_user(db: Session, email: str) -> User:
