@@ -47,6 +47,8 @@ def create_profile(
         db.flush()
         db.refresh(profile)
         db.refresh(measurement)
+        db.expunge(profile)
+        db.expunge(measurement)
         db.commit()
     except IntegrityError as error:
         db.rollback()
