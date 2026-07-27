@@ -1,0 +1,186 @@
+from uuid import UUID
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
+
+from app.profile.models import BodyMeasurement, UserProfile
+
+ORIGIN = {"Origin": "http://localhost:5173"}
+VALID_PROFILE = {
+    "display_name": "Mohammad",
+    "birth_date": "2000-05-14",
+    "sex": "male",
+    "height_cm": 178,
+    "current_weight_kg": 76.5,
+    "fitness_goal": "build_muscle",
+    "experience_level": "beginner",
+    "training_days_per_week": 3,
+    "physical_limitations": None,
+}
+
+
+def register(client: TestClient, email: str = "profile-update@example.com") -> UUID:
+    response = client.post(
+        "/api/v1/auth/register",
+        headers=ORIGIN,
+        json={"email": email, "password": "long password"},
+    )
+    assert response.status_code == 201
+    return UUID(response.json()["id"])
+
+
+def create_profile(client: TestClient) -> None:
+    response = client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE)
+    assert response.status_code == 201
+
+
+def test_patch_updates_stable_fields_and_appends_changed_weight(
+    client: TestClient, db: Session
+) -> None:
+    user_id = register(client)
+    create_profile(client)
+
+    response = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={"display_name": "New Name", "current_weight_kg": 75.25},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["display_name"] == "New Name"
+    assert response.json()["current_weight_kg"] == 75.25
+    assert db.scalar(
+        select(func.count()).select_from(BodyMeasurement).where(
+            BodyMeasurement.user_id == user_id
+        )
+    ) == 2
+
+
+def test_patch_same_weight_is_idempotent(client: TestClient, db: Session) -> None:
+    user_id = register(client)
+    create_profile(client)
+
+    first = client.patch(
+        "/api/v1/profile", headers=ORIGIN, json={"current_weight_kg": 76.5}
+    )
+    second = client.patch(
+        "/api/v1/profile", headers=ORIGIN, json={"current_weight_kg": 76.5}
+    )
+
+    assert first.status_code == second.status_code == 200
+    assert db.scalar(
+        select(func.count()).select_from(BodyMeasurement).where(
+            BodyMeasurement.user_id == user_id
+        )
+    ) == 1
+
+
+def test_patch_rejects_empty_body(client: TestClient) -> None:
+    register(client)
+    create_profile(client)
+
+    response = client.patch("/api/v1/profile", headers=ORIGIN, json={})
+
+    assert response.status_code == 422
+
+
+def test_patch_rejects_explicit_null_for_required_field(client: TestClient) -> None:
+    register(client)
+    create_profile(client)
+
+    response = client.patch("/api/v1/profile", headers=ORIGIN, json={"display_name": None})
+
+    assert response.status_code == 422
+
+
+def test_patch_clears_limitations_with_null(client: TestClient) -> None:
+    register(client)
+    create_profile(client)
+
+    response = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={"physical_limitations": None},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["physical_limitations"] is None
+
+
+def test_patch_returns_404_for_missing_profile(client: TestClient) -> None:
+    register(client)
+
+    response = client.patch(
+        "/api/v1/profile", headers=ORIGIN, json={"display_name": "New Name"}
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Fitness profile not found"}
+
+
+def test_patch_requires_authenticated_user(client: TestClient) -> None:
+    response = client.patch(
+        "/api/v1/profile", headers=ORIGIN, json={"display_name": "New Name"}
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize("headers", [{}, {"Origin": "http://evil.example"}])
+def test_patch_rejects_missing_or_untrusted_origin(
+    client: TestClient, headers: dict[str, str]
+) -> None:
+    register(client)
+    create_profile(client)
+
+    response = client.patch("/api/v1/profile", headers=headers, json={"display_name": "New Name"})
+
+    assert response.status_code == 403
+
+
+def test_patch_cors_preflight_allows_patch(client: TestClient) -> None:
+    response = client.options(
+        "/api/v1/profile",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "PATCH",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "PATCH" in response.headers["access-control-allow-methods"]
+
+
+def test_patch_commit_failure_rolls_back_profile_and_new_measurement(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user_id = register(client)
+    create_profile(client)
+    original_commit = db.commit
+
+    def unavailable_commit() -> None:
+        raise OperationalError("COMMIT", {}, Exception("database unavailable"))
+
+    monkeypatch.setattr(db, "commit", unavailable_commit)
+    response = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={"display_name": "New Name", "current_weight_kg": 75.25},
+    )
+    monkeypatch.setattr(db, "commit", original_commit)
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Service temporarily unavailable"}
+    profile = db.get(UserProfile, user_id)
+    assert profile is not None
+    assert profile.display_name == "Mohammad"
+    assert db.scalar(
+        select(func.count()).select_from(BodyMeasurement).where(
+            BodyMeasurement.user_id == user_id
+        )
+    ) == 1

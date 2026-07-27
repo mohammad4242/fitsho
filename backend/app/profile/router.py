@@ -12,8 +12,13 @@ from app.profile.exceptions import (
     ProfileInvariantError,
     ProfileNotFoundError,
 )
-from app.profile.schemas import ProfileCreate, ProfileResponse
-from app.profile.service import ProfileSnapshot, create_profile, get_profile
+from app.profile.schemas import ProfileCreate, ProfileResponse, ProfileUpdate
+from app.profile.service import (
+    ProfileSnapshot,
+    create_profile,
+    get_profile,
+    update_profile,
+)
 
 router = APIRouter(prefix="/api/v1/profile", tags=["profile"])
 
@@ -58,6 +63,30 @@ def create(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Fitness profile already exists",
+        ) from None
+    except ProfileInvariantError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable",
+        ) from None
+
+
+@router.patch(
+    "",
+    response_model=ProfileResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update(
+    payload: ProfileUpdate,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> ProfileResponse:
+    try:
+        return to_response(update_profile(db, user.id, payload))
+    except ProfileNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Fitness profile not found",
         ) from None
     except ProfileInvariantError:
         raise HTTPException(

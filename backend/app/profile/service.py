@@ -11,7 +11,7 @@ from app.profile.exceptions import (
     ProfileNotFoundError,
 )
 from app.profile.models import BodyMeasurement, UserProfile
-from app.profile.schemas import ProfileCreate
+from app.profile.schemas import ProfileCreate, ProfileUpdate
 
 
 @dataclass(frozen=True)
@@ -71,4 +71,45 @@ def get_profile(db: Session, user_id: UUID) -> ProfileSnapshot:
     )
     if measurement is None:
         raise ProfileInvariantError
+    return ProfileSnapshot(profile=profile, measurement=measurement)
+
+
+def update_profile(
+    db: Session,
+    user_id: UUID,
+    payload: ProfileUpdate,
+) -> ProfileSnapshot:
+    profile = db.scalar(
+        select(UserProfile).where(UserProfile.user_id == user_id).with_for_update()
+    )
+    if profile is None:
+        raise ProfileNotFoundError
+
+    measurement = db.scalar(
+        select(BodyMeasurement)
+        .where(BodyMeasurement.user_id == user_id)
+        .order_by(BodyMeasurement.measured_at.desc(), BodyMeasurement.id.desc())
+    )
+    if measurement is None:
+        raise ProfileInvariantError
+
+    supplied_fields = payload.model_dump(exclude_unset=True)
+    supplied_weight = supplied_fields.pop("current_weight_kg", None)
+    for field_name, value in supplied_fields.items():
+        setattr(profile, field_name, value)
+
+    if supplied_weight is not None and supplied_weight != measurement.weight_kg:
+        measurement = BodyMeasurement(user_id=user_id, weight_kg=supplied_weight)
+        db.add(measurement)
+
+    try:
+        db.flush()
+        db.refresh(profile)
+        db.refresh(measurement)
+        db.expunge(profile)
+        db.expunge(measurement)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
     return ProfileSnapshot(profile=profile, measurement=measurement)
