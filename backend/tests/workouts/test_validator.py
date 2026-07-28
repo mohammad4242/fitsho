@@ -65,6 +65,7 @@ def _exercise(
         rir=2,
         estimated_minutes=7,
         notes_en=notes_en,
+        notes_fa=None,
     )
 
 

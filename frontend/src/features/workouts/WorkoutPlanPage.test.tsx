@@ -41,6 +41,25 @@ const plan: WorkoutPlan = {
           estimated_minutes: 8,
           notes_en: null,
           notes_fa: "کنترل‌شده حرکت کن.",
+          alternatives: [
+            {
+              reason_en: "A no-equipment alternative.",
+              reason_fa: "جایگزین بدون تجهیزات.",
+              exercise: {
+                id: "018f0000-0000-7000-8000-000000000003",
+                slug: "push-up",
+                name_en: "Push-Up",
+                name_fa: "شنا سوئدی",
+                body_region: "upper_body",
+                primary_muscle: "chest",
+                secondary_muscles: ["triceps"],
+                equipment: ["bodyweight"],
+                difficulty: "beginner",
+                media_path: "/media/exercises/push-up.gif",
+                media_type: "gif",
+              },
+            },
+          ],
           exercise: {
             id: "018f0000-0000-7000-8000-000000000002",
             slug: "dumbbell-bench-press",
@@ -94,6 +113,11 @@ it("renders the selected duration, exercise media, and exercise detail link", as
   );
   expect(screen.getByRole("button", { name: "دانلود PDF" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "بازخورد پایان دوره" })).toBeDisabled();
+  expect(screen.getByText("حرکت جایگزین")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "شنا سوئدی" })).toHaveAttribute(
+    "href",
+    "/exercises/push-up",
+  );
 });
 
 it("shows a backend-reported stale plan without hiding its exercises", async () => {

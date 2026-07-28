@@ -1,5 +1,5 @@
 from typing import cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import FastAPI
@@ -7,8 +7,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.ai.schemas import ProviderErrorCode
+from app.exercises.enums import BodyRegion, Difficulty, MediaType, MuscleGroup
+from app.exercises.models import Exercise, ExerciseAlternative
 from app.workouts.enums import WorkoutPlanStatus
-from app.workouts.models import WorkoutPlan
+from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
 from app.workouts.service import (
     GenerationCooldownError,
     WorkoutGenerationFailedError,
@@ -62,6 +64,25 @@ def _plan(db: Session, user_id: UUID) -> WorkoutPlan:
     return plan
 
 
+def _exercise(slug: str, *, is_active: bool = True) -> Exercise:
+    unique_slug = f"{slug}-{uuid4().hex}"
+    return Exercise(
+        slug=unique_slug,
+        name_en=unique_slug.replace("-", " ").title(),
+        name_fa=f"حرکت {unique_slug}",
+        body_region=BodyRegion.UPPER_BODY,
+        primary_muscle=MuscleGroup.CHEST,
+        difficulty=Difficulty.BEGINNER,
+        instructions_en=["Set up.", "Perform the movement.", "Finish safely."],
+        instructions_fa=["شروع کن.", "حرکت را انجام بده.", "ایمن تمام کن."],
+        safety_notes_en=["Move with control."],
+        safety_notes_fa=["کنترل‌شده حرکت کن."],
+        media_path="/exercises/exercise-placeholder.svg",
+        media_type=MediaType.PLACEHOLDER,
+        is_active=is_active,
+    )
+
+
 def test_workout_plan_routes_require_authentication(client: TestClient) -> None:
     assert client.get("/api/v1/workout-plans/active").status_code == 401
     assert client.post("/api/v1/workout-plans/generate", headers=ORIGIN).status_code == 401
@@ -101,6 +122,79 @@ def test_workout_plan_is_scoped_to_its_owner(client: TestClient, db: Session) ->
     _register_and_complete_profile(client, "other-plan@example.com")
 
     assert client.get(f"/api/v1/workout-plans/{plan.id}").status_code == 404
+
+
+def test_workout_plan_returns_active_curated_alternatives_read_only(
+    client: TestClient, db: Session
+) -> None:
+    user_id = _register_and_complete_profile(client, "alternatives-plan@example.com")
+    plan = _plan(db, user_id)
+    planned = _exercise("dumbbell-bench-press")
+    active_alternative = _exercise("push-up")
+    inactive_alternative = _exercise("inactive-chest-press", is_active=False)
+    day = WorkoutDay(
+        workout_plan=plan,
+        day_number=1,
+        title_en="Upper body",
+        title_fa="بالاتنه",
+        estimated_duration_minutes=30,
+    )
+    db.add_all(
+        [
+            planned,
+            active_alternative,
+            inactive_alternative,
+            day,
+            WorkoutPlanExercise(
+                workout_day=day,
+                exercise=planned,
+                order_index=1,
+                sets=3,
+                reps_min=8,
+                reps_max=12,
+                rest_seconds=90,
+                rir=2,
+                estimated_minutes=8,
+            ),
+            ExerciseAlternative(
+                exercise=planned,
+                alternative_exercise=active_alternative,
+                reason_en="A no-equipment alternative.",
+                reason_fa="جایگزین بدون تجهیزات.",
+            ),
+            ExerciseAlternative(
+                exercise=planned,
+                alternative_exercise=inactive_alternative,
+                reason_en="Inactive catalog item.",
+                reason_fa="حرکت غیرفعال.",
+            ),
+        ]
+    )
+    db.commit()
+
+    response = client.get(f"/api/v1/workout-plans/{plan.id}")
+
+    assert response.status_code == 200
+    alternatives = response.json()["days"][0]["exercises"][0]["alternatives"]
+    assert alternatives == [
+        {
+            "reason_en": "A no-equipment alternative.",
+            "reason_fa": "جایگزین بدون تجهیزات.",
+            "exercise": {
+                "id": str(active_alternative.id),
+                "slug": active_alternative.slug,
+                "name_en": active_alternative.name_en,
+                "name_fa": active_alternative.name_fa,
+                "body_region": "upper_body",
+                "primary_muscle": "chest",
+                "secondary_muscles": [],
+                "equipment": [],
+                "difficulty": "beginner",
+                "media_path": "/exercises/exercise-placeholder.svg",
+                "media_type": "placeholder",
+            },
+        }
+    ]
 
 
 def test_generate_uses_authenticated_user_and_returns_reuse_flag(

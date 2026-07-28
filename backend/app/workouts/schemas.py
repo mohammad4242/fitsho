@@ -100,6 +100,14 @@ class GenerationSignatureContext:
     height_cm: int | None = None
 
 
+class WorkoutPlanExerciseAlternativeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason_en: str
+    reason_fa: str
+    exercise: ExerciseSummary
+
+
 class WorkoutPlanExerciseResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -113,6 +121,7 @@ class WorkoutPlanExerciseResponse(BaseModel):
     notes_en: str | None
     notes_fa: str | None
     exercise: ExerciseSummary
+    alternatives: list[WorkoutPlanExerciseAlternativeResponse]
 
 
 class WorkoutDayResponse(BaseModel):

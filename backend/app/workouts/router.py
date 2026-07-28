@@ -9,12 +9,14 @@ from app.auth.cookies import require_trusted_origin
 from app.auth.models import User
 from app.database.session import get_db
 from app.exercises.dependencies import require_completed_profile
+from app.exercises.models import Exercise
 from app.exercises.schemas import ExerciseSummary
 from app.workouts.dependencies import WorkoutGenerationServiceDependency
 from app.workouts.models import WorkoutPlan
 from app.workouts.repository import get_plan_for_user
 from app.workouts.schemas import (
     WorkoutDayResponse,
+    WorkoutPlanExerciseAlternativeResponse,
     WorkoutPlanExerciseResponse,
     WorkoutPlanGenerateResponse,
     WorkoutPlanResponse,
@@ -116,29 +118,41 @@ def to_plan_response(plan: WorkoutPlan, *, is_stale: bool = False) -> WorkoutPla
                         estimated_minutes=item.estimated_minutes,
                         notes_en=item.notes_en,
                         notes_fa=item.notes_fa,
-                        exercise=ExerciseSummary(
-                            id=item.exercise.id,
-                            slug=item.exercise.slug,
-                            name_en=item.exercise.name_en,
-                            name_fa=item.exercise.name_fa,
-                            body_region=item.exercise.body_region,
-                            primary_muscle=item.exercise.primary_muscle,
-                            secondary_muscles=[
-                                secondary.muscle for secondary in item.exercise.secondary_muscles
-                            ],
-                            equipment=[
-                                equipment.equipment for equipment in item.exercise.equipment_items
-                            ],
-                            difficulty=item.exercise.difficulty,
-                            media_path=item.exercise.media_path,
-                            media_type=item.exercise.media_type,
-                        ),
+                        exercise=to_exercise_summary(item.exercise),
+                        alternatives=[
+                            WorkoutPlanExerciseAlternativeResponse(
+                                reason_en=alternative.reason_en,
+                                reason_fa=alternative.reason_fa,
+                                exercise=to_exercise_summary(alternative.alternative_exercise),
+                            )
+                            for alternative in sorted(
+                                item.exercise.alternatives,
+                                key=lambda alternative: alternative.alternative_exercise.slug,
+                            )
+                            if alternative.alternative_exercise.is_active
+                        ],
                     )
                     for item in day.exercises
                 ],
             )
             for day in plan.days
         ],
+    )
+
+
+def to_exercise_summary(exercise: Exercise) -> ExerciseSummary:
+    return ExerciseSummary(
+        id=exercise.id,
+        slug=exercise.slug,
+        name_en=exercise.name_en,
+        name_fa=exercise.name_fa,
+        body_region=exercise.body_region,
+        primary_muscle=exercise.primary_muscle,
+        secondary_muscles=[secondary.muscle for secondary in exercise.secondary_muscles],
+        equipment=[equipment.equipment for equipment in exercise.equipment_items],
+        difficulty=exercise.difficulty,
+        media_path=exercise.media_path,
+        media_type=exercise.media_type,
     )
 
 

@@ -13,6 +13,13 @@ export type WorkoutPlanExercise = {
   notes_en: string | null;
   notes_fa: string | null;
   exercise: ExerciseSummary;
+  alternatives: WorkoutPlanExerciseAlternative[];
+};
+
+export type WorkoutPlanExerciseAlternative = {
+  reason_en: string;
+  reason_fa: string;
+  exercise: ExerciseSummary;
 };
 
 export type WorkoutDay = {

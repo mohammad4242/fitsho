@@ -114,6 +114,8 @@ def _response(exercise_ids: list[UUID]) -> WorkoutGenerationModelResponse:
                             rest_seconds=90,
                             rir=2,
                             estimated_minutes=8,
+                            notes_en=None,
+                            notes_fa=None,
                         )
                         for exercise_id in exercise_ids
                     ],

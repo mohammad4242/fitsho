@@ -129,6 +129,23 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                               <p>{isEnglish ? item.notes_en : item.notes_fa}</p>
                             )}
                             <Link to={`/exercises/${item.exercise.slug}`}>{t("workoutPlan.detail")}</Link>
+                            {item.alternatives.length > 0 && (
+                              <details className="workout-alternatives">
+                                <summary>{t("workoutPlan.alternatives")}</summary>
+                                <ul>
+                                  {item.alternatives.map((alternative) => (
+                                    <li key={alternative.exercise.id}>
+                                      <Link to={`/exercises/${alternative.exercise.slug}`}>
+                                        {isEnglish
+                                          ? alternative.exercise.name_en
+                                          : alternative.exercise.name_fa}
+                                      </Link>
+                                      <span>{isEnglish ? alternative.reason_en : alternative.reason_fa}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </details>
+                            )}
                           </div>
                         </li>
                       ))}

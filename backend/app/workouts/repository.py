@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.exercises.models import Exercise, ExerciseAlternative
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise, WorkoutPlanGeneration
 
@@ -19,6 +20,8 @@ def get_active_plan(db: Session, user_id: UUID) -> WorkoutPlan | None:
             selectinload(WorkoutPlan.days)
             .selectinload(WorkoutDay.exercises)
             .selectinload(WorkoutPlanExercise.exercise)
+            .selectinload(Exercise.alternatives)
+            .selectinload(ExerciseAlternative.alternative_exercise)
         )
     )
 
@@ -112,5 +115,7 @@ def get_plan_for_user(
             selectinload(WorkoutPlan.days)
             .selectinload(WorkoutDay.exercises)
             .selectinload(WorkoutPlanExercise.exercise)
+            .selectinload(Exercise.alternatives)
+            .selectinload(ExerciseAlternative.alternative_exercise)
         )
     )
