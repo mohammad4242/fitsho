@@ -410,3 +410,40 @@ def test_create_requires_trusted_origin(
 
     assert response.status_code == 403
     assert response.json() == {"detail": "Untrusted request origin"}
+
+
+def test_admin_can_update_programming_metadata(
+    client: TestClient,
+    db: Session,
+) -> None:
+    make_current_user_admin(client, db)
+    created = post_exercise(client, exercise_payload())
+    assert created.status_code == 201
+
+    response = client.patch(
+        f"/api/v1/admin/exercises/{created.json()['id']}",
+        headers=ORIGIN,
+        data={
+            "payload": json.dumps(
+                exercise_payload(
+                    movement_pattern="horizontal_push",
+                    exercise_type="compound",
+                    caution_tags=["shoulder_internal_rotation"],
+                    is_programmable=True,
+                )
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["movement_pattern"] == "horizontal_push"
+    assert body["exercise_type"] == "compound"
+    assert body["caution_tags"] == ["shoulder_internal_rotation"]
+    assert body["is_programmable"] is True
+    stored = db.scalar(select(Exercise).where(Exercise.id == created.json()["id"]))
+    assert stored is not None
+    assert stored.movement_pattern.value == "horizontal_push"
+    assert [item.caution_tag.value for item in stored.caution_tag_items] == [
+        "shoulder_internal_rotation"
+    ]
