@@ -22,6 +22,8 @@ const plan: WorkoutPlan = {
   status: "active",
   created_at: "2026-07-28T10:00:00Z",
   activated_at: "2026-07-28T10:00:00Z",
+  plan_duration_weeks: 4,
+  is_stale: false,
   days: [
     {
       day_number: 1,
@@ -92,6 +94,14 @@ it("renders the selected duration, exercise media, and exercise detail link", as
   );
   expect(screen.getByRole("button", { name: "دانلود PDF" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "بازخورد پایان دوره" })).toBeDisabled();
+});
+
+it("shows a backend-reported stale plan without hiding its exercises", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue({ ...plan, is_stale: true });
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByText("این برنامه دیگر با شرایط فعلی یا دورهٔ انتخاب‌شده هماهنگ نیست؛ هر وقت آماده بودی برنامه بعدی را بساز.")).toBeInTheDocument();
+  expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
 });
 
 it("keeps a plan visible during regeneration and announces a reused plan", async () => {

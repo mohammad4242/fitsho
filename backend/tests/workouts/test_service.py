@@ -1,5 +1,5 @@
 import asyncio
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -210,3 +210,44 @@ def test_generation_in_progress_rejects_a_second_request(db: Session) -> None:
     generation = db.query(WorkoutPlan).filter_by(user_id=user.id).first()
     assert generation is None
     assert db.query(WorkoutPlan).count() == 0
+
+
+def test_expired_active_plan_is_replaced_instead_of_reused(db: Session) -> None:
+    user = _user_with_profile(db)
+    exercises = _seed_candidates(db)
+    first = asyncio.run(
+        _service(
+            db, FakeWorkoutPlanModelProvider([_response([item.id for item in exercises])])
+        ).generate(user.id)
+    )
+    first.plan.activated_at = datetime.now(UTC) - timedelta(days=29)
+    db.commit()
+
+    provider = FakeWorkoutPlanModelProvider([_response([item.id for item in exercises])])
+    replacement = asyncio.run(_service(db, provider).generate(user.id))
+
+    assert not replacement.reused
+    assert replacement.plan.id != first.plan.id
+    assert len(provider.calls) == 1
+    assert db.get(WorkoutPlan, first.plan.id).status is WorkoutPlanStatus.SUPERSEDED  # type: ignore[union-attr]
+
+
+def test_active_plan_reports_stale_when_generation_conditions_change(db: Session) -> None:
+    user = _user_with_profile(db)
+    exercises = _seed_candidates(db)
+    asyncio.run(
+        _service(
+            db, FakeWorkoutPlanModelProvider([_response([item.id for item in exercises])])
+        ).generate(user.id)
+    )
+    profile = db.get(UserProfile, user.id)
+    assert profile is not None
+    profile.fitness_goal = FitnessGoal.IMPROVE_FITNESS
+    db.commit()
+    provider = FakeWorkoutPlanModelProvider([])
+
+    active = _service(db, provider).get_active(user.id)
+
+    assert active is not None
+    assert active.is_stale
+    assert provider.calls == []

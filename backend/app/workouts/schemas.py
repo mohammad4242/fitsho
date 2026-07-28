@@ -126,6 +126,8 @@ class WorkoutPlanResponse(BaseModel):
     status: WorkoutPlanStatus
     created_at: datetime
     activated_at: datetime | None
+    plan_duration_weeks: int
+    is_stale: bool
     days: list[WorkoutDayResponse]
 
 

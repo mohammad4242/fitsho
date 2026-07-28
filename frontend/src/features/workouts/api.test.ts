@@ -8,6 +8,8 @@ const plan: WorkoutPlan = {
   status: "active",
   created_at: "2026-07-28T10:00:00Z",
   activated_at: "2026-07-28T10:00:00Z",
+  plan_duration_weeks: 4,
+  is_stale: false,
   days: [],
 };
 

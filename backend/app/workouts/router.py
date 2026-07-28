@@ -11,7 +11,7 @@ from app.exercises.dependencies import require_completed_profile
 from app.exercises.schemas import ExerciseSummary
 from app.workouts.dependencies import WorkoutGenerationServiceDependency
 from app.workouts.models import WorkoutPlan
-from app.workouts.repository import get_active_plan, get_plan_for_user
+from app.workouts.repository import get_plan_for_user
 from app.workouts.schemas import (
     WorkoutDayResponse,
     WorkoutPlanExerciseResponse,
@@ -22,6 +22,7 @@ from app.workouts.service import (
     GenerationInProgressError,
     NoEligibleExercisesError,
     WorkoutGenerationFailedError,
+    WorkoutGenerationService,
 )
 
 router = APIRouter(prefix="/api/v1/workout-plans", tags=["workout-plans"])
@@ -30,11 +31,14 @@ CurrentUser = Annotated[User, Depends(require_completed_profile)]
 
 
 @router.get("/active", response_model=WorkoutPlanResponse)
-def read_active_plan(db: DatabaseSession, user: CurrentUser) -> WorkoutPlanResponse:
-    plan = get_active_plan(db, user.id)
-    if plan is None:
+def read_active_plan(
+    service: WorkoutGenerationServiceDependency,
+    user: CurrentUser,
+) -> WorkoutPlanResponse:
+    active = service.get_active(user.id)
+    if active is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active workout plan")
-    return to_plan_response(plan)
+    return to_plan_response(active.plan, is_stale=active.is_stale)
 
 
 @router.post(
@@ -78,12 +82,14 @@ def read_plan(
     return to_plan_response(plan)
 
 
-def to_plan_response(plan: WorkoutPlan) -> WorkoutPlanResponse:
+def to_plan_response(plan: WorkoutPlan, *, is_stale: bool = False) -> WorkoutPlanResponse:
     return WorkoutPlanResponse(
         id=plan.id,
         status=plan.status,
         created_at=plan.created_at,
         activated_at=plan.activated_at,
+        plan_duration_weeks=WorkoutGenerationService.plan_duration_weeks(plan),
+        is_stale=is_stale,
         days=[
             WorkoutDayResponse(
                 day_number=day.day_number,

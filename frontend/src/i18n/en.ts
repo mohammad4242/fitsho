@@ -294,7 +294,7 @@ const en = {
       loadError: "Your workout plan could not be loaded.",
       emptyTitle: "Your plan is ready to be built",
       emptyBody: "Fitsho will use your saved preferences and eligible exercises.",
-      generate: "Generate plan", generating: "Generating plan…", update: "Refresh plan", reused: "Your current plan still matches your current conditions.", expired: "This plan period has ended. You can generate the next plan when you are ready.",
+      generate: "Generate plan", generating: "Generating plan…", update: "Refresh plan", reused: "Your current plan still matches your current conditions.", stale: "This plan no longer matches your current conditions or selected duration. Generate the next plan when you are ready.",
       weekly: "Weekly schedule", scheduleTitle: "Your training days", sessionMinutes: "{{count}} minutes", sets: "Sets", reps: "Reps", rest: "Rest", seconds: "s", rir: "RIR", detail: "View exercise details",
       futureTitle: "Plan tools", comingSoon: "Coming soon",
       pdf: { title: "Download PDF", body: "A concise Persian workout PDF will be available here." },

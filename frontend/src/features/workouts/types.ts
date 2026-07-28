@@ -28,6 +28,8 @@ export type WorkoutPlan = {
   status: WorkoutPlanStatus;
   created_at: string;
   activated_at: string | null;
+  plan_duration_weeks: 4 | 6 | 8;
+  is_stale: boolean;
   days: WorkoutDay[];
 };
 

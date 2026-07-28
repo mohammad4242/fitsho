@@ -41,7 +41,7 @@ def _plan(db: Session, user_id: UUID) -> WorkoutPlan:
         user_id=user_id,
         status=WorkoutPlanStatus.ACTIVE,
         generation_signature="a" * 64,
-        profile_snapshot={"fitness_goal": "build_muscle"},
+        profile_snapshot={"fitness_goal": "build_muscle", "plan_duration_weeks": 4},
         provider="fake",
         model_id="fake-model",
         prompt_version="v1",
@@ -68,6 +68,17 @@ def test_active_workout_plan_returns_not_found_without_a_plan(client: TestClient
     assert response.json() == {"detail": "No active workout plan"}
 
 
+def test_active_workout_plan_reports_backend_staleness(client: TestClient, db: Session) -> None:
+    user_id = _register_and_complete_profile(client, "stale-plan@example.com")
+    _plan(db, user_id)
+
+    response = client.get("/api/v1/workout-plans/active")
+
+    assert response.status_code == 200
+    assert response.json()["plan_duration_weeks"] == 4
+    assert response.json()["is_stale"] is True
+
+
 def test_workout_plan_is_scoped_to_its_owner(client: TestClient, db: Session) -> None:
     owner_id = _register_and_complete_profile(client, "owner-plan@example.com")
     plan = _plan(db, owner_id)
@@ -75,6 +86,8 @@ def test_workout_plan_is_scoped_to_its_owner(client: TestClient, db: Session) ->
 
     assert response.status_code == 200
     assert response.json()["id"] == str(plan.id)
+    assert response.json()["plan_duration_weeks"] == 4
+    assert response.json()["is_stale"] is False
     assert "provider" not in response.json()
     assert client.post("/api/v1/auth/logout", headers=ORIGIN).status_code == 204
     _register_and_complete_profile(client, "other-plan@example.com")

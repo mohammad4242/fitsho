@@ -18,6 +18,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   const [reused, setReused] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const isEnglish = i18n.resolvedLanguage === "en";
+  const displayedPlanDuration = plan?.plan_duration_weeks ?? planDurationWeeks;
 
   useEffect(() => {
     let active = true;
@@ -59,8 +60,8 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
             <h1>{t("workoutPlan.title")}</h1>
             <p>{t("workoutPlan.intro")}</p>
           </div>
-          <div className="workout-plan-duration" aria-label={t("workoutPlan.duration", { count: planDurationWeeks })}>
-            <strong>{planDurationWeeks}</strong>
+          <div className="workout-plan-duration" aria-label={t("workoutPlan.duration", { count: displayedPlanDuration })}>
+            <strong>{displayedPlanDuration}</strong>
             <span>{t("workoutPlan.weeks")}</span>
           </div>
         </header>
@@ -86,8 +87,8 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         {state === "ready" && plan !== null && (
           <>
             {reused && <p className="workout-reused" role="status">{t("workoutPlan.reused")}</p>}
-            {isExpired(plan, planDurationWeeks) && (
-              <p className="workout-stale" role="status">{t("workoutPlan.expired")}</p>
+            {plan.is_stale && (
+              <p className="workout-stale" role="status">{t("workoutPlan.stale")}</p>
             )}
             <section className="workout-schedule" aria-labelledby="workout-schedule-title">
               <div className="workout-schedule__heading">
@@ -181,9 +182,4 @@ function GenerateButton({ generating, onClick, update = false }: { generating: b
 
 function StatusPanel({ role, message, action, onAction }: { role: "status" | "alert"; message: string; action?: string; onAction?: () => void }) {
   return <section className="workout-status" role={role}><p>{message}</p>{action !== undefined && onAction !== undefined && <button type="button" onClick={onAction}>{action}</button>}</section>;
-}
-
-function isExpired(plan: WorkoutPlan, weeks: number): boolean {
-  const start = Date.parse(plan.activated_at ?? plan.created_at);
-  return Number.isFinite(start) && Date.now() >= start + weeks * 7 * 24 * 60 * 60 * 1000;
 }

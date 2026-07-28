@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from time import perf_counter
 from uuid import UUID
 
@@ -48,6 +48,12 @@ class WorkoutPlanGenerationResult:
     reused: bool
 
 
+@dataclass(frozen=True)
+class ActiveWorkoutPlanResult:
+    plan: WorkoutPlan
+    is_stale: bool
+
+
 class GenerationInProgressError(Exception):
     pass
 
@@ -79,27 +85,13 @@ class WorkoutGenerationService:
         if not candidates.is_sufficient:
             raise NoEligibleExercisesError
         policy = WorkoutGenerationPolicy.for_session_duration(profile.session_duration_minutes)
-        signature = build_generation_signature(
-            GenerationSignatureContext(
-                fitness_goal=profile.fitness_goal,
-                experience_level=profile.experience_level,
-                training_days_per_week=profile.training_days_per_week,
-                training_location=profile.training_location,
-                home_training_setup=profile.home_training_setup,
-                session_duration_minutes=profile.session_duration_minutes,
-                plan_duration_weeks=profile.plan_duration_weeks,
-                training_cautions=profile.training_cautions,
-                physical_limitations=profile.physical_limitations,
-                current_weight_kg=profile.current_weight_kg,
-                candidate_set_hash=candidates.candidate_set_hash,
-                catalog_programming_version=self._settings.catalog_programming_version,
-                model_id=self._settings.model_id,
-                prompt_version=self._settings.prompt_version,
-                generation_policy_version=self._settings.generation_policy_version,
-            )
-        )
+        signature = self._generation_signature(profile, candidates)
         active_plan = get_active_plan(self._db, user_id)
-        if active_plan is not None and active_plan.generation_signature == signature:
+        if (
+            active_plan is not None
+            and active_plan.generation_signature == signature
+            and not self._is_plan_expired(active_plan)
+        ):
             return WorkoutPlanGenerationResult(plan=active_plan, reused=True)
 
         generation = self._start_generation(user_id, len(candidates.exercises))
@@ -321,3 +313,49 @@ class WorkoutGenerationService:
             self._db.commit()
         except SQLAlchemyError:
             self._db.rollback()
+
+    def get_active(self, user_id: UUID) -> ActiveWorkoutPlanResult | None:
+        plan = get_active_plan(self._db, user_id)
+        if plan is None:
+            return None
+        profile = self._to_generation_profile(get_profile(self._db, user_id))
+        candidates = WorkoutCandidateSelector(self._db).select(profile)
+        is_stale = plan.generation_signature != self._generation_signature(
+            profile, candidates
+        ) or self._is_plan_expired(plan)
+        return ActiveWorkoutPlanResult(plan=plan, is_stale=is_stale)
+
+    def _generation_signature(
+        self,
+        profile: WorkoutGenerationProfile,
+        candidates: CandidateSet,
+    ) -> str:
+        return build_generation_signature(
+            GenerationSignatureContext(
+                fitness_goal=profile.fitness_goal,
+                experience_level=profile.experience_level,
+                training_days_per_week=profile.training_days_per_week,
+                training_location=profile.training_location,
+                home_training_setup=profile.home_training_setup,
+                session_duration_minutes=profile.session_duration_minutes,
+                plan_duration_weeks=profile.plan_duration_weeks,
+                training_cautions=profile.training_cautions,
+                physical_limitations=profile.physical_limitations,
+                current_weight_kg=profile.current_weight_kg,
+                candidate_set_hash=candidates.candidate_set_hash,
+                catalog_programming_version=self._settings.catalog_programming_version,
+                model_id=self._settings.model_id,
+                prompt_version=self._settings.prompt_version,
+                generation_policy_version=self._settings.generation_policy_version,
+            )
+        )
+
+    @staticmethod
+    def plan_duration_weeks(plan: WorkoutPlan) -> int:
+        value = plan.profile_snapshot.get("plan_duration_weeks")
+        return value if isinstance(value, int) and value in {4, 6, 8} else 4
+
+    @classmethod
+    def _is_plan_expired(cls, plan: WorkoutPlan) -> bool:
+        started_at = plan.activated_at or plan.created_at
+        return datetime.now(UTC) >= started_at + timedelta(weeks=cls.plan_duration_weeks(plan))
