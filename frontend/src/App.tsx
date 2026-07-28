@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { AdminExercisesPage } from "./features/admin/AdminExercisesPage";
+import { AdminExerciseEditPage } from "./features/admin/AdminExerciseEditPage";
 import { AdminExerciseNewPage } from "./features/admin/AdminExerciseNewPage";
 import { AdminRoute } from "./features/admin/AdminRoute";
 import { AuthProvider } from "./features/auth/AuthContext";
@@ -30,6 +31,7 @@ export function AppRoutes() {
         <Route element={<AdminRoute />}>
           <Route path="/admin/exercises" element={<AdminExercisesPage />} />
           <Route path="/admin/exercises/new" element={<AdminExerciseNewPage />} />
+          <Route path="/admin/exercises/:exerciseId/edit" element={<AdminExerciseEditPage />} />
         </Route>
         <Route element={<OnboardingRoute />}>
           <Route path="/onboarding" element={<OnboardingPage />} />

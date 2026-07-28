@@ -37,3 +37,23 @@ export function createAdminExercise(
     body,
   });
 }
+
+export function getAdminExercise(exerciseId: string): Promise<AdminExercise> {
+  return request<AdminExercise>(`${adminExercisesPath}/${exerciseId}`);
+}
+
+export function updateAdminExercise(
+  exerciseId: string,
+  input: AdminExerciseCreate,
+  media: File | null = null,
+): Promise<AdminExercise> {
+  const body = new FormData();
+  body.set("payload", JSON.stringify(input));
+  if (media !== null) {
+    body.set("media", media);
+  }
+  return request<AdminExercise>(`${adminExercisesPath}/${exerciseId}`, {
+    method: "PATCH",
+    body,
+  });
+}

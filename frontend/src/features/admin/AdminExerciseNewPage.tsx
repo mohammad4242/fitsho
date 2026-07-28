@@ -8,6 +8,7 @@ import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import { bodyRegions, difficulties, equipment, type MuscleGroup } from "../exercises/types";
 import { createAdminExercise } from "./api";
 import type { AdminExerciseForm } from "./types";
+import { AdminExerciseForm as ProgrammingMetadataForm, type ProgrammingMetadata } from "./AdminExerciseForm";
 import {
   emptyAdminExerciseForm,
   musclesByRegion,
@@ -17,6 +18,14 @@ import {
   type AdminValidationErrors,
 } from "./validation";
 import "./admin.css";
+
+export type AdminExerciseFormProps = {
+  initialForm?: AdminExerciseForm;
+  initialMediaPath?: string;
+  initialMediaType?: "image" | "animated_webp" | "gif" | "video" | "placeholder";
+  editing?: boolean;
+  onSave?: (input: ReturnType<typeof toAdminExerciseCreate>, media: File | null) => Promise<void>;
+};
 
 export function AdminExerciseNewPage() {
   const { t } = useTranslation();
@@ -47,6 +56,10 @@ export function AdminExerciseNewPage() {
   ) {
     const values = form[key] as Array<typeof value>;
     setField(key, (values.includes(value) ? values.filter((item) => item !== value) : [...values, value]) as AdminExerciseForm[K]);
+  }
+
+  function setProgrammingField<K extends keyof ProgrammingMetadata>(key: K, value: ProgrammingMetadata[K]) {
+    setField(key, value as AdminExerciseForm[K]);
   }
 
   function changeList(key: "instructions_en" | "instructions_fa" | "safety_notes_en" | "safety_notes_fa", index: number, value: string) {
@@ -116,6 +129,7 @@ export function AdminExerciseNewPage() {
             <Field label={t("admin.fields.bodyRegion")} error={errorText("body_region")}><select value={form.body_region} onChange={(event) => { setField("body_region", event.target.value as AdminExerciseForm["body_region"]); setField("primary_muscle", ""); setField("secondary_muscles", []); }}><option value="">{t("admin.fields.select")}</option>{bodyRegions.map((value) => <option key={value} value={value}>{t(`catalog.bodyRegion.${value}`)}</option>)}</select></Field>
             <Field label={t("admin.fields.primaryMuscle")} error={errorText("primary_muscle")}><select value={form.primary_muscle} disabled={!form.body_region} onChange={(event) => setField("primary_muscle", event.target.value as MuscleGroup)}><option value="">{t("admin.fields.select")}</option>{availableMuscles.map((value) => <option key={value} value={value}>{t(`catalog.muscle.${value}`)}</option>)}</select></Field>
           </div><ChoiceGroup legend={t("admin.fields.secondaryMuscles")} error={errorText("secondary_muscles")} values={availableMuscles} selected={form.secondary_muscles} label={(value) => `${t("admin.fields.secondaryPrefix")}: ${t(`catalog.muscle.${value}`)}`} onToggle={(value) => toggleChoice("secondary_muscles", value)} /><ChoiceGroup legend={t("admin.fields.equipment")} error={errorText("equipment")} values={equipment} selected={form.equipment} label={(value) => t(`catalog.equipment.${value}`)} onToggle={(value) => toggleChoice("equipment", value)} /></fieldset>
+          <ProgrammingMetadataForm value={form} onChange={setProgrammingField} />
           <fieldset className="admin-form-section"><legend>{t("admin.sections.guidance")}</legend>
             <Repeater title={t("admin.fields.instructionsEn")} itemLabel={t("admin.fields.instructionEn")} addLabel={t("admin.actions.addInstructionEn")} values={form.instructions_en} error={errorText("instructions_en")} max={6} min={3} dir="ltr" onChange={(i,v) => changeList("instructions_en",i,v)} onAdd={() => setField("instructions_en", [...form.instructions_en, ""])} onRemove={(i) => setField("instructions_en", form.instructions_en.filter((_,x) => x !== i))} />
             <Repeater title={t("admin.fields.instructionsFa")} itemLabel={t("admin.fields.instructionFa")} addLabel={t("admin.actions.addInstructionFa")} values={form.instructions_fa} error={errorText("instructions_fa")} max={6} min={3} dir="rtl" onChange={(i,v) => changeList("instructions_fa",i,v)} onAdd={() => setField("instructions_fa", [...form.instructions_fa, ""])} onRemove={(i) => setField("instructions_fa", form.instructions_fa.filter((_,x) => x !== i))} />

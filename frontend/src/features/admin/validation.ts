@@ -31,6 +31,10 @@ export function emptyAdminExerciseForm(): AdminExerciseForm {
     secondary_muscles: [],
     equipment: [],
     difficulty: "beginner",
+    movement_pattern: "other",
+    exercise_type: "other",
+    caution_tags: [],
+    is_programmable: false,
     instructions_en: ["", "", ""],
     instructions_fa: ["", "", ""],
     safety_notes_en: [""],
@@ -120,5 +124,30 @@ export function toAdminExerciseCreate(form: AdminExerciseForm): AdminExerciseCre
     media_source_url: optional(form.media_source_url),
     media_license: optional(form.media_license),
     media_attribution: optional(form.media_attribution),
+  };
+}
+
+export function adminExerciseToForm(exercise: import("./types").AdminExercise): AdminExerciseForm {
+  return {
+    slug: exercise.slug,
+    name_en: exercise.name_en,
+    name_fa: exercise.name_fa,
+    body_region: exercise.body_region,
+    primary_muscle: exercise.primary_muscle,
+    secondary_muscles: exercise.secondary_muscles,
+    equipment: exercise.equipment,
+    difficulty: exercise.difficulty,
+    movement_pattern: exercise.movement_pattern,
+    exercise_type: exercise.exercise_type,
+    caution_tags: exercise.caution_tags,
+    is_programmable: exercise.is_programmable,
+    instructions_en: exercise.instructions_en,
+    instructions_fa: exercise.instructions_fa,
+    safety_notes_en: exercise.safety_notes_en,
+    safety_notes_fa: exercise.safety_notes_fa,
+    media_source_url: exercise.media_source_url,
+    media_license: exercise.media_license,
+    media_attribution: exercise.media_attribution,
+    is_active: exercise.is_active,
   };
 }

@@ -2,11 +2,18 @@ import type {
   BodyRegion,
   Difficulty,
   Equipment,
+  ExerciseCautionTag,
   ExerciseDetail,
+  ExerciseType,
+  MovementPattern,
   MuscleGroup,
 } from "../exercises/types";
 
 export type AdminExercise = ExerciseDetail & {
+  movement_pattern: MovementPattern;
+  exercise_type: ExerciseType;
+  caution_tags: ExerciseCautionTag[];
+  is_programmable: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -21,6 +28,10 @@ export type AdminExerciseCreate = {
   secondary_muscles: MuscleGroup[];
   equipment: Equipment[];
   difficulty: Difficulty;
+  movement_pattern: MovementPattern;
+  exercise_type: ExerciseType;
+  caution_tags: ExerciseCautionTag[];
+  is_programmable: boolean;
   instructions_en: string[];
   instructions_fa: string[];
   safety_notes_en: string[];
