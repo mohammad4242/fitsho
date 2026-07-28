@@ -1,5 +1,6 @@
 import asyncio
 import json
+from collections.abc import Coroutine
 from uuid import uuid4
 
 import httpx
@@ -9,13 +10,14 @@ from app.ai.opencode_zen import OpenCodeZenWorkoutPlanProvider
 from app.ai.schemas import (
     ProviderErrorCode,
     WorkoutGenerationModelRequest,
+    WorkoutGenerationModelResponse,
     WorkoutProviderError,
 )
 from app.workouts.prompt_builder import WORKOUT_PLAN_OUTPUT_SCHEMA
 
 
-def _run(awaitable: object) -> object:
-    return asyncio.run(awaitable)  # type: ignore[arg-type]
+def _run[ResponseT](awaitable: Coroutine[object, object, ResponseT]) -> ResponseT:
+    return asyncio.run(awaitable)
 
 
 def _request() -> WorkoutGenerationModelRequest:
@@ -89,15 +91,20 @@ def test_zen_provider_uses_responses_api_and_parses_structured_output() -> None:
     provider = _provider(httpx.MockTransport(handler))
     response = _run(provider.generate_plan(_request()))
 
-    assert response.provider_request_id == "resp_123"  # type: ignore[union-attr]
-    assert response.input_tokens == 12  # type: ignore[union-attr]
-    assert response.output_tokens == 34  # type: ignore[union-attr]
+    assert isinstance(response, WorkoutGenerationModelResponse)
+    assert response.provider_request_id == "resp_123"
+    assert response.input_tokens == 12
+    assert response.output_tokens == 34
     assert seen["url"] == "https://zen.example/v1/responses"
     assert seen["authorization"] == "Bearer test-secret-key"
     body = seen["body"]
     assert isinstance(body, dict)
     assert body["store"] is False
-    assert body["text"]["format"]["type"] == "json_schema"  # type: ignore[index]
+    text = body["text"]
+    assert isinstance(text, dict)
+    output_format = text["format"]
+    assert isinstance(output_format, dict)
+    assert output_format["type"] == "json_schema"
 
 
 @pytest.mark.parametrize(

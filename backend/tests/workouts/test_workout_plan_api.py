@@ -1,5 +1,7 @@
+from typing import cast
 from uuid import UUID
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -109,9 +111,10 @@ def test_generate_uses_authenticated_user_and_returns_reuse_flag(
 
     from app.workouts.dependencies import get_workout_generation_service
 
-    client.app.dependency_overrides[get_workout_generation_service] = lambda: FakeService()
+    app = cast(FastAPI, client.app)
+    app.dependency_overrides[get_workout_generation_service] = lambda: FakeService()
     response = client.post("/api/v1/workout-plans/generate", headers=ORIGIN)
-    client.app.dependency_overrides.pop(get_workout_generation_service)
+    app.dependency_overrides.pop(get_workout_generation_service)
 
     assert response.status_code == 200
     assert response.json()["reused"] is True
