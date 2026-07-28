@@ -147,3 +147,22 @@ it("keeps a plan visible during regeneration and announces a reused plan", async
 
   expect(await screen.findByText("برنامه فعلی‌ات هنوز با شرایط فعلی هماهنگ است.")).toBeInTheDocument();
 });
+
+it("keeps the active plan visible and offers retry when generation fails", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  api.generateWorkoutPlan.mockRejectedValueOnce(new Error("provider unavailable"));
+  api.generateWorkoutPlan.mockResolvedValueOnce({ plan, reused: false });
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  await screen.findByText("پرس سینه دمبل");
+  await user.click(screen.getByRole("button", { name: "به‌روزرسانی برنامه" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "ساخت برنامه انجام نشد؛ برنامه فعلی حفظ شده است. دوباره تلاش کن.",
+  );
+  expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "تلاش دوباره" }));
+
+  expect(api.generateWorkoutPlan).toHaveBeenCalledTimes(2);
+});

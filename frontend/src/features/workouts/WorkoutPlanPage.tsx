@@ -16,6 +16,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   const [state, setState] = useState<PlanState>("loading");
   const [generating, setGenerating] = useState(false);
   const [reused, setReused] = useState(false);
+  const [generationError, setGenerationError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const isEnglish = i18n.resolvedLanguage === "en";
   const displayedPlanDuration = plan?.plan_duration_weeks ?? planDurationWeeks;
@@ -40,13 +41,21 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   function generate() {
     setGenerating(true);
     setReused(false);
+    setGenerationError(false);
     void generateWorkoutPlan()
       .then((result) => {
         setPlan(result.plan);
         setState("ready");
         setReused(result.reused);
       })
-      .catch(() => setState(plan === null ? "error" : "ready"))
+      .catch(() => {
+        if (plan === null) {
+          setState("error");
+          return;
+        }
+        setState("ready");
+        setGenerationError(true);
+      })
       .finally(() => setGenerating(false));
   }
 
@@ -89,6 +98,14 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
             {reused && <p className="workout-reused" role="status">{t("workoutPlan.reused")}</p>}
             {plan.is_stale && (
               <p className="workout-stale" role="status">{t("workoutPlan.stale")}</p>
+            )}
+            {generationError && (
+              <StatusPanel
+                role="alert"
+                message={t("workoutPlan.generateError")}
+                action={t("common.retry")}
+                onAction={generate}
+              />
             )}
             <section className="workout-schedule" aria-labelledby="workout-schedule-title">
               <div className="workout-schedule__heading">
