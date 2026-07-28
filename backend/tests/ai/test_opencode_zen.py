@@ -107,6 +107,18 @@ def test_zen_provider_uses_responses_api_and_parses_structured_output() -> None:
     assert output_format["type"] == "json_schema"
 
 
+def test_zen_response_schema_requires_nullable_notes_keys() -> None:
+    definitions = WORKOUT_PLAN_OUTPUT_SCHEMA["$defs"]
+    assert isinstance(definitions, dict)
+    exercise = definitions["WorkoutPlanExerciseOutput"]
+    assert isinstance(exercise, dict)
+    required = exercise["required"]
+    assert isinstance(required, list)
+
+    assert "notes_en" in required
+    assert "notes_fa" in required
+
+
 @pytest.mark.parametrize(
     ("status_code", "expected_code"),
     [

@@ -127,6 +127,8 @@ npm run build
 فقط backend به Zen وصل می‌شود. مقادیر placeholder مربوط به Zen در `.env.example` هستند؛ کلید واقعی
 را فقط در `backend/.env` محلی قرار بده و هرگز در frontend یا Git قرار نده. راهنمای معماری، حریم
 خصوصی، تست و اجرای اختیاری live در [مولد برنامه تمرینی](workout-plan-generator.md) آمده است.
+اگر شبکه backend به Zen دسترسی مستقیم ندارد، `OPENCODE_ZEN_PROXY_URL` را فقط در backend با نشانی
+معتبر proxy (برای نمونه `socks5://127.0.0.1:10808`) تنظیم کن.
 
 ## اجرای کامل با Docker
 

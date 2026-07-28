@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     opencode_zen_base_url: str = "https://opencode.ai/zen/v1"
     opencode_zen_model: str = "gpt-5.6-terra"
     opencode_zen_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
+    opencode_zen_proxy_url: str | None = Field(default=None, max_length=500, repr=False)
     workout_prompt_version: str = "v1"
     workout_policy_version: str = "v1"
     workout_catalog_programming_version: str = "v1"

@@ -17,8 +17,8 @@ class WorkoutPlanExerciseOutput(BaseModel):
     rest_seconds: int
     rir: int
     estimated_minutes: int
-    notes_en: str | None = None
-    notes_fa: str | None = None
+    notes_en: str | None
+    notes_fa: str | None
 
 
 class WorkoutPlanDayOutput(BaseModel):

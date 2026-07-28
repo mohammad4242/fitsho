@@ -85,3 +85,9 @@ def test_settings_redact_zen_api_key_in_repr() -> None:
     assert settings.workout_max_candidates == 80
     assert settings.workout_max_request_bytes == 262144
     assert settings.workout_warmup_minutes == 5
+
+
+def test_settings_accept_an_explicit_zen_proxy_url() -> None:
+    settings = Settings(opencode_zen_proxy_url="socks5://127.0.0.1:10808")
+
+    assert settings.opencode_zen_proxy_url == "socks5://127.0.0.1:10808"

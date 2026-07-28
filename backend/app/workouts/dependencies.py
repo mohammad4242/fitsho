@@ -14,7 +14,7 @@ def get_workout_plan_model_provider(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> WorkoutPlanModelProvider:
-    client = request.app.state.http_client
+    client = request.app.state.zen_http_client
     if not isinstance(client, httpx.AsyncClient):
         raise RuntimeError("Workout HTTP client is unavailable")
     return OpenCodeZenWorkoutPlanProvider(

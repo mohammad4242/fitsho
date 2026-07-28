@@ -63,6 +63,7 @@ OPENCODE_ZEN_API_KEY=
 OPENCODE_ZEN_BASE_URL=https://opencode.ai/zen/v1
 OPENCODE_ZEN_MODEL=gpt-5.6-terra
 OPENCODE_ZEN_TIMEOUT_SECONDS=30
+OPENCODE_ZEN_PROXY_URL=
 WORKOUT_PROMPT_VERSION=v1
 WORKOUT_POLICY_VERSION=v1
 WORKOUT_CATALOG_PROGRAMMING_VERSION=v1
@@ -134,4 +135,7 @@ cd backend
 ZEN_LIVE_TEST=true OPENCODE_ZEN_API_KEY=... .venv/bin/pytest tests/ai/test_zen_live.py -q
 ```
 
-این دستور هزینه provider دارد و بخشی از CI نیست.
+این دستور هزینه provider دارد و بخشی از CI نیست. اگر سرور backend دسترسی مستقیم به Zen ندارد،
+نشانی proxy را فقط در متغیر backend به‌صورت `OPENCODE_ZEN_PROXY_URL` تنظیم کن؛ برای نمونه
+`socks5://127.0.0.1:10808`. این proxy فقط برای client مربوط به Zen استفاده می‌شود و frontend
+هرگز به آن یا کلید API دسترسی ندارد.
