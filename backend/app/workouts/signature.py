@@ -67,6 +67,7 @@ def hash_candidate_set(candidates: Iterable[WorkoutExerciseCandidate]) -> str:
 def build_generation_signature(context: GenerationSignatureContext) -> str:
     payload: dict[str, Any] = {
         "fitness_goal": _value(context.fitness_goal),
+        "sex": _value(context.sex),
         "experience_level": _value(context.experience_level),
         "training_days_per_week": context.training_days_per_week,
         "training_location": _value(context.training_location),

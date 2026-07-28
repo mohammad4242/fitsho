@@ -9,7 +9,7 @@ from app.workouts.time_budget import (
 def test_duration_calculation_includes_sets_rest_and_transition_time() -> None:
     estimated = calculate_day_minutes([ExerciseTiming(sets=3, rest_seconds=90)])
 
-    assert estimated == 8
+    assert estimated == 7
 
 
 def test_duration_rejects_session_overflow() -> None:

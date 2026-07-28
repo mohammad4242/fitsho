@@ -62,6 +62,7 @@ class CandidateSet:
     candidate_set_hash: str
     soft_cautions: tuple[TrainingCaution, ...]
     minimum_candidate_count: int
+    minimum_movement_pattern_count: int = 1
 
     @property
     def ids(self) -> tuple[UUID, ...]:
@@ -69,7 +70,11 @@ class CandidateSet:
 
     @property
     def is_sufficient(self) -> bool:
-        return len(self.exercises) >= self.minimum_candidate_count
+        return (
+            len(self.exercises) >= self.minimum_candidate_count
+            and len({item.movement_pattern for item in self.exercises})
+            >= self.minimum_movement_pattern_count
+        )
 
 
 @dataclass(frozen=True)
@@ -89,6 +94,7 @@ class GenerationSignatureContext:
     model_id: str
     prompt_version: str
     generation_policy_version: str
+    sex: Sex | None = None
     display_name: str | None = None
     age: int | None = None
     height_cm: int | None = None

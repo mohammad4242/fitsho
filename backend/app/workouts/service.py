@@ -31,7 +31,12 @@ from app.workouts.repository import (
 )
 from app.workouts.schemas import CandidateSet, GenerationSignatureContext, WorkoutGenerationProfile
 from app.workouts.signature import build_generation_signature, normalize_physical_limitations
-from app.workouts.time_budget import WorkoutGenerationPolicy
+from app.workouts.time_budget import (
+    ExerciseTiming,
+    WorkoutGenerationPolicy,
+    calculate_day_minutes,
+    calculate_exercise_minutes,
+)
 from app.workouts.validator import WorkoutPlanValidationError, WorkoutPlanValidator
 
 
@@ -135,6 +140,7 @@ class WorkoutGenerationService:
                 profile_snapshot=self._profile_snapshot(request),
                 candidate_set_hash=candidates.candidate_set_hash,
                 response=response.plan,
+                policy=policy,
             )
             generation.provider_request_id = response.provider_request_id
             generation.input_tokens = response.input_tokens
@@ -235,6 +241,7 @@ class WorkoutGenerationService:
         profile_snapshot: dict[str, object],
         candidate_set_hash: str,
         response: WorkoutPlanModelOutput,
+        policy: WorkoutGenerationPolicy,
     ) -> WorkoutPlan:
 
         plan = WorkoutPlan(
@@ -250,11 +257,20 @@ class WorkoutGenerationService:
             generation_method="ai",
         )
         for output_day in response.days:
+            timings = [
+                ExerciseTiming(sets=item.sets, rest_seconds=item.rest_seconds)
+                for item in output_day.exercises
+            ]
             day = WorkoutDay(
                 day_number=output_day.day_number,
                 title_en=output_day.title_en,
                 title_fa=output_day.title_fa,
-                estimated_duration_minutes=output_day.estimated_duration_minutes,
+                estimated_duration_minutes=policy.warmup_minutes
+                + calculate_day_minutes(
+                    timings,
+                    set_execution_seconds=policy.set_execution_seconds,
+                    transition_seconds=policy.transition_seconds_per_exercise,
+                ),
             )
             for order_index, output_exercise in enumerate(output_day.exercises, start=1):
                 day.exercises.append(
@@ -266,7 +282,14 @@ class WorkoutGenerationService:
                         reps_max=output_exercise.reps_max,
                         rest_seconds=output_exercise.rest_seconds,
                         rir=output_exercise.rir,
-                        estimated_minutes=output_exercise.estimated_minutes,
+                        estimated_minutes=calculate_exercise_minutes(
+                            ExerciseTiming(
+                                sets=output_exercise.sets,
+                                rest_seconds=output_exercise.rest_seconds,
+                            ),
+                            set_execution_seconds=policy.set_execution_seconds,
+                            transition_seconds=policy.transition_seconds_per_exercise,
+                        ),
                         notes_en=output_exercise.notes_en,
                         notes_fa=output_exercise.notes_fa,
                     )
@@ -355,6 +378,7 @@ class WorkoutGenerationService:
         return build_generation_signature(
             GenerationSignatureContext(
                 fitness_goal=profile.fitness_goal,
+                sex=profile.sex,
                 experience_level=profile.experience_level,
                 training_days_per_week=profile.training_days_per_week,
                 training_location=profile.training_location,

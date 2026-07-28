@@ -1,7 +1,13 @@
 from decimal import Decimal
 from typing import Any, cast
 
-from app.profile.enums import ExperienceLevel, HomeTrainingSetup, TrainingCaution, TrainingLocation
+from app.profile.enums import (
+    ExperienceLevel,
+    HomeTrainingSetup,
+    Sex,
+    TrainingCaution,
+    TrainingLocation,
+)
 from app.workouts.schemas import GenerationSignatureContext
 from app.workouts.signature import build_generation_signature
 
@@ -23,6 +29,7 @@ def context(**changes: object) -> GenerationSignatureContext:
         "model_id": "model-a",
         "prompt_version": "prompt-v1",
         "generation_policy_version": "policy-v1",
+        "sex": Sex.MALE,
     }
     values.update(changes)
     return GenerationSignatureContext(**cast(Any, values))
@@ -40,3 +47,4 @@ def test_relevant_conditions_and_candidate_set_change_generation_signature() -> 
     assert baseline != build_generation_signature(context(training_days_per_week=4))
     assert baseline != build_generation_signature(context(candidate_set_hash="b" * 64))
     assert baseline != build_generation_signature(context(current_weight_kg=Decimal("75.0")))
+    assert baseline != build_generation_signature(context(sex=Sex.FEMALE))

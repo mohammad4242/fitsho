@@ -165,6 +165,8 @@ def test_generation_persists_valid_plan_then_reuses_same_signature(db: Session) 
     assert len(provider.calls) == 1
     assert first.plan.status is WorkoutPlanStatus.ACTIVE
     assert first.plan.generation_records[0].input_tokens == 10
+    assert first.plan.days[0].estimated_duration_minutes == 26
+    assert [item.estimated_minutes for item in first.plan.days[0].exercises] == [7, 7, 7]
 
 
 def test_invalid_response_is_repaired_once_before_persistence(db: Session) -> None:

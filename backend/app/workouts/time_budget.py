@@ -22,7 +22,7 @@ class WorkoutGenerationPolicy:
     maximum_repetitions: int = 20
     allowed_rest_seconds: tuple[int, ...] = (45, 60, 75, 90, 120, 150, 180)
     allowed_rir: tuple[int, ...] = (1, 2, 3, 4)
-    set_execution_seconds: int = 60
+    set_execution_seconds: int = 45
     transition_seconds_per_exercise: int = 90
 
     @classmethod
@@ -43,7 +43,7 @@ class WorkoutGenerationPolicy:
 def calculate_exercise_minutes(
     timing: ExerciseTiming,
     *,
-    set_execution_seconds: int = 60,
+    set_execution_seconds: int = 45,
     transition_seconds: int = 90,
 ) -> int:
     total_seconds = (
@@ -57,7 +57,7 @@ def calculate_exercise_minutes(
 def calculate_day_minutes(
     exercises: Iterable[ExerciseTiming],
     *,
-    set_execution_seconds: int = 60,
+    set_execution_seconds: int = 45,
     transition_seconds: int = 90,
 ) -> int:
     return sum(

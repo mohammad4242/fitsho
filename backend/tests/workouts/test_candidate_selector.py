@@ -145,3 +145,41 @@ def test_selector_reports_an_insufficient_candidate_set(db: Session) -> None:
     )
 
     assert not result.is_sufficient
+
+
+def test_selector_strictly_excludes_other_caution_tag(db: Session) -> None:
+    safe = exercise(db, "safe-row", equipment=(Equipment.BODYWEIGHT,))
+    blocked = exercise(
+        db,
+        "other-caution-row",
+        equipment=(Equipment.BODYWEIGHT,),
+        caution_tags=(ExerciseCautionTag.OTHER,),
+    )
+
+    result = WorkoutCandidateSelector(db).select(
+        profile(
+            location=TrainingLocation.HOME,
+            setup=HomeTrainingSetup.BODYWEIGHT_ONLY,
+            cautions=(TrainingCaution.OTHER,),
+        )
+    )
+
+    assert safe.id in result.ids
+    assert blocked.id not in result.ids
+
+
+def test_multiday_selector_requires_candidate_count_and_pattern_coverage(db: Session) -> None:
+    for index in range(4):
+        exercise(
+            db,
+            f"same-pattern-{index}",
+            equipment=(Equipment.BODYWEIGHT,),
+            movement_pattern=MovementPattern.HORIZONTAL_PUSH,
+        )
+
+    result = WorkoutCandidateSelector(db).select(
+        profile(location=TrainingLocation.HOME, setup=HomeTrainingSetup.BODYWEIGHT_ONLY)
+    )
+
+    assert len(result.exercises) == 4
+    assert not result.is_sufficient

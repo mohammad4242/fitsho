@@ -143,7 +143,7 @@ class WorkoutPlanValidator:
                     )
                 )
 
-        calculated_minutes = calculate_day_minutes(
+        calculated_minutes = self._policy.warmup_minutes + calculate_day_minutes(
             timings,
             set_execution_seconds=self._policy.set_execution_seconds,
             transition_seconds=self._policy.transition_seconds_per_exercise,
