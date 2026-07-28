@@ -1,13 +1,19 @@
 from typing import cast
 from uuid import UUID
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.ai.schemas import ProviderErrorCode
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan
-from app.workouts.service import GenerationCooldownError, WorkoutPlanGenerationResult
+from app.workouts.service import (
+    GenerationCooldownError,
+    WorkoutGenerationFailedError,
+    WorkoutPlanGenerationResult,
+)
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 PROFILE = {
@@ -139,3 +145,33 @@ def test_generate_returns_retry_after_during_a_generation_cooldown(
 
     assert response.status_code == 429
     assert response.headers["Retry-After"] == "42"
+
+
+@pytest.mark.parametrize(
+    ("error_code", "expected_status"),
+    [
+        (ProviderErrorCode.TIMEOUT, 504),
+        (ProviderErrorCode.MALFORMED_RESPONSE, 502),
+        (ProviderErrorCode.RATE_LIMITED, 503),
+    ],
+)
+def test_generate_maps_provider_failures_to_safe_statuses(
+    client: TestClient,
+    error_code: ProviderErrorCode,
+    expected_status: int,
+) -> None:
+    _register_and_complete_profile(client, f"provider-{error_code.value}@example.com")
+
+    class FakeService:
+        async def generate(self, current_user_id: UUID) -> WorkoutPlanGenerationResult:
+            raise WorkoutGenerationFailedError(error_code)
+
+    from app.workouts.dependencies import get_workout_generation_service
+
+    app = cast(FastAPI, client.app)
+    app.dependency_overrides[get_workout_generation_service] = lambda: FakeService()
+    response = client.post("/api/v1/workout-plans/generate", headers=ORIGIN)
+    app.dependency_overrides.pop(get_workout_generation_service)
+
+    assert response.status_code == expected_status
+    assert "error_code" not in response.json()

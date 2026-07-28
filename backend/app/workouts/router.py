@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.ai.schemas import ProviderErrorCode
 from app.auth.cookies import require_trusted_origin
 from app.auth.models import User
 from app.database.session import get_db
@@ -69,9 +70,10 @@ async def generate_plan(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Not enough eligible exercises for a workout plan",
         ) from None
-    except WorkoutGenerationFailedError:
+    except WorkoutGenerationFailedError as error:
+        status_code = _provider_failure_status(error.provider_error_code)
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            status_code=status_code,
             detail="Workout plan generation is temporarily unavailable",
         ) from None
     return WorkoutPlanGenerateResponse(plan=to_plan_response(result.plan), reused=result.reused)
@@ -138,3 +140,17 @@ def to_plan_response(plan: WorkoutPlan, *, is_stale: bool = False) -> WorkoutPla
             for day in plan.days
         ],
     )
+
+
+def _provider_failure_status(error_code: ProviderErrorCode | None) -> int:
+    if error_code is ProviderErrorCode.TIMEOUT:
+        return status.HTTP_504_GATEWAY_TIMEOUT
+    if error_code in {
+        ProviderErrorCode.CONNECTION_FAILURE,
+        ProviderErrorCode.PROVIDER_UNAVAILABLE,
+        ProviderErrorCode.MALFORMED_RESPONSE,
+        ProviderErrorCode.INVALID_OUTPUT,
+        ProviderErrorCode.REFUSAL,
+    }:
+        return status.HTTP_502_BAD_GATEWAY
+    return status.HTTP_503_SERVICE_UNAVAILABLE

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.ai.provider import WorkoutPlanModelProvider
 from app.ai.schemas import (
+    ProviderErrorCode,
     WorkoutGenerationModelRequest,
     WorkoutGenerationModelResponse,
     WorkoutPlanModelOutput,
@@ -80,7 +81,8 @@ class NoEligibleExercisesError(Exception):
 
 
 class WorkoutGenerationFailedError(Exception):
-    pass
+    def __init__(self, provider_error_code: ProviderErrorCode | None = None) -> None:
+        self.provider_error_code = provider_error_code
 
 
 class GenerationInputsChangedError(Exception):
@@ -151,6 +153,7 @@ class WorkoutGenerationService:
             return WorkoutPlanGenerationResult(plan=plan, reused=False)
         except WorkoutProviderError as error:
             self._mark_failure(generation, error.code.value, error.safe_message)
+            raise WorkoutGenerationFailedError(error.code) from None
         except WorkoutPlanValidationError:
             self._mark_failure(
                 generation,
