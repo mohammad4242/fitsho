@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal, Self
 from urllib.parse import urlsplit
 
-from pydantic import model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     media_read_chunk_bytes: int = 1024 * 1024
     ffprobe_path: str = "ffprobe"
     ffprobe_timeout_seconds: float = 5.0
+    opencode_zen_api_key: SecretStr | None = Field(default=None, repr=False)
+    opencode_zen_base_url: str = "https://opencode.ai/zen/v1"
+    opencode_zen_model: str = "gpt-5.6-terra"
+    opencode_zen_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
+    workout_prompt_version: str = "v1"
+    workout_policy_version: str = "v1"
+    workout_max_repair_attempts: int = Field(default=1, ge=0, le=1)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

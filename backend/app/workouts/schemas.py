@@ -16,6 +16,7 @@ from app.profile.enums import (
     ExperienceLevel,
     FitnessGoal,
     HomeTrainingSetup,
+    Sex,
     TrainingCaution,
     TrainingLocation,
 )
@@ -33,6 +34,9 @@ class WorkoutGenerationProfile:
     training_cautions: tuple[TrainingCaution, ...]
     physical_limitations: str | None
     current_weight_kg: Decimal | float | int | None
+    age: int | None = None
+    sex: Sex | None = None
+    height_cm: int | None = None
 
 
 @dataclass(frozen=True)

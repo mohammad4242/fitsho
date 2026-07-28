@@ -74,3 +74,10 @@ def test_production_settings_reject_insecure_cookie_contract(
 
     with pytest.raises(ValidationError, match=expected_message):
         Settings(**values)  # type: ignore[arg-type]
+
+
+def test_settings_redact_zen_api_key_in_repr() -> None:
+    settings = Settings(opencode_zen_api_key="test-secret-key")
+
+    assert "test-secret-key" not in repr(settings)
+    assert settings.workout_max_repair_attempts == 1

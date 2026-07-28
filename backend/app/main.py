@@ -1,3 +1,7 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+import httpx
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +19,15 @@ from app.profile.router import router as profile_router
 def create_app(settings: Settings | None = None) -> FastAPI:
     active_settings = settings or get_settings()
     active_settings.media_root.mkdir(parents=True, exist_ok=True)
-    app = FastAPI(title="Fitsho API")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        timeout = httpx.Timeout(active_settings.opencode_zen_timeout_seconds)
+        async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
+            app.state.http_client = client
+            yield
+
+    app = FastAPI(title="Fitsho API", lifespan=lifespan)
     app.dependency_overrides[get_settings] = lambda: active_settings
     app.add_middleware(
         CORSMiddleware,
