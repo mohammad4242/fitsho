@@ -39,8 +39,12 @@ def get_workout_generation_service(
             model_id=settings.opencode_zen_model,
             prompt_version=settings.workout_prompt_version,
             generation_policy_version=settings.workout_policy_version,
-            catalog_programming_version="v1",
+            catalog_programming_version=settings.workout_catalog_programming_version,
             max_repair_attempts=settings.workout_max_repair_attempts,
+            cooldown_seconds=settings.workout_generation_cooldown_seconds,
+            max_candidates=settings.workout_max_candidates,
+            max_request_bytes=settings.workout_max_request_bytes,
+            warmup_minutes=settings.workout_warmup_minutes,
         ),
     )
 

@@ -81,3 +81,7 @@ def test_settings_redact_zen_api_key_in_repr() -> None:
 
     assert "test-secret-key" not in repr(settings)
     assert settings.workout_max_repair_attempts == 1
+    assert settings.workout_generation_cooldown_seconds == 300
+    assert settings.workout_max_candidates == 80
+    assert settings.workout_max_request_bytes == 262144
+    assert settings.workout_warmup_minutes == 5

@@ -43,6 +43,18 @@ def create_generation(
     return generation
 
 
+def get_latest_completed_generation_at(db: Session, user_id: UUID) -> datetime | None:
+    return db.scalar(
+        select(WorkoutPlanGeneration.completed_at)
+        .where(
+            WorkoutPlanGeneration.user_id == user_id,
+            WorkoutPlanGeneration.completed_at.is_not(None),
+        )
+        .order_by(WorkoutPlanGeneration.completed_at.desc())
+        .limit(1)
+    )
+
+
 def fail_generation(
     db: Session,
     generation: WorkoutPlanGeneration,

@@ -19,6 +19,7 @@ from app.workouts.schemas import (
     WorkoutPlanResponse,
 )
 from app.workouts.service import (
+    GenerationCooldownError,
     GenerationInProgressError,
     NoEligibleExercisesError,
     WorkoutGenerationFailedError,
@@ -52,6 +53,12 @@ async def generate_plan(
 ) -> WorkoutPlanGenerateResponse:
     try:
         result = await service.generate(user.id)
+    except GenerationCooldownError as error:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Workout plan generation is cooling down",
+            headers={"Retry-After": str(error.retry_after_seconds)},
+        ) from None
     except GenerationInProgressError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

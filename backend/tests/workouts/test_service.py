@@ -30,6 +30,7 @@ from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan, WorkoutPlanGeneration
 from app.workouts.repository import create_generation
 from app.workouts.service import (
+    GenerationCooldownError,
     GenerationInProgressError,
     WorkoutGenerationFailedError,
     WorkoutGenerationService,
@@ -125,7 +126,12 @@ def _response(exercise_ids: list[UUID]) -> WorkoutGenerationModelResponse:
     )
 
 
-def _service(db: Session, provider: FakeWorkoutPlanModelProvider) -> WorkoutGenerationService:
+def _service(
+    db: Session,
+    provider: FakeWorkoutPlanModelProvider,
+    *,
+    cooldown_seconds: int = 0,
+) -> WorkoutGenerationService:
     return WorkoutGenerationService(
         db,
         provider=provider,
@@ -136,6 +142,10 @@ def _service(db: Session, provider: FakeWorkoutPlanModelProvider) -> WorkoutGene
             generation_policy_version="v1",
             catalog_programming_version="v1",
             max_repair_attempts=1,
+            cooldown_seconds=cooldown_seconds,
+            max_candidates=80,
+            max_request_bytes=262144,
+            warmup_minutes=5,
         ),
     )
 
@@ -276,3 +286,21 @@ def test_profile_change_during_provider_call_prevents_activation(db: Session) ->
     generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
     assert generation.status is WorkoutGenerationStatus.FAILED
     assert generation.error_code == "generation_inputs_changed"
+
+
+def test_generation_cooldown_prevents_another_provider_request(db: Session) -> None:
+    user = _user_with_profile(db)
+    exercises = _seed_candidates(db)
+    first_provider = FakeWorkoutPlanModelProvider([_response([item.id for item in exercises])])
+    asyncio.run(_service(db, first_provider, cooldown_seconds=300).generate(user.id))
+    profile = db.get(UserProfile, user.id)
+    assert profile is not None
+    profile.fitness_goal = FitnessGoal.IMPROVE_FITNESS
+    db.commit()
+    second_provider = FakeWorkoutPlanModelProvider([])
+
+    with pytest.raises(GenerationCooldownError) as error:
+        asyncio.run(_service(db, second_provider, cooldown_seconds=300).generate(user.id))
+
+    assert 1 <= error.value.retry_after_seconds <= 300
+    assert second_provider.calls == []

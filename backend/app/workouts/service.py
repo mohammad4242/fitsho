@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
+from math import ceil
 from time import perf_counter
 from uuid import UUID
 
@@ -25,6 +27,7 @@ from app.workouts.repository import (
     create_generation,
     fail_generation,
     get_active_plan,
+    get_latest_completed_generation_at,
 )
 from app.workouts.schemas import CandidateSet, GenerationSignatureContext, WorkoutGenerationProfile
 from app.workouts.signature import build_generation_signature, normalize_physical_limitations
@@ -40,6 +43,10 @@ class WorkoutGenerationSettings:
     generation_policy_version: str
     catalog_programming_version: str
     max_repair_attempts: int
+    cooldown_seconds: int
+    max_candidates: int
+    max_request_bytes: int
+    warmup_minutes: int
 
 
 @dataclass(frozen=True)
@@ -56,6 +63,11 @@ class ActiveWorkoutPlanResult:
 
 class GenerationInProgressError(Exception):
     pass
+
+
+class GenerationCooldownError(Exception):
+    def __init__(self, retry_after_seconds: int) -> None:
+        self.retry_after_seconds = retry_after_seconds
 
 
 class NoEligibleExercisesError(Exception):
@@ -85,10 +97,13 @@ class WorkoutGenerationService:
     async def generate(self, user_id: UUID) -> WorkoutPlanGenerationResult:
         source_profile = get_profile(self._db, user_id)
         profile = self._to_generation_profile(source_profile)
-        candidates = WorkoutCandidateSelector(self._db).select(profile)
+        candidates = self._select_candidates(profile)
         if not candidates.is_sufficient:
             raise NoEligibleExercisesError
-        policy = WorkoutGenerationPolicy.for_session_duration(profile.session_duration_minutes)
+        policy = WorkoutGenerationPolicy.for_session_duration(
+            profile.session_duration_minutes,
+            warmup_minutes=self._settings.warmup_minutes,
+        )
         signature = self._generation_signature(profile, candidates)
         active_plan = get_active_plan(self._db, user_id)
         if (
@@ -98,8 +113,10 @@ class WorkoutGenerationService:
         ):
             return WorkoutPlanGenerationResult(plan=active_plan, reused=True)
 
-        generation = self._start_generation(user_id, len(candidates.exercises))
+        self._enforce_cooldown(user_id)
         request = build_workout_generation_model_request(profile, candidates, policy)
+        self._enforce_request_size(request)
+        generation = self._start_generation(user_id, len(candidates.exercises))
         started_at = perf_counter()
         try:
             response = await self._generate_valid_response(
@@ -109,7 +126,7 @@ class WorkoutGenerationService:
                 required_day_count=profile.training_days_per_week,
             )
             refreshed_profile = self._to_generation_profile(get_profile(self._db, user_id))
-            refreshed_candidates = WorkoutCandidateSelector(self._db).select(refreshed_profile)
+            refreshed_candidates = self._select_candidates(refreshed_profile)
             if self._generation_signature(refreshed_profile, refreshed_candidates) != signature:
                 raise GenerationInputsChangedError
             plan = self._build_plan(
@@ -324,7 +341,7 @@ class WorkoutGenerationService:
         if plan is None:
             return None
         profile = self._to_generation_profile(get_profile(self._db, user_id))
-        candidates = WorkoutCandidateSelector(self._db).select(profile)
+        candidates = self._select_candidates(profile)
         is_stale = plan.generation_signature != self._generation_signature(
             profile, candidates
         ) or self._is_plan_expired(plan)
@@ -354,6 +371,30 @@ class WorkoutGenerationService:
                 generation_policy_version=self._settings.generation_policy_version,
             )
         )
+
+    def _select_candidates(self, profile: WorkoutGenerationProfile) -> CandidateSet:
+        return WorkoutCandidateSelector(
+            self._db,
+            maximum_candidates=self._settings.max_candidates,
+        ).select(profile)
+
+    def _enforce_cooldown(self, user_id: UUID) -> None:
+        if self._settings.cooldown_seconds == 0:
+            return
+        completed_at = get_latest_completed_generation_at(self._db, user_id)
+        if completed_at is None:
+            return
+        elapsed = (datetime.now(UTC) - completed_at).total_seconds()
+        remaining = self._settings.cooldown_seconds - elapsed
+        if remaining > 0:
+            raise GenerationCooldownError(ceil(remaining))
+
+    def _enforce_request_size(self, request: WorkoutGenerationModelRequest) -> None:
+        request_size = len(
+            json.dumps(request.input_payload, ensure_ascii=False, separators=(",", ":")).encode()
+        )
+        if request_size > self._settings.max_request_bytes:
+            raise WorkoutGenerationFailedError
 
     @staticmethod
     def plan_duration_weeks(plan: WorkoutPlan) -> int:

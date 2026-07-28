@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan
-from app.workouts.service import WorkoutPlanGenerationResult
+from app.workouts.service import GenerationCooldownError, WorkoutPlanGenerationResult
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 PROFILE = {
@@ -119,3 +119,23 @@ def test_generate_uses_authenticated_user_and_returns_reuse_flag(
     assert response.status_code == 200
     assert response.json()["reused"] is True
     assert called_user_ids == [user_id]
+
+
+def test_generate_returns_retry_after_during_a_generation_cooldown(
+    client: TestClient,
+) -> None:
+    _register_and_complete_profile(client, "cooldown-plan@example.com")
+
+    class FakeService:
+        async def generate(self, current_user_id: UUID) -> WorkoutPlanGenerationResult:
+            raise GenerationCooldownError(42)
+
+    from app.workouts.dependencies import get_workout_generation_service
+
+    app = cast(FastAPI, client.app)
+    app.dependency_overrides[get_workout_generation_service] = lambda: FakeService()
+    response = client.post("/api/v1/workout-plans/generate", headers=ORIGIN)
+    app.dependency_overrides.pop(get_workout_generation_service)
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"] == "42"

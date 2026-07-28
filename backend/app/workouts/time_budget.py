@@ -26,11 +26,16 @@ class WorkoutGenerationPolicy:
     transition_seconds_per_exercise: int = 90
 
     @classmethod
-    def for_session_duration(cls, session_duration_minutes: int) -> WorkoutGenerationPolicy:
+    def for_session_duration(
+        cls,
+        session_duration_minutes: int,
+        *,
+        warmup_minutes: int = 5,
+    ) -> WorkoutGenerationPolicy:
         maximums = {30: 3, 45: 4, 60: 6, 75: 7, 90: 8}
         return cls(
             session_duration_minutes=session_duration_minutes,
-            warmup_minutes=5,
+            warmup_minutes=warmup_minutes,
             maximum_exercises_per_day=maximums[session_duration_minutes],
         )
 
