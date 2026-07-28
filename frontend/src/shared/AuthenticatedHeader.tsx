@@ -42,6 +42,12 @@ export function AuthenticatedHeader() {
               {t("header.dashboard")}
             </Link>
             <Link
+              to="/workout-plan"
+              aria-current={location.pathname.startsWith("/workout-plan") ? "page" : undefined}
+            >
+              {t("header.workoutPlan")}
+            </Link>
+            <Link
               to="/exercises"
               aria-current={
                 location.pathname.startsWith("/exercises") ? "page" : undefined

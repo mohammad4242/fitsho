@@ -247,7 +247,7 @@ it("renders the protected profile route for a member with a profile", async () =
   ).toBeInTheDocument();
 });
 
-it.each(["/exercises", "/exercises/dumbbell-bench-press"])(
+it.each(["/exercises", "/exercises/dumbbell-bench-press", "/workout-plan"])(
   "redirects a guest from %s to login",
   async (path) => {
     renderRoute(path);
@@ -258,7 +258,7 @@ it.each(["/exercises", "/exercises/dumbbell-bench-press"])(
   },
 );
 
-it.each(["/exercises", "/exercises/dumbbell-bench-press"])(
+it.each(["/exercises", "/exercises/dumbbell-bench-press", "/workout-plan"])(
   "redirects a member without a profile from %s to onboarding",
   async (path) => {
     auth.value.user = member;

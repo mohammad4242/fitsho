@@ -1,0 +1,37 @@
+import type { ExerciseSummary } from "../exercises/types";
+
+export type WorkoutPlanStatus = "generating" | "active" | "superseded" | "failed";
+
+export type WorkoutPlanExercise = {
+  order_index: number;
+  sets: number;
+  reps_min: number;
+  reps_max: number;
+  rest_seconds: number;
+  rir: number;
+  estimated_minutes: number;
+  notes_en: string | null;
+  notes_fa: string | null;
+  exercise: ExerciseSummary;
+};
+
+export type WorkoutDay = {
+  day_number: number;
+  title_en: string;
+  title_fa: string;
+  estimated_duration_minutes: number;
+  exercises: WorkoutPlanExercise[];
+};
+
+export type WorkoutPlan = {
+  id: string;
+  status: WorkoutPlanStatus;
+  created_at: string;
+  activated_at: string | null;
+  days: WorkoutDay[];
+};
+
+export type WorkoutPlanGeneration = {
+  plan: WorkoutPlan;
+  reused: boolean;
+};

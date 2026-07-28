@@ -13,6 +13,8 @@ import { ExerciseDetailPage } from "./features/exercises/ExerciseDetailPage";
 import { OnboardingPage } from "./features/profile/OnboardingPage";
 import { ProfilePage } from "./features/profile/ProfilePage";
 import { ProfileProvider } from "./features/profile/ProfileContext";
+import { useProfile } from "./features/profile/ProfileContext";
+import { WorkoutPlanPage } from "./features/workouts/WorkoutPlanPage";
 import {
   CompletedProfileRoute,
   GuestRoute,
@@ -39,6 +41,7 @@ export function AppRoutes() {
         <Route element={<CompletedProfileRoute />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/workout-plan" element={<WorkoutPlanRoute />} />
           <Route path="/exercises" element={<ExerciseCatalogPage />} />
           <Route path="/exercises/:slug" element={<ExerciseDetailPage />} />
         </Route>
@@ -47,6 +50,11 @@ export function AppRoutes() {
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
+}
+
+function WorkoutPlanRoute() {
+  const { profile } = useProfile();
+  return <WorkoutPlanPage planDurationWeeks={profile?.plan_duration_weeks ?? 4} />;
 }
 
 export default function App() {
