@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import unicodedata
 from collections.abc import Iterable
 from decimal import Decimal
 from enum import Enum
@@ -34,7 +35,12 @@ def _canonical_hash(payload: object) -> str:
 def normalize_physical_limitations(value: str | None) -> str | None:
     if value is None:
         return None
-    normalized = " ".join(value.split()).casefold()
+    normalized = unicodedata.normalize("NFKC", value)
+    normalized = "".join(
+        " " if unicodedata.category(character).startswith("C") else character
+        for character in normalized
+    )
+    normalized = " ".join(normalized.split()).casefold()
     return normalized or None
 
 

@@ -48,3 +48,11 @@ def test_relevant_conditions_and_candidate_set_change_generation_signature() -> 
     assert baseline != build_generation_signature(context(candidate_set_hash="b" * 64))
     assert baseline != build_generation_signature(context(current_weight_kg=Decimal("75.0")))
     assert baseline != build_generation_signature(context(sex=Sex.FEMALE))
+
+
+def test_limitations_normalization_ignores_unicode_form_and_control_character_changes() -> None:
+    baseline = build_generation_signature(context(physical_limitations="avoid shoulder load"))
+
+    assert baseline == build_generation_signature(
+        context(physical_limitations="avoid\u0000  shoulder\tload")
+    )

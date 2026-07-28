@@ -116,6 +116,7 @@ class WorkoutPlanValidator:
                 )
                 continue
             selected.append(candidate)
+            self._validate_notes(day.day_number, exercise, problems)
             if exercise.exercise_id in seen_ids:
                 problems.append(
                     ValidationProblem(
@@ -179,6 +180,48 @@ class WorkoutPlanValidator:
                     day_number=day.day_number,
                 )
             )
+
+        seen_smaller_movement = False
+        for candidate in selected:
+            if candidate.exercise_type is ExerciseType.COMPOUND and seen_smaller_movement:
+                problems.append(
+                    ValidationProblem(
+                        code="compound_order",
+                        message="Compound exercises must appear before isolation movements.",
+                        day_number=day.day_number,
+                    )
+                )
+                break
+            if candidate.exercise_type in {ExerciseType.ISOLATION, ExerciseType.CORE}:
+                seen_smaller_movement = True
+
+    @staticmethod
+    def _validate_notes(
+        day_number: int,
+        exercise: object,
+        problems: list[ValidationProblem],
+    ) -> None:
+        from app.ai.schemas import WorkoutPlanExerciseOutput
+
+        if not isinstance(exercise, WorkoutPlanExerciseOutput):
+            return
+        for note in (exercise.notes_en, exercise.notes_fa):
+            if note is None:
+                continue
+            normalized = note.casefold()
+            if any(
+                marker in normalized
+                for marker in ("<", ">", "http://", "https://", "```", "diagnos", "treat", "cure")
+            ):
+                problems.append(
+                    ValidationProblem(
+                        code="unsafe_notes",
+                        message="Workout notes must not contain markup, URLs, or medical claims.",
+                        day_number=day_number,
+                        exercise_id=exercise.exercise_id,
+                    )
+                )
+                return
 
     def _validate_prescription(
         self,
@@ -267,6 +310,18 @@ class WorkoutPlanValidator:
             "Plan needs broader movement-pattern coverage.",
             problems,
         )
+        if len(selected) >= 4:
+            most_common_muscle_count = max(
+                sum(candidate.primary_muscle is muscle for candidate in selected)
+                for muscle in {candidate.primary_muscle for candidate in selected}
+            )
+            if most_common_muscle_count * 2 > len(selected):
+                problems.append(
+                    ValidationProblem(
+                        code="muscle_group_concentration",
+                        message="No primary muscle group may dominate the plan.",
+                    )
+                )
         self._require_variety(
             {candidate.primary_muscle for candidate in selected},
             {candidate.primary_muscle for candidate in self._candidates.exercises},

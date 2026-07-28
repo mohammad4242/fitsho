@@ -50,7 +50,11 @@ def _candidates() -> CandidateSet:
 
 
 def _exercise(
-    exercise_id: UUID, *, sets: int = 3, rest_seconds: int = 90
+    exercise_id: UUID,
+    *,
+    sets: int = 3,
+    rest_seconds: int = 90,
+    notes_en: str | None = None,
 ) -> WorkoutPlanExerciseOutput:
     return WorkoutPlanExerciseOutput(
         exercise_id=exercise_id,
@@ -59,7 +63,8 @@ def _exercise(
         reps_max=12,
         rest_seconds=rest_seconds,
         rir=2,
-        estimated_minutes=8,
+        estimated_minutes=7,
+        notes_en=notes_en,
     )
 
 
@@ -71,7 +76,7 @@ def _plan(days: list[WorkoutPlanDayOutput] | None = None) -> WorkoutPlanModelOut
                 day_number=1,
                 title_en="Full body",
                 title_fa="تمام بدن",
-                estimated_duration_minutes=24,
+                estimated_duration_minutes=26,
                 exercises=[_exercise(FIRST_ID), _exercise(SECOND_ID), _exercise(THIRD_ID)],
             )
         ]
@@ -189,3 +194,66 @@ def test_validator_rejects_plan_that_overflows_time_budget() -> None:
     codes = {problem.code for problem in exc_info.value.problems}
     assert "duplicate_exercise" in codes
     assert "duration_exceeded" in codes
+
+
+def test_validator_rejects_isolation_before_a_suitable_compound() -> None:
+    candidates = CandidateSet(
+        exercises=(
+            _candidate(FIRST_ID, pattern=MovementPattern.HORIZONTAL_PUSH),
+            _candidate(
+                SECOND_ID,
+                pattern=MovementPattern.ELBOW_FLEXION,
+                exercise_type=ExerciseType.ISOLATION,
+                muscle=MuscleGroup.BICEPS,
+            ),
+            _candidate(THIRD_ID, pattern=MovementPattern.SQUAT, muscle=MuscleGroup.QUADRICEPS),
+        ),
+        candidate_set_hash="a" * 64,
+        soft_cautions=(),
+        minimum_candidate_count=1,
+    )
+    validator = WorkoutPlanValidator(
+        candidates=candidates,
+        policy=WorkoutGenerationPolicy.for_session_duration(45),
+        required_day_count=1,
+    )
+    plan = _plan(
+        [
+            WorkoutPlanDayOutput(
+                day_number=1,
+                title_en="Bad order",
+                title_fa="ترتیب بد",
+                estimated_duration_minutes=26,
+                exercises=[_exercise(SECOND_ID), _exercise(FIRST_ID), _exercise(THIRD_ID)],
+            )
+        ]
+    )
+
+    with pytest.raises(WorkoutPlanValidationError) as exc_info:
+        validator.validate(plan)
+
+    assert "compound_order" in {problem.code for problem in exc_info.value.problems}
+
+
+@pytest.mark.parametrize("unsafe_note", ["<b>HTML</b>", "https://example.com", "```markdown"])
+def test_validator_rejects_unsafe_model_notes(unsafe_note: str) -> None:
+    plan = _plan(
+        [
+            WorkoutPlanDayOutput(
+                day_number=1,
+                title_en="Unsafe note",
+                title_fa="یادداشت ناامن",
+                estimated_duration_minutes=26,
+                exercises=[
+                    _exercise(FIRST_ID, notes_en=unsafe_note),
+                    _exercise(SECOND_ID),
+                    _exercise(THIRD_ID),
+                ],
+            )
+        ]
+    )
+
+    with pytest.raises(WorkoutPlanValidationError) as exc_info:
+        _validator().validate(plan)
+
+    assert "unsafe_notes" in {problem.code for problem in exc_info.value.problems}

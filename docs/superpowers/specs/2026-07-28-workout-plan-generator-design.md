@@ -441,4 +441,3 @@ serialization, React, and persisted snapshots.
 
 Zen/OpenAI request-retention behavior is a documented limitation. Automated tests never
 call Zen. The optional synthetic live test requires `ZEN_LIVE_TEST=true`.
-
