@@ -87,6 +87,7 @@ def test_create_home_profile_stores_selected_setup(
     assert response.json()["home_training_setup"] == home_training_setup
     profile = db.get(UserProfile, user_id)
     assert profile is not None
+    assert profile.home_training_setup is not None
     assert profile.home_training_setup.value == home_training_setup
 
 

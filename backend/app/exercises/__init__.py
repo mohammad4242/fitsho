@@ -1,0 +1,1 @@
+"""Controlled exercise catalog domain."""
