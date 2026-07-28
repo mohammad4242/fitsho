@@ -11,6 +11,7 @@ const auth = vi.hoisted(() => ({
       id: string;
       email: string;
       created_at: string;
+      is_admin: boolean;
     },
     loading: false,
     startupError: false,
@@ -159,6 +160,7 @@ it("shows the real account and logs the user out", async () => {
     id: "1",
     email: "member@example.com",
     created_at: "2026-07-24T00:00:00Z",
+    is_admin: false,
   };
   profile.value.status = "ready";
   profile.value.profile = {
@@ -206,6 +208,7 @@ it("renders the protected profile route for a member with a profile", async () =
     id: "1",
     email: "member@example.com",
     created_at: "2026-07-24T00:00:00Z",
+    is_admin: false,
   };
   profile.value.status = "ready";
   profile.value.profile = {
@@ -297,10 +300,48 @@ it("links the dashboard exercise card to the catalog", async () => {
   ).toHaveAttribute("href", "/exercises");
 });
 
+it("hides admin navigation from regular members", async () => {
+  setReadyMember();
+  renderRoute("/dashboard");
+
+  expect(screen.queryByRole("link", { name: "مدیریت حرکات" })).not.toBeInTheDocument();
+});
+
+it("redirects a guest away from the admin route", async () => {
+  renderRoute("/admin/exercises");
+
+  expect(
+    await screen.findByRole("heading", { name: "ادامهٔ مسیر از همین‌جا" }),
+  ).toBeInTheDocument();
+});
+
+it("redirects a non-admin away from the admin route", async () => {
+  setReadyMember();
+  renderRoute("/admin/exercises");
+
+  expect(await screen.findByText("member@example.com")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "مدیریت حرکات" })).not.toBeInTheDocument();
+});
+
+it("lets an admin without a fitness profile open the admin route", async () => {
+  auth.value.user = { ...member, is_admin: true };
+  profile.value.status = "missing";
+  renderRoute("/admin/exercises");
+
+  expect(
+    await screen.findByRole("heading", { name: "مدیریت حرکات" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "مدیریت حرکات" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+});
+
 const member = {
   id: "1",
   email: "member@example.com",
   created_at: "2026-07-24T00:00:00Z",
+  is_admin: false,
 };
 
 function setReadyMember() {

@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -45,7 +46,7 @@ def db() -> Iterator[Session]:
 
 
 @pytest.fixture
-def test_settings() -> Settings:
+def test_settings(tmp_path: Path) -> Settings:
     return Settings(
         database_url=TEST_DATABASE_URL,
         frontend_origin="http://localhost:5173",
@@ -53,6 +54,7 @@ def test_settings() -> Settings:
         cookie_secure=False,
         session_cookie_name="fitsho_session",
         session_ttl_seconds=604800,
+        media_root=tmp_path / "media",
     )
 
 

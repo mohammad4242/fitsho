@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 
 from app.exercises.enums import BodyRegion, Difficulty, Equipment, MediaType, MuscleGroup
-
-OWNER_LICENSE = "Project owner supplied and authorized"
-OWNER_ATTRIBUTION = "Provided by Fitsho project owner"
+from app.exercises.media_metadata import OWNER_ATTRIBUTION, OWNER_LICENSE
 
 
 @dataclass(frozen=True)
