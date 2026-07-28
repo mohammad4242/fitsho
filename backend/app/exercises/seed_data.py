@@ -1,6 +1,15 @@
 from dataclasses import dataclass
 
-from app.exercises.enums import BodyRegion, Difficulty, Equipment, MediaType, MuscleGroup
+from app.exercises.enums import (
+    BodyRegion,
+    Difficulty,
+    Equipment,
+    ExerciseCautionTag,
+    ExerciseType,
+    MediaType,
+    MovementPattern,
+    MuscleGroup,
+)
 from app.exercises.media_metadata import OWNER_ATTRIBUTION, OWNER_LICENSE
 
 
@@ -14,6 +23,10 @@ class ExerciseSeed:
     secondary_muscles: tuple[MuscleGroup, ...]
     equipment: tuple[Equipment, ...]
     difficulty: Difficulty
+    movement_pattern: MovementPattern
+    exercise_type: ExerciseType
+    caution_tags: tuple[ExerciseCautionTag, ...]
+    is_programmable: bool
     instructions_en: tuple[str, ...]
     instructions_fa: tuple[str, ...]
     safety_notes_en: tuple[str, ...]
@@ -119,6 +132,7 @@ def _exercise(
     safety_en: str,
     safety_fa: str,
 ) -> ExerciseSeed:
+    movement_pattern, exercise_type, caution_tags = PROGRAMMING_METADATA[slug]
     media_path, media_type = _OWNER_MEDIA[slug]
     return ExerciseSeed(
         slug=slug,
@@ -128,6 +142,10 @@ def _exercise(
         primary_muscle=primary_muscle,
         secondary_muscles=secondary_muscles,
         equipment=equipment,
+        movement_pattern=movement_pattern,
+        exercise_type=exercise_type,
+        caution_tags=caution_tags,
+        is_programmable=True,
         difficulty=difficulty,
         instructions_en=instructions_en,
         instructions_fa=instructions_fa,
@@ -145,6 +163,32 @@ B = BodyRegion
 D = Difficulty
 E = Equipment
 M = MuscleGroup
+P = MovementPattern
+T = ExerciseType
+C = ExerciseCautionTag
+
+PROGRAMMING_METADATA: dict[
+    str, tuple[MovementPattern, ExerciseType, tuple[ExerciseCautionTag, ...]]
+] = {
+    "dumbbell-bench-press": (P.HORIZONTAL_PUSH, T.COMPOUND, (C.SHOULDER_INTERNAL_ROTATION,)),
+    "barbell-bent-over-row": (P.HORIZONTAL_PULL, T.COMPOUND, (C.LOWER_BACK_LOADING,)),
+    "dumbbell-lateral-raise": (P.SHOULDER_ABDUCTION, T.ISOLATION, ()),
+    "smith-machine-shoulder-press": (P.VERTICAL_PUSH, T.COMPOUND, (C.OVERHEAD_POSITION,)),
+    "rear-delt-fly": (P.HORIZONTAL_PULL, T.ISOLATION, (C.LOWER_BACK_LOADING,)),
+    "dumbbell-curl": (P.ELBOW_FLEXION, T.ISOLATION, ()),
+    "hammer-curl": (P.ELBOW_FLEXION, T.ISOLATION, ()),
+    "cable-curl": (P.ELBOW_FLEXION, T.ISOLATION, ()),
+    "barbell-curl": (P.ELBOW_FLEXION, T.ISOLATION, (C.WRIST_LOADING,)),
+    "overhead-dumbbell-extension": (P.ELBOW_EXTENSION, T.ISOLATION, (C.OVERHEAD_POSITION,)),
+    "glute-bridge": (P.HIP_EXTENSION, T.COMPOUND, ()),
+    "goblet-squat": (P.SQUAT, T.COMPOUND, (C.DEEP_KNEE_FLEXION, C.WRIST_LOADING)),
+    "leg-press": (P.SQUAT, T.COMPOUND, (C.DEEP_KNEE_FLEXION,)),
+    "leg-extension": (P.KNEE_EXTENSION, T.ISOLATION, ()),
+    "dumbbell-lunge": (P.LUNGE, T.COMPOUND, (C.DEEP_KNEE_FLEXION, C.BALANCE_DEMAND)),
+    "romanian-deadlift": (P.HIP_HINGE, T.COMPOUND, (C.LOWER_BACK_LOADING,)),
+    "standing-calf-raise": (P.CALF_RAISE, T.ISOLATION, (C.BALANCE_DEMAND,)),
+}
+
 
 EXERCISE_SEEDS: tuple[ExerciseSeed, ...] = (
     _exercise(

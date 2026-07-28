@@ -1,6 +1,7 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import Enum as SqlEnum
+from sqlalchemy import String, engine_from_config, pool
 
 from alembic import context
 from app.auth import models  # noqa: F401
@@ -18,12 +19,26 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def compare_type(
+    _context: object,
+    _inspected_column: object,
+    _metadata_column: object,
+    inspected_type: object,
+    metadata_type: object,
+) -> bool | None:
+    if isinstance(metadata_type, SqlEnum) and not metadata_type.native_enum:
+        if isinstance(inspected_type, String):
+            return False
+    return None
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=config.get_main_option("sqlalchemy.url"),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=compare_type,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -36,7 +51,11 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=compare_type,
+        )
         with context.begin_transaction():
             context.run_migrations()
 

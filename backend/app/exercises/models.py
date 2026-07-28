@@ -20,7 +20,16 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
-from app.exercises.enums import BodyRegion, Difficulty, Equipment, MediaType, MuscleGroup
+from app.exercises.enums import (
+    BodyRegion,
+    Difficulty,
+    Equipment,
+    ExerciseCautionTag,
+    ExerciseType,
+    MediaType,
+    MovementPattern,
+    MuscleGroup,
+)
 
 
 def enum_values(members: type[StrEnum]) -> list[str]:
@@ -65,6 +74,7 @@ class Exercise(Base):
         Index("ix_exercises_primary_muscle", "primary_muscle"),
         Index("ix_exercises_difficulty", "difficulty"),
         Index("ix_exercises_is_active", "is_active"),
+        Index("ix_exercises_is_programmable", "is_programmable"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -104,6 +114,32 @@ class Exercise(Base):
         ),
         nullable=False,
     )
+    movement_pattern: Mapped[MovementPattern] = mapped_column(
+        Enum(
+            MovementPattern,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercises_movement_pattern_values",
+        ),
+        default=MovementPattern.OTHER,
+        server_default=MovementPattern.OTHER.value,
+        nullable=False,
+    )
+    exercise_type: Mapped[ExerciseType] = mapped_column(
+        Enum(
+            ExerciseType,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercises_exercise_type_values",
+        ),
+        default=ExerciseType.OTHER,
+        server_default=ExerciseType.OTHER.value,
+        nullable=False,
+    )
     instructions_en: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     instructions_fa: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     safety_notes_en: Mapped[list[str]] = mapped_column(JSON, nullable=False)
@@ -127,6 +163,12 @@ class Exercise(Base):
         Boolean,
         default=True,
         server_default=true(),
+        nullable=False,
+    )
+    is_programmable: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
         nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -159,6 +201,35 @@ class Exercise(Base):
         passive_deletes=True,
         foreign_keys=lambda: ExerciseAlternative.exercise_id,
     )
+    caution_tag_items: Mapped[list[ExerciseCautionTagItem]] = relationship(
+        back_populates="exercise",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by=lambda: ExerciseCautionTagItem.caution_tag,
+    )
+
+
+class ExerciseCautionTagItem(Base):
+    __tablename__ = "exercise_caution_tags"
+    __table_args__ = (Index("ix_exercise_caution_tags_caution_tag", "caution_tag"),)
+
+    exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("exercises.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    caution_tag: Mapped[ExerciseCautionTag] = mapped_column(
+        Enum(
+            ExerciseCautionTag,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercise_caution_tags_caution_tag_values",
+        ),
+        primary_key=True,
+    )
+
+    exercise: Mapped[Exercise] = relationship(back_populates="caution_tag_items")
 
 
 class ExerciseSecondaryMuscle(Base):
