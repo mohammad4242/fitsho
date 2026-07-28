@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 
+import { ApiError } from "../../shared/apiClient";
 import type { WorkoutPlan } from "./types";
 
 const api = vi.hoisted(() => ({
@@ -95,6 +96,23 @@ it("shows the fixed start guide and a generate action when no plan exists", asyn
   await user.click(screen.getByRole("button", { name: "ساخت برنامه" }));
 
   expect(api.generateWorkoutPlan).toHaveBeenCalledOnce();
+});
+
+it("explains the generation cooldown instead of showing a generic failure", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(null);
+  api.generateWorkoutPlan.mockRejectedValue(
+    new ApiError(429, "Workout plan generation is cooling down"),
+  );
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  await screen.findByRole("button", { name: "ساخت برنامه" });
+  await user.click(screen.getByRole("button", { name: "ساخت برنامه" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "لطفاً چند دقیقه دیگر دوباره تلاش کن.",
+  );
+  expect(screen.queryByRole("button", { name: "تلاش دوباره" })).not.toBeInTheDocument();
 });
 
 it("renders the selected duration, exercise media, and exercise detail link", async () => {

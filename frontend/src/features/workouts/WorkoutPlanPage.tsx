@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { ApiError } from "../../shared/apiClient";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import { generateWorkoutPlan, getActiveWorkoutPlan } from "./api";
 import type { WorkoutPlan } from "./types";
@@ -16,7 +17,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   const [state, setState] = useState<PlanState>("loading");
   const [generating, setGenerating] = useState(false);
   const [reused, setReused] = useState(false);
-  const [generationError, setGenerationError] = useState(false);
+  const [generationError, setGenerationError] = useState<"cooldown" | "failed" | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const isEnglish = i18n.resolvedLanguage === "en";
   const displayedPlanDuration = plan?.plan_duration_weeks ?? planDurationWeeks;
@@ -41,20 +42,17 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   function generate() {
     setGenerating(true);
     setReused(false);
-    setGenerationError(false);
+    setGenerationError(null);
     void generateWorkoutPlan()
       .then((result) => {
         setPlan(result.plan);
         setState("ready");
         setReused(result.reused);
       })
-      .catch(() => {
-        if (plan === null) {
-          setState("error");
-          return;
-        }
-        setState("ready");
-        setGenerationError(true);
+      .catch((error: unknown) => {
+        const errorKind = error instanceof ApiError && error.status === 429 ? "cooldown" : "failed";
+        setState(plan === null ? "empty" : "ready");
+        setGenerationError(errorKind);
       })
       .finally(() => setGenerating(false));
   }
@@ -87,11 +85,29 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
           />
         )}
         {state === "empty" && (
-          <section className="workout-empty" aria-labelledby="workout-empty-title">
-            <h2 id="workout-empty-title">{t("workoutPlan.emptyTitle")}</h2>
-            <p>{t("workoutPlan.emptyBody")}</p>
-            <GenerateButton generating={generating} onClick={generate} />
-          </section>
+          <>
+            {generationError !== null && (
+              <StatusPanel
+                role="alert"
+                message={t(
+                  generationError === "cooldown"
+                    ? "workoutPlan.generateCooldown"
+                    : "workoutPlan.generateError",
+                )}
+                action={generationError === "failed" ? t("common.retry") : undefined}
+                onAction={generationError === "failed" ? generate : undefined}
+              />
+            )}
+            <section className="workout-empty" aria-labelledby="workout-empty-title">
+              <h2 id="workout-empty-title">{t("workoutPlan.emptyTitle")}</h2>
+              <p>{t("workoutPlan.emptyBody")}</p>
+              <GenerateButton
+                generating={generating}
+                onClick={generate}
+                disabled={generationError === "cooldown"}
+              />
+            </section>
+          </>
         )}
         {state === "ready" && plan !== null && (
           <>
@@ -102,9 +118,13 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
             {generationError && (
               <StatusPanel
                 role="alert"
-                message={t("workoutPlan.generateError")}
-                action={t("common.retry")}
-                onAction={generate}
+                message={t(
+                  generationError === "cooldown"
+                    ? "workoutPlan.generateCooldown"
+                    : "workoutPlan.generateError",
+                )}
+                action={generationError === "failed" ? t("common.retry") : undefined}
+                onAction={generationError === "failed" ? generate : undefined}
               />
             )}
             <section className="workout-schedule" aria-labelledby="workout-schedule-title">
@@ -113,7 +133,12 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                   <p className="eyebrow eyebrow--accent">{t("workoutPlan.weekly")}</p>
                   <h2 id="workout-schedule-title">{t("workoutPlan.scheduleTitle")}</h2>
                 </div>
-                <GenerateButton generating={generating} onClick={generate} update />
+                <GenerateButton
+                  generating={generating}
+                  onClick={generate}
+                  update
+                  disabled={generationError === "cooldown"}
+                />
               </div>
               {generating && <p className="workout-generating" role="status">{t("workoutPlan.generating")}</p>}
               <div className="workout-days">
@@ -209,9 +234,9 @@ function FixedGuidance() {
   );
 }
 
-function GenerateButton({ generating, onClick, update = false }: { generating: boolean; onClick: () => void; update?: boolean }) {
+function GenerateButton({ generating, onClick, update = false, disabled = false }: { generating: boolean; onClick: () => void; update?: boolean; disabled?: boolean }) {
   const { t } = useTranslation();
-  return <button className="workout-generate" type="button" disabled={generating} onClick={onClick}>{generating ? t("workoutPlan.generating") : t(update ? "workoutPlan.update" : "workoutPlan.generate")}</button>;
+  return <button className="workout-generate" type="button" disabled={generating || disabled} onClick={onClick}>{generating ? t("workoutPlan.generating") : t(update ? "workoutPlan.update" : "workoutPlan.generate")}</button>;
 }
 
 function StatusPanel({ role, message, action, onAction }: { role: "status" | "alert"; message: string; action?: string; onAction?: () => void }) {
