@@ -105,11 +105,6 @@ def _parse_payload(raw_payload: str) -> AdminExerciseCreate:
             "primary_muscle",
             "Primary muscle must belong to the selected body region",
         )
-    if any(muscle not in allowed_muscles for muscle in payload.secondary_muscles):
-        raise _validation_error(
-            "secondary_muscles",
-            "Secondary muscles must belong to the selected body region",
-        )
     if payload.primary_muscle in payload.secondary_muscles:
         raise _validation_error(
             "secondary_muscles",

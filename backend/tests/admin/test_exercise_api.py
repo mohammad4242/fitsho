@@ -352,21 +352,19 @@ def test_create_rejects_invalid_fields(
 
 
 @pytest.mark.parametrize(
-    ("body_region", "primary_muscle", "secondary_muscles", "invalid_field"),
+    ("body_region", "primary_muscle", "secondary_muscles"),
     [
-        ("upper_body", "quadriceps", ["triceps"], "primary_muscle"),
-        ("upper_body", "chest", ["calves"], "secondary_muscles"),
-        ("lower_body", "glutes", ["abs"], "secondary_muscles"),
-        ("core", "abs", ["shoulders"], "secondary_muscles"),
+        ("upper_body", "quadriceps", ["triceps"]),
+        ("lower_body", "abs", ["glutes"]),
+        ("core", "shoulders", ["abs"]),
     ],
 )
-def test_create_rejects_muscles_outside_body_region(
+def test_create_rejects_primary_muscle_outside_body_region(
     client: TestClient,
     db: Session,
     body_region: str,
     primary_muscle: str,
     secondary_muscles: list[str],
-    invalid_field: str,
 ) -> None:
     make_current_user_admin(client, db)
 
@@ -380,7 +378,7 @@ def test_create_rejects_muscles_outside_body_region(
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"][0]["loc"][-1] == invalid_field
+    assert response.json()["detail"][0]["loc"][-1] == "primary_muscle"
 
 
 def test_create_rejects_primary_muscle_as_secondary(
@@ -396,6 +394,31 @@ def test_create_rejects_primary_muscle_as_secondary(
 
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"][-1] == "secondary_muscles"
+
+
+def test_create_allows_cross_region_secondary_muscles(
+    client: TestClient,
+    db: Session,
+) -> None:
+    make_current_user_admin(client, db)
+    created = post_exercise(client, exercise_payload())
+    assert created.status_code == 201
+
+    response = client.patch(
+        f"/api/v1/admin/exercises/{created.json()['id']}",
+        headers=ORIGIN,
+        data={
+            "payload": json.dumps(
+                exercise_payload(
+                    primary_muscle="back",
+                    secondary_muscles=["biceps", "lower_back", "traps"],
+                )
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["secondary_muscles"] == ["biceps", "lower_back", "traps"]
 
 
 @pytest.mark.parametrize("headers", [{}, {"Origin": "https://evil.example"}])
