@@ -66,6 +66,10 @@ class WorkoutGenerationFailedError(Exception):
     pass
 
 
+class GenerationInputsChangedError(Exception):
+    pass
+
+
 class WorkoutGenerationService:
     def __init__(
         self,
@@ -104,9 +108,10 @@ class WorkoutGenerationService:
                 policy=policy,
                 required_day_count=profile.training_days_per_week,
             )
-            refreshed_candidates = WorkoutCandidateSelector(self._db).select(profile)
-            if refreshed_candidates.candidate_set_hash != candidates.candidate_set_hash:
-                raise WorkoutGenerationFailedError
+            refreshed_profile = self._to_generation_profile(get_profile(self._db, user_id))
+            refreshed_candidates = WorkoutCandidateSelector(self._db).select(refreshed_profile)
+            if self._generation_signature(refreshed_profile, refreshed_candidates) != signature:
+                raise GenerationInputsChangedError
             plan = self._build_plan(
                 user_id=user_id,
                 signature=signature,
@@ -129,11 +134,11 @@ class WorkoutGenerationService:
                 "semantic_validation_failed",
                 "Workout generation returned an invalid plan. Please try again.",
             )
-        except WorkoutGenerationFailedError:
+        except GenerationInputsChangedError:
             self._mark_failure(
                 generation,
-                "catalog_changed",
-                "Workout exercises changed while the plan was being generated. Please try again.",
+                "generation_inputs_changed",
+                "Workout conditions changed while the plan was being generated. Please try again.",
             )
         except SQLAlchemyError:
             self._db.rollback()

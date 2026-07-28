@@ -26,8 +26,8 @@ from app.exercises.enums import (
 from app.exercises.models import Exercise, ExerciseEquipment
 from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.models import BodyMeasurement, UserProfile
-from app.workouts.enums import WorkoutPlanStatus
-from app.workouts.models import WorkoutPlan
+from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
+from app.workouts.models import WorkoutPlan, WorkoutPlanGeneration
 from app.workouts.repository import create_generation
 from app.workouts.service import (
     GenerationInProgressError,
@@ -251,3 +251,28 @@ def test_active_plan_reports_stale_when_generation_conditions_change(db: Session
     assert active is not None
     assert active.is_stale
     assert provider.calls == []
+
+
+def test_profile_change_during_provider_call_prevents_activation(db: Session) -> None:
+    user = _user_with_profile(db)
+    exercises = _seed_candidates(db)
+
+    class ProfileMutatingProvider(FakeWorkoutPlanModelProvider):
+        async def generate_plan(self, request: object) -> WorkoutGenerationModelResponse:
+            profile = db.get(UserProfile, user.id)
+            assert profile is not None
+            profile.fitness_goal = FitnessGoal.IMPROVE_FITNESS
+            return await super().generate_plan(request)  # type: ignore[arg-type]
+
+    with pytest.raises(WorkoutGenerationFailedError):
+        asyncio.run(
+            _service(
+                db,
+                ProfileMutatingProvider([_response([item.id for item in exercises])]),
+            ).generate(user.id)
+        )
+
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0
+    generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
+    assert generation.status is WorkoutGenerationStatus.FAILED
+    assert generation.error_code == "generation_inputs_changed"
