@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
 
 from app.exercises.enums import (
     Difficulty,
@@ -12,6 +15,7 @@ from app.exercises.enums import (
     MovementPattern,
     MuscleGroup,
 )
+from app.exercises.schemas import ExerciseSummary
 from app.profile.enums import (
     ExperienceLevel,
     FitnessGoal,
@@ -20,6 +24,7 @@ from app.profile.enums import (
     TrainingCaution,
     TrainingLocation,
 )
+from app.workouts.enums import WorkoutPlanStatus
 
 
 @dataclass(frozen=True)
@@ -87,3 +92,45 @@ class GenerationSignatureContext:
     display_name: str | None = None
     age: int | None = None
     height_cm: int | None = None
+
+
+class WorkoutPlanExerciseResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    order_index: int
+    sets: int
+    reps_min: int
+    reps_max: int
+    rest_seconds: int
+    rir: int
+    estimated_minutes: int
+    notes_en: str | None
+    notes_fa: str | None
+    exercise: ExerciseSummary
+
+
+class WorkoutDayResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    day_number: int
+    title_en: str
+    title_fa: str
+    estimated_duration_minutes: int
+    exercises: list[WorkoutPlanExerciseResponse]
+
+
+class WorkoutPlanResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    status: WorkoutPlanStatus
+    created_at: datetime
+    activated_at: datetime | None
+    days: list[WorkoutDayResponse]
+
+
+class WorkoutPlanGenerateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plan: WorkoutPlanResponse
+    reused: bool

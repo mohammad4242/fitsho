@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
-from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanGeneration
+from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise, WorkoutPlanGeneration
 
 
 def get_active_plan(db: Session, user_id: UUID) -> WorkoutPlan | None:
@@ -15,7 +15,11 @@ def get_active_plan(db: Session, user_id: UUID) -> WorkoutPlan | None:
             WorkoutPlan.user_id == user_id,
             WorkoutPlan.status == WorkoutPlanStatus.ACTIVE,
         )
-        .options(selectinload(WorkoutPlan.days).selectinload(WorkoutDay.exercises))
+        .options(
+            selectinload(WorkoutPlan.days)
+            .selectinload(WorkoutDay.exercises)
+            .selectinload(WorkoutPlanExercise.exercise)
+        )
     )
 
 
@@ -81,3 +85,20 @@ def activate_plan(
     generation.completed_at = datetime.now(UTC)
     db.flush()
     return plan
+
+
+def get_plan_for_user(
+    db: Session,
+    *,
+    plan_id: UUID,
+    user_id: UUID,
+) -> WorkoutPlan | None:
+    return db.scalar(
+        select(WorkoutPlan)
+        .where(WorkoutPlan.id == plan_id, WorkoutPlan.user_id == user_id)
+        .options(
+            selectinload(WorkoutPlan.days)
+            .selectinload(WorkoutDay.exercises)
+            .selectinload(WorkoutPlanExercise.exercise)
+        )
+    )

@@ -14,6 +14,7 @@ from app.auth.router import router as auth_router
 from app.config import Settings, get_settings
 from app.exercises.router import router as exercises_router
 from app.profile.router import router as profile_router
+from app.workouts.router import router as workout_plans_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -67,6 +68,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(auth_router)
     app.include_router(profile_router)
+    app.include_router(workout_plans_router)
     app.include_router(exercises_router)
     app.include_router(admin_router)
     app.mount(
