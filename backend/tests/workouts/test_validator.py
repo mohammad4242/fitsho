@@ -54,6 +54,7 @@ def _exercise(
     *,
     sets: int = 3,
     rest_seconds: int = 90,
+    estimated_minutes: int = 7,
     notes_en: str | None = None,
 ) -> WorkoutPlanExerciseOutput:
     return WorkoutPlanExerciseOutput(
@@ -63,7 +64,7 @@ def _exercise(
         reps_max=12,
         rest_seconds=rest_seconds,
         rir=2,
-        estimated_minutes=7,
+        estimated_minutes=estimated_minutes,
         notes_en=notes_en,
         notes_fa=None,
     )
@@ -94,6 +95,45 @@ def _validator() -> WorkoutPlanValidator:
 
 def test_validator_accepts_a_valid_plan() -> None:
     _validator().validate(_plan())
+
+
+def test_validator_accepts_a_model_day_estimate_within_ten_minutes() -> None:
+    plan = _plan(
+        [
+            WorkoutPlanDayOutput(
+                day_number=1,
+                title_en="Full body",
+                title_fa="تمام بدن",
+                estimated_duration_minutes=36,
+                exercises=[
+                    _exercise(FIRST_ID, estimated_minutes=17),
+                    _exercise(SECOND_ID, estimated_minutes=17),
+                    _exercise(THIRD_ID, estimated_minutes=17),
+                ],
+            )
+        ]
+    )
+
+    _validator().validate(plan)
+
+
+def test_validator_rejects_a_model_day_estimate_more_than_ten_minutes_away() -> None:
+    plan = _plan(
+        [
+            WorkoutPlanDayOutput(
+                day_number=1,
+                title_en="Full body",
+                title_fa="تمام بدن",
+                estimated_duration_minutes=37,
+                exercises=[_exercise(FIRST_ID), _exercise(SECOND_ID), _exercise(THIRD_ID)],
+            )
+        ]
+    )
+
+    with pytest.raises(WorkoutPlanValidationError) as exc_info:
+        _validator().validate(plan)
+
+    assert "duration_mismatch" in {problem.code for problem in exc_info.value.problems}
 
 
 @pytest.mark.parametrize(
