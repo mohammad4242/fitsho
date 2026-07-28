@@ -230,3 +230,35 @@ def test_patch_commit_failure_rolls_back_profile_and_new_measurement(
         )
         == 1
     )
+
+
+def test_patch_replaces_training_cautions_only_when_supplied(
+    client: TestClient,
+    db: Session,
+) -> None:
+    user_id = register(client, "replace-cautions@example.com")
+    response = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={**VALID_PROFILE, "training_cautions": ["lower_back", "wrist"]},
+    )
+    assert response.status_code == 201
+
+    unchanged = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={"display_name": "New Name"},
+    )
+    assert unchanged.status_code == 200
+    assert unchanged.json()["training_cautions"] == ["lower_back", "wrist"]
+
+    replaced = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={"training_cautions": ["knee"]},
+    )
+    assert replaced.status_code == 200
+    assert replaced.json()["training_cautions"] == ["knee"]
+    profile = db.get(UserProfile, user_id)
+    assert profile is not None
+    assert [item.caution.value for item in profile.training_caution_items] == ["knee"]

@@ -62,6 +62,8 @@ const fa = {
         trainingLocation: "کجا تمرین می‌کنی؟",
         homeTrainingSetup: "برای تمرین در خانه چه امکاناتی داری؟",
         sessionDuration: "معمولاً برای هر جلسه چقدر زمان داری؟",
+        trainingCautions: "موارد احتیاط تمرین",
+        planDuration: "مدت این برنامه چقدر باشد؟",
         limitations: "محدودیت‌های جسمی (اختیاری)",
       },
       hints: {
@@ -102,6 +104,20 @@ const fa = {
           75: "۷۵ دقیقه",
           90: "۹۰ دقیقه",
         },
+        trainingCaution: {
+          none: "ندارم",
+          lower_back: "احتیاط برای کمر",
+          knee: "احتیاط برای زانو",
+          shoulder: "احتیاط برای شانه",
+          neck: "احتیاط برای گردن",
+          wrist: "احتیاط برای مچ",
+          other: "مورد احتیاط دیگر",
+        },
+        planDuration: {
+          4: "۴ هفته",
+          6: "۶ هفته",
+          8: "۸ هفته",
+        },
       },
       actions: {
         next: "ادامه",
@@ -119,6 +135,7 @@ const fa = {
         weightPrecision: "وزن حداکثر دو رقم اعشار داشته باشد.",
         trainingDaysRange: "روزهای تمرین باید بین ۱ تا ۷ باشد.",
         sessionDurationInvalid: "زمان جلسه باید یکی از گزینه‌های موجود باشد.",
+        planDurationInvalid: "مدت برنامه باید ۴، ۶ یا ۸ هفته باشد.",
         limitationsLength: "محدودیت‌ها حداکثر ۱۰۰۰ نویسه است.",
       },
     },

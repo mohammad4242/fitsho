@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.profile.enums import TrainingLocation
 from app.profile.exceptions import (
@@ -12,7 +12,11 @@ from app.profile.exceptions import (
     ProfileInvariantError,
     ProfileNotFoundError,
 )
-from app.profile.models import BodyMeasurement, UserProfile
+from app.profile.models import (
+    BodyMeasurement,
+    UserProfile,
+    UserProfileTrainingCaution,
+)
 from app.profile.schemas import ProfileCreate, ProfileUpdate
 
 
@@ -40,6 +44,11 @@ def create_profile(
         home_training_setup=payload.home_training_setup,
         session_duration_minutes=payload.session_duration_minutes,
         physical_limitations=payload.physical_limitations,
+        plan_duration_weeks=payload.plan_duration_weeks,
+        training_caution_items=[
+            UserProfileTrainingCaution(caution=caution)
+            for caution in sorted(payload.training_cautions, key=lambda value: value.value)
+        ],
     )
     measurement = BodyMeasurement(
         user_id=user_id,
@@ -52,6 +61,7 @@ def create_profile(
         db.flush()
         db.refresh(profile)
         db.refresh(measurement)
+        _ = profile.training_caution_items
         db.expunge(profile)
         db.expunge(measurement)
         db.commit()
@@ -65,7 +75,11 @@ def create_profile(
 
 
 def get_profile(db: Session, user_id: UUID) -> ProfileSnapshot:
-    profile = db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+    profile = db.scalar(
+        select(UserProfile)
+        .where(UserProfile.user_id == user_id)
+        .options(selectinload(UserProfile.training_caution_items))
+    )
     if profile is None:
         raise ProfileNotFoundError
 
@@ -84,7 +98,12 @@ def update_profile(
     user_id: UUID,
     payload: ProfileUpdate,
 ) -> ProfileSnapshot:
-    profile = db.scalar(select(UserProfile).where(UserProfile.user_id == user_id).with_for_update())
+    profile = db.scalar(
+        select(UserProfile)
+        .where(UserProfile.user_id == user_id)
+        .options(selectinload(UserProfile.training_caution_items))
+        .with_for_update()
+    )
     if profile is None:
         raise ProfileNotFoundError
 
@@ -97,6 +116,7 @@ def update_profile(
         raise ProfileInvariantError
 
     supplied_fields = payload.model_dump(exclude_unset=True)
+    supplied_cautions = supplied_fields.pop("training_cautions", None)
     supplied_weight = supplied_fields.pop("current_weight_kg", None)
 
     final_location = supplied_fields.get("training_location", profile.training_location)
@@ -109,6 +129,12 @@ def update_profile(
     for field_name, value in supplied_fields.items():
         setattr(profile, field_name, value)
 
+    if "training_cautions" in payload.model_fields_set:
+        profile.training_caution_items[:] = [
+            UserProfileTrainingCaution(caution=caution)
+            for caution in sorted(supplied_cautions or [], key=lambda value: value.value)
+        ]
+
     if supplied_weight is not None and supplied_weight != measurement.weight_kg:
         measurement = BodyMeasurement(user_id=user_id, weight_kg=supplied_weight)
         db.add(measurement)
@@ -117,6 +143,7 @@ def update_profile(
         db.flush()
         db.refresh(profile)
         db.refresh(measurement)
+        _ = profile.training_caution_items
         db.expunge(profile)
         db.expunge(measurement)
         db.commit()

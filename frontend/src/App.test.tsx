@@ -39,6 +39,8 @@ const profile = vi.hoisted(() => ({
       home_training_setup: null;
       session_duration_minutes: 60;
       physical_limitations: null;
+      training_cautions: string[];
+      plan_duration_weeks: 4;
       created_at: string;
       updated_at: string;
     },
@@ -178,6 +180,8 @@ it("shows the real account and logs the user out", async () => {
     home_training_setup: null,
     session_duration_minutes: 60,
     physical_limitations: null,
+  training_cautions: [],
+  plan_duration_weeks: 4,
     created_at: "2026-07-27T12:00:00Z",
     updated_at: "2026-07-27T12:00:00Z",
   };
@@ -226,6 +230,8 @@ it("renders the protected profile route for a member with a profile", async () =
     home_training_setup: null,
     session_duration_minutes: 60,
     physical_limitations: null,
+  training_cautions: [],
+  plan_duration_weeks: 4,
     created_at: "2026-07-27T12:00:00Z",
     updated_at: "2026-07-27T12:00:00Z",
   };
@@ -362,6 +368,8 @@ function setReadyMember() {
     home_training_setup: null,
     session_duration_minutes: 60,
     physical_limitations: null,
+  training_cautions: [],
+  plan_duration_weeks: 4,
     created_at: "2026-07-27T12:00:00Z",
     updated_at: "2026-07-27T12:00:00Z",
   };

@@ -20,6 +20,11 @@ export type HomeTrainingSetup = (typeof homeTrainingSetups)[number];
 
 export const sessionDurations = [30, 45, 60, 75, 90] as const;
 export type SessionDurationMinutes = (typeof sessionDurations)[number];
+export const trainingCautions = ["lower_back", "knee", "shoulder", "neck", "wrist", "other"] as const;
+export type TrainingCaution = (typeof trainingCautions)[number];
+
+export const planDurations = [4, 6, 8] as const;
+export type PlanDurationWeeks = (typeof planDurations)[number];
 
 export type ProfileInput = {
   display_name: string;
@@ -34,6 +39,8 @@ export type ProfileInput = {
   home_training_setup: HomeTrainingSetup | null;
   session_duration_minutes: SessionDurationMinutes;
   physical_limitations: string | null;
+  training_cautions: TrainingCaution[];
+  plan_duration_weeks: PlanDurationWeeks;
 };
 
 export type ProfilePatch = Partial<ProfileInput>;
@@ -58,4 +65,6 @@ export type ProfileFormValues = {
   home_training_setup: HomeTrainingSetup | "";
   session_duration_minutes: string;
   physical_limitations: string;
+  training_cautions: TrainingCaution[] | null;
+  plan_duration_weeks: string;
 };

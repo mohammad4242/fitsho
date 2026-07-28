@@ -45,6 +45,11 @@ def to_response(snapshot: ProfileSnapshot) -> ProfileResponse:
         home_training_setup=profile.home_training_setup,
         session_duration_minutes=profile.session_duration_minutes,
         physical_limitations=profile.physical_limitations,
+        training_cautions=sorted(
+            (item.caution for item in profile.training_caution_items),
+            key=lambda value: value.value,
+        ),
+        plan_duration_weeks=profile.plan_duration_weeks,
         created_at=profile.created_at,
         updated_at=profile.updated_at,
     )

@@ -43,6 +43,8 @@ const createdProfile: Profile = {
   home_training_setup: null,
   session_duration_minutes: 60,
   physical_limitations: null,
+  training_cautions: [],
+  plan_duration_weeks: 4,
   created_at: "2026-07-27T12:00:00Z",
   updated_at: "2026-07-27T12:00:00Z",
 };
@@ -94,6 +96,7 @@ async function completeExperienceFields(user: UserEvent) {
   await user.type(screen.getByLabelText("روزهای تمرین در هفته"), "3");
   await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "gym");
   await user.selectOptions(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"), "60");
+  await user.click(screen.getByLabelText("ندارم"));
 }
 
 beforeEach(async () => {
@@ -191,6 +194,7 @@ it("shows home setup only for home training and clears it after switching to gym
     "dumbbells_available",
   );
   await user.selectOptions(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"), "60");
+  await user.click(screen.getByLabelText("ندارم"));
   await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "gym");
 
   expect(
@@ -238,6 +242,8 @@ it("submits one normalized typed profile payload", async () => {
   renderOnboarding();
   await reachExperienceStep(user, "  Mohammad  ");
   await completeExperienceFields(user);
+  await user.click(screen.getByLabelText("احتیاط برای زانو"));
+  await user.selectOptions(screen.getByLabelText("مدت این برنامه چقدر باشد؟"), "6");
   await user.type(
     screen.getByLabelText("محدودیت‌های جسمی (اختیاری)"),
     "  knee pain  ",
@@ -259,6 +265,8 @@ it("submits one normalized typed profile payload", async () => {
     home_training_setup: null,
     session_duration_minutes: 60,
     physical_limitations: "knee pain",
+    training_cautions: ["knee"],
+    plan_duration_weeks: 6,
   });
 });
 
@@ -326,4 +334,22 @@ it("renders the onboarding structure in English", async () => {
   expect(
     screen.getByLabelText("How much time do you usually have for each workout?"),
   ).toBeInTheDocument();
+});
+
+it("requires a deliberate training-caution choice", async () => {
+  const user = userEvent.setup();
+  renderOnboarding();
+  await reachExperienceStep(user);
+  await user.selectOptions(screen.getByLabelText("سطح تجربه"), "beginner");
+  await user.type(screen.getByLabelText("روزهای تمرین در هفته"), "3");
+  await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "gym");
+  await user.selectOptions(
+    screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"),
+    "60",
+  );
+
+  await user.click(screen.getByRole("button", { name: "ساخت پروفایل" }));
+
+  expect(screen.getByText("این فیلد الزامی است.")).toBeInTheDocument();
+  expect(profileContext.createProfile).not.toHaveBeenCalled();
 });

@@ -10,10 +10,12 @@ from app.profile.enums import (
     FitnessGoal,
     HomeTrainingSetup,
     Sex,
+    TrainingCaution,
     TrainingLocation,
 )
 
 SessionDurationMinutes = Literal[30, 45, 60, 75, 90]
+PlanDurationWeeks = Literal[4, 6, 8]
 
 
 def calculate_age(birth_date: date, today: date) -> int:
@@ -40,6 +42,8 @@ class ProfileCreate(BaseModel):
     training_days_per_week: int = Field(ge=1, le=7)
     training_location: TrainingLocation
     home_training_setup: HomeTrainingSetup | None = None
+    training_cautions: list[TrainingCaution] = Field(default_factory=list)
+    plan_duration_weeks: PlanDurationWeeks = 4
     session_duration_minutes: SessionDurationMinutes
     physical_limitations: str | None = Field(default=None, max_length=1000)
 
@@ -53,6 +57,15 @@ class ProfileCreate(BaseModel):
         if normalized_value == "" and value is not None:
             return None
         return normalized_value
+
+    @field_validator("training_cautions")
+    @classmethod
+    def validate_unique_training_cautions(
+        cls, cautions: list[TrainingCaution]
+    ) -> list[TrainingCaution]:
+        if len(cautions) != len(set(cautions)):
+            raise ValueError("Training cautions must be unique")
+        return cautions
 
     @field_validator("birth_date")
     @classmethod
@@ -88,6 +101,8 @@ class ProfileUpdate(BaseModel):
     training_days_per_week: int | None = Field(default=None, ge=1, le=7)
     training_location: TrainingLocation | None = None
     home_training_setup: HomeTrainingSetup | None = None
+    training_cautions: list[TrainingCaution] | None = None
+    plan_duration_weeks: PlanDurationWeeks | None = None
     session_duration_minutes: SessionDurationMinutes | None = None
     physical_limitations: str | None = Field(default=None, max_length=1000)
 
@@ -101,6 +116,15 @@ class ProfileUpdate(BaseModel):
         if normalized_value == "":
             return None
         return normalized_value
+
+    @field_validator("training_cautions")
+    @classmethod
+    def validate_unique_training_cautions(
+        cls, cautions: list[TrainingCaution] | None
+    ) -> list[TrainingCaution] | None:
+        if cautions is not None and len(cautions) != len(set(cautions)):
+            raise ValueError("Training cautions must be unique")
+        return cautions
 
     @field_validator("birth_date")
     @classmethod
@@ -144,6 +168,8 @@ class ProfileResponse(BaseModel):
     updated_at: datetime
     training_location: TrainingLocation
     home_training_setup: HomeTrainingSetup | None
+    training_cautions: list[TrainingCaution]
+    plan_duration_weeks: PlanDurationWeeks
     session_duration_minutes: SessionDurationMinutes
 
     model_config = ConfigDict(from_attributes=True)

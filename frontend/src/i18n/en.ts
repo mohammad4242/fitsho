@@ -62,6 +62,8 @@ const en = {
         trainingLocation: "Where do you train?",
         homeTrainingSetup: "What equipment do you have for training at home?",
         sessionDuration: "How much time do you usually have for each workout?",
+        trainingCautions: "Training considerations",
+        planDuration: "How long should this plan run?",
         limitations: "Physical limitations (optional)",
       },
       hints: {
@@ -102,6 +104,20 @@ const en = {
           75: "75 minutes",
           90: "90 minutes",
         },
+        trainingCaution: {
+          none: "None",
+          lower_back: "Lower back consideration",
+          knee: "Knee consideration",
+          shoulder: "Shoulder consideration",
+          neck: "Neck consideration",
+          wrist: "Wrist consideration",
+          other: "Other consideration",
+        },
+        planDuration: {
+          4: "4 weeks",
+          6: "6 weeks",
+          8: "8 weeks",
+        },
       },
       actions: {
         next: "Continue",
@@ -119,6 +135,7 @@ const en = {
         weightPrecision: "Weight can have at most two decimal places.",
         trainingDaysRange: "Training days must be between 1 and 7.",
         sessionDurationInvalid: "Choose one of the available session durations.",
+        planDurationInvalid: "Choose 4, 6, or 8 weeks.",
         limitationsLength: "Limitations can have at most 1,000 characters.",
       },
     },

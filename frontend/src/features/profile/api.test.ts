@@ -17,6 +17,8 @@ const profileInput: ProfileInput = {
   home_training_setup: null,
   session_duration_minutes: 60,
   physical_limitations: null,
+  training_cautions: [],
+  plan_duration_weeks: 4,
 };
 
 const profile: Profile = {
