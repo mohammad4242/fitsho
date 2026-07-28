@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.database.base import Base
 from app.exercises import models as exercise_models  # noqa: F401
 from app.profile import models as profile_models  # noqa: F401
+from app.workouts import models as workout_models  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
