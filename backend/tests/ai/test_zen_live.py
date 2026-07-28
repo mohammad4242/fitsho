@@ -25,7 +25,7 @@ def test_zen_live_with_synthetic_profile() -> None:
     settings = Settings()
 
     async def generate() -> WorkoutGenerationModelResponse:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             provider = OpenCodeZenWorkoutPlanProvider(
                 client,
                 api_key=settings.opencode_zen_api_key,
