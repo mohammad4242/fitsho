@@ -21,6 +21,14 @@ function renderPage() {
   );
 }
 
+it("keeps the login form usable beside the decorative training photo", () => {
+  renderPage();
+
+  expect(screen.getByTestId("auth-training-accent")).toHaveAttribute("aria-hidden", "true");
+  expect(screen.getByLabelText("ایمیل")).toBeVisible();
+  expect(screen.getByRole("button", { name: "ورود به فیتشو" })).toBeEnabled();
+});
+
 it("shows a clear message for invalid credentials", async () => {
   vi.spyOn(globalThis, "fetch")
     .mockResolvedValueOnce(new Response(null, { status: 401 }))
