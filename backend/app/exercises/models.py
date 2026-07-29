@@ -12,6 +12,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Integer,
     String,
     UniqueConstraint,
     func,
@@ -230,7 +231,11 @@ class Exercise(Base):
         back_populates="exercise",
         cascade="all, delete-orphan",
         passive_deletes=True,
-        order_by=lambda: (ExerciseMediaAsset.presentation, ExerciseMediaAsset.role),
+        order_by=lambda: (
+            ExerciseMediaAsset.presentation,
+            ExerciseMediaAsset.role,
+            ExerciseMediaAsset.sort_order,
+        ),
     )
 
 
@@ -241,8 +246,10 @@ class ExerciseMediaAsset(Base):
             "exercise_id",
             "presentation",
             "role",
-            name="uq_exercise_media_assets_exercise_presentation_role",
+            "sort_order",
+            name="uq_exercise_media_assets_exercise_presentation_role_order",
         ),
+        CheckConstraint("sort_order >= 0", name="ck_exercise_media_assets_sort_order"),
         CheckConstraint(
             "(role = 'video' AND media_type = 'video') "
             "OR (role = 'thumbnail' AND media_type = 'image')",
@@ -275,6 +282,12 @@ class ExerciseMediaAsset(Base):
             values_callable=enum_values,
             name="ck_exercise_media_assets_role_values",
         ),
+        nullable=False,
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",
         nullable=False,
     )
     media_path: Mapped[str] = mapped_column(String(255), nullable=False)

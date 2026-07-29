@@ -312,7 +312,7 @@ def test_exercise_stores_separate_male_and_female_media_metadata(db: Session) ->
     }
 
 
-def test_exercise_database_rejects_duplicate_media_asset_variant(db: Session) -> None:
+def test_exercise_database_allows_multiple_media_assets_in_display_order(db: Session) -> None:
     from app.exercises.enums import MediaPresentation, MediaRole, MediaType
     from app.exercises.models import ExerciseMediaAsset
 
@@ -322,18 +322,24 @@ def test_exercise_database_rejects_duplicate_media_asset_variant(db: Session) ->
             ExerciseMediaAsset(
                 presentation=MediaPresentation.MALE,
                 role=MediaRole.VIDEO,
+                sort_order=0,
                 media_path="/media/first.mp4",
                 media_type=MediaType.VIDEO,
             ),
             ExerciseMediaAsset(
                 presentation=MediaPresentation.MALE,
                 role=MediaRole.VIDEO,
+                sort_order=1,
                 media_path="/media/second.mp4",
                 media_type=MediaType.VIDEO,
             ),
         ]
     )
     db.add(exercise)
+    db.flush()
+    db.expire(exercise, ["media_assets"])
 
-    with pytest.raises(IntegrityError):
-        db.flush()
+    stored = db.scalar(select(Exercise).where(Exercise.slug == "duplicate-media-variant"))
+
+    assert stored is not None
+    assert [item.sort_order for item in stored.media_assets] == [0, 1]
