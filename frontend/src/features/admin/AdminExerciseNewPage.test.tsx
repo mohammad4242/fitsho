@@ -81,6 +81,33 @@ it("previews GIF and video selections without autoplay", () => {
   expect(video).not.toHaveAttribute("autoplay");
 });
 
+it("submits separate male and female media assets", async () => {
+  adminApi.createAdminExercise.mockResolvedValue({ id: "created-id" });
+  const user = userEvent.setup();
+  renderPage();
+  await fillMinimumForm(user);
+  const maleVideo = new File(["video"], "male.mp4", { type: "video/mp4" });
+  const femaleThumbnail = new File(["image"], "female.jpg", { type: "image/jpeg" });
+
+  await user.upload(screen.getByLabelText("ویدئوی مرد"), maleVideo);
+  await user.upload(screen.getByLabelText("تصویر بندانگشتی زن"), femaleThumbnail);
+  await user.click(screen.getByRole("button", { name: "ذخیره حرکت" }));
+
+  expect(adminApi.createAdminExercise).toHaveBeenCalledWith(
+    expect.objectContaining({
+      media_assets: [
+        expect.objectContaining({ presentation: "male", role: "video" }),
+        expect.objectContaining({ presentation: "female", role: "thumbnail" }),
+      ],
+    }),
+    null,
+    expect.objectContaining({
+      male_video: maleVideo,
+      female_thumbnail: femaleThumbnail,
+    }),
+  );
+});
+
 it("announces validation errors and does not submit an empty form", async () => {
   const user = userEvent.setup();
   renderPage();

@@ -149,6 +149,33 @@ describe("exercise detail content", () => {
     expect(screen.queryByText(detail.instructions_fa[0])).not.toBeInTheDocument();
     expect(document.documentElement).toHaveAttribute("dir", "ltr");
   });
+
+  it("lets the member select an available male or female media asset", async () => {
+    const user = userEvent.setup();
+    api.getExercise.mockResolvedValue({
+      ...detail,
+      media_assets: [
+        {
+          presentation: "male",
+          role: "video",
+          media_path: "/media/male.mp4",
+          media_type: "video",
+          media_source_url: null,
+          media_license: "MIT",
+          media_attribution: "Male creator",
+        },
+      ],
+    });
+    renderDetail();
+
+    const selector = await screen.findByLabelText("رسانهٔ نمایش");
+    await user.selectOptions(selector, "male-video");
+
+    const video = screen.getByLabelText("نمایش حرکت پرس سینه دمبل");
+    expect(video.tagName).toBe("VIDEO");
+    expect(video).toHaveAttribute("src", "/media/male.mp4");
+    expect(screen.getByText("Male creator")).toBeVisible();
+  });
 });
 
 function renderDetail(

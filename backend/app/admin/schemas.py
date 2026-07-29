@@ -9,6 +9,8 @@ from app.exercises.enums import (
     Equipment,
     ExerciseCautionTag,
     ExerciseType,
+    MediaPresentation,
+    MediaRole,
     MovementPattern,
     MuscleGroup,
 )
@@ -41,6 +43,17 @@ class AdminExerciseFilters(BaseModel):
     page_size: int = Field(default=20, ge=1, le=100)
 
 
+class AdminExerciseMediaAssetInput(BaseModel):
+    presentation: MediaPresentation
+    role: MediaRole
+    media_source_url: OptionalMetadata = None
+    media_license: Annotated[
+        str | None,
+        StringConstraints(strip_whitespace=True, max_length=120),
+    ] = None
+    media_attribution: OptionalMetadata = None
+
+
 class AdminExerciseCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -67,6 +80,7 @@ class AdminExerciseCreate(BaseModel):
         StringConstraints(strip_whitespace=True, max_length=120),
     ] = None
     media_attribution: OptionalMetadata = None
+    media_assets: list[AdminExerciseMediaAssetInput] = Field(default_factory=list, max_length=4)
 
 
 class AdminExerciseDetail(ExerciseDetail):

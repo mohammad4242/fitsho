@@ -6,7 +6,12 @@ import { ApiError } from "../../shared/apiClient";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { getAdminExercise, updateAdminExercise } from "./api";
 import { AdminExerciseForm, type ProgrammingMetadata } from "./AdminExerciseForm";
-import type { AdminExercise, AdminExerciseForm as AdminExerciseFormState } from "./types";
+import { ExerciseMediaAssetsFields } from "./ExerciseMediaAssetsFields";
+import type {
+  AdminExercise,
+  AdminExerciseForm as AdminExerciseFormState,
+  AdminExerciseMediaFiles,
+} from "./types";
 import { adminExerciseToForm, toAdminExerciseCreate } from "./validation";
 import "./admin.css";
 
@@ -20,6 +25,7 @@ export function AdminExerciseEditPage() {
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [reload, setReload] = useState(0);
+  const [mediaAssets, setMediaAssets] = useState<AdminExerciseMediaFiles>({});
 
   useEffect(() => {
     if (!exerciseId) {
@@ -58,7 +64,7 @@ export function AdminExerciseEditPage() {
     setBusy(true);
     setSaveError(false);
     try {
-      await updateAdminExercise(exerciseId, toAdminExerciseCreate(form), null);
+      await updateAdminExercise(exerciseId, toAdminExerciseCreate(form), null, mediaAssets);
       navigate("/admin/exercises", { replace: true });
     } catch {
       setSaveError(true);
@@ -83,6 +89,13 @@ export function AdminExerciseEditPage() {
             {saveError && <div className="admin-form-alert" role="alert">{t("admin.errors.api")}</div>}
             <p className="admin-status" dir="ltr">{exercise.slug}</p>
             <AdminExerciseForm value={form} onChange={setProgrammingField} />
+            <ExerciseMediaAssetsFields
+              assets={form.media_assets}
+              files={mediaAssets}
+              retainMetadataWithoutFile
+              onAssetsChange={(mediaAssetsInput) => setField("media_assets", mediaAssetsInput)}
+              onFilesChange={setMediaAssets}
+            />
             <div className="admin-form-actions"><button className="admin-primary-link" type="submit" disabled={busy}>{busy ? t("admin.actions.savingChanges") : t("admin.actions.saveChanges")}</button></div>
           </form>
         )}

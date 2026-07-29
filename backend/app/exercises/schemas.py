@@ -3,7 +3,15 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from app.exercises.enums import BodyRegion, Difficulty, Equipment, MediaType, MuscleGroup
+from app.exercises.enums import (
+    BodyRegion,
+    Difficulty,
+    Equipment,
+    MediaPresentation,
+    MediaRole,
+    MediaType,
+    MuscleGroup,
+)
 
 SearchText = Annotated[
     str,
@@ -54,6 +62,16 @@ class ExerciseSummary(BaseModel):
     media_type: MediaType
 
 
+class ExerciseMediaAssetDetail(BaseModel):
+    presentation: MediaPresentation
+    role: MediaRole
+    media_path: str
+    media_type: MediaType
+    media_source_url: str | None
+    media_license: str | None
+    media_attribution: str | None
+
+
 class ExerciseDetail(ExerciseSummary):
     instructions_en: list[str]
     instructions_fa: list[str]
@@ -62,6 +80,7 @@ class ExerciseDetail(ExerciseSummary):
     media_source_url: str | None
     media_license: str | None
     media_attribution: str | None
+    media_assets: list[ExerciseMediaAssetDetail] = Field(default_factory=list)
 
 
 class PaginatedExercises(BaseModel):

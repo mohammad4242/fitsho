@@ -62,6 +62,7 @@ def list_exercises(
             .options(
                 selectinload(Exercise.secondary_muscles),
                 selectinload(Exercise.equipment_items),
+                selectinload(Exercise.media_assets),
             )
             .order_by(Exercise.name_en.asc(), Exercise.id.asc())
             .offset((filters.page - 1) * filters.page_size)
@@ -78,6 +79,7 @@ def get_active_exercise_by_slug(db: Session, slug: str) -> Exercise | None:
         .options(
             selectinload(Exercise.secondary_muscles),
             selectinload(Exercise.equipment_items),
+            selectinload(Exercise.media_assets),
         )
     )
 

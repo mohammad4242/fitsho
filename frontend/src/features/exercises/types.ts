@@ -88,6 +88,12 @@ export const mediaTypes = [
 ] as const;
 export type MediaType = (typeof mediaTypes)[number];
 
+export const mediaPresentations = ["male", "female"] as const;
+export type MediaPresentation = (typeof mediaPresentations)[number];
+
+export const mediaRoles = ["video", "thumbnail"] as const;
+export type MediaRole = (typeof mediaRoles)[number];
+
 export type BodyRegionCategory = {
   value: BodyRegion;
   name_en: string;
@@ -126,6 +132,17 @@ export type ExerciseDetail = ExerciseSummary & {
   instructions_fa: string[];
   safety_notes_en: string[];
   safety_notes_fa: string[];
+  media_source_url: string | null;
+  media_license: string | null;
+  media_attribution: string | null;
+  media_assets?: ExerciseMediaAsset[];
+};
+
+export type ExerciseMediaAsset = {
+  presentation: MediaPresentation;
+  role: MediaRole;
+  media_path: string;
+  media_type: MediaType;
   media_source_url: string | null;
   media_license: string | null;
   media_attribution: string | null;

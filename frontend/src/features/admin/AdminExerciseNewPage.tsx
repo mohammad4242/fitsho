@@ -7,7 +7,8 @@ import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import { bodyRegions, difficulties, equipment, type MuscleGroup } from "../exercises/types";
 import { createAdminExercise } from "./api";
-import type { AdminExerciseForm } from "./types";
+import { ExerciseMediaAssetsFields } from "./ExerciseMediaAssetsFields";
+import type { AdminExerciseForm, AdminExerciseMediaFiles } from "./types";
 import { AdminExerciseForm as ProgrammingMetadataForm, type ProgrammingMetadata } from "./AdminExerciseForm";
 import {
   emptyAdminExerciseForm,
@@ -34,6 +35,7 @@ export function AdminExerciseNewPage() {
   const [slugEdited, setSlugEdited] = useState(false);
   const [errors, setErrors] = useState<AdminValidationErrors>({});
   const [media, setMedia] = useState<File | null>(null);
+  const [mediaAssets, setMediaAssets] = useState<AdminExerciseMediaFiles>({});
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [requestError, setRequestError] = useState<"duplicate" | "api" | null>(null);
@@ -75,7 +77,7 @@ export function AdminExerciseNewPage() {
     if (Object.keys(nextErrors).length > 0) return;
     setBusy(true);
     try {
-      const created = await createAdminExercise(toAdminExerciseCreate(form), media);
+      const created = await createAdminExercise(toAdminExerciseCreate(form), media, mediaAssets);
       navigate("/admin/exercises", { replace: true, state: { createdId: created.id } });
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
@@ -142,6 +144,13 @@ export function AdminExerciseNewPage() {
             <Field label={t("admin.fields.license")}><input value={form.media_license ?? ""} onChange={(event) => setField("media_license", event.target.value)} /></Field>
             <Field label={t("admin.fields.attribution")}><input value={form.media_attribution ?? ""} onChange={(event) => setField("media_attribution", event.target.value)} /></Field>
           </div></fieldset>
+          <ExerciseMediaAssetsFields
+            assets={form.media_assets}
+            files={mediaAssets}
+            retainMetadataWithoutFile={false}
+            onAssetsChange={(mediaAssetsInput) => setField("media_assets", mediaAssetsInput)}
+            onFilesChange={setMediaAssets}
+          />
           <label className="admin-active-toggle"><input type="checkbox" checked={form.is_active} onChange={(event) => setField("is_active", event.target.checked)} /><span>{t("admin.fields.active")}</span></label>
           <div className="admin-form-actions"><button className="admin-primary-link" type="submit" disabled={busy}>{busy ? t("admin.actions.saving") : t("admin.actions.save")}</button></div>
         </form>
