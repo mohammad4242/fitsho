@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import authTrainingAccent from "../assets/landing/auth-training-accent.jpg";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 
 type AuthShellProps = {
@@ -13,6 +14,13 @@ export function AuthShell({ children }: AuthShellProps) {
   return (
     <main className="auth-shell">
       <section className="brand-panel" aria-labelledby="fitsho-promise">
+        <img
+          src={authTrainingAccent}
+          alt=""
+          aria-hidden="true"
+          data-testid="auth-training-accent"
+          className="brand-panel__photo"
+        />
         <div className="brand-panel__top">
           <a className="brand-mark" href="/" aria-label={t("common.brand")}>
             <span className="brand-mark__pulse" aria-hidden="true" />
@@ -23,7 +31,7 @@ export function AuthShell({ children }: AuthShellProps) {
 
         <div className="brand-copy">
           <p className="eyebrow">{t("brandPanel.eyebrow")}</p>
-          <h1 id="fitsho-promise">{t("brandPanel.title")}</h1>
+          <h1 id="fitsho-promise" className="fitsho-display">{t("brandPanel.title")}</h1>
           <p>{t("brandPanel.body")}</p>
         </div>
 

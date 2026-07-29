@@ -954,3 +954,37 @@ html[dir="rtl"] .catalog-dashboard-card__copy h2 {
     animation: none;
   }
 }
+
+/* Performance Pulse visual layer */
+.exercise-catalog-shell {
+  padding-block-end: 7rem;
+  background: radial-gradient(circle at 92% 6%, rgb(246 120 89 / 14%), transparent 25rem), var(--fitsho-surface);
+}
+.exercise-catalog-main,
+.exercise-detail-main { max-width: 82rem; }
+.exercise-catalog-hero {
+  border: 0;
+  border-radius: var(--fitsho-radius-card);
+  color: var(--fitsho-mist);
+  background: linear-gradient(135deg, var(--fitsho-petrol), var(--fitsho-teal));
+  box-shadow: var(--fitsho-shadow);
+}
+.exercise-catalog-hero h1 { font-size: clamp(3.8rem, 8vw, 6.8rem); letter-spacing: 0; }
+.exercise-catalog-hero > p { color: rgb(234 244 241 / 74%); }
+.catalog-stage,
+.catalog-results { border: 0; border-radius: var(--fitsho-radius-card); box-shadow: var(--fitsho-shadow); }
+.catalog-stage__heading > span { color: var(--fitsho-coral); background: rgb(246 120 89 / 12%); }
+.catalog-stage__heading h2,
+.exercise-detail-heading h1 { letter-spacing: 0; }
+.region-button,
+.muscle-button { border-radius: 1rem; }
+.region-button[aria-pressed="true"],
+.muscle-button[aria-pressed="true"] { border-color: var(--fitsho-aqua); color: var(--fitsho-petrol); background: var(--fitsho-aqua); }
+.exercise-card { border: 0; border-radius: 1.25rem; box-shadow: 0 0.8rem 2rem rgb(10 31 30 / 9%); }
+.exercise-card__media { border-radius: 1rem; }
+.exercise-detail-sheet { border: 0; border-radius: var(--fitsho-radius-card); box-shadow: var(--fitsho-shadow); }
+.exercise-detail-heading { background: var(--fitsho-mist); }
+.exercise-detail-media img,
+.exercise-detail-media video { border-radius: 1rem; }
+.exercise-instructions,
+.exercise-safety { border-radius: 1.25rem; }

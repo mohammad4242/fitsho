@@ -100,7 +100,7 @@ describe("catalog selection flow", () => {
 
     expect(
       await screen.findByRole("heading", { name: "کتابخانه حرکات" }),
-    ).toBeInTheDocument();
+    ).toHaveClass("fitsho-display");
     expect(screen.getByRole("button", { name: /بالاتنه.*Upper Body/ })).toBeVisible();
     expect(screen.getByRole("button", { name: /پایین‌تنه.*Lower Body/ })).toBeVisible();
     expect(screen.getByRole("button", { name: /میان‌تنه.*Core/ })).toBeVisible();

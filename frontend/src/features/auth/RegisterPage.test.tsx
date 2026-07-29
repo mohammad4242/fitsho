@@ -26,6 +26,14 @@ function renderPage() {
   );
 }
 
+it("keeps registration controls usable beside the decorative training photo", () => {
+  renderPage();
+
+  expect(screen.getByTestId("auth-training-accent")).toHaveAttribute("aria-hidden", "true");
+  expect(screen.getByLabelText("ایمیل")).toBeVisible();
+  expect(screen.getByRole("button", { name: "ساخت حساب" })).toBeEnabled();
+});
+
 it("does not submit when password confirmation differs", async () => {
   const user = userEvent.setup();
   renderPage();

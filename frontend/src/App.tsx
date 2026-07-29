@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 import { AdminExercisesPage } from "./features/admin/AdminExercisesPage";
 import { AdminExerciseEditPage } from "./features/admin/AdminExerciseEditPage";
@@ -21,6 +21,8 @@ import {
   OnboardingRoute,
 } from "./features/profile/ProfileRouteGuards";
 import { DashboardPage } from "./pages/DashboardPage";
+import { PublicLandingRoute } from "./features/landing/PublicLandingRoute";
+import { AppShell } from "./shared/AppShell";
 
 export function AppRoutes() {
   return (
@@ -39,16 +41,26 @@ export function AppRoutes() {
           <Route path="/onboarding" element={<OnboardingPage />} />
         </Route>
         <Route element={<CompletedProfileRoute />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/workout-plan" element={<WorkoutPlanRoute />} />
-          <Route path="/exercises" element={<ExerciseCatalogPage />} />
-          <Route path="/exercises/:slug" element={<ExerciseDetailPage />} />
+          <Route element={<CompletedAppShellRoute />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/workout-plan" element={<WorkoutPlanRoute />} />
+            <Route path="/exercises" element={<ExerciseCatalogPage />} />
+            <Route path="/exercises/:slug" element={<ExerciseDetailPage />} />
+          </Route>
         </Route>
       </Route>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<PublicLandingRoute />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+  );
+}
+
+function CompletedAppShellRoute() {
+  return (
+    <AppShell>
+      <Outlet />
+    </AppShell>
   );
 }
 

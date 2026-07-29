@@ -172,7 +172,7 @@ function ReadyExerciseDetail({
 
         <header className="exercise-detail-heading">
           <p className="eyebrow eyebrow--accent">{t("exerciseDetail.eyebrow")}</p>
-          <h1 dir={isEnglish ? "ltr" : "rtl"}>{name}</h1>
+          <h1 className="fitsho-display" dir={isEnglish ? "ltr" : "rtl"}>{name}</h1>
           <p className="exercise-detail-heading__secondary" dir={isEnglish ? "rtl" : "ltr"}>
             {secondaryName}
           </p>
@@ -213,7 +213,7 @@ function ReadyExerciseDetail({
         <section className="exercise-instructions" aria-labelledby="instructions-heading">
           <div className="exercise-detail-section-heading">
             <span aria-hidden="true">✓</span>
-            <h2 id="instructions-heading">{t("exerciseDetail.instructionsTitle")}</h2>
+            <h2 id="instructions-heading" className="fitsho-display">{t("exerciseDetail.instructionsTitle")}</h2>
           </div>
           <ol>
             {instructions.map((instruction) => (
@@ -225,7 +225,7 @@ function ReadyExerciseDetail({
         <section className="exercise-safety" aria-labelledby="safety-heading">
           <div className="exercise-detail-section-heading">
             <span aria-hidden="true">!</span>
-            <h2 id="safety-heading">{t("exerciseDetail.safetyTitle")}</h2>
+            <h2 id="safety-heading" className="fitsho-display">{t("exerciseDetail.safetyTitle")}</h2>
           </div>
           <ul>
             {safetyNotes.map((note) => (

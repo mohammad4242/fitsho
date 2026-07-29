@@ -128,7 +128,7 @@ function ReadyProfilePage({
       <main className="profile-page-main">
         <section className="profile-page-heading">
           <p className="eyebrow eyebrow--accent">{t("profile.eyebrow")}</p>
-          <h1>{t("profile.title")}</h1>
+          <h1 className="fitsho-display">{t("profile.title")}</h1>
           <p>{t("profile.intro")}</p>
         </section>
 

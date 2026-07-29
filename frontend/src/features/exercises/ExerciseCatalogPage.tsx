@@ -166,7 +166,7 @@ export function ExerciseCatalogPage() {
         <header className="exercise-catalog-hero">
           <div>
             <p className="eyebrow eyebrow--accent">{t("catalog.eyebrow")}</p>
-            <h1>{t("catalog.title")}</h1>
+            <h1 className="fitsho-display">{t("catalog.title")}</h1>
           </div>
           <p>{t("catalog.intro")}</p>
         </header>
@@ -227,7 +227,7 @@ export function ExerciseCatalogPage() {
               <div className="catalog-stage__heading">
                 <span>01</span>
                 <div>
-                  <h2 id="region-heading">{t("catalog.regionTitle")}</h2>
+                  <h2 id="region-heading" className="fitsho-display">{t("catalog.regionTitle")}</h2>
                   <p>{t("catalog.regionIntro")}</p>
                 </div>
               </div>
@@ -250,7 +250,7 @@ export function ExerciseCatalogPage() {
                 <div className="catalog-stage__heading">
                   <span>02</span>
                   <div>
-                    <h2 id="muscle-heading">{t("catalog.muscleTitle")}</h2>
+                  <h2 id="muscle-heading" className="fitsho-display">{t("catalog.muscleTitle")}</h2>
                     <p>{t("catalog.muscleIntro", { region: activeName(regionCategory, isEnglish) })}</p>
                   </div>
                 </div>
@@ -277,7 +277,9 @@ export function ExerciseCatalogPage() {
             <div className="catalog-stage__heading catalog-stage__heading--results">
               <span>03</span>
               <div>
-                <h2 id="results-heading">{resultHeading(query, muscleCategory, isEnglish, t)}</h2>
+                <h2 id="results-heading" className="fitsho-display">
+                  {resultHeading(query, muscleCategory, isEnglish, t)}
+                </h2>
                 <p>{t("catalog.resultsIntro")}</p>
               </div>
             </div>

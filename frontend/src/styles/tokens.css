@@ -1,0 +1,18 @@
+:root {
+  --fitsho-petrol: #0a1f1e;
+  --fitsho-teal: #102a2a;
+  --fitsho-aqua: #50dfce;
+  --fitsho-coral: #f67859;
+  --fitsho-mist: #eaf4f1;
+  --fitsho-ink: #102422;
+  --fitsho-surface: #f7fbf9;
+  --fitsho-line: #d4e4df;
+  --fitsho-muted: #607571;
+  --fitsho-radius-card: 1.5rem;
+  --fitsho-radius-pill: 999px;
+  --fitsho-shadow: 0 1.25rem 3.5rem rgb(10 31 30 / 12%);
+}
+
+.fitsho-app {
+  color-scheme: light;
+}

@@ -57,6 +57,11 @@ const exerciseApi = vi.hoisted(() => ({
   getExercise: vi.fn(),
 }));
 
+const workoutApi = vi.hoisted(() => ({
+  getActiveWorkoutPlan: vi.fn(),
+  generateWorkoutPlan: vi.fn(),
+}));
+
 vi.mock("./features/auth/AuthContext", () => ({
   useAuth: () => auth.value,
 }));
@@ -66,6 +71,7 @@ vi.mock("./features/profile/ProfileContext", () => ({
 }));
 
 vi.mock("./features/exercises/api", () => exerciseApi);
+vi.mock("./features/workouts/api", () => workoutApi);
 
 import { AppRoutes } from "./App";
 
@@ -124,9 +130,12 @@ beforeEach(() => {
   exerciseApi.getExerciseCategories.mockReset();
   exerciseApi.getExercises.mockReset();
   exerciseApi.getExercise.mockReset();
+  workoutApi.getActiveWorkoutPlan.mockReset();
+  workoutApi.generateWorkoutPlan.mockReset();
   exerciseApi.getExerciseCategories.mockResolvedValue(exerciseCategories);
   exerciseApi.getExercises.mockResolvedValue(emptyExercisePage);
   exerciseApi.getExercise.mockResolvedValue(exerciseDetail);
+  workoutApi.getActiveWorkoutPlan.mockImplementation(() => new Promise(() => {}));
 });
 
 it("shows a retry action when the initial session check is unavailable", async () => {
@@ -158,7 +167,20 @@ it("redirects a guest away from the protected dashboard", async () => {
   ).toBeInTheDocument();
 });
 
-it("shows the real account and logs the user out", async () => {
+it("shows the public landing to a guest at the root route", () => {
+  renderRoute("/");
+
+  expect(screen.getAllByRole("link", { name: "شروع رایگان" })).toHaveLength(3);
+});
+
+it("redirects a signed-in root visitor to Today", async () => {
+  setReadyMember();
+  renderRoute("/");
+
+  expect(await screen.findByRole("heading", { name: "سلام، Mohammad" })).toBeInTheDocument();
+});
+
+it("logs a signed-in user out from Today", async () => {
   auth.value.user = {
     id: "1",
     email: "member@example.com",
@@ -196,10 +218,9 @@ it("shows the real account and logs the user out", async () => {
     </MemoryRouter>,
   );
 
-  expect(screen.getByText("member@example.com")).toBeInTheDocument();
   expect(
-    screen.getByRole("link", { name: /ویرایش پروفایل/ }),
-  ).toHaveAttribute("href", "/profile");
+    screen.getByRole("link", { name: /برنامهٔ من/ }),
+  ).toHaveAttribute("href", "/workout-plan");
   await user.click(screen.getByRole("button", { name: "خروج" }));
 
   expect(auth.value.logout).toHaveBeenCalledOnce();
@@ -279,7 +300,9 @@ it("renders the catalog route for a ready member", async () => {
   expect(
     await screen.findByRole("heading", { name: "کتابخانه حرکات" }),
   ).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "حرکات" })).toHaveAttribute(
+  expect(
+    screen.getByRole("navigation", { name: "ناوبری اصلی" }).querySelector('[href="/exercises"]'),
+  ).toHaveAttribute(
     "aria-current",
     "page",
   );
@@ -292,7 +315,9 @@ it("renders detail with active exercise navigation for a ready member", async ()
   expect(
     await screen.findByRole("heading", { name: "پرس سینه دمبل" }),
   ).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "حرکات" })).toHaveAttribute(
+  expect(
+    screen.getByRole("navigation", { name: "ناوبری اصلی" }).querySelector('[href="/exercises"]'),
+  ).toHaveAttribute(
     "aria-current",
     "page",
   );
@@ -303,7 +328,7 @@ it("links the dashboard exercise card to the catalog", async () => {
   renderRoute("/dashboard");
 
   expect(
-    screen.getByRole("link", { name: /مرور کتابخانه حرکات/ }),
+    screen.getByRole("link", { name: /حرکت مناسب را پیدا کن/ }),
   ).toHaveAttribute("href", "/exercises");
 });
 
@@ -326,7 +351,7 @@ it("redirects a non-admin away from the admin route", async () => {
   setReadyMember();
   renderRoute("/admin/exercises");
 
-  expect(await screen.findByText("member@example.com")).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "سلام، Mohammad" })).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "مدیریت حرکات" })).not.toBeInTheDocument();
 });
 

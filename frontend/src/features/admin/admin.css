@@ -26,3 +26,9 @@
 .admin-active-toggle { width: fit-content; background: var(--paper); font-weight: 800; }.admin-form-alert { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.2rem; border: 1px solid rgb(161 63 50 / 35%); border-radius: 1rem; color: var(--danger); background: rgb(161 63 50 / 7%); }.admin-form-actions { position: sticky; bottom: 1rem; display: flex; justify-content: end; padding: .8rem; border: 1px solid var(--line); border-radius: 999px; background: rgb(255 255 255 / 90%); backdrop-filter: blur(10px); }
 @media (max-width: 760px) { .admin-hero, .admin-form-header { align-items: stretch; flex-direction: column; }.admin-exercise-row { grid-template-columns: 1fr; }.admin-exercise-row dl { flex-wrap: wrap; }.admin-field-grid, .admin-media-section, .admin-media-assets { grid-template-columns: 1fr; }.admin-media-section > legend { grid-column: auto; }.admin-form-actions { border-radius: 1rem; }.admin-form-actions .admin-primary-link { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .admin-page * { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+
+.admin-page { background: radial-gradient(circle at 92% 4%, rgb(80 223 206 / 14%), transparent 24rem), var(--fitsho-surface); }
+.admin-hero, .admin-form-header { border-radius: var(--fitsho-radius-card); background: linear-gradient(135deg, var(--fitsho-petrol), var(--fitsho-teal)); box-shadow: var(--fitsho-shadow); }
+.admin-hero h1, .admin-form-header h1 { letter-spacing: 0; }
+.admin-primary-link { color: var(--fitsho-petrol); background: var(--fitsho-aqua); }
+.admin-exercise-row, .admin-form-section { border: 0; border-radius: 1.25rem; box-shadow: 0 0.8rem 2rem rgb(10 31 30 / 7%); }

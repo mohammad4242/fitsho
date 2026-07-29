@@ -1,86 +1,146 @@
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
+import heroAthlete from "../assets/brand/hero-athlete.jpg";
+import heroGym from "../assets/brand/hero-gym.jpg";
+import heroLift from "../assets/brand/hero-lift.jpg";
 import { useAuth } from "../features/auth/AuthContext";
 import { useProfile } from "../features/profile/ProfileContext";
+import { generateWorkoutPlan, getActiveWorkoutPlan } from "../features/workouts/api";
 import { AuthenticatedHeader } from "../shared/AuthenticatedHeader";
+import "./dashboard.css";
+
+type PlanState = "loading" | "empty" | "ready" | "error";
 
 export function DashboardPage() {
-  const { i18n, t } = useTranslation();
+  const { t } = useTranslation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { profile } = useProfile();
+  const [planState, setPlanState] = useState<PlanState>("loading");
+  const [generating, setGenerating] = useState(false);
+  const [storyStage, setStoryStage] = useState<"gym" | "lift">("gym");
+  const gymChapter = useRef<HTMLElement>(null);
+  const liftChapter = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getActiveWorkoutPlan()
+      .then((plan) => {
+        if (active) setPlanState(plan === null ? "empty" : "ready");
+      })
+      .catch(() => {
+        if (active) setPlanState("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          setStoryStage(entry.target === liftChapter.current ? "lift" : "gym");
+        });
+      },
+      { threshold: 0.55 },
+    );
+    if (gymChapter.current) observer.observe(gymChapter.current);
+    if (liftChapter.current) observer.observe(liftChapter.current);
+    return () => observer.disconnect();
+  }, []);
 
   if (user === null || profile === null) {
     return null;
   }
 
-  const locale = i18n.resolvedLanguage === "en" ? "en" : "fa-IR";
-  const joinedAt = new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-  }).format(new Date(user.created_at));
+  function startWorkout() {
+    setGenerating(true);
+    void generateWorkoutPlan()
+      .then(() => navigate("/workout-plan"))
+      .finally(() => setGenerating(false));
+  }
 
   return (
-    <main className="dashboard-shell">
+    <main className="today-shell">
       <AuthenticatedHeader />
 
-      <div className="dashboard-grid">
-        <section className="welcome-card">
-          <div>
-            <p className="eyebrow eyebrow--accent">{t("dashboard.eyebrow")}</p>
-            <h1>{t("dashboard.greeting", { name: profile.display_name })}</h1>
-            <p className="welcome-card__intro">{t("dashboard.intro")}</p>
-          </div>
-          <div className="session-badge">
-            <span className="session-badge__dot" aria-hidden="true" />
-            <span>
-              <small>{t("dashboard.session")}</small>
-              {t("dashboard.sessionActive")}
-            </span>
-          </div>
-        </section>
+      <section className="today-hero" aria-labelledby="today-title">
+        <img src={heroAthlete} alt="" className="today-hero__image" />
+        <div className="today-hero__veil" />
+        <div className="today-hero__content">
+          <p className="today-kicker">{t("dashboard.kicker")}</p>
+          <h1 id="today-title" className="fitsho-display">
+            {t("dashboard.greeting", { name: profile.display_name })}
+          </h1>
+          <p>{t("dashboard.intro")}</p>
+          <PrimaryAction state={planState} generating={generating} onStart={startWorkout} />
+        </div>
+        <p className="today-hero__hint" aria-hidden="true">{t("dashboard.scrollHint")}</p>
+      </section>
 
-        <section className="account-card" aria-label={t("dashboard.emailLabel")}>
-          <div className="account-card__icon" aria-hidden="true">
-            @
-          </div>
-          <div>
-            <p>{t("dashboard.emailLabel")}</p>
-            <strong dir="ltr">{user.email}</strong>
-          </div>
-          <div className="account-card__date">
-            <p>{t("dashboard.joinedLabel")}</p>
-            <strong>{joinedAt}</strong>
-          </div>
-        </section>
+      <section className="today-story" aria-label={t("dashboard.storyLabel")} data-stage={storyStage}>
+        <div className="today-story__sticky" aria-hidden="true">
+          <img src={heroGym} alt="" className="today-story__image today-story__image--gym" />
+          <img src={heroLift} alt="" className="today-story__image today-story__image--lift" />
+          <div className="today-story__shade" />
+        </div>
+        <div className="today-story__chapters">
+          <article className="today-story__chapter" ref={gymChapter}>
+            <span>01</span>
+            <div>
+              <p className="today-kicker">{t("dashboard.storyOneEyebrow")}</p>
+              <h2 className="fitsho-display">{t("dashboard.storyOneTitle")}</h2>
+              <p>{t("dashboard.storyOneBody")}</p>
+            </div>
+          </article>
+          <article className="today-story__chapter today-story__chapter--lift" ref={liftChapter}>
+            <span>02</span>
+            <div>
+              <p className="today-kicker">{t("dashboard.storyTwoEyebrow")}</p>
+              <h2 className="fitsho-display">{t("dashboard.storyTwoTitle")}</h2>
+              <p>{t("dashboard.storyTwoBody")}</p>
+            </div>
+          </article>
+        </div>
+      </section>
 
-        <Link className="catalog-dashboard-card" to="/exercises">
-          <div className="catalog-dashboard-card__copy">
-            <p className="eyebrow">{t("dashboard.catalogEyebrow")}</p>
+      <section className="today-actions" aria-label={t("dashboard.quickActions")}>
+        <Link to="/workout-plan" className="today-actions__card">
+          <span>01</span>
+          <div>
+            <p>{t("dashboard.planCardEyebrow")}</p>
+            <h2>{t("dashboard.planCardTitle")}</h2>
+          </div>
+          <b aria-hidden="true">↖</b>
+        </Link>
+        <Link to="/exercises" className="today-actions__card today-actions__card--aqua">
+          <span>02</span>
+          <div>
+            <p>{t("dashboard.catalogEyebrow")}</p>
             <h2>{t("dashboard.catalogTitle")}</h2>
-            <p>{t("dashboard.catalogBody")}</p>
           </div>
-          <div className="catalog-dashboard-card__visual" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
-          <strong>{t("dashboard.catalogAction")}</strong>
+          <b aria-hidden="true">↖</b>
         </Link>
-
-        <Link className="next-step-card profile-card-link" to="/profile">
-          <div className="next-step-card__copy">
-            <p className="eyebrow">{t("dashboard.nextEyebrow")}</p>
-            <h2>{t("dashboard.nextTitle")}</h2>
-            <p>{t("dashboard.nextBody")}</p>
-          </div>
-          <div className="next-step-card__visual" aria-hidden="true">
-            <span className="profile-line profile-line--head" />
-            <span className="profile-line profile-line--body" />
-            <span className="profile-line profile-line--goal" />
-          </div>
-          <span className="coming-soon">{t("dashboard.editProfile")}</span>
-        </Link>
-      </div>
+      </section>
     </main>
+  );
+}
+
+function PrimaryAction({ state, generating, onStart }: { state: PlanState; generating: boolean; onStart: () => void }) {
+  const { t } = useTranslation();
+
+  if (state === "ready") {
+    return <Link className="today-primary-action" to="/workout-plan">{t("dashboard.start")}</Link>;
+  }
+
+  return (
+    <button className="today-primary-action" type="button" onClick={onStart} disabled={state === "loading" || generating}>
+      {generating ? t("dashboard.generating") : t("dashboard.start")}
+    </button>
   );
 }
