@@ -10,6 +10,7 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseCautionTag,
+    ExerciseLabel,
     ExerciseType,
     MovementPattern,
     MuscleGroup,
@@ -108,6 +109,59 @@ def test_free_exercise_db_maps_known_values_and_reports_unknown_values() -> None
     assert map_difficulty("advanced") is Difficulty.ADVANCED
     assert map_body_region("cardio") is None
     assert map_muscle_group("cardiovascular system") is None
+
+
+def test_importer_maps_forearms_and_preserves_unmapped_anatomy_for_review(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    record = source_record()
+    record["target"] = "forearms"
+    write_source(source_root, record)
+    report = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=FakeTranslator(),
+    ).run()
+    exercise = db.scalar(select(Exercise).where(Exercise.source_id == "0001"))
+
+    assert report.imported_records == ["0001"]
+    assert exercise is not None
+    assert exercise.primary_muscle is MuscleGroup.FOREARMS
+
+
+def test_importer_imports_unmapped_anatomy_with_review_flag_and_cardio_label(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    record = source_record()
+    record.update({"bodyPart": "cardio", "target": "cardiovascular system"})
+    write_source(source_root, record)
+    report = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=FakeTranslator(),
+    ).run()
+    exercise = db.scalar(select(Exercise).where(Exercise.source_id == "0001"))
+
+    assert report.imported_records == ["0001"]
+    assert "bodyPart:cardio" in report.unmapped_enum_values
+    assert "target:cardiovascular system" in report.unmapped_enum_values
+    assert exercise is not None
+    assert exercise.body_region is None
+    assert exercise.primary_muscle is None
+    assert exercise.needs_review is True
+    assert {item.label for item in exercise.labels} == {ExerciseLabel.CARDIO}
 
 
 def test_programming_metadata_classifies_sample_movements_conservatively() -> None:
@@ -395,6 +449,7 @@ def test_curated_translator_returns_only_local_persian_content() -> None:
         name_en="Push-Up",
         body_region=BodyRegion.UPPER_BODY,
         primary_muscle=MuscleGroup.CHEST,
+        labels=(),
         secondary_muscles=[],
         equipment=[Equipment.BODYWEIGHT],
         difficulty=Difficulty.BEGINNER,
