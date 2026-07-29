@@ -278,7 +278,9 @@ it("renders the catalog route for a ready member", async () => {
   expect(
     await screen.findByRole("heading", { name: "کتابخانه حرکات" }),
   ).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "حرکات" })).toHaveAttribute(
+  expect(
+    screen.getByRole("navigation", { name: "ناوبری اصلی" }).querySelector('[href="/exercises"]'),
+  ).toHaveAttribute(
     "aria-current",
     "page",
   );
@@ -291,7 +293,9 @@ it("renders detail with active exercise navigation for a ready member", async ()
   expect(
     await screen.findByRole("heading", { name: "پرس سینه دمبل" }),
   ).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "حرکات" })).toHaveAttribute(
+  expect(
+    screen.getByRole("navigation", { name: "ناوبری اصلی" }).querySelector('[href="/exercises"]'),
+  ).toHaveAttribute(
     "aria-current",
     "page",
   );

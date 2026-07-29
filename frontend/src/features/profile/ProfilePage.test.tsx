@@ -279,7 +279,7 @@ it("navigates from the profile header to dashboard", async () => {
   const user = userEvent.setup();
   renderProfilePage();
 
-  await user.click(screen.getByRole("link", { name: "داشبورد" }));
+  await user.click(screen.getByRole("link", { name: "امروز" }));
 
   expect(
     screen.getByRole("heading", { name: "destination:/dashboard" }),
