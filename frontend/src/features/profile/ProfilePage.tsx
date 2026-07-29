@@ -1,7 +1,9 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import authTrainingAccent from "../../assets/landing/auth-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import {
   BodyGoalFields,
   ExperienceFields,
@@ -127,6 +129,7 @@ function ReadyProfilePage({
       <AuthenticatedHeader />
       <main className="profile-page-main">
         <section className="profile-page-heading">
+          <MemberHeaderMedia imageSrc={authTrainingAccent} />
           <p className="eyebrow eyebrow--accent">{t("profile.eyebrow")}</p>
           <h1 className="fitsho-display">{t("profile.title")}</h1>
           <p>{t("profile.intro")}</p>

@@ -2,8 +2,10 @@ import { cloneElement, type FormEvent, type ReactElement, useEffect, useState } 
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
+import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { ApiError } from "../../shared/apiClient";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import { bodyRegions, difficulties, equipment, type MuscleGroup } from "../exercises/types";
 import { createAdminExercise } from "./api";
@@ -111,6 +113,7 @@ export function AdminExerciseNewPage() {
       <AuthenticatedHeader />
       <main className="admin-main admin-main--form">
         <header className="admin-form-header">
+          <MemberHeaderMedia imageSrc={appTrainingAccent} />
           <div><p className="eyebrow eyebrow--accent">{t("admin.new.eyebrow")}</p><h1>{t("admin.new.title")}</h1><p>{t("admin.new.intro")}</p></div>
           <Link to="/admin/exercises">{t("admin.new.back")}</Link>
         </header>

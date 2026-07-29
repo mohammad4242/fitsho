@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 
+import heroStrengthFallback from "../../assets/landing/hero-strength-fallback.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getExerciseCategories, getExercises } from "./api";
 import { ExerciseMedia } from "./ExerciseMedia";
 import {
@@ -164,6 +166,7 @@ export function ExerciseCatalogPage() {
       <AuthenticatedHeader />
       <main className="exercise-catalog-main">
         <header className="exercise-catalog-hero">
+          <MemberHeaderMedia imageSrc={heroStrengthFallback} />
           <div>
             <p className="eyebrow eyebrow--accent">{t("catalog.eyebrow")}</p>
             <h1 className="fitsho-display">{t("catalog.title")}</h1>

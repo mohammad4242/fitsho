@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 
+import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getAdminExercises } from "./api";
 import type { PaginatedAdminExercises } from "./types";
 import "./admin.css";
@@ -41,6 +43,7 @@ export function AdminExercisesPage() {
       <AuthenticatedHeader />
       <main className="admin-main">
         <header className="admin-hero">
+          <MemberHeaderMedia imageSrc={appTrainingAccent} />
           <div>
             <p className="eyebrow eyebrow--accent">{t("admin.exercises.eyebrow")}</p>
             <h1 className="fitsho-display">{t("admin.exercises.title")}</h1>

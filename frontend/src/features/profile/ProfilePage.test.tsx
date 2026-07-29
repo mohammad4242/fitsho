@@ -121,6 +121,15 @@ it("renders every saved profile value in editable controls", () => {
   );
 });
 
+it("uses the supplied training still in the profile header", () => {
+  renderProfilePage();
+
+  expect(screen.getByTestId("member-header-image")).toHaveAttribute(
+    "src",
+    expect.stringContaining("auth-training-accent"),
+  );
+});
+
 it("shows the latest measured weight and localized measurement time", () => {
   renderProfilePage();
   const locale = "fa-IR";

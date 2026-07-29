@@ -13,6 +13,9 @@
 }
 
 .exercise-catalog-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.65fr);
   align-items: end;
@@ -24,6 +27,11 @@
     linear-gradient(115deg, transparent 64%, rgb(56 183 165 / 12%) 64%),
     var(--petrol-900);
   box-shadow: 0 1.5rem 4rem rgb(18 51 50 / 14%);
+}
+
+.exercise-catalog-hero > :not(.member-header-media) {
+  position: relative;
+  z-index: 1;
 }
 
 .exercise-catalog-hero h1 {
@@ -533,6 +541,18 @@ html[dir="ltr"] .exercise-card__link span {
 .exercise-detail-main {
   max-width: 82rem;
   margin: 1.4rem auto 0;
+}
+
+.exercise-detail-hero {
+  position: relative;
+  min-height: clamp(8rem, 18vw, 13rem);
+  overflow: hidden;
+  border-radius: var(--fitsho-radius-card);
+  box-shadow: var(--fitsho-shadow);
+}
+
+.exercise-detail-hero .member-header-media__asset {
+  object-position: center 35%;
 }
 
 .exercise-detail-status {

@@ -64,6 +64,18 @@ it("renders inactive exercises and a clear add action", async () => {
   );
 });
 
+it("uses the supplied app still in the admin header", async () => {
+  adminApi.getAdminExercises.mockResolvedValue({
+    items: [], page: 1, page_size: 20, total: 0, total_pages: 0,
+  });
+  renderPage();
+
+  expect(await screen.findByTestId("member-header-image")).toHaveAttribute(
+    "src",
+    expect.stringContaining("app-training-accent"),
+  );
+});
+
 it("announces creation and focuses the created exercise", async () => {
   adminApi.getAdminExercises.mockResolvedValue({
     items: [exercise], page: 1, page_size: 20, total: 1, total_pages: 1,

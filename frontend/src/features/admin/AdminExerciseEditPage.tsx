@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { ApiError } from "../../shared/apiClient";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getAdminExercise, updateAdminExercise } from "./api";
 import { AdminExerciseForm, type ProgrammingMetadata } from "./AdminExerciseForm";
 import { ExerciseMediaAssetsFields } from "./ExerciseMediaAssetsFields";
@@ -78,6 +80,7 @@ export function AdminExerciseEditPage() {
       <AuthenticatedHeader />
       <main className="admin-main admin-main--form">
         <header className="admin-form-header">
+          <MemberHeaderMedia imageSrc={appTrainingAccent} />
           <div><p className="eyebrow eyebrow--accent">{t("admin.edit.eyebrow")}</p><h1>{t("admin.edit.title")}</h1><p>{t("admin.edit.intro")}</p></div>
           <Link to="/admin/exercises">{t("admin.edit.back")}</Link>
         </header>

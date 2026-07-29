@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
 
+import heroStrengthFallback from "../../assets/landing/hero-strength-fallback.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getExercise } from "./api";
 import { ExerciseMedia } from "./ExerciseMedia";
 import type { ExerciseDetail } from "./types";
@@ -52,6 +54,9 @@ export function ExerciseDetailPage() {
     <div className="exercise-catalog-shell exercise-detail-shell">
       <AuthenticatedHeader />
       <main className="exercise-detail-main">
+        <header className="exercise-detail-hero" aria-hidden="true">
+          <MemberHeaderMedia imageSrc={heroStrengthFallback} />
+        </header>
         {state === "loading" && (
           <DetailMessage role="status" message={t("exerciseDetail.loading")} />
         )}

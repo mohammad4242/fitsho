@@ -94,6 +94,15 @@ afterEach(() => {
 });
 
 describe("catalog selection flow", () => {
+  it("uses the supplied strength still in the catalog header", async () => {
+    renderCatalog();
+
+    expect(await screen.findByTestId("member-header-image")).toHaveAttribute(
+      "src",
+      expect.stringContaining("hero-strength-fallback"),
+    );
+  });
+
   it("moves from regions to muscles and then renders a bilingual exercise card", async () => {
     const user = userEvent.setup();
     renderCatalog();
