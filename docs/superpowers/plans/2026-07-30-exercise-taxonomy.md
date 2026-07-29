@@ -73,7 +73,7 @@ class ExerciseLabelItem(Base):
     __table_args__ = (UniqueConstraint("exercise_id", "label"),)
 ```
 
-Add forearms/neck to `MuscleGroup` and upper-body taxonomy. Recreate anatomy enum check constraints, relax anatomy columns to nullable, create the association table with cascade deletion and a label index. Downgrade rejects null anatomy before reapplying non-null constraints.
+Add forearms/neck to `MuscleGroup` and upper-body taxonomy. Recreate both primary and secondary muscle check constraints, relax anatomy columns to nullable, create the association table with cascade deletion and a label index. Downgrade rejects null anatomy and taxonomy-only muscle values before reapplying the prior constraints.
 
 - [ ] **Step 4: Verify GREEN**
 
