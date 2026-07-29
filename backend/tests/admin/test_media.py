@@ -11,6 +11,7 @@ from app.config import Settings
 from app.exercises.enums import MediaType
 
 GIF_BYTES = b"GIF89a" + b"\x00" * 32
+JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 32
 MP4_BYTES = b"\x00\x00\x00\x18ftypisom" + b"\x00" * 32
 WEBM_BYTES = b"\x1a\x45\xdf\xa3" + b"\x00" * 32
 
@@ -48,6 +49,14 @@ def test_valid_gif_is_stored_with_server_filename(tmp_path: Path) -> None:
     assert stored.absolute_path.read_bytes() == GIF_BYTES
 
 
+def test_valid_jpeg_thumbnail_is_stored_with_image_type(tmp_path: Path) -> None:
+    stored = store_upload(upload("demo.jpg", JPEG_BYTES, "image/jpeg"), settings(tmp_path))
+
+    assert stored.media_type is MediaType.IMAGE
+    assert stored.absolute_path.suffix == ".jpg"
+    assert stored.absolute_path.read_bytes() == JPEG_BYTES
+
+
 @pytest.mark.parametrize(
     ("filename", "content", "content_type", "expected_type"),
     [
@@ -78,6 +87,7 @@ def test_valid_short_video_is_stored(
         ("payload.exe", b"MZ" + b"\x00" * 20, "application/octet-stream"),
         ("demo.mp4", MP4_BYTES, "video/webm"),
         ("demo.gif", MP4_BYTES, "image/gif"),
+        ("demo.jpg", GIF_BYTES, "image/jpeg"),
     ],
 )
 def test_invalid_type_or_mismatched_signature_is_rejected(

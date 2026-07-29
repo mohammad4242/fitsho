@@ -14,6 +14,8 @@ from app.exercises.enums import MediaType
 
 ALLOWED_MEDIA: dict[str, tuple[str, MediaType]] = {
     ".gif": ("image/gif", MediaType.GIF),
+    ".jpg": ("image/jpeg", MediaType.IMAGE),
+    ".jpeg": ("image/jpeg", MediaType.IMAGE),
     ".mp4": ("video/mp4", MediaType.VIDEO),
     ".webm": ("video/webm", MediaType.VIDEO),
 }
@@ -36,7 +38,7 @@ def _validate_filename(filename: str | None) -> tuple[str, str, MediaType]:
     extension = Path(filename).suffix.lower()
     allowed = ALLOWED_MEDIA.get(extension)
     if allowed is None:
-        raise MediaValidationError("Only GIF, MP4, and WebM files are supported")
+        raise MediaValidationError("Only GIF, JPEG, MP4, and WebM files are supported")
     content_type, media_type = allowed
     return extension, content_type, media_type
 
@@ -44,6 +46,8 @@ def _validate_filename(filename: str | None) -> tuple[str, str, MediaType]:
 def _signature_extension(header: bytes) -> str | None:
     if header.startswith((b"GIF87a", b"GIF89a")):
         return ".gif"
+    if header.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
     if len(header) >= 12 and header[4:8] == b"ftyp":
         return ".mp4"
     if header.startswith(b"\x1a\x45\xdf\xa3"):
@@ -136,7 +140,9 @@ def store_upload(upload: UploadFile, settings: Settings) -> StoredMedia:
     try:
         with temporary_path.open("rb") as file_handle:
             detected_extension = _signature_extension(file_handle.read(64))
-        if detected_extension != extension:
+        if detected_extension != extension and not (
+            detected_extension == ".jpg" and extension == ".jpeg"
+        ):
             raise MediaValidationError("Media signature does not match its extension")
         if media_type is MediaType.VIDEO:
             duration = _probe_video_duration(temporary_path, settings)
