@@ -133,6 +133,85 @@ class ExerciseTranslator(Protocol):
     def translate(self, records: list[ImportCandidate]) -> dict[str, ExerciseTranslation]: ...
 
 
+CURATED_TRANSLATIONS: dict[str, dict[str, object]] = {
+    "0489": {
+        "name_fa": "هایپراکستنشن ۴۵ درجه",
+        "instructions_fa": [
+            "روی نیمکت هایپراکستنشن ۴۵ درجه قرار بگیر و مچ پاها را محکم کن.",
+            "دست‌ها را روی سینه ضربدری بگذار یا پشت سر قرار بده.",
+            "از مفصل لگن، بالاتنه را به سمت جلو پایین ببر.",
+            "وقتی بالاتنه کمی پایین‌تر از سطح موازی با زمین قرار گرفت، توقف کن.",
+            "بالاتنه را بالا بیاور تا در امتداد پاها قرار گیرد.",
+        ],
+    },
+    "drv-45-degree-bycicle-twisting-crunch": {
+        "name_fa": "کرانچ دوچرخه‌ای چرخشی ۴۵ درجه",
+        "instructions_fa": [
+            "به پشت دراز بکش؛ دست‌ها پشت سر و پاها با زاویه حدود ۴۵ درجه رو به بالا باشند.",
+            "میان‌تنه را درگیر کن و شانه‌ها را از زمین بلند کن.",
+            "بالاتنه را بچرخان و هم‌زمان آرنج راست را به زانوی چپ نزدیک کن و پای راست را بکش.",
+            "به وضعیت شروع برگرد و حرکت را برای سمت مقابل تکرار کن.",
+            "در یک حرکت چرخشی کنترل‌شده، سمت‌ها را یکی‌درمیان عوض کن.",
+        ],
+    },
+    "drv-45-degree-bycicle-twisting-crunch-1": {
+        "name_fa": "کرانچ دوچرخه‌ای چرخشی ۴۵ درجه",
+        "instructions_fa": [
+            "به پشت دراز بکش؛ دست‌ها را پشت سر بگذار و زانوها را خم کن.",
+            "شانه‌ها و پاها را از زمین بلند کن تا بالاتنه و پاها زاویه ۴۵ درجه بسازند.",
+            "زانوی راست را نزدیک کن و آرنج چپ را به سمت آن بچرخان.",
+            "سمت را عوض کن؛ پای راست را بکش و زانوی چپ را نزدیک کن، هم‌زمان آرنج راست را حرکت بده.",
+            "در حرکتی نرم و کنترل‌شده، سمت‌ها را یکی‌درمیان عوض کن.",
+        ],
+    },
+    "drv-stretching-all-fours-squad-stretch": {
+        "name_fa": "کشش کشالهٔ ران در حالت چهار دست‌وپا",
+        "instructions_fa": [
+            "در حالت چهار دست‌وپا شروع کن.",
+            "زانوها را از هم دور کن و ساق و پاها را در امتداد زانوها نگه دار.",
+            "با حفظ پشت صاف، لگن را به سمت زمین پایین ببر.",
+            "لگن را آرام به عقب ببر تا کشش کشالهٔ ران را حس کنی.",
+            "در وضعیت بمان و عمیق نفس بکش.",
+        ],
+    },
+    "0970": {
+        "name_fa": "بارفیکس کمکی با کش",
+        "instructions_fa": [
+            "کش را محکم دور میلهٔ بارفیکس حلقه کن و یک پا یا زانو را در بخش پایینی کش قرار بده.",
+            "میله را کمی بازتر از عرض شانه بگیر؛ کف دست‌ها رو به جلو باشند.",
+            "با دست‌های صاف آویزان شو، میان‌تنه را محکم کن و شانه‌ها را از گوش‌ها دور نگه دار.",
+            "با هدایت آرنج‌ها به پایین و عقب، بدن را بالا بکش تا چانه از میله عبور کند.",
+            "با کنترل پایین بیا تا دست‌ها دوباره صاف شوند و تنش میان‌تنه حفظ شود.",
+        ],
+    },
+}
+
+
+class CuratedExerciseTranslator:
+    def __init__(self, translations: Mapping[str, Mapping[str, object]]) -> None:
+        self._translations = translations
+
+    def translate(self, records: list[ImportCandidate]) -> dict[str, ExerciseTranslation]:
+        result: dict[str, ExerciseTranslation] = {}
+        for record in records:
+            item = self._translations.get(record.source_id)
+            if item is None:
+                continue
+            name_fa = item.get("name_fa")
+            instructions_fa = item.get("instructions_fa")
+            if (
+                not isinstance(name_fa, str)
+                or not isinstance(instructions_fa, list)
+                or not all(isinstance(step, str) for step in instructions_fa)
+            ):
+                raise ValueError(f"Invalid local translation for {record.source_id}")
+            result[record.source_id] = ExerciseTranslation(
+                name_fa=name_fa,
+                instructions_fa=list(instructions_fa),
+            )
+        return result
+
+
 class OpenCodeZenExerciseTranslator:
     def __init__(self, settings: Settings, *, client: httpx.Client | None = None) -> None:
         api_key = settings.opencode_zen_api_key
@@ -797,7 +876,7 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     settings = get_settings()
-    translator = None if args.dry_run else OpenCodeZenExerciseTranslator(settings)
+    translator = None if args.dry_run else CuratedExerciseTranslator(CURATED_TRANSLATIONS)
     with Session(get_engine(settings.database_url)) as db:
         report = FreeExerciseDbImporter(
             db,

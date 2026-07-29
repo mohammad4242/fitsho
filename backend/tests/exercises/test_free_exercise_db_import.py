@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 
-import httpx
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -231,32 +230,11 @@ def test_importer_reports_invalid_records_without_writing_them(
     )
 
 
-def test_opencode_zen_translator_returns_persian_name_and_steps() -> None:
+def test_curated_translator_returns_only_local_persian_content() -> None:
     from app.exercises.free_exercise_db_import import (
+        CuratedExerciseTranslator,
         ImportCandidate,
-        OpenCodeZenExerciseTranslator,
     )
-
-    requests: list[httpx.Request] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        return httpx.Response(
-            200,
-            json={
-                "output_text": json.dumps(
-                    {
-                        "translations": [
-                            {
-                                "source_id": "0001",
-                                "name_fa": "شنا سوئدی",
-                                "instructions_fa": ["آماده شو.", "پایین برو.", "فشار بده."],
-                            }
-                        ]
-                    }
-                )
-            },
-        )
 
     candidate = ImportCandidate(
         source_id="0001",
@@ -277,15 +255,16 @@ def test_opencode_zen_translator_returns_persian_name_and_steps() -> None:
         breathing_en=None,
         media_assets=[],
     )
-    settings = Settings(opencode_zen_api_key="test-key", opencode_zen_base_url="https://zen.test/v1")
-    translator = OpenCodeZenExerciseTranslator(
-        settings,
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    translator = CuratedExerciseTranslator(
+        {
+            "0001": {
+                "name_fa": "شنا سوئدی",
+                "instructions_fa": ["آماده شو.", "پایین برو.", "فشار بده."],
+            }
+        }
     )
 
     translations = translator.translate([candidate])
 
     assert translations["0001"].name_fa == "شنا سوئدی"
     assert translations["0001"].instructions_fa == ["آماده شو.", "پایین برو.", "فشار بده."]
-    assert requests[0].url == "https://zen.test/v1/responses"
-    assert requests[0].headers["authorization"] == "Bearer test-key"
