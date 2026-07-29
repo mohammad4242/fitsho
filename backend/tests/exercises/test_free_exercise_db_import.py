@@ -407,6 +407,18 @@ def test_local_translation_catalog_keeps_existing_imported_exercises() -> None:
         "drv-band-one-leg-kickback-bent-position",
         "new-band-overhead-triceps-extension",
         "0976",
+        "0991",
+        "drv-band-decline-sit-ups",
+        "0980",
+        "0990",
+        "drv-stretching-band-warm-up-shoulder-stretch",
+        "0002",
+        "0999",
+        "1005",
+        "0988",
+        "1408",
+        "1022",
+        "3144",
     }
     assert expected_ids.issubset(CURATED_TRANSLATIONS)
     assert all(CURATED_TRANSLATIONS[source_id]["name_fa"] for source_id in expected_ids)
