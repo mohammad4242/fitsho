@@ -57,6 +57,7 @@ const benchPress: ExerciseSummary = {
   name_fa: "پرس سینه دمبل",
   body_region: "upper_body",
   primary_muscle: "chest",
+  labels: [],
   secondary_muscles: ["triceps", "shoulders"],
   equipment: ["dumbbell", "bench"],
   difficulty: "intermediate",
@@ -172,6 +173,18 @@ describe("catalog selection flow", () => {
 });
 
 describe("catalog filters and states", () => {
+  it("opens the cardio catalog section", async () => {
+    const user = userEvent.setup();
+    renderCatalog();
+
+    await user.click(await screen.findByRole("button", { name: "هوازی" }));
+
+    expect(locationValue()).toBe("/exercises?labels=cardio");
+    expect(api.getExercises).toHaveBeenLastCalledWith(
+      expect.objectContaining({ labels: ["cardio"] }),
+    );
+  });
+
   it("writes accessible filters to the URL and resets pagination", async () => {
     const user = userEvent.setup();
     renderCatalog(

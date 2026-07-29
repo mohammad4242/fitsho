@@ -29,6 +29,8 @@ const exercise: AdminExercise = {
   movement_pattern: "horizontal_push",
   exercise_type: "compound",
   caution_tags: [],
+  labels: [],
+  needs_review: false,
   is_programmable: true,
   instructions_en: ["One", "Two", "Three"],
   instructions_fa: ["یک", "دو", "سه"],

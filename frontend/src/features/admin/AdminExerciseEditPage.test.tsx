@@ -31,6 +31,8 @@ const exercise = {
   movement_pattern: "horizontal_push",
   exercise_type: "compound",
   caution_tags: ["shoulder_internal_rotation"],
+  labels: [],
+  needs_review: false,
   is_programmable: true,
   instructions_en: ["Brace", "Lower", "Press"],
   instructions_fa: ["محکم", "پایین", "فشار"],

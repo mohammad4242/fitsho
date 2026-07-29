@@ -16,7 +16,9 @@ import {
   type ExerciseCategories,
   type ExerciseCategory,
   type ExerciseFilters,
+  type ExerciseLabel,
   type ExerciseSummary,
+  type ExerciseType,
   type MuscleGroup,
   type PaginatedExercises,
 } from "./types";
@@ -29,6 +31,8 @@ type CatalogQuery = {
   primary_muscle?: MuscleGroup;
   equipment?: Equipment;
   difficulty?: Difficulty;
+  exercise_type?: ExerciseType;
+  labels?: ExerciseLabel[];
   search?: string;
   page: number;
 };
@@ -56,6 +60,9 @@ export function ExerciseCatalogPage() {
     (category) => category.value === query.primary_muscle,
   );
   const selectedMuscle = muscleCategory?.value;
+  const selectedLabel = query.labels?.[0];
+  const hasSpecialFilter = selectedLabel !== undefined || query.exercise_type === "mobility";
+  const canLoadExercises = hasSpecialFilter || (regionCategory !== undefined && selectedMuscle !== undefined);
 
   useEffect(() => {
     let active = true;
@@ -76,7 +83,7 @@ export function ExerciseCatalogPage() {
   }, [categoryRetry]);
 
   useEffect(() => {
-    if (query.body_region === undefined || selectedMuscle === undefined) {
+    if (!canLoadExercises) {
       setExercisePage(null);
       setExerciseState("idle");
       return;
@@ -89,6 +96,8 @@ export function ExerciseCatalogPage() {
       primary_muscle: selectedMuscle,
       equipment: query.equipment,
       difficulty: query.difficulty,
+      exercise_type: query.exercise_type,
+      labels: query.labels,
       search: query.search?.trim() || undefined,
       page: query.page,
     };
@@ -107,9 +116,12 @@ export function ExerciseCatalogPage() {
     };
   }, [
     exerciseRetry,
+    canLoadExercises,
     query.body_region,
     query.difficulty,
+    query.exercise_type,
     query.equipment,
+    query.labels,
     query.page,
     query.search,
     selectedMuscle,
@@ -125,11 +137,15 @@ export function ExerciseCatalogPage() {
   }
 
   function chooseRegion(value: BodyRegion) {
-    writeQuery({ body_region: value, primary_muscle: undefined });
+    writeQuery({ body_region: value, primary_muscle: undefined, labels: undefined, exercise_type: undefined });
   }
 
   function chooseMuscle(value: MuscleGroup) {
-    writeQuery({ primary_muscle: value });
+    writeQuery({ primary_muscle: value, labels: undefined, exercise_type: undefined });
+  }
+
+  function chooseSpecialFilter(changes: Pick<CatalogQuery, "labels" | "exercise_type">) {
+    writeQuery({ ...changes, body_region: undefined, primary_muscle: undefined });
   }
 
   function resetLibrary() {
@@ -162,6 +178,36 @@ export function ExerciseCatalogPage() {
           onLibrary={resetLibrary}
           onRegion={resetToRegion}
         />
+
+        <section className="catalog-special-filters" aria-label={t("catalog.specialFiltersTitle")}>
+          <p>{t("catalog.specialFiltersTitle")}</p>
+          <div>
+            <button
+              className={selectedLabel === "full_body" ? "is-active" : ""}
+              type="button"
+              aria-pressed={selectedLabel === "full_body"}
+              onClick={() => chooseSpecialFilter({ labels: ["full_body"], exercise_type: undefined })}
+            >
+              {t("catalog.label.full_body")}
+            </button>
+            <button
+              className={selectedLabel === "cardio" ? "is-active" : ""}
+              type="button"
+              aria-pressed={selectedLabel === "cardio"}
+              onClick={() => chooseSpecialFilter({ labels: ["cardio"], exercise_type: undefined })}
+            >
+              {t("catalog.label.cardio")}
+            </button>
+            <button
+              className={query.exercise_type === "mobility" ? "is-active" : ""}
+              type="button"
+              aria-pressed={query.exercise_type === "mobility"}
+              onClick={() => chooseSpecialFilter({ labels: undefined, exercise_type: "mobility" })}
+            >
+              {t("catalog.mobility")}
+            </button>
+          </div>
+        </section>
 
         {categoryState === "loading" && (
           <StatusPanel role="status" message={t("catalog.loadingCategories")} />
@@ -217,6 +263,7 @@ export function ExerciseCatalogPage() {
                       isEnglish={isEnglish}
                       onClick={() => chooseMuscle(category.value)}
                       kind="muscle"
+                      compact={category.value === "forearms" || category.value === "neck"}
                     />
                   ))}
                 </div>
@@ -225,12 +272,12 @@ export function ExerciseCatalogPage() {
           </>
         )}
 
-        {regionCategory !== undefined && muscleCategory !== undefined && (
+        {canLoadExercises && (
           <section className="catalog-results" aria-labelledby="results-heading">
             <div className="catalog-stage__heading catalog-stage__heading--results">
               <span>03</span>
               <div>
-                <h2 id="results-heading">{activeName(muscleCategory, isEnglish)}</h2>
+                <h2 id="results-heading">{resultHeading(query, muscleCategory, isEnglish, t)}</h2>
                 <p>{t("catalog.resultsIntro")}</p>
               </div>
             </div>
@@ -392,16 +439,18 @@ function CategoryButton({
   isEnglish,
   onClick,
   kind,
+  compact = false,
 }: {
   category: { name_en: string; name_fa: string };
   active: boolean;
   isEnglish: boolean;
   onClick: () => void;
   kind: "region" | "muscle";
+  compact?: boolean;
 }) {
   return (
     <button
-      className={`${kind}-button${active ? " is-active" : ""}`}
+      className={`${kind}-button${compact ? " is-compact" : ""}${active ? " is-active" : ""}`}
       type="button"
       aria-pressed={active}
       onClick={onClick}
@@ -444,7 +493,13 @@ function ExerciseCard({
         <dl>
           <div>
             <dt>{t("catalog.primaryMuscleLabel")}</dt>
-            <dd>{muscle === undefined ? exercise.primary_muscle : activeName(muscle, isEnglish)}</dd>
+            <dd>
+              {exercise.primary_muscle === null
+                ? t("catalog.needsReview")
+                : muscle === undefined
+                  ? exercise.primary_muscle
+                  : activeName(muscle, isEnglish)}
+            </dd>
           </div>
           <div>
             <dt>{t("catalog.equipmentLabel")}</dt>
@@ -493,6 +548,8 @@ function parseCatalogQuery(searchParams: URLSearchParams): CatalogQuery {
     primary_muscle: optionalValue(searchParams.get("primary_muscle"), muscleGroups),
     equipment: optionalValue(searchParams.get("equipment"), equipment),
     difficulty: optionalValue(searchParams.get("difficulty"), difficulties),
+    exercise_type: optionalValue(searchParams.get("exercise_type"), ["mobility"] as const),
+    labels: parseLabels(searchParams),
     search: searchParams.get("search") || undefined,
     page: Number.isInteger(rawPage) && rawPage >= 1 ? rawPage : 1,
   };
@@ -506,9 +563,29 @@ function serializeCatalogQuery(query: CatalogQuery): URLSearchParams {
   }
   if (query.equipment !== undefined) searchParams.set("equipment", query.equipment);
   if (query.difficulty !== undefined) searchParams.set("difficulty", query.difficulty);
+  if (query.exercise_type !== undefined) searchParams.set("exercise_type", query.exercise_type);
+  query.labels?.forEach((label) => searchParams.append("labels", label));
   if (query.search?.trim()) searchParams.set("search", query.search);
   if (query.page > 1) searchParams.set("page", String(query.page));
   return searchParams;
+}
+
+function parseLabels(searchParams: URLSearchParams): ExerciseLabel[] | undefined {
+  const labels = searchParams.getAll("labels").filter(
+    (value): value is ExerciseLabel => value === "full_body" || value === "cardio",
+  );
+  return labels.length > 0 ? labels : undefined;
+}
+
+function resultHeading(
+  query: CatalogQuery,
+  muscle: ExerciseCategory | undefined,
+  isEnglish: boolean,
+  t: (key: string) => string,
+): string {
+  if (query.labels?.[0] !== undefined) return t(`catalog.label.${query.labels[0]}`);
+  if (query.exercise_type === "mobility") return t("catalog.mobility");
+  return muscle === undefined ? t("catalog.title") : activeName(muscle, isEnglish);
 }
 
 function optionalValue<T extends string>(value: string | null, values: readonly T[]): T | undefined {
@@ -531,8 +608,9 @@ function secondaryName(
 
 function findMuscleCategory(
   categories: ExerciseCategories,
-  value: MuscleGroup,
+  value: MuscleGroup | null,
 ): ExerciseCategory | undefined {
+  if (value === null) return undefined;
   return [...categories.upper_body, ...categories.lower_body, ...categories.core].find(
     (category) => category.value === value,
   );

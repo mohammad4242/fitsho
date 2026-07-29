@@ -16,6 +16,10 @@ export function getExercises(filters: ExerciseFilters = {}): Promise<PaginatedEx
   const searchParams = new URLSearchParams();
 
   for (const [key, value] of Object.entries(filters)) {
+    if (Array.isArray(value)) {
+      value.forEach((item) => searchParams.append(key, item));
+      continue;
+    }
     if (value !== undefined && value !== "") {
       searchParams.set(key, String(value));
     }
