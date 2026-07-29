@@ -65,6 +65,7 @@ class ExerciseSummary(BaseModel):
 class ExerciseMediaAssetDetail(BaseModel):
     presentation: MediaPresentation
     role: MediaRole
+    sort_order: int
     media_path: str
     media_type: MediaType
     media_source_url: str | None

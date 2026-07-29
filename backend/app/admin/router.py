@@ -73,6 +73,7 @@ def _detail(exercise: Exercise) -> AdminExerciseDetail:
             ExerciseMediaAssetDetail(
                 presentation=asset.presentation,
                 role=asset.role,
+                sort_order=asset.sort_order,
                 media_path=asset.media_path,
                 media_type=asset.media_type,
                 media_source_url=asset.media_source_url,

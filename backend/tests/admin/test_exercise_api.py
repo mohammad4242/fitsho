@@ -300,6 +300,7 @@ def test_admin_creates_gendered_media_assets_and_public_detail_returns_them(
         "male",
     ]
     assert response.json()["media_assets"][0]["media_type"] == "image"
+    assert response.json()["media_assets"][0]["sort_order"] == 0
     assert client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE).status_code == 201
 
     public_detail = client.get("/api/v1/exercises/incline-push-up")
