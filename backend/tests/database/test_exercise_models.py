@@ -86,6 +86,37 @@ def test_exercise_stores_lower_back_as_a_core_muscle(db: Session) -> None:
     assert stored.primary_muscle is MuscleGroup.LOWER_BACK
 
 
+def test_exercise_stores_import_source_metadata_and_review_status(db: Session) -> None:
+    exercise = make_exercise("source-backed-push-up")
+    exercise.source = "free-exercise-db"
+    exercise.source_id = "0001"
+    exercise.aliases_en = ["Press-up"]
+    exercise.short_description_en = "A horizontal bodyweight press."
+    exercise.steps_en = ["Set up.", "Lower.", "Press."]
+    exercise.form_cues_en = ["Keep the trunk braced."]
+    exercise.common_mistakes_en = ["Letting the hips sag."]
+    exercise.breathing_en = "Exhale while pressing."
+    exercise.source_metadata_en = {"compound": True, "unilateral": False}
+    exercise.needs_review = True
+    db.add(exercise)
+    db.flush()
+    db.expunge(exercise)
+
+    stored = db.scalar(select(Exercise).where(Exercise.slug == "source-backed-push-up"))
+
+    assert stored is not None
+    assert stored.source == "free-exercise-db"
+    assert stored.source_id == "0001"
+    assert stored.aliases_en == ["Press-up"]
+    assert stored.short_description_en == "A horizontal bodyweight press."
+    assert stored.steps_en == ["Set up.", "Lower.", "Press."]
+    assert stored.form_cues_en == ["Keep the trunk braced."]
+    assert stored.common_mistakes_en == ["Letting the hips sag."]
+    assert stored.breathing_en == "Exhale while pressing."
+    assert stored.source_metadata_en == {"compound": True, "unilateral": False}
+    assert stored.needs_review is True
+
+
 def test_exercise_slug_is_unique(db: Session) -> None:
     db.add_all([make_exercise(), make_exercise()])
 
