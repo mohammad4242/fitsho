@@ -388,3 +388,15 @@ def test_curated_translator_returns_only_local_persian_content() -> None:
 
     assert translations["0001"].name_fa == "شنا سوئدی"
     assert translations["0001"].instructions_fa == ["آماده شو.", "پایین برو.", "فشار بده."]
+
+
+def test_local_translation_catalog_keeps_existing_imported_exercises() -> None:
+    from app.exercises.free_exercise_db_translations import CURATED_TRANSLATIONS
+
+    assert set(CURATED_TRANSLATIONS) == {
+        "0489",
+        "drv-45-degree-bycicle-twisting-crunch",
+        "drv-45-degree-bycicle-twisting-crunch-1",
+        "drv-stretching-all-fours-squad-stretch",
+        "0970",
+    }
