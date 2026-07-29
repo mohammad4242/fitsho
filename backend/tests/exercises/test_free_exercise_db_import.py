@@ -214,6 +214,43 @@ def test_importer_prevents_duplicates_on_a_second_run(
     assert translator.calls == [["0001"]]
 
 
+def test_importer_recopies_existing_media_when_target_storage_is_empty(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    write_source(source_root, source_record())
+    translator = FakeTranslator()
+    first = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=translator,
+    ).run()
+    replica_settings = test_settings.model_copy(
+        update={"media_root": tmp_path / "replica-media"}
+    )
+
+    second = FreeExerciseDbImporter(
+        db,
+        settings=replica_settings,
+        source_root=source_root,
+        translator=translator,
+    ).run()
+    exercise = db.scalar(select(Exercise).where(Exercise.source_id == "0001"))
+
+    assert first.imported_records == ["0001"]
+    assert second.updated_records == ["0001"]
+    assert exercise is not None
+    assert all(
+        (replica_settings.media_root / asset.media_path.removeprefix("/media/")).is_file()
+        for asset in exercise.media_assets
+    )
+
+
 def test_importer_sets_programming_metadata_and_updates_existing_import(
     db: Session,
     test_settings: Settings,
@@ -388,3 +425,43 @@ def test_curated_translator_returns_only_local_persian_content() -> None:
 
     assert translations["0001"].name_fa == "شنا سوئدی"
     assert translations["0001"].instructions_fa == ["آماده شو.", "پایین برو.", "فشار بده."]
+
+
+def test_local_translation_catalog_keeps_existing_imported_exercises() -> None:
+    from app.exercises.free_exercise_db_translations import CURATED_TRANSLATIONS
+
+    expected_ids = {
+        "0489",
+        "drv-45-degree-bycicle-twisting-crunch",
+        "drv-45-degree-bycicle-twisting-crunch-1",
+        "drv-stretching-all-fours-squad-stretch",
+        "0970",
+        "drv-band-bent-over-rear-lateral-raise",
+        "3006",
+        "drv-band-hip-adduction",
+        "0983",
+        "1017",
+        "drv-band-one-leg-kickback-bent-position",
+        "new-band-overhead-triceps-extension",
+        "0976",
+        "0991",
+        "drv-band-decline-sit-ups",
+        "0980",
+        "0990",
+        "drv-stretching-band-warm-up-shoulder-stretch",
+        "0002",
+        "0999",
+        "1005",
+        "0988",
+        "1408",
+        "1022",
+        "3144",
+    }
+    assert expected_ids.issubset(CURATED_TRANSLATIONS)
+    assert all(CURATED_TRANSLATIONS[source_id]["name_fa"] for source_id in expected_ids)
+
+
+def test_local_translation_catalog_matches_normalized_instruction_limit() -> None:
+    from app.exercises.free_exercise_db_translations import CURATED_TRANSLATIONS
+
+    assert len(CURATED_TRANSLATIONS["0983"]["instructions_fa"]) == 6
