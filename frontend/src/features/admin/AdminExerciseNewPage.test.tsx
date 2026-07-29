@@ -48,6 +48,18 @@ it("suggests an editable slug and filters muscles by region", async () => {
   expect(screen.getByLabelText("عضله اصلی")).not.toContainHTML("quadriceps");
 });
 
+it("allows a review record to leave anatomy unassigned and add a cardio label", async () => {
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(screen.getByLabelText("نیازمند بازبینی"));
+  await user.click(screen.getByLabelText("هوازی"));
+
+  expect(screen.getByLabelText("ناحیه بدن")).toBeDisabled();
+  expect(screen.getByLabelText("عضله اصلی")).not.toBeRequired();
+  expect(screen.getByLabelText("هوازی")).toBeChecked();
+});
+
 it("supports repeatable instructions and safety notes plus multi-select choices", async () => {
   const user = userEvent.setup();
   renderPage();

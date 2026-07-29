@@ -102,6 +102,7 @@ function ReadyExerciseDetail({
   const secondaryMuscles = exercise.secondary_muscles.map((value) =>
     t(`catalog.muscle.${value}`),
   );
+  const labels = exercise.labels ?? [];
   const equipmentNames = exercise.equipment.map((value) =>
     t(`catalog.equipment.${value}`),
   );
@@ -127,9 +128,13 @@ function ReadyExerciseDetail({
       <nav className="catalog-breadcrumb" aria-label={t("exerciseDetail.breadcrumbLabel")}>
         <Link to={catalogPath}>{t("catalog.title")}</Link>
         <span aria-hidden="true">←</span>
-        <span>{t(`catalog.bodyRegion.${exercise.body_region}`)}</span>
-        <span aria-hidden="true">←</span>
-        <span>{t(`catalog.muscle.${exercise.primary_muscle}`)}</span>
+        <span>{exercise.body_region === null ? t("catalog.needsReview") : t(`catalog.bodyRegion.${exercise.body_region}`)}</span>
+        {exercise.primary_muscle !== null && (
+          <>
+            <span aria-hidden="true">←</span>
+            <span>{t(`catalog.muscle.${exercise.primary_muscle}`)}</span>
+          </>
+        )}
         <span aria-hidden="true">←</span>
         <span aria-current="page">{name}</span>
       </nav>
@@ -174,12 +179,18 @@ function ReadyExerciseDetail({
           <dl className="exercise-detail-facts">
             <div>
               <dt>{t("exerciseDetail.bodyRegion")}</dt>
-              <dd>{t(`catalog.bodyRegion.${exercise.body_region}`)}</dd>
+              <dd>{exercise.body_region === null ? t("catalog.needsReview") : t(`catalog.bodyRegion.${exercise.body_region}`)}</dd>
             </div>
             <div>
               <dt>{t("catalog.primaryMuscleLabel")}</dt>
-              <dd>{t(`catalog.muscle.${exercise.primary_muscle}`)}</dd>
+              <dd>{exercise.primary_muscle === null ? t("catalog.needsReview") : t(`catalog.muscle.${exercise.primary_muscle}`)}</dd>
             </div>
+            {labels.length > 0 && (
+              <div>
+                <dt>{t("exerciseDetail.labels")}</dt>
+                <dd>{labels.map((label) => t(`catalog.label.${label}`)).join(t("catalog.listSeparator"))}</dd>
+              </div>
+            )}
             <div>
               <dt>{t("exerciseDetail.secondaryMuscles")}</dt>
               <dd>

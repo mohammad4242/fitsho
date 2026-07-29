@@ -436,7 +436,6 @@ def test_create_rejects_browser_supplied_media_path(
     ("field", "value"),
     [
         ("body_region", "arms"),
-        ("primary_muscle", "forearms"),
         ("difficulty", "expert"),
         ("equipment", ["kettlebell"]),
         ("slug", "Incline Push Up"),
@@ -624,3 +623,26 @@ def test_admin_updates_a_gendered_media_asset(
     assert asset["media_source_url"] == "https://source.example/female.mp4"
     assert asset["media_license"] == "MIT"
     assert asset["media_attribution"] == "Female creator"
+
+
+def test_admin_creates_review_exercise_with_labels_and_no_anatomy(
+    client: TestClient,
+    db: Session,
+) -> None:
+    make_current_user_admin(client, db)
+
+    response = post_exercise(
+        client,
+        exercise_payload(
+            body_region=None,
+            primary_muscle=None,
+            secondary_muscles=[],
+            labels=["cardio"],
+            needs_review=True,
+        ),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["body_region"] is None
+    assert response.json()["primary_muscle"] is None
+    assert response.json()["labels"] == ["cardio"]

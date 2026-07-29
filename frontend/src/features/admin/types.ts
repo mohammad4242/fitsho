@@ -4,6 +4,7 @@ import type {
   Equipment,
   ExerciseCautionTag,
   ExerciseDetail,
+  ExerciseLabel,
   ExerciseType,
   MediaPresentation,
   MediaRole,
@@ -28,6 +29,8 @@ export type AdminExercise = ExerciseDetail & {
   movement_pattern: MovementPattern;
   exercise_type: ExerciseType;
   caution_tags: ExerciseCautionTag[];
+  labels: ExerciseLabel[];
+  needs_review: boolean;
   is_programmable: boolean;
   is_active: boolean;
   created_at: string;
@@ -38,14 +41,16 @@ export type AdminExerciseCreate = {
   slug: string;
   name_en: string;
   name_fa: string;
-  body_region: BodyRegion;
-  primary_muscle: MuscleGroup;
+  body_region: BodyRegion | null;
+  primary_muscle: MuscleGroup | null;
   secondary_muscles: MuscleGroup[];
   equipment: Equipment[];
   difficulty: Difficulty;
   movement_pattern: MovementPattern;
   exercise_type: ExerciseType;
   caution_tags: ExerciseCautionTag[];
+  labels: ExerciseLabel[];
+  needs_review: boolean;
   is_programmable: boolean;
   instructions_en: string[];
   instructions_fa: string[];

@@ -187,6 +187,7 @@ def test_workout_plan_returns_active_curated_alternatives_read_only(
                 "name_fa": active_alternative.name_fa,
                 "body_region": "upper_body",
                 "primary_muscle": "chest",
+                "labels": [],
                 "secondary_muscles": [],
                 "equipment": [],
                 "difficulty": "beginner",

@@ -8,6 +8,8 @@ export const muscleGroups = [
   "biceps",
   "triceps",
   "traps",
+  "forearms",
+  "neck",
   "glutes",
   "quadriceps",
   "hamstrings",
@@ -65,6 +67,9 @@ export type MovementPattern = (typeof movementPatterns)[number];
 export const exerciseTypes = ["compound", "isolation", "core", "mobility", "other"] as const;
 export type ExerciseType = (typeof exerciseTypes)[number];
 
+export const exerciseLabels = ["full_body", "cardio"] as const;
+export type ExerciseLabel = (typeof exerciseLabels)[number];
+
 export const exerciseCautionTags = [
   "lower_back_loading",
   "spinal_flexion",
@@ -118,8 +123,9 @@ export type ExerciseSummary = {
   slug: string;
   name_en: string;
   name_fa: string;
-  body_region: BodyRegion;
-  primary_muscle: MuscleGroup;
+  body_region: BodyRegion | null;
+  primary_muscle: MuscleGroup | null;
+  labels: ExerciseLabel[];
   secondary_muscles: MuscleGroup[];
   equipment: Equipment[];
   difficulty: Difficulty;
@@ -162,6 +168,8 @@ export type ExerciseFilters = {
   primary_muscle?: MuscleGroup | "";
   equipment?: Equipment | "";
   difficulty?: Difficulty | "";
+  exercise_type?: ExerciseType | "";
+  labels?: ExerciseLabel[];
   search?: string;
   page?: number;
   page_size?: number;

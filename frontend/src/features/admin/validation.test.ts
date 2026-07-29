@@ -1,6 +1,11 @@
 import { expect, it } from "vitest";
 
-import { emptyAdminExerciseForm, slugifyExerciseName, validateAdminExercise } from "./validation";
+import {
+  emptyAdminExerciseForm,
+  slugifyExerciseName,
+  toAdminExerciseCreate,
+  validateAdminExercise,
+} from "./validation";
 
 it("suggests an editable lowercase kebab-case slug", () => {
   expect(slugifyExerciseName("  Dumbbell Fly (Incline)  ")).toBe("dumbbell-fly-incline");
@@ -59,4 +64,28 @@ it("accepts a complete valid bilingual exercise", () => {
   });
 
   expect(validateAdminExercise(form)).toEqual({});
+});
+
+it("allows a review record with labels and no anatomy", () => {
+  const form = emptyAdminExerciseForm();
+  Object.assign(form, {
+    slug: "review-cardio",
+    name_en: "Review cardio",
+    name_fa: "هوازی بازبینی",
+    labels: ["cardio"],
+    needs_review: true,
+    equipment: ["bodyweight"],
+    instructions_en: ["One", "Two", "Three"],
+    instructions_fa: ["یک", "دو", "سه"],
+    safety_notes_en: ["Keep control"],
+    safety_notes_fa: ["کنترل را حفظ کن"],
+  });
+
+  expect(validateAdminExercise(form)).toEqual({});
+  expect(toAdminExerciseCreate(form)).toMatchObject({
+    body_region: null,
+    primary_muscle: null,
+    labels: ["cardio"],
+    needs_review: true,
+  });
 });

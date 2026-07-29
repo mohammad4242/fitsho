@@ -11,6 +11,7 @@ from app.exercises.models import (
     ExerciseAlternative,
     ExerciseCautionTagItem,
     ExerciseEquipment,
+    ExerciseLabelItem,
     ExerciseSecondaryMuscle,
 )
 from app.exercises.schemas import ExerciseFilters
@@ -44,6 +45,12 @@ def list_exercises(
         )
     if filters.difficulty is not None:
         conditions.append(Exercise.difficulty == filters.difficulty)
+    if filters.exercise_type is not None:
+        conditions.append(Exercise.exercise_type == filters.exercise_type)
+    if filters.labels:
+        conditions.extend(
+            Exercise.labels.any(ExerciseLabelItem.label == label) for label in filters.labels
+        )
     if filters.search is not None:
         pattern = f"%{_escape_like(filters.search)}%"
         conditions.append(
@@ -63,6 +70,7 @@ def list_exercises(
                 selectinload(Exercise.secondary_muscles),
                 selectinload(Exercise.equipment_items),
                 selectinload(Exercise.media_assets),
+                selectinload(Exercise.labels),
             )
             .order_by(Exercise.name_en.asc(), Exercise.id.asc())
             .offset((filters.page - 1) * filters.page_size)
@@ -80,6 +88,7 @@ def get_active_exercise_by_slug(db: Session, slug: str) -> Exercise | None:
             selectinload(Exercise.secondary_muscles),
             selectinload(Exercise.equipment_items),
             selectinload(Exercise.media_assets),
+            selectinload(Exercise.labels),
         )
     )
 

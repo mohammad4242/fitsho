@@ -24,6 +24,7 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseCautionTag,
+    ExerciseLabel,
     ExerciseType,
     MediaPresentation,
     MediaRole,
@@ -36,6 +37,7 @@ from app.exercises.models import (
     Exercise,
     ExerciseCautionTagItem,
     ExerciseEquipment,
+    ExerciseLabelItem,
     ExerciseMediaAsset,
     ExerciseSecondaryMuscle,
 )
@@ -63,12 +65,15 @@ MUSCLE_GROUP_MAP: dict[str, MuscleGroup] = {
     "delts": MuscleGroup.SHOULDERS,
     "erector spinae": MuscleGroup.LOWER_BACK,
     "erectors": MuscleGroup.LOWER_BACK,
+    "forearm extensors": MuscleGroup.FOREARMS,
+    "forearms": MuscleGroup.FOREARMS,
     "glutes": MuscleGroup.GLUTES,
     "gluteus medius": MuscleGroup.GLUTES,
     "hamstrings": MuscleGroup.HAMSTRINGS,
     "lats": MuscleGroup.BACK,
     "lower back": MuscleGroup.LOWER_BACK,
     "middle back": MuscleGroup.BACK,
+    "neck flexors": MuscleGroup.NECK,
     "obliques": MuscleGroup.OBLIQUES,
     "pectorals": MuscleGroup.CHEST,
     "posterior deltoid": MuscleGroup.SHOULDERS,
@@ -79,6 +84,7 @@ MUSCLE_GROUP_MAP: dict[str, MuscleGroup] = {
     "rhomboids": MuscleGroup.BACK,
     "spinal erectors": MuscleGroup.LOWER_BACK,
     "spine": MuscleGroup.LOWER_BACK,
+    "sternocleidomastoid": MuscleGroup.NECK,
     "thoracic spine": MuscleGroup.LOWER_BACK,
     "traps": MuscleGroup.TRAPS,
     "triceps": MuscleGroup.TRICEPS,
@@ -144,7 +150,7 @@ class ProgrammingMetadata:
 def classify_programming_metadata(
     *,
     name_en: str,
-    primary_muscle: MuscleGroup,
+    primary_muscle: MuscleGroup | None,
     instructions_en: Sequence[str],
     steps_en: Sequence[str],
     form_cues_en: Sequence[str],
@@ -274,6 +280,23 @@ def classify_programming_metadata(
 
 def _contains_any(value: str, terms: Sequence[str]) -> bool:
     return any(term in value for term in terms)
+
+
+def classify_exercise_labels(
+    *,
+    body_part: str,
+    target: str,
+    exercise_type: ExerciseType,
+) -> tuple[ExerciseLabel, ...]:
+    labels: list[ExerciseLabel] = []
+    if target.strip().lower() == "full body":
+        labels.append(ExerciseLabel.FULL_BODY)
+    if exercise_type is not ExerciseType.MOBILITY and (
+        body_part.strip().lower() == "cardio"
+        or target.strip().lower() == "cardiovascular system"
+    ):
+        labels.append(ExerciseLabel.CARDIO)
+    return tuple(labels)
 
 
 class ExerciseTranslator(Protocol):
@@ -435,8 +458,9 @@ class ImportCandidate:
     source_metadata: dict[str, object]
     slug: str
     name_en: str
-    body_region: BodyRegion
-    primary_muscle: MuscleGroup
+    body_region: BodyRegion | None
+    primary_muscle: MuscleGroup | None
+    labels: tuple[ExerciseLabel, ...]
     secondary_muscles: list[MuscleGroup]
     equipment: list[Equipment]
     difficulty: Difficulty
@@ -586,12 +610,7 @@ class FreeExerciseDbImporter:
             self._add_unmapped(report, f"equipment:{equipment_name}")
         if difficulty is None:
             self._add_unmapped(report, f"difficulty:{difficulty_name}")
-        if (
-            body_region is None
-            or primary_muscle is None
-            or equipment is None
-            or difficulty is None
-        ):
+        if equipment is None or difficulty is None:
             return None
         secondary_muscles: list[MuscleGroup] = []
         for secondary_name in secondary_names:
@@ -618,6 +637,11 @@ class FreeExerciseDbImporter:
             form_cues_en=form_cues,
             common_mistakes_en=common_mistakes,
         )
+        labels = classify_exercise_labels(
+            body_part=body_part,
+            target=target,
+            exercise_type=programming_metadata.exercise_type,
+        )
         media_assets = self._media_assets(raw_record, source_id, report)
         if not any(asset.role is MediaRole.VIDEO for asset in media_assets):
             report.validation_failures.append(
@@ -631,6 +655,7 @@ class FreeExerciseDbImporter:
             name_en=name_en,
             body_region=body_region,
             primary_muscle=primary_muscle,
+            labels=labels,
             secondary_muscles=secondary_muscles,
             equipment=[equipment],
             difficulty=difficulty,
@@ -714,6 +739,7 @@ class FreeExerciseDbImporter:
                 selectinload(Exercise.equipment_items),
                 selectinload(Exercise.media_assets),
                 selectinload(Exercise.caution_tag_items),
+                selectinload(Exercise.labels),
             )
         )
 
@@ -732,6 +758,7 @@ class FreeExerciseDbImporter:
             and exercise.movement_pattern is candidate.programming_metadata.movement_pattern
             and exercise.exercise_type is candidate.programming_metadata.exercise_type
             and exercise.is_programmable is True
+            and {item.label for item in exercise.labels} == set(candidate.labels)
             and {item.caution_tag for item in exercise.caution_tag_items}
             == set(candidate.programming_metadata.caution_tags)
         )
@@ -847,6 +874,7 @@ class FreeExerciseDbImporter:
         self._sync_secondary_muscles(exercise, candidate.secondary_muscles)
         self._sync_equipment(exercise, candidate.equipment)
         self._sync_caution_tags(exercise, candidate.programming_metadata.caution_tags)
+        self._sync_labels(exercise, candidate.labels)
         self._sync_media_assets(exercise, stored_assets)
 
     @staticmethod
@@ -887,6 +915,17 @@ class FreeExerciseDbImporter:
             ExerciseCautionTagItem(caution_tag=caution_tag)
             for caution_tag in desired
             if caution_tag not in existing
+        )
+
+    @staticmethod
+    def _sync_labels(exercise: Exercise, desired: tuple[ExerciseLabel, ...]) -> None:
+        desired_set = set(desired)
+        for item in list(exercise.labels):
+            if item.label not in desired_set:
+                exercise.labels.remove(item)
+        existing = {item.label for item in exercise.labels}
+        exercise.labels.extend(
+            ExerciseLabelItem(label=label) for label in desired if label not in existing
         )
 
     @staticmethod

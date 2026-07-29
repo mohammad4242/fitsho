@@ -36,6 +36,8 @@ UPPER_BODY_CATEGORIES = (
     (MuscleGroup.BICEPS, "Biceps", "جلو بازو"),
     (MuscleGroup.TRICEPS, "Triceps", "پشت بازو"),
     (MuscleGroup.TRAPS, "Traps", "کول"),
+    (MuscleGroup.FOREARMS, "Forearms", "ساعد"),
+    (MuscleGroup.NECK, "Neck", "گردن"),
 )
 LOWER_BODY_CATEGORIES = (
     (MuscleGroup.GLUTES, "Glutes", "باسن"),
@@ -84,6 +86,7 @@ def _summary(exercise: Exercise) -> ExerciseSummary:
             key=lambda value: value.value,
         ),
         difficulty=exercise.difficulty,
+        labels=sorted((item.label for item in exercise.labels), key=lambda value: value.value),
         media_path=exercise.media_path,
         media_type=exercise.media_type,
     )

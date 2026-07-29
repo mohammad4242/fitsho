@@ -63,6 +63,7 @@ def test_prompt_builder_keeps_user_limitations_as_json_data() -> None:
             "equipment": ["dumbbell", "bench"],
             "difficulty": "beginner",
             "caution_tags": [],
+            "labels": [],
         }
     ]
     assert "Use only exercise_id values present in allowed_exercises." in SYSTEM_PROMPT_V1

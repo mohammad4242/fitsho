@@ -5,7 +5,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.exercises.models import Exercise
+from app.exercises.enums import ExerciseLabel
+from app.exercises.models import Exercise, ExerciseLabelItem
 from app.exercises.service import seed_exercises
 
 ORIGIN = {"Origin": "http://localhost:5173"}
@@ -109,6 +110,8 @@ def test_categories_return_ordered_bilingual_taxonomy_even_when_core_is_empty(
         ("biceps", "Biceps", "جلو بازو"),
         ("triceps", "Triceps", "پشت بازو"),
         ("traps", "Traps", "کول"),
+        ("forearms", "Forearms", "ساعد"),
+        ("neck", "Neck", "گردن"),
     ]
     assert [
         (item["value"], item["name_en"], item["name_fa"]) for item in response.json()["lower_body"]
@@ -155,10 +158,25 @@ def test_list_returns_active_exercises_with_pagination_metadata(
         "primary_muscle",
         "secondary_muscles",
         "equipment",
-        "difficulty",
-        "media_path",
+            "difficulty",
+            "labels",
+            "media_path",
         "media_type",
     }
+
+
+def test_list_filters_by_exercise_labels(client: TestClient, db: Session) -> None:
+    prepare_catalog(client, db)
+    exercise = db.scalar(select(Exercise).where(Exercise.slug == "dumbbell-bench-press"))
+    assert exercise is not None
+    exercise.labels.append(ExerciseLabelItem(label=ExerciseLabel.CARDIO))
+    db.commit()
+
+    response = client.get("/api/v1/exercises?labels=cardio")
+
+    assert response.status_code == 200
+    assert [item["slug"] for item in response.json()["items"]] == ["dumbbell-bench-press"]
+    assert response.json()["items"][0]["labels"] == ["cardio"]
 
 
 def test_detail_returns_complete_bilingual_exercise(
@@ -340,7 +358,6 @@ def test_pagination_returns_stable_pages_and_empty_out_of_range_page(
     "query",
     [
         "body_region=arms",
-        "primary_muscle=forearms",
         "equipment=kettlebell",
         "difficulty=expert",
         "page=0",

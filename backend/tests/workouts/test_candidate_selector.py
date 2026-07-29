@@ -7,12 +7,18 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseCautionTag,
+    ExerciseLabel,
     ExerciseType,
     MediaType,
     MovementPattern,
     MuscleGroup,
 )
-from app.exercises.models import Exercise, ExerciseCautionTagItem, ExerciseEquipment
+from app.exercises.models import (
+    Exercise,
+    ExerciseCautionTagItem,
+    ExerciseEquipment,
+    ExerciseLabelItem,
+)
 from app.profile.enums import ExperienceLevel, HomeTrainingSetup, TrainingCaution, TrainingLocation
 from app.workouts.candidate_selector import WorkoutCandidateSelector
 from app.workouts.schemas import WorkoutGenerationProfile
@@ -183,3 +189,18 @@ def test_multiday_selector_requires_candidate_count_and_pattern_coverage(db: Ses
 
     assert len(result.exercises) == 4
     assert not result.is_sufficient
+
+
+def test_candidate_preserves_cardio_label_and_null_primary_muscle(db: Session) -> None:
+    cardio = exercise(db, "cardio-step", equipment=(Equipment.BODYWEIGHT,))
+    cardio.primary_muscle = None
+    cardio.labels.append(ExerciseLabelItem(label=ExerciseLabel.CARDIO))
+    db.commit()
+
+    result = WorkoutCandidateSelector(db).select(
+        profile(location=TrainingLocation.HOME, setup=HomeTrainingSetup.BODYWEIGHT_ONLY)
+    )
+
+    candidate = next(item for item in result.exercises if item.id == cardio.id)
+    assert candidate.primary_muscle is None
+    assert ExerciseLabel.CARDIO in candidate.labels

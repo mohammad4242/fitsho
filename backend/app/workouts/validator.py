@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from app.ai.schemas import WorkoutPlanDayOutput, WorkoutPlanModelOutput
-from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
+from app.exercises.enums import ExerciseLabel, ExerciseType, MovementPattern, MuscleGroup
 from app.workouts.schemas import CandidateSet, WorkoutExerciseCandidate
 from app.workouts.time_budget import (
     ExerciseTiming,
@@ -155,8 +155,26 @@ class WorkoutPlanValidator:
             )
         if (
             selected
+            and self._has_suitable_strength_candidate()
+            and not any(self._can_fill_strength_slot(candidate) for candidate in selected)
+        ):
+            problems.append(
+                ValidationProblem(
+                    code="insufficient_strength_movements",
+                    message=(
+                        "A resistance-training day must include a non-cardio strength movement."
+                    ),
+                    day_number=day.day_number,
+                )
+            )
+        elif (
+            selected
             and self._has_suitable_compound_candidate()
-            and all(candidate.exercise_type is ExerciseType.ISOLATION for candidate in selected)
+            and all(
+                candidate.exercise_type is ExerciseType.ISOLATION
+                or ExerciseLabel.CARDIO in candidate.labels
+                for candidate in selected
+            )
         ):
             problems.append(
                 ValidationProblem(
@@ -298,10 +316,20 @@ class WorkoutPlanValidator:
             "Plan needs broader movement-pattern coverage.",
             problems,
         )
-        if len(selected) >= 4:
+        selected_muscles = {
+            candidate.primary_muscle
+            for candidate in selected
+            if candidate.primary_muscle is not None
+        }
+        available_muscles = {
+            candidate.primary_muscle
+            for candidate in self._candidates.exercises
+            if candidate.primary_muscle is not None
+        }
+        if len(selected) >= 4 and selected_muscles:
             most_common_muscle_count = max(
                 sum(candidate.primary_muscle is muscle for candidate in selected)
-                for muscle in {candidate.primary_muscle for candidate in selected}
+                for muscle in selected_muscles
             )
             if most_common_muscle_count * 2 > len(selected):
                 problems.append(
@@ -311,8 +339,8 @@ class WorkoutPlanValidator:
                     )
                 )
         self._require_variety(
-            {candidate.primary_muscle for candidate in selected},
-            {candidate.primary_muscle for candidate in self._candidates.exercises},
+            selected_muscles,
+            available_muscles,
             min(2, len(selected)),
             "muscle_group_balance",
             "Plan needs broader muscle-group coverage.",
@@ -335,5 +363,18 @@ class WorkoutPlanValidator:
     def _has_suitable_compound_candidate(self) -> bool:
         return any(
             candidate.exercise_type is ExerciseType.COMPOUND
+            and self._can_fill_strength_slot(candidate)
             for candidate in self._candidates.exercises
+        )
+
+    def _has_suitable_strength_candidate(self) -> bool:
+        return any(
+            self._can_fill_strength_slot(candidate) for candidate in self._candidates.exercises
+        )
+
+    @staticmethod
+    def _can_fill_strength_slot(candidate: WorkoutExerciseCandidate) -> bool:
+        return (
+            ExerciseLabel.CARDIO not in candidate.labels
+            and candidate.exercise_type in {ExerciseType.COMPOUND, ExerciseType.ISOLATION}
         )

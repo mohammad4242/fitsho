@@ -7,7 +7,14 @@ from app.ai.schemas import (
     WorkoutPlanExerciseOutput,
     WorkoutPlanModelOutput,
 )
-from app.exercises.enums import Difficulty, Equipment, ExerciseType, MovementPattern, MuscleGroup
+from app.exercises.enums import (
+    Difficulty,
+    Equipment,
+    ExerciseLabel,
+    ExerciseType,
+    MovementPattern,
+    MuscleGroup,
+)
 from app.workouts.schemas import CandidateSet, WorkoutExerciseCandidate
 from app.workouts.time_budget import WorkoutGenerationPolicy
 from app.workouts.validator import WorkoutPlanValidationError, WorkoutPlanValidator
@@ -23,6 +30,7 @@ def _candidate(
     pattern: MovementPattern,
     exercise_type: ExerciseType = ExerciseType.COMPOUND,
     muscle: MuscleGroup = MuscleGroup.CHEST,
+    labels: tuple[ExerciseLabel, ...] = (),
 ) -> WorkoutExerciseCandidate:
     return WorkoutExerciseCandidate(
         id=exercise_id,
@@ -33,6 +41,7 @@ def _candidate(
         equipment=(Equipment.BODYWEIGHT,),
         difficulty=Difficulty.BEGINNER,
         caution_tags=(),
+        labels=labels,
     )
 
 
@@ -274,6 +283,45 @@ def test_validator_rejects_isolation_before_a_suitable_compound() -> None:
         validator.validate(plan)
 
     assert "compound_order" in {problem.code for problem in exc_info.value.problems}
+
+
+def test_cardio_cannot_fill_required_strength_slot() -> None:
+    candidates = CandidateSet(
+        exercises=(
+            _candidate(
+                FIRST_ID,
+                pattern=MovementPattern.OTHER,
+                labels=(ExerciseLabel.CARDIO,),
+            ),
+            _candidate(SECOND_ID, pattern=MovementPattern.HORIZONTAL_PUSH),
+        ),
+        candidate_set_hash="a" * 64,
+        soft_cautions=(),
+        minimum_candidate_count=1,
+    )
+    validator = WorkoutPlanValidator(
+        candidates=candidates,
+        policy=WorkoutGenerationPolicy.for_session_duration(45),
+        required_day_count=1,
+    )
+    plan = _plan(
+        [
+            WorkoutPlanDayOutput(
+                day_number=1,
+                title_en="Cardio only",
+                title_fa="فقط هوازی",
+                estimated_duration_minutes=8,
+                exercises=[_exercise(FIRST_ID)],
+            )
+        ]
+    )
+
+    with pytest.raises(WorkoutPlanValidationError) as exc_info:
+        validator.validate(plan)
+
+    assert "insufficient_strength_movements" in {
+        problem.code for problem in exc_info.value.problems
+    }
 
 
 @pytest.mark.parametrize("unsafe_note", ["<b>HTML</b>", "https://example.com", "```markdown"])

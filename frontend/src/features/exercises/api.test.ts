@@ -36,6 +36,7 @@ const detail: ExerciseDetail = {
   name_fa: "پرس سینه دمبل",
   body_region: "upper_body",
   primary_muscle: "chest",
+  labels: [],
   secondary_muscles: ["triceps", "shoulders"],
   equipment: ["dumbbell", "bench"],
   difficulty: "intermediate",

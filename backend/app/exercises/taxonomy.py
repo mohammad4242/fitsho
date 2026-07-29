@@ -9,6 +9,8 @@ MUSCLES_BY_REGION: dict[BodyRegion, frozenset[MuscleGroup]] = {
             MuscleGroup.BICEPS,
             MuscleGroup.TRICEPS,
             MuscleGroup.TRAPS,
+            MuscleGroup.FOREARMS,
+            MuscleGroup.NECK,
         }
     ),
     BodyRegion.LOWER_BODY: frozenset(

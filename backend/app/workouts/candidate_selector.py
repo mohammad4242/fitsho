@@ -9,6 +9,7 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseCautionTag,
+    ExerciseLabel,
     ExerciseType,
     MovementPattern,
 )
@@ -61,6 +62,7 @@ class WorkoutCandidateSelector:
                 selectinload(Exercise.secondary_muscles),
                 selectinload(Exercise.equipment_items),
                 selectinload(Exercise.caution_tag_items),
+                selectinload(Exercise.labels),
             )
         ).all()
         available_equipment = self._available_equipment(profile)
@@ -127,6 +129,7 @@ class WorkoutCandidateSelector:
             equipment=tuple(item.equipment for item in exercise.equipment_items),
             difficulty=exercise.difficulty,
             caution_tags=tuple(item.caution_tag for item in exercise.caution_tag_items),
+            labels=tuple(item.label for item in exercise.labels),
         )
 
     def _cap_for_movement_coverage(
@@ -157,6 +160,7 @@ class WorkoutCandidateSelector:
         for group in grouped.values():
             group.sort(
                 key=lambda item: (
+                    ExerciseLabel.CARDIO in item.labels,
                     type_rank[item.exercise_type],
                     abs(difficulty_rank[item.difficulty] - target_difficulty),
                     str(item.id),

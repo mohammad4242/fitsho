@@ -11,6 +11,7 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseCautionTag,
+    ExerciseLabel,
     ExerciseType,
     MovementPattern,
     MuscleGroup,
@@ -47,13 +48,14 @@ class WorkoutGenerationProfile:
 @dataclass(frozen=True)
 class WorkoutExerciseCandidate:
     id: UUID
-    primary_muscle: MuscleGroup
+    primary_muscle: MuscleGroup | None
     secondary_muscles: tuple[MuscleGroup, ...]
     movement_pattern: MovementPattern
     exercise_type: ExerciseType
     equipment: tuple[Equipment, ...]
     difficulty: Difficulty
     caution_tags: tuple[ExerciseCautionTag, ...]
+    labels: tuple[ExerciseLabel, ...] = ()
 
 
 @dataclass(frozen=True)

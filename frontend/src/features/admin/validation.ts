@@ -16,7 +16,7 @@ export type AdminValidationErrors = Partial<
 >;
 
 export const musclesByRegion: Record<BodyRegion, readonly MuscleGroup[]> = {
-  upper_body: ["chest", "back", "shoulders", "biceps", "triceps", "traps"],
+  upper_body: ["chest", "back", "shoulders", "biceps", "triceps", "traps", "forearms", "neck"],
   lower_body: ["glutes", "quadriceps", "hamstrings", "adductors", "calves"],
   core: ["abs", "obliques", "lower_back"],
 };
@@ -34,6 +34,8 @@ export function emptyAdminExerciseForm(): AdminExerciseForm {
     movement_pattern: "other",
     exercise_type: "other",
     caution_tags: [],
+    labels: [],
+    needs_review: false,
     is_programmable: false,
     instructions_en: ["", "", ""],
     instructions_fa: ["", "", ""],
@@ -76,8 +78,11 @@ export function validateAdminExercise(form: AdminExerciseForm): AdminValidationE
   else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug)) errors.slug = "slugFormat";
   if (!form.name_en.trim()) errors.name_en = "required";
   if (!form.name_fa.trim()) errors.name_fa = "required";
-  if (!form.body_region) errors.body_region = "required";
-  if (!form.primary_muscle) errors.primary_muscle = "required";
+  if (!form.needs_review && !form.body_region) errors.body_region = "required";
+  if (!form.needs_review && !form.primary_muscle) errors.primary_muscle = "required";
+  if (form.needs_review && Boolean(form.body_region) !== Boolean(form.primary_muscle)) {
+    errors.primary_muscle = "required";
+  }
   if (form.equipment.length === 0) errors.equipment = "equipmentRequired";
 
   const enSteps = nonEmptyCount(form.instructions_en);
@@ -106,7 +111,10 @@ export function validateAdminExercise(form: AdminExerciseForm): AdminValidationE
 }
 
 export function toAdminExerciseCreate(form: AdminExerciseForm): AdminExerciseCreate {
-  if (!form.body_region || !form.primary_muscle) {
+  if (
+    (!form.needs_review && (!form.body_region || !form.primary_muscle))
+    || Boolean(form.body_region) !== Boolean(form.primary_muscle)
+  ) {
     throw new Error("Cannot serialize an invalid admin exercise form");
   }
   const trimList = (items: string[]) => items.map((item) => item.trim()).filter(Boolean);
@@ -116,8 +124,8 @@ export function toAdminExerciseCreate(form: AdminExerciseForm): AdminExerciseCre
     slug: form.slug.trim(),
     name_en: form.name_en.trim(),
     name_fa: form.name_fa.trim(),
-    body_region: form.body_region,
-    primary_muscle: form.primary_muscle,
+    body_region: form.body_region || null,
+    primary_muscle: form.primary_muscle || null,
     instructions_en: trimList(form.instructions_en),
     instructions_fa: trimList(form.instructions_fa),
     safety_notes_en: trimList(form.safety_notes_en),
@@ -139,14 +147,16 @@ export function adminExerciseToForm(exercise: import("./types").AdminExercise): 
     slug: exercise.slug,
     name_en: exercise.name_en,
     name_fa: exercise.name_fa,
-    body_region: exercise.body_region,
-    primary_muscle: exercise.primary_muscle,
+    body_region: exercise.body_region ?? "",
+    primary_muscle: exercise.primary_muscle ?? "",
     secondary_muscles: exercise.secondary_muscles,
     equipment: exercise.equipment,
     difficulty: exercise.difficulty,
     movement_pattern: exercise.movement_pattern,
     exercise_type: exercise.exercise_type,
     caution_tags: exercise.caution_tags,
+    labels: exercise.labels,
+    needs_review: exercise.needs_review,
     is_programmable: exercise.is_programmable,
     instructions_en: exercise.instructions_en,
     instructions_fa: exercise.instructions_fa,

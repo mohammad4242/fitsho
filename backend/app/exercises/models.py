@@ -26,6 +26,7 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseCautionTag,
+    ExerciseLabel,
     ExerciseType,
     MediaPresentation,
     MediaRole,
@@ -85,7 +86,7 @@ class Exercise(Base):
     slug: Mapped[str] = mapped_column(String(120), nullable=False)
     name_en: Mapped[str] = mapped_column(String(160), nullable=False)
     name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
-    body_region: Mapped[BodyRegion] = mapped_column(
+    body_region: Mapped[BodyRegion | None] = mapped_column(
         Enum(
             BodyRegion,
             native_enum=False,
@@ -94,9 +95,9 @@ class Exercise(Base):
             values_callable=enum_values,
             name="ck_exercises_body_region_values",
         ),
-        nullable=False,
+        nullable=True,
     )
-    primary_muscle: Mapped[MuscleGroup] = mapped_column(
+    primary_muscle: Mapped[MuscleGroup | None] = mapped_column(
         Enum(
             MuscleGroup,
             native_enum=False,
@@ -105,7 +106,7 @@ class Exercise(Base):
             values_callable=enum_values,
             name="ck_exercises_primary_muscle_values",
         ),
-        nullable=False,
+        nullable=True,
     )
     difficulty: Mapped[Difficulty] = mapped_column(
         Enum(
@@ -226,6 +227,12 @@ class Exercise(Base):
         passive_deletes=True,
         order_by=lambda: ExerciseCautionTagItem.caution_tag,
     )
+    labels: Mapped[list[ExerciseLabelItem]] = relationship(
+        back_populates="exercise",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by=lambda: ExerciseLabelItem.label,
+    )
 
     media_assets: Mapped[list[ExerciseMediaAsset]] = relationship(
         back_populates="exercise",
@@ -330,6 +337,29 @@ class ExerciseCautionTagItem(Base):
     )
 
     exercise: Mapped[Exercise] = relationship(back_populates="caution_tag_items")
+
+
+class ExerciseLabelItem(Base):
+    __tablename__ = "exercise_label_items"
+    __table_args__ = (Index("ix_exercise_label_items_label", "label"),)
+
+    exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("exercises.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    label: Mapped[ExerciseLabel] = mapped_column(
+        Enum(
+            ExerciseLabel,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercise_label_items_label_values",
+        ),
+        primary_key=True,
+    )
+
+    exercise: Mapped[Exercise] = relationship(back_populates="labels")
 
 
 class ExerciseSecondaryMuscle(Base):

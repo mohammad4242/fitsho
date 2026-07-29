@@ -31,7 +31,8 @@ Hard rules:
 13. Assume that one exercise usually requires approximately 8–10 minutes including setup, working sets, and rest.
 14. Use only the allowed set, repetition, rest, and RIR ranges supplied in generation_policy.
 15. Output only data matching the required JSON schema.
-16. Do not include Markdown, commentary, explanations outside the schema, or additional keys.
+16. An exercise labelled cardio is not a resistance-training strength movement and cannot satisfy a required compound or isolation strength slot.
+17. Do not include Markdown, commentary, explanations outside the schema, or additional keys.
 
 The backend will reject any plan that violates these rules."""
 
@@ -85,6 +86,7 @@ def build_workout_generation_model_request(
                     "equipment": [_value(item) for item in candidate.equipment],
                     "difficulty": _value(candidate.difficulty),
                     "caution_tags": [_value(item) for item in candidate.caution_tags],
+                    "labels": [_value(item) for item in candidate.labels],
                 }
                 for candidate in candidates.exercises
             ],

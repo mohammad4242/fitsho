@@ -7,6 +7,8 @@ from app.exercises.enums import (
     BodyRegion,
     Difficulty,
     Equipment,
+    ExerciseLabel,
+    ExerciseType,
     MediaPresentation,
     MediaRole,
     MediaType,
@@ -24,6 +26,8 @@ class ExerciseFilters(BaseModel):
     primary_muscle: MuscleGroup | None = None
     equipment: Equipment | None = None
     difficulty: Difficulty | None = None
+    exercise_type: ExerciseType | None = None
+    labels: list[ExerciseLabel] | None = None
     search: SearchText | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=12, ge=1, le=50)
@@ -53,8 +57,9 @@ class ExerciseSummary(BaseModel):
     slug: str
     name_en: str
     name_fa: str
-    body_region: BodyRegion
-    primary_muscle: MuscleGroup
+    body_region: BodyRegion | None
+    primary_muscle: MuscleGroup | None
+    labels: list[ExerciseLabel] = Field(default_factory=list)
     secondary_muscles: list[MuscleGroup]
     equipment: list[Equipment]
     difficulty: Difficulty

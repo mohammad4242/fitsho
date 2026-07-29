@@ -2,9 +2,11 @@ import { useTranslation } from "react-i18next";
 
 import {
   exerciseCautionTags,
+  exerciseLabels,
   exerciseTypes,
   movementPatterns,
   type ExerciseCautionTag,
+  type ExerciseLabel,
   type ExerciseType,
   type MovementPattern,
 } from "../exercises/types";
@@ -13,6 +15,8 @@ export type ProgrammingMetadata = {
   movement_pattern: MovementPattern;
   exercise_type: ExerciseType;
   caution_tags: ExerciseCautionTag[];
+  labels: ExerciseLabel[];
+  needs_review: boolean;
   is_programmable: boolean;
 };
 
@@ -32,6 +36,13 @@ export function AdminExerciseForm({ value, onChange }: AdminExerciseFormProps) {
       ? value.caution_tags.filter((current) => current !== tag)
       : [...value.caution_tags, tag];
     onChange("caution_tags", next);
+  }
+
+  function toggleLabel(label: ExerciseLabel) {
+    const next = value.labels.includes(label)
+      ? value.labels.filter((current) => current !== label)
+      : [...value.labels, label];
+    onChange("labels", next);
   }
 
   return (
@@ -78,6 +89,29 @@ export function AdminExerciseForm({ value, onChange }: AdminExerciseFormProps) {
           ))}
         </div>
       </fieldset>
+      <fieldset className="admin-choice-group">
+        <legend>{t("admin.fields.labels")}</legend>
+        <div>
+          {exerciseLabels.map((label) => (
+            <label key={label}>
+              <input
+                type="checkbox"
+                checked={value.labels.includes(label)}
+                onChange={() => toggleLabel(label)}
+              />
+              {t(`catalog.label.${label}`)}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <label className="admin-active-toggle">
+        <input
+          type="checkbox"
+          checked={value.needs_review}
+          onChange={(event) => onChange("needs_review", event.target.checked)}
+        />
+        <span>{t("admin.fields.needsReview")}</span>
+      </label>
       <label className="admin-active-toggle">
         <input
           type="checkbox"

@@ -14,6 +14,8 @@ class MuscleGroup(StrEnum):
     BICEPS = "biceps"
     TRICEPS = "triceps"
     TRAPS = "traps"
+    FOREARMS = "forearms"
+    NECK = "neck"
     GLUTES = "glutes"
     QUADRICEPS = "quadriceps"
     HAMSTRINGS = "hamstrings"
@@ -92,6 +94,11 @@ class ExerciseType(StrEnum):
     CORE = "core"
     MOBILITY = "mobility"
     OTHER = "other"
+
+
+class ExerciseLabel(StrEnum):
+    FULL_BODY = "full_body"
+    CARDIO = "cardio"
 
 
 class ExerciseCautionTag(StrEnum):

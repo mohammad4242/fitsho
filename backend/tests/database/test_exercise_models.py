@@ -130,7 +130,7 @@ def test_exercise_slug_is_unique(db: Session) -> None:
     ("column", "invalid_value", "constraint_name"),
     [
         ("body_region", "arms", "ck_exercises_body_region_values"),
-        ("primary_muscle", "forearms", "ck_exercises_primary_muscle_values"),
+        ("primary_muscle", "pelvic_floor", "ck_exercises_primary_muscle_values"),
         ("primary_muscle", "core_stability", "ck_exercises_primary_muscle_values"),
         ("difficulty", "expert", "ck_exercises_difficulty_values"),
         ("media_type", "youtube", "ck_exercises_media_type_values"),

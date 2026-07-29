@@ -51,6 +51,7 @@ def _detail(exercise: Exercise) -> AdminExerciseDetail:
             key=lambda value: value.value,
         ),
         difficulty=exercise.difficulty,
+        labels=sorted((item.label for item in exercise.labels), key=lambda value: value.value),
         instructions_en=exercise.instructions_en,
         instructions_fa=exercise.instructions_fa,
         safety_notes_en=exercise.safety_notes_en,
@@ -124,6 +125,15 @@ def _parse_payload(raw_payload: str) -> AdminExerciseCreate:
             detail=detail,
         ) from None
 
+    if payload.body_region is None or payload.primary_muscle is None:
+        if payload.body_region is not None or payload.primary_muscle is not None:
+            raise _validation_error(
+                "anatomy",
+                "Body region and primary muscle must be provided together",
+            )
+        if not payload.needs_review:
+            raise _validation_error("anatomy", "Unknown anatomy requires review")
+        return payload
     allowed_muscles = MUSCLES_BY_REGION[payload.body_region]
     if payload.primary_muscle not in allowed_muscles:
         raise _validation_error(
