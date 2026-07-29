@@ -64,7 +64,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         <header className="workout-plan-hero">
           <div>
             <p className="eyebrow">{t("workoutPlan.eyebrow")}</p>
-            <h1>{t("workoutPlan.title")}</h1>
+            <h1 className="fitsho-display">{t("workoutPlan.title")}</h1>
             <p>{t("workoutPlan.intro")}</p>
           </div>
           <div className="workout-plan-duration" aria-label={t("workoutPlan.duration", { count: displayedPlanDuration })}>
@@ -99,7 +99,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
               />
             )}
             <section className="workout-empty" aria-labelledby="workout-empty-title">
-              <h2 id="workout-empty-title">{t("workoutPlan.emptyTitle")}</h2>
+              <h2 id="workout-empty-title" className="fitsho-display">{t("workoutPlan.emptyTitle")}</h2>
               <p>{t("workoutPlan.emptyBody")}</p>
               <GenerateButton
                 generating={generating}
@@ -131,7 +131,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
               <div className="workout-schedule__heading">
                 <div>
                   <p className="eyebrow eyebrow--accent">{t("workoutPlan.weekly")}</p>
-                  <h2 id="workout-schedule-title">{t("workoutPlan.scheduleTitle")}</h2>
+                  <h2 id="workout-schedule-title" className="fitsho-display">{t("workoutPlan.scheduleTitle")}</h2>
                 </div>
                 <GenerateButton
                   generating={generating}

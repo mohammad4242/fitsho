@@ -91,7 +91,7 @@ it("shows the fixed start guide and a generate action when no plan exists", asyn
   const user = userEvent.setup();
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
-  expect(await screen.findByRole("heading", { name: "برنامه تمرینی من" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "برنامه تمرینی من" })).toHaveClass("fitsho-display");
   expect(screen.getByText("قبل از شروع")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "ساخت برنامه" }));
 

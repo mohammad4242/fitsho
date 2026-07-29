@@ -15,3 +15,30 @@
 .workout-future { margin-top: 2.2rem; }.workout-future h2 { font-size: 1.35rem; }.workout-future > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }.workout-future article { padding: 1.2rem; border: 1px dashed var(--line); border-radius: 1rem; background: rgb(255 255 255 / 55%); }.workout-future h3 { margin: 0; font-size: 1rem; }.workout-future p { min-height: 3rem; color: var(--muted); font-size: .85rem; line-height: 1.6; }.workout-future button:disabled { color: var(--muted); background: var(--mist-100); cursor: not-allowed; }
 @media (max-width: 680px) { .workout-plan-hero, .workout-schedule__heading { align-items: stretch; flex-direction: column; }.workout-plan-duration { align-self: flex-start; }.workout-future > div { grid-template-columns: 1fr; }.workout-exercise { grid-template-columns: 5.5rem minmax(0, 1fr); }.workout-exercise > img, .workout-exercise > video { width: 5.5rem; height: 5rem; } }
 @media (prefers-reduced-motion: reduce) { .workout-plan-shell * { transition: none !important; animation: none !important; } }
+
+/* Performance Pulse visual layer */
+.workout-plan-shell {
+  padding-block-end: 7rem;
+  background: radial-gradient(circle at 85% 7%, rgb(80 223 206 / 18%), transparent 26rem), var(--fitsho-surface);
+}
+.workout-plan-main { max-width: 82rem; }
+.workout-plan-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(80 223 206 / 24%);
+  border-radius: var(--fitsho-radius-card);
+  background: linear-gradient(125deg, var(--fitsho-petrol), var(--fitsho-teal));
+}
+.workout-plan-hero::after { position: absolute; inset: auto -4rem -7rem auto; width: 18rem; aspect-ratio: 1; border: 1px solid rgb(80 223 206 / 30%); border-radius: 50%; box-shadow: 0 0 0 2rem rgb(80 223 206 / 6%), 0 0 0 4rem rgb(80 223 206 / 4%); content: ""; }
+.workout-plan-hero h1 { position: relative; z-index: 1; font-size: clamp(3.8rem, 8vw, 6.8rem); letter-spacing: 0; }
+.workout-plan-duration { z-index: 1; border-color: rgb(80 223 206 / 35%); color: var(--fitsho-mist); background: rgb(80 223 206 / 10%); backdrop-filter: blur(12px); }
+.workout-plan-duration strong { color: var(--fitsho-aqua); }
+.workout-guidance { border-inline-start-color: var(--fitsho-coral); border-radius: var(--fitsho-radius-card); box-shadow: var(--fitsho-shadow); }
+.workout-guidance > div span { color: var(--fitsho-petrol); background: var(--fitsho-aqua); }
+.workout-day { border: 0; border-radius: var(--fitsho-radius-card); box-shadow: var(--fitsho-shadow); }
+.workout-day > header { color: var(--fitsho-mist); background: var(--fitsho-teal); }
+.workout-day > header p { color: rgb(234 244 241 / 66%); }
+.workout-day > header > span { color: var(--fitsho-petrol); background: var(--fitsho-aqua); }
+.workout-exercise { padding: 1.2rem; }
+.workout-exercise > img, .workout-exercise > video { border-radius: 1rem; }
+.workout-generate, .workout-status button { color: var(--fitsho-petrol); background: var(--fitsho-aqua); }
