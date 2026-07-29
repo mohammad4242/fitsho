@@ -35,7 +35,7 @@ export function LoginPage() {
     <AuthShell>
       <div className="form-heading">
         <p className="eyebrow eyebrow--accent">{t("login.eyebrow")}</p>
-        <h2>{t("login.title")}</h2>
+        <h2 className="fitsho-display">{t("login.title")}</h2>
         <p>{t("login.subtitle")}</p>
       </div>
 

@@ -23,7 +23,7 @@ export function AuthShell({ children }: AuthShellProps) {
 
         <div className="brand-copy">
           <p className="eyebrow">{t("brandPanel.eyebrow")}</p>
-          <h1 id="fitsho-promise">{t("brandPanel.title")}</h1>
+          <h1 id="fitsho-promise" className="fitsho-display">{t("brandPanel.title")}</h1>
           <p>{t("brandPanel.body")}</p>
         </div>
 

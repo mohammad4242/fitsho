@@ -107,6 +107,7 @@ beforeEach(async () => {
 it("announces the first of three onboarding steps", () => {
   renderOnboarding();
 
+  expect(screen.getByRole("heading", { name: "پروفایل ورزشی‌ات را بساز" })).toHaveClass("fitsho-display");
   expect(screen.getByText("مرحله ۱ از ۳")).toBeInTheDocument();
   const progress = screen.getByRole("list", { name: "مراحل ساخت پروفایل" });
   expect(progress).toBeInTheDocument();

@@ -43,7 +43,7 @@ export function AdminExercisesPage() {
         <header className="admin-hero">
           <div>
             <p className="eyebrow eyebrow--accent">{t("admin.exercises.eyebrow")}</p>
-            <h1>{t("admin.exercises.title")}</h1>
+            <h1 className="fitsho-display">{t("admin.exercises.title")}</h1>
             <p>{t("admin.exercises.intro")}</p>
           </div>
           <Link className="admin-primary-link" to="/admin/exercises/new">

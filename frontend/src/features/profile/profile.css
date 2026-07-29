@@ -332,6 +332,29 @@
   line-height: 1;
 }
 
+.onboarding-flow .form-heading h2,
+.profile-page-heading h1 { letter-spacing: 0; }
+
+.profile-page-shell {
+  padding-block-end: 7rem;
+  background: radial-gradient(circle at 92% 4%, rgb(80 223 206 / 16%), transparent 24rem), var(--fitsho-surface);
+}
+
+.profile-page-heading {
+  border-radius: var(--fitsho-radius-card);
+  background: linear-gradient(135deg, var(--fitsho-petrol), var(--fitsho-teal));
+  box-shadow: var(--fitsho-shadow);
+}
+
+.measurement-card {
+  color: var(--fitsho-petrol);
+  border-radius: var(--fitsho-radius-card);
+  background: var(--fitsho-aqua);
+  box-shadow: var(--fitsho-shadow);
+}
+
+.profile-fieldset { border-radius: 1.25rem; box-shadow: 0 0.8rem 2rem rgb(10 31 30 / 7%); }
+
 html[dir="rtl"] .profile-page-heading h1 {
   letter-spacing: -0.03em;
 }
