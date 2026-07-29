@@ -717,8 +717,7 @@ class FreeExerciseDbImporter:
             )
         )
 
-    @staticmethod
-    def _is_current(exercise: Exercise, candidate: ImportCandidate) -> bool:
+    def _is_current(self, exercise: Exercise, candidate: ImportCandidate) -> bool:
         expected_assets = {
             (asset.presentation, asset.role, asset.source_url) for asset in candidate.media_assets
         }
@@ -729,12 +728,23 @@ class FreeExerciseDbImporter:
         return (
             exercise.source_metadata_en == candidate.source_metadata
             and actual_assets == expected_assets
+            and all(self._stored_media_exists(asset.media_path) for asset in exercise.media_assets)
             and exercise.movement_pattern is candidate.programming_metadata.movement_pattern
             and exercise.exercise_type is candidate.programming_metadata.exercise_type
             and exercise.is_programmable is True
             and {item.caution_tag for item in exercise.caution_tag_items}
             == set(candidate.programming_metadata.caution_tags)
         )
+
+    def _stored_media_exists(self, public_path: str) -> bool:
+        public_root = self._settings.media_public_path.rstrip("/")
+        prefix = f"{public_root}/"
+        if not public_path.startswith(prefix):
+            return False
+        relative_path = Path(public_path.removeprefix(prefix))
+        if ".." in relative_path.parts:
+            return False
+        return (self._settings.media_root / relative_path).is_file()
 
     def _translate(
         self,
