@@ -309,6 +309,34 @@ def test_admin_creates_gendered_media_assets_and_public_detail_returns_them(
     assert public_detail.json()["media_assets"] == response.json()["media_assets"]
 
 
+def test_admin_creates_multiple_media_items_for_one_gender_and_role(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    make_current_user_admin(client, db)
+    monkeypatch.setattr("app.admin.media._probe_video_duration", lambda *_: 5.0)
+    payload = exercise_payload(
+        media_assets=[
+            {"presentation": "male", "role": "video", "sort_order": 0, "upload_index": 0},
+            {"presentation": "male", "role": "video", "sort_order": 1, "upload_index": 1},
+        ]
+    )
+
+    response = client.post(
+        "/api/v1/admin/exercises",
+        headers=ORIGIN,
+        data={"payload": json.dumps(payload)},
+        files=[
+            ("media_files", ("first.mp4", MP4_BYTES, "video/mp4")),
+            ("media_files", ("second.mp4", MP4_BYTES + b"second", "video/mp4")),
+        ],
+    )
+
+    assert response.status_code == 201
+    assert [asset["sort_order"] for asset in response.json()["media_assets"]] == [0, 1]
+
+
 def test_invalid_upload_returns_field_error_and_leaves_no_file(
     client: TestClient,
     db: Session,

@@ -160,6 +160,34 @@ def _variant_uploads(
     return stored
 
 
+def _gallery_uploads(
+    settings: AppSettings,
+    payload: AdminExerciseCreate,
+    uploads: list[UploadFile],
+) -> dict[MediaAssetKey, StoredMedia]:
+    stored: dict[MediaAssetKey, StoredMedia] = {}
+    try:
+        for asset in payload.media_assets:
+            if asset.upload_index is None:
+                continue
+            if asset.upload_index >= len(uploads):
+                raise MediaValidationError("Media upload index does not exist")
+            key: MediaAssetKey = (asset.presentation, asset.role, asset.sort_order)
+            if key in stored:
+                raise MediaValidationError("Duplicate media gallery item")
+            media = store_upload(uploads[asset.upload_index], settings)
+            expected_type = MediaType.VIDEO if asset.role is MediaRole.VIDEO else MediaType.IMAGE
+            if media.media_type is not expected_type:
+                discard_media(media)
+                raise MediaValidationError("Media file type does not match its media role")
+            stored[key] = media
+    except Exception:
+        for media in stored.values():
+            discard_media(media)
+        raise
+    return stored
+
+
 def _discard_media_assets(media_assets: dict[MediaAssetKey, StoredMedia]) -> None:
     for media in media_assets.values():
         discard_media(media)
@@ -206,6 +234,7 @@ def update_exercise(
     media_female_video: Annotated[UploadFile | None, File()] = None,
     media_male_thumbnail: Annotated[UploadFile | None, File()] = None,
     media_female_thumbnail: Annotated[UploadFile | None, File()] = None,
+    media_files: Annotated[list[UploadFile] | None, File()] = None,
 ) -> AdminExerciseDetail:
     exercise_payload = _parse_payload(payload)
     stored_media: StoredMedia | None = None
@@ -216,12 +245,13 @@ def update_exercise(
         stored_media_assets = _variant_uploads(
             settings,
             {
-                (MediaPresentation.MALE, MediaRole.VIDEO): media_male_video,
-                (MediaPresentation.FEMALE, MediaRole.VIDEO): media_female_video,
-                (MediaPresentation.MALE, MediaRole.THUMBNAIL): media_male_thumbnail,
-                (MediaPresentation.FEMALE, MediaRole.THUMBNAIL): media_female_thumbnail,
+                (MediaPresentation.MALE, MediaRole.VIDEO, 0): media_male_video,
+                (MediaPresentation.FEMALE, MediaRole.VIDEO, 0): media_female_video,
+                (MediaPresentation.MALE, MediaRole.THUMBNAIL, 0): media_male_thumbnail,
+                (MediaPresentation.FEMALE, MediaRole.THUMBNAIL, 0): media_female_thumbnail,
             },
         )
+        stored_media_assets.update(_gallery_uploads(settings, exercise_payload, media_files or []))
         exercise = update_admin_exercise(
             db,
             exercise_id,
@@ -280,6 +310,7 @@ def create_exercise(
     media_female_video: Annotated[UploadFile | None, File()] = None,
     media_male_thumbnail: Annotated[UploadFile | None, File()] = None,
     media_female_thumbnail: Annotated[UploadFile | None, File()] = None,
+    media_files: Annotated[list[UploadFile] | None, File()] = None,
 ) -> AdminExerciseDetail:
     exercise_payload = _parse_payload(payload)
     stored_media: StoredMedia | None = None
@@ -290,12 +321,13 @@ def create_exercise(
         stored_media_assets = _variant_uploads(
             settings,
             {
-                (MediaPresentation.MALE, MediaRole.VIDEO): media_male_video,
-                (MediaPresentation.FEMALE, MediaRole.VIDEO): media_female_video,
-                (MediaPresentation.MALE, MediaRole.THUMBNAIL): media_male_thumbnail,
-                (MediaPresentation.FEMALE, MediaRole.THUMBNAIL): media_female_thumbnail,
+                (MediaPresentation.MALE, MediaRole.VIDEO, 0): media_male_video,
+                (MediaPresentation.FEMALE, MediaRole.VIDEO, 0): media_female_video,
+                (MediaPresentation.MALE, MediaRole.THUMBNAIL, 0): media_male_thumbnail,
+                (MediaPresentation.FEMALE, MediaRole.THUMBNAIL, 0): media_female_thumbnail,
             },
         )
+        stored_media_assets.update(_gallery_uploads(settings, exercise_payload, media_files or []))
         exercise = create_admin_exercise(
             db,
             exercise_payload,

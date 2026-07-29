@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Annotated
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
@@ -44,8 +45,11 @@ class AdminExerciseFilters(BaseModel):
 
 
 class AdminExerciseMediaAssetInput(BaseModel):
+    id: UUID | None = None
     presentation: MediaPresentation
     role: MediaRole
+    sort_order: int = Field(default=0, ge=0)
+    upload_index: int | None = Field(default=None, ge=0)
     media_source_url: OptionalMetadata = None
     media_license: Annotated[
         str | None,
@@ -80,7 +84,7 @@ class AdminExerciseCreate(BaseModel):
         StringConstraints(strip_whitespace=True, max_length=120),
     ] = None
     media_attribution: OptionalMetadata = None
-    media_assets: list[AdminExerciseMediaAssetInput] = Field(default_factory=list, max_length=4)
+    media_assets: list[AdminExerciseMediaAssetInput] = Field(default_factory=list)
 
 
 class AdminExerciseDetail(ExerciseDetail):

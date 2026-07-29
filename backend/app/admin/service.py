@@ -25,11 +25,11 @@ from app.exercises.models import (
 )
 
 PLACEHOLDER_MEDIA_PATH = "/exercises/exercise-placeholder.svg"
-MediaAssetKey = tuple[MediaPresentation, MediaRole]
+MediaAssetKey = tuple[MediaPresentation, MediaRole, int]
 
 
 def _media_asset_key(asset: AdminExerciseMediaAssetInput) -> MediaAssetKey:
-    return asset.presentation, asset.role
+    return asset.presentation, asset.role, asset.sort_order
 
 
 def _validate_media_assets(
@@ -39,7 +39,7 @@ def _validate_media_assets(
 ) -> None:
     payload_keys = [_media_asset_key(asset) for asset in payload_assets]
     if len(payload_keys) != len(set(payload_keys)):
-        raise ValueError("Each presentation and media role may appear only once")
+        raise ValueError("Each presentation, media role, and display order must be unique")
     if not set(stored_assets).issubset(payload_keys):
         raise ValueError("Each uploaded media file requires matching metadata")
     if any(key not in existing and key not in stored_assets for key in payload_keys):
@@ -51,7 +51,9 @@ def _sync_media_assets(
     payload_assets: list[AdminExerciseMediaAssetInput],
     stored_assets: dict[MediaAssetKey, StoredMedia],
 ) -> None:
-    existing = {(asset.presentation, asset.role): asset for asset in exercise.media_assets}
+    existing = {
+        (asset.presentation, asset.role, asset.sort_order): asset for asset in exercise.media_assets
+    }
     _validate_media_assets(existing, payload_assets, stored_assets)
     for payload_asset in payload_assets:
         key = _media_asset_key(payload_asset)
@@ -62,6 +64,7 @@ def _sync_media_assets(
             asset = ExerciseMediaAsset(
                 presentation=payload_asset.presentation,
                 role=payload_asset.role,
+                sort_order=payload_asset.sort_order,
                 media_path=stored_media.public_path,
                 media_type=stored_media.media_type,
             )
@@ -76,6 +79,10 @@ def _sync_media_assets(
         asset.media_attribution = payload_asset.media_attribution or (
             OWNER_ATTRIBUTION if stored_media is not None else asset.media_attribution
         )
+    desired_keys = {_media_asset_key(asset) for asset in payload_assets}
+    for asset in list(exercise.media_assets):
+        if (asset.presentation, asset.role, asset.sort_order) not in desired_keys:
+            exercise.media_assets.remove(asset)
 
 
 def grant_admin(db: Session, email: str) -> User:
