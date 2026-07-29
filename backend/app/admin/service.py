@@ -14,12 +14,13 @@ from app.admin.schemas import (
 )
 from app.auth.models import User
 from app.auth.service import normalize_email
-from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+from app.exercises.enums import ExerciseLabel, MediaPresentation, MediaRole, MediaType
 from app.exercises.media_metadata import OWNER_ATTRIBUTION, OWNER_LICENSE
 from app.exercises.models import (
     Exercise,
     ExerciseCautionTagItem,
     ExerciseEquipment,
+    ExerciseLabelItem,
     ExerciseMediaAsset,
     ExerciseSecondaryMuscle,
 )
@@ -85,6 +86,19 @@ def _sync_media_assets(
             exercise.media_assets.remove(asset)
 
 
+def _sync_labels(exercise: Exercise, desired: list[ExerciseLabel]) -> None:
+    desired_set = set(desired)
+    for item in list(exercise.labels):
+        if item.label not in desired_set:
+            exercise.labels.remove(item)
+    existing = {item.label for item in exercise.labels}
+    exercise.labels.extend(
+        ExerciseLabelItem(label=label)
+        for label in sorted(desired_set, key=lambda value: value.value)
+        if label not in existing
+    )
+
+
 def grant_admin(db: Session, email: str) -> User:
     user = db.scalar(select(User).where(User.email == normalize_email(email)))
     if user is None:
@@ -133,6 +147,7 @@ def list_admin_exercises(
                 selectinload(Exercise.equipment_items),
                 selectinload(Exercise.caution_tag_items),
                 selectinload(Exercise.media_assets),
+                selectinload(Exercise.labels),
             )
             .order_by(Exercise.created_at.desc(), Exercise.id.asc())
             .offset((filters.page - 1) * filters.page_size)
@@ -183,6 +198,11 @@ def create_admin_exercise(
             ExerciseCautionTagItem(caution_tag=tag)
             for tag in sorted(set(payload.caution_tags), key=lambda value: value.value)
         ],
+        labels=[
+            ExerciseLabelItem(label=label)
+            for label in sorted(set(payload.labels), key=lambda value: value.value)
+        ],
+        needs_review=payload.needs_review,
     )
     _sync_media_assets(exercise, payload.media_assets, stored_media_assets)
     db.add(exercise)
@@ -207,6 +227,7 @@ def get_admin_exercise(db: Session, exercise_id: UUID) -> Exercise | None:
             selectinload(Exercise.equipment_items),
             selectinload(Exercise.caution_tag_items),
             selectinload(Exercise.media_assets),
+            selectinload(Exercise.labels),
         )
     )
 
@@ -226,6 +247,7 @@ def update_admin_exercise(
             selectinload(Exercise.equipment_items),
             selectinload(Exercise.caution_tag_items),
             selectinload(Exercise.media_assets),
+            selectinload(Exercise.labels),
         )
         .with_for_update()
     )
@@ -250,6 +272,7 @@ def update_admin_exercise(
         "media_license",
         "media_attribution",
         "is_active",
+        "needs_review",
     ):
         setattr(exercise, field, getattr(payload, field))
     exercise.secondary_muscles[:] = [
@@ -264,6 +287,7 @@ def update_admin_exercise(
         ExerciseCautionTagItem(caution_tag=tag)
         for tag in sorted(set(payload.caution_tags), key=lambda value: value.value)
     ]
+    _sync_labels(exercise, payload.labels)
     if media is not None:
         exercise.media_path = media.public_path
         exercise.media_type = media.media_type

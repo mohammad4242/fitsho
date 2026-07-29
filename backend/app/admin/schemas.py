@@ -9,6 +9,7 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseCautionTag,
+    ExerciseLabel,
     ExerciseType,
     MediaPresentation,
     MediaRole,
@@ -64,8 +65,8 @@ class AdminExerciseCreate(BaseModel):
     slug: Slug
     name_en: Name
     name_fa: Name
-    body_region: BodyRegion
-    primary_muscle: MuscleGroup
+    body_region: BodyRegion | None
+    primary_muscle: MuscleGroup | None
     secondary_muscles: list[MuscleGroup] = Field(default_factory=list)
     equipment: list[Equipment] = Field(min_length=1)
     difficulty: Difficulty
@@ -78,6 +79,8 @@ class AdminExerciseCreate(BaseModel):
     is_programmable: bool = False
     safety_notes_fa: list[TextItem] = Field(min_length=1)
     is_active: bool = True
+    needs_review: bool = False
+    labels: list[ExerciseLabel] = Field(default_factory=list)
     media_source_url: OptionalMetadata = None
     media_license: Annotated[
         str | None,
