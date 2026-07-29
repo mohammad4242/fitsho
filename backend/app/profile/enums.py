@@ -29,3 +29,12 @@ class TrainingLocation(StrEnum):
 class HomeTrainingSetup(StrEnum):
     BODYWEIGHT_ONLY = "bodyweight_only"
     DUMBBELLS_AVAILABLE = "dumbbells_available"
+
+
+class TrainingCaution(StrEnum):
+    LOWER_BACK = "lower_back"
+    KNEE = "knee"
+    SHOULDER = "shoulder"
+    NECK = "neck"
+    WRIST = "wrist"
+    OTHER = "other"

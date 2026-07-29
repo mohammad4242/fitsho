@@ -65,6 +65,10 @@ def test_seed_manifest_has_complete_bilingual_safe_content() -> None:
         assert len(set(seed.equipment)) == len(seed.equipment)
         assert seed.primary_muscle not in seed.secondary_muscles
         assert len(set(seed.secondary_muscles)) == len(seed.secondary_muscles)
+        assert seed.is_programmable is True
+        assert seed.movement_pattern.value
+        assert seed.exercise_type.value
+        assert len(set(seed.caution_tags)) == len(seed.caution_tags)
         combined_copy = " ".join(
             (
                 *seed.instructions_en,
@@ -163,6 +167,8 @@ def test_seed_is_idempotent_and_restores_seed_owned_fields(db: Session) -> None:
     assert first.alternatives == second.alternatives == 1
     assert ids_after == ids_before
     assert restored_bench_press is not None
+    assert restored_bench_press.is_programmable is True
+    assert restored_bench_press.movement_pattern.value == "horizontal_push"
     assert restored_bench_press.name_en == "Dumbbell Bench Press"
     assert {item.equipment for item in restored_bench_press.equipment_items} == {
         Equipment.DUMBBELL,

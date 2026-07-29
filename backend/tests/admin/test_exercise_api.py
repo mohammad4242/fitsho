@@ -352,21 +352,19 @@ def test_create_rejects_invalid_fields(
 
 
 @pytest.mark.parametrize(
-    ("body_region", "primary_muscle", "secondary_muscles", "invalid_field"),
+    ("body_region", "primary_muscle", "secondary_muscles"),
     [
-        ("upper_body", "quadriceps", ["triceps"], "primary_muscle"),
-        ("upper_body", "chest", ["calves"], "secondary_muscles"),
-        ("lower_body", "glutes", ["abs"], "secondary_muscles"),
-        ("core", "abs", ["shoulders"], "secondary_muscles"),
+        ("upper_body", "quadriceps", ["triceps"]),
+        ("lower_body", "abs", ["glutes"]),
+        ("core", "shoulders", ["abs"]),
     ],
 )
-def test_create_rejects_muscles_outside_body_region(
+def test_create_rejects_primary_muscle_outside_body_region(
     client: TestClient,
     db: Session,
     body_region: str,
     primary_muscle: str,
     secondary_muscles: list[str],
-    invalid_field: str,
 ) -> None:
     make_current_user_admin(client, db)
 
@@ -380,7 +378,7 @@ def test_create_rejects_muscles_outside_body_region(
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"][0]["loc"][-1] == invalid_field
+    assert response.json()["detail"][0]["loc"][-1] == "primary_muscle"
 
 
 def test_create_rejects_primary_muscle_as_secondary(
@@ -398,6 +396,31 @@ def test_create_rejects_primary_muscle_as_secondary(
     assert response.json()["detail"][0]["loc"][-1] == "secondary_muscles"
 
 
+def test_create_allows_cross_region_secondary_muscles(
+    client: TestClient,
+    db: Session,
+) -> None:
+    make_current_user_admin(client, db)
+    created = post_exercise(client, exercise_payload())
+    assert created.status_code == 201
+
+    response = client.patch(
+        f"/api/v1/admin/exercises/{created.json()['id']}",
+        headers=ORIGIN,
+        data={
+            "payload": json.dumps(
+                exercise_payload(
+                    primary_muscle="back",
+                    secondary_muscles=["biceps", "lower_back", "traps"],
+                )
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["secondary_muscles"] == ["biceps", "lower_back", "traps"]
+
+
 @pytest.mark.parametrize("headers", [{}, {"Origin": "https://evil.example"}])
 def test_create_requires_trusted_origin(
     client: TestClient,
@@ -410,3 +433,40 @@ def test_create_requires_trusted_origin(
 
     assert response.status_code == 403
     assert response.json() == {"detail": "Untrusted request origin"}
+
+
+def test_admin_can_update_programming_metadata(
+    client: TestClient,
+    db: Session,
+) -> None:
+    make_current_user_admin(client, db)
+    created = post_exercise(client, exercise_payload())
+    assert created.status_code == 201
+
+    response = client.patch(
+        f"/api/v1/admin/exercises/{created.json()['id']}",
+        headers=ORIGIN,
+        data={
+            "payload": json.dumps(
+                exercise_payload(
+                    movement_pattern="horizontal_push",
+                    exercise_type="compound",
+                    caution_tags=["shoulder_internal_rotation"],
+                    is_programmable=True,
+                )
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["movement_pattern"] == "horizontal_push"
+    assert body["exercise_type"] == "compound"
+    assert body["caution_tags"] == ["shoulder_internal_rotation"]
+    assert body["is_programmable"] is True
+    stored = db.scalar(select(Exercise).where(Exercise.id == created.json()["id"]))
+    assert stored is not None
+    assert stored.movement_pattern.value == "horizontal_push"
+    assert [item.caution_tag.value for item in stored.caution_tag_items] == [
+        "shoulder_internal_rotation"
+    ]

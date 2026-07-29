@@ -205,3 +205,33 @@ def test_exercise_database_rejects_self_alternative(db: Session) -> None:
         db.flush()
 
     assert "ck_exercise_alternatives_distinct_exercises" in str(error.value)
+
+
+def test_exercise_stores_programming_metadata_and_caution_tags(db: Session) -> None:
+    from app.exercises.enums import (
+        ExerciseCautionTag,
+        ExerciseType,
+        MovementPattern,
+    )
+    from app.exercises.models import ExerciseCautionTagItem
+
+    exercise = make_exercise("dumbbell-press")
+    exercise.movement_pattern = MovementPattern.HORIZONTAL_PUSH
+    exercise.exercise_type = ExerciseType.COMPOUND
+    exercise.is_programmable = True
+    exercise.caution_tag_items.append(
+        ExerciseCautionTagItem(caution_tag=ExerciseCautionTag.SHOULDER_INTERNAL_ROTATION)
+    )
+    db.add(exercise)
+    db.flush()
+    db.expire(exercise)
+
+    stored = db.scalar(select(Exercise).where(Exercise.slug == "dumbbell-press"))
+
+    assert stored is not None
+    assert stored.movement_pattern is MovementPattern.HORIZONTAL_PUSH
+    assert stored.exercise_type is ExerciseType.COMPOUND
+    assert stored.is_programmable is True
+    assert [item.caution_tag for item in stored.caution_tag_items] == [
+        ExerciseCautionTag.SHOULDER_INTERNAL_ROTATION
+    ]

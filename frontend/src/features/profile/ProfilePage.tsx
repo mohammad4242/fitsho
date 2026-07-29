@@ -53,7 +53,10 @@ function ReadyProfilePage({
     }
   }, [errors]);
 
-  function updateValue(field: keyof ProfileFormValues, value: string) {
+  function updateValue(
+    field: keyof ProfileFormValues,
+    value: string | ProfileFormValues["training_cautions"],
+  ) {
     const clearsHomeSetup = field === "training_location" && value === "gym";
     setValues((current) => ({
       ...current,

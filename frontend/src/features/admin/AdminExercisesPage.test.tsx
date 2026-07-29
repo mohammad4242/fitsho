@@ -26,6 +26,10 @@ const exercise: AdminExercise = {
   secondary_muscles: ["triceps"],
   equipment: ["bodyweight"],
   difficulty: "beginner",
+  movement_pattern: "horizontal_push",
+  exercise_type: "compound",
+  caution_tags: [],
+  is_programmable: true,
   instructions_en: ["One", "Two", "Three"],
   instructions_fa: ["یک", "دو", "سه"],
   safety_notes_en: ["Safe"],
@@ -52,6 +56,9 @@ it("renders inactive exercises and a clear add action", async () => {
   expect(screen.getByText("غیرفعال")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "افزودن حرکت" })).toHaveAttribute(
     "href", "/admin/exercises/new",
+  );
+  expect(screen.getByRole("link", { name: "ویرایش" })).toHaveAttribute(
+    "href", "/admin/exercises/1/edit",
   );
 });
 

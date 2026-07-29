@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
@@ -10,7 +12,12 @@ from app.auth.models import User
 from app.auth.service import normalize_email
 from app.exercises.enums import MediaType
 from app.exercises.media_metadata import OWNER_ATTRIBUTION, OWNER_LICENSE
-from app.exercises.models import Exercise, ExerciseEquipment, ExerciseSecondaryMuscle
+from app.exercises.models import (
+    Exercise,
+    ExerciseCautionTagItem,
+    ExerciseEquipment,
+    ExerciseSecondaryMuscle,
+)
 
 PLACEHOLDER_MEDIA_PATH = "/exercises/exercise-placeholder.svg"
 
@@ -61,6 +68,7 @@ def list_admin_exercises(
             .options(
                 selectinload(Exercise.secondary_muscles),
                 selectinload(Exercise.equipment_items),
+                selectinload(Exercise.caution_tag_items),
             )
             .order_by(Exercise.created_at.desc(), Exercise.id.asc())
             .offset((filters.page - 1) * filters.page_size)
@@ -82,6 +90,9 @@ def create_admin_exercise(
         body_region=payload.body_region,
         primary_muscle=payload.primary_muscle,
         difficulty=payload.difficulty,
+        movement_pattern=payload.movement_pattern,
+        exercise_type=payload.exercise_type,
+        is_programmable=payload.is_programmable,
         instructions_en=payload.instructions_en,
         instructions_fa=payload.instructions_fa,
         safety_notes_en=payload.safety_notes_en,
@@ -101,8 +112,91 @@ def create_admin_exercise(
             ExerciseEquipment(equipment=equipment)
             for equipment in sorted(set(payload.equipment), key=lambda value: value.value)
         ],
+        caution_tag_items=[
+            ExerciseCautionTagItem(caution_tag=tag)
+            for tag in sorted(set(payload.caution_tags), key=lambda value: value.value)
+        ],
     )
     db.add(exercise)
+    try:
+        db.commit()
+        db.refresh(exercise)
+    except IntegrityError as error:
+        db.rollback()
+        raise DuplicateExerciseSlugError from error
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return exercise
+
+
+def get_admin_exercise(db: Session, exercise_id: UUID) -> Exercise | None:
+    return db.scalar(
+        select(Exercise)
+        .where(Exercise.id == exercise_id)
+        .options(
+            selectinload(Exercise.secondary_muscles),
+            selectinload(Exercise.equipment_items),
+            selectinload(Exercise.caution_tag_items),
+        )
+    )
+
+
+def update_admin_exercise(
+    db: Session,
+    exercise_id: UUID,
+    payload: AdminExerciseCreate,
+    media: StoredMedia | None = None,
+) -> Exercise | None:
+    exercise = db.scalar(
+        select(Exercise)
+        .where(Exercise.id == exercise_id)
+        .options(
+            selectinload(Exercise.secondary_muscles),
+            selectinload(Exercise.equipment_items),
+            selectinload(Exercise.caution_tag_items),
+        )
+        .with_for_update()
+    )
+    if exercise is None:
+        return None
+
+    for field in (
+        "slug",
+        "name_en",
+        "name_fa",
+        "body_region",
+        "primary_muscle",
+        "difficulty",
+        "movement_pattern",
+        "exercise_type",
+        "is_programmable",
+        "instructions_en",
+        "instructions_fa",
+        "safety_notes_en",
+        "safety_notes_fa",
+        "media_source_url",
+        "media_license",
+        "media_attribution",
+        "is_active",
+    ):
+        setattr(exercise, field, getattr(payload, field))
+    exercise.secondary_muscles[:] = [
+        ExerciseSecondaryMuscle(muscle=muscle)
+        for muscle in sorted(set(payload.secondary_muscles), key=lambda value: value.value)
+    ]
+    exercise.equipment_items[:] = [
+        ExerciseEquipment(equipment=equipment)
+        for equipment in sorted(set(payload.equipment), key=lambda value: value.value)
+    ]
+    exercise.caution_tag_items[:] = [
+        ExerciseCautionTagItem(caution_tag=tag)
+        for tag in sorted(set(payload.caution_tags), key=lambda value: value.value)
+    ]
+    if media is not None:
+        exercise.media_path = media.public_path
+        exercise.media_type = media.media_type
+
     try:
         db.commit()
         db.refresh(exercise)

@@ -3,7 +3,15 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from app.exercises.enums import BodyRegion, Difficulty, Equipment, MuscleGroup
+from app.exercises.enums import (
+    BodyRegion,
+    Difficulty,
+    Equipment,
+    ExerciseCautionTag,
+    ExerciseType,
+    MovementPattern,
+    MuscleGroup,
+)
 from app.exercises.schemas import ExerciseDetail
 
 Slug = Annotated[
@@ -47,6 +55,10 @@ class AdminExerciseCreate(BaseModel):
     instructions_en: list[TextItem] = Field(min_length=3, max_length=6)
     instructions_fa: list[TextItem] = Field(min_length=3, max_length=6)
     safety_notes_en: list[TextItem] = Field(min_length=1)
+    movement_pattern: MovementPattern = MovementPattern.OTHER
+    exercise_type: ExerciseType = ExerciseType.OTHER
+    caution_tags: list[ExerciseCautionTag] = Field(default_factory=list)
+    is_programmable: bool = False
     safety_notes_fa: list[TextItem] = Field(min_length=1)
     is_active: bool = True
     media_source_url: OptionalMetadata = None
@@ -61,6 +73,11 @@ class AdminExerciseDetail(ExerciseDetail):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+    movement_pattern: MovementPattern
+    exercise_type: ExerciseType
+    caution_tags: list[ExerciseCautionTag]
+    is_programmable: bool
 
 
 class PaginatedAdminExercises(BaseModel):

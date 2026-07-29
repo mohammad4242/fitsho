@@ -5,10 +5,11 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.exercises.enums import Equipment, MuscleGroup
+from app.exercises.enums import Equipment, ExerciseCautionTag, MuscleGroup
 from app.exercises.models import (
     Exercise,
     ExerciseAlternative,
+    ExerciseCautionTagItem,
     ExerciseEquipment,
     ExerciseSecondaryMuscle,
 )
@@ -91,6 +92,9 @@ def _apply_seed_fields(exercise: Exercise, seed: ExerciseSeed) -> None:
     exercise.body_region = seed.body_region
     exercise.primary_muscle = seed.primary_muscle
     exercise.difficulty = seed.difficulty
+    exercise.movement_pattern = seed.movement_pattern
+    exercise.exercise_type = seed.exercise_type
+    exercise.is_programmable = seed.is_programmable
     exercise.instructions_en = list(seed.instructions_en)
     exercise.instructions_fa = list(seed.instructions_fa)
     exercise.safety_notes_en = list(seed.safety_notes_en)
@@ -131,14 +135,32 @@ def _sync_equipment(
     )
 
 
+def _sync_caution_tags(
+    exercise: Exercise,
+    desired: tuple[ExerciseCautionTag, ...],
+) -> None:
+    desired_set = set(desired)
+    for item in list(exercise.caution_tag_items):
+        if item.caution_tag not in desired_set:
+            exercise.caution_tag_items.remove(item)
+    existing = {item.caution_tag for item in exercise.caution_tag_items}
+    exercise.caution_tag_items.extend(
+        ExerciseCautionTagItem(caution_tag=caution_tag)
+        for caution_tag in desired
+        if caution_tag not in existing
+    )
+
+
 def seed_exercises(db: Session) -> SeedResult:
     slugs = [seed.slug for seed in EXERCISE_SEEDS]
+
     existing = {
         exercise.slug: exercise
         for exercise in db.scalars(
             select(Exercise)
             .where(Exercise.slug.in_(slugs))
             .options(
+                selectinload(Exercise.caution_tag_items),
                 selectinload(Exercise.secondary_muscles),
                 selectinload(Exercise.equipment_items),
             )
@@ -160,6 +182,7 @@ def seed_exercises(db: Session) -> SeedResult:
             _sync_equipment(exercise, exercise_seed.equipment)
             exercises_by_slug[exercise_seed.slug] = exercise
 
+            _sync_caution_tags(exercise, exercise_seed.caution_tags)
         db.flush()
 
         alternative_keys = {

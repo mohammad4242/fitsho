@@ -207,3 +207,42 @@ def test_profile_validation_does_not_echo_sensitive_text(client: TestClient) -> 
     assert response.status_code == 422
     assert rejected_text not in response.text
     assert all("input" not in error for error in response.json()["detail"])
+
+
+def test_profile_stores_normalized_training_cautions_and_plan_duration(
+    client: TestClient,
+    db: Session,
+) -> None:
+    user_id = register(client, "cautions@example.com")
+
+    response = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={
+            **VALID_PROFILE,
+            "training_cautions": ["lower_back", "wrist"],
+            "plan_duration_weeks": 6,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["training_cautions"] == ["lower_back", "wrist"]
+    assert response.json()["plan_duration_weeks"] == 6
+    profile = db.get(UserProfile, user_id)
+    assert profile is not None
+    assert [item.caution.value for item in profile.training_caution_items] == [
+        "lower_back",
+        "wrist",
+    ]
+
+
+def test_profile_rejects_duplicate_training_cautions(client: TestClient) -> None:
+    register(client, "duplicate-cautions@example.com")
+
+    response = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={**VALID_PROFILE, "training_cautions": ["knee", "knee"]},
+    )
+
+    assert response.status_code == 422

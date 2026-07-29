@@ -7,7 +7,9 @@ import {
   type ProfileFormValues,
   type ProfileInput,
   type ProfilePatch,
+  type PlanDurationWeeks,
   type SessionDurationMinutes,
+  type TrainingCaution,
   type Sex,
   type TrainingLocation,
 } from "./types";
@@ -22,6 +24,7 @@ export type ProfileValidationCode =
   | "weightPrecision"
   | "trainingDaysRange"
   | "sessionDurationInvalid"
+  | "planDurationInvalid"
   | "limitationsLength";
 
 export type ProfileValidationErrors = Partial<
@@ -158,6 +161,17 @@ function validateStepThree(values: ProfileFormValues): ProfileValidationErrors {
     errors.session_duration_minutes = "sessionDurationInvalid";
   }
 
+  if (values.training_cautions === null) {
+    errors.training_cautions = "required";
+  }
+
+  const planDuration = values.plan_duration_weeks.trim();
+  if (planDuration === "") {
+    errors.plan_duration_weeks = "required";
+  } else if (![4, 6, 8].includes(Number(planDuration))) {
+    errors.plan_duration_weeks = "planDurationInvalid";
+  }
+
   if (values.physical_limitations.trim().length > 1000) {
     errors.physical_limitations = "limitationsLength";
   }
@@ -208,6 +222,8 @@ export function toProfileInput(values: ProfileFormValues): ProfileInput {
       values.session_duration_minutes,
     ) as SessionDurationMinutes,
     physical_limitations: values.physical_limitations.trim() || null,
+    training_cautions: values.training_cautions as TrainingCaution[],
+    plan_duration_weeks: Number(values.plan_duration_weeks) as PlanDurationWeeks,
   };
 }
 
@@ -225,6 +241,8 @@ export function profileToFormValues(profile: Profile): ProfileFormValues {
     home_training_setup: profile.home_training_setup ?? "",
     session_duration_minutes: String(profile.session_duration_minutes),
     physical_limitations: profile.physical_limitations ?? "",
+    training_cautions: profile.training_cautions,
+    plan_duration_weeks: String(profile.plan_duration_weeks),
   };
 }
 
@@ -270,6 +288,12 @@ export function toProfilePatch(
   }
   if (input.physical_limitations !== currentProfile.physical_limitations) {
     patch.physical_limitations = input.physical_limitations;
+  }
+  if (input.training_cautions.join(",") !== currentProfile.training_cautions.join(",")) {
+    patch.training_cautions = input.training_cautions;
+  }
+  if (input.plan_duration_weeks !== currentProfile.plan_duration_weeks) {
+    patch.plan_duration_weeks = input.plan_duration_weeks;
   }
   return patch;
 }

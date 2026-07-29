@@ -88,6 +88,7 @@ export function AdminExercisesPage() {
                   <div><dt>{t("catalog.primaryMuscleLabel")}</dt><dd>{t(`catalog.muscle.${exercise.primary_muscle}`)}</dd></div>
                   <div><dt>{t("catalog.difficultyLabel")}</dt><dd>{t(`catalog.difficulty.${exercise.difficulty}`)}</dd></div>
                 </dl>
+                <Link to={`/admin/exercises/${exercise.id}/edit`}>{t("admin.exercises.edit")}</Link>
               </article>
             ))}
           </section>

@@ -33,6 +33,8 @@ const emptyValues: ProfileFormValues = {
   home_training_setup: "",
   session_duration_minutes: "",
   physical_limitations: "",
+  training_cautions: null,
+  plan_duration_weeks: "4",
 };
 
 const stepKeys = ["personal", "bodyGoal", "experience"] as const;
@@ -56,7 +58,10 @@ export function OnboardingPage() {
     }
   }, [errors]);
 
-  function updateValue(field: keyof ProfileFormValues, value: string) {
+  function updateValue(
+    field: keyof ProfileFormValues,
+    value: string | ProfileFormValues["training_cautions"],
+  ) {
     const clearsHomeSetup = field === "training_location" && value === "gym";
     setValues((current) => ({
       ...current,

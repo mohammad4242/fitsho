@@ -15,7 +15,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 from app.profile.enums import (
@@ -23,6 +23,7 @@ from app.profile.enums import (
     FitnessGoal,
     HomeTrainingSetup,
     Sex,
+    TrainingCaution,
     TrainingLocation,
 )
 
@@ -46,6 +47,10 @@ class UserProfile(Base):
         CheckConstraint(
             "session_duration_minutes IN (30, 45, 60, 75, 90)",
             name="ck_user_profiles_session_duration_values",
+        ),
+        CheckConstraint(
+            "plan_duration_weeks IN (4, 6, 8)",
+            name="ck_user_profiles_plan_duration_weeks_values",
         ),
         CheckConstraint(
             "(training_location = 'home' AND home_training_setup IS NOT NULL) OR "
@@ -121,6 +126,12 @@ class UserProfile(Base):
         nullable=False,
     )
     physical_limitations: Mapped[str | None] = mapped_column(Text, nullable=True)
+    plan_duration_weeks: Mapped[int] = mapped_column(
+        SmallInteger, default=4, server_default="4", nullable=False
+    )
+    training_caution_items: Mapped[list["UserProfileTrainingCaution"]] = relationship(
+        back_populates="profile", cascade="all, delete-orphan", passive_deletes=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -130,6 +141,27 @@ class UserProfile(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+
+class UserProfileTrainingCaution(Base):
+    __tablename__ = "user_profile_training_cautions"
+    __table_args__ = (Index("ix_user_profile_training_cautions_caution", "caution"),)
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("user_profiles.user_id", ondelete="CASCADE"), primary_key=True
+    )
+    caution: Mapped[TrainingCaution] = mapped_column(
+        Enum(
+            TrainingCaution,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=lambda members: [member.value for member in members],
+            name="ck_user_profile_training_cautions_values",
+        ),
+        primary_key=True,
+    )
+    profile: Mapped[UserProfile] = relationship(back_populates="training_caution_items")
 
 
 class BodyMeasurement(Base):

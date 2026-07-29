@@ -24,6 +24,8 @@ const validValues: ProfileFormValues = {
   home_training_setup: "",
   session_duration_minutes: "60",
   physical_limitations: "",
+  training_cautions: [],
+  plan_duration_weeks: "4",
 };
 
 const profile: Profile = {
@@ -41,6 +43,8 @@ const profile: Profile = {
   home_training_setup: null,
   session_duration_minutes: 60,
   physical_limitations: null,
+  training_cautions: [],
+  plan_duration_weeks: 4,
   created_at: "2026-07-27T12:00:00Z",
   updated_at: "2026-07-27T12:00:00Z",
 };
@@ -186,6 +190,8 @@ describe("profile validation", () => {
       home_training_setup: null,
       session_duration_minutes: 60,
       physical_limitations: null,
+  training_cautions: [],
+  plan_duration_weeks: 4,
     });
   });
 

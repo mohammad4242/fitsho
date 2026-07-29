@@ -8,8 +8,11 @@ import {
   experienceLevels,
   fitnessGoals,
   homeTrainingSetups,
+  planDurations,
   sessionDurations,
   sexes,
+  trainingCautions,
+  type TrainingCaution,
   trainingLocations,
   type ProfileFormValues,
 } from "./types";
@@ -18,7 +21,10 @@ type FieldGroupProps = {
   values: ProfileFormValues;
   errors: ProfileValidationErrors;
   disabled?: boolean;
-  onChange: (field: keyof ProfileFormValues, value: string) => void;
+  onChange: (
+    field: keyof ProfileFormValues,
+    value: string | ProfileFormValues["training_cautions"],
+  ) => void;
 };
 
 function describedBy(
@@ -213,6 +219,17 @@ export function ExperienceFields({
   onChange,
 }: FieldGroupProps) {
   const { t } = useTranslation();
+
+  function toggleTrainingCaution(caution: TrainingCaution) {
+    const selected = values.training_cautions ?? [];
+    onChange(
+      "training_cautions",
+      selected.includes(caution)
+        ? selected.filter((item) => item !== caution)
+        : [...selected, caution],
+    );
+  }
+
   return (
     <fieldset className="profile-fieldset" disabled={disabled}>
       <legend>{t("onboarding.steps.experience")}</legend>
@@ -367,6 +384,55 @@ export function ExperienceFields({
           field="session_duration_minutes"
           error={errors.session_duration_minutes}
         />
+      </div>
+
+      <fieldset
+        className="profile-field"
+        aria-describedby={describedBy("training_cautions", errors.training_cautions)}
+      >
+        <legend>{t("onboarding.fields.trainingCautions")}</legend>
+        <div className="profile-checkboxes">
+          <label>
+            <input
+              type="checkbox"
+              name="training_cautions"
+              checked={values.training_cautions !== null && values.training_cautions.length === 0}
+              onChange={() => onChange("training_cautions", [])}
+            />
+            {t("onboarding.options.trainingCaution.none")}
+          </label>
+          {trainingCautions.map((caution) => (
+            <label key={caution}>
+              <input
+                type="checkbox"
+                checked={values.training_cautions?.includes(caution) ?? false}
+                onChange={() => toggleTrainingCaution(caution)}
+              />
+              {t(`onboarding.options.trainingCaution.${caution}`)}
+            </label>
+          ))}
+        </div>
+        <FieldError field="training_cautions" error={errors.training_cautions} />
+      </fieldset>
+
+      <div className="profile-field">
+        <label htmlFor="profile-plan-duration">{t("onboarding.fields.planDuration")}</label>
+        <select
+          id="profile-plan-duration"
+          name="plan_duration_weeks"
+          required
+          value={values.plan_duration_weeks}
+          aria-invalid={errors.plan_duration_weeks !== undefined}
+          aria-describedby={describedBy("plan_duration_weeks", errors.plan_duration_weeks)}
+          onChange={(event) => onChange("plan_duration_weeks", event.target.value)}
+        >
+          {planDurations.map((duration) => (
+            <option key={duration} value={duration}>
+              {t(`onboarding.options.planDuration.${duration}`)}
+            </option>
+          ))}
+        </select>
+        <FieldError field="plan_duration_weeks" error={errors.plan_duration_weeks} />
       </div>
 
       <div className="profile-field">

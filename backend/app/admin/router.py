@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from pydantic import ValidationError
@@ -12,7 +13,12 @@ from app.admin.schemas import (
     AdminExerciseFilters,
     PaginatedAdminExercises,
 )
-from app.admin.service import create_admin_exercise, list_admin_exercises
+from app.admin.service import (
+    create_admin_exercise,
+    get_admin_exercise,
+    list_admin_exercises,
+    update_admin_exercise,
+)
 from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import AppSettings, DatabaseSession
 from app.exercises.models import Exercise
@@ -53,6 +59,12 @@ def _detail(exercise: Exercise) -> AdminExerciseDetail:
         media_attribution=exercise.media_attribution,
         is_active=exercise.is_active,
         created_at=exercise.created_at,
+        movement_pattern=exercise.movement_pattern,
+        exercise_type=exercise.exercise_type,
+        caution_tags=sorted(
+            (item.caution_tag for item in exercise.caution_tag_items), key=lambda value: value.value
+        ),
+        is_programmable=exercise.is_programmable,
         updated_at=exercise.updated_at,
     )
 
@@ -93,11 +105,6 @@ def _parse_payload(raw_payload: str) -> AdminExerciseCreate:
             "primary_muscle",
             "Primary muscle must belong to the selected body region",
         )
-    if any(muscle not in allowed_muscles for muscle in payload.secondary_muscles):
-        raise _validation_error(
-            "secondary_muscles",
-            "Secondary muscles must belong to the selected body region",
-        )
     if payload.primary_muscle in payload.secondary_muscles:
         raise _validation_error(
             "secondary_muscles",
@@ -119,6 +126,60 @@ def read_admin_exercises(
         total=total,
         total_pages=(total + filters.page_size - 1) // filters.page_size,
     )
+
+
+@router.get("/exercises/{exercise_id}", response_model=AdminExerciseDetail)
+def read_admin_exercise(
+    exercise_id: UUID,
+    db: DatabaseSession,
+) -> AdminExerciseDetail:
+    exercise = get_admin_exercise(db, exercise_id)
+    if exercise is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercise not found")
+    return _detail(exercise)
+
+
+@router.patch(
+    "/exercises/{exercise_id}",
+    response_model=AdminExerciseDetail,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_exercise(
+    exercise_id: UUID,
+    payload: Annotated[str, Form()],
+    db: DatabaseSession,
+    settings: AppSettings,
+    media: Annotated[UploadFile | None, File()] = None,
+) -> AdminExerciseDetail:
+    exercise_payload = _parse_payload(payload)
+    stored_media: StoredMedia | None = None
+    try:
+        if media is not None:
+            stored_media = store_upload(media, settings)
+        exercise = update_admin_exercise(db, exercise_id, exercise_payload, stored_media)
+        if exercise is None:
+            if stored_media is not None:
+                discard_media(stored_media)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Exercise not found",
+            )
+    except MediaValidationError as error:
+        raise _validation_error("media", str(error)) from None
+    except DuplicateExerciseSlugError:
+        if stored_media is not None:
+            discard_media(stored_media)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Exercise slug already exists",
+        ) from None
+    except HTTPException:
+        raise
+    except Exception:
+        if stored_media is not None:
+            discard_media(stored_media)
+        raise
+    return _detail(exercise)
 
 
 @router.post(

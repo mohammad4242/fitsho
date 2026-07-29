@@ -61,6 +61,8 @@ const savedProfile: Profile = {
   home_training_setup: "dumbbells_available",
   session_duration_minutes: 75,
   physical_limitations: "Knee pain",
+  training_cautions: ["knee"],
+  plan_duration_weeks: 6,
   created_at: "2026-07-27T12:00:00Z",
   updated_at: "2026-07-27T12:00:00Z",
 };

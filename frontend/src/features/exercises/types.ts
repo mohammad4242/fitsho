@@ -35,6 +35,50 @@ export type Equipment = (typeof equipment)[number];
 export const difficulties = ["beginner", "intermediate", "advanced"] as const;
 export type Difficulty = (typeof difficulties)[number];
 
+export const movementPatterns = [
+  "horizontal_push",
+  "vertical_push",
+  "horizontal_pull",
+  "vertical_pull",
+  "squat",
+  "hip_hinge",
+  "lunge",
+  "knee_extension",
+  "knee_flexion",
+  "hip_extension",
+  "hip_abduction",
+  "hip_adduction",
+  "calf_raise",
+  "elbow_flexion",
+  "elbow_extension",
+  "shoulder_abduction",
+  "shoulder_external_rotation",
+  "shrug",
+  "spinal_flexion",
+  "core_anti_extension",
+  "core_anti_rotation",
+  "core_anti_lateral_flexion",
+  "other",
+] as const;
+export type MovementPattern = (typeof movementPatterns)[number];
+
+export const exerciseTypes = ["compound", "isolation", "core", "mobility", "other"] as const;
+export type ExerciseType = (typeof exerciseTypes)[number];
+
+export const exerciseCautionTags = [
+  "lower_back_loading",
+  "spinal_flexion",
+  "deep_knee_flexion",
+  "overhead_position",
+  "shoulder_internal_rotation",
+  "shoulder_external_rotation",
+  "wrist_loading",
+  "neck_loading",
+  "balance_demand",
+  "other",
+] as const;
+export type ExerciseCautionTag = (typeof exerciseCautionTags)[number];
+
 export const mediaTypes = [
   "image",
   "animated_webp",
