@@ -1,17 +1,19 @@
+@import "./styles/tokens.css";
+
 :root {
-  --petrol-950: #0b2727;
-  --petrol-900: #123332;
-  --petrol-800: #1b4845;
-  --mist-100: #eaf1ee;
-  --mist-50: #f5f8f6;
+  --petrol-950: var(--fitsho-petrol);
+  --petrol-900: var(--fitsho-teal);
+  --petrol-800: #173d3b;
+  --mist-100: var(--fitsho-mist);
+  --mist-50: var(--fitsho-surface);
   --paper: #ffffff;
-  --turquoise: #38b7a5;
-  --turquoise-dark: #168b7d;
-  --persimmon: #f26b4a;
+  --turquoise: var(--fitsho-aqua);
+  --turquoise-dark: #1cae9d;
+  --persimmon: var(--fitsho-coral);
   --saffron: #f4b942;
-  --ink: #173331;
-  --muted: #657875;
-  --line: #d7e3df;
+  --ink: var(--fitsho-ink);
+  --muted: var(--fitsho-muted);
+  --line: var(--fitsho-line);
   --danger: #a13f32;
   font-family: "Vazirmatn Variable", Tahoma, sans-serif;
   color: var(--ink);
@@ -22,7 +24,20 @@
 }
 
 html[lang="en"] {
-  font-family: "Manrope Variable", system-ui, sans-serif;
+  font-family: "Sora Variable", system-ui, sans-serif;
+}
+
+.fitsho-display {
+  font-family: Lalezar, "Vazirmatn Variable", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+html[lang="en"] .fitsho-display {
+  font-family: "Sora Variable", system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.055em;
 }
 
 * {
