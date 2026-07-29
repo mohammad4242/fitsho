@@ -1,140 +1,113 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  AdminExerciseMediaAssetInput,
-  AdminExerciseMediaFiles,
-  MediaAssetKey,
-} from "./types";
-
-type AssetDefinition = {
-  key: MediaAssetKey;
-  presentation: AdminExerciseMediaAssetInput["presentation"];
-  role: AdminExerciseMediaAssetInput["role"];
-  accept: string;
-  labelKey: "maleVideo" | "femaleVideo" | "maleThumbnail" | "femaleThumbnail";
-};
-
-const assetDefinitions: readonly AssetDefinition[] = [
-  { key: "male_video", presentation: "male", role: "video", accept: "video/mp4,video/webm", labelKey: "maleVideo" },
-  { key: "female_video", presentation: "female", role: "video", accept: "video/mp4,video/webm", labelKey: "femaleVideo" },
-  { key: "male_thumbnail", presentation: "male", role: "thumbnail", accept: "image/jpeg", labelKey: "maleThumbnail" },
-  { key: "female_thumbnail", presentation: "female", role: "thumbnail", accept: "image/jpeg", labelKey: "femaleThumbnail" },
-];
+import type { AdminExerciseMediaAssetInput, AdminExerciseMediaFiles } from "./types";
 
 type Props = {
   assets: AdminExerciseMediaAssetInput[];
   files: AdminExerciseMediaFiles;
-  retainMetadataWithoutFile: boolean;
   onAssetsChange: (assets: AdminExerciseMediaAssetInput[]) => void;
   onFilesChange: (files: AdminExerciseMediaFiles) => void;
 };
 
-export function ExerciseMediaAssetsFields({
-  assets,
-  files,
-  retainMetadataWithoutFile,
-  onAssetsChange,
-  onFilesChange,
-}: Props) {
+function nextSortOrder(
+  assets: AdminExerciseMediaAssetInput[],
+  presentation: "male" | "female",
+  role: "video" | "thumbnail",
+): number {
+  return Math.max(
+    -1,
+    ...assets
+      .filter((asset) => asset.presentation === presentation && asset.role === role)
+      .map((asset) => asset.sort_order),
+  ) + 1;
+}
+
+export function ExerciseMediaAssetsFields({ assets, files, onAssetsChange, onFilesChange }: Props) {
   const { t } = useTranslation();
+  const [presentation, setPresentation] = useState<"male" | "female">("male");
+  const visible = assets.filter((asset) => asset.presentation === presentation);
 
-  function findAsset(definition: AssetDefinition) {
-    return assets.find(
-      (asset) => asset.presentation === definition.presentation && asset.role === definition.role,
-    );
-  }
-
-  function ensureAsset(definition: AssetDefinition) {
-    return findAsset(definition) ?? {
-      presentation: definition.presentation,
-      role: definition.role,
+  function addAsset() {
+    onAssetsChange([...assets, {
+      presentation,
+      role: "video",
+      sort_order: nextSortOrder(assets, presentation, "video"),
+      upload_index: null,
       media_source_url: null,
       media_license: null,
       media_attribution: null,
-    };
+    }]);
   }
 
-  function changeFile(definition: AssetDefinition, file: File | null) {
-    const nextFiles = { ...files };
-    if (file === null) delete nextFiles[definition.key];
-    else nextFiles[definition.key] = file;
+  function change(index: number, patch: Partial<AdminExerciseMediaAssetInput>) {
+    onAssetsChange(assets.map((asset) => asset === visible[index] ? { ...asset, ...patch } : asset));
+  }
+
+  function changeRole(index: number, role: "video" | "thumbnail") {
+    const asset = visible[index];
+    if (asset.role === role) return;
+    const otherAssets = assets.filter((item) => item !== asset);
+    change(index, { role, sort_order: nextSortOrder(otherAssets, asset.presentation, role) });
+  }
+
+  function remove(index: number) {
+    const asset = visible[index];
+    const next = assets.filter((item) => item !== asset);
+    if (asset.upload_index !== null && asset.upload_index !== undefined) {
+      onFilesChange(files.filter((_, fileIndex) => fileIndex !== asset.upload_index));
+      onAssetsChange(next.map((item) => (
+        item.upload_index !== null && item.upload_index !== undefined && item.upload_index > asset.upload_index!
+          ? { ...item, upload_index: item.upload_index - 1 }
+          : item
+      )));
+      return;
+    }
+    onAssetsChange(next);
+  }
+
+  function changeFile(index: number, file: File | null) {
+    if (file === null) return;
+    const asset = visible[index];
+    const uploadIndex = asset.upload_index ?? files.length;
+    const nextFiles = [...files];
+    nextFiles[uploadIndex] = file;
     onFilesChange(nextFiles);
-    if (file !== null && findAsset(definition) === undefined) {
-      onAssetsChange([...assets, ensureAsset(definition)]);
-    }
-    if (file === null && !retainMetadataWithoutFile) {
-      onAssetsChange(
-        assets.filter(
-          (asset) => asset.presentation !== definition.presentation || asset.role !== definition.role,
-        ),
-      );
-    }
+    onAssetsChange(assets.map((item) => item === asset ? { ...item, upload_index: uploadIndex } : item));
   }
 
-  function changeMetadata(
-    definition: AssetDefinition,
-    field: "media_source_url" | "media_license" | "media_attribution",
-    value: string,
-  ) {
-    const current = ensureAsset(definition);
-    const next = { ...current, [field]: value || null };
-    onAssetsChange([
-      ...assets.filter(
-        (asset) => asset.presentation !== definition.presentation || asset.role !== definition.role,
-      ),
-      next,
-    ]);
-  }
-
-  return (
-    <fieldset className="admin-form-section">
-      <legend>{t("admin.fields.mediaVariants")}</legend>
-      <div className="admin-media-assets">
-        {assetDefinitions.map((definition) => {
-          const asset = findAsset(definition);
-          const label = t(`admin.fields.${definition.labelKey}`);
-          return (
-            <section className="admin-media-asset" key={definition.key}>
-              <h2>{label}</h2>
-              <label>
-                {label}
-                <input
-                  accept={definition.accept}
-                  type="file"
-                  onChange={(event) => changeFile(definition, event.target.files?.[0] ?? null)}
-                />
-              </label>
-              {asset !== undefined && (
-                <div className="admin-field-grid">
-                  <label>
-                    {t("admin.fields.sourceUrl")}
-                    <input
-                      dir="ltr"
-                      type="url"
-                      value={asset.media_source_url ?? ""}
-                      onChange={(event) => changeMetadata(definition, "media_source_url", event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    {t("admin.fields.license")}
-                    <input
-                      value={asset.media_license ?? ""}
-                      onChange={(event) => changeMetadata(definition, "media_license", event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    {t("admin.fields.attribution")}
-                    <input
-                      value={asset.media_attribution ?? ""}
-                      onChange={(event) => changeMetadata(definition, "media_attribution", event.target.value)}
-                    />
-                  </label>
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </div>
-    </fieldset>
-  );
+  return <fieldset className="admin-form-section"><legend>{t("admin.fields.mediaVariants")}</legend>
+    <div className="admin-media-tabs" role="tablist" aria-label={t("admin.fields.mediaVariants")}>
+      <button type="button" role="tab" aria-selected={presentation === "male"} onClick={() => setPresentation("male")}>{t("admin.fields.male")}</button>
+      <button type="button" role="tab" aria-selected={presentation === "female"} onClick={() => setPresentation("female")}>{t("admin.fields.female")}</button>
+    </div>
+    <div className="admin-media-assets">{visible.map((asset, index) => {
+      const number = (index + 1).toLocaleString("fa-IR");
+      const fileId = `media-${asset.presentation}-${asset.role}-${asset.sort_order}`;
+      return <section className="admin-media-asset" key={fileId}>
+        <div className="admin-media-asset__header">
+          <strong>{t("admin.fields.mediaItem", { number })}</strong>
+          <button type="button" className="admin-media-remove" onClick={() => remove(index)}>{t("admin.fields.removeMedia")}</button>
+        </div>
+        <label htmlFor={`${fileId}-role`}>{t("admin.fields.mediaType", { number })}</label>
+        <select id={`${fileId}-role`} value={asset.role} onChange={(event) => changeRole(index, event.target.value as "video" | "thumbnail")}>
+          <option value="video">{t("admin.fields.video")}</option>
+          <option value="thumbnail">{t("admin.fields.image")}</option>
+        </select>
+        <label htmlFor={`${fileId}-file`}>{t("admin.fields.galleryMediaFile", { number })}</label>
+        <input id={`${fileId}-file`} accept={asset.role === "video" ? "video/mp4,video/webm" : "image/jpeg"} type="file" onChange={(event) => changeFile(index, event.target.files?.[0] ?? null)} />
+        <small>{asset.upload_index === null || asset.upload_index === undefined ? t("admin.fields.existingFile") : files[asset.upload_index]?.name}</small>
+        <details>
+          <summary>{t("admin.fields.sourceDetails")}</summary>
+          <label htmlFor={`${fileId}-source`}>{t("admin.fields.sourceUrl")}</label>
+          <input id={`${fileId}-source`} dir="ltr" type="url" value={asset.media_source_url ?? ""} onChange={(event) => change(index, { media_source_url: event.target.value })} />
+          <label htmlFor={`${fileId}-license`}>{t("admin.fields.license")}</label>
+          <input id={`${fileId}-license`} value={asset.media_license ?? ""} onChange={(event) => change(index, { media_license: event.target.value })} />
+          <label htmlFor={`${fileId}-attribution`}>{t("admin.fields.attribution")}</label>
+          <input id={`${fileId}-attribution`} value={asset.media_attribution ?? ""} onChange={(event) => change(index, { media_attribution: event.target.value })} />
+        </details>
+      </section>;
+    })}</div>
+    <button type="button" className="admin-media-add" onClick={addAsset}>{t("admin.fields.addMedia")}</button>
+  </fieldset>;
 }

@@ -158,6 +158,8 @@ export function adminExerciseToForm(exercise: import("./types").AdminExercise): 
     media_assets: exercise.media_assets?.map((asset) => ({
       presentation: asset.presentation,
       role: asset.role,
+      sort_order: asset.sort_order,
+      upload_index: null,
       media_source_url: asset.media_source_url,
       media_license: asset.media_license,
       media_attribution: asset.media_attribution,

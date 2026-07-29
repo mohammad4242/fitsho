@@ -35,7 +35,7 @@ export function AdminExerciseNewPage() {
   const [slugEdited, setSlugEdited] = useState(false);
   const [errors, setErrors] = useState<AdminValidationErrors>({});
   const [media, setMedia] = useState<File | null>(null);
-  const [mediaAssets, setMediaAssets] = useState<AdminExerciseMediaFiles>({});
+  const [mediaAssets, setMediaAssets] = useState<AdminExerciseMediaFiles>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [requestError, setRequestError] = useState<"duplicate" | "api" | null>(null);
@@ -147,7 +147,6 @@ export function AdminExerciseNewPage() {
           <ExerciseMediaAssetsFields
             assets={form.media_assets}
             files={mediaAssets}
-            retainMetadataWithoutFile={false}
             onAssetsChange={(mediaAssetsInput) => setField("media_assets", mediaAssetsInput)}
             onFilesChange={setMediaAssets}
           />

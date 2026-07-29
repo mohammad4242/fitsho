@@ -141,6 +141,7 @@ export type ExerciseDetail = ExerciseSummary & {
 export type ExerciseMediaAsset = {
   presentation: MediaPresentation;
   role: MediaRole;
+  sort_order: number;
   media_path: string;
   media_type: MediaType;
   media_source_url: string | null;

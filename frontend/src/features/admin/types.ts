@@ -12,15 +12,17 @@ import type {
 } from "../exercises/types";
 
 export type AdminExerciseMediaAssetInput = {
+  id?: string | null;
   presentation: MediaPresentation;
   role: MediaRole;
+  sort_order: number;
+  upload_index?: number | null;
   media_source_url: string | null;
   media_license: string | null;
   media_attribution: string | null;
 };
 
-export type MediaAssetKey = "male_video" | "female_video" | "male_thumbnail" | "female_thumbnail";
-export type AdminExerciseMediaFiles = Partial<Record<MediaAssetKey, File>>;
+export type AdminExerciseMediaFiles = File[];
 
 export type AdminExercise = ExerciseDetail & {
   movement_pattern: MovementPattern;

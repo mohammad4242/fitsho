@@ -81,7 +81,7 @@ it("previews GIF and video selections without autoplay", () => {
   expect(video).not.toHaveAttribute("autoplay");
 });
 
-it("submits separate male and female media assets", async () => {
+it("submits a male video and a female image from separate media galleries", async () => {
   adminApi.createAdminExercise.mockResolvedValue({ id: "created-id" });
   const user = userEvent.setup();
   renderPage();
@@ -89,22 +89,23 @@ it("submits separate male and female media assets", async () => {
   const maleVideo = new File(["video"], "male.mp4", { type: "video/mp4" });
   const femaleThumbnail = new File(["image"], "female.jpg", { type: "image/jpeg" });
 
-  await user.upload(screen.getByLabelText("ویدئوی مرد"), maleVideo);
-  await user.upload(screen.getByLabelText("تصویر بندانگشتی زن"), femaleThumbnail);
+  await user.click(screen.getByRole("button", { name: "افزودن رسانه" }));
+  await user.upload(screen.getByLabelText("فایل رسانه ۱"), maleVideo);
+  await user.click(screen.getByRole("tab", { name: "زن" }));
+  await user.click(screen.getByRole("button", { name: "افزودن رسانه" }));
+  await user.selectOptions(screen.getByLabelText("نوع رسانه ۱"), "thumbnail");
+  await user.upload(screen.getByLabelText("فایل رسانه ۱"), femaleThumbnail);
   await user.click(screen.getByRole("button", { name: "ذخیره حرکت" }));
 
   expect(adminApi.createAdminExercise).toHaveBeenCalledWith(
     expect.objectContaining({
       media_assets: [
-        expect.objectContaining({ presentation: "male", role: "video" }),
-        expect.objectContaining({ presentation: "female", role: "thumbnail" }),
+        expect.objectContaining({ presentation: "male", role: "video", sort_order: 0, upload_index: 0 }),
+        expect.objectContaining({ presentation: "female", role: "thumbnail", sort_order: 0, upload_index: 1 }),
       ],
     }),
     null,
-    expect.objectContaining({
-      male_video: maleVideo,
-      female_thumbnail: femaleThumbnail,
-    }),
+    [maleVideo, femaleThumbnail],
   );
 });
 

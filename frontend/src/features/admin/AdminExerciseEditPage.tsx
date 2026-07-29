@@ -25,7 +25,7 @@ export function AdminExerciseEditPage() {
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [reload, setReload] = useState(0);
-  const [mediaAssets, setMediaAssets] = useState<AdminExerciseMediaFiles>({});
+  const [mediaAssets, setMediaAssets] = useState<AdminExerciseMediaFiles>([]);
 
   useEffect(() => {
     if (!exerciseId) {
@@ -92,7 +92,6 @@ export function AdminExerciseEditPage() {
             <ExerciseMediaAssetsFields
               assets={form.media_assets}
               files={mediaAssets}
-              retainMetadataWithoutFile
               onAssetsChange={(mediaAssetsInput) => setField("media_assets", mediaAssetsInput)}
               onFilesChange={setMediaAssets}
             />
