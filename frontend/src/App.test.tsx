@@ -166,6 +166,19 @@ it("redirects a guest away from the protected dashboard", async () => {
   ).toBeInTheDocument();
 });
 
+it("shows the public landing to a guest at the root route", () => {
+  renderRoute("/");
+
+  expect(screen.getAllByRole("link", { name: "شروع رایگان" })).toHaveLength(3);
+});
+
+it("redirects a signed-in root visitor to Today", async () => {
+  setReadyMember();
+  renderRoute("/");
+
+  expect(await screen.findByRole("heading", { name: "سلام، Mohammad" })).toBeInTheDocument();
+});
+
 it("logs a signed-in user out from Today", async () => {
   auth.value.user = {
     id: "1",

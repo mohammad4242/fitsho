@@ -21,6 +21,7 @@ import {
   OnboardingRoute,
 } from "./features/profile/ProfileRouteGuards";
 import { DashboardPage } from "./pages/DashboardPage";
+import { PublicLandingRoute } from "./features/landing/PublicLandingRoute";
 import { AppShell } from "./shared/AppShell";
 
 export function AppRoutes() {
@@ -49,7 +50,7 @@ export function AppRoutes() {
           </Route>
         </Route>
       </Route>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<PublicLandingRoute />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

@@ -18,7 +18,7 @@ export function LandingVideo({ scene, active, reducedMotion }: LandingVideoProps
     if (!video) return;
 
     if (active && !showFallback) {
-      void video.play().catch(() => setHasVideoError(true));
+      void Promise.resolve(video.play()).catch(() => setHasVideoError(true));
       return;
     }
 
