@@ -63,3 +63,19 @@ it("links the primary CTA to the active workout plan", async () => {
     "/workout-plan",
   );
 });
+
+it("uses the supplied strength still in the Today header", async () => {
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
+
+  render(
+    <MemoryRouter>
+      <DashboardPage />
+    </MemoryRouter>,
+  );
+
+  const hero = await screen.findByRole("heading", { name: "سلام، محمد" });
+  expect(hero.closest("section")?.querySelector("img")).toHaveAttribute(
+    "src",
+    expect.stringContaining("hero-strength-fallback"),
+  );
+});

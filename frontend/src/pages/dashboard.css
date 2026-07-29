@@ -26,7 +26,6 @@
   isolation: isolate;
 }
 
-.today-hero__image,
 .today-story__image {
   position: absolute;
   z-index: -2;
@@ -36,7 +35,7 @@
   object-fit: cover;
 }
 
-.today-hero__image { object-position: center 34%; }
+.today-hero__media .member-header-media__asset { object-position: center 34%; }
 
 .today-hero__veil,
 .today-story__shade {
@@ -47,6 +46,8 @@
 }
 
 .today-hero__content {
+  position: relative;
+  z-index: 1;
   width: min(100% - 2rem, 82rem);
   margin: 0 auto;
   padding: clamp(4rem, 10vw, 9rem) 0 clamp(3rem, 7vw, 6rem);
@@ -96,6 +97,7 @@
 
 .today-hero__hint {
   position: absolute;
+  z-index: 1;
   inset: auto clamp(1rem, 4vw, 3rem) 1.4rem auto;
   margin: 0;
   color: rgb(234 244 241 / 65%);
@@ -154,8 +156,7 @@
   .today-shell .authenticated-nav,
   .today-shell .logout-button { display: none; }
   .today-hero { min-height: calc(100svh - 4rem); }
-  .today-hero__image { object-position: 55% center; }
-  .today-hero__veil { background: linear-gradient(0deg, rgb(10 31 30 / 96%) 0%, rgb(10 31 30 / 48%) 62%, rgb(10 31 30 / 32%) 100%); }
+  .today-hero__media .member-header-media__asset { object-position: 55% center; }
   .today-hero h1 { font-size: clamp(4rem, 20vw, 6rem); }
   .today-hero__hint { display: none; }
   .today-story { min-height: 145svh; }

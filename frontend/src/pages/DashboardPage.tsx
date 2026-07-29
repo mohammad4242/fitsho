@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
-import heroAthlete from "../assets/brand/hero-athlete.jpg";
-import heroGym from "../assets/brand/hero-gym.jpg";
-import heroLift from "../assets/brand/hero-lift.jpg";
+import heroStrengthFallback from "../assets/landing/hero-strength-fallback.jpg";
+import planFocusFallback from "../assets/landing/plan-focus-fallback.jpg";
+import progressDriveFallback from "../assets/landing/progress-drive-fallback.jpg";
 import { useAuth } from "../features/auth/AuthContext";
 import { useProfile } from "../features/profile/ProfileContext";
 import { generateWorkoutPlan, getActiveWorkoutPlan } from "../features/workouts/api";
 import { AuthenticatedHeader } from "../shared/AuthenticatedHeader";
+import { MemberHeaderMedia } from "../shared/MemberHeaderMedia";
 import "./dashboard.css";
 
 type PlanState = "loading" | "empty" | "ready" | "error";
@@ -70,8 +71,7 @@ export function DashboardPage() {
       <AuthenticatedHeader />
 
       <section className="today-hero" aria-labelledby="today-title">
-        <img src={heroAthlete} alt="" className="today-hero__image" />
-        <div className="today-hero__veil" />
+        <MemberHeaderMedia imageSrc={heroStrengthFallback} className="today-hero__media" />
         <div className="today-hero__content">
           <p className="today-kicker">{t("dashboard.kicker")}</p>
           <h1 id="today-title" className="fitsho-display">
@@ -85,8 +85,8 @@ export function DashboardPage() {
 
       <section className="today-story" aria-label={t("dashboard.storyLabel")} data-stage={storyStage}>
         <div className="today-story__sticky" aria-hidden="true">
-          <img src={heroGym} alt="" className="today-story__image today-story__image--gym" />
-          <img src={heroLift} alt="" className="today-story__image today-story__image--lift" />
+          <img src={planFocusFallback} alt="" className="today-story__image today-story__image--gym" />
+          <img src={progressDriveFallback} alt="" className="today-story__image today-story__image--lift" />
           <div className="today-story__shade" />
         </div>
         <div className="today-story__chapters">

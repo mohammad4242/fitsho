@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import planFocusFallback from "../../assets/landing/plan-focus-fallback.jpg";
+import planFocusVideo from "../../assets/landing/plan-focus.mp4";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { ApiError } from "../../shared/apiClient";
+import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import { generateWorkoutPlan, getActiveWorkoutPlan } from "./api";
 import type { WorkoutPlan } from "./types";
@@ -62,7 +65,8 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
       <AuthenticatedHeader />
       <main className="workout-plan-main">
         <header className="workout-plan-hero">
-          <div>
+          <MemberHeaderMedia imageSrc={planFocusFallback} videoSrc={planFocusVideo} />
+          <div className="workout-plan-hero__content">
             <p className="eyebrow">{t("workoutPlan.eyebrow")}</p>
             <h1 className="fitsho-display">{t("workoutPlan.title")}</h1>
             <p>{t("workoutPlan.intro")}</p>
