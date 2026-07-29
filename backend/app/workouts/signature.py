@@ -64,6 +64,7 @@ def hash_candidate_set(candidates: Iterable[WorkoutExerciseCandidate]) -> str:
             "equipment": sorted(_string_value(value) for value in candidate.equipment),
             "difficulty": _value(candidate.difficulty),
             "caution_tags": sorted(_string_value(value) for value in candidate.caution_tags),
+            "labels": sorted(_string_value(value) for value in candidate.labels),
         }
         for candidate in sorted(candidates, key=lambda item: str(item.id))
     ]

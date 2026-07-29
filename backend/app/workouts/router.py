@@ -148,6 +148,7 @@ def to_exercise_summary(exercise: Exercise) -> ExerciseSummary:
         name_fa=exercise.name_fa,
         body_region=exercise.body_region,
         primary_muscle=exercise.primary_muscle,
+        labels=[item.label for item in exercise.labels],
         secondary_muscles=[secondary.muscle for secondary in exercise.secondary_muscles],
         equipment=[equipment.equipment for equipment in exercise.equipment_items],
         difficulty=exercise.difficulty,
