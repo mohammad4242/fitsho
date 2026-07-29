@@ -23,13 +23,17 @@ from app.exercises.enums import (
     BodyRegion,
     Difficulty,
     Equipment,
+    ExerciseCautionTag,
+    ExerciseType,
     MediaPresentation,
     MediaRole,
     MediaType,
+    MovementPattern,
     MuscleGroup,
 )
 from app.exercises.models import (
     Exercise,
+    ExerciseCautionTagItem,
     ExerciseEquipment,
     ExerciseMediaAsset,
     ExerciseSecondaryMuscle,
@@ -127,6 +131,148 @@ SOURCE_NAME = "free-exercise-db"
 class ExerciseTranslation:
     name_fa: str
     instructions_fa: list[str]
+
+
+@dataclass(frozen=True)
+class ProgrammingMetadata:
+    movement_pattern: MovementPattern
+    exercise_type: ExerciseType
+    caution_tags: tuple[ExerciseCautionTag, ...]
+
+
+def classify_programming_metadata(
+    *,
+    name_en: str,
+    primary_muscle: MuscleGroup,
+    instructions_en: Sequence[str],
+    steps_en: Sequence[str],
+    form_cues_en: Sequence[str],
+    common_mistakes_en: Sequence[str],
+) -> ProgrammingMetadata:
+    name = name_en.lower().replace("-", " ")
+    is_mobility = _contains_any(name, ("stretch", "mobility"))
+    source_text = (
+        " ".join([name_en, *instructions_en, *steps_en, *form_cues_en, *common_mistakes_en])
+        .lower()
+        .replace("-", " ")
+    )
+
+    if _contains_any(name, ("pull up", "pullup", "chin up", "chinup", "pulldown")):
+        movement_pattern = MovementPattern.VERTICAL_PULL
+    elif _contains_any(name, ("row", "rear delt fly", "reverse fly")):
+        movement_pattern = MovementPattern.HORIZONTAL_PULL
+    elif _contains_any(name, ("overhead press", "shoulder press", "military press")):
+        movement_pattern = MovementPattern.VERTICAL_PUSH
+    elif _contains_any(name, ("bench press", "push up", "pushup", "chest press", "dip")):
+        movement_pattern = MovementPattern.HORIZONTAL_PUSH
+    elif "squat" in name:
+        movement_pattern = MovementPattern.SQUAT
+    elif _contains_any(name, ("deadlift", "good morning", "hyperextension")):
+        movement_pattern = MovementPattern.HIP_HINGE
+    elif _contains_any(name, ("lunge", "split squat", "step up")):
+        movement_pattern = MovementPattern.LUNGE
+    elif "leg extension" in name:
+        movement_pattern = MovementPattern.KNEE_EXTENSION
+    elif _contains_any(name, ("leg curl", "hamstring curl")):
+        movement_pattern = MovementPattern.KNEE_FLEXION
+    elif _contains_any(name, ("hip thrust", "glute bridge", "hip extension", "kickback")):
+        movement_pattern = MovementPattern.HIP_EXTENSION
+    elif _contains_any(name, ("hip abduction", "abductor")):
+        movement_pattern = MovementPattern.HIP_ABDUCTION
+    elif _contains_any(name, ("hip adduction", "adductor")):
+        movement_pattern = MovementPattern.HIP_ADDUCTION
+    elif _contains_any(name, ("calf raise", "calves raise")):
+        movement_pattern = MovementPattern.CALF_RAISE
+    elif "curl" in name:
+        movement_pattern = MovementPattern.ELBOW_FLEXION
+    elif _contains_any(name, ("triceps extension", "elbow extension")):
+        movement_pattern = MovementPattern.ELBOW_EXTENSION
+    elif _contains_any(name, ("lateral raise", "front raise")):
+        movement_pattern = MovementPattern.SHOULDER_ABDUCTION
+    elif "external rotation" in name:
+        movement_pattern = MovementPattern.SHOULDER_EXTERNAL_ROTATION
+    elif "shrug" in name:
+        movement_pattern = MovementPattern.SHRUG
+    elif _contains_any(name, ("crunch", "sit up", "bicycle", "twist")):
+        movement_pattern = MovementPattern.SPINAL_FLEXION
+    elif "side plank" in name:
+        movement_pattern = MovementPattern.CORE_ANTI_LATERAL_FLEXION
+    elif "plank" in name:
+        movement_pattern = MovementPattern.CORE_ANTI_EXTENSION
+    elif not is_mobility:
+        movement_pattern = {
+            MuscleGroup.BICEPS: MovementPattern.ELBOW_FLEXION,
+            MuscleGroup.TRICEPS: MovementPattern.ELBOW_EXTENSION,
+            MuscleGroup.CALVES: MovementPattern.CALF_RAISE,
+            MuscleGroup.QUADRICEPS: MovementPattern.KNEE_EXTENSION,
+            MuscleGroup.HAMSTRINGS: MovementPattern.KNEE_FLEXION,
+            MuscleGroup.GLUTES: MovementPattern.HIP_EXTENSION,
+            MuscleGroup.ADDUCTORS: MovementPattern.HIP_ADDUCTION,
+            MuscleGroup.TRAPS: MovementPattern.SHRUG,
+        }.get(primary_muscle, MovementPattern.OTHER)
+    else:
+        movement_pattern = MovementPattern.OTHER
+
+    if is_mobility:
+        exercise_type = ExerciseType.MOBILITY
+    elif movement_pattern in {
+        MovementPattern.SPINAL_FLEXION,
+        MovementPattern.CORE_ANTI_EXTENSION,
+        MovementPattern.CORE_ANTI_ROTATION,
+        MovementPattern.CORE_ANTI_LATERAL_FLEXION,
+    }:
+        exercise_type = ExerciseType.CORE
+    elif (
+        movement_pattern
+        in {
+            MovementPattern.ELBOW_FLEXION,
+            MovementPattern.ELBOW_EXTENSION,
+            MovementPattern.SHOULDER_ABDUCTION,
+            MovementPattern.SHOULDER_EXTERNAL_ROTATION,
+            MovementPattern.SHRUG,
+            MovementPattern.KNEE_EXTENSION,
+            MovementPattern.KNEE_FLEXION,
+            MovementPattern.HIP_ABDUCTION,
+            MovementPattern.HIP_ADDUCTION,
+            MovementPattern.CALF_RAISE,
+        }
+        or "fly" in name
+    ):
+        exercise_type = ExerciseType.ISOLATION
+    elif movement_pattern is not MovementPattern.OTHER:
+        exercise_type = ExerciseType.COMPOUND
+    else:
+        exercise_type = ExerciseType.OTHER
+
+    cautions: list[ExerciseCautionTag] = []
+    if movement_pattern is MovementPattern.HIP_HINGE:
+        cautions.append(ExerciseCautionTag.LOWER_BACK_LOADING)
+    if movement_pattern is MovementPattern.SPINAL_FLEXION:
+        cautions.append(ExerciseCautionTag.SPINAL_FLEXION)
+    if movement_pattern in {MovementPattern.SQUAT, MovementPattern.LUNGE}:
+        cautions.append(ExerciseCautionTag.DEEP_KNEE_FLEXION)
+    if movement_pattern in {MovementPattern.VERTICAL_PUSH, MovementPattern.VERTICAL_PULL}:
+        cautions.append(ExerciseCautionTag.OVERHEAD_POSITION)
+    if movement_pattern is MovementPattern.SHOULDER_EXTERNAL_ROTATION:
+        cautions.append(ExerciseCautionTag.SHOULDER_EXTERNAL_ROTATION)
+    if "internal rotation" in source_text:
+        cautions.append(ExerciseCautionTag.SHOULDER_INTERNAL_ROTATION)
+    if "neck" in source_text:
+        cautions.append(ExerciseCautionTag.NECK_LOADING)
+    if "wrist" in source_text:
+        cautions.append(ExerciseCautionTag.WRIST_LOADING)
+    if _contains_any(source_text, ("balance", "single leg", "one leg")):
+        cautions.append(ExerciseCautionTag.BALANCE_DEMAND)
+
+    return ProgrammingMetadata(
+        movement_pattern=movement_pattern,
+        exercise_type=exercise_type,
+        caution_tags=tuple(dict.fromkeys(cautions)),
+    )
+
+
+def _contains_any(value: str, terms: Sequence[str]) -> bool:
+    return any(term in value for term in terms)
 
 
 class ExerciseTranslator(Protocol):
@@ -347,6 +493,7 @@ class ImportCandidate:
     secondary_muscles: list[MuscleGroup]
     equipment: list[Equipment]
     difficulty: Difficulty
+    programming_metadata: ProgrammingMetadata
     aliases_en: list[str]
     short_description_en: str | None
     instructions_en: list[str]
@@ -516,6 +663,14 @@ class FreeExerciseDbImporter:
             )
             return None
         normalized_instructions = self._normalize_instruction_steps(steps)
+        programming_metadata = classify_programming_metadata(
+            name_en=name_en,
+            primary_muscle=primary_muscle,
+            instructions_en=[instructions],
+            steps_en=steps,
+            form_cues_en=form_cues,
+            common_mistakes_en=common_mistakes,
+        )
         media_assets = self._media_assets(raw_record, source_id, report)
         if not any(asset.role is MediaRole.VIDEO for asset in media_assets):
             report.validation_failures.append(
@@ -532,6 +687,7 @@ class FreeExerciseDbImporter:
             secondary_muscles=secondary_muscles,
             equipment=[equipment],
             difficulty=difficulty,
+            programming_metadata=programming_metadata,
             aliases_en=aliases,
             short_description_en=self._optional_text(raw_record, "shortDescription"),
             instructions_en=normalized_instructions,
@@ -610,6 +766,7 @@ class FreeExerciseDbImporter:
                 selectinload(Exercise.secondary_muscles),
                 selectinload(Exercise.equipment_items),
                 selectinload(Exercise.media_assets),
+                selectinload(Exercise.caution_tag_items),
             )
         )
 
@@ -625,6 +782,11 @@ class FreeExerciseDbImporter:
         return (
             exercise.source_metadata_en == candidate.source_metadata
             and actual_assets == expected_assets
+            and exercise.movement_pattern is candidate.programming_metadata.movement_pattern
+            and exercise.exercise_type is candidate.programming_metadata.exercise_type
+            and exercise.is_programmable is True
+            and {item.caution_tag for item in exercise.caution_tag_items}
+            == set(candidate.programming_metadata.caution_tags)
         )
 
     def _translate(
@@ -702,6 +864,8 @@ class FreeExerciseDbImporter:
         exercise.body_region = candidate.body_region
         exercise.primary_muscle = candidate.primary_muscle
         exercise.difficulty = candidate.difficulty
+        exercise.movement_pattern = candidate.programming_metadata.movement_pattern
+        exercise.exercise_type = candidate.programming_metadata.exercise_type
         exercise.instructions_en = candidate.instructions_en
         exercise.instructions_fa = [item.strip() for item in translation.instructions_fa]
         exercise.safety_notes_en = []
@@ -722,8 +886,10 @@ class FreeExerciseDbImporter:
         exercise.source_metadata_en = candidate.source_metadata
         exercise.needs_review = True
         exercise.is_active = True
+        exercise.is_programmable = True
         self._sync_secondary_muscles(exercise, candidate.secondary_muscles)
         self._sync_equipment(exercise, candidate.equipment)
+        self._sync_caution_tags(exercise, candidate.programming_metadata.caution_tags)
         self._sync_media_assets(exercise, stored_assets)
 
     @staticmethod
@@ -748,6 +914,22 @@ class FreeExerciseDbImporter:
             ExerciseEquipment(equipment=equipment)
             for equipment in desired
             if equipment not in existing
+        )
+
+    @staticmethod
+    def _sync_caution_tags(
+        exercise: Exercise,
+        desired: tuple[ExerciseCautionTag, ...],
+    ) -> None:
+        desired_set = set(desired)
+        for item in list(exercise.caution_tag_items):
+            if item.caution_tag not in desired_set:
+                exercise.caution_tag_items.remove(item)
+        existing = {item.caution_tag for item in exercise.caution_tag_items}
+        exercise.caution_tag_items.extend(
+            ExerciseCautionTagItem(caution_tag=caution_tag)
+            for caution_tag in desired
+            if caution_tag not in existing
         )
 
     @staticmethod

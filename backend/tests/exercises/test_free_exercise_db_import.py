@@ -5,7 +5,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.exercises.enums import BodyRegion, Difficulty, Equipment, MuscleGroup
+from app.exercises.enums import (
+    BodyRegion,
+    Difficulty,
+    Equipment,
+    ExerciseCautionTag,
+    ExerciseType,
+    MovementPattern,
+    MuscleGroup,
+)
 from app.exercises.models import Exercise
 
 MP4_BYTES = b"\x00\x00\x00\x18ftypisom\x00\x00\x00\x00isomiso2"
@@ -102,6 +110,67 @@ def test_free_exercise_db_maps_known_values_and_reports_unknown_values() -> None
     assert map_muscle_group("cardiovascular system") is None
 
 
+def test_programming_metadata_classifies_sample_movements_conservatively() -> None:
+    from app.exercises.free_exercise_db_import import classify_programming_metadata
+
+    cases = (
+        (
+            "45 Degree Hyperextension",
+            MuscleGroup.LOWER_BACK,
+            ["Hinge from hips"],
+            MovementPattern.HIP_HINGE,
+            ExerciseType.COMPOUND,
+            (ExerciseCautionTag.LOWER_BACK_LOADING,),
+        ),
+        (
+            "45-Degree Bicycle Twisting Crunch",
+            MuscleGroup.OBLIQUES,
+            ["Do not pull on neck"],
+            MovementPattern.SPINAL_FLEXION,
+            ExerciseType.CORE,
+            (ExerciseCautionTag.SPINAL_FLEXION, ExerciseCautionTag.NECK_LOADING),
+        ),
+        (
+            "All Fours Groin Stretch",
+            MuscleGroup.ADDUCTORS,
+            ["Relax into stretch"],
+            MovementPattern.OTHER,
+            ExerciseType.MOBILITY,
+            (),
+        ),
+        (
+            "Band Assisted Pull-up",
+            MuscleGroup.BACK,
+            ["Hang with straight arms"],
+            MovementPattern.VERTICAL_PULL,
+            ExerciseType.COMPOUND,
+            (ExerciseCautionTag.OVERHEAD_POSITION,),
+        ),
+        (
+            "Biceps Static Hold",
+            MuscleGroup.BICEPS,
+            [],
+            MovementPattern.ELBOW_FLEXION,
+            ExerciseType.ISOLATION,
+            (),
+        ),
+    )
+
+    for name_en, primary_muscle, form_cues_en, pattern, exercise_type, cautions in cases:
+        result = classify_programming_metadata(
+            name_en=name_en,
+            primary_muscle=primary_muscle,
+            instructions_en=[],
+            steps_en=[],
+            form_cues_en=form_cues_en,
+            common_mistakes_en=[],
+        )
+
+        assert result.movement_pattern is pattern
+        assert result.exercise_type is exercise_type
+        assert result.caution_tags == cautions
+
+
 def test_importer_prevents_duplicates_on_a_second_run(
     db: Session,
     test_settings: Settings,
@@ -143,6 +212,51 @@ def test_importer_prevents_duplicates_on_a_second_run(
     assert exercise.needs_review is True
     assert len(exercise.media_assets) == 4
     assert translator.calls == [["0001"]]
+
+
+def test_importer_sets_programming_metadata_and_updates_existing_import(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    write_source(source_root, source_record())
+    translator = FakeTranslator()
+
+    first = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=translator,
+    ).run()
+    exercise = db.scalar(select(Exercise).where(Exercise.source_id == "0001"))
+
+    assert first.imported_records == ["0001"]
+    assert exercise is not None
+    assert exercise.movement_pattern is MovementPattern.HORIZONTAL_PUSH
+    assert exercise.exercise_type is ExerciseType.COMPOUND
+    assert exercise.is_programmable is True
+    assert exercise.caution_tag_items == []
+
+    exercise.movement_pattern = MovementPattern.OTHER
+    exercise.exercise_type = ExerciseType.OTHER
+    exercise.is_programmable = False
+    db.commit()
+
+    second = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=translator,
+    ).run()
+    db.refresh(exercise)
+
+    assert second.updated_records == ["0001"]
+    assert exercise.movement_pattern is MovementPattern.HORIZONTAL_PUSH
+    assert exercise.exercise_type is ExerciseType.COMPOUND
+    assert exercise.is_programmable is True
 
 
 def test_importer_dry_run_does_not_write_database_files_or_translations(
@@ -234,6 +348,7 @@ def test_curated_translator_returns_only_local_persian_content() -> None:
     from app.exercises.free_exercise_db_import import (
         CuratedExerciseTranslator,
         ImportCandidate,
+        ProgrammingMetadata,
     )
 
     candidate = ImportCandidate(
@@ -246,6 +361,11 @@ def test_curated_translator_returns_only_local_persian_content() -> None:
         secondary_muscles=[],
         equipment=[Equipment.BODYWEIGHT],
         difficulty=Difficulty.BEGINNER,
+        programming_metadata=ProgrammingMetadata(
+            movement_pattern=MovementPattern.HORIZONTAL_PUSH,
+            exercise_type=ExerciseType.COMPOUND,
+            caution_tags=(),
+        ),
         aliases_en=[],
         short_description_en=None,
         instructions_en=["Set up.", "Lower.", "Press."],
