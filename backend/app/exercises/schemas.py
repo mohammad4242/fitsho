@@ -77,6 +77,15 @@ class ExerciseDetail(ExerciseSummary):
     instructions_fa: list[str]
     safety_notes_en: list[str]
     safety_notes_fa: list[str]
+    source: str | None
+    source_id: str | None
+    aliases_en: list[str] | None
+    short_description_en: str | None
+    steps_en: list[str] | None
+    form_cues_en: list[str] | None
+    common_mistakes_en: list[str] | None
+    breathing_en: str | None
+    needs_review: bool
     media_source_url: str | None
     media_license: str | None
     media_attribution: str | None
