@@ -76,6 +76,7 @@ it("loads structured programming metadata and saves an edited exercise", async (
     "exercise-id",
     expect.objectContaining({ movement_pattern: "vertical_push", is_programmable: true }),
     null,
+    [],
   );
   expect(await screen.findByText("LIST PAGE")).toBeInTheDocument();
 });

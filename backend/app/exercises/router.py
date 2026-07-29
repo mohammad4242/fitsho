@@ -12,6 +12,7 @@ from app.exercises.schemas import (
     ExerciseCategory,
     ExerciseDetail,
     ExerciseFilters,
+    ExerciseMediaAssetDetail,
     ExerciseSummary,
     PaginatedExercises,
 )
@@ -96,9 +97,31 @@ def _detail(exercise: Exercise) -> ExerciseDetail:
         instructions_fa=exercise.instructions_fa,
         safety_notes_en=exercise.safety_notes_en,
         safety_notes_fa=exercise.safety_notes_fa,
+        source=exercise.source,
+        source_id=exercise.source_id,
+        aliases_en=exercise.aliases_en,
+        short_description_en=exercise.short_description_en,
+        steps_en=exercise.steps_en,
+        form_cues_en=exercise.form_cues_en,
+        common_mistakes_en=exercise.common_mistakes_en,
+        breathing_en=exercise.breathing_en,
+        needs_review=exercise.needs_review,
         media_source_url=exercise.media_source_url,
         media_license=exercise.media_license,
         media_attribution=exercise.media_attribution,
+        media_assets=[
+            ExerciseMediaAssetDetail(
+                presentation=asset.presentation,
+                role=asset.role,
+                sort_order=asset.sort_order,
+                media_path=asset.media_path,
+                media_type=asset.media_type,
+                media_source_url=asset.media_source_url,
+                media_license=asset.media_license,
+                media_attribution=asset.media_attribution,
+            )
+            for asset in exercise.media_assets
+        ],
     )
 
 

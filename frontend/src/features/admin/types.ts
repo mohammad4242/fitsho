@@ -5,9 +5,24 @@ import type {
   ExerciseCautionTag,
   ExerciseDetail,
   ExerciseType,
+  MediaPresentation,
+  MediaRole,
   MovementPattern,
   MuscleGroup,
 } from "../exercises/types";
+
+export type AdminExerciseMediaAssetInput = {
+  id?: string | null;
+  presentation: MediaPresentation;
+  role: MediaRole;
+  sort_order: number;
+  upload_index?: number | null;
+  media_source_url: string | null;
+  media_license: string | null;
+  media_attribution: string | null;
+};
+
+export type AdminExerciseMediaFiles = File[];
 
 export type AdminExercise = ExerciseDetail & {
   movement_pattern: MovementPattern;
@@ -39,15 +54,17 @@ export type AdminExerciseCreate = {
   media_source_url: string | null;
   media_license: string | null;
   media_attribution: string | null;
+  media_assets?: AdminExerciseMediaAssetInput[];
   is_active: boolean;
 };
 
 export type AdminExerciseForm = Omit<
   AdminExerciseCreate,
-  "body_region" | "primary_muscle"
+  "body_region" | "primary_muscle" | "media_assets"
 > & {
   body_region: BodyRegion | "";
   primary_muscle: MuscleGroup | "";
+  media_assets: AdminExerciseMediaAssetInput[];
 };
 
 export type AdminExerciseFilters = {

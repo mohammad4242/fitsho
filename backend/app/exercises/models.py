@@ -12,6 +12,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Integer,
     String,
     UniqueConstraint,
     func,
@@ -26,6 +27,8 @@ from app.exercises.enums import (
     Equipment,
     ExerciseCautionTag,
     ExerciseType,
+    MediaPresentation,
+    MediaRole,
     MediaType,
     MovementPattern,
     MuscleGroup,
@@ -63,13 +66,14 @@ class Exercise(Base):
             name="ck_exercises_instructions_fa_steps",
         ),
         CheckConstraint(
-            "json_typeof(safety_notes_en) = 'array' AND json_array_length(safety_notes_en) >= 1",
+            "json_typeof(safety_notes_en) = 'array'",
             name="ck_exercises_safety_notes_en_items",
         ),
         CheckConstraint(
-            "json_typeof(safety_notes_fa) = 'array' AND json_array_length(safety_notes_fa) >= 1",
+            "json_typeof(safety_notes_fa) = 'array'",
             name="ck_exercises_safety_notes_fa_items",
         ),
+        UniqueConstraint("source", "source_id", name="uq_exercises_source_source_id"),
         Index("ix_exercises_body_region", "body_region"),
         Index("ix_exercises_primary_muscle", "primary_muscle"),
         Index("ix_exercises_difficulty", "difficulty"),
@@ -159,6 +163,21 @@ class Exercise(Base):
     media_source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     media_license: Mapped[str | None] = mapped_column(String(120), nullable=True)
     media_attribution: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    source_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    aliases_en: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    short_description_en: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    steps_en: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    form_cues_en: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    common_mistakes_en: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    breathing_en: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    source_metadata_en: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    needs_review: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False,
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
@@ -207,6 +226,87 @@ class Exercise(Base):
         passive_deletes=True,
         order_by=lambda: ExerciseCautionTagItem.caution_tag,
     )
+
+    media_assets: Mapped[list[ExerciseMediaAsset]] = relationship(
+        back_populates="exercise",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by=lambda: (
+            ExerciseMediaAsset.presentation,
+            ExerciseMediaAsset.role,
+            ExerciseMediaAsset.sort_order,
+        ),
+    )
+
+
+class ExerciseMediaAsset(Base):
+    __tablename__ = "exercise_media_assets"
+    __table_args__ = (
+        UniqueConstraint(
+            "exercise_id",
+            "presentation",
+            "role",
+            "sort_order",
+            name="uq_exercise_media_assets_exercise_presentation_role_order",
+        ),
+        CheckConstraint("sort_order >= 0", name="ck_exercise_media_assets_sort_order"),
+        CheckConstraint(
+            "(role = 'video' AND media_type = 'video') "
+            "OR (role = 'thumbnail' AND media_type = 'image')",
+            name="ck_exercise_media_assets_role_media_type",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("exercises.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    presentation: Mapped[MediaPresentation] = mapped_column(
+        Enum(
+            MediaPresentation,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercise_media_assets_presentation_values",
+        ),
+        nullable=False,
+    )
+    role: Mapped[MediaRole] = mapped_column(
+        Enum(
+            MediaRole,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercise_media_assets_role_values",
+        ),
+        nullable=False,
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",
+        nullable=False,
+    )
+    media_path: Mapped[str] = mapped_column(String(255), nullable=False)
+    media_type: Mapped[MediaType] = mapped_column(
+        Enum(
+            MediaType,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercise_media_assets_media_type_values",
+        ),
+        nullable=False,
+    )
+    media_source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    media_license: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    media_attribution: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    exercise: Mapped[Exercise] = relationship(back_populates="media_assets")
 
 
 class ExerciseCautionTagItem(Base):

@@ -3,6 +3,7 @@ import type {
   AdminExercise,
   AdminExerciseCreate,
   AdminExerciseFilters,
+  AdminExerciseMediaFiles,
   PaginatedAdminExercises,
 } from "./types";
 
@@ -26,12 +27,14 @@ export function getAdminExercises(
 export function createAdminExercise(
   input: AdminExerciseCreate,
   media: File | null = null,
+  mediaAssets: AdminExerciseMediaFiles = [],
 ): Promise<AdminExercise> {
   const body = new FormData();
   body.set("payload", JSON.stringify(input));
   if (media !== null) {
     body.set("media", media);
   }
+  mediaAssets.forEach((file) => body.append("media_files", file));
   return request<AdminExercise>(adminExercisesPath, {
     method: "POST",
     body,
@@ -46,12 +49,14 @@ export function updateAdminExercise(
   exerciseId: string,
   input: AdminExerciseCreate,
   media: File | null = null,
+  mediaAssets: AdminExerciseMediaFiles = [],
 ): Promise<AdminExercise> {
   const body = new FormData();
   body.set("payload", JSON.stringify(input));
   if (media !== null) {
     body.set("media", media);
   }
+  mediaAssets.forEach((file) => body.append("media_files", file));
   return request<AdminExercise>(`${adminExercisesPath}/${exerciseId}`, {
     method: "PATCH",
     body,

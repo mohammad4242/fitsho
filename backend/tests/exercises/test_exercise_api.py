@@ -166,6 +166,18 @@ def test_detail_returns_complete_bilingual_exercise(
     db: Session,
 ) -> None:
     prepare_catalog(client, db)
+    exercise = db.scalar(select(Exercise).where(Exercise.slug == "dumbbell-bench-press"))
+    assert exercise is not None
+    exercise.source = "free-exercise-db"
+    exercise.source_id = "0031"
+    exercise.aliases_en = ["Dumbbell chest press"]
+    exercise.short_description_en = "A dumbbell chest press."
+    exercise.steps_en = ["Set up.", "Lower.", "Press."]
+    exercise.form_cues_en = ["Brace the trunk."]
+    exercise.common_mistakes_en = ["Flaring the elbows."]
+    exercise.breathing_en = "Exhale while pressing."
+    exercise.needs_review = True
+    db.commit()
 
     response = client.get("/api/v1/exercises/dumbbell-bench-press")
 
@@ -186,6 +198,15 @@ def test_detail_returns_complete_bilingual_exercise(
     assert payload["media_source_url"] is None
     assert payload["media_license"] == "Project owner supplied and authorized"
     assert payload["media_attribution"] == "Provided by Fitsho project owner"
+    assert payload["source"] == "free-exercise-db"
+    assert payload["source_id"] == "0031"
+    assert payload["aliases_en"] == ["Dumbbell chest press"]
+    assert payload["short_description_en"] == "A dumbbell chest press."
+    assert payload["steps_en"] == ["Set up.", "Lower.", "Press."]
+    assert payload["form_cues_en"] == ["Brace the trunk."]
+    assert payload["common_mistakes_en"] == ["Flaring the elbows."]
+    assert payload["breathing_en"] == "Exhale while pressing."
+    assert payload["needs_review"] is True
 
 
 def test_inactive_exercises_are_hidden_from_list_and_detail(

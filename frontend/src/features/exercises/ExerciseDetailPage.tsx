@@ -105,6 +105,22 @@ function ReadyExerciseDetail({
   const equipmentNames = exercise.equipment.map((value) =>
     t(`catalog.equipment.${value}`),
   );
+  const mediaAssets = exercise.media_assets ?? [];
+  const [selectedMediaKey, setSelectedMediaKey] = useState("legacy");
+  const selectedAsset = mediaAssets.find(
+    (asset) => `${asset.presentation}-${asset.role}` === selectedMediaKey,
+  );
+  const displayedMedia = selectedAsset ?? {
+    media_path: exercise.media_path,
+    media_type: exercise.media_type,
+    media_attribution: exercise.media_attribution,
+  };
+
+  function mediaAssetLabel(presentation: "male" | "female", role: "video" | "thumbnail") {
+    return t(
+      `exerciseDetail.${presentation}${role === "video" ? "Video" : "Thumbnail"}`,
+    );
+  }
 
   return (
     <>
@@ -120,9 +136,32 @@ function ReadyExerciseDetail({
 
       <article className="exercise-detail-sheet">
         <div className="exercise-detail-media">
-          <ExerciseMedia path={exercise.media_path} name={name} mediaType={exercise.media_type} />
-          {exercise.media_attribution !== null && (
-            <small>{exercise.media_attribution}</small>
+          <ExerciseMedia
+            path={displayedMedia.media_path}
+            name={name}
+            mediaType={displayedMedia.media_type}
+          />
+          {mediaAssets.length > 0 && (
+            <label className="exercise-detail-media__selector">
+              {t("exerciseDetail.mediaSelector")}
+              <select
+                value={selectedMediaKey}
+                onChange={(event) => setSelectedMediaKey(event.target.value)}
+              >
+                <option value="legacy">{t("exerciseDetail.legacyMedia")}</option>
+                {mediaAssets.map((asset) => (
+                  <option
+                    key={`${asset.presentation}-${asset.role}`}
+                    value={`${asset.presentation}-${asset.role}`}
+                  >
+                    {mediaAssetLabel(asset.presentation, asset.role)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {displayedMedia.media_attribution !== null && (
+            <small>{displayedMedia.media_attribution}</small>
           )}
         </div>
 

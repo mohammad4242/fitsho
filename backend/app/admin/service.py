@@ -7,19 +7,82 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from app.admin.exceptions import AdminUserNotFoundError, DuplicateExerciseSlugError
 from app.admin.media import StoredMedia
-from app.admin.schemas import AdminExerciseCreate, AdminExerciseFilters
+from app.admin.schemas import (
+    AdminExerciseCreate,
+    AdminExerciseFilters,
+    AdminExerciseMediaAssetInput,
+)
 from app.auth.models import User
 from app.auth.service import normalize_email
-from app.exercises.enums import MediaType
+from app.exercises.enums import MediaPresentation, MediaRole, MediaType
 from app.exercises.media_metadata import OWNER_ATTRIBUTION, OWNER_LICENSE
 from app.exercises.models import (
     Exercise,
     ExerciseCautionTagItem,
     ExerciseEquipment,
+    ExerciseMediaAsset,
     ExerciseSecondaryMuscle,
 )
 
 PLACEHOLDER_MEDIA_PATH = "/exercises/exercise-placeholder.svg"
+MediaAssetKey = tuple[MediaPresentation, MediaRole, int]
+
+
+def _media_asset_key(asset: AdminExerciseMediaAssetInput) -> MediaAssetKey:
+    return asset.presentation, asset.role, asset.sort_order
+
+
+def _validate_media_assets(
+    existing: dict[MediaAssetKey, ExerciseMediaAsset],
+    payload_assets: list[AdminExerciseMediaAssetInput],
+    stored_assets: dict[MediaAssetKey, StoredMedia],
+) -> None:
+    payload_keys = [_media_asset_key(asset) for asset in payload_assets]
+    if len(payload_keys) != len(set(payload_keys)):
+        raise ValueError("Each presentation, media role, and display order must be unique")
+    if not set(stored_assets).issubset(payload_keys):
+        raise ValueError("Each uploaded media file requires matching metadata")
+    if any(key not in existing and key not in stored_assets for key in payload_keys):
+        raise ValueError("New media metadata requires its media file")
+
+
+def _sync_media_assets(
+    exercise: Exercise,
+    payload_assets: list[AdminExerciseMediaAssetInput],
+    stored_assets: dict[MediaAssetKey, StoredMedia],
+) -> None:
+    existing = {
+        (asset.presentation, asset.role, asset.sort_order): asset for asset in exercise.media_assets
+    }
+    _validate_media_assets(existing, payload_assets, stored_assets)
+    for payload_asset in payload_assets:
+        key = _media_asset_key(payload_asset)
+        stored_media = stored_assets.get(key)
+        asset = existing.get(key)
+        if asset is None:
+            assert stored_media is not None
+            asset = ExerciseMediaAsset(
+                presentation=payload_asset.presentation,
+                role=payload_asset.role,
+                sort_order=payload_asset.sort_order,
+                media_path=stored_media.public_path,
+                media_type=stored_media.media_type,
+            )
+            exercise.media_assets.append(asset)
+        elif stored_media is not None:
+            asset.media_path = stored_media.public_path
+            asset.media_type = stored_media.media_type
+        asset.media_source_url = payload_asset.media_source_url
+        asset.media_license = payload_asset.media_license or (
+            OWNER_LICENSE if stored_media is not None else asset.media_license
+        )
+        asset.media_attribution = payload_asset.media_attribution or (
+            OWNER_ATTRIBUTION if stored_media is not None else asset.media_attribution
+        )
+    desired_keys = {_media_asset_key(asset) for asset in payload_assets}
+    for asset in list(exercise.media_assets):
+        if (asset.presentation, asset.role, asset.sort_order) not in desired_keys:
+            exercise.media_assets.remove(asset)
 
 
 def grant_admin(db: Session, email: str) -> User:
@@ -69,6 +132,7 @@ def list_admin_exercises(
                 selectinload(Exercise.secondary_muscles),
                 selectinload(Exercise.equipment_items),
                 selectinload(Exercise.caution_tag_items),
+                selectinload(Exercise.media_assets),
             )
             .order_by(Exercise.created_at.desc(), Exercise.id.asc())
             .offset((filters.page - 1) * filters.page_size)
@@ -82,7 +146,10 @@ def create_admin_exercise(
     db: Session,
     payload: AdminExerciseCreate,
     media: StoredMedia | None = None,
+    media_assets: dict[MediaAssetKey, StoredMedia] | None = None,
 ) -> Exercise:
+    stored_media_assets = media_assets or {}
+    _validate_media_assets({}, payload.media_assets, stored_media_assets)
     exercise = Exercise(
         slug=payload.slug,
         name_en=payload.name_en,
@@ -117,6 +184,7 @@ def create_admin_exercise(
             for tag in sorted(set(payload.caution_tags), key=lambda value: value.value)
         ],
     )
+    _sync_media_assets(exercise, payload.media_assets, stored_media_assets)
     db.add(exercise)
     try:
         db.commit()
@@ -138,6 +206,7 @@ def get_admin_exercise(db: Session, exercise_id: UUID) -> Exercise | None:
             selectinload(Exercise.secondary_muscles),
             selectinload(Exercise.equipment_items),
             selectinload(Exercise.caution_tag_items),
+            selectinload(Exercise.media_assets),
         )
     )
 
@@ -147,6 +216,7 @@ def update_admin_exercise(
     exercise_id: UUID,
     payload: AdminExerciseCreate,
     media: StoredMedia | None = None,
+    media_assets: dict[MediaAssetKey, StoredMedia] | None = None,
 ) -> Exercise | None:
     exercise = db.scalar(
         select(Exercise)
@@ -155,6 +225,7 @@ def update_admin_exercise(
             selectinload(Exercise.secondary_muscles),
             selectinload(Exercise.equipment_items),
             selectinload(Exercise.caution_tag_items),
+            selectinload(Exercise.media_assets),
         )
         .with_for_update()
     )
@@ -196,6 +267,7 @@ def update_admin_exercise(
     if media is not None:
         exercise.media_path = media.public_path
         exercise.media_type = media.media_type
+    _sync_media_assets(exercise, payload.media_assets, media_assets or {})
 
     try:
         db.commit()

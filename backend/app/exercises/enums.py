@@ -50,6 +50,16 @@ class MediaType(StrEnum):
     PLACEHOLDER = "placeholder"
 
 
+class MediaPresentation(StrEnum):
+    MALE = "male"
+    FEMALE = "female"
+
+
+class MediaRole(StrEnum):
+    VIDEO = "video"
+    THUMBNAIL = "thumbnail"
+
+
 class MovementPattern(StrEnum):
     HORIZONTAL_PUSH = "horizontal_push"
     VERTICAL_PUSH = "vertical_push"

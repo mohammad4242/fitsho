@@ -43,6 +43,7 @@ export function emptyAdminExerciseForm(): AdminExerciseForm {
     media_source_url: null,
     media_license: null,
     media_attribution: null,
+    media_assets: [],
   };
 }
 
@@ -124,6 +125,12 @@ export function toAdminExerciseCreate(form: AdminExerciseForm): AdminExerciseCre
     media_source_url: optional(form.media_source_url),
     media_license: optional(form.media_license),
     media_attribution: optional(form.media_attribution),
+    media_assets: form.media_assets.map((asset) => ({
+      ...asset,
+      media_source_url: optional(asset.media_source_url),
+      media_license: optional(asset.media_license),
+      media_attribution: optional(asset.media_attribution),
+    })),
   };
 }
 
@@ -148,6 +155,15 @@ export function adminExerciseToForm(exercise: import("./types").AdminExercise): 
     media_source_url: exercise.media_source_url,
     media_license: exercise.media_license,
     media_attribution: exercise.media_attribution,
+    media_assets: exercise.media_assets?.map((asset) => ({
+      presentation: asset.presentation,
+      role: asset.role,
+      sort_order: asset.sort_order,
+      upload_index: null,
+      media_source_url: asset.media_source_url,
+      media_license: asset.media_license,
+      media_attribution: asset.media_attribution,
+    })) ?? [],
     is_active: exercise.is_active,
   };
 }

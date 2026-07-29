@@ -570,6 +570,23 @@ html[dir="ltr"] .exercise-card__link span {
   font-size: 0.66rem;
 }
 
+.exercise-detail-media__selector {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem;
+  color: rgb(255 255 255 / 72%);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.exercise-detail-media__selector select {
+  min-height: 2.5rem;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 0.65rem;
+  color: var(--paper);
+  background: var(--petrol-900);
+}
+
 .exercise-detail-heading {
   padding: clamp(1.5rem, 4vw, 3rem);
   border-radius: 2rem 0.45rem 2rem 2rem;

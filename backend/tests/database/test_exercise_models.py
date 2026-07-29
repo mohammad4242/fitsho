@@ -86,6 +86,37 @@ def test_exercise_stores_lower_back_as_a_core_muscle(db: Session) -> None:
     assert stored.primary_muscle is MuscleGroup.LOWER_BACK
 
 
+def test_exercise_stores_import_source_metadata_and_review_status(db: Session) -> None:
+    exercise = make_exercise("source-backed-push-up")
+    exercise.source = "free-exercise-db"
+    exercise.source_id = "0001"
+    exercise.aliases_en = ["Press-up"]
+    exercise.short_description_en = "A horizontal bodyweight press."
+    exercise.steps_en = ["Set up.", "Lower.", "Press."]
+    exercise.form_cues_en = ["Keep the trunk braced."]
+    exercise.common_mistakes_en = ["Letting the hips sag."]
+    exercise.breathing_en = "Exhale while pressing."
+    exercise.source_metadata_en = {"compound": True, "unilateral": False}
+    exercise.needs_review = True
+    db.add(exercise)
+    db.flush()
+    db.expunge(exercise)
+
+    stored = db.scalar(select(Exercise).where(Exercise.slug == "source-backed-push-up"))
+
+    assert stored is not None
+    assert stored.source == "free-exercise-db"
+    assert stored.source_id == "0001"
+    assert stored.aliases_en == ["Press-up"]
+    assert stored.short_description_en == "A horizontal bodyweight press."
+    assert stored.steps_en == ["Set up.", "Lower.", "Press."]
+    assert stored.form_cues_en == ["Keep the trunk braced."]
+    assert stored.common_mistakes_en == ["Letting the hips sag."]
+    assert stored.breathing_en == "Exhale while pressing."
+    assert stored.source_metadata_en == {"compound": True, "unilateral": False}
+    assert stored.needs_review is True
+
+
 def test_exercise_slug_is_unique(db: Session) -> None:
     db.add_all([make_exercise(), make_exercise()])
 
@@ -235,3 +266,80 @@ def test_exercise_stores_programming_metadata_and_caution_tags(db: Session) -> N
     assert [item.caution_tag for item in stored.caution_tag_items] == [
         ExerciseCautionTag.SHOULDER_INTERNAL_ROTATION
     ]
+
+
+def test_exercise_stores_separate_male_and_female_media_metadata(db: Session) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.models import ExerciseMediaAsset
+
+    exercise = make_exercise("variant-media-push-up")
+    exercise.media_assets.extend(
+        [
+            ExerciseMediaAsset(
+                presentation=MediaPresentation.MALE,
+                role=MediaRole.VIDEO,
+                media_path="/media/push-up-male.mp4",
+                media_type=MediaType.VIDEO,
+                media_source_url="https://source.example/male.mp4",
+                media_license="MIT",
+                media_attribution="Male creator",
+            ),
+            ExerciseMediaAsset(
+                presentation=MediaPresentation.FEMALE,
+                role=MediaRole.THUMBNAIL,
+                media_path="/media/push-up-female.jpg",
+                media_type=MediaType.IMAGE,
+                media_source_url="https://source.example/female.jpg",
+                media_license="MIT",
+                media_attribution="Female creator",
+            ),
+        ]
+    )
+    db.add(exercise)
+    db.flush()
+    db.expire(exercise, ["media_assets"])
+
+    stored = db.scalar(select(Exercise).where(Exercise.slug == "variant-media-push-up"))
+
+    assert stored is not None
+    assert [item.presentation for item in stored.media_assets] == [
+        MediaPresentation.FEMALE,
+        MediaPresentation.MALE,
+    ]
+    assert {item.media_attribution for item in stored.media_assets} == {
+        "Female creator",
+        "Male creator",
+    }
+
+
+def test_exercise_database_allows_multiple_media_assets_in_display_order(db: Session) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.models import ExerciseMediaAsset
+
+    exercise = make_exercise("duplicate-media-variant")
+    exercise.media_assets.extend(
+        [
+            ExerciseMediaAsset(
+                presentation=MediaPresentation.MALE,
+                role=MediaRole.VIDEO,
+                sort_order=0,
+                media_path="/media/first.mp4",
+                media_type=MediaType.VIDEO,
+            ),
+            ExerciseMediaAsset(
+                presentation=MediaPresentation.MALE,
+                role=MediaRole.VIDEO,
+                sort_order=1,
+                media_path="/media/second.mp4",
+                media_type=MediaType.VIDEO,
+            ),
+        ]
+    )
+    db.add(exercise)
+    db.flush()
+    db.expire(exercise, ["media_assets"])
+
+    stored = db.scalar(select(Exercise).where(Exercise.slug == "duplicate-media-variant"))
+
+    assert stored is not None
+    assert [item.sort_order for item in stored.media_assets] == [0, 1]
