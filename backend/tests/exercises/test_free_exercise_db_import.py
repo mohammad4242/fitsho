@@ -393,10 +393,20 @@ def test_curated_translator_returns_only_local_persian_content() -> None:
 def test_local_translation_catalog_keeps_existing_imported_exercises() -> None:
     from app.exercises.free_exercise_db_translations import CURATED_TRANSLATIONS
 
-    assert set(CURATED_TRANSLATIONS) == {
+    expected_ids = {
         "0489",
         "drv-45-degree-bycicle-twisting-crunch",
         "drv-45-degree-bycicle-twisting-crunch-1",
         "drv-stretching-all-fours-squad-stretch",
         "0970",
+        "drv-band-bent-over-rear-lateral-raise",
+        "3006",
+        "drv-band-hip-adduction",
+        "0983",
+        "1017",
+        "drv-band-one-leg-kickback-bent-position",
+        "new-band-overhead-triceps-extension",
+        "0976",
     }
+    assert expected_ids.issubset(CURATED_TRANSLATIONS)
+    assert all(CURATED_TRANSLATIONS[source_id]["name_fa"] for source_id in expected_ids)
