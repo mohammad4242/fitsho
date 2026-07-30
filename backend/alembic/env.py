@@ -4,6 +4,7 @@ from sqlalchemy import Enum as SqlEnum
 from sqlalchemy import String, engine_from_config, pool
 
 from alembic import context
+from app.ai import models as ai_models  # noqa: F401
 from app.auth import models  # noqa: F401
 from app.config import get_settings
 from app.database.base import Base
