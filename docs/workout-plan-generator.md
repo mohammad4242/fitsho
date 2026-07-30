@@ -56,6 +56,10 @@ strict، `store=false` و `httpx.AsyncClient` مشترک استفاده می‌�
 را پشتیبانی کند با تغییر `OPENCODE_ZEN_MODEL` قابل انتخاب است. provider دیگری مانند Gemini باید
 adapter جداگانه‌ای بسازد که `WorkoutPlanModelProvider` را پیاده‌سازی کند؛ service تغییر نمی‌کند.
 
+یادداشت عملیاتی: مدل‌های GPT 5.6 از Responses API استفاده می‌کنند؛
+`nemotron-3-ultra-free` از OpenAI-compatible Chat Completions استفاده می‌کند. مدل ناشناخته همچنان
+به Responses API بازمی‌گردد.
+
 متغیرهای backend:
 
 ```text
