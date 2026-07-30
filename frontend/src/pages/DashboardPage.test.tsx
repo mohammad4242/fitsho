@@ -57,9 +57,49 @@ it("links the primary CTA to the active workout plan", async () => {
     </MemoryRouter>,
   );
 
-  expect(await screen.findByLabelText("مسیر امروز")).toHaveAttribute("data-stage", "gym");
   expect(await screen.findByRole("link", { name: "شروع کن" })).toHaveAttribute(
     "href",
     "/workout-plan",
   );
+});
+
+it("keeps the scrolling chapters and uses two different videos instead of images", async () => {
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
+
+  render(
+    <MemoryRouter>
+      <DashboardPage />
+    </MemoryRouter>,
+  );
+
+  await screen.findByRole("heading", { name: "سلام، محمد" });
+  expect(screen.getByLabelText("مسیر امروز")).toBeInTheDocument();
+  expect(document.querySelector(".today-story__image")).not.toBeInTheDocument();
+  expect(document.querySelector(".today-story__video--plan video")).toHaveAttribute(
+    "poster",
+    expect.stringContaining("plan-focus-fallback"),
+  );
+  expect(document.querySelector(".today-story__video--progress video")).toHaveAttribute(
+    "poster",
+    expect.stringContaining("progress-drive-fallback"),
+  );
+});
+
+it("uses the supplied strength video behind the Today page", async () => {
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
+
+  render(
+    <MemoryRouter>
+      <DashboardPage />
+    </MemoryRouter>,
+  );
+
+  await screen.findByRole("heading", { name: "سلام، محمد" });
+  const background = document.querySelector(".member-page-background video");
+  if (background === null) throw new Error("Today background video is missing");
+  expect(background).toHaveAttribute(
+    "poster",
+    expect.stringContaining("hero-strength-fallback"),
+  );
+  expect(background.parentElement).toHaveClass("member-page-background");
 });

@@ -100,6 +100,20 @@ it("shows the fixed start guide and a generate action when no plan exists", asyn
   expect(api.generateWorkoutPlan).toHaveBeenCalledOnce();
 });
 
+it("uses the supplied plan video behind the workout page", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(null);
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByTestId("member-header-video")).toHaveAttribute(
+    "poster",
+    expect.stringContaining("plan-focus-fallback"),
+  );
+  expect(screen.getByTestId("member-header-video").parentElement).toHaveClass(
+    "member-page-background",
+  );
+});
+
 it("explains the generation cooldown instead of showing a generic failure", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue(null);
   api.generateWorkoutPlan.mockRejectedValue(

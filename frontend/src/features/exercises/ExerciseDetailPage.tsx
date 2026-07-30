@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
 
+import heroStrengthFallback from "../../assets/landing/hero-strength-fallback.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getExercise } from "./api";
 import { ExerciseMedia } from "./ExerciseMedia";
 import type { ExerciseDetail } from "./types";
@@ -50,6 +52,7 @@ export function ExerciseDetailPage() {
 
   return (
     <div className="exercise-catalog-shell exercise-detail-shell">
+      <MemberHeaderMedia imageSrc={heroStrengthFallback} className="member-page-background" />
       <AuthenticatedHeader />
       <main className="exercise-detail-main">
         {state === "loading" && (

@@ -60,6 +60,17 @@ beforeEach(async () => {
 afterEach(() => vi.clearAllMocks());
 
 describe("exercise detail states", () => {
+  it("uses the supplied strength still above the exercise detail", async () => {
+    renderDetail();
+
+    const background = await screen.findByTestId("member-header-image");
+    expect(background).toHaveAttribute(
+      "src",
+      expect.stringContaining("hero-strength-fallback"),
+    );
+    expect(background.parentElement).toHaveClass("member-page-background");
+  });
+
   it("shows a loading state while the exercise is requested", async () => {
     const pending = deferred<ExerciseDetail | null>();
     api.getExercise.mockReturnValue(pending.promise);

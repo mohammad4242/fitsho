@@ -2,13 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
-import heroAthlete from "../assets/brand/hero-athlete.jpg";
-import heroGym from "../assets/brand/hero-gym.jpg";
-import heroLift from "../assets/brand/hero-lift.jpg";
+import heroStrengthFallback from "../assets/landing/hero-strength-fallback.jpg";
+import heroStrengthVideo from "../assets/landing/hero-strength.mp4";
+import planFocusFallback from "../assets/landing/plan-focus-fallback.jpg";
+import planFocusVideo from "../assets/landing/plan-focus.mp4";
+import progressDriveFallback from "../assets/landing/progress-drive-fallback.jpg";
+import progressDriveVideo from "../assets/landing/progress-drive.mp4";
 import { useAuth } from "../features/auth/AuthContext";
 import { useProfile } from "../features/profile/ProfileContext";
 import { generateWorkoutPlan, getActiveWorkoutPlan } from "../features/workouts/api";
 import { AuthenticatedHeader } from "../shared/AuthenticatedHeader";
+import { MemberHeaderMedia } from "../shared/MemberHeaderMedia";
 import "./dashboard.css";
 
 type PlanState = "loading" | "empty" | "ready" | "error";
@@ -20,9 +24,9 @@ export function DashboardPage() {
   const { profile } = useProfile();
   const [planState, setPlanState] = useState<PlanState>("loading");
   const [generating, setGenerating] = useState(false);
-  const [storyStage, setStoryStage] = useState<"gym" | "lift">("gym");
-  const gymChapter = useRef<HTMLElement>(null);
-  const liftChapter = useRef<HTMLElement>(null);
+  const [storyStage, setStoryStage] = useState<"plan" | "progress">("plan");
+  const planChapter = useRef<HTMLElement>(null);
+  const progressChapter = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -44,13 +48,13 @@ export function DashboardPage() {
       (entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
-          setStoryStage(entry.target === liftChapter.current ? "lift" : "gym");
+          setStoryStage(entry.target === progressChapter.current ? "progress" : "plan");
         });
       },
       { threshold: 0.55 },
     );
-    if (gymChapter.current) observer.observe(gymChapter.current);
-    if (liftChapter.current) observer.observe(liftChapter.current);
+    if (planChapter.current) observer.observe(planChapter.current);
+    if (progressChapter.current) observer.observe(progressChapter.current);
     return () => observer.disconnect();
   }, []);
 
@@ -67,11 +71,14 @@ export function DashboardPage() {
 
   return (
     <main className="today-shell">
+      <MemberHeaderMedia
+        imageSrc={heroStrengthFallback}
+        videoSrc={heroStrengthVideo}
+        className="member-page-background"
+      />
       <AuthenticatedHeader />
 
       <section className="today-hero" aria-labelledby="today-title">
-        <img src={heroAthlete} alt="" className="today-hero__image" />
-        <div className="today-hero__veil" />
         <div className="today-hero__content">
           <p className="today-kicker">{t("dashboard.kicker")}</p>
           <h1 id="today-title" className="fitsho-display">
@@ -85,12 +92,21 @@ export function DashboardPage() {
 
       <section className="today-story" aria-label={t("dashboard.storyLabel")} data-stage={storyStage}>
         <div className="today-story__sticky" aria-hidden="true">
-          <img src={heroGym} alt="" className="today-story__image today-story__image--gym" />
-          <img src={heroLift} alt="" className="today-story__image today-story__image--lift" />
-          <div className="today-story__shade" />
+          <MemberHeaderMedia
+            imageSrc={planFocusFallback}
+            videoSrc={planFocusVideo}
+            active={storyStage === "plan"}
+            className="today-story__video today-story__video--plan"
+          />
+          <MemberHeaderMedia
+            imageSrc={progressDriveFallback}
+            videoSrc={progressDriveVideo}
+            active={storyStage === "progress"}
+            className="today-story__video today-story__video--progress"
+          />
         </div>
         <div className="today-story__chapters">
-          <article className="today-story__chapter" ref={gymChapter}>
+          <article className="today-story__chapter" ref={planChapter}>
             <span>01</span>
             <div>
               <p className="today-kicker">{t("dashboard.storyOneEyebrow")}</p>
@@ -98,7 +114,7 @@ export function DashboardPage() {
               <p>{t("dashboard.storyOneBody")}</p>
             </div>
           </article>
-          <article className="today-story__chapter today-story__chapter--lift" ref={liftChapter}>
+          <article className="today-story__chapter today-story__chapter--progress" ref={progressChapter}>
             <span>02</span>
             <div>
               <p className="today-kicker">{t("dashboard.storyTwoEyebrow")}</p>

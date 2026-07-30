@@ -1,6 +1,7 @@
 .admin-page { min-height: 100vh; background: var(--mist-50); }
 .admin-main { width: min(1180px, calc(100% - 2rem)); margin: 0 auto; padding: clamp(2rem, 5vw, 4.5rem) 0 5rem; }
-.admin-hero, .admin-form-header { display: flex; align-items: end; justify-content: space-between; gap: 2rem; padding: clamp(1.5rem, 4vw, 3rem); border-radius: 2rem; color: var(--paper); background: var(--petrol-900); }
+.admin-hero, .admin-form-header { position: relative; display: flex; align-items: end; justify-content: space-between; gap: 2rem; overflow: hidden; isolation: isolate; padding: clamp(1.5rem, 4vw, 3rem); border-radius: 2rem; color: var(--paper); background: var(--petrol-900); }
+.admin-hero > :not(.member-header-media), .admin-form-header > :not(.member-header-media) { position: relative; z-index: 1; }
 .admin-hero h1, .admin-form-header h1 { margin: 0; font-size: clamp(2.2rem, 5vw, 4.8rem); letter-spacing: -.045em; line-height: 1; }
 .admin-hero p:last-child, .admin-form-header p:last-child { max-width: 42rem; color: rgb(255 255 255 / 70%); line-height: 1.8; }
 .admin-primary-link { display: inline-flex; min-height: 3rem; align-items: center; justify-content: center; padding: .75rem 1.25rem; border: 0; border-radius: 999px; color: var(--petrol-950); background: var(--saffron); font-weight: 850; text-decoration: none; cursor: pointer; }
@@ -32,3 +33,19 @@
 .admin-hero h1, .admin-form-header h1 { letter-spacing: 0; }
 .admin-primary-link { color: var(--fitsho-petrol); background: var(--fitsho-aqua); }
 .admin-exercise-row, .admin-form-section { border: 0; border-radius: 1.25rem; box-shadow: 0 0.8rem 2rem rgb(10 31 30 / 7%); }
+
+.admin-page {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+.admin-page > :not(.member-page-background) {
+  position: relative;
+  z-index: 1;
+}
+
+.admin-hero, .admin-form-header {
+  background: rgb(10 31 30 / 52%);
+  backdrop-filter: blur(8px);
+}

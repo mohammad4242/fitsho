@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 
+import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getAdminExercises } from "./api";
 import type { PaginatedAdminExercises } from "./types";
 import "./admin.css";
@@ -38,6 +40,7 @@ export function AdminExercisesPage() {
   const english = i18n.resolvedLanguage === "en";
   return (
     <div className="admin-page">
+      <MemberHeaderMedia imageSrc={appTrainingAccent} className="member-page-background" />
       <AuthenticatedHeader />
       <main className="admin-main">
         <header className="admin-hero">

@@ -319,10 +319,18 @@
 }
 
 .profile-page-heading {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   padding: clamp(1.5rem, 4vw, 3rem);
   border-radius: 2rem 2rem 0.45rem 2rem;
   color: var(--paper);
   background: var(--petrol-900);
+}
+
+.profile-page-heading > :not(.member-header-media) {
+  position: relative;
+  z-index: 1;
 }
 
 .profile-page-heading h1 {
@@ -364,6 +372,22 @@ html[dir="rtl"] .profile-page-heading h1 {
   margin: 1rem 0 0;
   color: rgb(255 255 255 / 72%);
   line-height: 1.8;
+}
+
+.profile-page-shell {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+.profile-page-shell > :not(.member-page-background) {
+  position: relative;
+  z-index: 1;
+}
+
+.profile-page-heading {
+  background: rgb(10 31 30 / 52%);
+  backdrop-filter: blur(8px);
 }
 
 .measurement-card {

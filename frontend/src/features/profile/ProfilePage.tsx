@@ -1,7 +1,9 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import authTrainingAccent from "../../assets/landing/auth-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import {
   BodyGoalFields,
   ExperienceFields,
@@ -124,6 +126,7 @@ function ReadyProfilePage({
 
   return (
     <div className="profile-page-shell">
+      <MemberHeaderMedia imageSrc={authTrainingAccent} className="member-page-background" />
       <AuthenticatedHeader />
       <main className="profile-page-main">
         <section className="profile-page-heading">
