@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import httpx
 from fastapi.testclient import TestClient
@@ -7,8 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai.models import AiModel, BillingClass, ZenApiKind
+from app.ai.schemas import WorkoutPlanModelOutput
 from app.auth.models import User
 from app.config import Settings
+from app.workouts.models import WorkoutPlanGeneration
+from app.workouts.repository import create_generation, fail_generation
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -161,16 +165,20 @@ def test_admin_can_run_a_model_health_check(
     model = _custom_model(db)
     test_settings.opencode_zen_api_key = SecretStr("test-key")
     original_client = client.app.state.zen_http_client
-    mock_client = httpx.AsyncClient(
-        transport=httpx.MockTransport(
-            lambda request: httpx.Response(
-                200,
-                json={
-                    "id": "health-check",
-                    "choices": [{"message": {"content": '{"days": []}'}}],
-                },
-            )
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = request.read()
+        return httpx.Response(
+            200,
+            json={
+                "id": "health-check",
+                "choices": [{"message": {"content": '{"days": []}'}}],
+            },
         )
+
+    mock_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler)
     )
     client.app.state.zen_http_client = mock_client
     try:
@@ -182,3 +190,64 @@ def test_admin_can_run_a_model_health_check(
     assert response.status_code == 200
     assert response.json()["success"] is True
     assert db.get(AiModel, model.id).last_checked_at is not None  # type: ignore[union-attr]
+    request_body = json.loads(seen["body"])
+    assert json.loads(request_body["messages"][1]["content"]) == {
+        "health_check": True,
+        "expected_output": {"days": []},
+    }
+    assert request_body["response_format"]["json_schema"]["schema"] == (
+        WorkoutPlanModelOutput.model_json_schema()
+    )
+
+
+def test_admin_can_read_recent_generation_failures_without_user_data(
+    client: TestClient,
+    db: Session,
+) -> None:
+    user = _make_current_user_admin(client, db)
+    generation = create_generation(
+        db,
+        user_id=user.id,
+        provider="opencode_zen",
+        model_id="nemotron-3-ultra-free",
+        candidate_count=12,
+    )
+    diagnostics: list[dict[str, object]] = [
+        {
+            "model_id": "nemotron-3-ultra-free",
+            "phase": "initial",
+            "problems": [
+                {
+                    "code": "duplicate_exercise",
+                    "message": "An exercise may not appear twice.",
+                    "day_number": 2,
+                    "exercise_id": "018f0000-0000-7000-8000-000000000099",
+                }
+            ],
+        }
+    ]
+    fail_generation(
+        db,
+        generation,
+        error_code="semantic_validation_failed",
+        safe_error_message="Workout generation returned an invalid plan.",
+        validation_diagnostics=diagnostics,
+    )
+    db.commit()
+
+    response = client.get("/api/v1/admin/ai-generation-failures?limit=1")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "id": str(generation.id),
+            "model_id": "nemotron-3-ultra-free",
+            "created_at": generation.created_at.isoformat().replace("+00:00", "Z"),
+            "completed_at": generation.completed_at.isoformat().replace("+00:00", "Z"),  # type: ignore[union-attr]
+            "error_code": "semantic_validation_failed",
+            "safe_error_message": "Workout generation returned an invalid plan.",
+            "validation_diagnostics": diagnostics,
+        }
+    ]
+    assert "user_id" not in response.text
+    assert db.get(WorkoutPlanGeneration, generation.id) is generation

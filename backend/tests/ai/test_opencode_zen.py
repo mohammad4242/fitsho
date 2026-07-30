@@ -238,6 +238,38 @@ def test_zen_provider_maps_http_errors_safely(
 
 
 @pytest.mark.parametrize(
+    ("error_payload", "expected_code"),
+    [
+        (
+            {"type": "server_error", "message": "upstream failed"},
+            ProviderErrorCode.PROVIDER_UNAVAILABLE,
+        ),
+        (
+            {"type": "authentication_error", "message": "invalid key"},
+            ProviderErrorCode.UNAUTHORIZED,
+        ),
+        (
+            {"type": "invalid_request_error", "message": "bad request"},
+            ProviderErrorCode.MALFORMED_RESPONSE,
+        ),
+    ],
+)
+def test_zen_provider_rejects_http_200_error_envelope(
+    error_payload: dict[str, str],
+    expected_code: ProviderErrorCode,
+) -> None:
+    provider = _provider(
+        httpx.MockTransport(lambda request: httpx.Response(200, json={"error": error_payload}))
+    )
+
+    with pytest.raises(WorkoutProviderError) as exc_info:
+        _run(provider.generate_plan(_request()))
+
+    assert exc_info.value.code is expected_code
+    assert error_payload["message"] not in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
     "exception,expected_code",
     [
         (httpx.ReadTimeout("slow"), ProviderErrorCode.TIMEOUT),

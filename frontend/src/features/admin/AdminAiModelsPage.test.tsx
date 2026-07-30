@@ -7,6 +7,7 @@ import type { AdminAiModel, AdminAiModelsResponse } from "./types";
 
 const adminApi = vi.hoisted(() => ({
   getAdminAiModels: vi.fn(),
+  getAdminAiGenerationFailures: vi.fn(),
   updateAdminAiRouting: vi.fn(),
   updateAdminAiModel: vi.fn(),
   createAdminAiModel: vi.fn(),
@@ -56,11 +57,13 @@ const freeSecond: AdminAiModel = {
 
 beforeEach(() => {
   adminApi.getAdminAiModels.mockReset();
+  adminApi.getAdminAiGenerationFailures.mockReset();
   adminApi.updateAdminAiRouting.mockReset();
   adminApi.updateAdminAiModel.mockReset();
   adminApi.createAdminAiModel.mockReset();
   adminApi.syncAdminAiModels.mockReset();
   adminApi.testAdminAiModel.mockReset();
+  adminApi.getAdminAiGenerationFailures.mockResolvedValue([]);
   adminApi.updateAdminAiRouting.mockResolvedValue({ mode: "automatic", manual_model_id: null });
 });
 
@@ -88,6 +91,84 @@ it("shows a classification-required model as unavailable", async () => {
   renderPage();
 
   expect(await screen.findByText("نیازمند دسته‌بندی")).toBeInTheDocument();
+});
+
+it("reindexes duplicate free priorities when moving a later fallback model", async () => {
+  const freeThird: AdminAiModel = {
+    ...freeSecond,
+    id: "018f0000-0000-7000-8000-000000000004",
+    model_id: "mimo-v2.5-free",
+    display_name: "MiMo 2.5 Free",
+  };
+  adminApi.getAdminAiModels.mockResolvedValue({
+    routing: { mode: "automatic", manual_model_id: null },
+    models: [freeFirst, freeSecond, freeThird],
+  });
+  adminApi.updateAdminAiModel.mockImplementation(
+    (modelId: string, update: Partial<AdminAiModel>) => Promise.resolve({
+      ...[freeFirst, freeSecond, freeThird].find((model) => model.id === modelId),
+      ...update,
+    }),
+  );
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click((await screen.findAllByRole("button", { name: "پایین‌تر" }))[1]);
+
+  expect(adminApi.updateAdminAiModel).toHaveBeenCalledWith(freeSecond.id, { priority: 30 });
+});
+
+it("shows a green successful connection message after a model test", async () => {
+  adminApi.getAdminAiModels.mockResolvedValue({
+    routing: { mode: "manual", manual_model_id: freeFirst.id },
+    models: [freeFirst],
+  });
+  adminApi.testAdminAiModel.mockResolvedValue({ success: true, model: freeFirst });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByRole("button", { name: "تست مدل" }));
+
+  const message = await screen.findByText("با موفقیت متصل شد");
+  expect(message).toHaveClass("admin-status--success");
+});
+
+it("renders recent generation validation failures", async () => {
+  adminApi.getAdminAiModels.mockResolvedValue({
+    routing: { mode: "manual", manual_model_id: freeFirst.id },
+    models: [freeFirst],
+  });
+  adminApi.getAdminAiGenerationFailures.mockResolvedValue([
+    {
+      id: "018f0000-0000-7000-8000-000000000010",
+      model_id: "nemotron-3-ultra-free",
+      created_at: "2026-07-30T20:00:00Z",
+      completed_at: "2026-07-30T20:00:05Z",
+      error_code: "semantic_validation_failed",
+      safe_error_message: "Workout generation returned an invalid plan.",
+      validation_diagnostics: [
+        {
+          model_id: "nemotron-3-ultra-free",
+          phase: "repair",
+          problems: [
+            {
+              code: "duplicate_exercise",
+              message: "An exercise may not appear twice.",
+              day_number: 2,
+              exercise_id: "018f0000-0000-7000-8000-000000000099",
+            },
+          ],
+        },
+      ],
+    },
+  ]);
+  renderPage();
+
+  expect(await screen.findByText("خطاهای اخیر تولید برنامه")).toBeInTheDocument();
+  expect(screen.getByText("semantic_validation_failed")).toBeInTheDocument();
+  expect(screen.getByText("duplicate_exercise")).toBeInTheDocument();
+  expect(screen.getByText("repair")).toBeInTheDocument();
+  expect(screen.getByText("018f0000-0000-7000-8000-000000000099")).toBeInTheDocument();
 });
 
 function renderPage() {

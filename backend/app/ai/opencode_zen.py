@@ -224,6 +224,21 @@ class OpenCodeZenWorkoutPlanProvider:
                 ProviderErrorCode.MALFORMED_RESPONSE,
                 "Workout generation returned an invalid response.",
             )
+        error_payload = payload.get("error")
+        if isinstance(error_payload, dict):
+            error_type = str(
+                error_payload.get("type") or error_payload.get("code") or ""
+            ).casefold()
+            if "auth" in error_type or "unauthorized" in error_type:
+                code = ProviderErrorCode.UNAUTHORIZED
+                message = "Workout generation credentials were rejected."
+            elif "invalid_request" in error_type or "bad_request" in error_type:
+                code = ProviderErrorCode.MALFORMED_RESPONSE
+                message = "Workout generation request could not be completed."
+            else:
+                code = ProviderErrorCode.PROVIDER_UNAVAILABLE
+                message = "Workout generation is temporarily unavailable. Please try again."
+            raise WorkoutProviderError(code, message)
         return payload
 
     def _parse_plan(self, payload: dict[str, Any]) -> WorkoutPlanModelOutput:

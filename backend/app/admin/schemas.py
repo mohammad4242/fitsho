@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -183,3 +183,26 @@ class AdminAiModelCheckResponse(BaseModel):
 class AdminAiModelSyncResponse(BaseModel):
     synchronized_model_ids: list[str]
     needs_classification: list[str]
+
+
+class AdminAiValidationProblem(BaseModel):
+    code: str
+    message: str
+    day_number: int | None = None
+    exercise_id: str | None = None
+
+
+class AdminAiValidationDiagnostic(BaseModel):
+    model_id: str
+    phase: Literal["initial", "repair"]
+    problems: list[AdminAiValidationProblem]
+
+
+class AdminAiGenerationFailure(BaseModel):
+    id: UUID
+    model_id: str
+    created_at: datetime
+    completed_at: datetime | None
+    error_code: str | None
+    safe_error_message: str | None
+    validation_diagnostics: list[AdminAiValidationDiagnostic] | None

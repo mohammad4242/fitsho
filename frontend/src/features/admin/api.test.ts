@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import {
   createAdminExercise,
+  getAdminAiGenerationFailures,
   getAdminAiModels,
   getAdminExercises,
   updateAdminAiRouting,
@@ -91,6 +92,17 @@ it("reads models and updates the global AI routing setting", async () => {
     2,
     "/api/v1/admin/ai-routing",
     expect.objectContaining({ method: "PATCH", body: JSON.stringify({ mode: "automatic" }) }),
+  );
+});
+
+it("reads recent AI generation failures", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([]));
+
+  await expect(getAdminAiGenerationFailures()).resolves.toEqual([]);
+
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/admin/ai-generation-failures?limit=20",
+    expect.objectContaining({ credentials: "include" }),
   );
 });
 

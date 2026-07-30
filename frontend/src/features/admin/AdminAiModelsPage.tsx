@@ -6,6 +6,7 @@ import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import {
   createAdminAiModel,
+  getAdminAiGenerationFailures,
   getAdminAiModels,
   syncAdminAiModels,
   testAdminAiModel,
@@ -15,6 +16,7 @@ import {
 import type {
   AdminAiModel,
   AdminAiModelCreate,
+  AdminAiGenerationFailure,
   AdminAiModelsResponse,
   BillingClass,
   RoutingMode,
@@ -23,6 +25,7 @@ import type {
 import "./admin.css";
 
 type Filter = "free" | "paid" | "custom";
+type Feedback = { text: string; tone: "success" | "error" };
 
 const blankCustomModel: AdminAiModelCreate = {
   model_id: "",
@@ -36,18 +39,20 @@ const blankCustomModel: AdminAiModelCreate = {
 export function AdminAiModelsPage() {
   const { t } = useTranslation();
   const [page, setPage] = useState<AdminAiModelsResponse | null>(null);
+  const [failures, setFailures] = useState<AdminAiGenerationFailure[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [filter, setFilter] = useState<Filter>("free");
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [customModel, setCustomModel] = useState<AdminAiModelCreate>(blankCustomModel);
   const [busy, setBusy] = useState<string | null>(null);
 
   function load() {
     setState("loading");
-    setMessage(null);
-    void getAdminAiModels()
-      .then((result) => {
-        setPage(result);
+    setFeedback(null);
+    void Promise.all([getAdminAiModels(), getAdminAiGenerationFailures()])
+      .then(([models, generationFailures]) => {
+        setPage(models);
+        setFailures(generationFailures);
         setState("ready");
       })
       .catch(() => setState("error"));
@@ -79,21 +84,21 @@ export function AdminAiModelsPage() {
 
   function setRouting(mode: RoutingMode, manualModelId?: string) {
     setBusy("routing");
-    setMessage(null);
+    setFeedback(null);
     void updateAdminAiRouting(
       mode === "manual" ? { mode, manual_model_id: manualModelId } : { mode },
     )
       .then((routing) => setPage((current) => current === null ? current : { ...current, routing }))
-      .catch(() => setMessage(t("admin.aiModels.updateError")))
+      .catch(() => setFeedback({ text: t("admin.aiModels.updateError"), tone: "error" }))
       .finally(() => setBusy(null));
   }
 
   function updateModel(model: AdminAiModel, update: Parameters<typeof updateAdminAiModel>[1]) {
     setBusy(model.id);
-    setMessage(null);
+    setFeedback(null);
     void updateAdminAiModel(model.id, update)
       .then(updatePageModel)
-      .catch(() => setMessage(t("admin.aiModels.updateError")))
+      .catch(() => setFeedback({ text: t("admin.aiModels.updateError"), tone: "error" }))
       .finally(() => setBusy(null));
   }
 
@@ -101,58 +106,70 @@ export function AdminAiModelsPage() {
     const index = automaticModels.findIndex((item) => item.id === model.id);
     const neighbor = automaticModels[index + direction];
     if (neighbor === undefined) return;
+    const reordered = [...automaticModels];
+    reordered.splice(index, 1);
+    reordered.splice(index + direction, 0, model);
+    const updates = reordered
+      .map((item, order) => ({ item, priority: (order + 1) * 10 }))
+      .filter(({ item, priority }) => item.priority !== priority);
     setBusy(model.id);
-    setMessage(null);
-    void Promise.all([
-      updateAdminAiModel(model.id, { priority: neighbor.priority }),
-      updateAdminAiModel(neighbor.id, { priority: model.priority }),
-    ])
-      .then(([updated, adjacent]) => {
-        updatePageModel(updated);
-        updatePageModel(adjacent);
+    setFeedback(null);
+    void Promise.all(
+      updates.map(({ item, priority }) => updateAdminAiModel(item.id, { priority })),
+    )
+      .then((updatedModels) => {
+        updatedModels.forEach(updatePageModel);
       })
-      .catch(() => setMessage(t("admin.aiModels.updateError")))
+      .catch(() => setFeedback({ text: t("admin.aiModels.updateError"), tone: "error" }))
       .finally(() => setBusy(null));
   }
 
   function syncModels() {
     setBusy("sync");
-    setMessage(null);
+    setFeedback(null);
     void syncAdminAiModels()
       .then((result) => {
-        setMessage(result.needs_classification.length > 0
-          ? t("admin.aiModels.syncNeedsClassification", { count: result.needs_classification.length })
-          : t("admin.aiModels.syncSuccess"));
+        setFeedback({
+          text: result.needs_classification.length > 0
+            ? t("admin.aiModels.syncNeedsClassification", { count: result.needs_classification.length })
+            : t("admin.aiModels.syncSuccess"),
+          tone: "success",
+        });
         load();
       })
-      .catch(() => setMessage(t("admin.aiModels.syncError")))
+      .catch(() => setFeedback({ text: t("admin.aiModels.syncError"), tone: "error" }))
       .finally(() => setBusy(null));
   }
 
   function checkModel(model: AdminAiModel) {
     setBusy(model.id);
-    setMessage(null);
+    setFeedback(null);
     void testAdminAiModel(model.id)
       .then((result) => {
         updatePageModel(result.model);
-        setMessage(result.success ? t("admin.aiModels.testSuccess") : t("admin.aiModels.testFailure"));
+        setFeedback({
+          text: result.success
+            ? t("admin.aiModels.testSuccess")
+            : result.model.last_error_message ?? t("admin.aiModels.testFailure"),
+          tone: result.success ? "success" : "error",
+        });
       })
-      .catch(() => setMessage(t("admin.aiModels.testFailure")))
+      .catch(() => setFeedback({ text: t("admin.aiModels.testFailure"), tone: "error" }))
       .finally(() => setBusy(null));
   }
 
   function createCustomModel(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy("create");
-    setMessage(null);
+    setFeedback(null);
     void createAdminAiModel(customModel)
       .then((model) => {
         setPage((current) => current === null ? current : { ...current, models: [...current.models, model] });
         setCustomModel(blankCustomModel);
         setFilter("custom");
-        setMessage(t("admin.aiModels.createSuccess"));
+        setFeedback({ text: t("admin.aiModels.createSuccess"), tone: "success" });
       })
-      .catch(() => setMessage(t("admin.aiModels.createError")))
+      .catch(() => setFeedback({ text: t("admin.aiModels.createError"), tone: "error" }))
       .finally(() => setBusy(null));
   }
 
@@ -174,7 +191,14 @@ export function AdminAiModelsPage() {
 
         {state === "loading" && <p className="admin-status" role="status">{t("admin.aiModels.loading")}</p>}
         {state === "error" && <div className="admin-status" role="alert"><p>{t("admin.aiModels.loadError")}</p><button type="button" onClick={load}>{t("common.retry")}</button></div>}
-        {message !== null && <p className="admin-status admin-status--success" role="status">{message}</p>}
+        {feedback !== null && (
+          <p
+            className={`admin-status admin-status--${feedback.tone}`}
+            role={feedback.tone === "error" ? "alert" : "status"}
+          >
+            {feedback.text}
+          </p>
+        )}
 
         {state === "ready" && page !== null && (
           <>
@@ -194,6 +218,51 @@ export function AdminAiModelsPage() {
             <section className="admin-ai-catalog" aria-labelledby="ai-catalog-title">
               <div className="admin-section-heading"><div><p className="eyebrow">{t("admin.aiModels.catalogEyebrow")}</p><h2 id="ai-catalog-title">{t("admin.aiModels.catalogTitle")}</h2></div><div className="admin-ai-tabs" role="tablist" aria-label={t("admin.aiModels.filterLabel")}>{(["free", "paid", "custom"] as const).map((value) => <button type="button" key={value} role="tab" aria-selected={filter === value} onClick={() => setFilter(value)}>{t(`admin.aiModels.filters.${value}`)}</button>)}</div></div>
               <div className="admin-ai-model-list">{displayedModels.map((model) => <article className="admin-ai-model-row" key={model.id}><div className="admin-ai-model-row__identity"><div className="admin-ai-model-row__title"><h3>{model.display_name}</h3>{model.classification_required && <span className="admin-state admin-state--inactive">{t("admin.aiModels.needsClassification")}</span>}{!model.classification_required && <span className={`admin-state admin-state--${model.is_enabled ? "active" : "inactive"}`}>{t(`admin.aiModels.${model.is_enabled ? "enabled" : "disabled"}`)}</span>}</div><code>{model.model_id}</code></div><dl><div><dt>{t("admin.aiModels.apiKind")}</dt><dd>{model.api_kind ?? "—"}</dd></div><div><dt>{t("admin.aiModels.billing")}</dt><dd>{model.billing_class === null ? "—" : t(`admin.aiModels.filters.${model.billing_class}`)}</dd></div><div><dt>{t("admin.aiModels.priority")}</dt><dd>{model.priority}</dd></div></dl>{model.last_error_message !== null && <p className="admin-ai-model-error">{model.last_error_message}</p>}<div className="admin-ai-row-actions"><button type="button" disabled={busy === model.id} onClick={() => updateModel(model, { is_enabled: !model.is_enabled })}>{t(`admin.aiModels.${model.is_enabled ? "disable" : "enable"}`)}</button><button type="button" disabled={busy === model.id || model.classification_required} onClick={() => checkModel(model)}>{t("admin.aiModels.test")}</button></div></article>)}</div>
+            </section>
+
+            <section className="admin-ai-failures admin-form-section" aria-labelledby="ai-failures-title">
+              <div className="admin-section-heading">
+                <div>
+                  <p className="eyebrow">{t("admin.aiModels.failuresEyebrow")}</p>
+                  <h2 id="ai-failures-title">{t("admin.aiModels.failuresTitle")}</h2>
+                </div>
+              </div>
+              {failures.length === 0 && (
+                <p className="admin-ai-failures__empty">{t("admin.aiModels.failuresEmpty")}</p>
+              )}
+              <div className="admin-ai-failure-list">
+                {failures.map((failure) => (
+                  <article className="admin-ai-failure" key={failure.id}>
+                    <header>
+                      <code>{failure.model_id}</code>
+                      <time dateTime={failure.created_at}>
+                        {new Date(failure.created_at).toLocaleString()}
+                      </time>
+                    </header>
+                    {failure.error_code !== null && <strong>{failure.error_code}</strong>}
+                    {failure.safe_error_message !== null && <p>{failure.safe_error_message}</p>}
+                    {failure.validation_diagnostics?.flatMap((diagnostic, diagnosticIndex) =>
+                      diagnostic.problems.map((problem, problemIndex) => (
+                        <div
+                          className="admin-ai-diagnostic"
+                          key={`${failure.id}-${diagnosticIndex}-${problemIndex}`}
+                        >
+                          <span>{t("admin.aiModels.failurePhase")}: <code>{diagnostic.phase}</code></span>
+                          <strong>{problem.code}</strong>
+                          {problem.day_number !== undefined && (
+                            <span>{t("admin.aiModels.failureDay")}: {problem.day_number}</span>
+                          )}
+                          {problem.exercise_id !== undefined && (
+                            <span>
+                              {t("admin.aiModels.failureExercise")}: <code>{problem.exercise_id}</code>
+                            </span>
+                          )}
+                        </div>
+                      )),
+                    )}
+                  </article>
+                ))}
+              </div>
             </section>
 
             <form className="admin-form admin-ai-custom-form" onSubmit={createCustomModel}>

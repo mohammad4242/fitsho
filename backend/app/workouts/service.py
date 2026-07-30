@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from math import ceil
@@ -22,6 +23,7 @@ from app.profile.service import ProfileSnapshot, get_profile
 from app.workouts.candidate_selector import WorkoutCandidateSelector
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise, WorkoutPlanGeneration
+from app.workouts.normalizer import normalize_workout_plan
 from app.workouts.prompt_builder import build_workout_generation_model_request
 from app.workouts.repository import (
     activate_plan,
@@ -39,6 +41,8 @@ from app.workouts.time_budget import (
     calculate_exercise_minutes,
 )
 from app.workouts.validator import WorkoutPlanValidationError, WorkoutPlanValidator
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -95,6 +99,37 @@ class GenerationInputsChangedError(Exception):
     pass
 
 
+def _log_validation_failure(
+    model_id: str,
+    phase: str,
+    error: WorkoutPlanValidationError,
+) -> None:
+    problems = [problem.to_repair_payload() for problem in error.problems]
+    logger.warning(
+        "workout_plan_validation_failed model_id=%s phase=%s problems=%s",
+        model_id,
+        phase,
+        json.dumps(problems, ensure_ascii=False, separators=(",", ":")),
+        extra={
+            "workout_model_id": model_id,
+            "validation_phase": phase,
+            "validation_problems": problems,
+        },
+    )
+
+
+def _validation_diagnostic(
+    model_id: str,
+    phase: str,
+    error: WorkoutPlanValidationError,
+) -> dict[str, object]:
+    return {
+        "model_id": model_id,
+        "phase": phase,
+        "problems": [problem.to_repair_payload() for problem in error.problems],
+    }
+
+
 class WorkoutGenerationService:
     def __init__(
         self,
@@ -133,12 +168,14 @@ class WorkoutGenerationService:
         self._enforce_request_size(request)
         generation = self._start_generation(user_id, len(candidates.exercises))
         started_at = perf_counter()
+        validation_diagnostics: list[dict[str, object]] = []
         try:
             model_response = await self._generate_valid_response(
                 request=request,
                 candidates=candidates,
                 policy=policy,
                 required_day_count=profile.training_days_per_week,
+                validation_diagnostics=validation_diagnostics,
             )
             refreshed_profile = self._to_generation_profile(get_profile(self._db, user_id))
             refreshed_candidates = self._select_candidates(refreshed_profile)
@@ -158,23 +195,31 @@ class WorkoutGenerationService:
             generation.input_tokens = model_response.response.input_tokens
             generation.output_tokens = model_response.response.output_tokens
             generation.latency_ms = int((perf_counter() - started_at) * 1000)
+            generation.validation_diagnostics = validation_diagnostics or None
             activate_plan(self._db, plan, generation)
             self._db.commit()
             return WorkoutPlanGenerationResult(plan=plan, reused=False)
         except WorkoutProviderError as error:
-            self._mark_failure(generation, error.code.value, error.safe_message)
+            self._mark_failure(
+                generation,
+                error.code.value,
+                error.safe_message,
+                validation_diagnostics,
+            )
             raise WorkoutGenerationFailedError(error.code) from None
         except WorkoutPlanValidationError:
             self._mark_failure(
                 generation,
                 "semantic_validation_failed",
                 "Workout generation returned an invalid plan. Please try again.",
+                validation_diagnostics,
             )
         except GenerationInputsChangedError:
             self._mark_failure(
                 generation,
                 "generation_inputs_changed",
                 "Workout conditions changed while the plan was being generated. Please try again.",
+                validation_diagnostics,
             )
         except SQLAlchemyError:
             self._db.rollback()
@@ -182,6 +227,7 @@ class WorkoutGenerationService:
                 generation,
                 "persistence_failed",
                 "Workout generation could not be saved. Please try again.",
+                validation_diagnostics,
             )
         raise WorkoutGenerationFailedError
 
@@ -207,6 +253,7 @@ class WorkoutGenerationService:
         candidates: CandidateSet,
         policy: WorkoutGenerationPolicy,
         required_day_count: int,
+        validation_diagnostics: list[dict[str, object]],
     ) -> ModelGenerationResponse:
         validator = WorkoutPlanValidator(
             candidates=candidates,
@@ -217,10 +264,18 @@ class WorkoutGenerationService:
         for candidate in self._providers:
             try:
                 response = await candidate.provider.generate_plan(request)
+                response = replace(
+                    response,
+                    plan=normalize_workout_plan(response.plan, candidates),
+                )
                 try:
                     validator.validate(response.plan)
                     return ModelGenerationResponse(candidate.model_id, response)
                 except WorkoutPlanValidationError as initial_error:
+                    _log_validation_failure(candidate.model_id, "initial", initial_error)
+                    validation_diagnostics.append(
+                        _validation_diagnostic(candidate.model_id, "initial", initial_error)
+                    )
                     if self._settings.max_repair_attempts < 1:
                         last_error = initial_error
                         continue
@@ -241,7 +296,18 @@ class WorkoutGenerationService:
                         },
                     )
                     repaired = await candidate.provider.generate_plan(repair_request)
-                    validator.validate(repaired.plan)
+                    repaired = replace(
+                        repaired,
+                        plan=normalize_workout_plan(repaired.plan, candidates),
+                    )
+                    try:
+                        validator.validate(repaired.plan)
+                    except WorkoutPlanValidationError as repair_error:
+                        _log_validation_failure(candidate.model_id, "repair", repair_error)
+                        validation_diagnostics.append(
+                            _validation_diagnostic(candidate.model_id, "repair", repair_error)
+                        )
+                        raise
                     return ModelGenerationResponse(candidate.model_id, repaired)
             except (WorkoutProviderError, WorkoutPlanValidationError) as error:
                 last_error = error
@@ -372,6 +438,7 @@ class WorkoutGenerationService:
         generation: WorkoutPlanGeneration,
         error_code: str,
         safe_message: str,
+        validation_diagnostics: list[dict[str, object]],
     ) -> None:
         try:
             if generation not in self._db:
@@ -381,6 +448,7 @@ class WorkoutGenerationService:
                 generation,
                 error_code=error_code,
                 safe_error_message=safe_message,
+                validation_diagnostics=validation_diagnostics or None,
             )
             self._db.commit()
         except SQLAlchemyError:

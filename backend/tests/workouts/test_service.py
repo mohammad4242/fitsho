@@ -187,6 +187,55 @@ def test_invalid_response_is_repaired_once_before_persistence(db: Session) -> No
     assert not result.reused
     assert len(provider.calls) == 2
     assert "repair" in provider.calls[1].input_payload
+    generation = result.plan.generation_records[0]
+    assert generation.validation_diagnostics is not None
+    assert generation.validation_diagnostics[0]["model_id"] == "fake-model"
+    assert generation.validation_diagnostics[0]["phase"] == "initial"
+
+
+def test_invalid_initial_and_repair_responses_log_exact_problems(
+    db: Session,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    user = _user_with_profile(db)
+    exercises = _seed_candidates(db)
+    invalid = _response([exercises[0].id, exercises[0].id])
+    provider = FakeWorkoutPlanModelProvider([invalid, invalid])
+
+    with caplog.at_level("WARNING", logger="app.workouts.service"):
+        with pytest.raises(WorkoutGenerationFailedError):
+            asyncio.run(_service(db, provider).generate(user.id))
+
+    records = [
+        record
+        for record in caplog.records
+        if record.getMessage().startswith("workout_plan_validation_failed")
+    ]
+    assert [record.__dict__["validation_phase"] for record in records] == [
+        "initial",
+        "repair",
+    ]
+    assert all(record.__dict__["workout_model_id"] == "fake-model" for record in records)
+    expected_problem = {
+        "code": "duplicate_exercise",
+        "message": "An exercise may not appear more than once in the same day.",
+        "day_number": 1,
+        "exercise_id": str(exercises[0].id),
+    }
+    assert all(
+        expected_problem in record.__dict__["validation_problems"] for record in records
+    )
+    assert all('"code":"duplicate_exercise"' in record.getMessage() for record in records)
+    generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
+    assert generation.validation_diagnostics is not None
+    assert [item["phase"] for item in generation.validation_diagnostics] == [
+        "initial",
+        "repair",
+    ]
+    assert all(
+        expected_problem in item["problems"]
+        for item in generation.validation_diagnostics
+    )
 
 
 def test_generation_falls_back_to_the_next_model_after_a_provider_error(db: Session) -> None:

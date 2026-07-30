@@ -20,6 +20,7 @@ from app.admin.ai_models import (
     create_ai_model,
     get_ai_model,
     list_ai_models,
+    list_generation_failures,
     sync_zen_models,
     update_ai_model,
     update_ai_routing,
@@ -28,6 +29,7 @@ from app.admin.dependencies import require_admin
 from app.admin.exceptions import DuplicateExerciseSlugError
 from app.admin.media import MediaValidationError, StoredMedia, discard_media, store_upload
 from app.admin.schemas import (
+    AdminAiGenerationFailure,
     AdminAiModelCheckResponse,
     AdminAiModelCreate,
     AdminAiModelDetail,
@@ -92,6 +94,28 @@ def read_ai_models(db: DatabaseSession) -> AdminAiModelsResponse:
         routing=_ai_routing_detail(routing),
         models=[_ai_model_detail(model) for model in models],
     )
+
+
+@router.get(
+    "/ai-generation-failures",
+    response_model=list[AdminAiGenerationFailure],
+)
+def read_ai_generation_failures(
+    db: DatabaseSession,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[AdminAiGenerationFailure]:
+    return [
+        AdminAiGenerationFailure(
+            id=generation.id,
+            model_id=generation.model_id,
+            created_at=generation.created_at,
+            completed_at=generation.completed_at,
+            error_code=generation.error_code,
+            safe_error_message=generation.safe_error_message,
+            validation_diagnostics=generation.validation_diagnostics,
+        )
+        for generation in list_generation_failures(db, limit=limit)
+    ]
 
 
 @router.post(

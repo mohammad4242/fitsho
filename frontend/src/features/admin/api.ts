@@ -3,6 +3,7 @@ import type {
   AdminAiModel,
   AdminAiModelCheck,
   AdminAiModelCreate,
+  AdminAiGenerationFailure,
   AdminAiModelsResponse,
   AdminAiModelSync,
   AdminAiModelUpdate,
@@ -20,6 +21,14 @@ const adminAiModelsPath = "/api/v1/admin/ai-models";
 
 export function getAdminAiModels(): Promise<AdminAiModelsResponse> {
   return request<AdminAiModelsResponse>(adminAiModelsPath);
+}
+
+export function getAdminAiGenerationFailures(
+  limit = 20,
+): Promise<AdminAiGenerationFailure[]> {
+  return request<AdminAiGenerationFailure[]>(
+    `/api/v1/admin/ai-generation-failures?limit=${limit}`,
+  );
 }
 
 export function updateAdminAiRouting(

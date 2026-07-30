@@ -145,3 +145,26 @@ export type AdminAiModelSync = {
   synchronized_model_ids: string[];
   needs_classification: string[];
 };
+
+export type AdminAiValidationProblem = {
+  code: string;
+  message: string;
+  day_number?: number;
+  exercise_id?: string;
+};
+
+export type AdminAiValidationDiagnostic = {
+  model_id: string;
+  phase: "initial" | "repair";
+  problems: AdminAiValidationProblem[];
+};
+
+export type AdminAiGenerationFailure = {
+  id: string;
+  model_id: string;
+  created_at: string;
+  completed_at: string | null;
+  error_code: string | null;
+  safe_error_message: string | null;
+  validation_diagnostics: AdminAiValidationDiagnostic[] | null;
+};

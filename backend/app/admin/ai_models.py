@@ -12,8 +12,14 @@ from app.admin.schemas import AdminAiModelCreate, AdminAiModelUpdate, AdminAiRou
 from app.ai.catalog import CatalogSyncResult, synchronize_zen_catalogue
 from app.ai.models import AiModel, AiRoutingSettings, RoutingMode
 from app.ai.opencode_zen import OpenCodeZenWorkoutPlanProvider
-from app.ai.schemas import WorkoutGenerationModelRequest, WorkoutProviderError
+from app.ai.schemas import (
+    WorkoutGenerationModelRequest,
+    WorkoutPlanModelOutput,
+    WorkoutProviderError,
+)
 from app.config import Settings
+from app.workouts.enums import WorkoutGenerationStatus
+from app.workouts.models import WorkoutPlanGeneration
 
 
 def list_ai_models(db: Session) -> tuple[AiRoutingSettings, list[AiModel]]:
@@ -22,6 +28,17 @@ def list_ai_models(db: Session) -> tuple[AiRoutingSettings, list[AiModel]]:
         raise RuntimeError("AI routing settings are unavailable")
     models = list(db.scalars(select(AiModel).order_by(AiModel.priority, AiModel.model_id)))
     return settings, models
+
+
+def list_generation_failures(db: Session, *, limit: int) -> list[WorkoutPlanGeneration]:
+    return list(
+        db.scalars(
+            select(WorkoutPlanGeneration)
+            .where(WorkoutPlanGeneration.status == WorkoutGenerationStatus.FAILED)
+            .order_by(WorkoutPlanGeneration.created_at.desc())
+            .limit(limit)
+        )
+    )
 
 
 def get_ai_model(db: Session, model_id: UUID) -> AiModel:
@@ -172,8 +189,8 @@ async def check_ai_model(
     )
     request = WorkoutGenerationModelRequest(
         system_prompt="Return the requested JSON object.",
-        input_payload={"health_check": True},
-        response_schema={"type": "object", "properties": {"days": {"type": "array"}}},
+        input_payload={"health_check": True, "expected_output": {"days": []}},
+        response_schema=WorkoutPlanModelOutput.model_json_schema(),
     )
     model.last_checked_at = datetime.now(UTC)
     try:
