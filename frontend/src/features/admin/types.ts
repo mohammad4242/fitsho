@@ -86,3 +86,62 @@ export type PaginatedAdminExercises = {
   total: number;
   total_pages: number;
 };
+
+export type ZenApiKind = "responses" | "chat_completions" | "messages" | "gemini";
+export type BillingClass = "free" | "paid";
+export type RoutingMode = "manual" | "automatic";
+
+export type AdminAiModel = {
+  id: string;
+  model_id: string;
+  display_name: string;
+  api_kind: ZenApiKind | null;
+  billing_class: BillingClass | null;
+  is_enabled: boolean;
+  priority: number;
+  is_custom: boolean;
+  classification_required: boolean;
+  last_synced_at: string | null;
+  last_checked_at: string | null;
+  last_error_code: string | null;
+  last_error_message: string | null;
+};
+
+export type AdminAiRoutingSettings = {
+  mode: RoutingMode;
+  manual_model_id: string | null;
+};
+
+export type AdminAiModelsResponse = {
+  routing: AdminAiRoutingSettings;
+  models: AdminAiModel[];
+};
+
+export type AdminAiModelUpdate = Partial<Pick<
+  AdminAiModel,
+  "model_id" | "display_name" | "api_kind" | "billing_class" | "is_enabled" | "priority"
+>>;
+
+export type AdminAiModelCreate = {
+  model_id: string;
+  display_name: string;
+  api_kind: ZenApiKind;
+  billing_class: BillingClass;
+  is_enabled?: boolean;
+  priority?: number;
+};
+
+export type AdminAiRoutingUpdate = {
+  mode: RoutingMode;
+  manual_model_id?: string | null;
+};
+
+export type AdminAiModelCheck = {
+  success: boolean;
+  model: AdminAiModel;
+};
+
+export type AdminAiModelSync = {
+  synchronized_model_ids: string[];
+  needs_classification: string[];
+};

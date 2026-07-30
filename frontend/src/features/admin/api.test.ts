@@ -1,7 +1,17 @@
 import { afterEach, expect, it, vi } from "vitest";
 
-import { createAdminExercise, getAdminExercises } from "./api";
-import type { AdminExercise, AdminExerciseCreate, PaginatedAdminExercises } from "./types";
+import {
+  createAdminExercise,
+  getAdminAiModels,
+  getAdminExercises,
+  updateAdminAiRouting,
+} from "./api";
+import type {
+  AdminAiModelsResponse,
+  AdminExercise,
+  AdminExerciseCreate,
+  PaginatedAdminExercises,
+} from "./types";
 
 const created: AdminExercise = {
   id: "018f0000-0000-7000-8000-000000000001",
@@ -59,6 +69,30 @@ const input: AdminExerciseCreate = {
 };
 
 afterEach(() => vi.restoreAllMocks());
+
+it("reads models and updates the global AI routing setting", async () => {
+  const models: AdminAiModelsResponse = {
+    routing: { mode: "automatic", manual_model_id: null },
+    models: [],
+  };
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(jsonResponse(models))
+    .mockResolvedValueOnce(jsonResponse(models.routing));
+
+  await expect(getAdminAiModels()).resolves.toEqual(models);
+  await expect(updateAdminAiRouting({ mode: "automatic" })).resolves.toEqual(models.routing);
+
+  expect(fetch).toHaveBeenNthCalledWith(
+    1,
+    "/api/v1/admin/ai-models",
+    expect.objectContaining({ credentials: "include" }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    "/api/v1/admin/ai-routing",
+    expect.objectContaining({ method: "PATCH", body: JSON.stringify({ mode: "automatic" }) }),
+  );
+});
 
 it("lists admin exercises with inactive filter support", async () => {
   const page: PaginatedAdminExercises = {

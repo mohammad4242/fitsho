@@ -1,5 +1,13 @@
 import { request } from "../../shared/apiClient";
 import type {
+  AdminAiModel,
+  AdminAiModelCheck,
+  AdminAiModelCreate,
+  AdminAiModelsResponse,
+  AdminAiModelSync,
+  AdminAiModelUpdate,
+  AdminAiRoutingSettings,
+  AdminAiRoutingUpdate,
   AdminExercise,
   AdminExerciseCreate,
   AdminExerciseFilters,
@@ -8,6 +16,47 @@ import type {
 } from "./types";
 
 const adminExercisesPath = "/api/v1/admin/exercises";
+const adminAiModelsPath = "/api/v1/admin/ai-models";
+
+export function getAdminAiModels(): Promise<AdminAiModelsResponse> {
+  return request<AdminAiModelsResponse>(adminAiModelsPath);
+}
+
+export function updateAdminAiRouting(
+  input: AdminAiRoutingUpdate,
+): Promise<AdminAiRoutingSettings> {
+  return request<AdminAiRoutingSettings>("/api/v1/admin/ai-routing", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateAdminAiModel(
+  modelId: string,
+  input: AdminAiModelUpdate,
+): Promise<AdminAiModel> {
+  return request<AdminAiModel>(`${adminAiModelsPath}/${modelId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function createAdminAiModel(input: AdminAiModelCreate): Promise<AdminAiModel> {
+  return request<AdminAiModel>(adminAiModelsPath, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function syncAdminAiModels(): Promise<AdminAiModelSync> {
+  return request<AdminAiModelSync>(`${adminAiModelsPath}/sync`, { method: "POST" });
+}
+
+export function testAdminAiModel(modelId: string): Promise<AdminAiModelCheck> {
+  return request<AdminAiModelCheck>(`${adminAiModelsPath}/${modelId}/test`, {
+    method: "POST",
+  });
+}
 
 export function getAdminExercises(
   filters: AdminExerciseFilters = {},
