@@ -33,3 +33,19 @@
 .admin-hero h1, .admin-form-header h1 { letter-spacing: 0; }
 .admin-primary-link { color: var(--fitsho-petrol); background: var(--fitsho-aqua); }
 .admin-exercise-row, .admin-form-section { border: 0; border-radius: 1.25rem; box-shadow: 0 0.8rem 2rem rgb(10 31 30 / 7%); }
+
+.admin-page {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+.admin-page > :not(.member-page-background) {
+  position: relative;
+  z-index: 1;
+}
+
+.admin-hero, .admin-form-header {
+  background: rgb(10 31 30 / 52%);
+  backdrop-filter: blur(8px);
+}

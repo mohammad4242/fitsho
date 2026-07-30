@@ -40,10 +40,10 @@ export function AdminExercisesPage() {
   const english = i18n.resolvedLanguage === "en";
   return (
     <div className="admin-page">
+      <MemberHeaderMedia imageSrc={appTrainingAccent} className="member-page-background" />
       <AuthenticatedHeader />
       <main className="admin-main">
         <header className="admin-hero">
-          <MemberHeaderMedia imageSrc={appTrainingAccent} />
           <div>
             <p className="eyebrow eyebrow--accent">{t("admin.exercises.eyebrow")}</p>
             <h1 className="fitsho-display">{t("admin.exercises.title")}</h1>

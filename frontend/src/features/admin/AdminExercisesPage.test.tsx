@@ -70,10 +70,12 @@ it("uses the supplied app still in the admin header", async () => {
   });
   renderPage();
 
-  expect(await screen.findByTestId("member-header-image")).toHaveAttribute(
+  const background = await screen.findByTestId("member-header-image");
+  expect(background).toHaveAttribute(
     "src",
     expect.stringContaining("app-training-accent"),
   );
+  expect(background.parentElement).toHaveClass("member-page-background");
 });
 
 it("announces creation and focuses the created exercise", async () => {

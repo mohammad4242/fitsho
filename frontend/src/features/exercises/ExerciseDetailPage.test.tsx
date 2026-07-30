@@ -63,10 +63,12 @@ describe("exercise detail states", () => {
   it("uses the supplied strength still above the exercise detail", async () => {
     renderDetail();
 
-    expect(await screen.findByTestId("member-header-image")).toHaveAttribute(
+    const background = await screen.findByTestId("member-header-image");
+    expect(background).toHaveAttribute(
       "src",
       expect.stringContaining("hero-strength-fallback"),
     );
+    expect(background.parentElement).toHaveClass("member-page-background");
   });
 
   it("shows a loading state while the exercise is requested", async () => {

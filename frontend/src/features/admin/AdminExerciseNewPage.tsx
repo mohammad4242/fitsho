@@ -110,10 +110,10 @@ export function AdminExerciseNewPage() {
 
   return (
     <div className="admin-page">
+      <MemberHeaderMedia imageSrc={appTrainingAccent} className="member-page-background" />
       <AuthenticatedHeader />
       <main className="admin-main admin-main--form">
         <header className="admin-form-header">
-          <MemberHeaderMedia imageSrc={appTrainingAccent} />
           <div><p className="eyebrow eyebrow--accent">{t("admin.new.eyebrow")}</p><h1>{t("admin.new.title")}</h1><p>{t("admin.new.intro")}</p></div>
           <Link to="/admin/exercises">{t("admin.new.back")}</Link>
         </header>

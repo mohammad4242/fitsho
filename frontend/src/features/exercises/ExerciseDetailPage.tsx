@@ -52,11 +52,9 @@ export function ExerciseDetailPage() {
 
   return (
     <div className="exercise-catalog-shell exercise-detail-shell">
+      <MemberHeaderMedia imageSrc={heroStrengthFallback} className="member-page-background" />
       <AuthenticatedHeader />
       <main className="exercise-detail-main">
-        <header className="exercise-detail-hero" aria-hidden="true">
-          <MemberHeaderMedia imageSrc={heroStrengthFallback} />
-        </header>
         {state === "loading" && (
           <DetailMessage role="status" message={t("exerciseDetail.loading")} />
         )}

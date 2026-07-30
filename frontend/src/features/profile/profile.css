@@ -374,6 +374,22 @@ html[dir="rtl"] .profile-page-heading h1 {
   line-height: 1.8;
 }
 
+.profile-page-shell {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+.profile-page-shell > :not(.member-page-background) {
+  position: relative;
+  z-index: 1;
+}
+
+.profile-page-heading {
+  background: rgb(10 31 30 / 52%);
+  backdrop-filter: blur(8px);
+}
+
 .measurement-card {
   display: flex;
   flex-direction: column;

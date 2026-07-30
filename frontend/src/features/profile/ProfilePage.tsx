@@ -126,10 +126,10 @@ function ReadyProfilePage({
 
   return (
     <div className="profile-page-shell">
+      <MemberHeaderMedia imageSrc={authTrainingAccent} className="member-page-background" />
       <AuthenticatedHeader />
       <main className="profile-page-main">
         <section className="profile-page-heading">
-          <MemberHeaderMedia imageSrc={authTrainingAccent} />
           <p className="eyebrow eyebrow--accent">{t("profile.eyebrow")}</p>
           <h1 className="fitsho-display">{t("profile.title")}</h1>
           <p>{t("profile.intro")}</p>

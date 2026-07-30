@@ -555,6 +555,22 @@ html[dir="ltr"] .exercise-card__link span {
   object-position: center 35%;
 }
 
+.exercise-catalog-shell {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+.exercise-catalog-shell > :not(.member-page-background) {
+  position: relative;
+  z-index: 1;
+}
+
+.exercise-catalog-hero {
+  background: rgb(10 31 30 / 52%);
+  backdrop-filter: blur(8px);
+}
+
 .exercise-detail-status {
   margin-block-start: 2.5rem;
 }
@@ -1008,3 +1024,19 @@ html[dir="rtl"] .catalog-dashboard-card__copy h2 {
 .exercise-detail-media video { border-radius: 1rem; }
 .exercise-instructions,
 .exercise-safety { border-radius: 1.25rem; }
+
+.exercise-catalog-shell {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+.exercise-catalog-shell > :not(.member-page-background) {
+  position: relative;
+  z-index: 1;
+}
+
+.exercise-catalog-hero {
+  background: rgb(10 31 30 / 52%);
+  backdrop-filter: blur(8px);
+}

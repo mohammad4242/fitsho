@@ -163,10 +163,10 @@ export function ExerciseCatalogPage() {
 
   return (
     <div className="exercise-catalog-shell">
+      <MemberHeaderMedia imageSrc={heroStrengthFallback} className="member-page-background" />
       <AuthenticatedHeader />
       <main className="exercise-catalog-main">
         <header className="exercise-catalog-hero">
-          <MemberHeaderMedia imageSrc={heroStrengthFallback} />
           <div>
             <p className="eyebrow eyebrow--accent">{t("catalog.eyebrow")}</p>
             <h1 className="fitsho-display">{t("catalog.title")}</h1>
