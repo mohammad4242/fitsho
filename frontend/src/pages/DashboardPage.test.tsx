@@ -57,11 +57,24 @@ it("links the primary CTA to the active workout plan", async () => {
     </MemoryRouter>,
   );
 
-  expect(await screen.findByLabelText("مسیر امروز")).toHaveAttribute("data-stage", "gym");
   expect(await screen.findByRole("link", { name: "شروع کن" })).toHaveAttribute(
     "href",
     "/workout-plan",
   );
+});
+
+it("removes the two story-image chapters from the Today page", async () => {
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
+
+  render(
+    <MemoryRouter>
+      <DashboardPage />
+    </MemoryRouter>,
+  );
+
+  await screen.findByRole("heading", { name: "سلام، محمد" });
+  expect(screen.queryByLabelText("مسیر امروز")).not.toBeInTheDocument();
+  expect(document.querySelector(".today-story__image")).not.toBeInTheDocument();
 });
 
 it("uses the supplied strength video behind the Today page", async () => {

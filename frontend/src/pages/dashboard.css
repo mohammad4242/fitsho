@@ -32,23 +32,6 @@
   isolation: isolate;
 }
 
-.today-story__image {
-  position: absolute;
-  z-index: -2;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.today-hero__veil,
-.today-story__shade {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  background: linear-gradient(90deg, rgb(10 31 30 / 94%) 0%, rgb(10 31 30 / 55%) 52%, rgb(10 31 30 / 20%) 100%), linear-gradient(0deg, rgb(10 31 30 / 94%) 0%, transparent 55%);
-}
-
 .today-hero__content {
   position: relative;
   z-index: 1;
@@ -65,8 +48,7 @@
   letter-spacing: 0.11em;
 }
 
-.today-hero h1,
-.today-story h2 {
+.today-hero h1 {
   max-width: 9ch;
   margin: 0;
   font-size: clamp(4.2rem, 11vw, 8.5rem);
@@ -108,27 +90,6 @@
   font-size: 0.74rem;
 }
 
-.today-story { position: relative; min-height: 160svh; }
-.today-story__sticky { position: sticky; top: 0; height: 100svh; overflow: hidden; }
-.today-story__image { transition: opacity 500ms ease; }
-.today-story__image--gym { object-position: center; }
-.today-story__image--lift { opacity: 0; object-position: center 35%; }
-.today-story__chapters { position: absolute; inset: 0; width: min(100% - 2rem, 82rem); margin: 0 auto; }
-
-.today-story__chapter {
-  min-height: 80svh;
-  display: grid;
-  grid-template-columns: 3rem minmax(0, 1fr);
-  align-content: center;
-  gap: clamp(1rem, 5vw, 5rem);
-}
-
-.today-story__chapter > span { color: var(--fitsho-coral); font-family: "Sora Variable", sans-serif; font-size: 0.8rem; font-weight: 800; }
-.today-story__chapter h2 { font-size: clamp(3.5rem, 9vw, 7rem); }
-.today-story__chapter p:not(.today-kicker) { max-width: 30rem; margin: 1rem 0 0; color: rgb(234 244 241 / 76%); line-height: 1.9; }
-.today-story__chapter--lift { align-content: end; padding-block-end: 8rem; }
-.today-story[data-stage="lift"] .today-story__image--lift { opacity: 1; }
-
 .today-actions {
   width: min(100% - 2rem, 82rem);
   display: grid;
@@ -162,13 +123,6 @@
   .today-hero { min-height: calc(100svh - 4rem); }
   .today-hero h1 { font-size: clamp(4rem, 20vw, 6rem); }
   .today-hero__hint { display: none; }
-  .today-story { min-height: 145svh; }
-  .today-story__chapter { grid-template-columns: 2.2rem minmax(0, 1fr); gap: 0.8rem; }
-  .today-story__chapter--lift { padding-block-end: 5rem; }
   .today-actions { grid-template-columns: 1fr; }
   .today-actions__card { min-height: 11rem; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .today-story__image { transition: none; }
 }
