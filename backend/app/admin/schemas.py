@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from app.ai.models import BillingClass, RoutingMode, ZenApiKind
 from app.exercises.enums import (
     BodyRegion,
     Difficulty,
@@ -107,3 +108,78 @@ class PaginatedAdminExercises(BaseModel):
     page_size: int
     total: int
     total_pages: int
+
+
+AiModelId = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
+]
+AiModelName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=2, max_length=160),
+]
+
+
+class AdminAiModelCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model_id: AiModelId
+    display_name: AiModelName
+    api_kind: ZenApiKind
+    billing_class: BillingClass
+    is_enabled: bool = True
+    priority: int = Field(default=1000, ge=0)
+
+
+class AdminAiModelUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model_id: AiModelId | None = None
+    display_name: AiModelName | None = None
+    api_kind: ZenApiKind | None = None
+    billing_class: BillingClass | None = None
+    is_enabled: bool | None = None
+    priority: int | None = Field(default=None, ge=0)
+
+
+class AdminAiModelDetail(BaseModel):
+    id: UUID
+    model_id: str
+    display_name: str
+    api_kind: ZenApiKind | None
+    billing_class: BillingClass | None
+    is_enabled: bool
+    priority: int
+    is_custom: bool
+    classification_required: bool
+    last_synced_at: datetime | None
+    last_checked_at: datetime | None
+    last_error_code: str | None
+    last_error_message: str | None
+
+
+class AdminAiRoutingUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: RoutingMode
+    manual_model_id: UUID | None = None
+
+
+class AdminAiRoutingDetail(BaseModel):
+    mode: RoutingMode
+    manual_model_id: UUID | None
+
+
+class AdminAiModelsResponse(BaseModel):
+    routing: AdminAiRoutingDetail
+    models: list[AdminAiModelDetail]
+
+
+class AdminAiModelCheckResponse(BaseModel):
+    success: bool
+    model: AdminAiModelDetail
+
+
+class AdminAiModelSyncResponse(BaseModel):
+    synchronized_model_ids: list[str]
+    needs_classification: list[str]

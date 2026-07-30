@@ -1,13 +1,41 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+import httpx
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from pydantic import ValidationError
 
+from app.admin.ai_models import (
+    check_ai_model,
+    create_ai_model,
+    get_ai_model,
+    list_ai_models,
+    sync_zen_models,
+    update_ai_model,
+    update_ai_routing,
+)
 from app.admin.dependencies import require_admin
 from app.admin.exceptions import DuplicateExerciseSlugError
 from app.admin.media import MediaValidationError, StoredMedia, discard_media, store_upload
 from app.admin.schemas import (
+    AdminAiModelCheckResponse,
+    AdminAiModelCreate,
+    AdminAiModelDetail,
+    AdminAiModelsResponse,
+    AdminAiModelSyncResponse,
+    AdminAiModelUpdate,
+    AdminAiRoutingDetail,
+    AdminAiRoutingUpdate,
     AdminExerciseCreate,
     AdminExerciseDetail,
     AdminExerciseFilters,
@@ -20,6 +48,7 @@ from app.admin.service import (
     list_admin_exercises,
     update_admin_exercise,
 )
+from app.ai.models import AiModel, AiRoutingSettings
 from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import AppSettings, DatabaseSession
 from app.exercises.enums import MediaPresentation, MediaRole, MediaType
@@ -32,6 +61,113 @@ router = APIRouter(
     tags=["admin"],
     dependencies=[Depends(require_admin)],
 )
+
+
+def _ai_model_detail(model: AiModel) -> AdminAiModelDetail:
+    return AdminAiModelDetail(
+        id=model.id,
+        model_id=model.model_id,
+        display_name=model.display_name,
+        api_kind=model.api_kind,
+        billing_class=model.billing_class,
+        is_enabled=model.is_enabled,
+        priority=model.priority,
+        is_custom=model.is_custom,
+        classification_required=model.classification_required,
+        last_synced_at=model.last_synced_at,
+        last_checked_at=model.last_checked_at,
+        last_error_code=model.last_error_code,
+        last_error_message=model.last_error_message,
+    )
+
+
+def _ai_routing_detail(settings: AiRoutingSettings) -> AdminAiRoutingDetail:
+    return AdminAiRoutingDetail(mode=settings.mode, manual_model_id=settings.manual_model_id)
+
+
+@router.get("/ai-models", response_model=AdminAiModelsResponse)
+def read_ai_models(db: DatabaseSession) -> AdminAiModelsResponse:
+    routing, models = list_ai_models(db)
+    return AdminAiModelsResponse(
+        routing=_ai_routing_detail(routing),
+        models=[_ai_model_detail(model) for model in models],
+    )
+
+
+@router.post(
+    "/ai-models",
+    response_model=AdminAiModelDetail,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def create_ai_model_route(
+    payload: AdminAiModelCreate,
+    db: DatabaseSession,
+) -> AdminAiModelDetail:
+    return _ai_model_detail(create_ai_model(db, payload))
+
+
+@router.patch(
+    "/ai-models/{model_id}",
+    response_model=AdminAiModelDetail,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_ai_model_route(
+    model_id: UUID,
+    payload: AdminAiModelUpdate,
+    db: DatabaseSession,
+) -> AdminAiModelDetail:
+    return _ai_model_detail(update_ai_model(db, get_ai_model(db, model_id), payload))
+
+
+@router.patch(
+    "/ai-routing",
+    response_model=AdminAiRoutingDetail,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_ai_routing_route(
+    payload: AdminAiRoutingUpdate,
+    db: DatabaseSession,
+) -> AdminAiRoutingDetail:
+    return _ai_routing_detail(update_ai_routing(db, payload))
+
+
+@router.post(
+    "/ai-models/sync",
+    response_model=AdminAiModelSyncResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def sync_ai_models_route(
+    request: Request,
+    db: DatabaseSession,
+    settings: AppSettings,
+) -> AdminAiModelSyncResponse:
+    client = request.app.state.zen_http_client
+    if not isinstance(client, httpx.AsyncClient):
+        raise RuntimeError("Zen HTTP client is unavailable")
+    result = await sync_zen_models(db, client, settings)
+    return AdminAiModelSyncResponse(
+        synchronized_model_ids=result.synchronized_model_ids,
+        needs_classification=result.needs_classification,
+    )
+
+
+@router.post(
+    "/ai-models/{model_id}/test",
+    response_model=AdminAiModelCheckResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def check_ai_model_route(
+    model_id: UUID,
+    request: Request,
+    db: DatabaseSession,
+    settings: AppSettings,
+) -> AdminAiModelCheckResponse:
+    client = request.app.state.zen_http_client
+    if not isinstance(client, httpx.AsyncClient):
+        raise RuntimeError("Zen HTTP client is unavailable")
+    success, model = await check_ai_model(db, get_ai_model(db, model_id), client, settings)
+    return AdminAiModelCheckResponse(success=success, model=_ai_model_detail(model))
 
 
 def _detail(exercise: Exercise) -> AdminExerciseDetail:
