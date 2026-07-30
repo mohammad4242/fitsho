@@ -954,3 +954,15 @@ html[dir="ltr"] .primary-button span:last-child {
   inset: 0;
   background: linear-gradient(115deg, rgb(10 31 30 / 84%), rgb(10 31 30 / 48%) 54%, rgb(10 31 30 / 74%));
 }
+
+.member-page-background {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  width: 100vw;
+  height: 100svh;
+}
+
+.member-page-background .member-header-media__asset {
+  object-fit: cover;
+}
