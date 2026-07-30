@@ -262,6 +262,11 @@ class OpenCodeZenWorkoutPlanProvider:
                 ProviderErrorCode.MALFORMED_RESPONSE,
                 "Workout generation returned an invalid response.",
             )
+        if message.get("refusal") is not None:
+            raise WorkoutProviderError(
+                ProviderErrorCode.REFUSAL,
+                "Workout generation could not produce a plan.",
+            )
         content = message.get("content")
         if not isinstance(content, str):
             raise WorkoutProviderError(

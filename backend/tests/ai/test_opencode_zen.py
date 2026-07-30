@@ -109,6 +109,29 @@ def test_zen_provider_uses_responses_api_and_parses_structured_output() -> None:
     assert output_format["type"] == "json_schema"
 
 
+def test_unknown_model_uses_responses_api() -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        return httpx.Response(
+            200,
+            json={
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": json.dumps(_plan())}],
+                    }
+                ]
+            },
+        )
+
+    provider = _provider(httpx.MockTransport(handler), model="future-model-2026")
+    _run(provider.generate_plan(_request()))
+
+    assert seen["url"] == "https://zen.example/v1/responses"
+
+
 def test_nemotron_provider_uses_chat_completions_and_parses_choices_output() -> None:
     seen: dict[str, object] = {}
 
@@ -169,6 +192,23 @@ def test_nemotron_provider_rejects_malformed_choices(choices: list[object]) -> N
         _run(provider.generate_plan(_request()))
 
     assert exc_info.value.code is ProviderErrorCode.MALFORMED_RESPONSE
+
+
+def test_nemotron_provider_classifies_chat_completions_refusal() -> None:
+    provider = _provider(
+        httpx.MockTransport(
+            lambda request: httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": None, "refusal": "no"}}]},
+            )
+        ),
+        model="nemotron-3-ultra-free",
+    )
+
+    with pytest.raises(WorkoutProviderError) as exc_info:
+        _run(provider.generate_plan(_request()))
+
+    assert exc_info.value.code is ProviderErrorCode.REFUSAL
 
 
 def test_zen_response_schema_requires_nullable_notes_keys() -> None:
