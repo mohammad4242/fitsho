@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     ffprobe_timeout_seconds: float = 5.0
     opencode_zen_api_key: SecretStr | None = Field(default=None, repr=False)
     opencode_zen_base_url: str = "https://opencode.ai/zen/v1"
-    opencode_zen_model: str = "gpt-5.6-terra"
-    opencode_zen_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
+    opencode_zen_model: str = "nemotron-3-ultra-free"
+    opencode_zen_timeout_seconds: float = Field(default=300.0, gt=0, le=300)
     opencode_zen_proxy_url: str | None = Field(default=None, max_length=500, repr=False)
     workout_prompt_version: str = "v1"
     workout_policy_version: str = "v1"

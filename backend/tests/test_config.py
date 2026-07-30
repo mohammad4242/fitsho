@@ -17,6 +17,19 @@ def test_settings_accept_explicit_environment_values() -> None:
     assert settings.frontend_origin == "http://localhost:5173"
 
 
+def test_settings_use_nemotron_runtime_defaults() -> None:
+    settings = Settings()
+
+    assert settings.opencode_zen_model == "nemotron-3-ultra-free"
+    assert settings.opencode_zen_timeout_seconds == 300.0
+
+
+def test_settings_accept_a_five_minute_zen_timeout() -> None:
+    settings = Settings(opencode_zen_timeout_seconds=300)
+
+    assert settings.opencode_zen_timeout_seconds == 300.0
+
+
 def test_production_settings_accept_secure_cookie_contract() -> None:
     settings = Settings(
         app_env="production",
