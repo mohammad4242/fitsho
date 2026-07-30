@@ -50,3 +50,12 @@ it("uses the still image when reduced motion is requested", () => {
   expect(screen.getByTestId("member-header-image")).toHaveAttribute("src", "/still.jpg");
   expect(screen.queryByTestId("member-header-video")).not.toBeInTheDocument();
 });
+
+it("does not play a visible video while its chapter is inactive", () => {
+  render(<MemberHeaderMedia imageSrc="/still.jpg" videoSrc="/motion.mp4" active={false} />);
+
+  act(() => onIntersect?.([{ isIntersecting: true } as IntersectionObserverEntry]));
+
+  expect(play).not.toHaveBeenCalled();
+  expect(pause).toHaveBeenCalled();
+});

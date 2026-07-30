@@ -4,6 +4,7 @@ type MemberHeaderMediaProps = {
   imageSrc: string;
   videoSrc?: string;
   className?: string;
+  active?: boolean;
 };
 
 function getReducedMotionPreference() {
@@ -11,7 +12,7 @@ function getReducedMotionPreference() {
     && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-export function MemberHeaderMedia({ imageSrc, videoSrc, className }: MemberHeaderMediaProps) {
+export function MemberHeaderMedia({ imageSrc, videoSrc, className, active = true }: MemberHeaderMediaProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [reducedMotion, setReducedMotion] = useState(getReducedMotionPreference);
@@ -44,13 +45,13 @@ export function MemberHeaderMedia({ imageSrc, videoSrc, className }: MemberHeade
     const video = videoRef.current;
     if (!video) return;
 
-    if (showVideo && visible) {
+    if (showVideo && visible && active) {
       void Promise.resolve(video.play()).catch(() => setVideoError(true));
       return;
     }
 
     video.pause();
-  }, [showVideo, visible]);
+  }, [active, showVideo, visible]);
 
   return (
     <div ref={containerRef} className={["member-header-media", className].filter(Boolean).join(" ")} aria-hidden="true">
