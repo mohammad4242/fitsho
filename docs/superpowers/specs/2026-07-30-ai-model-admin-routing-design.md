@@ -41,11 +41,14 @@ administrator-controlled priority.
 
 ## Zen synchronization
 
-An authenticated administrator action fetches the current Zen catalogue. The
-server creates or updates only built-in records, including API kind and
-free/paid classification. A built-in model absent from the current catalogue is
-disabled; custom records are never changed. The sync response reports its time
-and any unavailable metadata.
+An authenticated administrator action fetches the current Zen model-ID list.
+The server creates or updates only built-in records that have a maintained,
+documented metadata mapping, including API kind and free/paid classification.
+An ID that Zen returns but the mapping does not know is added as disabled and
+requires the administrator to set its API kind and billing class before it can
+be selected. A built-in model absent from the current catalogue is disabled;
+custom records are never changed. The sync response reports its time and any
+models requiring classification.
 
 ## Provider routing
 
@@ -66,8 +69,8 @@ continues to be read only from backend environment configuration.
 ## Administrator UI
 
 The Admin area gains an AI Models page with Free, Paid, and Custom views. Each
-model shows its name, ID, API kind, state, priority, and most recent test/error
-status. An administrator can:
+model shows its name, ID, API kind, state, priority, classification-needed
+state, and most recent test/error status. An administrator can:
 
 - synchronize Zen models on demand;
 - enable or disable a model;
