@@ -51,10 +51,11 @@ bodyweight-only فقط bodyweight، خانه با دمبل فقط bodyweight و 
 
 ## OpenCode Zen و provider
 
-تنها adapter تولیدی فعلی `OpenCodeZenWorkoutPlanProvider` است و از Responses API با JSON Schema
-strict، `store=false` و `httpx.AsyncClient` مشترک استفاده می‌کند. مدل Zen دیگری که Responses API
-را پشتیبانی کند با تغییر `OPENCODE_ZEN_MODEL` قابل انتخاب است. provider دیگری مانند Gemini باید
-adapter جداگانه‌ای بسازد که `WorkoutPlanModelProvider` را پیاده‌سازی کند؛ service تغییر نمی‌کند.
+تنها adapter تولیدی فعلی `OpenCodeZenWorkoutPlanProvider` است. برای مدل‌های GPT 5.6 از Responses
+API با JSON Schema strict، `store=false` و `httpx.AsyncClient` مشترک استفاده می‌کند؛ برای
+`nemotron-3-ultra-free` از OpenAI-compatible Chat Completions استفاده می‌کند. provider دیگری مانند
+Gemini باید adapter جداگانه‌ای بسازد که `WorkoutPlanModelProvider` را پیاده‌سازی کند؛ service تغییر
+نمی‌کند.
 
 یادداشت عملیاتی: مدل‌های GPT 5.6 از Responses API استفاده می‌کنند؛
 `nemotron-3-ultra-free` از OpenAI-compatible Chat Completions استفاده می‌کند. مدل ناشناخته همچنان
