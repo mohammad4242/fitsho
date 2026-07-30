@@ -64,7 +64,7 @@ it("links the primary CTA to the active workout plan", async () => {
   );
 });
 
-it("uses the supplied strength still in the Today header", async () => {
+it("uses the supplied strength video behind the Today page", async () => {
   workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
 
   render(
@@ -73,9 +73,11 @@ it("uses the supplied strength still in the Today header", async () => {
     </MemoryRouter>,
   );
 
-  const hero = await screen.findByRole("heading", { name: "سلام، محمد" });
-  expect(hero.closest("section")?.querySelector("img")).toHaveAttribute(
-    "src",
+  await screen.findByRole("heading", { name: "سلام، محمد" });
+  const background = screen.getByTestId("member-header-video");
+  expect(background).toHaveAttribute(
+    "poster",
     expect.stringContaining("hero-strength-fallback"),
   );
+  expect(background.parentElement).toHaveClass("member-page-background");
 });

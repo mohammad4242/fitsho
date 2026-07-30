@@ -1,4 +1,5 @@
-.workout-plan-shell { min-height: 100svh; padding: 1.3rem clamp(1rem, 4vw, 4rem) 5rem; background: radial-gradient(circle at 92% 2%, rgb(242 107 74 / 13%), transparent 19rem), var(--mist-50); }
+.workout-plan-shell { position: relative; min-height: 100svh; padding: 1.3rem clamp(1rem, 4vw, 4rem) 5rem; background: radial-gradient(circle at 92% 2%, rgb(242 107 74 / 13%), transparent 19rem), var(--mist-50); }
+.workout-plan-shell > :not(.member-page-background) { position: relative; z-index: 1; }
 .workout-plan-main { max-width: 78rem; margin: 2.5rem auto 0; }
 .workout-plan-hero { display: flex; justify-content: space-between; align-items: end; gap: 2rem; padding: clamp(2rem, 5vw, 4rem); color: var(--paper); background: var(--petrol-900); border-radius: 2.3rem 0.5rem 2.3rem 2.3rem; box-shadow: 0 1.5rem 4rem rgb(18 51 50 / 16%); }
 .workout-plan-hero h1, .workout-schedule h2, .workout-empty h2 { margin: 0; font-size: clamp(2.3rem, 5vw, 4.5rem); line-height: .95; letter-spacing: -.055em; }
@@ -27,7 +28,8 @@
   overflow: hidden;
   border: 1px solid rgb(80 223 206 / 24%);
   border-radius: var(--fitsho-radius-card);
-  background: linear-gradient(125deg, var(--fitsho-petrol), var(--fitsho-teal));
+  background: rgb(10 31 30 / 46%);
+  backdrop-filter: blur(8px);
 }
 .workout-plan-hero::after { position: absolute; inset: auto -4rem -7rem auto; width: 18rem; aspect-ratio: 1; border: 1px solid rgb(80 223 206 / 30%); border-radius: 50%; box-shadow: 0 0 0 2rem rgb(80 223 206 / 6%), 0 0 0 4rem rgb(80 223 206 / 4%); content: ""; }
 .workout-plan-hero__content, .workout-plan-hero h1 { position: relative; z-index: 1; }

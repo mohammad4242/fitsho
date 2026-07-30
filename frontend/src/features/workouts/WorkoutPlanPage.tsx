@@ -62,10 +62,14 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
 
   return (
     <div className="workout-plan-shell">
+      <MemberHeaderMedia
+        imageSrc={planFocusFallback}
+        videoSrc={planFocusVideo}
+        className="member-page-background"
+      />
       <AuthenticatedHeader />
       <main className="workout-plan-main">
         <header className="workout-plan-hero">
-          <MemberHeaderMedia imageSrc={planFocusFallback} videoSrc={planFocusVideo} />
           <div className="workout-plan-hero__content">
             <p className="eyebrow">{t("workoutPlan.eyebrow")}</p>
             <h1 className="fitsho-display">{t("workoutPlan.title")}</h1>

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
 import heroStrengthFallback from "../assets/landing/hero-strength-fallback.jpg";
+import heroStrengthVideo from "../assets/landing/hero-strength.mp4";
 import planFocusFallback from "../assets/landing/plan-focus-fallback.jpg";
 import progressDriveFallback from "../assets/landing/progress-drive-fallback.jpg";
 import { useAuth } from "../features/auth/AuthContext";
@@ -68,10 +69,14 @@ export function DashboardPage() {
 
   return (
     <main className="today-shell">
+      <MemberHeaderMedia
+        imageSrc={heroStrengthFallback}
+        videoSrc={heroStrengthVideo}
+        className="member-page-background"
+      />
       <AuthenticatedHeader />
 
       <section className="today-hero" aria-labelledby="today-title">
-        <MemberHeaderMedia imageSrc={heroStrengthFallback} className="today-hero__media" />
         <div className="today-hero__content">
           <p className="today-kicker">{t("dashboard.kicker")}</p>
           <h1 id="today-title" className="fitsho-display">
