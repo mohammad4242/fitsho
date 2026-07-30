@@ -56,13 +56,15 @@ def _plan() -> dict[str, object]:
 
 def _provider(
     handler: httpx.AsyncBaseTransport | httpx.MockTransport,
+    *,
+    model: str = "gpt-5.6-terra",
 ) -> OpenCodeZenWorkoutPlanProvider:
     client = httpx.AsyncClient(transport=handler)
     return OpenCodeZenWorkoutPlanProvider(
         client,
         api_key="test-secret-key",
         base_url="https://zen.example/v1/",
-        model="gpt-5.6-terra",
+        model=model,
         timeout_seconds=8,
     )
 
@@ -105,6 +107,68 @@ def test_zen_provider_uses_responses_api_and_parses_structured_output() -> None:
     output_format = text["format"]
     assert isinstance(output_format, dict)
     assert output_format["type"] == "json_schema"
+
+
+def test_nemotron_provider_uses_chat_completions_and_parses_choices_output() -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "id": "chatcmpl_123",
+                "usage": {"prompt_tokens": 12, "completion_tokens": 34},
+                "choices": [{"message": {"content": json.dumps(_plan())}}],
+            },
+        )
+
+    provider = _provider(httpx.MockTransport(handler), model="nemotron-3-ultra-free")
+    response = _run(provider.generate_plan(_request()))
+
+    assert response.provider_request_id == "chatcmpl_123"
+    assert response.input_tokens == 12
+    assert response.output_tokens == 34
+    assert seen["url"] == "https://zen.example/v1/chat/completions"
+    body = seen["body"]
+    assert isinstance(body, dict)
+    assert body == {
+        "model": "nemotron-3-ultra-free",
+        "messages": [
+            {"role": "system", "content": _request().system_prompt},
+            {
+                "role": "user",
+                "content": json.dumps(
+                    _request().input_payload, ensure_ascii=False, separators=(",", ":")
+                ),
+            },
+        ],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "fitsho_workout_plan",
+                "strict": True,
+                "schema": WORKOUT_PLAN_OUTPUT_SCHEMA,
+            },
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "choices",
+    [[], [{}], [{"message": {}}], [{"message": {"content": None}}]],
+)
+def test_nemotron_provider_rejects_malformed_choices(choices: list[object]) -> None:
+    provider = _provider(
+        httpx.MockTransport(lambda request: httpx.Response(200, json={"choices": choices})),
+        model="nemotron-3-ultra-free",
+    )
+
+    with pytest.raises(WorkoutProviderError) as exc_info:
+        _run(provider.generate_plan(_request()))
+
+    assert exc_info.value.code is ProviderErrorCode.MALFORMED_RESPONSE
 
 
 def test_zen_response_schema_requires_nullable_notes_keys() -> None:

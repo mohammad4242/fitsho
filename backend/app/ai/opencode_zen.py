@@ -16,6 +16,8 @@ from app.ai.schemas import (
 
 
 class OpenCodeZenWorkoutPlanProvider:
+    _CHAT_COMPLETIONS_MODELS = frozenset({"nemotron-3-ultra-free"})
+
     def __init__(
         self,
         client: httpx.AsyncClient,
@@ -27,8 +29,10 @@ class OpenCodeZenWorkoutPlanProvider:
     ) -> None:
         self._client = client
         self._api_key = api_key
-        self._endpoint = f"{base_url.rstrip('/')}/responses"
         self._model = model
+        self._uses_chat_completions = model in self._CHAT_COMPLETIONS_MODELS
+        endpoint = "chat/completions" if self._uses_chat_completions else "responses"
+        self._endpoint = f"{base_url.rstrip('/')}/{endpoint}"
         self._timeout = httpx.Timeout(timeout_seconds)
 
     async def generate_plan(
@@ -63,7 +67,7 @@ class OpenCodeZenWorkoutPlanProvider:
 
         self._raise_for_status(response)
         payload = self._parse_response_envelope(response)
-        plan = self._parse_plan(payload)
+        plan = self._parse_plan(payload, chat_completions=self._uses_chat_completions)
         usage = payload.get("usage")
         usage_data = usage if isinstance(usage, dict) else {}
         provider_request_id = payload.get("id")
@@ -72,8 +76,14 @@ class OpenCodeZenWorkoutPlanProvider:
             provider_request_id=provider_request_id
             if isinstance(provider_request_id, str)
             else None,
-            input_tokens=self._optional_int(usage_data.get("input_tokens")),
-            output_tokens=self._optional_int(usage_data.get("output_tokens")),
+            input_tokens=self._optional_int(
+                usage_data.get("prompt_tokens" if self._uses_chat_completions else "input_tokens")
+            ),
+            output_tokens=self._optional_int(
+                usage_data.get(
+                    "completion_tokens" if self._uses_chat_completions else "output_tokens"
+                )
+            ),
         )
 
     def _api_key_value(self) -> str | None:
@@ -84,6 +94,29 @@ class OpenCodeZenWorkoutPlanProvider:
         return None
 
     def _request_body(self, request: WorkoutGenerationModelRequest) -> dict[str, object]:
+        if self._uses_chat_completions:
+            return {
+                "model": self._model,
+                "messages": [
+                    {"role": "system", "content": request.system_prompt},
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            request.input_payload,
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                        ),
+                    },
+                ],
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "fitsho_workout_plan",
+                        "strict": True,
+                        "schema": request.response_schema,
+                    },
+                },
+            }
         return {
             "model": self._model,
             "instructions": request.system_prompt,
@@ -153,8 +186,14 @@ class OpenCodeZenWorkoutPlanProvider:
         return payload
 
     @staticmethod
-    def _parse_plan(payload: dict[str, Any]) -> WorkoutPlanModelOutput:
-        output_text = OpenCodeZenWorkoutPlanProvider._extract_output_text(payload)
+    def _parse_plan(
+        payload: dict[str, Any], *, chat_completions: bool
+    ) -> WorkoutPlanModelOutput:
+        output_text = (
+            OpenCodeZenWorkoutPlanProvider._extract_chat_completions_output_text(payload)
+            if chat_completions
+            else OpenCodeZenWorkoutPlanProvider._extract_output_text(payload)
+        )
         try:
             plan_payload = json.loads(output_text)
         except json.JSONDecodeError as error:
@@ -202,6 +241,34 @@ class OpenCodeZenWorkoutPlanProvider:
             ProviderErrorCode.MALFORMED_RESPONSE,
             "Workout generation returned an invalid response.",
         )
+
+    @staticmethod
+    def _extract_chat_completions_output_text(payload: dict[str, Any]) -> str:
+        choices = payload.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise WorkoutProviderError(
+                ProviderErrorCode.MALFORMED_RESPONSE,
+                "Workout generation returned an invalid response.",
+            )
+        first_choice = choices[0]
+        if not isinstance(first_choice, dict):
+            raise WorkoutProviderError(
+                ProviderErrorCode.MALFORMED_RESPONSE,
+                "Workout generation returned an invalid response.",
+            )
+        message = first_choice.get("message")
+        if not isinstance(message, dict):
+            raise WorkoutProviderError(
+                ProviderErrorCode.MALFORMED_RESPONSE,
+                "Workout generation returned an invalid response.",
+            )
+        content = message.get("content")
+        if not isinstance(content, str):
+            raise WorkoutProviderError(
+                ProviderErrorCode.MALFORMED_RESPONSE,
+                "Workout generation returned an invalid response.",
+            )
+        return content
 
     @staticmethod
     def _optional_int(value: object) -> int | None:
