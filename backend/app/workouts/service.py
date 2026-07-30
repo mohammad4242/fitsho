@@ -10,7 +10,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.ai.provider import WorkoutPlanModelProvider
+from app.ai.routing import ModelProviderCandidate
 from app.ai.schemas import (
     ProviderErrorCode,
     WorkoutGenerationModelRequest,
@@ -67,6 +67,12 @@ class ActiveWorkoutPlanResult:
     is_stale: bool
 
 
+@dataclass(frozen=True)
+class ModelGenerationResponse:
+    model_id: str
+    response: WorkoutGenerationModelResponse
+
+
 class GenerationInProgressError(Exception):
     pass
 
@@ -94,11 +100,13 @@ class WorkoutGenerationService:
         self,
         db: Session,
         *,
-        provider: WorkoutPlanModelProvider,
+        providers: tuple[ModelProviderCandidate, ...],
         settings: WorkoutGenerationSettings,
     ) -> None:
+        if not providers:
+            raise ValueError("At least one workout model provider is required")
         self._db = db
-        self._provider = provider
+        self._providers = providers
         self._settings = settings
 
     async def generate(self, user_id: UUID) -> WorkoutPlanGenerationResult:
@@ -126,7 +134,7 @@ class WorkoutGenerationService:
         generation = self._start_generation(user_id, len(candidates.exercises))
         started_at = perf_counter()
         try:
-            response = await self._generate_valid_response(
+            model_response = await self._generate_valid_response(
                 request=request,
                 candidates=candidates,
                 policy=policy,
@@ -141,12 +149,14 @@ class WorkoutGenerationService:
                 signature=signature,
                 profile_snapshot=self._profile_snapshot(request),
                 candidate_set_hash=candidates.candidate_set_hash,
-                response=response.plan,
+                response=model_response.response.plan,
                 policy=policy,
+                model_id=model_response.model_id,
             )
-            generation.provider_request_id = response.provider_request_id
-            generation.input_tokens = response.input_tokens
-            generation.output_tokens = response.output_tokens
+            generation.model_id = model_response.model_id
+            generation.provider_request_id = model_response.response.provider_request_id
+            generation.input_tokens = model_response.response.input_tokens
+            generation.output_tokens = model_response.response.output_tokens
             generation.latency_ms = int((perf_counter() - started_at) * 1000)
             activate_plan(self._db, plan, generation)
             self._db.commit()
@@ -181,7 +191,7 @@ class WorkoutGenerationService:
                 self._db,
                 user_id=user_id,
                 provider=self._settings.provider_name,
-                model_id=self._settings.model_id,
+                model_id=self._providers[0].model_id,
                 candidate_count=candidate_count,
             )
             self._db.commit()
@@ -197,37 +207,50 @@ class WorkoutGenerationService:
         candidates: CandidateSet,
         policy: WorkoutGenerationPolicy,
         required_day_count: int,
-    ) -> WorkoutGenerationModelResponse:
-
+    ) -> ModelGenerationResponse:
         validator = WorkoutPlanValidator(
             candidates=candidates,
             policy=policy,
             required_day_count=required_day_count,
         )
-        response = await self._provider.generate_plan(request)
-        try:
-            validator.validate(response.plan)
-            return response
-        except WorkoutPlanValidationError as initial_error:
-            if self._settings.max_repair_attempts < 1:
-                raise
-            repair_request = replace(
-                request,
-                input_payload={
-                    **request.input_payload,
-                    "repair": {
-                        "instruction": (
-                            "Return the complete plan again using the same allowed exercises."
-                        ),
-                        "validation_problems": [
-                            problem.to_repair_payload() for problem in initial_error.problems
-                        ],
-                    },
-                },
-            )
-            repaired = await self._provider.generate_plan(repair_request)
-            validator.validate(repaired.plan)
-            return repaired
+        last_error: WorkoutProviderError | WorkoutPlanValidationError | None = None
+        for candidate in self._providers:
+            try:
+                response = await candidate.provider.generate_plan(request)
+                try:
+                    validator.validate(response.plan)
+                    return ModelGenerationResponse(candidate.model_id, response)
+                except WorkoutPlanValidationError as initial_error:
+                    if self._settings.max_repair_attempts < 1:
+                        last_error = initial_error
+                        continue
+                    repair_request = replace(
+                        request,
+                        input_payload={
+                            **request.input_payload,
+                            "repair": {
+                                "instruction": (
+                                    "Return the complete plan again using the same "
+                                    "allowed exercises."
+                                ),
+                                "validation_problems": [
+                                    problem.to_repair_payload()
+                                    for problem in initial_error.problems
+                                ],
+                            },
+                        },
+                    )
+                    repaired = await candidate.provider.generate_plan(repair_request)
+                    validator.validate(repaired.plan)
+                    return ModelGenerationResponse(candidate.model_id, repaired)
+            except (WorkoutProviderError, WorkoutPlanValidationError) as error:
+                last_error = error
+        if last_error is not None:
+            raise last_error
+        raise WorkoutProviderError(
+            ProviderErrorCode.PROVIDER_UNAVAILABLE,
+            "Workout generation is unavailable. Please try again.",
+        )
 
     @staticmethod
     def _profile_snapshot(request: WorkoutGenerationModelRequest) -> dict[str, object]:
@@ -245,6 +268,7 @@ class WorkoutGenerationService:
         candidate_set_hash: str,
         response: WorkoutPlanModelOutput,
         policy: WorkoutGenerationPolicy,
+        model_id: str,
     ) -> WorkoutPlan:
 
         plan = WorkoutPlan(
@@ -253,7 +277,7 @@ class WorkoutGenerationService:
             generation_signature=signature,
             profile_snapshot=profile_snapshot,
             provider=self._settings.provider_name,
-            model_id=self._settings.model_id,
+            model_id=model_id,
             prompt_version=self._settings.prompt_version,
             generation_policy_version=self._settings.generation_policy_version,
             candidate_set_hash=candidate_set_hash,

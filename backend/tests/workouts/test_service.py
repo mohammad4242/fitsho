@@ -7,11 +7,14 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.ai.fake_provider import FakeWorkoutPlanModelProvider
+from app.ai.routing import ModelProviderCandidate
 from app.ai.schemas import (
+    ProviderErrorCode,
     WorkoutGenerationModelResponse,
     WorkoutPlanDayOutput,
     WorkoutPlanExerciseOutput,
     WorkoutPlanModelOutput,
+    WorkoutProviderError,
 )
 from app.auth.models import User
 from app.exercises.enums import (
@@ -132,11 +135,13 @@ def _service(
     db: Session,
     provider: FakeWorkoutPlanModelProvider,
     *,
+    candidates: tuple[ModelProviderCandidate, ...] | None = None,
     cooldown_seconds: int = 0,
 ) -> WorkoutGenerationService:
     return WorkoutGenerationService(
         db,
-        provider=provider,
+        providers=candidates
+        or (ModelProviderCandidate(model_id="fake-model", provider=provider),),
         settings=WorkoutGenerationSettings(
             provider_name="fake",
             model_id="fake-model",
@@ -182,6 +187,31 @@ def test_invalid_response_is_repaired_once_before_persistence(db: Session) -> No
     assert not result.reused
     assert len(provider.calls) == 2
     assert "repair" in provider.calls[1].input_payload
+
+
+def test_generation_falls_back_to_the_next_model_after_a_provider_error(db: Session) -> None:
+    user = _user_with_profile(db)
+    exercises = _seed_candidates(db)
+    unavailable = FakeWorkoutPlanModelProvider(
+        [WorkoutProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE, "Unavailable")]
+    )
+    working = FakeWorkoutPlanModelProvider([_response([item.id for item in exercises])])
+
+    result = asyncio.run(
+        _service(
+            db,
+            unavailable,
+            candidates=(
+                ModelProviderCandidate(model_id="first-free", provider=unavailable),
+                ModelProviderCandidate(model_id="second-free", provider=working),
+            ),
+        ).generate(user.id)
+    )
+
+    assert len(unavailable.calls) == 1
+    assert len(working.calls) == 1
+    assert result.plan.model_id == "second-free"
+    assert result.plan.generation_records[0].model_id == "second-free"
 
 
 def test_failed_replacement_preserves_previous_active_plan(db: Session) -> None:
