@@ -4,6 +4,8 @@ import pytest
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
+from app.admin.ai_models import update_ai_routing
+from app.admin.schemas import AdminAiRoutingUpdate
 from app.ai.catalog import (
     NoEnabledRouteModelsError,
     get_model_by_id,
@@ -84,3 +86,22 @@ def test_unknown_zen_id_is_disabled_until_admin_classifies_it(db: Session) -> No
     assert model.classification_required is True
     assert model.api_kind is None
     assert model.billing_class is None
+
+
+def test_admin_routing_change_applies_to_the_next_generation_without_restart(
+    db: Session,
+) -> None:
+    settings = _reset_models(db, RoutingMode.MANUAL)
+    first = _model("first-free", BillingClass.FREE, priority=10)
+    second = _model("second-free", BillingClass.FREE, priority=20)
+    db.add_all([first, second])
+    db.flush()
+    settings.manual_model_id = first.id
+    db.commit()
+
+    update_ai_routing(
+        db,
+        AdminAiRoutingUpdate(mode=RoutingMode.MANUAL, manual_model_id=second.id),
+    )
+
+    assert [model.model_id for model in select_route_models(db)] == ["second-free"]
