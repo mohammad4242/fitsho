@@ -63,7 +63,7 @@ it("links the primary CTA to the active workout plan", async () => {
   );
 });
 
-it("removes the two story-image chapters from the Today page", async () => {
+it("keeps the scrolling chapters and uses two different videos instead of images", async () => {
   workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
 
   render(
@@ -73,8 +73,16 @@ it("removes the two story-image chapters from the Today page", async () => {
   );
 
   await screen.findByRole("heading", { name: "سلام، محمد" });
-  expect(screen.queryByLabelText("مسیر امروز")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("مسیر امروز")).toBeInTheDocument();
   expect(document.querySelector(".today-story__image")).not.toBeInTheDocument();
+  expect(document.querySelector(".today-story__video--plan video")).toHaveAttribute(
+    "poster",
+    expect.stringContaining("plan-focus-fallback"),
+  );
+  expect(document.querySelector(".today-story__video--progress video")).toHaveAttribute(
+    "poster",
+    expect.stringContaining("progress-drive-fallback"),
+  );
 });
 
 it("uses the supplied strength video behind the Today page", async () => {
@@ -87,7 +95,8 @@ it("uses the supplied strength video behind the Today page", async () => {
   );
 
   await screen.findByRole("heading", { name: "سلام، محمد" });
-  const background = screen.getByTestId("member-header-video");
+  const background = document.querySelector(".member-page-background video");
+  if (background === null) throw new Error("Today background video is missing");
   expect(background).toHaveAttribute(
     "poster",
     expect.stringContaining("hero-strength-fallback"),
