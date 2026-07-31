@@ -21,6 +21,10 @@ from app.ai.schemas import (
 )
 from app.profile.service import ProfileSnapshot, get_profile
 from app.workouts.candidate_selector import WorkoutCandidateSelector
+from app.workouts.deterministic_generator import (
+    DETERMINISTIC_MODEL_ID,
+    DeterministicWorkoutPlanGenerator,
+)
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise, WorkoutPlanGeneration
 from app.workouts.normalizer import normalize_workout_plan
@@ -57,6 +61,7 @@ class WorkoutGenerationSettings:
     max_candidates: int
     max_request_bytes: int
     warmup_minutes: int
+    deterministic_fallback_enabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -172,6 +177,7 @@ class WorkoutGenerationService:
         try:
             model_response = await self._generate_valid_response(
                 request=request,
+                profile=profile,
                 candidates=candidates,
                 policy=policy,
                 required_day_count=profile.training_days_per_week,
@@ -250,6 +256,7 @@ class WorkoutGenerationService:
         self,
         *,
         request: WorkoutGenerationModelRequest,
+        profile: WorkoutGenerationProfile,
         candidates: CandidateSet,
         policy: WorkoutGenerationPolicy,
         required_day_count: int,
@@ -311,6 +318,23 @@ class WorkoutGenerationService:
                     return ModelGenerationResponse(candidate.model_id, repaired)
             except (WorkoutProviderError, WorkoutPlanValidationError) as error:
                 last_error = error
+        if self._settings.deterministic_fallback_enabled:
+            plan = DeterministicWorkoutPlanGenerator().generate(profile, candidates, policy)
+            plan = normalize_workout_plan(plan, candidates)
+            validator.validate(plan)
+            logger.warning(
+                "workout_plan_deterministic_fallback model_id=%s",
+                DETERMINISTIC_MODEL_ID,
+            )
+            return ModelGenerationResponse(
+                DETERMINISTIC_MODEL_ID,
+                WorkoutGenerationModelResponse(
+                    plan=plan,
+                    provider_request_id=None,
+                    input_tokens=None,
+                    output_tokens=None,
+                ),
+            )
         if last_error is not None:
             raise last_error
         raise WorkoutProviderError(

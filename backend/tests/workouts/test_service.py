@@ -137,7 +137,11 @@ def _service(
     *,
     candidates: tuple[ModelProviderCandidate, ...] | None = None,
     cooldown_seconds: int = 0,
+    deterministic_fallback_enabled: bool = False,
 ) -> WorkoutGenerationService:
+    settings_kwargs: dict[str, object] = {}
+    if deterministic_fallback_enabled:
+        settings_kwargs["deterministic_fallback_enabled"] = True
     return WorkoutGenerationService(
         db,
         providers=candidates
@@ -153,6 +157,7 @@ def _service(
             max_candidates=80,
             max_request_bytes=262144,
             warmup_minutes=5,
+            **settings_kwargs,  # type: ignore[arg-type]
         ),
     )
 
@@ -261,6 +266,27 @@ def test_generation_falls_back_to_the_next_model_after_a_provider_error(db: Sess
     assert len(working.calls) == 1
     assert result.plan.model_id == "second-free"
     assert result.plan.generation_records[0].model_id == "second-free"
+
+
+def test_generation_uses_deterministic_fallback_after_all_models_fail(db: Session) -> None:
+    user = _user_with_profile(db)
+    _seed_candidates(db)
+    unavailable = FakeWorkoutPlanModelProvider(
+        [WorkoutProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE, "Unavailable")]
+    )
+
+    result = asyncio.run(
+        _service(
+            db,
+            unavailable,
+            deterministic_fallback_enabled=True,
+        ).generate(user.id)
+    )
+
+    assert not result.reused
+    assert result.plan.model_id == "fitsho-deterministic-v1"
+    assert result.plan.status is WorkoutPlanStatus.ACTIVE
+    assert result.plan.generation_records[0].model_id == "fitsho-deterministic-v1"
 
 
 def test_failed_replacement_preserves_previous_active_plan(db: Session) -> None:
