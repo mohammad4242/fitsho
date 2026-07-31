@@ -164,11 +164,16 @@ def test_admin_can_run_a_model_health_check(
     model = _custom_model(db)
     test_settings.opencode_zen_api_key = SecretStr("test-key")
     original_client = client.app.state.zen_http_client
-    seen: dict[str, object] = {}
+    request_bodies: list[dict[str, object]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        seen["body"] = request.read()
-        return httpx.Response(200, json={"id": "health-check"})
+        request_bodies.append(json.loads(request.read()))
+        if len(request_bodies) == 1:
+            return httpx.Response(200, json={"id": "health-check"})
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"status":"ok"}'}}]},
+        )
 
     mock_client = httpx.AsyncClient(
         transport=httpx.MockTransport(handler)
@@ -191,12 +196,57 @@ def test_admin_can_run_a_model_health_check(
         "created_at": response.json()["test_run"]["created_at"],
     }
     assert db.get(AiModel, model.id).last_checked_at is not None  # type: ignore[union-attr]
-    request_body = json.loads(seen["body"])
-    assert request_body == {
+    assert request_bodies[0] == {
         "model": "custom-workout-model",
         "messages": [{"role": "user", "content": "Reply only: OK"}],
         "max_tokens": 1,
     }
+    assert request_bodies[1]["response_format"] == {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "fitsho_model_test_contract",
+            "strict": True,
+            "schema": request_bodies[1]["response_format"]["json_schema"]["schema"],
+        },
+    }
+    assert "profile" not in json.dumps(request_bodies)
+
+
+def test_admin_model_test_requires_compact_structured_output(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    _make_current_user_admin(client, db)
+    model = _custom_model(db)
+    test_settings.opencode_zen_api_key = SecretStr("test-key")
+    original_client = client.app.state.zen_http_client
+    requests: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.read()))
+        if len(requests) == 1:
+            return httpx.Response(200, json={"id": "available"})
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"status":"no"}'}}]},
+        )
+
+    mock_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client.app.state.zen_http_client = mock_client
+    try:
+        response = client.post(f"/api/v1/admin/ai-models/{model.id}/test", headers=ORIGIN)
+    finally:
+        asyncio.run(mock_client.aclose())
+        client.app.state.zen_http_client = original_client
+
+    assert response.status_code == 200
+    assert response.json()["success"] is False
+    assert response.json()["test_run"]["error_code"] == "invalid_output"
+    assert "structured JSON" in response.json()["test_run"]["safe_error_message"]
+    assert len(requests) == 2
+    assert "profile" not in json.dumps(requests)
+    assert "allowed_exercises" not in json.dumps(requests)
 
 
 def test_admin_retains_successful_and_failed_model_test_runs(
@@ -213,8 +263,13 @@ def test_admin_retains_successful_and_failed_model_test_runs(
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal calls
         calls += 1
-        if calls == 1:
+        if calls in {1, 3}:
             return httpx.Response(200, json={"id": "available"})
+        if calls == 2:
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": '{"status":"ok"}'}}]},
+            )
         return httpx.Response(
             200,
             json={"error": {"type": "server_error", "message": "upstream failed"}},

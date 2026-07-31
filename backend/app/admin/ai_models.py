@@ -200,6 +200,7 @@ async def check_ai_model(
     model.last_checked_at = datetime.now(UTC)
     try:
         await provider.check_availability()
+        await provider.check_model_test_contract()
     except WorkoutProviderError as error:
         model.last_error_code = error.code.value
         model.last_error_message = error.safe_message
