@@ -117,10 +117,6 @@ class WorkoutGenerationFailedError(Exception):
         self.error_code = error_code
 
 
-class GenerationInputsChangedError(Exception):
-    pass
-
-
 class WorkoutGenerationService:
     def __init__(
         self,
@@ -133,7 +129,6 @@ class WorkoutGenerationService:
         self._db = db
         self._settings = settings
         self._ruleset = ruleset
-        self._legacy_providers = providers
 
     async def generate(
         self,
