@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict, deque
 from dataclasses import dataclass
 
 from app.ai.schemas import WorkoutPlanDayOutput, WorkoutPlanExerciseOutput, WorkoutPlanModelOutput
@@ -32,13 +33,13 @@ class DeterministicWorkoutPlanGenerator:
         candidates: CandidateSet,
         policy: WorkoutGenerationPolicy,
     ) -> WorkoutPlanModelOutput:
-        ordered = sorted(candidates.exercises, key=self._candidate_rank)
+        ordered = self._balanced_candidates(candidates.exercises)
         exercise_count = min(policy.maximum_exercises_per_day, len(ordered))
         prescription = self._prescription(profile, policy)
         days: list[WorkoutPlanDayOutput] = []
         for day_index in range(profile.training_days_per_week):
             rotated = ordered[day_index % len(ordered) :] + ordered[: day_index % len(ordered)]
-            selected = rotated[:exercise_count]
+            selected = sorted(rotated[:exercise_count], key=self._candidate_rank)
             outputs = [self._exercise(candidate, prescription, policy) for candidate in selected]
             timing = [
                 ExerciseTiming(sets=item.sets, rest_seconds=item.rest_seconds)
@@ -55,6 +56,24 @@ class DeterministicWorkoutPlanGenerator:
                 )
             )
         return WorkoutPlanModelOutput(days=days)
+
+    @classmethod
+    def _balanced_candidates(
+        cls,
+        candidates: tuple[WorkoutExerciseCandidate, ...],
+    ) -> list[WorkoutExerciseCandidate]:
+        by_muscle: dict[str, deque[WorkoutExerciseCandidate]] = defaultdict(deque)
+        for candidate in sorted(candidates, key=cls._candidate_rank):
+            muscle_key = candidate.primary_muscle.value if candidate.primary_muscle else "unknown"
+            by_muscle[muscle_key].append(candidate)
+
+        ordered: list[WorkoutExerciseCandidate] = []
+        muscle_keys = sorted(by_muscle)
+        while any(by_muscle.values()):
+            for muscle_key in muscle_keys:
+                if by_muscle[muscle_key]:
+                    ordered.append(by_muscle[muscle_key].popleft())
+        return ordered
 
     @staticmethod
     def _candidate_rank(candidate: WorkoutExerciseCandidate) -> tuple[int, int, str, str]:

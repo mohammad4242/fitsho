@@ -207,7 +207,7 @@ class AdminAiValidationProblem(BaseModel):
 
 class AdminAiValidationDiagnostic(BaseModel):
     model_id: str
-    phase: Literal["initial", "repair"]
+    phase: Literal["initial", "repair", "fallback"]
     problems: list[AdminAiValidationProblem]
 
 

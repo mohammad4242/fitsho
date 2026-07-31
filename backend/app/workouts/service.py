@@ -321,7 +321,22 @@ class WorkoutGenerationService:
         if self._settings.deterministic_fallback_enabled:
             plan = DeterministicWorkoutPlanGenerator().generate(profile, candidates, policy)
             plan = normalize_workout_plan(plan, candidates)
-            validator.validate(plan)
+            try:
+                validator.validate(plan)
+            except WorkoutPlanValidationError as fallback_error:
+                _log_validation_failure(
+                    DETERMINISTIC_MODEL_ID,
+                    "fallback",
+                    fallback_error,
+                )
+                validation_diagnostics.append(
+                    _validation_diagnostic(
+                        DETERMINISTIC_MODEL_ID,
+                        "fallback",
+                        fallback_error,
+                    )
+                )
+                raise
             logger.warning(
                 "workout_plan_deterministic_fallback model_id=%s",
                 DETERMINISTIC_MODEL_ID,

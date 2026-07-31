@@ -1,5 +1,5 @@
 from decimal import Decimal
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from app.exercises.enums import Difficulty, ExerciseType, MovementPattern, MuscleGroup
 from app.profile.enums import ExperienceLevel, FitnessGoal, TrainingLocation
@@ -70,3 +70,57 @@ def test_deterministic_generator_returns_repeatable_validator_approved_plan() ->
         policy=policy,
         required_day_count=3,
     ).validate(first)
+
+
+def test_deterministic_generator_balances_an_uneven_candidate_catalogue() -> None:
+    profile = WorkoutGenerationProfile(
+        fitness_goal=FitnessGoal.BUILD_MUSCLE,
+        experience_level=ExperienceLevel.INTERMEDIATE,
+        training_days_per_week=4,
+        training_location=TrainingLocation.GYM,
+        home_training_setup=None,
+        session_duration_minutes=60,
+        plan_duration_weeks=4,
+        training_cautions=(),
+        physical_limitations=None,
+        current_weight_kg=Decimal("75"),
+    )
+    muscles = [MuscleGroup.BACK] * 8 + [
+        MuscleGroup.CHEST,
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.SHOULDERS,
+        MuscleGroup.GLUTES,
+        MuscleGroup.BICEPS,
+        MuscleGroup.TRICEPS,
+        MuscleGroup.ABS,
+    ]
+    exercises = tuple(
+        WorkoutExerciseCandidate(
+            id=UUID(int=index + 1),
+            primary_muscle=muscle,
+            secondary_muscles=(),
+            movement_pattern=MovementPattern.HORIZONTAL_PULL,
+            exercise_type=ExerciseType.COMPOUND,
+            equipment=(),
+            difficulty=Difficulty.INTERMEDIATE,
+            caution_tags=(),
+        )
+        for index, muscle in enumerate(muscles)
+    )
+    candidates = CandidateSet(
+        exercises=exercises,
+        candidate_set_hash="uneven-candidates",
+        soft_cautions=(),
+        minimum_candidate_count=5,
+        minimum_movement_pattern_count=2,
+    )
+    policy = WorkoutGenerationPolicy.for_session_duration(60)
+
+    plan = DeterministicWorkoutPlanGenerator().generate(profile, candidates, policy)
+
+    WorkoutPlanValidator(
+        candidates=candidates,
+        policy=policy,
+        required_day_count=4,
+    ).validate(plan)

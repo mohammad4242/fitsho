@@ -168,7 +168,7 @@ export type AdminAiValidationProblem = {
 
 export type AdminAiValidationDiagnostic = {
   model_id: string;
-  phase: "initial" | "repair";
+  phase: "initial" | "repair" | "fallback";
   problems: AdminAiValidationProblem[];
 };
 

@@ -289,6 +289,45 @@ def test_generation_uses_deterministic_fallback_after_all_models_fail(db: Sessio
     assert result.plan.generation_records[0].model_id == "fitsho-deterministic-v1"
 
 
+def test_invalid_deterministic_fallback_records_exact_validation_problems(
+    db: Session,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = _user_with_profile(db)
+    exercises = _seed_candidates(db)
+    unavailable = FakeWorkoutPlanModelProvider(
+        [WorkoutProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE, "Unavailable")]
+    )
+    invalid_plan = _response([exercises[0].id, exercises[0].id]).plan
+    monkeypatch.setattr(
+        "app.workouts.service.DeterministicWorkoutPlanGenerator.generate",
+        lambda *_args, **_kwargs: invalid_plan,
+    )
+
+    with caplog.at_level("WARNING", logger="app.workouts.service"):
+        with pytest.raises(WorkoutGenerationFailedError):
+            asyncio.run(
+                _service(
+                    db,
+                    unavailable,
+                    deterministic_fallback_enabled=True,
+                ).generate(user.id)
+            )
+
+    generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
+    assert generation.validation_diagnostics is not None
+    assert generation.validation_diagnostics[0]["model_id"] == "fitsho-deterministic-v1"
+    assert generation.validation_diagnostics[0]["phase"] == "fallback"
+    assert generation.validation_diagnostics[0]["problems"][0]["code"] == "duplicate_exercise"
+    fallback_records = [
+        record
+        for record in caplog.records
+        if record.__dict__.get("validation_phase") == "fallback"
+    ]
+    assert len(fallback_records) == 1
+
+
 def test_failed_replacement_preserves_previous_active_plan(db: Session) -> None:
     user = _user_with_profile(db)
     exercises = _seed_candidates(db)
