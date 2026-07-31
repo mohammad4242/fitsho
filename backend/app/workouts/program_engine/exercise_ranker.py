@@ -63,4 +63,3 @@ def rank_exercises(
         )
     ranked.sort(key=lambda item: (-item[0].score, item[1], str(item[0].exercise.id)))
     return tuple(item[0] for item in ranked)
-

@@ -69,9 +69,10 @@ def filter_eligible_exercises(
             reasons.append("EXERCISE_REJECTED_IMPACT_LIMIT")
         if _LIMIT_RANK[exercise.axial_loading_level] > _LIMIT_RANK[constraints.axial_load_limit]:
             reasons.append("EXERCISE_REJECTED_AXIAL_LOAD_LIMIT")
-        if _STABILITY_RANK[exercise.stability_demand] > _BALANCE_RANK[
-            constraints.balance_requirement
-        ]:
+        if (
+            _STABILITY_RANK[exercise.stability_demand]
+            > _BALANCE_RANK[constraints.balance_requirement]
+        ):
             reasons.append("EXERCISE_REJECTED_BALANCE_DEMAND")
         if (
             exercise.movement_pattern is MovementPattern.VERTICAL_PUSH
@@ -80,16 +81,11 @@ def filter_eligible_exercises(
             reasons.append("EXERCISE_REJECTED_OVERHEAD_LIMIT")
         if constraints.allowed_range_of_motion and (
             not exercise.range_of_motion_profile
-            or not exercise.range_of_motion_profile.issubset(
-                constraints.allowed_range_of_motion
-            )
+            or not exercise.range_of_motion_profile.issubset(constraints.allowed_range_of_motion)
         ):
             reasons.append("EXERCISE_REJECTED_RANGE_OF_MOTION")
         if reasons:
-            rejected.append(
-                RejectedCandidate(exercise_id=exercise.id, reason_codes=tuple(reasons))
-            )
+            rejected.append(RejectedCandidate(exercise_id=exercise.id, reason_codes=tuple(reasons)))
         else:
             eligible.append(exercise)
     return EligibilityResult(eligible=tuple(eligible), rejected=tuple(rejected))
-

@@ -107,9 +107,7 @@ def test_identical_input_catalog_ruleset_and_seed_are_identical() -> None:
 def test_goal_specific_prescriptions_use_ranges_rir_and_rest() -> None:
     strength = generate_program(request(primary_goal=Goal.STRENGTH), catalog(), RULESET)
     hypertrophy = generate_program(request(primary_goal=Goal.HYPERTROPHY), catalog(), RULESET)
-    endurance = generate_program(
-        request(primary_goal=Goal.MUSCULAR_ENDURANCE), catalog(), RULESET
-    )
+    endurance = generate_program(request(primary_goal=Goal.MUSCULAR_ENDURANCE), catalog(), RULESET)
 
     assert strength.program is not None
     assert hypertrophy.program is not None
@@ -142,9 +140,7 @@ def test_warmup_sets_do_not_count_toward_working_volume() -> None:
     day = result.program.weekly_schedule[0]
     assert day.exercises[0].warmup_sets >= 2
     direct = result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
-    expected = sum(
-        item.sets for item in day.exercises if item.primary_muscle is MuscleGroup.CHEST
-    )
+    expected = sum(item.sets for item in day.exercises if item.primary_muscle is MuscleGroup.CHEST)
     assert direct[MuscleGroup.CHEST.value] == expected
 
 

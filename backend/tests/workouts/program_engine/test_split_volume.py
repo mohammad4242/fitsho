@@ -121,9 +121,7 @@ def test_poor_recovery_reduces_volume_without_falling_below_novice_floor() -> No
     )
     plan = plan_weekly_volume(request, select_split(request, RULESET), RULESET)
 
-    assert plan.direct_sets_for(MuscleGroup.CHEST) == RULESET.minimum_sets[
-        request.training_status
-    ]
+    assert plan.direct_sets_for(MuscleGroup.CHEST) == RULESET.minimum_sets[request.training_status]
     assert "VOLUME_REDUCED_FOR_RECOVERY" in plan.reason_codes
 
 

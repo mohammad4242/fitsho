@@ -87,9 +87,7 @@ def build_sessions(
             )
         )
         if chosen and chosen[0].primary_muscle in request.source.priority_muscles:
-            reasons[chosen[0].id] = reasons[chosen[0].id] + (
-                "PRIORITY_MUSCLE_PLACED_FIRST",
-            )
+            reasons[chosen[0].id] = reasons[chosen[0].id] + ("PRIORITY_MUSCLE_PLACED_FIRST",)
         substitutions = {
             item.id: tuple(
                 alternative.id
@@ -103,11 +101,7 @@ def build_sessions(
             )[:3]
             for item in chosen
         }
-        session_reasons = (
-            ("SESSION_TRIMMED_FOR_TIME_LIMIT",)
-            if capacity < len(slots)
-            else ()
-        )
+        session_reasons = ("SESSION_TRIMMED_FOR_TIME_LIMIT",) if capacity < len(slots) else ()
         sessions.append(
             SessionDraft(
                 day_index=index + 1,

@@ -213,9 +213,7 @@ ADVANCED_HISTORY = RecentTrainingHistory(consistent_weeks=80, completed_session_
 def golden_scenarios() -> dict[str, ProgramGenerationRequest]:
     return {
         "novice_1_day_45_general": request(available_training_days=1),
-        "novice_2_days_35_general": request(
-            available_training_days=2, session_duration_minutes=35
-        ),
+        "novice_2_days_35_general": request(available_training_days=2, session_duration_minutes=35),
         "novice_3_days_fat_loss_low_impact": request(
             primary_goal=Goal.FAT_LOSS, impact_limit=ImpactLimit.LOW
         ),

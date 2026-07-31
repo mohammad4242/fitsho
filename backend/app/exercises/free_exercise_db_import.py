@@ -297,8 +297,7 @@ def classify_exercise_labels(
     if target.strip().lower() == "full body":
         labels.append(ExerciseLabel.FULL_BODY)
     if exercise_type is not ExerciseType.MOBILITY and (
-        body_part.strip().lower() == "cardio"
-        or target.strip().lower() == "cardiovascular system"
+        body_part.strip().lower() == "cardio" or target.strip().lower() == "cardiovascular system"
     ):
         labels.append(ExerciseLabel.CARDIO)
     return tuple(labels)
@@ -388,9 +387,7 @@ class OpenCodeZenExerciseTranslator:
         except json.JSONDecodeError as error:
             raise RuntimeError("OpenCode Zen translation returned invalid JSON") from error
         translations = (
-            translated_payload.get("translations")
-            if isinstance(translated_payload, dict)
-            else None
+            translated_payload.get("translations") if isinstance(translated_payload, dict) else None
         )
         if not isinstance(translations, list):
             raise RuntimeError("OpenCode Zen translation returned invalid translations")

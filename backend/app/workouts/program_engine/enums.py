@@ -137,4 +137,3 @@ class CardioIntensity(StrEnum):
     EASY = "easy"
     MODERATE = "moderate"
     VIGOROUS = "vigorous"
-

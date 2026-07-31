@@ -56,10 +56,15 @@ def validate_program(
                 per_session[key] += item.sets
         if any(value > ruleset.max_sets_per_muscle_per_session for value in per_session.values()):
             errors.append("PER_SESSION_MUSCLE_VOLUME_EXCEEDED")
-        if day.cardio and day.cardio.intensity.value == "vigorous" and day.focus in {
-            "lower",
-            "legs",
-        }:
+        if (
+            day.cardio
+            and day.cardio.intensity.value == "vigorous"
+            and day.focus
+            in {
+                "lower",
+                "legs",
+            }
+        ):
             errors.append("CARDIO_LOWER_BODY_RECOVERY_CONFLICT")
 
     if len(program.weekly_schedule) != len(program.split.day_focuses):

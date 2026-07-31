@@ -16,8 +16,38 @@ down_revision: str | Sequence[str] | None = "20260731_12"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+CURATED_EXERCISE_SLUGS = (
+    "dumbbell-bench-press",
+    "barbell-bent-over-row",
+    "dumbbell-lateral-raise",
+    "smith-machine-shoulder-press",
+    "rear-delt-fly",
+    "dumbbell-curl",
+    "hammer-curl",
+    "cable-curl",
+    "barbell-curl",
+    "overhead-dumbbell-extension",
+    "glute-bridge",
+    "goblet-squat",
+    "leg-press",
+    "leg-extension",
+    "dumbbell-lunge",
+    "romanian-deadlift",
+    "standing-calf-raise",
+)
+
 
 def upgrade() -> None:
+    exercises = sa.table(
+        "exercises",
+        sa.column("slug", sa.String()),
+        sa.column("needs_review", sa.Boolean()),
+    )
+    op.execute(
+        exercises.update()
+        .where(exercises.c.slug.in_(CURATED_EXERCISE_SLUGS))
+        .values(needs_review=False)
+    )
     op.drop_constraint(
         "ck_workout_plan_generations_candidate_count_range",
         "workout_plan_generations",

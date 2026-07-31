@@ -91,9 +91,7 @@ def candidate(
         ({"stability_demand": StabilityDemand.HIGH}, "EXERCISE_REJECTED_BALANCE_DEMAND"),
     ],
 )
-def test_each_hard_constraint_rejects_candidate(
-    changes: dict[str, object], reason: str
-) -> None:
+def test_each_hard_constraint_rejects_candidate(changes: dict[str, object], reason: str) -> None:
     request = normalized(
         blocked_caution_tags=[ExerciseCautionTag.WRIST_LOADING],
         impact_limit=ImpactLimit.LOW,
@@ -117,9 +115,7 @@ def test_blocked_exercise_and_pattern_are_hard_filters() -> None:
     blocked_exercise = candidate(
         "blocked", MovementPattern.SQUAT, MuscleGroup.QUADRICEPS, id=blocked_id
     )
-    blocked_pattern = candidate(
-        "overhead", MovementPattern.VERTICAL_PUSH, MuscleGroup.SHOULDERS
-    )
+    blocked_pattern = candidate("overhead", MovementPattern.VERTICAL_PUSH, MuscleGroup.SHOULDERS)
 
     result = filter_eligible_exercises(request, [blocked_exercise, blocked_pattern])
 
@@ -187,9 +183,9 @@ def test_full_body_session_covers_required_patterns_and_priority_is_first() -> N
     assert MovementPattern.HORIZONTAL_PULL in patterns
     assert MovementPattern.SQUAT in patterns
     assert sessions[0].exercises[0].primary_muscle is MuscleGroup.BACK
-    assert "PRIORITY_MUSCLE_PLACED_FIRST" in sessions[0].selection_reasons[
-        sessions[0].exercises[0].id
-    ]
+    assert (
+        "PRIORITY_MUSCLE_PLACED_FIRST" in sessions[0].selection_reasons[sessions[0].exercises[0].id]
+    )
 
 
 def test_short_session_is_trimmed_to_realistic_exercise_count() -> None:

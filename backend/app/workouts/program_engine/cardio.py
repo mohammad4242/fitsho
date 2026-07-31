@@ -61,4 +61,3 @@ def add_cardio(
 
 def _safe_cardio(exercises: tuple[ExerciseCandidate, ...]) -> tuple[ExerciseCandidate, ...]:
     return tuple(item for item in exercises if ExerciseLabel.CARDIO in item.labels)
-

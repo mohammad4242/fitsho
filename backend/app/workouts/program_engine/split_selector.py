@@ -75,4 +75,3 @@ def _select_weekdays(days: int, preferred: tuple[int, ...]) -> tuple[int, ...]:
         6: (0, 1, 2, 3, 4, 5),
     }
     return defaults[days]
-

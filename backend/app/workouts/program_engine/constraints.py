@@ -17,9 +17,7 @@ def derive_constraints(request: ProgramGenerationRequest) -> DerivedConstraints:
         if limitation.impact_limit is not None:
             impact_limit = min(impact_limit, limitation.impact_limit, key=_limit_rank)
         if limitation.axial_load_limit is not None:
-            axial_load_limit = min(
-                axial_load_limit, limitation.axial_load_limit, key=_limit_rank
-            )
+            axial_load_limit = min(axial_load_limit, limitation.axial_load_limit, key=_limit_rank)
         if limitation.overhead_limit is not None:
             overhead_limit = min(overhead_limit, limitation.overhead_limit, key=_limit_rank)
         if limitation.balance_requirement is not None:
@@ -40,4 +38,3 @@ def derive_constraints(request: ProgramGenerationRequest) -> DerivedConstraints:
 
 def _limit_rank(value: object) -> int:
     return {"none": 0, "low": 1, "moderate": 2, "high": 3}[str(value)]
-

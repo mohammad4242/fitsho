@@ -82,11 +82,7 @@ def test_red_flags_stop_automatic_generation(red_flag: RedFlag) -> None:
 def test_ambiguous_limitation_requires_professional_review() -> None:
     assessment = screen_safety(
         normalize_request(
-            request(
-                injuries_and_limitations=[
-                    Limitation(name="old shoulder issue", stable=True)
-                ]
-            )
+            request(injuries_and_limitations=[Limitation(name="old shoulder issue", stable=True)])
         )
     )
 
