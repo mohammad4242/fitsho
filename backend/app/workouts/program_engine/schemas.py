@@ -236,6 +236,12 @@ class RejectedCandidate:
 
 
 @dataclass(frozen=True)
+class EligibilityResult:
+    eligible: tuple[ExerciseCandidate, ...]
+    rejected: tuple[RejectedCandidate, ...]
+
+
+@dataclass(frozen=True)
 class RankedCandidate:
     exercise: ExerciseCandidate
     score: int
@@ -340,4 +346,6 @@ class SessionDraft:
     weekday: int | None
     focus: str
     exercises: list[ExerciseCandidate] = field(default_factory=list)
-
+    selection_reasons: dict[UUID, tuple[str, ...]] = field(default_factory=dict)
+    substitutions: dict[UUID, tuple[UUID, ...]] = field(default_factory=dict)
+    reason_codes: tuple[str, ...] = ()
