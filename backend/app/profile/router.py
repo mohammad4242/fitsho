@@ -50,6 +50,7 @@ def to_response(snapshot: ProfileSnapshot) -> ProfileResponse:
             key=lambda value: value.value,
         ),
         plan_duration_weeks=profile.plan_duration_weeks,
+        workout_generation_method=profile.workout_generation_method,
         created_at=profile.created_at,
         updated_at=profile.updated_at,
     )

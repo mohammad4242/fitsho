@@ -12,6 +12,7 @@ from app.profile.enums import (
     Sex,
     TrainingCaution,
     TrainingLocation,
+    WorkoutGenerationMethod,
 )
 
 SessionDurationMinutes = Literal[30, 45, 60, 75, 90]
@@ -44,6 +45,7 @@ class ProfileCreate(BaseModel):
     home_training_setup: HomeTrainingSetup | None = None
     training_cautions: list[TrainingCaution] = Field(default_factory=list)
     plan_duration_weeks: PlanDurationWeeks = 4
+    workout_generation_method: WorkoutGenerationMethod = WorkoutGenerationMethod.FITSHO_COACH
     session_duration_minutes: SessionDurationMinutes
     physical_limitations: str | None = Field(default=None, max_length=1000)
 
@@ -103,6 +105,7 @@ class ProfileUpdate(BaseModel):
     home_training_setup: HomeTrainingSetup | None = None
     training_cautions: list[TrainingCaution] | None = None
     plan_duration_weeks: PlanDurationWeeks | None = None
+    workout_generation_method: WorkoutGenerationMethod | None = None
     session_duration_minutes: SessionDurationMinutes | None = None
     physical_limitations: str | None = Field(default=None, max_length=1000)
 
@@ -170,6 +173,7 @@ class ProfileResponse(BaseModel):
     home_training_setup: HomeTrainingSetup | None
     training_cautions: list[TrainingCaution]
     plan_duration_weeks: PlanDurationWeeks
+    workout_generation_method: WorkoutGenerationMethod
     session_duration_minutes: SessionDurationMinutes
 
     model_config = ConfigDict(from_attributes=True)

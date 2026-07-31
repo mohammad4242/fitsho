@@ -352,6 +352,11 @@ const en = {
     workoutPlan: {
       eyebrow: "Personal training rhythm",
       title: "My Workout Plan",
+      generationMethodEyebrow: "Generation method",
+      generationMethodTitle: "Who should write your plan?",
+      generationMethodBody: "Your choice is saved for future plans.",
+      fitshoCoach: "Fitsho Coach",
+      aiCoach: "AI Coach",
       intro: "A focused weekly schedule built from the movements available to you.",
       weeks: "weeks",
       duration: "{{count}}-week plan",

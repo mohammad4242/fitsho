@@ -352,6 +352,11 @@ const fa = {
     workoutPlan: {
       eyebrow: "ریتم تمرین شخصی",
       title: "برنامه تمرینی من",
+      generationMethodEyebrow: "روش ساخت برنامه",
+      generationMethodTitle: "چه کسی برنامه‌ات را بنویسد؟",
+      generationMethodBody: "انتخابت برای ساخت برنامه‌های بعدی ذخیره می‌شود.",
+      fitshoCoach: "مربی فیتشو",
+      aiCoach: "مربی هوش مصنوعی",
       intro: "یک برنامه هفتگی متمرکز که با حرکت‌های مناسب شرایط تو ساخته می‌شود.",
       weeks: "هفته",
       duration: "دوره {{count}} هفته‌ای",

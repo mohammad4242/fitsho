@@ -38,3 +38,8 @@ class TrainingCaution(StrEnum):
     NECK = "neck"
     WRIST = "wrist"
     OTHER = "other"
+
+
+class WorkoutGenerationMethod(StrEnum):
+    FITSHO_COACH = "fitsho_coach"
+    AI = "ai"

@@ -6,6 +6,8 @@ import planFocusFallback from "../../assets/landing/plan-focus-fallback.jpg";
 import planFocusVideo from "../../assets/landing/plan-focus.mp4";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { ApiError } from "../../shared/apiClient";
+import { getProfile, updateProfile } from "../profile/api";
+import type { WorkoutGenerationMethod } from "../profile/types";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import { generateWorkoutPlan, getActiveWorkoutPlan } from "./api";
@@ -22,6 +24,8 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   const [reused, setReused] = useState(false);
   const [generationError, setGenerationError] = useState<"cooldown" | "failed" | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [generationMethod, setGenerationMethod] = useState<WorkoutGenerationMethod>("fitsho_coach");
+  const [savingGenerationMethod, setSavingGenerationMethod] = useState(false);
   const isEnglish = i18n.resolvedLanguage === "en";
   const displayedPlanDuration = plan?.plan_duration_weeks ?? planDurationWeeks;
 
@@ -41,6 +45,21 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
       active = false;
     };
   }, [loadAttempt]);
+
+  useEffect(() => {
+    void getProfile().then((profile) => {
+      if (profile !== null) setGenerationMethod(profile.workout_generation_method ?? "fitsho_coach");
+    }).catch(() => undefined);
+  }, []);
+
+  function changeGenerationMethod(method: WorkoutGenerationMethod) {
+    const previous = generationMethod;
+    setGenerationMethod(method);
+    setSavingGenerationMethod(true);
+    void updateProfile({ workout_generation_method: method })
+      .catch(() => setGenerationMethod(previous))
+      .finally(() => setSavingGenerationMethod(false));
+  }
 
   function generate() {
     setGenerating(true);
@@ -82,6 +101,18 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         </header>
 
         <FixedGuidance />
+
+        <section className="workout-generation-method" aria-labelledby="workout-generation-method-title">
+          <div>
+            <p className="eyebrow eyebrow--accent">{t("workoutPlan.generationMethodEyebrow")}</p>
+            <h2 id="workout-generation-method-title">{t("workoutPlan.generationMethodTitle")}</h2>
+            <p>{t("workoutPlan.generationMethodBody")}</p>
+          </div>
+          <div className="workout-generation-method__choices">
+            <label><input type="radio" name="workout-generation-method" checked={generationMethod === "fitsho_coach"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("fitsho_coach")} />{t("workoutPlan.fitshoCoach")}</label>
+            <label><input type="radio" name="workout-generation-method" checked={generationMethod === "ai"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("ai")} />{t("workoutPlan.aiCoach")}</label>
+          </div>
+        </section>
 
         {state === "loading" && <StatusPanel role="status" message={t("workoutPlan.loading")} />}
         {state === "error" && plan === null && (

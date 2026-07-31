@@ -25,6 +25,8 @@ export type TrainingCaution = (typeof trainingCautions)[number];
 
 export const planDurations = [4, 6, 8] as const;
 export type PlanDurationWeeks = (typeof planDurations)[number];
+export const workoutGenerationMethods = ["fitsho_coach", "ai"] as const;
+export type WorkoutGenerationMethod = (typeof workoutGenerationMethods)[number];
 
 export type ProfileInput = {
   display_name: string;
@@ -41,6 +43,7 @@ export type ProfileInput = {
   physical_limitations: string | null;
   training_cautions: TrainingCaution[];
   plan_duration_weeks: PlanDurationWeeks;
+  workout_generation_method?: WorkoutGenerationMethod;
 };
 
 export type ProfilePatch = Partial<ProfileInput>;
