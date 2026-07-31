@@ -8,6 +8,7 @@ import {
   createAdminAiModel,
   getAdminAiGenerationFailures,
   getAdminAiModels,
+  getAdminAiModelTestRuns,
   syncAdminAiModels,
   testAdminAiModel,
   updateAdminAiModel,
@@ -17,6 +18,7 @@ import type {
   AdminAiModel,
   AdminAiModelCreate,
   AdminAiGenerationFailure,
+  AdminAiModelTestRun,
   AdminAiModelsResponse,
   BillingClass,
   RoutingMode,
@@ -26,6 +28,15 @@ import "./admin.css";
 
 type Filter = "free" | "paid" | "custom";
 type Feedback = { text: string; tone: "success" | "error" };
+type AiEvent = {
+  id: string;
+  modelId: string;
+  createdAt: string;
+  tone: "success" | "error";
+  errorCode: string | null;
+  message: string | null;
+  diagnostics?: AdminAiGenerationFailure["validation_diagnostics"];
+};
 
 const blankCustomModel: AdminAiModelCreate = {
   model_id: "",
@@ -40,6 +51,7 @@ export function AdminAiModelsPage() {
   const { t } = useTranslation();
   const [page, setPage] = useState<AdminAiModelsResponse | null>(null);
   const [failures, setFailures] = useState<AdminAiGenerationFailure[]>([]);
+  const [modelTestRuns, setModelTestRuns] = useState<AdminAiModelTestRun[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [filter, setFilter] = useState<Filter>("free");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -49,10 +61,11 @@ export function AdminAiModelsPage() {
   function load() {
     setState("loading");
     setFeedback(null);
-    void Promise.all([getAdminAiModels(), getAdminAiGenerationFailures()])
-      .then(([models, generationFailures]) => {
+    void Promise.all([getAdminAiModels(), getAdminAiGenerationFailures(), getAdminAiModelTestRuns()])
+      .then(([models, generationFailures, testRuns]) => {
         setPage(models);
         setFailures(generationFailures);
+        setModelTestRuns(testRuns);
         setState("ready");
       })
       .catch(() => setState("error"));
@@ -74,6 +87,27 @@ export function AdminAiModelsPage() {
     if (filter === "custom") return model.is_custom;
     return !model.is_custom && model.billing_class === filter;
   }) ?? [], [filter, page]);
+  const events = useMemo<AiEvent[]>(() => [
+    ...modelTestRuns.map((testRun) => ({
+      id: `test-${testRun.id}`,
+      modelId: testRun.model_id,
+      createdAt: testRun.created_at,
+      tone: testRun.outcome === "succeeded" ? "success" as const : "error" as const,
+      errorCode: testRun.error_code,
+      message: testRun.outcome === "succeeded"
+        ? t("admin.aiModels.testSuccess")
+        : testRun.safe_error_message,
+    })),
+    ...failures.map((failure) => ({
+      id: `generation-${failure.id}`,
+      modelId: failure.model_id,
+      createdAt: failure.created_at,
+      tone: "error" as const,
+      errorCode: failure.error_code,
+      message: failure.safe_error_message,
+      diagnostics: failure.validation_diagnostics,
+    })),
+  ].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()), [failures, modelTestRuns, t]);
 
   function updatePageModel(model: AdminAiModel) {
     setPage((current) => current === null ? current : {
@@ -147,12 +181,10 @@ export function AdminAiModelsPage() {
     void testAdminAiModel(model.id)
       .then((result) => {
         updatePageModel(result.model);
-        setFeedback({
-          text: result.success
-            ? t("admin.aiModels.testSuccess")
-            : result.model.last_error_message ?? t("admin.aiModels.testFailure"),
-          tone: result.success ? "success" : "error",
-        });
+        setModelTestRuns((current) => [
+          result.test_run,
+          ...current.filter((testRun) => testRun.id !== result.test_run.id),
+        ]);
       })
       .catch(() => setFeedback({ text: t("admin.aiModels.testFailure"), tone: "error" }))
       .finally(() => setBusy(null));
@@ -227,25 +259,25 @@ export function AdminAiModelsPage() {
                   <h2 id="ai-failures-title">{t("admin.aiModels.failuresTitle")}</h2>
                 </div>
               </div>
-              {failures.length === 0 && (
+              {events.length === 0 && (
                 <p className="admin-ai-failures__empty">{t("admin.aiModels.failuresEmpty")}</p>
               )}
               <div className="admin-ai-failure-list">
-                {failures.map((failure) => (
-                  <article className="admin-ai-failure" key={failure.id}>
+                {events.map((event) => (
+                  <article className={`admin-ai-event admin-ai-event--${event.tone}`} key={event.id}>
                     <header>
-                      <code>{failure.model_id}</code>
-                      <time dateTime={failure.created_at}>
-                        {new Date(failure.created_at).toLocaleString()}
+                      <code>{event.modelId}</code>
+                      <time dateTime={event.createdAt}>
+                        {new Date(event.createdAt).toLocaleString()}
                       </time>
                     </header>
-                    {failure.error_code !== null && <strong>{failure.error_code}</strong>}
-                    {failure.safe_error_message !== null && <p>{failure.safe_error_message}</p>}
-                    {failure.validation_diagnostics?.flatMap((diagnostic, diagnosticIndex) =>
+                    {event.errorCode !== null && <strong>{event.errorCode}</strong>}
+                    {event.message !== null && <p>{event.message}</p>}
+                    {event.diagnostics?.flatMap((diagnostic, diagnosticIndex) =>
                       diagnostic.problems.map((problem, problemIndex) => (
                         <div
                           className="admin-ai-diagnostic"
-                          key={`${failure.id}-${diagnosticIndex}-${problemIndex}`}
+                          key={`${event.id}-${diagnosticIndex}-${problemIndex}`}
                         >
                           <span>{t("admin.aiModels.failurePhase")}: <code>{diagnostic.phase}</code></span>
                           <strong>{problem.code}</strong>

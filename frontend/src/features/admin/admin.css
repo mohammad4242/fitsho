@@ -69,9 +69,11 @@
 .admin-ai-model-row__title, .admin-ai-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }.admin-ai-model-row h3 { margin: 0; }.admin-ai-model-row dl { display: flex; gap: 1rem; margin: 0; }.admin-ai-model-row dt { color: var(--muted); font-size: .72rem; }.admin-ai-model-row dd { margin: .1rem 0 0; font-weight: 800; }.admin-ai-model-error { grid-column: 1 / -1; margin: 0; color: var(--danger); font-size: .85rem; }.admin-ai-row-actions { justify-content: end; }.admin-ai-row-actions button:disabled { opacity: .5; cursor: wait; }
 .admin-ai-failure-list { display: grid; gap: .8rem; margin-top: 1rem; }
 .admin-ai-failures__empty { margin: 1rem 0 0; color: var(--muted); }
-.admin-ai-failure { display: grid; gap: .65rem; padding: 1rem; border-inline-start: .3rem solid var(--danger); border-radius: .8rem; background: rgb(161 63 50 / 6%); }
-.admin-ai-failure header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; }
-.admin-ai-failure p { margin: 0; color: var(--muted); }
+.admin-ai-event { display: grid; gap: .65rem; padding: 1rem; border-inline-start: .3rem solid; border-radius: .8rem; }
+.admin-ai-event--error { border-color: var(--danger); background: rgb(161 63 50 / 6%); }
+.admin-ai-event--success { border-color: var(--turquoise-dark); background: rgb(56 183 165 / 10%); }
+.admin-ai-event header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; }
+.admin-ai-event p { margin: 0; color: var(--muted); }
 .admin-ai-diagnostic { display: flex; flex-wrap: wrap; gap: .5rem 1rem; padding: .7rem; border-radius: .65rem; background: rgb(255 255 255 / 72%); font-size: .82rem; }
 .admin-ai-diagnostic code { direction: ltr; unicode-bidi: isolate; }
 .admin-ai-custom-form { margin: 0; }.admin-ai-custom-form .admin-form-section { margin: 0; }

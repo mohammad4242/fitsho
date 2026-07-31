@@ -8,6 +8,7 @@ import type { AdminAiModel, AdminAiModelsResponse } from "./types";
 const adminApi = vi.hoisted(() => ({
   getAdminAiModels: vi.fn(),
   getAdminAiGenerationFailures: vi.fn(),
+  getAdminAiModelTestRuns: vi.fn(),
   updateAdminAiRouting: vi.fn(),
   updateAdminAiModel: vi.fn(),
   createAdminAiModel: vi.fn(),
@@ -58,12 +59,14 @@ const freeSecond: AdminAiModel = {
 beforeEach(() => {
   adminApi.getAdminAiModels.mockReset();
   adminApi.getAdminAiGenerationFailures.mockReset();
+  adminApi.getAdminAiModelTestRuns.mockReset();
   adminApi.updateAdminAiRouting.mockReset();
   adminApi.updateAdminAiModel.mockReset();
   adminApi.createAdminAiModel.mockReset();
   adminApi.syncAdminAiModels.mockReset();
   adminApi.testAdminAiModel.mockReset();
   adminApi.getAdminAiGenerationFailures.mockResolvedValue([]);
+  adminApi.getAdminAiModelTestRuns.mockResolvedValue([]);
   adminApi.updateAdminAiRouting.mockResolvedValue({ mode: "automatic", manual_model_id: null });
 });
 
@@ -123,14 +126,25 @@ it("shows a green successful connection message after a model test", async () =>
     routing: { mode: "manual", manual_model_id: freeFirst.id },
     models: [freeFirst],
   });
-  adminApi.testAdminAiModel.mockResolvedValue({ success: true, model: freeFirst });
+  adminApi.testAdminAiModel.mockResolvedValue({
+    success: true,
+    model: freeFirst,
+    test_run: {
+      id: "018f0000-0000-7000-8000-000000000020",
+      model_id: freeFirst.model_id,
+      outcome: "succeeded",
+      error_code: null,
+      safe_error_message: null,
+      created_at: "2026-07-31T12:00:00Z",
+    },
+  });
   const user = userEvent.setup();
   renderPage();
 
   await user.click(await screen.findByRole("button", { name: "تست مدل" }));
 
   const message = await screen.findByText("با موفقیت متصل شد");
-  expect(message).toHaveClass("admin-status--success");
+  expect(message.closest("article")).toHaveClass("admin-ai-event--success");
 });
 
 it("renders recent generation validation failures", async () => {
@@ -164,11 +178,33 @@ it("renders recent generation validation failures", async () => {
   ]);
   renderPage();
 
-  expect(await screen.findByText("خطاهای اخیر تولید برنامه")).toBeInTheDocument();
+  expect(await screen.findByText("رویدادهای اخیر هوش مصنوعی")).toBeInTheDocument();
   expect(screen.getByText("semantic_validation_failed")).toBeInTheDocument();
   expect(screen.getByText("duplicate_exercise")).toBeInTheDocument();
   expect(screen.getByText("repair")).toBeInTheDocument();
   expect(screen.getByText("018f0000-0000-7000-8000-000000000099")).toBeInTheDocument();
+});
+
+it("renders failed model availability tests as red recent events", async () => {
+  adminApi.getAdminAiModels.mockResolvedValue({
+    routing: { mode: "manual", manual_model_id: freeFirst.id },
+    models: [freeFirst],
+  });
+  adminApi.getAdminAiModelTestRuns.mockResolvedValue([
+    {
+      id: "018f0000-0000-7000-8000-000000000021",
+      model_id: "unavailable-free-model",
+      outcome: "failed",
+      error_code: "provider_unavailable",
+      safe_error_message: "Workout generation is temporarily unavailable. Please try again.",
+      created_at: "2026-07-31T11:00:00Z",
+    },
+  ]);
+  renderPage();
+
+  const errorCode = await screen.findByText("provider_unavailable");
+  expect(errorCode.closest("article")).toHaveClass("admin-ai-event--error");
+  expect(screen.getByText("unavailable-free-model")).toBeInTheDocument();
 });
 
 function renderPage() {

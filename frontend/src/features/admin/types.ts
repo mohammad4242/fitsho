@@ -139,6 +139,16 @@ export type AdminAiRoutingUpdate = {
 export type AdminAiModelCheck = {
   success: boolean;
   model: AdminAiModel;
+  test_run: AdminAiModelTestRun;
+};
+
+export type AdminAiModelTestRun = {
+  id: string;
+  model_id: string;
+  outcome: "succeeded" | "failed";
+  error_code: string | null;
+  safe_error_message: string | null;
+  created_at: string;
 };
 
 export type AdminAiModelSync = {

@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import {
   createAdminExercise,
   getAdminAiGenerationFailures,
+  getAdminAiModelTestRuns,
   getAdminAiModels,
   getAdminExercises,
   updateAdminAiRouting,
@@ -102,6 +103,17 @@ it("reads recent AI generation failures", async () => {
 
   expect(fetch).toHaveBeenCalledWith(
     "/api/v1/admin/ai-generation-failures?limit=20",
+    expect.objectContaining({ credentials: "include" }),
+  );
+});
+
+it("reads recent AI model test runs", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([]));
+
+  await expect(getAdminAiModelTestRuns()).resolves.toEqual([]);
+
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/admin/ai-model-test-runs?limit=20",
     expect.objectContaining({ credentials: "include" }),
   );
 });

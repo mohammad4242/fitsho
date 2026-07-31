@@ -4,6 +4,7 @@ import type {
   AdminAiModelCheck,
   AdminAiModelCreate,
   AdminAiGenerationFailure,
+  AdminAiModelTestRun,
   AdminAiModelsResponse,
   AdminAiModelSync,
   AdminAiModelUpdate,
@@ -29,6 +30,10 @@ export function getAdminAiGenerationFailures(
   return request<AdminAiGenerationFailure[]>(
     `/api/v1/admin/ai-generation-failures?limit=${limit}`,
   );
+}
+
+export function getAdminAiModelTestRuns(limit = 20): Promise<AdminAiModelTestRun[]> {
+  return request<AdminAiModelTestRun[]>(`/api/v1/admin/ai-model-test-runs?limit=${limit}`);
 }
 
 export function updateAdminAiRouting(
