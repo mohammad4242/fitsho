@@ -54,6 +54,22 @@ def test_two_days_use_coherent_full_body_ab_with_spacing() -> None:
     assert split.weekdays[1] - split.weekdays[0] >= 3
 
 
+def test_consecutive_preferred_full_body_days_are_adjusted_for_recovery() -> None:
+    split = select_split(
+        normalized(available_training_days=3, preferred_weekdays=(0, 1, 2)), RULESET
+    )
+
+    assert split.weekdays == RULESET.default_weekdays[3]
+    assert "SPLIT_PREFERRED_DAYS_ADJUSTED_FOR_RECOVERY" in split.reason_codes
+
+
+def test_partial_weekday_preferences_do_not_claim_recovery_adjustment() -> None:
+    split = select_split(normalized(available_training_days=3, preferred_weekdays=(0,)), RULESET)
+
+    assert split.weekdays == RULESET.default_weekdays[3]
+    assert "SPLIT_PREFERRED_DAYS_ADJUSTED_FOR_RECOVERY" not in split.reason_codes
+
+
 def test_seven_available_days_never_create_seven_resistance_sessions() -> None:
     split = select_split(
         normalized(

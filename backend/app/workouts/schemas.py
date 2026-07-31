@@ -212,6 +212,7 @@ class ProgramGenerationOverrides(BaseModel):
     current_pain_or_red_flags: tuple[RedFlag, ...] = ()
     medical_clearance_status: MedicalClearanceStatus | None = None
     reports_uncontrolled_medical_condition: bool = False
+    pregnancy_or_postpartum: bool = False
     sleep_quality: RecoveryRating | None = None
     stress_level: RecoveryRating | None = None
     physical_job_demand: PhysicalJobDemand | None = None

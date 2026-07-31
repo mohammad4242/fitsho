@@ -119,3 +119,10 @@ def test_missing_medical_clearance_for_reported_condition_requires_review() -> N
     )
 
     assert assessment.status is SafetyStatus.STOP_AND_REFER
+
+
+def test_pregnancy_or_postpartum_requires_specialist_pathway() -> None:
+    assessment = screen_safety(normalize_request(request(pregnancy_or_postpartum=True)))
+
+    assert assessment.status is SafetyStatus.REQUIRES_PROFESSIONAL_REVIEW
+    assert assessment.reason_codes == ("SPECIALIST_PATHWAY_REQUIRED",)

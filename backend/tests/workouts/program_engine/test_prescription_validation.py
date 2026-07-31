@@ -215,3 +215,17 @@ def test_validator_rejects_duration_overrun() -> None:
     report = validate_program(invalid, source, RULESET)
 
     assert "SESSION_DURATION_EXCEEDED" in report.errors
+
+
+def test_validator_rejects_adjacent_full_body_sessions() -> None:
+    source = request(available_training_days=3)
+    result = generate_program(source, catalog(), RULESET)
+    assert result.program is not None
+    adjacent_days = tuple(
+        replace(day, weekday=index) for index, day in enumerate(result.program.weekly_schedule)
+    )
+    invalid = replace(result.program, weekly_schedule=adjacent_days)
+
+    report = validate_program(invalid, source, RULESET)
+
+    assert "RECOVERY_SPACING_INVALID" in report.errors

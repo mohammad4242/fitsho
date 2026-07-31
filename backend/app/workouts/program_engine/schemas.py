@@ -117,6 +117,7 @@ class ProgramGenerationRequest(BaseModel):
     current_pain_or_red_flags: tuple[RedFlag, ...] = ()
     medical_clearance_status: MedicalClearanceStatus = MedicalClearanceStatus.NOT_REQUIRED
     reports_uncontrolled_medical_condition: bool = False
+    pregnancy_or_postpartum: bool = False
     sleep_quality: RecoveryRating = RecoveryRating.AVERAGE
     stress_level: RecoveryRating = RecoveryRating.AVERAGE
     physical_job_demand: PhysicalJobDemand = PhysicalJobDemand.LOW

@@ -33,7 +33,11 @@ def select_split(request: NormalizedProgramRequest, ruleset: ProgramRuleset) -> 
         reasons.append("SPLIT_FULL_BODY_FOR_LOW_FREQUENCY")
     if days >= 4:
         reasons.append("SPLIT_SELECTED_FOR_TWICE_WEEKLY_EXPOSURE")
-    weekdays = _select_weekdays(days, source.preferred_weekdays, ruleset)
+    weekdays = _select_weekdays(days, source.preferred_weekdays, focuses, ruleset)
+    if len(source.preferred_weekdays) >= days and weekdays != tuple(
+        sorted(source.preferred_weekdays[:days])
+    ):
+        reasons.append("SPLIT_PREFERRED_DAYS_ADJUSTED_FOR_RECOVERY")
     return SplitPlan(
         split_type=split_type,
         day_focuses=focuses,
@@ -70,8 +74,28 @@ def _structure(days: int, status: TrainingStatus) -> tuple[SplitType, tuple[str,
 def _select_weekdays(
     days: int,
     preferred: tuple[int, ...],
+    focuses: tuple[str, ...],
     ruleset: ProgramRuleset,
 ) -> tuple[int, ...]:
     if len(preferred) >= days:
-        return tuple(sorted(preferred[:days]))
+        selected = tuple(sorted(preferred[:days]))
+        if _spacing_is_acceptable(selected, focuses):
+            return selected
     return ruleset.default_weekdays[days]
+
+
+def _spacing_is_acceptable(weekdays: tuple[int, ...], focuses: tuple[str, ...]) -> bool:
+    if len(weekdays) <= 1:
+        return True
+    ordered = sorted(zip(weekdays, focuses, strict=True))
+    circular = ordered + [(ordered[0][0] + 7, ordered[0][1])]
+    for current, following in zip(circular, circular[1:], strict=False):
+        gap = following[0] - current[0]
+        recovery_sensitive = (
+            current[1].startswith("full_body")
+            or following[1].startswith("full_body")
+            or current[1] == following[1]
+        )
+        if recovery_sensitive and gap < 2:
+            return False
+    return True

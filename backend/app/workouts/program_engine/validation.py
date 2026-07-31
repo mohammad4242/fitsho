@@ -72,6 +72,8 @@ def validate_program(
 
     if len(program.weekly_schedule) != len(program.split.day_focuses):
         errors.append("TRAINING_DAY_COUNT_MISMATCH")
+    if not _recovery_spacing_is_valid(program):
+        errors.append("RECOVERY_SPACING_INVALID")
     if program.safety_status not in {
         SafetyStatus.CLEAR,
         SafetyStatus.CLEAR_WITH_MODIFICATIONS,
@@ -118,3 +120,21 @@ def validate_program(
         },
         decision_trace=program.decision_trace,
     )
+
+
+def _recovery_spacing_is_valid(program: WorkoutProgram) -> bool:
+    scheduled = sorted(
+        (day.weekday, day.focus) for day in program.weekly_schedule if day.weekday is not None
+    )
+    if len(scheduled) <= 1:
+        return True
+    circular = scheduled + [(scheduled[0][0] + 7, scheduled[0][1])]
+    for current, following in zip(circular, circular[1:], strict=False):
+        recovery_sensitive = (
+            current[1].startswith("full_body")
+            or following[1].startswith("full_body")
+            or current[1] == following[1]
+        )
+        if recovery_sensitive and following[0] - current[0] < 2:
+            return False
+    return True

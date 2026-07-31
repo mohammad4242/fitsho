@@ -9,6 +9,11 @@ def screen_safety(request: NormalizedProgramRequest) -> SafetyAssessment:
             status=SafetyStatus.STOP_AND_REFER,
             reason_codes=("PROGRAM_REJECTED_SAFETY_STATUS",),
         )
+    if source.pregnancy_or_postpartum:
+        return SafetyAssessment(
+            status=SafetyStatus.REQUIRES_PROFESSIONAL_REVIEW,
+            reason_codes=("SPECIALIST_PATHWAY_REQUIRED",),
+        )
     if any(
         not item.stable or not item.has_computable_constraint
         for item in source.injuries_and_limitations
