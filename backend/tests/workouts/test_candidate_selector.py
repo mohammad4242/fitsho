@@ -55,6 +55,7 @@ def exercise(
     movement_pattern: MovementPattern = MovementPattern.ELBOW_FLEXION,
     is_active: bool = True,
     is_programmable: bool = True,
+    needs_review: bool = False,
 ) -> Exercise:
     unique_slug = f"{slug}-{uuid4().hex}"
     item = Exercise(
@@ -74,6 +75,7 @@ def exercise(
         media_type=MediaType.PLACEHOLDER,
         is_active=is_active,
         is_programmable=is_programmable,
+        needs_review=needs_review,
         equipment_items=[ExerciseEquipment(equipment=value) for value in equipment],
         caution_tag_items=[ExerciseCautionTagItem(caution_tag=value) for value in caution_tags],
     )
@@ -104,6 +106,7 @@ def test_selector_excludes_inactive_nonprogrammable_unsafe_and_too_hard_exercise
     allowed = exercise(db, "bodyweight-row", equipment=(Equipment.BODYWEIGHT,))
     exercise(db, "inactive-row", equipment=(Equipment.BODYWEIGHT,), is_active=False)
     exercise(db, "catalog-only-row", equipment=(Equipment.BODYWEIGHT,), is_programmable=False)
+    exercise(db, "review-pending-row", equipment=(Equipment.BODYWEIGHT,), needs_review=True)
     exercise(
         db,
         "advanced-row",

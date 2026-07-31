@@ -124,6 +124,7 @@ def test_seed_is_idempotent_and_restores_seed_owned_fields(db: Session) -> None:
     bench_press = db.scalar(select(Exercise).where(Exercise.slug == "dumbbell-bench-press"))
     assert bench_press is not None
     bench_press.name_en = "Outdated Bench Press"
+    bench_press.needs_review = True
     bench_press.equipment_items.append(ExerciseEquipment(equipment=Equipment.OTHER))
     custom = Exercise(
         slug="project-owner-custom-exercise",
@@ -168,6 +169,7 @@ def test_seed_is_idempotent_and_restores_seed_owned_fields(db: Session) -> None:
     assert ids_after == ids_before
     assert restored_bench_press is not None
     assert restored_bench_press.is_programmable is True
+    assert restored_bench_press.needs_review is False
     assert restored_bench_press.movement_pattern.value == "horizontal_push"
     assert restored_bench_press.name_en == "Dumbbell Bench Press"
     assert {item.equipment for item in restored_bench_press.equipment_items} == {

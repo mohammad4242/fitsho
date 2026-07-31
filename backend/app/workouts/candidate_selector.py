@@ -57,7 +57,11 @@ class WorkoutCandidateSelector:
     def select(self, profile: WorkoutGenerationProfile) -> CandidateSet:
         exercises = self._db.scalars(
             select(Exercise)
-            .where(Exercise.is_active.is_(True), Exercise.is_programmable.is_(True))
+            .where(
+                Exercise.is_active.is_(True),
+                Exercise.is_programmable.is_(True),
+                Exercise.needs_review.is_(False),
+            )
             .options(
                 selectinload(Exercise.secondary_muscles),
                 selectinload(Exercise.equipment_items),
