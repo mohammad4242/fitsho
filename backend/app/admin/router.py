@@ -59,6 +59,7 @@ from app.exercises.enums import MediaPresentation, MediaRole, MediaType
 from app.exercises.models import Exercise
 from app.exercises.schemas import ExerciseMediaAssetDetail
 from app.exercises.taxonomy import MUSCLES_BY_REGION
+from app.workouts.models import WorkoutPlanGeneration
 
 router = APIRouter(
     prefix="/api/v1/admin",
@@ -103,6 +104,41 @@ def _ai_model_test_run_detail(run: AiModelTestRun) -> AdminAiModelTestRun:
     )
 
 
+def _ai_generation_failure_detail(generation: WorkoutPlanGeneration) -> AdminAiGenerationFailure:
+    diagnostics = generation.validation_diagnostics
+    if diagnostics is not None and any("errors" in diagnostic for diagnostic in diagnostics):
+        normalized_diagnostics: list[dict[str, object]] = []
+        for diagnostic in diagnostics:
+            legacy_errors = diagnostic.get("errors")
+            if not isinstance(legacy_errors, list):
+                normalized_diagnostics.append(diagnostic)
+                continue
+            normalized_diagnostics.append(
+                {
+                    "model_id": generation.model_id,
+                    "phase": "initial",
+                    "problems": [
+                        {
+                            "code": error,
+                            "message": "Deterministic program validation rejected this generation.",
+                        }
+                        for error in legacy_errors
+                        if isinstance(error, str)
+                    ],
+                }
+            )
+        diagnostics = normalized_diagnostics
+    return AdminAiGenerationFailure(
+        id=generation.id,
+        model_id=generation.model_id,
+        created_at=generation.created_at,
+        completed_at=generation.completed_at,
+        error_code=generation.error_code,
+        safe_error_message=generation.safe_error_message,
+        validation_diagnostics=diagnostics,
+    )
+
+
 @router.get("/ai-models", response_model=AdminAiModelsResponse)
 def read_ai_models(db: DatabaseSession) -> AdminAiModelsResponse:
     routing, models = list_ai_models(db)
@@ -120,18 +156,8 @@ def read_ai_generation_failures(
     db: DatabaseSession,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> list[AdminAiGenerationFailure]:
-    return [
-        AdminAiGenerationFailure(
-            id=generation.id,
-            model_id=generation.model_id,
-            created_at=generation.created_at,
-            completed_at=generation.completed_at,
-            error_code=generation.error_code,
-            safe_error_message=generation.safe_error_message,
-            validation_diagnostics=generation.validation_diagnostics,
-        )
-        for generation in list_generation_failures(db, limit=limit)
-    ]
+    failures = list_generation_failures(db, limit=limit)
+    return [_ai_generation_failure_detail(generation) for generation in failures]
 
 
 @router.get("/ai-model-test-runs", response_model=list[AdminAiModelTestRun])
