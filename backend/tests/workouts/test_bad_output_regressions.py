@@ -1,7 +1,13 @@
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
-from app.workouts.program_engine.enums import Goal, PhysicalJobDemand, RecoveryRating
+from app.workouts.program_engine.enums import (
+    Goal,
+    PhysicalJobDemand,
+    RecoveryRating,
+    TrainingExperience,
+)
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+from app.workouts.program_engine.schemas import RecentTrainingHistory
 from workouts.program_engine.golden_fixtures import full_catalog, request
 
 
@@ -80,3 +86,45 @@ def test_regression_priority_muscle_is_early_and_gets_more_planned_volume() -> N
     assert result.program.weekly_schedule[0].exercises[0].primary_muscle is MuscleGroup.BACK
     planned = result.program.aggregate_metrics["planned_direct_sets_by_muscle"]
     assert planned[MuscleGroup.BACK.value] > planned[MuscleGroup.CHEST.value]
+
+
+def test_regression_short_sessions_cover_hinge_and_core_across_the_week() -> None:
+    result = generate_program(
+        request(available_training_days=3, session_duration_minutes=25),
+        full_catalog(),
+        RULESET,
+    )
+
+    assert result.program is not None, result.errors
+    patterns = {
+        item.movement_pattern for day in result.program.weekly_schedule for item in day.exercises
+    }
+    assert MovementPattern.HIP_HINGE in patterns
+    assert MovementPattern.CORE_ANTI_EXTENSION in patterns
+
+
+def test_regression_short_upper_lower_keeps_required_trunk_work() -> None:
+    result = generate_program(
+        request(
+            available_training_days=4,
+            session_duration_minutes=25,
+            primary_goal=Goal.HYPERTROPHY,
+            training_experience=TrainingExperience.INTERMEDIATE,
+            training_age_months=30,
+            recent_training_history=RecentTrainingHistory(consistent_weeks=20),
+        ),
+        full_catalog(),
+        RULESET,
+    )
+
+    assert result.program is not None, result.errors
+    assert any(
+        item.movement_pattern is MovementPattern.CORE_ANTI_EXTENSION
+        for day in result.program.weekly_schedule
+        for item in day.exercises
+    )
+    assert any(day.cardio is not None for day in result.program.weekly_schedule)
+    assert all(
+        day.estimated_duration_minutes <= 25 + RULESET.duration_tolerance_minutes
+        for day in result.program.weekly_schedule
+    )

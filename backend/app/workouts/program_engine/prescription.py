@@ -31,16 +31,23 @@ def prescribe_sessions(
     for draft in drafts:
         exercise_count = max(1, len(draft.exercises))
         available = max(
-            10,
+            ruleset.minimum_session_work_minutes,
             request.source.session_duration_minutes
             - ruleset.general_warmup_minutes
             - cardio_reserve_minutes,
         )
-        per_exercise_budget = max(3, available // exercise_count)
+        per_exercise_budget = max(
+            ruleset.minimum_exercise_budget_minutes,
+            available // exercise_count,
+        )
         programmed: list[ProgrammedExercise] = []
         for index, exercise in enumerate(draft.exercises):
             primary_muscle = exercise.primary_muscle
-            target = volume.direct_sets_for(primary_muscle) if primary_muscle is not None else 2
+            target = (
+                volume.direct_sets_for(primary_muscle)
+                if primary_muscle is not None
+                else ruleset.default_untracked_muscle_sets
+            )
             appearance_count = appearances[primary_muscle] if primary_muscle is not None else 1
             desired_sets = max(
                 ruleset.minimum_working_sets,

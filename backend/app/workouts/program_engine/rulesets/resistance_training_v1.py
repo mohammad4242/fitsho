@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from app.workouts.program_engine.enums import Goal, TrainingStatus
+from app.workouts.program_engine.enums import Goal, SplitType, TrainingStatus
 
 
 @dataclass(frozen=True)
@@ -15,6 +15,12 @@ class ProgramRuleset:
     version: str = "resistance_training_v1"
     engine_version: str = "program_engine_v1"
     max_resistance_days: int = 6
+    days_per_week: int = 7
+    minimum_recovery_gap_days: int = 2
+    novice_training_age_months: int = 6
+    early_intermediate_training_age_months: int = 18
+    intermediate_training_age_months: int = 48
+    minimum_consistent_weeks_for_experience: int = 4
     duration_tolerance_minutes: int = 5
     general_warmup_minutes: int = 5
     primary_set_credit: float = 1.0
@@ -53,6 +59,10 @@ class ProgramRuleset:
     max_exercises_per_session: int = 8
     minimum_exercises_per_session: int = 3
     minutes_per_exercise_slot: int = 7
+    minimum_session_work_minutes: int = 10
+    minimum_exercise_budget_minutes: int = 3
+    default_untracked_muscle_sets: int = 2
+    substitution_limit: int = 3
     maximum_novice_recovery_days: int = 3
     short_session_minutes: int = 30
     older_adult_modifier_age: int = 60
@@ -69,6 +79,7 @@ class ProgramRuleset:
     minimum_rest_seconds: int = 30
     maximum_target_rir: int = 5
     cardio_start_minutes: int = 10
+    minimum_cardio_minutes: int = 5
     fat_loss_cardio_days: int = 2
     maintenance_cardio_days: int = 1
     double_progression_qualifying_sessions: int = 2
@@ -84,6 +95,38 @@ class ProgramRuleset:
             4: (0, 1, 3, 4),
             5: (0, 1, 2, 4, 5),
             6: (0, 1, 2, 3, 4, 5),
+        }
+    )
+    split_weights: dict[str, int] = field(
+        default_factory=lambda: {
+            "base": 100,
+            "simplicity": 16,
+            "goal_specificity": 12,
+            "twice_weekly_frequency": 6,
+            "priority_specialization": 10,
+            "short_session_full_body": 8,
+            "recovery_complexity_penalty": 8,
+        }
+    )
+    split_complexity: dict[SplitType, int] = field(
+        default_factory=lambda: {
+            SplitType.FULL_BODY: 0,
+            SplitType.FULL_BODY_AB: 0,
+            SplitType.FULL_BODY_ABC: 0,
+            SplitType.FULL_BODY_FOUR: 1,
+            SplitType.UPPER_LOWER_FULL: 1,
+            SplitType.UPPER_LOWER: 2,
+            SplitType.UPPER_LOWER_SPECIALIZATION: 3,
+            SplitType.PUSH_PULL_LEGS_UPPER_LOWER: 4,
+            SplitType.UPPER_LOWER_X3: 4,
+            SplitType.PUSH_PULL_LEGS_X2: 6,
+        }
+    )
+    exercise_order_rank: dict[str, int] = field(
+        default_factory=lambda: {
+            "primary_compound": 0,
+            "accessory": 1,
+            "trunk": 2,
         }
     )
     prescription_rules: dict[str, PrescriptionRule] = field(

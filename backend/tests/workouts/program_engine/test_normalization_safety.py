@@ -1,3 +1,4 @@
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -14,6 +15,7 @@ from app.workouts.program_engine.enums import (
     TrainingStatus,
 )
 from app.workouts.program_engine.normalization import normalize_request
+from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.safety import screen_safety
 from app.workouts.program_engine.schemas import Limitation, ProgramGenerationRequest
 
@@ -69,6 +71,27 @@ def test_conflicting_experience_is_classified_conservatively() -> None:
 
     assert normalized.training_status is TrainingStatus.NOVICE
     assert "TRAINING_STATUS_REDUCED_FOR_TRAINING_AGE" in normalized.assumptions
+
+
+def test_normalization_uses_versioned_status_and_frequency_limits() -> None:
+    custom_ruleset = replace(
+        RULESET,
+        max_resistance_days=4,
+        novice_training_age_months=12,
+    )
+
+    normalized = normalize_request(
+        request(
+            training_experience=TrainingExperience.ADVANCED,
+            training_age_months=10,
+            available_training_days=6,
+        ),
+        custom_ruleset,
+    )
+
+    assert normalized.training_status is TrainingStatus.NOVICE
+    assert normalized.resistance_training_days == 4
+    assert "RESISTANCE_DAYS_CAPPED_AT_RULESET_MAXIMUM" in normalized.assumptions
 
 
 @pytest.mark.parametrize("red_flag", list(RedFlag))

@@ -91,6 +91,7 @@ class SplitType(StrEnum):
     FULL_BODY = "full_body"
     FULL_BODY_AB = "full_body_ab"
     FULL_BODY_ABC = "full_body_abc"
+    FULL_BODY_FOUR = "full_body_four"
     UPPER_LOWER_FULL = "upper_lower_full"
     UPPER_LOWER = "upper_lower"
     UPPER_LOWER_SPECIALIZATION = "upper_lower_specialization"

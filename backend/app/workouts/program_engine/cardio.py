@@ -35,13 +35,21 @@ def add_cardio(
     updated: list[WorkoutDay] = []
     assigned = 0
     for day in days:
-        eligible_day = day.focus not in {"lower", "legs"} or len(days) == 1
+        available_cardio_minutes = min(
+            ruleset.cardio_start_minutes,
+            request.source.session_duration_minutes
+            + ruleset.duration_tolerance_minutes
+            - day.estimated_duration_minutes,
+        )
+        eligible_day = (
+            day.focus not in {"lower", "legs"} or len(days) == 1
+        ) and available_cardio_minutes >= ruleset.minimum_cardio_minutes
         cardio = None
         if eligible_day and assigned < target_days:
             cardio = CardioPrescription(
                 modality_exercise_id=modality.id,
                 modality_name=modality.name,
-                duration_minutes=ruleset.cardio_start_minutes,
+                duration_minutes=available_cardio_minutes,
                 intensity=CardioIntensity.MODERATE,
                 reason_codes=(
                     "LOW_IMPACT_CARDIO_SELECTED",

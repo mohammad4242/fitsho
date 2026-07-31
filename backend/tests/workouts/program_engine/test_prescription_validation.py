@@ -205,7 +205,7 @@ def test_every_successful_program_passes_independent_validator() -> None:
 
 
 def test_validator_rejects_duration_overrun() -> None:
-    source = request(session_duration_minutes=25)
+    source = request(session_duration_minutes=45)
     result = generate_program(source, catalog(), RULESET)
     assert result.program is not None
     day = result.program.weekly_schedule[0]
@@ -229,3 +229,23 @@ def test_validator_rejects_adjacent_full_body_sessions() -> None:
     report = validate_program(invalid, source, RULESET)
 
     assert "RECOVERY_SPACING_INVALID" in report.errors
+
+
+def test_validator_rejects_program_without_trunk_pattern() -> None:
+    source = request()
+    result = generate_program(source, catalog(), RULESET)
+    assert result.program is not None
+    day = result.program.weekly_schedule[0]
+    without_trunk = replace(
+        day,
+        exercises=tuple(
+            item
+            for item in day.exercises
+            if item.movement_pattern is not MovementPattern.CORE_ANTI_EXTENSION
+        ),
+    )
+    invalid = replace(result.program, weekly_schedule=(without_trunk,))
+
+    report = validate_program(invalid, source, RULESET)
+
+    assert "REQUIRED_MOVEMENT_PATTERN_MISSING" in report.errors

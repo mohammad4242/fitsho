@@ -84,7 +84,7 @@ def build_sessions(
         chosen.sort(
             key=lambda item: (
                 item.primary_muscle not in request.source.priority_muscles,
-                _order_rank(item.movement_pattern),
+                _order_rank(item.movement_pattern, ruleset),
             )
         )
         if chosen and chosen[0].primary_muscle in request.source.priority_muscles:
@@ -99,7 +99,7 @@ def build_sessions(
                     alternative.substitution_group == item.substitution_group
                     or item.substitution_group is None
                 )
-            )[:3]
+            )[: ruleset.substitution_limit]
             for item in chosen
         }
         session_reasons = ("SESSION_TRIMMED_FOR_TIME_LIMIT",) if capacity < len(slots) else ()
@@ -129,6 +129,33 @@ def _by_pattern(
 def _slots_for_focus(
     focus: str,
 ) -> tuple[tuple[frozenset[MovementPattern], bool], ...]:
+    if focus == "full_body_b":
+        return (
+            (HINGE_PATTERNS, True),
+            (CORE_PATTERNS, True),
+            (PUSH_PATTERNS, True),
+            (PULL_PATTERNS, False),
+            (KNEE_PATTERNS, False),
+            (frozenset({MovementPattern.CALF_RAISE}), False),
+        )
+    if focus == "full_body_c":
+        return (
+            (PULL_PATTERNS, True),
+            (KNEE_PATTERNS, True),
+            (HINGE_PATTERNS, True),
+            (PUSH_PATTERNS, False),
+            (CORE_PATTERNS, False),
+            (frozenset({MovementPattern.CALF_RAISE}), False),
+        )
+    if focus == "full_body_d":
+        return (
+            (CORE_PATTERNS, True),
+            (PUSH_PATTERNS, True),
+            (PULL_PATTERNS, True),
+            (KNEE_PATTERNS, False),
+            (HINGE_PATTERNS, False),
+            (frozenset({MovementPattern.CALF_RAISE}), False),
+        )
     if focus.startswith("full_body"):
         return (
             (PUSH_PATTERNS, True),
@@ -151,10 +178,10 @@ def _slots_for_focus(
         return (
             (KNEE_PATTERNS, True),
             (HINGE_PATTERNS, True),
+            (CORE_PATTERNS, True),
             (frozenset({MovementPattern.KNEE_FLEXION}), False),
             (frozenset({MovementPattern.KNEE_EXTENSION}), False),
             (frozenset({MovementPattern.CALF_RAISE}), False),
-            (CORE_PATTERNS, False),
         )
     if focus == "push":
         return (
@@ -189,9 +216,9 @@ def _duplicates_substitution_group(
     )
 
 
-def _order_rank(pattern: MovementPattern) -> int:
+def _order_rank(pattern: MovementPattern, ruleset: ProgramRuleset) -> int:
     if pattern in PUSH_PATTERNS | PULL_PATTERNS | KNEE_PATTERNS | HINGE_PATTERNS:
-        return 0
+        return ruleset.exercise_order_rank["primary_compound"]
     if pattern in CORE_PATTERNS:
-        return 2
-    return 1
+        return ruleset.exercise_order_rank["trunk"]
+    return ruleset.exercise_order_rank["accessory"]

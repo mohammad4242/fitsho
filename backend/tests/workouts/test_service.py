@@ -63,16 +63,24 @@ def _user_with_profile(db: Session) -> User:
     return user
 
 
-def _exercise(db: Session, slug: str, pattern: MovementPattern, muscle: MuscleGroup) -> Exercise:
+def _exercise(
+    db: Session,
+    slug: str,
+    pattern: MovementPattern,
+    muscle: MuscleGroup,
+    *,
+    body_region: BodyRegion = BodyRegion.UPPER_BODY,
+    exercise_type: ExerciseType = ExerciseType.COMPOUND,
+) -> Exercise:
     item = Exercise(
         slug=slug,
         name_en=slug,
         name_fa=slug,
-        body_region=BodyRegion.UPPER_BODY,
+        body_region=body_region,
         primary_muscle=muscle,
         difficulty=Difficulty.BEGINNER,
         movement_pattern=pattern,
-        exercise_type=ExerciseType.COMPOUND,
+        exercise_type=exercise_type,
         instructions_en=["one", "two", "three"],
         instructions_fa=["یک", "دو", "سه"],
         safety_notes_en=["steady"],
@@ -93,7 +101,28 @@ def _seed_candidates(db: Session) -> list[Exercise]:
     return [
         _exercise(db, "service-push", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
         _exercise(db, "service-pull", MovementPattern.HORIZONTAL_PULL, MuscleGroup.BACK),
-        _exercise(db, "service-squat", MovementPattern.SQUAT, MuscleGroup.QUADRICEPS),
+        _exercise(
+            db,
+            "service-squat",
+            MovementPattern.SQUAT,
+            MuscleGroup.QUADRICEPS,
+            body_region=BodyRegion.LOWER_BODY,
+        ),
+        _exercise(
+            db,
+            "service-hinge",
+            MovementPattern.HIP_HINGE,
+            MuscleGroup.HAMSTRINGS,
+            body_region=BodyRegion.LOWER_BODY,
+        ),
+        _exercise(
+            db,
+            "service-plank",
+            MovementPattern.CORE_ANTI_EXTENSION,
+            MuscleGroup.ABS,
+            body_region=BodyRegion.CORE,
+            exercise_type=ExerciseType.CORE,
+        ),
     ]
 
 

@@ -82,7 +82,8 @@ fixtures are the source of truth.
 
 - Before: AI could choose P/P/L, leaving most muscles at one exposure, or fallback days could repeat.
 - Root cause: number of days acted as the split rule; no scored candidates or frequency invariant.
-- V1: full-body A/B/C with required push, pull, and knee-dominant coverage each day when safe.
+- V1: full-body A/B/C with push, pull, knee-dominant, hinge, and trunk coverage distributed across
+  the week; short sessions rotate priorities instead of repeating the same three slots.
 - Correcting rule: `SPLIT_SIMPLIFIED_FOR_NOVICE` and hard weekly movement coverage.
 - Validation: no errors; three requested days; deterministic repeated core movements carry an explicit
   progression reason.
@@ -104,7 +105,8 @@ fixtures are the source of truth.
 
 - Before: a plan missing pulling and trunk work passed validation.
 - Root cause: validator counted valid IDs but not weekly movement coverage.
-- V1: full body with push, pull, knee-dominant work and optional hinge/trunk slots as time permits.
+- V1: full body with push, pull, knee-dominant, hinge, and trunk work. If that coverage cannot fit
+  safely, generation returns a structured failure instead of dropping an essential pattern.
 - Correcting rule: required safe patterns and time-prioritized session assembly.
 - Validation: no errors; equipment subset holds; duration is within tolerance.
 - Limitation: a usable bodyweight pull exercise must exist with reviewed metadata; otherwise generation
@@ -119,4 +121,3 @@ fixtures are the source of truth.
 - Correcting rule: blocked pattern/tag hard filters and independent substitution eligibility.
 - Validation: no errors; no vertical press; no blocked caution tag.
 - Limitation: ambiguous free text still requires professional review; the engine does not guess ROM.
-

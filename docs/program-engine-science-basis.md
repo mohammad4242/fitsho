@@ -59,7 +59,8 @@ compounds, 90–120 seconds for typical hypertrophy work, and 60 seconds for end
 
 WHO's long-term adult-health target is 150–300 minutes of moderate activity or its vigorous equivalent,
 but also states that some activity is better than none. V1 treats that as a destination, not a first-week
-dose: it starts with 10-minute moderate, low-impact sessions when an eligible modality exists.
+dose: it starts with 10-minute moderate, low-impact sessions when an eligible modality exists and may
+trim a time-constrained bout to no less than the configured 5-minute minimum.
 
 - [WHO physical-activity guidance](https://www.who.int/europe/publications/i/item/9789240014886)
 - [Concurrent aerobic/resistance hypertrophy review](https://pubmed.ncbi.nlm.nih.gov/35476184/)
@@ -83,4 +84,3 @@ constraints for stable limitations.
 Evidence and product heuristics should be reviewed when the ruleset version changes. A numeric change
 requires a rationale here, one ruleset edit, focused tests, golden-scenario review, and an explicit
 migration/diff note. Runtime generation never needs internet access.
-

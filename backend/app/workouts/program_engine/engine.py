@@ -27,7 +27,7 @@ def generate_program(
     exercise_catalog: list[ExerciseCandidate] | tuple[ExerciseCandidate, ...],
     ruleset: ProgramRuleset,
 ) -> ProgramGenerationResult:
-    normalized = normalize_request(request)
+    normalized = normalize_request(request, ruleset)
     safety = screen_safety(normalized)
     if safety.status not in {SafetyStatus.CLEAR, SafetyStatus.CLEAR_WITH_MODIFICATIONS}:
         return ProgramGenerationResult(
@@ -93,7 +93,7 @@ def generate_program(
         ),
         "estimated_weekly_duration": sum(day.estimated_duration_minutes for day in days),
         "hard_training_days": len(days),
-        "recovery_days": 7 - len(days),
+        "recovery_days": ruleset.days_per_week - len(days),
     }
     trace: tuple[dict[str, object], ...] = (
         {"stage": "normalization", "assumptions": normalized.assumptions},

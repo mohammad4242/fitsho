@@ -107,4 +107,3 @@ Safety review and constraint failures return HTTP 422 with a stable code. Core d
 - `PROGRAM_VALIDATION_FAILED`
 
 The engine does not select an ineligible fallback to fill a slot.
-

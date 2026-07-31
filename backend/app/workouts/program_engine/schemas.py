@@ -209,6 +209,12 @@ class ExerciseCandidate:
 
 
 @dataclass(frozen=True)
+class SplitCandidate:
+    split_type: SplitType
+    day_focuses: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class SplitPlan:
     split_type: SplitType
     day_focuses: tuple[str, ...]

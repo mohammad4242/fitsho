@@ -50,4 +50,3 @@ When an active plan expires or its normalized input/catalog signature changes, t
 
 The previous active plan is superseded only in the same transaction that activates a validator-approved
 replacement. A failed replacement leaves the previous active plan unchanged.
-

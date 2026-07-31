@@ -22,6 +22,9 @@ programming heuristics, not medical laws.
 | Rule | V1 value | Runtime use |
 |---|---:|---|
 | Maximum resistance days | 6 | Split selection |
+| Minimum recovery gap | 2 days for recovery-sensitive adjacent focuses | Split scoring/validator |
+| Training-age thresholds | 6/18/48 months | Conservative status classification |
+| Recent consistency floor | 4 weeks | Conservative status classification |
 | Session duration tolerance | 5 minutes | Validator |
 | General warm-up | 5 minutes | Duration model |
 | Primary set credit | 1.0 | Volume metrics |
@@ -36,7 +39,7 @@ programming heuristics, not medical laws.
 | Prior-volume increase ceiling | 20% | Avoids large unjustified jumps |
 | Per-session muscle ceiling | 6 direct sets | Validator and prescription |
 | Exercises/session ceiling | 8 | Session assembly |
-| Cardio starter dose | 10 minutes/session | Gradual, separate prescription |
+| Cardio starter dose | 10 minutes; minimum 5 when time-constrained | Gradual prescription |
 
 When time, prior exposure, and a generic status floor conflict, V1 prefers a smaller feasible program
 and emits `PLANNED_VOLUME_REDUCED_DURING_SESSION_FIT`. It never shortens essential heavy-lift rest to
@@ -44,12 +47,16 @@ hide a duration overrun.
 
 ## Split rules
 
+- Every supported day count produces typed candidate structures before scoring.
+- Scores use only `split_weights` and `split_complexity` from the V1 ruleset.
+- Goal specificity, simplicity, recovery, short sessions, priority muscles, and twice-weekly exposure
+  influence ranking; stable type ordering resolves exact ties.
 - One day: full body.
 - Two days: full body A/B with at least three days between defaults.
-- Three novice days: full body A/B/C, not automatic P/P/L.
-- Four days: upper/lower repeated.
-- Five days: upper/lower plus specialization.
-- Six days: P/P/L twice only for advanced status; otherwise upper/lower repeated.
+- Three days: full body A/B/C and upper/lower/full are candidates; novices prefer the simpler option.
+- Four days: upper/lower and short full-body sessions are candidates.
+- Five days: upper/lower plus specialization and P/P/L/upper/lower are candidates.
+- Six days: P/P/L twice and upper/lower repeated are candidates; experience and recovery decide.
 - Seven available days: six resistance days maximum.
 - Novice plus poor recovery/high physical job: three resistance days maximum.
 
@@ -66,6 +73,7 @@ require primary muscle and a non-`other` movement pattern.
 
 - Priority muscles are moved first, followed by major compound patterns, accessories, and trunk work.
 - Same-session substitution-group duplicates are prevented.
+- Short full-body sessions rotate push, pull, knee, hinge, and trunk slots across the week.
 - Cross-day repeats require `CORE_MOVEMENT_REPEATED_FOR_PROGRESSION`.
 - Strength compounds: 3–6 reps, RIR 2–3, 180-second default rest.
 - Hypertrophy compounds: 6–12 reps; isolation: 10–20; RIR 2–3.
@@ -84,4 +92,3 @@ increment. Load and volume are not increased together by default.
 
 The persisted deload policy requires multiple fatigue signals, keeps movement patterns, suggests
 30–50% less volume and optionally 5–10% less load, and never replaces a safety referral.
-

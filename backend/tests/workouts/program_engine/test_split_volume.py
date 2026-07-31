@@ -16,7 +16,7 @@ from app.workouts.program_engine.schemas import (
     ProgramGenerationRequest,
     RecentTrainingHistory,
 )
-from app.workouts.program_engine.split_selector import select_split
+from app.workouts.program_engine.split_selector import generate_split_candidates, select_split
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 
 
@@ -114,6 +114,31 @@ def test_intermediate_four_day_hypertrophy_uses_upper_lower_frequency() -> None:
     assert split.split_type is SplitType.UPPER_LOWER
     assert split.day_focuses.count("upper") == 2
     assert split.day_focuses.count("lower") == 2
+
+
+def test_five_days_generate_multiple_valid_split_candidates() -> None:
+    candidates = generate_split_candidates(5)
+
+    assert {candidate.split_type for candidate in candidates} == {
+        SplitType.UPPER_LOWER_SPECIALIZATION,
+        SplitType.PUSH_PULL_LEGS_UPPER_LOWER,
+    }
+
+
+def test_advanced_six_day_strength_selects_specific_ppl_candidate() -> None:
+    split = select_split(
+        normalized(
+            available_training_days=6,
+            primary_goal=Goal.STRENGTH,
+            training_experience=TrainingExperience.ADVANCED,
+            training_age_months=72,
+            recent_training_history=RecentTrainingHistory(consistent_weeks=40),
+        ),
+        RULESET,
+    )
+
+    assert split.split_type is SplitType.PUSH_PULL_LEGS_X2
+    assert "SPLIT_SELECTED_FOR_GOAL_SPECIFICITY" in split.reason_codes
 
 
 def test_priority_muscle_receives_more_but_bounded_volume() -> None:
