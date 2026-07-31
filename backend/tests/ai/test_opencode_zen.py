@@ -243,6 +243,94 @@ def test_zen_provider_availability_check_uses_minimal_request(
         assert body["max_tokens"] == 1
 
 
+def _structured_test_success(api_kind: ZenApiKind) -> dict[str, object]:
+    if api_kind is ZenApiKind.RESPONSES:
+        return {
+            "id": "resp_contract",
+            "output": [
+                {
+                    "type": "message",
+                    "content": [{"type": "output_text", "text": '{"status":"ok"}'}],
+                }
+            ],
+        }
+    if api_kind is ZenApiKind.CHAT_COMPLETIONS:
+        return {"id": "chat_contract", "choices": [{"message": {"content": '{"status":"ok"}'}}]}
+    if api_kind is ZenApiKind.MESSAGES:
+        return {
+            "id": "msg_contract",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "name": "fitsho_model_test_contract",
+                    "input": {"status": "ok"},
+                }
+            ],
+        }
+    return {
+        "responseId": "gem_contract",
+        "candidates": [{"content": {"parts": [{"text": '{"status":"ok"}'}]}}],
+    }
+
+
+@pytest.mark.parametrize(
+    ("api_kind", "model"),
+    [
+        (ZenApiKind.RESPONSES, "gpt-5.4-nano"),
+        (ZenApiKind.CHAT_COMPLETIONS, "nemotron-3-ultra-free"),
+        (ZenApiKind.MESSAGES, "claude-sonnet-4-5"),
+        (ZenApiKind.GEMINI, "gemini-3.6-flash"),
+    ],
+)
+def test_zen_provider_model_test_contract_uses_compact_structured_output(
+    api_kind: ZenApiKind,
+    model: str,
+) -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json=_structured_test_success(api_kind))
+
+    provider = _provider_for(api_kind, model, httpx.MockTransport(handler))
+
+    _run(provider.check_model_test_contract())
+
+    body = seen["body"]
+    assert isinstance(body, dict)
+    serialized = json.dumps(body)
+    assert "profile" not in serialized
+    assert "exercises" not in serialized
+    assert "Reply only: OK" not in serialized
+    if api_kind is ZenApiKind.RESPONSES:
+        assert body["text"]["format"]["type"] == "json_schema"
+    elif api_kind is ZenApiKind.CHAT_COMPLETIONS:
+        assert body["response_format"]["type"] == "json_schema"
+    elif api_kind is ZenApiKind.MESSAGES:
+        assert body["tool_choice"] == {"type": "tool", "name": "fitsho_model_test_contract"}
+    else:
+        assert body["generationConfig"]["responseMimeType"] == "application/json"
+
+
+def test_zen_provider_model_test_contract_rejects_invalid_structured_output() -> None:
+    provider = _provider_for(
+        ZenApiKind.CHAT_COMPLETIONS,
+        "nemotron-3-ultra-free",
+        httpx.MockTransport(
+            lambda request: httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": '{"status":"no"}'}}]},
+            )
+        ),
+    )
+
+    with pytest.raises(WorkoutProviderError) as error:
+        _run(provider.check_model_test_contract())
+
+    assert error.value.code is ProviderErrorCode.INVALID_OUTPUT
+    assert "structured JSON" in error.value.safe_message
+
+
 def test_zen_response_schema_requires_nullable_notes_keys() -> None:
     definitions = WORKOUT_PLAN_OUTPUT_SCHEMA["$defs"]
     assert isinstance(definitions, dict)

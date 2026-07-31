@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Literal
 
 import httpx
-from pydantic import SecretStr, ValidationError
+from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError
 
 from app.ai.models import ZenApiKind
 from app.ai.schemas import (
@@ -14,6 +14,16 @@ from app.ai.schemas import (
     WorkoutPlanModelOutput,
     WorkoutProviderError,
 )
+
+
+class _ModelTestContract(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["ok"]
+
+
+_MODEL_TEST_CONTRACT_SCHEMA = _ModelTestContract.model_json_schema()
+_MODEL_TEST_CONTRACT_PROMPT = "Return only a JSON object with status set to ok."
 
 
 class OpenCodeZenWorkoutPlanProvider:
@@ -105,6 +115,52 @@ class OpenCodeZenWorkoutPlanProvider:
             ) from error
         self._raise_for_status(response)
         self._parse_response_envelope(response)
+
+    async def check_model_test_contract(self) -> None:
+        api_key = self._api_key_value()
+        if api_key is None:
+            raise WorkoutProviderError(
+                ProviderErrorCode.NOT_CONFIGURED,
+                "Workout generation is not configured.",
+            )
+        try:
+            response = await self._client.post(
+                self._endpoint(),
+                headers=self._headers(api_key),
+                json=self._model_test_contract_request_body(),
+                timeout=self._timeout,
+            )
+        except httpx.TimeoutException as error:
+            raise WorkoutProviderError(
+                ProviderErrorCode.TIMEOUT,
+                "Workout generation timed out. Please try again.",
+            ) from error
+        except httpx.RequestError as error:
+            raise WorkoutProviderError(
+                ProviderErrorCode.CONNECTION_FAILURE,
+                "Workout generation is temporarily unavailable. Please try again.",
+            ) from error
+
+        self._raise_for_status(response)
+        payload = self._parse_response_envelope(response)
+        try:
+            if self._api_kind is ZenApiKind.MESSAGES:
+                contract = self._extract_messages_tool_input(
+                    payload,
+                    tool_name="fitsho_model_test_contract",
+                )
+            elif self._api_kind is ZenApiKind.CHAT_COMPLETIONS:
+                contract = self._load_plan_json(self._extract_chat_completions_output_text(payload))
+            elif self._api_kind is ZenApiKind.GEMINI:
+                contract = self._load_plan_json(self._extract_gemini_output_text(payload))
+            else:
+                contract = self._load_plan_json(self._extract_output_text(payload))
+            _ModelTestContract.model_validate(contract)
+        except (ValidationError, WorkoutProviderError) as error:
+            raise WorkoutProviderError(
+                ProviderErrorCode.INVALID_OUTPUT,
+                "The model did not complete the structured JSON check.",
+            ) from error
 
     def _endpoint(self) -> str:
         if self._api_kind is ZenApiKind.RESPONSES:
@@ -228,6 +284,58 @@ class OpenCodeZenWorkoutPlanProvider:
             "input": "Reply only: OK",
             "max_output_tokens": 1,
             "store": False,
+        }
+
+    def _model_test_contract_request_body(self) -> dict[str, object]:
+        if self._api_kind is ZenApiKind.CHAT_COMPLETIONS:
+            return {
+                "model": self._model,
+                "messages": [{"role": "user", "content": _MODEL_TEST_CONTRACT_PROMPT}],
+                "max_tokens": 32,
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "fitsho_model_test_contract",
+                        "strict": True,
+                        "schema": _MODEL_TEST_CONTRACT_SCHEMA,
+                    },
+                },
+            }
+        if self._api_kind is ZenApiKind.MESSAGES:
+            return {
+                "model": self._model,
+                "max_tokens": 32,
+                "messages": [{"role": "user", "content": _MODEL_TEST_CONTRACT_PROMPT}],
+                "tools": [
+                    {
+                        "name": "fitsho_model_test_contract",
+                        "description": "Return the model test contract.",
+                        "input_schema": _MODEL_TEST_CONTRACT_SCHEMA,
+                    }
+                ],
+                "tool_choice": {"type": "tool", "name": "fitsho_model_test_contract"},
+            }
+        if self._api_kind is ZenApiKind.GEMINI:
+            return {
+                "contents": [{"role": "user", "parts": [{"text": _MODEL_TEST_CONTRACT_PROMPT}]}],
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "responseJsonSchema": _MODEL_TEST_CONTRACT_SCHEMA,
+                },
+            }
+        return {
+            "model": self._model,
+            "input": _MODEL_TEST_CONTRACT_PROMPT,
+            "max_output_tokens": 32,
+            "store": False,
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "fitsho_model_test_contract",
+                    "strict": True,
+                    "schema": _MODEL_TEST_CONTRACT_SCHEMA,
+                }
+            },
         }
 
     @staticmethod
@@ -383,7 +491,11 @@ class OpenCodeZenWorkoutPlanProvider:
         return content
 
     @staticmethod
-    def _extract_messages_tool_input(payload: dict[str, Any]) -> object:
+    def _extract_messages_tool_input(
+        payload: dict[str, Any],
+        *,
+        tool_name: str = "fitsho_workout_plan",
+    ) -> object:
         if payload.get("stop_reason") == "refusal":
             raise WorkoutProviderError(
                 ProviderErrorCode.REFUSAL,
@@ -398,7 +510,7 @@ class OpenCodeZenWorkoutPlanProvider:
         for part in content:
             if not isinstance(part, dict):
                 continue
-            if part.get("type") == "tool_use" and part.get("name") == "fitsho_workout_plan":
+            if part.get("type") == "tool_use" and part.get("name") == tool_name:
                 return part.get("input")
         raise WorkoutProviderError(
             ProviderErrorCode.MALFORMED_RESPONSE,
