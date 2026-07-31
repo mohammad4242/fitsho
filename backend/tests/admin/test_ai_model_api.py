@@ -193,6 +193,9 @@ def test_admin_can_run_a_model_health_check(
         "outcome": "succeeded",
         "error_code": None,
         "safe_error_message": None,
+        "provider_status_code": None,
+        "provider_error_type": None,
+        "provider_error_message": None,
         "created_at": response.json()["test_run"]["created_at"],
     }
     assert db.get(AiModel, model.id).last_checked_at is not None  # type: ignore[union-attr]

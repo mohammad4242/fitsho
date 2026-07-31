@@ -197,6 +197,9 @@ it("renders failed model availability tests as red recent events", async () => {
       outcome: "failed",
       error_code: "provider_unavailable",
       safe_error_message: "Workout generation is temporarily unavailable. Please try again.",
+      provider_status_code: 400,
+      provider_error_type: "invalid_request_error",
+      provider_error_message: "Unsupported response_format.",
       created_at: "2026-07-31T11:00:00Z",
     },
   ]);
@@ -205,6 +208,8 @@ it("renders failed model availability tests as red recent events", async () => {
   const errorCode = await screen.findByText("provider_unavailable");
   expect(errorCode.closest("article")).toHaveClass("admin-ai-event--error");
   expect(screen.getByText("unavailable-free-model")).toBeInTheDocument();
+  expect(screen.getByText("HTTP:", { exact: false })).toBeInTheDocument();
+  expect(screen.getByText("Unsupported response_format.")).toBeInTheDocument();
 });
 
 function renderPage() {

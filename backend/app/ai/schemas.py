@@ -65,7 +65,18 @@ class ProviderErrorCode(StrEnum):
 
 
 class WorkoutProviderError(Exception):
-    def __init__(self, code: ProviderErrorCode, safe_message: str) -> None:
+    def __init__(
+        self,
+        code: ProviderErrorCode,
+        safe_message: str,
+        *,
+        provider_status_code: int | None = None,
+        provider_error_type: str | None = None,
+        provider_error_message: str | None = None,
+    ) -> None:
         super().__init__(safe_message)
         self.code = code
         self.safe_message = safe_message
+        self.provider_status_code = provider_status_code
+        self.provider_error_type = provider_error_type
+        self.provider_error_message = provider_error_message

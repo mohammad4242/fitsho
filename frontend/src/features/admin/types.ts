@@ -148,6 +148,9 @@ export type AdminAiModelTestRun = {
   outcome: "succeeded" | "failed";
   error_code: string | null;
   safe_error_message: string | null;
+  provider_status_code: number | null;
+  provider_error_type: string | null;
+  provider_error_message: string | null;
   created_at: string;
 };
 

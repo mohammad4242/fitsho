@@ -181,6 +181,9 @@ class AdminAiModelTestRun(BaseModel):
     outcome: AiModelTestOutcome
     error_code: str | None
     safe_error_message: str | None
+    provider_status_code: int | None
+    provider_error_type: str | None
+    provider_error_message: str | None
     created_at: datetime
 
 

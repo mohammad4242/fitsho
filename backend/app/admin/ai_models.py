@@ -210,6 +210,9 @@ async def check_ai_model(
             outcome=AiModelTestOutcome.FAILED,
             error_code=error.code.value,
             safe_error_message=error.safe_message,
+            provider_status_code=error.provider_status_code,
+            provider_error_type=error.provider_error_type,
+            provider_error_message=error.provider_error_message,
         )
         db.add(run)
         db.commit()

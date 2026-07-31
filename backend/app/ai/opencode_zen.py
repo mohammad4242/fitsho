@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Literal
+import re
+from typing import Any, Literal, TypedDict
 
 import httpx
 from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError
@@ -24,6 +25,12 @@ class _ModelTestContract(BaseModel):
 
 _MODEL_TEST_CONTRACT_SCHEMA = _ModelTestContract.model_json_schema()
 _MODEL_TEST_CONTRACT_PROMPT = "Return only a JSON object with status set to ok."
+
+
+class _ProviderErrorDiagnostics(TypedDict, total=False):
+    provider_status_code: int
+    provider_error_type: str
+    provider_error_message: str
 
 
 class OpenCodeZenWorkoutPlanProvider:
@@ -351,26 +358,61 @@ class OpenCodeZenWorkoutPlanProvider:
 
     @staticmethod
     def _raise_for_status(response: httpx.Response) -> None:
+        diagnostics = OpenCodeZenWorkoutPlanProvider._response_error_diagnostics(response)
         if response.status_code in {401, 403}:
             raise WorkoutProviderError(
                 ProviderErrorCode.UNAUTHORIZED,
                 "Workout generation credentials were rejected.",
+                **diagnostics,
             )
         if response.status_code == 429:
             raise WorkoutProviderError(
                 ProviderErrorCode.RATE_LIMITED,
                 "Workout generation is busy. Please try again later.",
+                **diagnostics,
             )
         if response.status_code >= 500:
             raise WorkoutProviderError(
                 ProviderErrorCode.PROVIDER_UNAVAILABLE,
                 "Workout generation is temporarily unavailable. Please try again.",
+                **diagnostics,
             )
         if response.status_code >= 400:
             raise WorkoutProviderError(
                 ProviderErrorCode.MALFORMED_RESPONSE,
                 "Workout generation request could not be completed.",
+                **diagnostics,
             )
+
+    @staticmethod
+    def _response_error_diagnostics(response: httpx.Response) -> _ProviderErrorDiagnostics:
+        result: _ProviderErrorDiagnostics = {"provider_status_code": response.status_code}
+        try:
+            payload = response.json()
+        except json.JSONDecodeError:
+            return result
+        error = payload.get("error") if isinstance(payload, dict) else None
+        if not isinstance(error, dict):
+            return result
+        error_type = error.get("type") or error.get("code")
+        if isinstance(error_type, str):
+            result["provider_error_type"] = error_type[:80]
+        message = error.get("message")
+        if isinstance(message, str):
+            result["provider_error_message"] = (
+                OpenCodeZenWorkoutPlanProvider._sanitize_error_message(message)
+            )
+        return result
+
+    @staticmethod
+    def _sanitize_error_message(message: str) -> str:
+        sanitized = re.sub(r"(?i)bearer\s+[^\s,;]+", "[REDACTED]", message)
+        sanitized = re.sub(
+            r"(?i)(api[_-]?key|token|secret)\s*[:=]\s*[^\s,;]+",
+            r"\1=[REDACTED]",
+            sanitized,
+        )
+        return sanitized[:500]
 
     @staticmethod
     def _parse_response_envelope(response: httpx.Response) -> dict[str, Any]:

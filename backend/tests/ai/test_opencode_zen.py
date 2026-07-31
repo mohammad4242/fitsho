@@ -331,6 +331,31 @@ def test_zen_provider_model_test_contract_rejects_invalid_structured_output() ->
     assert "structured JSON" in error.value.safe_message
 
 
+def test_zen_provider_captures_sanitized_upstream_error_diagnostics() -> None:
+    provider = _provider_for(
+        ZenApiKind.CHAT_COMPLETIONS,
+        "custom-model",
+        httpx.MockTransport(
+            lambda request: httpx.Response(
+                400,
+                json={
+                    "error": {
+                        "type": "invalid_request_error",
+                        "message": "Unsupported response_format. Bearer secret-token",
+                    }
+                },
+            )
+        ),
+    )
+
+    with pytest.raises(WorkoutProviderError) as error:
+        _run(provider.check_availability())
+
+    assert error.value.provider_status_code == 400
+    assert error.value.provider_error_type == "invalid_request_error"
+    assert error.value.provider_error_message == "Unsupported response_format. [REDACTED]"
+
+
 def test_zen_response_schema_requires_nullable_notes_keys() -> None:
     definitions = WORKOUT_PLAN_OUTPUT_SCHEMA["$defs"]
     assert isinstance(definitions, dict)

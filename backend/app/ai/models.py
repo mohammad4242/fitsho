@@ -175,6 +175,9 @@ class AiModelTestRun(Base):
     )
     error_code: Mapped[str | None] = mapped_column(String(80))
     safe_error_message: Mapped[str | None] = mapped_column(String(500))
+    provider_status_code: Mapped[int | None] = mapped_column(Integer)
+    provider_error_type: Mapped[str | None] = mapped_column(String(80))
+    provider_error_message: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),

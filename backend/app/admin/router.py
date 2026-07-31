@@ -96,6 +96,9 @@ def _ai_model_test_run_detail(run: AiModelTestRun) -> AdminAiModelTestRun:
         outcome=run.outcome,
         error_code=run.error_code,
         safe_error_message=run.safe_error_message,
+        provider_status_code=run.provider_status_code,
+        provider_error_type=run.provider_error_type,
+        provider_error_message=run.provider_error_message,
         created_at=run.created_at,
     )
 

@@ -35,6 +35,9 @@ type AiEvent = {
   tone: "success" | "error";
   errorCode: string | null;
   message: string | null;
+  providerStatusCode?: number | null;
+  providerErrorType?: string | null;
+  providerErrorMessage?: string | null;
   diagnostics?: AdminAiGenerationFailure["validation_diagnostics"];
 };
 
@@ -97,6 +100,9 @@ export function AdminAiModelsPage() {
       message: testRun.outcome === "succeeded"
         ? t("admin.aiModels.testSuccess")
         : testRun.safe_error_message,
+      providerStatusCode: testRun.provider_status_code,
+      providerErrorType: testRun.provider_error_type,
+      providerErrorMessage: testRun.provider_error_message,
     })),
     ...failures.map((failure) => ({
       id: `generation-${failure.id}`,
@@ -273,6 +279,15 @@ export function AdminAiModelsPage() {
                     </header>
                     {event.errorCode !== null && <strong>{event.errorCode}</strong>}
                     {event.message !== null && <p>{event.message}</p>}
+                    {event.providerStatusCode !== null && event.providerStatusCode !== undefined && (
+                      <span>HTTP: <code>{event.providerStatusCode}</code></span>
+                    )}
+                    {event.providerErrorType !== null && event.providerErrorType !== undefined && (
+                      <span>Zen: <code>{event.providerErrorType}</code></span>
+                    )}
+                    {event.providerErrorMessage !== null && event.providerErrorMessage !== undefined && (
+                      <p>{event.providerErrorMessage}</p>
+                    )}
                     {event.diagnostics?.flatMap((diagnostic, diagnosticIndex) =>
                       diagnostic.problems.map((problem, problemIndex) => (
                         <div
