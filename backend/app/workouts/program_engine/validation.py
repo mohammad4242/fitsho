@@ -72,7 +72,7 @@ def validate_program(
     for group in (
         {MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH},
         {MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL},
-        {MovementPattern.SQUAT, MovementPattern.LUNGE},
+        {MovementPattern.SQUAT, MovementPattern.LUNGE, MovementPattern.KNEE_EXTENSION},
     ):
         if not any(patterns[pattern] for pattern in group):
             errors.append("REQUIRED_MOVEMENT_PATTERN_MISSING")
@@ -110,4 +110,3 @@ def validate_program(
         },
         decision_trace=program.decision_trace,
     )
-

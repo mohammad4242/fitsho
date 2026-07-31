@@ -14,7 +14,9 @@ from app.workouts.program_engine.schemas import (
 
 PUSH_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH})
 PULL_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL})
-KNEE_PATTERNS = frozenset({MovementPattern.SQUAT, MovementPattern.LUNGE})
+KNEE_PATTERNS = frozenset(
+    {MovementPattern.SQUAT, MovementPattern.LUNGE, MovementPattern.KNEE_EXTENSION}
+)
 HINGE_PATTERNS = frozenset({MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION})
 CORE_PATTERNS = frozenset(
     {
