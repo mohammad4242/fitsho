@@ -204,6 +204,45 @@ def test_zen_provider_uses_responses_api_and_parses_structured_output() -> None:
     assert output_format["type"] == "json_schema"
 
 
+@pytest.mark.parametrize(
+    ("api_kind", "model"),
+    [
+        (ZenApiKind.RESPONSES, "gpt-5.4-nano"),
+        (ZenApiKind.CHAT_COMPLETIONS, "nemotron-3-ultra-free"),
+        (ZenApiKind.MESSAGES, "claude-sonnet-4-5"),
+        (ZenApiKind.GEMINI, "gemini-3.6-flash"),
+    ],
+)
+def test_zen_provider_availability_check_uses_minimal_request(
+    api_kind: ZenApiKind,
+    model: str,
+) -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"id": "available"})
+
+    provider = _provider_for(api_kind, model, httpx.MockTransport(handler))
+
+    _run(provider.check_availability())
+
+    body = seen["body"]
+    assert isinstance(body, dict)
+    serialized = json.dumps(body)
+    assert "Reply only: OK" in serialized
+    assert "fitsho_workout_plan" not in serialized
+    assert "response_format" not in body
+    assert "tools" not in body
+    if api_kind is ZenApiKind.RESPONSES:
+        assert body["max_output_tokens"] == 1
+        assert body["store"] is False
+    elif api_kind is ZenApiKind.GEMINI:
+        assert body["generationConfig"] == {"maxOutputTokens": 1}
+    else:
+        assert body["max_tokens"] == 1
+
+
 def test_zen_response_schema_requires_nullable_notes_keys() -> None:
     definitions = WORKOUT_PLAN_OUTPUT_SCHEMA["$defs"]
     assert isinstance(definitions, dict)

@@ -79,6 +79,33 @@ class OpenCodeZenWorkoutPlanProvider:
             output_tokens=self._optional_int(usage_data.get(output_key)),
         )
 
+    async def check_availability(self) -> None:
+        api_key = self._api_key_value()
+        if api_key is None:
+            raise WorkoutProviderError(
+                ProviderErrorCode.NOT_CONFIGURED,
+                "Workout generation is not configured.",
+            )
+        try:
+            response = await self._client.post(
+                self._endpoint(),
+                headers=self._headers(api_key),
+                json=self._availability_request_body(),
+                timeout=self._timeout,
+            )
+        except httpx.TimeoutException as error:
+            raise WorkoutProviderError(
+                ProviderErrorCode.TIMEOUT,
+                "Workout generation timed out. Please try again.",
+            ) from error
+        except httpx.RequestError as error:
+            raise WorkoutProviderError(
+                ProviderErrorCode.CONNECTION_FAILURE,
+                "Workout generation is temporarily unavailable. Please try again.",
+            ) from error
+        self._raise_for_status(response)
+        self._parse_response_envelope(response)
+
     def _endpoint(self) -> str:
         if self._api_kind is ZenApiKind.RESPONSES:
             return f"{self._base_url}/responses"
@@ -174,6 +201,33 @@ class OpenCodeZenWorkoutPlanProvider:
                     "schema": request.response_schema,
                 }
             },
+        }
+
+    def _availability_request_body(self) -> dict[str, object]:
+        if self._api_kind is ZenApiKind.CHAT_COMPLETIONS:
+            return {
+                "model": self._model,
+                "messages": [{"role": "user", "content": "Reply only: OK"}],
+                "max_tokens": 1,
+            }
+        if self._api_kind is ZenApiKind.MESSAGES:
+            return {
+                "model": self._model,
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "Reply only: OK"}],
+            }
+        if self._api_kind is ZenApiKind.GEMINI:
+            return {
+                "contents": [
+                    {"role": "user", "parts": [{"text": "Reply only: OK"}]}
+                ],
+                "generationConfig": {"maxOutputTokens": 1},
+            }
+        return {
+            "model": self._model,
+            "input": "Reply only: OK",
+            "max_output_tokens": 1,
+            "store": False,
         }
 
     @staticmethod
