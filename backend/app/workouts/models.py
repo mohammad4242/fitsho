@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     CheckConstraint,
     DateTime,
     Enum,
@@ -75,6 +76,51 @@ class WorkoutPlan(Base):
     generation_policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
     candidate_set_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     generation_method: Mapped[str] = mapped_column(String(30), nullable=False)
+    engine_version: Mapped[str] = mapped_column(
+        String(64), default="legacy_ai", server_default="legacy_ai", nullable=False
+    )
+    ruleset_version: Mapped[str] = mapped_column(
+        String(64), default="legacy", server_default="legacy", nullable=False
+    )
+    primary_goal: Mapped[str] = mapped_column(
+        String(40), default="general_fitness", server_default="general_fitness", nullable=False
+    )
+    secondary_goal: Mapped[str | None] = mapped_column(String(40))
+    training_status: Mapped[str] = mapped_column(
+        String(40), default="novice", server_default="novice", nullable=False
+    )
+    safety_status: Mapped[str] = mapped_column(
+        String(50), default="clear", server_default="clear", nullable=False
+    )
+    seed: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    exercise_catalog_snapshot: Mapped[dict[str, object]] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'::json"), nullable=False
+    )
+    assumptions: Mapped[list[str]] = mapped_column(
+        JSON, default=list, server_default=text("'[]'::json"), nullable=False
+    )
+    warnings: Mapped[list[str]] = mapped_column(
+        JSON, default=list, server_default=text("'[]'::json"), nullable=False
+    )
+    validation_report: Mapped[dict[str, object]] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'::json"), nullable=False
+    )
+    aggregate_metrics: Mapped[dict[str, object]] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'::json"), nullable=False
+    )
+    decision_trace: Mapped[list[dict[str, object]]] = mapped_column(
+        JSON, default=list, server_default=text("'[]'::json"), nullable=False
+    )
+    progression_policy: Mapped[dict[str, object]] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'::json"), nullable=False
+    )
+    previous_program_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("workout_plans.id", ondelete="SET NULL")
+    )
+    regeneration_reason: Mapped[str | None] = mapped_column(String(160))
+    difference_summary: Mapped[dict[str, object]] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'::json"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -111,6 +157,11 @@ class WorkoutDay(Base):
     title_en: Mapped[str] = mapped_column(String(120), nullable=False)
     title_fa: Mapped[str] = mapped_column(String(120), nullable=False)
     estimated_duration_minutes: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    weekday: Mapped[int | None] = mapped_column(SmallInteger)
+    focus: Mapped[str] = mapped_column(
+        String(80), default="legacy", server_default="legacy", nullable=False
+    )
+    cardio: Mapped[dict[str, object] | None] = mapped_column(JSON)
 
     workout_plan: Mapped[WorkoutPlan] = relationship(back_populates="days")
     exercises: Mapped[list[WorkoutPlanExercise]] = relationship(
@@ -171,6 +222,22 @@ class WorkoutPlanExercise(Base):
     estimated_minutes: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     notes_en: Mapped[str | None] = mapped_column(Text)
     notes_fa: Mapped[str | None] = mapped_column(Text)
+    exercise_snapshot: Mapped[dict[str, object]] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'::json"), nullable=False
+    )
+    reason_codes: Mapped[list[str]] = mapped_column(
+        JSON, default=list, server_default=text("'[]'::json"), nullable=False
+    )
+    substitution_exercise_ids: Mapped[list[str]] = mapped_column(
+        JSON, default=list, server_default=text("'[]'::json"), nullable=False
+    )
+    warmup_sets: Mapped[int] = mapped_column(
+        SmallInteger, default=0, server_default="0", nullable=False
+    )
+    load_guidance: Mapped[str] = mapped_column(Text, default="", server_default="", nullable=False)
+    progression_rule: Mapped[str] = mapped_column(
+        String(80), default="legacy", server_default="legacy", nullable=False
+    )
 
     workout_day: Mapped[WorkoutDay] = relationship(back_populates="exercises")
     exercise: Mapped[Exercise] = relationship()
@@ -180,7 +247,7 @@ class WorkoutPlanGeneration(Base):
     __tablename__ = "workout_plan_generations"
     __table_args__ = (
         CheckConstraint(
-            "candidate_count BETWEEN 0 AND 200",
+            "candidate_count BETWEEN 0 AND 5000",
             name="ck_workout_plan_generations_candidate_count_range",
         ),
         CheckConstraint(

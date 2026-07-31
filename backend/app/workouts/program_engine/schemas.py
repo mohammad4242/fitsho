@@ -198,6 +198,7 @@ class ExerciseCandidate:
     substitution_group: str | None = None
     progression_exercise_ids: tuple[UUID, ...] = ()
     regression_exercise_ids: tuple[UUID, ...] = ()
+    display_snapshot: dict[str, object] = field(default_factory=dict)
 
     @property
     def has_required_metadata(self) -> bool:

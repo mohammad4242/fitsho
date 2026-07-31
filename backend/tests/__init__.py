@@ -1,2 +1,0 @@
-"""Fitsho backend tests."""
-

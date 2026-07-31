@@ -12,9 +12,10 @@ from app.exercises.dependencies import require_completed_profile
 from app.exercises.models import Exercise
 from app.exercises.schemas import ExerciseSummary
 from app.workouts.dependencies import WorkoutGenerationServiceDependency
-from app.workouts.models import WorkoutPlan
+from app.workouts.models import WorkoutPlan, WorkoutPlanExercise
 from app.workouts.repository import get_plan_for_user
 from app.workouts.schemas import (
+    ProgramGenerationOverrides,
     WorkoutDayResponse,
     WorkoutPlanExerciseAlternativeResponse,
     WorkoutPlanExerciseResponse,
@@ -25,6 +26,7 @@ from app.workouts.service import (
     GenerationCooldownError,
     GenerationInProgressError,
     NoEligibleExercisesError,
+    ProgramGenerationRejectedError,
     WorkoutGenerationFailedError,
     WorkoutGenerationService,
 )
@@ -53,9 +55,14 @@ def read_active_plan(
 async def generate_plan(
     service: WorkoutGenerationServiceDependency,
     user: CurrentUser,
+    payload: ProgramGenerationOverrides | None = None,
 ) -> WorkoutPlanGenerateResponse:
     try:
-        result = await service.generate(user.id)
+        result = (
+            await service.generate(user.id)
+            if payload is None
+            else await service.generate(user.id, payload)
+        )
     except GenerationCooldownError as error:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -67,10 +74,22 @@ async def generate_plan(
             status_code=status.HTTP_409_CONFLICT,
             detail="Workout plan generation is already in progress",
         ) from None
-    except NoEligibleExercisesError:
+    except NoEligibleExercisesError as error:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Not enough eligible exercises for a workout plan",
+            detail={
+                "code": error.error_code,
+                "message": "Not enough eligible exercises for a safe workout plan",
+            },
+        ) from None
+    except ProgramGenerationRejectedError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": error.error_code,
+                "safety_status": error.safety_status,
+                "message": "Professional review is required before automatic programming",
+            },
         ) from None
     except WorkoutGenerationFailedError as error:
         status_code = _provider_failure_status(error.provider_error_code)
@@ -107,6 +126,9 @@ def to_plan_response(plan: WorkoutPlan, *, is_stale: bool = False) -> WorkoutPla
                 title_en=day.title_en,
                 title_fa=day.title_fa,
                 estimated_duration_minutes=day.estimated_duration_minutes,
+                weekday=day.weekday,
+                focus=day.focus,
+                cardio=day.cardio,
                 exercises=[
                     WorkoutPlanExerciseResponse(
                         order_index=item.order_index,
@@ -118,26 +140,78 @@ def to_plan_response(plan: WorkoutPlan, *, is_stale: bool = False) -> WorkoutPla
                         estimated_minutes=item.estimated_minutes,
                         notes_en=item.notes_en,
                         notes_fa=item.notes_fa,
-                        exercise=to_exercise_summary(item.exercise),
-                        alternatives=[
-                            WorkoutPlanExerciseAlternativeResponse(
-                                reason_en=alternative.reason_en,
-                                reason_fa=alternative.reason_fa,
-                                exercise=to_exercise_summary(alternative.alternative_exercise),
-                            )
-                            for alternative in sorted(
-                                item.exercise.alternatives,
-                                key=lambda alternative: alternative.alternative_exercise.slug,
-                            )
-                            if alternative.alternative_exercise.is_active
-                        ],
+                        exercise=to_snapshot_or_live_summary(item.exercise_snapshot, item.exercise),
+                        alternatives=to_alternative_responses(plan, item),
+                        reason_codes=item.reason_codes,
+                        warmup_sets=item.warmup_sets,
+                        load_guidance=item.load_guidance,
+                        progression_rule=item.progression_rule,
                     )
                     for item in day.exercises
                 ],
             )
             for day in plan.days
         ],
+        engine_version=plan.engine_version,
+        ruleset_version=plan.ruleset_version,
+        seed=plan.seed,
+        primary_goal=plan.primary_goal,
+        secondary_goal=plan.secondary_goal,
+        training_status=plan.training_status,
+        safety_status=plan.safety_status,
+        assumptions=plan.assumptions,
+        warnings=plan.warnings,
+        validation_report=plan.validation_report,
+        aggregate_metrics=plan.aggregate_metrics,
+        progression_policy=plan.progression_policy,
+        decision_trace=plan.decision_trace,
     )
+
+
+def to_alternative_responses(
+    plan: WorkoutPlan,
+    item: WorkoutPlanExercise,
+) -> list[WorkoutPlanExerciseAlternativeResponse]:
+    substitution_ids = item.substitution_exercise_ids
+    catalog = plan.exercise_catalog_snapshot.get("exercises", {})
+    if substitution_ids and isinstance(catalog, dict):
+        responses: list[WorkoutPlanExerciseAlternativeResponse] = []
+        for exercise_id in substitution_ids:
+            snapshot = catalog.get(exercise_id)
+            if isinstance(snapshot, dict):
+                display = snapshot.get("display_snapshot")
+                if isinstance(display, dict):
+                    responses.append(
+                        WorkoutPlanExerciseAlternativeResponse(
+                            reason_en="Safe substitution selected by the program rules.",
+                            reason_fa="جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است.",
+                            exercise=ExerciseSummary.model_validate(display),
+                        )
+                    )
+        return responses
+    exercise = item.exercise
+    return [
+        WorkoutPlanExerciseAlternativeResponse(
+            reason_en=alternative.reason_en,
+            reason_fa=alternative.reason_fa,
+            exercise=to_exercise_summary(alternative.alternative_exercise),
+        )
+        for alternative in sorted(
+            exercise.alternatives,
+            key=lambda alternative: alternative.alternative_exercise.slug,
+        )
+        if alternative.alternative_exercise.is_active
+    ]
+
+
+def to_snapshot_or_live_summary(
+    snapshot: dict[str, object],
+    exercise: Exercise,
+) -> ExerciseSummary:
+    display = snapshot.get("display_snapshot")
+    if isinstance(display, dict) and display:
+        return ExerciseSummary.model_validate(display)
+    return to_exercise_summary(exercise)
 
 
 def to_exercise_summary(exercise: Exercise) -> ExerciseSummary:

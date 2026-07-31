@@ -10,7 +10,7 @@ def normalize_request(request: ProgramGenerationRequest) -> NormalizedProgramReq
     seed = request.seed_optional
     if seed is None:
         canonical = request.model_dump_json(exclude={"seed_optional"})
-        seed = int.from_bytes(hashlib.sha256(canonical.encode()).digest()[:8], "big")
+        seed = int.from_bytes(hashlib.sha256(canonical.encode()).digest()[:8], "big") % (2**63 - 1)
         assumptions.append("SEED_DERIVED_FROM_NORMALIZED_INPUT")
     resistance_days = min(request.available_training_days, 6)
     if request.available_training_days == 7:
@@ -50,4 +50,3 @@ def _classify_status(request: ProgramGenerationRequest) -> tuple[TrainingStatus,
         status = TrainingStatus.EARLY_INTERMEDIATE
         assumptions.append("TRAINING_STATUS_REDUCED_FOR_RECENT_CONSISTENCY")
     return status, assumptions
-

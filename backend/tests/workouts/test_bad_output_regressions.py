@@ -2,7 +2,7 @@ from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, PhysicalJobDemand, RecoveryRating
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-from tests.workouts.program_engine.golden_fixtures import full_catalog, request
+from workouts.program_engine.golden_fixtures import full_catalog, request
 
 
 def test_regression_novice_poor_recovery_never_gets_six_demanding_days() -> None:
@@ -51,9 +51,7 @@ def test_regression_repeated_exercises_have_progression_reason() -> None:
 
 
 def test_regression_fat_loss_is_not_cardio_only() -> None:
-    result = generate_program(
-        request(primary_goal=Goal.FAT_LOSS), full_catalog(), RULESET
-    )
+    result = generate_program(request(primary_goal=Goal.FAT_LOSS), full_catalog(), RULESET)
 
     assert result.program is not None
     assert all(day.exercises for day in result.program.weekly_schedule)
@@ -61,9 +59,7 @@ def test_regression_fat_loss_is_not_cardio_only() -> None:
 
 
 def test_regression_strength_is_not_random_high_rep_isolation() -> None:
-    result = generate_program(
-        request(primary_goal=Goal.STRENGTH), full_catalog(), RULESET
-    )
+    result = generate_program(request(primary_goal=Goal.STRENGTH), full_catalog(), RULESET)
 
     assert result.program is not None
     first = result.program.weekly_schedule[0].exercises[0]

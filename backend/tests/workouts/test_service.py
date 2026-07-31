@@ -1,21 +1,12 @@
 import asyncio
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from uuid import UUID
 
 import pytest
 from sqlalchemy.orm import Session
 
 from app.ai.fake_provider import FakeWorkoutPlanModelProvider
 from app.ai.routing import ModelProviderCandidate
-from app.ai.schemas import (
-    ProviderErrorCode,
-    WorkoutGenerationModelResponse,
-    WorkoutPlanDayOutput,
-    WorkoutPlanExerciseOutput,
-    WorkoutPlanModelOutput,
-    WorkoutProviderError,
-)
 from app.auth.models import User
 from app.exercises.enums import (
     BodyRegion,
@@ -31,10 +22,16 @@ from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, S
 from app.profile.models import BodyMeasurement, UserProfile
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan, WorkoutPlanGeneration
-from app.workouts.repository import create_generation
+from app.workouts.program_engine.enums import GenerationErrorCode, RedFlag
+from app.workouts.program_engine.schemas import ProgramGenerationResult
+from app.workouts.repository import create_generation, get_plan_for_user
+from app.workouts.router import to_plan_response
+from app.workouts.schemas import ProgramGenerationOverrides
 from app.workouts.service import (
     GenerationCooldownError,
     GenerationInProgressError,
+    NoEligibleExercisesError,
+    ProgramGenerationRejectedError,
     WorkoutGenerationFailedError,
     WorkoutGenerationService,
     WorkoutGenerationSettings,
@@ -84,6 +81,7 @@ def _exercise(db: Session, slug: str, pattern: MovementPattern, muscle: MuscleGr
         media_type=MediaType.PLACEHOLDER,
         is_active=True,
         is_programmable=True,
+        needs_review=False,
         equipment_items=[ExerciseEquipment(equipment=Equipment.BODYWEIGHT)],
     )
     db.add(item)
@@ -99,74 +97,39 @@ def _seed_candidates(db: Session) -> list[Exercise]:
     ]
 
 
-def _response(exercise_ids: list[UUID]) -> WorkoutGenerationModelResponse:
-    return WorkoutGenerationModelResponse(
-        plan=WorkoutPlanModelOutput(
-            days=[
-                WorkoutPlanDayOutput(
-                    day_number=1,
-                    title_en="Full body",
-                    title_fa="تمام بدن",
-                    estimated_duration_minutes=24,
-                    exercises=[
-                        WorkoutPlanExerciseOutput(
-                            exercise_id=exercise_id,
-                            sets=3,
-                            reps_min=8,
-                            reps_max=12,
-                            rest_seconds=90,
-                            rir=2,
-                            estimated_minutes=8,
-                            notes_en=None,
-                            notes_fa=None,
-                        )
-                        for exercise_id in exercise_ids
-                    ],
-                )
-            ]
-        ),
-        provider_request_id="response-id",
-        input_tokens=10,
-        output_tokens=20,
-    )
-
-
 def _service(
     db: Session,
-    provider: FakeWorkoutPlanModelProvider,
     *,
-    candidates: tuple[ModelProviderCandidate, ...] | None = None,
+    provider: FakeWorkoutPlanModelProvider | None = None,
     cooldown_seconds: int = 0,
-    deterministic_fallback_enabled: bool = False,
 ) -> WorkoutGenerationService:
-    settings_kwargs: dict[str, object] = {}
-    if deterministic_fallback_enabled:
-        settings_kwargs["deterministic_fallback_enabled"] = True
+    providers = (
+        (ModelProviderCandidate(model_id="legacy-model", provider=provider),)
+        if provider is not None
+        else ()
+    )
     return WorkoutGenerationService(
         db,
-        providers=candidates
-        or (ModelProviderCandidate(model_id="fake-model", provider=provider),),
+        providers=providers,
         settings=WorkoutGenerationSettings(
-            provider_name="fake",
-            model_id="fake-model",
-            prompt_version="v1",
-            generation_policy_version="v1",
+            provider_name="fitsho_domain",
+            model_id="program_engine_v1",
+            prompt_version="none",
+            generation_policy_version="resistance_training_v1",
             catalog_programming_version="v1",
-            max_repair_attempts=1,
+            max_repair_attempts=0,
             cooldown_seconds=cooldown_seconds,
-            max_candidates=80,
+            max_candidates=5000,
             max_request_bytes=262144,
             warmup_minutes=5,
-            **settings_kwargs,  # type: ignore[arg-type]
         ),
     )
 
 
-def test_generation_persists_valid_plan_then_reuses_same_signature(db: Session) -> None:
+def test_generation_persists_valid_snapshot_then_reuses_signature(db: Session) -> None:
     user = _user_with_profile(db)
-    exercises = _seed_candidates(db)
-    provider = FakeWorkoutPlanModelProvider([_response([item.id for item in exercises])])
-    service = _service(db, provider)
+    _seed_candidates(db)
+    service = _service(db)
 
     first = asyncio.run(service.generate(user.id))
     second = asyncio.run(service.generate(user.id))
@@ -174,281 +137,189 @@ def test_generation_persists_valid_plan_then_reuses_same_signature(db: Session) 
     assert not first.reused
     assert second.reused
     assert second.plan.id == first.plan.id
-    assert len(provider.calls) == 1
     assert first.plan.status is WorkoutPlanStatus.ACTIVE
-    assert first.plan.generation_records[0].input_tokens == 10
-    assert first.plan.days[0].estimated_duration_minutes == 26
-    assert [item.estimated_minutes for item in first.plan.days[0].exercises] == [7, 7, 7]
+    assert first.plan.engine_version == "program_engine_v1"
+    assert first.plan.ruleset_version == "resistance_training_v1"
+    assert first.plan.validation_report["errors"] == []
+    assert first.plan.exercise_catalog_snapshot["hash"] == first.plan.candidate_set_hash
+    assert first.plan.generation_records[0].status is WorkoutGenerationStatus.SUCCEEDED
 
 
-def test_invalid_response_is_repaired_once_before_persistence(db: Session) -> None:
-    user = _user_with_profile(db)
-    exercises = _seed_candidates(db)
-    invalid = _response([exercises[0].id, exercises[0].id])
-    provider = FakeWorkoutPlanModelProvider([invalid, _response([item.id for item in exercises])])
-
-    result = asyncio.run(_service(db, provider).generate(user.id))
-
-    assert not result.reused
-    assert len(provider.calls) == 2
-    assert "repair" in provider.calls[1].input_payload
-    generation = result.plan.generation_records[0]
-    assert generation.validation_diagnostics is not None
-    assert generation.validation_diagnostics[0]["model_id"] == "fake-model"
-    assert generation.validation_diagnostics[0]["phase"] == "initial"
-
-
-def test_invalid_initial_and_repair_responses_log_exact_problems(
-    db: Session,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    user = _user_with_profile(db)
-    exercises = _seed_candidates(db)
-    invalid = _response([exercises[0].id, exercises[0].id])
-    provider = FakeWorkoutPlanModelProvider([invalid, invalid])
-
-    with caplog.at_level("WARNING", logger="app.workouts.service"):
-        with pytest.raises(WorkoutGenerationFailedError):
-            asyncio.run(_service(db, provider).generate(user.id))
-
-    records = [
-        record
-        for record in caplog.records
-        if record.getMessage().startswith("workout_plan_validation_failed")
-    ]
-    assert [record.__dict__["validation_phase"] for record in records] == [
-        "initial",
-        "repair",
-    ]
-    assert all(record.__dict__["workout_model_id"] == "fake-model" for record in records)
-    expected_problem = {
-        "code": "duplicate_exercise",
-        "message": "An exercise may not appear more than once in the same day.",
-        "day_number": 1,
-        "exercise_id": str(exercises[0].id),
-    }
-    assert all(
-        expected_problem in record.__dict__["validation_problems"] for record in records
-    )
-    assert all('"code":"duplicate_exercise"' in record.getMessage() for record in records)
-    generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
-    assert generation.validation_diagnostics is not None
-    assert [item["phase"] for item in generation.validation_diagnostics] == [
-        "initial",
-        "repair",
-    ]
-    assert all(
-        expected_problem in item["problems"]
-        for item in generation.validation_diagnostics
-    )
-
-
-def test_generation_falls_back_to_the_next_model_after_a_provider_error(db: Session) -> None:
-    user = _user_with_profile(db)
-    exercises = _seed_candidates(db)
-    unavailable = FakeWorkoutPlanModelProvider(
-        [WorkoutProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE, "Unavailable")]
-    )
-    working = FakeWorkoutPlanModelProvider([_response([item.id for item in exercises])])
-
-    result = asyncio.run(
-        _service(
-            db,
-            unavailable,
-            candidates=(
-                ModelProviderCandidate(model_id="first-free", provider=unavailable),
-                ModelProviderCandidate(model_id="second-free", provider=working),
-            ),
-        ).generate(user.id)
-    )
-
-    assert len(unavailable.calls) == 1
-    assert len(working.calls) == 1
-    assert result.plan.model_id == "second-free"
-    assert result.plan.generation_records[0].model_id == "second-free"
-
-
-def test_generation_uses_deterministic_fallback_after_all_models_fail(db: Session) -> None:
+def test_generation_never_calls_legacy_model_provider(db: Session) -> None:
     user = _user_with_profile(db)
     _seed_candidates(db)
-    unavailable = FakeWorkoutPlanModelProvider(
-        [WorkoutProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE, "Unavailable")]
-    )
+    provider = FakeWorkoutPlanModelProvider([])
 
-    result = asyncio.run(
-        _service(
-            db,
-            unavailable,
-            deterministic_fallback_enabled=True,
-        ).generate(user.id)
-    )
+    result = asyncio.run(_service(db, provider=provider).generate(user.id))
 
-    assert not result.reused
-    assert result.plan.model_id == "fitsho-deterministic-v1"
     assert result.plan.status is WorkoutPlanStatus.ACTIVE
-    assert result.plan.generation_records[0].model_id == "fitsho-deterministic-v1"
+    assert provider.calls == []
+    assert result.plan.generation_method == "deterministic_domain"
 
 
-def test_invalid_deterministic_fallback_records_exact_validation_problems(
+def test_validation_failure_is_recorded_before_any_plan_is_persisted(
     db: Session,
-    caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     user = _user_with_profile(db)
-    exercises = _seed_candidates(db)
-    unavailable = FakeWorkoutPlanModelProvider(
-        [WorkoutProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE, "Unavailable")]
-    )
-    invalid_plan = _response([exercises[0].id, exercises[0].id]).plan
+    _seed_candidates(db)
     monkeypatch.setattr(
-        "app.workouts.service.DeterministicWorkoutPlanGenerator.generate",
-        lambda *_args, **_kwargs: invalid_plan,
+        "app.workouts.service.generate_program",
+        lambda *_args: ProgramGenerationResult(
+            program=None,
+            error_code=GenerationErrorCode.PROGRAM_VALIDATION_FAILED,
+            errors=("TEST_VALIDATION_ERROR",),
+        ),
     )
 
-    with caplog.at_level("WARNING", logger="app.workouts.service"):
-        with pytest.raises(WorkoutGenerationFailedError):
-            asyncio.run(
-                _service(
-                    db,
-                    unavailable,
-                    deterministic_fallback_enabled=True,
-                ).generate(user.id)
-            )
+    with pytest.raises(WorkoutGenerationFailedError):
+        asyncio.run(_service(db).generate(user.id))
 
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0
     generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
-    assert generation.validation_diagnostics is not None
-    assert generation.validation_diagnostics[0]["model_id"] == "fitsho-deterministic-v1"
-    assert generation.validation_diagnostics[0]["phase"] == "fallback"
-    assert generation.validation_diagnostics[0]["problems"][0]["code"] == "duplicate_exercise"
-    fallback_records = [
-        record
-        for record in caplog.records
-        if record.__dict__.get("validation_phase") == "fallback"
-    ]
-    assert len(fallback_records) == 1
+    assert generation.status is WorkoutGenerationStatus.FAILED
+    assert generation.error_code == GenerationErrorCode.PROGRAM_VALIDATION_FAILED.value
+
+
+def test_safety_red_flag_returns_professional_review_without_plan(db: Session) -> None:
+    user = _user_with_profile(db)
+    _seed_candidates(db)
+
+    with pytest.raises(ProgramGenerationRejectedError) as error:
+        asyncio.run(
+            _service(db).generate(
+                user.id,
+                ProgramGenerationOverrides(current_pain_or_red_flags=(RedFlag.CHEST_PAIN,)),
+            )
+        )
+
+    assert error.value.error_code == "PROGRAM_REJECTED_SAFETY_STATUS"
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0
+
+
+def test_missing_safe_pattern_does_not_persist_partial_plan(db: Session) -> None:
+    user = _user_with_profile(db)
+    exercises = _seed_candidates(db)
+    exercises[1].needs_review = True
+    db.flush()
+
+    with pytest.raises(NoEligibleExercisesError) as error:
+        asyncio.run(_service(db).generate(user.id))
+
+    assert error.value.error_code == "NO_SAFE_EXERCISE_FOR_PATTERN"
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0
+
+
+def test_historical_response_uses_saved_exercise_snapshot_after_catalog_edit(
+    db: Session,
+) -> None:
+    user = _user_with_profile(db)
+    exercises = _seed_candidates(db)
+    result = asyncio.run(_service(db).generate(user.id))
+    saved_name = result.plan.days[0].exercises[0].exercise_snapshot["display_snapshot"]["name_en"]
+    exercises[0].name_en = "catalog name changed later"
+    db.commit()
+    stored = get_plan_for_user(db, plan_id=result.plan.id, user_id=user.id)
+    assert stored is not None
+
+    response = to_plan_response(stored)
+
+    assert response.days[0].exercises[0].exercise.name_en == saved_name
+
+
+def test_request_time_seed_and_priority_are_persisted(db: Session) -> None:
+    user = _user_with_profile(db)
+    _seed_candidates(db)
+
+    result = asyncio.run(
+        _service(db).generate(
+            user.id,
+            ProgramGenerationOverrides(
+                seed_optional=7,
+                priority_muscles=frozenset({MuscleGroup.BACK}),
+            ),
+        )
+    )
+
+    assert result.plan.seed == 7
+    assert result.plan.days[0].exercises[0].exercise_snapshot["primary_muscle"] == "back"
+    assert "PRIORITY_MUSCLE_PLACED_FIRST" in result.plan.days[0].exercises[0].reason_codes
 
 
 def test_failed_replacement_preserves_previous_active_plan(db: Session) -> None:
     user = _user_with_profile(db)
     exercises = _seed_candidates(db)
-    initial = asyncio.run(
-        _service(
-            db, FakeWorkoutPlanModelProvider([_response([item.id for item in exercises])])
-        ).generate(user.id)
-    )
+    initial = asyncio.run(_service(db).generate(user.id))
     profile = db.get(UserProfile, user.id)
     assert profile is not None
     profile.fitness_goal = FitnessGoal.IMPROVE_FITNESS
+    exercises[1].needs_review = True
     db.commit()
-    invalid = _response([exercises[0].id, exercises[0].id])
 
-    with pytest.raises(WorkoutGenerationFailedError):
-        asyncio.run(
-            _service(db, FakeWorkoutPlanModelProvider([invalid, invalid])).generate(user.id)
-        )
+    with pytest.raises(NoEligibleExercisesError):
+        asyncio.run(_service(db).generate(user.id))
 
     assert db.get(WorkoutPlan, initial.plan.id).status is WorkoutPlanStatus.ACTIVE  # type: ignore[union-attr]
 
 
-def test_generation_in_progress_rejects_a_second_request(db: Session) -> None:
+def test_generation_in_progress_rejects_second_request(db: Session) -> None:
     user = _user_with_profile(db)
     _seed_candidates(db)
     create_generation(
         db,
         user_id=user.id,
-        provider="fake",
-        model_id="fake-model",
+        provider="fitsho_domain",
+        model_id="program_engine_v1",
         candidate_count=3,
     )
     db.commit()
 
     with pytest.raises(GenerationInProgressError):
-        asyncio.run(_service(db, FakeWorkoutPlanModelProvider([])).generate(user.id))
+        asyncio.run(_service(db).generate(user.id))
 
-    generation = db.query(WorkoutPlan).filter_by(user_id=user.id).first()
-    assert generation is None
-    assert db.query(WorkoutPlan).count() == 0
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0
 
 
-def test_expired_active_plan_is_replaced_instead_of_reused(db: Session) -> None:
+def test_expired_plan_is_replaced_with_structured_difference(db: Session) -> None:
     user = _user_with_profile(db)
-    exercises = _seed_candidates(db)
-    first = asyncio.run(
-        _service(
-            db, FakeWorkoutPlanModelProvider([_response([item.id for item in exercises])])
-        ).generate(user.id)
-    )
+    _seed_candidates(db)
+    first = asyncio.run(_service(db).generate(user.id))
     first.plan.activated_at = datetime.now(UTC) - timedelta(days=29)
     db.commit()
 
-    provider = FakeWorkoutPlanModelProvider([_response([item.id for item in exercises])])
-    replacement = asyncio.run(_service(db, provider).generate(user.id))
+    replacement = asyncio.run(_service(db).generate(user.id))
 
     assert not replacement.reused
-    assert replacement.plan.id != first.plan.id
-    assert len(provider.calls) == 1
+    assert replacement.plan.previous_program_id == first.plan.id
+    assert replacement.plan.difference_summary["previous_program_id"] == str(first.plan.id)
     assert db.get(WorkoutPlan, first.plan.id).status is WorkoutPlanStatus.SUPERSEDED  # type: ignore[union-attr]
 
 
-def test_active_plan_reports_stale_when_generation_conditions_change(db: Session) -> None:
+def test_active_plan_is_stale_when_profile_changes(db: Session) -> None:
     user = _user_with_profile(db)
-    exercises = _seed_candidates(db)
-    asyncio.run(
-        _service(
-            db, FakeWorkoutPlanModelProvider([_response([item.id for item in exercises])])
-        ).generate(user.id)
-    )
+    _seed_candidates(db)
+    asyncio.run(_service(db).generate(user.id))
     profile = db.get(UserProfile, user.id)
     assert profile is not None
     profile.fitness_goal = FitnessGoal.IMPROVE_FITNESS
     db.commit()
-    provider = FakeWorkoutPlanModelProvider([])
 
-    active = _service(db, provider).get_active(user.id)
+    active = _service(db).get_active(user.id)
 
     assert active is not None
     assert active.is_stale
-    assert provider.calls == []
 
 
-def test_profile_change_during_provider_call_prevents_activation(db: Session) -> None:
+def test_generation_cooldown_prevents_another_generation(db: Session) -> None:
     user = _user_with_profile(db)
-    exercises = _seed_candidates(db)
-
-    class ProfileMutatingProvider(FakeWorkoutPlanModelProvider):
-        async def generate_plan(self, request: object) -> WorkoutGenerationModelResponse:
-            profile = db.get(UserProfile, user.id)
-            assert profile is not None
-            profile.fitness_goal = FitnessGoal.IMPROVE_FITNESS
-            return await super().generate_plan(request)  # type: ignore[arg-type]
-
-    with pytest.raises(WorkoutGenerationFailedError):
-        asyncio.run(
-            _service(
-                db,
-                ProfileMutatingProvider([_response([item.id for item in exercises])]),
-            ).generate(user.id)
-        )
-
-    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0
-    generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
-    assert generation.status is WorkoutGenerationStatus.FAILED
-    assert generation.error_code == "generation_inputs_changed"
-
-
-def test_generation_cooldown_prevents_another_provider_request(db: Session) -> None:
-    user = _user_with_profile(db)
-    exercises = _seed_candidates(db)
-    first_provider = FakeWorkoutPlanModelProvider([_response([item.id for item in exercises])])
-    asyncio.run(_service(db, first_provider, cooldown_seconds=300).generate(user.id))
+    _seed_candidates(db)
+    asyncio.run(_service(db, cooldown_seconds=300).generate(user.id))
     profile = db.get(UserProfile, user.id)
     assert profile is not None
     profile.fitness_goal = FitnessGoal.IMPROVE_FITNESS
     db.commit()
-    second_provider = FakeWorkoutPlanModelProvider([])
 
     with pytest.raises(GenerationCooldownError) as error:
-        asyncio.run(_service(db, second_provider, cooldown_seconds=300).generate(user.id))
+        asyncio.run(_service(db, cooldown_seconds=300).generate(user.id))
 
     assert 1 <= error.value.retry_after_seconds <= 300
-    assert second_provider.calls == []

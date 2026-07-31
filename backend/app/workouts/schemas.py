@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.exercises.enums import (
     Difficulty,
@@ -26,6 +26,18 @@ from app.profile.enums import (
     TrainingLocation,
 )
 from app.workouts.enums import WorkoutPlanStatus
+from app.workouts.program_engine.enums import (
+    ActivityLevel,
+    BalanceAbility,
+    Goal,
+    ImpactLimit,
+    LoadLimit,
+    MedicalClearanceStatus,
+    PhysicalJobDemand,
+    RecoveryRating,
+    RedFlag,
+)
+from app.workouts.program_engine.schemas import Limitation, RecentTrainingHistory
 
 
 @dataclass(frozen=True)
@@ -124,6 +136,10 @@ class WorkoutPlanExerciseResponse(BaseModel):
     notes_fa: str | None
     exercise: ExerciseSummary
     alternatives: list[WorkoutPlanExerciseAlternativeResponse]
+    reason_codes: list[str] = Field(default_factory=list)
+    warmup_sets: int = 0
+    load_guidance: str = ""
+    progression_rule: str = "legacy"
 
 
 class WorkoutDayResponse(BaseModel):
@@ -134,6 +150,9 @@ class WorkoutDayResponse(BaseModel):
     title_fa: str
     estimated_duration_minutes: int
     exercises: list[WorkoutPlanExerciseResponse]
+    weekday: int | None = None
+    focus: str = "legacy"
+    cardio: dict[str, object] | None = None
 
 
 class WorkoutPlanResponse(BaseModel):
@@ -146,6 +165,19 @@ class WorkoutPlanResponse(BaseModel):
     plan_duration_weeks: int
     is_stale: bool
     days: list[WorkoutDayResponse]
+    engine_version: str = "legacy_ai"
+    ruleset_version: str = "legacy"
+    seed: int = 0
+    primary_goal: str = "general_fitness"
+    secondary_goal: str | None = None
+    training_status: str = "novice"
+    safety_status: str = "clear"
+    assumptions: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    validation_report: dict[str, object] = Field(default_factory=dict)
+    aggregate_metrics: dict[str, object] = Field(default_factory=dict)
+    progression_policy: dict[str, object] = Field(default_factory=dict)
+    decision_trace: list[dict[str, object]] = Field(default_factory=list)
 
 
 class WorkoutPlanGenerateResponse(BaseModel):
@@ -153,3 +185,37 @@ class WorkoutPlanGenerateResponse(BaseModel):
 
     plan: WorkoutPlanResponse
     reused: bool
+
+
+class ProgramGenerationOverrides(BaseModel):
+    """Optional request-time evidence not yet stored in the core profile."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    secondary_goal_optional: Goal | None = None
+    training_age_months: int | None = Field(default=None, ge=0, le=900)
+    current_activity_level: ActivityLevel | None = None
+    preferred_weekdays: tuple[int, ...] | None = None
+    available_equipment: frozenset[Equipment] | None = None
+    preferred_exercises: frozenset[UUID] = frozenset()
+    disliked_exercises: frozenset[UUID] = frozenset()
+    priority_muscles: frozenset[MuscleGroup] = frozenset()
+    injuries_and_limitations: tuple[Limitation, ...] = ()
+    blocked_exercises: frozenset[UUID] = frozenset()
+    blocked_movement_patterns: frozenset[MovementPattern] = frozenset()
+    blocked_caution_tags: frozenset[ExerciseCautionTag] = frozenset()
+    allowed_range_of_motion: frozenset[str] = frozenset()
+    impact_limit: ImpactLimit | None = None
+    axial_load_limit: LoadLimit | None = None
+    overhead_limit: LoadLimit | None = None
+    balance_requirement: BalanceAbility | None = None
+    current_pain_or_red_flags: tuple[RedFlag, ...] = ()
+    medical_clearance_status: MedicalClearanceStatus | None = None
+    reports_uncontrolled_medical_condition: bool = False
+    sleep_quality: RecoveryRating | None = None
+    stress_level: RecoveryRating | None = None
+    physical_job_demand: PhysicalJobDemand | None = None
+    cardio_tolerance: ActivityLevel | None = None
+    recent_training_history: RecentTrainingHistory | None = None
+    known_strength_data: dict[UUID, float] = Field(default_factory=dict)
+    seed_optional: int | None = None

@@ -207,7 +207,7 @@ def classify_programming_metadata(
     elif "plank" in name:
         movement_pattern = MovementPattern.CORE_ANTI_EXTENSION
     elif not is_mobility:
-        movement_pattern = {
+        pattern_by_muscle = {
             MuscleGroup.BICEPS: MovementPattern.ELBOW_FLEXION,
             MuscleGroup.TRICEPS: MovementPattern.ELBOW_EXTENSION,
             MuscleGroup.CALVES: MovementPattern.CALF_RAISE,
@@ -216,7 +216,12 @@ def classify_programming_metadata(
             MuscleGroup.GLUTES: MovementPattern.HIP_EXTENSION,
             MuscleGroup.ADDUCTORS: MovementPattern.HIP_ADDUCTION,
             MuscleGroup.TRAPS: MovementPattern.SHRUG,
-        }.get(primary_muscle, MovementPattern.OTHER)
+        }
+        movement_pattern = (
+            pattern_by_muscle.get(primary_muscle, MovementPattern.OTHER)
+            if primary_muscle is not None
+            else MovementPattern.OTHER
+        )
     else:
         movement_pattern = MovementPattern.OTHER
 

@@ -4,7 +4,7 @@ from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-from tests.workouts.program_engine.golden_fixtures import (
+from workouts.program_engine.golden_fixtures import (
     full_catalog,
     golden_scenarios,
     impossible_equipment_request,
@@ -53,9 +53,7 @@ def test_golden_constraints_and_recovery(name: str) -> None:
     result = generate_program(source, full_catalog(), RULESET)
 
     assert result.program is not None, result.errors
-    selected = [
-        item for day in result.program.weekly_schedule for item in day.exercises
-    ]
+    selected = [item for day in result.program.weekly_schedule for item in day.exercises]
     assert all(item.equipment.issubset(source.available_equipment) for item in selected)
     assert all(item.movement_pattern not in source.blocked_movement_patterns for item in selected)
     assert all(not item.caution_tags.intersection(source.blocked_caution_tags) for item in selected)

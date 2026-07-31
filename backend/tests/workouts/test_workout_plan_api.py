@@ -11,8 +11,10 @@ from app.exercises.enums import BodyRegion, Difficulty, MediaType, MuscleGroup
 from app.exercises.models import Exercise, ExerciseAlternative
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
+from app.workouts.schemas import ProgramGenerationOverrides
 from app.workouts.service import (
     GenerationCooldownError,
+    ProgramGenerationRejectedError,
     WorkoutGenerationFailedError,
     WorkoutPlanGenerationResult,
 )
@@ -220,6 +222,55 @@ def test_generate_uses_authenticated_user_and_returns_reuse_flag(
     assert response.status_code == 200
     assert response.json()["reused"] is True
     assert called_user_ids == [user_id]
+
+
+def test_generate_accepts_typed_optional_engine_evidence(client: TestClient, db: Session) -> None:
+    user_id = _register_and_complete_profile(client, "generate-overrides@example.com")
+    plan = _plan(db, user_id)
+    captured_seed: list[int | None] = []
+
+    class FakeService:
+        async def generate(
+            self,
+            current_user_id: UUID,
+            payload: ProgramGenerationOverrides,
+        ) -> WorkoutPlanGenerationResult:
+            assert current_user_id == user_id
+            captured_seed.append(payload.seed_optional)
+            return WorkoutPlanGenerationResult(plan=plan, reused=False)
+
+    from app.workouts.dependencies import get_workout_generation_service
+
+    app = cast(FastAPI, client.app)
+    app.dependency_overrides[get_workout_generation_service] = lambda: FakeService()
+    response = client.post(
+        "/api/v1/workout-plans/generate",
+        headers=ORIGIN,
+        json={"seed_optional": 123, "priority_muscles": ["back"]},
+    )
+    app.dependency_overrides.pop(get_workout_generation_service)
+
+    assert response.status_code == 200
+    assert captured_seed == [123]
+
+
+def test_generate_returns_structured_professional_review_status(client: TestClient) -> None:
+    _register_and_complete_profile(client, "review-plan@example.com")
+
+    class FakeService:
+        async def generate(self, current_user_id: UUID) -> WorkoutPlanGenerationResult:
+            raise ProgramGenerationRejectedError("PROGRAM_REJECTED_SAFETY_STATUS", "stop_and_refer")
+
+    from app.workouts.dependencies import get_workout_generation_service
+
+    app = cast(FastAPI, client.app)
+    app.dependency_overrides[get_workout_generation_service] = lambda: FakeService()
+    response = client.post("/api/v1/workout-plans/generate", headers=ORIGIN)
+    app.dependency_overrides.pop(get_workout_generation_service)
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "PROGRAM_REJECTED_SAFETY_STATUS"
+    assert response.json()["detail"]["safety_status"] == "stop_and_refer"
 
 
 def test_generate_returns_retry_after_during_a_generation_cooldown(
