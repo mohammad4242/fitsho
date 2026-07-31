@@ -40,10 +40,11 @@ def build_sessions(
     sessions: list[SessionDraft] = []
     for index, focus in enumerate(split.day_focuses):
         capacity = max(
-            3,
+            ruleset.minimum_exercises_per_session,
             min(
                 ruleset.max_exercises_per_session,
-                (request.source.session_duration_minutes - ruleset.general_warmup_minutes) // 7,
+                (request.source.session_duration_minutes - ruleset.general_warmup_minutes)
+                // ruleset.minutes_per_exercise_slot,
             ),
         )
         slots = _slots_for_focus(focus)

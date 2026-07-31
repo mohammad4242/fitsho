@@ -18,8 +18,12 @@ def select_split(request: NormalizedProgramRequest, ruleset: ProgramRuleset) -> 
         or source.physical_job_demand is PhysicalJobDemand.HIGH
         or source.recent_training_history.recovery_problems
     )
-    if request.training_status is TrainingStatus.NOVICE and recovery_limited and days > 3:
-        days = 3
+    if (
+        request.training_status is TrainingStatus.NOVICE
+        and recovery_limited
+        and days > ruleset.maximum_novice_recovery_days
+    ):
+        days = ruleset.maximum_novice_recovery_days
         reasons.append("SPLIT_REDUCED_FOR_RECOVERY")
 
     split_type, focuses = _structure(days, request.training_status)
@@ -29,7 +33,7 @@ def select_split(request: NormalizedProgramRequest, ruleset: ProgramRuleset) -> 
         reasons.append("SPLIT_FULL_BODY_FOR_LOW_FREQUENCY")
     if days >= 4:
         reasons.append("SPLIT_SELECTED_FOR_TWICE_WEEKLY_EXPOSURE")
-    weekdays = _select_weekdays(days, source.preferred_weekdays)
+    weekdays = _select_weekdays(days, source.preferred_weekdays, ruleset)
     return SplitPlan(
         split_type=split_type,
         day_focuses=focuses,
@@ -63,15 +67,11 @@ def _structure(days: int, status: TrainingStatus) -> tuple[SplitType, tuple[str,
     return SplitType.UPPER_LOWER_X3, ("upper", "lower", "upper", "lower", "upper", "lower")
 
 
-def _select_weekdays(days: int, preferred: tuple[int, ...]) -> tuple[int, ...]:
+def _select_weekdays(
+    days: int,
+    preferred: tuple[int, ...],
+    ruleset: ProgramRuleset,
+) -> tuple[int, ...]:
     if len(preferred) >= days:
         return tuple(sorted(preferred[:days]))
-    defaults: dict[int, tuple[int, ...]] = {
-        1: (0,),
-        2: (0, 3),
-        3: (0, 2, 4),
-        4: (0, 1, 3, 4),
-        5: (0, 1, 2, 4, 5),
-        6: (0, 1, 2, 3, 4, 5),
-    }
-    return defaults[days]
+    return ruleset.default_weekdays[days]

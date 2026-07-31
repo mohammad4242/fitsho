@@ -1,14 +1,17 @@
-def double_progression_policy() -> dict[str, object]:
+from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET, ProgramRuleset
+
+
+def double_progression_policy(ruleset: ProgramRuleset = RULESET) -> dict[str, object]:
     return {
         "type": "double_progression",
-        "qualifying_sessions": 2,
+        "qualifying_sessions": ruleset.double_progression_qualifying_sessions,
         "conditions": (
             "top_of_rep_range_for_all_working_sets",
             "within_target_rir",
             "acceptable_technique",
         ),
-        "upper_body_load_increase_percent": (2.5, 5.0),
-        "lower_body_load_increase_percent": (5.0, 10.0),
+        "upper_body_load_increase_percent": ruleset.upper_body_load_increase_percent,
+        "lower_body_load_increase_percent": ruleset.lower_body_load_increase_percent,
         "use_smallest_available_increment": True,
         "increase_volume_and_load_together": False,
         "regression_actions": (
@@ -21,11 +24,11 @@ def double_progression_policy() -> dict[str, object]:
     }
 
 
-def deload_policy() -> dict[str, object]:
+def deload_policy(ruleset: ProgramRuleset = RULESET) -> dict[str, object]:
     return {
         "trigger_requires_multiple_signals": True,
-        "volume_reduction_percent": (30, 50),
-        "load_reduction_percent": (5, 10),
+        "volume_reduction_percent": ruleset.deload_volume_reduction_percent,
+        "load_reduction_percent": ruleset.deload_load_reduction_percent,
         "maintain_main_movement_patterns": True,
         "never_override_safety_referral": True,
     }

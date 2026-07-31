@@ -46,7 +46,10 @@ def validate_program(
                 errors.append("UNAVAILABLE_EQUIPMENT_SELECTED")
             if item.sets < 1 or item.rep_min < 1 or item.rep_max < item.rep_min:
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
-            if not 0 <= item.target_rir <= 5 or item.rest_seconds < 30:
+            if (
+                not 0 <= item.target_rir <= ruleset.maximum_target_rir
+                or item.rest_seconds < ruleset.minimum_rest_seconds
+            ):
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
             if not item.reason_codes:
                 errors.append("MISSING_SELECTION_REASON")

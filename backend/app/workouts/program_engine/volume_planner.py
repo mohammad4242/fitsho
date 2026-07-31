@@ -47,18 +47,18 @@ def plan_weekly_volume(
             base - ruleset.poor_recovery_set_reduction * recovery_signals,
         )
         reasons.append("VOLUME_REDUCED_FOR_RECOVERY")
-    if source.session_duration_minutes <= 30:
-        base = max(minimum, base - 1)
+    if source.session_duration_minutes <= ruleset.short_session_minutes:
+        base = max(minimum, base - ruleset.contextual_volume_reduction_sets)
         reasons.append("VOLUME_REDUCED_FOR_TIME_LIMIT")
-    if source.age >= 60:
-        base = max(minimum, base - 1)
+    if source.age >= ruleset.older_adult_modifier_age:
+        base = max(minimum, base - ruleset.contextual_volume_reduction_sets)
         reasons.append("VOLUME_REDUCED_FOR_RECOVERY")
 
     targets: list[VolumeTarget] = []
     for muscle in MAJOR_MUSCLES:
         sets = base
         if source.priority_muscles and muscle not in source.priority_muscles:
-            sets = max(minimum, sets - 1)
+            sets = max(minimum, sets - ruleset.contextual_volume_reduction_sets)
         if muscle in source.priority_muscles:
             sets = min(maximum, sets + ruleset.priority_muscle_bonus_sets)
             reasons.append("VOLUME_INCREASED_FOR_PRIORITY_MUSCLE")

@@ -65,7 +65,7 @@ def generate_program(
             safety_status=safety.status,
             rejected_candidates=eligibility.rejected,
         )
-    reserve = cardio_reserve_minutes(normalized, eligibility.eligible)
+    reserve = cardio_reserve_minutes(normalized, eligibility.eligible, ruleset)
     days = prescribe_sessions(
         normalized,
         drafts,
@@ -73,7 +73,7 @@ def generate_program(
         ruleset,
         cardio_reserve_minutes=reserve,
     )
-    days = add_cardio(normalized, days, eligibility.eligible)
+    days = add_cardio(normalized, days, eligibility.eligible, ruleset)
     direct: Counter[str] = Counter()
     fractional: defaultdict[str, float] = defaultdict(float)
     for day in days:
@@ -128,8 +128,8 @@ def generate_program(
         split=split,
         weekly_schedule=days,
         progression_policy={
-            **double_progression_policy(),
-            "deload": deload_policy(),
+            **double_progression_policy(ruleset),
+            "deload": deload_policy(ruleset),
         },
         validation_report=empty_report,
         aggregate_metrics=metrics,

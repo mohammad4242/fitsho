@@ -42,17 +42,28 @@ def prescribe_sessions(
             primary_muscle = exercise.primary_muscle
             target = volume.direct_sets_for(primary_muscle) if primary_muscle is not None else 2
             appearance_count = appearances[primary_muscle] if primary_muscle is not None else 1
-            desired_sets = max(2, math.ceil(target / max(1, appearance_count)))
+            desired_sets = max(
+                ruleset.minimum_working_sets,
+                math.ceil(target / max(1, appearance_count)),
+            )
             sets = min(ruleset.max_sets_per_muscle_per_session, desired_sets)
             rep_min, rep_max, rir, rest = _prescription_for(
                 request.primary_goal,
                 exercise.exercise_type,
                 request.training_status,
+                ruleset,
             )
             warmup_sets = 0
             if index == 0 and exercise.exercise_type is ExerciseType.COMPOUND:
-                warmup_sets = 3 if request.primary_goal is Goal.STRENGTH else 2
-            while sets > 2 and _estimate_minutes(sets, rest, warmup_sets) > per_exercise_budget:
+                warmup_sets = (
+                    ruleset.strength_compound_warmup_sets
+                    if request.primary_goal is Goal.STRENGTH
+                    else ruleset.first_compound_warmup_sets
+                )
+            while (
+                sets > ruleset.minimum_working_sets
+                and _estimate_minutes(sets, rest, warmup_sets, ruleset) > per_exercise_budget
+            ):
                 sets -= 1
             programmed.append(
                 ProgrammedExercise(
@@ -64,7 +75,7 @@ def prescribe_sessions(
                     rep_max=rep_max,
                     target_rir=rir,
                     rest_seconds=rest,
-                    estimated_minutes=_estimate_minutes(sets, rest, warmup_sets),
+                    estimated_minutes=_estimate_minutes(sets, rest, warmup_sets, ruleset),
                     reason_codes=draft.selection_reasons[exercise.id],
                     substitution_exercise_ids=draft.substitutions[exercise.id],
                     warmup_sets=warmup_sets,
@@ -102,25 +113,41 @@ def _prescription_for(
     goal: Goal,
     exercise_type: ExerciseType,
     status: TrainingStatus,
+    ruleset: ProgramRuleset,
 ) -> tuple[int, int, int, int]:
     novice = status is TrainingStatus.NOVICE
+    rir = ruleset.novice_target_rir if novice else ruleset.experienced_target_rir
     if goal is Goal.STRENGTH:
-        if exercise_type is ExerciseType.COMPOUND:
-            return 3, 6, 3 if novice else 2, 180
-        return 6, 12, 3 if novice else 2, 120
+        key = (
+            "strength_compound" if exercise_type is ExerciseType.COMPOUND else "strength_accessory"
+        )
     if goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN}:
-        if exercise_type is ExerciseType.ISOLATION:
-            return 10, 20, 3 if novice else 2, 90
-        return 6, 12, 3 if novice else 2, 120
-    if goal is Goal.MUSCULAR_ENDURANCE:
-        return 12, 25, 3, 60
-    if goal in {Goal.FAT_LOSS, Goal.BODY_RECOMPOSITION}:
-        return 8, 15, 3 if novice else 2, 90
-    return 6, 15, 3 if novice else 2, 90
+        key = (
+            "hypertrophy_isolation"
+            if exercise_type is ExerciseType.ISOLATION
+            else "hypertrophy_compound"
+        )
+    elif goal is Goal.MUSCULAR_ENDURANCE:
+        key = "muscular_endurance"
+        rir = ruleset.novice_target_rir
+    elif goal in {Goal.FAT_LOSS, Goal.BODY_RECOMPOSITION}:
+        key = "fat_loss"
+    elif goal is not Goal.STRENGTH:
+        key = "general_fitness"
+    rule = ruleset.prescription_rules[key]
+    return rule.rep_min, rule.rep_max, rir, rule.rest_seconds
 
 
-def _estimate_minutes(sets: int, rest_seconds: int, warmup_sets: int) -> int:
-    work = sets * 0.6
+def _estimate_minutes(
+    sets: int,
+    rest_seconds: int,
+    warmup_sets: int,
+    ruleset: ProgramRuleset,
+) -> int:
+    work = sets * ruleset.set_execution_minutes
     rest = max(0, sets - 1) * rest_seconds / 60
-    ramp_up = warmup_sets * 0.75
-    return max(3, math.ceil(1 + work + rest + ramp_up))
+    ramp_up = warmup_sets * ruleset.warmup_set_minutes
+    return max(
+        ruleset.minimum_exercise_estimate_minutes,
+        math.ceil(ruleset.exercise_transition_minutes + work + rest + ramp_up),
+    )

@@ -1,5 +1,6 @@
 from app.exercises.enums import ExerciseLabel
 from app.workouts.program_engine.enums import CardioIntensity, Goal
+from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     CardioPrescription,
     ExerciseCandidate,
@@ -7,26 +8,30 @@ from app.workouts.program_engine.schemas import (
     WorkoutDay,
 )
 
-CARDIO_MINUTES = 10
-
 
 def cardio_reserve_minutes(
     request: NormalizedProgramRequest,
     exercises: tuple[ExerciseCandidate, ...],
+    ruleset: ProgramRuleset,
 ) -> int:
-    return CARDIO_MINUTES if _safe_cardio(exercises) else 0
+    return ruleset.cardio_start_minutes if _safe_cardio(exercises) else 0
 
 
 def add_cardio(
     request: NormalizedProgramRequest,
     days: tuple[WorkoutDay, ...],
     exercises: tuple[ExerciseCandidate, ...],
+    ruleset: ProgramRuleset,
 ) -> tuple[WorkoutDay, ...]:
     options = _safe_cardio(exercises)
     if not options or not days:
         return days
     modality = min(options, key=lambda item: (item.fatigue_cost, item.setup_cost, str(item.id)))
-    target_days = 2 if request.primary_goal in {Goal.FAT_LOSS, Goal.BODY_RECOMPOSITION} else 1
+    target_days = (
+        ruleset.fat_loss_cardio_days
+        if request.primary_goal in {Goal.FAT_LOSS, Goal.BODY_RECOMPOSITION}
+        else ruleset.maintenance_cardio_days
+    )
     updated: list[WorkoutDay] = []
     assigned = 0
     for day in days:
@@ -36,7 +41,7 @@ def add_cardio(
             cardio = CardioPrescription(
                 modality_exercise_id=modality.id,
                 modality_name=modality.name,
-                duration_minutes=CARDIO_MINUTES,
+                duration_minutes=ruleset.cardio_start_minutes,
                 intensity=CardioIntensity.MODERATE,
                 reason_codes=(
                     "LOW_IMPACT_CARDIO_SELECTED",
