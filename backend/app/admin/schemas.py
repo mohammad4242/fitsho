@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from app.ai.models import BillingClass, RoutingMode, ZenApiKind
+from app.ai.models import AiModelTestOutcome, BillingClass, RoutingMode, ZenApiKind
 from app.exercises.enums import (
     BodyRegion,
     Difficulty,
@@ -175,9 +175,19 @@ class AdminAiModelsResponse(BaseModel):
     models: list[AdminAiModelDetail]
 
 
+class AdminAiModelTestRun(BaseModel):
+    id: UUID
+    model_id: str
+    outcome: AiModelTestOutcome
+    error_code: str | None
+    safe_error_message: str | None
+    created_at: datetime
+
+
 class AdminAiModelCheckResponse(BaseModel):
     success: bool
     model: AdminAiModelDetail
+    test_run: AdminAiModelTestRun
 
 
 class AdminAiModelSyncResponse(BaseModel):

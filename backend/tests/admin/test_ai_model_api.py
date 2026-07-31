@@ -8,7 +8,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai.models import AiModel, BillingClass, ZenApiKind
-from app.ai.schemas import WorkoutPlanModelOutput
 from app.auth.models import User
 from app.config import Settings
 from app.workouts.models import WorkoutPlanGeneration
@@ -169,13 +168,7 @@ def test_admin_can_run_a_model_health_check(
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen["body"] = request.read()
-        return httpx.Response(
-            200,
-            json={
-                "id": "health-check",
-                "choices": [{"message": {"content": '{"days": []}'}}],
-            },
-        )
+        return httpx.Response(200, json={"id": "health-check"})
 
     mock_client = httpx.AsyncClient(
         transport=httpx.MockTransport(handler)
@@ -189,15 +182,63 @@ def test_admin_can_run_a_model_health_check(
 
     assert response.status_code == 200
     assert response.json()["success"] is True
+    assert response.json()["test_run"] == {
+        "id": response.json()["test_run"]["id"],
+        "model_id": "custom-workout-model",
+        "outcome": "succeeded",
+        "error_code": None,
+        "safe_error_message": None,
+        "created_at": response.json()["test_run"]["created_at"],
+    }
     assert db.get(AiModel, model.id).last_checked_at is not None  # type: ignore[union-attr]
     request_body = json.loads(seen["body"])
-    assert json.loads(request_body["messages"][1]["content"]) == {
-        "health_check": True,
-        "expected_output": {"days": []},
+    assert request_body == {
+        "model": "custom-workout-model",
+        "messages": [{"role": "user", "content": "Reply only: OK"}],
+        "max_tokens": 1,
     }
-    assert request_body["response_format"]["json_schema"]["schema"] == (
-        WorkoutPlanModelOutput.model_json_schema()
-    )
+
+
+def test_admin_retains_successful_and_failed_model_test_runs(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    _make_current_user_admin(client, db)
+    model = _custom_model(db)
+    test_settings.opencode_zen_api_key = SecretStr("test-key")
+    original_client = client.app.state.zen_http_client
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(200, json={"id": "available"})
+        return httpx.Response(
+            200,
+            json={"error": {"type": "server_error", "message": "upstream failed"}},
+        )
+
+    mock_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client.app.state.zen_http_client = mock_client
+    try:
+        successful = client.post(f"/api/v1/admin/ai-models/{model.id}/test", headers=ORIGIN)
+        failed = client.post(f"/api/v1/admin/ai-models/{model.id}/test", headers=ORIGIN)
+        history = client.get("/api/v1/admin/ai-model-test-runs?limit=20")
+    finally:
+        asyncio.run(mock_client.aclose())
+        client.app.state.zen_http_client = original_client
+
+    assert successful.json()["success"] is True
+    assert successful.json()["test_run"]["outcome"] == "succeeded"
+    assert failed.json()["success"] is False
+    assert failed.json()["test_run"]["outcome"] == "failed"
+    assert failed.json()["test_run"]["error_code"] == "provider_unavailable"
+    assert history.status_code == 200
+    assert [item["outcome"] for item in history.json()] == ["failed", "succeeded"]
+    assert "user_id" not in history.text
+    assert "Reply only: OK" not in history.text
 
 
 def test_admin_can_read_recent_generation_failures_without_user_data(

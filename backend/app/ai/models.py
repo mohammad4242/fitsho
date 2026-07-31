@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
@@ -39,6 +39,11 @@ class BillingClass(StrEnum):
 class RoutingMode(StrEnum):
     MANUAL = "manual"
     AUTOMATIC = "automatic"
+
+
+class AiModelTestOutcome(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
 
 
 class AiModel(Base):
@@ -141,5 +146,38 @@ class AiRoutingSettings(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class AiModelTestRun(Base):
+    __tablename__ = "ai_model_test_runs"
+    __table_args__ = (
+        Index("ix_ai_model_test_runs_created_at", "created_at"),
+        Index("ix_ai_model_test_runs_model_created_at", "ai_model_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    ai_model_id: Mapped[UUID] = mapped_column(
+        ForeignKey("ai_models.id", ondelete="CASCADE"), nullable=False
+    )
+    model_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    outcome: Mapped[AiModelTestOutcome] = mapped_column(
+        Enum(
+            AiModelTestOutcome,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_ai_model_test_runs_outcome_values",
+        ),
+        nullable=False,
+    )
+    error_code: Mapped[str | None] = mapped_column(String(80))
+    safe_error_message: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        server_default=func.now(),
         nullable=False,
     )

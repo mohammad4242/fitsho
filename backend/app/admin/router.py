@@ -19,6 +19,7 @@ from app.admin.ai_models import (
     check_ai_model,
     create_ai_model,
     get_ai_model,
+    list_ai_model_test_runs,
     list_ai_models,
     list_generation_failures,
     sync_zen_models,
@@ -35,6 +36,7 @@ from app.admin.schemas import (
     AdminAiModelDetail,
     AdminAiModelsResponse,
     AdminAiModelSyncResponse,
+    AdminAiModelTestRun,
     AdminAiModelUpdate,
     AdminAiRoutingDetail,
     AdminAiRoutingUpdate,
@@ -50,7 +52,7 @@ from app.admin.service import (
     list_admin_exercises,
     update_admin_exercise,
 )
-from app.ai.models import AiModel, AiRoutingSettings
+from app.ai.models import AiModel, AiModelTestRun, AiRoutingSettings
 from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import AppSettings, DatabaseSession
 from app.exercises.enums import MediaPresentation, MediaRole, MediaType
@@ -87,6 +89,17 @@ def _ai_routing_detail(settings: AiRoutingSettings) -> AdminAiRoutingDetail:
     return AdminAiRoutingDetail(mode=settings.mode, manual_model_id=settings.manual_model_id)
 
 
+def _ai_model_test_run_detail(run: AiModelTestRun) -> AdminAiModelTestRun:
+    return AdminAiModelTestRun(
+        id=run.id,
+        model_id=run.model_id,
+        outcome=run.outcome,
+        error_code=run.error_code,
+        safe_error_message=run.safe_error_message,
+        created_at=run.created_at,
+    )
+
+
 @router.get("/ai-models", response_model=AdminAiModelsResponse)
 def read_ai_models(db: DatabaseSession) -> AdminAiModelsResponse:
     routing, models = list_ai_models(db)
@@ -116,6 +129,14 @@ def read_ai_generation_failures(
         )
         for generation in list_generation_failures(db, limit=limit)
     ]
+
+
+@router.get("/ai-model-test-runs", response_model=list[AdminAiModelTestRun])
+def read_ai_model_test_runs(
+    db: DatabaseSession,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[AdminAiModelTestRun]:
+    return [_ai_model_test_run_detail(run) for run in list_ai_model_test_runs(db, limit=limit)]
 
 
 @router.post(
@@ -190,8 +211,17 @@ async def check_ai_model_route(
     client = request.app.state.zen_http_client
     if not isinstance(client, httpx.AsyncClient):
         raise RuntimeError("Zen HTTP client is unavailable")
-    success, model = await check_ai_model(db, get_ai_model(db, model_id), client, settings)
-    return AdminAiModelCheckResponse(success=success, model=_ai_model_detail(model))
+    success, model, test_run = await check_ai_model(
+        db,
+        get_ai_model(db, model_id),
+        client,
+        settings,
+    )
+    return AdminAiModelCheckResponse(
+        success=success,
+        model=_ai_model_detail(model),
+        test_run=_ai_model_test_run_detail(test_run),
+    )
 
 
 def _detail(exercise: Exercise) -> AdminExerciseDetail:

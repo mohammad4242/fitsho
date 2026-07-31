@@ -10,13 +10,15 @@ from sqlalchemy.orm import Session
 
 from app.admin.schemas import AdminAiModelCreate, AdminAiModelUpdate, AdminAiRoutingUpdate
 from app.ai.catalog import CatalogSyncResult, synchronize_zen_catalogue
-from app.ai.models import AiModel, AiRoutingSettings, RoutingMode
-from app.ai.opencode_zen import OpenCodeZenWorkoutPlanProvider
-from app.ai.schemas import (
-    WorkoutGenerationModelRequest,
-    WorkoutPlanModelOutput,
-    WorkoutProviderError,
+from app.ai.models import (
+    AiModel,
+    AiModelTestOutcome,
+    AiModelTestRun,
+    AiRoutingSettings,
+    RoutingMode,
 )
+from app.ai.opencode_zen import OpenCodeZenWorkoutPlanProvider
+from app.ai.schemas import WorkoutProviderError
 from app.config import Settings
 from app.workouts.enums import WorkoutGenerationStatus
 from app.workouts.models import WorkoutPlanGeneration
@@ -37,6 +39,14 @@ def list_generation_failures(db: Session, *, limit: int) -> list[WorkoutPlanGene
             .where(WorkoutPlanGeneration.status == WorkoutGenerationStatus.FAILED)
             .order_by(WorkoutPlanGeneration.created_at.desc())
             .limit(limit)
+        )
+    )
+
+
+def list_ai_model_test_runs(db: Session, *, limit: int) -> list[AiModelTestRun]:
+    return list(
+        db.scalars(
+            select(AiModelTestRun).order_by(AiModelTestRun.created_at.desc()).limit(limit)
         )
     )
 
@@ -173,7 +183,7 @@ async def check_ai_model(
     model: AiModel,
     client: httpx.AsyncClient,
     settings: Settings,
-) -> tuple[bool, AiModel]:
+) -> tuple[bool, AiModel, AiModelTestRun]:
     if model.api_kind is None or model.billing_class is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -187,22 +197,33 @@ async def check_ai_model(
         timeout_seconds=settings.opencode_zen_timeout_seconds,
         api_kind=model.api_kind,
     )
-    request = WorkoutGenerationModelRequest(
-        system_prompt="Return the requested JSON object.",
-        input_payload={"health_check": True, "expected_output": {"days": []}},
-        response_schema=WorkoutPlanModelOutput.model_json_schema(),
-    )
     model.last_checked_at = datetime.now(UTC)
     try:
-        await provider.generate_plan(request)
+        await provider.check_availability()
     except WorkoutProviderError as error:
         model.last_error_code = error.code.value
         model.last_error_message = error.safe_message
+        run = AiModelTestRun(
+            ai_model_id=model.id,
+            model_id=model.model_id,
+            outcome=AiModelTestOutcome.FAILED,
+            error_code=error.code.value,
+            safe_error_message=error.safe_message,
+        )
+        db.add(run)
         db.commit()
         db.refresh(model)
-        return False, model
+        db.refresh(run)
+        return False, model, run
     model.last_error_code = None
     model.last_error_message = None
+    run = AiModelTestRun(
+        ai_model_id=model.id,
+        model_id=model.model_id,
+        outcome=AiModelTestOutcome.SUCCEEDED,
+    )
+    db.add(run)
     db.commit()
     db.refresh(model)
-    return True, model
+    db.refresh(run)
+    return True, model, run
