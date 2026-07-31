@@ -201,6 +201,8 @@ class ExerciseCandidate:
 
     @property
     def has_required_metadata(self) -> bool:
+        if ExerciseLabel.CARDIO in self.labels:
+            return bool(self.name and self.equipment)
         return self.primary_muscle is not None and self.movement_pattern.value != "other"
 
 
@@ -271,6 +273,13 @@ class ProgrammedExercise:
     secondary_muscles: tuple[MuscleGroup, ...] = ()
     equipment: frozenset[Equipment] = frozenset()
     caution_tags: frozenset[ExerciseCautionTag] = frozenset()
+    range_of_motion_profile: frozenset[str] = frozenset()
+    impact_level: ImpactLimit = ImpactLimit.LOW
+    axial_loading_level: LoadLimit = LoadLimit.LOW
+    stability_demand: StabilityDemand = StabilityDemand.MODERATE
+    is_active: bool = True
+    is_programmable: bool = True
+    needs_review: bool = False
 
 
 @dataclass(frozen=True)
