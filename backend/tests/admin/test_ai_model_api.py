@@ -350,3 +350,43 @@ def test_admin_can_read_recent_generation_failures_without_user_data(
     ]
     assert "user_id" not in response.text
     assert db.get(WorkoutPlanGeneration, generation.id) is generation
+
+
+def test_admin_normalizes_domain_engine_failure_diagnostics(
+    client: TestClient,
+    db: Session,
+) -> None:
+    user = _make_current_user_admin(client, db)
+    generation = create_generation(
+        db,
+        user_id=user.id,
+        provider="fitsho_domain",
+        model_id="program_engine_v1",
+        candidate_count=317,
+    )
+    fail_generation(
+        db,
+        generation,
+        error_code="NO_AVAILABLE_EQUIPMENT_MATCH",
+        safe_error_message="A safe valid workout program could not be generated.",
+        validation_diagnostics=[{"errors": ["NO_ELIGIBLE_EXERCISES"]}],
+    )
+    db.commit()
+
+    response = client.get("/api/v1/admin/ai-generation-failures?limit=1")
+
+    assert response.status_code == 200
+    assert response.json()[0]["validation_diagnostics"] == [
+        {
+            "model_id": "program_engine_v1",
+            "phase": "initial",
+            "problems": [
+                {
+                    "code": "NO_ELIGIBLE_EXERCISES",
+                    "message": "Deterministic program validation rejected this generation.",
+                    "day_number": None,
+                    "exercise_id": None,
+                }
+            ],
+        }
+    ]

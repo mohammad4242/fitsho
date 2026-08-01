@@ -208,6 +208,18 @@ def test_validation_failure_is_recorded_before_any_plan_is_persisted(
     generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
     assert generation.status is WorkoutGenerationStatus.FAILED
     assert generation.error_code == GenerationErrorCode.PROGRAM_VALIDATION_FAILED.value
+    assert generation.validation_diagnostics == [
+        {
+            "model_id": "program_engine_v1",
+            "phase": "initial",
+            "problems": [
+                {
+                    "code": "TEST_VALIDATION_ERROR",
+                    "message": "Deterministic program validation rejected this generation.",
+                }
+            ],
+        }
+    ]
 
 
 def test_safety_red_flag_returns_professional_review_without_plan(db: Session) -> None:
