@@ -126,7 +126,7 @@ def test_validator_accepts_a_model_day_estimate_within_ten_minutes() -> None:
     _validator().validate(plan)
 
 
-def test_validator_rejects_a_model_day_estimate_more_than_ten_minutes_away() -> None:
+def test_validator_ignores_model_duration_estimates_when_actual_timing_fits() -> None:
     plan = _plan(
         [
             WorkoutPlanDayOutput(
@@ -139,10 +139,7 @@ def test_validator_rejects_a_model_day_estimate_more_than_ten_minutes_away() -> 
         ]
     )
 
-    with pytest.raises(WorkoutPlanValidationError) as exc_info:
-        _validator().validate(plan)
-
-    assert "duration_mismatch" in {problem.code for problem in exc_info.value.problems}
+    _validator().validate(plan)
 
 
 @pytest.mark.parametrize(
@@ -203,20 +200,6 @@ def test_validator_rejects_a_model_day_estimate_more_than_ten_minutes_away() -> 
                 ]
             ),
             "sets_out_of_policy",
-        ),
-        (
-            _plan(
-                [
-                    WorkoutPlanDayOutput(
-                        day_number=1,
-                        title_en="Bad",
-                        title_fa="بد",
-                        estimated_duration_minutes=45,
-                        exercises=[_exercise(FIRST_ID)],
-                    )
-                ]
-            ),
-            "duration_mismatch",
         ),
     ],
 )

@@ -25,6 +25,7 @@ from app.profile.enums import (
     Sex,
     TrainingCaution,
     TrainingLocation,
+    WorkoutGenerationMethod,
 )
 
 
@@ -128,6 +129,19 @@ class UserProfile(Base):
     physical_limitations: Mapped[str | None] = mapped_column(Text, nullable=True)
     plan_duration_weeks: Mapped[int] = mapped_column(
         SmallInteger, default=4, server_default="4", nullable=False
+    )
+    workout_generation_method: Mapped[WorkoutGenerationMethod] = mapped_column(
+        Enum(
+            WorkoutGenerationMethod,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=lambda members: [member.value for member in members],
+            name="ck_user_profiles_workout_generation_method_values",
+        ),
+        default=WorkoutGenerationMethod.FITSHO_COACH,
+        server_default=WorkoutGenerationMethod.FITSHO_COACH.value,
+        nullable=False,
     )
     training_caution_items: Mapped[list["UserProfileTrainingCaution"]] = relationship(
         back_populates="profile", cascade="all, delete-orphan", passive_deletes=True

@@ -9,7 +9,6 @@ from app.workouts.schemas import CandidateSet, WorkoutExerciseCandidate
 from app.workouts.time_budget import (
     ExerciseTiming,
     WorkoutGenerationPolicy,
-    calculate_day_minutes,
     fits_session_duration,
 )
 
@@ -129,22 +128,6 @@ class WorkoutPlanValidator:
             self._validate_prescription(day.day_number, exercise, problems)
             timings.append(ExerciseTiming(sets=exercise.sets, rest_seconds=exercise.rest_seconds))
 
-        calculated_minutes = self._policy.warmup_minutes + calculate_day_minutes(
-            timings,
-            set_execution_seconds=self._policy.set_execution_seconds,
-            transition_seconds=self._policy.transition_seconds_per_exercise,
-        )
-        if (
-            abs(day.estimated_duration_minutes - calculated_minutes)
-            > self._policy.model_duration_tolerance_minutes
-        ):
-            problems.append(
-                ValidationProblem(
-                    code="duration_mismatch",
-                    message="Day duration does not match the deterministic time budget.",
-                    day_number=day.day_number,
-                )
-            )
         if not fits_session_duration(timings, self._policy):
             problems.append(
                 ValidationProblem(

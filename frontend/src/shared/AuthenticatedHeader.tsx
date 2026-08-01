@@ -62,14 +62,24 @@ export function AuthenticatedHeader() {
               {t("header.profile")}
             </Link>
             {user.is_admin && (
-              <Link
-                to="/admin/exercises"
-                aria-current={
-                  location.pathname.startsWith("/admin/exercises") ? "page" : undefined
-                }
-              >
-                {t("header.adminExercises")}
-              </Link>
+              <>
+                <Link
+                  to="/admin/exercises"
+                  aria-current={
+                    location.pathname.startsWith("/admin/exercises") ? "page" : undefined
+                  }
+                >
+                  {t("header.adminExercises")}
+                </Link>
+                <Link
+                  to="/admin/ai-models"
+                  aria-current={
+                    location.pathname.startsWith("/admin/ai-models") ? "page" : undefined
+                  }
+                >
+                  {t("header.adminAiModels")}
+                </Link>
+              </>
             )}
           </nav>
           <LanguageSwitcher />

@@ -1,13 +1,45 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+import httpx
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from pydantic import ValidationError
 
+from app.admin.ai_models import (
+    check_ai_model,
+    create_ai_model,
+    get_ai_model,
+    list_ai_model_test_runs,
+    list_ai_models,
+    list_generation_failures,
+    sync_zen_models,
+    update_ai_model,
+    update_ai_routing,
+)
 from app.admin.dependencies import require_admin
 from app.admin.exceptions import DuplicateExerciseSlugError
 from app.admin.media import MediaValidationError, StoredMedia, discard_media, store_upload
 from app.admin.schemas import (
+    AdminAiGenerationFailure,
+    AdminAiModelCheckResponse,
+    AdminAiModelCreate,
+    AdminAiModelDetail,
+    AdminAiModelsResponse,
+    AdminAiModelSyncResponse,
+    AdminAiModelTestRun,
+    AdminAiModelUpdate,
+    AdminAiRoutingDetail,
+    AdminAiRoutingUpdate,
     AdminExerciseCreate,
     AdminExerciseDetail,
     AdminExerciseFilters,
@@ -20,18 +52,205 @@ from app.admin.service import (
     list_admin_exercises,
     update_admin_exercise,
 )
+from app.ai.models import AiModel, AiModelTestRun, AiRoutingSettings
 from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import AppSettings, DatabaseSession
 from app.exercises.enums import MediaPresentation, MediaRole, MediaType
 from app.exercises.models import Exercise
 from app.exercises.schemas import ExerciseMediaAssetDetail
 from app.exercises.taxonomy import MUSCLES_BY_REGION
+from app.workouts.models import WorkoutPlanGeneration
 
 router = APIRouter(
     prefix="/api/v1/admin",
     tags=["admin"],
     dependencies=[Depends(require_admin)],
 )
+
+
+def _ai_model_detail(model: AiModel) -> AdminAiModelDetail:
+    return AdminAiModelDetail(
+        id=model.id,
+        model_id=model.model_id,
+        display_name=model.display_name,
+        api_kind=model.api_kind,
+        billing_class=model.billing_class,
+        is_enabled=model.is_enabled,
+        priority=model.priority,
+        is_custom=model.is_custom,
+        classification_required=model.classification_required,
+        last_synced_at=model.last_synced_at,
+        last_checked_at=model.last_checked_at,
+        last_error_code=model.last_error_code,
+        last_error_message=model.last_error_message,
+    )
+
+
+def _ai_routing_detail(settings: AiRoutingSettings) -> AdminAiRoutingDetail:
+    return AdminAiRoutingDetail(mode=settings.mode, manual_model_id=settings.manual_model_id)
+
+
+def _ai_model_test_run_detail(run: AiModelTestRun) -> AdminAiModelTestRun:
+    return AdminAiModelTestRun(
+        id=run.id,
+        model_id=run.model_id,
+        outcome=run.outcome,
+        error_code=run.error_code,
+        safe_error_message=run.safe_error_message,
+        provider_status_code=run.provider_status_code,
+        provider_error_type=run.provider_error_type,
+        provider_error_message=run.provider_error_message,
+        created_at=run.created_at,
+    )
+
+
+def _ai_generation_failure_detail(generation: WorkoutPlanGeneration) -> AdminAiGenerationFailure:
+    diagnostics = generation.validation_diagnostics
+    if diagnostics is not None and any("errors" in diagnostic for diagnostic in diagnostics):
+        normalized_diagnostics: list[dict[str, object]] = []
+        for diagnostic in diagnostics:
+            legacy_errors = diagnostic.get("errors")
+            if not isinstance(legacy_errors, list):
+                normalized_diagnostics.append(diagnostic)
+                continue
+            normalized_diagnostics.append(
+                {
+                    "model_id": generation.model_id,
+                    "phase": "initial",
+                    "problems": [
+                        {
+                            "code": error,
+                            "message": "Deterministic program validation rejected this generation.",
+                        }
+                        for error in legacy_errors
+                        if isinstance(error, str)
+                    ],
+                }
+            )
+        diagnostics = normalized_diagnostics
+    return AdminAiGenerationFailure(
+        id=generation.id,
+        model_id=generation.model_id,
+        created_at=generation.created_at,
+        completed_at=generation.completed_at,
+        error_code=generation.error_code,
+        safe_error_message=generation.safe_error_message,
+        validation_diagnostics=diagnostics,
+    )
+
+
+@router.get("/ai-models", response_model=AdminAiModelsResponse)
+def read_ai_models(db: DatabaseSession) -> AdminAiModelsResponse:
+    routing, models = list_ai_models(db)
+    return AdminAiModelsResponse(
+        routing=_ai_routing_detail(routing),
+        models=[_ai_model_detail(model) for model in models],
+    )
+
+
+@router.get(
+    "/ai-generation-failures",
+    response_model=list[AdminAiGenerationFailure],
+)
+def read_ai_generation_failures(
+    db: DatabaseSession,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[AdminAiGenerationFailure]:
+    failures = list_generation_failures(db, limit=limit)
+    return [_ai_generation_failure_detail(generation) for generation in failures]
+
+
+@router.get("/ai-model-test-runs", response_model=list[AdminAiModelTestRun])
+def read_ai_model_test_runs(
+    db: DatabaseSession,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[AdminAiModelTestRun]:
+    return [_ai_model_test_run_detail(run) for run in list_ai_model_test_runs(db, limit=limit)]
+
+
+@router.post(
+    "/ai-models",
+    response_model=AdminAiModelDetail,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def create_ai_model_route(
+    payload: AdminAiModelCreate,
+    db: DatabaseSession,
+) -> AdminAiModelDetail:
+    return _ai_model_detail(create_ai_model(db, payload))
+
+
+@router.patch(
+    "/ai-models/{model_id}",
+    response_model=AdminAiModelDetail,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_ai_model_route(
+    model_id: UUID,
+    payload: AdminAiModelUpdate,
+    db: DatabaseSession,
+) -> AdminAiModelDetail:
+    return _ai_model_detail(update_ai_model(db, get_ai_model(db, model_id), payload))
+
+
+@router.patch(
+    "/ai-routing",
+    response_model=AdminAiRoutingDetail,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_ai_routing_route(
+    payload: AdminAiRoutingUpdate,
+    db: DatabaseSession,
+) -> AdminAiRoutingDetail:
+    return _ai_routing_detail(update_ai_routing(db, payload))
+
+
+@router.post(
+    "/ai-models/sync",
+    response_model=AdminAiModelSyncResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def sync_ai_models_route(
+    request: Request,
+    db: DatabaseSession,
+    settings: AppSettings,
+) -> AdminAiModelSyncResponse:
+    client = request.app.state.zen_http_client
+    if not isinstance(client, httpx.AsyncClient):
+        raise RuntimeError("Zen HTTP client is unavailable")
+    result = await sync_zen_models(db, client, settings)
+    return AdminAiModelSyncResponse(
+        synchronized_model_ids=result.synchronized_model_ids,
+        needs_classification=result.needs_classification,
+    )
+
+
+@router.post(
+    "/ai-models/{model_id}/test",
+    response_model=AdminAiModelCheckResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def check_ai_model_route(
+    model_id: UUID,
+    request: Request,
+    db: DatabaseSession,
+    settings: AppSettings,
+) -> AdminAiModelCheckResponse:
+    client = request.app.state.zen_http_client
+    if not isinstance(client, httpx.AsyncClient):
+        raise RuntimeError("Zen HTTP client is unavailable")
+    success, model, test_run = await check_ai_model(
+        db,
+        get_ai_model(db, model_id),
+        client,
+        settings,
+    )
+    return AdminAiModelCheckResponse(
+        success=success,
+        model=_ai_model_detail(model),
+        test_run=_ai_model_test_run_detail(test_run),
+    )
 
 
 def _detail(exercise: Exercise) -> AdminExerciseDetail:

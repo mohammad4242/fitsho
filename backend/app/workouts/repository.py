@@ -64,10 +64,12 @@ def fail_generation(
     *,
     error_code: str,
     safe_error_message: str,
+    validation_diagnostics: list[dict[str, object]] | None = None,
 ) -> None:
     generation.status = WorkoutGenerationStatus.FAILED
     generation.error_code = error_code
     generation.safe_error_message = safe_error_message
+    generation.validation_diagnostics = validation_diagnostics
     generation.completed_at = datetime.now(UTC)
     db.flush()
 

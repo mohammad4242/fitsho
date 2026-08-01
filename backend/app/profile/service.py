@@ -45,6 +45,7 @@ def create_profile(
         session_duration_minutes=payload.session_duration_minutes,
         physical_limitations=payload.physical_limitations,
         plan_duration_weeks=payload.plan_duration_weeks,
+        workout_generation_method=payload.workout_generation_method,
         training_caution_items=[
             UserProfileTrainingCaution(caution=caution)
             for caution in sorted(payload.training_cautions, key=lambda value: value.value)
