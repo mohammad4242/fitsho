@@ -17,6 +17,7 @@ from app.workouts.program_engine.enums import (
     Goal,
     ImpactLimit,
     LoadLimit,
+    SplitType,
     StabilityDemand,
     TrainingExperience,
 )
@@ -27,6 +28,8 @@ from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
     NormalizedProgramRequest,
     ProgramGenerationRequest,
+    RecentTrainingHistory,
+    SplitPlan,
 )
 from app.workouts.program_engine.session_builder import build_sessions
 from app.workouts.program_engine.split_selector import select_split
@@ -170,6 +173,21 @@ def _full_body_catalog() -> list[ExerciseCandidate]:
     ]
 
 
+def _body_part_catalog() -> tuple[ExerciseCandidate, ...]:
+    return (
+        candidate("chest press", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+        candidate("triceps extension", MovementPattern.ELBOW_EXTENSION, MuscleGroup.TRICEPS),
+        candidate("row", MovementPattern.HORIZONTAL_PULL, MuscleGroup.BACK),
+        candidate("curl", MovementPattern.ELBOW_FLEXION, MuscleGroup.BICEPS),
+        candidate("shoulder press", MovementPattern.VERTICAL_PUSH, MuscleGroup.SHOULDERS),
+        candidate("lateral raise", MovementPattern.SHOULDER_ABDUCTION, MuscleGroup.SHOULDERS),
+        candidate("shrug", MovementPattern.SHRUG, MuscleGroup.TRAPS),
+        candidate("squat", MovementPattern.SQUAT, MuscleGroup.QUADRICEPS),
+        candidate("hinge", MovementPattern.HIP_HINGE, MuscleGroup.HAMSTRINGS),
+        candidate("plank", MovementPattern.CORE_ANTI_EXTENSION, MuscleGroup.ABS),
+    )
+
+
 def test_full_body_session_covers_required_patterns_and_priority_is_first() -> None:
     request = normalized(priority_muscles=[MuscleGroup.BACK])
     eligibility = filter_eligible_exercises(request, _full_body_catalog())
@@ -242,3 +260,52 @@ def test_missing_required_safe_pattern_returns_structured_domain_error() -> None
             eligible,
             RULESET,
         )
+
+
+def test_body_part_rotation_places_chest_and_direct_triceps_in_one_session() -> None:
+    request = normalized(
+        priority_muscles=[MuscleGroup.CHEST],
+        training_experience=TrainingExperience.ADVANCED,
+        training_age_months=72,
+        recent_training_history=RecentTrainingHistory(consistent_weeks=40),
+    )
+    split = SplitPlan(
+        SplitType.BODY_PART_ROTATION,
+        ("chest_triceps",),
+        (0,),
+        1,
+        (),
+    )
+
+    sessions = build_sessions(
+        request,
+        split,
+        plan_weekly_volume(request, split, RULESET),
+        _body_part_catalog(),
+        RULESET,
+    )
+
+    muscles = {item.primary_muscle for item in sessions[0].exercises}
+    assert {MuscleGroup.CHEST, MuscleGroup.TRICEPS}.issubset(muscles)
+    assert sessions[0].exercises[0].primary_muscle is MuscleGroup.CHEST
+
+
+def test_body_part_rotation_places_priority_shoulders_first() -> None:
+    request = normalized(priority_muscles=[MuscleGroup.SHOULDERS])
+    split = SplitPlan(
+        SplitType.BODY_PART_ROTATION,
+        ("shoulders_traps",),
+        (0,),
+        1,
+        (),
+    )
+
+    sessions = build_sessions(
+        request,
+        split,
+        plan_weekly_volume(request, split, RULESET),
+        _body_part_catalog(),
+        RULESET,
+    )
+
+    assert sessions[0].exercises[0].primary_muscle is MuscleGroup.SHOULDERS

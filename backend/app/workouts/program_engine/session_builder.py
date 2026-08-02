@@ -1,7 +1,8 @@
 from collections import Counter
+from dataclasses import dataclass
 from uuid import UUID
 
-from app.exercises.enums import MovementPattern
+from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -25,6 +26,16 @@ CORE_PATTERNS = frozenset(
         MovementPattern.CORE_ANTI_LATERAL_FLEXION,
     }
 )
+SHOULDER_PATTERNS = frozenset(
+    {MovementPattern.VERTICAL_PUSH, MovementPattern.SHOULDER_ABDUCTION}
+)
+
+
+@dataclass(frozen=True)
+class SlotSpec:
+    patterns: frozenset[MovementPattern]
+    required: bool
+    target_muscle: MuscleGroup | None = None
 
 
 def build_sessions(
@@ -50,22 +61,27 @@ def build_sessions(
         slots = _slots_for_focus(focus)
         chosen: list[ExerciseCandidate] = []
         reasons: dict[UUID, tuple[str, ...]] = {}
-        for patterns, required in slots:
+        for slot in slots:
             if len(chosen) >= capacity:
                 break
             options = [
                 item
-                for pattern in patterns
+                for pattern in slot.patterns
                 for item in by_pattern.get(pattern, ())
                 if item.id not in {selected.id for selected in chosen}
                 and not _duplicates_substitution_group(item, chosen)
             ]
             if not options:
-                if required:
-                    missing = sorted(pattern.value for pattern in patterns)
+                if slot.required:
+                    missing = sorted(pattern.value for pattern in slot.patterns)
                     raise ValueError(f"NO_SAFE_EXERCISE_FOR_PATTERN:{missing}")
                 continue
-            ranked = rank_exercises(request, options, ruleset)
+            ranked = rank_exercises(
+                request,
+                options,
+                ruleset,
+                needed_muscle=slot.target_muscle,
+            )
             selected = min(
                 ranked,
                 key=lambda item: (
@@ -126,83 +142,99 @@ def _by_pattern(
     }
 
 
-def _slots_for_focus(
-    focus: str,
-) -> tuple[tuple[frozenset[MovementPattern], bool], ...]:
+def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
     if focus == "full_body_b":
         return (
-            (HINGE_PATTERNS, True),
-            (CORE_PATTERNS, True),
-            (PUSH_PATTERNS, True),
-            (PULL_PATTERNS, False),
-            (KNEE_PATTERNS, False),
-            (frozenset({MovementPattern.CALF_RAISE}), False),
+            SlotSpec(HINGE_PATTERNS, True),
+            SlotSpec(CORE_PATTERNS, True),
+            SlotSpec(PUSH_PATTERNS, True),
+            SlotSpec(PULL_PATTERNS, False),
+            SlotSpec(KNEE_PATTERNS, False),
+            SlotSpec(frozenset({MovementPattern.CALF_RAISE}), False),
         )
     if focus == "full_body_c":
         return (
-            (PULL_PATTERNS, True),
-            (KNEE_PATTERNS, True),
-            (HINGE_PATTERNS, True),
-            (PUSH_PATTERNS, False),
-            (CORE_PATTERNS, False),
-            (frozenset({MovementPattern.CALF_RAISE}), False),
+            SlotSpec(PULL_PATTERNS, True),
+            SlotSpec(KNEE_PATTERNS, True),
+            SlotSpec(HINGE_PATTERNS, True),
+            SlotSpec(PUSH_PATTERNS, False),
+            SlotSpec(CORE_PATTERNS, False),
+            SlotSpec(frozenset({MovementPattern.CALF_RAISE}), False),
         )
     if focus == "full_body_d":
         return (
-            (CORE_PATTERNS, True),
-            (PUSH_PATTERNS, True),
-            (PULL_PATTERNS, True),
-            (KNEE_PATTERNS, False),
-            (HINGE_PATTERNS, False),
-            (frozenset({MovementPattern.CALF_RAISE}), False),
+            SlotSpec(CORE_PATTERNS, True),
+            SlotSpec(PUSH_PATTERNS, True),
+            SlotSpec(PULL_PATTERNS, True),
+            SlotSpec(KNEE_PATTERNS, False),
+            SlotSpec(HINGE_PATTERNS, False),
+            SlotSpec(frozenset({MovementPattern.CALF_RAISE}), False),
         )
     if focus.startswith("full_body"):
         return (
-            (PUSH_PATTERNS, True),
-            (PULL_PATTERNS, True),
-            (KNEE_PATTERNS, True),
-            (HINGE_PATTERNS, False),
-            (CORE_PATTERNS, False),
-            (frozenset({MovementPattern.CALF_RAISE}), False),
+            SlotSpec(PUSH_PATTERNS, True),
+            SlotSpec(PULL_PATTERNS, True),
+            SlotSpec(KNEE_PATTERNS, True),
+            SlotSpec(HINGE_PATTERNS, False),
+            SlotSpec(CORE_PATTERNS, False),
+            SlotSpec(frozenset({MovementPattern.CALF_RAISE}), False),
         )
-    if focus == "upper":
+    if focus.startswith("upper"):
         return (
-            (PUSH_PATTERNS, True),
-            (PULL_PATTERNS, True),
-            (frozenset({MovementPattern.VERTICAL_PUSH}), False),
-            (frozenset({MovementPattern.VERTICAL_PULL}), False),
-            (frozenset({MovementPattern.ELBOW_FLEXION}), False),
-            (frozenset({MovementPattern.ELBOW_EXTENSION}), False),
+            SlotSpec(PUSH_PATTERNS, True),
+            SlotSpec(PULL_PATTERNS, True),
+            SlotSpec(frozenset({MovementPattern.VERTICAL_PUSH}), False),
+            SlotSpec(frozenset({MovementPattern.VERTICAL_PULL}), False),
+            SlotSpec(frozenset({MovementPattern.ELBOW_FLEXION}), False),
+            SlotSpec(frozenset({MovementPattern.ELBOW_EXTENSION}), False),
         )
-    if focus in {"lower", "legs"}:
+    if focus.startswith("lower") or focus == "legs":
         return (
-            (KNEE_PATTERNS, True),
-            (HINGE_PATTERNS, True),
-            (CORE_PATTERNS, True),
-            (frozenset({MovementPattern.KNEE_FLEXION}), False),
-            (frozenset({MovementPattern.KNEE_EXTENSION}), False),
-            (frozenset({MovementPattern.CALF_RAISE}), False),
+            SlotSpec(KNEE_PATTERNS, True),
+            SlotSpec(HINGE_PATTERNS, True),
+            SlotSpec(CORE_PATTERNS, True),
+            SlotSpec(frozenset({MovementPattern.KNEE_FLEXION}), False),
+            SlotSpec(frozenset({MovementPattern.KNEE_EXTENSION}), False),
+            SlotSpec(frozenset({MovementPattern.CALF_RAISE}), False),
         )
     if focus == "push":
         return (
-            (PUSH_PATTERNS, True),
-            (frozenset({MovementPattern.HORIZONTAL_PUSH}), False),
-            (frozenset({MovementPattern.VERTICAL_PUSH}), False),
-            (frozenset({MovementPattern.ELBOW_EXTENSION}), False),
+            SlotSpec(PUSH_PATTERNS, True),
+            SlotSpec(frozenset({MovementPattern.HORIZONTAL_PUSH}), False),
+            SlotSpec(frozenset({MovementPattern.VERTICAL_PUSH}), False),
+            SlotSpec(frozenset({MovementPattern.ELBOW_EXTENSION}), False),
         )
     if focus == "pull":
         return (
-            (PULL_PATTERNS, True),
-            (frozenset({MovementPattern.HORIZONTAL_PULL}), False),
-            (frozenset({MovementPattern.VERTICAL_PULL}), False),
-            (frozenset({MovementPattern.ELBOW_FLEXION}), False),
+            SlotSpec(PULL_PATTERNS, True),
+            SlotSpec(frozenset({MovementPattern.HORIZONTAL_PULL}), False),
+            SlotSpec(frozenset({MovementPattern.VERTICAL_PULL}), False),
+            SlotSpec(frozenset({MovementPattern.ELBOW_FLEXION}), False),
+        )
+    if focus == "chest_triceps":
+        return (
+            SlotSpec(PUSH_PATTERNS, True, MuscleGroup.CHEST),
+            SlotSpec(frozenset({MovementPattern.HORIZONTAL_PUSH}), False, MuscleGroup.CHEST),
+            SlotSpec(frozenset({MovementPattern.ELBOW_EXTENSION}), False, MuscleGroup.TRICEPS),
+        )
+    if focus == "back_biceps":
+        return (
+            SlotSpec(PULL_PATTERNS, True, MuscleGroup.BACK),
+            SlotSpec(frozenset({MovementPattern.HORIZONTAL_PULL}), False, MuscleGroup.BACK),
+            SlotSpec(frozenset({MovementPattern.ELBOW_FLEXION}), False, MuscleGroup.BICEPS),
+        )
+    if focus == "shoulders_traps":
+        return (
+            SlotSpec(SHOULDER_PATTERNS, True, MuscleGroup.SHOULDERS),
+            SlotSpec(frozenset({MovementPattern.SHOULDER_ABDUCTION}), False, MuscleGroup.SHOULDERS),
+            SlotSpec(frozenset({MovementPattern.SHRUG}), False, MuscleGroup.TRAPS),
         )
     return (
-        (PUSH_PATTERNS, True),
-        (PULL_PATTERNS, True),
-        (KNEE_PATTERNS, True),
-        (HINGE_PATTERNS, False),
-        (CORE_PATTERNS, False),
+        SlotSpec(PUSH_PATTERNS, True),
+        SlotSpec(PULL_PATTERNS, True),
+        SlotSpec(KNEE_PATTERNS, True),
+        SlotSpec(HINGE_PATTERNS, False),
+        SlotSpec(CORE_PATTERNS, False),
     )
 
 
