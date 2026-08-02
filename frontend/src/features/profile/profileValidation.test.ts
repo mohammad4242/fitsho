@@ -112,11 +112,11 @@ describe("profile validation", () => {
     });
   });
 
-  it("catches invalid training days and overlong limitations", () => {
-    expect(validateStep({ ...validValues, training_days_per_week: "0" }, 3, today)).toEqual({
+  it("accepts only two through five training days and catches overlong limitations", () => {
+    expect(validateStep({ ...validValues, training_days_per_week: "1" }, 3, today)).toEqual({
       training_days_per_week: "trainingDaysRange",
     });
-    expect(validateStep({ ...validValues, training_days_per_week: "8" }, 3, today)).toEqual({
+    expect(validateStep({ ...validValues, training_days_per_week: "6" }, 3, today)).toEqual({
       training_days_per_week: "trainingDaysRange",
     });
     expect(

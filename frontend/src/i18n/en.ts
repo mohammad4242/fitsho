@@ -133,7 +133,7 @@ const en = {
         heightRange: "Height must be between 100 and 250 centimeters.",
         weightRange: "Weight must be between 20 and 500 kilograms.",
         weightPrecision: "Weight can have at most two decimal places.",
-        trainingDaysRange: "Training days must be between 1 and 7.",
+        trainingDaysRange: "Training days must be between 2 and 5.",
         sessionDurationInvalid: "Choose one of the available session durations.",
         planDurationInvalid: "Choose 4, 6, or 8 weeks.",
         limitationsLength: "Limitations can have at most 1,000 characters.",

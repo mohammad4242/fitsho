@@ -44,6 +44,7 @@ class TrainingProgramTemplateSeed:
     intensity_methods: tuple[TrainingTemplateMethod, ...]
     days: tuple[TemplateDaySeed, ...]
     fitness_goal: FitnessGoal = FitnessGoal.BUILD_MUSCLE
+    is_active: bool = True
 
 
 M = MuscleGroup
@@ -56,6 +57,9 @@ SOURCE_NAME = "Fitsho original evidence-informed template"
 SOURCE_URL = "https://pubmed.ncbi.nlm.nih.gov/38595233/"
 
 CATALOG_SLUG_ALIASES: dict[str, tuple[str, ...]] = {
+    "barbell-bench-press": ("fedb-0025-barbell-bench-press",),
+    "barbell-back-squat": ("fedb-1435-barbell-back-squat",),
+    "barbell-straight-leg-deadlift": ("fedb-0116-barbell-straight-leg-deadlift",),
     "dumbbell-bench-press": ("fedb-0025-barbell-bench-press",),
     "incline-dumbbell-bench-press": ("fedb-0314-dumbbell-incline-bench-press",),
     "cable-fly": ("fedb-1269-cable-standing-fly",),
@@ -110,6 +114,16 @@ def _slot(
 
 
 CHEST = _slot("dumbbell-bench-press", (M.CHEST,), P.HORIZONTAL_PUSH, sets=4)
+BARBELL_BENCH = _slot(
+    "barbell-bench-press",
+    (M.CHEST,),
+    P.HORIZONTAL_PUSH,
+    placeholder_en="Barbell Bench Press",
+    placeholder_fa="پرس سینه هالتر",
+    sets=4,
+    reps=(6, 10),
+    rest=120,
+)
 INCLINE_CHEST = _slot(
     "incline-dumbbell-bench-press",
     (M.CHEST,),
@@ -171,10 +185,30 @@ PUSH_DOWN = _slot(
     rest=60,
 )
 SQUAT = _slot("goblet-squat", (M.QUADRICEPS,), P.SQUAT, sets=4)
+BARBELL_BACK_SQUAT = _slot(
+    "barbell-back-squat",
+    (M.QUADRICEPS,),
+    P.SQUAT,
+    placeholder_en="Barbell Back Squat",
+    placeholder_fa="اسکوات پشت هالتر",
+    sets=4,
+    reps=(6, 10),
+    rest=120,
+)
 LEG_PRESS = _slot("leg-press", (M.QUADRICEPS,), P.SQUAT, sets=4)
 LEG_EXTENSION = _slot("leg-extension", (M.QUADRICEPS,), P.KNEE_EXTENSION, reps=(12, 15), rest=60)
 LUNGE = _slot("dumbbell-lunge", (M.QUADRICEPS, M.GLUTES), P.LUNGE)
 RDL = _slot("romanian-deadlift", (M.HAMSTRINGS, M.GLUTES), P.HIP_HINGE, sets=4)
+BARBELL_STRAIGHT_LEG_DEADLIFT = _slot(
+    "barbell-straight-leg-deadlift",
+    (M.HAMSTRINGS, M.GLUTES),
+    P.HIP_HINGE,
+    placeholder_en="Barbell Straight Leg Deadlift",
+    placeholder_fa="ددلیفت پا صاف هالتر",
+    sets=3,
+    reps=(8, 10),
+    rest=120,
+)
 LEG_CURL = _slot(
     "seated-leg-curl",
     (M.HAMSTRINGS,),
@@ -381,10 +415,11 @@ def _specialized_template_movement_floors(
     template: TrainingProgramTemplateSeed,
 ) -> TrainingProgramTemplateSeed:
     if template.days_per_week < 4 or "body_part_rotation" not in template.focus_tags:
-        return template
+        return replace(template, is_active=False) if template.days_per_week == 6 else template
     return replace(
         template,
         days=tuple(_specialized_day_movement_floors(day) for day in template.days),
+        is_active=False if template.days_per_week == 6 else template.is_active,
     )
 
 
@@ -435,6 +470,7 @@ def _template(
     tags: tuple[str, ...],
     methods: tuple[TrainingTemplateMethod, ...],
     *days: TemplateDaySeed,
+    is_active: bool = True,
 ) -> TrainingProgramTemplateSeed:
     return TrainingProgramTemplateSeed(
         slug=slug,
@@ -447,6 +483,7 @@ def _template(
         focus_tags=tags,
         intensity_methods=methods,
         days=days,
+        is_active=is_active,
     )
 
 
@@ -466,51 +503,51 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         _day(
             "Full Body A",
             "تمام‌بدن A",
-            (M.CHEST, M.BACK, M.QUADRICEPS),
+            (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
             CHEST,
             BACK_ROW,
             SQUAT,
-            CORE,
+            GLUTE_BRIDGE,
         ),
         _day(
             "Full Body B",
             "تمام‌بدن B",
-            (M.SHOULDERS, M.HAMSTRINGS, M.GLUTES),
-            SHOULDER_PRESS,
+            (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
+            INCLINE_CHEST,
             LAT_PULLDOWN,
+            LEG_PRESS,
             RDL,
-            GLUTE_BRIDGE,
-            CALF,
+            CORE,
         ),
     ),
     _template(
         "two-day-upper-lower-foundation",
-        "Two-Day Upper / Lower Foundation",
-        "پایه بالاتنه / پایین‌تنه دو روزه",
-        "A simple upper/lower split with enough recovery between two weekly sessions.",
-        "تقسیم ساده بالاتنه و پایین‌تنه با ریکاوری کافی بین دو جلسهٔ هفتگی.",
+        "Two-Day Full Body Barbell Foundation",
+        "پایه هالتر تمام‌بدن دو روزه",
+        "A full-body A/B plan built around fundamental barbell and cable movement patterns.",
+        "برنامهٔ A/B تمام‌بدن بر پایهٔ الگوهای اصلی هالتر و سیم‌کش.",
         2,
         Level.BEGINNER,
-        ("upper_lower", "classic", "foundation"),
+        ("full_body", "classic", "foundation"),
         (Method.STANDARD,),
         _day(
-            "Upper Body",
-            "بالاتنه",
-            (M.CHEST, M.BACK, M.SHOULDERS),
-            CHEST,
-            BACK_ROW,
-            SHOULDER_PRESS,
-            BICEPS,
-            TRICEPS,
+            "Full Body A",
+            "تمام‌بدن A",
+            (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
+            BARBELL_BACK_SQUAT,
+            BARBELL_BENCH,
+            LAT_PULLDOWN,
+            GLUTE_BRIDGE,
         ),
         _day(
-            "Lower Body",
-            "پایین‌تنه",
-            (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-            SQUAT,
-            RDL,
-            GLUTE_BRIDGE,
-            CALF,
+            "Full Body B",
+            "تمام‌بدن B",
+            (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
+            LEG_PRESS,
+            INCLINE_CHEST,
+            BACK_ROW,
+            BARBELL_STRAIGHT_LEG_DEADLIFT,
+            CORE,
         ),
     ),
     _template(
@@ -525,52 +562,56 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         ("full_body", "hypertrophy", "balanced"),
         (Method.STANDARD,),
         _day(
-            "Full Body Push Bias",
-            "تمام‌بدن با تأکید پوش",
-            (M.CHEST, M.QUADRICEPS, M.TRICEPS),
-            CHEST,
-            INCLINE_CHEST,
-            LEG_PRESS,
+            "Full Body A",
+            "تمام‌بدن A",
+            (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
+            BARBELL_BACK_SQUAT,
+            BARBELL_BENCH,
+            BACK_ROW,
+            RDL,
             LEG_EXTENSION,
-            TRICEPS,
         ),
         _day(
-            "Full Body Pull Bias",
-            "تمام‌بدن با تأکید پول",
-            (M.BACK, M.HAMSTRINGS, M.BICEPS),
-            BACK_ROW,
+            "Full Body B",
+            "تمام‌بدن B",
+            (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
+            LEG_PRESS,
+            INCLINE_CHEST,
             LAT_PULLDOWN,
-            RDL,
+            HIP_THRUST,
             LEG_CURL,
-            BICEPS,
+            CALF,
         ),
     ),
     _template(
         "two-day-upper-lower-strength-hypertrophy",
-        "Two-Day Upper / Lower Strength-Hypertrophy",
-        "قدرت / هایپرتروفی بالاتنه پایین‌تنه دو روزه",
-        "Compound-first upper/lower sessions with moderate accessory volume.",
-        "جلسات بالاتنه و پایین‌تنه با اولویت حرکات چندمفصلی و حجم کمکی متوسط.",
+        "Two-Day Full Body Compound Hypertrophy",
+        "هایپرتروفی چندمفصلی تمام‌بدن دو روزه",
+        "Compound-first full-body sessions that keep each major movement pattern in both days.",
+        "جلسات تمام‌بدن با اولویت حرکات چندمفصلی که الگوهای اصلی را در هر دو روز حفظ می‌کند.",
         2,
         Level.INTERMEDIATE,
-        ("upper_lower", "strength_hypertrophy", "compound_first"),
+        ("full_body", "strength_hypertrophy", "compound_first"),
         (Method.STANDARD,),
         _day(
-            "Upper Strength",
-            "قدرت بالاتنه",
-            (M.CHEST, M.BACK, M.SHOULDERS),
-            CHEST,
+            "Full Body A",
+            "تمام‌بدن A",
+            (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
+            BARBELL_BACK_SQUAT,
+            BARBELL_BENCH,
             BACK_ROW,
-            SHOULDER_PRESS,
-            BICEPS,
+            BARBELL_STRAIGHT_LEG_DEADLIFT,
+            CORE,
         ),
         _day(
-            "Lower Strength",
-            "قدرت پایین‌تنه",
-            (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
+            "Full Body B",
+            "تمام‌بدن B",
+            (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
             LEG_PRESS,
-            RDL,
+            INCLINE_CHEST,
+            LAT_PULLDOWN,
             LUNGE,
+            HIP_THRUST,
             CALF,
         ),
     ),
@@ -578,7 +619,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         "two-day-full-body-superset",
         "Two-Day Full Body Supersets",
         "تمام‌بدن سوپرست دو روزه",
-        "Time-efficient antagonist pairings for an experienced trainee with limited weekly access.",
+        "Time-efficient antagonist pairings for an experienced trainee "
+        "with limited weekly access.",
         "جفت‌کردن عضلات مخالف برای ورزشکار باتجربه با زمان محدود در هفته.",
         2,
         Level.ADVANCED,
@@ -587,10 +629,11 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         _day(
             "Full Body A",
             "تمام‌بدن A",
-            (M.CHEST, M.BACK, M.QUADRICEPS),
-            CHEST,
+            (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
+            BARBELL_BACK_SQUAT,
+            BARBELL_BENCH,
             BACK_ROW,
-            SQUAT,
+            RDL,
             _slot("dumbbell-curl", (M.BICEPS,), P.ELBOW_FLEXION, method=Method.SUPERSET),
             _slot(
                 "overhead-dumbbell-extension",
@@ -602,9 +645,10 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         _day(
             "Full Body B",
             "تمام‌بدن B",
-            (M.SHOULDERS, M.HAMSTRINGS, M.GLUTES),
-            SHOULDER_PRESS,
-            RDL,
+            (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
+            LEG_PRESS,
+            INCLINE_CHEST,
+            LAT_PULLDOWN,
             GLUTE_BRIDGE,
             _slot(
                 "dumbbell-lateral-raise",
@@ -803,7 +847,11 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             BACK_ROW,
             RDL,
             _slot(
-                "cable-curl", (M.BICEPS,), P.ELBOW_FLEXION, method=Method.DROP_SET, reps=(12, 15)
+                "cable-curl",
+                (M.BICEPS,),
+                P.ELBOW_FLEXION,
+                method=Method.DROP_SET,
+                reps=(12, 15),
             ),
         ),
         _day(
@@ -876,7 +924,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         "four-day-chest-priority",
         "Four-Day Chest Priority Rotation",
         "تفکیک چهار روزه با تأکید سینه",
-        "A body-part rotation with two chest exposures while keeping arm work directly assigned.",
+        "A body-part rotation with two chest exposures while keeping arm work "
+        "directly assigned.",
         "تفکیک عضلات با دو مواجههٔ سینه و حفظ تمرین مستقیم بازوها.",
         4,
         Level.INTERMEDIATE,
@@ -962,7 +1011,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         "four-day-quad-hamstring-split",
         "Four-Day Quad / Hamstring Split",
         "تفکیک چهار روزهٔ چهارسر / همسترینگ",
-        "An advanced upper/lower variant that separates knee-dominant and posterior-chain work.",
+        "An advanced upper/lower variant that separates knee-dominant and "
+        "posterior-chain work.",
         "گونهٔ پیشرفتهٔ بالاتنه/پایین‌تنه که چهارسر و زنجیرهٔ خلفی را جدا می‌کند.",
         4,
         Level.ADVANCED,
@@ -1140,7 +1190,12 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             TRICEPS,
         ),
         _day(
-            "Back + Biceps", "زیربغل + جلو بازو", (M.BACK, M.BICEPS), BACK_ROW, LAT_PULLDOWN, BICEPS
+            "Back + Biceps",
+            "زیربغل + جلو بازو",
+            (M.BACK, M.BICEPS),
+            BACK_ROW,
+            LAT_PULLDOWN,
+            BICEPS,
         ),
         _day(
             "Legs",
@@ -1245,7 +1300,12 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             TRICEPS,
         ),
         _day(
-            "Back + Biceps", "زیربغل + جلو بازو", (M.BACK, M.BICEPS), BACK_ROW, LAT_PULLDOWN, BICEPS
+            "Back + Biceps",
+            "زیربغل + جلو بازو",
+            (M.BACK, M.BICEPS),
+            BACK_ROW,
+            LAT_PULLDOWN,
+            BICEPS,
         ),
         _day(
             "Quadriceps + Calves",
@@ -1805,7 +1865,16 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         Level.ADVANCED,
         ("body_part_rotation", "arms_priority", "specialization", "drop_set"),
         (Method.STANDARD, Method.DROP_SET),
-        _day("Chest", "سینه", (M.CHEST,), CHEST, INCLINE_CHEST, MACHINE_CHEST, CABLE_FLY, PEC_DECK),
+        _day(
+            "Chest",
+            "سینه",
+            (M.CHEST,),
+            CHEST,
+            INCLINE_CHEST,
+            MACHINE_CHEST,
+            CABLE_FLY,
+            PEC_DECK,
+        ),
         _day(
             "Back",
             "زیربغل",
@@ -1982,7 +2051,9 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         Level.INTERMEDIATE,
         ("push_pull_legs", "classic", "frequency_two"),
         (Method.STANDARD,),
-        _day("Push A", "پوش A", (M.CHEST, M.SHOULDERS, M.TRICEPS), CHEST, SHOULDER_PRESS, TRICEPS),
+        _day(
+            "Push A", "پوش A", (M.CHEST, M.SHOULDERS, M.TRICEPS), CHEST, SHOULDER_PRESS, TRICEPS
+        ),
         _day("Pull A", "پول A", (M.BACK, M.BICEPS), BACK_ROW, LAT_PULLDOWN, BICEPS),
         _day("Legs A", "پا A", (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES), SQUAT, RDL, CALF),
         _day(
@@ -2016,9 +2087,22 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         ("push_pull_legs", "hypertrophy", "volume"),
         (Method.STANDARD,),
         _day(
-            "Push Chest", "پوش سینه", (M.CHEST, M.TRICEPS), CHEST, INCLINE_CHEST, CABLE_FLY, TRICEPS
+            "Push Chest",
+            "پوش سینه",
+            (M.CHEST, M.TRICEPS),
+            CHEST,
+            INCLINE_CHEST,
+            CABLE_FLY,
+            TRICEPS,
         ),
-        _day("Pull Width", "پول عرض پشت", (M.BACK, M.BICEPS), LAT_PULLDOWN, CABLE_PULLDOWN, BICEPS),
+        _day(
+            "Pull Width",
+            "پول عرض پشت",
+            (M.BACK, M.BICEPS),
+            LAT_PULLDOWN,
+            CABLE_PULLDOWN,
+            BICEPS,
+        ),
         _day(
             "Legs Quadriceps",
             "پا چهارسر",
@@ -2100,7 +2184,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         "six-day-chest-priority",
         "Six-Day Chest Priority",
         "تأکید سینه شش روزه",
-        "A specialization block with two chest exposures and a separate calves-and-core session.",
+        "A specialization block with two chest exposures and a separate "
+        "calves-and-core session.",
         "دورهٔ تخصصی با دو مواجههٔ سینه و یک جلسهٔ جداگانهٔ ساق و میان‌تنه.",
         6,
         Level.ADVANCED,
@@ -2108,7 +2193,12 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         (Method.STANDARD,),
         _day("Chest Heavy", "سینه سنگین", (M.CHEST,), CHEST, INCLINE_CHEST, CABLE_FLY),
         _day(
-            "Back + Biceps", "زیربغل + جلو بازو", (M.BACK, M.BICEPS), BACK_ROW, LAT_PULLDOWN, BICEPS
+            "Back + Biceps",
+            "زیربغل + جلو بازو",
+            (M.BACK, M.BICEPS),
+            BACK_ROW,
+            LAT_PULLDOWN,
+            BICEPS,
         ),
         _day(
             "Legs",
@@ -2142,7 +2232,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
         "six-day-back-priority",
         "Six-Day Back Priority",
         "تأکید زیربغل شش روزه",
-        "A specialization block with two back exposures and a separate calves-and-core session.",
+        "A specialization block with two back exposures and a separate "
+        "calves-and-core session.",
         "دورهٔ تخصصی با دو مواجههٔ زیربغل و یک جلسهٔ جداگانهٔ ساق و میان‌تنه.",
         6,
         Level.ADVANCED,
@@ -2166,7 +2257,9 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             LEG_EXTENSION,
             LEG_CURL,
         ),
-        _day("Back Thickness", "ضخامت زیربغل", (M.BACK,), BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN),
+        _day(
+            "Back Thickness", "ضخامت زیربغل", (M.BACK,), BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN
+        ),
         _day(
             "Shoulders + Biceps",
             "سرشانه + جلو بازو",

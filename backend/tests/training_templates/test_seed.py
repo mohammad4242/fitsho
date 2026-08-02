@@ -3,7 +3,7 @@ from collections import Counter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.exercises.enums import MuscleGroup
+from app.exercises.enums import MovementPattern, MuscleGroup
 from app.exercises.models import Exercise
 from app.exercises.service import seed_exercises
 from app.profile.enums import ExperienceLevel
@@ -22,6 +22,45 @@ def test_seed_adds_five_templates_for_every_supported_training_frequency(db: Ses
     assert {template.days_per_week for template in templates} == {2, 3, 4, 5, 6}
     for days_per_week in range(2, 7):
         assert sum(template.days_per_week == days_per_week for template in templates) >= 5
+
+
+def test_active_library_offers_two_through_five_days_and_only_full_body_two_day_templates(
+    db: Session,
+) -> None:
+    seed_exercises(db)
+    seed_training_program_templates(db)
+
+    active_templates = list(
+        db.scalars(
+            select(TrainingProgramTemplate).where(TrainingProgramTemplate.is_active.is_(True))
+        )
+    )
+
+    assert {template.days_per_week for template in active_templates} == {2, 3, 4, 5}
+    assert all(
+        "full_body" in template.focus_tags
+        for template in active_templates
+        if template.days_per_week == 2
+    )
+
+    two_day_seeds = [
+        template for template in TRAINING_PROGRAM_TEMPLATE_SEEDS if template.days_per_week == 2
+    ]
+    for template in two_day_seeds:
+        for day in template.days:
+            patterns = {slot.movement_pattern for slot in day.slots}
+            assert MovementPattern.HORIZONTAL_PUSH in patterns, template.slug
+            assert patterns & {MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL}, (
+                template.slug
+            )
+            assert patterns & {
+                MovementPattern.SQUAT,
+                MovementPattern.LUNGE,
+                MovementPattern.KNEE_EXTENSION,
+            }, template.slug
+            assert patterns & {MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION}, (
+                template.slug
+            )
 
 
 def test_seed_expands_four_and_five_day_reference_library_across_levels(db: Session) -> None:

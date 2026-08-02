@@ -48,6 +48,8 @@ def test_calculate_age_handles_birthday_boundary() -> None:
         ("current_weight_kg", "500.01"),
         ("current_weight_kg", "70.123"),
         ("training_days_per_week", 0),
+        ("training_days_per_week", 1),
+        ("training_days_per_week", 6),
         ("training_days_per_week", 8),
         ("sex", "unknown"),
         ("fitness_goal", "bulk"),

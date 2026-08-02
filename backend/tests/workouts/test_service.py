@@ -51,7 +51,7 @@ def _user_with_profile(db: Session) -> User:
             height_cm=180,
             fitness_goal=FitnessGoal.BUILD_MUSCLE,
             experience_level=ExperienceLevel.BEGINNER,
-            training_days_per_week=1,
+            training_days_per_week=2,
             training_location=TrainingLocation.HOME,
             home_training_setup=HomeTrainingSetup.BODYWEIGHT_ONLY,
             session_duration_minutes=45,

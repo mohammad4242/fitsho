@@ -38,7 +38,7 @@ class UserProfile(Base):
         ),
         CheckConstraint("height_cm BETWEEN 100 AND 250", name="ck_user_profiles_height_cm_range"),
         CheckConstraint(
-            "training_days_per_week BETWEEN 1 AND 7",
+            "training_days_per_week BETWEEN 2 AND 5",
             name="ck_user_profiles_training_days_range",
         ),
         CheckConstraint(

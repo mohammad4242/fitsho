@@ -136,8 +136,8 @@ function validateStepThree(values: ProfileFormValues): ProfileValidationErrors {
     errors.training_days_per_week = "required";
   } else if (
     !/^\d+$/.test(trainingDays) ||
-    Number(trainingDays) < 1 ||
-    Number(trainingDays) > 7
+    Number(trainingDays) < 2 ||
+    Number(trainingDays) > 5
   ) {
     errors.training_days_per_week = "trainingDaysRange";
   }

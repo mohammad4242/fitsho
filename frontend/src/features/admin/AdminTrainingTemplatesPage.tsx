@@ -8,7 +8,7 @@ import { getAdminTrainingProgramTemplates } from "./api";
 import type { AdminTrainingProgramTemplatesResponse } from "./types";
 import "./admin.css";
 
-const trainingDays = [2, 3, 4, 5, 6] as const;
+const trainingDays = [2, 3, 4, 5] as const;
 const trainingLevels = ["all", "beginner", "intermediate", "advanced"] as const;
 
 export function AdminTrainingTemplatesPage() {

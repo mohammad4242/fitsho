@@ -40,7 +40,7 @@ class ProfileCreate(BaseModel):
     )
     fitness_goal: FitnessGoal
     experience_level: ExperienceLevel
-    training_days_per_week: int = Field(ge=1, le=7)
+    training_days_per_week: int = Field(ge=2, le=5)
     training_location: TrainingLocation
     home_training_setup: HomeTrainingSetup | None = None
     training_cautions: list[TrainingCaution] = Field(default_factory=list)
@@ -100,7 +100,7 @@ class ProfileUpdate(BaseModel):
     )
     fitness_goal: FitnessGoal | None = None
     experience_level: ExperienceLevel | None = None
-    training_days_per_week: int | None = Field(default=None, ge=1, le=7)
+    training_days_per_week: int | None = Field(default=None, ge=2, le=5)
     training_location: TrainingLocation | None = None
     home_training_setup: HomeTrainingSetup | None = None
     training_cautions: list[TrainingCaution] | None = None

@@ -57,7 +57,7 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
         template.intensity_methods = [method.value for method in seed.intensity_methods]
         template.source_name = "Fitsho original evidence-informed template"
         template.source_url = "https://pubmed.ncbi.nlm.nih.gov/38595233/"
-        template.is_active = True
+        template.is_active = seed.is_active
 
     db.flush()
 

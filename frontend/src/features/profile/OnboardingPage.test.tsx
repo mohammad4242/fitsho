@@ -232,7 +232,7 @@ it("blocks invalid training days and long limitations", async () => {
   });
   await user.click(screen.getByRole("button", { name: "ساخت پروفایل" }));
 
-  expect(screen.getByText("روزهای تمرین باید بین ۱ تا ۷ باشد.")).toBeInTheDocument();
+  expect(screen.getByText("روزهای تمرین باید بین ۲ تا ۵ باشد.")).toBeInTheDocument();
   expect(screen.getByText("محدودیت‌ها حداکثر ۱۰۰۰ نویسه است.")).toBeInTheDocument();
   expect(profileContext.createProfile).not.toHaveBeenCalled();
 });
