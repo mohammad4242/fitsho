@@ -27,6 +27,12 @@ class TrainingTemplateMethod(StrEnum):
     DROP_SET = "drop_set"
 
 
+class TrainingTemplateSlotPriority(StrEnum):
+    CORE = "core"
+    ACCESSORY = "accessory"
+    OPTIONAL = "optional"
+
+
 class TrainingProgramTemplate(Base):
     __tablename__ = "training_program_templates"
     __table_args__ = (
@@ -47,7 +53,7 @@ class TrainingProgramTemplate(Base):
     name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
     description_en: Mapped[str] = mapped_column(String(1000), nullable=False)
     description_fa: Mapped[str] = mapped_column(String(1000), nullable=False)
-    days_per_week: Mapped[int] = mapped_column(Integer, nullable=False)
+    days_per_week: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     training_level: Mapped[ExperienceLevel] = mapped_column(
         Enum(
             ExperienceLevel,
@@ -138,7 +144,7 @@ class TrainingProgramTemplateSlot(Base):
     )
     slot_order: Mapped[int] = mapped_column(Integer, nullable=False)
     exercise_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("exercises.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("exercises.id", ondelete="SET NULL"), nullable=True, index=True
     )
     exercise_slug_hint: Mapped[str] = mapped_column(String(120), nullable=False)
     placeholder_name_en: Mapped[str | None] = mapped_column(String(160), nullable=True)
@@ -167,6 +173,20 @@ class TrainingProgramTemplateSlot(Base):
         nullable=False,
         default=TrainingTemplateMethod.STANDARD,
     )
+    adaptation_priority: Mapped[TrainingTemplateSlotPriority] = mapped_column(
+        Enum(
+            TrainingTemplateSlotPriority,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_training_program_template_slots_priority_values",
+        ),
+        nullable=False,
+        default=TrainingTemplateSlotPriority.CORE,
+        server_default=TrainingTemplateSlotPriority.CORE.value,
+    )
+    superset_group: Mapped[str | None] = mapped_column(String(32), nullable=True)
     sets: Mapped[int] = mapped_column(Integer, nullable=False)
     rep_min: Mapped[int] = mapped_column(Integer, nullable=False)
     rep_max: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -95,6 +95,8 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
                         target_muscles=[muscle.value for muscle in slot_seed.target_muscles],
                         movement_pattern=slot_seed.movement_pattern,
                         intensity_method=slot_seed.intensity_method,
+                        adaptation_priority=slot_seed.adaptation_priority,
+                        superset_group=slot_seed.superset_group,
                         sets=slot_seed.sets,
                         rep_min=slot_seed.rep_min,
                         rep_max=slot_seed.rep_max,
