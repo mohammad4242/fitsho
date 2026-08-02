@@ -43,6 +43,11 @@ from app.admin.schemas import (
     AdminExerciseCreate,
     AdminExerciseDetail,
     AdminExerciseFilters,
+    AdminTrainingProgramTemplate,
+    AdminTrainingProgramTemplatesResponse,
+    AdminTrainingTemplateDay,
+    AdminTrainingTemplateExercise,
+    AdminTrainingTemplateSlot,
     PaginatedAdminExercises,
 )
 from app.admin.service import (
@@ -59,6 +64,8 @@ from app.exercises.enums import MediaPresentation, MediaRole, MediaType
 from app.exercises.models import Exercise
 from app.exercises.schemas import ExerciseMediaAssetDetail
 from app.exercises.taxonomy import MUSCLES_BY_REGION
+from app.training_templates.models import TrainingProgramTemplate
+from app.training_templates.service import list_training_program_templates
 from app.workouts.models import WorkoutPlanGeneration
 
 router = APIRouter(
@@ -139,12 +146,82 @@ def _ai_generation_failure_detail(generation: WorkoutPlanGeneration) -> AdminAiG
     )
 
 
+def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainingProgramTemplate:
+    return AdminTrainingProgramTemplate(
+        id=template.id,
+        slug=template.slug,
+        name_en=template.name_en,
+        name_fa=template.name_fa,
+        description_en=template.description_en,
+        description_fa=template.description_fa,
+        days_per_week=template.days_per_week,
+        training_level=template.training_level,
+        fitness_goal=template.fitness_goal,
+        focus_tags=template.focus_tags,
+        intensity_methods=template.intensity_methods,
+        source_name=template.source_name,
+        source_url=template.source_url,
+        days=[
+            AdminTrainingTemplateDay(
+                id=day.id,
+                day_number=day.day_number,
+                title_en=day.title_en,
+                title_fa=day.title_fa,
+                direct_target_muscles=day.direct_target_muscles,
+                slots=[
+                    AdminTrainingTemplateSlot(
+                        id=slot.id,
+                        slot_order=slot.slot_order,
+                        exercise_slug_hint=slot.exercise_slug_hint,
+                        placeholder_name_en=slot.placeholder_name_en,
+                        placeholder_name_fa=slot.placeholder_name_fa,
+                        target_muscles=slot.target_muscles,
+                        movement_pattern=slot.movement_pattern,
+                        intensity_method=slot.intensity_method,
+                        sets=slot.sets,
+                        rep_min=slot.rep_min,
+                        rep_max=slot.rep_max,
+                        target_rir=slot.target_rir,
+                        rest_seconds=slot.rest_seconds,
+                        exercise=(
+                            AdminTrainingTemplateExercise(
+                                id=slot.exercise.id,
+                                slug=slot.exercise.slug,
+                                name_en=slot.exercise.name_en,
+                                name_fa=slot.exercise.name_fa,
+                            )
+                            if slot.exercise is not None
+                            else None
+                        ),
+                    )
+                    for slot in day.slots
+                ],
+            )
+            for day in template.days
+        ],
+    )
+
+
 @router.get("/ai-models", response_model=AdminAiModelsResponse)
 def read_ai_models(db: DatabaseSession) -> AdminAiModelsResponse:
     routing, models = list_ai_models(db)
     return AdminAiModelsResponse(
         routing=_ai_routing_detail(routing),
         models=[_ai_model_detail(model) for model in models],
+    )
+
+
+@router.get(
+    "/training-program-templates",
+    response_model=AdminTrainingProgramTemplatesResponse,
+)
+def read_training_program_templates(
+    db: DatabaseSession,
+    days_per_week: Annotated[int | None, Query(ge=2, le=6)] = None,
+) -> AdminTrainingProgramTemplatesResponse:
+    templates = list_training_program_templates(db, days_per_week=days_per_week)
+    return AdminTrainingProgramTemplatesResponse(
+        items=[_training_template_detail(template) for template in templates]
     )
 
 

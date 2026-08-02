@@ -18,6 +18,8 @@ from app.exercises.enums import (
     MuscleGroup,
 )
 from app.exercises.schemas import ExerciseDetail
+from app.profile.enums import ExperienceLevel, FitnessGoal
+from app.training_templates.models import TrainingTemplateMethod
 
 Slug = Annotated[
     str,
@@ -219,3 +221,57 @@ class AdminAiGenerationFailure(BaseModel):
     error_code: str | None
     safe_error_message: str | None
     validation_diagnostics: list[AdminAiValidationDiagnostic] | None
+
+
+class AdminTrainingTemplateExercise(BaseModel):
+    id: UUID
+    slug: str
+    name_en: str
+    name_fa: str
+
+
+class AdminTrainingTemplateSlot(BaseModel):
+    id: UUID
+    slot_order: int
+    exercise_slug_hint: str
+    placeholder_name_en: str | None
+    placeholder_name_fa: str | None
+    target_muscles: list[MuscleGroup]
+    movement_pattern: MovementPattern
+    intensity_method: TrainingTemplateMethod
+    sets: int
+    rep_min: int
+    rep_max: int
+    target_rir: int
+    rest_seconds: int
+    exercise: AdminTrainingTemplateExercise | None
+
+
+class AdminTrainingTemplateDay(BaseModel):
+    id: UUID
+    day_number: int
+    title_en: str
+    title_fa: str
+    direct_target_muscles: list[MuscleGroup]
+    slots: list[AdminTrainingTemplateSlot]
+
+
+class AdminTrainingProgramTemplate(BaseModel):
+    id: UUID
+    slug: str
+    name_en: str
+    name_fa: str
+    description_en: str
+    description_fa: str
+    days_per_week: int
+    training_level: ExperienceLevel
+    fitness_goal: FitnessGoal
+    focus_tags: list[str]
+    intensity_methods: list[TrainingTemplateMethod]
+    source_name: str
+    source_url: str
+    days: list[AdminTrainingTemplateDay]
+
+
+class AdminTrainingProgramTemplatesResponse(BaseModel):
+    items: list[AdminTrainingProgramTemplate]
