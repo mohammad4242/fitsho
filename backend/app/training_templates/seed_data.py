@@ -8,6 +8,7 @@ from app.training_templates.models import TrainingTemplateMethod
 @dataclass(frozen=True)
 class TemplateSlotSeed:
     exercise_slug_hint: str
+    catalog_slug_hints: tuple[str, ...]
     target_muscles: tuple[MuscleGroup, ...]
     movement_pattern: MovementPattern
     placeholder_name_en: str | None = None
@@ -51,6 +52,26 @@ Level = ExperienceLevel
 SOURCE_NAME = "Fitsho original evidence-informed template"
 SOURCE_URL = "https://pubmed.ncbi.nlm.nih.gov/38595233/"
 
+CATALOG_SLUG_ALIASES: dict[str, tuple[str, ...]] = {
+    "dumbbell-bench-press": ("fedb-0025-barbell-bench-press",),
+    "incline-dumbbell-bench-press": ("fedb-0314-dumbbell-incline-bench-press",),
+    "cable-fly": ("fedb-1269-cable-standing-fly",),
+    "barbell-bent-over-row": ("fedb-0027-barbell-underhand-bent-over-row",),
+    "lat-pulldown": ("fedb-0974-cable-close-grip-lat-pulldown",),
+    "smith-machine-shoulder-press": ("fedb-0765-smith-seated-shoulder-press",),
+    "dumbbell-lateral-raise": ("fedb-0334-dumbbell-lateral-raise",),
+    "dumbbell-curl": ("fedb-0294-dumbbell-biceps-curl",),
+    "hammer-curl": ("fedb-0298-dumbbell-cross-body-hammer-curl",),
+    "cable-triceps-pushdown": ("fedb-1723-cable-triceps-pushdown",),
+    "goblet-squat": ("fedb-1760-dumbbell-goblet-squat",),
+    "leg-press": ("fedb-2611-lever-horizontal-leg-press",),
+    "leg-extension": ("fedb-0585-lever-leg-extension",),
+    "dumbbell-lunge": ("fedb-0336-dumbbell-lunge",),
+    "seated-leg-curl": ("fedb-0599-lever-seated-leg-curl",),
+    "glute-bridge": ("fedb-drv-hip-raise-bridge-glute-bridge",),
+    "standing-calf-raise": ("fedb-0417-dumbbell-standing-calf-raise",),
+}
+
 
 def _slot(
     slug: str,
@@ -67,6 +88,7 @@ def _slot(
 ) -> TemplateSlotSeed:
     return TemplateSlotSeed(
         exercise_slug_hint=slug,
+        catalog_slug_hints=(slug, *CATALOG_SLUG_ALIASES.get(slug, ())),
         target_muscles=muscles,
         movement_pattern=pattern,
         placeholder_name_en=placeholder_en,

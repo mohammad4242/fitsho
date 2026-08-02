@@ -26,20 +26,23 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
     }
     linked_slots = 0
     placeholder_slots = 0
-
-    for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS:
-        template = db.scalar(
-            select(TrainingProgramTemplate)
-            .where(TrainingProgramTemplate.slug == seed.slug)
-            .options(
+    existing_templates = list(
+        db.scalars(
+            select(TrainingProgramTemplate).options(
                 selectinload(TrainingProgramTemplate.days).selectinload(
                     TrainingProgramTemplateDay.slots
                 )
             )
         )
+    )
+    templates_by_slug = {template.slug: template for template in existing_templates}
+
+    for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS:
+        template = templates_by_slug.get(seed.slug)
         if template is None:
             template = TrainingProgramTemplate(slug=seed.slug)
             db.add(template)
+            templates_by_slug[seed.slug] = template
         else:
             template.days.clear()
 
@@ -56,6 +59,11 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
         template.source_url = "https://pubmed.ncbi.nlm.nih.gov/38595233/"
         template.is_active = True
 
+    db.flush()
+
+    for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS:
+        template = templates_by_slug[seed.slug]
+
         for day_number, day_seed in enumerate(seed.days, start=1):
             day = TrainingProgramTemplateDay(
                 day_number=day_number,
@@ -65,7 +73,14 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
             )
             template.days.append(day)
             for slot_order, slot_seed in enumerate(day_seed.slots, start=1):
-                exercise_id = exercises_by_slug.get(slot_seed.exercise_slug_hint)
+                exercise_id = next(
+                    (
+                        exercises_by_slug[candidate_slug]
+                        for candidate_slug in slot_seed.catalog_slug_hints
+                        if candidate_slug in exercises_by_slug
+                    ),
+                    None,
+                )
                 if exercise_id is None:
                     placeholder_slots += 1
                 else:
