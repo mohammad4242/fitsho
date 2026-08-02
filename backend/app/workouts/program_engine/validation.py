@@ -105,10 +105,29 @@ def validate_program(
                 for item in occurrences[1:]
             ):
                 errors.append("UNJUSTIFIED_DUPLICATE_EXERCISE")
-    maximum = ruleset.maximum_sets[program.training_status]
-    if any(value > maximum for value in direct_sets.values()):
-        errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
     planned = program.aggregate_metrics.get("planned_direct_sets_by_muscle", {})
+    ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
+    if isinstance(ranges, dict):
+        for muscle, range_values in ranges.items():
+            if not isinstance(range_values, dict):
+                continue
+            actual = direct_sets[str(muscle)]
+            maximum_hard = int(
+                range_values.get(
+                    "maximum_hard",
+                    ruleset.maximum_sets[program.training_status],
+                )
+            )
+            if actual > maximum_hard:
+                errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
+            if actual > int(range_values.get("maximum_soft", maximum_hard)):
+                warnings.append("SOFT_WEEKLY_VOLUME_EXCEEDED")
+            if actual < int(range_values.get("minimum_soft", 0)):
+                warnings.append("SOFT_WEEKLY_VOLUME_BELOW_MINIMUM")
+    else:
+        maximum = ruleset.maximum_sets[program.training_status]
+        if any(value > maximum for value in direct_sets.values()):
+            errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
     if isinstance(planned, dict) and any(
         direct_sets[str(muscle)] < int(target) for muscle, target in planned.items()
     ):

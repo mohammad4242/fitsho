@@ -19,7 +19,7 @@ from workouts.program_engine.golden_fixtures import (
         ("novice_3_days_fat_loss_low_impact", SplitType.FULL_BODY_ABC),
         ("intermediate_4_days_hypertrophy", SplitType.UPPER_LOWER),
         ("intermediate_5_days_shoulder_priority", SplitType.UPPER_LOWER_SPECIALIZATION),
-        ("advanced_4_days_strength", SplitType.UPPER_LOWER),
+        ("advanced_4_days_strength", SplitType.PHUL),
     ],
 )
 def test_golden_split_and_validation(name: str, split_type: SplitType) -> None:

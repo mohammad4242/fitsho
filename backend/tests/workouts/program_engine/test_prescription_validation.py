@@ -20,10 +20,14 @@ from app.workouts.program_engine.enums import (
     SafetyStatus,
     TrainingExperience,
 )
+from app.workouts.program_engine.normalization import normalize_request
+from app.workouts.program_engine.prescription import allocate_direct_sets
 from app.workouts.program_engine.progression import double_progression_policy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import ExerciseCandidate, ProgramGenerationRequest
 from app.workouts.program_engine.validation import validate_program
+from app.workouts.program_engine.volume_planner import plan_weekly_volume
+from app.workouts.program_engine.volume_repair import repair_weekly_volume
 
 
 def request(**overrides: object) -> ProgramGenerationRequest:
@@ -142,6 +146,71 @@ def test_warmup_sets_do_not_count_toward_working_volume() -> None:
     direct = result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
     expected = sum(item.sets for item in day.exercises if item.primary_muscle is MuscleGroup.CHEST)
     assert direct[MuscleGroup.CHEST.value] == expected
+
+
+def test_direct_sets_are_distributed_exactly_across_exposures() -> None:
+    assert allocate_direct_sets(10, 3, RULESET.minimum_working_sets) == (4, 3, 3)
+    assert allocate_direct_sets(9, 4, RULESET.minimum_working_sets) == (3, 2, 2, 2)
+
+
+def test_four_day_program_does_not_round_each_muscle_exposure_up() -> None:
+    source = request(
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        available_training_days=4,
+    )
+
+    result = generate_program(source, catalog(), RULESET)
+
+    assert result.program is not None, result.errors
+    direct = result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
+    maximum = RULESET.maximum_sets[result.program.training_status]
+    assert all(value <= maximum for value in direct.values())
+
+
+def test_volume_repair_reduces_hard_excess_before_validation() -> None:
+    source = request()
+    result = generate_program(source, catalog(), RULESET)
+    assert result.program is not None
+    day = result.program.weekly_schedule[0]
+    chest = next(item for item in day.exercises if item.primary_muscle is MuscleGroup.CHEST)
+    excessive_chest = replace(chest, sets=10)
+    excessive_day = replace(
+        day,
+        exercises=tuple(excessive_chest if item is chest else item for item in day.exercises),
+    )
+    normalized = normalize_request(source, RULESET)
+    volume = plan_weekly_volume(normalized, result.program.split, RULESET)
+
+    repaired_days, reasons = repair_weekly_volume(
+        (excessive_day,), normalized, volume, RULESET
+    )
+
+    repaired_chest = next(
+        item for item in repaired_days[0].exercises if item.primary_muscle is MuscleGroup.CHEST
+    )
+    assert repaired_chest.sets == RULESET.maximum_sets[result.program.training_status]
+    assert "VOLUME_REPAIR_REDUCED_SET" in reasons
+
+
+def test_validator_rejects_hard_weekly_volume_excess() -> None:
+    source = request()
+    result = generate_program(source, catalog(), RULESET)
+    assert result.program is not None
+    day = result.program.weekly_schedule[0]
+    chest = next(item for item in day.exercises if item.primary_muscle is MuscleGroup.CHEST)
+    invalid_day = replace(
+        day,
+        exercises=tuple(
+            replace(item, sets=10) if item is chest else item for item in day.exercises
+        ),
+    )
+    invalid = replace(result.program, weekly_schedule=(invalid_day,))
+
+    report = validate_program(invalid, source, RULESET)
+
+    assert "WEEKLY_MUSCLE_VOLUME_EXCEEDED" in report.errors
 
 
 def test_fat_loss_retains_resistance_and_adds_separate_cardio() -> None:

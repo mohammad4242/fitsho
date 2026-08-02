@@ -20,6 +20,7 @@ from app.workouts.program_engine.session_builder import build_sessions
 from app.workouts.program_engine.split_selector import select_split
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
+from app.workouts.program_engine.volume_repair import repair_weekly_volume
 
 
 def generate_program(
@@ -74,6 +75,7 @@ def generate_program(
         cardio_reserve_minutes=reserve,
     )
     days = add_cardio(normalized, days, eligibility.eligible, ruleset)
+    days, repair_reasons = repair_weekly_volume(days, normalized, volume, ruleset)
     direct: Counter[str] = Counter()
     fractional: defaultdict[str, float] = defaultdict(float)
     for day in days:
@@ -85,6 +87,15 @@ def generate_program(
     metrics: dict[str, object] = {
         "planned_direct_sets_by_muscle": {
             target.muscle.value: target.direct_sets for target in volume.targets
+        },
+        "volume_ranges_by_muscle": {
+            target.muscle.value: {
+                "minimum_soft": target.minimum_soft,
+                "target_sets": target.target_sets,
+                "maximum_soft": target.maximum_soft,
+                "maximum_hard": target.maximum_hard,
+            }
+            for target in volume.targets
         },
         "weekly_direct_sets_by_muscle": dict(direct),
         "weekly_fractional_sets_by_muscle": dict(fractional),
@@ -100,6 +111,7 @@ def generate_program(
         {"stage": "safety", "status": safety.status.value, "reasons": safety.reason_codes},
         {"stage": "split", "selected": split.split_type.value, "reasons": split.reason_codes},
         {"stage": "volume", "reasons": volume.reason_codes},
+        {"stage": "volume_repair", "reasons": repair_reasons},
         {
             "stage": "eligibility",
             "eligible_count": len(eligibility.eligible),

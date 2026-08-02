@@ -27,6 +27,17 @@ def prescribe_sessions(
         for item in draft.exercises
         if item.primary_muscle is not None
     )
+    allocations = {
+        muscle: iter(
+            allocate_direct_sets(
+                volume.direct_sets_for(muscle),
+                count,
+                ruleset.minimum_working_sets,
+            )
+        )
+        for muscle, count in appearances.items()
+        if volume.direct_sets_for(muscle) > 0
+    }
     days: list[WorkoutDay] = []
     for draft in drafts:
         exercise_count = max(1, len(draft.exercises))
@@ -41,19 +52,17 @@ def prescribe_sessions(
             available // exercise_count,
         )
         programmed: list[ProgrammedExercise] = []
-        for index, exercise in enumerate(draft.exercises):
+        for exercise in draft.exercises:
             primary_muscle = exercise.primary_muscle
-            target = (
-                volume.direct_sets_for(primary_muscle)
-                if primary_muscle is not None
-                else ruleset.default_untracked_muscle_sets
-            )
-            appearance_count = appearances[primary_muscle] if primary_muscle is not None else 1
-            desired_sets = max(
-                ruleset.minimum_working_sets,
-                math.ceil(target / max(1, appearance_count)),
-            )
-            sets = min(ruleset.max_sets_per_muscle_per_session, desired_sets)
+            if primary_muscle in allocations:
+                sets = next(allocations[primary_muscle])
+            else:
+                sets = min(
+                    ruleset.max_sets_per_muscle_per_session,
+                    ruleset.default_untracked_muscle_sets,
+                )
+            if sets == 0:
+                continue
             rep_min, rep_max, rir, rest = _prescription_for(
                 request.primary_goal,
                 exercise.exercise_type,
@@ -61,7 +70,7 @@ def prescribe_sessions(
                 ruleset,
             )
             warmup_sets = 0
-            if index == 0 and exercise.exercise_type is ExerciseType.COMPOUND:
+            if not programmed and exercise.exercise_type is ExerciseType.COMPOUND:
                 warmup_sets = (
                     ruleset.strength_compound_warmup_sets
                     if request.primary_goal is Goal.STRENGTH
@@ -69,20 +78,21 @@ def prescribe_sessions(
                 )
             while (
                 sets > ruleset.minimum_working_sets
-                and _estimate_minutes(sets, rest, warmup_sets, ruleset) > per_exercise_budget
+                and estimate_exercise_minutes(sets, rest, warmup_sets, ruleset)
+                > per_exercise_budget
             ):
                 sets -= 1
             programmed.append(
                 ProgrammedExercise(
                     exercise_id=exercise.id,
                     exercise_name=exercise.name,
-                    order=index + 1,
+                    order=len(programmed) + 1,
                     sets=sets,
                     rep_min=rep_min,
                     rep_max=rep_max,
                     target_rir=rir,
                     rest_seconds=rest,
-                    estimated_minutes=_estimate_minutes(sets, rest, warmup_sets, ruleset),
+                    estimated_minutes=estimate_exercise_minutes(sets, rest, warmup_sets, ruleset),
                     reason_codes=draft.selection_reasons[exercise.id],
                     substitution_exercise_ids=draft.substitutions[exercise.id],
                     warmup_sets=warmup_sets,
@@ -116,6 +126,26 @@ def prescribe_sessions(
     return tuple(days)
 
 
+def allocate_direct_sets(
+    target_sets: int,
+    appearance_count: int,
+    minimum_working_sets: int,
+) -> tuple[int, ...]:
+    """Allocate a weekly direct-set target exactly without forced round-up."""
+    if target_sets < 0 or appearance_count < 0 or minimum_working_sets < 1:
+        raise ValueError("invalid direct-set allocation inputs")
+    if appearance_count == 0:
+        return ()
+    active_appearances = min(appearance_count, target_sets // minimum_working_sets)
+    if active_appearances == 0:
+        return (0,) * appearance_count
+    base, remainder = divmod(target_sets, active_appearances)
+    return tuple(
+        base + (1 if index < remainder else 0) if index < active_appearances else 0
+        for index in range(appearance_count)
+    )
+
+
 def _prescription_for(
     goal: Goal,
     exercise_type: ExerciseType,
@@ -145,7 +175,7 @@ def _prescription_for(
     return rule.rep_min, rule.rep_max, rir, rule.rest_seconds
 
 
-def _estimate_minutes(
+def estimate_exercise_minutes(
     sets: int,
     rest_seconds: int,
     warmup_sets: int,
