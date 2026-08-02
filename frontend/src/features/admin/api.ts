@@ -15,6 +15,8 @@ import type {
   AdminExerciseFilters,
   AdminExerciseMediaFiles,
   AdminTrainingProgramTemplatesResponse,
+  AdminTrainingProgramTemplate,
+  AdminTrainingProgramTemplateWrite,
   PaginatedAdminExercises,
 } from "./types";
 
@@ -32,6 +34,31 @@ export function getAdminTrainingProgramTemplates(
   return request<AdminTrainingProgramTemplatesResponse>(
     `${adminTrainingProgramTemplatesPath}?days_per_week=${daysPerWeek}`,
   );
+}
+
+export function getAdminTrainingProgramTemplate(
+  templateId: string,
+): Promise<AdminTrainingProgramTemplate> {
+  return request<AdminTrainingProgramTemplate>(`${adminTrainingProgramTemplatesPath}/${templateId}`);
+}
+
+export function createAdminTrainingProgramTemplate(
+  input: AdminTrainingProgramTemplateWrite,
+): Promise<AdminTrainingProgramTemplate> {
+  return request<AdminTrainingProgramTemplate>(adminTrainingProgramTemplatesPath, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateAdminTrainingProgramTemplate(
+  templateId: string,
+  input: AdminTrainingProgramTemplateWrite,
+): Promise<AdminTrainingProgramTemplate> {
+  return request<AdminTrainingProgramTemplate>(`${adminTrainingProgramTemplatesPath}/${templateId}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
 }
 
 export function getAdminAiGenerationFailures(

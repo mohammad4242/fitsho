@@ -184,6 +184,7 @@ export type AdminAiGenerationFailure = {
 };
 
 export type TrainingTemplateMethod = "standard" | "superset" | "drop_set";
+export type TrainingTemplateSlotPriority = "core" | "accessory" | "optional";
 
 export type AdminTrainingTemplateExercise = {
   id: string;
@@ -202,6 +203,8 @@ export type AdminTrainingTemplateSlot = {
   target_muscles: MuscleGroup[];
   movement_pattern: MovementPattern;
   intensity_method: TrainingTemplateMethod;
+  adaptation_priority: TrainingTemplateSlotPriority;
+  superset_group: string | null;
   sets: number;
   rep_min: number;
   rep_max: number;
@@ -246,4 +249,50 @@ export type AdminTrainingProgramTemplate = {
 
 export type AdminTrainingProgramTemplatesResponse = {
   items: AdminTrainingProgramTemplate[];
+};
+
+export type AdminTrainingTemplateRationaleWrite = {
+  title_en: string;
+  title_fa: string;
+  detail_en: string;
+  detail_fa: string;
+};
+
+export type AdminTrainingTemplateSlotWrite = {
+  exercise_id: string;
+  display_name_en: string | null;
+  display_name_fa: string | null;
+  target_muscles: MuscleGroup[];
+  movement_pattern: MovementPattern;
+  intensity_method: TrainingTemplateMethod;
+  adaptation_priority: TrainingTemplateSlotPriority;
+  superset_group: string | null;
+  sets: number;
+  rep_min: number;
+  rep_max: number;
+  target_rir: number;
+  rest_seconds: number;
+};
+
+export type AdminTrainingTemplateDayWrite = {
+  title_en: string;
+  title_fa: string;
+  direct_target_muscles: MuscleGroup[];
+  slots: AdminTrainingTemplateSlotWrite[];
+};
+
+export type AdminTrainingProgramTemplateWrite = {
+  name_en: string;
+  name_fa: string;
+  description_en: string;
+  description_fa: string;
+  days_per_week: number;
+  training_level: ExperienceLevel;
+  fitness_goal: FitnessGoal;
+  focus_tags: string[];
+  intensity_methods: TrainingTemplateMethod[];
+  programming_rationale: AdminTrainingTemplateRationaleWrite[];
+  source_name: string;
+  source_url: string;
+  days: AdminTrainingTemplateDayWrite[];
 };

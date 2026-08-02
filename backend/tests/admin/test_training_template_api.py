@@ -79,3 +79,178 @@ def test_training_template_library_has_no_public_endpoint(client: TestClient) ->
     response = client.get("/api/v1/training-program-templates")
 
     assert response.status_code == 404
+
+
+def test_admin_creates_a_complete_program_template_with_catalog_exercise(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    exercise_id = client.get("/api/v1/admin/exercises?search=bench").json()["items"][0]["id"]
+
+    response = client.post(
+        "/api/v1/admin/training-program-templates",
+        headers=ORIGIN,
+        json={
+            "name_en": "Admin Four Day Program",
+            "name_fa": "برنامه چهارروزه ادمین",
+            "description_en": "A configurable four-day reference program.",
+            "description_fa": "برنامه مرجع چهارروزه قابل تنظیم.",
+            "days_per_week": 4,
+            "training_level": "intermediate",
+            "fitness_goal": "build_muscle",
+            "focus_tags": ["classic"],
+            "intensity_methods": ["standard"],
+            "programming_rationale": _rationale_payload(),
+            "source_name": "Fitsho admin library",
+            "source_url": "https://fitsho.local/admin-library",
+            "days": [_day_payload(day, exercise_id) for day in range(1, 5)],
+        },
+    )
+
+    assert response.status_code == 201
+    created = response.json()
+    assert created["slug"] == "admin-four-day-program"
+    assert len(created["days"]) == 4
+    assert len(created["days"][0]["slots"]) == 5
+    assert created["days"][0]["slots"][0]["exercise"]["id"] == exercise_id
+
+
+def test_admin_update_replaces_removed_slots_and_keeps_catalog_exercise_link(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    template_response = client.get("/api/v1/admin/training-program-templates?days_per_week=4")
+    template = template_response.json()["items"][0]
+    detail_response = client.get(f"/api/v1/admin/training-program-templates/{template['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["id"] == template["id"]
+    first_slot = template["days"][0]["slots"][0]
+    payload = {
+        "name_en": template["name_en"],
+        "name_fa": template["name_fa"],
+        "description_en": template["description_en"],
+        "description_fa": template["description_fa"],
+        "days_per_week": template["days_per_week"],
+        "training_level": template["training_level"],
+        "fitness_goal": template["fitness_goal"],
+        "focus_tags": template["focus_tags"],
+        "intensity_methods": template["intensity_methods"],
+        "programming_rationale": template["programming_rationale"],
+        "source_name": template["source_name"],
+        "source_url": template["source_url"],
+        "days": [
+            {
+                "title_en": day["title_en"],
+                "title_fa": day["title_fa"],
+                "direct_target_muscles": day["direct_target_muscles"],
+                "slots": [
+                    _slot_payload(first_slot, display_name_fa="پرس سینه انتخابی") for _ in range(5)
+                ]
+                if day["day_number"] == 1
+                else [_slot_payload(slot) for slot in day["slots"][:5]],
+            }
+            for day in template["days"]
+        ],
+    }
+
+    response = client.put(
+        f"/api/v1/admin/training-program-templates/{template['id']}",
+        headers=ORIGIN,
+        json=payload,
+    )
+
+    assert response.status_code == 200
+    first_day = response.json()["days"][0]
+    assert len(first_day["slots"]) == 5
+    assert first_day["slots"][0]["placeholder_name_fa"] == "پرس سینه انتخابی"
+    assert first_day["slots"][0]["exercise"]["id"] == first_slot["exercise"]["id"]
+
+
+def test_admin_rejects_template_slot_with_unknown_exercise(client: TestClient, db: Session) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    payload = {
+        "name_en": "Invalid Exercise Program",
+        "name_fa": "برنامه حرکت نامعتبر",
+        "description_en": "Invalid exercise test.",
+        "description_fa": "آزمون حرکت نامعتبر.",
+        "days_per_week": 2,
+        "training_level": "beginner",
+        "fitness_goal": "build_muscle",
+        "focus_tags": ["foundation"],
+        "intensity_methods": ["standard"],
+        "programming_rationale": _rationale_payload(),
+        "source_name": "Fitsho admin library",
+        "source_url": "https://fitsho.local/admin-library",
+        "days": [_day_payload(day, "00000000-0000-0000-0000-000000000000") for day in range(1, 3)],
+    }
+
+    response = client.post(
+        "/api/v1/admin/training-program-templates",
+        headers=ORIGIN,
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "days"]
+
+
+def _rationale_payload() -> list[dict[str, str]]:
+    return [
+        {
+            "title_en": f"Reason {number}",
+            "title_fa": f"علت {number}",
+            "detail_en": f"Program rationale {number}.",
+            "detail_fa": f"منطق برنامه {number}.",
+        }
+        for number in range(1, 6)
+    ]
+
+
+def _day_payload(day_number: int, exercise_id: str) -> dict[str, object]:
+    return {
+        "title_en": f"Day {day_number}",
+        "title_fa": f"روز {day_number}",
+        "direct_target_muscles": ["chest"],
+        "slots": [
+            {
+                "exercise_id": exercise_id,
+                "display_name_en": None,
+                "display_name_fa": None,
+                "target_muscles": ["chest"],
+                "movement_pattern": "horizontal_push",
+                "intensity_method": "standard",
+                "adaptation_priority": "core",
+                "superset_group": None,
+                "sets": 3,
+                "rep_min": 8,
+                "rep_max": 12,
+                "target_rir": 2,
+                "rest_seconds": 90,
+            }
+            for _ in range(5)
+        ],
+    }
+
+
+def _slot_payload(slot: dict[str, object], **overrides: object) -> dict[str, object]:
+    return {
+        "exercise_id": slot["exercise"]["id"],
+        "display_name_en": slot["placeholder_name_en"],
+        "display_name_fa": slot["placeholder_name_fa"],
+        "target_muscles": slot["target_muscles"],
+        "movement_pattern": slot["movement_pattern"],
+        "intensity_method": slot["intensity_method"],
+        "adaptation_priority": "core",
+        "superset_group": None,
+        "sets": slot["sets"],
+        "rep_min": slot["rep_min"],
+        "rep_max": slot["rep_max"],
+        "target_rir": slot["target_rir"],
+        "rest_seconds": slot["rest_seconds"],
+        **overrides,
+    }

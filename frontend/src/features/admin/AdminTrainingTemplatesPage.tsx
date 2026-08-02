@@ -23,6 +23,8 @@ export function AdminTrainingTemplatesPage() {
   const visibleTemplates = page?.items.filter(
     (template) => trainingLevel === "all" || template.training_level === trainingLevel,
   ) ?? [];
+  const newProgramLevel = trainingLevel === "all" ? "beginner" : trainingLevel;
+  const newProgramPath = `/admin/training-program-templates/new?days=${daysPerWeek}&level=${newProgramLevel}`;
 
   useEffect(() => {
     let active = true;
@@ -174,12 +176,23 @@ export function AdminTrainingTemplatesPage() {
                   </ol>
                 </section>
                 <footer>
+                  <Link
+                    aria-label={t("admin.templates.editProgramAria", { name: english ? template.name_en : template.name_fa })}
+                    to={`/admin/training-program-templates/${template.id}/edit`}
+                  >
+                    {t("admin.templates.editProgram")}
+                  </Link>
                   <span>{t("admin.templates.source")}: {template.source_name}</span>
                   <a href={template.source_url} rel="noreferrer" target="_blank">{t("admin.templates.reference")}</a>
                 </footer>
               </article>
             ))}
           </section>
+        )}
+        {state === "ready" && (
+          <div className="admin-template-add-program">
+            <Link className="admin-primary-link" to={newProgramPath}>{t("admin.templates.addProgram")}</Link>
+          </div>
         )}
       </main>
     </div>

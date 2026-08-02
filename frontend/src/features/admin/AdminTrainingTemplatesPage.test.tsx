@@ -128,6 +128,11 @@ it("filters the library by day count and training level", async () => {
   expect(screen.getAllByText("نیازمند ویدیو و بازبینی")).toHaveLength(3);
   expect(screen.getAllByRole("link", { name: "جزئیات حرکت: پرس سینه دمبل" })).toHaveLength(3);
   expect(screen.getAllByRole("link", { name: "جزئیات حرکت: پلاور کابل" })).toHaveLength(3);
+  expect(screen.getAllByRole("link", { name: "ویرایش برنامه: تفکیک کلاسیک چهار روزه" })).toHaveLength(1);
+  expect(screen.getByRole("link", { name: "افزودن برنامه جدید" })).toHaveAttribute(
+    "href",
+    "/admin/training-program-templates/new?days=4&level=beginner",
+  );
   expect(screen.getAllByText("منطق برنامه")).toHaveLength(3);
   expect(screen.getAllByText("ترتیب حرکات")).toHaveLength(3);
   expect(adminApi.getAdminTrainingProgramTemplates).toHaveBeenCalledWith(4);

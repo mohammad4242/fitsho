@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.ai.models import AiModelTestOutcome, BillingClass, RoutingMode, ZenApiKind
 from app.exercises.enums import (
@@ -19,7 +19,7 @@ from app.exercises.enums import (
 )
 from app.exercises.schemas import ExerciseDetail
 from app.profile.enums import ExperienceLevel, FitnessGoal
-from app.training_templates.models import TrainingTemplateMethod
+from app.training_templates.models import TrainingTemplateMethod, TrainingTemplateSlotPriority
 
 Slug = Annotated[
     str,
@@ -35,6 +35,14 @@ TextItem = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
 OptionalMetadata = Annotated[
     str | None,
     StringConstraints(strip_whitespace=True, max_length=500),
+]
+FocusTag = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=80),
+]
+SourceUrl = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=8, max_length=500),
 ]
 
 
@@ -240,6 +248,8 @@ class AdminTrainingTemplateSlot(BaseModel):
     target_muscles: list[MuscleGroup]
     movement_pattern: MovementPattern
     intensity_method: TrainingTemplateMethod
+    adaptation_priority: TrainingTemplateSlotPriority
+    superset_group: str | None
     sets: int
     rep_min: int
     rep_max: int
@@ -284,3 +294,77 @@ class AdminTrainingProgramTemplate(BaseModel):
 
 class AdminTrainingProgramTemplatesResponse(BaseModel):
     items: list[AdminTrainingProgramTemplate]
+
+
+class AdminTrainingTemplateRationaleWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title_en: Name
+    title_fa: Name
+    detail_en: TextItem
+    detail_fa: TextItem
+
+
+class AdminTrainingTemplateSlotWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    exercise_id: UUID
+    display_name_en: Name | None = None
+    display_name_fa: Name | None = None
+    target_muscles: list[MuscleGroup] = Field(min_length=1)
+    movement_pattern: MovementPattern
+    intensity_method: TrainingTemplateMethod = TrainingTemplateMethod.STANDARD
+    adaptation_priority: TrainingTemplateSlotPriority = TrainingTemplateSlotPriority.CORE
+    superset_group: Annotated[
+        str | None,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=32),
+    ] = None
+    sets: int = Field(ge=1, le=10)
+    rep_min: int = Field(ge=1, le=100)
+    rep_max: int = Field(ge=1, le=100)
+    target_rir: int = Field(ge=0, le=6)
+    rest_seconds: int = Field(ge=0, le=600)
+
+    @model_validator(mode="after")
+    def validate_rep_range(self) -> "AdminTrainingTemplateSlotWrite":
+        if self.rep_min > self.rep_max:
+            raise ValueError("Minimum repetitions cannot exceed maximum repetitions")
+        return self
+
+
+class AdminTrainingTemplateDayWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title_en: Name
+    title_fa: Name
+    direct_target_muscles: list[MuscleGroup] = Field(min_length=1)
+    slots: list[AdminTrainingTemplateSlotWrite] = Field(min_length=5, max_length=9)
+
+
+class AdminTrainingProgramTemplateWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name_en: Name
+    name_fa: Name
+    description_en: TextItem
+    description_fa: TextItem
+    days_per_week: int = Field(ge=2, le=6)
+    training_level: ExperienceLevel
+    fitness_goal: FitnessGoal
+    focus_tags: list[FocusTag] = Field(min_length=1, max_length=12)
+    intensity_methods: list[TrainingTemplateMethod] = Field(min_length=1, max_length=3)
+    programming_rationale: list[AdminTrainingTemplateRationaleWrite] = Field(
+        min_length=5,
+        max_length=5,
+    )
+    source_name: Name
+    source_url: SourceUrl
+    days: list[AdminTrainingTemplateDayWrite]
+
+    @model_validator(mode="after")
+    def validate_program_shape(self) -> "AdminTrainingProgramTemplateWrite":
+        if len(self.days) != self.days_per_week:
+            raise ValueError("Program must contain one configured day per training day")
+        if len(self.intensity_methods) != len(set(self.intensity_methods)):
+            raise ValueError("Intensity methods must be unique")
+        return self

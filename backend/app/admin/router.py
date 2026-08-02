@@ -45,6 +45,7 @@ from app.admin.schemas import (
     AdminExerciseFilters,
     AdminTrainingProgramTemplate,
     AdminTrainingProgramTemplatesResponse,
+    AdminTrainingProgramTemplateWrite,
     AdminTrainingTemplateDay,
     AdminTrainingTemplateExercise,
     AdminTrainingTemplateSlot,
@@ -64,6 +65,12 @@ from app.exercises.enums import MediaPresentation, MediaRole, MediaType
 from app.exercises.models import Exercise
 from app.exercises.schemas import ExerciseMediaAssetDetail
 from app.exercises.taxonomy import MUSCLES_BY_REGION
+from app.training_templates.admin_service import (
+    TemplateWriteError,
+    create_training_program_template,
+    get_training_program_template,
+    update_training_program_template,
+)
 from app.training_templates.models import TrainingProgramTemplate
 from app.training_templates.service import list_training_program_templates
 from app.workouts.models import WorkoutPlanGeneration
@@ -179,6 +186,8 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
                         target_muscles=slot.target_muscles,
                         movement_pattern=slot.movement_pattern,
                         intensity_method=slot.intensity_method,
+                        adaptation_priority=slot.adaptation_priority,
+                        superset_group=slot.superset_group,
                         sets=slot.sets,
                         rep_min=slot.rep_min,
                         rep_max=slot.rep_max,
@@ -225,6 +234,61 @@ def read_training_program_templates(
     return AdminTrainingProgramTemplatesResponse(
         items=[_training_template_detail(template) for template in templates]
     )
+
+
+@router.get(
+    "/training-program-templates/{template_id}",
+    response_model=AdminTrainingProgramTemplate,
+)
+def read_training_program_template(
+    template_id: UUID,
+    db: DatabaseSession,
+) -> AdminTrainingProgramTemplate:
+    template = get_training_program_template(db, template_id)
+    if template is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Program template not found",
+        )
+    return _training_template_detail(template)
+
+
+@router.post(
+    "/training-program-templates",
+    response_model=AdminTrainingProgramTemplate,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def create_training_template(
+    payload: AdminTrainingProgramTemplateWrite,
+    db: DatabaseSession,
+) -> AdminTrainingProgramTemplate:
+    try:
+        return _training_template_detail(create_training_program_template(db, payload))
+    except TemplateWriteError as error:
+        raise _validation_error("days", str(error)) from None
+
+
+@router.put(
+    "/training-program-templates/{template_id}",
+    response_model=AdminTrainingProgramTemplate,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_training_template(
+    template_id: UUID,
+    payload: AdminTrainingProgramTemplateWrite,
+    db: DatabaseSession,
+) -> AdminTrainingProgramTemplate:
+    try:
+        template = update_training_program_template(db, template_id, payload)
+    except TemplateWriteError as error:
+        raise _validation_error("days", str(error)) from None
+    if template is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Program template not found",
+        )
+    return _training_template_detail(template)
 
 
 @router.get(
