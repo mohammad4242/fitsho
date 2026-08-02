@@ -30,3 +30,8 @@ class BodyPhotoSessionState(StrEnum):
 class BodyPhotoConsentType(StrEnum):
     OPERATIONAL_PROCESSING = "operational_processing"
     MODEL_TRAINING = "model_training"
+
+
+class BodyPhotoCleanupReason(StrEnum):
+    REPLACEMENT = "replacement"
+    SESSION_DELETE = "session_delete"

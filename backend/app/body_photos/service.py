@@ -9,15 +9,25 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
 from app.body_photos.enums import (
+    BodyPhotoCleanupReason,
     BodyPhotoConsentType,
     BodyPhotoPurpose,
     BodyPhotoSessionState,
     BodyPhotoView,
 )
 from app.body_photos.image_validation import NormalizedBodyPhoto, validate_and_normalize
-from app.body_photos.models import BodyPhoto, BodyPhotoConsent, BodyPhotoSession
+from app.body_photos.models import (
+    BodyPhoto,
+    BodyPhotoConsent,
+    BodyPhotoSession,
+    BodyPhotoStorageCleanup,
+)
 from app.body_photos.schemas import BodyPhotoConsentInput, BodyPhotoSubmit
-from app.body_photos.storage import BodyPhotoStorage
+from app.body_photos.storage import (
+    BodyPhotoStorage,
+    BodyPhotoStorageError,
+    BodyPhotoStorageProtocol,
+)
 from app.config import Settings
 
 EDITABLE_STATES = {
@@ -40,23 +50,41 @@ class BodyPhotoSessionStateError(ValueError):
     pass
 
 
+class BodyPhotoCleanupPendingError(RuntimeError):
+    pass
+
+
 class BodyPhotoService:
-    def __init__(self, db: Session, settings: Settings) -> None:
+    def __init__(
+        self,
+        db: Session,
+        settings: Settings,
+        storage: BodyPhotoStorageProtocol | None = None,
+    ) -> None:
         self._db = db
-        self.storage = BodyPhotoStorage(settings)
+        self.storage = storage or BodyPhotoStorage(settings)
         self._settings = settings
 
-    def _owner_session(self, session_id: UUID, user_id: UUID) -> BodyPhotoSession:
+    def _owner_session(
+        self,
+        session_id: UUID,
+        user_id: UUID,
+        *,
+        include_deleted: bool = False,
+    ) -> BodyPhotoSession:
+        conditions = [
+            BodyPhotoSession.id == session_id,
+            BodyPhotoSession.user_id == user_id,
+        ]
+        if not include_deleted:
+            conditions.append(BodyPhotoSession.state != BodyPhotoSessionState.DELETED)
         session = self._db.scalar(
             select(BodyPhotoSession)
-            .where(
-                BodyPhotoSession.id == session_id,
-                BodyPhotoSession.user_id == user_id,
-                BodyPhotoSession.state != BodyPhotoSessionState.DELETED,
-            )
+            .where(*conditions)
             .options(
                 selectinload(BodyPhotoSession.photos),
                 selectinload(BodyPhotoSession.consents),
+                selectinload(BodyPhotoSession.storage_cleanups),
             )
         )
         if session is None:
@@ -102,15 +130,26 @@ class BodyPhotoService:
         *,
         head_cropped: str | None,
         crop_confidence: str | None,
+        original_height: str | None,
+        crop_top: str | None,
+        crop_bottom: str | None,
+        processed_sha256: str | None,
+        crop_evidence_sha256: str | None,
     ) -> BodyPhotoSession:
         session = self._owner_session(session_id, user_id)
         if session.state not in EDITABLE_STATES:
             raise BodyPhotoSessionStateError
+        self._drain_pending_cleanup(session)
         normalized = validate_and_normalize(
             upload,
             self._settings,
             head_cropped=head_cropped,
             crop_confidence=crop_confidence,
+            original_height=original_height,
+            crop_top=crop_top,
+            crop_bottom=crop_bottom,
+            processed_sha256=processed_sha256,
+            crop_evidence_sha256=crop_evidence_sha256,
         )
         return self._store_photo(session, view, normalized)
 
@@ -133,6 +172,13 @@ class BodyPhotoService:
         existing.height = normalized.height
         existing.crop_confidence = normalized.crop_confidence
         existing.crop_geometry_verified = normalized.crop_geometry_verified
+        existing.crop_original_height = normalized.crop_original_height
+        existing.crop_top = normalized.crop_top
+        existing.crop_bottom = normalized.crop_bottom
+        existing.processed_sha256 = normalized.processed_sha256
+        existing.crop_evidence_sha256 = normalized.crop_evidence_sha256
+        if old_key is not None:
+            self._queue_cleanup(session, old_key, BodyPhotoCleanupReason.REPLACEMENT)
         session.state = BodyPhotoSessionState.UPLOADING
         try:
             self._db.flush()
@@ -146,11 +192,48 @@ class BodyPhotoService:
             self._db.commit()
         except SQLAlchemyError:
             self._db.rollback()
-            self.storage.delete(stored.key)
+            try:
+                self.storage.delete(stored.key)
+            except BodyPhotoStorageError:
+                pass
             raise
-        if old_key is not None:
-            self.storage.delete(old_key)
+        refreshed = self._owner_session(session.id, session.user_id)
+        self._drain_pending_cleanup(refreshed)
         return self._owner_session(session.id, session.user_id)
+
+    def _queue_cleanup(
+        self,
+        session: BodyPhotoSession,
+        storage_key: str,
+        reason: BodyPhotoCleanupReason,
+    ) -> None:
+        if any(item.storage_key == storage_key for item in session.storage_cleanups):
+            return
+        session.storage_cleanups.append(
+            BodyPhotoStorageCleanup(storage_key=storage_key, reason=reason)
+        )
+
+    def _drain_pending_cleanup(self, session: BodyPhotoSession) -> bool:
+        failed = False
+        for cleanup in list(session.storage_cleanups):
+            try:
+                self.storage.delete(cleanup.storage_key)
+            except BodyPhotoStorageError:
+                cleanup.attempts += 1
+                cleanup.last_attempt_at = datetime.now(UTC)
+                failed = True
+            else:
+                self._db.delete(cleanup)
+        try:
+            self._db.commit()
+        except SQLAlchemyError:
+            self._db.rollback()
+            raise
+        return not failed
+
+    def retry_pending_cleanup(self, session_id: UUID, user_id: UUID) -> bool:
+        session = self._owner_session(session_id, user_id, include_deleted=True)
+        return self._drain_pending_cleanup(session)
 
     def submit(
         self,
@@ -216,16 +299,22 @@ class BodyPhotoService:
         return event
 
     def delete_session(self, session_id: UUID, user_id: UUID) -> None:
-        session = self._owner_session(session_id, user_id)
-        keys = [photo.storage_key for photo in session.photos]
-        session.state = BodyPhotoSessionState.DELETED
-        session.deleted_at = datetime.now(UTC)
-        for photo in list(session.photos):
-            self._db.delete(photo)
-        try:
-            self._db.commit()
-        except SQLAlchemyError:
-            self._db.rollback()
-            raise
-        for key in keys:
-            self.storage.delete(key)
+        session = self._owner_session(session_id, user_id, include_deleted=True)
+        if session.state is not BodyPhotoSessionState.DELETED:
+            for photo in list(session.photos):
+                self._queue_cleanup(
+                    session,
+                    photo.storage_key,
+                    BodyPhotoCleanupReason.SESSION_DELETE,
+                )
+                self._db.delete(photo)
+            session.state = BodyPhotoSessionState.DELETED
+            session.deleted_at = datetime.now(UTC)
+            try:
+                self._db.commit()
+            except SQLAlchemyError:
+                self._db.rollback()
+                raise
+            session = self._owner_session(session_id, user_id, include_deleted=True)
+        if not self._drain_pending_cleanup(session):
+            raise BodyPhotoCleanupPendingError

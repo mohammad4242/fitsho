@@ -17,10 +17,12 @@ from sqlalchemy import (
     UniqueConstraint,
     false,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.body_photos.enums import (
+    BodyPhotoCleanupReason,
     BodyPhotoConsentType,
     BodyPhotoPurpose,
     BodyPhotoSessionState,
@@ -88,6 +90,12 @@ class BodyPhotoSession(Base):
         passive_deletes=True,
         order_by="BodyPhotoConsent.recorded_at",
     )
+    storage_cleanups: Mapped[list[BodyPhotoStorageCleanup]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="BodyPhotoStorageCleanup.created_at",
+    )
 
 
 class BodyPhoto(Base):
@@ -99,6 +107,26 @@ class BodyPhoto(Base):
         CheckConstraint(
             "crop_confidence >= 0 AND crop_confidence <= 1",
             name="ck_body_photos_crop_confidence_range",
+        ),
+        CheckConstraint(
+            "crop_original_height IS NULL OR crop_original_height > 0",
+            name="ck_body_photos_crop_original_height_positive",
+        ),
+        CheckConstraint(
+            "crop_top IS NULL OR crop_top >= 0",
+            name="ck_body_photos_crop_top_nonnegative",
+        ),
+        CheckConstraint(
+            "crop_bottom IS NULL OR crop_bottom > crop_top",
+            name="ck_body_photos_crop_bottom_after_top",
+        ),
+        CheckConstraint(
+            "NOT crop_geometry_verified OR "
+            "(crop_original_height IS NOT NULL AND crop_top IS NOT NULL AND "
+            "crop_bottom IS NOT NULL AND crop_bottom <= crop_original_height AND "
+            "crop_bottom - crop_top = height AND char_length(processed_sha256) = 64 AND "
+            "char_length(crop_evidence_sha256) = 64)",
+            name="ck_body_photos_verified_crop_evidence_complete",
         ),
     )
 
@@ -126,6 +154,11 @@ class BodyPhoto(Base):
     crop_geometry_verified: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=false(), nullable=False
     )
+    crop_original_height: Mapped[int | None] = mapped_column(Integer)
+    crop_top: Mapped[int | None] = mapped_column(Integer)
+    crop_bottom: Mapped[int | None] = mapped_column(Integer)
+    processed_sha256: Mapped[str | None] = mapped_column(String(64))
+    crop_evidence_sha256: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -172,3 +205,43 @@ class BodyPhotoConsent(Base):
     )
 
     session: Mapped[BodyPhotoSession] = relationship(back_populates="consents")
+
+
+class BodyPhotoStorageCleanup(Base):
+    """Durable private-object cleanup work retained across storage failures."""
+
+    __tablename__ = "body_photo_storage_cleanups"
+    __table_args__ = (
+        CheckConstraint(
+            "attempts >= 0", name="ck_body_photo_storage_cleanups_attempts_nonnegative"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("body_photo_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    storage_key: Mapped[str] = mapped_column(String(160), unique=True, nullable=False)
+    reason: Mapped[BodyPhotoCleanupReason] = mapped_column(
+        Enum(
+            BodyPhotoCleanupReason,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_body_photo_storage_cleanups_reason_values",
+        ),
+        nullable=False,
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default=text("0"),
+        nullable=False,
+    )
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    session: Mapped[BodyPhotoSession] = relationship(back_populates="storage_cleanups")

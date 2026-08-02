@@ -4,7 +4,7 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import BinaryIO
+from typing import BinaryIO, Protocol
 from uuid import uuid4
 
 from app.config import Settings
@@ -17,7 +17,14 @@ class BodyPhotoStorageError(RuntimeError):
 @dataclass(frozen=True)
 class StoredBodyPhoto:
     key: str
-    path: Path
+
+
+class BodyPhotoStorageProtocol(Protocol):
+    def store(self, content: bytes, extension: str) -> StoredBodyPhoto: ...
+
+    def open(self, key: str) -> BinaryIO: ...
+
+    def delete(self, key: str) -> None: ...
 
 
 class BodyPhotoStorage:
@@ -57,7 +64,7 @@ class BodyPhotoStorage:
             if temporary_path is not None:
                 temporary_path.unlink(missing_ok=True)
             raise BodyPhotoStorageError("Private storage is temporarily unavailable") from error
-        return StoredBodyPhoto(key=key, path=final_path)
+        return StoredBodyPhoto(key=key)
 
     def open(self, key: str) -> BinaryIO:
         try:

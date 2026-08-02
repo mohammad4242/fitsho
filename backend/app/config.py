@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     body_photo_storage_root: Path = Path("var/private/body-photos")
     body_photo_max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=20 * 1024 * 1024)
     body_photo_max_pixels: int = Field(default=20_000_000, ge=1, le=40_000_000)
+    body_photo_min_width: int = Field(default=256, ge=64, le=4096)
+    body_photo_min_height: int = Field(default=512, ge=64, le=8192)
+    body_photo_min_crop_top_ratio: float = Field(default=0.15, ge=0.05, le=0.5)
     body_photo_read_chunk_bytes: int = Field(default=1024 * 1024, ge=1024, le=4 * 1024 * 1024)
     ffprobe_path: str = "ffprobe"
     ffprobe_timeout_seconds: float = 5.0

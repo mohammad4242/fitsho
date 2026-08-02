@@ -44,6 +44,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "Content-Type",
             "X-Fitsho-Head-Cropped",
             "X-Fitsho-Crop-Confidence",
+            "X-Fitsho-Original-Height",
+            "X-Fitsho-Crop-Top",
+            "X-Fitsho-Crop-Bottom",
+            "X-Fitsho-Processed-SHA256",
+            "X-Fitsho-Crop-Evidence-SHA256",
         ],
     )
 

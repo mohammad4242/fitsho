@@ -32,6 +32,7 @@ from app.body_photos.schemas import (
     BodyPhotoSubmit,
 )
 from app.body_photos.service import (
+    BodyPhotoCleanupPendingError,
     BodyPhotoService,
     BodyPhotoSessionNotFoundError,
     BodyPhotoSessionStateError,
@@ -161,6 +162,14 @@ def upload_photo(
     file: Annotated[UploadFile, File()],
     head_cropped: Annotated[str | None, Header(alias="X-Fitsho-Head-Cropped")] = None,
     crop_confidence: Annotated[str | None, Header(alias="X-Fitsho-Crop-Confidence")] = None,
+    original_height: Annotated[str | None, Header(alias="X-Fitsho-Original-Height")] = None,
+    crop_top: Annotated[str | None, Header(alias="X-Fitsho-Crop-Top")] = None,
+    crop_bottom: Annotated[str | None, Header(alias="X-Fitsho-Crop-Bottom")] = None,
+    processed_sha256: Annotated[str | None, Header(alias="X-Fitsho-Processed-SHA256")] = None,
+    crop_evidence_sha256: Annotated[
+        str | None,
+        Header(alias="X-Fitsho-Crop-Evidence-SHA256"),
+    ] = None,
 ) -> BodyPhotoSessionResponse:
     try:
         session = BodyPhotoService(db, settings).upload_processed_photo(
@@ -170,6 +179,11 @@ def upload_photo(
             file,
             head_cropped=head_cropped,
             crop_confidence=crop_confidence,
+            original_height=original_height,
+            crop_top=crop_top,
+            crop_bottom=crop_bottom,
+            processed_sha256=processed_sha256,
+            crop_evidence_sha256=crop_evidence_sha256,
         )
         return _session_response(session)
     except BodyPhotoSessionNotFoundError:
@@ -264,6 +278,11 @@ def delete_session(
     except BodyPhotoSessionNotFoundError:
         raise _not_found() from None
     except BodyPhotoStorageError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable",
+        ) from None
+    except BodyPhotoCleanupPendingError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service temporarily unavailable",

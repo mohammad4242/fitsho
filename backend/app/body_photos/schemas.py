@@ -1,9 +1,21 @@
 from datetime import datetime
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.body_photos.enums import BodyPhotoPurpose, BodyPhotoSessionState, BodyPhotoView
+
+Sha256Hex = Annotated[str, StringConstraints(pattern=r"^[0-9a-fA-F]{64}$")]
+
+
+class BodyPhotoCropEvidenceInput(BaseModel):
+    confidence: float = Field(ge=0.8, le=1.0)
+    original_height: int = Field(gt=0)
+    crop_top: int = Field(ge=0)
+    crop_bottom: int = Field(gt=0)
+    processed_sha256: Sha256Hex
+    crop_evidence_sha256: Sha256Hex
 
 
 class BodyPhotoSessionCreate(BaseModel):

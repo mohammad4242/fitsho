@@ -1,3 +1,4 @@
+import hashlib
 import struct
 import zlib
 from pathlib import Path
@@ -10,14 +11,13 @@ from sqlalchemy.orm import Session
 from app.config import Settings
 
 ORIGIN = {"Origin": "http://localhost:5173"}
-CROP_HEADERS = {
-    **ORIGIN,
-    "X-Fitsho-Head-Cropped": "true",
-    "X-Fitsho-Crop-Confidence": "0.97",
-}
 
 
-def _png(width: int = 4, height: int = 8, color: tuple[int, int, int] = (20, 40, 60)) -> bytes:
+def _png(
+    width: int = 320,
+    height: int = 640,
+    color: tuple[int, int, int] = (20, 40, 60),
+) -> bytes:
     def chunk(kind: bytes, payload: bytes) -> bytes:
         return (
             struct.pack(">I", len(payload))
@@ -34,6 +34,29 @@ def _png(width: int = 4, height: int = 8, color: tuple[int, int, int] = (20, 40,
         + chunk(b"IDAT", zlib.compress(rows))
         + chunk(b"IEND", b"")
     )
+
+
+def _crop_headers(
+    content: bytes,
+    *,
+    output_height: int = 640,
+    original_height: int = 800,
+    crop_top: int = 160,
+    crop_bottom: int | None = None,
+) -> dict[str, str]:
+    bottom = crop_bottom if crop_bottom is not None else crop_top + output_height
+    processed_sha256 = hashlib.sha256(content).hexdigest()
+    evidence = f"v1:{processed_sha256}:{original_height}:{crop_top}:{bottom}"
+    return {
+        **ORIGIN,
+        "X-Fitsho-Head-Cropped": "true",
+        "X-Fitsho-Crop-Confidence": "0.97",
+        "X-Fitsho-Original-Height": str(original_height),
+        "X-Fitsho-Crop-Top": str(crop_top),
+        "X-Fitsho-Crop-Bottom": str(bottom),
+        "X-Fitsho-Processed-SHA256": processed_sha256,
+        "X-Fitsho-Crop-Evidence-SHA256": hashlib.sha256(evidence.encode()).hexdigest(),
+    }
 
 
 def _register(client: TestClient, email: str) -> None:
@@ -77,10 +100,11 @@ def _upload(
     headers: dict[str, str] | None = None,
     content_type: str = "image/png",
 ) -> object:
+    payload = content or _png()
     return client.put(
         f"/api/v1/body-photo-sessions/{session_id}/photos/{view}",
-        headers=headers or CROP_HEADERS,
-        files={"file": (f"{view}.png", content or _png(), content_type)},
+        headers=headers or _crop_headers(payload),
+        files={"file": (f"{view}.png", payload, content_type)},
     )
 
 
@@ -118,6 +142,11 @@ def test_every_session_mutation_rejects_missing_trusted_origin(client: TestClien
         headers={
             "X-Fitsho-Head-Cropped": "true",
             "X-Fitsho-Crop-Confidence": "0.97",
+            "X-Fitsho-Original-Height": "800",
+            "X-Fitsho-Crop-Top": "160",
+            "X-Fitsho-Crop-Bottom": "800",
+            "X-Fitsho-Processed-SHA256": hashlib.sha256(_png()).hexdigest(),
+            "X-Fitsho-Crop-Evidence-SHA256": "unused-without-trusted-origin",
         },
         files={"file": ("front.png", _png(), "image/png")},
     )
@@ -146,7 +175,9 @@ def test_upload_cors_preflight_allows_private_photo_headers(client: TestClient) 
             "Origin": "http://localhost:5173",
             "Access-Control-Request-Method": "PUT",
             "Access-Control-Request-Headers": (
-                "content-type,x-fitsho-head-cropped,x-fitsho-crop-confidence"
+                "content-type,x-fitsho-head-cropped,x-fitsho-crop-confidence,"
+                "x-fitsho-original-height,x-fitsho-crop-top,x-fitsho-crop-bottom,"
+                "x-fitsho-processed-sha256,x-fitsho-crop-evidence-sha256"
             ),
         },
     )
@@ -154,6 +185,10 @@ def test_upload_cors_preflight_allows_private_photo_headers(client: TestClient) 
     assert response.status_code == 200
     assert "PUT" in response.headers["access-control-allow-methods"]
     assert "x-fitsho-head-cropped" in response.headers["access-control-allow-headers"].lower()
+    assert "x-fitsho-processed-sha256" in response.headers["access-control-allow-headers"].lower()
+    assert (
+        "x-fitsho-crop-evidence-sha256" in response.headers["access-control-allow-headers"].lower()
+    )
 
 
 def test_owner_can_create_list_and_read_safe_session_dtos(client: TestClient) -> None:
