@@ -8,6 +8,7 @@ from app.workouts.program_engine.schemas import (
     NormalizedProgramRequest,
     ProgrammedExercise,
     TemplateReference,
+    TemplateReferenceDay,
     TemplateReferenceSlot,
     WorkoutDay,
 )
@@ -92,6 +93,18 @@ def build_template_sessions(
                 )
             )
 
+        _add_targeted_accessories(
+            selected,
+            reference_day,
+            eligible,
+            used,
+            ruleset.minimum_exercises_per_session,
+        )
+        if not ruleset.minimum_exercises_per_session <= len(selected) <= (
+            ruleset.max_exercises_per_session
+        ):
+            return None
+
         while (
             _minutes(selected, ruleset) + ruleset.general_warmup_minutes
             > request.source.session_duration_minutes
@@ -109,6 +122,9 @@ def build_template_sessions(
                 return None
             selected.pop(removable)
 
+        if len(selected) < ruleset.minimum_exercises_per_session:
+            return None
+
         exercises = tuple(
             _programmed(candidate, slot, order, ruleset)
             for order, (candidate, slot) in enumerate(selected, start=1)
@@ -125,6 +141,47 @@ def build_template_sessions(
             )
         )
     return tuple(days)
+
+
+def _add_targeted_accessories(
+    selected: list[tuple[ExerciseCandidate, TemplateReferenceSlot]],
+    reference_day: TemplateReferenceDay,
+    eligible: tuple[ExerciseCandidate, ...],
+    used: Counter[object],
+    minimum_exercises: int,
+) -> None:
+    target_muscles = reference_day.focus
+    while len(selected) < minimum_exercises:
+        candidate = next(
+            (
+                item
+                for item in eligible
+                if not used[item.id] and item.primary_muscle in target_muscles
+            ),
+            None,
+        )
+        if candidate is None:
+            return
+        selected.append(
+            (
+                candidate,
+                TemplateReferenceSlot(
+                    exercise_id=candidate.id,
+                    exercise_slug_hint="engine-targeted-accessory",
+                    target_muscles=target_muscles,
+                    movement_pattern=candidate.movement_pattern,
+                    intensity_method="standard",
+                    adaptation_priority="accessory",
+                    superset_group=None,
+                    sets=2,
+                    rep_min=8,
+                    rep_max=15,
+                    target_rir=2,
+                    rest_seconds=60,
+                ),
+            )
+        )
+        used[candidate.id] += 1
 
 
 def _programmed(

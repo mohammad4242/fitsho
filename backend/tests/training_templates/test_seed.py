@@ -63,6 +63,12 @@ def test_active_library_offers_two_through_six_days_and_only_full_body_two_day_t
             )
 
 
+def test_every_template_session_contains_between_five_and_nine_exercises() -> None:
+    for template in TRAINING_PROGRAM_TEMPLATE_SEEDS:
+        for day in template.days:
+            assert 5 <= len(day.slots) <= 9, f"{template.slug}: {day.title_en}"
+
+
 def test_seed_expands_four_and_five_day_reference_library_across_levels(db: Session) -> None:
     seed_exercises(db)
 

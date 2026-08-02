@@ -2,6 +2,9 @@ from dataclasses import dataclass, field
 
 from app.workouts.program_engine.enums import Goal, SplitType, TrainingStatus
 
+MINIMUM_EXERCISES_PER_SESSION = 5
+MAXIMUM_EXERCISES_PER_SESSION = 9
+
 
 @dataclass(frozen=True)
 class PrescriptionRule:
@@ -74,8 +77,8 @@ class ProgramRuleset:
             TrainingStatus.ADVANCED: 28,
         }
     )
-    max_exercises_per_session: int = 8
-    minimum_exercises_per_session: int = 3
+    max_exercises_per_session: int = MAXIMUM_EXERCISES_PER_SESSION
+    minimum_exercises_per_session: int = MINIMUM_EXERCISES_PER_SESSION
     minutes_per_exercise_slot: int = 7
     minimum_session_work_minutes: int = 10
     minimum_exercise_budget_minutes: int = 3

@@ -40,6 +40,7 @@ def prescribe_sessions(
         if volume.direct_sets_for(muscle) > 0
     }
     days: list[WorkoutDay] = []
+    compact_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
     for draft in drafts:
         exercise_count = max(1, len(draft.exercises))
         available = max(
@@ -53,8 +54,10 @@ def prescribe_sessions(
             available // exercise_count,
         )
         programmed: list[ProgrammedExercise] = []
+        direct_session_sets: Counter[object] = Counter()
         for exercise in draft.exercises:
             primary_muscle = exercise.primary_muscle
+            counts_toward_volume = True
             if primary_muscle in allocations:
                 sets = next(allocations[primary_muscle])
             else:
@@ -63,15 +66,33 @@ def prescribe_sessions(
                     ruleset.default_untracked_muscle_sets,
                 )
             if sets == 0:
-                continue
+                sets = ruleset.default_untracked_muscle_sets
+                counts_toward_volume = False
+            if primary_muscle is not None and counts_toward_volume:
+                remaining_direct_sets = (
+                    ruleset.max_sets_per_muscle_per_session
+                    - direct_session_sets[primary_muscle]
+                )
+                if remaining_direct_sets < ruleset.minimum_working_sets:
+                    sets = ruleset.default_untracked_muscle_sets
+                    counts_toward_volume = False
+                else:
+                    sets = min(sets, remaining_direct_sets)
+                    direct_session_sets[primary_muscle] += sets
             rep_min, rep_max, rir, rest = _prescription_for(
                 request.primary_goal,
                 exercise.exercise_type,
                 request.training_status,
                 ruleset,
             )
+            if compact_session:
+                rest = ruleset.minimum_rest_seconds
             warmup_sets = 0
-            if not programmed and exercise.exercise_type is ExerciseType.COMPOUND:
+            if (
+                not compact_session
+                and not programmed
+                and exercise.exercise_type is ExerciseType.COMPOUND
+            ):
                 warmup_sets = (
                     ruleset.strength_compound_warmup_sets
                     if request.primary_goal is Goal.STRENGTH
@@ -94,9 +115,13 @@ def prescribe_sessions(
                     target_rir=rir,
                     rest_seconds=rest,
                     estimated_minutes=estimate_exercise_minutes(sets, rest, warmup_sets, ruleset),
-                    reason_codes=draft.selection_reasons[exercise.id],
+                    reason_codes=(
+                        draft.selection_reasons[exercise.id]
+                        + (("SESSION_SIZE_ACCESSORY",) if not counts_toward_volume else ())
+                    ),
                     substitution_exercise_ids=draft.substitutions[exercise.id],
                     warmup_sets=warmup_sets,
+                    counts_toward_volume=counts_toward_volume,
                     movement_pattern=exercise.movement_pattern,
                     primary_muscle=exercise.primary_muscle,
                     secondary_muscles=exercise.secondary_muscles,

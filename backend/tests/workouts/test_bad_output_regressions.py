@@ -32,12 +32,17 @@ def test_regression_three_day_novice_is_not_push_pull_legs() -> None:
     assert all(day.focus.startswith("full_body") for day in result.program.weekly_schedule)
 
 
-def test_regression_thirty_minute_session_is_not_overfilled() -> None:
+def test_regression_thirty_minute_session_keeps_the_exercise_count_floor() -> None:
     source = request(session_duration_minutes=30)
     result = generate_program(source, full_catalog(), RULESET)
 
     assert result.program is not None, result.errors
-    assert all(len(day.exercises) <= 3 for day in result.program.weekly_schedule)
+    assert all(
+        RULESET.minimum_exercises_per_session
+        <= len(day.exercises)
+        <= RULESET.max_exercises_per_session
+        for day in result.program.weekly_schedule
+    )
     assert all(day.estimated_duration_minutes <= 35 for day in result.program.weekly_schedule)
 
 

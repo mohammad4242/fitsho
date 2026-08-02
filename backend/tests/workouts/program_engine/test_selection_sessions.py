@@ -206,7 +206,7 @@ def test_full_body_session_covers_required_patterns_and_priority_is_first() -> N
     )
 
 
-def test_short_session_is_trimmed_to_realistic_exercise_count() -> None:
+def test_short_session_keeps_the_minimum_exercise_count() -> None:
     request = normalized(session_duration_minutes=25)
     eligible = filter_eligible_exercises(request, _full_body_catalog()).eligible
     split = select_split(request, RULESET)
@@ -214,7 +214,7 @@ def test_short_session_is_trimmed_to_realistic_exercise_count() -> None:
 
     sessions = build_sessions(request, split, volume, eligible, RULESET)
 
-    assert len(sessions[0].exercises) <= 3
+    assert len(sessions[0].exercises) == RULESET.minimum_exercises_per_session
     assert "SESSION_TRIMMED_FOR_TIME_LIMIT" in sessions[0].reason_codes
 
 

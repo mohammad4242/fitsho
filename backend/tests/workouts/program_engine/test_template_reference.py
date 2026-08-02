@@ -64,7 +64,11 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
                 (
                     ("Chest", (MuscleGroup.CHEST,), MovementPattern.HORIZONTAL_PUSH),
                     ("Back", (MuscleGroup.BACK,), MovementPattern.HORIZONTAL_PULL),
-                    ("Legs", (MuscleGroup.QUADRICEPS,), MovementPattern.SQUAT),
+                    (
+                        "Legs",
+                        (MuscleGroup.QUADRICEPS, MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES),
+                        MovementPattern.SQUAT,
+                    ),
                     ("Core", (MuscleGroup.ABS,), MovementPattern.CORE_ANTI_EXTENSION),
                 ),
                 start=1,

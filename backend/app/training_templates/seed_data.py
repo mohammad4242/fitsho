@@ -3,6 +3,10 @@ from dataclasses import dataclass, replace
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.profile.enums import ExperienceLevel, FitnessGoal
 from app.training_templates.models import TrainingTemplateMethod, TrainingTemplateSlotPriority
+from app.workouts.program_engine.rulesets.resistance_training_v1 import (
+    MAXIMUM_EXERCISES_PER_SESSION,
+    MINIMUM_EXERCISES_PER_SESSION,
+)
 
 
 @dataclass(frozen=True)
@@ -377,6 +381,15 @@ SIDE_PLANK = _slot(
     reps=(8, 12),
     rest=45,
 )
+PALLOF_PRESS = _slot(
+    "pallof-press",
+    (M.ABS,),
+    P.CORE_ANTI_ROTATION,
+    placeholder_en="Pallof Press",
+    placeholder_fa="پالوف پرس",
+    reps=(10, 15),
+    rest=45,
+)
 
 _SPECIALIZED_LARGE_TARGETS: tuple[tuple[str, tuple[MuscleGroup, ...]], ...] = (
     ("Chest", (M.CHEST,)),
@@ -407,7 +420,7 @@ _MOVEMENT_FLOOR_SLOTS: dict[tuple[MuscleGroup, ...], tuple[TemplateSlotSeed, ...
     (M.TRICEPS,): (TRICEPS, PUSH_DOWN, SKULL_CRUSHER, ROPE_OVERHEAD_EXTENSION),
     (M.TRAPS,): (SHRUG, BARBELL_SHRUG),
     (M.CALVES,): (CALF, SEATED_CALF_RAISE),
-    (M.ABS,): (CORE, SIDE_PLANK),
+    (M.ABS,): (CORE, SIDE_PLANK, PALLOF_PRESS),
 }
 
 
@@ -449,6 +462,78 @@ def _specialized_day_movement_floors(day: TemplateDaySeed) -> TemplateDaySeed:
     return replace(day, slots=tuple(slots))
 
 
+def _fit_template_session_exercise_count(
+    template: TrainingProgramTemplateSeed,
+) -> TrainingProgramTemplateSeed:
+    return replace(
+        template,
+        days=tuple(_fit_template_day_exercise_count(day) for day in template.days),
+    )
+
+
+def _fit_template_day_exercise_count(day: TemplateDaySeed) -> TemplateDaySeed:
+    slots = list(day.slots)
+    minimums = _direct_movement_minimums(day)
+    while len(slots) > MAXIMUM_EXERCISES_PER_SESSION:
+        removable = next(
+            (
+                index
+                for index in range(len(slots) - 1, -1, -1)
+                if _can_remove_slot(slots, index, minimums)
+            ),
+            None,
+        )
+        if removable is None:
+            raise ValueError(f"Template session cannot fit exercise limit: {day.title_en}")
+        slots.pop(removable)
+
+    candidates = tuple(
+        candidate
+        for muscle in day.direct_target_muscles
+        for candidate in _MOVEMENT_FLOOR_SLOTS.get((muscle,), ())
+    )
+    while len(slots) < MINIMUM_EXERCISES_PER_SESSION:
+        candidate = next(
+            (
+                item
+                for item in candidates
+                if all(slot.exercise_slug_hint != item.exercise_slug_hint for slot in slots)
+            ),
+            None,
+        )
+        if candidate is None:
+            raise ValueError(f"Template session lacks eligible exercise variety: {day.title_en}")
+        slots.append(candidate)
+    return replace(day, slots=tuple(slots))
+
+
+def _direct_movement_minimums(day: TemplateDaySeed) -> dict[tuple[MuscleGroup, ...], int]:
+    minimums: dict[tuple[MuscleGroup, ...], int] = {}
+    for label, muscles in _SPECIALIZED_LARGE_TARGETS:
+        if label in day.title_en:
+            minimums[muscles] = 3
+    for label, muscles in _SPECIALIZED_SMALL_TARGETS:
+        if label in day.title_en:
+            if label == "Arms":
+                for muscle in muscles:
+                    minimums[(muscle,)] = 2
+            else:
+                minimums[muscles] = 2
+    return minimums
+
+
+def _can_remove_slot(
+    slots: list[TemplateSlotSeed],
+    index: int,
+    minimums: dict[tuple[MuscleGroup, ...], int],
+) -> bool:
+    remaining = slots[:index] + slots[index + 1 :]
+    return all(
+        sum(bool(set(slot.target_muscles).intersection(muscles)) for slot in remaining) >= minimum
+        for muscles, minimum in minimums.items()
+    )
+
+
 def _day(
     title_en: str,
     title_fa: str,
@@ -487,7 +572,7 @@ def _template(
 
 
 TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple(
-    _specialized_template_movement_floors(template)
+    _fit_template_session_exercise_count(_specialized_template_movement_floors(template))
     for template in (
     _template(
         "two-day-full-body-foundation",

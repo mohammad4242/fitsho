@@ -1,6 +1,8 @@
 from dataclasses import replace
 from uuid import uuid4
 
+import pytest
+
 from app.exercises.enums import (
     Difficulty,
     Equipment,
@@ -28,6 +30,7 @@ from app.workouts.program_engine.schemas import ExerciseCandidate, ProgramGenera
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from app.workouts.program_engine.volume_repair import repair_weekly_volume
+from workouts.program_engine.golden_fixtures import full_catalog
 
 
 def request(**overrides: object) -> ProgramGenerationRequest:
@@ -175,12 +178,12 @@ def test_four_day_program_does_not_round_each_muscle_exposure_up() -> None:
         training_experience=TrainingExperience.INTERMEDIATE,
         training_age_months=30,
         available_training_days=4,
+        available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
     )
 
     result = generate_program(
         source,
-        catalog()
-        + [exercise("press", MovementPattern.VERTICAL_PUSH, MuscleGroup.SHOULDERS)],
+        full_catalog(),
         RULESET,
     )
 
@@ -308,6 +311,23 @@ def test_validator_rejects_duration_overrun() -> None:
     report = validate_program(invalid, source, RULESET)
 
     assert "SESSION_DURATION_EXCEEDED" in report.errors
+
+
+@pytest.mark.parametrize("exercise_count", (4, 10))
+def test_validator_rejects_session_exercise_counts_outside_the_ruleset(
+    exercise_count: int,
+) -> None:
+    source = request()
+    result = generate_program(source, catalog(), RULESET)
+    assert result.program is not None
+    day = result.program.weekly_schedule[0]
+    invalid_exercises = (day.exercises * exercise_count)[:exercise_count]
+    invalid_day = replace(day, exercises=invalid_exercises)
+    invalid = replace(result.program, weekly_schedule=(invalid_day,))
+
+    report = validate_program(invalid, source, RULESET)
+
+    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors
 
 
 def test_validator_rejects_adjacent_full_body_sessions() -> None:

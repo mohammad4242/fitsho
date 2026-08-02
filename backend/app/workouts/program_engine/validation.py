@@ -23,6 +23,10 @@ def validate_program(
     direct_sets: Counter[str] = Counter()
     direct_session_frequency: Counter[str] = Counter()
     for day in program.weekly_schedule:
+        if not ruleset.minimum_exercises_per_session <= len(day.exercises) <= (
+            ruleset.max_exercises_per_session
+        ):
+            errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
         if day.estimated_duration_minutes > (
             request.session_duration_minutes + ruleset.duration_tolerance_minutes
         ):
