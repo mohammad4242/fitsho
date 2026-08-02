@@ -267,6 +267,41 @@ class RankedCandidate:
 
 
 @dataclass(frozen=True)
+class TemplateReferenceSlot:
+    exercise_id: UUID | None
+    exercise_slug_hint: str
+    target_muscles: tuple[MuscleGroup, ...]
+    movement_pattern: MovementPattern
+    intensity_method: str
+    adaptation_priority: str
+    superset_group: str | None
+    sets: int
+    rep_min: int
+    rep_max: int
+    target_rir: int
+    rest_seconds: int
+
+
+@dataclass(frozen=True)
+class TemplateReferenceDay:
+    day_number: int
+    title: str
+    focus: tuple[MuscleGroup, ...]
+    slots: tuple[TemplateReferenceSlot, ...]
+
+
+@dataclass(frozen=True)
+class TemplateReference:
+    slug: str
+    days_per_week: int
+    training_level: str
+    fitness_goal: str
+    focus_tags: tuple[str, ...]
+    intensity_methods: tuple[str, ...]
+    days: tuple[TemplateReferenceDay, ...]
+
+
+@dataclass(frozen=True)
 class ProgrammedExercise:
     exercise_id: UUID
     exercise_name: str
