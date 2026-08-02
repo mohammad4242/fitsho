@@ -78,6 +78,8 @@
 .admin-ai-diagnostic code { direction: ltr; unicode-bidi: isolate; }
 .admin-ai-custom-form { margin: 0; }.admin-ai-custom-form .admin-form-section { margin: 0; }
 .admin-main--templates { display: grid; gap: 1.5rem; }
+.admin-template-filters { display: grid; gap: .9rem; padding: 1rem 1.1rem; border: 1px solid rgb(22 91 84 / 14%); border-radius: 1.2rem; background: rgb(255 255 255 / 72%); }
+.admin-template-filter-group { display: grid; gap: .5rem; }.admin-template-filter-group > span { color: var(--petrol-900); font-size: .78rem; font-weight: 900; }
 .admin-template-tabs { display: flex; flex-wrap: wrap; gap: .55rem; }
 .admin-template-tabs button { min-width: 5.5rem; padding: .65rem 1rem; border: 1px solid var(--line); border-radius: 999px; color: var(--petrol-900); background: rgb(255 255 255 / 82%); cursor: pointer; font-weight: 800; }
 .admin-template-tabs button[aria-selected="true"] { color: var(--paper); background: var(--petrol-800); }

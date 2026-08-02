@@ -53,13 +53,31 @@ const template = {
   }],
 };
 
+const templates = [
+  template,
+  {
+    ...template,
+    id: "2",
+    slug: "four-day-beginner-foundation",
+    name_fa: "پایه چهارروزه مبتدی",
+    training_level: "beginner" as const,
+  },
+  {
+    ...template,
+    id: "3",
+    slug: "four-day-advanced-chest",
+    name_fa: "تخصصی سینه چهارروزه پیشرفته",
+    training_level: "advanced" as const,
+  },
+];
+
 beforeEach(() => {
   adminApi.getAdminTrainingProgramTemplates.mockReset();
 });
 
-it("filters the library by day count and shows resolved and missing exercise slots", async () => {
+it("filters the library by day count and training level", async () => {
   adminApi.getAdminTrainingProgramTemplates.mockImplementation((days: number) => (
-    days === 4 ? Promise.resolve({ items: [template] }) : new Promise(() => {})
+    days === 4 ? Promise.resolve({ items: templates }) : new Promise(() => {})
   ));
   const user = userEvent.setup();
   render(
@@ -68,13 +86,18 @@ it("filters the library by day count and shows resolved and missing exercise slo
     </MemoryRouter>,
   );
 
-  await user.click(screen.getByRole("tab", { name: "4 روز" }));
+  await user.click(screen.getByRole("tab", { name: "4 روزه" }));
 
   expect(await screen.findByText("تفکیک کلاسیک چهار روزه")).toBeInTheDocument();
-  expect(screen.getByText("متوسط")).toBeInTheDocument();
-  expect(screen.getByText("سینه + پشت بازو")).toBeInTheDocument();
-  expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
-  expect(screen.getByText("پلاور کابل")).toBeInTheDocument();
-  expect(screen.getByText("جای‌خالی در کتابخانهٔ حرکات")).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: "متوسط" })).toBeInTheDocument();
+  expect(screen.getAllByText("سینه + پشت بازو")).toHaveLength(3);
+  expect(screen.getAllByText("پرس سینه دمبل")).toHaveLength(3);
+  expect(screen.getAllByText("پلاور کابل")).toHaveLength(3);
+  expect(screen.getAllByText("جای‌خالی در کتابخانهٔ حرکات")).toHaveLength(3);
   expect(adminApi.getAdminTrainingProgramTemplates).toHaveBeenCalledWith(4);
+
+  await user.click(screen.getByRole("tab", { name: "پیشرفته" }));
+
+  expect(await screen.findByText("تخصصی سینه چهارروزه پیشرفته")).toBeInTheDocument();
+  expect(screen.queryByText("تفکیک کلاسیک چهار روزه")).not.toBeInTheDocument();
 });

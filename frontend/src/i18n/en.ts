@@ -234,6 +234,8 @@ const en = {
         dayFilter: "Training days per week",
         days_one: "{{count}} day",
         days_other: "{{count}} days",
+        levelFilter: "Program level",
+        allLevels: "All levels",
         loading: "Loading templates…",
         loadError: "The program library could not be loaded.",
         empty: "No template has been recorded for this day count.",

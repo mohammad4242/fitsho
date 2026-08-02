@@ -9,14 +9,19 @@ import type { AdminTrainingProgramTemplatesResponse } from "./types";
 import "./admin.css";
 
 const trainingDays = [2, 3, 4, 5, 6] as const;
+const trainingLevels = ["all", "beginner", "intermediate", "advanced"] as const;
 
 export function AdminTrainingTemplatesPage() {
   const { i18n, t } = useTranslation();
   const [daysPerWeek, setDaysPerWeek] = useState<(typeof trainingDays)[number]>(2);
+  const [trainingLevel, setTrainingLevel] = useState<(typeof trainingLevels)[number]>("all");
   const [page, setPage] = useState<AdminTrainingProgramTemplatesResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [retry, setRetry] = useState(0);
   const english = i18n.resolvedLanguage === "en";
+  const visibleTemplates = page?.items.filter(
+    (template) => trainingLevel === "all" || template.training_level === trainingLevel,
+  ) ?? [];
 
   useEffect(() => {
     let active = true;
@@ -46,19 +51,45 @@ export function AdminTrainingTemplatesPage() {
           </div>
         </header>
 
-        <div className="admin-template-tabs" role="tablist" aria-label={t("admin.templates.dayFilter")}>
-          {trainingDays.map((days) => (
-            <button
-              aria-selected={days === daysPerWeek}
-              id={`template-tab-${days}`}
-              key={days}
-              onClick={() => setDaysPerWeek(days)}
-              role="tab"
-              type="button"
-            >
-              {t("admin.templates.days", { count: days })}
-            </button>
-          ))}
+        <div className="admin-template-filters">
+          <div className="admin-template-filter-group">
+            <span>{t("admin.templates.dayFilter")}</span>
+            <div className="admin-template-tabs" role="tablist" aria-label={t("admin.templates.dayFilter")}>
+              {trainingDays.map((days) => (
+                <button
+                  aria-selected={days === daysPerWeek}
+                  id={`template-tab-${days}`}
+                  key={days}
+                  onClick={() => {
+                    setDaysPerWeek(days);
+                    setTrainingLevel("all");
+                  }}
+                  role="tab"
+                  type="button"
+                >
+                  {t("admin.templates.days", { count: days })}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="admin-template-filter-group">
+            <span>{t("admin.templates.levelFilter")}</span>
+            <div className="admin-template-tabs admin-template-tabs--levels" role="tablist" aria-label={t("admin.templates.levelFilter")}>
+              {trainingLevels.map((level) => (
+                <button
+                  aria-selected={level === trainingLevel}
+                  key={level}
+                  onClick={() => setTrainingLevel(level)}
+                  role="tab"
+                  type="button"
+                >
+                  {level === "all"
+                    ? t("admin.templates.allLevels")
+                    : t(`catalog.difficulty.${level}`)}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {state === "loading" && <p className="admin-status" role="status">{t("admin.templates.loading")}</p>}
@@ -68,12 +99,12 @@ export function AdminTrainingTemplatesPage() {
             <button type="button" onClick={() => setRetry((value) => value + 1)}>{t("common.retry")}</button>
           </div>
         )}
-        {state === "ready" && page?.items.length === 0 && (
+        {state === "ready" && visibleTemplates.length === 0 && (
           <p className="admin-status">{t("admin.templates.empty")}</p>
         )}
-        {state === "ready" && page !== null && page.items.length > 0 && (
+        {state === "ready" && page !== null && visibleTemplates.length > 0 && (
           <section className="admin-template-list" role="tabpanel" aria-labelledby={`template-tab-${daysPerWeek}`}>
-            {page.items.map((template) => (
+            {visibleTemplates.map((template) => (
               <article className="admin-template-card" key={template.id}>
                 <header>
                   <div>
