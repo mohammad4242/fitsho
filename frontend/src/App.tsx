@@ -4,6 +4,7 @@ import { AdminExercisesPage } from "./features/admin/AdminExercisesPage";
 import { AdminAiModelsPage } from "./features/admin/AdminAiModelsPage";
 import { AdminExerciseEditPage } from "./features/admin/AdminExerciseEditPage";
 import { AdminExerciseNewPage } from "./features/admin/AdminExerciseNewPage";
+import { AdminTrainingTemplatesPage } from "./features/admin/AdminTrainingTemplatesPage";
 import { AdminRoute } from "./features/admin/AdminRoute";
 import { AuthProvider } from "./features/auth/AuthContext";
 import { LoginPage } from "./features/auth/LoginPage";
@@ -35,6 +36,7 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AdminRoute />}>
           <Route path="/admin/ai-models" element={<AdminAiModelsPage />} />
+          <Route path="/admin/training-program-templates" element={<AdminTrainingTemplatesPage />} />
           <Route path="/admin/exercises" element={<AdminExercisesPage />} />
           <Route path="/admin/exercises/new" element={<AdminExerciseNewPage />} />
           <Route path="/admin/exercises/:exerciseId/edit" element={<AdminExerciseEditPage />} />

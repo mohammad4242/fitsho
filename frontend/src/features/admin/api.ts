@@ -14,14 +14,24 @@ import type {
   AdminExerciseCreate,
   AdminExerciseFilters,
   AdminExerciseMediaFiles,
+  AdminTrainingProgramTemplatesResponse,
   PaginatedAdminExercises,
 } from "./types";
 
 const adminExercisesPath = "/api/v1/admin/exercises";
 const adminAiModelsPath = "/api/v1/admin/ai-models";
+const adminTrainingProgramTemplatesPath = "/api/v1/admin/training-program-templates";
 
 export function getAdminAiModels(): Promise<AdminAiModelsResponse> {
   return request<AdminAiModelsResponse>(adminAiModelsPath);
+}
+
+export function getAdminTrainingProgramTemplates(
+  daysPerWeek: number,
+): Promise<AdminTrainingProgramTemplatesResponse> {
+  return request<AdminTrainingProgramTemplatesResponse>(
+    `${adminTrainingProgramTemplatesPath}?days_per_week=${daysPerWeek}`,
+  );
 }
 
 export function getAdminAiGenerationFailures(

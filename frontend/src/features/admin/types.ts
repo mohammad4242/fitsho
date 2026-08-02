@@ -11,6 +11,7 @@ import type {
   MovementPattern,
   MuscleGroup,
 } from "../exercises/types";
+import type { ExperienceLevel, FitnessGoal } from "../profile/types";
 
 export type AdminExerciseMediaAssetInput = {
   id?: string | null;
@@ -180,4 +181,60 @@ export type AdminAiGenerationFailure = {
   error_code: string | null;
   safe_error_message: string | null;
   validation_diagnostics: AdminAiValidationDiagnostic[] | null;
+};
+
+export type TrainingTemplateMethod = "standard" | "superset" | "drop_set";
+
+export type AdminTrainingTemplateExercise = {
+  id: string;
+  slug: string;
+  name_en: string;
+  name_fa: string;
+};
+
+export type AdminTrainingTemplateSlot = {
+  id: string;
+  slot_order: number;
+  exercise_slug_hint: string;
+  placeholder_name_en: string | null;
+  placeholder_name_fa: string | null;
+  target_muscles: MuscleGroup[];
+  movement_pattern: MovementPattern;
+  intensity_method: TrainingTemplateMethod;
+  sets: number;
+  rep_min: number;
+  rep_max: number;
+  target_rir: number;
+  rest_seconds: number;
+  exercise: AdminTrainingTemplateExercise | null;
+};
+
+export type AdminTrainingTemplateDay = {
+  id: string;
+  day_number: number;
+  title_en: string;
+  title_fa: string;
+  direct_target_muscles: MuscleGroup[];
+  slots: AdminTrainingTemplateSlot[];
+};
+
+export type AdminTrainingProgramTemplate = {
+  id: string;
+  slug: string;
+  name_en: string;
+  name_fa: string;
+  description_en: string;
+  description_fa: string;
+  days_per_week: number;
+  training_level: ExperienceLevel;
+  fitness_goal: FitnessGoal;
+  focus_tags: string[];
+  intensity_methods: TrainingTemplateMethod[];
+  source_name: string;
+  source_url: string;
+  days: AdminTrainingTemplateDay[];
+};
+
+export type AdminTrainingProgramTemplatesResponse = {
+  items: AdminTrainingProgramTemplate[];
 };

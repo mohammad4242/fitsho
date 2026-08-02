@@ -79,6 +79,16 @@ export function AuthenticatedHeader() {
                 >
                   {t("header.adminAiModels")}
                 </Link>
+                <Link
+                  to="/admin/training-program-templates"
+                  aria-current={
+                    location.pathname.startsWith("/admin/training-program-templates")
+                      ? "page"
+                      : undefined
+                  }
+                >
+                  {t("header.adminTrainingTemplates")}
+                </Link>
               </>
             )}
           </nav>
