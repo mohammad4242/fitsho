@@ -159,6 +159,7 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
         fitness_goal=template.fitness_goal,
         focus_tags=template.focus_tags,
         intensity_methods=template.intensity_methods,
+        programming_rationale=template.programming_rationale,
         source_name=template.source_name,
         source_url=template.source_url,
         days=[

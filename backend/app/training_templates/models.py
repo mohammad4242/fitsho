@@ -12,6 +12,7 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -78,6 +79,12 @@ class TrainingProgramTemplate(Base):
     )
     focus_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     intensity_methods: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    programming_rationale: Mapped[list[dict[str, str]]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=list,
+        server_default=text("'[]'::json"),
+    )
     source_name: Mapped[str] = mapped_column(String(160), nullable=False)
     source_url: Mapped[str] = mapped_column(String(500), nullable=False)
     is_active: Mapped[bool] = mapped_column(

@@ -10,7 +10,11 @@ from app.training_templates.models import (
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
 )
-from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS
+from app.training_templates.seed_data import (
+    SOURCE_NAME,
+    SOURCE_URL,
+    TRAINING_PROGRAM_TEMPLATE_SEEDS,
+)
 
 
 @dataclass(frozen=True)
@@ -55,8 +59,17 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
         template.fitness_goal = seed.fitness_goal
         template.focus_tags = list(seed.focus_tags)
         template.intensity_methods = [method.value for method in seed.intensity_methods]
-        template.source_name = "Fitsho original evidence-informed template"
-        template.source_url = "https://pubmed.ncbi.nlm.nih.gov/38595233/"
+        template.programming_rationale = [
+            {
+                "title_en": rationale.title_en,
+                "title_fa": rationale.title_fa,
+                "detail_en": rationale.detail_en,
+                "detail_fa": rationale.detail_fa,
+            }
+            for rationale in seed.programming_rationale
+        ]
+        template.source_name = SOURCE_NAME
+        template.source_url = SOURCE_URL
         template.is_active = seed.is_active
 
     db.flush()

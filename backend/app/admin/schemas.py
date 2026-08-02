@@ -256,6 +256,13 @@ class AdminTrainingTemplateDay(BaseModel):
     slots: list[AdminTrainingTemplateSlot]
 
 
+class AdminTrainingTemplateProgrammingRationale(BaseModel):
+    title_en: str
+    title_fa: str
+    detail_en: str
+    detail_fa: str
+
+
 class AdminTrainingProgramTemplate(BaseModel):
     id: UUID
     slug: str
@@ -268,6 +275,7 @@ class AdminTrainingProgramTemplate(BaseModel):
     fitness_goal: FitnessGoal
     focus_tags: list[str]
     intensity_methods: list[TrainingTemplateMethod]
+    programming_rationale: list[AdminTrainingTemplateProgrammingRationale]
     source_name: str
     source_url: str
     days: list[AdminTrainingTemplateDay]

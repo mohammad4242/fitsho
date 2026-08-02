@@ -240,6 +240,7 @@ const en = {
         loadError: "The program library could not be loaded.",
         empty: "No template has been recorded for this day count.",
         labels: "Program labels",
+        rationaleTitle: "Programming rationale",
         dayNumber: "Day {{number}}",
         placeholder: "Missing from exercise library",
         source: "Structure basis",

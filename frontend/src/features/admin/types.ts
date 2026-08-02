@@ -218,6 +218,13 @@ export type AdminTrainingTemplateDay = {
   slots: AdminTrainingTemplateSlot[];
 };
 
+export type AdminTrainingTemplateProgrammingRationale = {
+  title_en: string;
+  title_fa: string;
+  detail_en: string;
+  detail_fa: string;
+};
+
 export type AdminTrainingProgramTemplate = {
   id: string;
   slug: string;
@@ -230,6 +237,7 @@ export type AdminTrainingProgramTemplate = {
   fitness_goal: FitnessGoal;
   focus_tags: string[];
   intensity_methods: TrainingTemplateMethod[];
+  programming_rationale: AdminTrainingTemplateProgrammingRationale[];
   source_name: string;
   source_url: string;
   days: AdminTrainingTemplateDay[];

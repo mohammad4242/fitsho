@@ -54,6 +54,8 @@ def test_admin_lists_complete_four_day_template_details(client: TestClient, db: 
     classic = next(item for item in templates if item["slug"] == "four-day-classic-body-part")
     assert classic["training_level"] == "intermediate"
     assert "classic" in classic["focus_tags"]
+    assert len(classic["programming_rationale"]) == 5
+    assert classic["programming_rationale"][0]["title_fa"] == "ترتیب حرکات"
     assert [day["title_fa"] for day in classic["days"]] == [
         "سینه + پشت بازو",
         "زیربغل + جلو بازو",

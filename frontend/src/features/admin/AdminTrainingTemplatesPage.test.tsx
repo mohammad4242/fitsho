@@ -28,6 +28,38 @@ const template = {
   intensity_methods: ["standard" as const],
   source_name: "Fitsho original evidence-informed template",
   source_url: "https://pubmed.ncbi.nlm.nih.gov/38595233/",
+  programming_rationale: [
+    {
+      title_en: "Exercise order",
+      title_fa: "ترتیب حرکات",
+      detail_en: "Main chest work comes first.",
+      detail_fa: "حرکت اصلی سینه ابتدا می‌آید.",
+    },
+    {
+      title_en: "Main movements",
+      title_fa: "حرکت‌های اصلی",
+      detail_en: "Compound work leads the session.",
+      detail_fa: "حرکت‌های چندمفصلی ابتدای جلسه هستند.",
+    },
+    {
+      title_en: "Working sets",
+      title_fa: "ست‌های کاری",
+      detail_en: "Three to four quality sets.",
+      detail_fa: "سه تا چهار ست باکیفیت.",
+    },
+    {
+      title_en: "Program focus",
+      title_fa: "تمرکز برنامه",
+      detail_en: "Direct target rotation.",
+      detail_fa: "چرخش عضلات هدف مستقیم.",
+    },
+    {
+      title_en: "Fatigue management",
+      title_fa: "مدیریت خستگی",
+      detail_en: "Isolation work closes the session.",
+      detail_fa: "حرکات تک‌مفصلی پایان جلسه هستند.",
+    },
+  ],
   days: [{
     id: "day-1",
     day_number: 1,
@@ -94,6 +126,8 @@ it("filters the library by day count and training level", async () => {
   expect(screen.getAllByText("پرس سینه دمبل")).toHaveLength(3);
   expect(screen.getAllByText("پلاور کابل")).toHaveLength(3);
   expect(screen.getAllByText("جای‌خالی در کتابخانهٔ حرکات")).toHaveLength(3);
+  expect(screen.getAllByText("منطق برنامه")).toHaveLength(3);
+  expect(screen.getAllByText("ترتیب حرکات")).toHaveLength(3);
   expect(adminApi.getAdminTrainingProgramTemplates).toHaveBeenCalledWith(4);
 
   await user.click(screen.getByRole("tab", { name: "پیشرفته" }));

@@ -150,6 +150,17 @@ export function AdminTrainingTemplatesPage() {
                     </section>
                   ))}
                 </div>
+                <section className="admin-template-rationale" aria-label={t("admin.templates.rationaleTitle")}>
+                  <h3>{t("admin.templates.rationaleTitle")}</h3>
+                  <ol>
+                    {template.programming_rationale.map((rationale) => (
+                      <li key={rationale.title_en}>
+                        <strong>{english ? rationale.title_en : rationale.title_fa}</strong>
+                        <p>{english ? rationale.detail_en : rationale.detail_fa}</p>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
                 <footer>
                   <span>{t("admin.templates.source")}: {template.source_name}</span>
                   <a href={template.source_url} rel="noreferrer" target="_blank">{t("admin.templates.reference")}</a>

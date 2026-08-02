@@ -36,6 +36,14 @@ class TemplateDaySeed:
 
 
 @dataclass(frozen=True)
+class TemplateProgrammingRationaleSeed:
+    title_en: str
+    title_fa: str
+    detail_en: str
+    detail_fa: str
+
+
+@dataclass(frozen=True)
 class TrainingProgramTemplateSeed:
     slug: str
     name_en: str
@@ -47,6 +55,7 @@ class TrainingProgramTemplateSeed:
     focus_tags: tuple[str, ...]
     intensity_methods: tuple[TrainingTemplateMethod, ...]
     days: tuple[TemplateDaySeed, ...]
+    programming_rationale: tuple[TemplateProgrammingRationaleSeed, ...]
     fitness_goal: FitnessGoal = FitnessGoal.BUILD_MUSCLE
     is_active: bool = True
 
@@ -57,8 +66,8 @@ Method = TrainingTemplateMethod
 Priority = TrainingTemplateSlotPriority
 Level = ExperienceLevel
 
-SOURCE_NAME = "Fitsho original evidence-informed template"
-SOURCE_URL = "https://pubmed.ncbi.nlm.nih.gov/38595233/"
+SOURCE_NAME = "Fitsho synthesis: Stronger By Science · Jeff Nippard · RP Strength"
+SOURCE_URL = "https://www.strongerbyscience.com/exercise-order-video/"
 
 CATALOG_SLUG_ALIASES: dict[str, tuple[str, ...]] = {
     "barbell-bench-press": ("fedb-0025-barbell-bench-press",),
@@ -534,6 +543,273 @@ def _can_remove_slot(
     )
 
 
+_MAIN_MOVEMENT_PATTERNS = frozenset(
+    {
+        P.SQUAT,
+        P.HIP_HINGE,
+        P.LUNGE,
+        P.HORIZONTAL_PUSH,
+        P.HORIZONTAL_PULL,
+        P.VERTICAL_PUSH,
+        P.VERTICAL_PULL,
+        P.HIP_EXTENSION,
+    }
+)
+_ISOLATION_SLOT_SLUGS = frozenset(
+    {
+        "cable-fly",
+        "pec-deck-fly",
+        "cable-pullover",
+        "rear-delt-fly",
+        "face-pull",
+    }
+)
+_DEFAULT_MOVEMENT_ORDER = {
+    P.SQUAT: 0,
+    P.HIP_HINGE: 1,
+    P.LUNGE: 2,
+    P.HORIZONTAL_PUSH: 3,
+    P.HORIZONTAL_PULL: 4,
+    P.VERTICAL_PULL: 5,
+    P.VERTICAL_PUSH: 6,
+    P.HIP_EXTENSION: 7,
+}
+_ISOLATION_MOVEMENT_ORDER = {
+    P.KNEE_EXTENSION: 0,
+    P.KNEE_FLEXION: 1,
+    P.SHOULDER_ABDUCTION: 2,
+    P.ELBOW_FLEXION: 3,
+    P.ELBOW_EXTENSION: 4,
+    P.SHRUG: 5,
+    P.CALF_RAISE: 6,
+    P.CORE_ANTI_EXTENSION: 7,
+    P.CORE_ANTI_ROTATION: 8,
+    P.CORE_ANTI_LATERAL_FLEXION: 9,
+}
+
+
+def _evidence_informed_template_order(
+    template: TrainingProgramTemplateSeed,
+) -> TrainingProgramTemplateSeed:
+    return replace(
+        template,
+        days=tuple(_evidence_informed_day_order(day) for day in template.days),
+    )
+
+
+def _evidence_informed_day_order(day: TemplateDaySeed) -> TemplateDaySeed:
+    focus_order = _day_focus_order(day.title_en)
+    ordered_slots = tuple(
+        slot
+        for _, slot in sorted(
+            enumerate(day.slots),
+            key=lambda item: _slot_ordering_key(item[1], focus_order, item[0]),
+        )
+    )
+    return replace(day, slots=ordered_slots)
+
+
+def _slot_ordering_key(
+    slot: TemplateSlotSeed,
+    focus_order: dict[MovementPattern, int],
+    original_index: int,
+) -> tuple[int, int, int, int]:
+    method_phase = 0 if slot.intensity_method is Method.STANDARD else 1
+    movement_phase = (
+        0
+        if slot.movement_pattern in _MAIN_MOVEMENT_PATTERNS
+        and slot.exercise_slug_hint not in _ISOLATION_SLOT_SLUGS
+        else 1
+    )
+    fallback_order = (
+        _DEFAULT_MOVEMENT_ORDER.get(slot.movement_pattern, 99)
+        if movement_phase == 0
+        else _ISOLATION_MOVEMENT_ORDER.get(slot.movement_pattern, 99)
+    )
+    return (
+        method_phase,
+        movement_phase,
+        focus_order.get(slot.movement_pattern, fallback_order),
+        original_index,
+    )
+
+
+def _day_focus_order(title_en: str) -> dict[MovementPattern, int]:
+    if "Width" in title_en:
+        return {P.VERTICAL_PULL: 0, P.HORIZONTAL_PULL: 1}
+    if "Thickness" in title_en:
+        return {P.HORIZONTAL_PULL: 0, P.VERTICAL_PULL: 1}
+    if "Chest" in title_en:
+        return {P.HORIZONTAL_PUSH: 0}
+    if "Back" in title_en:
+        return {P.HORIZONTAL_PULL: 0, P.VERTICAL_PULL: 1}
+    if "Quadriceps" in title_en or "Quads" in title_en:
+        return {P.SQUAT: 0, P.LUNGE: 1, P.KNEE_EXTENSION: 2}
+    if "Hamstrings" in title_en:
+        return {P.HIP_HINGE: 0, P.KNEE_FLEXION: 1, P.HIP_EXTENSION: 2}
+    if "Shoulders" in title_en or "Delts" in title_en:
+        return {P.VERTICAL_PUSH: 0, P.SHOULDER_ABDUCTION: 1}
+    return _DEFAULT_MOVEMENT_ORDER
+
+
+def _programming_rationale(
+    template: TrainingProgramTemplateSeed,
+) -> tuple[TemplateProgrammingRationaleSeed, ...]:
+    focus_en, focus_fa = _priority_focus(template.focus_tags)
+    split_en, split_fa = _split_focus(template.focus_tags, template.days_per_week)
+    volume_en, volume_fa = _volume_guidance(template.training_level)
+    intensity_en, intensity_fa = _intensity_guidance(template.intensity_methods)
+    return (
+        TemplateProgrammingRationaleSeed(
+            "Exercise order",
+            "ترتیب حرکات",
+            (
+                f"{focus_en} is placed before lower-priority work; "
+                "main multi-joint movements lead each session."
+            ),
+            (
+                f"{focus_fa} پیش از کار کم‌اولویت قرار می‌گیرد و هر جلسه با "
+                "حرکت‌های اصلی چندمفصلی شروع می‌شود."
+            ),
+        ),
+        TemplateProgrammingRationaleSeed(
+            "Main movements",
+            "حرکت‌های اصلی",
+            (
+                "The first movements use stable, repeatable loading; "
+                "complementary angles follow before isolation work."
+            ),
+            (
+                "حرکت‌های اول با بارگذاری پایدار و قابل‌پیگیری انتخاب شده‌اند؛ "
+                "زاویه‌های مکمل بعد از آن و حرکات تک‌مفصلی در ادامه می‌آیند."
+            ),
+        ),
+        TemplateProgrammingRationaleSeed(
+            "Working sets and reps",
+            "ست‌ها و تکرارهای کاری",
+            volume_en,
+            volume_fa,
+        ),
+        TemplateProgrammingRationaleSeed(
+            "Program focus",
+            "تمرکز برنامه",
+            split_en,
+            split_fa,
+        ),
+        TemplateProgrammingRationaleSeed(
+            "Fatigue and progression",
+            "مدیریت خستگی و پیشرفت",
+            intensity_en,
+            intensity_fa,
+        ),
+    )
+
+
+def _priority_focus(tags: tuple[str, ...]) -> tuple[str, str]:
+    priorities = {
+        "chest_priority": ("Chest priority", "اولویت سینه"),
+        "back_priority": ("Back priority", "اولویت زیربغل"),
+        "shoulders_priority": ("Shoulder priority", "اولویت سرشانه"),
+        "quad_priority": ("Quadriceps priority", "اولویت چهارسر"),
+        "legs_priority": ("Lower-body priority", "اولویت پا"),
+        "arms_priority": ("Arm priority", "اولویت بازو"),
+        "hamstrings_glutes": ("Hamstrings and glutes", "اولویت همسترینگ و باسن"),
+    }
+    return next(
+        (priorities[tag] for tag in tags if tag in priorities),
+        ("The session target", "عضلهٔ هدف جلسه"),
+    )
+
+
+def _split_focus(tags: tuple[str, ...], days_per_week: int) -> tuple[str, str]:
+    if "full_body" in tags:
+        return (
+            (
+                f"Full-body exposure is distributed across {days_per_week} days "
+                "so practice and volume stay manageable."
+            ),
+            f"فشار تمام‌بدن در {days_per_week} روز پخش شده تا تمرین و حجم قابل‌مدیریت بماند.",
+        )
+    if "push_pull_legs" in tags:
+        return (
+            (
+                "Push, pull, and lower-body work are separated to limit overlap "
+                "and preserve performance."
+            ),
+            "پوش، پول و پا جدا شده‌اند تا هم‌پوشانی خستگی کم و کیفیت ست‌ها حفظ شود.",
+        )
+    if "body_part_rotation" in tags:
+        return (
+            (
+                "Direct target-muscle days concentrate useful work while leaving "
+                "recovery before the next exposure."
+            ),
+            "روزهای عضلهٔ هدف، ست‌های مفید را متمرکز می‌کنند و تا نوبت بعدی فرصت ریکاوری می‌دهند.",
+        )
+    return (
+        "The weekly split balances direct target work with recovery between related sessions.",
+        "تقسیم هفتگی بین کار مستقیم عضلهٔ هدف و ریکاوری جلسات مرتبط تعادل ایجاد می‌کند.",
+    )
+
+
+def _volume_guidance(level: ExperienceLevel) -> tuple[str, str]:
+    if level is Level.BEGINNER:
+        return (
+            (
+                "Main movements use 3–4 quality working sets and controlled repetitions, "
+                "leaving room to learn technique and recover."
+            ),
+            (
+                "حرکت‌های اصلی ۳ تا ۴ ست کاری با تکرار کنترل‌شده دارند تا برای "
+                "یادگیری فرم و ریکاوری فضا بماند."
+            ),
+        )
+    if level is Level.INTERMEDIATE:
+        return (
+            (
+                "Main lifts use 3–4 working sets; isolation work uses moderate repetitions "
+                "to add volume without unnecessary joint stress."
+            ),
+            (
+                "حرکت‌های اصلی ۳ تا ۴ ست کاری دارند و حرکات تک‌مفصلی با تکرار متوسط "
+                "حجم می‌سازند، بدون فشار اضافه به مفصل‌ها."
+            ),
+        )
+    return (
+        (
+            "Main lifts retain 3–4 high-quality working sets; higher-repetition isolation "
+            "work adds targeted volume after the main work."
+        ),
+        (
+            "حرکت‌های اصلی ۳ تا ۴ ست باکیفیت دارند و تکرار بالاتر در حرکات تک‌مفصلی "
+            "پس از کار اصلی، حجم هدفمند اضافه می‌کند."
+        ),
+    )
+
+
+def _intensity_guidance(
+    methods: tuple[TrainingTemplateMethod, ...],
+) -> tuple[str, str]:
+    if Method.DROP_SET in methods or Method.SUPERSET in methods:
+        return (
+            (
+                "Supersets and drop sets are reserved for the end of a session, "
+                "after primary performance work is complete."
+            ),
+            "سوپرست و دراپ‌ست فقط پس از پایان کار اصلی و در انتهای جلسه قرار گرفته‌اند.",
+        )
+    return (
+        (
+            "Progress by adding repetitions or load with good form; accessory work stays "
+            "after the demanding movements to manage fatigue."
+        ),
+        (
+            "با حفظ فرم، تکرار یا وزنه را تدریجی بالا ببر؛ حرکات کمکی پس از حرکات پرفشار "
+            "قرار دارند تا خستگی مدیریت شود."
+        ),
+    )
+
+
 def _day(
     title_en: str,
     title_fa: str,
@@ -556,7 +832,7 @@ def _template(
     *days: TemplateDaySeed,
     is_active: bool = True,
 ) -> TrainingProgramTemplateSeed:
-    return TrainingProgramTemplateSeed(
+    template = TrainingProgramTemplateSeed(
         slug=slug,
         name_en=name_en,
         name_fa=name_fa,
@@ -567,12 +843,16 @@ def _template(
         focus_tags=tags,
         intensity_methods=methods,
         days=days,
+        programming_rationale=(),
         is_active=is_active,
     )
+    return replace(template, programming_rationale=_programming_rationale(template))
 
 
 TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple(
-    _fit_template_session_exercise_count(_specialized_template_movement_floors(template))
+    _evidence_informed_template_order(
+        _fit_template_session_exercise_count(_specialized_template_movement_floors(template))
+    )
     for template in (
     _template(
         "two-day-full-body-foundation",
