@@ -50,7 +50,7 @@ def test_admin_lists_complete_four_day_template_details(client: TestClient, db: 
 
     assert response.status_code == 200
     templates = response.json()["items"]
-    assert len(templates) == 5
+    assert len(templates) == 10
     classic = next(item for item in templates if item["slug"] == "four-day-classic-body-part")
     assert classic["training_level"] == "intermediate"
     assert "classic" in classic["focus_tags"]
