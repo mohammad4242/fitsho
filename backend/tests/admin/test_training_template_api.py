@@ -70,7 +70,8 @@ def test_admin_lists_complete_four_day_template_details(client: TestClient, db: 
         for slot in day["slots"]
         if slot["exercise_slug_hint"] == "cable-pullover"
     )
-    assert placeholder["exercise"] is None
+    assert placeholder["exercise"]["slug"] == "cable-pullover"
+    assert placeholder["exercise"]["needs_review"] is True
     assert placeholder["placeholder_name_fa"] == "پلاور کابل"
 
 

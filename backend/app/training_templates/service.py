@@ -5,6 +5,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.exercises.models import Exercise
+from app.training_templates.catalog_placeholders import (
+    ensure_template_catalog_placeholders,
+    is_template_catalog_placeholder,
+)
 from app.training_templates.models import (
     TrainingProgramTemplate,
     TrainingProgramTemplateDay,
@@ -25,8 +29,16 @@ class TrainingTemplateSeedResult:
 
 
 def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
-    exercises_by_slug: dict[str, UUID] = {
-        slug: exercise_id for slug, exercise_id in db.execute(select(Exercise.slug, Exercise.id))
+    template_slots = tuple(
+        slot
+        for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
+        for day in template.days
+        for slot in day.slots
+    )
+    ensure_template_catalog_placeholders(db, template_slots)
+    db.flush()
+    exercises_by_slug = {
+        exercise.slug: exercise for exercise in db.scalars(select(Exercise))
     }
     linked_slots = 0
     placeholder_slots = 0
@@ -86,14 +98,7 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
             )
             template.days.append(day)
             for slot_order, slot_seed in enumerate(day_seed.slots, start=1):
-                exercise_id = next(
-                    (
-                        exercises_by_slug[candidate_slug]
-                        for candidate_slug in slot_seed.catalog_slug_hints
-                        if candidate_slug in exercises_by_slug
-                    ),
-                    None,
-                )
+                exercise_id = _exercise_id_for_slot(slot_seed.catalog_slug_hints, exercises_by_slug)
                 if exercise_id is None:
                     placeholder_slots += 1
                 else:
@@ -124,6 +129,22 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
         linked_slots=linked_slots,
         placeholder_slots=placeholder_slots,
     )
+
+
+def _exercise_id_for_slot(
+    candidate_slugs: tuple[str, ...],
+    exercises_by_slug: dict[str, Exercise],
+) -> UUID | None:
+    candidates = [
+        exercises_by_slug[candidate_slug]
+        for candidate_slug in candidate_slugs
+        if candidate_slug in exercises_by_slug
+    ]
+    selected = next(
+        (exercise for exercise in candidates if not is_template_catalog_placeholder(exercise)),
+        next(iter(candidates), None),
+    )
+    return selected.id if selected is not None else None
 
 
 def list_training_program_templates(

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
@@ -135,10 +136,21 @@ export function AdminTrainingTemplatesPage() {
                             ? (english ? slot.placeholder_name_en : slot.placeholder_name_fa)
                             : (english ? slot.exercise.name_en : slot.exercise.name_fa);
                           return (
-                            <li className={slot.exercise === null ? "is-placeholder" : ""} key={slot.id}>
+                            <li className={slot.exercise === null || slot.exercise.needs_review ? "is-placeholder" : ""} key={slot.id}>
                               <div>
                                 <strong>{name ?? slot.exercise_slug_hint}</strong>
                                 {slot.exercise === null && <small>{t("admin.templates.placeholder")}</small>}
+                                {slot.exercise !== null && (
+                                  <Link
+                                    aria-label={t("admin.templates.exerciseDetailAria", { name })}
+                                    className="admin-template-exercise-detail"
+                                    to={`/exercises/${slot.exercise.slug}`}
+                                  >
+                                    <span aria-hidden="true">↗</span>
+                                    {t("admin.templates.exerciseDetail")}
+                                  </Link>
+                                )}
+                                {slot.exercise?.needs_review && <small>{t("admin.templates.reviewMedia")}</small>}
                               </div>
                               <span dir="ltr">
                                 {slot.sets} × {slot.rep_min}–{slot.rep_max} · RIR {slot.target_rir}

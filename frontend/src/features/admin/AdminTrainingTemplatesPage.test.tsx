@@ -72,14 +72,14 @@ const template = {
         placeholder_name_en: null, placeholder_name_fa: null, target_muscles: ["chest"],
         movement_pattern: "horizontal_push", intensity_method: "standard" as const,
         sets: 4, rep_min: 8, rep_max: 12, target_rir: 2, rest_seconds: 90,
-        exercise: { id: "exercise-1", slug: "dumbbell-bench-press", name_en: "Dumbbell Bench Press", name_fa: "پرس سینه دمبل" },
+        exercise: { id: "exercise-1", slug: "dumbbell-bench-press", name_en: "Dumbbell Bench Press", name_fa: "پرس سینه دمبل", needs_review: false },
       },
       {
         id: "slot-2", slot_order: 2, exercise_slug_hint: "cable-pullover",
         placeholder_name_en: "Cable Pullover", placeholder_name_fa: "پلاور کابل", target_muscles: ["back"],
         movement_pattern: "vertical_pull", intensity_method: "standard" as const,
         sets: 3, rep_min: 10, rep_max: 15, target_rir: 2, rest_seconds: 60,
-        exercise: null,
+        exercise: { id: "exercise-2", slug: "cable-pullover", name_en: "Cable Pullover", name_fa: "پلاور کابل", needs_review: true },
       },
     ],
   }],
@@ -125,7 +125,9 @@ it("filters the library by day count and training level", async () => {
   expect(screen.getAllByText("سینه + پشت بازو")).toHaveLength(3);
   expect(screen.getAllByText("پرس سینه دمبل")).toHaveLength(3);
   expect(screen.getAllByText("پلاور کابل")).toHaveLength(3);
-  expect(screen.getAllByText("جای‌خالی در کتابخانهٔ حرکات")).toHaveLength(3);
+  expect(screen.getAllByText("نیازمند ویدیو و بازبینی")).toHaveLength(3);
+  expect(screen.getAllByRole("link", { name: "جزئیات حرکت: پرس سینه دمبل" })).toHaveLength(3);
+  expect(screen.getAllByRole("link", { name: "جزئیات حرکت: پلاور کابل" })).toHaveLength(3);
   expect(screen.getAllByText("منطق برنامه")).toHaveLength(3);
   expect(screen.getAllByText("ترتیب حرکات")).toHaveLength(3);
   expect(adminApi.getAdminTrainingProgramTemplates).toHaveBeenCalledWith(4);

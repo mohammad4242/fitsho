@@ -228,6 +228,7 @@ class AdminTrainingTemplateExercise(BaseModel):
     slug: str
     name_en: str
     name_fa: str
+    needs_review: bool
 
 
 class AdminTrainingTemplateSlot(BaseModel):

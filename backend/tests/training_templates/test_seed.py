@@ -3,7 +3,7 @@ from collections import Counter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.exercises.enums import MovementPattern, MuscleGroup
+from app.exercises.enums import MediaType, MovementPattern, MuscleGroup
 from app.exercises.models import Exercise
 from app.exercises.service import seed_exercises
 from app.profile.enums import ExperienceLevel
@@ -200,19 +200,44 @@ def _direct_slot_count(day: TemplateDaySeed, muscles: tuple[MuscleGroup, ...]) -
     return sum(bool(set(slot.target_muscles).intersection(muscles)) for slot in day.slots)
 
 
-def test_seed_keeps_unavailable_exercise_as_explicit_placeholder(db: Session) -> None:
+def test_seed_creates_missing_template_exercise_as_safe_catalog_placeholder(db: Session) -> None:
     seed_exercises(db)
 
     seed_training_program_templates(db)
 
-    placeholder = db.scalar(
+    slot = db.scalar(
         select(TrainingProgramTemplateSlot).where(
             TrainingProgramTemplateSlot.exercise_slug_hint == "cable-pullover"
         )
     )
+    assert slot is not None
+    assert slot.exercise is not None
+    assert slot.exercise.slug == "cable-pullover"
+    assert slot.exercise.primary_muscle is MuscleGroup.BACK
+    assert slot.exercise.needs_review is True
+    assert slot.exercise.is_programmable is False
+    assert slot.exercise.media_type is MediaType.PLACEHOLDER
+
+
+def test_template_placeholder_seed_preserves_admin_media_and_review_updates(db: Session) -> None:
+    seed_exercises(db)
+    seed_training_program_templates(db)
+    placeholder = db.scalar(select(Exercise).where(Exercise.slug == "cable-pullover"))
     assert placeholder is not None
-    assert placeholder.exercise_id is None
-    assert placeholder.placeholder_name_en == "Cable Pullover"
+    placeholder.media_path = "/media/exercises/cable-pullover.gif"
+    placeholder.media_type = MediaType.GIF
+    placeholder.needs_review = False
+    placeholder.is_programmable = True
+    db.commit()
+
+    seed_training_program_templates(db)
+
+    stored = db.scalar(select(Exercise).where(Exercise.slug == "cable-pullover"))
+    assert stored is not None
+    assert stored.media_path == "/media/exercises/cable-pullover.gif"
+    assert stored.media_type is MediaType.GIF
+    assert stored.needs_review is False
+    assert stored.is_programmable is True
 
 
 def test_seed_resolves_a_curated_imported_catalog_alias(db: Session) -> None:

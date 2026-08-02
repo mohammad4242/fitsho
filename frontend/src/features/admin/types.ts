@@ -190,6 +190,7 @@ export type AdminTrainingTemplateExercise = {
   slug: string;
   name_en: string;
   name_fa: string;
+  needs_review: boolean;
 };
 
 export type AdminTrainingTemplateSlot = {

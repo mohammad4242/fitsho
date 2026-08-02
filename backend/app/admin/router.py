@@ -190,6 +190,7 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
                                 slug=slot.exercise.slug,
                                 name_en=slot.exercise.name_en,
                                 name_fa=slot.exercise.name_fa,
+                                needs_review=slot.exercise.needs_review,
                             )
                             if slot.exercise is not None
                             else None
