@@ -54,7 +54,8 @@ def _classify_status(
     if status is not label_status:
         assumptions.append("TRAINING_STATUS_REDUCED_FOR_TRAINING_AGE")
     if (
-        request.recent_training_history.consistent_weeks
+        request.recent_training_history.consistent_weeks is not None
+        and request.recent_training_history.consistent_weeks
         < ruleset.minimum_consistent_weeks_for_experience
         and status is not TrainingStatus.NOVICE
     ):

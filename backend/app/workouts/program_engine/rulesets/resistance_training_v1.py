@@ -41,6 +41,15 @@ class ProgramRuleset:
             TrainingStatus.ADVANCED: 16,
         }
     )
+    soft_maximum_allowance_sets: dict[TrainingStatus, int] = field(
+        default_factory=lambda: {
+            TrainingStatus.NOVICE: 1,
+            TrainingStatus.EARLY_INTERMEDIATE: 1,
+            TrainingStatus.INTERMEDIATE: 2,
+            TrainingStatus.ADVANCED: 2,
+        }
+    )
+    good_recovery_soft_maximum_bonus_sets: int = 1
     goal_base_sets: dict[Goal, int] = field(
         default_factory=lambda: {
             Goal.FAT_LOSS: 6,

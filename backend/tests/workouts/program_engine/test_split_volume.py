@@ -8,6 +8,7 @@ from app.workouts.program_engine.enums import (
     RecoveryRating,
     SplitType,
     TrainingExperience,
+    TrainingStatus,
 )
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -180,3 +181,20 @@ def test_previous_volume_caps_unjustified_jump() -> None:
 
     assert plan.direct_sets_for(MuscleGroup.CHEST) <= 6
     assert "VOLUME_CAPPED_FOR_PREVIOUS_VOLUME" in plan.reason_codes
+
+
+def test_unknown_history_does_not_reduce_declared_advanced_status() -> None:
+    request = normalized(
+        training_experience=TrainingExperience.ADVANCED,
+        training_age_months=72,
+        recent_training_history=RecentTrainingHistory(),
+    )
+
+    assert request.training_status is TrainingStatus.ADVANCED
+
+
+def test_volume_target_exposes_soft_and_hard_boundaries() -> None:
+    request = normalized(primary_goal=Goal.HYPERTROPHY)
+    target = plan_weekly_volume(request, select_split(request, RULESET), RULESET).targets[0]
+
+    assert target.minimum_soft <= target.target_sets <= target.maximum_soft <= target.maximum_hard

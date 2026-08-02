@@ -77,7 +77,7 @@ class Limitation(BaseModel):
 class RecentTrainingHistory(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    consistent_weeks: int = Field(default=0, ge=0, le=520)
+    consistent_weeks: int | None = Field(default=None, ge=0, le=520)
     completed_session_ratio: float = Field(default=0.0, ge=0, le=1)
     previous_weekly_sets_by_muscle: dict[MuscleGroup, int] = Field(default_factory=dict)
     performance_trend: str | None = None
@@ -226,8 +226,16 @@ class SplitPlan:
 @dataclass(frozen=True)
 class VolumeTarget:
     muscle: MuscleGroup
-    direct_sets: int
+    minimum_soft: int
+    target_sets: int
+    maximum_soft: int
+    maximum_hard: int
     fractional_sets: float
+
+    @property
+    def direct_sets(self) -> int:
+        """Compatibility alias for the planned direct-set target."""
+        return self.target_sets
 
 
 @dataclass(frozen=True)

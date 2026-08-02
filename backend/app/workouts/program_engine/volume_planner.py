@@ -1,7 +1,7 @@
 import math
 
 from app.exercises.enums import MuscleGroup
-from app.workouts.program_engine.enums import PhysicalJobDemand, RecoveryRating
+from app.workouts.program_engine.enums import PhysicalJobDemand, RecoveryRating, TrainingStatus
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     NormalizedProgramRequest,
@@ -54,6 +54,18 @@ def plan_weekly_volume(
         base = max(minimum, base - ruleset.contextual_volume_reduction_sets)
         reasons.append("VOLUME_REDUCED_FOR_RECOVERY")
 
+    soft_allowance = ruleset.soft_maximum_allowance_sets[request.training_status]
+    if recovery_signals:
+        soft_allowance = min(soft_allowance, 1)
+    elif (
+        request.training_status is TrainingStatus.ADVANCED
+        and source.sleep_quality is RecoveryRating.GOOD
+        and source.stress_level is RecoveryRating.GOOD
+        and source.physical_job_demand is not PhysicalJobDemand.HIGH
+        and not source.recent_training_history.recovery_problems
+    ):
+        soft_allowance += ruleset.good_recovery_soft_maximum_bonus_sets
+
     targets: list[VolumeTarget] = []
     for muscle in MAJOR_MUSCLES:
         sets = base
@@ -74,7 +86,10 @@ def plan_weekly_volume(
         targets.append(
             VolumeTarget(
                 muscle=muscle,
-                direct_sets=sets,
+                minimum_soft=minimum,
+                target_sets=sets,
+                maximum_soft=min(maximum, sets + soft_allowance),
+                maximum_hard=maximum,
                 fractional_sets=round(sets * ruleset.secondary_set_credit, 1),
             )
         )
