@@ -177,7 +177,12 @@ def test_four_day_program_does_not_round_each_muscle_exposure_up() -> None:
         available_training_days=4,
     )
 
-    result = generate_program(source, catalog(), RULESET)
+    result = generate_program(
+        source,
+        catalog()
+        + [exercise("press", MovementPattern.VERTICAL_PUSH, MuscleGroup.SHOULDERS)],
+        RULESET,
+    )
 
     assert result.program is not None, result.errors
     direct = result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]

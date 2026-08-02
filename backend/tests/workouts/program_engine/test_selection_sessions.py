@@ -309,3 +309,25 @@ def test_body_part_rotation_places_priority_shoulders_first() -> None:
     )
 
     assert sessions[0].exercises[0].primary_muscle is MuscleGroup.SHOULDERS
+
+
+def test_specialization_day_resolves_to_priority_muscle_group() -> None:
+    request = normalized(
+        priority_muscles=[MuscleGroup.BACK],
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        recent_training_history=RecentTrainingHistory(consistent_weeks=20),
+    )
+    split = SplitPlan(SplitType.BODY_PART_ROTATION, ("specialization",), (0,), 1, ())
+    sessions = build_sessions(
+        request,
+        split,
+        plan_weekly_volume(request, split, RULESET),
+        _body_part_catalog(),
+        RULESET,
+    )
+
+    assert sessions[0].focus == "back_biceps"
+    assert {item.primary_muscle for item in sessions[0].exercises}.issuperset(
+        {MuscleGroup.BACK, MuscleGroup.BICEPS}
+    )

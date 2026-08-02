@@ -45,11 +45,11 @@ def build_sessions(
     exercises: tuple[ExerciseCandidate, ...],
     ruleset: ProgramRuleset,
 ) -> tuple[SessionDraft, ...]:
-    del volume
     by_pattern = _by_pattern(exercises)
     usage: Counter[UUID] = Counter()
     sessions: list[SessionDraft] = []
-    for index, focus in enumerate(split.day_focuses):
+    for index, planned_focus in enumerate(split.day_focuses):
+        focus = _resolve_focus(planned_focus, request, volume)
         capacity = max(
             ruleset.minimum_exercises_per_session,
             min(
@@ -188,6 +188,19 @@ def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
             SlotSpec(frozenset({MovementPattern.ELBOW_FLEXION}), False),
             SlotSpec(frozenset({MovementPattern.ELBOW_EXTENSION}), False),
         )
+    if focus == "quadriceps_calves":
+        return (
+            SlotSpec(KNEE_PATTERNS, True, MuscleGroup.QUADRICEPS),
+            SlotSpec(frozenset({MovementPattern.KNEE_EXTENSION}), False, MuscleGroup.QUADRICEPS),
+            SlotSpec(frozenset({MovementPattern.CALF_RAISE}), False, MuscleGroup.CALVES),
+        )
+    if focus == "posterior_chain_core":
+        return (
+            SlotSpec(HINGE_PATTERNS, True, MuscleGroup.HAMSTRINGS),
+            SlotSpec(frozenset({MovementPattern.HIP_EXTENSION}), False, MuscleGroup.GLUTES),
+            SlotSpec(frozenset({MovementPattern.KNEE_FLEXION}), False, MuscleGroup.HAMSTRINGS),
+            SlotSpec(CORE_PATTERNS, False, MuscleGroup.ABS),
+        )
     if focus.startswith("lower") or focus == "legs":
         return (
             SlotSpec(KNEE_PATTERNS, True),
@@ -236,6 +249,35 @@ def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
         SlotSpec(HINGE_PATTERNS, False),
         SlotSpec(CORE_PATTERNS, False),
     )
+
+
+def _resolve_focus(
+    focus: str,
+    request: NormalizedProgramRequest,
+    volume: WeeklyVolumePlan,
+) -> str:
+    if focus != "specialization":
+        return focus
+    priorities = request.source.priority_muscles
+    for muscle_group, specialized_focus in (
+        ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
+        ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),
+        ((MuscleGroup.SHOULDERS, MuscleGroup.TRAPS), "shoulders_traps"),
+        ((MuscleGroup.QUADRICEPS, MuscleGroup.CALVES), "quadriceps_calves"),
+        ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.ABS), "posterior_chain_core"),
+    ):
+        if priorities.intersection(muscle_group):
+            return specialized_focus
+    highest_target = max(volume.targets, key=lambda target: target.target_sets).muscle
+    if highest_target in {MuscleGroup.BACK}:
+        return "back_biceps"
+    if highest_target in {MuscleGroup.SHOULDERS}:
+        return "shoulders_traps"
+    if highest_target in {MuscleGroup.QUADRICEPS, MuscleGroup.CALVES}:
+        return "quadriceps_calves"
+    if highest_target in {MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.ABS}:
+        return "posterior_chain_core"
+    return "chest_triceps"
 
 
 def _duplicates_substitution_group(

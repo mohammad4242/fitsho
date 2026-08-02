@@ -58,47 +58,30 @@ def generate_split_candidates(days: int) -> tuple[SplitCandidate, ...]:
                 SplitType.FULL_BODY_ABC,
                 ("full_body_a", "full_body_b", "full_body_c"),
             ),
-            SplitCandidate(
-                SplitType.UPPER_LOWER_FULL,
-                ("upper", "lower", "full_body"),
-            ),
         ),
         4: (
             SplitCandidate(
-                SplitType.UPPER_LOWER,
-                ("upper", "lower", "upper", "lower"),
-            ),
-            SplitCandidate(
-                SplitType.FULL_BODY_FOUR,
-                ("full_body_a", "full_body_b", "full_body_c", "full_body_d"),
-            ),
-            SplitCandidate(
-                SplitType.PHUL,
-                ("upper_strength", "lower_strength", "upper_hypertrophy", "lower_hypertrophy"),
-            ),
-            SplitCandidate(
                 SplitType.BODY_PART_ROTATION,
-                ("chest_triceps", "back_biceps", "shoulders_traps", "legs"),
+                ("chest_triceps", "back_biceps", "legs", "shoulders_traps"),
             ),
         ),
         5: (
             SplitCandidate(
-                SplitType.UPPER_LOWER_SPECIALIZATION,
-                ("upper", "lower", "upper", "lower", "specialization"),
-            ),
-            SplitCandidate(
-                SplitType.PUSH_PULL_LEGS_UPPER_LOWER,
-                ("push", "pull", "legs", "upper", "lower"),
+                SplitType.BODY_PART_ROTATION,
+                ("chest_triceps", "back_biceps", "shoulders_traps", "legs", "specialization"),
             ),
         ),
         6: (
             SplitCandidate(
-                SplitType.PUSH_PULL_LEGS_X2,
-                ("push", "pull", "legs", "push", "pull", "legs"),
-            ),
-            SplitCandidate(
-                SplitType.UPPER_LOWER_X3,
-                ("upper", "lower", "upper", "lower", "upper", "lower"),
+                SplitType.BODY_PART_ROTATION,
+                (
+                    "chest_triceps",
+                    "back_biceps",
+                    "quadriceps_calves",
+                    "shoulders_traps",
+                    "posterior_chain_core",
+                    "specialization",
+                ),
             ),
         ),
     }
@@ -193,14 +176,9 @@ def score_split_candidates(
         } and request.training_status is TrainingStatus.ADVANCED:
             score += ruleset.phul_bonus
             reasons.append("SPLIT_SELECTED_FOR_PERIODIZED_UPPER_LOWER")
-        if (
-            candidate.split_type is SplitType.BODY_PART_ROTATION
-            and request.training_status is TrainingStatus.ADVANCED
-            and request.primary_goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN}
-            and request.source.session_duration_minutes >= 60
-        ):
+        if candidate.split_type is SplitType.BODY_PART_ROTATION:
             score += ruleset.body_part_rotation_bonus
-            reasons.append("SPLIT_SELECTED_FOR_BODY_PART_SPECIALIZATION")
+            reasons.append("SPLIT_SELECTED_FOR_SPECIALIZED_DIRECT_TARGETS")
 
         weekdays = _select_weekdays(
             len(candidate.day_focuses),

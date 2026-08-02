@@ -17,9 +17,9 @@ from workouts.program_engine.golden_fixtures import (
         ("novice_1_day_45_general", SplitType.FULL_BODY),
         ("novice_2_days_35_general", SplitType.FULL_BODY_AB),
         ("novice_3_days_fat_loss_low_impact", SplitType.FULL_BODY_ABC),
-        ("intermediate_4_days_hypertrophy", SplitType.UPPER_LOWER),
-        ("intermediate_5_days_shoulder_priority", SplitType.UPPER_LOWER_SPECIALIZATION),
-        ("advanced_4_days_strength", SplitType.PHUL),
+        ("intermediate_4_days_hypertrophy", SplitType.BODY_PART_ROTATION),
+        ("intermediate_5_days_shoulder_priority", SplitType.BODY_PART_ROTATION),
+        ("advanced_4_days_strength", SplitType.BODY_PART_ROTATION),
     ],
 )
 def test_golden_split_and_validation(name: str, split_type: SplitType) -> None:
@@ -89,6 +89,22 @@ def test_priority_muscle_affects_volume_and_order() -> None:
     ]
     assert shoulder_days
     assert all(day.exercises[0].primary_muscle is MuscleGroup.SHOULDERS for day in shoulder_days)
+
+
+def test_four_day_program_separates_direct_upper_body_targets() -> None:
+    result = generate_program(
+        golden_scenarios()["intermediate_4_days_hypertrophy"], full_catalog(), RULESET
+    )
+
+    assert result.program is not None, result.errors
+    direct_targets = [
+        tuple(item.primary_muscle for item in day.exercises if item.primary_muscle is not None)
+        for day in result.program.weekly_schedule
+    ]
+    assert direct_targets[0] == (MuscleGroup.CHEST, MuscleGroup.TRICEPS)
+    assert direct_targets[1] == (MuscleGroup.BACK, MuscleGroup.BICEPS)
+    assert MuscleGroup.CHEST not in direct_targets[1]
+    assert MuscleGroup.BACK not in direct_targets[0]
 
 
 def test_program_trace_explains_priority_volume_and_repair_boundary() -> None:

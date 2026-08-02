@@ -128,7 +128,7 @@ def test_poor_recovery_user_can_receive_fewer_sessions_than_available() -> None:
     assert "SPLIT_SELECTED_FOR_APPROPRIATE_SESSION_COUNT" in split.reason_codes
 
 
-def test_intermediate_four_day_hypertrophy_uses_upper_lower_frequency() -> None:
+def test_intermediate_four_day_hypertrophy_uses_specialized_direct_target_days() -> None:
     split = select_split(
         normalized(
             available_training_days=4,
@@ -140,9 +140,13 @@ def test_intermediate_four_day_hypertrophy_uses_upper_lower_frequency() -> None:
         RULESET,
     )
 
-    assert split.split_type is SplitType.UPPER_LOWER
-    assert split.day_focuses.count("upper") == 2
-    assert split.day_focuses.count("lower") == 2
+    assert split.split_type is SplitType.BODY_PART_ROTATION
+    assert split.day_focuses == (
+        "chest_triceps",
+        "back_biceps",
+        "legs",
+        "shoulders_traps",
+    )
 
 
 def test_advanced_hypertrophy_user_can_select_body_part_rotation() -> None:
@@ -162,21 +166,23 @@ def test_advanced_hypertrophy_user_can_select_body_part_rotation() -> None:
     assert split.day_focuses == (
         "chest_triceps",
         "back_biceps",
-        "shoulders_traps",
         "legs",
+        "shoulders_traps",
     )
 
 
 def test_five_days_generate_multiple_valid_split_candidates() -> None:
     candidates = generate_split_candidates(5)
 
-    assert {candidate.split_type for candidate in candidates} == {
-        SplitType.UPPER_LOWER_SPECIALIZATION,
-        SplitType.PUSH_PULL_LEGS_UPPER_LOWER,
-    }
+    assert candidates == (
+        type(candidates[0])(
+            SplitType.BODY_PART_ROTATION,
+            ("chest_triceps", "back_biceps", "shoulders_traps", "legs", "specialization"),
+        ),
+    )
 
 
-def test_advanced_six_day_strength_selects_specific_ppl_candidate() -> None:
+def test_six_day_program_uses_specialized_direct_target_days() -> None:
     split = select_split(
         normalized(
             available_training_days=6,
@@ -188,8 +194,15 @@ def test_advanced_six_day_strength_selects_specific_ppl_candidate() -> None:
         RULESET,
     )
 
-    assert split.split_type is SplitType.PUSH_PULL_LEGS_X2
-    assert "SPLIT_SELECTED_FOR_GOAL_SPECIFICITY" in split.reason_codes
+    assert split.split_type is SplitType.BODY_PART_ROTATION
+    assert split.day_focuses == (
+        "chest_triceps",
+        "back_biceps",
+        "quadriceps_calves",
+        "shoulders_traps",
+        "posterior_chain_core",
+        "specialization",
+    )
 
 
 def test_priority_muscle_receives_more_but_bounded_volume() -> None:
@@ -203,6 +216,21 @@ def test_priority_muscle_receives_more_but_bounded_volume() -> None:
     chest_sets = plan.direct_sets_for(MuscleGroup.CHEST)
     assert shoulder_sets > chest_sets
     assert shoulder_sets <= RULESET.maximum_sets[request.training_status]
+
+
+def test_specialized_four_day_split_caps_volume_to_one_safe_exposure() -> None:
+    request = normalized(
+        primary_goal=Goal.HYPERTROPHY,
+        available_training_days=4,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        recent_training_history=RecentTrainingHistory(consistent_weeks=20),
+    )
+    plan = plan_weekly_volume(request, select_split(request, RULESET), RULESET)
+
+    assert plan.direct_sets_for(MuscleGroup.CHEST) <= RULESET.max_sets_per_muscle_per_session
+    assert plan.direct_sets_for(MuscleGroup.SHOULDERS) <= RULESET.max_sets_per_muscle_per_session
+    assert "VOLUME_CAPPED_FOR_SPLIT_FREQUENCY" in plan.reason_codes
 
 
 def test_poor_recovery_reduces_volume_without_falling_below_novice_floor() -> None:
