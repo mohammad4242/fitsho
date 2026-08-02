@@ -91,6 +91,20 @@ def test_priority_muscle_affects_volume_and_order() -> None:
     assert all(day.exercises[0].primary_muscle is MuscleGroup.SHOULDERS for day in shoulder_days)
 
 
+def test_program_trace_explains_priority_volume_and_repair_boundary() -> None:
+    result = generate_program(
+        golden_scenarios()["intermediate_5_days_shoulder_priority"], full_catalog(), RULESET
+    )
+
+    assert result.program is not None, result.errors
+    stages = {entry["stage"] for entry in result.program.decision_trace}
+    assert {"split", "volume", "volume_repair"}.issubset(stages)
+    ranges = result.program.aggregate_metrics["volume_ranges_by_muscle"]
+    assert ranges[MuscleGroup.SHOULDERS.value]["target_sets"] > ranges[MuscleGroup.CHEST.value][
+        "target_sets"
+    ]
+
+
 def test_low_impact_scenario_never_uses_high_impact_cardio() -> None:
     source = golden_scenarios()["novice_3_days_fat_loss_low_impact"]
     result = generate_program(source, full_catalog(), RULESET)

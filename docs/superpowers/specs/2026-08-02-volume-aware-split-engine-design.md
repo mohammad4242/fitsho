@@ -2,7 +2,7 @@
 
 ## Scope
 
-Refine the deterministic Fitsho coach for hypertrophy-focused beginner and intermediate users. The engine must treat the profile's available training days as a maximum, choose an appropriate split and actual number of resistance sessions, and repair volume allocation before final validation.
+Refine the deterministic Fitsho coach for hypertrophy-focused beginner, intermediate, and appropriately recovered advanced users. The engine must treat the profile's available training days as a maximum, choose an appropriate split and actual number of resistance sessions, and repair volume allocation before final validation.
 
 ## Decisions
 
@@ -21,11 +21,11 @@ The selector scores every compatible template at every feasible number of resist
 | --- | --- | --- |
 | 2 | Full Body A/B | compact, balanced exposure |
 | 3 | Full Body A/B/C; Upper/Lower/Full | balanced hypertrophy and time efficiency |
-| 4 | PHUL; Torso/Limbs; Push/Pull/Legs plus Full or priority session | intermediate and advanced users |
-| 5 | Push/Pull/Legs/Upper/Lower; PHAT; four-day base plus specialization | higher volume or a priority muscle |
+| 4 | Upper/Lower; Full Body Four; PHUL; Body-Part Rotation | intermediate and advanced users |
+| 5 | Push/Pull/Legs/Upper/Lower; Upper/Lower plus specialization | higher volume or a priority muscle |
 | 6 | Push/Pull/Legs A/B; Upper/Lower A/B/C | advanced users with adequate recovery |
 
-Five-day `Push/Pull/Legs/Upper/Lower` is the balanced default. It provides a second exposure for chest, back, shoulders, arms, quadriceps, hamstrings, glutes, calves, and trunk without assigning a universal body-part rule.
+Five-day `Push/Pull/Legs/Upper/Lower` is a balanced candidate, not a universal default. It provides a second exposure for chest, back, shoulders, arms, quadriceps, hamstrings, glutes, calves, and trunk without assigning a universal body-part rule. The body-part rotation candidate is only scored as a preference for an advanced hypertrophy user with at least 60 minutes per session.
 
 ```text
 Push: chest, anterior/lateral deltoids, triceps
@@ -57,17 +57,27 @@ The two lower days are separated, chest and back receive two planned exposures, 
 2. Allocate each muscle's integer direct-set budget across its appearances exactly. For example, a target of ten sets across three appearances becomes `4 + 3 + 3`, never `4 + 4 + 4` due to repeated ceiling rounding.
 3. Fit the prescriptions into the session time budget.
 4. Repair deterministically before validation, in this order:
-   - remove excess above the soft maximum from non-priority and redundant slots;
-   - reduce low-value direct accessory sets;
-   - remove redundant movement slots;
-   - re-score a lower-session-count template when the selected template cannot satisfy hard limits.
+   - reduce hard excess from later non-priority work while preserving minimum working sets;
+   - remove a redundant direct exposure only when another exposure of that muscle remains;
+   - rebuild exercise order and session-time estimates.
 5. Preserve priority-muscle volume unless no valid safe plan remains.
 
 ## Validator behavior
 
 - Values below `minimum_soft` or above `maximum_soft` produce structured warnings and an explanation.
 - A value above `maximum_hard`, a session-duration violation, a safety violation, or a movement/equipment conflict fails validation.
-- The validation report exposes direct sets, fractional indirect sets, effective exposure, soft-range warnings, hard failures, selected split alternatives, and repair decisions.
+- The validation report exposes direct sets, fractional indirect sets, soft-range warnings, hard failures, and repair decisions. Effective exposure is available to later ranking rules but is not yet a separate persisted metric.
+
+## Future approved physique-assessment boundary
+
+Future body-image analysis is advisory only. The workflow is strictly:
+
+```text
+body photos -> model preliminary observations -> human coach approval or edit
+-> structured approved priorities and limitations -> deterministic engine
+```
+
+Only the approved structured result may affect `priority_muscles`, volume targets, exercise order, or split scoring. A raw model assessment cannot change a program, diagnose a condition, or override safety constraints. The current engine already consumes `priority_muscles`, so this future workflow requires an approval record and UI/API integration rather than a new training-rule path.
 
 ## Tests
 
