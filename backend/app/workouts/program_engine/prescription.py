@@ -11,6 +11,7 @@ from app.workouts.program_engine.schemas import (
     WeeklyVolumePlan,
     WorkoutDay,
 )
+from app.workouts.program_engine.session_targets import english_session_title
 
 
 def prescribe_sessions(
@@ -117,7 +118,7 @@ def prescribe_sessions(
             WorkoutDay(
                 day_index=draft.day_index,
                 weekday=draft.weekday,
-                title=f"Day {draft.day_index}: {draft.focus.replace('_', ' ').title()}",
+                title=english_session_title(draft.day_index, programmed),
                 focus=draft.focus,
                 estimated_duration_minutes=estimated,
                 exercises=tuple(programmed),

@@ -12,7 +12,12 @@ from app.exercises.dependencies import require_completed_profile
 from app.exercises.models import Exercise
 from app.exercises.schemas import ExerciseSummary
 from app.workouts.dependencies import WorkoutGenerationServiceDependency
-from app.workouts.models import WorkoutPlan, WorkoutPlanExercise
+from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
+from app.workouts.program_engine.session_targets import (
+    english_session_title_for_targets,
+    persian_session_title_for_targets,
+    target_muscles_from_values,
+)
 from app.workouts.repository import get_plan_for_user
 from app.workouts.schemas import (
     ProgramGenerationOverrides,
@@ -123,8 +128,8 @@ def to_plan_response(plan: WorkoutPlan, *, is_stale: bool = False) -> WorkoutPla
         days=[
             WorkoutDayResponse(
                 day_number=day.day_number,
-                title_en=day.title_en,
-                title_fa=day.title_fa,
+                title_en=_day_titles(plan, day)[0],
+                title_fa=_day_titles(plan, day)[1],
                 estimated_duration_minutes=day.estimated_duration_minutes,
                 weekday=day.weekday,
                 focus=day.focus,
@@ -165,6 +170,23 @@ def to_plan_response(plan: WorkoutPlan, *, is_stale: bool = False) -> WorkoutPla
         aggregate_metrics=plan.aggregate_metrics,
         progression_policy=plan.progression_policy,
         decision_trace=plan.decision_trace,
+    )
+
+
+def _day_titles(plan: WorkoutPlan, day: WorkoutDay) -> tuple[str, str]:
+    if plan.engine_version != "program_engine_v1":
+        return day.title_en, day.title_fa
+    targets = target_muscles_from_values(
+        item.exercise_snapshot.get("primary_muscle")
+        if item.exercise_snapshot
+        else item.exercise.primary_muscle
+        for item in day.exercises
+    )
+    if not targets:
+        return day.title_en, day.title_fa
+    return (
+        english_session_title_for_targets(day.day_number, targets),
+        persian_session_title_for_targets(day.day_number, targets),
     )
 
 

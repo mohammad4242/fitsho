@@ -148,6 +148,22 @@ def test_warmup_sets_do_not_count_toward_working_volume() -> None:
     assert direct[MuscleGroup.CHEST.value] == expected
 
 
+def test_session_title_lists_direct_targets_but_not_secondary_muscles() -> None:
+    candidates = catalog()
+    candidates[0] = replace(
+        candidates[0],
+        secondary_muscles=(MuscleGroup.TRICEPS, MuscleGroup.SHOULDERS),
+    )
+
+    result = generate_program(request(), candidates, RULESET)
+
+    assert result.program is not None
+    assert result.program.weekly_schedule[0].title == (
+        "Day 1: Chest + Back + Quadriceps + Hamstrings + Abs"
+    )
+    assert "Triceps" not in result.program.weekly_schedule[0].title
+
+
 def test_direct_sets_are_distributed_exactly_across_exposures() -> None:
     assert allocate_direct_sets(10, 3, RULESET.minimum_working_sets) == (4, 3, 3)
     assert allocate_direct_sets(9, 4, RULESET.minimum_working_sets) == (3, 2, 2, 2)

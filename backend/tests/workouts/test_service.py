@@ -172,6 +172,8 @@ def test_generation_persists_valid_snapshot_then_reuses_signature(db: Session) -
     assert first.plan.validation_report["errors"] == []
     assert first.plan.exercise_catalog_snapshot["hash"] == first.plan.candidate_set_hash
     assert first.plan.generation_records[0].status is WorkoutGenerationStatus.SUCCEEDED
+    assert first.plan.days[0].title_en == "Day 1: Chest + Back + Quadriceps + Hamstrings + Abs"
+    assert first.plan.days[0].title_fa == "روز 1: سینه + زیربغل + چهارسر + پشت پا + شکم"
 
 
 def test_generation_never_calls_legacy_model_provider(db: Session) -> None:

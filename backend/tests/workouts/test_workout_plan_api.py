@@ -66,14 +66,19 @@ def _plan(db: Session, user_id: UUID) -> WorkoutPlan:
     return plan
 
 
-def _exercise(slug: str, *, is_active: bool = True) -> Exercise:
+def _exercise(
+    slug: str,
+    *,
+    is_active: bool = True,
+    muscle: MuscleGroup = MuscleGroup.CHEST,
+) -> Exercise:
     unique_slug = f"{slug}-{uuid4().hex}"
     return Exercise(
         slug=unique_slug,
         name_en=unique_slug.replace("-", " ").title(),
         name_fa=f"حرکت {unique_slug}",
         body_region=BodyRegion.UPPER_BODY,
-        primary_muscle=MuscleGroup.CHEST,
+        primary_muscle=muscle,
         difficulty=Difficulty.BEGINNER,
         instructions_en=["Set up.", "Perform the movement.", "Finish safely."],
         instructions_fa=["شروع کن.", "حرکت را انجام بده.", "ایمن تمام کن."],
@@ -198,6 +203,59 @@ def test_workout_plan_returns_active_curated_alternatives_read_only(
             },
         }
     ]
+
+
+def test_deterministic_plan_response_derives_titles_from_direct_targets(
+    client: TestClient, db: Session
+) -> None:
+    user_id = _register_and_complete_profile(client, "direct-target-titles@example.com")
+    plan = _plan(db, user_id)
+    plan.engine_version = "program_engine_v1"
+    chest = _exercise("direct-chest", muscle=MuscleGroup.CHEST)
+    triceps = _exercise("direct-triceps", muscle=MuscleGroup.TRICEPS)
+    day = WorkoutDay(
+        workout_plan=plan,
+        day_number=1,
+        title_en="Upper body",
+        title_fa="بالاتنه",
+        estimated_duration_minutes=30,
+    )
+    db.add_all(
+        [
+            chest,
+            triceps,
+            day,
+            WorkoutPlanExercise(
+                workout_day=day,
+                exercise=chest,
+                order_index=1,
+                sets=3,
+                reps_min=8,
+                reps_max=12,
+                rest_seconds=90,
+                rir=2,
+                estimated_minutes=8,
+            ),
+            WorkoutPlanExercise(
+                workout_day=day,
+                exercise=triceps,
+                order_index=2,
+                sets=2,
+                reps_min=10,
+                reps_max=15,
+                rest_seconds=60,
+                rir=2,
+                estimated_minutes=6,
+            ),
+        ]
+    )
+    db.commit()
+
+    response = client.get(f"/api/v1/workout-plans/{plan.id}")
+
+    assert response.status_code == 200
+    assert response.json()["days"][0]["title_en"] == "Day 1: Chest + Triceps"
+    assert response.json()["days"][0]["title_fa"] == "روز 1: سینه + پشت بازو"
 
 
 def test_generate_uses_authenticated_user_and_returns_reuse_flag(

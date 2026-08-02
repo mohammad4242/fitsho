@@ -51,6 +51,7 @@ from app.workouts.program_engine.schemas import (
     ProgramGenerationRequest,
     WorkoutProgram,
 )
+from app.workouts.program_engine.session_targets import persian_session_title
 from app.workouts.prompt_builder import build_workout_generation_model_request
 from app.workouts.repository import (
     activate_plan,
@@ -542,7 +543,7 @@ class WorkoutGenerationService:
                 day_number=output_day.day_index,
                 weekday=output_day.weekday,
                 title_en=output_day.title,
-                title_fa=_persian_title(output_day.focus, output_day.day_index),
+                title_fa=persian_session_title(output_day.day_index, output_day.exercises),
                 focus=output_day.focus,
                 cardio=_json_ready(asdict(output_day.cardio)) if output_day.cardio else None,
                 estimated_duration_minutes=output_day.estimated_duration_minutes,
@@ -806,19 +807,6 @@ class WorkoutGenerationService:
     def _is_plan_expired(cls, plan: WorkoutPlan) -> bool:
         started_at = plan.activated_at or plan.created_at
         return datetime.now(UTC) >= started_at + timedelta(weeks=cls.plan_duration_weeks(plan))
-
-
-def _persian_title(focus: str, day_index: int) -> str:
-    labels = {
-        "upper": "بالاتنه",
-        "lower": "پایین‌تنه",
-        "push": "حرکات فشاری",
-        "pull": "حرکات کششی",
-        "legs": "پا",
-        "specialization": "تخصصی",
-    }
-    label = labels.get(focus, "تمام بدن")
-    return f"روز {day_index}: {label}"
 
 
 def _json_ready(value: object) -> object:
