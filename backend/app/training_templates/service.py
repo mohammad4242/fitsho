@@ -1,0 +1,120 @@
+from dataclasses import dataclass
+from uuid import UUID
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
+
+from app.exercises.models import Exercise
+from app.training_templates.models import (
+    TrainingProgramTemplate,
+    TrainingProgramTemplateDay,
+    TrainingProgramTemplateSlot,
+)
+from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS
+
+
+@dataclass(frozen=True)
+class TrainingTemplateSeedResult:
+    templates: int
+    linked_slots: int
+    placeholder_slots: int
+
+
+def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
+    exercises_by_slug: dict[str, UUID] = {
+        slug: exercise_id for slug, exercise_id in db.execute(select(Exercise.slug, Exercise.id))
+    }
+    linked_slots = 0
+    placeholder_slots = 0
+
+    for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS:
+        template = db.scalar(
+            select(TrainingProgramTemplate)
+            .where(TrainingProgramTemplate.slug == seed.slug)
+            .options(
+                selectinload(TrainingProgramTemplate.days).selectinload(
+                    TrainingProgramTemplateDay.slots
+                )
+            )
+        )
+        if template is None:
+            template = TrainingProgramTemplate(slug=seed.slug)
+            db.add(template)
+        else:
+            template.days.clear()
+
+        template.name_en = seed.name_en
+        template.name_fa = seed.name_fa
+        template.description_en = seed.description_en
+        template.description_fa = seed.description_fa
+        template.days_per_week = seed.days_per_week
+        template.training_level = seed.training_level
+        template.fitness_goal = seed.fitness_goal
+        template.focus_tags = list(seed.focus_tags)
+        template.intensity_methods = [method.value for method in seed.intensity_methods]
+        template.source_name = "Fitsho original evidence-informed template"
+        template.source_url = "https://pubmed.ncbi.nlm.nih.gov/38595233/"
+        template.is_active = True
+
+        for day_number, day_seed in enumerate(seed.days, start=1):
+            day = TrainingProgramTemplateDay(
+                day_number=day_number,
+                title_en=day_seed.title_en,
+                title_fa=day_seed.title_fa,
+                direct_target_muscles=[muscle.value for muscle in day_seed.direct_target_muscles],
+            )
+            template.days.append(day)
+            for slot_order, slot_seed in enumerate(day_seed.slots, start=1):
+                exercise_id = exercises_by_slug.get(slot_seed.exercise_slug_hint)
+                if exercise_id is None:
+                    placeholder_slots += 1
+                else:
+                    linked_slots += 1
+                day.slots.append(
+                    TrainingProgramTemplateSlot(
+                        slot_order=slot_order,
+                        exercise_id=exercise_id,
+                        exercise_slug_hint=slot_seed.exercise_slug_hint,
+                        placeholder_name_en=slot_seed.placeholder_name_en,
+                        placeholder_name_fa=slot_seed.placeholder_name_fa,
+                        target_muscles=[muscle.value for muscle in slot_seed.target_muscles],
+                        movement_pattern=slot_seed.movement_pattern,
+                        intensity_method=slot_seed.intensity_method,
+                        sets=slot_seed.sets,
+                        rep_min=slot_seed.rep_min,
+                        rep_max=slot_seed.rep_max,
+                        target_rir=slot_seed.target_rir,
+                        rest_seconds=slot_seed.rest_seconds,
+                    )
+                )
+
+    db.commit()
+    return TrainingTemplateSeedResult(
+        templates=len(TRAINING_PROGRAM_TEMPLATE_SEEDS),
+        linked_slots=linked_slots,
+        placeholder_slots=placeholder_slots,
+    )
+
+
+def list_training_program_templates(
+    db: Session,
+    *,
+    days_per_week: int | None = None,
+) -> list[TrainingProgramTemplate]:
+    statement = (
+        select(TrainingProgramTemplate)
+        .where(TrainingProgramTemplate.is_active.is_(True))
+        .options(
+            selectinload(TrainingProgramTemplate.days)
+            .selectinload(TrainingProgramTemplateDay.slots)
+            .selectinload(TrainingProgramTemplateSlot.exercise)
+        )
+        .order_by(
+            TrainingProgramTemplate.days_per_week.asc(),
+            TrainingProgramTemplate.training_level.asc(),
+            TrainingProgramTemplate.name_en.asc(),
+        )
+    )
+    if days_per_week is not None:
+        statement = statement.where(TrainingProgramTemplate.days_per_week == days_per_week)
+    return list(db.scalars(statement))

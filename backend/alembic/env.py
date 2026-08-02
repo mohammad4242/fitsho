@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.database.base import Base
 from app.exercises import models as exercise_models  # noqa: F401
 from app.profile import models as profile_models  # noqa: F401
+from app.training_templates import models as training_template_models  # noqa: F401
 from app.workouts import models as workout_models  # noqa: F401
 
 config = context.config
