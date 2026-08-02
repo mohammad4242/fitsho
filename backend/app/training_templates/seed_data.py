@@ -415,11 +415,10 @@ def _specialized_template_movement_floors(
     template: TrainingProgramTemplateSeed,
 ) -> TrainingProgramTemplateSeed:
     if template.days_per_week < 4 or "body_part_rotation" not in template.focus_tags:
-        return replace(template, is_active=False) if template.days_per_week == 6 else template
+        return template
     return replace(
         template,
         days=tuple(_specialized_day_movement_floors(day) for day in template.days),
-        is_active=False if template.days_per_week == 6 else template.is_active,
     )
 
 

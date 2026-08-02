@@ -270,7 +270,7 @@ export function ExperienceFields({
           inputMode="numeric"
           autoComplete="off"
           min={2}
-          max={5}
+          max={6}
           step={1}
           required
           value={values.training_days_per_week}

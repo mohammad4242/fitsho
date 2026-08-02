@@ -24,7 +24,7 @@ def test_seed_adds_five_templates_for_every_supported_training_frequency(db: Ses
         assert sum(template.days_per_week == days_per_week for template in templates) >= 5
 
 
-def test_active_library_offers_two_through_five_days_and_only_full_body_two_day_templates(
+def test_active_library_offers_two_through_six_days_and_only_full_body_two_day_templates(
     db: Session,
 ) -> None:
     seed_exercises(db)
@@ -36,7 +36,7 @@ def test_active_library_offers_two_through_five_days_and_only_full_body_two_day_
         )
     )
 
-    assert {template.days_per_week for template in active_templates} == {2, 3, 4, 5}
+    assert {template.days_per_week for template in active_templates} == {2, 3, 4, 5, 6}
     assert all(
         "full_body" in template.focus_tags
         for template in active_templates

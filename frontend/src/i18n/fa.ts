@@ -133,7 +133,7 @@ const fa = {
         heightRange: "قد باید بین ۱۰۰ تا ۲۵۰ سانتی‌متر باشد.",
         weightRange: "وزن باید بین ۲۰ تا ۵۰۰ کیلوگرم باشد.",
         weightPrecision: "وزن حداکثر دو رقم اعشار داشته باشد.",
-        trainingDaysRange: "روزهای تمرین باید بین ۲ تا ۵ باشد.",
+        trainingDaysRange: "روزهای تمرین باید بین ۲ تا ۶ باشد.",
         sessionDurationInvalid: "زمان جلسه باید یکی از گزینه‌های موجود باشد.",
         planDurationInvalid: "مدت برنامه باید ۴، ۶ یا ۸ هفته باشد.",
         limitationsLength: "محدودیت‌ها حداکثر ۱۰۰۰ نویسه است.",

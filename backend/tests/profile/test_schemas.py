@@ -49,7 +49,7 @@ def test_calculate_age_handles_birthday_boundary() -> None:
         ("current_weight_kg", "70.123"),
         ("training_days_per_week", 0),
         ("training_days_per_week", 1),
-        ("training_days_per_week", 6),
+        ("training_days_per_week", 7),
         ("training_days_per_week", 8),
         ("sex", "unknown"),
         ("fitness_goal", "bulk"),
@@ -65,6 +65,13 @@ def test_profile_create_rejects_invalid_values(field: str, value: object) -> Non
 
     with pytest.raises(ValidationError):
         ProfileCreate.model_validate(payload)
+
+
+def test_profile_create_accepts_six_training_days() -> None:
+    payload = valid_payload()
+    payload["training_days_per_week"] = 6
+
+    assert ProfileCreate.model_validate(payload).training_days_per_week == 6
 
 
 @pytest.mark.parametrize(
