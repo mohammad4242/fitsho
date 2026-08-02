@@ -11,6 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.admin.router import router as admin_router
 from app.auth.router import router as auth_router
+from app.body_photos.router import router as body_photo_router
 from app.config import Settings, get_settings
 from app.exercises.router import router as exercises_router
 from app.profile.router import router as profile_router
@@ -38,8 +39,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=[active_settings.frontend_origin],
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PATCH"],
-        allow_headers=["Content-Type"],
+        allow_methods=["DELETE", "GET", "PATCH", "POST", "PUT"],
+        allow_headers=[
+            "Content-Type",
+            "X-Fitsho-Head-Cropped",
+            "X-Fitsho-Crop-Confidence",
+        ],
     )
 
     @app.exception_handler(SQLAlchemyError)
@@ -71,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     app.include_router(auth_router)
+    app.include_router(body_photo_router)
     app.include_router(profile_router)
     app.include_router(workout_plans_router)
     app.include_router(exercises_router)

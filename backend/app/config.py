@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     import_media_max_bytes: int = 24 * 1024 * 1024
     media_max_video_duration_seconds: float = 20.0
     media_read_chunk_bytes: int = 1024 * 1024
+    body_photo_storage_root: Path = Path("var/private/body-photos")
+    body_photo_max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=20 * 1024 * 1024)
+    body_photo_max_pixels: int = Field(default=20_000_000, ge=1, le=40_000_000)
+    body_photo_read_chunk_bytes: int = Field(default=1024 * 1024, ge=1024, le=4 * 1024 * 1024)
     ffprobe_path: str = "ffprobe"
     ffprobe_timeout_seconds: float = 5.0
     opencode_zen_api_key: SecretStr | None = Field(default=None, repr=False)
@@ -38,6 +42,14 @@ class Settings(BaseSettings):
     workout_warmup_minutes: int = Field(default=5, ge=0, le=30)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @model_validator(mode="after")
+    def enforce_private_body_photo_storage(self) -> Self:
+        public_root = self.media_root.resolve()
+        private_root = self.body_photo_storage_root.resolve()
+        if private_root == public_root or private_root.is_relative_to(public_root):
+            raise ValueError("Body photo storage must be outside public media storage")
+        return self
 
     @model_validator(mode="after")
     def enforce_production_cookie_contract(self) -> Self:

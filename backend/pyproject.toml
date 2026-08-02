@@ -10,8 +10,8 @@ dependencies = [
   "alembic>=1,<2",
   "email-validator>=2,<3",
   "fastapi>=0.115,<1",
-
   "httpx[socks]>=0.27,<1",
+  "pillow>=11,<13",
   "psycopg[binary]>=3,<4",
   "pwdlib[argon2]>=0.2,<1",
   "pydantic-settings>=2,<3",
