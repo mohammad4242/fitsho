@@ -65,6 +65,14 @@ class ProgramRuleset:
     poor_recovery_set_reduction: int = 2
     max_previous_volume_increase: float = 0.2
     max_sets_per_muscle_per_session: int = 6
+    template_reference_max_sets_per_muscle_per_session: dict[TrainingStatus, int] = field(
+        default_factory=lambda: {
+            TrainingStatus.NOVICE: 15,
+            TrainingStatus.EARLY_INTERMEDIATE: 20,
+            TrainingStatus.INTERMEDIATE: 20,
+            TrainingStatus.ADVANCED: 28,
+        }
+    )
     max_exercises_per_session: int = 8
     minimum_exercises_per_session: int = 3
     minutes_per_exercise_slot: int = 7

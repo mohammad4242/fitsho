@@ -3,7 +3,7 @@ from dataclasses import replace
 
 from app.workouts.program_engine.cardio import add_cardio, cardio_reserve_minutes
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
-from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus
+from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import prescribe_sessions
 from app.workouts.program_engine.progression import deload_policy, double_progression_policy
@@ -11,13 +11,20 @@ from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramR
 from app.workouts.program_engine.safety import screen_safety
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
+    NormalizedProgramRequest,
     ProgramGenerationRequest,
     ProgramGenerationResult,
+    RejectedCandidate,
+    SplitPlan,
+    TemplateReference,
     ValidationReport,
+    WorkoutDay,
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_builder import build_sessions
 from app.workouts.program_engine.split_selector import select_split
+from app.workouts.program_engine.template_selector import select_template_reference
+from app.workouts.program_engine.template_sessions import build_template_sessions
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from app.workouts.program_engine.volume_repair import repair_weekly_volume
@@ -27,6 +34,8 @@ def generate_program(
     request: ProgramGenerationRequest,
     exercise_catalog: list[ExerciseCandidate] | tuple[ExerciseCandidate, ...],
     ruleset: ProgramRuleset,
+    *,
+    reference_templates: tuple[TemplateReference, ...] = (),
 ) -> ProgramGenerationResult:
     normalized = normalize_request(request, ruleset)
     safety = screen_safety(normalized)
@@ -54,6 +63,23 @@ def generate_program(
             safety_status=safety.status,
             rejected_candidates=eligibility.rejected,
         )
+    reference = select_template_reference(normalized, eligibility.eligible, reference_templates)
+    if reference is not None:
+        reference_days = build_template_sessions(
+            normalized, reference, eligibility.eligible, ruleset
+        )
+        if reference_days is not None:
+            reference_result = _reference_program(
+                request,
+                normalized,
+                safety.status,
+                eligibility.rejected,
+                reference,
+                reference_days,
+                ruleset,
+            )
+            if reference_result.is_success:
+                return reference_result
     split = select_split(normalized, ruleset)
     volume = plan_weekly_volume(normalized, split, ruleset)
     try:
@@ -161,4 +187,93 @@ def generate_program(
         program=program,
         safety_status=safety.status,
         rejected_candidates=eligibility.rejected,
+    )
+
+
+def _reference_program(
+    request: ProgramGenerationRequest,
+    normalized: NormalizedProgramRequest,
+    safety_status: SafetyStatus,
+    rejected: tuple[RejectedCandidate, ...],
+    reference: TemplateReference,
+    days: tuple[WorkoutDay, ...],
+    ruleset: ProgramRuleset,
+) -> ProgramGenerationResult:
+    direct: Counter[str] = Counter()
+    fractional: defaultdict[str, float] = defaultdict(float)
+    for day in days:
+        for item in day.exercises:
+            if item.primary_muscle is not None:
+                direct[item.primary_muscle.value] += item.sets
+            for muscle in item.secondary_muscles:
+                fractional[muscle.value] += item.sets * ruleset.secondary_set_credit
+    split = SplitPlan(
+        split_type=SplitType.BODY_PART_ROTATION,
+        day_focuses=tuple(day.focus for day in days),
+        weekdays=tuple(day.weekday for day in days if day.weekday is not None),
+        score=100,
+        reason_codes=("TEMPLATE_REFERENCE_SELECTED",),
+    )
+    metrics: dict[str, object] = {
+        "reference_template": reference.slug,
+        "reference_max_sets_per_muscle_per_session": (
+            ruleset.template_reference_max_sets_per_muscle_per_session[normalized.training_status]
+        ),
+        "planned_direct_sets_by_muscle": dict(direct),
+        "volume_ranges_by_muscle": {
+            muscle: {
+                "minimum_soft": sets,
+                "target_sets": sets,
+                "maximum_soft": sets,
+                "maximum_hard": max(sets, ruleset.maximum_sets[normalized.training_status]),
+            }
+            for muscle, sets in direct.items()
+        },
+        "weekly_direct_sets_by_muscle": dict(direct),
+        "weekly_fractional_sets_by_muscle": dict(fractional),
+        "weekly_cardio_minutes": 0,
+        "estimated_weekly_duration": sum(day.estimated_duration_minutes for day in days),
+        "hard_training_days": len(days),
+        "recovery_days": ruleset.days_per_week - len(days),
+    }
+    trace: tuple[dict[str, object], ...] = (
+        {"stage": "normalization", "assumptions": normalized.assumptions},
+        {"stage": "safety", "status": safety_status.value, "reasons": ()},
+        {"stage": "template_reference", "selected": reference.slug},
+    )
+    program = WorkoutProgram(
+        user_profile_snapshot=request.model_dump(mode="json"),
+        engine_version=ruleset.engine_version,
+        ruleset_version=ruleset.version,
+        seed=normalized.seed,
+        primary_goal=normalized.primary_goal,
+        secondary_goal=request.secondary_goal_optional,
+        training_status=normalized.training_status,
+        safety_status=safety_status,
+        assumptions=normalized.assumptions,
+        warnings=(),
+        duration_weeks=request.program_duration_weeks,
+        split=split,
+        weekly_schedule=days,
+        progression_policy={
+            **double_progression_policy(ruleset),
+            "deload": deload_policy(ruleset),
+        },
+        validation_report=ValidationReport((), (), normalized.assumptions, metrics, trace),
+        aggregate_metrics=metrics,
+        decision_trace=trace,
+    )
+    report = validate_program(program, request, ruleset)
+    if not report.is_valid:
+        return ProgramGenerationResult(
+            program=None,
+            error_code=GenerationErrorCode.PROGRAM_VALIDATION_FAILED,
+            errors=report.errors,
+            safety_status=safety_status,
+            rejected_candidates=rejected,
+        )
+    return ProgramGenerationResult(
+        program=replace(program, validation_report=report, warnings=report.warnings),
+        safety_status=safety_status,
+        rejected_candidates=rejected,
     )

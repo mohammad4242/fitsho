@@ -196,7 +196,7 @@ def test_validation_failure_is_recorded_before_any_plan_is_persisted(
     _seed_candidates(db)
     monkeypatch.setattr(
         "app.workouts.service.generate_program",
-        lambda *_args: ProgramGenerationResult(
+        lambda *_args, **_kwargs: ProgramGenerationResult(
             program=None,
             error_code=GenerationErrorCode.PROGRAM_VALIDATION_FAILED,
             errors=("TEST_VALIDATION_ERROR",),

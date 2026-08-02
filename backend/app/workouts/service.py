@@ -31,6 +31,7 @@ from app.exercises.enums import (
 from app.exercises.models import Exercise
 from app.profile.enums import ExperienceLevel, HomeTrainingSetup, TrainingLocation
 from app.profile.service import ProfileSnapshot, get_profile
+from app.training_templates.engine_reference import load_template_references
 from app.workouts.candidate_selector import CAUTION_EXCLUSIONS, WorkoutCandidateSelector
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise, WorkoutPlanGeneration
@@ -49,6 +50,7 @@ from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
     Limitation,
     ProgramGenerationRequest,
+    TemplateReference,
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_targets import persian_session_title
@@ -161,7 +163,9 @@ class WorkoutGenerationService:
             raise ProgramGenerationRejectedError("INVALID_PROFILE_INPUT") from error
         catalog = self._load_catalog()
         catalog_hash = self._catalog_hash(catalog)
-        signature = self._generation_signature(request, catalog_hash)
+        references = load_template_references(self._db)
+        reference_hash = self._template_reference_hash(references)
+        signature = self._generation_signature(request, catalog_hash, reference_hash)
         active_plan = get_active_plan(self._db, user_id)
         if (
             active_plan is not None
@@ -173,7 +177,12 @@ class WorkoutGenerationService:
         self._enforce_cooldown(user_id)
         generation = self._start_generation(user_id, len(catalog))
         started_at = perf_counter()
-        result = generate_program(request, catalog, self._ruleset)
+        result = generate_program(
+            request,
+            catalog,
+            self._ruleset,
+            reference_templates=references,
+        )
         if not result.is_success or result.program is None:
             error_code = (
                 result.error_code.value
@@ -218,7 +227,11 @@ class WorkoutGenerationService:
         refreshed_request = self._to_program_request(refreshed_profile, overrides)
         refreshed_catalog = self._load_catalog()
         if (
-            self._generation_signature(refreshed_request, self._catalog_hash(refreshed_catalog))
+            self._generation_signature(
+                refreshed_request,
+                self._catalog_hash(refreshed_catalog),
+                self._template_reference_hash(load_template_references(self._db)),
+            )
             != signature
         ):
             self._mark_failure(
@@ -708,13 +721,21 @@ class WorkoutGenerationService:
         self,
         request: ProgramGenerationRequest,
         catalog_hash: str,
+        reference_hash: str = "",
     ) -> str:
         payload = {
             "request": request.model_dump(mode="json"),
             "catalog_hash": catalog_hash,
+            "reference_hash": reference_hash,
             "engine_version": self._ruleset.engine_version,
             "ruleset_version": self._ruleset.version,
         }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        return hashlib.sha256(encoded).hexdigest()
+
+    @staticmethod
+    def _template_reference_hash(references: tuple[TemplateReference, ...]) -> str:
+        payload = _json_ready([asdict(reference) for reference in references])
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         return hashlib.sha256(encoded).hexdigest()
 
@@ -766,8 +787,9 @@ class WorkoutGenerationService:
             )
         request = self._to_program_request(get_profile(self._db, user_id), None)
         catalog_hash = self._catalog_hash(self._load_catalog())
+        reference_hash = self._template_reference_hash(load_template_references(self._db))
         is_stale = plan.generation_signature != self._generation_signature(
-            request, catalog_hash
+            request, catalog_hash, reference_hash
         ) or self._is_plan_expired(plan)
         return ActiveWorkoutPlanResult(plan=plan, is_stale=is_stale)
 

@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.exercises.enums import MuscleGroup
 from app.training_templates.models import (
     TrainingProgramTemplate,
     TrainingProgramTemplateDay,
@@ -43,7 +44,7 @@ def _reference(template: TrainingProgramTemplate) -> TemplateReference:
             TemplateReferenceDay(
                 day_number=day.day_number,
                 title=day.title_en,
-                focus=tuple(day.direct_target_muscles),
+                focus=tuple(MuscleGroup(muscle) for muscle in day.direct_target_muscles),
                 slots=tuple(_slot_reference(slot) for slot in day.slots),
             )
             for day in template.days
@@ -55,7 +56,7 @@ def _slot_reference(slot: TrainingProgramTemplateSlot) -> TemplateReferenceSlot:
     return TemplateReferenceSlot(
         exercise_id=slot.exercise_id,
         exercise_slug_hint=slot.exercise_slug_hint,
-        target_muscles=tuple(slot.target_muscles),
+        target_muscles=tuple(MuscleGroup(muscle) for muscle in slot.target_muscles),
         movement_pattern=slot.movement_pattern,
         intensity_method=slot.intensity_method.value,
         adaptation_priority=slot.adaptation_priority.value,

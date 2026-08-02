@@ -57,7 +57,16 @@ def validate_program(
                 key = item.primary_muscle.value
                 direct_sets[key] += item.sets
                 per_session[key] += item.sets
-        if any(value > ruleset.max_sets_per_muscle_per_session for value in per_session.values()):
+        configured_limit = program.aggregate_metrics.get(
+            "reference_max_sets_per_muscle_per_session",
+            ruleset.max_sets_per_muscle_per_session,
+        )
+        per_session_limit = (
+            configured_limit
+            if isinstance(configured_limit, int)
+            else ruleset.max_sets_per_muscle_per_session
+        )
+        if any(value > per_session_limit for value in per_session.values()):
             errors.append("PER_SESSION_MUSCLE_VOLUME_EXCEEDED")
         if (
             day.cardio
