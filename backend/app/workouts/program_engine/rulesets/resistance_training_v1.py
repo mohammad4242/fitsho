@@ -12,7 +12,7 @@ class PrescriptionRule:
 
 @dataclass(frozen=True)
 class ProgramRuleset:
-    version: str = "resistance_training_v1"
+    version: str = "resistance_training_v2"
     engine_version: str = "program_engine_v1"
     max_resistance_days: int = 6
     days_per_week: int = 7

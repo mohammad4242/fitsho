@@ -168,7 +168,7 @@ def test_generation_persists_valid_snapshot_then_reuses_signature(db: Session) -
     assert second.plan.id == first.plan.id
     assert first.plan.status is WorkoutPlanStatus.ACTIVE
     assert first.plan.engine_version == "program_engine_v1"
-    assert first.plan.ruleset_version == "resistance_training_v1"
+    assert first.plan.ruleset_version == "resistance_training_v2"
     assert first.plan.validation_report["errors"] == []
     assert first.plan.exercise_catalog_snapshot["hash"] == first.plan.candidate_set_hash
     assert first.plan.generation_records[0].status is WorkoutGenerationStatus.SUCCEEDED
