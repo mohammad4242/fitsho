@@ -211,7 +211,10 @@ def test_volume_repair_reduces_hard_excess_before_validation() -> None:
     repaired_chest = next(
         item for item in repaired_days[0].exercises if item.primary_muscle is MuscleGroup.CHEST
     )
-    assert repaired_chest.sets == RULESET.maximum_sets[result.program.training_status]
+    assert repaired_chest.sets == min(
+        RULESET.maximum_sets[result.program.training_status],
+        RULESET.max_sets_per_muscle_per_session,
+    )
     assert "VOLUME_REPAIR_REDUCED_SET" in reasons
 
 
@@ -319,6 +322,40 @@ def test_validator_rejects_adjacent_full_body_sessions() -> None:
     report = validate_program(invalid, source, RULESET)
 
     assert "RECOVERY_SPACING_INVALID" in report.errors
+
+
+def test_validator_rejects_a_third_direct_weekly_muscle_exposure_for_four_day_programs() -> None:
+    source = request(available_training_days=4)
+    result = generate_program(source, catalog(), RULESET)
+    assert result.program is not None
+
+    base_day = result.program.weekly_schedule[0]
+    repeated_days = tuple(
+        replace(base_day, day_index=index, weekday=weekday)
+        for index, weekday in enumerate((0, 1, 3), start=1)
+    )
+    fourth_day = replace(
+        base_day,
+        day_index=4,
+        weekday=4,
+        exercises=(),
+        estimated_duration_minutes=RULESET.general_warmup_minutes,
+    )
+    weekly_schedule = (*repeated_days, fourth_day)
+    invalid = replace(
+        result.program,
+        weekly_schedule=weekly_schedule,
+        split=replace(
+            result.program.split,
+            day_focuses=tuple(day.focus for day in weekly_schedule),
+            weekdays=(0, 1, 3, 4),
+        ),
+    )
+
+    report = validate_program(invalid, source, RULESET)
+
+    assert "MUSCLE_DIRECT_FREQUENCY_EXCEEDED" in report.errors
+    assert report.metrics["direct_session_frequency_by_muscle"]["chest"] == 3
 
 
 def test_validator_rejects_program_without_trunk_pattern() -> None:

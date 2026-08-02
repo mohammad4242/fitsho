@@ -65,6 +65,7 @@ class ProgramRuleset:
     poor_recovery_set_reduction: int = 2
     max_previous_volume_increase: float = 0.2
     max_sets_per_muscle_per_session: int = 6
+    maximum_direct_sessions_per_muscle_per_week: int = 2
     template_reference_max_sets_per_muscle_per_session: dict[TrainingStatus, int] = field(
         default_factory=lambda: {
             TrainingStatus.NOVICE: 15,

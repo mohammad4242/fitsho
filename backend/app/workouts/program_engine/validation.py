@@ -21,6 +21,7 @@ def validate_program(
     patterns: Counter[MovementPattern] = Counter()
     exercise_usage: Counter[object] = Counter()
     direct_sets: Counter[str] = Counter()
+    direct_session_frequency: Counter[str] = Counter()
     for day in program.weekly_schedule:
         if day.estimated_duration_minutes > (
             request.session_duration_minutes + ruleset.duration_tolerance_minutes
@@ -57,6 +58,8 @@ def validate_program(
                 key = item.primary_muscle.value
                 direct_sets[key] += item.sets
                 per_session[key] += item.sets
+        for muscle in per_session:
+            direct_session_frequency[muscle] += 1
         configured_limit = program.aggregate_metrics.get(
             "reference_max_sets_per_muscle_per_session",
             ruleset.max_sets_per_muscle_per_session,
@@ -81,6 +84,11 @@ def validate_program(
 
     if len(program.weekly_schedule) != len(program.split.day_focuses):
         errors.append("TRAINING_DAY_COUNT_MISMATCH")
+    if len(program.weekly_schedule) >= 4 and any(
+        frequency > ruleset.maximum_direct_sessions_per_muscle_per_week
+        for frequency in direct_session_frequency.values()
+    ):
+        errors.append("MUSCLE_DIRECT_FREQUENCY_EXCEEDED")
     if not _recovery_spacing_is_valid(program, ruleset):
         errors.append("RECOVERY_SPACING_INVALID")
     if program.safety_status not in {
@@ -148,6 +156,7 @@ def validate_program(
         metrics={
             **program.aggregate_metrics,
             "weekly_direct_sets_by_muscle": dict(direct_sets),
+            "direct_session_frequency_by_muscle": dict(direct_session_frequency),
             "movement_pattern_frequency": {
                 pattern.value: count for pattern, count in patterns.items()
             },

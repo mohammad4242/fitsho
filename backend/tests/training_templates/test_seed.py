@@ -1,10 +1,14 @@
+from collections import Counter
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.exercises.enums import MuscleGroup
 from app.exercises.models import Exercise
 from app.exercises.service import seed_exercises
 from app.profile.enums import ExperienceLevel
 from app.training_templates.models import TrainingProgramTemplate, TrainingProgramTemplateSlot
+from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS, TemplateDaySeed
 from app.training_templates.service import seed_training_program_templates
 
 
@@ -37,6 +41,56 @@ def test_seed_expands_four_and_five_day_reference_library_across_levels(db: Sess
         }
         tags = {tag for template in bucket for tag in template.focus_tags}
         assert {"chest_priority", "back_priority"}.issubset(tags)
+
+
+def test_specialized_body_part_templates_meet_direct_movement_floors() -> None:
+    for template in TRAINING_PROGRAM_TEMPLATE_SEEDS:
+        if template.days_per_week < 4 or "body_part_rotation" not in template.focus_tags:
+            continue
+
+        exposures: Counter[MuscleGroup] = Counter()
+        for day in template.days:
+            _assert_session_movement_floors(day)
+            for muscle in MuscleGroup:
+                if _direct_slot_count(day, (muscle,)):
+                    exposures[muscle] += 1
+
+        assert all(count <= 2 for count in exposures.values()), template.slug
+
+
+def _assert_session_movement_floors(day: TemplateDaySeed) -> None:
+    large_targets = {
+        "Chest": (MuscleGroup.CHEST,),
+        "Back": (MuscleGroup.BACK,),
+        "Shoulder": (MuscleGroup.SHOULDERS,),
+        "Delts": (MuscleGroup.SHOULDERS,),
+        "Quadriceps": (MuscleGroup.QUADRICEPS,),
+        "Hamstrings": (MuscleGroup.HAMSTRINGS,),
+        "Glutes": (MuscleGroup.GLUTES,),
+        "Legs": (MuscleGroup.QUADRICEPS, MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES),
+    }
+    small_targets = {
+        "Arms": (MuscleGroup.BICEPS, MuscleGroup.TRICEPS),
+        "Biceps": (MuscleGroup.BICEPS,),
+        "Triceps": (MuscleGroup.TRICEPS,),
+        "Traps": (MuscleGroup.TRAPS,),
+        "Calves": (MuscleGroup.CALVES,),
+        "Core": (MuscleGroup.ABS,),
+    }
+    for label, muscles in large_targets.items():
+        if label in day.title_en:
+            assert _direct_slot_count(day, muscles) >= 3, day.title_en
+    for label, muscles in small_targets.items():
+        if label in day.title_en:
+            if label == "Arms":
+                for muscle in muscles:
+                    assert _direct_slot_count(day, (muscle,)) >= 2, day.title_en
+            else:
+                assert _direct_slot_count(day, muscles) >= 2, day.title_en
+
+
+def _direct_slot_count(day: TemplateDaySeed, muscles: tuple[MuscleGroup, ...]) -> int:
+    return sum(bool(set(slot.target_muscles).intersection(muscles)) for slot in day.slots)
 
 
 def test_seed_keeps_unavailable_exercise_as_explicit_placeholder(db: Session) -> None:

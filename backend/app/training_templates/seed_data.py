@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.profile.enums import ExperienceLevel, FitnessGoal
@@ -317,6 +317,102 @@ HIP_THRUST = _slot(
     placeholder_fa="هیپ تراست هالتر",
     sets=4,
 )
+BARBELL_SHRUG = _slot(
+    "barbell-shrug",
+    (M.TRAPS,),
+    P.SHRUG,
+    placeholder_en="Barbell Shrug",
+    placeholder_fa="شراگ هالتر",
+    reps=(10, 15),
+)
+SEATED_CALF_RAISE = _slot(
+    "seated-calf-raise",
+    (M.CALVES,),
+    P.CALF_RAISE,
+    placeholder_en="Seated Calf Raise",
+    placeholder_fa="ساق نشسته",
+    reps=(10, 20),
+    rest=60,
+)
+SIDE_PLANK = _slot(
+    "side-plank",
+    (M.ABS,),
+    P.CORE_ANTI_LATERAL_FLEXION,
+    placeholder_en="Side Plank",
+    placeholder_fa="پلانک بغل",
+    reps=(8, 12),
+    rest=45,
+)
+
+_SPECIALIZED_LARGE_TARGETS: tuple[tuple[str, tuple[MuscleGroup, ...]], ...] = (
+    ("Chest", (M.CHEST,)),
+    ("Back", (M.BACK,)),
+    ("Shoulder", (M.SHOULDERS,)),
+    ("Delts", (M.SHOULDERS,)),
+    ("Quadriceps", (M.QUADRICEPS,)),
+    ("Hamstrings", (M.HAMSTRINGS,)),
+    ("Glutes", (M.GLUTES,)),
+    ("Legs", (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES)),
+)
+_SPECIALIZED_SMALL_TARGETS: tuple[tuple[str, tuple[MuscleGroup, ...]], ...] = (
+    ("Arms", (M.BICEPS, M.TRICEPS)),
+    ("Biceps", (M.BICEPS,)),
+    ("Triceps", (M.TRICEPS,)),
+    ("Traps", (M.TRAPS,)),
+    ("Calves", (M.CALVES,)),
+    ("Core", (M.ABS,)),
+)
+_MOVEMENT_FLOOR_SLOTS: dict[tuple[MuscleGroup, ...], tuple[TemplateSlotSeed, ...]] = {
+    (M.CHEST,): (CHEST, INCLINE_CHEST, MACHINE_CHEST, CABLE_FLY, PEC_DECK),
+    (M.BACK,): (BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN, CHEST_SUPPORTED_ROW, SINGLE_ARM_CABLE_ROW),
+    (M.SHOULDERS,): (SHOULDER_PRESS, LATERAL_RAISE, REAR_DELT, CABLE_LATERAL_RAISE, FACE_PULL),
+    (M.QUADRICEPS,): (SQUAT, LEG_PRESS, LEG_EXTENSION, HACK_SQUAT, BULGARIAN_SPLIT_SQUAT),
+    (M.HAMSTRINGS,): (RDL, LEG_CURL, LYING_LEG_CURL),
+    (M.GLUTES,): (GLUTE_BRIDGE, HIP_THRUST, LUNGE, BULGARIAN_SPLIT_SQUAT),
+    (M.BICEPS,): (BICEPS, HAMMER_CURL, PREACHER_CURL, CABLE_CURL),
+    (M.TRICEPS,): (TRICEPS, PUSH_DOWN, SKULL_CRUSHER, ROPE_OVERHEAD_EXTENSION),
+    (M.TRAPS,): (SHRUG, BARBELL_SHRUG),
+    (M.CALVES,): (CALF, SEATED_CALF_RAISE),
+    (M.ABS,): (CORE, SIDE_PLANK),
+}
+
+
+def _specialized_template_movement_floors(
+    template: TrainingProgramTemplateSeed,
+) -> TrainingProgramTemplateSeed:
+    if template.days_per_week < 4 or "body_part_rotation" not in template.focus_tags:
+        return template
+    return replace(
+        template,
+        days=tuple(_specialized_day_movement_floors(day) for day in template.days),
+    )
+
+
+def _specialized_day_movement_floors(day: TemplateDaySeed) -> TemplateDaySeed:
+    minimums: dict[tuple[MuscleGroup, ...], int] = {}
+    for label, muscles in _SPECIALIZED_LARGE_TARGETS:
+        if label in day.title_en:
+            minimums[muscles] = max(minimums.get(muscles, 0), 3)
+    for label, muscles in _SPECIALIZED_SMALL_TARGETS:
+        if label not in day.title_en:
+            continue
+        if label == "Arms":
+            for muscle in muscles:
+                minimums[(muscle,)] = 2
+        else:
+            minimums[muscles] = max(minimums.get(muscles, 0), 2)
+
+    slots = list(day.slots)
+    for muscles, minimum in minimums.items():
+        existing = sum(bool(set(slot.target_muscles).intersection(muscles)) for slot in slots)
+        for candidate in _MOVEMENT_FLOOR_SLOTS.get(muscles, ()):
+            if existing >= minimum:
+                break
+            if any(slot.exercise_slug_hint == candidate.exercise_slug_hint for slot in slots):
+                continue
+            slots.append(candidate)
+            existing += 1
+    return replace(day, slots=tuple(slots))
 
 
 def _day(
@@ -354,7 +450,9 @@ def _template(
     )
 
 
-TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = (
+TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple(
+    _specialized_template_movement_floors(template)
+    for template in (
     _template(
         "two-day-full-body-foundation",
         "Two-Day Full Body Foundation",
@@ -2002,8 +2100,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = (
         "six-day-chest-priority",
         "Six-Day Chest Priority",
         "تأکید سینه شش روزه",
-        "A specialization block with three controlled chest exposures separated by other targets.",
-        "دورهٔ تخصصی با سه مواجههٔ کنترل‌شدهٔ سینه که با اهداف دیگر جدا شده‌اند.",
+        "A specialization block with two chest exposures and a separate calves-and-core session.",
+        "دورهٔ تخصصی با دو مواجههٔ سینه و یک جلسهٔ جداگانهٔ ساق و میان‌تنه.",
         6,
         Level.ADVANCED,
         ("body_part_rotation", "chest_priority", "specialization"),
@@ -2031,20 +2129,21 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = (
             TRICEPS,
         ),
         _day(
-            "Chest Pump + Calves",
-            "پمپ سینه + ساق",
-            (M.CHEST, M.CALVES),
-            CABLE_FLY,
-            INCLINE_CHEST,
+            "Calves + Core",
+            "ساق + میان‌تنه",
+            (M.CALVES, M.ABS),
             CALF,
+            SEATED_CALF_RAISE,
+            CORE,
+            SIDE_PLANK,
         ),
     ),
     _template(
         "six-day-back-priority",
         "Six-Day Back Priority",
         "تأکید زیربغل شش روزه",
-        "A specialization block with three back exposures separated by push and lower-body work.",
-        "دورهٔ تخصصی با سه مواجههٔ زیربغل که با پوش و پایین‌تنه جدا شده‌اند.",
+        "A specialization block with two back exposures and a separate calves-and-core session.",
+        "دورهٔ تخصصی با دو مواجههٔ زیربغل و یک جلسهٔ جداگانهٔ ساق و میان‌تنه.",
         6,
         Level.ADVANCED,
         ("body_part_rotation", "back_priority", "specialization"),
@@ -2077,12 +2176,13 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = (
             BICEPS,
         ),
         _day(
-            "Back Pump + Calves",
-            "پمپ زیربغل + ساق",
-            (M.BACK, M.CALVES),
-            CABLE_PULLDOWN,
-            BACK_ROW,
+            "Calves + Core",
+            "ساق + میان‌تنه",
+            (M.CALVES, M.ABS),
             CALF,
+            SEATED_CALF_RAISE,
+            CORE,
+            SIDE_PLANK,
         ),
     ),
-)
+))

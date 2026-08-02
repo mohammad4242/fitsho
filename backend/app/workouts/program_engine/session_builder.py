@@ -226,7 +226,7 @@ def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
         )
     if focus == "chest_triceps":
         return (
-            SlotSpec(PUSH_PATTERNS, True, MuscleGroup.CHEST),
+            SlotSpec(frozenset({MovementPattern.HORIZONTAL_PUSH}), True, MuscleGroup.CHEST),
             SlotSpec(frozenset({MovementPattern.HORIZONTAL_PUSH}), False, MuscleGroup.CHEST),
             SlotSpec(frozenset({MovementPattern.ELBOW_EXTENSION}), False, MuscleGroup.TRICEPS),
         )

@@ -30,7 +30,7 @@ def repair_weekly_volume(
     reasons: list[str] = []
     while True:
         direct = _direct_sets(repaired)
-        excessive = {
+        weekly_excessive = {
             muscle
             for muscle, sets in direct.items()
             if sets > hard_maximums.get(
@@ -38,13 +38,19 @@ def repair_weekly_volume(
                 ruleset.maximum_sets[request.training_status],
             )
         }
-        if not excessive:
+        per_session_excessive = _per_session_excessive(repaired, ruleset)
+        if not weekly_excessive and not per_session_excessive:
             break
         candidates = [
             (day_index, exercise_index, exercise)
             for day_index, exercises in enumerate(repaired)
             for exercise_index, exercise in enumerate(exercises)
-            if exercise.primary_muscle in excessive and exercise.counts_toward_volume
+            if exercise.counts_toward_volume
+            and exercise.primary_muscle is not None
+            and (
+                exercise.primary_muscle in weekly_excessive
+                or (day_index, exercise.primary_muscle) in per_session_excessive
+            )
         ]
         if not candidates:
             break
@@ -93,6 +99,20 @@ def _direct_sets(days: list[list[ProgrammedExercise]]) -> Counter[MuscleGroup]:
         if item.primary_muscle is not None and item.counts_toward_volume
         for _ in range(item.sets)
     )
+
+
+def _per_session_excessive(
+    days: list[list[ProgrammedExercise]], ruleset: ProgramRuleset
+) -> set[tuple[int, MuscleGroup]]:
+    excessive: set[tuple[int, MuscleGroup]] = set()
+    for day_index, exercises in enumerate(days):
+        direct = _direct_sets([exercises])
+        excessive.update(
+            (day_index, muscle)
+            for muscle, sets in direct.items()
+            if sets > ruleset.max_sets_per_muscle_per_session
+        )
+    return excessive
 
 
 def _rebuild_days(
