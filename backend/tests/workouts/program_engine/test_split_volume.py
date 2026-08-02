@@ -85,6 +85,21 @@ def test_seven_available_days_never_create_seven_resistance_sessions() -> None:
     assert len(split.day_focuses) == 6
 
 
+def test_advanced_user_with_seven_available_days_records_resistance_cap() -> None:
+    split = select_split(
+        normalized(
+            available_training_days=7,
+            training_experience=TrainingExperience.ADVANCED,
+            training_age_months=72,
+            recent_training_history=RecentTrainingHistory(consistent_weeks=40),
+        ),
+        RULESET,
+    )
+
+    assert len(split.day_focuses) == 6
+    assert "RESISTANCE_DAYS_CAPPED_AT_RULESET_MAXIMUM" in split.reason_codes
+
+
 def test_novice_with_poor_recovery_does_not_receive_high_frequency_split() -> None:
     split = select_split(
         normalized(
@@ -98,6 +113,19 @@ def test_novice_with_poor_recovery_does_not_receive_high_frequency_split() -> No
 
     assert len(split.day_focuses) <= 3
     assert "SPLIT_REDUCED_FOR_RECOVERY" in split.reason_codes
+
+
+def test_poor_recovery_user_can_receive_fewer_sessions_than_available() -> None:
+    split = select_split(
+        normalized(
+            available_training_days=6,
+            sleep_quality=RecoveryRating.POOR,
+        ),
+        RULESET,
+    )
+
+    assert len(split.day_focuses) < 6
+    assert "SPLIT_SELECTED_FOR_APPROPRIATE_SESSION_COUNT" in split.reason_codes
 
 
 def test_intermediate_four_day_hypertrophy_uses_upper_lower_frequency() -> None:
@@ -115,6 +143,28 @@ def test_intermediate_four_day_hypertrophy_uses_upper_lower_frequency() -> None:
     assert split.split_type is SplitType.UPPER_LOWER
     assert split.day_focuses.count("upper") == 2
     assert split.day_focuses.count("lower") == 2
+
+
+def test_advanced_hypertrophy_user_can_select_body_part_rotation() -> None:
+    split = select_split(
+        normalized(
+            available_training_days=4,
+            session_duration_minutes=75,
+            primary_goal=Goal.HYPERTROPHY,
+            training_experience=TrainingExperience.ADVANCED,
+            training_age_months=72,
+            recent_training_history=RecentTrainingHistory(consistent_weeks=40),
+        ),
+        RULESET,
+    )
+
+    assert split.split_type is SplitType.BODY_PART_ROTATION
+    assert split.day_focuses == (
+        "chest_triceps",
+        "back_biceps",
+        "shoulders_traps",
+        "legs",
+    )
 
 
 def test_five_days_generate_multiple_valid_split_candidates() -> None:

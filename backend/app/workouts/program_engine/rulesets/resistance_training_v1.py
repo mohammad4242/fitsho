@@ -73,6 +73,18 @@ class ProgramRuleset:
     default_untracked_muscle_sets: int = 2
     substitution_limit: int = 3
     maximum_novice_recovery_days: int = 3
+    recommended_resistance_days: dict[TrainingStatus, int] = field(
+        default_factory=lambda: {
+            TrainingStatus.NOVICE: 3,
+            TrainingStatus.EARLY_INTERMEDIATE: 4,
+            TrainingStatus.INTERMEDIATE: 5,
+            TrainingStatus.ADVANCED: 6,
+        }
+    )
+    poor_recovery_session_reduction: int = 2
+    session_count_distance_penalty: int = 12
+    body_part_rotation_bonus: int = 30
+    phul_bonus: int = 8
     short_session_minutes: int = 30
     older_adult_modifier_age: int = 60
     contextual_volume_reduction_sets: int = 1
@@ -129,6 +141,8 @@ class ProgramRuleset:
             SplitType.PUSH_PULL_LEGS_UPPER_LOWER: 4,
             SplitType.UPPER_LOWER_X3: 4,
             SplitType.PUSH_PULL_LEGS_X2: 6,
+            SplitType.PHUL: 3,
+            SplitType.BODY_PART_ROTATION: 4,
         }
     )
     exercise_order_rank: dict[str, int] = field(

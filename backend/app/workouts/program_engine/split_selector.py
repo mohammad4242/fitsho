@@ -16,22 +16,30 @@ from app.workouts.program_engine.schemas import (
 
 
 def select_split(request: NormalizedProgramRequest, ruleset: ProgramRuleset) -> SplitPlan:
-    days = min(request.resistance_training_days, ruleset.max_resistance_days)
+    available_days = min(request.resistance_training_days, ruleset.max_resistance_days)
     recovery_limited = _recovery_is_limited(request)
-    reduced_for_recovery = False
-    if (
-        request.training_status is TrainingStatus.NOVICE
-        and recovery_limited
-        and days > ruleset.maximum_novice_recovery_days
-    ):
-        days = ruleset.maximum_novice_recovery_days
-        reduced_for_recovery = True
+    preferred_days = min(
+        available_days,
+        ruleset.recommended_resistance_days[request.training_status],
+    )
+    if recovery_limited:
+        preferred_days = max(1, preferred_days - ruleset.poor_recovery_session_reduction)
+    if request.training_status is TrainingStatus.NOVICE and recovery_limited:
+        preferred_days = min(preferred_days, ruleset.maximum_novice_recovery_days)
 
-    candidates = generate_split_candidates(days)
-    scored = score_split_candidates(request, candidates, ruleset)
+    candidates = tuple(
+        candidate
+        for days in range(1, available_days + 1)
+        for candidate in generate_split_candidates(days)
+    )
+    scored = score_split_candidates(request, candidates, ruleset, preferred_days)
     selected = scored[0]
     reasons = list(selected.reason_codes)
-    if reduced_for_recovery:
+    if request.source.available_training_days > ruleset.max_resistance_days:
+        reasons.append("RESISTANCE_DAYS_CAPPED_AT_RULESET_MAXIMUM")
+    if len(selected.day_focuses) < request.source.available_training_days:
+        reasons.append("SPLIT_SELECTED_FOR_APPROPRIATE_SESSION_COUNT")
+    if recovery_limited and len(selected.day_focuses) < available_days:
         reasons.append("SPLIT_REDUCED_FOR_RECOVERY")
     return replace(selected, reason_codes=tuple(dict.fromkeys(reasons)))
 
@@ -64,6 +72,14 @@ def generate_split_candidates(days: int) -> tuple[SplitCandidate, ...]:
                 SplitType.FULL_BODY_FOUR,
                 ("full_body_a", "full_body_b", "full_body_c", "full_body_d"),
             ),
+            SplitCandidate(
+                SplitType.PHUL,
+                ("upper_strength", "lower_strength", "upper_hypertrophy", "lower_hypertrophy"),
+            ),
+            SplitCandidate(
+                SplitType.BODY_PART_ROTATION,
+                ("chest_triceps", "back_biceps", "shoulders_traps", "legs"),
+            ),
         ),
         5: (
             SplitCandidate(
@@ -95,6 +111,7 @@ def score_split_candidates(
     request: NormalizedProgramRequest,
     candidates: tuple[SplitCandidate, ...],
     ruleset: ProgramRuleset,
+    preferred_days: int | None = None,
 ) -> tuple[SplitPlan, ...]:
     weights = ruleset.split_weights
     scored: list[tuple[SplitPlan, int]] = []
@@ -108,6 +125,11 @@ def score_split_candidates(
         complexity = ruleset.split_complexity[candidate.split_type]
         score = weights["base"] - complexity
         reasons: list[str] = []
+        if preferred_days is not None:
+            score -= (
+                abs(len(candidate.day_focuses) - preferred_days)
+                * ruleset.session_count_distance_penalty
+            )
         full_body = candidate.split_type in {
             SplitType.FULL_BODY,
             SplitType.FULL_BODY_AB,
@@ -125,6 +147,7 @@ def score_split_candidates(
             SplitType.PUSH_PULL_LEGS_UPPER_LOWER,
             SplitType.PUSH_PULL_LEGS_X2,
             SplitType.UPPER_LOWER_X3,
+            SplitType.PHUL,
         }:
             score += weights["twice_weekly_frequency"]
             reasons.append("SPLIT_SELECTED_FOR_TWICE_WEEKLY_EXPOSURE")
@@ -134,6 +157,7 @@ def score_split_candidates(
             SplitType.UPPER_LOWER_SPECIALIZATION,
             SplitType.PUSH_PULL_LEGS_UPPER_LOWER,
             SplitType.PUSH_PULL_LEGS_X2,
+            SplitType.PHUL,
         }:
             score += weights["goal_specificity"]
             reasons.append("SPLIT_SELECTED_FOR_GOAL_SPECIFICITY")
@@ -162,6 +186,21 @@ def score_split_candidates(
         ):
             score += weights["goal_specificity"]
             reasons.append("SPLIT_SELECTED_FOR_ADVANCED_STATUS")
+        if candidate.split_type is SplitType.PHUL and request.primary_goal in {
+            Goal.HYPERTROPHY,
+            Goal.MUSCLE_GAIN,
+            Goal.STRENGTH,
+        } and request.training_status is TrainingStatus.ADVANCED:
+            score += ruleset.phul_bonus
+            reasons.append("SPLIT_SELECTED_FOR_PERIODIZED_UPPER_LOWER")
+        if (
+            candidate.split_type is SplitType.BODY_PART_ROTATION
+            and request.training_status is TrainingStatus.ADVANCED
+            and request.primary_goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN}
+            and request.source.session_duration_minutes >= 60
+        ):
+            score += ruleset.body_part_rotation_bonus
+            reasons.append("SPLIT_SELECTED_FOR_BODY_PART_SPECIALIZATION")
 
         weekdays = _select_weekdays(
             len(candidate.day_focuses),
