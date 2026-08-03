@@ -1,4 +1,5 @@
 import type { AdminAiCatalogModel } from "./types";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 type Props = {
@@ -23,6 +24,12 @@ export function AiModelSelector({
   onMultipleChange,
 }: Props) {
   const { t } = useTranslation();
+  const [search, setSearch] = useState("");
+  const [searchVisible, setSearchVisible] = useState(false);
+  const visibleModels = models.filter((model) => {
+    const term = search.trim().toLocaleLowerCase();
+    return !term || `${model.display_name} ${model.model_id}`.toLocaleLowerCase().includes(term);
+  });
   return (
     <label className="admin-ai-setting-field" htmlFor={id}>
       <span>{label}</span>
@@ -30,6 +37,7 @@ export function AiModelSelector({
         id={id}
         multiple={multiple}
         value={multiple ? values : value}
+        onFocus={() => setSearchVisible(true)}
         onChange={(event) => {
           if (multiple) {
             onMultipleChange?.(
@@ -41,12 +49,21 @@ export function AiModelSelector({
         }}
       >
         {!multiple && <option value="">{t("admin.aiSettings.selectModel")}</option>}
-        {models.map((model) => (
+        {visibleModels.map((model) => (
           <option key={model.model_id} value={model.model_id}>
             {model.display_name} — {model.model_id}
           </option>
         ))}
       </select>
+      {searchVisible && (
+        <input
+          aria-label={`${label} search`}
+          type="search"
+          value={search}
+          placeholder={t("admin.aiSettings.searchModels")}
+          onChange={(event) => setSearch(event.currentTarget.value)}
+        />
+      )}
     </label>
   );
 }
