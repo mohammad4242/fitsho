@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -295,3 +295,39 @@ class VisualPhysiqueAssessment(VisualPhysiqueAssessmentPayload):
         "این ارزیابی صرفاً یک بررسی بصری اولیه است و پیش از استفاده در طراحی برنامه باید توسط "
         "مربی واجد صلاحیت بازبینی شود."
     )
+
+
+def visual_physique_provider_schema() -> dict[str, Any]:
+    """Return a transport schema supported by constrained-output vision providers.
+
+    Pydantic validates the full product contract after generation. The provider receives
+    the same object shape without state-exploding string, number, and array bounds.
+    """
+
+    return cast(
+        dict[str, Any],
+        _relax_provider_schema(VisualPhysiqueAssessmentPayload.model_json_schema()),
+    )
+
+
+def _relax_provider_schema(value: Any) -> Any:
+    if isinstance(value, dict):
+        unsupported_constraints = {
+            "format",
+            "maxItems",
+            "maxLength",
+            "maximum",
+            "minItems",
+            "minLength",
+            "minimum",
+            "pattern",
+            "uniqueItems",
+        }
+        return {
+            key: _relax_provider_schema(item)
+            for key, item in value.items()
+            if key not in unsupported_constraints
+        }
+    if isinstance(value, list):
+        return [_relax_provider_schema(item) for item in value]
+    return value

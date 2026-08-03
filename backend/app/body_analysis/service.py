@@ -45,7 +45,7 @@ from app.body_analysis.schemas import (
     BodyPhotoPreflight,
     BodyPhotoValidationIssue,
     NormalizedBodyAnalysis,
-    VisualPhysiqueAssessmentPayload,
+    visual_physique_provider_schema,
 )
 from app.body_photos.enums import BodyPhotoSessionState, BodyPhotoView
 from app.body_photos.models import BodyPhoto, BodyPhotoSession
@@ -716,7 +716,7 @@ class BodyAnalysisService:
                 "schema_version": config.schema_version,
             },
             response_schema=(
-                VisualPhysiqueAssessmentPayload.model_json_schema()
+                visual_physique_provider_schema()
                 if config.schema_version == "2.0"
                 else NormalizedBodyAnalysis.model_json_schema()
             ),

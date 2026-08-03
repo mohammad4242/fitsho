@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -545,6 +546,23 @@ def test_analysis_prompt_requires_a_full_schema_compatible_coach_scan() -> None:
     assert "photo_quality" in normalized_prompt
     assert "all-uncertain" in normalized_prompt
     assert "natural Persian" in normalized_prompt
+
+
+def test_v2_provider_schema_avoids_structured_output_state_explosion() -> None:
+    request = BodyAnalysisService._request(
+        AnalysisExecutionConfig(
+            provider_name="openrouter",
+            primary_model="google/gemini-2.5-flash",
+            prompt_version="body-analysis-v2",
+            schema_version="2.0",
+        )
+    )
+    serialized = json.dumps(request.response_schema)
+
+    assert "maxItems" not in serialized
+    assert "minItems" not in serialized
+    assert '"minimum"' not in serialized
+    assert '"maximum"' not in serialized
 
 
 def test_retry_rejects_nonlatest_revision(db: Session) -> None:
