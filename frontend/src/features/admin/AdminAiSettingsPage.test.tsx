@@ -13,6 +13,12 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock("./api", () => api);
+vi.mock("../../shared/AuthenticatedHeader", () => ({
+  AuthenticatedHeader: () => null,
+}));
+vi.mock("../../shared/MemberHeaderMedia", () => ({
+  MemberHeaderMedia: () => null,
+}));
 
 import { AdminAiSettingsPage } from "./AdminAiSettingsPage";
 import type { AdminAiCatalogResponse, AdminAiTaskConfig } from "./types";

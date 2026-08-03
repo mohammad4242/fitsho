@@ -2,6 +2,9 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
+import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import {
   getAdminAiTaskConfigs,
   getAdminAiTaskModels,
@@ -19,7 +22,7 @@ import type {
 import "./admin.css";
 
 export function AdminAiSettingsPage() {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const [configs, setConfigs] = useState<AdminAiTaskConfig[]>([]);
   const [selectedTask, setSelectedTask] = useState<AdminAiTaskType>("body_photo_analysis");
   const [models, setModels] = useState<AdminAiCatalogModel[]>([]);
@@ -206,15 +209,20 @@ export function AdminAiSettingsPage() {
     if (isActiveOperation(task, epoch, operation)) setBusy(null);
   }
 
+  const backLabel = i18n.resolvedLanguage === "en" ? "Return" : "بازگشت";
+
   if (!config) return <main className="admin-main"><p>{t("admin.aiSettings.loading")}</p></main>;
 
   return (
-    <main className="admin-main admin-main--ai-settings">
+    <div className="admin-page">
+      <MemberHeaderMedia imageSrc={appTrainingAccent} className="member-page-background" />
+      <AuthenticatedHeader />
+      <main className="admin-main admin-main--ai-settings">
       <header className="admin-page-heading">
         <div><p className="admin-kicker">{t("admin.aiSettings.eyebrow")}</p><h1>{t("admin.aiSettings.title")}</h1></div>
-        <Link className="admin-ai-back" to="/admin/exercises" aria-label={t("common.back")}>
+        <Link className="admin-ai-back" to="/admin/exercises" aria-label={backLabel}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7M8 12h9" /></svg>
-          <span>{t("common.back")}</span>
+          <span>{backLabel}</span>
         </Link>
       </header>
 
@@ -281,7 +289,8 @@ export function AdminAiSettingsPage() {
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="admin-ai-settings-actions"><button type="submit" disabled={busy !== null}>{t("admin.aiSettings.save")}</button><button type="button" disabled={busy !== null} onClick={handleDisable}>{t("admin.aiSettings.disable")}</button></div>
       </form>
-    </main>
+      </main>
+    </div>
   );
 }
 
