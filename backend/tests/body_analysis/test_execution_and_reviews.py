@@ -32,6 +32,7 @@ from app.body_analysis.providers import (
     StructuredGenerationResponse,
 )
 from app.body_analysis.runtime import _validate_budget_preflight
+from app.body_analysis.schemas import BodyPhotoPreflight
 from app.body_analysis.service import (
     _ANALYSIS_PROMPT,
     _PHOTO_PREFLIGHT_PROMPT,
@@ -126,6 +127,7 @@ class _PreflightRejectingProvider(_Provider):
                 "confidence": 0.94,
                 "issues": [
                     {"view": "front", "reasons": ["full_body_not_visible", "low_lighting"]},
+                    {"view": "side", "reasons": ["low_lighting"]},
                 ],
             },
             model_id="vision-primary",
@@ -250,6 +252,7 @@ def test_execution_stops_after_rejected_photo_preflight_and_preserves_view_reaso
             "confidence": 0.94,
             "issues": [
                 {"view": "front", "reasons": ["full_body_not_visible", "low_lighting"]},
+                {"view": "side", "reasons": ["low_lighting"]},
             ],
         },
     }
@@ -532,9 +535,28 @@ def test_photo_preflight_allows_fitted_clothing_and_nonblocking_backgrounds() ->
     normalized_prompt = " ".join(_PHOTO_PREFLIGHT_PROMPT.split())
 
     assert "Fitted athletic shorts or underwear are acceptable" in normalized_prompt
+    assert "absence of the head is expected and must never trigger full_body_not_visible" in (
+        normalized_prompt
+    )
     assert "Do not reject a photo merely because its background is a gym or a room" in (
         normalized_prompt
     )
+
+
+def test_preflight_discards_head_crop_only_full_body_false_positives() -> None:
+    preflight = BodyPhotoPreflight(
+        accepted=False,
+        confidence=0.96,
+        issues=(
+            {"view": "front", "reasons": ["full_body_not_visible"]},
+            {"view": "side", "reasons": ["full_body_not_visible"]},
+        ),
+    )
+
+    normalized = BodyAnalysisService._discard_head_crop_false_positives(preflight)
+
+    assert normalized.accepted is True
+    assert normalized.issues == ()
 
 
 def test_analysis_prompt_requires_a_full_schema_compatible_coach_scan() -> None:
