@@ -15,6 +15,7 @@ import { RegisterPage } from "./features/auth/RegisterPage";
 import { ExerciseCatalogPage } from "./features/exercises/ExerciseCatalogPage";
 import { ExerciseDetailPage } from "./features/exercises/ExerciseDetailPage";
 import { BodyPhotoWizard } from "./features/bodyPhotos/BodyPhotoWizard";
+import { BodyAnalysisResultPage } from "./features/bodyPhotos/BodyAnalysisResultPage";
 import { BodyProgressPage } from "./features/bodyPhotos/BodyProgressPage";
 import { OnboardingPage } from "./features/profile/OnboardingPage";
 import { ProfilePage } from "./features/profile/ProfilePage";
@@ -57,6 +58,7 @@ export function AppRoutes() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/body-progress" element={<BodyProgressPage />} />
             <Route path="/body-progress/new" element={<BodyPhotoWizard />} />
+            <Route path="/body-progress/:sessionId" element={<BodyAnalysisResultPage />} />
             <Route path="/workout-plan" element={<WorkoutPlanRoute />} />
             <Route path="/exercises" element={<ExerciseCatalogPage />} />
             <Route path="/exercises/:slug" element={<ExerciseDetailPage />} />

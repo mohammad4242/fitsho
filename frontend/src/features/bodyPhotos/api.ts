@@ -1,6 +1,12 @@
 import { request } from "../../shared/apiClient";
 
-import type { BodyPhotoPurpose, BodyPhotoSession, BodyPhotoSessionList, BodyPhotoView } from "./types";
+import type {
+  BodyAnalysis,
+  BodyPhotoPurpose,
+  BodyPhotoSession,
+  BodyPhotoSessionList,
+  BodyPhotoView,
+} from "./types";
 import type { ProcessedBodyPhoto } from "./processor";
 
 const basePath = "/api/v1/body-photo-sessions";
@@ -58,4 +64,16 @@ export function submitBodyPhotoSession(
 
 export function deleteBodyPhotoSession(sessionId: string): Promise<void> {
   return request<void>(`${basePath}/${sessionId}`, { method: "DELETE" });
+}
+
+export function getBodyPhotoAnalysis(sessionId: string): Promise<BodyAnalysis | null> {
+  return request<BodyAnalysis | null>(`${basePath}/${sessionId}/analysis`);
+}
+
+export function startBodyPhotoAnalysis(sessionId: string): Promise<BodyAnalysis> {
+  return request<BodyAnalysis>(`${basePath}/${sessionId}/analysis`, { method: "POST" });
+}
+
+export function retryBodyPhotoAnalysis(sessionId: string): Promise<BodyAnalysis> {
+  return request<BodyAnalysis>(`${basePath}/${sessionId}/analysis/retry`, { method: "POST" });
 }

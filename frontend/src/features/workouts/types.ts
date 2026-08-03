@@ -38,6 +38,7 @@ export type WorkoutPlan = {
   plan_duration_weeks: 4 | 6 | 8;
   is_stale: boolean;
   days: WorkoutDay[];
+  body_analysis_provenance?: Record<string, unknown>;
 };
 
 export type WorkoutPlanGeneration = {

@@ -154,6 +154,11 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
             {plan.is_stale && (
               <p className="workout-stale" role="status">{t("workoutPlan.stale")}</p>
             )}
+            {plan.body_analysis_provenance?.provisional === true && (
+              <p className="workout-body-analysis-warning" role="alert">
+                {t("workoutPlan.provisionalBodyAnalysisWarning")}
+              </p>
+            )}
             {generationError && (
               <StatusPanel
                 role="alert"
@@ -244,7 +249,6 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
             {[
               ["pdf", "workoutPlan.pdf"],
               ["feedback", "workoutPlan.feedback"],
-              ["body", "workoutPlan.body"],
             ].map(([key, translationKey]) => (
               <article key={key}>
                 <h3>{t(`${translationKey}.title`)}</h3>
@@ -252,6 +256,13 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 <button type="button" disabled aria-label={t(`${translationKey}.title`)}>{t("workoutPlan.comingSoon")}</button>
               </article>
             ))}
+            <article>
+              <h3>{t("workoutPlan.body.title")}</h3>
+              <p>{t("workoutPlan.body.body")}</p>
+              <Link className="workout-future__link" to="/body-progress">
+                {t("workoutPlan.body.action")}
+              </Link>
+            </article>
           </div>
         </section>
       </main>

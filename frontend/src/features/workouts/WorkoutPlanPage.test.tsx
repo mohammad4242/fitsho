@@ -147,10 +147,31 @@ it("renders the selected duration, exercise media, and exercise detail link", as
   );
   expect(screen.getByRole("button", { name: "دانلود PDF" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "بازخورد پایان دوره" })).toBeDisabled();
+  expect(screen.getByRole("link", { name: "مشاهده پیشرفت بدنی" })).toHaveAttribute(
+    "href",
+    "/body-progress",
+  );
   expect(screen.getByText("حرکت جایگزین")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "شنا سوئدی" })).toHaveAttribute(
     "href",
     "/exercises/push-up",
+  );
+});
+
+it("warns when the plan used provisional body-analysis findings", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue({
+    ...plan,
+    body_analysis_provenance: {
+      analysis_id: "analysis-1",
+      result_version: 1,
+      source: "ai_provisional",
+      provisional: true,
+    },
+  });
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    /تأیید هر دو متخصص نرسیده است/,
   );
 });
 
