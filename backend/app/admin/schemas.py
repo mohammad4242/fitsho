@@ -1,10 +1,9 @@
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
-from app.ai.models import AiModelTestOutcome, BillingClass, RoutingMode, ZenApiKind
 from app.exercises.enums import (
     BodyRegion,
     Difficulty,
@@ -118,117 +117,6 @@ class PaginatedAdminExercises(BaseModel):
     page_size: int
     total: int
     total_pages: int
-
-
-AiModelId = Annotated[
-    str,
-    StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
-]
-AiModelName = Annotated[
-    str,
-    StringConstraints(strip_whitespace=True, min_length=2, max_length=160),
-]
-
-
-class AdminAiModelCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    model_id: AiModelId
-    display_name: AiModelName
-    api_kind: ZenApiKind
-    billing_class: BillingClass
-    is_enabled: bool = True
-    priority: int = Field(default=1000, ge=0)
-
-
-class AdminAiModelUpdate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    model_id: AiModelId | None = None
-    display_name: AiModelName | None = None
-    api_kind: ZenApiKind | None = None
-    billing_class: BillingClass | None = None
-    is_enabled: bool | None = None
-    priority: int | None = Field(default=None, ge=0)
-
-
-class AdminAiModelDetail(BaseModel):
-    id: UUID
-    model_id: str
-    display_name: str
-    api_kind: ZenApiKind | None
-    billing_class: BillingClass | None
-    is_enabled: bool
-    priority: int
-    is_custom: bool
-    classification_required: bool
-    last_synced_at: datetime | None
-    last_checked_at: datetime | None
-    last_error_code: str | None
-    last_error_message: str | None
-
-
-class AdminAiRoutingUpdate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    mode: RoutingMode
-    manual_model_id: UUID | None = None
-
-
-class AdminAiRoutingDetail(BaseModel):
-    mode: RoutingMode
-    manual_model_id: UUID | None
-
-
-class AdminAiModelsResponse(BaseModel):
-    routing: AdminAiRoutingDetail
-    models: list[AdminAiModelDetail]
-
-
-class AdminAiModelTestRun(BaseModel):
-    id: UUID
-    model_id: str
-    outcome: AiModelTestOutcome
-    error_code: str | None
-    safe_error_message: str | None
-    provider_status_code: int | None
-    provider_error_type: str | None
-    provider_error_message: str | None
-    created_at: datetime
-
-
-class AdminAiModelCheckResponse(BaseModel):
-    success: bool
-    model: AdminAiModelDetail
-    test_run: AdminAiModelTestRun
-
-
-class AdminAiModelSyncResponse(BaseModel):
-    synchronized_model_ids: list[str]
-    needs_classification: list[str]
-
-
-class AdminAiValidationProblem(BaseModel):
-    code: str
-    message: str
-    day_number: int | None = None
-    exercise_id: str | None = None
-
-
-class AdminAiValidationDiagnostic(BaseModel):
-    model_id: str
-    phase: Literal["initial", "repair", "fallback"]
-    problems: list[AdminAiValidationProblem]
-
-
-class AdminAiGenerationFailure(BaseModel):
-    id: UUID
-    model_id: str
-    created_at: datetime
-    completed_at: datetime | None
-    error_code: str | None
-    safe_error_message: str | None
-    validation_diagnostics: list[AdminAiValidationDiagnostic] | None
 
 
 class AdminTrainingTemplateExercise(BaseModel):

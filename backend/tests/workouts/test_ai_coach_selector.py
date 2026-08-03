@@ -108,6 +108,7 @@ def test_ai_coach_candidate_payload_contains_fixed_library_exercises_only() -> N
             {
                 "day_number": 1,
                 "title": "Full body",
+                "title_fa": "Full body",
                 "exercise_names_fa": ["شنا سوئدی"],
             }
         ],
