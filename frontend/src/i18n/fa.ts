@@ -607,6 +607,7 @@ const fa = {
           unsuitable_background: "پس‌زمینه‌ای خلوت و واضح انتخاب کن",
           photo_uncertain: "با کادر و نور واضح‌تر دوباره عکس بگیر",
         },
+        editPhoto: "ویرایش عکس {{view}}",
         retry: "تلاش دوباره برای تحلیل",
         viewAnalysis: "مشاهده تحلیل",
         viewWorkoutPlan: "مشاهده برنامه تمرینی",

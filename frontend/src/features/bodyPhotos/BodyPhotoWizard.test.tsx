@@ -13,6 +13,7 @@ import {
 
 const api = vi.hoisted(() => ({
   createBodyPhotoSession: vi.fn(),
+  getBodyPhotoSession: vi.fn(),
   uploadBodyPhoto: vi.fn(),
   submitBodyPhotoSession: vi.fn(),
   startBodyPhotoAnalysis: vi.fn(),
@@ -53,9 +54,9 @@ function processed(view: "front" | "side" | "back"): ProcessedBodyPhoto {
   };
 }
 
-function renderWizard(processor?: BodyPhotoProcessor) {
+function renderWizard(processor?: BodyPhotoProcessor, entry = "/body-progress/new") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <BodyPhotoWizard processor={processor} />
     </MemoryRouter>,
   );
@@ -65,6 +66,13 @@ beforeEach(async () => {
   vi.clearAllMocks();
   await i18n.changeLanguage("en");
   api.createBodyPhotoSession.mockResolvedValue({ id: "session-1", state: "draft", photos: [] });
+  api.getBodyPhotoSession.mockResolvedValue({
+    id: "session-2",
+    state: "failed",
+    photos: [],
+    operational_processing_consent: { granted: true },
+    model_training_consent: { granted: false },
+  });
   api.uploadBodyPhoto.mockResolvedValue({ id: "session-1", state: "uploading", photos: [] });
   api.submitBodyPhotoSession.mockResolvedValue({ id: "session-1", state: "queued", photos: [] });
   api.startBodyPhotoAnalysis.mockResolvedValue({ id: "analysis-1", status: "queued" });
@@ -96,6 +104,25 @@ it("requires operational consent before the confirm upload action is enabled", a
 
   await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
   expect(screen.getByRole("button", { name: /confirm and upload front/i })).toBeEnabled();
+});
+
+it("replaces only the rejected view in an existing photo session", async () => {
+  const user = userEvent.setup();
+  const processor: BodyPhotoProcessor = { process: vi.fn().mockResolvedValue(processed("side")) };
+  renderWizard(processor, "/body-progress/new?sessionId=session-2&view=side");
+
+  expect(await screen.findByRole("heading", { name: /side photo/i })).toBeInTheDocument();
+  await user.upload(screen.getByLabelText(/side photo upload/i), file);
+  await user.click(screen.getByRole("button", { name: /confirm and upload side/i }));
+
+  await waitFor(() => expect(api.uploadBodyPhoto).toHaveBeenCalledWith(
+    "session-2",
+    "side",
+    expect.objectContaining({ file: expect.any(File) }),
+  ));
+  expect(api.createBodyPhotoSession).not.toHaveBeenCalled();
+  expect(api.submitBodyPhotoSession).toHaveBeenCalledWith("session-2", true, false);
+  expect(api.startBodyPhotoAnalysis).toHaveBeenCalledWith("session-2");
 });
 
 it("shows the selected photo immediately while anonymization is processing", async () => {

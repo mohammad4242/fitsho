@@ -1,9 +1,10 @@
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   createBodyPhotoSession,
+  getBodyPhotoSession,
   startBodyPhotoAnalysis,
   submitBodyPhotoSession,
   uploadBodyPhoto,
@@ -35,7 +36,11 @@ export function BodyPhotoWizard({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [searchParams] = useSearchParams();
+  const editSessionId = searchParams.get("sessionId");
+  const editView = views.find((item) => item === searchParams.get("view")) ?? null;
+  const editingExistingPhoto = editSessionId !== null && editView !== null;
+  const [currentIndex, setCurrentIndex] = useState(() => editView === null ? 0 : views.indexOf(editView));
   const [processed, setProcessed] = useState<Partial<Record<BodyPhotoView, ProcessedBodyPhoto>>>({});
   const [session, setSession] = useState<BodyPhotoSession | null>(null);
   const [operationalConsent, setOperationalConsent] = useState(false);
@@ -52,6 +57,7 @@ export function BodyPhotoWizard({
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(editingExistingPhoto);
 
   const view = views[currentIndex];
   const current = processed[view] ?? null;
@@ -73,6 +79,23 @@ export function BodyPhotoWizard({
       selectedPreviewRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!editingExistingPhoto || editSessionId === null) return;
+    void getBodyPhotoSession(editSessionId)
+      .then((loaded) => {
+        if (!mountedRef.current) return;
+        setSession(loaded);
+        setOperationalConsent(loaded.operational_processing_consent?.granted ?? false);
+        setModelTrainingConsent(loaded.model_training_consent?.granted ?? false);
+      })
+      .catch(() => {
+        if (mountedRef.current) setError(t("bodyPhotos.errors.load"));
+      })
+      .finally(() => {
+        if (mountedRef.current) setSessionLoading(false);
+      });
+  }, [editSessionId, editingExistingPhoto, t]);
 
   const instructions = useMemo(() => ({
     front: t("bodyPhotos.pose.front"),
@@ -197,7 +220,11 @@ export function BodyPhotoWizard({
   }
 
   async function confirmUpload() {
-    if (current === null || !operationalConsent || busy) return;
+    if (current === null || !operationalConsent || busy || sessionLoading) return;
+    if (editingExistingPhoto && session === null) {
+      setError(t("bodyPhotos.errors.load"));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -206,6 +233,16 @@ export function BodyPhotoWizard({
       const uploaded = await uploadBodyPhoto(activeSession.id, view, current);
       setSession(uploaded);
       clearSelectedPreview(view);
+      if (editingExistingPhoto) {
+        await submitBodyPhotoSession(
+          activeSession.id,
+          true,
+          uploaded.model_training_consent?.granted ?? false,
+        );
+        await startBodyPhotoAnalysis(activeSession.id);
+        navigate(`/body-progress/${activeSession.id}`);
+        return;
+      }
       if (currentIndex === views.length - 1) {
         setState("confirm");
       } else {
@@ -329,7 +366,7 @@ export function BodyPhotoWizard({
         <p>{instructions[view]}</p>
         <p className="body-photo-muted">{t("bodyPhotos.cameraGuidance")}</p>
         <div className="body-photo-source-actions">
-          <button className="secondary-button" type="button" onClick={() => void openCamera()} disabled={busy || cameraOpen}>
+          <button className="secondary-button" type="button" onClick={() => void openCamera()} disabled={busy || cameraOpen || sessionLoading}>
             {t("bodyPhotos.takePhoto", { view: t(`bodyPhotos.views.${view}`) })}
           </button>
           <label className="body-photo-upload-control">
@@ -339,7 +376,7 @@ export function BodyPhotoWizard({
               accept="image/jpeg,image/png,image/webp"
               type="file"
               onChange={selectFile}
-              disabled={busy}
+              disabled={busy || sessionLoading}
             />
           </label>
         </div>
@@ -380,7 +417,7 @@ export function BodyPhotoWizard({
           <span>{t("bodyPhotos.processingConsentBefore")} <button type="button" className="body-photo-link-button" onClick={() => setTermsOpen(true)}>{t("bodyPhotos.processingTerms")}</button></span>
         </label>
         {error !== null && <p className="form-error" role="alert">{error}</p>}
-        <button className="primary-button" type="button" onClick={() => void confirmUpload()} disabled={current === null || !operationalConsent || busy}>
+        <button className="primary-button" type="button" onClick={() => void confirmUpload()} disabled={current === null || !operationalConsent || busy || sessionLoading}>
           {busy ? t("bodyPhotos.preparing") : t("bodyPhotos.confirmUpload", { view: t(`bodyPhotos.views.${view}`) })}
         </button>
       </section>

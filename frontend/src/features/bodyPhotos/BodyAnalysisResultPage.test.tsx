@@ -293,3 +293,23 @@ it("shows view-specific retake reasons when photo validation rejects an upload",
   expect(alert).toHaveTextContent("Front: Show your full body in the frame");
   expect(alert).toHaveTextContent("Use brighter, even lighting");
 });
+
+it("offers editing only for the rejected photo view", async () => {
+  api.getBodyPhotoAnalysis.mockResolvedValue({
+    ...analysis,
+    status: "failed",
+    normalized_result: null,
+    overall_confidence: null,
+    photo_validation: {
+      accepted: false,
+      confidence: 0.94,
+      issues: [{ view: "side", reasons: ["wrong_view"] }],
+    },
+  });
+  renderPage();
+
+  const edit = await screen.findByRole("link", { name: /edit side photo/i });
+
+  expect(edit).toHaveAttribute("href", "/body-progress/new?sessionId=session-2&view=side");
+  expect(screen.queryByRole("link", { name: /edit front photo/i })).not.toBeInTheDocument();
+});

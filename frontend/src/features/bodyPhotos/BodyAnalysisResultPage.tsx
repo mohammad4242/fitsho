@@ -164,10 +164,20 @@ export function BodyAnalysisResultPage() {
             <strong>{t("bodyPhotos.results.analysisStatus.failed")}</strong>
             <p>{analysis.safe_error_message ?? t("bodyPhotos.results.failedSafe")}</p>
             {analysis.photo_validation?.issues.map((issue) => (
-              <p key={issue.view}>
-                <strong>{t(`bodyPhotos.views.${issue.view}`)}: </strong>
-                {issue.reasons.map((reason) => t(`bodyPhotos.results.photoValidation.${reason}`)).join(" · ")}
-              </p>
+              <div className="body-analysis-status__issue" key={issue.view}>
+                <p>
+                  <strong>{t(`bodyPhotos.views.${issue.view}`)}: </strong>
+                  {issue.reasons.map((reason) => t(`bodyPhotos.results.photoValidation.${reason}`)).join(" · ")}
+                </p>
+                <Link
+                  className="body-photo-link-button"
+                  to={`/body-progress/new?sessionId=${session.id}&view=${issue.view}`}
+                >
+                  {t("bodyPhotos.results.editPhoto", {
+                    view: t(`bodyPhotos.views.${issue.view}`),
+                  })}
+                </Link>
+              </div>
             ))}
           </div>
           <button className="secondary-button" type="button" disabled={actionBusy} onClick={() => void retry()}>

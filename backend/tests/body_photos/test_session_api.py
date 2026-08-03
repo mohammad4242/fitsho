@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.body_photos.enums import BodyPhotoSessionState
+from app.body_photos.models import BodyPhotoSession
 from app.config import Settings
 
 ORIGIN = {"Origin": "http://localhost:5173"}
@@ -121,6 +123,29 @@ def _consents(training_granted: bool = False) -> dict[str, object]:
     }
 
 
+def test_photo_validation_failure_allows_replacing_only_the_rejected_view(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _register(client, "photo-replace-rejected-view@example.com")
+    created = _create_session(client)
+    session_id = created["id"]
+    for view in ("front", "side", "back"):
+        assert _upload(client, session_id, view).status_code == 200
+
+    session = db.get(BodyPhotoSession, UUID(str(session_id)))
+    assert session is not None
+    session.state = BodyPhotoSessionState.FAILED
+    db.commit()
+
+    response = _upload(client, session_id, "side", _png(color=(80, 70, 60)))
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["state"] == "uploaded"
+    assert [photo["view"] for photo in payload["photos"]] == ["back", "front", "side"]
+
+
 def test_session_routes_require_authentication_and_trusted_origin(client: TestClient) -> None:
     anonymous = client.post(
         "/api/v1/body-photo-sessions",
@@ -191,8 +216,7 @@ def test_upload_cors_preflight_allows_private_photo_headers(client: TestClient) 
     assert response.status_code == 200
     assert "PUT" in response.headers["access-control-allow-methods"]
     assert (
-        "x-fitsho-client-crop-confirmed"
-        in response.headers["access-control-allow-headers"].lower()
+        "x-fitsho-client-crop-confirmed" in response.headers["access-control-allow-headers"].lower()
     )
     assert "x-fitsho-processed-sha256" in response.headers["access-control-allow-headers"].lower()
     assert (

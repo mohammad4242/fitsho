@@ -37,6 +37,7 @@ EDITABLE_STATES = {
     BodyPhotoSessionState.AWAITING_CONSENT,
     BodyPhotoSessionState.UPLOADING,
     BodyPhotoSessionState.UPLOADED,
+    BodyPhotoSessionState.FAILED,
 }
 
 

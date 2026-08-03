@@ -607,6 +607,7 @@ const en = {
           unsuitable_background: "Use a clear, uncluttered background",
           photo_uncertain: "Retake with clearer framing and lighting",
         },
+        editPhoto: "Edit {{view}} photo",
         retry: "Retry analysis",
         viewAnalysis: "View analysis",
         viewWorkoutPlan: "View workout plan",
