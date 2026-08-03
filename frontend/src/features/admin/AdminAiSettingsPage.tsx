@@ -29,6 +29,8 @@ export function AdminAiSettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const modelRequestVersion = useRef(0);
+  const operationVersion = useRef(0);
+  const activeTask = useRef<AdminAiTaskType>(selectedTask);
 
   const config = useMemo(
     () => configs.find((item) => item.task_type === selectedTask) ?? null,
@@ -40,6 +42,7 @@ export function AdminAiSettingsPage() {
       .then((items) => {
         setConfigs(items);
         if (!items.some((item) => item.task_type === selectedTask) && items[0]) {
+          activeTask.current = items[0].task_type;
           setSelectedTask(items[0].task_type);
         }
       })
@@ -51,6 +54,7 @@ export function AdminAiSettingsPage() {
   }, [selectedTask]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function loadModels(task: AdminAiTaskType, query: string) {
+    if (activeTask.current !== task) return Promise.resolve();
     const requestVersion = modelRequestVersion.current + 1;
     modelRequestVersion.current = requestVersion;
     return getAdminAiTaskModels(task, query)
@@ -86,7 +90,8 @@ export function AdminAiSettingsPage() {
   }
 
   function persistConfig(target: AdminAiTaskConfig, replacementKey: string) {
-    setBusy("save");
+    const taskAtStart = selectedTask;
+    const operation = beginOperation("save");
     setMessage(null);
     setError(null);
     const payload: AdminAiTaskConfigUpdate = {
@@ -103,36 +108,73 @@ export function AdminAiSettingsPage() {
       replace_credential: replacementKey.length > 0,
       ...(replacementKey ? { api_key: replacementKey } : {}),
     };
-    void saveAdminAiTaskConfig(selectedTask, payload)
+    void saveAdminAiTaskConfig(taskAtStart, payload)
       .then((saved) => {
-        setConfigs((current) => current.map((item) => item.task_type === selectedTask ? saved : item));
-        setApiKey("");
-        setMessage(t("admin.aiSettings.saved"));
+        setConfigs((current) => current.map((item) => item.task_type === taskAtStart ? saved : item));
+        if (isActiveOperation(taskAtStart, operation)) {
+          setApiKey("");
+          setMessage(t("admin.aiSettings.saved"));
+        }
       })
-      .catch(() => setError(t("admin.aiSettings.saveError")))
-      .finally(() => setBusy(null));
+      .catch(() => {
+        if (isActiveOperation(taskAtStart, operation)) setError(t("admin.aiSettings.saveError"));
+      })
+      .finally(() => finishOperation(operation));
   }
 
   function handleConnectionTest() {
-    setBusy("test");
+    const taskAtStart = selectedTask;
+    const operation = beginOperation("test");
     setMessage(null);
     setError(null);
     void testAdminAiProvider(apiKey || undefined)
-      .then((result) => result.ok
-        ? setMessage(t("admin.aiSettings.connected"))
-        : setError(result.safe_error_message ?? t("admin.aiSettings.connectionFailed")))
-      .catch(() => setError(t("admin.aiSettings.connectionFailed")))
-      .finally(() => setBusy(null));
+      .then((result) => {
+        if (!isActiveOperation(taskAtStart, operation)) return;
+        if (result.ok) setMessage(t("admin.aiSettings.connected"));
+        else setError(result.safe_error_message ?? t("admin.aiSettings.connectionFailed"));
+      })
+      .catch(() => {
+        if (isActiveOperation(taskAtStart, operation)) setError(t("admin.aiSettings.connectionFailed"));
+      })
+      .finally(() => finishOperation(operation));
   }
 
   function handleRefresh() {
-    setBusy("refresh");
+    const taskAtStart = selectedTask;
+    const operation = beginOperation("refresh");
     setError(null);
     void refreshAdminAiModels()
-      .then(() => loadModels(selectedTask, search))
-      .then(() => setMessage(t("admin.aiSettings.refreshed")))
-      .catch(() => setError(t("admin.aiSettings.refreshError")))
-      .finally(() => setBusy(null));
+      .then(() => {
+        if (!isActiveOperation(taskAtStart, operation)) return;
+        return loadModels(taskAtStart, search);
+      })
+      .then(() => {
+        if (isActiveOperation(taskAtStart, operation)) setMessage(t("admin.aiSettings.refreshed"));
+      })
+      .catch(() => {
+        if (isActiveOperation(taskAtStart, operation)) setError(t("admin.aiSettings.refreshError"));
+      })
+      .finally(() => finishOperation(operation));
+  }
+
+  function selectTask(task: AdminAiTaskType) {
+    activeTask.current = task;
+    setSelectedTask(task);
+  }
+
+  function beginOperation(kind: string) {
+    const operation = operationVersion.current + 1;
+    operationVersion.current = operation;
+    setBusy(kind);
+    return operation;
+  }
+
+  function isActiveOperation(task: AdminAiTaskType, operation: number) {
+    return activeTask.current === task && operationVersion.current === operation;
+  }
+
+  function finishOperation(operation: number) {
+    if (operationVersion.current === operation) setBusy(null);
   }
 
   if (!config) return <main className="admin-main"><p>{t("admin.aiSettings.loading")}</p></main>;
@@ -150,7 +192,7 @@ export function AdminAiSettingsPage() {
             key={item.task_type}
             type="button"
             aria-pressed={item.task_type === selectedTask}
-            onClick={() => setSelectedTask(item.task_type)}
+            onClick={() => selectTask(item.task_type)}
           >{t(`admin.aiSettings.tasks.${item.task_type}`)}</button>
         ))}
       </nav>

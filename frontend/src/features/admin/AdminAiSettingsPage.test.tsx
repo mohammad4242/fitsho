@@ -207,6 +207,54 @@ it("ignores a stale catalog response after switching AI tasks", async () => {
   await waitFor(() => expect(screen.queryByRole("option", { name: /Old Vision Model/ })).not.toBeInTheDocument());
 });
 
+it("does not refresh task A's catalog after switching to task B", async () => {
+  let resolveRefresh: (() => void) | undefined;
+  api.getAdminAiTaskConfigs.mockResolvedValue([
+    { ...bodyConfig, credential: { configured: true, masked: "••••cret" } },
+    progressConfig,
+  ]);
+  api.refreshAdminAiModels.mockReturnValue(new Promise((resolve) => { resolveRefresh = () => resolve({
+    provider: "openrouter", model_count: 2, refreshed_at: "2026-08-03T12:00:00Z",
+  }); }));
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByRole("button", { name: "Refresh models" }));
+  await user.click(screen.getByRole("button", { name: "Progress comparison" }));
+  await screen.findAllByRole("option", { name: /Vision Model/ });
+  const callsBeforeResolve = api.getAdminAiTaskModels.mock.calls.length;
+  resolveRefresh?.();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(api.getAdminAiTaskModels).toHaveBeenCalledTimes(callsBeforeResolve);
+  expect(screen.queryByText("Model catalog refreshed")).not.toBeInTheDocument();
+});
+
+it("does not show stale connection or save results after switching tasks", async () => {
+  let resolveConnection: ((value: { ok: boolean; checked_at: string; model_count: number; error_code: null; safe_error_message: null }) => void) | undefined;
+  let resolveSave: ((value: AdminAiTaskConfig) => void) | undefined;
+  api.getAdminAiTaskConfigs.mockResolvedValue([bodyConfig, progressConfig]);
+  api.testAdminAiProvider.mockReturnValue(new Promise((resolve) => { resolveConnection = resolve; }));
+  api.saveAdminAiTaskConfig.mockReturnValue(new Promise((resolve) => { resolveSave = resolve; }));
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByRole("button", { name: "Test connection" }));
+  await user.click(screen.getByRole("button", { name: "Progress comparison" }));
+  resolveConnection?.({ ok: true, checked_at: "2026-08-03T12:00:00Z", model_count: 2, error_code: null, safe_error_message: null });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.queryByText("Connection successful")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Body-photo analysis" }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await user.click(screen.getByRole("button", { name: "Progress comparison" }));
+  resolveSave?.({ ...bodyConfig, enabled: true });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(screen.queryByText("Settings saved")).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Progress comparison" })).toBeInTheDocument();
+});
+
 function renderPage() {
   return render(
     <MemoryRouter>

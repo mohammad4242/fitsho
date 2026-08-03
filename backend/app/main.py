@@ -27,14 +27,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        timeout = httpx.Timeout(active_settings.opencode_zen_timeout_seconds)
-        async with httpx.AsyncClient(
-            timeout=timeout,
-            proxy=active_settings.opencode_zen_proxy_url,
-            trust_env=False,
-        ) as client:
-            app.state.zen_http_client = client
-            app.state.ai_http_client = client
+        zen_timeout = httpx.Timeout(active_settings.opencode_zen_timeout_seconds)
+        ai_timeout = httpx.Timeout(active_settings.openrouter_timeout_seconds)
+        async with (
+            httpx.AsyncClient(
+                timeout=zen_timeout,
+                proxy=active_settings.opencode_zen_proxy_url,
+                trust_env=False,
+            ) as zen_client,
+            httpx.AsyncClient(
+                timeout=ai_timeout,
+                proxy=active_settings.openrouter_proxy_url,
+                trust_env=False,
+            ) as ai_client,
+        ):
+            app.state.zen_http_client = zen_client
+            app.state.ai_http_client = ai_client
             yield
 
     app = FastAPI(title="Fitsho API", lifespan=lifespan)
