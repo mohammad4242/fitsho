@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from app.exercises.enums import ExerciseCautionTag, MuscleGroup
+from app.exercises.enums import Equipment, ExerciseCautionTag, MovementPattern, MuscleGroup
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.exercise_ranker import rank_exercises
@@ -10,6 +10,8 @@ from app.workouts.program_engine.schemas import (
     BodyAnalysisInfluence,
     ProgramGenerationRequest,
     TemplateReference,
+    TemplateReferenceDay,
+    TemplateReferenceSlot,
 )
 from app.workouts.program_engine.split_selector import select_split
 from app.workouts.program_engine.template_selector import select_template_reference
@@ -111,6 +113,29 @@ def test_low_confidence_body_priority_does_not_change_volume() -> None:
     assert "VOLUME_INCREASED_FOR_BODY_ANALYSIS" not in low_plan.reason_codes
 
 
+def test_low_confidence_influence_is_absent_from_program_snapshot_and_trace() -> None:
+    source = request(primary_goal="build_muscle", session_duration_minutes=60)
+    baseline = generate_program(
+        source,
+        full_catalog(),
+        RULESET,
+    )
+    low_confidence = generate_program(
+        source.model_copy(
+            update={"body_analysis_influence": influence(MuscleGroup.CHEST, confidence=0.4)}
+        ),
+        full_catalog(),
+        RULESET,
+    )
+
+    assert baseline.program is not None, baseline.errors
+    assert low_confidence.program is not None, low_confidence.errors
+    assert low_confidence.program.user_profile_snapshot == baseline.program.user_profile_snapshot
+    assert low_confidence.program.decision_trace == baseline.program.decision_trace
+    assert low_confidence.program.body_analysis_provenance == {}
+    assert low_confidence.program.warnings == baseline.program.warnings
+
+
 def test_clear_lag_volume_boost_stays_inside_hard_ruleset_limit() -> None:
     source = request(
         primary_goal="build_muscle",
@@ -164,6 +189,108 @@ def test_reference_template_path_scores_body_analysis_emphasis_tags() -> None:
     assert selected.slug == "a-shoulders"
 
 
+def _template_slot(
+    pattern: MovementPattern,
+    target: tuple[MuscleGroup, ...],
+    *,
+    sets: int = 3,
+) -> TemplateReferenceSlot:
+    return TemplateReferenceSlot(
+        exercise_id=None,
+        exercise_slug_hint=pattern.value,
+        target_muscles=target,
+        movement_pattern=pattern,
+        intensity_method="standard",
+        adaptation_priority="core",
+        superset_group=None,
+        sets=sets,
+        rep_min=8,
+        rep_max=12,
+        target_rir=2,
+        rest_seconds=90,
+    )
+
+
+def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> None:
+    chest = (MuscleGroup.CHEST,)
+    back = (MuscleGroup.BACK,)
+    legs = (MuscleGroup.QUADRICEPS, MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES)
+    core = (MuscleGroup.ABS,)
+    oversized = TemplateReference(
+        slug="oversized-chest-reference",
+        days_per_week=4,
+        training_level="intermediate",
+        fitness_goal="build_muscle",
+        focus_tags=("chest_priority",),
+        intensity_methods=("standard",),
+        days=(
+            TemplateReferenceDay(
+                1,
+                "Chest",
+                chest,
+                tuple(_template_slot(MovementPattern.HORIZONTAL_PUSH, chest) for _ in range(5)),
+            ),
+            TemplateReferenceDay(
+                2,
+                "Back",
+                back,
+                (
+                    _template_slot(MovementPattern.HORIZONTAL_PULL, back),
+                    _template_slot(MovementPattern.VERTICAL_PULL, back),
+                    _template_slot(MovementPattern.HORIZONTAL_PULL, back),
+                    _template_slot(MovementPattern.VERTICAL_PULL, back),
+                    _template_slot(MovementPattern.HORIZONTAL_PULL, back),
+                ),
+            ),
+            TemplateReferenceDay(
+                3,
+                "Legs",
+                legs,
+                (
+                    _template_slot(MovementPattern.SQUAT, legs),
+                    _template_slot(MovementPattern.HIP_HINGE, legs),
+                    _template_slot(MovementPattern.LUNGE, legs),
+                    _template_slot(MovementPattern.KNEE_EXTENSION, legs),
+                    _template_slot(MovementPattern.HIP_EXTENSION, legs),
+                ),
+            ),
+            TemplateReferenceDay(
+                4,
+                "Core",
+                core,
+                (
+                    _template_slot(MovementPattern.CORE_ANTI_EXTENSION, core),
+                    _template_slot(MovementPattern.CORE_ANTI_ROTATION, core),
+                    _template_slot(MovementPattern.CORE_ANTI_LATERAL_FLEXION, core),
+                    _template_slot(MovementPattern.CORE_ANTI_EXTENSION, core),
+                    _template_slot(MovementPattern.CORE_ANTI_ROTATION, core),
+                ),
+            ),
+        ),
+    )
+
+    result = generate_program(
+        request(
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            available_training_days=4,
+            session_duration_minutes=120,
+            available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
+        ),
+        full_catalog(),
+        RULESET,
+        reference_templates=(oversized,),
+    )
+
+    assert result.program is not None, result.errors
+    assert result.program.aggregate_metrics.get("reference_template") is None
+    assert all(
+        values["maximum_hard"] <= RULESET.maximum_sets[result.program.training_status]
+        for values in result.program.aggregate_metrics["volume_ranges_by_muscle"].values()
+    )
+
+
 def test_program_trace_preserves_provisional_analysis_version() -> None:
     body_influence = influence(MuscleGroup.CHEST, source="ai_provisional")
 
@@ -192,5 +319,9 @@ def test_program_trace_preserves_provisional_analysis_version() -> None:
         and item["source"] == "ai_provisional"
         and item["applied_muscles"] == ["chest"]
         for item in result.program.decision_trace
+    )
+    stages = [item["stage"] for item in result.program.decision_trace]
+    assert stages.index("safety") < stages.index("eligibility") < stages.index(
+        "body_analysis_influence"
     )
     assert "BODY_ANALYSIS_NOT_FULLY_REVIEWED" in result.program.warnings

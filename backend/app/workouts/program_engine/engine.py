@@ -2,6 +2,7 @@ from collections import Counter, defaultdict
 from dataclasses import replace
 
 from app.workouts.program_engine.body_analysis import (
+    applicable_body_analysis_influence,
     body_analysis_provenance,
     body_analysis_trace,
 )
@@ -41,6 +42,13 @@ def generate_program(
     *,
     reference_templates: tuple[TemplateReference, ...] = (),
 ) -> ProgramGenerationResult:
+    request = request.model_copy(
+        update={
+            "body_analysis_influence": applicable_body_analysis_influence(
+                request.body_analysis_influence, ruleset
+            )
+        }
+    )
     normalized = normalize_request(request, ruleset)
     safety = screen_safety(normalized)
     if safety.status not in {SafetyStatus.CLEAR, SafetyStatus.CLEAR_WITH_MODIFICATIONS}:
@@ -79,7 +87,9 @@ def generate_program(
                 request,
                 normalized,
                 safety.status,
+                safety.reason_codes,
                 eligibility.rejected,
+                len(eligibility.eligible),
                 reference,
                 reference_days,
                 ruleset,
@@ -142,15 +152,15 @@ def generate_program(
     trace: tuple[dict[str, object], ...] = (
         {"stage": "normalization", "assumptions": normalized.assumptions},
         {"stage": "safety", "status": safety.status.value, "reasons": safety.reason_codes},
-        *((body_trace,) if body_trace is not None else ()),
-        {"stage": "split", "selected": split.split_type.value, "reasons": split.reason_codes},
-        {"stage": "volume", "reasons": volume.reason_codes},
-        {"stage": "volume_repair", "reasons": repair_reasons},
         {
             "stage": "eligibility",
             "eligible_count": len(eligibility.eligible),
             "rejected_count": len(eligibility.rejected),
         },
+        *((body_trace,) if body_trace is not None else ()),
+        {"stage": "split", "selected": split.split_type.value, "reasons": split.reason_codes},
+        {"stage": "volume", "reasons": volume.reason_codes},
+        {"stage": "volume_repair", "reasons": repair_reasons},
     )
     empty_report = ValidationReport(
         errors=(),
@@ -203,7 +213,9 @@ def _reference_program(
     request: ProgramGenerationRequest,
     normalized: NormalizedProgramRequest,
     safety_status: SafetyStatus,
+    safety_reasons: tuple[str, ...],
     rejected: tuple[RejectedCandidate, ...],
+    eligible_count: int,
     reference: TemplateReference,
     days: tuple[WorkoutDay, ...],
     ruleset: ProgramRuleset,
@@ -231,10 +243,10 @@ def _reference_program(
         "planned_direct_sets_by_muscle": dict(direct),
         "volume_ranges_by_muscle": {
             muscle: {
-                "minimum_soft": sets,
-                "target_sets": sets,
-                "maximum_soft": sets,
-                "maximum_hard": max(sets, ruleset.maximum_sets[normalized.training_status]),
+                "minimum_soft": min(sets, ruleset.maximum_sets[normalized.training_status]),
+                "target_sets": min(sets, ruleset.maximum_sets[normalized.training_status]),
+                "maximum_soft": ruleset.maximum_sets[normalized.training_status],
+                "maximum_hard": ruleset.maximum_sets[normalized.training_status],
             }
             for muscle, sets in direct.items()
         },
@@ -248,7 +260,12 @@ def _reference_program(
     body_trace = body_analysis_trace(normalized, ruleset)
     trace: tuple[dict[str, object], ...] = (
         {"stage": "normalization", "assumptions": normalized.assumptions},
-        {"stage": "safety", "status": safety_status.value, "reasons": ()},
+        {"stage": "safety", "status": safety_status.value, "reasons": safety_reasons},
+        {
+            "stage": "eligibility",
+            "eligible_count": eligible_count,
+            "rejected_count": len(rejected),
+        },
         *((body_trace,) if body_trace is not None else ()),
         {"stage": "template_reference", "selected": reference.slug},
     )

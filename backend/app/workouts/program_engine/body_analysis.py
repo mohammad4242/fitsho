@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
-from app.workouts.program_engine.schemas import BodyAnalysisPriority, NormalizedProgramRequest
+from app.workouts.program_engine.schemas import (
+    BodyAnalysisInfluence,
+    BodyAnalysisPriority,
+    NormalizedProgramRequest,
+)
 
 BODY_ANALYSIS_TRAINING_MAPPING_VERSION = "body_analysis_training_map_v1"
 
@@ -33,6 +37,24 @@ def eligible_body_analysis_priorities(
         for priority in influence.priorities
         if priority.confidence >= ruleset.body_analysis_minimum_confidence
     )
+
+
+def applicable_body_analysis_influence(
+    influence: BodyAnalysisInfluence | None,
+    ruleset: ProgramRuleset,
+) -> BodyAnalysisInfluence | None:
+    """Drops evidence that cannot safely influence any program decision."""
+
+    if influence is None or influence.overall_confidence < ruleset.body_analysis_minimum_confidence:
+        return None
+    priorities = tuple(
+        priority
+        for priority in influence.priorities
+        if priority.confidence >= ruleset.body_analysis_minimum_confidence
+    )
+    if not priorities:
+        return None
+    return influence.model_copy(update={"priorities": priorities})
 
 
 def body_analysis_priority_muscles(

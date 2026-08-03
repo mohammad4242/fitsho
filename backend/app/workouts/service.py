@@ -39,6 +39,7 @@ from app.workouts.body_analysis_resolver import (
 from app.workouts.candidate_selector import CAUTION_EXCLUSIONS, WorkoutCandidateSelector
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise, WorkoutPlanGeneration
+from app.workouts.program_engine.body_analysis import applicable_body_analysis_influence
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     BodyPosition,
@@ -164,7 +165,9 @@ class WorkoutGenerationService:
         if self._settings.generation_method == "ai":
             return await self._generate_with_ai(user_id)
         source_profile = get_profile(self._db, user_id)
-        body_analysis_influence = self._body_analysis_resolver.resolve(user_id)
+        body_analysis_influence = applicable_body_analysis_influence(
+            self._body_analysis_resolver.resolve(user_id), self._ruleset
+        )
         try:
             request = self._to_program_request(
                 source_profile, overrides, body_analysis_influence
@@ -237,7 +240,9 @@ class WorkoutGenerationService:
         refreshed_request = self._to_program_request(
             refreshed_profile,
             overrides,
-            self._body_analysis_resolver.resolve(user_id),
+            applicable_body_analysis_influence(
+                self._body_analysis_resolver.resolve(user_id), self._ruleset
+            ),
         )
         refreshed_catalog = self._load_catalog()
         if (
@@ -805,7 +810,9 @@ class WorkoutGenerationService:
         request = self._to_program_request(
             get_profile(self._db, user_id),
             None,
-            self._body_analysis_resolver.resolve(user_id),
+            applicable_body_analysis_influence(
+                self._body_analysis_resolver.resolve(user_id), self._ruleset
+            ),
         )
         catalog_hash = self._catalog_hash(self._load_catalog())
         reference_hash = self._template_reference_hash(load_template_references(self._db))

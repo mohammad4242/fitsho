@@ -8,6 +8,10 @@ from sqlalchemy.orm import Session
 from app.ai.fake_provider import FakeWorkoutPlanModelProvider
 from app.ai.routing import ModelProviderCandidate
 from app.auth.models import User
+from app.body_analysis.enums import BodyAnalysisStatus
+from app.body_analysis.models import BodyAnalysis
+from app.body_photos.enums import BodyPhotoPurpose, BodyPhotoSessionState
+from app.body_photos.models import BodyPhotoSession
 from app.exercises.enums import (
     BodyRegion,
     Difficulty,
@@ -166,7 +170,7 @@ class _InfluenceResolver:
         return self.influence
 
 
-def _body_influence(*, result_version_id=None, source="ai_provisional"):
+def _body_influence(*, result_version_id=None, source="ai_provisional", confidence=0.88):
     return BodyAnalysisInfluence.model_validate(
         {
             "analysis_id": "2cfda8dc-cb60-4adb-9105-1b367ff27b88",
@@ -179,7 +183,7 @@ def _body_influence(*, result_version_id=None, source="ai_provisional"):
                 {
                     "muscle": "chest",
                     "classification": "mild_lag",
-                    "confidence": 0.88,
+                    "confidence": confidence,
                     "severity": 0.5,
                     "emphasis": ["chest"],
                 }
@@ -436,3 +440,49 @@ def test_specialist_correction_changes_signature_and_marks_active_plan_stale(
     assert active is not None and active.is_stale
     assert replacement.plan.id != first.plan.id
     assert replacement.plan.body_analysis_provenance["source"] == "fully_reviewed"
+
+
+def test_low_confidence_analysis_reuses_same_plan_signature(db: Session) -> None:
+    user = _user_with_profile(db)
+    _seed_candidates(db)
+    resolver = _InfluenceResolver(None)
+    service = _service(db, body_analysis_resolver=resolver)
+    first = asyncio.run(service.generate(user.id))
+
+    resolver.influence = _body_influence(confidence=0.4)
+    second = asyncio.run(service.generate(user.id))
+
+    assert second.reused
+    assert second.plan.id == first.plan.id
+    assert second.plan.body_analysis_provenance == {}
+
+
+def test_failed_body_analysis_does_not_block_normal_plan_generation(db: Session) -> None:
+    user = _user_with_profile(db)
+    _seed_candidates(db)
+    photo_session = BodyPhotoSession(
+        user_id=user.id,
+        purpose=BodyPhotoPurpose.PROGRESS_CHECK,
+        state=BodyPhotoSessionState.FAILED,
+    )
+    db.add(photo_session)
+    db.flush()
+    db.add(
+        BodyAnalysis(
+            session_id=photo_session.id,
+            revision=1,
+            provider="openrouter",
+            model_id="vision",
+            prompt_version="body-v1",
+            schema_version="1.0",
+            status=BodyAnalysisStatus.FAILED,
+            error_code="provider_unavailable",
+            error_message="safe message",
+        )
+    )
+    db.commit()
+
+    result = asyncio.run(_service(db).generate(user.id))
+
+    assert result.plan.status is WorkoutPlanStatus.ACTIVE
+    assert result.plan.body_analysis_provenance == {}
