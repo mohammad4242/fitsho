@@ -48,6 +48,11 @@ export type BodyLandmarkDetection = {
   clothingVisibilityScore: number;
   backgroundReliabilityScore: number;
   isSafeAndRelevant: boolean;
+  clothingValidation: "accepted" | "rejected" | "unavailable";
+  contentSafetyValidation: "accepted" | "rejected" | "unavailable";
+  backgroundValidation: "accepted" | "rejected" | "unavailable";
+  /** Lowest confidently observed face/head landmark in normalized image coordinates. */
+  faceBottomY: number | null;
   /** Normalized Y coordinate below the complete head and above both shoulders. */
   safeHeadCropY: number | null;
   /** Normalized Y coordinate of the highest shoulder landmark. */
@@ -113,6 +118,9 @@ export type BodyPhotoProcessingErrorCode =
   | "low_pose_confidence"
   | "body_not_fully_visible"
   | "clothing_hides_body_contours"
+  | "clothing_validation_unavailable"
+  | "content_validation_unavailable"
+  | "background_validation_unavailable"
   | "unsafe_or_irrelevant_image"
   | "image_too_dark"
   | "image_too_bright"
@@ -152,6 +160,7 @@ const defaultLimits = {
   minimumSharpnessScore: 0.025,
   targetWidth: 1200,
   outputQuality: 0.9,
+  minimumFaceCropSafetyMargin: 0.04,
 } as const;
 
 export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
@@ -275,6 +284,18 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
     if (detection.personCount !== 1) {
       throw new BodyPhotoProcessingError("exactly_one_person_required");
     }
+    if (detection.clothingValidation === "unavailable") {
+      throw new BodyPhotoProcessingError("clothing_validation_unavailable");
+    }
+    if (detection.contentSafetyValidation === "unavailable") {
+      throw new BodyPhotoProcessingError("content_validation_unavailable");
+    }
+    if (detection.backgroundValidation === "unavailable") {
+      throw new BodyPhotoProcessingError("background_validation_unavailable");
+    }
+    if (detection.clothingValidation === "rejected") {
+      throw new BodyPhotoProcessingError("clothing_hides_body_contours");
+    }
     if (!detection.isSafeAndRelevant) {
       throw new BodyPhotoProcessingError("unsafe_or_irrelevant_image");
     }
@@ -299,11 +320,14 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
     if (
       detection.safeHeadCropY === null
       || detection.shoulderLineY === null
+      || detection.faceBottomY === null
       || !detection.headFullyExcluded
       || !detection.shouldersPreserved
       || detection.headCropConfidence < defaultLimits.minimumCropConfidence
       || detection.safeHeadCropY <= 0
       || detection.safeHeadCropY >= detection.shoulderLineY
+      || detection.safeHeadCropY
+        < detection.faceBottomY + defaultLimits.minimumFaceCropSafetyMargin
       || detection.shoulderLineY - detection.safeHeadCropY > 0.18
       || detection.shoulderLineY >= 0.5
     ) {

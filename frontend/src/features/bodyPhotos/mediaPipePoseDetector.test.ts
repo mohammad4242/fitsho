@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { MediaPipePoseLandmarkDetector } from "./mediaPipePoseDetector";
+import {
+  createMediaPipePoseLandmarkLoader,
+  MediaPipePoseLandmarkDetector,
+  mediaPipePoseAssets,
+} from "./mediaPipePoseDetector";
 import type { DecodedBodyPhoto } from "./processor";
 
 function decodedImage(): DecodedBodyPhoto {
@@ -30,9 +34,10 @@ describe("MediaPipePoseLandmarkDetector", () => {
 
     await expect(detector.detect(decodedImage(), "front")).resolves.toMatchObject({
       personCount: 1,
-      detectedView: "front",
+      detectedView: "unknown",
       headFullyExcluded: true,
       shouldersPreserved: true,
+      clothingValidation: "unavailable",
     });
     await detector.detect(decodedImage(), "front");
 
@@ -50,5 +55,26 @@ describe("MediaPipePoseLandmarkDetector", () => {
       safeHeadCropY: null,
       isSafeAndRelevant: false,
     });
+  });
+
+  it("uses pinned matching WASM and model configuration", async () => {
+    const forVisionTasks = vi.fn().mockResolvedValue("fileset");
+    const createFromOptions = vi.fn().mockResolvedValue({ detect: vi.fn() });
+    const loader = createMediaPipePoseLandmarkLoader(
+      mediaPipePoseAssets,
+      async () => ({
+        FilesetResolver: { forVisionTasks },
+        PoseLandmarker: { createFromOptions },
+      }),
+    );
+
+    await loader();
+
+    expect(mediaPipePoseAssets.wasmBasePath).toContain("@0.10.35/wasm");
+    expect(mediaPipePoseAssets.modelAssetPath).toContain("/float16/1/");
+    expect(forVisionTasks).toHaveBeenCalledWith(mediaPipePoseAssets.wasmBasePath);
+    expect(createFromOptions).toHaveBeenCalledWith("fileset", expect.objectContaining({
+      baseOptions: { modelAssetPath: mediaPipePoseAssets.modelAssetPath },
+    }));
   });
 });

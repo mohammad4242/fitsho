@@ -13,11 +13,20 @@ export type PoseLandmarkerLike = {
 
 type PoseLandmarkerLoader = () => Promise<PoseLandmarkerLike>;
 
+type MediaPipeVisionModule = {
+  FilesetResolver: { forVisionTasks(basePath: string): Promise<unknown> };
+  PoseLandmarker: {
+    createFromOptions(fileset: unknown, options: Record<string, unknown>): Promise<PoseLandmarkerLike>;
+  };
+};
+
 const visibilityIndices = [0, 7, 8, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
-const modelAssetPath = import.meta.env.VITE_BODY_PHOTO_POSE_MODEL_URL
-  ?? "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task";
-const wasmBasePath = import.meta.env.VITE_BODY_PHOTO_MEDIAPIPE_WASM_URL
-  ?? "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm";
+export const mediaPipePoseAssets = {
+  modelAssetPath: import.meta.env.VITE_BODY_PHOTO_POSE_MODEL_URL
+    ?? "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+  wasmBasePath: import.meta.env.VITE_BODY_PHOTO_MEDIAPIPE_WASM_URL
+    ?? "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm",
+} as const;
 
 /**
  * Real on-device landmark adapter. The model download contains only model assets;
@@ -49,18 +58,22 @@ export class MediaPipePoseLandmarkDetector implements BodyLandmarkDetector {
     }
 
     const shoulderLineY = Math.min(leftShoulder.y, rightShoulder.y);
-    const headBottomY = Math.max(nose.y, leftEar.y, rightEar.y);
-    const safeHeadCropY = headBottomY + 0.02 < shoulderLineY - 0.012
-      ? headBottomY + 0.02
+    const faceBottomY = Math.max(nose.y, leftEar.y, rightEar.y);
+    // Crop immediately above the shoulder line, but only when it remains safely
+    // below every observed head/face landmark. This removes the visible head rather
+    // than applying a fixed image-percentage crop.
+    const candidateCropY = shoulderLineY - 0.012;
+    const safeHeadCropY = candidateCropY >= faceBottomY + 0.04
+      ? candidateCropY
       : null;
     const shoulderSpan = Math.abs(leftShoulder.x - rightShoulder.x);
-    const detectedView = viewMatchesGeometry(expectedView, shoulderSpan)
-      ? expectedView
+    const detectedView = expectedView === "side" && viewMatchesGeometry("side", shoulderSpan)
+      ? "side"
       : "unknown";
     const completeness = bodyCompleteness(landmarks);
-    // MediaPipe landmarks cannot diagnose clothing. Visibility and segmentation-aware
-    // landmark confidence are used only as a conservative reliability proxy.
-    const clothingVisibilityScore = Math.min(1, 0.35 + (visibility * 0.65));
+    // Pose landmarks do not validate clothing, nudity, relevance, or background.
+    // Those checks fail closed until a purpose-built, on-device policy is added.
+    const clothingVisibilityScore = 0;
     const poseScore = Math.min(1, (visibility + completeness) / 2);
 
     return {
@@ -70,14 +83,18 @@ export class MediaPipePoseLandmarkDetector implements BodyLandmarkDetector {
       poseScore,
       bodyCompletenessScore: completeness,
       clothingVisibilityScore,
-      backgroundReliabilityScore: completeness,
-      isSafeAndRelevant: true,
+      backgroundReliabilityScore: 0,
+      isSafeAndRelevant: false,
+      clothingValidation: "unavailable",
+      contentSafetyValidation: "unavailable",
+      backgroundValidation: "unavailable",
+      faceBottomY,
       safeHeadCropY,
       shoulderLineY,
       headFullyExcluded: safeHeadCropY !== null,
       shouldersPreserved: safeHeadCropY !== null,
       headCropConfidence: safeHeadCropY === null ? 0 : Math.min(1, visibility),
-      warnings: ["clothing_visibility_landmark_proxy"],
+      warnings: [],
     };
   }
 
@@ -92,20 +109,41 @@ export class MediaPipePoseLandmarkDetector implements BodyLandmarkDetector {
   }
 }
 
+export function createMediaPipePoseLandmarkLoader(
+  assets = mediaPipePoseAssets,
+  loadVision: () => Promise<MediaPipeVisionModule> = loadMediaPipeVision,
+): PoseLandmarkerLoader {
+  return async () => {
+    const { FilesetResolver, PoseLandmarker } = await loadVision();
+    const fileset = await FilesetResolver.forVisionTasks(assets.wasmBasePath);
+    return PoseLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: assets.modelAssetPath },
+      runningMode: "IMAGE",
+      numPoses: 2,
+      minPoseDetectionConfidence: 0.7,
+      minPosePresenceConfidence: 0.7,
+      minTrackingConfidence: 0.7,
+      outputSegmentationMasks: true,
+    });
+  };
+}
+
 async function loadMediaPipeLandmarker(): Promise<PoseLandmarkerLike> {
-  const { FilesetResolver, PoseLandmarker } = await import("@mediapipe/tasks-vision");
-  const fileset = await FilesetResolver.forVisionTasks(wasmBasePath);
-  const poseLandmarker = await PoseLandmarker.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath },
-    runningMode: "IMAGE",
-    numPoses: 2,
-    minPoseDetectionConfidence: 0.7,
-    minPosePresenceConfidence: 0.7,
-    minTrackingConfidence: 0.7,
-    outputSegmentationMasks: true,
-  });
+  return createMediaPipePoseLandmarkLoader()();
+}
+
+async function loadMediaPipeVision(): Promise<MediaPipeVisionModule> {
+  const vision = await import("@mediapipe/tasks-vision");
   return {
-    detect: (image) => poseLandmarker.detect(image as never) as { landmarks: Landmark[][] },
+    FilesetResolver: vision.FilesetResolver,
+    PoseLandmarker: {
+      createFromOptions: async (fileset, options) => {
+        const poseLandmarker = await vision.PoseLandmarker.createFromOptions(fileset as never, options as never);
+        return {
+          detect: (image) => poseLandmarker.detect(image as never) as { landmarks: Landmark[][] },
+        };
+      },
+    },
   };
 }
 
@@ -119,6 +157,10 @@ function rejectedDetection(personCount: number): BodyLandmarkDetection {
     clothingVisibilityScore: 0,
     backgroundReliabilityScore: 0,
     isSafeAndRelevant: false,
+    clothingValidation: "unavailable",
+    contentSafetyValidation: "unavailable",
+    backgroundValidation: "unavailable",
+    faceBottomY: null,
     safeHeadCropY: null,
     shoulderLineY: null,
     headFullyExcluded: false,
@@ -137,7 +179,11 @@ function incompleteDetection(view: BodyPhotoView, visibility: number): BodyLandm
     bodyCompletenessScore: 0,
     clothingVisibilityScore: 0,
     backgroundReliabilityScore: 0,
-    isSafeAndRelevant: true,
+    isSafeAndRelevant: false,
+    clothingValidation: "unavailable",
+    contentSafetyValidation: "unavailable",
+    backgroundValidation: "unavailable",
+    faceBottomY: null,
     safeHeadCropY: null,
     shoulderLineY: null,
     headFullyExcluded: false,

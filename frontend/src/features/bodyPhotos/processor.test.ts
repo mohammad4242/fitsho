@@ -27,7 +27,11 @@ function validDetection(view: BodyPhotoView): BodyLandmarkDetection {
     clothingVisibilityScore: 0.9,
     backgroundReliabilityScore: 0.88,
     isSafeAndRelevant: true,
-    safeHeadCropY: 0.18,
+    clothingValidation: "accepted",
+    contentSafetyValidation: "accepted",
+    backgroundValidation: "accepted",
+    faceBottomY: 0.16,
+    safeHeadCropY: 0.21,
     shoulderLineY: 0.25,
     headFullyExcluded: true,
     shouldersPreserved: true,
@@ -50,7 +54,7 @@ function makeRuntime() {
   const runtime: BodyPhotoRuntime = {
     decode: vi.fn().mockResolvedValue(decoded),
     measureQuality: vi.fn().mockReturnValue({ brightnessScore: 0.78, sharpnessScore: 0.84 }),
-    cropAndEncode: vi.fn().mockResolvedValue({ blob: output, width: 1200, height: 1476 }),
+    cropAndEncode: vi.fn().mockResolvedValue({ blob: output, width: 1200, height: 1422 }),
     createObjectUrl: vi.fn().mockReturnValue("blob:anonymized-preview"),
     sha256: vi.fn()
       .mockResolvedValueOnce("a".repeat(64))
@@ -91,7 +95,7 @@ describe("BrowserBodyPhotoProcessor", () => {
       crop: { headRemoved: true, confidence: 0.95 },
     });
     expect(runtime.cropAndEncode).toHaveBeenCalledWith(expect.anything(), {
-      top: 324,
+      top: 378,
       bottom: 1800,
       targetWidth: 1200,
       quality: 0.9,
@@ -161,12 +165,40 @@ describe("BrowserBodyPhotoProcessor", () => {
       runtime,
     }).process(inputFile(), "front");
 
-    expect(result).toMatchObject({ originalHeight: 1800, cropTop: 324, cropBottom: 1800 });
-    expect(result.cropBottom - result.cropTop).toBe(1476);
+    expect(result).toMatchObject({ originalHeight: 1800, cropTop: 378, cropBottom: 1800 });
+    expect(result.cropBottom - result.cropTop).toBe(1422);
     const canonicalBytes = vi.mocked(runtime.sha256).mock.calls[1][0];
     expect(new TextDecoder().decode(canonicalBytes)).toBe(
-      `v1:${"a".repeat(64)}:1800:324:1800`,
+      `v1:${"a".repeat(64)}:1800:378:1800`,
     );
+  });
+
+  it.each([
+    ["face", 0.2, 0.23],
+    ["chin", 0.21, 0.245],
+    ["ear", 0.19, 0.22],
+  ])("rejects a crop that leaves a visible %s landmark", async (_name, faceBottomY, safeHeadCropY) => {
+    const { runtime } = makeRuntime();
+    await expect(new BrowserBodyPhotoProcessor({
+      detector: detector({ ...validDetection("front"), faceBottomY, safeHeadCropY }),
+      runtime,
+    }).process(inputFile(), "front")).rejects.toMatchObject({ code: "safe_head_crop_unavailable" });
+  });
+
+  it("rejects when clothing, content, or background validation is unavailable", async () => {
+    for (const field of ["clothingValidation", "contentSafetyValidation", "backgroundValidation"] as const) {
+      const { runtime } = makeRuntime();
+      await expect(new BrowserBodyPhotoProcessor({
+        detector: detector({ ...validDetection("front"), [field]: "unavailable" }),
+        runtime,
+      }).process(inputFile(), "front")).rejects.toMatchObject({
+        code: field === "clothingValidation"
+          ? "clothing_validation_unavailable"
+          : field === "contentSafetyValidation"
+            ? "content_validation_unavailable"
+            : "background_validation_unavailable",
+      });
+    }
   });
 
   it("checks the decoded file signature instead of trusting the declared MIME type", async () => {
