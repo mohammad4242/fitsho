@@ -120,6 +120,20 @@ it("tests connection and refreshes the dynamic model catalog", async () => {
   expect(api.getAdminAiTaskModels).toHaveBeenCalledTimes(2);
 });
 
+it("persists disable immediately", async () => {
+  api.getAdminAiTaskConfigs.mockResolvedValue([{ ...bodyConfig, enabled: true }]);
+  api.saveAdminAiTaskConfig.mockResolvedValue({ ...bodyConfig, enabled: false });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByRole("button", { name: "Disable" }));
+
+  expect(api.saveAdminAiTaskConfig).toHaveBeenCalledWith(
+    "body_photo_analysis",
+    expect.objectContaining({ enabled: false, replace_credential: false }),
+  );
+});
+
 function renderPage() {
   return render(
     <MemoryRouter>

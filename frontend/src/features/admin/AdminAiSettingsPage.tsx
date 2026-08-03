@@ -65,22 +65,31 @@ export function AdminAiSettingsPage() {
   function handleSave(event: FormEvent) {
     event.preventDefault();
     if (!config) return;
+    persistConfig(config, apiKey);
+  }
+
+  function handleDisable() {
+    if (!config) return;
+    persistConfig({ ...config, enabled: false }, "");
+  }
+
+  function persistConfig(target: AdminAiTaskConfig, replacementKey: string) {
     setBusy("save");
     setMessage(null);
     setError(null);
     const payload: AdminAiTaskConfigUpdate = {
-      provider: config.provider,
-      enabled: config.enabled,
-      primary_model_id: config.primary_model_id,
-      fallback_model_ids: config.fallback_model_ids,
-      temperature: config.temperature,
-      max_output_tokens: config.max_output_tokens,
-      timeout_seconds: config.timeout_seconds,
-      minimum_confidence: config.minimum_confidence,
-      max_cost_per_request: config.max_cost_per_request,
-      routing_restrictions: config.routing_restrictions,
-      replace_credential: apiKey.length > 0,
-      ...(apiKey ? { api_key: apiKey } : {}),
+      provider: target.provider,
+      enabled: target.enabled,
+      primary_model_id: target.primary_model_id,
+      fallback_model_ids: target.fallback_model_ids,
+      temperature: target.temperature,
+      max_output_tokens: target.max_output_tokens,
+      timeout_seconds: target.timeout_seconds,
+      minimum_confidence: target.minimum_confidence,
+      max_cost_per_request: target.max_cost_per_request,
+      routing_restrictions: target.routing_restrictions,
+      replace_credential: replacementKey.length > 0,
+      ...(replacementKey ? { api_key: replacementKey } : {}),
     };
     void saveAdminAiTaskConfig(selectedTask, payload)
       .then((saved) => {
@@ -178,7 +187,7 @@ export function AdminAiSettingsPage() {
 
         {message && <p className="admin-ai-settings-message" role="status">{message}</p>}
         {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="admin-ai-settings-actions"><button type="submit" disabled={busy !== null}>{t("admin.aiSettings.save")}</button><button type="button" disabled={busy !== null} onClick={() => patchConfig({ enabled: false })}>{t("admin.aiSettings.disable")}</button></div>
+        <div className="admin-ai-settings-actions"><button type="submit" disabled={busy !== null}>{t("admin.aiSettings.save")}</button><button type="button" disabled={busy !== null} onClick={handleDisable}>{t("admin.aiSettings.disable")}</button></div>
       </form>
     </main>
   );
