@@ -26,8 +26,9 @@
 .body-photo-upload-control { display: grid; gap: .55rem; padding: 1rem; border: 1px dashed var(--turquoise-dark); border-radius: .8rem; cursor: pointer; font-weight: 800; }
 .body-photo-upload-control input { max-width: 100%; }
 .body-photo-camera { display: grid; gap: .65rem; padding: .75rem; border: 1px solid var(--turquoise-dark); border-radius: .85rem; background: #eef9f6; }.body-photo-camera video { width: 100%; max-height: 28rem; border-radius: .65rem; background: var(--petrol-950); object-fit: cover; }.body-photo-camera > div { display: flex; flex-wrap: wrap; gap: .6rem; }
-.body-photo-preview { display: grid; gap: .65rem; }
-.body-photo-preview img { max-height: 28rem; width: min(100%, 22rem); border-radius: .75rem; object-fit: contain; background: var(--petrol-950); }
+.body-photo-preview, .body-photo-source-preview { display: grid; gap: .65rem; }
+.body-photo-preview img, .body-photo-source-preview img { max-height: 28rem; width: min(100%, 22rem); border-radius: .75rem; object-fit: contain; background: var(--petrol-950); }
+.body-photo-source-preview { padding: .75rem; border: 1px solid var(--turquoise-dark); border-radius: .85rem; background: #eef9f6; }
 .body-photo-quality { display: grid; gap: .45rem; padding: .75rem; border: 1px solid var(--line); border-radius: .65rem; background: #f5fbfa; }
 .body-photo-quality dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem .75rem; margin: 0; }
 .body-photo-quality dl div { display: flex; justify-content: space-between; gap: .5rem; }

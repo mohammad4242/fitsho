@@ -532,6 +532,8 @@ const en = {
       coverage: "Minimum coverage is required: men must wear men's underwear; women must wear women's underwear. More clothing is not required. Avoid loose clothing and accessories that obscure the body.",
       anonymizedPreview: "This is the head-cropped, anonymized image that will be uploaded. Your original photo is not uploaded.",
       previewAlt: "Anonymized {{view}} preview",
+      selectedPreview: "Selected photo — it stays only on this device and is not uploaded.",
+      selectedPreviewAlt: "Selected {{view}} preview",
       retake: "Retake {{view}}",
       processingConsentBefore: "I have read and agree to the",
       processingTerms: "body-photo privacy and processing terms",

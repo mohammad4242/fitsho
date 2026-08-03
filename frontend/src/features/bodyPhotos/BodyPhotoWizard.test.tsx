@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
 import {
@@ -69,6 +69,10 @@ beforeEach(async () => {
   api.startBodyPhotoAnalysis.mockResolvedValue({ id: "analysis-1", status: "queued" });
 });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 it("keeps the photo workflow optional and offers a skip path", async () => {
   const user = userEvent.setup();
   renderWizard();
@@ -91,6 +95,30 @@ it("requires operational consent before the confirm upload action is enabled", a
 
   await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
   expect(screen.getByRole("button", { name: /confirm and upload front/i })).toBeEnabled();
+});
+
+it("shows the selected photo immediately while anonymization is processing", async () => {
+  const user = userEvent.setup();
+  let resolveProcessing: ((value: ProcessedBodyPhoto) => void) | undefined;
+  vi.stubGlobal("URL", {
+    createObjectURL: vi.fn(() => "blob:selected-front"),
+    revokeObjectURL: vi.fn(),
+  });
+  const processor: BodyPhotoProcessor = {
+    process: vi.fn().mockImplementation(() => new Promise<ProcessedBodyPhoto>((resolve) => {
+      resolveProcessing = resolve;
+    })),
+  };
+  renderWizard(processor);
+
+  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+
+  expect(await screen.findByAltText(/selected front preview/i)).toHaveAttribute(
+    "src",
+    "blob:selected-front",
+  );
+
+  resolveProcessing?.(processed("front"));
 });
 
 it("shows fitted-clothing guidance on every capture step", async () => {

@@ -21,6 +21,11 @@ const views: BodyPhotoView[] = ["front", "side", "back"];
 
 type WizardState = "capture" | "confirm" | "complete" | "skipped";
 
+type SelectedPhotoPreview = {
+  view: BodyPhotoView;
+  url: string;
+};
+
 export function BodyPhotoWizard({
   processor = browserBodyPhotoProcessor,
   purpose = "initial_plan",
@@ -39,7 +44,9 @@ export function BodyPhotoWizard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [selectedPreview, setSelectedPreview] = useState<SelectedPhotoPreview | null>(null);
   const processedRef = useRef(processed);
+  const selectedPreviewRef = useRef<SelectedPhotoPreview | null>(null);
   const mountedRef = useRef(false);
   const selectionTokenRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -61,7 +68,9 @@ export function BodyPhotoWizard({
       selectionTokenRef.current += 1;
       releaseCamera();
       Object.values(processedRef.current).forEach(disposeProcessedPhoto);
+      disposeSelectedPreview(selectedPreviewRef.current);
       processedRef.current = {};
+      selectedPreviewRef.current = null;
     };
   }, []);
 
@@ -81,6 +90,7 @@ export function BodyPhotoWizard({
     if (busy) return;
     const selectedView = view;
     const selectionToken = ++selectionTokenRef.current;
+    replaceSelectedPreview(file, selectedView);
     setBusy(true);
     setError(null);
     try {
@@ -175,6 +185,7 @@ export function BodyPhotoWizard({
 
   function retake() {
     selectionTokenRef.current += 1;
+    clearSelectedPreview(view);
     setProcessed((currentProcessed) => {
       const previous = currentProcessed[view];
       disposeProcessedPhoto(previous);
@@ -194,6 +205,7 @@ export function BodyPhotoWizard({
       if (session === null) setSession(activeSession);
       const uploaded = await uploadBodyPhoto(activeSession.id, view, current);
       setSession(uploaded);
+      clearSelectedPreview(view);
       if (currentIndex === views.length - 1) {
         setState("confirm");
       } else {
@@ -204,6 +216,21 @@ export function BodyPhotoWizard({
     } finally {
       setBusy(false);
     }
+  }
+
+  function replaceSelectedPreview(file: File, selectedView: BodyPhotoView) {
+    disposeSelectedPreview(selectedPreviewRef.current);
+    const next = { view: selectedView, url: URL.createObjectURL(file) };
+    selectedPreviewRef.current = next;
+    setSelectedPreview(next);
+  }
+
+  function clearSelectedPreview(selectedView: BodyPhotoView) {
+    const currentPreview = selectedPreviewRef.current;
+    if (currentPreview?.view !== selectedView) return;
+    disposeSelectedPreview(currentPreview);
+    selectedPreviewRef.current = null;
+    setSelectedPreview(null);
   }
 
   async function submit() {
@@ -319,6 +346,15 @@ export function BodyPhotoWizard({
             </div>
           </section>
         )}
+        {selectedPreview?.view === view && (
+          <div className="body-photo-source-preview">
+            <img
+              src={selectedPreview.url}
+              alt={t("bodyPhotos.selectedPreviewAlt", { view: t(`bodyPhotos.views.${view}`) })}
+            />
+            <p>{t("bodyPhotos.selectedPreview")}</p>
+          </div>
+        )}
         {current !== null && (
           <div className="body-photo-preview">
             <img src={current.previewUrl} alt={t("bodyPhotos.previewAlt", { view: t(`bodyPhotos.views.${view}`) })} />
@@ -382,6 +418,10 @@ function formatScore(score: number): string {
 
 function disposeProcessedPhoto(photo: ProcessedBodyPhoto | undefined) {
   if (photo !== undefined) URL.revokeObjectURL(photo.previewUrl);
+}
+
+function disposeSelectedPreview(preview: SelectedPhotoPreview | null) {
+  if (preview !== null) URL.revokeObjectURL(preview.url);
 }
 
 function ConsentModal({ onClose }: { onClose: () => void }) {
