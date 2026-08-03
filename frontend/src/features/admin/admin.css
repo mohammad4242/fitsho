@@ -94,4 +94,17 @@
 .admin-template-rationale { padding-top: 1.15rem; border-top: 2px solid rgb(22 91 84 / 30%); }.admin-template-rationale h3 { margin: 0; color: var(--petrol-900); font-size: 1.12rem; }.admin-template-rationale ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .75rem; margin: .9rem 0 0; padding: 0; list-style: none; }.admin-template-rationale li { padding: .75rem .85rem; border: 1px solid rgb(22 91 84 / 12%); border-radius: .85rem; background: rgb(238 248 246 / 65%); }.admin-template-rationale strong { color: var(--petrol-900); font-size: .92rem; }.admin-template-rationale p { margin: .35rem 0 0; color: var(--muted); font-size: .83rem; line-height: 1.65; }
 .admin-template-card footer { align-items: center; color: var(--muted); font-size: .8rem; }.admin-template-card footer a { color: var(--turquoise-dark); font-weight: 800; }
 @media (max-width: 760px) { .admin-ai-model-row { grid-template-columns: 1fr; }.admin-ai-model-row dl { flex-wrap: wrap; }.admin-ai-row-actions { justify-content: start; }.admin-ai-priority-row { grid-template-columns: 2.25rem minmax(0, 1fr); }.admin-ai-priority-row .admin-ai-row-actions { grid-column: 1 / -1; } }
+
+.admin-main--ai-settings { display: grid; gap: 1rem; }
+.admin-ai-task-tabs, .admin-ai-settings-actions { display: flex; flex-wrap: wrap; gap: .65rem; }
+.admin-ai-task-tabs button[aria-pressed="true"] { background: var(--petrol-900); color: white; }
+.admin-ai-settings-form { display: grid; gap: 1rem; }
+.admin-ai-setting-field { display: grid; gap: .35rem; margin-block: .7rem; }
+.admin-ai-setting-field > span { color: var(--muted); font-size: .82rem; font-weight: 700; }
+.admin-ai-setting-field input, .admin-ai-setting-field select { width: 100%; min-height: 2.7rem; padding: .65rem .8rem; border: 1px solid rgb(10 31 30 / 18%); border-radius: .7rem; background: white; }
+.admin-ai-setting-field select[multiple] { min-height: 7rem; }
+.admin-ai-settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .5rem 1rem; }
+.admin-ai-capabilities div { display: flex; flex-wrap: wrap; gap: .6rem; color: var(--muted); font-size: .8rem; }
+.admin-ai-secret-status { direction: ltr; text-align: left; font-family: monospace; }
+.admin-ai-settings-message { color: var(--success, #16734a); font-weight: 800; }
 @media (max-width: 760px) { .admin-template-card > header, .admin-template-card footer, .admin-template-day li { align-items: start; flex-direction: column; }.admin-template-day li > span { white-space: normal; } }

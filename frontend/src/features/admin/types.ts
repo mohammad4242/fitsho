@@ -183,6 +183,82 @@ export type AdminAiGenerationFailure = {
   validation_diagnostics: AdminAiValidationDiagnostic[] | null;
 };
 
+export type AdminAiTaskType =
+  | "workout_plan_generation"
+  | "body_photo_analysis"
+  | "progress_comparison"
+  | "specialist_summary";
+
+export type AdminAiCredentialStatus = {
+  configured: boolean;
+  masked: string | null;
+};
+
+export type AdminAiTaskConfig = {
+  task_type: AdminAiTaskType;
+  provider: "openrouter";
+  enabled: boolean;
+  primary_model_id: string | null;
+  fallback_model_ids: string[];
+  temperature: number;
+  max_output_tokens: number;
+  timeout_seconds: number;
+  minimum_confidence: number;
+  max_cost_per_request: string | null;
+  routing_restrictions: string[];
+  credential: AdminAiCredentialStatus;
+  last_successful_connection_test_at: string | null;
+  last_model_catalog_refresh_at: string | null;
+  last_error_code: string | null;
+  last_error_message: string | null;
+};
+
+export type AdminAiTaskConfigUpdate = Omit<
+  AdminAiTaskConfig,
+  | "task_type"
+  | "credential"
+  | "last_successful_connection_test_at"
+  | "last_model_catalog_refresh_at"
+  | "last_error_code"
+  | "last_error_message"
+> & {
+  api_key?: string;
+  replace_credential: boolean;
+};
+
+export type AdminAiCatalogModel = {
+  provider: "openrouter";
+  model_id: string;
+  display_name: string;
+  provider_family: string;
+  supports_text_input: boolean;
+  supports_image_input: boolean;
+  supports_structured_output: boolean;
+  context_length: number | null;
+  input_price_per_token: string | null;
+  output_price_per_token: string | null;
+  available: boolean;
+};
+
+export type AdminAiCatalogResponse = {
+  items: AdminAiCatalogModel[];
+  refreshed_at: string | null;
+};
+
+export type AdminAiProviderTest = {
+  ok: boolean;
+  checked_at: string;
+  model_count: number | null;
+  error_code: string | null;
+  safe_error_message: string | null;
+};
+
+export type AdminAiCatalogRefresh = {
+  provider: "openrouter";
+  model_count: number;
+  refreshed_at: string;
+};
+
 export type TrainingTemplateMethod = "standard" | "superset" | "drop_set";
 export type TrainingTemplateSlotPriority = "core" | "accessory" | "optional";
 

@@ -10,6 +10,12 @@ import type {
   AdminAiModelUpdate,
   AdminAiRoutingSettings,
   AdminAiRoutingUpdate,
+  AdminAiCatalogRefresh,
+  AdminAiCatalogResponse,
+  AdminAiProviderTest,
+  AdminAiTaskConfig,
+  AdminAiTaskConfigUpdate,
+  AdminAiTaskType,
   AdminExercise,
   AdminExerciseCreate,
   AdminExerciseFilters,
@@ -105,6 +111,42 @@ export function syncAdminAiModels(): Promise<AdminAiModelSync> {
 
 export function testAdminAiModel(modelId: string): Promise<AdminAiModelCheck> {
   return request<AdminAiModelCheck>(`${adminAiModelsPath}/${modelId}/test`, {
+    method: "POST",
+  });
+}
+
+export function getAdminAiTaskConfigs(): Promise<AdminAiTaskConfig[]> {
+  return request<AdminAiTaskConfig[]>("/api/v1/admin/ai/task-configs");
+}
+
+export function getAdminAiTaskModels(
+  taskType: AdminAiTaskType,
+  search = "",
+): Promise<AdminAiCatalogResponse> {
+  const query = new URLSearchParams({ task_type: taskType });
+  if (search.trim()) query.set("search", search.trim());
+  return request<AdminAiCatalogResponse>(`/api/v1/admin/ai/models?${query.toString()}`);
+}
+
+export function saveAdminAiTaskConfig(
+  taskType: AdminAiTaskType,
+  input: AdminAiTaskConfigUpdate,
+): Promise<AdminAiTaskConfig> {
+  return request<AdminAiTaskConfig>(`/api/v1/admin/ai/task-configs/${taskType}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function testAdminAiProvider(apiKey?: string): Promise<AdminAiProviderTest> {
+  return request<AdminAiProviderTest>("/api/v1/admin/ai/providers/test", {
+    method: "POST",
+    body: JSON.stringify({ provider: "openrouter", ...(apiKey ? { api_key: apiKey } : {}) }),
+  });
+}
+
+export function refreshAdminAiModels(): Promise<AdminAiCatalogRefresh> {
+  return request<AdminAiCatalogRefresh>("/api/v1/admin/ai/models/refresh", {
     method: "POST",
   });
 }

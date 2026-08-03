@@ -7,6 +7,7 @@ from alembic import context
 from app.ai import models as ai_models  # noqa: F401
 from app.auth import models  # noqa: F401
 from app.body_analysis import models as body_analysis_models  # noqa: F401
+from app.body_analysis.admin_config import models as ai_admin_config_models  # noqa: F401
 from app.body_photos import models as body_photo_models  # noqa: F401
 from app.config import get_settings
 from app.database.base import Base

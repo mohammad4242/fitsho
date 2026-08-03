@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom
 
 import { AdminExercisesPage } from "./features/admin/AdminExercisesPage";
 import { AdminAiModelsPage } from "./features/admin/AdminAiModelsPage";
+import { AdminAiSettingsPage } from "./features/admin/AdminAiSettingsPage";
 import { AdminExerciseEditPage } from "./features/admin/AdminExerciseEditPage";
 import { AdminExerciseNewPage } from "./features/admin/AdminExerciseNewPage";
 import { AdminTrainingTemplatesPage } from "./features/admin/AdminTrainingTemplatesPage";
@@ -39,6 +40,7 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AdminRoute />}>
           <Route path="/admin/ai-models" element={<AdminAiModelsPage />} />
+          <Route path="/admin/ai-settings" element={<AdminAiSettingsPage />} />
           <Route path="/admin/training-program-templates" element={<AdminTrainingTemplatesPage />} />
           <Route path="/admin/training-program-templates/new" element={<AdminTrainingTemplateEditorPage />} />
           <Route path="/admin/training-program-templates/:templateId/edit" element={<AdminTrainingTemplateEditorPage />} />
