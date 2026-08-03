@@ -88,6 +88,10 @@ def test_rejects_unrecognized_body_area() -> None:
         "A torn tendon is visible.",
         "This diagnoses osteoporosis.",
         "Kyphosis is present.",
+        "Shoulder impingement is visible.",
+        "This medical condition is confirmed.",
+        "The images show a musculoskeletal disorder.",
+        "Inflammation is present.",
     ],
 )
 def test_rejects_medical_diagnostic_claims(medical_claim: str) -> None:
