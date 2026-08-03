@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.admin.router import router as admin_router
 from app.auth.router import router as auth_router
 from app.body_analysis.admin_config.router import router as admin_ai_settings_router
+from app.body_analysis.comparison_router import router as body_progress_comparison_router
 from app.body_analysis.router import admin_router as body_analysis_admin_router
 from app.body_analysis.router import review_router as body_analysis_review_router
 from app.body_analysis.router import router as body_analysis_router
@@ -96,6 +97,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(body_photo_router)
     app.include_router(body_analysis_router)
+    app.include_router(body_progress_comparison_router)
     app.include_router(profile_router)
     app.include_router(workout_plans_router)
     app.include_router(exercises_router)
