@@ -227,10 +227,12 @@ export function BodyPhotoWizard({
     }
     setBusy(true);
     setError(null);
+    let uploadedPhoto = false;
     try {
       const activeSession = session ?? await createBodyPhotoSession(purpose);
       if (session === null) setSession(activeSession);
       const uploaded = await uploadBodyPhoto(activeSession.id, view, current);
+      uploadedPhoto = true;
       setSession(uploaded);
       clearSelectedPreview(view);
       if (editingExistingPhoto) {
@@ -249,7 +251,7 @@ export function BodyPhotoWizard({
         setCurrentIndex((index) => index + 1);
       }
     } catch {
-      setError(t("bodyPhotos.errors.upload"));
+      setError(t(uploadedPhoto ? "bodyPhotos.errors.analysisNotStarted" : "bodyPhotos.errors.upload"));
     } finally {
       setBusy(false);
     }

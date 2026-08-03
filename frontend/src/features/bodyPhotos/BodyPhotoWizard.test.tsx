@@ -125,6 +125,21 @@ it("replaces only the rejected view in an existing photo session", async () => {
   expect(api.startBodyPhotoAnalysis).toHaveBeenCalledWith("session-2");
 });
 
+it("does not report a successful replacement as an upload failure", async () => {
+  const user = userEvent.setup();
+  const processor: BodyPhotoProcessor = { process: vi.fn().mockResolvedValue(processed("side")) };
+  api.startBodyPhotoAnalysis.mockRejectedValueOnce(new Error("retry limit"));
+  renderWizard(processor, "/body-progress/new?sessionId=session-2&view=side");
+
+  await screen.findByRole("heading", { name: /side photo/i });
+  await user.upload(screen.getByLabelText(/side photo upload/i), file);
+  await user.click(screen.getByRole("button", { name: /confirm and upload side/i }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    /photos were submitted successfully, but body analysis has not started/i,
+  );
+});
+
 it("shows the selected photo immediately while anonymization is processing", async () => {
   const user = userEvent.setup();
   let resolveProcessing: ((value: ProcessedBodyPhoto) => void) | undefined;

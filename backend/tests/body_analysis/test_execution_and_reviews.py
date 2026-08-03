@@ -494,6 +494,24 @@ def test_normal_queue_path_respects_retry_limit(db: Session) -> None:
         service.queue(session.id, user.id, config)
 
 
+def test_replacing_a_photo_resets_the_analysis_retry_budget(db: Session) -> None:
+    user, session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    config = _config().model_copy(update={"retry_limit": 0})
+    failed = service.queue(session.id, user.id, config)
+    failed.status = BodyAnalysisStatus.FAILED
+    db.commit()
+
+    replacement = session.photos[0]
+    replacement.updated_at = datetime.now(UTC) + timedelta(seconds=1)
+    db.commit()
+
+    retried = service.queue(session.id, user.id, config)
+
+    assert retried.revision == 2
+    assert retried.replaces_analysis_id == failed.id
+
+
 def test_retry_rejects_nonlatest_revision(db: Session) -> None:
     user, session = _submitted_session(db)
     service = BodyAnalysisService(db)

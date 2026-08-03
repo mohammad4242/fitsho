@@ -194,10 +194,16 @@ class BodyAnalysisService:
         session_id: UUID,
         config: AnalysisExecutionConfig,
     ) -> None:
+        latest_photo_change = (
+            select(func.max(BodyPhoto.updated_at))
+            .where(BodyPhoto.session_id == session_id)
+            .scalar_subquery()
+        )
         attempts = int(
             self._db.scalar(
                 select(func.count()).select_from(BodyAnalysis).where(
-                    BodyAnalysis.session_id == session_id
+                    BodyAnalysis.session_id == session_id,
+                    BodyAnalysis.created_at >= latest_photo_change,
                 )
             )
             or 0
