@@ -167,6 +167,8 @@ def _submitted_session(db: Session, user: User | None = None) -> tuple[User, Bod
         )
     db.commit()
     return user, session
+
+
 def _config() -> AnalysisExecutionConfig:
     return AnalysisExecutionConfig(
         provider_name="openrouter",
@@ -439,6 +441,22 @@ def test_low_confidence_and_cost_limited_results_fail_safely(db: Session) -> Non
 
     assert failed.status is BodyAnalysisStatus.FAILED
     assert failed.error_message == "Body analysis could not be completed. Please retry later."
+
+
+def test_unauthorized_provider_error_tells_admin_to_replace_openrouter_key(db: Session) -> None:
+    user, session = _submitted_session(db)
+    analysis = BodyAnalysisService(db).queue(session.id, user.id, _config())
+
+    failed = asyncio.run(
+        BodyAnalysisService(db).execute(analysis.id, _FailingProvider(), _Storage())
+    )
+
+    assert failed.status is BodyAnalysisStatus.FAILED
+    assert failed.error_code == "unauthorized"
+    assert (
+        failed.error_message
+        == "The OpenRouter API key for body analysis was rejected. Update it in Admin AI settings."
+    )
 
 
 def test_rejected_cost_is_retained_for_billing_reconciliation(db: Session) -> None:

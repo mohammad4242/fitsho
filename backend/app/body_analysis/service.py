@@ -369,7 +369,7 @@ class BodyAnalysisService:
                 analysis.request_cost = preflight_response.cost
             analysis.status = BodyAnalysisStatus.FAILED
             analysis.error_code = provider_error.code.value
-            analysis.error_message = "Body analysis could not be completed. Please retry later."
+            analysis.error_message = self._safe_failure_message(provider_error.code)
             if provider_error.provider_request_id is not None:
                 analysis.provider_request_id = provider_error.provider_request_id
             analysis.completed_at = datetime.now(UTC)
@@ -651,6 +651,15 @@ class BodyAnalysisService:
                 "The provider response did not match the body-analysis contract.",
             )
         return provider.normalize_error(error)
+
+    @staticmethod
+    def _safe_failure_message(code: ProviderErrorCode) -> str:
+        if code is ProviderErrorCode.UNAUTHORIZED:
+            return (
+                "The OpenRouter API key for body analysis was rejected. "
+                "Update it in Admin AI settings."
+            )
+        return "Body analysis could not be completed. Please retry later."
 
     def _current_version(self, analysis_id: UUID) -> BodyAnalysisResultVersion | None:
         return self._db.scalar(
