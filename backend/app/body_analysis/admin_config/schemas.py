@@ -4,7 +4,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
-from app.body_analysis.admin_config.enums import AIProviderName, AITaskType
+from app.body_analysis.admin_config.enums import AIProviderName, AIRoutingPolicy, AITaskType
 
 
 class CredentialStatus(BaseModel):
@@ -29,7 +29,7 @@ class AITaskConfigUpdate(BaseModel):
     timeout_seconds: int = Field(default=45, ge=1, le=180)
     minimum_confidence: float = Field(default=0.7, ge=0, le=1)
     max_cost_per_request: Decimal | None = Field(default=None, ge=0)
-    routing_restrictions: list[str] = Field(default_factory=list, max_length=20)
+    routing_restrictions: list[AIRoutingPolicy] = Field(default_factory=list, max_length=3)
 
     @model_validator(mode="after")
     def credential_replacement_is_explicit(self) -> "AITaskConfigUpdate":
@@ -41,6 +41,8 @@ class AITaskConfigUpdate(BaseModel):
             raise ValueError("Fallback models must be unique")
         if self.primary_model_id in self.fallback_model_ids:
             raise ValueError("Primary model cannot also be a fallback")
+        if len(set(self.routing_restrictions)) != len(self.routing_restrictions):
+            raise ValueError("Routing policies must be unique")
         return self
 
 
@@ -55,7 +57,7 @@ class AITaskConfigDetail(BaseModel):
     timeout_seconds: int
     minimum_confidence: float
     max_cost_per_request: Decimal | None
-    routing_restrictions: list[str]
+    routing_restrictions: list[AIRoutingPolicy]
     credential: CredentialStatus
     last_successful_connection_test_at: datetime | None
     last_model_catalog_refresh_at: datetime | None

@@ -6,6 +6,7 @@ from app.body_analysis.providers.models import (
     ModelRoute,
     ProviderConnectionResult,
     ProviderErrorCode,
+    ProviderRoutingPreferences,
     StructuredGenerationRequest,
     StructuredGenerationResponse,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "OpenRouterProvider",
     "ProviderConnectionResult",
     "ProviderErrorCode",
+    "ProviderRoutingPreferences",
     "StructuredGenerationRequest",
     "StructuredGenerationResponse",
 ]

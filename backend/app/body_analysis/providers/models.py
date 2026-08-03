@@ -78,6 +78,14 @@ class ModelRoute(BaseModel):
     fallback_models: tuple[str, ...] = Field(default=(), max_length=5)
 
 
+class ProviderRoutingPreferences(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    data_collection: Literal["deny"] | None = None
+    zdr: bool | None = None
+    require_parameters: bool | None = None
+
+
 class ImageInput(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -94,6 +102,9 @@ class StructuredGenerationRequest(BaseModel):
     response_schema: dict[str, Any]
     schema_name: str = Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")
     route: ModelRoute
+    provider_preferences: ProviderRoutingPreferences = Field(
+        default_factory=ProviderRoutingPreferences
+    )
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     max_output_tokens: int = Field(default=4096, ge=1, le=65_536)
 

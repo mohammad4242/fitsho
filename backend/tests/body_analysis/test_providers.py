@@ -15,6 +15,7 @@ from app.body_analysis.providers import (
     ModelRoute,
     OpenRouterProvider,
     ProviderErrorCode,
+    ProviderRoutingPreferences,
     StructuredGenerationRequest,
 )
 
@@ -200,6 +201,38 @@ def test_openrouter_image_request_sends_three_processed_images_with_json_schema(
         "data:image/webp;base64,YmFjaw==",
     ]
     assert "test-openrouter-secret" not in json.dumps(body)
+
+
+def test_openrouter_maps_typed_privacy_routing_preferences_to_request() -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return _completion('{"status":"ok"}')
+
+    request = _request().model_copy(
+        update={
+            "provider_preferences": ProviderRoutingPreferences(
+                data_collection="deny",
+                zdr=True,
+                require_parameters=True,
+            )
+        }
+    )
+    _run(
+        _provider(httpx.MockTransport(handler)).analyze_images(
+            request,
+            images=(ImageInput(label="front", mime_type="image/jpeg", base64_data="ZnJvbnQ="),),
+        )
+    )
+
+    body = seen["body"]
+    assert isinstance(body, dict)
+    assert body["provider"] == {
+        "data_collection": "deny",
+        "zdr": True,
+        "require_parameters": True,
+    }
 
 
 def test_openrouter_uses_configured_fallback_after_retryable_primary_failure() -> None:

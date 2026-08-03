@@ -31,7 +31,9 @@ from app.body_analysis.providers import (
     ImageInput,
     ModelRoute,
     ProviderErrorCode,
+    ProviderRoutingPreferences,
     StructuredGenerationRequest,
+    StructuredGenerationResponse,
 )
 from app.body_analysis.schemas import NormalizedBodyAnalysis
 from app.body_photos.enums import BodyPhotoSessionState, BodyPhotoView
@@ -68,7 +70,9 @@ class AnalysisExecutionConfig(BaseModel):
     retry_limit: int = Field(default=2, ge=0, le=5)
     minimum_confidence: float = Field(default=0.7, ge=0, le=1)
     max_cost_per_request: Decimal | None = Field(default=None, ge=0)
-    routing_restrictions: tuple[str, ...] = Field(default=(), max_length=20)
+    routing_preferences: ProviderRoutingPreferences = Field(
+        default_factory=ProviderRoutingPreferences
+    )
 
 
 class ReviewSubmission(BaseModel):
@@ -202,6 +206,7 @@ class BodyAnalysisService:
             schema_version=config.schema_version,
             status=BodyAnalysisStatus.QUEUED,
         )
+        photo_session.state = BodyPhotoSessionState.QUEUED
         self._db.add(analysis)
         try:
             self._db.commit()
@@ -228,6 +233,7 @@ class BodyAnalysisService:
             prompt_version=analysis.prompt_version,
             schema_version=analysis.schema_version,
         )
+        response: StructuredGenerationResponse | None = None
         try:
             analysis.status = BodyAnalysisStatus.VALIDATING
             analysis.attempt_count += 1
@@ -292,6 +298,15 @@ class BodyAnalysisService:
             self._db.rollback()
             analysis = self._analysis(analysis_id, lock=True)
             provider_error = self._safe_provider_error(provider, error)
+            if response is not None:
+                # Preserve provider accounting even if output validation or a
+                # configured cost ceiling rejects the result. This makes later
+                # billing reconciliation possible without retaining raw photos.
+                analysis.model_id = response.model_id
+                analysis.provider_request_id = response.provider_request_id
+                analysis.input_tokens = response.input_tokens
+                analysis.output_tokens = response.output_tokens
+                analysis.request_cost = response.cost
             analysis.status = BodyAnalysisStatus.FAILED
             analysis.error_code = provider_error.code.value
             analysis.error_message = "Body analysis could not be completed. Please retry later."
@@ -490,6 +505,7 @@ class BodyAnalysisService:
                 primary_model=config.primary_model,
                 fallback_models=config.fallback_models,
             ),
+            provider_preferences=config.routing_preferences,
             temperature=config.temperature,
             max_output_tokens=config.max_output_tokens,
         )
@@ -558,7 +574,9 @@ class BodyAnalysisService:
     @staticmethod
     def _is_stale(analysis: BodyAnalysis, config: AnalysisExecutionConfig) -> bool:
         if analysis.started_at is None:
-            return analysis.status is BodyAnalysisStatus.QUEUED
+            return analysis.created_at <= datetime.now(UTC) - timedelta(
+                seconds=config.timeout_seconds
+            )
         return analysis.started_at <= datetime.now(UTC) - timedelta(
             seconds=config.timeout_seconds
         )

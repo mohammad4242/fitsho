@@ -2,17 +2,25 @@ import asyncio
 import json
 
 import httpx
+import pytest
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.body_analysis.admin_config.models import AIAuditEvent, AIProviderCredential
+from app.body_analysis.admin_config.schemas import AITaskConfigUpdate
 from app.config import Settings
 from app.main import create_app
 
 ORIGIN = {"Origin": "http://localhost:5173"}
+
+
+def test_task_config_rejects_unsupported_routing_policy() -> None:
+    with pytest.raises(ValidationError, match="routing_restrictions"):
+        AITaskConfigUpdate.model_validate({"routing_restrictions": ["unsafe_free_text"]})
 
 
 def _register(client: TestClient, email: str) -> None:
@@ -117,7 +125,10 @@ def test_admin_saves_encrypted_masked_credential_and_audits_without_secret(
             "timeout_seconds": 45,
             "minimum_confidence": 0.72,
             "max_cost_per_request": "0.15",
-            "routing_restrictions": ["no_training", "no_retention"],
+                "routing_restrictions": [
+                    "deny_provider_data_collection",
+                    "zero_data_retention",
+                ],
         },
     )
 

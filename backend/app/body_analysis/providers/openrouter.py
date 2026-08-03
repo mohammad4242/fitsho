@@ -321,6 +321,7 @@ class OpenRouterProvider:
             },
             "temperature": request.temperature,
             "max_tokens": request.max_output_tokens,
+            "provider": request.provider_preferences.model_dump(exclude_none=True),
         }
 
     @staticmethod

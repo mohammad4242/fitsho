@@ -11,6 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
+from app.body_analysis.admin_config.enums import AIProviderName, AITaskType
+from app.body_analysis.admin_config.models import AIModelCatalogEntry, AITaskConfig
 from app.body_analysis.enums import (
     BodyAnalysisReviewDecision,
     BodyAnalysisReviewerRole,
@@ -28,6 +30,7 @@ from app.body_analysis.providers import (
     ProviderErrorCode,
     StructuredGenerationResponse,
 )
+from app.body_analysis.runtime import _validate_budget_preflight
 from app.body_analysis.service import (
     AnalysisExecutionConfig,
     BodyAnalysisService,
@@ -346,6 +349,8 @@ def test_stale_analysis_is_recovered_but_retry_attempts_are_bounded(db: Session)
 
     assert recovered.id != first.id
     assert recovered.revision == 2
+    recovered.status = BodyAnalysisStatus.FAILED
+    db.commit()
     with pytest.raises(BodyAnalysisStateError, match="retry limit"):
         service.retry(recovered.id, user.id, config)
 
@@ -362,3 +367,61 @@ def test_low_confidence_and_cost_limited_results_fail_safely(db: Session) -> Non
 
     assert failed.status is BodyAnalysisStatus.FAILED
     assert failed.error_message == "Body analysis could not be completed. Please retry later."
+
+
+def test_rejected_cost_is_retained_for_billing_reconciliation(db: Session) -> None:
+    user, session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    config = _config().model_copy(update={"max_cost_per_request": Decimal("0.01")})
+    analysis = service.queue(session.id, user.id, config)
+
+    failed = asyncio.run(service.execute(analysis.id, _Provider(), _Storage(), config))
+
+    assert failed.status is BodyAnalysisStatus.FAILED
+    assert failed.request_cost == Decimal("0.012")
+    assert failed.input_tokens == 100
+    assert failed.output_tokens == 200
+
+
+def test_fresh_queued_analysis_is_not_considered_stale(db: Session) -> None:
+    user, session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    config = _config().model_copy(update={"timeout_seconds": 1})
+    queued = service.queue(session.id, user.id, config)
+
+    assert service.retry(queued.id, user.id, config).id == queued.id
+
+
+def test_cost_ceiling_preflight_fails_closed_without_complete_catalog_pricing(db: Session) -> None:
+    task = AITaskConfig(
+        task_type=AITaskType.BODY_PHOTO_ANALYSIS,
+        provider=AIProviderName.OPENROUTER,
+        primary_model_id="vision-model",
+        enabled=True,
+        max_output_tokens=100,
+        max_cost_per_request=Decimal("0.00001"),
+    )
+    db.add(task)
+    db.commit()
+
+    with pytest.raises(ValueError, match="cannot evaluate"):
+        _validate_budget_preflight(db, task)
+
+    db.add(
+        AIModelCatalogEntry(
+            provider=AIProviderName.OPENROUTER,
+            model_id="vision-model",
+            display_name="Vision",
+            provider_family="vendor",
+            supports_text_input=True,
+            supports_image_input=True,
+            supports_structured_output=True,
+            context_length=200,
+            input_price_per_token=Decimal("0.00001"),
+            output_price_per_token=Decimal("0.00001"),
+            refreshed_at=datetime.now(UTC),
+        )
+    )
+    db.commit()
+    with pytest.raises(ValueError, match="cost ceiling"):
+        _validate_budget_preflight(db, task)

@@ -8,8 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
-from app.body_analysis.enums import SpecialistRole
+from app.body_analysis.enums import BodyAnalysisStatus, SpecialistRole
 from app.body_analysis.models import UserSpecialistRole
+from app.body_analysis.runtime import BodyAnalysisRuntime, get_body_analysis_runtime
 from app.body_analysis.service import BodyAnalysisService
 from app.body_photos.enums import BodyPhotoSessionState
 
@@ -34,6 +35,14 @@ def _register(client: TestClient, email: str) -> None:
 
 def _logout(client: TestClient) -> None:
     assert client.post("/api/v1/auth/logout", headers=ORIGIN).status_code == 204
+
+
+def _runtime_override(client: TestClient) -> None:
+    client.app.dependency_overrides[get_body_analysis_runtime] = lambda: BodyAnalysisRuntime(
+        provider=_Provider(),
+        config=_config(),
+        storage=_Storage(),  # type: ignore[arg-type]
+    )
 
 
 def test_analysis_result_api_is_owner_only_and_hides_provider_envelopes(
@@ -115,3 +124,67 @@ def test_unconfigured_analysis_returns_safe_failure_without_changing_photo_sessi
     assert response.status_code == 503
     assert response.json() == {"detail": "Body analysis is temporarily unavailable"}
     assert photo_session.state is BodyPhotoSessionState.QUEUED
+
+
+def test_start_and_retry_do_not_disclose_another_users_photo_session(
+    client: TestClient, db: Session
+) -> None:
+    _runtime_override(client)
+    owner_email = f"owner-{uuid4()}@example.com"
+    _register(client, owner_email)
+    owner = db.scalar(select(User).where(User.email == owner_email))
+    assert owner is not None
+    _, photo_session = _submitted_session(db, owner)
+    _logout(client)
+    _register(client, f"other-{uuid4()}@example.com")
+
+    start = client.post(f"/api/v1/body-photo-sessions/{photo_session.id}/analysis", headers=ORIGIN)
+    retry = client.post(
+        f"/api/v1/body-photo-sessions/{photo_session.id}/analysis/retry",
+        headers=ORIGIN,
+    )
+
+    assert start.status_code == 404
+    assert retry.status_code == 404
+
+
+def test_fresh_queued_analysis_is_not_replaced_by_retry(client: TestClient, db: Session) -> None:
+    _runtime_override(client)
+    email = f"queued-{uuid4()}@example.com"
+    _register(client, email)
+    owner = db.scalar(select(User).where(User.email == email))
+    assert owner is not None
+    _, photo_session = _submitted_session(db, owner)
+    analysis = BodyAnalysisService(db).queue(photo_session.id, owner.id, _config())
+
+    response = client.post(
+        f"/api/v1/body-photo-sessions/{photo_session.id}/analysis/retry",
+        headers=ORIGIN,
+    )
+
+    assert response.status_code == 202
+    assert response.json()["id"] == str(analysis.id)
+    assert BodyAnalysisService(db).latest_for_session(photo_session.id, owner.id).id == analysis.id
+
+
+def test_admin_retry_requires_admin_and_can_queue_failed_analysis(
+    client: TestClient, db: Session
+) -> None:
+    _runtime_override(client)
+    email = f"admin-retry-{uuid4()}@example.com"
+    _register(client, email)
+    actor = db.scalar(select(User).where(User.email == email))
+    assert actor is not None
+    owner, photo_session = _submitted_session(db)
+    analysis = BodyAnalysisService(db).queue(photo_session.id, owner.id, _config())
+    analysis.status = BodyAnalysisStatus.FAILED
+    db.commit()
+    path = f"/api/v1/admin/body-analyses/{analysis.id}/retry"
+
+    assert client.post(path, headers=ORIGIN).status_code == 403
+    actor.is_admin = True
+    db.commit()
+    response = client.post(path, headers=ORIGIN)
+
+    assert response.status_code == 202
+    assert response.json()["id"] != str(analysis.id)

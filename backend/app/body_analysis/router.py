@@ -20,7 +20,7 @@ from app.body_analysis.api_schemas import (
     SpecialistReviewResponse,
     SpecialistReviewState,
 )
-from app.body_analysis.enums import BodyAnalysisReviewerRole
+from app.body_analysis.enums import BodyAnalysisReviewerRole, BodyAnalysisStatus
 from app.body_analysis.models import BodyAnalysis, BodyAnalysisResultVersion, BodyAnalysisReview
 from app.body_analysis.runtime import (
     BodyAnalysisRuntimeDependency,
@@ -184,6 +184,13 @@ def retry_session_analysis(
         latest = service.latest_for_session(session_id, user.id)
         if latest is None:
             raise BodyAnalysisNotFoundError
+        if latest.status not in {
+            BodyAnalysisStatus.FAILED,
+            BodyAnalysisStatus.QUEUED,
+            BodyAnalysisStatus.VALIDATING,
+            BodyAnalysisStatus.ANALYZING,
+        }:
+            raise BodyAnalysisStateError("only failed or stale analyses can be retried")
         analysis = service.retry(latest.id, user.id, runtime.config)
     except BodyAnalysisNotFoundError:
         raise _not_found() from None
