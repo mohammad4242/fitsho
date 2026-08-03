@@ -14,6 +14,28 @@ class AiCoachProgramCandidate:
     score: int
 
 
+def candidate_program_payload(
+    candidate: AiCoachProgramCandidate,
+    *,
+    exercise_names_fa: dict[UUID, str],
+) -> dict[str, object]:
+    return {
+        "candidate_id": candidate.template.slug,
+        "days": [
+            {
+                "day_number": day.day_number,
+                "title": day.title,
+                "exercise_names_fa": [
+                    exercise_names_fa[slot.exercise_id]
+                    for slot in day.slots
+                    if slot.exercise_id is not None
+                ],
+            }
+            for day in candidate.template.days
+        ],
+    }
+
+
 def select_ai_coach_candidates(
     *,
     templates: tuple[TemplateReference, ...],

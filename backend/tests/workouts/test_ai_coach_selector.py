@@ -2,7 +2,11 @@ from uuid import uuid4
 
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, TrainingLocation
-from app.workouts.ai_coach import select_ai_coach_candidates
+from app.workouts.ai_coach import (
+    AiCoachProgramCandidate,
+    candidate_program_payload,
+    select_ai_coach_candidates,
+)
 from app.workouts.program_engine.schemas import (
     TemplateReference,
     TemplateReferenceDay,
@@ -84,3 +88,27 @@ def test_ai_coach_selects_distinct_eligible_library_programs_in_priority_order()
     )
 
     assert [candidate.template.slug for candidate in candidates] == ["chest-focus", "balanced"]
+
+
+def test_ai_coach_candidate_payload_contains_fixed_library_exercises_only() -> None:
+    exercise_id = uuid4()
+    candidate = AiCoachProgramCandidate(
+        template=_template("fixed-library-plan", focus=("chest",), exercise_id=exercise_id),
+        score=110,
+    )
+
+    payload = candidate_program_payload(
+        candidate,
+        exercise_names_fa={exercise_id: "شنا سوئدی"},
+    )
+
+    assert payload == {
+        "candidate_id": "fixed-library-plan",
+        "days": [
+            {
+                "day_number": 1,
+                "title": "Full body",
+                "exercise_names_fa": ["شنا سوئدی"],
+            }
+        ],
+    }
