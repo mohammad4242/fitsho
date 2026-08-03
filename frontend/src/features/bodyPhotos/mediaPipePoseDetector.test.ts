@@ -59,6 +59,21 @@ describe("MediaPipePoseLandmarkDetector", () => {
     });
   });
 
+  it("uses a conservative head crop for a tall full-body photo when face detection misses", async () => {
+    const detector = new MediaPipePoseLandmarkDetector(
+      vi.fn().mockResolvedValue({ detect: vi.fn().mockReturnValue({ detections: [] }) }),
+    );
+
+    await expect(detector.detect(decodedImage(), "front")).resolves.toMatchObject({
+      personCount: 1,
+      detectedView: "front",
+      detectionConfidence: 0.8,
+      safeHeadCropY: 0.24,
+      headFullyExcluded: true,
+      warnings: ["face_crop_fallback"],
+    });
+  });
+
   it("uses bundled local WASM and model configuration", async () => {
     const forVisionTasks = vi.fn().mockResolvedValue("fileset");
     const createFaceDetector = vi.fn().mockResolvedValue({ detect: vi.fn() });

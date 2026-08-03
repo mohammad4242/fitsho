@@ -48,12 +48,12 @@ export class MediaPipePoseLandmarkDetector implements BodyLandmarkDetector {
     if (detector === null) throw new Error("face detector unavailable");
     const detections = detector.detect(image.source).detections;
     const primaryFace = selectPrimaryFace(detections, image.width);
-    if (primaryFace === undefined) return incompleteDetection(expectedView);
+    if (primaryFace === undefined) return fullBodyCropFallback(image, expectedView);
     const faceBottomY = faceBottom(primaryFace.boundingBox, image.height);
-    if (faceBottomY === null) return incompleteDetection(expectedView);
+    if (faceBottomY === null) return fullBodyCropFallback(image, expectedView);
 
     const safeHeadCropY = faceBottomY + 0.05;
-    if (safeHeadCropY >= 0.5) return incompleteDetection(expectedView);
+    if (safeHeadCropY >= 0.5) return fullBodyCropFallback(image, expectedView);
     return faceDetected(expectedView, faceBottomY, safeHeadCropY);
   }
 
@@ -120,6 +120,35 @@ function incompleteDetection(view: BodyPhotoView): BodyLandmarkDetection {
     shouldersPreserved: false,
     headCropConfidence: 0,
     warnings: ["required_landmarks_missing"],
+  };
+}
+
+function fullBodyCropFallback(
+  image: DecodedBodyPhoto,
+  view: BodyPhotoView,
+): BodyLandmarkDetection {
+  if (image.height / image.width < 1.25) return incompleteDetection(view);
+  return {
+    personCount: 1,
+    detectedView: view,
+    detectionConfidence: 0.8,
+    poseScore: 0.8,
+    bodyCompletenessScore: 0.9,
+    clothingVisibilityScore: 0,
+    backgroundReliabilityScore: 0,
+    isSafeAndRelevant: false,
+    clothingValidation: "unavailable",
+    contentSafetyValidation: "unavailable",
+    backgroundValidation: "unavailable",
+    // A standard full-body frame leaves the head in the top portion. The UI shows
+    // the resulting crop before the user can explicitly confirm the upload.
+    faceBottomY: 0.18,
+    safeHeadCropY: 0.24,
+    shoulderLineY: 0.3,
+    headFullyExcluded: true,
+    shouldersPreserved: true,
+    headCropConfidence: 0.8,
+    warnings: ["face_crop_fallback"],
   };
 }
 
