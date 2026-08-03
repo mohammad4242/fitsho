@@ -142,6 +142,8 @@ class BodyAnalysisService:
         latest = self._latest_analysis(session_id)
         if latest is not None and latest.status is not BodyAnalysisStatus.FAILED:
             return latest
+        if latest is not None:
+            self._assert_retry_available(photo_session.id, config)
         return self._create_analysis(photo_session, config, replaces=latest)
 
     def retry(
@@ -153,7 +155,9 @@ class BodyAnalysisService:
         previous = self.get_analysis(analysis_id, user_id)
         photo_session = self._owner_photo_session(previous.session_id, user_id, lock=True)
         latest = self._latest_analysis(photo_session.id)
-        if latest is not None and latest.status in {
+        if latest is None or latest.id != previous.id:
+            raise BodyAnalysisStateError("only the latest analysis revision can be retried")
+        if latest.status in {
             BodyAnalysisStatus.QUEUED,
             BodyAnalysisStatus.VALIDATING,
             BodyAnalysisStatus.ANALYZING,
@@ -165,17 +169,26 @@ class BodyAnalysisService:
             latest.error_message = "Body analysis could not be completed. Please retry later."
             latest.completed_at = datetime.now(UTC)
             self._db.commit()
+        elif latest.status is not BodyAnalysisStatus.FAILED:
+            raise BodyAnalysisStateError("only failed or stale analyses can be retried")
+        self._assert_retry_available(photo_session.id, config)
+        return self._create_analysis(photo_session, config, replaces=latest)
+
+    def _assert_retry_available(
+        self,
+        session_id: UUID,
+        config: AnalysisExecutionConfig,
+    ) -> None:
         attempts = int(
             self._db.scalar(
                 select(func.count()).select_from(BodyAnalysis).where(
-                    BodyAnalysis.session_id == photo_session.id
+                    BodyAnalysis.session_id == session_id
                 )
             )
             or 0
         )
         if attempts >= config.retry_limit + 1:
             raise BodyAnalysisStateError("analysis retry limit reached")
-        return self._create_analysis(photo_session, config, replaces=previous)
 
     def _create_analysis(
         self,
@@ -310,7 +323,8 @@ class BodyAnalysisService:
             analysis.status = BodyAnalysisStatus.FAILED
             analysis.error_code = provider_error.code.value
             analysis.error_message = "Body analysis could not be completed. Please retry later."
-            analysis.provider_request_id = provider_error.provider_request_id
+            if provider_error.provider_request_id is not None:
+                analysis.provider_request_id = provider_error.provider_request_id
             analysis.completed_at = datetime.now(UTC)
             analysis.session.state = self._session_state_after_failure(analysis)
             self._db.commit()

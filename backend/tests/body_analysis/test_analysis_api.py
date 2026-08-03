@@ -188,3 +188,37 @@ def test_admin_retry_requires_admin_and_can_queue_failed_analysis(
 
     assert response.status_code == 202
     assert response.json()["id"] != str(analysis.id)
+
+
+def test_admin_retry_rejects_completed_and_nonlatest_revisions(
+    client: TestClient, db: Session
+) -> None:
+    _runtime_override(client)
+    email = f"admin-retry-reject-{uuid4()}@example.com"
+    _register(client, email)
+    admin = db.scalar(select(User).where(User.email == email))
+    assert admin is not None
+    admin.is_admin = True
+    db.commit()
+    owner, photo_session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    completed = service.queue(photo_session.id, owner.id, _config())
+    completed.status = BodyAnalysisStatus.COMPLETED
+    db.commit()
+
+    completed_response = client.post(
+        f"/api/v1/admin/body-analyses/{completed.id}/retry",
+        headers=ORIGIN,
+    )
+
+    assert completed_response.status_code == 409
+    completed.status = BodyAnalysisStatus.FAILED
+    db.commit()
+    replacement = service.retry(completed.id, owner.id, _config())
+    nonlatest_response = client.post(
+        f"/api/v1/admin/body-analyses/{completed.id}/retry",
+        headers=ORIGIN,
+    )
+
+    assert replacement.id != completed.id
+    assert nonlatest_response.status_code == 409

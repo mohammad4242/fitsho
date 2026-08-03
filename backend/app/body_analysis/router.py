@@ -221,7 +221,11 @@ def retry_analysis_as_admin(
     if analysis is None:
         raise _not_found()
     try:
-        queued = BodyAnalysisService(db).retry(
+        service = BodyAnalysisService(db)
+        latest = service.latest_for_session(analysis.session_id, analysis.session.user_id)
+        if latest is None or latest.id != analysis.id:
+            raise BodyAnalysisStateError("only the latest analysis revision can be retried")
+        queued = service.retry(
             analysis.id,
             analysis.session.user_id,
             runtime.config,

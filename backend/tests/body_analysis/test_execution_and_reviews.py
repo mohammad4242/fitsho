@@ -195,25 +195,14 @@ def test_execution_persists_validated_result_and_is_idempotent(db: Session) -> N
     assert versions[0].normalized_result["summary"]["priority_areas"] == ["shoulders"]
 
 
-def test_execution_sanitizes_provider_failure_and_retry_preserves_prior_success(
-    db: Session,
-) -> None:
+def test_completed_analysis_cannot_be_retried(db: Session) -> None:
     user, session = _submitted_session(db)
     service = BodyAnalysisService(db)
     successful = service.queue(session.id, user.id, _config())
     asyncio.run(service.execute(successful.id, _Provider(), _Storage()))
 
-    retry = service.retry(successful.id, user.id, _config())
-    failed = asyncio.run(service.execute(retry.id, _FailingProvider(), _Storage()))
-
-    assert retry.id != successful.id
-    assert failed.status is BodyAnalysisStatus.FAILED
-    assert failed.error_code == "unauthorized"
-    assert failed.error_message == "Body analysis could not be completed. Please retry later."
-    assert "credential" not in failed.error_message.lower()
-    assert service.effective_result(session.id, user.id).analysis_id == successful.id
-    db.refresh(session)
-    assert session.state is BodyPhotoSessionState.REVIEW_PENDING
+    with pytest.raises(BodyAnalysisStateError, match="only failed or stale"):
+        service.retry(successful.id, user.id, _config())
 
 
 def test_coach_and_doctor_approvals_are_independent_and_version_bound(db: Session) -> None:
@@ -349,6 +338,9 @@ def test_stale_analysis_is_recovered_but_retry_attempts_are_bounded(db: Session)
 
     assert recovered.id != first.id
     assert recovered.revision == 2
+    assert recovered.replaces_analysis_id == first.id
+    db.refresh(session)
+    assert session.state is BodyPhotoSessionState.QUEUED
     recovered.status = BodyAnalysisStatus.FAILED
     db.commit()
     with pytest.raises(BodyAnalysisStateError, match="retry limit"):
@@ -390,6 +382,43 @@ def test_fresh_queued_analysis_is_not_considered_stale(db: Session) -> None:
     queued = service.queue(session.id, user.id, config)
 
     assert service.retry(queued.id, user.id, config).id == queued.id
+
+
+def test_normal_queue_path_respects_retry_limit(db: Session) -> None:
+    user, session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    config = _config().model_copy(update={"retry_limit": 0})
+    failed = service.queue(session.id, user.id, config)
+    failed.status = BodyAnalysisStatus.FAILED
+    db.commit()
+
+    with pytest.raises(BodyAnalysisStateError, match="retry limit"):
+        service.queue(session.id, user.id, config)
+
+
+def test_retry_rejects_nonlatest_revision(db: Session) -> None:
+    user, session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    initial = service.queue(session.id, user.id, _config())
+    initial.status = BodyAnalysisStatus.FAILED
+    db.commit()
+    replacement = service.retry(initial.id, user.id, _config())
+
+    with pytest.raises(BodyAnalysisStateError, match="latest analysis revision"):
+        service.retry(initial.id, user.id, _config())
+    assert replacement.replaces_analysis_id == initial.id
+
+
+def test_provider_request_id_survives_post_response_validation_error(db: Session) -> None:
+    user, session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    analysis = service.queue(session.id, user.id, _config())
+    malformed_schema = {**_normalized_payload(), "schema_version": "9.9"}
+
+    failed = asyncio.run(service.execute(analysis.id, _Provider(malformed_schema), _Storage()))
+
+    assert failed.status is BodyAnalysisStatus.FAILED
+    assert failed.provider_request_id == "req-safe-id"
 
 
 def test_cost_ceiling_preflight_fails_closed_without_complete_catalog_pricing(db: Session) -> None:
