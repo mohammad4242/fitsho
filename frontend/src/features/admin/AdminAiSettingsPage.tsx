@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -28,6 +28,7 @@ export function AdminAiSettingsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const modelRequestVersion = useRef(0);
 
   const config = useMemo(
     () => configs.find((item) => item.task_type === selectedTask) ?? null,
@@ -50,12 +51,19 @@ export function AdminAiSettingsPage() {
   }, [selectedTask]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function loadModels(task: AdminAiTaskType, query: string) {
+    const requestVersion = modelRequestVersion.current + 1;
+    modelRequestVersion.current = requestVersion;
     return getAdminAiTaskModels(task, query)
       .then((response) => {
+        if (requestVersion !== modelRequestVersion.current) return;
         setModels(response.items);
         setCatalogStale(response.stale);
       })
-      .catch(() => setError(t("admin.aiSettings.catalogError")));
+      .catch(() => {
+        if (requestVersion === modelRequestVersion.current) {
+          setError(t("admin.aiSettings.catalogError"));
+        }
+      });
   }
 
   function patchConfig(update: Partial<AdminAiTaskConfig>) {
@@ -163,6 +171,11 @@ export function AdminAiSettingsPage() {
             />
           </label>
           {config.credential.masked && <p className="admin-ai-secret-status">{config.credential.masked}</p>}
+          <dl className="admin-ai-observability">
+            <div><dt>{t("admin.aiSettings.lastConnection")}</dt><dd>{config.last_successful_connection_test_at ?? "—"}</dd></div>
+            <div><dt>{t("admin.aiSettings.lastCatalogRefresh")}</dt><dd>{config.last_model_catalog_refresh_at ?? "—"}</dd></div>
+            <div><dt>{t("admin.aiSettings.lastError")}</dt><dd>{config.last_error_code ?? "—"}{config.last_error_message ? ` — ${config.last_error_message}` : ""}</dd></div>
+          </dl>
           <div className="admin-ai-settings-actions">
             <button type="button" disabled={busy !== null} onClick={handleConnectionTest}>{t("admin.aiSettings.test")}</button>
             <button type="button" disabled={busy !== null || !config.credential.configured} onClick={handleRefresh}>{t("admin.aiSettings.refresh")}</button>

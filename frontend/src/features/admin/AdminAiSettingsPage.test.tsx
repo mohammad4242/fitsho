@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -15,7 +15,7 @@ const api = vi.hoisted(() => ({
 vi.mock("./api", () => api);
 
 import { AdminAiSettingsPage } from "./AdminAiSettingsPage";
-import type { AdminAiTaskConfig } from "./types";
+import type { AdminAiCatalogResponse, AdminAiTaskConfig } from "./types";
 
 const bodyConfig: AdminAiTaskConfig = {
   task_type: "body_photo_analysis",
@@ -34,6 +34,11 @@ const bodyConfig: AdminAiTaskConfig = {
   last_model_catalog_refresh_at: null,
   last_error_code: null,
   last_error_message: null,
+};
+
+const progressConfig: AdminAiTaskConfig = {
+  ...bodyConfig,
+  task_type: "progress_comparison",
 };
 
 beforeEach(() => {
@@ -133,6 +138,73 @@ it("persists disable immediately", async () => {
     "body_photo_analysis",
     expect.objectContaining({ enabled: false, replace_credential: false }),
   );
+});
+
+it("renders persisted observability for the selected task", async () => {
+  api.getAdminAiTaskConfigs.mockResolvedValue([
+    {
+      ...bodyConfig,
+      last_successful_connection_test_at: "2026-08-03T12:00:00Z",
+      last_model_catalog_refresh_at: "2026-08-03T12:10:00Z",
+      last_error_code: "rate_limited",
+      last_error_message: "The AI provider rate limit was reached.",
+    },
+  ]);
+  renderPage();
+
+  expect(await screen.findByText("2026-08-03T12:00:00Z")).toBeInTheDocument();
+  expect(screen.getByText("2026-08-03T12:10:00Z")).toBeInTheDocument();
+  expect(screen.getByText(/rate_limited/)).toBeInTheDocument();
+});
+
+it("ignores a stale catalog response after switching AI tasks", async () => {
+  let resolveOldCatalog: ((value: AdminAiCatalogResponse) => void) | undefined;
+  const oldCatalog = new Promise<AdminAiCatalogResponse>((resolve) => { resolveOldCatalog = resolve; });
+  api.getAdminAiTaskConfigs.mockResolvedValue([bodyConfig, progressConfig]);
+  api.getAdminAiTaskModels.mockImplementation((task: string) => task === "body_photo_analysis"
+    ? oldCatalog
+    : Promise.resolve({
+      refreshed_at: "2026-08-03T12:00:00Z",
+      stale: false,
+      items: [{
+        provider: "openrouter",
+        model_id: "vendor/progress-model",
+        display_name: "Progress Model",
+        provider_family: "vendor",
+        supports_text_input: true,
+        supports_image_input: false,
+        supports_structured_output: true,
+        context_length: 32000,
+        input_price_per_token: null,
+        output_price_per_token: null,
+        available: true,
+      }],
+    }));
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByRole("button", { name: "Progress comparison" }));
+  expect(await screen.findAllByRole("option", { name: /Progress Model/ })).toHaveLength(2);
+  resolveOldCatalog?.({
+    refreshed_at: "2026-08-03T11:00:00Z",
+    stale: false,
+    items: [{
+      provider: "openrouter",
+      model_id: "vendor/old-vision-model",
+      display_name: "Old Vision Model",
+      provider_family: "vendor",
+      supports_text_input: true,
+      supports_image_input: true,
+      supports_structured_output: true,
+      context_length: 32000,
+      input_price_per_token: null,
+      output_price_per_token: null,
+      available: true,
+    }],
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitFor(() => expect(screen.queryByRole("option", { name: /Old Vision Model/ })).not.toBeInTheDocument());
 });
 
 function renderPage() {

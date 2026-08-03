@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth.models import User
 from app.body_analysis.admin_config.models import AIAuditEvent, AIProviderCredential
 from app.config import Settings
+from app.main import create_app
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -88,6 +89,13 @@ def test_task_settings_require_admin_and_trusted_origin(client: TestClient) -> N
     )
 
 
+def test_openrouter_client_is_independent_from_zen_client(test_settings: Settings) -> None:
+    test_settings.opencode_zen_proxy_url = "http://127.0.0.1:19876"
+    with TestClient(create_app(test_settings)) as app_client:
+        assert app_client.app.state.ai_http_client is not app_client.app.state.zen_http_client
+        assert app_client.app.state.ai_http_client._trust_env is False
+
+
 def test_admin_saves_encrypted_masked_credential_and_audits_without_secret(
     client: TestClient,
     db: Session,
@@ -104,8 +112,6 @@ def test_admin_saves_encrypted_masked_credential_and_audits_without_secret(
             "enabled": False,
             "api_key": "sk-openrouter-secret",
             "replace_credential": True,
-            "primary_model_id": "vendor/vision-model",
-            "fallback_model_ids": ["vendor/vision-fallback"],
             "temperature": 0.1,
             "max_output_tokens": 4096,
             "timeout_seconds": 45,
@@ -261,3 +267,61 @@ def test_body_analysis_rejects_a_text_only_model_when_enabled(
 
     assert response.status_code == 422
     assert "image" in response.text.lower()
+
+
+def test_selected_models_are_validated_even_when_task_is_disabled(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    _admin(client, db)
+    test_settings.ai_credential_encryption_key = Fernet.generate_key().decode()
+    client.put(
+        "/api/v1/admin/ai/task-configs/body_photo_analysis",
+        headers=ORIGIN,
+        json={
+            "provider": "openrouter",
+            "enabled": False,
+            "api_key": "sk-openrouter-secret",
+            "replace_credential": True,
+        },
+    )
+    replacement = _mock_openrouter(client, httpx.MockTransport(_catalog_response))
+    try:
+        client.post("/api/v1/admin/ai/models/refresh", headers=ORIGIN)
+    finally:
+        _restore_openrouter(client, replacement)
+
+    text_only = client.put(
+        "/api/v1/admin/ai/task-configs/body_photo_analysis",
+        headers=ORIGIN,
+        json={
+            "provider": "openrouter",
+            "enabled": False,
+            "primary_model_id": "vendor/text-model",
+        },
+    )
+    missing_fallback = client.put(
+        "/api/v1/admin/ai/task-configs/body_photo_analysis",
+        headers=ORIGIN,
+        json={
+            "provider": "openrouter",
+            "enabled": False,
+            "fallback_model_ids": ["vendor/missing-model"],
+        },
+    )
+    malformed_fallback = client.put(
+        "/api/v1/admin/ai/task-configs/body_photo_analysis",
+        headers=ORIGIN,
+        json={
+            "provider": "openrouter",
+            "enabled": False,
+            "fallback_model_ids": [""],
+        },
+    )
+
+    assert text_only.status_code == 422
+    assert "image" in text_only.text.lower()
+    assert missing_fallback.status_code == 422
+    assert "catalog" in missing_fallback.text.lower()
+    assert malformed_fallback.status_code == 422

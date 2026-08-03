@@ -131,7 +131,7 @@ def save_task_config(
         raise AIConfigError("A provider credential is required before enabling this task")
     if payload.enabled and payload.primary_model_id is None:
         raise AIConfigError("A primary model is required before enabling this task")
-    if payload.enabled:
+    if payload.primary_model_id is not None or payload.fallback_model_ids:
         _validate_selected_models(
             db,
             task_type=task_type,

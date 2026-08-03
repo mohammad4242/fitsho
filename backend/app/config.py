@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     ai_credential_encryption_key: SecretStr | None = Field(default=None, repr=False)
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_timeout_seconds: float = Field(default=45.0, gt=0, le=180)
+    openrouter_proxy_url: str | None = Field(default=None, max_length=500, repr=False)
     ai_model_catalog_ttl_seconds: int = Field(default=3600, ge=60, le=86400)
     workout_prompt_version: str = "v1"
     workout_policy_version: str = "v1"

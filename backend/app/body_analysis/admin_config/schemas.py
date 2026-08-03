@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
@@ -19,7 +20,10 @@ class AITaskConfigUpdate(BaseModel):
     api_key: SecretStr | None = Field(default=None, repr=False)
     replace_credential: bool = False
     primary_model_id: str | None = Field(default=None, min_length=1, max_length=300)
-    fallback_model_ids: list[str] = Field(default_factory=list, max_length=5)
+    fallback_model_ids: list[Annotated[str, Field(min_length=1, max_length=300)]] = Field(
+        default_factory=list,
+        max_length=5,
+    )
     temperature: float = Field(default=0.0, ge=0, le=2)
     max_output_tokens: int = Field(default=4096, ge=1, le=65_536)
     timeout_seconds: int = Field(default=45, ge=1, le=180)
