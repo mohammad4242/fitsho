@@ -228,11 +228,13 @@ export function BodyPhotoWizard({
     setBusy(true);
     setError(null);
     let uploadedPhoto = false;
+    let uploadedSessionId: string | null = null;
     try {
       const activeSession = session ?? await createBodyPhotoSession(purpose);
       if (session === null) setSession(activeSession);
       const uploaded = await uploadBodyPhoto(activeSession.id, view, current);
       uploadedPhoto = true;
+      uploadedSessionId = activeSession.id;
       setSession(uploaded);
       clearSelectedPreview(view);
       if (editingExistingPhoto) {
@@ -251,6 +253,10 @@ export function BodyPhotoWizard({
         setCurrentIndex((index) => index + 1);
       }
     } catch {
+      if (uploadedPhoto && editingExistingPhoto && uploadedSessionId !== null) {
+        navigate(`/body-progress/${uploadedSessionId}`);
+        return;
+      }
       setError(t(uploadedPhoto ? "bodyPhotos.errors.analysisNotStarted" : "bodyPhotos.errors.upload"));
     } finally {
       setBusy(false);

@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
@@ -58,8 +58,14 @@ function renderWizard(processor?: BodyPhotoProcessor, entry = "/body-progress/ne
   return render(
     <MemoryRouter initialEntries={[entry]}>
       <BodyPhotoWizard processor={processor} />
+      <LocationDisplay />
     </MemoryRouter>,
   );
+}
+
+function LocationDisplay() {
+  const location = useLocation();
+  return <output data-testid="location">{location.pathname}</output>;
 }
 
 beforeEach(async () => {
@@ -125,7 +131,7 @@ it("replaces only the rejected view in an existing photo session", async () => {
   expect(api.startBodyPhotoAnalysis).toHaveBeenCalledWith("session-2");
 });
 
-it("does not report a successful replacement as an upload failure", async () => {
+it("returns to the result after a successful replacement cannot start analysis", async () => {
   const user = userEvent.setup();
   const processor: BodyPhotoProcessor = { process: vi.fn().mockResolvedValue(processed("side")) };
   api.startBodyPhotoAnalysis.mockRejectedValueOnce(new Error("retry limit"));
@@ -135,9 +141,8 @@ it("does not report a successful replacement as an upload failure", async () => 
   await user.upload(screen.getByLabelText(/side photo upload/i), file);
   await user.click(screen.getByRole("button", { name: /confirm and upload side/i }));
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    /photos were submitted successfully, but body analysis has not started/i,
-  );
+  await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/body-progress/session-2"));
+  expect(screen.queryByText(/anonymized photo could not be uploaded/i)).not.toBeInTheDocument();
 });
 
 it("shows the selected photo immediately while anonymization is processing", async () => {
