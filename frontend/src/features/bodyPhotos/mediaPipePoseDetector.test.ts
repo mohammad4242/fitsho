@@ -85,7 +85,7 @@ describe("MediaPipePoseLandmarkDetector", () => {
     });
   });
 
-  it("uses pinned matching WASM and model configuration", async () => {
+  it("uses bundled local WASM and model configuration", async () => {
     const forVisionTasks = vi.fn().mockResolvedValue("fileset");
     const createFromOptions = vi.fn().mockResolvedValue({ detect: vi.fn() });
     const createFaceDetector = vi.fn().mockResolvedValue({ detect: vi.fn() });
@@ -100,8 +100,8 @@ describe("MediaPipePoseLandmarkDetector", () => {
 
     await loader();
 
-    expect(mediaPipePoseAssets.wasmBasePath).toContain("@0.10.35/wasm");
-    expect(mediaPipePoseAssets.modelAssetPath).toContain("/float16/1/");
+    expect(mediaPipePoseAssets.wasmBasePath).toBe("/mediapipe/wasm");
+    expect(mediaPipePoseAssets.modelAssetPath).toBe("/mediapipe/models/pose_landmarker_lite.task");
     expect(forVisionTasks).toHaveBeenCalledWith(mediaPipePoseAssets.wasmBasePath);
     expect(createFromOptions).toHaveBeenCalledWith("fileset", expect.objectContaining({
       baseOptions: { modelAssetPath: mediaPipePoseAssets.modelAssetPath },

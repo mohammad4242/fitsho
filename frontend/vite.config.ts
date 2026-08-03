@@ -9,7 +9,7 @@ export default defineConfig({
         target: "http://localhost:8001",
         changeOrigin: false,
       },
-      "/media": {
+      "^/media(?:/|$)": {
         target: "http://localhost:8001",
         changeOrigin: false,
       },

@@ -31,15 +31,12 @@ type MediaPipeVisionModule = {
 
 const visibilityIndices = [0, 7, 8, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
 export const mediaPipePoseAssets = {
-  modelAssetPath: import.meta.env.VITE_BODY_PHOTO_POSE_MODEL_URL
-    ?? "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
-  wasmBasePath: import.meta.env.VITE_BODY_PHOTO_MEDIAPIPE_WASM_URL
-    ?? "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm",
+  modelAssetPath: "/mediapipe/models/pose_landmarker_lite.task",
+  wasmBasePath: "/mediapipe/wasm",
 } as const;
 
 export const mediaPipeFaceAssets = {
-  modelAssetPath: import.meta.env.VITE_BODY_PHOTO_FACE_MODEL_URL
-    ?? "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+  modelAssetPath: "/mediapipe/models/blaze_face_short_range.tflite",
   wasmBasePath: mediaPipePoseAssets.wasmBasePath,
 } as const;
 

@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "prepare:mediapipe": "node ./scripts/prepare-mediapipe-assets.mjs",
+    "dev": "npm run prepare:mediapipe && vite",
+    "build": "npm run prepare:mediapipe && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run"
