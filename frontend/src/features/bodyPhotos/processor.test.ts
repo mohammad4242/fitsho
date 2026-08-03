@@ -50,7 +50,7 @@ function makeRuntime() {
   const runtime: BodyPhotoRuntime = {
     decode: vi.fn().mockResolvedValue(decoded),
     measureQuality: vi.fn().mockReturnValue({ brightnessScore: 0.78, sharpnessScore: 0.84 }),
-    cropAndEncode: vi.fn().mockResolvedValue(output),
+    cropAndEncode: vi.fn().mockResolvedValue({ blob: output, width: 1200, height: 1476 }),
     createObjectUrl: vi.fn().mockReturnValue("blob:anonymized-preview"),
     sha256: vi.fn()
       .mockResolvedValueOnce("a".repeat(64))
@@ -99,9 +99,12 @@ describe("BrowserBodyPhotoProcessor", () => {
     expect(dispose).toHaveBeenCalledOnce();
   });
 
-  it("fails closed when no detector is configured", async () => {
+  it("fails closed when the landmark runtime cannot load", async () => {
     const { runtime, dispose } = makeRuntime();
-    await expect(new BrowserBodyPhotoProcessor({ runtime }).process(inputFile(), "front"))
+    await expect(new BrowserBodyPhotoProcessor({
+      runtime,
+      detector: { detect: vi.fn().mockRejectedValue(new Error("model unavailable")) },
+    }).process(inputFile(), "front"))
       .rejects.toMatchObject({ code: "pose_detection_unavailable" });
     expect(dispose).toHaveBeenCalledOnce();
   });
@@ -149,6 +152,21 @@ describe("BrowserBodyPhotoProcessor", () => {
     }).process(inputFile("image/png"), "front")).rejects.toMatchObject({
       code: "image_signature_mismatch",
     });
+  });
+
+  it("matches the backend v1 crop-evidence contract after output resizing", async () => {
+    const { runtime } = makeRuntime();
+    const result = await new BrowserBodyPhotoProcessor({
+      detector: detector(validDetection("front")),
+      runtime,
+    }).process(inputFile(), "front");
+
+    expect(result).toMatchObject({ originalHeight: 1800, cropTop: 324, cropBottom: 1800 });
+    expect(result.cropBottom - result.cropTop).toBe(1476);
+    const canonicalBytes = vi.mocked(runtime.sha256).mock.calls[1][0];
+    expect(new TextDecoder().decode(canonicalBytes)).toBe(
+      `v1:${"a".repeat(64)}:1800:324:1800`,
+    );
   });
 
   it("checks the decoded file signature instead of trusting the declared MIME type", async () => {

@@ -4,7 +4,11 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
-import type { BodyPhotoProcessor, ProcessedBodyPhoto } from "./processor";
+import {
+  BodyPhotoProcessingError,
+  type BodyPhotoProcessor,
+  type ProcessedBodyPhoto,
+} from "./processor";
 
 const api = vi.hoisted(() => ({
   createBodyPhotoSession: vi.fn(),
@@ -80,6 +84,8 @@ it("requires operational consent before the confirm upload action is enabled", a
   await user.upload(screen.getByLabelText(/front photo upload/i), file);
   expect(await screen.findByAltText(/anonymized front preview/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /confirm and upload front/i })).toBeDisabled();
+  expect(api.createBodyPhotoSession).not.toHaveBeenCalled();
+  expect(api.uploadBodyPhoto).not.toHaveBeenCalled();
 
   await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
   expect(screen.getByRole("button", { name: /confirm and upload front/i })).toBeEnabled();
@@ -90,7 +96,7 @@ it("shows fitted-clothing guidance on every capture step", async () => {
   const processor: BodyPhotoProcessor = { process: vi.fn().mockImplementation((_, view) => processed(view)) };
   renderWizard(processor);
 
-  expect(screen.getByText(/athletic shorts and fitted, minimal athletic clothing/i)).toBeInTheDocument();
+  expect(screen.getAllByText(/athletic shorts and fitted, minimal athletic clothing/i)).not.toHaveLength(0);
   await user.upload(screen.getByLabelText(/front photo upload/i), file);
   await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
   await user.click(screen.getByRole("button", { name: /confirm and upload front/i }));
@@ -137,4 +143,44 @@ it("revokes anonymized preview URLs when a photo is replaced and on unmount", as
 
   rendered.unmount();
   expect(revoke).toHaveBeenCalledWith("blob:replacement");
+});
+
+it("shows structured quality feedback for an anonymized preview", async () => {
+  const user = userEvent.setup();
+  renderWizard({ process: vi.fn().mockResolvedValue(processed("front")) });
+
+  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+
+  expect(screen.getByLabelText(/photo check/i)).toHaveTextContent(/overall quality/i);
+  expect(screen.getByLabelText(/photo check/i)).toHaveTextContent(/pose and framing/i);
+});
+
+it("shows a distinct clothing rejection and keeps the repeated clothing guidance visible", async () => {
+  const user = userEvent.setup();
+  renderWizard({
+    process: vi.fn().mockRejectedValue(new BodyPhotoProcessingError("clothing_hides_body_contours")),
+  });
+
+  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(/clothing hides body contours/i);
+  expect(screen.getByLabelText(/clothing and coverage/i)).toBeInTheDocument();
+});
+
+it("releases a late preview when processing resolves after the wizard unmounts", async () => {
+  const user = userEvent.setup();
+  const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  let resolveProcessing: ((value: ProcessedBodyPhoto) => void) | undefined;
+  const processor: BodyPhotoProcessor = {
+    process: vi.fn().mockImplementation(() => new Promise<ProcessedBodyPhoto>((resolve) => {
+      resolveProcessing = resolve;
+    })),
+  };
+  const rendered = renderWizard(processor);
+
+  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  rendered.unmount();
+  resolveProcessing?.({ ...processed("front"), previewUrl: "blob:late-preview" });
+
+  await waitFor(() => expect(revoke).toHaveBeenCalledWith("blob:late-preview"));
 });

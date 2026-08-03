@@ -9,6 +9,7 @@ import {
 } from "./api";
 import {
   browserBodyPhotoProcessor,
+  BodyPhotoProcessingError,
   type BodyPhotoProcessor,
   type ProcessedBodyPhoto,
 } from "./processor";
@@ -38,6 +39,8 @@ export function BodyPhotoWizard({
   const [error, setError] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
   const processedRef = useRef(processed);
+  const mountedRef = useRef(false);
+  const selectionTokenRef = useRef(0);
 
   const view = views[currentIndex];
   const current = processed[view] ?? null;
@@ -47,10 +50,14 @@ export function BodyPhotoWizard({
     processedRef.current = processed;
   }, [processed]);
 
-  useEffect(() => () => {
-    Object.values(processedRef.current).forEach((item) => {
-      if (item !== undefined) URL.revokeObjectURL(item.previewUrl);
-    });
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      selectionTokenRef.current += 1;
+      Object.values(processedRef.current).forEach(disposeProcessedPhoto);
+      processedRef.current = {};
+    };
   }, []);
 
   const instructions = useMemo(() => ({
@@ -62,28 +69,40 @@ export function BodyPhotoWizard({
   async function selectFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (file === undefined || busy) return;
+    const selectedView = view;
+    const selectionToken = ++selectionTokenRef.current;
     setBusy(true);
     setError(null);
     try {
-      const next = await processor.process(file, view);
+      const next = await processor.process(file, selectedView);
+      if (!mountedRef.current || selectionToken !== selectionTokenRef.current) {
+        disposeProcessedPhoto(next);
+        return;
+      }
       setProcessed((currentProcessed) => {
-        const previous = currentProcessed[view];
-        if (previous !== undefined) URL.revokeObjectURL(previous.previewUrl);
-        return { ...currentProcessed, [view]: next };
+        const previous = currentProcessed[selectedView];
+        disposeProcessedPhoto(previous);
+        const updated = { ...currentProcessed, [selectedView]: next };
+        processedRef.current = updated;
+        return updated;
       });
-    } catch {
-      setError(t("bodyPhotos.errors.processing"));
+    } catch (processingError) {
+      if (mountedRef.current && selectionToken === selectionTokenRef.current) {
+        setError(processingErrorMessage(processingError, t));
+      }
     } finally {
       event.target.value = "";
-      setBusy(false);
+      if (mountedRef.current && selectionToken === selectionTokenRef.current) setBusy(false);
     }
   }
 
   function retake() {
+    selectionTokenRef.current += 1;
     setProcessed((currentProcessed) => {
       const previous = currentProcessed[view];
-      if (previous !== undefined) URL.revokeObjectURL(previous.previewUrl);
+      disposeProcessedPhoto(previous);
       const { [view]: _, ...remaining } = currentProcessed;
+      processedRef.current = remaining;
       return remaining;
     });
     setError(null);
@@ -213,6 +232,7 @@ export function BodyPhotoWizard({
           <div className="body-photo-preview">
             <img src={current.previewUrl} alt={t("bodyPhotos.previewAlt", { view: t(`bodyPhotos.views.${view}`) })} />
             <p>{t("bodyPhotos.anonymizedPreview")}</p>
+            <PhotoQualityFeedback photo={current} />
             <button type="button" className="secondary-button" onClick={retake} disabled={busy}>
               {t("bodyPhotos.retake", { view: t(`bodyPhotos.views.${view}`) })}
             </button>
@@ -239,6 +259,38 @@ export function BodyPhotoWizard({
 function PhotoClothingGuide() {
   const { t } = useTranslation();
   return <aside className="body-photo-clothing-guide" aria-label={t("bodyPhotos.clothingTitle")}><strong>{t("bodyPhotos.clothingTitle")}</strong><p>{t("bodyPhotos.clothingBody")}</p><p>{t("bodyPhotos.coverage")}</p></aside>;
+}
+
+function PhotoQualityFeedback({ photo }: { photo: ProcessedBodyPhoto }) {
+  const { t } = useTranslation();
+  const { quality, warnings } = photo.validation;
+  return (
+    <section className="body-photo-quality" aria-label={t("bodyPhotos.quality.title")}>
+      <strong>{t("bodyPhotos.quality.title")}</strong>
+      <dl>
+        <div><dt>{t("bodyPhotos.quality.overall")}</dt><dd>{formatScore(quality.overallScore)}</dd></div>
+        <div><dt>{t("bodyPhotos.quality.lighting")}</dt><dd>{formatScore(quality.brightnessScore)}</dd></div>
+        <div><dt>{t("bodyPhotos.quality.sharpness")}</dt><dd>{formatScore(quality.sharpnessScore)}</dd></div>
+        <div><dt>{t("bodyPhotos.quality.pose")}</dt><dd>{formatScore(quality.poseScore)}</dd></div>
+      </dl>
+      {warnings.length > 0 && <p className="body-photo-muted">{t("bodyPhotos.quality.warning")}</p>}
+    </section>
+  );
+}
+
+function processingErrorMessage(error: unknown, t: ReturnType<typeof useTranslation>["t"]): string {
+  if (error instanceof BodyPhotoProcessingError) {
+    return t(`bodyPhotos.errors.${error.code}`, { defaultValue: t("bodyPhotos.errors.processing") });
+  }
+  return t("bodyPhotos.errors.processing");
+}
+
+function formatScore(score: number): string {
+  return `${Math.round(score * 100)}%`;
+}
+
+function disposeProcessedPhoto(photo: ProcessedBodyPhoto | undefined) {
+  if (photo !== undefined) URL.revokeObjectURL(photo.previewUrl);
 }
 
 function ConsentModal({ onClose }: { onClose: () => void }) {

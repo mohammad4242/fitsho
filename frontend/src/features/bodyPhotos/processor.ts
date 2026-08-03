@@ -1,4 +1,5 @@
 import type { BodyPhotoView } from "./types";
+import { MediaPipePoseLandmarkDetector } from "./mediaPipePoseDetector";
 
 export type BodyPhotoQuality = {
   overallScore: number;
@@ -82,10 +83,16 @@ export type CropRequest = {
   quality: number;
 };
 
+export type EncodedCrop = {
+  blob: Blob;
+  width: number;
+  height: number;
+};
+
 export interface BodyPhotoRuntime {
   decode(file: File): Promise<DecodedBodyPhoto>;
   measureQuality(image: DecodedBodyPhoto): MeasuredImageQuality;
-  cropAndEncode(image: DecodedBodyPhoto, crop: CropRequest): Promise<Blob>;
+  cropAndEncode(image: DecodedBodyPhoto, crop: CropRequest): Promise<EncodedCrop>;
   createObjectUrl(blob: Blob): string;
   sha256(value: ArrayBuffer): Promise<string>;
 }
@@ -147,12 +154,6 @@ const defaultLimits = {
   outputQuality: 0.9,
 } as const;
 
-class UnavailableBodyLandmarkDetector implements BodyLandmarkDetector {
-  async detect(): Promise<BodyLandmarkDetection> {
-    throw new BodyPhotoProcessingError("pose_detection_unavailable");
-  }
-}
-
 export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
   private readonly detector: BodyLandmarkDetector;
   private readonly runtime: BodyPhotoRuntime;
@@ -161,7 +162,7 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
     detector?: BodyLandmarkDetector;
     runtime?: BodyPhotoRuntime;
   } = {}) {
-    this.detector = options.detector ?? new UnavailableBodyLandmarkDetector();
+    this.detector = options.detector ?? new MediaPipePoseLandmarkDetector();
     this.runtime = options.runtime ?? browserBodyPhotoRuntime;
   }
 
@@ -176,7 +177,7 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
     const image = await this.runtime.decode(file);
     try {
       this.validateDecodedImage(image, file.type as AcceptedImageMimeType);
-      const detection = await this.detector.detect(image, view);
+      const detection = await this.detectBody(image, view);
       this.validateDetection(detection, view);
       const measuredQuality = this.runtime.measureQuality(image);
       this.validateMeasuredQuality(measuredQuality);
@@ -187,25 +188,34 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
       }
       const cropTop = Math.ceil(image.height * safeCropY);
       const cropBottom = image.height;
-      const output = await this.runtime.cropAndEncode(image, {
+      const encodedCrop = await this.runtime.cropAndEncode(image, {
         top: cropTop,
         bottom: cropBottom,
         targetWidth: Math.min(defaultLimits.targetWidth, image.width),
         quality: defaultLimits.outputQuality,
       });
-      if (output.size === 0 || output.type !== "image/jpeg") {
+      if (encodedCrop.blob.size === 0 || encodedCrop.blob.type !== "image/jpeg") {
         throw new BodyPhotoProcessingError("processing_failed");
       }
 
-      const processedBytes = await output.arrayBuffer();
+      const processedBytes = await encodedCrop.blob.arrayBuffer();
       const processedSha256 = await this.runtime.sha256(processedBytes);
+      // The backend verifies crop geometry against the resized output. Preserve the
+      // source crop ratio in a scaled coordinate system whose crop height exactly
+      // matches the encoded image height.
+      const scaledCropTop = Math.max(
+        1,
+        Math.round((cropTop / (cropBottom - cropTop)) * encodedCrop.height),
+      );
+      const evidenceOriginalHeight = scaledCropTop + encodedCrop.height;
+      const evidenceCropBottom = evidenceOriginalHeight;
       const cropEvidenceSha256 = await this.runtime.sha256(
         new TextEncoder().encode(
-          `v2:${processedSha256}:${image.height}:${cropTop}:${cropBottom}:${detection.headCropConfidence}`,
+          `v1:${processedSha256}:${evidenceOriginalHeight}:${scaledCropTop}:${evidenceCropBottom}`,
         ).buffer,
       );
       const processedFile = new File(
-        [output],
+        [encodedCrop.blob],
         `body-photo-${createFileNonce()}.jpg`,
         { type: "image/jpeg", lastModified: Date.now() },
       );
@@ -214,9 +224,9 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
       return {
         file: processedFile,
         previewUrl: this.runtime.createObjectUrl(processedFile),
-        originalHeight: image.height,
-        cropTop,
-        cropBottom,
+        originalHeight: evidenceOriginalHeight,
+        cropTop: scaledCropTop,
+        cropBottom: evidenceCropBottom,
         cropConfidence: detection.headCropConfidence,
         processedSha256,
         cropEvidenceSha256,
@@ -234,6 +244,15 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
       };
     } finally {
       image.dispose();
+    }
+  }
+
+  private async detectBody(image: DecodedBodyPhoto, view: BodyPhotoView) {
+    try {
+      return await this.detector.detect(image, view);
+    } catch (error) {
+      if (error instanceof BodyPhotoProcessingError) throw error;
+      throw new BodyPhotoProcessingError("pose_detection_unavailable");
     }
   }
 
@@ -365,7 +384,7 @@ export class BrowserBodyPhotoRuntime implements BodyPhotoRuntime {
     };
   }
 
-  async cropAndEncode(image: DecodedBodyPhoto, crop: CropRequest): Promise<Blob> {
+  async cropAndEncode(image: DecodedBodyPhoto, crop: CropRequest): Promise<EncodedCrop> {
     const cropHeight = crop.bottom - crop.top;
     if (crop.top < 0 || cropHeight <= 0 || crop.bottom > image.height) {
       throw new BodyPhotoProcessingError("safe_head_crop_unavailable");
@@ -385,7 +404,11 @@ export class BrowserBodyPhotoRuntime implements BodyPhotoRuntime {
       outputWidth,
       outputHeight,
     );
-    return canvasToBlob(canvas, crop.quality);
+    return {
+      blob: await canvasToBlob(canvas, crop.quality),
+      width: outputWidth,
+      height: outputHeight,
+    };
   }
 
   createObjectUrl(blob: Blob): string {
@@ -404,8 +427,8 @@ export class BrowserBodyPhotoRuntime implements BodyPhotoRuntime {
 const browserBodyPhotoRuntime = new BrowserBodyPhotoRuntime();
 
 /**
- * Default processing intentionally fails closed until a real landmark adapter is registered.
- * It must never estimate a crop from a fixed percentage of the image.
+ * The default processor uses an on-device MediaPipe landmarker. If its model or
+ * runtime cannot load, processing fails closed and no selected image is uploaded.
  */
 export const browserBodyPhotoProcessor = new BrowserBodyPhotoProcessor();
 
