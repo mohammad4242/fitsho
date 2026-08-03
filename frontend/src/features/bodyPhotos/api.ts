@@ -32,7 +32,7 @@ export function uploadBodyPhoto(
     body: data,
     headers: {
       "X-Fitsho-Client-Crop-Confirmed": "true",
-      "X-Fitsho-Crop-Confidence": String(processed.cropConfidence),
+      "X-Fitsho-Client-Crop-Confidence": String(processed.cropConfidence),
       "X-Fitsho-Original-Height": String(processed.originalHeight),
       "X-Fitsho-Crop-Top": String(processed.cropTop),
       "X-Fitsho-Crop-Bottom": String(processed.cropBottom),

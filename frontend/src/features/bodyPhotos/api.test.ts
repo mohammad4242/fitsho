@@ -1,0 +1,48 @@
+import { afterEach, expect, it, vi } from "vitest";
+
+import { uploadBodyPhoto } from "./api";
+import type { ProcessedBodyPhoto } from "./processor";
+
+afterEach(() => vi.restoreAllMocks());
+
+it("labels crop confidence as client-reported in the upload contract", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ id: "session-1", state: "uploading", photos: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+  const processed: ProcessedBodyPhoto = {
+    file: new File(["cropped"], "front.jpg", { type: "image/jpeg" }),
+    previewUrl: "blob:preview",
+    originalHeight: 1800,
+    cropTop: 324,
+    cropBottom: 1800,
+    cropConfidence: 0.95,
+    processedSha256: "a".repeat(64),
+    cropEvidenceSha256: "b".repeat(64),
+    validation: {
+      isValid: true,
+      expectedView: "front",
+      detectedView: "front",
+      quality: {
+        overallScore: 0.9,
+        brightnessScore: 0.8,
+        sharpnessScore: 0.9,
+        poseScore: 0.9,
+        bodyCompletenessScore: 0.9,
+        clothingVisibilityScore: 0.9,
+        backgroundReliabilityScore: 0.9,
+      },
+      warnings: [],
+      crop: { headRemoved: true, confidence: 0.95 },
+    },
+  };
+
+  await uploadBodyPhoto("session-1", "front", processed);
+
+  const [, init] = vi.mocked(fetch).mock.calls[0];
+  const headers = new Headers(init?.headers);
+  expect(headers.get("X-Fitsho-Client-Crop-Confidence")).toBe("0.95");
+  expect(headers.has("X-Fitsho-Crop-Confidence")).toBe(false);
+});
