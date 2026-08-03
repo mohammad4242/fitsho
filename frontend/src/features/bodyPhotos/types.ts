@@ -153,6 +153,32 @@ export type VisualPhysiqueAssessment = {
   provisional_notice_fa: string;
 };
 
+export type VisualChecklistRating =
+  | "excellent"
+  | "good"
+  | "average"
+  | "needs_attention"
+  | "focus_priority"
+  | "not_assessable";
+
+export type VisualPhysiqueAssessmentV3 = Omit<VisualPhysiqueAssessment, "findings"> & {
+  goal_suggestion: {
+    suggested_goal: "lose_weight" | "maintain_weight" | "build_muscle" | "gain_weight";
+    reasoning_fa: string;
+    inputs_unavailable_fa: string[];
+  };
+  findings: Array<{
+    area: BodyArea;
+    front: { rating: VisualChecklistRating; evidence_fa: string };
+    side: { rating: VisualChecklistRating; evidence_fa: string };
+    back: { rating: VisualChecklistRating; evidence_fa: string };
+    overall_rating: VisualChecklistRating;
+    overall_summary_fa: string;
+    confidence: number;
+    suggested_training_emphasis: string[];
+  }>;
+};
+
 export type SpecialistReviewState = {
   role: "coach" | "doctor";
   decision: "approved" | "changes_required" | "rejected" | null;
@@ -171,7 +197,7 @@ export type BodyAnalysis = {
   result_version: number | null;
   result_source: "ai" | "coach" | "doctor" | null;
   normalized_result: NormalizedBodyAnalysis | null;
-  visual_result?: VisualPhysiqueAssessment | null;
+  visual_result?: VisualPhysiqueAssessment | VisualPhysiqueAssessmentV3 | null;
   overall_confidence: number | null;
   coach_review: SpecialistReviewState;
   doctor_review: SpecialistReviewState;
@@ -189,6 +215,8 @@ export type BodyProgressState =
   | "unchanged"
   | "declined_or_less_balanced"
   | "uncertain";
+
+export type OverallBodyProgressState = "improved" | "stable" | "needs_attention" | "insufficient_data";
 
 export type BodyAreaComparison = {
   bodyArea: BodyArea;

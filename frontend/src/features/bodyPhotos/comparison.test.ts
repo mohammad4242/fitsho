@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { compareNormalizedAnalyses } from "./comparison";
+import { compareNormalizedAnalyses, deriveOverallProgressState } from "./comparison";
 import type { NormalizedBodyAnalysis } from "./types";
 
 function normalized(
@@ -41,4 +41,32 @@ it("reports a conservative improvement from clear lag to mild lag", () => {
 it("returns uncertain when either session has low confidence or uncertain evidence", () => {
   expect(compareNormalizedAnalyses(normalized("clear_lag", 0.4), normalized("mild_lag"))[0]?.state).toBe("uncertain");
   expect(compareNormalizedAnalyses(normalized("uncertain"), normalized("mild_lag"))[0]?.state).toBe("uncertain");
+});
+
+it("derives a single overall progress state from confident area comparisons", () => {
+  expect(deriveOverallProgressState([
+    {
+      bodyArea: "shoulders",
+      state: "improved",
+      previousClassification: "mild_lag",
+      currentClassification: "neutral",
+      confidence: 0.8,
+    },
+    {
+      bodyArea: "chest",
+      state: "unchanged",
+      previousClassification: "neutral",
+      currentClassification: "neutral",
+      confidence: 0.8,
+    },
+  ])).toBe("improved");
+  expect(deriveOverallProgressState([
+    {
+      bodyArea: "shoulders",
+      state: "uncertain",
+      previousClassification: null,
+      currentClassification: null,
+      confidence: 0.2,
+    },
+  ])).toBe("insufficient_data");
 });

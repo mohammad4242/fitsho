@@ -3,6 +3,7 @@ import type {
   BodyArea,
   BodyAreaComparison,
   NormalizedBodyAnalysis,
+  OverallBodyProgressState,
 } from "./types";
 
 const minimumComparisonConfidence = 0.6;
@@ -60,4 +61,18 @@ export function compareNormalizedAnalyses(
       confidence,
     };
   });
+}
+
+export function deriveOverallProgressState(
+  comparisons: BodyAreaComparison[],
+): OverallBodyProgressState {
+  const confident = comparisons.filter((comparison) => comparison.state !== "uncertain");
+  if (confident.length === 0) return "insufficient_data";
+  const improved = confident.filter((comparison) => comparison.state === "improved").length;
+  const needsAttention = confident.filter(
+    (comparison) => comparison.state === "declined_or_less_balanced",
+  ).length;
+  if (improved > needsAttention) return "improved";
+  if (needsAttention > improved) return "needs_attention";
+  return "stable";
 }

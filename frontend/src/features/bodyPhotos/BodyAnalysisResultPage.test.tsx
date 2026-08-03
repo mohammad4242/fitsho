@@ -135,6 +135,43 @@ const analysis: BodyAnalysis = {
   photo_validation: null,
   created_at: "2026-08-03T10:00:00Z",
   completed_at: "2026-08-03T10:01:00Z",
+  visual_result: {
+    assessment_status: "complete",
+    photo_quality: {
+      front: { usable: true, issues_fa: [] },
+      side: { usable: true, issues_fa: [] },
+      back: { usable: true, issues_fa: [] },
+      global_limitations_fa: [],
+    },
+    overall_assessment: {
+      development_pattern: "mixed",
+      shoulder_to_waist_taper: "moderate",
+      upper_lower_balance: "balanced",
+      summary_fa: "Visible proportions were reviewed across the three available views.",
+    },
+    goal_suggestion: {
+      suggested_goal: "build_muscle",
+      reasoning_fa: "The current goal and visible proportions support a muscle-building focus.",
+      inputs_unavailable_fa: ["Shoulder circumference was not recorded."],
+    },
+    findings: ([
+      "shoulders", "chest", "back", "lats", "arms", "forearms", "waist_midsection",
+      "glutes", "quads", "hamstrings", "calves", "symmetry", "visible_alignment_or_posture",
+    ] as const).map((area) => ({
+      area,
+      front: { rating: "average" as const, evidence_fa: "Front view is usable for a visual comparison." },
+      side: { rating: "average" as const, evidence_fa: "Side view is usable for a visual comparison." },
+      back: { rating: "average" as const, evidence_fa: "Back view is usable for a visual comparison." },
+      overall_rating: area === "lats" ? "focus_priority" as const : "average" as const,
+      overall_summary_fa: "This area is assessed relative to the visible physique.",
+      confidence: 0.8,
+      suggested_training_emphasis: area === "lats" ? ["lat_width"] : [],
+    })),
+    medical_review_recommended: false,
+    human_coach_review_required: true,
+    human_doctor_review_required: true,
+    provisional_notice_fa: "This assessment is provisional.",
+  },
 };
 
 function renderPage() {
@@ -170,6 +207,16 @@ it("shows protected thumbnails, confidence, four labeled finding groups, and rev
   expect(screen.getByLabelText(/doctor review pending/i)).toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent(/not yet been approved by both/i);
   expect(screen.getByRole("link", { name: /view workout plan/i })).toHaveAttribute("href", "/workout-plan");
+});
+
+it("shows the v3 goal suggestion and three-view assessment checklist", async () => {
+  renderPage();
+
+  expect(await screen.findByRole("heading", { name: "Muscle-building focus" })).toBeInTheDocument();
+  expect(screen.getByText(/shoulder circumference was not recorded/i)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: /three-view checklist/i })).toBeInTheDocument();
+  expect(screen.getAllByText(/front/i).length).toBeGreaterThan(1);
+  expect(screen.getByText(/focus priority/i)).toBeInTheDocument();
 });
 
 it("shows limitations and never presents a medical diagnosis", async () => {

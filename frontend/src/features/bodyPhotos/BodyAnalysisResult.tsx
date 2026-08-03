@@ -4,6 +4,7 @@ import type {
   BodyAnalysis,
   BodyAnalysisClassification,
   BodyAnalysisFinding,
+  VisualPhysiqueAssessmentV3,
 } from "./types";
 import { SpecialistReviewStatus } from "./SpecialistReviewStatus";
 
@@ -53,6 +54,10 @@ export function BodyAnalysisResult({ analysis }: { analysis: BodyAnalysis }) {
         </section>
       )}
 
+      {isV3Checklist(analysis.visual_result) && (
+        <ChecklistAssessment assessment={analysis.visual_result} />
+      )}
+
       <section className="body-analysis-reviews" aria-labelledby="body-analysis-reviews-title">
         <h2 id="body-analysis-reviews-title">{t("bodyPhotos.results.reviewTitle")}</h2>
         <div>
@@ -81,6 +86,71 @@ export function BodyAnalysisResult({ analysis }: { analysis: BodyAnalysis }) {
       </aside>
     </div>
   );
+}
+
+function ChecklistAssessment({ assessment }: { assessment: VisualPhysiqueAssessmentV3 }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <section className="body-goal-suggestion" aria-labelledby="body-goal-suggestion-title">
+        <div className="body-goal-suggestion__badge" aria-hidden="true">✦</div>
+        <div>
+          <p className="eyebrow eyebrow--accent">{t("bodyPhotos.results.goalSuggestionEyebrow")}</p>
+          <h2 id="body-goal-suggestion-title">
+            {t(`bodyPhotos.results.suggestedGoals.${assessment.goal_suggestion.suggested_goal}`)}
+          </h2>
+          <p>{assessment.goal_suggestion.reasoning_fa}</p>
+          {assessment.goal_suggestion.inputs_unavailable_fa.length > 0 && (
+            <p className="body-photo-muted">
+              {t("bodyPhotos.results.missingInputs")}: {assessment.goal_suggestion.inputs_unavailable_fa.join(" · ")}
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section className="body-checklist" aria-labelledby="body-checklist-title">
+        <header>
+          <div>
+            <p className="eyebrow eyebrow--accent">{t("bodyPhotos.results.checklistEyebrow")}</p>
+            <h2 id="body-checklist-title">{t("bodyPhotos.results.checklistTitle")}</h2>
+          </div>
+          <p>{t("bodyPhotos.results.checklistHelp")}</p>
+        </header>
+        <div className="body-checklist__list">
+          {assessment.findings.map((finding) => (
+            <article className="body-checklist__area" key={finding.area}>
+              <header>
+                <div>
+                  <h3>{t(`bodyPhotos.results.areas.${finding.area}`)}</h3>
+                  <p>{finding.overall_summary_fa}</p>
+                </div>
+                <span data-rating={finding.overall_rating}>
+                  {t(`bodyPhotos.results.ratings.${finding.overall_rating}`)}
+                </span>
+              </header>
+              <dl>
+                {(["front", "side", "back"] as const).map((view) => (
+                  <div key={view}>
+                    <dt>{t(`bodyPhotos.views.${view}`)}</dt>
+                    <dd data-rating={finding[view].rating}>
+                      <strong>{t(`bodyPhotos.results.ratings.${finding[view].rating}`)}</strong>
+                      <span>{finding[view].evidence_fa}</span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function isV3Checklist(
+  assessment: BodyAnalysis["visual_result"],
+): assessment is VisualPhysiqueAssessmentV3 {
+  return assessment !== null && assessment !== undefined && "goal_suggestion" in assessment;
 }
 
 function FindingGroup({
