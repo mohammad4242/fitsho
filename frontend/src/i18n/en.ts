@@ -529,7 +529,7 @@ const en = {
       },
       clothingTitle: "Clothing and coverage",
       clothingBody: "Wear athletic shorts and fitted, minimal athletic clothing that keeps the body appropriately covered while clearly showing the body’s contours. Avoid loose, oversized, layered, or patterned clothing that prevents reliable body analysis.",
-      coverage: "Minimum coverage is required: men must wear shorts; women must wear shorts and a bra. More clothing is not required. Avoid loose clothing and accessories that obscure the body.",
+      coverage: "Minimum coverage is required: men must wear men's underwear; women must wear women's underwear. More clothing is not required. Avoid loose clothing and accessories that obscure the body.",
       anonymizedPreview: "This is the head-cropped, anonymized image that will be uploaded. Your original photo is not uploaded.",
       previewAlt: "Anonymized {{view}} preview",
       retake: "Retake {{view}}",
