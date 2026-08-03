@@ -183,6 +183,8 @@ const fa = {
         searchModels: "جست‌وجوی مدل‌ها",
         search: "جست‌وجو",
         selectModel: "یک مدل انتخاب کنید",
+        selectedModels: "{{count}} مدل انتخاب شده",
+        noMatchingModels: "مدلی پیدا نشد",
         primaryModel: "مدل اصلی",
         fallbackModels: "مدل‌های جایگزین",
         selectedCapabilities: "قابلیت‌های مدل انتخاب‌شده",

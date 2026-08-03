@@ -183,6 +183,8 @@ const en = {
         searchModels: "Search models",
         search: "Search",
         selectModel: "Select a model",
+        selectedModels: "{{count}} selected",
+        noMatchingModels: "No matching models",
         primaryModel: "Primary model",
         fallbackModels: "Fallback models",
         selectedCapabilities: "Selected model capabilities",

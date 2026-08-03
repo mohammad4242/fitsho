@@ -76,8 +76,9 @@ it("shows task-specific vision models and capability details", async () => {
   const user = userEvent.setup();
   renderPage();
 
-  expect(await screen.findAllByRole("option", { name: /Vision Model/ })).toHaveLength(2);
-  await user.selectOptions(screen.getByLabelText("Primary model"), "vendor/vision-model");
+  await user.click(await screen.findByRole("combobox", { name: "Primary model" }));
+  expect(await screen.findAllByRole("option", { name: /Vision Model/ })).toHaveLength(1);
+  await user.click(screen.getByRole("option", { name: /Vision Model/ }));
   expect(screen.getByText(/Image input/)).toBeInTheDocument();
   expect(screen.getByText(/Structured output/)).toBeInTheDocument();
 });
@@ -92,7 +93,8 @@ it("requires explicit credential replacement and saves task settings", async () 
   renderPage();
 
   await user.type(await screen.findByLabelText("API key"), "sk-openrouter-secret");
-  await user.selectOptions(screen.getByLabelText("Primary model"), "vendor/vision-model");
+  await user.click(screen.getByRole("combobox", { name: "Primary model" }));
+  await user.click(screen.getByRole("option", { name: /Vision Model/ }));
   await user.click(screen.getByRole("button", { name: "Save" }));
 
   expect(api.saveAdminAiTaskConfig).toHaveBeenCalledWith(
@@ -198,7 +200,8 @@ it("ignores a stale catalog response after switching AI tasks", async () => {
   renderPage();
 
   await user.click(await screen.findByRole("button", { name: "Progress comparison" }));
-  expect(await screen.findAllByRole("option", { name: /Progress Model/ })).toHaveLength(2);
+  await user.click(screen.getByRole("combobox", { name: "Primary model" }));
+  expect(await screen.findAllByRole("option", { name: /Progress Model/ })).toHaveLength(1);
   resolveOldCatalog?.({
     refreshed_at: "2026-08-03T11:00:00Z",
     stale: false,
@@ -235,6 +238,7 @@ it("does not refresh task A's catalog after switching to task B", async () => {
 
   await user.click(await screen.findByRole("button", { name: "Refresh models" }));
   await user.click(screen.getByRole("button", { name: "Progress comparison" }));
+  await user.click(screen.getByRole("combobox", { name: "Primary model" }));
   await screen.findAllByRole("option", { name: /Vision Model/ });
   const callsBeforeResolve = api.getAdminAiTaskModels.mock.calls.length;
   resolveRefresh?.();

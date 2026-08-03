@@ -5,7 +5,7 @@ import { expect, it } from "vitest";
 import i18n from "../../i18n";
 import { AiModelSelector } from "./AiModelSelector";
 
-it("reveals a model search only after opening the selector", async () => {
+it("opens a searchable model list from the model-selection control", async () => {
   await i18n.changeLanguage("en");
   const user = userEvent.setup();
   render(
@@ -22,7 +22,9 @@ it("reveals a model search only after opening the selector", async () => {
   );
 
   expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: /GPT/ })).not.toBeInTheDocument();
   await user.click(screen.getByRole("combobox", { name: /Primary model/i }));
+  expect(screen.getByRole("listbox", { name: /Primary model/i })).toBeInTheDocument();
   await user.type(screen.getByRole("searchbox"), "claude");
   expect(screen.getByRole("option", { name: /Claude/ })).toBeInTheDocument();
   expect(screen.queryByRole("option", { name: /GPT/ })).not.toBeInTheDocument();
