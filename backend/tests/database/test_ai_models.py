@@ -1,22 +1,14 @@
-from sqlalchemy import inspect, select
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
-from app.ai.models import AiModel, AiRoutingSettings, BillingClass, RoutingMode, ZenApiKind
+from app.body_analysis.admin_config.models import AIProviderCredential, AITaskConfig
 
 
-def test_ai_model_migration_seeds_documented_nemotron_default(db: Session) -> None:
+def test_ai_task_configuration_tables_are_present(db: Session) -> None:
     inspector = inspect(db.connection())
 
-    assert "ai_models" in inspector.get_table_names()
-    assert "ai_routing_settings" in inspector.get_table_names()
+    assert AIProviderCredential.__tablename__ in inspector.get_table_names()
+    assert AITaskConfig.__tablename__ in inspector.get_table_names()
 
-    model = db.scalar(select(AiModel).where(AiModel.model_id == "nemotron-3-ultra-free"))
-    settings = db.get(AiRoutingSettings, 1)
-
-    assert model is not None
-    assert model.api_kind is ZenApiKind.CHAT_COMPLETIONS
-    assert model.billing_class is BillingClass.FREE
-    assert model.is_enabled is True
-    assert settings is not None
-    assert settings.mode is RoutingMode.MANUAL
-    assert settings.manual_model_id == model.id
+    assert AIProviderCredential.__table__.c.encrypted_api_key.nullable is False
+    assert AITaskConfig.__table__.c.primary_model_id.nullable is True

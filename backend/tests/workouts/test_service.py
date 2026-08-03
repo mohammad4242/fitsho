@@ -5,8 +5,6 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.orm import Session
 
-from app.ai.fake_provider import FakeWorkoutPlanModelProvider
-from app.ai.routing import ModelProviderCandidate
 from app.auth.models import User
 from app.body_analysis.enums import BodyAnalysisStatus
 from app.body_analysis.models import BodyAnalysis
@@ -134,18 +132,11 @@ def _seed_candidates(db: Session) -> list[Exercise]:
 def _service(
     db: Session,
     *,
-    provider: FakeWorkoutPlanModelProvider | None = None,
     cooldown_seconds: int = 0,
     body_analysis_resolver: BodyAnalysisInfluenceResolver | None = None,
 ) -> WorkoutGenerationService:
-    providers = (
-        (ModelProviderCandidate(model_id="legacy-model", provider=provider),)
-        if provider is not None
-        else ()
-    )
     return WorkoutGenerationService(
         db,
-        providers=providers,
         settings=WorkoutGenerationSettings(
             provider_name="fitsho_domain",
             model_id="program_engine_v1",
@@ -213,15 +204,14 @@ def test_generation_persists_valid_snapshot_then_reuses_signature(db: Session) -
     assert first.plan.days[0].title_fa == "روز 1: سینه + زیربغل + چهارسر + پشت پا + شکم"
 
 
-def test_generation_never_calls_legacy_model_provider(db: Session) -> None:
+def test_generation_uses_the_deterministic_domain_engine(db: Session) -> None:
     user = _user_with_profile(db)
     _seed_candidates(db)
-    provider = FakeWorkoutPlanModelProvider([])
 
-    result = asyncio.run(_service(db, provider=provider).generate(user.id))
+    result = asyncio.run(_service(db).generate(user.id))
 
     assert result.plan.status is WorkoutPlanStatus.ACTIVE
-    assert provider.calls == []
+    assert result.plan.generation_method == "deterministic_domain"
     assert result.plan.generation_method == "deterministic_domain"
 
 
@@ -414,10 +404,7 @@ def test_plan_persists_provisional_body_analysis_provenance(db: Session) -> None
 
     assert result.plan.body_analysis_provenance["source"] == "ai_provisional"
     assert result.plan.body_analysis_provenance["provisional"] is True
-    assert any(
-        item["stage"] == "body_analysis_influence"
-        for item in result.plan.decision_trace
-    )
+    assert any(item["stage"] == "body_analysis_influence" for item in result.plan.decision_trace)
 
 
 def test_specialist_correction_changes_signature_and_marks_active_plan_stale(

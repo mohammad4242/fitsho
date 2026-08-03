@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime, timedelta
 from enum import Enum
 from math import ceil
 from time import perf_counter
-from typing import TYPE_CHECKING, cast
+from typing import cast
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -17,9 +17,6 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.ai.schemas import (
     ProviderErrorCode,
-    WorkoutGenerationModelRequest,
-    WorkoutGenerationModelResponse,
-    WorkoutPlanModelOutput,
     WorkoutProviderError,
 )
 from app.body_analysis.providers import ProviderRoutingPreferences
@@ -82,14 +79,10 @@ from app.workouts.schemas import CandidateSet, ProgramGenerationOverrides, Worko
 from app.workouts.signature import normalize_physical_limitations
 from app.workouts.time_budget import (
     ExerciseTiming,
-    WorkoutGenerationPolicy,
     calculate_day_minutes,
     calculate_exercise_minutes,
 )
-from app.workouts.validator import WorkoutPlanValidationError, WorkoutPlanValidator
-
-if TYPE_CHECKING:
-    from app.ai.routing import ModelProviderCandidate
+from app.workouts.validator import WorkoutPlanValidationError
 
 
 @dataclass(frozen=True)
@@ -160,14 +153,12 @@ class WorkoutGenerationService:
         self,
         db: Session,
         *,
-        providers: tuple[ModelProviderCandidate, ...] = (),
         ai_coach_provider: OpenRouterAiCoachProvider | None = None,
         settings: WorkoutGenerationSettings,
         ruleset: ProgramRuleset = RULESET,
         body_analysis_resolver: BodyAnalysisInfluenceResolver | None = None,
     ) -> None:
         self._db = db
-        self._providers = providers
         self._ai_coach_provider = ai_coach_provider
         self._settings = settings
         self._ruleset = ruleset
@@ -185,9 +176,7 @@ class WorkoutGenerationService:
             self._body_analysis_resolver.resolve(user_id), self._ruleset
         )
         try:
-            request = self._to_program_request(
-                source_profile, overrides, body_analysis_influence
-            )
+            request = self._to_program_request(source_profile, overrides, body_analysis_influence)
         except ValidationError as error:
             raise ProgramGenerationRejectedError("INVALID_PROFILE_INPUT") from error
         catalog = self._load_catalog()
@@ -355,11 +344,13 @@ class WorkoutGenerationService:
             for candidate in library_candidates
         )
         profile_payload = self._ai_coach_profile_payload(profile, body_analysis)
-        request_size = len(json.dumps(
-            {"profile": profile_payload, "candidate_programs": payloads},
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ).encode())
+        request_size = len(
+            json.dumps(
+                {"profile": profile_payload, "candidate_programs": payloads},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode()
+        )
         if request_size > self._settings.max_request_bytes:
             raise WorkoutGenerationFailedError(error_code="request_too_large")
         generation = self._start_generation(user_id, len(library_candidates))
@@ -525,117 +516,6 @@ class WorkoutGenerationService:
             ),
         }
 
-    async def _generate_valid_ai_response(
-        self,
-        request: WorkoutGenerationModelRequest,
-        candidates: CandidateSet,
-        policy: WorkoutGenerationPolicy,
-        required_day_count: int,
-    ) -> tuple[str, WorkoutGenerationModelResponse]:
-        validator = WorkoutPlanValidator(
-            candidates=candidates, policy=policy, required_day_count=required_day_count
-        )
-        last_error: WorkoutProviderError | WorkoutPlanValidationError | None = None
-        for candidate in self._providers:
-            try:
-                response = await candidate.provider.generate_plan(request)
-                try:
-                    validator.validate(response.plan)
-                    return candidate.model_id, response
-                except WorkoutPlanValidationError as initial_error:
-                    if self._settings.max_repair_attempts < 1:
-                        last_error = initial_error
-                        continue
-                    repaired = await candidate.provider.generate_plan(
-                        replace(
-                            request,
-                            input_payload={
-                                **request.input_payload,
-                                "repair": {
-                                    "instruction": (
-                                        "Return the complete plan again using the same "
-                                        "allowed exercises."
-                                    ),
-                                    "validation_problems": [
-                                        problem.to_repair_payload()
-                                        for problem in initial_error.problems
-                                    ],
-                                },
-                            },
-                        )
-                    )
-                    validator.validate(repaired.plan)
-                    return candidate.model_id, repaired
-            except (WorkoutProviderError, WorkoutPlanValidationError) as error:
-                last_error = error
-        if last_error is not None:
-            raise last_error
-        raise WorkoutProviderError(
-            ProviderErrorCode.PROVIDER_UNAVAILABLE,
-            "Workout generation is unavailable. Please try again.",
-        )
-
-    def _build_ai_plan(
-        self,
-        *,
-        user_id: UUID,
-        signature: str,
-        profile_snapshot: dict[str, object],
-        candidate_set_hash: str,
-        response: WorkoutPlanModelOutput,
-        policy: WorkoutGenerationPolicy,
-        model_id: str,
-    ) -> WorkoutPlan:
-        plan = WorkoutPlan(
-            user_id=user_id,
-            status=WorkoutPlanStatus.GENERATING,
-            generation_signature=signature,
-            profile_snapshot=profile_snapshot,
-            provider=self._settings.provider_name,
-            model_id=model_id,
-            prompt_version=self._settings.prompt_version,
-            generation_policy_version=self._settings.generation_policy_version,
-            candidate_set_hash=candidate_set_hash,
-            generation_method="ai",
-        )
-        for output_day in response.days:
-            timings = [
-                ExerciseTiming(sets=item.sets, rest_seconds=item.rest_seconds)
-                for item in output_day.exercises
-            ]
-            day = WorkoutDay(
-                day_number=output_day.day_number,
-                title_en=output_day.title_en,
-                title_fa=output_day.title_fa,
-                estimated_duration_minutes=policy.warmup_minutes + calculate_day_minutes(timings),
-            )
-            for order_index, item in enumerate(output_day.exercises, start=1):
-                day.exercises.append(
-                    WorkoutPlanExercise(
-                        exercise_id=item.exercise_id,
-                        order_index=order_index,
-                        sets=item.sets,
-                        reps_min=item.reps_min,
-                        reps_max=item.reps_max,
-                        rest_seconds=item.rest_seconds,
-                        rir=item.rir,
-                        estimated_minutes=calculate_exercise_minutes(
-                            ExerciseTiming(item.sets, item.rest_seconds)
-                        ),
-                        notes_en=item.notes_en,
-                        notes_fa=item.notes_fa,
-                    )
-                )
-            plan.days.append(day)
-        return plan
-
-    @staticmethod
-    def _profile_snapshot(request: WorkoutGenerationModelRequest) -> dict[str, object]:
-        profile = request.input_payload.get("profile")
-        if not isinstance(profile, dict):
-            raise ValueError("Workout profile payload is invalid")
-        return dict(profile)
-
     def _to_generation_profile(self, source: ProfileSnapshot) -> WorkoutGenerationProfile:
         profile = source.profile
         return WorkoutGenerationProfile(
@@ -658,25 +538,6 @@ class WorkoutGenerationService:
             sex=profile.sex,
             height_cm=profile.height_cm,
         )
-
-    def _ai_generation_signature(
-        self, profile: WorkoutGenerationProfile, candidates: CandidateSet
-    ) -> str:
-        payload = {
-            "profile": {
-                "goal": str(profile.fitness_goal),
-                "experience": profile.experience_level.value,
-                "days": profile.training_days_per_week,
-                "duration": profile.session_duration_minutes,
-                "plan_weeks": profile.plan_duration_weeks,
-                "cautions": [item.value for item in profile.training_cautions],
-            },
-            "candidate_set_hash": candidates.candidate_set_hash,
-            "method": "ai",
-            "model": self._settings.model_id,
-            "prompt": self._settings.prompt_version,
-        }
-        return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
     def _start_generation(self, user_id: UUID, candidate_count: int) -> WorkoutPlanGeneration:
         try:
@@ -979,9 +840,7 @@ class WorkoutGenerationService:
                 profile=profile,
                 eligible_exercise_ids=frozenset(eligible_exercises.ids),
             )
-            signature = self._ai_coach_generation_signature(
-                profile, candidates, eligible_exercises
-            )
+            signature = self._ai_coach_generation_signature(profile, candidates, eligible_exercises)
             return ActiveWorkoutPlanResult(
                 plan=plan,
                 is_stale=plan.generation_signature != signature or self._is_plan_expired(plan),
