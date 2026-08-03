@@ -25,7 +25,12 @@ from app.body_analysis.models import (
     BodyAnalysisReview,
     UserSpecialistRole,
 )
-from app.body_analysis.normalization import MedicalClaimError, normalize_body_analysis
+from app.body_analysis.normalization import (
+    MedicalClaimError,
+    normalize_body_analysis,
+    normalize_visual_physique_assessment,
+    visual_assessment_to_normalized,
+)
 from app.body_analysis.providers import (
     AIProvider,
     AIProviderError,
@@ -40,6 +45,7 @@ from app.body_analysis.schemas import (
     BodyPhotoPreflight,
     BodyPhotoValidationIssue,
     NormalizedBodyAnalysis,
+    VisualPhysiqueAssessmentPayload,
 )
 from app.body_photos.enums import BodyPhotoSessionState, BodyPhotoView
 from app.body_photos.models import BodyPhoto, BodyPhotoSession
@@ -114,14 +120,77 @@ class EffectiveBodyAnalysisResult:
         return "ai_only"
 
 
-_ANALYSIS_PROMPT = """You analyze only visible muscular development, proportions, and visible
-asymmetry using the three processed head-cropped body views. Do not diagnose disease, injury,
-deformity, posture disorders, or medical conditions. Do not infer identity, ethnicity,
-personality, or actual muscular strength. Account for lighting, pose, body fat, clothing,
-perspective, and visibility. Use 'visibly developed', 'relatively lagging', or 'uncertain'.
-Do not invent findings. Return lower confidence and uncertain when evidence is insufficient.
-The result is provisional and requires coach and doctor review. Return only the requested JSON.
-"""
+_ANALYSIS_PROMPT = """You are Fitsho's conservative visual physique-development assessor.
+Reproduce the structured visual review process of an experienced in-person physique coach while
+remaining strictly limited to what is visibly supported by the three processed, head-cropped body
+photos labelled front, side, and back. Review all views internally before producing JSON. Do not
+reveal intermediate reasoning.
+
+Provide a non-medical visual coaching assessment of visible muscular development, proportional
+balance, shoulder-to-waist taper, upper-to-lower-body balance, and clearly visible left-right
+differences. This is only a provisional input for future training personalization; never create a
+workout program.
+
+Do not infer age, sex, gender, identity, ethnicity, body-fat percentage, health, diagnosis, pain,
+injury, mobility, physical strength, training history, genetics, the cause of an asymmetry, or
+whether a visible difference persists outside the photo. Do not diagnose posture or a medical
+condition. Do not recommend medical care, rehabilitation, exercises, sets, repetitions, loads,
+frequency, or volume. A classification of strength means only visually more developed or
+proportionally prominent relative to this person's other visible body areas; it never means actual
+physical strength.
+
+Compare areas primarily with this same person's other visible areas, never with the general
+population, athletes, fitness models, ideals, or demographic groups. Use visible size, contour,
+width, thickness, and proportion. Do not require sharp definition, separation, vascularity, or low
+body fat to make a relative visual assessment. Soft definition alone is never a reason to use
+uncertain. Use uncertain only when framing, clothing, lighting, perspective, pose, or occlusion
+genuinely prevents a responsible comparison. When an area appears in multiple views, cross-check
+it and prefer the clearest, most neutral view. Do not invent findings. Use neutral when an area is
+assessable but has no meaningful relative strength or lag.
+
+Scan these areas in this exact order: shoulders, chest, back, lats, arms, forearms,
+waist_midsection, glutes, quads, hamstrings, calves, symmetry, visible_alignment_or_posture.
+In the front view assess shoulder width and deltoids, chest, arms and forearms, waist, quads,
+calves, and visible image-left versus image-right differences. In the side view assess chest depth,
+arm profile, torso-to-waist proportion, glute profile, quad and hamstring profile, and calf
+profile. A phone is a limitation only when it materially hides the relevant tissue. In the back
+view assess rear delts, upper and mid-back thickness, lat width, arms, waist taper, glutes,
+hamstrings, calves, and visible side-to-side differences.
+
+Classify every area exactly once. Use strength only when it is visibly more developed or
+proportionally prominent relative to this person's other assessable areas. Use neutral when it is
+assessable with no meaningful relative strength or lag. Use mild_lag for a smaller but credible
+proportional gap. Use clear_lag sparingly for a noticeable, actionable proportional gap, normally
+supported by two views when the area is visible in two views. Use uncertain only when it cannot be
+responsibly compared from the available views. Do not return an all-uncertain result when multiple
+body regions are clearly visible. Do not force strengths or lags: a genuinely balanced visible area
+is neutral.
+
+For symmetry, report only obvious image-left versus image-right differences. Never call either
+side the person's anatomical left or right. Ignore small differences reasonably explained by camera
+angle, phone position, stance, rotation, or lighting. For visible_alignment_or_posture, describe
+only a clear snapshot observation. Never name a condition, infer pain or mobility, explain the
+cause, or claim persistence. Use neutral when there is no clear observation.
+
+Return only valid JSON matching the supplied schema and do not add fields. Set assessment_status
+to complete when all three views are usable and partial when exactly two are usable. In
+photo_quality record each view's usable state and concise Persian limitations. In
+overall_assessment provide the allowed proportional labels and a concise Persian summary. Return
+exactly 13 findings using these
+area values: shoulders, chest, back, lats, arms, forearms, waist_midsection, glutes, quads,
+hamstrings, calves, symmetry, visible_alignment_or_posture. For every finding, write evidence_fa in
+concise, natural Persian. Name the visible comparison and supporting view or views, describe only
+observable evidence, and avoid motivational filler. For mild_lag and clear_lag set severity between
+0 and 1; for strength, neutral, uncertain, and not_assessable set severity to null.
+
+Only mild_lag and clear_lag may contain suggested_training_emphasis. Use only values directly
+supported by the affected area: shoulders -> overall_shoulders, lateral_delts, and/or rear_delts;
+chest -> overall_chest and/or upper_chest; back -> upper_back and/or mid_back; lats -> lat_width;
+arms -> overall_arms, biceps, and/or triceps; forearms -> forearms; waist_midsection ->
+trunk_musculature; glutes -> glutes; quads -> quads; hamstrings -> hamstrings; calves -> calves.
+For symmetry use left_right_balance only when it is a lag. For visible_alignment_or_posture leave
+suggested_training_emphasis empty. Never provide exercises or programming instructions. The result
+is provisional and requires human coach and doctor review."""
 
 _PHOTO_PREFLIGHT_PROMPT = """You validate three processed, head-cropped body photos before
 any body-development analysis. Check each labelled view for exactly one visible person, full
@@ -136,8 +205,10 @@ only when people or objects materially hide body regions or make the requested v
 Count only real people in the foreground: ignore people shown in posters, wall art, mirrors, gym
 branding, screens, or other background imagery. Do not infer nudity, identity, health, or body
 composition. Reject only when the evidence clearly fails a listed requirement; when uncertain,
-use photo_uncertain rather than guessing. If any view is rejected, do not analyze muscular
-development. Return only the requested JSON."""
+use photo_uncertain rather than guessing. Set accepted to true when at least two views are usable;
+when one view is unusable, include its view-specific reasons in issues so the later assessment can
+be partial. Set accepted to false only when fewer than two views are usable. Return only the
+requested JSON."""
 
 
 class BodyAnalysisService:
@@ -303,15 +374,27 @@ class BodyAnalysisService:
             if not preflight.accepted:
                 self._record_photo_rejection(analysis, preflight, preflight_response)
                 return self._analysis(analysis_id)
+            rejected_views = {issue.view for issue in preflight.issues}
+            analysis_images = tuple(
+                image for image in image_inputs if BodyPhotoView(image.label) not in rejected_views
+            )
+            if len(analysis_images) < 2:
+                raise BodyAnalysisInputError("fewer than two photos are usable for analysis")
             analysis.status = BodyAnalysisStatus.ANALYZING
             analysis.session.state = BodyPhotoSessionState.ANALYZING
             self._db.commit()
 
             response = await provider.analyze_images(
                 self._request(execution_config),
-                images=image_inputs,
+                images=analysis_images,
             )
-            normalized = normalize_body_analysis(response.payload)
+            visual_result = None
+            if execution_config.schema_version == "2.0":
+                visual = normalize_visual_physique_assessment(response.payload)
+                normalized = visual_assessment_to_normalized(visual)
+                visual_result = visual.model_dump(mode="json")
+            else:
+                normalized = normalize_body_analysis(response.payload)
             if normalized.schema_version != execution_config.schema_version:
                 raise BodyAnalysisInputError("unexpected analysis schema version")
             if normalized.overall_confidence < execution_config.minimum_confidence:
@@ -324,6 +407,7 @@ class BodyAnalysisService:
                 "analysis": response.payload,
             }
             analysis.normalized_result = normalized.model_dump(mode="json")
+            analysis.visual_result = visual_result
             analysis.overall_confidence = normalized.overall_confidence
             analysis.model_id = response.model_id
             analysis.provider_request_id = response.provider_request_id
@@ -347,6 +431,7 @@ class BodyAnalysisService:
                     version=1,
                     source=BodyAnalysisResultSource.AI,
                     normalized_result=normalized.model_dump(mode="json"),
+                    visual_result=visual_result,
                     overall_confidence=normalized.overall_confidence,
                 )
             )
@@ -478,6 +563,7 @@ class BodyAnalysisService:
                 version=current.version + 1,
                 source=BodyAnalysisResultSource(submission.role.value),
                 normalized_result=corrected.model_dump(mode="json"),
+                visual_result=current.visual_result,
                 overall_confidence=corrected.overall_confidence,
                 created_by_user_id=reviewer_id,
             )
@@ -485,6 +571,7 @@ class BodyAnalysisService:
             self._db.flush()
             current = replacement
             analysis.normalized_result = corrected.model_dump(mode="json")
+            analysis.visual_result = current.visual_result
             analysis.overall_confidence = corrected.overall_confidence
         review = BodyAnalysisReview(
             analysis_id=analysis.id,
@@ -628,8 +715,16 @@ class BodyAnalysisService:
                 "task": "analyze_processed_body_views",
                 "schema_version": config.schema_version,
             },
-            response_schema=NormalizedBodyAnalysis.model_json_schema(),
-            schema_name="fitsho_body_analysis",
+            response_schema=(
+                VisualPhysiqueAssessmentPayload.model_json_schema()
+                if config.schema_version == "2.0"
+                else NormalizedBodyAnalysis.model_json_schema()
+            ),
+            schema_name=(
+                "fitsho_physique_assessment_v2"
+                if config.schema_version == "2.0"
+                else "fitsho_body_analysis"
+            ),
             route=ModelRoute(
                 primary_model=config.primary_model,
                 fallback_models=config.fallback_models,

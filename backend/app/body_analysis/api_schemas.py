@@ -11,7 +11,11 @@ from app.body_analysis.enums import (
     BodyAnalysisReviewerRole,
     BodyAnalysisStatus,
 )
-from app.body_analysis.schemas import BodyPhotoPreflight, NormalizedBodyAnalysis
+from app.body_analysis.schemas import (
+    BodyPhotoPreflight,
+    NormalizedBodyAnalysis,
+    VisualPhysiqueAssessment,
+)
 
 
 class SpecialistReviewState(BaseModel):
@@ -32,6 +36,7 @@ class BodyAnalysisResponse(BaseModel):
     result_version: int | None
     result_source: BodyAnalysisResultSource | None
     normalized_result: NormalizedBodyAnalysis | None
+    visual_result: VisualPhysiqueAssessment | None
     overall_confidence: float | None
     coach_review: SpecialistReviewState
     doctor_review: SpecialistReviewState
@@ -69,6 +74,7 @@ class BodyAnalysisResultVersionResponse(BaseModel):
     version: int
     source: BodyAnalysisResultSource
     normalized_result: NormalizedBodyAnalysis
+    visual_result: VisualPhysiqueAssessment | None
     overall_confidence: float
     created_by_user_id: UUID | None
     created_at: datetime

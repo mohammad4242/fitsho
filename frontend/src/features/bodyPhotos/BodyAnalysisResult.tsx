@@ -40,6 +40,19 @@ export function BodyAnalysisResult({ analysis }: { analysis: BodyAnalysis }) {
         <p>{t("bodyPhotos.results.confidenceHelp")}</p>
       </section>
 
+      {analysis.visual_result !== null && analysis.visual_result !== undefined && (
+        <section className="body-analysis-overview" aria-labelledby="body-analysis-coach-title">
+          <div>
+            <p className="eyebrow eyebrow--accent">{t("bodyPhotos.results.coachAssessment")}</p>
+            <h2 id="body-analysis-coach-title">
+              {t(`bodyPhotos.results.assessmentStatus.${analysis.visual_result.assessment_status}`)}
+            </h2>
+          </div>
+          <p>{analysis.visual_result.overall_assessment.summary_fa}</p>
+          <p className="body-photo-muted">{analysis.visual_result.provisional_notice_fa}</p>
+        </section>
+      )}
+
       <section className="body-analysis-reviews" aria-labelledby="body-analysis-reviews-title">
         <h2 id="body-analysis-reviews-title">{t("bodyPhotos.results.reviewTitle")}</h2>
         <div>

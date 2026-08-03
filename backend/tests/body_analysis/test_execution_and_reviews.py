@@ -32,6 +32,7 @@ from app.body_analysis.providers import (
 )
 from app.body_analysis.runtime import _validate_budget_preflight
 from app.body_analysis.service import (
+    _ANALYSIS_PROMPT,
     _PHOTO_PREFLIGHT_PROMPT,
     AnalysisExecutionConfig,
     BodyAnalysisService,
@@ -533,6 +534,17 @@ def test_photo_preflight_allows_fitted_clothing_and_nonblocking_backgrounds() ->
     assert "Do not reject a photo merely because its background is a gym or a room" in (
         normalized_prompt
     )
+
+
+def test_analysis_prompt_requires_a_full_schema_compatible_coach_scan() -> None:
+    normalized_prompt = " ".join(_ANALYSIS_PROMPT.split())
+
+    assert "Return exactly 13 findings" in normalized_prompt
+    assert "visible_alignment_or_posture" in normalized_prompt
+    assert "not_assessable" in normalized_prompt
+    assert "photo_quality" in normalized_prompt
+    assert "all-uncertain" in normalized_prompt
+    assert "natural Persian" in normalized_prompt
 
 
 def test_retry_rejects_nonlatest_revision(db: Session) -> None:

@@ -627,6 +627,8 @@ const en = {
         unverifiedWarning: "This body analysis has not yet been approved by both a coach and a doctor. Any workout personalization based on it is provisional.",
         confidenceLabel: "Overall confidence",
         confidenceHelp: "Confidence reflects photo visibility and consistency, not medical certainty.",
+        coachAssessment: "Coach visual summary",
+        assessmentStatus: { complete: "Complete assessment", partial: "Two-view assessment" },
         reviewTitle: "Specialist review",
         reviewAria: "{{role}} review {{state}}",
         reviewRoles: { coach: "Coach", doctor: "Doctor" },

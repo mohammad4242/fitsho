@@ -88,6 +88,7 @@ class BodyAnalysis(Base):
     )
     raw_result: Mapped[dict[str, object] | None] = mapped_column(JSON)
     normalized_result: Mapped[dict[str, object] | None] = mapped_column(JSON)
+    visual_result: Mapped[dict[str, object] | None] = mapped_column(JSON)
     overall_confidence: Mapped[float | None] = mapped_column(Float)
     error_code: Mapped[str | None] = mapped_column(String(80))
     error_message: Mapped[str | None] = mapped_column(String(500))
@@ -161,6 +162,7 @@ class BodyAnalysisResultVersion(Base):
         nullable=False,
     )
     normalized_result: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    visual_result: Mapped[dict[str, object] | None] = mapped_column(JSON)
     overall_confidence: Mapped[float] = mapped_column(Float, nullable=False)
     created_by_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")

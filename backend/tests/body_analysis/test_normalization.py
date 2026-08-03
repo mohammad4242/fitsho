@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import UniqueConstraint
 
+import app.body_analysis.normalization as normalization
 from app.body_analysis.enums import (
     BodyAnalysisClassification,
     BodyAnalysisStatus,
@@ -64,6 +65,61 @@ def test_normalizes_provider_independent_analysis() -> None:
     assert result.findings[1].severity is None
     assert result.requires_coach_review is True
     assert result.requires_doctor_review is True
+
+
+def test_normalizes_schema_v2_visual_assessment_and_derives_legacy_projection() -> None:
+    areas = [
+        "shoulders",
+        "chest",
+        "back",
+        "lats",
+        "arms",
+        "forearms",
+        "waist_midsection",
+        "glutes",
+        "quads",
+        "hamstrings",
+        "calves",
+        "symmetry",
+        "visible_alignment_or_posture",
+    ]
+    payload = {
+        "assessment_status": "complete",
+        "photo_quality": {
+            "front": {"usable": True, "issues_fa": []},
+            "side": {"usable": True, "issues_fa": []},
+            "back": {"usable": True, "issues_fa": []},
+            "global_limitations_fa": [],
+        },
+        "overall_assessment": {
+            "development_pattern": "mixed",
+            "shoulder_to_waist_taper": "moderate",
+            "upper_lower_balance": "balanced",
+            "summary_fa": "تناسب کلی بدن در نماهای موجود بررسی شد.",
+        },
+        "findings": [
+            {
+                "area": area,
+                "classification": "clear_lag" if area == "lats" else "neutral",
+                "severity": 0.72 if area == "lats" else None,
+                "confidence": 0.8,
+                "views_used": ["back"],
+                "evidence_fa": "شواهد صرفاً از نمای قابل مشاهده ثبت شده است.",
+                "suggested_training_emphasis": ["lat_width"] if area == "lats" else [],
+            }
+            for area in areas
+        ],
+    }
+
+    visual = normalization.normalize_visual_physique_assessment(payload)
+    legacy = normalization.visual_assessment_to_normalized(visual)
+
+    assert visual.human_coach_review_required is True
+    assert visual.medical_review_recommended is False
+    assert len(visual.findings) == 13
+    assert legacy.schema_version == "2.0"
+    assert legacy.summary.priority_areas == ("lats",)
+    assert legacy.findings[3].suggested_training_emphasis == ("back_width",)
 
 
 def test_rejects_unrecognized_body_area() -> None:

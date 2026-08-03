@@ -627,6 +627,8 @@ const fa = {
         unverifiedWarning: "این تحلیل بدن هنوز توسط هر دو متخصص، مربی و پزشک، تأیید نشده است. هر شخصی‌سازی برنامه بر پایه آن موقت محسوب می‌شود.",
         confidenceLabel: "اطمینان کلی",
         confidenceHelp: "این عدد میزان وضوح و هماهنگی عکس‌ها را نشان می‌دهد، نه قطعیت پزشکی.",
+        coachAssessment: "جمع‌بندی بصری مربی",
+        assessmentStatus: { complete: "ارزیابی کامل", partial: "ارزیابی با دو نما" },
         reviewTitle: "بازبینی متخصصان",
         reviewAria: "بازبینی {{role}}: {{state}}",
         reviewRoles: { coach: "مربی", doctor: "پزشک" },

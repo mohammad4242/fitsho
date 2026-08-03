@@ -120,6 +120,39 @@ export type NormalizedBodyAnalysis = {
   requires_doctor_review: true;
 };
 
+export type VisualAssessmentStatus = "complete" | "partial";
+
+export type VisualPhysiqueFinding = {
+  area: BodyArea;
+  classification: BodyAnalysisClassification | "not_assessable";
+  severity: number | null;
+  confidence: number;
+  views_used: BodyPhotoView[];
+  evidence_fa: string;
+  suggested_training_emphasis: string[];
+};
+
+export type VisualPhysiqueAssessment = {
+  assessment_status: VisualAssessmentStatus;
+  photo_quality: {
+    front: { usable: boolean; issues_fa: string[] };
+    side: { usable: boolean; issues_fa: string[] };
+    back: { usable: boolean; issues_fa: string[] };
+    global_limitations_fa: string[];
+  };
+  overall_assessment: {
+    development_pattern: string;
+    shoulder_to_waist_taper: string;
+    upper_lower_balance: string;
+    summary_fa: string;
+  };
+  findings: VisualPhysiqueFinding[];
+  medical_review_recommended: false;
+  human_coach_review_required: true;
+  human_doctor_review_required: true;
+  provisional_notice_fa: string;
+};
+
 export type SpecialistReviewState = {
   role: "coach" | "doctor";
   decision: "approved" | "changes_required" | "rejected" | null;
@@ -138,6 +171,7 @@ export type BodyAnalysis = {
   result_version: number | null;
   result_source: "ai" | "coach" | "doctor" | null;
   normalized_result: NormalizedBodyAnalysis | null;
+  visual_result?: VisualPhysiqueAssessment | null;
   overall_confidence: number | null;
   coach_review: SpecialistReviewState;
   doctor_review: SpecialistReviewState;
