@@ -147,7 +147,9 @@ class BodyPhotoService:
         crop_evidence_sha256: str | None,
     ) -> BodyPhotoSession:
         session = self._owner_session(session_id, user_id)
-        if session.state not in EDITABLE_STATES:
+        if session.state not in EDITABLE_STATES and not self._queued_session_has_failed_analysis(
+            session.id
+        ):
             raise BodyPhotoSessionStateError
         self._drain_pending_cleanup(session)
         normalized = validate_and_normalize(
@@ -162,6 +164,18 @@ class BodyPhotoService:
             crop_evidence_sha256=crop_evidence_sha256,
         )
         return self._store_photo(session, view, normalized)
+
+    def _queued_session_has_failed_analysis(self, session_id: UUID) -> bool:
+        from app.body_analysis.enums import BodyAnalysisStatus
+        from app.body_analysis.models import BodyAnalysis
+
+        latest_status = self._db.scalar(
+            select(BodyAnalysis.status)
+            .where(BodyAnalysis.session_id == session_id)
+            .order_by(BodyAnalysis.revision.desc())
+            .limit(1)
+        )
+        return latest_status is BodyAnalysisStatus.FAILED
 
     def _store_photo(
         self,

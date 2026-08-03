@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.body_analysis.enums import BodyAnalysisStatus
+from app.body_analysis.models import BodyAnalysis
 from app.body_photos.enums import BodyPhotoSessionState
 from app.body_photos.models import BodyPhotoSession
 from app.config import Settings
@@ -144,6 +146,39 @@ def test_photo_validation_failure_allows_replacing_only_the_rejected_view(
     payload = response.json()
     assert payload["state"] == "uploaded"
     assert [photo["view"] for photo in payload["photos"]] == ["back", "front", "side"]
+
+
+def test_queued_session_with_a_failed_analysis_allows_replacing_a_rejected_view(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _register(client, "photo-replace-queued-view@example.com")
+    created = _create_session(client)
+    session_id = created["id"]
+    for view in ("front", "side", "back"):
+        assert _upload(client, session_id, view).status_code == 200
+
+    session = db.get(BodyPhotoSession, UUID(str(session_id)))
+    assert session is not None
+    session.state = BodyPhotoSessionState.QUEUED
+    db.add(
+        BodyAnalysis(
+            session_id=session.id,
+            revision=1,
+            provider="openrouter",
+            model_id="vision-model",
+            prompt_version="body-v1",
+            schema_version="1.0",
+            status=BodyAnalysisStatus.FAILED,
+            error_code="photo_validation_failed",
+        )
+    )
+    db.commit()
+
+    response = _upload(client, session_id, "side", _png(color=(90, 80, 70)))
+
+    assert response.status_code == 200
+    assert response.json()["state"] == "uploaded"
 
 
 def test_session_routes_require_authentication_and_trusted_origin(client: TestClient) -> None:
