@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
+import { ApiError } from "../../shared/apiClient";
 import {
   BodyPhotoProcessingError,
   type BodyPhotoProcessor,
@@ -179,6 +180,28 @@ it("starts analysis immediately after a successful submission", async () => {
 
   await user.click(await screen.findByRole("button", { name: /submit photos/i }));
   await waitFor(() => expect(api.startBodyPhotoAnalysis).toHaveBeenCalledWith("session-1"));
+});
+
+it("explains that photos were submitted when body analysis cannot start", async () => {
+  const user = userEvent.setup();
+  const processor: BodyPhotoProcessor = { process: vi.fn().mockImplementation((_, view) => processed(view)) };
+  api.startBodyPhotoAnalysis.mockRejectedValue(new ApiError(503, "Body photo analysis is temporarily unavailable"));
+  renderWizard(processor);
+
+  for (const view of ["front", "side", "back"] as const) {
+    await user.upload(await screen.findByLabelText(new RegExp(`${view} photo upload`, "i")), file);
+    if (view === "front") {
+      await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
+    }
+    await user.click(screen.getByRole("button", { name: new RegExp(`confirm and upload ${view}`, "i") }));
+  }
+
+  await user.click(await screen.findByRole("button", { name: /submit photos/i }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    /photos were submitted successfully, but body analysis has not started/i,
+  );
+  expect(api.submitBodyPhotoSession).toHaveBeenCalledWith("session-1", true, false);
 });
 
 it("revokes anonymized preview URLs when a photo is replaced and on unmount", async () => {

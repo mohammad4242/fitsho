@@ -240,10 +240,16 @@ export function BodyPhotoWizard({
     try {
       const submitted = await submitBodyPhotoSession(session.id, true, modelTrainingConsent);
       setSession(submitted);
-      await startBodyPhotoAnalysis(submitted.id);
-      setState("complete");
     } catch {
       setError(t("bodyPhotos.errors.submit"));
+      setBusy(false);
+      return;
+    }
+    try {
+      await startBodyPhotoAnalysis(session.id);
+      setState("complete");
+    } catch {
+      setError(t("bodyPhotos.errors.analysisNotStarted"));
     } finally {
       setBusy(false);
     }

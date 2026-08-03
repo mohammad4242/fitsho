@@ -209,7 +209,7 @@ const en = {
           maxTokens: "300–600 is about 5–10 short lines. 600–1,200 is normal for workout selection, about 10–25 lines. 1,200–2,500 suits detailed photo analysis or a specialist summary. Increase it only when answers are cut off.",
           timeout: "Maximum wait time, not model speed. 30–60 seconds is normal. Use 60–90 seconds only for slower fallback models; longer waits make failures feel stuck.",
           confidence: "For scored body-photo analysis, 0.70–0.80 is the normal range. A higher value rejects more uncertain results. It does not currently change AI Coach's workout-template selection.",
-          cost: "Maximum allowed cost for one request. It is enforced for body-photo analysis. For other tasks it is saved for future enforcement, so set it only after reviewing the selected model's catalog pricing.",
+          cost: "Maximum allowed cost for one request. Leave blank or enter 0 for no cost limit. It is enforced for body-photo analysis. For other tasks it is saved for future enforcement, so set it only after reviewing the selected model's catalog pricing.",
           restrictions: "Comma-separated OpenRouter controls. deny_provider_data_collection asks providers not to use data for training; zero_data_retention requires no retention; require_supported_parameters avoids providers that ignore requested parameters.",
         },
         save: "Save",
@@ -574,6 +574,7 @@ const en = {
         safe_head_crop_unavailable: "Fitsho could not safely remove the complete head area. Retake the photo with your head and shoulders clearly visible.",
         upload: "The anonymized photo could not be uploaded. Try again.",
         submit: "The photo session could not be submitted. Try again.",
+        analysisNotStarted: "Photos were submitted successfully, but body analysis has not started. Check the Body photo analysis task in Admin settings.",
         load: "Photo sessions could not be loaded.",
       },
       quality: {

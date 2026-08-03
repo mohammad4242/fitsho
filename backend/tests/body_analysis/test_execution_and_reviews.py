@@ -534,3 +534,17 @@ def test_cost_ceiling_preflight_fails_closed_without_complete_catalog_pricing(db
     db.commit()
     with pytest.raises(ValueError, match="cost ceiling"):
         _validate_budget_preflight(db, task)
+
+
+def test_zero_cost_ceiling_means_no_cost_limit(db: Session) -> None:
+    task = AITaskConfig(
+        task_type=AITaskType.BODY_PHOTO_ANALYSIS,
+        provider=AIProviderName.OPENROUTER,
+        primary_model_id="vision-model",
+        enabled=True,
+        max_cost_per_request=Decimal("0"),
+    )
+    db.add(task)
+    db.commit()
+
+    _validate_budget_preflight(db, task)

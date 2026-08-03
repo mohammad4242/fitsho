@@ -79,7 +79,11 @@ def get_body_analysis_runtime(
             max_output_tokens=task.max_output_tokens,
             timeout_seconds=task.timeout_seconds,
             minimum_confidence=task.minimum_confidence,
-            max_cost_per_request=task.max_cost_per_request,
+            max_cost_per_request=(
+                task.max_cost_per_request
+                if task.max_cost_per_request and task.max_cost_per_request > 0
+                else None
+            ),
             routing_preferences=preferences,
         ),
         storage=BodyPhotoStorage(settings),
@@ -104,7 +108,7 @@ def _provider_preferences(
 
 
 def _validate_budget_preflight(db: DatabaseSession, task: AITaskConfig) -> None:
-    if task.max_cost_per_request is None:
+    if task.max_cost_per_request is None or task.max_cost_per_request == 0:
         return
     model_ids = (task.primary_model_id, *task.fallback_model_ids)
     for model_id in model_ids:
