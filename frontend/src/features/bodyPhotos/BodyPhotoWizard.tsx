@@ -42,6 +42,9 @@ export function BodyPhotoWizard({
   const processedRef = useRef(processed);
   const mountedRef = useRef(false);
   const selectionTokenRef = useRef(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const view = views[currentIndex];
   const current = processed[view] ?? null;
@@ -56,6 +59,7 @@ export function BodyPhotoWizard({
     return () => {
       mountedRef.current = false;
       selectionTokenRef.current += 1;
+      releaseCamera();
       Object.values(processedRef.current).forEach(disposeProcessedPhoto);
       processedRef.current = {};
     };
@@ -67,9 +71,14 @@ export function BodyPhotoWizard({
     back: t("bodyPhotos.pose.back"),
   }), [t]);
 
-  async function selectFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (file === undefined || busy) return;
+  useEffect(() => {
+    if (cameraOpen && videoRef.current && cameraStreamRef.current) {
+      videoRef.current.srcObject = cameraStreamRef.current;
+    }
+  }, [cameraOpen]);
+
+  async function processFile(file: File) {
+    if (busy) return;
     const selectedView = view;
     const selectionToken = ++selectionTokenRef.current;
     setBusy(true);
@@ -92,9 +101,76 @@ export function BodyPhotoWizard({
         setError(processingErrorMessage(processingError, t));
       }
     } finally {
-      event.target.value = "";
       if (mountedRef.current && selectionToken === selectionTokenRef.current) setBusy(false);
     }
+  }
+
+  function selectFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file !== undefined) void processFile(file);
+  }
+
+  async function openCamera() {
+    if (busy || cameraOpen) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError(t("bodyPhotos.errors.cameraUnavailable"));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      cameraStreamRef.current = stream;
+      setCameraOpen(true);
+    } catch {
+      setError(t("bodyPhotos.errors.cameraUnavailable"));
+    } finally {
+      if (mountedRef.current) setBusy(false);
+    }
+  }
+
+  function closeCamera() {
+    releaseCamera();
+    setCameraOpen(false);
+  }
+
+  function releaseCamera() {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }
+
+  function captureCameraPhoto() {
+    const video = videoRef.current;
+    if (video === null || video.videoWidth === 0 || video.videoHeight === 0) {
+      setError(t("bodyPhotos.errors.cameraNotReady"));
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (context === null) {
+      setError(t("bodyPhotos.errors.processing"));
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (blob === null) {
+        setError(t("bodyPhotos.errors.processing"));
+        return;
+      }
+      closeCamera();
+      void processFile(new File([blob], `camera-${view}.jpg`, { type: "image/jpeg" }));
+    }, "image/jpeg", 0.92);
   }
 
   function retake() {
@@ -219,17 +295,30 @@ export function BodyPhotoWizard({
         <h2 id={`body-photo-${view}`}>{t("bodyPhotos.captureTitle", { view: t(`bodyPhotos.views.${view}`) })}</h2>
         <p>{instructions[view]}</p>
         <p className="body-photo-muted">{t("bodyPhotos.cameraGuidance")}</p>
-        <label className="body-photo-upload-control">
-          <span>{t("bodyPhotos.selectPhoto", { view: t(`bodyPhotos.views.${view}`) })}</span>
-          <input
-            aria-label={t("bodyPhotos.inputLabel", { view: t(`bodyPhotos.views.${view}`) })}
-            accept="image/jpeg,image/png,image/webp"
-            capture="environment"
-            type="file"
-            onChange={(event) => void selectFile(event)}
-            disabled={busy}
-          />
-        </label>
+        <div className="body-photo-source-actions">
+          <button className="secondary-button" type="button" onClick={() => void openCamera()} disabled={busy || cameraOpen}>
+            {t("bodyPhotos.takePhoto", { view: t(`bodyPhotos.views.${view}`) })}
+          </button>
+          <label className="body-photo-upload-control">
+            <span>{t("bodyPhotos.uploadExistingPhoto", { view: t(`bodyPhotos.views.${view}`) })}</span>
+            <input
+              aria-label={t("bodyPhotos.inputLabel", { view: t(`bodyPhotos.views.${view}`) })}
+              accept="image/jpeg,image/png,image/webp"
+              type="file"
+              onChange={selectFile}
+              disabled={busy}
+            />
+          </label>
+        </div>
+        {cameraOpen && (
+          <section className="body-photo-camera" aria-label={t("bodyPhotos.cameraTitle")}>
+            <video ref={videoRef} autoPlay muted playsInline />
+            <div>
+              <button className="primary-button" type="button" onClick={captureCameraPhoto} disabled={busy}>{t("bodyPhotos.capturePhoto")}</button>
+              <button className="secondary-button" type="button" onClick={closeCamera} disabled={busy}>{t("bodyPhotos.closeCamera")}</button>
+            </div>
+          </section>
+        )}
         {current !== null && (
           <div className="body-photo-preview">
             <img src={current.previewUrl} alt={t("bodyPhotos.previewAlt", { view: t(`bodyPhotos.views.${view}`) })} />

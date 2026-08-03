@@ -284,19 +284,12 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
     if (detection.personCount !== 1) {
       throw new BodyPhotoProcessingError("exactly_one_person_required");
     }
-    if (detection.clothingValidation === "unavailable") {
-      throw new BodyPhotoProcessingError("clothing_validation_unavailable");
-    }
-    if (detection.contentSafetyValidation === "unavailable") {
-      throw new BodyPhotoProcessingError("content_validation_unavailable");
-    }
-    if (detection.backgroundValidation === "unavailable") {
-      throw new BodyPhotoProcessingError("background_validation_unavailable");
-    }
     if (detection.clothingValidation === "rejected") {
       throw new BodyPhotoProcessingError("clothing_hides_body_contours");
     }
-    if (!detection.isSafeAndRelevant) {
+    if (detection.contentSafetyValidation === "rejected" || (
+      detection.contentSafetyValidation === "accepted" && !detection.isSafeAndRelevant
+    )) {
       throw new BodyPhotoProcessingError("unsafe_or_irrelevant_image");
     }
     if (detection.detectedView !== expectedView) {
@@ -311,10 +304,13 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
     if (detection.bodyCompletenessScore < defaultLimits.minimumBodyCompletenessScore) {
       throw new BodyPhotoProcessingError("body_not_fully_visible");
     }
-    if (detection.clothingVisibilityScore < defaultLimits.minimumClothingVisibilityScore) {
+    if (
+      detection.clothingValidation === "accepted"
+      && detection.clothingVisibilityScore < defaultLimits.minimumClothingVisibilityScore
+    ) {
       throw new BodyPhotoProcessingError("clothing_hides_body_contours");
     }
-    if (detection.backgroundReliabilityScore < 0.5) {
+    if (detection.backgroundValidation === "accepted" && detection.backgroundReliabilityScore < 0.5) {
       throw new BodyPhotoProcessingError("body_not_fully_visible");
     }
     if (

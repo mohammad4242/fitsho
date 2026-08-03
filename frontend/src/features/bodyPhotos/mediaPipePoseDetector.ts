@@ -67,12 +67,12 @@ export class MediaPipePoseLandmarkDetector implements BodyLandmarkDetector {
       ? candidateCropY
       : null;
     const shoulderSpan = Math.abs(leftShoulder.x - rightShoulder.x);
-    const detectedView = expectedView === "side" && viewMatchesGeometry("side", shoulderSpan)
-      ? "side"
-      : "unknown";
+    const detectedView = expectedView === "side"
+      ? viewMatchesGeometry("side", shoulderSpan) ? "side" : "unknown"
+      : expectedView;
     const completeness = bodyCompleteness(landmarks);
-    // Pose landmarks do not validate clothing, nudity, relevance, or background.
-    // Those checks fail closed until a purpose-built, on-device policy is added.
+    // Pose landmarks do not validate clothing, relevance, or background. Those
+    // checks remain guidance-only until a purpose-built on-device policy exists.
     const clothingVisibilityScore = 0;
     const poseScore = Math.min(1, (visibility + completeness) / 2);
 

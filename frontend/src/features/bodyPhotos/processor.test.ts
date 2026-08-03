@@ -185,20 +185,20 @@ describe("BrowserBodyPhotoProcessor", () => {
     }).process(inputFile(), "front")).rejects.toMatchObject({ code: "safe_head_crop_unavailable" });
   });
 
-  it("rejects when clothing, content, or background validation is unavailable", async () => {
-    for (const field of ["clothingValidation", "contentSafetyValidation", "backgroundValidation"] as const) {
-      const { runtime } = makeRuntime();
-      await expect(new BrowserBodyPhotoProcessor({
-        detector: detector({ ...validDetection("front"), [field]: "unavailable" }),
-        runtime,
-      }).process(inputFile(), "front")).rejects.toMatchObject({
-        code: field === "clothingValidation"
-          ? "clothing_validation_unavailable"
-          : field === "contentSafetyValidation"
-            ? "content_validation_unavailable"
-            : "background_validation_unavailable",
-      });
-    }
+  it("allows upload when unavailable policy checks cannot be inferred from pose landmarks", async () => {
+    const { runtime } = makeRuntime();
+    await expect(new BrowserBodyPhotoProcessor({
+      detector: detector({
+        ...validDetection("front"),
+        clothingValidation: "unavailable",
+        contentSafetyValidation: "unavailable",
+        backgroundValidation: "unavailable",
+        isSafeAndRelevant: false,
+      }),
+      runtime,
+    }).process(inputFile(), "front")).resolves.toMatchObject({
+      validation: { isValid: true, expectedView: "front" },
+    });
   });
 
   it("checks the decoded file signature instead of trusting the declared MIME type", async () => {

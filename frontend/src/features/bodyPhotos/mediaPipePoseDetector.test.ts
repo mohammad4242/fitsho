@@ -34,7 +34,7 @@ describe("MediaPipePoseLandmarkDetector", () => {
 
     await expect(detector.detect(decodedImage(), "front")).resolves.toMatchObject({
       personCount: 1,
-      detectedView: "unknown",
+      detectedView: "front",
       headFullyExcluded: true,
       shouldersPreserved: true,
       clothingValidation: "unavailable",

@@ -106,6 +106,13 @@ it("shows fitted-clothing guidance on every capture step", async () => {
   expect(screen.getByText(/athletic shorts and fitted, minimal athletic clothing/i)).toBeInTheDocument();
 });
 
+it("offers separate actions for taking a photo and uploading an existing photo", () => {
+  renderWizard();
+
+  expect(screen.getByRole("button", { name: /take front photo/i })).toBeInTheDocument();
+  expect(screen.getByLabelText(/upload an existing front photo/i)).toBeInTheDocument();
+});
+
 it("processes three views, allows retake, and never passes the original file to upload", async () => {
   const user = userEvent.setup();
   const processor: BodyPhotoProcessor = { process: vi.fn().mockImplementation((_, view) => processed(view)) };
