@@ -170,6 +170,7 @@ def to_plan_response(plan: WorkoutPlan, *, is_stale: bool = False) -> WorkoutPla
         aggregate_metrics=plan.aggregate_metrics,
         progression_policy=plan.progression_policy,
         decision_trace=plan.decision_trace,
+        body_analysis_provenance=plan.body_analysis_provenance,
     )
 
 

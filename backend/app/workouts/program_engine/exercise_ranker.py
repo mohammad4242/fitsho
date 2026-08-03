@@ -1,6 +1,7 @@
 import hashlib
 
 from app.exercises.enums import ExerciseType, MuscleGroup
+from app.workouts.program_engine.body_analysis import eligible_body_analysis_priorities
 from app.workouts.program_engine.enums import Goal, StabilityDemand, TrainingStatus
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -19,6 +20,9 @@ def rank_exercises(
 ) -> tuple[RankedCandidate, ...]:
     ranked: list[tuple[RankedCandidate, str]] = []
     weights = ruleset.selection_weights
+    body_priorities = {
+        item.muscle: item for item in eligible_body_analysis_priorities(request, ruleset)
+    }
     for exercise in exercises:
         score = 0
         reasons: list[str] = []
@@ -28,6 +32,14 @@ def rank_exercises(
         if exercise.primary_muscle in request.source.priority_muscles:
             score += weights["priority_muscle"]
             reasons.append("PRIORITY_MUSCLE")
+        body_priority = (
+            body_priorities.get(exercise.primary_muscle)
+            if exercise.primary_muscle is not None
+            else None
+        )
+        if body_priority is not None:
+            score += weights[f"body_analysis_{body_priority.classification}"]
+            reasons.append(f"BODY_ANALYSIS_{body_priority.classification.upper()}")
         if exercise.id in request.source.preferred_exercises:
             score += weights["preference"]
             reasons.append("USER_PREFERRED")

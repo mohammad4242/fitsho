@@ -111,6 +111,9 @@ class WorkoutPlan(Base):
     decision_trace: Mapped[list[dict[str, object]]] = mapped_column(
         JSON, default=list, server_default=text("'[]'::json"), nullable=False
     )
+    body_analysis_provenance: Mapped[dict[str, object]] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'::json"), nullable=False
+    )
     progression_policy: Mapped[dict[str, object]] = mapped_column(
         JSON, default=dict, server_default=text("'{}'::json"), nullable=False
     )

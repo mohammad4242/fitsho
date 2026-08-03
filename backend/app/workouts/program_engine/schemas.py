@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -84,6 +84,46 @@ class RecentTrainingHistory(BaseModel):
     recovery_problems: bool = False
 
 
+class BodyAnalysisPriority(BaseModel):
+    """A normalized, non-medical training signal derived from one result version."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    muscle: MuscleGroup
+    classification: Literal["mild_lag", "clear_lag"]
+    confidence: float = Field(ge=0, le=1)
+    severity: float = Field(ge=0, le=1)
+    emphasis: tuple[str, ...] = Field(default=(), max_length=8)
+
+
+class BodyAnalysisInfluence(BaseModel):
+    """Immutable workout input with exact analysis and result-version provenance."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    analysis_id: UUID
+    result_version_id: UUID
+    analysis_revision: int = Field(ge=1)
+    schema_version: str = Field(pattern=r"^[0-9]+\.[0-9]+$", max_length=16)
+    source: Literal[
+        "ai_provisional",
+        "coach_reviewed",
+        "doctor_reviewed",
+        "fully_reviewed",
+    ]
+    overall_confidence: float = Field(ge=0, le=1)
+    priorities: tuple[BodyAnalysisPriority, ...] = Field(default=(), max_length=16)
+
+    @field_validator("priorities")
+    @classmethod
+    def validate_unique_muscles(
+        cls, value: tuple[BodyAnalysisPriority, ...]
+    ) -> tuple[BodyAnalysisPriority, ...]:
+        if len({item.muscle for item in value}) != len(value):
+            raise ValueError("body-analysis priorities must contain unique muscles")
+        return value
+
+
 class ProgramGenerationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -105,6 +145,7 @@ class ProgramGenerationRequest(BaseModel):
     preferred_exercises: frozenset[UUID] = frozenset()
     disliked_exercises: frozenset[UUID] = frozenset()
     priority_muscles: frozenset[MuscleGroup] = frozenset()
+    body_analysis_influence: BodyAnalysisInfluence | None = None
     injuries_and_limitations: tuple[Limitation, ...] = ()
     blocked_exercises: frozenset[UUID] = frozenset()
     blocked_movement_patterns: frozenset[MovementPattern] = frozenset()
@@ -385,6 +426,7 @@ class WorkoutProgram:
     validation_report: ValidationReport
     aggregate_metrics: dict[str, object]
     decision_trace: tuple[dict[str, object], ...]
+    body_analysis_provenance: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

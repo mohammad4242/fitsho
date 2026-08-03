@@ -2,6 +2,10 @@ import math
 from collections import Counter
 
 from app.exercises.enums import MuscleGroup
+from app.workouts.program_engine.body_analysis import (
+    body_analysis_priority_muscles,
+    eligible_body_analysis_priorities,
+)
 from app.workouts.program_engine.enums import (
     PhysicalJobDemand,
     RecoveryRating,
@@ -72,7 +76,13 @@ def plan_weekly_volume(
         soft_allowance += ruleset.good_recovery_soft_maximum_bonus_sets
 
     targets: list[VolumeTarget] = []
-    direct_exposures = _direct_exposure_counts(split, source.priority_muscles)
+    body_priorities = {
+        item.muscle: item for item in eligible_body_analysis_priorities(request, ruleset)
+    }
+    effective_priorities = source.priority_muscles | body_analysis_priority_muscles(
+        request, ruleset
+    )
+    direct_exposures = _direct_exposure_counts(split, effective_priorities)
     for muscle in MAJOR_MUSCLES:
         sets = base
         if source.priority_muscles and muscle not in source.priority_muscles:
@@ -80,6 +90,15 @@ def plan_weekly_volume(
         if muscle in source.priority_muscles:
             sets = min(maximum, sets + ruleset.priority_muscle_bonus_sets)
             reasons.append("VOLUME_INCREASED_FOR_PRIORITY_MUSCLE")
+        body_priority = body_priorities.get(muscle)
+        if body_priority is not None:
+            bonus = (
+                ruleset.body_analysis_clear_lag_bonus_sets
+                if body_priority.classification == "clear_lag"
+                else ruleset.body_analysis_mild_lag_bonus_sets
+            )
+            sets = min(maximum, sets + bonus)
+            reasons.append("VOLUME_INCREASED_FOR_BODY_ANALYSIS")
         previous = source.recent_training_history.previous_weekly_sets_by_muscle.get(muscle)
         if previous is not None and previous > 0:
             increase_limit = max(

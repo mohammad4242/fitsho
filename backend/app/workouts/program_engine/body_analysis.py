@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+from app.exercises.enums import MuscleGroup
+from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
+from app.workouts.program_engine.schemas import BodyAnalysisPriority, NormalizedProgramRequest
+
+BODY_ANALYSIS_TRAINING_MAPPING_VERSION = "body_analysis_training_map_v1"
+
+TEMPLATE_TAGS_BY_MUSCLE: dict[MuscleGroup, frozenset[str]] = {
+    MuscleGroup.CHEST: frozenset({"chest_priority"}),
+    MuscleGroup.BACK: frozenset({"back_priority"}),
+    MuscleGroup.SHOULDERS: frozenset({"shoulders_priority"}),
+    MuscleGroup.BICEPS: frozenset({"arms_priority"}),
+    MuscleGroup.TRICEPS: frozenset({"arms_priority"}),
+    MuscleGroup.FOREARMS: frozenset({"arms_priority"}),
+    MuscleGroup.QUADRICEPS: frozenset({"quad_priority", "legs_priority"}),
+    MuscleGroup.HAMSTRINGS: frozenset({"posterior_chain_priority", "legs_priority"}),
+    MuscleGroup.GLUTES: frozenset({"posterior_chain_priority", "legs_priority"}),
+    MuscleGroup.CALVES: frozenset({"calf_priority", "legs_priority"}),
+    MuscleGroup.ABS: frozenset({"core_priority"}),
+}
+
+
+def eligible_body_analysis_priorities(
+    request: NormalizedProgramRequest,
+    ruleset: ProgramRuleset,
+) -> tuple[BodyAnalysisPriority, ...]:
+    influence = request.source.body_analysis_influence
+    if influence is None or influence.overall_confidence < ruleset.body_analysis_minimum_confidence:
+        return ()
+    return tuple(
+        priority
+        for priority in influence.priorities
+        if priority.confidence >= ruleset.body_analysis_minimum_confidence
+    )
+
+
+def body_analysis_priority_muscles(
+    request: NormalizedProgramRequest,
+    ruleset: ProgramRuleset,
+) -> frozenset[MuscleGroup]:
+    return frozenset(
+        priority.muscle for priority in eligible_body_analysis_priorities(request, ruleset)
+    )
+
+
+def body_analysis_provenance(request: NormalizedProgramRequest) -> dict[str, object]:
+    influence = request.source.body_analysis_influence
+    if influence is None:
+        return {}
+    return {
+        "analysis_id": str(influence.analysis_id),
+        "result_version_id": str(influence.result_version_id),
+        "analysis_revision": influence.analysis_revision,
+        "schema_version": influence.schema_version,
+        "source": influence.source,
+        "provisional": influence.source != "fully_reviewed",
+        "mapping_version": BODY_ANALYSIS_TRAINING_MAPPING_VERSION,
+    }
+
+
+def body_analysis_trace(
+    request: NormalizedProgramRequest,
+    ruleset: ProgramRuleset,
+) -> dict[str, object] | None:
+    influence = request.source.body_analysis_influence
+    if influence is None:
+        return None
+    priorities = eligible_body_analysis_priorities(request, ruleset)
+    return {
+        "stage": "body_analysis_influence",
+        "analysis_id": str(influence.analysis_id),
+        "result_version_id": str(influence.result_version_id),
+        "source": influence.source,
+        "provisional": influence.source != "fully_reviewed",
+        "mapping_version": BODY_ANALYSIS_TRAINING_MAPPING_VERSION,
+        "minimum_confidence": ruleset.body_analysis_minimum_confidence,
+        "applied_muscles": sorted(item.muscle.value for item in priorities),
+    }

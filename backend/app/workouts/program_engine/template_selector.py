@@ -1,6 +1,11 @@
 from uuid import UUID
 
+from app.workouts.program_engine.body_analysis import (
+    TEMPLATE_TAGS_BY_MUSCLE,
+    eligible_body_analysis_priorities,
+)
 from app.workouts.program_engine.enums import Goal, TrainingStatus
+from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
     NormalizedProgramRequest,
@@ -12,11 +17,12 @@ def select_template_reference(
     request: NormalizedProgramRequest,
     eligible: tuple[ExerciseCandidate, ...],
     templates: tuple[TemplateReference, ...],
+    ruleset: ProgramRuleset,
 ) -> TemplateReference | None:
     level = _template_level(request.training_status)
     eligible_by_id = {candidate.id for candidate in eligible}
     scored = [
-        (template, _score(request, template))
+        (template, _score(request, template, ruleset))
         for template in templates
         if template.days_per_week == request.resistance_training_days
         and template.training_level == level
@@ -40,9 +46,22 @@ def _matches_goal(goal: Goal, template_goal: str) -> bool:
     return goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN} and template_goal == "build_muscle"
 
 
-def _score(request: NormalizedProgramRequest, template: TemplateReference) -> int:
+def _score(
+    request: NormalizedProgramRequest,
+    template: TemplateReference,
+    ruleset: ProgramRuleset,
+) -> int:
     priority_tags = {f"{muscle.value}_priority" for muscle in request.source.priority_muscles}
     score = 100 + 35 * len(priority_tags.intersection(template.focus_tags))
+    template_tags = set(template.focus_tags)
+    for priority in eligible_body_analysis_priorities(request, ruleset):
+        if not template_tags.intersection(TEMPLATE_TAGS_BY_MUSCLE.get(priority.muscle, ())):
+            continue
+        score += (
+            ruleset.body_analysis_clear_lag_template_boost
+            if priority.classification == "clear_lag"
+            else ruleset.body_analysis_mild_lag_template_boost
+        )
     if "classic" in template.focus_tags and not priority_tags:
         score += 10
     if "long_session" in template.focus_tags and request.source.session_duration_minutes < 80:

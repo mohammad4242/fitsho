@@ -65,6 +65,11 @@ class ProgramRuleset:
         }
     )
     priority_muscle_bonus_sets: int = 2
+    body_analysis_minimum_confidence: float = 0.7
+    body_analysis_mild_lag_bonus_sets: int = 1
+    body_analysis_clear_lag_bonus_sets: int = 2
+    body_analysis_mild_lag_template_boost: int = 20
+    body_analysis_clear_lag_template_boost: int = 35
     poor_recovery_set_reduction: int = 2
     max_previous_volume_increase: float = 0.2
     max_sets_per_muscle_per_session: int = 6
@@ -179,6 +184,8 @@ class ProgramRuleset:
         default_factory=lambda: {
             "goal_specificity": 20,
             "priority_muscle": 18,
+            "body_analysis_mild_lag": 10,
+            "body_analysis_clear_lag": 18,
             "movement_need": 16,
             "beginner_friendly": 12,
             "preference": 10,

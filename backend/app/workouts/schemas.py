@@ -178,6 +178,7 @@ class WorkoutPlanResponse(BaseModel):
     aggregate_metrics: dict[str, object] = Field(default_factory=dict)
     progression_policy: dict[str, object] = Field(default_factory=dict)
     decision_trace: list[dict[str, object]] = Field(default_factory=list)
+    body_analysis_provenance: dict[str, object] = Field(default_factory=dict)
 
 
 class WorkoutPlanGenerateResponse(BaseModel):

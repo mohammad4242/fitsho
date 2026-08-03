@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from app.exercises.enums import MovementPattern, MuscleGroup
+from app.workouts.program_engine.body_analysis import body_analysis_priority_muscles
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -46,10 +47,13 @@ def build_sessions(
     ruleset: ProgramRuleset,
 ) -> tuple[SessionDraft, ...]:
     by_pattern = _by_pattern(exercises)
+    effective_priorities = request.source.priority_muscles | body_analysis_priority_muscles(
+        request, ruleset
+    )
     usage: Counter[UUID] = Counter()
     sessions: list[SessionDraft] = []
     for index, planned_focus in enumerate(split.day_focuses):
-        focus = _resolve_focus(planned_focus, request, volume)
+        focus = _resolve_focus(planned_focus, request, volume, ruleset)
         capacity = max(
             ruleset.minimum_exercises_per_session,
             min(
@@ -99,12 +103,17 @@ def build_sessions(
 
         chosen.sort(
             key=lambda item: (
-                item.primary_muscle not in request.source.priority_muscles,
+                item.primary_muscle not in effective_priorities,
                 _order_rank(item.movement_pattern, ruleset),
             )
         )
-        if chosen and chosen[0].primary_muscle in request.source.priority_muscles:
-            reasons[chosen[0].id] = reasons[chosen[0].id] + ("PRIORITY_MUSCLE_PLACED_FIRST",)
+        if chosen and chosen[0].primary_muscle in effective_priorities:
+            placement_reason = (
+                "PRIORITY_MUSCLE_PLACED_FIRST"
+                if chosen[0].primary_muscle in request.source.priority_muscles
+                else "BODY_ANALYSIS_PRIORITY_PLACED_FIRST"
+            )
+            reasons[chosen[0].id] = reasons[chosen[0].id] + (placement_reason,)
         substitutions = {
             item.id: tuple(
                 alternative.id
@@ -266,10 +275,13 @@ def _resolve_focus(
     focus: str,
     request: NormalizedProgramRequest,
     volume: WeeklyVolumePlan,
+    ruleset: ProgramRuleset,
 ) -> str:
     if focus != "specialization":
         return focus
-    priorities = request.source.priority_muscles
+    priorities = request.source.priority_muscles | body_analysis_priority_muscles(
+        request, ruleset
+    )
     for muscle_group, specialized_focus in (
         ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
         ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),

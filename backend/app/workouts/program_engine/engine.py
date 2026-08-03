@@ -1,6 +1,10 @@
 from collections import Counter, defaultdict
 from dataclasses import replace
 
+from app.workouts.program_engine.body_analysis import (
+    body_analysis_provenance,
+    body_analysis_trace,
+)
 from app.workouts.program_engine.cardio import add_cardio, cardio_reserve_minutes
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
@@ -63,7 +67,9 @@ def generate_program(
             safety_status=safety.status,
             rejected_candidates=eligibility.rejected,
         )
-    reference = select_template_reference(normalized, eligibility.eligible, reference_templates)
+    reference = select_template_reference(
+        normalized, eligibility.eligible, reference_templates, ruleset
+    )
     if reference is not None:
         reference_days = build_template_sessions(
             normalized, reference, eligibility.eligible, ruleset
@@ -132,9 +138,11 @@ def generate_program(
         "hard_training_days": len(days),
         "recovery_days": ruleset.days_per_week - len(days),
     }
+    body_trace = body_analysis_trace(normalized, ruleset)
     trace: tuple[dict[str, object], ...] = (
         {"stage": "normalization", "assumptions": normalized.assumptions},
         {"stage": "safety", "status": safety.status.value, "reasons": safety.reason_codes},
+        *((body_trace,) if body_trace is not None else ()),
         {"stage": "split", "selected": split.split_type.value, "reasons": split.reason_codes},
         {"stage": "volume", "reasons": volume.reason_codes},
         {"stage": "volume_repair", "reasons": repair_reasons},
@@ -172,6 +180,7 @@ def generate_program(
         validation_report=empty_report,
         aggregate_metrics=metrics,
         decision_trace=trace,
+        body_analysis_provenance=body_analysis_provenance(normalized),
     )
     report = validate_program(program, request, ruleset)
     if not report.is_valid:
@@ -236,9 +245,11 @@ def _reference_program(
         "hard_training_days": len(days),
         "recovery_days": ruleset.days_per_week - len(days),
     }
+    body_trace = body_analysis_trace(normalized, ruleset)
     trace: tuple[dict[str, object], ...] = (
         {"stage": "normalization", "assumptions": normalized.assumptions},
         {"stage": "safety", "status": safety_status.value, "reasons": ()},
+        *((body_trace,) if body_trace is not None else ()),
         {"stage": "template_reference", "selected": reference.slug},
     )
     program = WorkoutProgram(
@@ -262,6 +273,7 @@ def _reference_program(
         validation_report=ValidationReport((), (), normalized.assumptions, metrics, trace),
         aggregate_metrics=metrics,
         decision_trace=trace,
+        body_analysis_provenance=body_analysis_provenance(normalized),
     )
     report = validate_program(program, request, ruleset)
     if not report.is_valid:

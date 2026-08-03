@@ -20,10 +20,11 @@ from app.exercises.enums import (
 from app.exercises.models import Exercise, ExerciseEquipment
 from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.models import BodyMeasurement, UserProfile
+from app.workouts.body_analysis_resolver import BodyAnalysisInfluenceResolver
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan, WorkoutPlanGeneration
 from app.workouts.program_engine.enums import GenerationErrorCode, RedFlag
-from app.workouts.program_engine.schemas import ProgramGenerationResult
+from app.workouts.program_engine.schemas import BodyAnalysisInfluence, ProgramGenerationResult
 from app.workouts.repository import create_generation, get_plan_for_user
 from app.workouts.router import to_plan_response
 from app.workouts.schemas import ProgramGenerationOverrides
@@ -131,6 +132,7 @@ def _service(
     *,
     provider: FakeWorkoutPlanModelProvider | None = None,
     cooldown_seconds: int = 0,
+    body_analysis_resolver: BodyAnalysisInfluenceResolver | None = None,
 ) -> WorkoutGenerationService:
     providers = (
         (ModelProviderCandidate(model_id="legacy-model", provider=provider),)
@@ -152,6 +154,37 @@ def _service(
             max_request_bytes=262144,
             warmup_minutes=5,
         ),
+        body_analysis_resolver=body_analysis_resolver,
+    )
+
+
+class _InfluenceResolver:
+    def __init__(self, influence: BodyAnalysisInfluence | None) -> None:
+        self.influence = influence
+
+    def resolve(self, _user_id):
+        return self.influence
+
+
+def _body_influence(*, result_version_id=None, source="ai_provisional"):
+    return BodyAnalysisInfluence.model_validate(
+        {
+            "analysis_id": "2cfda8dc-cb60-4adb-9105-1b367ff27b88",
+            "result_version_id": result_version_id or "0a537064-afd4-40cc-8534-b86269037c9b",
+            "analysis_revision": 1,
+            "schema_version": "1.0",
+            "source": source,
+            "overall_confidence": 0.9,
+            "priorities": [
+                {
+                    "muscle": "chest",
+                    "classification": "mild_lag",
+                    "confidence": 0.88,
+                    "severity": 0.5,
+                    "emphasis": ["chest"],
+                }
+            ],
+        }
     )
 
 
@@ -366,3 +399,40 @@ def test_generation_cooldown_prevents_another_generation(db: Session) -> None:
         asyncio.run(_service(db, cooldown_seconds=300).generate(user.id))
 
     assert 1 <= error.value.retry_after_seconds <= 300
+
+
+def test_plan_persists_provisional_body_analysis_provenance(db: Session) -> None:
+    user = _user_with_profile(db)
+    _seed_candidates(db)
+    resolver = _InfluenceResolver(_body_influence())
+
+    result = asyncio.run(_service(db, body_analysis_resolver=resolver).generate(user.id))
+
+    assert result.plan.body_analysis_provenance["source"] == "ai_provisional"
+    assert result.plan.body_analysis_provenance["provisional"] is True
+    assert any(
+        item["stage"] == "body_analysis_influence"
+        for item in result.plan.decision_trace
+    )
+
+
+def test_specialist_correction_changes_signature_and_marks_active_plan_stale(
+    db: Session,
+) -> None:
+    user = _user_with_profile(db)
+    _seed_candidates(db)
+    resolver = _InfluenceResolver(_body_influence())
+    service = _service(db, body_analysis_resolver=resolver)
+    first = asyncio.run(service.generate(user.id))
+
+    resolver.influence = _body_influence(
+        result_version_id="2e9dd8b5-a70c-493e-b7b0-9832f9999c87",
+        source="fully_reviewed",
+    )
+
+    active = service.get_active(user.id)
+    replacement = asyncio.run(service.generate(user.id))
+
+    assert active is not None and active.is_stale
+    assert replacement.plan.id != first.plan.id
+    assert replacement.plan.body_analysis_provenance["source"] == "fully_reviewed"

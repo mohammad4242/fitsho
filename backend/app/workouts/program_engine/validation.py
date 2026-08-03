@@ -17,6 +17,8 @@ def validate_program(
 ) -> ValidationReport:
     errors: list[str] = []
     warnings: list[str] = []
+    if program.body_analysis_provenance.get("provisional") is True:
+        warnings.append("BODY_ANALYSIS_NOT_FULLY_REVIEWED")
     constraints = request
     patterns: Counter[MovementPattern] = Counter()
     exercise_usage: Counter[object] = Counter()

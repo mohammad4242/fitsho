@@ -32,6 +32,10 @@ from app.exercises.models import Exercise
 from app.profile.enums import ExperienceLevel, HomeTrainingSetup, TrainingLocation
 from app.profile.service import ProfileSnapshot, get_profile
 from app.training_templates.engine_reference import load_template_references
+from app.workouts.body_analysis_resolver import (
+    BodyAnalysisInfluenceResolver,
+    WorkoutBodyAnalysisResolver,
+)
 from app.workouts.candidate_selector import CAUTION_EXCLUSIONS, WorkoutCandidateSelector
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise, WorkoutPlanGeneration
@@ -47,6 +51,7 @@ from app.workouts.program_engine.enums import (
 )
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET, ProgramRuleset
 from app.workouts.program_engine.schemas import (
+    BodyAnalysisInfluence,
     ExerciseCandidate,
     Limitation,
     ProgramGenerationRequest,
@@ -143,11 +148,13 @@ class WorkoutGenerationService:
         providers: tuple[ModelProviderCandidate, ...] = (),
         settings: WorkoutGenerationSettings,
         ruleset: ProgramRuleset = RULESET,
+        body_analysis_resolver: BodyAnalysisInfluenceResolver | None = None,
     ) -> None:
         self._db = db
         self._providers = providers
         self._settings = settings
         self._ruleset = ruleset
+        self._body_analysis_resolver = body_analysis_resolver or WorkoutBodyAnalysisResolver(db)
 
     async def generate(
         self,
@@ -157,8 +164,11 @@ class WorkoutGenerationService:
         if self._settings.generation_method == "ai":
             return await self._generate_with_ai(user_id)
         source_profile = get_profile(self._db, user_id)
+        body_analysis_influence = self._body_analysis_resolver.resolve(user_id)
         try:
-            request = self._to_program_request(source_profile, overrides)
+            request = self._to_program_request(
+                source_profile, overrides, body_analysis_influence
+            )
         except ValidationError as error:
             raise ProgramGenerationRejectedError("INVALID_PROFILE_INPUT") from error
         catalog = self._load_catalog()
@@ -224,7 +234,11 @@ class WorkoutGenerationService:
             raise WorkoutGenerationFailedError(error_code=error_code)
 
         refreshed_profile = get_profile(self._db, user_id)
-        refreshed_request = self._to_program_request(refreshed_profile, overrides)
+        refreshed_request = self._to_program_request(
+            refreshed_profile,
+            overrides,
+            self._body_analysis_resolver.resolve(user_id),
+        )
         refreshed_catalog = self._load_catalog()
         if (
             self._generation_signature(
@@ -537,6 +551,7 @@ class WorkoutGenerationService:
             validation_report=_json_ready(asdict(program.validation_report)),
             aggregate_metrics=_json_ready(program.aggregate_metrics),
             decision_trace=_json_ready(program.decision_trace),
+            body_analysis_provenance=_json_ready(program.body_analysis_provenance),
             progression_policy=_json_ready(program.progression_policy),
             previous_program_id=previous.id if previous else None,
             regeneration_reason="inputs_or_program_expired" if previous else None,
@@ -591,6 +606,7 @@ class WorkoutGenerationService:
         self,
         source: ProfileSnapshot,
         overrides: ProgramGenerationOverrides | None,
+        body_analysis_influence: BodyAnalysisInfluence | None = None,
     ) -> ProgramGenerationRequest:
         profile = source.profile
         equipment = self._available_equipment(
@@ -622,6 +638,7 @@ class WorkoutGenerationService:
             "injuries_and_limitations": limitations,
             "blocked_caution_tags": blocked_caution_tags,
             "program_duration_weeks": profile.plan_duration_weeks,
+            "body_analysis_influence": body_analysis_influence,
         }
         if overrides is not None:
             values.update(overrides.model_dump(exclude_none=True))
@@ -785,7 +802,11 @@ class WorkoutGenerationService:
                 plan=plan,
                 is_stale=plan.generation_signature != signature or self._is_plan_expired(plan),
             )
-        request = self._to_program_request(get_profile(self._db, user_id), None)
+        request = self._to_program_request(
+            get_profile(self._db, user_id),
+            None,
+            self._body_analysis_resolver.resolve(user_id),
+        )
         catalog_hash = self._catalog_hash(self._load_catalog())
         reference_hash = self._template_reference_hash(load_template_references(self._db))
         is_stale = plan.generation_signature != self._generation_signature(
