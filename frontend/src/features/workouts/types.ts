@@ -28,6 +28,7 @@ export type WorkoutDay = {
   title_fa: string;
   estimated_duration_minutes: number;
   exercises: WorkoutPlanExercise[];
+  ai_coach_explanation_fa?: string | null;
 };
 
 export type WorkoutPlan = {
@@ -39,6 +40,8 @@ export type WorkoutPlan = {
   is_stale: boolean;
   days: WorkoutDay[];
   body_analysis_provenance?: Record<string, unknown>;
+  ai_coach_template_slug?: string | null;
+  ai_coach_program_explanation_fa?: string | null;
 };
 
 export type WorkoutPlanGeneration = {

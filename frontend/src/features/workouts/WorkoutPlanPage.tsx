@@ -171,6 +171,12 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 onAction={generationError === "failed" ? generate : undefined}
               />
             )}
+            {plan.ai_coach_program_explanation_fa && (
+              <aside className="workout-ai-coach" aria-label={t("workoutPlan.aiCoach")}>
+                <span className="workout-ai-coach__icon" aria-hidden="true">✦</span>
+                <div><p>{t("workoutPlan.aiCoach")}</p><strong>{plan.ai_coach_program_explanation_fa}</strong></div>
+              </aside>
+            )}
             <section className="workout-schedule" aria-labelledby="workout-schedule-title">
               <div className="workout-schedule__heading">
                 <div>
@@ -195,6 +201,12 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                         <p>{t("workoutPlan.sessionMinutes", { count: day.estimated_duration_minutes })}</p>
                       </div>
                     </header>
+                    {day.ai_coach_explanation_fa && (
+                      <aside className="workout-ai-coach workout-ai-coach--day">
+                        <span className="workout-ai-coach__icon" aria-hidden="true">✦</span>
+                        <div><p>{t("workoutPlan.aiCoach")}</p><strong>{day.ai_coach_explanation_fa}</strong></div>
+                      </aside>
+                    )}
                     <ol>
                       {day.exercises.map((item) => (
                         <li className="workout-exercise" key={item.order_index}>

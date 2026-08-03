@@ -47,3 +47,4 @@
 .workout-exercise { padding: 1.2rem; }
 .workout-exercise > img, .workout-exercise > video { border-radius: 1rem; }
 .workout-generate, .workout-status button { color: var(--fitsho-petrol); background: var(--fitsho-aqua); }
+.workout-ai-coach { display: flex; gap: .8rem; align-items: flex-start; margin: 1rem 0; padding: 1rem 1.1rem; border: 1px solid rgb(56 183 165 / 30%); border-radius: 1rem; background: linear-gradient(135deg, rgb(56 183 165 / 14%), rgb(255 255 255 / 82%)); }.workout-ai-coach__icon { display: grid; flex: 0 0 auto; width: 2rem; height: 2rem; place-items: center; border-radius: 50%; color: var(--paper); background: var(--petrol-800); }.workout-ai-coach p, .workout-ai-coach strong { margin: 0; }.workout-ai-coach p { margin-bottom: .25rem; color: var(--turquoise-dark); font-size: .78rem; font-weight: 900; }.workout-ai-coach strong { display: block; color: var(--petrol-900); line-height: 1.7; }.workout-ai-coach--day { margin: 1rem 0 0; }

@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import {
   getAdminAiTaskConfigs,
@@ -211,7 +212,10 @@ export function AdminAiSettingsPage() {
     <main className="admin-main admin-main--ai-settings">
       <header className="admin-page-heading">
         <div><p className="admin-kicker">{t("admin.aiSettings.eyebrow")}</p><h1>{t("admin.aiSettings.title")}</h1></div>
-        <a href="/admin/ai-models">{t("admin.aiSettings.legacy")}</a>
+        <Link className="admin-ai-back" to="/admin/exercises" aria-label={t("common.back")}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7M8 12h9" /></svg>
+          <span>{t("common.back")}</span>
+        </Link>
       </header>
 
       <nav className="admin-ai-task-tabs" aria-label={t("admin.aiSettings.taskNav")}>
