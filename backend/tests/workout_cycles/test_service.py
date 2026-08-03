@@ -1,6 +1,6 @@
 import os
 from concurrent.futures import ThreadPoolExecutor
-from threading import Barrier
+from threading import Barrier, Lock
 from uuid import UUID, uuid4
 
 import pytest
@@ -225,6 +225,26 @@ def test_start_cycle_is_concurrency_idempotent_with_two_database_sessions() -> N
 def test_cycle_completion_is_concurrency_safe_with_optional_feedback() -> None:
     engine = create_engine(_test_database_url())
     email = f"concurrent-completion-{uuid4()}@example.com"
+    lock_barrier = Barrier(2)
+    participant_lock = Lock()
+    participants = 0
+
+    def synchronize_locked_cycle_read(
+        _connection: object,
+        _cursor: object,
+        statement: str,
+        _parameters: object,
+        _context: object,
+        _executemany: object,
+    ) -> None:
+        nonlocal participants
+        if "FROM workout_cycles" not in statement or "FOR UPDATE" not in statement:
+            return
+        with participant_lock:
+            participants += 1
+        lock_barrier.wait(timeout=5)
+
+    event.listen(engine, "before_cursor_execute", synchronize_locked_cycle_read)
     try:
         with Session(engine) as setup_db:
             user = make_user(setup_db, email)
@@ -252,6 +272,7 @@ def test_cycle_completion_is_concurrency_safe_with_optional_feedback() -> None:
         with ThreadPoolExecutor(max_workers=2) as executor:
             outcomes = list(executor.map(complete_in_session, [70, 90]))
 
+        assert participants == 2
         assert sorted(outcomes) == ["already_completed", "completed"]
         with Session(engine) as check_db:
             cycle = check_db.get(WorkoutCycle, cycle_id)
@@ -263,6 +284,7 @@ def test_cycle_completion_is_concurrency_safe_with_optional_feedback() -> None:
                 )
             ) == 1
     finally:
+        event.remove(engine, "before_cursor_execute", synchronize_locked_cycle_read)
         with Session(engine) as cleanup_db:
             cleanup_db.execute(delete(User).where(User.email == email))
             cleanup_db.commit()
