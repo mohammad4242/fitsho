@@ -587,6 +587,34 @@ def test_v2_provider_schema_avoids_structured_output_state_explosion() -> None:
     assert '"maximum"' not in serialized
 
 
+def test_v3_provider_request_includes_advisory_profile_context() -> None:
+    request = BodyAnalysisService._request(
+        AnalysisExecutionConfig(
+            provider_name="openrouter",
+            primary_model="google/gemini-2.5-flash",
+            prompt_version="body-analysis-v3",
+            schema_version="3.0",
+        ),
+        profile_context={
+            "selected_goal": "build_muscle",
+            "height_cm": 178,
+            "weight_kg": 76.5,
+            "shoulder_circumference_cm": 122.0,
+            "waist_circumference_cm": 84.0,
+            "hip_circumference_cm": 98.0,
+        },
+    )
+
+    assert request.input_payload["profile_context"] == {
+        "selected_goal": "build_muscle",
+        "height_cm": 178,
+        "weight_kg": 76.5,
+        "shoulder_circumference_cm": 122.0,
+        "waist_circumference_cm": 84.0,
+        "hip_circumference_cm": 98.0,
+    }
+
+
 def test_retry_rejects_nonlatest_revision(db: Session) -> None:
     user, session = _submitted_session(db)
     service = BodyAnalysisService(db)

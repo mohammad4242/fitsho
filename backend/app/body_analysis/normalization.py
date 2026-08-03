@@ -15,7 +15,10 @@ from app.body_analysis.schemas import (
     NormalizedBodyAnalysis,
     VisualPhysiqueAssessment,
     VisualPhysiqueAssessmentPayload,
+    VisualPhysiqueAssessmentV3,
+    VisualPhysiqueAssessmentV3Payload,
 )
+from app.body_photos.enums import BodyPhotoView
 
 
 class MedicalClaimError(ValueError):
@@ -51,6 +54,24 @@ def normalize_visual_physique_assessment(
         if _MEDICAL_CLAIM_PATTERN.search(finding.evidence_fa):
             raise MedicalClaimError("body analysis cannot contain medical diagnostic claims")
     return VisualPhysiqueAssessment.model_validate(visual.model_dump(mode="json"))
+
+
+def normalize_visual_physique_assessment_v3(
+    payload: Mapping[str, Any],
+) -> VisualPhysiqueAssessmentV3:
+    """Validate a provider-owned v3 checklist and add product policy fields."""
+
+    visual = VisualPhysiqueAssessmentV3Payload.model_validate(payload)
+    prose = [visual.overall_assessment.summary_fa, visual.goal_suggestion.reasoning_fa]
+    prose.extend(finding.overall_summary_fa for finding in visual.findings)
+    prose.extend(
+        checklist.evidence_fa
+        for finding in visual.findings
+        for checklist in (finding.front, finding.side, finding.back)
+    )
+    if any(_MEDICAL_CLAIM_PATTERN.search(value) for value in prose):
+        raise MedicalClaimError("body analysis cannot contain medical diagnostic claims")
+    return VisualPhysiqueAssessmentV3.model_validate(visual.model_dump(mode="json"))
 
 
 _EMPHASIS_MAP: dict[str, tuple[TrainingEmphasis, ...]] = {
@@ -112,6 +133,43 @@ def visual_assessment_to_normalized(
     )
 
 
+def visual_assessment_v3_to_normalized(
+    assessment: VisualPhysiqueAssessmentV3,
+) -> NormalizedBodyAnalysis:
+    """Project the v3 checklist into the stable workout and comparison contract."""
+
+    findings = tuple(_v3_legacy_finding(finding) for finding in assessment.findings)
+    return NormalizedBodyAnalysis(
+        schema_version="3.0",
+        overall_confidence=sum(item.confidence for item in findings) / len(findings),
+        findings=findings,
+        summary=BodyAnalysisSummary(
+            visible_strengths=tuple(
+                item.body_area
+                for item in findings
+                if item.classification is BodyAnalysisClassification.STRENGTH
+            ),
+            priority_areas=tuple(
+                item.body_area
+                for item in findings
+                if item.classification is BodyAnalysisClassification.CLEAR_LAG
+            ),
+            moderate_attention_areas=tuple(
+                item.body_area
+                for item in findings
+                if item.classification is BodyAnalysisClassification.MILD_LAG
+            ),
+            uncertain_areas=tuple(
+                item.body_area
+                for item in findings
+                if item.classification is BodyAnalysisClassification.UNCERTAIN
+            ),
+        ),
+        requires_coach_review=True,
+        requires_doctor_review=True,
+    )
+
+
 def _legacy_finding(finding: object) -> BodyAnalysisFinding:
     from app.body_analysis.schemas import VisualPhysiqueFinding
 
@@ -134,6 +192,54 @@ def _legacy_finding(finding: object) -> BodyAnalysisFinding:
         explanation=finding.evidence_fa,
         limitations=(AnalysisLimitation.VISIBILITY,)
         if finding.classification == "not_assessable"
+        else (),
+        suggested_training_emphasis=tuple(dict.fromkeys(emphasis)),
+        medical_review_recommended=False,
+    )
+
+
+def _v3_legacy_finding(finding: object) -> BodyAnalysisFinding:
+    from app.body_analysis.schemas import VisualChecklistFinding
+
+    if not isinstance(finding, VisualChecklistFinding):
+        raise TypeError("visual assessment v3 finding is invalid")
+    ratings = (finding.front.rating, finding.side.rating, finding.back.rating)
+    supported_views = tuple(
+        view
+        for view, rating in zip(("front", "side", "back"), ratings, strict=True)
+        if rating != "not_assessable"
+    )
+    if finding.overall_rating == "focus_priority":
+        classification = BodyAnalysisClassification.CLEAR_LAG
+        severity: float | None = 0.75
+    elif finding.overall_rating == "needs_attention":
+        classification = BodyAnalysisClassification.MILD_LAG
+        severity = 0.5
+    elif all(rating == "not_assessable" for rating in ratings):
+        classification = BodyAnalysisClassification.UNCERTAIN
+        severity = None
+    elif (
+        finding.overall_rating in {"excellent", "good"}
+        and sum(rating in {"excellent", "good"} for rating in ratings) >= 2
+    ):
+        classification = BodyAnalysisClassification.STRENGTH
+        severity = None
+    else:
+        classification = BodyAnalysisClassification.NEUTRAL
+        severity = None
+    emphasis = tuple(
+        emphasis for item in finding.suggested_training_emphasis for emphasis in _EMPHASIS_MAP[item]
+    )
+    return BodyAnalysisFinding(
+        body_area=finding.area,
+        classification=classification,
+        severity=severity,
+        confidence=finding.confidence,
+        supporting_views=tuple(BodyPhotoView(view) for view in supported_views)
+        or (BodyPhotoView.FRONT,),
+        explanation=finding.overall_summary_fa,
+        limitations=(AnalysisLimitation.VISIBILITY,)
+        if classification is BodyAnalysisClassification.UNCERTAIN
         else (),
         suggested_training_emphasis=tuple(dict.fromkeys(emphasis)),
         medical_review_recommended=False,

@@ -15,6 +15,7 @@ from app.body_analysis.schemas import (
     BodyPhotoPreflight,
     NormalizedBodyAnalysis,
     VisualPhysiqueAssessment,
+    VisualPhysiqueAssessmentV3,
 )
 
 
@@ -36,7 +37,7 @@ class BodyAnalysisResponse(BaseModel):
     result_version: int | None
     result_source: BodyAnalysisResultSource | None
     normalized_result: NormalizedBodyAnalysis | None
-    visual_result: VisualPhysiqueAssessment | None
+    visual_result: VisualPhysiqueAssessment | VisualPhysiqueAssessmentV3 | None
     overall_confidence: float | None
     coach_review: SpecialistReviewState
     doctor_review: SpecialistReviewState
@@ -74,7 +75,7 @@ class BodyAnalysisResultVersionResponse(BaseModel):
     version: int
     source: BodyAnalysisResultSource
     normalized_result: NormalizedBodyAnalysis
-    visual_result: VisualPhysiqueAssessment | None
+    visual_result: VisualPhysiqueAssessment | VisualPhysiqueAssessmentV3 | None
     overall_confidence: float
     created_by_user_id: UUID | None
     created_at: datetime

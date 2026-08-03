@@ -189,6 +189,15 @@ VisualTrainingEmphasis = Literal[
     "calves",
     "left_right_balance",
 ]
+VisualChecklistRating = Literal[
+    "excellent",
+    "good",
+    "average",
+    "needs_attention",
+    "focus_priority",
+    "not_assessable",
+]
+VisualSuggestedGoal = Literal["lose_weight", "maintain_weight", "build_muscle", "gain_weight"]
 
 
 class VisualViewQuality(BaseModel):
@@ -297,6 +306,98 @@ class VisualPhysiqueAssessment(VisualPhysiqueAssessmentPayload):
     )
 
 
+class VisualChecklistView(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    rating: VisualChecklistRating
+    evidence_fa: str = Field(min_length=1, max_length=500)
+
+
+class VisualChecklistFinding(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    area: BodyArea
+    front: VisualChecklistView
+    side: VisualChecklistView
+    back: VisualChecklistView
+    overall_rating: VisualChecklistRating
+    overall_summary_fa: str = Field(min_length=1, max_length=800)
+    confidence: float = Field(ge=0, le=1)
+    suggested_training_emphasis: tuple[VisualTrainingEmphasis, ...] = Field(
+        default=(), max_length=8
+    )
+
+    @model_validator(mode="after")
+    def validate_training_emphasis(self) -> VisualChecklistFinding:
+        if self.overall_rating not in {"needs_attention", "focus_priority"}:
+            if self.suggested_training_emphasis:
+                raise ValueError("only attention ratings can include training emphasis")
+        if len(set(self.suggested_training_emphasis)) != len(self.suggested_training_emphasis):
+            raise ValueError("training emphasis values must be unique")
+        return self
+
+
+class VisualGoalSuggestion(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    suggested_goal: VisualSuggestedGoal
+    reasoning_fa: str = Field(min_length=1, max_length=800)
+    inputs_unavailable_fa: tuple[str, ...] = Field(default=(), max_length=6)
+
+
+class VisualPhysiqueAssessmentV3Payload(BaseModel):
+    """Provider-owned v3 checklist response."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    assessment_status: VisualAssessmentStatus
+    photo_quality: VisualPhotoQuality
+    overall_assessment: VisualOverallAssessment
+    goal_suggestion: VisualGoalSuggestion
+    findings: tuple[VisualChecklistFinding, ...] = Field(min_length=13, max_length=13)
+
+    @model_validator(mode="after")
+    def validate_assessment(self) -> VisualPhysiqueAssessmentV3Payload:
+        expected_areas = set(BodyArea)
+        areas = {finding.area for finding in self.findings}
+        if areas != expected_areas or len(areas) != len(self.findings):
+            raise ValueError("findings must contain each supported body area exactly once")
+        usable_count = len(self.photo_quality.usable_views)
+        if self.assessment_status == "complete" and usable_count != 3:
+            raise ValueError("complete assessments require three usable views")
+        if self.assessment_status == "partial" and usable_count != 2:
+            raise ValueError("partial assessments require exactly two usable views")
+        qualities = {
+            BodyPhotoView.FRONT: self.photo_quality.front,
+            BodyPhotoView.SIDE: self.photo_quality.side,
+            BodyPhotoView.BACK: self.photo_quality.back,
+        }
+        for finding in self.findings:
+            for view, checklist in (
+                (BodyPhotoView.FRONT, finding.front),
+                (BodyPhotoView.SIDE, finding.side),
+                (BodyPhotoView.BACK, finding.back),
+            ):
+                if not qualities[view].usable and checklist.rating != "not_assessable":
+                    raise ValueError("unusable views must be not_assessable")
+        return self
+
+
+class VisualPhysiqueAssessmentV3(VisualPhysiqueAssessmentV3Payload):
+    """Validated v3 result enriched with backend-owned product policy."""
+
+    medical_review_recommended: Literal[False] = False
+    human_coach_review_required: Literal[True] = True
+    human_doctor_review_required: Literal[True] = True
+    provisional_notice_fa: Literal[
+        "این ارزیابی صرفاً یک بررسی بصری اولیه است و پیش از استفاده در طراحی برنامه باید توسط "
+        "مربی واجد صلاحیت بازبینی شود."
+    ] = (
+        "این ارزیابی صرفاً یک بررسی بصری اولیه است و پیش از استفاده در طراحی برنامه باید توسط "
+        "مربی واجد صلاحیت بازبینی شود."
+    )
+
+
 def visual_physique_provider_schema() -> dict[str, Any]:
     """Return a transport schema supported by constrained-output vision providers.
 
@@ -307,6 +408,15 @@ def visual_physique_provider_schema() -> dict[str, Any]:
     return cast(
         dict[str, Any],
         _relax_provider_schema(VisualPhysiqueAssessmentPayload.model_json_schema()),
+    )
+
+
+def visual_physique_v3_provider_schema() -> dict[str, Any]:
+    """Return the relaxed transport schema for the v3 checklist."""
+
+    return cast(
+        dict[str, Any],
+        _relax_provider_schema(VisualPhysiqueAssessmentV3Payload.model_json_schema()),
     )
 
 

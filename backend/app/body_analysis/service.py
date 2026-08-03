@@ -29,7 +29,9 @@ from app.body_analysis.normalization import (
     MedicalClaimError,
     normalize_body_analysis,
     normalize_visual_physique_assessment,
+    normalize_visual_physique_assessment_v3,
     visual_assessment_to_normalized,
+    visual_assessment_v3_to_normalized,
 )
 from app.body_analysis.providers import (
     AIProvider,
@@ -46,9 +48,11 @@ from app.body_analysis.schemas import (
     BodyPhotoValidationIssue,
     NormalizedBodyAnalysis,
     visual_physique_provider_schema,
+    visual_physique_v3_provider_schema,
 )
 from app.body_photos.enums import BodyPhotoSessionState, BodyPhotoView
 from app.body_photos.models import BodyPhoto, BodyPhotoSession
+from app.profile.models import BodyMeasurement, UserProfile
 
 
 class BodyAnalysisNotFoundError(LookupError):
@@ -135,9 +139,7 @@ Do not infer age, sex, gender, identity, ethnicity, body-fat percentage, health,
 injury, mobility, physical strength, training history, genetics, the cause of an asymmetry, or
 whether a visible difference persists outside the photo. Do not diagnose posture or a medical
 condition. Do not recommend medical care, rehabilitation, exercises, sets, repetitions, loads,
-frequency, or volume. A classification of strength means only visually more developed or
-proportionally prominent relative to this person's other visible body areas; it never means actual
-physical strength.
+frequency, or volume.
 
 Compare areas primarily with this same person's other visible areas, never with the general
 population, athletes, fitness models, ideals, or demographic groups. Use visible size, contour,
@@ -157,14 +159,16 @@ profile. A phone is a limitation only when it materially hides the relevant tiss
 view assess rear delts, upper and mid-back thickness, lat width, arms, waist taper, glutes,
 hamstrings, calves, and visible side-to-side differences.
 
-Classify every area exactly once. Use strength only when it is visibly more developed or
-proportionally prominent relative to this person's other assessable areas. Use neutral when it is
-assessable with no meaningful relative strength or lag. Use mild_lag for a smaller but credible
-proportional gap. Use clear_lag sparingly for a noticeable, actionable proportional gap, normally
-supported by two views when the area is visible in two views. Use uncertain only when it cannot be
-responsibly compared from the available views. Do not return an all-uncertain result when multiple
-body regions are clearly visible. Do not force strengths or lags: a genuinely balanced visible area
-is neutral.
+For each area, fill front, side, and back checklist items. Use excellent and good only when the
+area is proportionally prominent relative to this same person's other visible areas; average when
+it is assessable without a meaningful relative gap; needs_attention for a credible moderate
+proportional gap; focus_priority for a clear actionable proportional gap; and not_assessable only
+when that specific view cannot responsibly demonstrate the area. A view may be not_assessable
+because it does not show the area naturally; this is not a failure. The overall rating must compare
+the area with the person's full visible physique, cross-check usable views, and must not invent a
+gap. Use focus_priority sparingly. A strong overall rating requires support in at least two views
+when the area is visible in two views.
+Do not return an all-uncertain result when multiple body regions are clearly visible.
 
 For symmetry, report only obvious image-left versus image-right differences. Never call either
 side the person's anatomical left or right. Ignore small differences reasonably explained by camera
@@ -176,19 +180,23 @@ Return only valid JSON matching the supplied schema and do not add fields. Set a
 to complete when all three views are usable and partial when exactly two are usable. In
 photo_quality record each view's usable state and concise Persian limitations. In
 overall_assessment provide the allowed proportional labels and a concise Persian summary. Return
-exactly 13 findings using these
-area values: shoulders, chest, back, lats, arms, forearms, waist_midsection, glutes, quads,
-hamstrings, calves, symmetry, visible_alignment_or_posture. For every finding, write evidence_fa in
-concise, natural Persian. Name the visible comparison and supporting view or views, describe only
-observable evidence, and avoid motivational filler. For mild_lag and clear_lag set severity between
-0 and 1; for strength, neutral, uncertain, and not_assessable set severity to null.
+exactly 13 findings using the prescribed area values. For every per-view and overall finding, write
+concise, natural Persian evidence that names the visible comparison and its view; describe only
+observable evidence and avoid motivational filler.
 
-Only mild_lag and clear_lag may contain suggested_training_emphasis. Use only values directly
-supported by the affected area: shoulders -> overall_shoulders, lateral_delts, and/or rear_delts;
-chest -> overall_chest and/or upper_chest; back -> upper_back and/or mid_back; lats -> lat_width;
-arms -> overall_arms, biceps, and/or triceps; forearms -> forearms; waist_midsection ->
+Use the supplied profile context only for the advisory goal_suggestion. Choose exactly one of
+lose_weight, maintain_weight, build_muscle, or gain_weight. Respect the user's recorded goal as a
+strong input but do not overwrite it. You may use available height, weight, shoulder, waist, and hip
+measurements plus non-medical visible proportion observations. Never estimate body-fat percentage.
+State missing inputs in inputs_unavailable_fa. The suggestion is advisory, not a diagnosis or a
+prescription.
+
+Only needs_attention and focus_priority may contain suggested_training_emphasis. Use only values
+directly supported by the affected area: shoulders -> overall_shoulders, lateral_delts, and/or
+rear_delts; chest -> overall_chest and/or upper_chest; back -> upper_back and/or mid_back; lats ->
+lat_width; arms -> overall_arms, biceps, and/or triceps; forearms -> forearms; waist_midsection ->
 trunk_musculature; glutes -> glutes; quads -> quads; hamstrings -> hamstrings; calves -> calves.
-For symmetry use left_right_balance only when it is a lag. For visible_alignment_or_posture leave
+For symmetry use left_right_balance only when appropriate. For visible_alignment_or_posture leave
 suggested_training_emphasis empty. Never provide exercises or programming instructions. The result
 is provisional and requires human coach and doctor review."""
 
@@ -390,14 +398,21 @@ class BodyAnalysisService:
             self._db.commit()
 
             response = await provider.analyze_images(
-                self._request(execution_config),
+                self._request(
+                    execution_config,
+                    profile_context=self._profile_context(analysis.session.user_id),
+                ),
                 images=analysis_images,
             )
             visual_result = None
             if execution_config.schema_version == "2.0":
-                visual = normalize_visual_physique_assessment(response.payload)
-                normalized = visual_assessment_to_normalized(visual)
-                visual_result = visual.model_dump(mode="json")
+                visual_v2 = normalize_visual_physique_assessment(response.payload)
+                normalized = visual_assessment_to_normalized(visual_v2)
+                visual_result = visual_v2.model_dump(mode="json")
+            elif execution_config.schema_version == "3.0":
+                visual_v3 = normalize_visual_physique_assessment_v3(response.payload)
+                normalized = visual_assessment_v3_to_normalized(visual_v3)
+                visual_result = visual_v3.model_dump(mode="json")
             else:
                 normalized = normalize_body_analysis(response.payload)
             if normalized.schema_version != execution_config.schema_version:
@@ -729,21 +744,30 @@ class BodyAnalysisService:
         return (left or Decimal("0")) + (right or Decimal("0"))
 
     @staticmethod
-    def _request(config: AnalysisExecutionConfig) -> StructuredGenerationRequest:
+    def _request(
+        config: AnalysisExecutionConfig,
+        *,
+        profile_context: dict[str, object] | None = None,
+    ) -> StructuredGenerationRequest:
         return StructuredGenerationRequest(
             system_prompt=_ANALYSIS_PROMPT,
             input_payload={
                 "task": "analyze_processed_body_views",
                 "schema_version": config.schema_version,
+                "profile_context": profile_context or {},
             },
             response_schema=(
                 visual_physique_provider_schema()
                 if config.schema_version == "2.0"
+                else visual_physique_v3_provider_schema()
+                if config.schema_version == "3.0"
                 else NormalizedBodyAnalysis.model_json_schema()
             ),
             schema_name=(
                 "fitsho_physique_assessment_v2"
                 if config.schema_version == "2.0"
+                else "fitsho_physique_assessment_v3"
+                if config.schema_version == "3.0"
                 else "fitsho_body_analysis"
             ),
             route=ModelRoute(
@@ -754,6 +778,41 @@ class BodyAnalysisService:
             temperature=config.temperature,
             max_output_tokens=config.max_output_tokens,
         )
+
+    def _profile_context(self, user_id: UUID) -> dict[str, object]:
+        profile = self._db.get(UserProfile, user_id)
+        if profile is None:
+            return {}
+        measurement = self._db.scalar(
+            select(BodyMeasurement)
+            .where(BodyMeasurement.user_id == user_id)
+            .order_by(BodyMeasurement.measured_at.desc(), BodyMeasurement.id.desc())
+        )
+        if measurement is None:
+            return {
+                "selected_goal": profile.fitness_goal.value,
+                "height_cm": profile.height_cm,
+            }
+        return {
+            "selected_goal": profile.fitness_goal.value,
+            "height_cm": profile.height_cm,
+            "weight_kg": float(measurement.weight_kg),
+            "shoulder_circumference_cm": (
+                float(measurement.shoulder_circumference_cm)
+                if measurement.shoulder_circumference_cm is not None
+                else None
+            ),
+            "waist_circumference_cm": (
+                float(measurement.waist_circumference_cm)
+                if measurement.waist_circumference_cm is not None
+                else None
+            ),
+            "hip_circumference_cm": (
+                float(measurement.hip_circumference_cm)
+                if measurement.hip_circumference_cm is not None
+                else None
+            ),
+        }
 
     @staticmethod
     def _preflight_request(config: AnalysisExecutionConfig) -> StructuredGenerationRequest:

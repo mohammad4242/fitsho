@@ -122,6 +122,71 @@ def test_normalizes_schema_v2_visual_assessment_and_derives_legacy_projection() 
     assert legacy.findings[3].suggested_training_emphasis == ("back_width",)
 
 
+def test_normalizes_schema_v3_checklist_and_projects_program_priorities() -> None:
+    from app.body_analysis.normalization import (
+        normalize_visual_physique_assessment_v3,
+        visual_assessment_v3_to_normalized,
+    )
+
+    areas = [area.value for area in BodyArea]
+    payload = {
+        "assessment_status": "complete",
+        "photo_quality": {
+            "front": {"usable": True, "issues_fa": []},
+            "side": {"usable": True, "issues_fa": []},
+            "back": {"usable": True, "issues_fa": []},
+            "global_limitations_fa": [],
+        },
+        "overall_assessment": {
+            "development_pattern": "mixed",
+            "shoulder_to_waist_taper": "moderate",
+            "upper_lower_balance": "balanced",
+            "summary_fa": "تناسب کلی بر پایهٔ نماهای قابل مشاهده بررسی شد.",
+        },
+        "goal_suggestion": {
+            "suggested_goal": "build_muscle",
+            "reasoning_fa": "هدف فعلی کاربر با تناسب قابل مشاهده و داده‌های ثبت‌شده هم‌راستاست.",
+            "inputs_unavailable_fa": ["اندازهٔ دور شانه ثبت نشده است."],
+        },
+        "findings": [
+            {
+                "area": area,
+                "front": {
+                    "rating": "average",
+                    "evidence_fa": "نمای روبه‌رو برای مقایسه قابل استفاده است.",
+                },
+                "side": {
+                    "rating": "average",
+                    "evidence_fa": "نمای نیمرخ برای مقایسه قابل استفاده است.",
+                },
+                "back": {
+                    "rating": "average",
+                    "evidence_fa": "نمای پشت برای مقایسه قابل استفاده است.",
+                },
+                "overall_rating": "focus_priority" if area == "lats" else "average",
+                "overall_summary_fa": "جمع‌بندی فقط بر پایهٔ تناسب قابل مشاهده است.",
+                "confidence": 0.8,
+                "suggested_training_emphasis": ["lat_width"] if area == "lats" else [],
+            }
+            for area in areas
+        ],
+    }
+    lats = next(item for item in payload["findings"] if item["area"] == "lats")
+    lats["back"] = {
+        "rating": "focus_priority",
+        "evidence_fa": "در نمای پشت عرض لت‌ها نسبت به بالاتنه کمتر دیده می‌شود.",
+    }
+
+    visual = normalize_visual_physique_assessment_v3(payload)
+    normalized = visual_assessment_v3_to_normalized(visual)
+
+    assert visual.goal_suggestion.suggested_goal == "build_muscle"
+    assert len(visual.findings) == 13
+    assert normalized.schema_version == "3.0"
+    assert normalized.summary.priority_areas == (BodyArea.LATS,)
+    assert normalized.findings[3].suggested_training_emphasis == ("back_width",)
+
+
 def test_rejects_unrecognized_body_area() -> None:
     payload = _valid_payload()
     findings = payload["findings"]
