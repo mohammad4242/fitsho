@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import httpx
@@ -91,11 +92,17 @@ def update_task_config(
 @router.get("/models", response_model=ModelCatalogResponse)
 def read_models(
     db: DatabaseSession,
+    settings: AppSettings,
     task_type: AITaskType,
     search: Annotated[str | None, Query(max_length=100)] = None,
 ) -> ModelCatalogResponse:
     items, refreshed_at = list_models(db, task_type=task_type, search=search)
-    return ModelCatalogResponse(items=items, refreshed_at=refreshed_at)
+    stale_before = datetime.now(UTC) - timedelta(seconds=settings.ai_model_catalog_ttl_seconds)
+    return ModelCatalogResponse(
+        items=items,
+        refreshed_at=refreshed_at,
+        stale=refreshed_at is None or refreshed_at < stale_before,
+    )
 
 
 @router.post(

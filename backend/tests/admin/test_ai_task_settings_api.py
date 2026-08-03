@@ -179,6 +179,7 @@ def test_refresh_catalog_and_filter_models_by_task_capability(
     assert refreshed.status_code == 200, refreshed.text
     assert refreshed.json()["model_count"] == 2
     assert [item["model_id"] for item in vision.json()["items"]] == ["vendor/vision-model"]
+    assert vision.json()["stale"] is False
     assert {item["model_id"] for item in workout.json()["items"]} == {
         "vendor/text-model",
         "vendor/vision-model",

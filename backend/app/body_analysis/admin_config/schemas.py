@@ -96,6 +96,7 @@ class ModelCatalogItem(BaseModel):
 class ModelCatalogResponse(BaseModel):
     items: list[ModelCatalogItem]
     refreshed_at: datetime | None
+    stale: bool
 
 
 class ModelCatalogRefreshResponse(BaseModel):

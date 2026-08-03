@@ -22,6 +22,7 @@ export function AdminAiSettingsPage() {
   const [configs, setConfigs] = useState<AdminAiTaskConfig[]>([]);
   const [selectedTask, setSelectedTask] = useState<AdminAiTaskType>("body_photo_analysis");
   const [models, setModels] = useState<AdminAiCatalogModel[]>([]);
+  const [catalogStale, setCatalogStale] = useState(false);
   const [search, setSearch] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -50,7 +51,10 @@ export function AdminAiSettingsPage() {
 
   function loadModels(task: AdminAiTaskType, query: string) {
     return getAdminAiTaskModels(task, query)
-      .then((response) => setModels(response.items))
+      .then((response) => {
+        setModels(response.items);
+        setCatalogStale(response.stale);
+      })
       .catch(() => setError(t("admin.aiSettings.catalogError")));
   }
 
@@ -168,6 +172,7 @@ export function AdminAiSettingsPage() {
         <section className="admin-panel">
           <label className="admin-ai-setting-field" htmlFor="model-search"><span>{t("admin.aiSettings.searchModels")}</span><input id="model-search" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
           <button type="button" onClick={() => void loadModels(selectedTask, search)}>{t("admin.aiSettings.search")}</button>
+          {catalogStale && <p className="form-error" role="status">{t("admin.aiSettings.catalogStale")}</p>}
           <AiModelSelector id="primary-model" label={t("admin.aiSettings.primaryModel")} models={models} value={config.primary_model_id ?? ""} onChange={(value) => patchConfig({ primary_model_id: value || null })} />
           <AiModelSelector id="fallback-models" label={t("admin.aiSettings.fallbackModels")} models={models.filter((model) => model.model_id !== config.primary_model_id)} value="" onChange={() => undefined} multiple values={config.fallback_model_ids} onMultipleChange={(values) => patchConfig({ fallback_model_ids: values })} />
           <div className="admin-ai-capabilities" aria-label={t("admin.aiSettings.selectedCapabilities")}>

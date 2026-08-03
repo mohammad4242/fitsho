@@ -243,6 +243,7 @@ export type AdminAiCatalogModel = {
 export type AdminAiCatalogResponse = {
   items: AdminAiCatalogModel[];
   refreshed_at: string | null;
+  stale: boolean;
 };
 
 export type AdminAiProviderTest = {

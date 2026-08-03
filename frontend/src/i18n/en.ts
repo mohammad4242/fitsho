@@ -209,6 +209,7 @@ const en = {
         refreshed: "Model catalog refreshed",
         loadError: "Unable to load AI settings.",
         catalogError: "Unable to load the model catalog.",
+        catalogStale: "The cached model catalog is stale. Refresh it before selecting models.",
         saveError: "Unable to save AI settings.",
         refreshError: "Unable to refresh models.",
       },
