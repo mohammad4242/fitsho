@@ -21,7 +21,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.body_analysis.enums import BodyAnalysisStatus
+from app.body_analysis.enums import (
+    BodyAnalysisResultSource,
+    BodyAnalysisReviewDecision,
+    BodyAnalysisReviewerRole,
+    BodyAnalysisStatus,
+)
 from app.body_photos.models import BodyPhotoSession
 from app.database.base import Base
 
@@ -107,3 +112,118 @@ class BodyAnalysis(Base):
 
     session: Mapped[BodyPhotoSession] = relationship()
     replaces_analysis: Mapped[BodyAnalysis | None] = relationship(remote_side="BodyAnalysis.id")
+    result_versions: Mapped[list[BodyAnalysisResultVersion]] = relationship(
+        back_populates="analysis",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="BodyAnalysisResultVersion.version",
+    )
+    reviews: Mapped[list[BodyAnalysisReview]] = relationship(
+        back_populates="analysis",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="BodyAnalysisReview.created_at",
+    )
+
+
+class BodyAnalysisResultVersion(Base):
+    """Append-only normalized result history, independent of provider envelopes."""
+
+    __tablename__ = "body_analysis_result_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "analysis_id", "version", name="uq_body_analysis_result_versions_analysis_version"
+        ),
+        CheckConstraint("version > 0", name="ck_body_analysis_result_versions_version_positive"),
+        CheckConstraint(
+            "overall_confidence >= 0 AND overall_confidence <= 1",
+            name="ck_body_analysis_result_versions_confidence_range",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    analysis_id: Mapped[UUID] = mapped_column(
+        ForeignKey("body_analyses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    replaces_version_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("body_analysis_result_versions.id", ondelete="SET NULL")
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[BodyAnalysisResultSource] = mapped_column(
+        Enum(
+            BodyAnalysisResultSource,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_body_analysis_result_versions_source_values",
+        ),
+        nullable=False,
+    )
+    normalized_result: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    overall_confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    created_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    analysis: Mapped[BodyAnalysis] = relationship(back_populates="result_versions")
+    replaces_version: Mapped[BodyAnalysisResultVersion | None] = relationship(
+        remote_side="BodyAnalysisResultVersion.id"
+    )
+
+
+class BodyAnalysisReview(Base):
+    """Append-only specialist decision for one immutable result version."""
+
+    __tablename__ = "body_analysis_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "notes IS NULL OR char_length(notes) > 0",
+            name="ck_body_analysis_reviews_notes_nonempty",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    analysis_id: Mapped[UUID] = mapped_column(
+        ForeignKey("body_analyses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    result_version_id: Mapped[UUID] = mapped_column(
+        ForeignKey("body_analysis_result_versions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    reviewer_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    reviewer_role: Mapped[BodyAnalysisReviewerRole] = mapped_column(
+        Enum(
+            BodyAnalysisReviewerRole,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_body_analysis_reviews_role_values",
+        ),
+        nullable=False,
+    )
+    decision: Mapped[BodyAnalysisReviewDecision] = mapped_column(
+        Enum(
+            BodyAnalysisReviewDecision,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_body_analysis_reviews_decision_values",
+        ),
+        nullable=False,
+    )
+    notes: Mapped[str | None] = mapped_column(String(2000))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    analysis: Mapped[BodyAnalysis] = relationship(back_populates="reviews")
+    result_version: Mapped[BodyAnalysisResultVersion] = relationship()

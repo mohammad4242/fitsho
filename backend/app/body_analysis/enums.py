@@ -34,6 +34,23 @@ class BodyAnalysisStatus(StrEnum):
     FAILED = "failed"
 
 
+class BodyAnalysisResultSource(StrEnum):
+    AI = "ai"
+    COACH = "coach"
+    DOCTOR = "doctor"
+
+
+class BodyAnalysisReviewerRole(StrEnum):
+    COACH = "coach"
+    DOCTOR = "doctor"
+
+
+class BodyAnalysisReviewDecision(StrEnum):
+    APPROVED = "approved"
+    CHANGES_REQUIRED = "changes_required"
+    REJECTED = "rejected"
+
+
 class TrainingEmphasis(StrEnum):
     LATERAL_DELTOID = "lateral_deltoid"
     REAR_DELTOID = "rear_deltoid"
