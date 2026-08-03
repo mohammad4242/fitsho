@@ -185,6 +185,18 @@ class BodyMeasurement(Base):
             "weight_kg BETWEEN 20 AND 500",
             name="ck_body_measurements_weight_kg_range",
         ),
+        CheckConstraint(
+            "shoulder_circumference_cm IS NULL OR shoulder_circumference_cm BETWEEN 40 AND 250",
+            name="ck_body_measurements_shoulder_circumference_range",
+        ),
+        CheckConstraint(
+            "waist_circumference_cm IS NULL OR waist_circumference_cm BETWEEN 40 AND 250",
+            name="ck_body_measurements_waist_circumference_range",
+        ),
+        CheckConstraint(
+            "hip_circumference_cm IS NULL OR hip_circumference_cm BETWEEN 40 AND 250",
+            name="ck_body_measurements_hip_circumference_range",
+        ),
         Index("ix_body_measurements_user_id_measured_at", "user_id", "measured_at"),
     )
 
@@ -193,6 +205,9 @@ class BodyMeasurement(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     weight_kg: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    shoulder_circumference_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    waist_circumference_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    hip_circumference_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     measured_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

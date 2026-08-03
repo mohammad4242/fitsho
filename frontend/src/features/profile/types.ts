@@ -34,6 +34,9 @@ export type ProfileInput = {
   sex: Sex;
   height_cm: number;
   current_weight_kg: number;
+  shoulder_circumference_cm: number | null;
+  waist_circumference_cm: number | null;
+  hip_circumference_cm: number | null;
   fitness_goal: FitnessGoal;
   experience_level: ExperienceLevel;
   training_days_per_week: number;
@@ -51,6 +54,7 @@ export type ProfilePatch = Partial<ProfileInput>;
 export type Profile = ProfileInput & {
   user_id: string;
   weight_measured_at: string;
+  circumferences_measured_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -61,6 +65,9 @@ export type ProfileFormValues = {
   sex: Sex | "";
   height_cm: string;
   current_weight_kg: string;
+  shoulder_circumference_cm: string;
+  waist_circumference_cm: string;
+  hip_circumference_cm: string;
   fitness_goal: FitnessGoal | "";
   experience_level: ExperienceLevel | "";
   training_days_per_week: string;

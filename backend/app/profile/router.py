@@ -38,6 +38,33 @@ def to_response(snapshot: ProfileSnapshot) -> ProfileResponse:
         height_cm=profile.height_cm,
         current_weight_kg=float(measurement.weight_kg),
         weight_measured_at=measurement.measured_at,
+        shoulder_circumference_cm=(
+            float(measurement.shoulder_circumference_cm)
+            if measurement.shoulder_circumference_cm is not None
+            else None
+        ),
+        waist_circumference_cm=(
+            float(measurement.waist_circumference_cm)
+            if measurement.waist_circumference_cm is not None
+            else None
+        ),
+        hip_circumference_cm=(
+            float(measurement.hip_circumference_cm)
+            if measurement.hip_circumference_cm is not None
+            else None
+        ),
+        circumferences_measured_at=(
+            measurement.measured_at
+            if any(
+                value is not None
+                for value in (
+                    measurement.shoulder_circumference_cm,
+                    measurement.waist_circumference_cm,
+                    measurement.hip_circumference_cm,
+                )
+            )
+            else None
+        ),
         fitness_goal=profile.fitness_goal,
         experience_level=profile.experience_level,
         training_days_per_week=profile.training_days_per_week,

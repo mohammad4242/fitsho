@@ -17,6 +17,9 @@ const validValues: ProfileFormValues = {
   sex: "male",
   height_cm: "178",
   current_weight_kg: "76.5",
+  shoulder_circumference_cm: "",
+  waist_circumference_cm: "",
+  hip_circumference_cm: "",
   fitness_goal: "build_muscle",
   experience_level: "beginner",
   training_days_per_week: "3",
@@ -36,6 +39,10 @@ const profile: Profile = {
   height_cm: 178,
   current_weight_kg: 76.5,
   weight_measured_at: "2026-07-27T12:00:00Z",
+  shoulder_circumference_cm: null,
+  waist_circumference_cm: null,
+  hip_circumference_cm: null,
+  circumferences_measured_at: null,
   fitness_goal: "build_muscle",
   experience_level: "beginner",
   training_days_per_week: 3,
@@ -112,6 +119,20 @@ describe("profile validation", () => {
     });
   });
 
+  it("accepts blank optional circumferences and validates supplied values", () => {
+    expect(validateStep(validValues, 2, today)).toEqual({});
+    expect(
+      validateStep(
+        { ...validValues, shoulder_circumference_cm: "39.99", hip_circumference_cm: "98.123" },
+        2,
+        today,
+      ),
+    ).toEqual({
+      shoulder_circumference_cm: "circumferenceRange",
+      hip_circumference_cm: "circumferencePrecision",
+    });
+  });
+
   it("accepts only two through six training days and catches overlong limitations", () => {
     expect(validateStep({ ...validValues, training_days_per_week: "6" }, 3, today)).toEqual({});
     expect(validateStep({ ...validValues, training_days_per_week: "1" }, 3, today)).toEqual({
@@ -175,6 +196,9 @@ describe("profile validation", () => {
         display_name: "  Mohammad  ",
         height_cm: " 178 ",
         current_weight_kg: " 76.5 ",
+        shoulder_circumference_cm: " 122.5 ",
+        waist_circumference_cm: " 84 ",
+        hip_circumference_cm: " 98.25 ",
         training_days_per_week: " 3 ",
         physical_limitations: "   ",
       }),
@@ -184,6 +208,9 @@ describe("profile validation", () => {
       sex: "male",
       height_cm: 178,
       current_weight_kg: 76.5,
+      shoulder_circumference_cm: 122.5,
+      waist_circumference_cm: 84,
+      hip_circumference_cm: 98.25,
       fitness_goal: "build_muscle",
       experience_level: "beginner",
       training_days_per_week: 3,

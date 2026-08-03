@@ -83,6 +83,37 @@ def test_patch_same_weight_is_idempotent(client: TestClient, db: Session) -> Non
     )
 
 
+def test_patch_updates_optional_circumferences_as_a_new_measurement(
+    client: TestClient, db: Session
+) -> None:
+    user_id = register(client, "profile-circumferences@example.com")
+    create_profile(client)
+
+    response = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={
+            "shoulder_circumference_cm": 122.5,
+            "waist_circumference_cm": 84,
+            "hip_circumference_cm": 98.25,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["shoulder_circumference_cm"] == 122.5
+    assert response.json()["waist_circumference_cm"] == 84
+    assert response.json()["hip_circumference_cm"] == 98.25
+    assert response.json()["circumferences_measured_at"] is not None
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(BodyMeasurement)
+            .where(BodyMeasurement.user_id == user_id)
+        )
+        == 2
+    )
+
+
 def test_patch_rejects_empty_body(client: TestClient) -> None:
     register(client)
     create_profile(client)

@@ -54,6 +54,9 @@ def create_profile(
     measurement = BodyMeasurement(
         user_id=user_id,
         weight_kg=payload.current_weight_kg,
+        shoulder_circumference_cm=payload.shoulder_circumference_cm,
+        waist_circumference_cm=payload.waist_circumference_cm,
+        hip_circumference_cm=payload.hip_circumference_cm,
     )
     db.add(profile)
     try:
@@ -119,6 +122,16 @@ def update_profile(
     supplied_fields = payload.model_dump(exclude_unset=True)
     supplied_cautions = supplied_fields.pop("training_cautions", None)
     supplied_weight = supplied_fields.pop("current_weight_kg", None)
+    circumference_fields = (
+        "shoulder_circumference_cm",
+        "waist_circumference_cm",
+        "hip_circumference_cm",
+    )
+    supplied_circumferences = {
+        field_name: supplied_fields.pop(field_name)
+        for field_name in circumference_fields
+        if field_name in supplied_fields
+    }
 
     final_location = supplied_fields.get("training_location", profile.training_location)
     final_home_setup = supplied_fields.get("home_training_setup", profile.home_training_setup)
@@ -136,8 +149,25 @@ def update_profile(
             for caution in sorted(supplied_cautions or [], key=lambda value: value.value)
         ]
 
-    if supplied_weight is not None and supplied_weight != measurement.weight_kg:
-        measurement = BodyMeasurement(user_id=user_id, weight_kg=supplied_weight)
+    changed_weight = supplied_weight is not None and supplied_weight != measurement.weight_kg
+    changed_circumferences = any(
+        value != getattr(measurement, field_name)
+        for field_name, value in supplied_circumferences.items()
+    )
+    if changed_weight or changed_circumferences:
+        measurement = BodyMeasurement(
+            user_id=user_id,
+            weight_kg=supplied_weight if changed_weight else measurement.weight_kg,
+            shoulder_circumference_cm=supplied_circumferences.get(
+                "shoulder_circumference_cm", measurement.shoulder_circumference_cm
+            ),
+            waist_circumference_cm=supplied_circumferences.get(
+                "waist_circumference_cm", measurement.waist_circumference_cm
+            ),
+            hip_circumference_cm=supplied_circumferences.get(
+                "hip_circumference_cm", measurement.hip_circumference_cm
+            ),
+        )
         db.add(measurement)
 
     try:

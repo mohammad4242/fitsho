@@ -17,6 +17,7 @@ from app.profile.enums import (
 
 SessionDurationMinutes = Literal[30, 45, 60, 75, 90]
 PlanDurationWeeks = Literal[4, 6, 8]
+CircumferenceCm = Decimal
 
 
 def calculate_age(birth_date: date, today: date) -> int:
@@ -37,6 +38,15 @@ class ProfileCreate(BaseModel):
         le=Decimal("500"),
         max_digits=5,
         decimal_places=2,
+    )
+    shoulder_circumference_cm: CircumferenceCm | None = Field(
+        default=None, ge=Decimal("40"), le=Decimal("250"), max_digits=5, decimal_places=2
+    )
+    waist_circumference_cm: CircumferenceCm | None = Field(
+        default=None, ge=Decimal("40"), le=Decimal("250"), max_digits=5, decimal_places=2
+    )
+    hip_circumference_cm: CircumferenceCm | None = Field(
+        default=None, ge=Decimal("40"), le=Decimal("250"), max_digits=5, decimal_places=2
     )
     fitness_goal: FitnessGoal
     experience_level: ExperienceLevel
@@ -98,6 +108,15 @@ class ProfileUpdate(BaseModel):
         max_digits=5,
         decimal_places=2,
     )
+    shoulder_circumference_cm: CircumferenceCm | None = Field(
+        default=None, ge=Decimal("40"), le=Decimal("250"), max_digits=5, decimal_places=2
+    )
+    waist_circumference_cm: CircumferenceCm | None = Field(
+        default=None, ge=Decimal("40"), le=Decimal("250"), max_digits=5, decimal_places=2
+    )
+    hip_circumference_cm: CircumferenceCm | None = Field(
+        default=None, ge=Decimal("40"), le=Decimal("250"), max_digits=5, decimal_places=2
+    )
     fitness_goal: FitnessGoal | None = None
     experience_level: ExperienceLevel | None = None
     training_days_per_week: int | None = Field(default=None, ge=2, le=6)
@@ -145,7 +164,13 @@ class ProfileUpdate(BaseModel):
         if not self.model_fields_set:
             raise ValueError("At least one profile field is required")
 
-        required_fields = self.model_fields_set - {"home_training_setup", "physical_limitations"}
+        required_fields = self.model_fields_set - {
+            "home_training_setup",
+            "physical_limitations",
+            "shoulder_circumference_cm",
+            "waist_circumference_cm",
+            "hip_circumference_cm",
+        }
         if any(getattr(self, field_name) is None for field_name in required_fields):
             raise ValueError("Profile fields cannot be null")
         if self.training_location == TrainingLocation.GYM:
@@ -163,6 +188,10 @@ class ProfileResponse(BaseModel):
     height_cm: int
     current_weight_kg: float
     weight_measured_at: datetime
+    shoulder_circumference_cm: float | None
+    waist_circumference_cm: float | None
+    hip_circumference_cm: float | None
+    circumferences_measured_at: datetime | None
     fitness_goal: FitnessGoal
     experience_level: ExperienceLevel
     training_days_per_week: int

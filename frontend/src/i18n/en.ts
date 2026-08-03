@@ -56,6 +56,9 @@ const en = {
         sex: "Sex",
         height: "Height (centimeters)",
         weight: "Current weight (kilograms)",
+        shoulderCircumference: "Shoulder circumference (cm, optional)",
+        waistCircumference: "Waist circumference (cm, optional)",
+        hipCircumference: "Hip circumference (cm, optional)",
         fitnessGoal: "Fitness goal",
         experience: "Experience level",
         trainingDays: "Training days per week",
@@ -69,6 +72,7 @@ const en = {
       hints: {
         birthDate: "Age must be between 18 and 100.",
         limitations: "Injuries or conditions that should be considered during training.",
+        circumference: "Used for body-proportion analysis; measure at the widest point.",
       },
       options: {
         select: "Select an option",

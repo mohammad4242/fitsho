@@ -185,6 +185,36 @@ export function BodyGoalFields({
         </div>
       </div>
 
+      <div className="profile-field profile-field--measurements">
+        {([
+          ["shoulder_circumference_cm", "shoulderCircumference"],
+          ["waist_circumference_cm", "waistCircumference"],
+          ["hip_circumference_cm", "hipCircumference"],
+        ] as const).map(([field, label]) => (
+          <div key={field}>
+            <label htmlFor={`profile-${field}`}>{t(`onboarding.fields.${label}`)}</label>
+            <input
+              id={`profile-${field}`}
+              name={field}
+              type="number"
+              inputMode="decimal"
+              autoComplete="off"
+              min={40}
+              max={250}
+              step={0.01}
+              value={values[field]}
+              aria-invalid={errors[field] !== undefined}
+              aria-describedby={describedBy(field, errors[field], true)}
+              onChange={(event) => onChange(field, event.target.value)}
+            />
+            <p className="profile-field__hint" id={`${field}-hint`}>
+              {t("onboarding.hints.circumference")}
+            </p>
+            <FieldError field={field} error={errors[field]} />
+          </div>
+        ))}
+      </div>
+
       <div className="profile-field">
         <label htmlFor="profile-fitness-goal">{t("onboarding.fields.fitnessGoal")}</label>
         <select

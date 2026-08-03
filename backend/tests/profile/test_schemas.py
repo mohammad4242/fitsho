@@ -32,6 +32,21 @@ def test_profile_create_normalizes_text_and_decimal() -> None:
     assert profile.physical_limitations is None
 
 
+def test_profile_create_accepts_optional_circumference_measurements() -> None:
+    profile = ProfileCreate.model_validate(
+        {
+            **valid_payload(),
+            "shoulder_circumference_cm": "122.5",
+            "waist_circumference_cm": "84.0",
+            "hip_circumference_cm": "98.25",
+        }
+    )
+
+    assert profile.shoulder_circumference_cm == Decimal("122.50")
+    assert profile.waist_circumference_cm == Decimal("84.00")
+    assert profile.hip_circumference_cm == Decimal("98.25")
+
+
 def test_calculate_age_handles_birthday_boundary() -> None:
     today = date(2026, 7, 27)
 
@@ -47,6 +62,9 @@ def test_calculate_age_handles_birthday_boundary() -> None:
         ("current_weight_kg", "19.99"),
         ("current_weight_kg", "500.01"),
         ("current_weight_kg", "70.123"),
+        ("shoulder_circumference_cm", "39.99"),
+        ("waist_circumference_cm", "250.01"),
+        ("hip_circumference_cm", "98.123"),
         ("training_days_per_week", 0),
         ("training_days_per_week", 1),
         ("training_days_per_week", 7),

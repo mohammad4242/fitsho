@@ -109,6 +109,11 @@
   gap: 0.8rem;
 }
 
+.profile-field--measurements {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
 .profile-field label {
   color: var(--ink);
   font-size: 0.86rem;
@@ -256,6 +261,10 @@
   }
 
   .profile-field--paired {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-field--measurements {
     grid-template-columns: 1fr;
   }
 

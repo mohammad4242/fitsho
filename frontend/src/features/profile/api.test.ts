@@ -10,6 +10,9 @@ const profileInput: ProfileInput = {
   sex: "male",
   height_cm: 178,
   current_weight_kg: 76.5,
+  shoulder_circumference_cm: null,
+  waist_circumference_cm: null,
+  hip_circumference_cm: null,
   fitness_goal: "build_muscle",
   experience_level: "beginner",
   training_days_per_week: 3,
@@ -25,6 +28,7 @@ const profile: Profile = {
   user_id: "018f0000-0000-7000-8000-000000000001",
   ...profileInput,
   weight_measured_at: "2026-07-27T12:00:00Z",
+  circumferences_measured_at: null,
   created_at: "2026-07-27T12:00:00Z",
   updated_at: "2026-07-27T12:00:00Z",
 };

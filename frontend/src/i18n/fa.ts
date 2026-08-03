@@ -56,6 +56,9 @@ const fa = {
         sex: "جنسیت",
         height: "قد (سانتی‌متر)",
         weight: "وزن فعلی (کیلوگرم)",
+        shoulderCircumference: "دور شانه (سانتی‌متر، اختیاری)",
+        waistCircumference: "دور کمر (سانتی‌متر، اختیاری)",
+        hipCircumference: "دور باسن (سانتی‌متر، اختیاری)",
         fitnessGoal: "هدف ورزشی",
         experience: "سطح تجربه",
         trainingDays: "روزهای تمرین در هفته",
@@ -69,6 +72,7 @@ const fa = {
       hints: {
         birthDate: "سن باید بین ۱۸ تا ۱۰۰ سال باشد.",
         limitations: "آسیب‌دیدگی یا شرایطی که باید در تمرین در نظر گرفته شود.",
+        circumference: "برای تحلیل تناسب بدن؛ در پهن‌ترین بخش اندازه بگیر.",
       },
       options: {
         select: "انتخاب کن",

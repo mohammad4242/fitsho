@@ -22,6 +22,8 @@ export type ProfileValidationCode =
   | "heightRange"
   | "weightRange"
   | "weightPrecision"
+  | "circumferenceRange"
+  | "circumferencePrecision"
   | "trainingDaysRange"
   | "sessionDurationInvalid"
   | "planDurationInvalid"
@@ -103,6 +105,24 @@ function validateStepTwo(values: ProfileFormValues): ProfileValidationErrors {
     errors.height_cm = "required";
   } else if (!/^\d+$/.test(height) || Number(height) < 100 || Number(height) > 250) {
     errors.height_cm = "heightRange";
+  }
+
+  for (const field of [
+    "shoulder_circumference_cm",
+    "waist_circumference_cm",
+    "hip_circumference_cm",
+  ] as const) {
+    const value = values[field].trim();
+    if (value === "") {
+      continue;
+    }
+    const match = /^-?\d+(?:\.(\d+))?$/.exec(value);
+    const numericValue = Number(value);
+    if (match === null || !Number.isFinite(numericValue) || numericValue < 40 || numericValue > 250) {
+      errors[field] = "circumferenceRange";
+    } else if ((match[1]?.length ?? 0) > 2) {
+      errors[field] = "circumferencePrecision";
+    }
   }
 
   const weight = values.current_weight_kg.trim();
@@ -210,6 +230,15 @@ export function toProfileInput(values: ProfileFormValues): ProfileInput {
     sex: values.sex as Sex,
     height_cm: Number(values.height_cm.trim()),
     current_weight_kg: Number(values.current_weight_kg.trim()),
+    shoulder_circumference_cm: values.shoulder_circumference_cm.trim()
+      ? Number(values.shoulder_circumference_cm.trim())
+      : null,
+    waist_circumference_cm: values.waist_circumference_cm.trim()
+      ? Number(values.waist_circumference_cm.trim())
+      : null,
+    hip_circumference_cm: values.hip_circumference_cm.trim()
+      ? Number(values.hip_circumference_cm.trim())
+      : null,
     fitness_goal: values.fitness_goal as FitnessGoal,
     experience_level: values.experience_level as ExperienceLevel,
     training_days_per_week: Number(values.training_days_per_week.trim()),
@@ -234,6 +263,9 @@ export function profileToFormValues(profile: Profile): ProfileFormValues {
     sex: profile.sex,
     height_cm: String(profile.height_cm),
     current_weight_kg: String(profile.current_weight_kg),
+    shoulder_circumference_cm: profile.shoulder_circumference_cm === null ? "" : String(profile.shoulder_circumference_cm),
+    waist_circumference_cm: profile.waist_circumference_cm === null ? "" : String(profile.waist_circumference_cm),
+    hip_circumference_cm: profile.hip_circumference_cm === null ? "" : String(profile.hip_circumference_cm),
     fitness_goal: profile.fitness_goal,
     experience_level: profile.experience_level,
     training_days_per_week: String(profile.training_days_per_week),
@@ -267,6 +299,15 @@ export function toProfilePatch(
   }
   if (input.current_weight_kg !== currentProfile.current_weight_kg) {
     patch.current_weight_kg = input.current_weight_kg;
+  }
+  for (const field of [
+    "shoulder_circumference_cm",
+    "waist_circumference_cm",
+    "hip_circumference_cm",
+  ] as const) {
+    if (input[field] !== currentProfile[field]) {
+      patch[field] = input[field];
+    }
   }
   if (input.fitness_goal !== currentProfile.fitness_goal) {
     patch.fitness_goal = input.fitness_goal;
