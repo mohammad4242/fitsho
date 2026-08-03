@@ -163,6 +163,14 @@ it("renders persisted observability for the selected task", async () => {
   expect(screen.getByText(/rate_limited/)).toBeInTheDocument();
 });
 
+it("opens a concise guide for an advanced task setting", async () => {
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByLabelText("About Temperature"));
+  expect(screen.getByText(/0.1–0.3/)).toBeInTheDocument();
+});
+
 it("ignores a stale catalog response after switching AI tasks", async () => {
   let resolveOldCatalog: ((value: AdminAiCatalogResponse) => void) | undefined;
   const oldCatalog = new Promise<AdminAiCatalogResponse>((resolve) => { resolveOldCatalog = resolve; });
