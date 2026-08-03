@@ -293,6 +293,7 @@ it("ignores delayed task A refresh, test, and save results after an A-to-B-to-A 
   resolveSave?.({ ...bodyConfig, enabled: true });
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(screen.queryByText("Settings saved")).not.toBeInTheDocument();
+  expect(screen.getByRole("checkbox", { name: "Enabled" })).not.toBeChecked();
 });
 
 function renderPage() {

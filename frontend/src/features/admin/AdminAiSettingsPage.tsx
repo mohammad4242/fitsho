@@ -121,11 +121,10 @@ export function AdminAiSettingsPage() {
     };
     void saveAdminAiTaskConfig(taskAtStart, payload)
       .then((saved) => {
+        if (!isActiveOperation(taskAtStart, epochAtStart, operation)) return;
         setConfigs((current) => current.map((item) => item.task_type === taskAtStart ? saved : item));
-        if (isActiveOperation(taskAtStart, epochAtStart, operation)) {
-          setApiKey("");
-          setMessage(t("admin.aiSettings.saved"));
-        }
+        setApiKey("");
+        setMessage(t("admin.aiSettings.saved"));
       })
       .catch(() => {
         if (isActiveOperation(taskAtStart, epochAtStart, operation)) {
