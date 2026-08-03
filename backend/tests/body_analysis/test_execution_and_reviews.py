@@ -440,7 +440,7 @@ def test_low_confidence_and_cost_limited_results_fail_safely(db: Session) -> Non
     failed = asyncio.run(service.execute(analysis.id, _Provider(), _Storage(), config))
 
     assert failed.status is BodyAnalysisStatus.FAILED
-    assert failed.error_message == "Body analysis could not be completed. Please retry later."
+    assert "invalid structured response" in (failed.error_message or "")
 
 
 def test_unauthorized_provider_error_tells_admin_to_replace_openrouter_key(db: Session) -> None:
@@ -456,6 +456,18 @@ def test_unauthorized_provider_error_tells_admin_to_replace_openrouter_key(db: S
     assert (
         failed.error_message
         == "The OpenRouter API key for body analysis was rejected. Update it in Admin AI settings."
+    )
+
+
+def test_invalid_model_output_tells_admin_how_to_correct_the_ai_task(db: Session) -> None:
+    service = BodyAnalysisService(db)
+
+    message = service._safe_failure_message(ProviderErrorCode.INVALID_OUTPUT)
+
+    assert message == (
+        "The selected AI model returned an invalid structured response. "
+        "Choose another image and Structured Output capable model, add a fallback, "
+        "or raise the output-token limit."
     )
 
 

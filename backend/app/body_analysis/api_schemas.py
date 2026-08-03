@@ -37,6 +37,7 @@ class BodyAnalysisResponse(BaseModel):
     doctor_review: SpecialistReviewState
     fully_reviewed: bool
     unverified_warning: bool
+    error_code: str | None
     safe_error_message: str | None
     photo_validation: BodyPhotoPreflight | None
     created_at: datetime

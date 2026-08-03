@@ -130,6 +130,7 @@ const analysis: BodyAnalysis = {
   },
   fully_reviewed: false,
   unverified_warning: true,
+  error_code: null,
   safe_error_message: null,
   photo_validation: null,
   created_at: "2026-08-03T10:00:00Z",
@@ -272,6 +273,22 @@ it("offers a retry for failed analysis and preserves a safe error message", asyn
 
   expect(api.retryBodyPhotoAnalysis).toHaveBeenCalledWith("session-2");
   expect(await screen.findByRole("status")).toHaveTextContent(/queued/i);
+});
+
+it("explains when the selected model returned an invalid analysis response", async () => {
+  api.getBodyPhotoAnalysis.mockResolvedValue({
+    ...analysis,
+    status: "failed",
+    normalized_result: null,
+    overall_confidence: null,
+    error_code: "invalid_output",
+    safe_error_message: "Body analysis could not be completed. Please retry later.",
+  });
+  renderPage();
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    /selected AI model returned an invalid analysis response/i,
+  );
 });
 
 it("shows view-specific retake reasons when photo validation rejects an upload", async () => {

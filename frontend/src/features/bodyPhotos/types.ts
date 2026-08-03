@@ -143,6 +143,7 @@ export type BodyAnalysis = {
   doctor_review: SpecialistReviewState;
   fully_reviewed: boolean;
   unverified_warning: boolean;
+  error_code: string | null;
   safe_error_message: string | null;
   photo_validation: BodyPhotoPreflight | null;
   created_at: string;

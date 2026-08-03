@@ -116,6 +116,7 @@ def _response(db: Session, analysis: BodyAnalysis) -> BodyAnalysisResponse:
         doctor_review=doctor,
         fully_reviewed=fully_reviewed,
         unverified_warning=current is not None and not fully_reviewed,
+        error_code=analysis.error_code,
         safe_error_message=analysis.error_message,
         photo_validation=photo_validation,
         created_at=analysis.created_at,
@@ -224,9 +225,7 @@ def retry_analysis_as_admin(
     runtime: BodyAnalysisRuntimeDependency,
 ) -> BodyAnalysisResponse:
     analysis = db.scalar(
-        select(BodyAnalysis)
-        .where(BodyAnalysis.id == analysis_id)
-        .join(BodyAnalysis.session)
+        select(BodyAnalysis).where(BodyAnalysis.id == analysis_id).join(BodyAnalysis.session)
     )
     if analysis is None:
         raise _not_found()

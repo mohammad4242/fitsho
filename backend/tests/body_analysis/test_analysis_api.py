@@ -72,6 +72,26 @@ def test_analysis_result_api_is_owner_only_and_hides_provider_envelopes(
     assert client.get(f"/api/v1/body-photo-sessions/{photo_session.id}/analysis").status_code == 404
 
 
+def test_analysis_result_exposes_a_safe_error_code_for_actionable_feedback(
+    client: TestClient, db: Session
+) -> None:
+    email = f"result-error-code-{uuid4()}@example.com"
+    _register(client, email)
+    owner = db.scalar(select(User).where(User.email == email))
+    assert owner is not None
+    _, photo_session = _submitted_session(db, owner)
+    analysis = BodyAnalysisService(db).queue(photo_session.id, owner.id, _config())
+    analysis.status = BodyAnalysisStatus.FAILED
+    analysis.error_code = "invalid_output"
+    analysis.error_message = "Body analysis could not be completed. Please retry later."
+    db.commit()
+
+    result = client.get(f"/api/v1/body-photo-sessions/{photo_session.id}/analysis")
+
+    assert result.status_code == 200
+    assert result.json()["error_code"] == "invalid_output"
+
+
 def test_review_api_requires_admin_and_records_reviewer_identity(
     client: TestClient, db: Session
 ) -> None:

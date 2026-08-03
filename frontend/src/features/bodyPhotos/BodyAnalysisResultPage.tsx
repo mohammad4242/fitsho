@@ -113,6 +113,11 @@ export function BodyAnalysisResultPage() {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(session.created_at));
+  const failedAnalysisMessage = analysis?.error_code === null || analysis?.error_code === undefined
+    ? analysis?.safe_error_message ?? t("bodyPhotos.results.failedSafe")
+    : t(`bodyPhotos.results.providerErrors.${analysis.error_code}`, {
+      defaultValue: analysis.safe_error_message ?? t("bodyPhotos.results.failedSafe"),
+    });
 
   return (
     <main className="body-analysis-page">
@@ -162,7 +167,7 @@ export function BodyAnalysisResultPage() {
         <section className="body-analysis-status body-analysis-status--failed" role="alert">
           <div>
             <strong>{t("bodyPhotos.results.analysisStatus.failed")}</strong>
-            <p>{analysis.safe_error_message ?? t("bodyPhotos.results.failedSafe")}</p>
+            <p>{failedAnalysisMessage}</p>
             {analysis.photo_validation?.issues.map((issue) => (
               <div className="body-analysis-status__issue" key={issue.view}>
                 <p>

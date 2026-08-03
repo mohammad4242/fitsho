@@ -43,8 +43,7 @@ class BodyAnalysis(Base):
         CheckConstraint("revision > 0", name="ck_body_analyses_revision_positive"),
         CheckConstraint("attempt_count >= 0", name="ck_body_analyses_attempt_count_nonnegative"),
         CheckConstraint(
-            "overall_confidence IS NULL OR "
-            "(overall_confidence >= 0 AND overall_confidence <= 1)",
+            "overall_confidence IS NULL OR (overall_confidence >= 0 AND overall_confidence <= 1)",
             name="ck_body_analyses_overall_confidence_range",
         ),
         CheckConstraint(

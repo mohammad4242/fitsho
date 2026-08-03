@@ -201,7 +201,9 @@ class BodyAnalysisService:
         )
         attempts = int(
             self._db.scalar(
-                select(func.count()).select_from(BodyAnalysis).where(
+                select(func.count())
+                .select_from(BodyAnalysis)
+                .where(
                     BodyAnalysis.session_id == session_id,
                     BodyAnalysis.created_at >= latest_photo_change,
                 )
@@ -607,9 +609,7 @@ class BodyAnalysisService:
         return (left or 0) + (right or 0)
 
     @staticmethod
-    def _sum_optional_decimal(
-        left: Decimal | None, right: Decimal | None
-    ) -> Decimal | None:
+    def _sum_optional_decimal(left: Decimal | None, right: Decimal | None) -> Decimal | None:
         if left is None and right is None:
             return None
         return (left or Decimal("0")) + (right or Decimal("0"))
@@ -664,6 +664,12 @@ class BodyAnalysisService:
             return (
                 "The OpenRouter API key for body analysis was rejected. "
                 "Update it in Admin AI settings."
+            )
+        if code is ProviderErrorCode.INVALID_OUTPUT:
+            return (
+                "The selected AI model returned an invalid structured response. "
+                "Choose another image and Structured Output capable model, add a fallback, "
+                "or raise the output-token limit."
             )
         return "Body analysis could not be completed. Please retry later."
 
@@ -725,6 +731,4 @@ class BodyAnalysisService:
             return analysis.created_at <= datetime.now(UTC) - timedelta(
                 seconds=config.timeout_seconds
             )
-        return analysis.started_at <= datetime.now(UTC) - timedelta(
-            seconds=config.timeout_seconds
-        )
+        return analysis.started_at <= datetime.now(UTC) - timedelta(seconds=config.timeout_seconds)

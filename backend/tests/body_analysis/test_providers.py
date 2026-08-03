@@ -99,9 +99,7 @@ def test_openrouter_catalog_normalizes_and_filters_model_capabilities() -> None:
 
     provider = _provider(httpx.MockTransport(handler))
     models = _run(
-        provider.list_models(
-            ModelCapabilityFilter(image_input=True, structured_output=True)
-        )
+        provider.list_models(ModelCapabilityFilter(image_input=True, structured_output=True))
     )
 
     assert seen == {
@@ -119,9 +117,7 @@ def test_openrouter_catalog_normalizes_and_filters_model_capabilities() -> None:
 
 
 def test_openrouter_get_model_capabilities_rejects_unknown_model() -> None:
-    provider = _provider(
-        httpx.MockTransport(lambda _: httpx.Response(200, json={"data": []}))
-    )
+    provider = _provider(httpx.MockTransport(lambda _: httpx.Response(200, json={"data": []})))
 
     with pytest.raises(AIProviderError) as error:
         _run(provider.get_model_capabilities("missing/model"))
@@ -247,9 +243,7 @@ def test_openrouter_uses_configured_fallback_after_retryable_primary_failure() -
 
     provider = _provider(httpx.MockTransport(handler))
     response = _run(
-        provider.generate_structured_text(
-            _request(fallback_models=("vision-fallback",))
-        )
+        provider.generate_structured_text(_request(fallback_models=("vision-fallback",)))
     )
 
     assert attempts == ["vision-primary", "vision-fallback"]
@@ -290,18 +284,14 @@ def test_openrouter_image_repair_retains_anonymized_images() -> None:
     _run(
         provider.analyze_images(
             _request(),
-            images=(
-                ImageInput(label="front", mime_type="image/jpeg", base64_data="ZnJvbnQ="),
-            ),
+            images=(ImageInput(label="front", mime_type="image/jpeg", base64_data="ZnJvbnQ="),),
         )
     )
 
     messages = cast(list[dict[str, object]], bodies[1]["messages"])
     repair_content = cast(list[dict[str, object]], messages[1]["content"])
     assert "failed schema validation" in cast(str, repair_content[0]["text"])
-    assert repair_content[2]["image_url"] == {
-        "url": "data:image/jpeg;base64,ZnJvbnQ="
-    }
+    assert repair_content[2]["image_url"] == {"url": "data:image/jpeg;base64,ZnJvbnQ="}
 
 
 def test_openrouter_rejects_malformed_output_after_single_controlled_repair() -> None:

@@ -128,9 +128,7 @@ class OpenRouterProvider:
         attempted_models: list[str] = []
         repair_available = True
         last_error: AIProviderError | None = None
-        model_ids = dict.fromkeys(
-            (request.route.primary_model, *request.route.fallback_models)
-        )
+        model_ids = dict.fromkeys((request.route.primary_model, *request.route.fallback_models))
 
         for model_id in model_ids:
             attempted_models.append(model_id)
@@ -339,9 +337,7 @@ class OpenRouterProvider:
                     },
                     {
                         "type": "image_url",
-                        "image_url": {
-                            "url": f"data:{image.mime_type};base64,{image.base64_data}"
-                        },
+                        "image_url": {"url": f"data:{image.mime_type};base64,{image.base64_data}"},
                     },
                 ]
             )

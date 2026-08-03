@@ -59,9 +59,7 @@ class BodyAnalysisFinding(BaseModel):
     supporting_views: tuple[BodyPhotoView, ...] = Field(min_length=1, max_length=3)
     explanation: str = Field(min_length=1, max_length=800)
     limitations: tuple[AnalysisLimitation, ...] = Field(default=(), max_length=10)
-    suggested_training_emphasis: tuple[TrainingEmphasis, ...] = Field(
-        default=(), max_length=8
-    )
+    suggested_training_emphasis: tuple[TrainingEmphasis, ...] = Field(default=(), max_length=8)
     medical_review_recommended: bool = False
 
     @model_validator(mode="after")
@@ -84,9 +82,7 @@ class BodyAnalysisFinding(BaseModel):
             raise ValueError("supporting views must be unique")
         if len(set(self.limitations)) != len(self.limitations):
             raise ValueError("limitations must be unique")
-        if len(set(self.suggested_training_emphasis)) != len(
-            self.suggested_training_emphasis
-        ):
+        if len(set(self.suggested_training_emphasis)) != len(self.suggested_training_emphasis):
             raise ValueError("training emphasis values must be unique")
         return self
 
