@@ -25,6 +25,7 @@ from app.body_analysis.models import BodyAnalysis, BodyAnalysisResultVersion, Bo
 from app.body_analysis.runtime import (
     BodyAnalysisRuntimeDependency,
 )
+from app.body_analysis.schemas import BodyPhotoPreflight
 from app.body_analysis.service import (
     BodyAnalysisNotFoundError,
     BodyAnalysisService,
@@ -91,6 +92,14 @@ def _response(db: Session, analysis: BodyAnalysis) -> BodyAnalysisResponse:
         and doctor.decision is not None
         and doctor.decision.value == "approved"
     )
+    photo_validation = None
+    if isinstance(analysis.raw_result, dict):
+        payload = analysis.raw_result.get("photo_validation")
+        if isinstance(payload, dict):
+            try:
+                photo_validation = BodyPhotoPreflight.model_validate(payload)
+            except ValueError:
+                photo_validation = None
     return BodyAnalysisResponse(
         id=analysis.id,
         session_id=analysis.session_id,
@@ -108,6 +117,7 @@ def _response(db: Session, analysis: BodyAnalysis) -> BodyAnalysisResponse:
         fully_reviewed=fully_reviewed,
         unverified_warning=current is not None and not fully_reviewed,
         safe_error_message=analysis.error_message,
+        photo_validation=photo_validation,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
     )

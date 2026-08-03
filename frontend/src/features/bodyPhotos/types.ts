@@ -78,6 +78,22 @@ export type BodyAnalysisStatus =
   | "completed"
   | "failed";
 
+export type PhotoValidationReason =
+  | "exactly_one_person_required"
+  | "full_body_not_visible"
+  | "wrong_view"
+  | "low_lighting"
+  | "low_sharpness"
+  | "clothing_obscures_body"
+  | "unsuitable_background"
+  | "photo_uncertain";
+
+export type BodyPhotoPreflight = {
+  accepted: boolean;
+  confidence: number;
+  issues: Array<{ view: BodyPhotoView; reasons: PhotoValidationReason[] }>;
+};
+
 export type BodyAnalysisFinding = {
   body_area: BodyArea;
   classification: BodyAnalysisClassification;
@@ -128,6 +144,7 @@ export type BodyAnalysis = {
   fully_reviewed: boolean;
   unverified_warning: boolean;
   safe_error_message: string | null;
+  photo_validation: BodyPhotoPreflight | null;
   created_at: string;
   completed_at: string | null;
 };

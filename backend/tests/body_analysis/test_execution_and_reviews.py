@@ -84,8 +84,13 @@ class _Provider:
     async def analyze_images(self, request: object, *, images: tuple[object, ...]) -> object:
         self.calls += 1
         assert len(images) == 3
+        payload = (
+            {"accepted": True, "confidence": 0.92, "issues": []}
+            if getattr(request, "schema_name", None) == "fitsho_body_photo_preflight"
+            else self.payload
+        )
         return StructuredGenerationResponse(
-            payload=self.payload,
+            payload=payload,
             model_id="vision-primary",
             attempted_models=("vision-primary",),
             provider_request_id="req-safe-id",
@@ -106,6 +111,26 @@ class _FailingProvider(_Provider):
         raise AIProviderError(
             ProviderErrorCode.UNAUTHORIZED,
             "The AI provider credential was rejected.",
+        )
+
+
+class _PreflightRejectingProvider(_Provider):
+    async def analyze_images(self, request: object, *, images: tuple[object, ...]) -> object:
+        self.calls += 1
+        return StructuredGenerationResponse(
+            payload={
+                "accepted": False,
+                "confidence": 0.94,
+                "issues": [
+                    {"view": "front", "reasons": ["full_body_not_visible", "low_lighting"]},
+                ],
+            },
+            model_id="vision-primary",
+            attempted_models=("vision-primary",),
+            provider_request_id="req-preflight",
+            input_tokens=80,
+            output_tokens=60,
+            cost=Decimal("0.004"),
         )
 
 
@@ -182,7 +207,7 @@ def test_execution_persists_validated_result_and_is_idempotent(db: Session) -> N
 
     assert completed.status is BodyAnalysisStatus.REVIEW_PENDING
     assert repeated.id == completed.id
-    assert provider.calls == 1
+    assert provider.calls == 2
     assert completed.model_id == "vision-primary"
     assert completed.error_message is None
     versions = db.scalars(
@@ -193,6 +218,28 @@ def test_execution_persists_validated_result_and_is_idempotent(db: Session) -> N
     assert len(versions) == 1
     assert versions[0].version == 1
     assert versions[0].normalized_result["summary"]["priority_areas"] == ["shoulders"]
+
+
+def test_execution_stops_after_rejected_photo_preflight_and_preserves_view_reasons(
+    db: Session,
+) -> None:
+    user, session = _submitted_session(db)
+    provider = _PreflightRejectingProvider()
+    analysis = BodyAnalysisService(db).queue(session.id, user.id, _config())
+
+    failed = asyncio.run(BodyAnalysisService(db).execute(analysis.id, provider, _Storage()))
+
+    assert failed.status is BodyAnalysisStatus.FAILED
+    assert provider.calls == 1
+    assert failed.raw_result == {
+        "photo_validation": {
+            "accepted": False,
+            "confidence": 0.94,
+            "issues": [
+                {"view": "front", "reasons": ["full_body_not_visible", "low_lighting"]},
+            ],
+        },
+    }
 
 
 def test_execution_creates_a_progress_comparison_for_the_new_result(

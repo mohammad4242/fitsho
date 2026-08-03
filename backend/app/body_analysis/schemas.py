@@ -12,6 +12,42 @@ from app.body_analysis.enums import (
 )
 from app.body_photos.enums import BodyPhotoView
 
+PhotoValidationReason = Literal[
+    "exactly_one_person_required",
+    "full_body_not_visible",
+    "wrong_view",
+    "low_lighting",
+    "low_sharpness",
+    "clothing_obscures_body",
+    "unsuitable_background",
+    "photo_uncertain",
+]
+
+
+class BodyPhotoValidationIssue(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    view: BodyPhotoView
+    reasons: tuple[PhotoValidationReason, ...] = Field(min_length=1, max_length=4)
+
+
+class BodyPhotoPreflight(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    accepted: bool
+    confidence: float = Field(ge=0, le=1)
+    issues: tuple[BodyPhotoValidationIssue, ...] = Field(default=(), max_length=3)
+
+    @model_validator(mode="after")
+    def validate_decision(self) -> BodyPhotoPreflight:
+        if self.accepted and self.issues:
+            raise ValueError("accepted photos cannot have validation issues")
+        if not self.accepted and not self.issues:
+            raise ValueError("rejected photos require validation issues")
+        if len({issue.view for issue in self.issues}) != len(self.issues):
+            raise ValueError("validation issues must contain each view at most once")
+        return self
+
 
 class BodyAnalysisFinding(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)

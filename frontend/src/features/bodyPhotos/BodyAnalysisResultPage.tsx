@@ -163,6 +163,12 @@ export function BodyAnalysisResultPage() {
           <div>
             <strong>{t("bodyPhotos.results.analysisStatus.failed")}</strong>
             <p>{analysis.safe_error_message ?? t("bodyPhotos.results.failedSafe")}</p>
+            {analysis.photo_validation?.issues.map((issue) => (
+              <p key={issue.view}>
+                <strong>{t(`bodyPhotos.views.${issue.view}`)}: </strong>
+                {issue.reasons.map((reason) => t(`bodyPhotos.results.photoValidation.${reason}`)).join(" · ")}
+              </p>
+            ))}
           </div>
           <button className="secondary-button" type="button" disabled={actionBusy} onClick={() => void retry()}>
             {t("bodyPhotos.results.retry")}

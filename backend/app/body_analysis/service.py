@@ -36,7 +36,11 @@ from app.body_analysis.providers import (
     StructuredGenerationRequest,
     StructuredGenerationResponse,
 )
-from app.body_analysis.schemas import NormalizedBodyAnalysis
+from app.body_analysis.schemas import (
+    BodyPhotoPreflight,
+    BodyPhotoValidationIssue,
+    NormalizedBodyAnalysis,
+)
 from app.body_photos.enums import BodyPhotoSessionState, BodyPhotoView
 from app.body_photos.models import BodyPhoto, BodyPhotoSession
 
@@ -118,6 +122,14 @@ perspective, and visibility. Use 'visibly developed', 'relatively lagging', or '
 Do not invent findings. Return lower confidence and uncertain when evidence is insufficient.
 The result is provisional and requires coach and doctor review. Return only the requested JSON.
 """
+
+_PHOTO_PREFLIGHT_PROMPT = """You validate three processed, head-cropped body photos before
+any body-development analysis. Check each labelled view for exactly one visible person, full
+body framing, the requested view, usable lighting, adequate sharpness, clothing that does not
+obscure body contours, and an unobstructed background. Do not infer nudity, identity, health,
+or body composition. Reject only when the evidence clearly fails a listed requirement; when
+uncertain, use photo_uncertain rather than guessing. If any view is rejected, do not analyze
+muscular development. Return only the requested JSON."""
 
 
 class BodyAnalysisService:
@@ -248,6 +260,7 @@ class BodyAnalysisService:
             schema_version=analysis.schema_version,
         )
         response: StructuredGenerationResponse | None = None
+        preflight_response: StructuredGenerationResponse | None = None
         try:
             analysis.status = BodyAnalysisStatus.VALIDATING
             analysis.attempt_count += 1
@@ -255,22 +268,32 @@ class BodyAnalysisService:
             analysis.session.state = BodyPhotoSessionState.VALIDATING
             self._db.commit()
             images = self._prepare_images(analysis)
+            image_inputs = self._image_inputs(storage, images)
+            preflight_response = await provider.analyze_images(
+                self._preflight_request(execution_config),
+                images=image_inputs,
+            )
+            preflight = BodyPhotoPreflight.model_validate(preflight_response.payload)
+            if preflight.accepted and preflight.confidence < execution_config.minimum_confidence:
+                preflight = BodyPhotoPreflight(
+                    accepted=False,
+                    confidence=preflight.confidence,
+                    issues=tuple(
+                        BodyPhotoValidationIssue(view=photo.view, reasons=("photo_uncertain",))
+                        for photo in images
+                    ),
+                )
+            self._validate_response_cost(preflight_response, execution_config)
+            if not preflight.accepted:
+                self._record_photo_rejection(analysis, preflight, preflight_response)
+                return self._analysis(analysis_id)
             analysis.status = BodyAnalysisStatus.ANALYZING
             analysis.session.state = BodyPhotoSessionState.ANALYZING
             self._db.commit()
 
             response = await provider.analyze_images(
                 self._request(execution_config),
-                images=tuple(
-                    ImageInput(
-                        label=photo.view.value,
-                        mime_type=photo.mime_type,
-                        base64_data=base64.b64encode(
-                            self._read(storage, photo.storage_key)
-                        ).decode(),
-                    )
-                    for photo in images
-                ),
+                images=image_inputs,
             )
             normalized = normalize_body_analysis(response.payload)
             if normalized.schema_version != execution_config.schema_version:
@@ -279,20 +302,24 @@ class BodyAnalysisService:
                 raise BodyAnalysisInputError(
                     "analysis confidence is below the configured threshold"
                 )
-            if (
-                execution_config.max_cost_per_request is not None
-                and response.cost is not None
-                and response.cost > execution_config.max_cost_per_request
-            ):
-                raise BodyAnalysisInputError("analysis cost exceeds the configured limit")
-            analysis.raw_result = response.payload
+            self._validate_response_cost(response, execution_config)
+            analysis.raw_result = {
+                "photo_validation": preflight.model_dump(mode="json"),
+                "analysis": response.payload,
+            }
             analysis.normalized_result = normalized.model_dump(mode="json")
             analysis.overall_confidence = normalized.overall_confidence
             analysis.model_id = response.model_id
             analysis.provider_request_id = response.provider_request_id
-            analysis.input_tokens = response.input_tokens
-            analysis.output_tokens = response.output_tokens
-            analysis.request_cost = response.cost
+            analysis.input_tokens = self._sum_optional_int(
+                preflight_response.input_tokens, response.input_tokens
+            )
+            analysis.output_tokens = self._sum_optional_int(
+                preflight_response.output_tokens, response.output_tokens
+            )
+            analysis.request_cost = self._sum_optional_decimal(
+                preflight_response.cost, response.cost
+            )
             analysis.error_code = None
             analysis.error_message = None
             analysis.status = BodyAnalysisStatus.REVIEW_PENDING
@@ -332,6 +359,12 @@ class BodyAnalysisService:
                 analysis.input_tokens = response.input_tokens
                 analysis.output_tokens = response.output_tokens
                 analysis.request_cost = response.cost
+            elif preflight_response is not None:
+                analysis.model_id = preflight_response.model_id
+                analysis.provider_request_id = preflight_response.provider_request_id
+                analysis.input_tokens = preflight_response.input_tokens
+                analysis.output_tokens = preflight_response.output_tokens
+                analysis.request_cost = preflight_response.cost
             analysis.status = BodyAnalysisStatus.FAILED
             analysis.error_code = provider_error.code.value
             analysis.error_message = "Body analysis could not be completed. Please retry later."
@@ -517,6 +550,62 @@ class BodyAnalysisService:
         with storage.open(key) as handle:
             return handle.read()
 
+    def _image_inputs(
+        self, storage: BodyAnalysisReadStorage, images: tuple[BodyPhoto, ...]
+    ) -> tuple[ImageInput, ...]:
+        return tuple(
+            ImageInput(
+                label=photo.view.value,
+                mime_type=photo.mime_type,
+                base64_data=base64.b64encode(self._read(storage, photo.storage_key)).decode(),
+            )
+            for photo in images
+        )
+
+    def _record_photo_rejection(
+        self,
+        analysis: BodyAnalysis,
+        preflight: BodyPhotoPreflight,
+        response: StructuredGenerationResponse,
+    ) -> None:
+        analysis.raw_result = {"photo_validation": preflight.model_dump(mode="json")}
+        analysis.model_id = response.model_id
+        analysis.provider_request_id = response.provider_request_id
+        analysis.input_tokens = response.input_tokens
+        analysis.output_tokens = response.output_tokens
+        analysis.request_cost = response.cost
+        analysis.status = BodyAnalysisStatus.FAILED
+        analysis.error_code = "photo_validation_failed"
+        analysis.error_message = "Your photos need to be retaken. Review the view-specific reasons."
+        analysis.completed_at = datetime.now(UTC)
+        analysis.session.state = self._session_state_after_failure(analysis)
+        self._db.commit()
+
+    @staticmethod
+    def _validate_response_cost(
+        response: StructuredGenerationResponse, config: AnalysisExecutionConfig
+    ) -> None:
+        if (
+            config.max_cost_per_request is not None
+            and response.cost is not None
+            and response.cost > config.max_cost_per_request
+        ):
+            raise BodyAnalysisInputError("analysis cost exceeds the configured limit")
+
+    @staticmethod
+    def _sum_optional_int(left: int | None, right: int | None) -> int | None:
+        if left is None and right is None:
+            return None
+        return (left or 0) + (right or 0)
+
+    @staticmethod
+    def _sum_optional_decimal(
+        left: Decimal | None, right: Decimal | None
+    ) -> Decimal | None:
+        if left is None and right is None:
+            return None
+        return (left or Decimal("0")) + (right or Decimal("0"))
+
     @staticmethod
     def _request(config: AnalysisExecutionConfig) -> StructuredGenerationRequest:
         return StructuredGenerationRequest(
@@ -534,6 +623,22 @@ class BodyAnalysisService:
             provider_preferences=config.routing_preferences,
             temperature=config.temperature,
             max_output_tokens=config.max_output_tokens,
+        )
+
+    @staticmethod
+    def _preflight_request(config: AnalysisExecutionConfig) -> StructuredGenerationRequest:
+        return StructuredGenerationRequest(
+            system_prompt=_PHOTO_PREFLIGHT_PROMPT,
+            input_payload={"task": "validate_processed_body_views"},
+            response_schema=BodyPhotoPreflight.model_json_schema(),
+            schema_name="fitsho_body_photo_preflight",
+            route=ModelRoute(
+                primary_model=config.primary_model,
+                fallback_models=config.fallback_models,
+            ),
+            provider_preferences=config.routing_preferences,
+            temperature=0,
+            max_output_tokens=min(config.max_output_tokens, 900),
         )
 
     @staticmethod

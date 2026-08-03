@@ -11,7 +11,7 @@ from app.body_analysis.enums import (
     BodyAnalysisReviewerRole,
     BodyAnalysisStatus,
 )
-from app.body_analysis.schemas import NormalizedBodyAnalysis
+from app.body_analysis.schemas import BodyPhotoPreflight, NormalizedBodyAnalysis
 
 
 class SpecialistReviewState(BaseModel):
@@ -38,6 +38,7 @@ class BodyAnalysisResponse(BaseModel):
     fully_reviewed: bool
     unverified_warning: bool
     safe_error_message: str | None
+    photo_validation: BodyPhotoPreflight | None
     created_at: datetime
     completed_at: datetime | None
 

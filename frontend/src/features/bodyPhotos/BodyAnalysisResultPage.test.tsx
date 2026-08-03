@@ -131,6 +131,7 @@ const analysis: BodyAnalysis = {
   fully_reviewed: false,
   unverified_warning: true,
   safe_error_message: null,
+  photo_validation: null,
   created_at: "2026-08-03T10:00:00Z",
   completed_at: "2026-08-03T10:01:00Z",
 };
@@ -271,4 +272,24 @@ it("offers a retry for failed analysis and preserves a safe error message", asyn
 
   expect(api.retryBodyPhotoAnalysis).toHaveBeenCalledWith("session-2");
   expect(await screen.findByRole("status")).toHaveTextContent(/queued/i);
+});
+
+it("shows view-specific retake reasons when photo validation rejects an upload", async () => {
+  api.getBodyPhotoAnalysis.mockResolvedValue({
+    ...analysis,
+    status: "failed",
+    normalized_result: null,
+    overall_confidence: null,
+    photo_validation: {
+      accepted: false,
+      confidence: 0.94,
+      issues: [{ view: "front", reasons: ["full_body_not_visible", "low_lighting"] }],
+    },
+  });
+  renderPage();
+
+  const alert = await screen.findByRole("alert");
+
+  expect(alert).toHaveTextContent("Front: Show your full body in the frame");
+  expect(alert).toHaveTextContent("Use brighter, even lighting");
 });
