@@ -32,6 +32,7 @@ from app.body_analysis.providers import (
 )
 from app.body_analysis.runtime import _validate_budget_preflight
 from app.body_analysis.service import (
+    _PHOTO_PREFLIGHT_PROMPT,
     AnalysisExecutionConfig,
     BodyAnalysisService,
     BodyAnalysisStateError,
@@ -200,9 +201,10 @@ def test_queue_is_idempotent_for_same_session(db: Session) -> None:
 
 def test_photo_preflight_ignores_people_in_background_artwork() -> None:
     request = BodyAnalysisService._preflight_request(_config())
+    normalized_prompt = " ".join(request.system_prompt.split())
 
-    assert "posters, wall art, mirrors, gym branding" in request.system_prompt
-    assert "Count only real people in the foreground" in request.system_prompt
+    assert "posters, wall art, mirrors, gym branding" in normalized_prompt
+    assert "Count only real people in the foreground" in normalized_prompt
 
 
 def test_execution_persists_validated_result_and_is_idempotent(db: Session) -> None:
@@ -522,6 +524,15 @@ def test_replacing_a_photo_resets_the_analysis_retry_budget(db: Session) -> None
 
     assert retried.revision == 2
     assert retried.replaces_analysis_id == failed.id
+
+
+def test_photo_preflight_allows_fitted_clothing_and_nonblocking_backgrounds() -> None:
+    normalized_prompt = " ".join(_PHOTO_PREFLIGHT_PROMPT.split())
+
+    assert "Fitted athletic shorts or underwear are acceptable" in normalized_prompt
+    assert "Do not reject a photo merely because its background is a gym or a room" in (
+        normalized_prompt
+    )
 
 
 def test_retry_rejects_nonlatest_revision(db: Session) -> None:

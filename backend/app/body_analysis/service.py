@@ -126,12 +126,18 @@ The result is provisional and requires coach and doctor review. Return only the 
 _PHOTO_PREFLIGHT_PROMPT = """You validate three processed, head-cropped body photos before
 any body-development analysis. Check each labelled view for exactly one visible person, full
 body framing, the requested view, usable lighting, adequate sharpness, clothing that does not
-obscure body contours, and an unobstructed background. Count only real people in the foreground:
-ignore people shown in posters, wall art, mirrors, gym branding, screens, or other background
-imagery. Do not infer nudity, identity, health, or body composition. Reject only when the
-evidence clearly fails a listed requirement; when uncertain, use photo_uncertain rather than
-guessing. If any view is rejected, do not analyze muscular development. Return only the
-requested JSON."""
+obscure body contours, and a background that does not materially obstruct the body. Fitted
+athletic shorts or underwear are acceptable when the torso, arms, legs, and visible body
+contours remain clear; do not reject them merely for being fitted or dark. Do not reject a photo
+merely because its background is a gym or a room, contains equipment, furniture, a bed, a mirror,
+or is visually cluttered. A mirror selfie is acceptable when exactly one full body is clearly
+visible; a phone is acceptable when it does not cover relevant body regions. Reject background
+only when people or objects materially hide body regions or make the requested view ambiguous.
+Count only real people in the foreground: ignore people shown in posters, wall art, mirrors, gym
+branding, screens, or other background imagery. Do not infer nudity, identity, health, or body
+composition. Reject only when the evidence clearly fails a listed requirement; when uncertain,
+use photo_uncertain rather than guessing. If any view is rejected, do not analyze muscular
+development. Return only the requested JSON."""
 
 
 class BodyAnalysisService:
