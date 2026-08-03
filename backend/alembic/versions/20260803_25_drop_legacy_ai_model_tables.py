@@ -4,8 +4,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "20260803_25"
-down_revision: str | Sequence[str] | None = "20260803_24"
+revision: str = "20260803_27"
+down_revision: str | Sequence[str] | None = "20260803_26"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
