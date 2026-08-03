@@ -51,6 +51,11 @@ class BodyAnalysisReviewDecision(StrEnum):
     REJECTED = "rejected"
 
 
+class SpecialistRole(StrEnum):
+    COACH = "coach"
+    DOCTOR = "doctor"
+
+
 class TrainingEmphasis(StrEnum):
     LATERAL_DELTOID = "lateral_deltoid"
     REAR_DELTOID = "rear_deltoid"

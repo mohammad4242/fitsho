@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import BinaryIO, Protocol
 from uuid import UUID
 
@@ -17,7 +18,12 @@ from app.body_analysis.enums import (
     BodyAnalysisReviewerRole,
     BodyAnalysisStatus,
 )
-from app.body_analysis.models import BodyAnalysis, BodyAnalysisResultVersion, BodyAnalysisReview
+from app.body_analysis.models import (
+    BodyAnalysis,
+    BodyAnalysisResultVersion,
+    BodyAnalysisReview,
+    UserSpecialistRole,
+)
 from app.body_analysis.normalization import MedicalClaimError, normalize_body_analysis
 from app.body_analysis.providers import (
     AIProvider,
@@ -58,6 +64,11 @@ class AnalysisExecutionConfig(BaseModel):
     schema_version: str = Field(pattern=r"^[0-9]+\.[0-9]+$", max_length=16)
     temperature: float = Field(default=0.0, ge=0, le=1)
     max_output_tokens: int = Field(default=4096, ge=1, le=65_536)
+    timeout_seconds: int = Field(default=45, ge=1, le=180)
+    retry_limit: int = Field(default=2, ge=0, le=5)
+    minimum_confidence: float = Field(default=0.7, ge=0, le=1)
+    max_cost_per_request: Decimal | None = Field(default=None, ge=0)
+    routing_restrictions: tuple[str, ...] = Field(default=(), max_length=20)
 
 
 class ReviewSubmission(BaseModel):
@@ -143,7 +154,23 @@ class BodyAnalysisService:
             BodyAnalysisStatus.VALIDATING,
             BodyAnalysisStatus.ANALYZING,
         }:
-            return latest
+            if not self._is_stale(latest, config):
+                return latest
+            latest.status = BodyAnalysisStatus.FAILED
+            latest.error_code = ProviderErrorCode.TIMEOUT.value
+            latest.error_message = "Body analysis could not be completed. Please retry later."
+            latest.completed_at = datetime.now(UTC)
+            self._db.commit()
+        attempts = int(
+            self._db.scalar(
+                select(func.count()).select_from(BodyAnalysis).where(
+                    BodyAnalysis.session_id == photo_session.id
+                )
+            )
+            or 0
+        )
+        if attempts >= config.retry_limit + 1:
+            raise BodyAnalysisStateError("analysis retry limit reached")
         return self._create_analysis(photo_session, config, replaces=previous)
 
     def _create_analysis(
@@ -202,10 +229,13 @@ class BodyAnalysisService:
             schema_version=analysis.schema_version,
         )
         try:
-            images = self._prepare_images(analysis)
-            analysis.status = BodyAnalysisStatus.ANALYZING
+            analysis.status = BodyAnalysisStatus.VALIDATING
             analysis.attempt_count += 1
             analysis.started_at = datetime.now(UTC)
+            analysis.session.state = BodyPhotoSessionState.VALIDATING
+            self._db.commit()
+            images = self._prepare_images(analysis)
+            analysis.status = BodyAnalysisStatus.ANALYZING
             analysis.session.state = BodyPhotoSessionState.ANALYZING
             self._db.commit()
 
@@ -223,6 +253,18 @@ class BodyAnalysisService:
                 ),
             )
             normalized = normalize_body_analysis(response.payload)
+            if normalized.schema_version != execution_config.schema_version:
+                raise BodyAnalysisInputError("unexpected analysis schema version")
+            if normalized.overall_confidence < execution_config.minimum_confidence:
+                raise BodyAnalysisInputError(
+                    "analysis confidence is below the configured threshold"
+                )
+            if (
+                execution_config.max_cost_per_request is not None
+                and response.cost is not None
+                and response.cost > execution_config.max_cost_per_request
+            ):
+                raise BodyAnalysisInputError("analysis cost exceeds the configured limit")
             analysis.raw_result = response.payload
             analysis.normalized_result = normalized.model_dump(mode="json")
             analysis.overall_confidence = normalized.overall_confidence
@@ -310,6 +352,7 @@ class BodyAnalysisService:
         submission: ReviewSubmission,
     ) -> BodyAnalysisReview:
         analysis = self._analysis(analysis_id, lock=True)
+        self._authorize_reviewer(reviewer_id, submission.role)
         if analysis.status not in {
             BodyAnalysisStatus.REVIEW_PENDING,
             BodyAnalysisStatus.COMPLETED,
@@ -318,6 +361,25 @@ class BodyAnalysisService:
         current = self._current_version(analysis.id)
         if current is None:
             raise BodyAnalysisStateError("analysis has no normalized result")
+        other_role = (
+            BodyAnalysisReviewerRole.DOCTOR
+            if submission.role is BodyAnalysisReviewerRole.COACH
+            else BodyAnalysisReviewerRole.COACH
+        )
+        other_approval = self._db.scalar(
+            select(BodyAnalysisReview).where(
+                BodyAnalysisReview.analysis_id == analysis.id,
+                BodyAnalysisReview.result_version_id == current.id,
+                BodyAnalysisReview.reviewer_role == other_role,
+                BodyAnalysisReview.reviewer_id == reviewer_id,
+                BodyAnalysisReview.decision == BodyAnalysisReviewDecision.APPROVED,
+            )
+        )
+        if (
+            other_approval is not None
+            and submission.decision is BodyAnalysisReviewDecision.APPROVED
+        ):
+            raise BodyAnalysisStateError("one reviewer cannot approve both specialist roles")
         if submission.corrected_result is not None:
             corrected = normalize_body_analysis(submission.corrected_result)
             replacement = BodyAnalysisResultVersion(
@@ -481,4 +543,22 @@ class BodyAnalysisService:
         return (
             latest.get(BodyAnalysisReviewerRole.COACH) is BodyAnalysisReviewDecision.APPROVED,
             latest.get(BodyAnalysisReviewerRole.DOCTOR) is BodyAnalysisReviewDecision.APPROVED,
+        )
+
+    def _authorize_reviewer(self, reviewer_id: UUID, role: BodyAnalysisReviewerRole) -> None:
+        allowed = self._db.scalar(
+            select(UserSpecialistRole).where(
+                UserSpecialistRole.user_id == reviewer_id,
+                UserSpecialistRole.role == role.value,
+            )
+        )
+        if allowed is None:
+            raise BodyAnalysisStateError("reviewer is not authorized for this specialist role")
+
+    @staticmethod
+    def _is_stale(analysis: BodyAnalysis, config: AnalysisExecutionConfig) -> bool:
+        if analysis.started_at is None:
+            return analysis.status is BodyAnalysisStatus.QUEUED
+        return analysis.started_at <= datetime.now(UTC) - timedelta(
+            seconds=config.timeout_seconds
         )

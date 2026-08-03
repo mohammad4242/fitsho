@@ -40,6 +40,27 @@ def get_body_analysis_runtime(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Body analysis is temporarily unavailable",
         )
+    restrictions = tuple(task.routing_restrictions)
+    allowed_models = {
+        item.removeprefix("allow_model:")
+        for item in restrictions
+        if item.startswith("allow_model:")
+    }
+    denied_models = {
+        item.removeprefix("deny_model:")
+        for item in restrictions
+        if item.startswith("deny_model:")
+    }
+    selected_models = {task.primary_model_id, *task.fallback_model_ids}
+    if (
+        "no_external_image_routing" in restrictions
+        or selected_models & denied_models
+        or (allowed_models and not selected_models.issubset(allowed_models))
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Body analysis is temporarily unavailable",
+        )
     client = getattr(request.app.state, "ai_http_client", None)
     if not isinstance(client, httpx.AsyncClient):
         raise HTTPException(
@@ -68,6 +89,10 @@ def get_body_analysis_runtime(
             schema_version="1.0",
             temperature=task.temperature,
             max_output_tokens=task.max_output_tokens,
+            timeout_seconds=task.timeout_seconds,
+            minimum_confidence=task.minimum_confidence,
+            max_cost_per_request=task.max_cost_per_request,
+            routing_restrictions=restrictions,
         ),
         storage=BodyPhotoStorage(settings),
     )

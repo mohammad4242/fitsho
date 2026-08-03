@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import io
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,8 +15,14 @@ from app.body_analysis.enums import (
     BodyAnalysisReviewDecision,
     BodyAnalysisReviewerRole,
     BodyAnalysisStatus,
+    SpecialistRole,
 )
-from app.body_analysis.models import BodyAnalysis, BodyAnalysisResultVersion, BodyAnalysisReview
+from app.body_analysis.models import (
+    BodyAnalysis,
+    BodyAnalysisResultVersion,
+    BodyAnalysisReview,
+    UserSpecialistRole,
+)
 from app.body_analysis.providers import (
     AIProviderError,
     ProviderErrorCode,
@@ -23,6 +31,7 @@ from app.body_analysis.providers import (
 from app.body_analysis.service import (
     AnalysisExecutionConfig,
     BodyAnalysisService,
+    BodyAnalysisStateError,
     ReviewSubmission,
 )
 from app.body_photos.enums import BodyPhotoPurpose, BodyPhotoSessionState, BodyPhotoView
@@ -141,6 +150,11 @@ def _config() -> AnalysisExecutionConfig:
     )
 
 
+def _grant(db: Session, user: User, role: SpecialistRole) -> None:
+    db.add(UserSpecialistRole(user_id=user.id, role=role))
+    db.commit()
+
+
 def test_queue_is_idempotent_for_same_session(db: Session) -> None:
     user, session = _submitted_session(db)
     service = BodyAnalysisService(db)
@@ -208,6 +222,8 @@ def test_coach_and_doctor_approvals_are_independent_and_version_bound(db: Sessio
     doctor = User(email=f"doctor-{uuid4()}@example.com", password_hash="x", is_admin=True)
     db.add_all([coach, doctor])
     db.commit()
+    _grant(db, coach, SpecialistRole.COACH)
+    _grant(db, doctor, SpecialistRole.DOCTOR)
 
     coach_review = service.review(
         analysis.id,
@@ -246,6 +262,8 @@ def test_specialist_correction_creates_history_and_invalidates_old_approval(
     doctor = User(email=f"doctor-{uuid4()}@example.com", password_hash="x", is_admin=True)
     db.add_all([coach, doctor])
     db.commit()
+    _grant(db, coach, SpecialistRole.COACH)
+    _grant(db, doctor, SpecialistRole.DOCTOR)
     service.review(
         analysis.id,
         coach.id,
@@ -283,3 +301,64 @@ def test_specialist_correction_creates_history_and_invalidates_old_approval(
     assert effective.normalized_result.summary.uncertain_areas == ("shoulders",)
     assert effective.fully_reviewed is False
     assert service.get_analysis(analysis.id, user.id).status is BodyAnalysisStatus.REVIEW_PENDING
+
+
+def test_same_user_cannot_satisfy_coach_and_doctor_approvals(db: Session) -> None:
+    user, session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    analysis = service.queue(session.id, user.id, _config())
+    asyncio.run(service.execute(analysis.id, _Provider(), _Storage()))
+    reviewer = User(email=f"dual-{uuid4()}@example.com", password_hash="x")
+    db.add(reviewer)
+    db.commit()
+    _grant(db, reviewer, SpecialistRole.COACH)
+    _grant(db, reviewer, SpecialistRole.DOCTOR)
+    service.review(
+        analysis.id,
+        reviewer.id,
+        ReviewSubmission(
+            role=BodyAnalysisReviewerRole.COACH,
+            decision=BodyAnalysisReviewDecision.APPROVED,
+        ),
+    )
+
+    with pytest.raises(BodyAnalysisStateError, match="cannot approve both"):
+        service.review(
+            analysis.id,
+            reviewer.id,
+            ReviewSubmission(
+                role=BodyAnalysisReviewerRole.DOCTOR,
+                decision=BodyAnalysisReviewDecision.APPROVED,
+            ),
+        )
+
+
+def test_stale_analysis_is_recovered_but_retry_attempts_are_bounded(db: Session) -> None:
+    user, session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    config = _config().model_copy(update={"retry_limit": 1, "timeout_seconds": 1})
+    first = service.queue(session.id, user.id, config)
+    first.status = BodyAnalysisStatus.ANALYZING
+    first.started_at = datetime.now(UTC) - timedelta(seconds=2)
+    db.commit()
+
+    recovered = service.retry(first.id, user.id, config)
+
+    assert recovered.id != first.id
+    assert recovered.revision == 2
+    with pytest.raises(BodyAnalysisStateError, match="retry limit"):
+        service.retry(recovered.id, user.id, config)
+
+
+def test_low_confidence_and_cost_limited_results_fail_safely(db: Session) -> None:
+    user, session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    config = _config().model_copy(
+        update={"minimum_confidence": 0.9, "max_cost_per_request": Decimal("0.01")}
+    )
+    analysis = service.queue(session.id, user.id, config)
+
+    failed = asyncio.run(service.execute(analysis.id, _Provider(), _Storage(), config))
+
+    assert failed.status is BodyAnalysisStatus.FAILED
+    assert failed.error_message == "Body analysis could not be completed. Please retry later."

@@ -8,6 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
+from app.body_analysis.enums import SpecialistRole
+from app.body_analysis.models import UserSpecialistRole
 from app.body_analysis.service import BodyAnalysisService
 from app.body_photos.enums import BodyPhotoSessionState
 
@@ -82,6 +84,7 @@ def test_review_api_requires_admin_and_records_reviewer_identity(
     assert client.post(path, headers=ORIGIN, json=payload).status_code == 403
     assert client.get(f"/api/v1/reviews/body-analyses/{analysis.id}").status_code == 403
     reviewer.is_admin = True
+    db.add(UserSpecialistRole(user_id=reviewer.id, role=SpecialistRole.COACH))
     db.commit()
     approved = client.post(path, headers=ORIGIN, json=payload)
     history = client.get(f"/api/v1/reviews/body-analyses/{analysis.id}")

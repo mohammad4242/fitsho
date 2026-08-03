@@ -26,6 +26,7 @@ from app.body_analysis.enums import (
     BodyAnalysisReviewDecision,
     BodyAnalysisReviewerRole,
     BodyAnalysisStatus,
+    SpecialistRole,
 )
 from app.body_photos.models import BodyPhotoSession
 from app.database.base import Base
@@ -227,3 +228,26 @@ class BodyAnalysisReview(Base):
 
     analysis: Mapped[BodyAnalysis] = relationship(back_populates="reviews")
     result_version: Mapped[BodyAnalysisResultVersion] = relationship()
+
+
+class UserSpecialistRole(Base):
+    """Explicit reviewer authorization; admin status is not a clinical role."""
+
+    __tablename__ = "user_specialist_roles"
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    role: Mapped[SpecialistRole] = mapped_column(
+        Enum(
+            SpecialistRole,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_user_specialist_roles_role_values",
+        ),
+        primary_key=True,
+    )
+    granted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

@@ -20,7 +20,7 @@ from app.body_analysis.api_schemas import (
     SpecialistReviewResponse,
     SpecialistReviewState,
 )
-from app.body_analysis.enums import BodyAnalysisReviewerRole, BodyAnalysisStatus
+from app.body_analysis.enums import BodyAnalysisReviewerRole
 from app.body_analysis.models import BodyAnalysis, BodyAnalysisResultVersion, BodyAnalysisReview
 from app.body_analysis.runtime import (
     BodyAnalysisRuntimeDependency,
@@ -37,6 +37,11 @@ router = APIRouter(prefix="/api/v1/body-photo-sessions", tags=["body-analysis"])
 review_router = APIRouter(
     prefix="/api/v1/reviews/body-analyses",
     tags=["body-analysis-reviews"],
+    dependencies=[Depends(require_admin)],
+)
+admin_router = APIRouter(
+    prefix="/api/v1/admin/body-analyses",
+    tags=["admin-body-analyses"],
     dependencies=[Depends(require_admin)],
 )
 
@@ -179,8 +184,6 @@ def retry_session_analysis(
         latest = service.latest_for_session(session_id, user.id)
         if latest is None:
             raise BodyAnalysisNotFoundError
-        if latest.status is not BodyAnalysisStatus.FAILED:
-            raise BodyAnalysisStateError("only failed analyses can be retried")
         analysis = service.retry(latest.id, user.id, runtime.config)
     except BodyAnalysisNotFoundError:
         raise _not_found() from None
@@ -188,6 +191,40 @@ def retry_session_analysis(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from None
     background_tasks.add_task(_execute_background, service, analysis.id, runtime)
     return _response(db, analysis)
+
+
+@admin_router.post(
+    "/{analysis_id}/retry",
+    response_model=BodyAnalysisResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def retry_analysis_as_admin(
+    analysis_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: DatabaseSession,
+    _admin: AdminUser,
+    runtime: BodyAnalysisRuntimeDependency,
+) -> BodyAnalysisResponse:
+    analysis = db.scalar(
+        select(BodyAnalysis)
+        .where(BodyAnalysis.id == analysis_id)
+        .join(BodyAnalysis.session)
+    )
+    if analysis is None:
+        raise _not_found()
+    try:
+        queued = BodyAnalysisService(db).retry(
+            analysis.id,
+            analysis.session.user_id,
+            runtime.config,
+        )
+    except BodyAnalysisNotFoundError:
+        raise _not_found() from None
+    except BodyAnalysisStateError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from None
+    background_tasks.add_task(_execute_background, BodyAnalysisService(db), queued.id, runtime)
+    return _response(db, queued)
 
 
 @review_router.post(
