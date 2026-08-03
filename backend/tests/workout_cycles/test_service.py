@@ -1,16 +1,21 @@
-from uuid import UUID
+import os
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import create_engine, delete, event, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.workout_cycles.enums import WorkoutCycleStatus
-from app.workout_cycles.models import WorkoutCycle
+from app.workout_cycles.models import WorkoutCycle, WorkoutCycleFeedback
 from app.workout_cycles.schemas import CompletionFeedbackInput
 from app.workout_cycles.service import (
     WorkoutCycleAlreadyCompletedError,
     WorkoutCycleNotFoundError,
+    WorkoutCyclePlanInactiveError,
     complete_cycle,
     get_cycle_for_user,
     start_cycle,
@@ -75,6 +80,22 @@ def test_start_cycle_rejects_unsupported_plan_duration(db: Session) -> None:
     plan = make_plan(db, user.id, duration_weeks=5)
 
     with pytest.raises(ValueError, match="4, 6, or 8"):
+        start_cycle(db, user_id=user.id, workout_plan_id=plan.id)
+
+
+@pytest.mark.parametrize(
+    "plan_status",
+    [WorkoutPlanStatus.GENERATING, WorkoutPlanStatus.SUPERSEDED, WorkoutPlanStatus.FAILED],
+)
+def test_start_cycle_requires_an_active_workout_plan(
+    db: Session, plan_status: WorkoutPlanStatus
+) -> None:
+    user = make_user(db, f"inactive-{plan_status.value}@example.com")
+    plan = make_plan(db, user.id)
+    plan.status = plan_status
+    db.flush()
+
+    with pytest.raises(WorkoutCyclePlanInactiveError):
         start_cycle(db, user_id=user.id, workout_plan_id=plan.id)
 
 
@@ -150,3 +171,106 @@ def test_completed_cycle_cannot_be_completed_again(db: Session) -> None:
 
     with pytest.raises(WorkoutCycleAlreadyCompletedError):
         complete_cycle(db, cycle_id=cycle.id, user_id=user.id)
+
+
+def test_start_cycle_is_concurrency_idempotent_with_two_database_sessions() -> None:
+    engine = create_engine(_test_database_url())
+    email = f"concurrent-cycle-{uuid4()}@example.com"
+    insert_barrier = Barrier(2)
+
+    def synchronize_cycle_inserts(
+        _connection: object,
+        _cursor: object,
+        statement: str,
+        _parameters: object,
+        _context: object,
+        _executemany: object,
+    ) -> None:
+        if "INSERT INTO workout_cycles" in statement:
+            insert_barrier.wait(timeout=5)
+
+    event.listen(engine, "before_cursor_execute", synchronize_cycle_inserts)
+    try:
+        with Session(engine) as setup_db:
+            user = make_user(setup_db, email)
+            plan = make_plan(setup_db, user.id)
+            user_id = user.id
+            plan_id = plan.id
+            setup_db.commit()
+
+        def start_in_session() -> UUID:
+            with Session(engine) as worker_db:
+                cycle = start_cycle(worker_db, user_id=user_id, workout_plan_id=plan_id)
+                worker_db.commit()
+                return cycle.id
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            cycle_ids = list(executor.map(lambda _index: start_in_session(), range(2)))
+
+        assert cycle_ids[0] == cycle_ids[1]
+        with Session(engine) as check_db:
+            assert check_db.scalar(
+                select(func.count()).select_from(WorkoutCycle).where(
+                    WorkoutCycle.workout_plan_id == plan_id
+                )
+            ) == 1
+    finally:
+        event.remove(engine, "before_cursor_execute", synchronize_cycle_inserts)
+        with Session(engine) as cleanup_db:
+            cleanup_db.execute(delete(User).where(User.email == email))
+            cleanup_db.commit()
+        engine.dispose()
+
+
+def test_cycle_completion_is_concurrency_safe_with_optional_feedback() -> None:
+    engine = create_engine(_test_database_url())
+    email = f"concurrent-completion-{uuid4()}@example.com"
+    try:
+        with Session(engine) as setup_db:
+            user = make_user(setup_db, email)
+            plan = make_plan(setup_db, user.id)
+            cycle = start_cycle(setup_db, user_id=user.id, workout_plan_id=plan.id)
+            user_id = user.id
+            cycle_id = cycle.id
+            setup_db.commit()
+
+        def complete_in_session(adherence_percent: int) -> str:
+            with Session(engine) as worker_db:
+                try:
+                    complete_cycle(
+                        worker_db,
+                        cycle_id=cycle_id,
+                        user_id=user_id,
+                        feedback=CompletionFeedbackInput(adherence_percent=adherence_percent),
+                    )
+                    worker_db.commit()
+                    return "completed"
+                except WorkoutCycleAlreadyCompletedError:
+                    worker_db.rollback()
+                    return "already_completed"
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            outcomes = list(executor.map(complete_in_session, [70, 90]))
+
+        assert sorted(outcomes) == ["already_completed", "completed"]
+        with Session(engine) as check_db:
+            cycle = check_db.get(WorkoutCycle, cycle_id)
+            assert cycle is not None
+            assert cycle.status is WorkoutCycleStatus.COMPLETED
+            assert check_db.scalar(
+                select(func.count()).select_from(WorkoutCycleFeedback).where(
+                    WorkoutCycleFeedback.cycle_id == cycle_id
+                )
+            ) == 1
+    finally:
+        with Session(engine) as cleanup_db:
+            cleanup_db.execute(delete(User).where(User.email == email))
+            cleanup_db.commit()
+        engine.dispose()
+
+
+def _test_database_url() -> str:
+    return os.environ.get(
+        "TEST_DATABASE_URL",
+        "postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho_test",
+    )

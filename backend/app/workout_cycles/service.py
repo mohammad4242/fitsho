@@ -2,11 +2,13 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.workout_cycles.enums import WorkoutCycleStatus
 from app.workout_cycles.models import WorkoutCycle, WorkoutCycleFeedback
 from app.workout_cycles.schemas import CompletionFeedbackInput
+from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan
 
 SUPPORTED_CYCLE_DURATIONS = frozenset({4, 6, 8})
@@ -17,6 +19,10 @@ class WorkoutCycleNotFoundError(Exception):
 
 
 class WorkoutCycleAlreadyCompletedError(Exception):
+    pass
+
+
+class WorkoutCyclePlanInactiveError(Exception):
     pass
 
 
@@ -43,6 +49,8 @@ def start_cycle(
     )
     if plan is None:
         raise WorkoutCycleNotFoundError
+    if plan.status is not WorkoutPlanStatus.ACTIVE:
+        raise WorkoutCyclePlanInactiveError
 
     duration_weeks = _plan_duration_weeks(plan)
     cycle = WorkoutCycle(
@@ -50,8 +58,17 @@ def start_cycle(
         workout_plan_id=plan.id,
         duration_weeks=duration_weeks,
     )
-    db.add(cycle)
-    db.flush()
+    try:
+        with db.begin_nested():
+            db.add(cycle)
+            db.flush()
+    except IntegrityError:
+        concurrent_cycle = db.scalar(
+            select(WorkoutCycle).where(WorkoutCycle.workout_plan_id == workout_plan_id)
+        )
+        if concurrent_cycle is not None:
+            return concurrent_cycle
+        raise
     return cycle
 
 
@@ -76,7 +93,14 @@ def complete_cycle(
     user_id: UUID,
     feedback: CompletionFeedbackInput | None = None,
 ) -> WorkoutCycle:
-    cycle = get_cycle_for_user(db, cycle_id=cycle_id, user_id=user_id)
+    cycle = db.scalar(
+        select(WorkoutCycle)
+        .where(
+            WorkoutCycle.id == cycle_id,
+            WorkoutCycle.user_id == user_id,
+        )
+        .with_for_update()
+    )
     if cycle is None:
         raise WorkoutCycleNotFoundError
     if cycle.status is WorkoutCycleStatus.COMPLETED:
