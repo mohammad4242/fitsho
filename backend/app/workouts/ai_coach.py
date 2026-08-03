@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from uuid import UUID
+
+from app.exercises.enums import MuscleGroup
+from app.workouts.program_engine.schemas import TemplateReference
+from app.workouts.schemas import WorkoutGenerationProfile
+
+
+@dataclass(frozen=True)
+class AiCoachProgramCandidate:
+    template: TemplateReference
+    score: int
+
+
+def select_ai_coach_candidates(
+    *,
+    templates: tuple[TemplateReference, ...],
+    profile: WorkoutGenerationProfile,
+    eligible_exercise_ids: frozenset[UUID],
+    priority_muscles: tuple[MuscleGroup, ...] = (),
+    maximum_candidates: int = 3,
+) -> tuple[AiCoachProgramCandidate, ...]:
+    """Return only fully eligible library programs in deterministic priority order."""
+    priority_tags = {muscle.value for muscle in priority_muscles}
+    candidates: list[AiCoachProgramCandidate] = []
+    for template in templates:
+        if (
+            template.days_per_week != profile.training_days_per_week
+            or template.training_level != profile.experience_level.value
+            or template.fitness_goal != str(profile.fitness_goal)
+        ):
+            continue
+        exercise_ids = tuple(
+            slot.exercise_id
+            for day in template.days
+            for slot in day.slots
+        )
+        if not exercise_ids or any(exercise_id is None for exercise_id in exercise_ids):
+            continue
+        if not set(exercise_ids).issubset(eligible_exercise_ids):
+            continue
+        score = 100 + 10 * len(priority_tags.intersection(template.focus_tags))
+        candidates.append(AiCoachProgramCandidate(template=template, score=score))
+    return tuple(
+        sorted(candidates, key=lambda candidate: (-candidate.score, candidate.template.slug))[
+            :maximum_candidates
+        ]
+    )
