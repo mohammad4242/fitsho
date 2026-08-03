@@ -134,6 +134,7 @@ def to_plan_response(plan: WorkoutPlan, *, is_stale: bool = False) -> WorkoutPla
                 weekday=day.weekday,
                 focus=day.focus,
                 cardio=day.cardio,
+                ai_coach_explanation_fa=day.ai_coach_explanation_fa,
                 exercises=[
                     WorkoutPlanExerciseResponse(
                         order_index=item.order_index,
@@ -171,6 +172,8 @@ def to_plan_response(plan: WorkoutPlan, *, is_stale: bool = False) -> WorkoutPla
         progression_policy=plan.progression_policy,
         decision_trace=plan.decision_trace,
         body_analysis_provenance=plan.body_analysis_provenance,
+        ai_coach_template_slug=plan.ai_coach_template_slug,
+        ai_coach_program_explanation_fa=plan.ai_coach_program_explanation_fa,
     )
 
 

@@ -153,6 +153,7 @@ class WorkoutDayResponse(BaseModel):
     weekday: int | None = None
     focus: str = "legacy"
     cardio: dict[str, object] | None = None
+    ai_coach_explanation_fa: str | None = None
 
 
 class WorkoutPlanResponse(BaseModel):
@@ -179,6 +180,8 @@ class WorkoutPlanResponse(BaseModel):
     progression_policy: dict[str, object] = Field(default_factory=dict)
     decision_trace: list[dict[str, object]] = Field(default_factory=list)
     body_analysis_provenance: dict[str, object] = Field(default_factory=dict)
+    ai_coach_template_slug: str | None = None
+    ai_coach_program_explanation_fa: str | None = None
 
 
 class WorkoutPlanGenerateResponse(BaseModel):

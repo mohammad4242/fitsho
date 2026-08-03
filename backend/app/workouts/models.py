@@ -114,6 +114,8 @@ class WorkoutPlan(Base):
     body_analysis_provenance: Mapped[dict[str, object]] = mapped_column(
         JSON, default=dict, server_default=text("'{}'::json"), nullable=False
     )
+    ai_coach_template_slug: Mapped[str | None] = mapped_column(String(120))
+    ai_coach_program_explanation_fa: Mapped[str | None] = mapped_column(Text)
     progression_policy: Mapped[dict[str, object]] = mapped_column(
         JSON, default=dict, server_default=text("'{}'::json"), nullable=False
     )
@@ -165,6 +167,7 @@ class WorkoutDay(Base):
         String(80), default="legacy", server_default="legacy", nullable=False
     )
     cardio: Mapped[dict[str, object] | None] = mapped_column(JSON)
+    ai_coach_explanation_fa: Mapped[str | None] = mapped_column(Text)
 
     workout_plan: Mapped[WorkoutPlan] = relationship(back_populates="days")
     exercises: Mapped[list[WorkoutPlanExercise]] = relationship(

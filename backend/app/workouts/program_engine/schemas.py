@@ -329,6 +329,7 @@ class TemplateReferenceDay:
     title: str
     focus: tuple[MuscleGroup, ...]
     slots: tuple[TemplateReferenceSlot, ...]
+    title_fa: str = ""
 
 
 @dataclass(frozen=True)

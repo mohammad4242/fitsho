@@ -25,6 +25,7 @@ def candidate_program_payload(
             {
                 "day_number": day.day_number,
                 "title": day.title,
+                "title_fa": day.title_fa or day.title,
                 "exercise_names_fa": [
                     exercise_names_fa[slot.exercise_id]
                     for slot in day.slots

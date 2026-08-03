@@ -22,6 +22,7 @@ from app.ai.schemas import (
     WorkoutPlanModelOutput,
     WorkoutProviderError,
 )
+from app.body_analysis.providers import ProviderRoutingPreferences
 from app.exercises.enums import (
     Difficulty,
     Equipment,
@@ -32,6 +33,16 @@ from app.exercises.models import Exercise
 from app.profile.enums import ExperienceLevel, HomeTrainingSetup, TrainingLocation
 from app.profile.service import ProfileSnapshot, get_profile
 from app.training_templates.engine_reference import load_template_references
+from app.workouts.ai_coach import (
+    AiCoachProgramCandidate,
+    candidate_program_payload,
+    select_ai_coach_candidates,
+)
+from app.workouts.ai_coach_provider import (
+    AiCoachRecommendation,
+    AiCoachRecommendationRequest,
+    OpenRouterAiCoachProvider,
+)
 from app.workouts.body_analysis_resolver import (
     BodyAnalysisInfluenceResolver,
     WorkoutBodyAnalysisResolver,
@@ -60,7 +71,6 @@ from app.workouts.program_engine.schemas import (
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_targets import persian_session_title
-from app.workouts.prompt_builder import build_workout_generation_model_request
 from app.workouts.repository import (
     activate_plan,
     create_generation,
@@ -96,6 +106,10 @@ class WorkoutGenerationSettings:
     warmup_minutes: int
     deterministic_fallback_enabled: bool = False
     generation_method: str = "fitsho_coach"
+    ai_coach_fallback_models: tuple[str, ...] = ()
+    ai_coach_temperature: float = 0.0
+    ai_coach_max_output_tokens: int = 4096
+    ai_coach_routing_preferences: ProviderRoutingPreferences = ProviderRoutingPreferences()
 
 
 @dataclass(frozen=True)
@@ -147,12 +161,14 @@ class WorkoutGenerationService:
         db: Session,
         *,
         providers: tuple[ModelProviderCandidate, ...] = (),
+        ai_coach_provider: OpenRouterAiCoachProvider | None = None,
         settings: WorkoutGenerationSettings,
         ruleset: ProgramRuleset = RULESET,
         body_analysis_resolver: BodyAnalysisInfluenceResolver | None = None,
     ) -> None:
         self._db = db
         self._providers = providers
+        self._ai_coach_provider = ai_coach_provider
         self._settings = settings
         self._ruleset = ruleset
         self._body_analysis_resolver = body_analysis_resolver or WorkoutBodyAnalysisResolver(db)
@@ -290,19 +306,33 @@ class WorkoutGenerationService:
             raise WorkoutGenerationFailedError(error_code="persistence_failed") from error
 
     async def _generate_with_ai(self, user_id: UUID) -> WorkoutPlanGenerationResult:
-        if not self._providers:
+        if self._ai_coach_provider is None:
             raise WorkoutGenerationFailedError(error_code="no_enabled_ai_model")
         source_profile = get_profile(self._db, user_id)
         profile = self._to_generation_profile(source_profile)
-        candidates = WorkoutCandidateSelector(
+        eligible_exercises = WorkoutCandidateSelector(
             self._db, maximum_candidates=self._settings.max_candidates
         ).select(profile)
-        if not candidates.is_sufficient:
+        if not eligible_exercises.is_sufficient:
             raise NoEligibleExercisesError("INSUFFICIENT_ELIGIBLE_EXERCISES")
-        policy = WorkoutGenerationPolicy.for_session_duration(
-            profile.session_duration_minutes, warmup_minutes=self._settings.warmup_minutes
+        body_analysis = applicable_body_analysis_influence(
+            self._body_analysis_resolver.resolve(user_id), self._ruleset
         )
-        signature = self._ai_generation_signature(profile, candidates)
+        library_candidates = select_ai_coach_candidates(
+            templates=load_template_references(self._db),
+            profile=profile,
+            eligible_exercise_ids=frozenset(eligible_exercises.ids),
+            priority_muscles=(
+                tuple(priority.muscle for priority in body_analysis.priorities)
+                if body_analysis is not None
+                else ()
+            ),
+        )
+        if len(library_candidates) < 2:
+            raise WorkoutGenerationFailedError(error_code="insufficient_library_programs")
+        signature = self._ai_coach_generation_signature(
+            profile, library_candidates, eligible_exercises
+        )
         active_plan = get_active_plan(self._db, user_id)
         if (
             active_plan is not None
@@ -311,32 +341,61 @@ class WorkoutGenerationService:
         ):
             return WorkoutPlanGenerationResult(plan=active_plan, reused=True)
         self._enforce_cooldown(user_id)
-        request = build_workout_generation_model_request(profile, candidates, policy)
-        request_size = len(
-            json.dumps(request.input_payload, ensure_ascii=False, separators=(",", ":")).encode()
+        catalog = {item.id: item for item in self._load_catalog()}
+        payloads = tuple(
+            candidate_program_payload(
+                candidate,
+                exercise_names_fa={
+                    exercise_id: str(catalog[exercise_id].display_snapshot["name_fa"])
+                    for day in candidate.template.days
+                    for slot in day.slots
+                    if (exercise_id := slot.exercise_id) is not None
+                },
+            )
+            for candidate in library_candidates
         )
+        profile_payload = self._ai_coach_profile_payload(profile, body_analysis)
+        request_size = len(json.dumps(
+            {"profile": profile_payload, "candidate_programs": payloads},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode())
         if request_size > self._settings.max_request_bytes:
             raise WorkoutGenerationFailedError(error_code="request_too_large")
-        generation = self._start_generation(user_id, len(candidates.exercises))
+        generation = self._start_generation(user_id, len(library_candidates))
         started_at = perf_counter()
         try:
-            response = await self._generate_valid_ai_response(
-                request, candidates, policy, profile.training_days_per_week
+            recommendation = await self._ai_coach_provider.recommend(
+                AiCoachRecommendationRequest(
+                    profile=profile_payload,
+                    candidate_programs=payloads,
+                    primary_model=self._settings.model_id,
+                    fallback_models=self._settings.ai_coach_fallback_models,
+                    temperature=self._settings.ai_coach_temperature,
+                    max_output_tokens=self._settings.ai_coach_max_output_tokens,
+                    routing_preferences=self._settings.ai_coach_routing_preferences,
+                )
             )
-            plan = self._build_ai_plan(
+            selected = next(
+                candidate
+                for candidate in library_candidates
+                if candidate.template.slug == recommendation.selected_candidate_id
+            )
+            plan = self._build_ai_coach_plan(
                 user_id=user_id,
                 signature=signature,
-                profile_snapshot=self._profile_snapshot(request),
-                candidate_set_hash=candidates.candidate_set_hash,
-                response=response[1].plan,
-                policy=policy,
-                model_id=response[0],
+                profile=profile,
+                candidate_set_hash=eligible_exercises.candidate_set_hash,
+                candidate=selected,
+                catalog=catalog,
+                recommendation=recommendation,
+                body_analysis=body_analysis,
             )
             generation.provider = self._settings.provider_name
-            generation.model_id = response[0]
-            generation.provider_request_id = response[1].provider_request_id
-            generation.input_tokens = response[1].input_tokens
-            generation.output_tokens = response[1].output_tokens
+            generation.model_id = recommendation.model_id
+            generation.provider_request_id = recommendation.provider_request_id
+            generation.input_tokens = recommendation.input_tokens
+            generation.output_tokens = recommendation.output_tokens
             generation.latency_ms = int((perf_counter() - started_at) * 1000)
             activate_plan(self._db, plan, generation)
             self._db.commit()
@@ -352,6 +411,119 @@ class WorkoutGenerationService:
                 [{"errors": [problem.code for problem in error.problems]}],
             )
             raise WorkoutGenerationFailedError(error_code="semantic_validation_failed") from None
+
+    def _build_ai_coach_plan(
+        self,
+        *,
+        user_id: UUID,
+        signature: str,
+        profile: WorkoutGenerationProfile,
+        candidate_set_hash: str,
+        candidate: AiCoachProgramCandidate,
+        catalog: dict[UUID, ExerciseCandidate],
+        recommendation: AiCoachRecommendation,
+        body_analysis: BodyAnalysisInfluence | None,
+    ) -> WorkoutPlan:
+        snapshots = {str(item.id): self._candidate_snapshot(item) for item in catalog.values()}
+        day_notes = {
+            item.day_number: item.explanation_fa for item in recommendation.day_explanations
+        }
+        plan = WorkoutPlan(
+            user_id=user_id,
+            status=WorkoutPlanStatus.GENERATING,
+            generation_signature=signature,
+            profile_snapshot={
+                "goal": str(profile.fitness_goal),
+                "experience_level": profile.experience_level.value,
+                "training_days_per_week": profile.training_days_per_week,
+                "session_duration_minutes": profile.session_duration_minutes,
+                "plan_duration_weeks": profile.plan_duration_weeks,
+            },
+            provider=self._settings.provider_name,
+            model_id=recommendation.model_id,
+            prompt_version=self._settings.prompt_version,
+            generation_policy_version=self._settings.generation_policy_version,
+            candidate_set_hash=candidate_set_hash,
+            generation_method="ai",
+            engine_version="template_library_v1",
+            ruleset_version="template_library_v1",
+            primary_goal=str(profile.fitness_goal),
+            training_status=profile.experience_level.value,
+            safety_status="template_eligible",
+            exercise_catalog_snapshot={"hash": candidate_set_hash, "exercises": snapshots},
+            body_analysis_provenance=(
+                _json_ready(body_analysis.model_dump(mode="json")) if body_analysis else {}
+            ),
+            ai_coach_template_slug=candidate.template.slug,
+            ai_coach_program_explanation_fa=recommendation.program_explanation_fa,
+        )
+        for template_day in candidate.template.days:
+            timings = [ExerciseTiming(slot.sets, slot.rest_seconds) for slot in template_day.slots]
+            day = WorkoutDay(
+                day_number=template_day.day_number,
+                title_en=template_day.title,
+                title_fa=template_day.title_fa or template_day.title,
+                focus=", ".join(muscle.value for muscle in template_day.focus),
+                estimated_duration_minutes=(
+                    self._settings.warmup_minutes + calculate_day_minutes(timings)
+                ),
+                ai_coach_explanation_fa=day_notes.get(template_day.day_number),
+            )
+            for order, slot in enumerate(template_day.slots, start=1):
+                if slot.exercise_id is None:
+                    raise ValueError("AI coach candidate has an unresolved exercise")
+                day.exercises.append(
+                    WorkoutPlanExercise(
+                        exercise_id=slot.exercise_id,
+                        order_index=order,
+                        sets=slot.sets,
+                        reps_min=slot.rep_min,
+                        reps_max=slot.rep_max,
+                        rest_seconds=slot.rest_seconds,
+                        rir=slot.target_rir,
+                        estimated_minutes=calculate_exercise_minutes(
+                            ExerciseTiming(slot.sets, slot.rest_seconds)
+                        ),
+                        exercise_snapshot=snapshots[str(slot.exercise_id)],
+                    )
+                )
+            plan.days.append(day)
+        return plan
+
+    def _ai_coach_generation_signature(
+        self,
+        profile: WorkoutGenerationProfile,
+        candidates: tuple[AiCoachProgramCandidate, ...],
+        eligible_exercises: CandidateSet,
+    ) -> str:
+        payload = {
+            "profile": self._ai_coach_profile_payload(profile, None),
+            "candidate_set_hash": eligible_exercises.candidate_set_hash,
+            "templates": [item.template.slug for item in candidates],
+            "model": self._settings.model_id,
+            "prompt": self._settings.prompt_version,
+        }
+        return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+    @staticmethod
+    def _ai_coach_profile_payload(
+        profile: WorkoutGenerationProfile,
+        body_analysis: BodyAnalysisInfluence | None,
+    ) -> dict[str, object]:
+        return {
+            "fitness_goal": str(profile.fitness_goal),
+            "experience_level": profile.experience_level.value,
+            "training_days_per_week": profile.training_days_per_week,
+            "session_duration_minutes": profile.session_duration_minutes,
+            "training_location": profile.training_location.value,
+            "training_cautions": [item.value for item in profile.training_cautions],
+            "physical_limitations": profile.physical_limitations,
+            "body_analysis_priorities": (
+                [priority.model_dump(mode="json") for priority in body_analysis.priorities]
+                if body_analysis is not None
+                else []
+            ),
+        }
 
     async def _generate_valid_ai_response(
         self,
@@ -799,10 +971,17 @@ class WorkoutGenerationService:
             return None
         if self._settings.generation_method == "ai":
             profile = self._to_generation_profile(get_profile(self._db, user_id))
-            candidates = WorkoutCandidateSelector(
+            eligible_exercises = WorkoutCandidateSelector(
                 self._db, maximum_candidates=self._settings.max_candidates
             ).select(profile)
-            signature = self._ai_generation_signature(profile, candidates)
+            candidates = select_ai_coach_candidates(
+                templates=load_template_references(self._db),
+                profile=profile,
+                eligible_exercise_ids=frozenset(eligible_exercises.ids),
+            )
+            signature = self._ai_coach_generation_signature(
+                profile, candidates, eligible_exercises
+            )
             return ActiveWorkoutPlanResult(
                 plan=plan,
                 is_stale=plan.generation_signature != signature or self._is_plan_expired(plan),

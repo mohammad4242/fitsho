@@ -44,6 +44,7 @@ def _reference(template: TrainingProgramTemplate) -> TemplateReference:
             TemplateReferenceDay(
                 day_number=day.day_number,
                 title=day.title_en,
+                title_fa=day.title_fa,
                 focus=tuple(MuscleGroup(muscle) for muscle in day.direct_target_muscles),
                 slots=tuple(_slot_reference(slot) for slot in day.slots),
             )
