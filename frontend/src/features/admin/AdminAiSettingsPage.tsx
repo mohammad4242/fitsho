@@ -31,6 +31,7 @@ export function AdminAiSettingsPage() {
   const modelRequestVersion = useRef(0);
   const operationVersion = useRef(0);
   const activeTask = useRef<AdminAiTaskType>(selectedTask);
+  const taskEpoch = useRef(0);
 
   const config = useMemo(
     () => configs.find((item) => item.task_type === selectedTask) ?? null,
@@ -43,6 +44,7 @@ export function AdminAiSettingsPage() {
         setConfigs(items);
         if (!items.some((item) => item.task_type === selectedTask) && items[0]) {
           activeTask.current = items[0].task_type;
+          taskEpoch.current += 1;
           setSelectedTask(items[0].task_type);
         }
       })
@@ -53,18 +55,26 @@ export function AdminAiSettingsPage() {
     void loadModels(selectedTask, search);
   }, [selectedTask]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function loadModels(task: AdminAiTaskType, query: string) {
-    if (activeTask.current !== task) return Promise.resolve();
+  function loadModels(task: AdminAiTaskType, query: string, epoch = taskEpoch.current) {
+    if (activeTask.current !== task || taskEpoch.current !== epoch) return Promise.resolve();
     const requestVersion = modelRequestVersion.current + 1;
     modelRequestVersion.current = requestVersion;
     return getAdminAiTaskModels(task, query)
       .then((response) => {
-        if (requestVersion !== modelRequestVersion.current) return;
+        if (
+          requestVersion !== modelRequestVersion.current
+          || activeTask.current !== task
+          || taskEpoch.current !== epoch
+        ) return;
         setModels(response.items);
         setCatalogStale(response.stale);
       })
       .catch(() => {
-        if (requestVersion === modelRequestVersion.current) {
+        if (
+          requestVersion === modelRequestVersion.current
+          && activeTask.current === task
+          && taskEpoch.current === epoch
+        ) {
           setError(t("admin.aiSettings.catalogError"));
         }
       });
@@ -91,6 +101,7 @@ export function AdminAiSettingsPage() {
 
   function persistConfig(target: AdminAiTaskConfig, replacementKey: string) {
     const taskAtStart = selectedTask;
+    const epochAtStart = taskEpoch.current;
     const operation = beginOperation("save");
     setMessage(null);
     setError(null);
@@ -111,54 +122,68 @@ export function AdminAiSettingsPage() {
     void saveAdminAiTaskConfig(taskAtStart, payload)
       .then((saved) => {
         setConfigs((current) => current.map((item) => item.task_type === taskAtStart ? saved : item));
-        if (isActiveOperation(taskAtStart, operation)) {
+        if (isActiveOperation(taskAtStart, epochAtStart, operation)) {
           setApiKey("");
           setMessage(t("admin.aiSettings.saved"));
         }
       })
       .catch(() => {
-        if (isActiveOperation(taskAtStart, operation)) setError(t("admin.aiSettings.saveError"));
+        if (isActiveOperation(taskAtStart, epochAtStart, operation)) {
+          setError(t("admin.aiSettings.saveError"));
+        }
       })
-      .finally(() => finishOperation(operation));
+      .finally(() => finishOperation(taskAtStart, epochAtStart, operation));
   }
 
   function handleConnectionTest() {
     const taskAtStart = selectedTask;
+    const epochAtStart = taskEpoch.current;
     const operation = beginOperation("test");
     setMessage(null);
     setError(null);
     void testAdminAiProvider(apiKey || undefined)
       .then((result) => {
-        if (!isActiveOperation(taskAtStart, operation)) return;
+        if (!isActiveOperation(taskAtStart, epochAtStart, operation)) return;
         if (result.ok) setMessage(t("admin.aiSettings.connected"));
         else setError(result.safe_error_message ?? t("admin.aiSettings.connectionFailed"));
       })
       .catch(() => {
-        if (isActiveOperation(taskAtStart, operation)) setError(t("admin.aiSettings.connectionFailed"));
+        if (isActiveOperation(taskAtStart, epochAtStart, operation)) {
+          setError(t("admin.aiSettings.connectionFailed"));
+        }
       })
-      .finally(() => finishOperation(operation));
+      .finally(() => finishOperation(taskAtStart, epochAtStart, operation));
   }
 
   function handleRefresh() {
     const taskAtStart = selectedTask;
+    const epochAtStart = taskEpoch.current;
     const operation = beginOperation("refresh");
     setError(null);
     void refreshAdminAiModels()
       .then(() => {
-        if (!isActiveOperation(taskAtStart, operation)) return;
-        return loadModels(taskAtStart, search);
+        if (!isActiveOperation(taskAtStart, epochAtStart, operation)) return;
+        return loadModels(taskAtStart, search, epochAtStart);
       })
       .then(() => {
-        if (isActiveOperation(taskAtStart, operation)) setMessage(t("admin.aiSettings.refreshed"));
+        if (isActiveOperation(taskAtStart, epochAtStart, operation)) {
+          setMessage(t("admin.aiSettings.refreshed"));
+        }
       })
       .catch(() => {
-        if (isActiveOperation(taskAtStart, operation)) setError(t("admin.aiSettings.refreshError"));
+        if (isActiveOperation(taskAtStart, epochAtStart, operation)) {
+          setError(t("admin.aiSettings.refreshError"));
+        }
       })
-      .finally(() => finishOperation(operation));
+      .finally(() => finishOperation(taskAtStart, epochAtStart, operation));
   }
 
   function selectTask(task: AdminAiTaskType) {
+    if (task !== activeTask.current) taskEpoch.current += 1;
     activeTask.current = task;
+    setBusy(null);
+    setMessage(null);
+    setError(null);
     setSelectedTask(task);
   }
 
@@ -169,12 +194,16 @@ export function AdminAiSettingsPage() {
     return operation;
   }
 
-  function isActiveOperation(task: AdminAiTaskType, operation: number) {
-    return activeTask.current === task && operationVersion.current === operation;
+  function isActiveOperation(task: AdminAiTaskType, epoch: number, operation: number) {
+    return (
+      activeTask.current === task
+      && taskEpoch.current === epoch
+      && operationVersion.current === operation
+    );
   }
 
-  function finishOperation(operation: number) {
-    if (operationVersion.current === operation) setBusy(null);
+  function finishOperation(task: AdminAiTaskType, epoch: number, operation: number) {
+    if (isActiveOperation(task, epoch, operation)) setBusy(null);
   }
 
   if (!config) return <main className="admin-main"><p>{t("admin.aiSettings.loading")}</p></main>;

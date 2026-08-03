@@ -255,6 +255,46 @@ it("does not show stale connection or save results after switching tasks", async
   expect(screen.getByRole("heading", { name: "Progress comparison" })).toBeInTheDocument();
 });
 
+it("ignores delayed task A refresh, test, and save results after an A-to-B-to-A switch", async () => {
+  let resolveRefresh: (() => void) | undefined;
+  let resolveConnection: ((value: { ok: boolean; checked_at: string; model_count: number; error_code: null; safe_error_message: null }) => void) | undefined;
+  let resolveSave: ((value: AdminAiTaskConfig) => void) | undefined;
+  api.getAdminAiTaskConfigs.mockResolvedValue([
+    { ...bodyConfig, credential: { configured: true, masked: "••••cret" } },
+    progressConfig,
+  ]);
+  api.refreshAdminAiModels.mockReturnValue(new Promise((resolve) => { resolveRefresh = () => resolve({
+    provider: "openrouter", model_count: 2, refreshed_at: "2026-08-03T12:00:00Z",
+  }); }));
+  api.testAdminAiProvider.mockReturnValue(new Promise((resolve) => { resolveConnection = resolve; }));
+  api.saveAdminAiTaskConfig.mockReturnValue(new Promise((resolve) => { resolveSave = resolve; }));
+  const user = userEvent.setup();
+  renderPage();
+
+  const bodyTab = await screen.findByRole("button", { name: "Body-photo analysis" });
+  const progressTab = screen.getByRole("button", { name: "Progress comparison" });
+  await user.click(screen.getByRole("button", { name: "Refresh models" }));
+  await user.click(progressTab);
+  await user.click(bodyTab);
+  resolveRefresh?.();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.queryByText("Model catalog refreshed")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Test connection" }));
+  await user.click(progressTab);
+  await user.click(bodyTab);
+  resolveConnection?.({ ok: true, checked_at: "2026-08-03T12:00:00Z", model_count: 2, error_code: null, safe_error_message: null });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.queryByText("Connection successful")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await user.click(progressTab);
+  await user.click(bodyTab);
+  resolveSave?.({ ...bodyConfig, enabled: true });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.queryByText("Settings saved")).not.toBeInTheDocument();
+});
+
 function renderPage() {
   return render(
     <MemoryRouter>
