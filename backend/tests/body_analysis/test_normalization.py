@@ -84,6 +84,10 @@ def test_rejects_unrecognized_body_area() -> None:
         "The user has scoliosis.",
         "This indicates an injured rotator cuff.",
         "A medical diagnosis of arthritis is visible.",
+        "The image proves a fracture.",
+        "A torn tendon is visible.",
+        "This diagnoses osteoporosis.",
+        "Kyphosis is present.",
     ],
 )
 def test_rejects_medical_diagnostic_claims(medical_claim: str) -> None:
@@ -95,6 +99,42 @@ def test_rejects_medical_diagnostic_claims(medical_claim: str) -> None:
     finding["explanation"] = medical_claim
 
     with pytest.raises(MedicalClaimError):
+        normalize_body_analysis(payload)
+
+
+def test_allows_visible_development_language_without_medical_claim() -> None:
+    payload = _valid_payload()
+    findings = payload["findings"]
+    assert isinstance(findings, list)
+    finding = findings[0]
+    assert isinstance(finding, dict)
+    finding["explanation"] = (
+        "Shoulders appear visibly less developed than the chest in these images."
+    )
+
+    result = normalize_body_analysis(payload)
+
+    assert result.findings[0].classification is BodyAnalysisClassification.CLEAR_LAG
+
+
+@pytest.mark.parametrize("classification", ["mild_lag", "clear_lag"])
+def test_actionable_lag_requires_bounded_severity(classification: str) -> None:
+    payload = _valid_payload()
+    findings = payload["findings"]
+    assert isinstance(findings, list)
+    finding = findings[0]
+    assert isinstance(finding, dict)
+    finding["classification"] = classification
+    finding["severity"] = None
+    summary = payload["summary"]
+    assert isinstance(summary, dict)
+    summary["priority_areas"] = []
+    summary["moderate_attention_areas"] = ["shoulders"]
+    if classification == "clear_lag":
+        summary["priority_areas"] = ["shoulders"]
+        summary["moderate_attention_areas"] = []
+
+    with pytest.raises(ValidationError):
         normalize_body_analysis(payload)
 
 

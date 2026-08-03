@@ -12,8 +12,9 @@ class MedicalClaimError(ValueError):
 
 
 _MEDICAL_CLAIM_PATTERN = re.compile(
-    r"\b(?:arthritis|diagnos(?:e|ed|is|tic)|disease|deformit(?:y|ies)|hernia|"
-    r"injur(?:y|ed|ies)|scoliosis|tendinitis|tendonitis)\b",
+    r"\b(?:arthritis|diagnos(?:e|es|ed|is|tic)|disease|deformit(?:y|ies)|"
+    r"fracture|hernia|injur(?:y|ed|ies)|kyphosis|osteoporosis|prov(?:e|es|ed|ing)|"
+    r"scoliosis|tear(?:s|ing)?|tendinitis|tendonitis|torn)\b",
     flags=re.IGNORECASE,
 )
 

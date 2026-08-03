@@ -30,6 +30,15 @@ class BodyAnalysisFinding(BaseModel):
 
     @model_validator(mode="after")
     def validate_classification_fields(self) -> BodyAnalysisFinding:
+        if (
+            self.classification
+            in {
+                BodyAnalysisClassification.MILD_LAG,
+                BodyAnalysisClassification.CLEAR_LAG,
+            }
+            and self.severity is None
+        ):
+            raise ValueError("lag findings require severity")
         if self.classification is BodyAnalysisClassification.UNCERTAIN:
             if self.severity is not None:
                 raise ValueError("uncertain findings cannot have severity")
