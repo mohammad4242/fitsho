@@ -40,21 +40,22 @@ describe("MediaPipePoseLandmarkDetector", () => {
     expect(faceLoader).toHaveBeenCalledOnce();
   });
 
-  it("rejects a multiple-person result through face detection", async () => {
+  it("uses the centered face and does not treat background artwork as another person", async () => {
     const detector = new MediaPipePoseLandmarkDetector(
       vi.fn().mockResolvedValue({
         detect: vi.fn().mockReturnValue({
           detections: [
-            { boundingBox: { originY: 20, height: 220 } },
-            { boundingBox: { originY: 30, height: 210 } },
+            { boundingBox: { originX: 24, width: 220, originY: 10, height: 190 } },
+            { boundingBox: { originX: 480, width: 220, originY: 12, height: 240 } },
           ],
         }),
       }),
     );
 
     await expect(detector.detect(decodedImage(), "front")).resolves.toMatchObject({
-      personCount: 2,
-      safeHeadCropY: null,
+      personCount: 1,
+      faceBottomY: 252 / 1800,
+      safeHeadCropY: expect.any(Number),
     });
   });
 

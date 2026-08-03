@@ -6,7 +6,14 @@ import type {
 import type { BodyPhotoView } from "./types";
 
 type FaceDetectorLike = {
-  detect(image: CanvasImageSource): { detections: Array<{ boundingBox?: { originY: number; height: number } }> };
+  detect(image: CanvasImageSource): { detections: Array<{ boundingBox?: FaceBoundingBox }> };
+};
+
+type FaceBoundingBox = {
+  originX?: number;
+  width?: number;
+  originY: number;
+  height: number;
 };
 
 type FaceDetectorLoader = () => Promise<FaceDetectorLike>;
@@ -40,8 +47,9 @@ export class MediaPipePoseLandmarkDetector implements BodyLandmarkDetector {
     const detector = await this.getFaceDetector();
     if (detector === null) throw new Error("face detector unavailable");
     const detections = detector.detect(image.source).detections;
-    if (detections.length !== 1) return rejectedDetection(detections.length);
-    const faceBottomY = faceBottom(detections[0]?.boundingBox, image.height);
+    const primaryFace = selectPrimaryFace(detections, image.width);
+    if (primaryFace === undefined) return incompleteDetection(expectedView);
+    const faceBottomY = faceBottom(primaryFace.boundingBox, image.height);
     if (faceBottomY === null) return incompleteDetection(expectedView);
 
     const safeHeadCropY = faceBottomY + 0.05;
@@ -85,33 +93,10 @@ async function loadMediaPipeVision(): Promise<MediaPipeVisionModule> {
       createFromOptions: async (fileset, options) => {
         const faceDetector = await vision.FaceDetector.createFromOptions(fileset as never, options as never);
         return {
-          detect: (image) => faceDetector.detect(image as never) as { detections: Array<{ boundingBox?: { originY: number; height: number } }> },
+          detect: (image) => faceDetector.detect(image as never) as { detections: Array<{ boundingBox?: FaceBoundingBox }> },
         };
       },
     },
-  };
-}
-
-function rejectedDetection(personCount: number): BodyLandmarkDetection {
-  return {
-    personCount,
-    detectedView: "unknown",
-    detectionConfidence: 0,
-    poseScore: 0,
-    bodyCompletenessScore: 0,
-    clothingVisibilityScore: 0,
-    backgroundReliabilityScore: 0,
-    isSafeAndRelevant: false,
-    clothingValidation: "unavailable",
-    contentSafetyValidation: "unavailable",
-    backgroundValidation: "unavailable",
-    faceBottomY: null,
-    safeHeadCropY: null,
-    shoulderLineY: null,
-    headFullyExcluded: false,
-    shouldersPreserved: false,
-    headCropConfidence: 0,
-    warnings: ["no_single_body_detected"],
   };
 }
 
@@ -139,12 +124,26 @@ function incompleteDetection(view: BodyPhotoView): BodyLandmarkDetection {
 }
 
 function faceBottom(
-  box: { originY: number; height: number } | undefined,
+  box: FaceBoundingBox | undefined,
   imageHeight: number,
 ): number | null {
   if (box === undefined || box.height <= 0 || imageHeight <= 0) return null;
   const bottom = (box.originY + box.height) / imageHeight;
   return Number.isFinite(bottom) && bottom > 0 && bottom < 0.45 ? bottom : null;
+}
+
+function selectPrimaryFace(
+  detections: Array<{ boundingBox?: FaceBoundingBox }>,
+  imageWidth: number,
+): { boundingBox?: FaceBoundingBox } | undefined {
+  return detections
+    .filter((detection) => detection.boundingBox !== undefined)
+    .sort((left, right) => faceCenterDistance(left.boundingBox, imageWidth) - faceCenterDistance(right.boundingBox, imageWidth))[0];
+}
+
+function faceCenterDistance(box: FaceBoundingBox | undefined, imageWidth: number): number {
+  if (box?.originX === undefined || box.width === undefined || imageWidth <= 0) return Infinity;
+  return Math.abs(((box.originX + (box.width / 2)) / imageWidth) - 0.5);
 }
 
 function faceDetected(
