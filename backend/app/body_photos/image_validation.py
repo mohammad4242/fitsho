@@ -37,7 +37,7 @@ class NormalizedBodyPhoto:
     extension: str
     width: int
     height: int
-    crop_confidence: float
+    client_crop_confidence: float
     client_crop_confirmed: bool
     server_geometry_checked: bool
     crop_original_height: int
@@ -75,7 +75,7 @@ def _read_limited(upload: UploadFile, settings: Settings) -> bytes:
 def _parse_crop_evidence(
     *,
     client_crop_confirmed: str | None,
-    crop_confidence: str | None,
+    client_crop_confidence: str | None,
     original_height: str | None,
     crop_top: str | None,
     crop_bottom: str | None,
@@ -84,7 +84,7 @@ def _parse_crop_evidence(
 ) -> CropEvidence:
     if (
         client_crop_confirmed != "true"
-        or crop_confidence is None
+        or client_crop_confidence is None
         or original_height is None
         or crop_top is None
         or crop_bottom is None
@@ -95,7 +95,7 @@ def _parse_crop_evidence(
     try:
         parsed = BodyPhotoCropEvidenceInput.model_validate(
             {
-                "confidence": crop_confidence,
+                "confidence": client_crop_confidence,
                 "original_height": original_height,
                 "crop_top": crop_top,
                 "crop_bottom": crop_bottom,
@@ -194,7 +194,7 @@ def validate_and_normalize(
     settings: Settings,
     *,
     client_crop_confirmed: str | None,
-    crop_confidence: str | None,
+    client_crop_confidence: str | None,
     original_height: str | None,
     crop_top: str | None,
     crop_bottom: str | None,
@@ -203,7 +203,7 @@ def validate_and_normalize(
 ) -> NormalizedBodyPhoto:
     evidence = _parse_crop_evidence(
         client_crop_confirmed=client_crop_confirmed,
-        crop_confidence=crop_confidence,
+        client_crop_confidence=client_crop_confidence,
         original_height=original_height,
         crop_top=crop_top,
         crop_bottom=crop_bottom,
@@ -261,7 +261,7 @@ def validate_and_normalize(
         extension=extension,
         width=normalized.width,
         height=normalized.height,
-        crop_confidence=evidence.confidence,
+        client_crop_confidence=evidence.confidence,
         client_crop_confirmed=evidence.client_crop_confirmed,
         server_geometry_checked=True,
         crop_original_height=evidence.original_height,

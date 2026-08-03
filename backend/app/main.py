@@ -43,7 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=[
             "Content-Type",
             "X-Fitsho-Client-Crop-Confirmed",
-            "X-Fitsho-Crop-Confidence",
+            "X-Fitsho-Client-Crop-Confidence",
             "X-Fitsho-Original-Height",
             "X-Fitsho-Crop-Top",
             "X-Fitsho-Crop-Bottom",

@@ -65,7 +65,7 @@ def _crop_headers(
     return {
         **ORIGIN,
         "X-Fitsho-Client-Crop-Confirmed": "true",
-        "X-Fitsho-Crop-Confidence": "0.95",
+        "X-Fitsho-Client-Crop-Confidence": "0.95",
         "X-Fitsho-Original-Height": str(original_height),
         "X-Fitsho-Crop-Top": str(crop_top),
         "X-Fitsho-Crop-Bottom": str(bottom),
@@ -225,7 +225,7 @@ def test_pillow_decompression_bomb_warning_is_sanitized_and_stores_nothing(
         ORIGIN,
         {**_crop_headers(_png()), "X-Fitsho-Client-Crop-Confirmed": "false"},
         {key: value for key, value in _crop_headers(_png()).items() if key != "X-Fitsho-Crop-Top"},
-        {**_crop_headers(_png()), "X-Fitsho-Crop-Confidence": "0.2"},
+        {**_crop_headers(_png()), "X-Fitsho-Client-Crop-Confidence": "0.2"},
     ],
 )
 def test_missing_or_unreliable_crop_attestation_is_rejected_without_storage(
@@ -495,6 +495,9 @@ def test_service_accepts_storage_interface_injection(
         def delete(self, key: str) -> None:
             self.objects.pop(key, None)
 
+    test_settings.body_photo_storage_root = (
+        Path(test_settings.media_root).parent / "body-private-storage-port"
+    )
     assert (
         client.post(
             "/api/v1/auth/register",
@@ -522,7 +525,7 @@ def test_service_accepts_storage_interface_injection(
         BodyPhotoView.FRONT,
         upload,
         client_crop_confirmed=headers["X-Fitsho-Client-Crop-Confirmed"],
-        crop_confidence=headers["X-Fitsho-Crop-Confidence"],
+        client_crop_confidence=headers["X-Fitsho-Client-Crop-Confidence"],
         original_height=headers["X-Fitsho-Original-Height"],
         crop_top=headers["X-Fitsho-Crop-Top"],
         crop_bottom=headers["X-Fitsho-Crop-Bottom"],
@@ -607,7 +610,7 @@ def test_failed_db_commit_and_failed_delete_persist_cleanup_in_separate_session(
             BodyPhotoView.FRONT,
             upload,
             client_crop_confirmed=headers["X-Fitsho-Client-Crop-Confirmed"],
-            crop_confidence=headers["X-Fitsho-Crop-Confidence"],
+            client_crop_confidence=headers["X-Fitsho-Client-Crop-Confidence"],
             original_height=headers["X-Fitsho-Original-Height"],
             crop_top=headers["X-Fitsho-Crop-Top"],
             crop_bottom=headers["X-Fitsho-Crop-Bottom"],

@@ -138,7 +138,7 @@ class BodyPhotoService:
         upload: UploadFile,
         *,
         client_crop_confirmed: str | None,
-        crop_confidence: str | None,
+        client_crop_confidence: str | None,
         original_height: str | None,
         crop_top: str | None,
         crop_bottom: str | None,
@@ -153,7 +153,7 @@ class BodyPhotoService:
             upload,
             self._settings,
             client_crop_confirmed=client_crop_confirmed,
-            crop_confidence=crop_confidence,
+            client_crop_confidence=client_crop_confidence,
             original_height=original_height,
             crop_top=crop_top,
             crop_bottom=crop_bottom,
@@ -179,7 +179,7 @@ class BodyPhotoService:
         existing.byte_size = len(normalized.content)
         existing.width = normalized.width
         existing.height = normalized.height
-        existing.crop_confidence = normalized.crop_confidence
+        existing.client_crop_confidence = normalized.client_crop_confidence
         existing.client_crop_confirmed = normalized.client_crop_confirmed
         existing.server_geometry_checked = normalized.server_geometry_checked
         existing.crop_original_height = normalized.crop_original_height

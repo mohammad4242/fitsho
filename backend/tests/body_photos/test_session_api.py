@@ -56,7 +56,7 @@ def _crop_headers(
     return {
         **ORIGIN,
         "X-Fitsho-Client-Crop-Confirmed": "true",
-        "X-Fitsho-Crop-Confidence": "0.97",
+        "X-Fitsho-Client-Crop-Confidence": "0.97",
         "X-Fitsho-Original-Height": str(original_height),
         "X-Fitsho-Crop-Top": str(crop_top),
         "X-Fitsho-Crop-Bottom": str(bottom),
@@ -147,7 +147,7 @@ def test_every_session_mutation_rejects_missing_trusted_origin(client: TestClien
         f"/api/v1/body-photo-sessions/{session_id}/photos/front",
         headers={
             "X-Fitsho-Client-Crop-Confirmed": "true",
-            "X-Fitsho-Crop-Confidence": "0.97",
+            "X-Fitsho-Client-Crop-Confidence": "0.97",
             "X-Fitsho-Original-Height": "800",
             "X-Fitsho-Crop-Top": "160",
             "X-Fitsho-Crop-Bottom": "800",
@@ -181,7 +181,7 @@ def test_upload_cors_preflight_allows_private_photo_headers(client: TestClient) 
             "Origin": "http://localhost:5173",
             "Access-Control-Request-Method": "PUT",
             "Access-Control-Request-Headers": (
-                "content-type,x-fitsho-client-crop-confirmed,x-fitsho-crop-confidence,"
+                "content-type,x-fitsho-client-crop-confirmed,x-fitsho-client-crop-confidence,"
                 "x-fitsho-original-height,x-fitsho-crop-top,x-fitsho-crop-bottom,"
                 "x-fitsho-processed-sha256,x-fitsho-crop-evidence-sha256"
             ),
@@ -198,6 +198,27 @@ def test_upload_cors_preflight_allows_private_photo_headers(client: TestClient) 
     assert (
         "x-fitsho-crop-evidence-sha256" in response.headers["access-control-allow-headers"].lower()
     )
+
+
+def test_upload_requires_client_named_crop_confidence_and_returns_client_metadata(
+    client: TestClient,
+) -> None:
+    _register(client, "photo-client-crop-name@example.com")
+    created = _create_session(client)
+    content = _png()
+    legacy_headers = _crop_headers(content)
+    legacy_headers["X-Fitsho-Crop-Confidence"] = legacy_headers.pop(
+        "X-Fitsho-Client-Crop-Confidence"
+    )
+
+    rejected = _upload(client, created["id"], "front", content, headers=legacy_headers)
+    accepted = _upload(client, created["id"], "front", content)
+
+    assert rejected.status_code == 422
+    assert accepted.status_code == 200
+    photo = accepted.json()["photos"][0]
+    assert photo["client_crop_confidence"] == 0.97
+    assert "crop_confidence" not in photo
 
 
 def test_owner_can_create_list_and_read_safe_session_dtos(client: TestClient) -> None:

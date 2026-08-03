@@ -151,7 +151,11 @@ class BodyPhoto(Base):
     byte_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
     width: Mapped[int] = mapped_column(Integer, nullable=False)
     height: Mapped[int] = mapped_column(Integer, nullable=False)
-    crop_confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    # This is browser-reported evidence about the crop operation.  It is not a
+    # server-side anatomical determination that a head was removed.
+    client_crop_confidence: Mapped[float] = mapped_column(
+        "crop_confidence", Float, nullable=False
+    )
     client_crop_confirmed: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=false(), nullable=False
     )

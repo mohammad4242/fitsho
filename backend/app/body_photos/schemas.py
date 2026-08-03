@@ -50,7 +50,7 @@ class BodyPhotoResponse(BaseModel):
     byte_size: int
     width: int
     height: int
-    crop_confidence: float
+    client_crop_confidence: float
     client_crop_confirmed: bool
     server_geometry_checked: bool
     content_url: str
