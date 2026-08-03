@@ -61,6 +61,7 @@ function renderOnboarding() {
       <Routes>
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/dashboard" element={<Destination />} />
+        <Route path="/body-progress/new" element={<Destination />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -271,7 +272,7 @@ it("submits one normalized typed profile payload", async () => {
   });
 });
 
-it("replaces onboarding with dashboard after successful creation", async () => {
+it("offers the optional photo flow after successful profile creation", async () => {
   profileContext.createProfile.mockResolvedValue(createdProfile);
   const user = userEvent.setup();
   renderOnboarding();
@@ -281,7 +282,7 @@ it("replaces onboarding with dashboard after successful creation", async () => {
   await user.click(screen.getByRole("button", { name: "ساخت پروفایل" }));
 
   expect(
-    await screen.findByRole("heading", { name: "REPLACE:/dashboard" }),
+    await screen.findByRole("heading", { name: "REPLACE:/body-progress/new" }),
   ).toBeInTheDocument();
 });
 

@@ -117,7 +117,7 @@ export function OnboardingPage() {
     setBusy(true);
     setSubmitError(false);
     void createProfile(toProfileInput(values))
-      .then(() => navigate("/dashboard", { replace: true }))
+      .then(() => navigate("/body-progress/new", { replace: true }))
       .catch(() => setSubmitError(true))
       .finally(() => setBusy(false));
   }

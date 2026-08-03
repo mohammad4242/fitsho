@@ -147,6 +147,16 @@ it("shows the latest measured weight and localized measurement time", () => {
   expect(screen.getByText(`ثبت‌شده در ${expectedDate}`)).toBeInTheDocument();
 });
 
+it("offers optional body-photo progress from the profile without blocking edits", () => {
+  renderProfilePage();
+
+  expect(screen.getByRole("link", { name: "شروع جلسه عکس" })).toHaveAttribute(
+    "href",
+    "/body-progress",
+  );
+  expect(screen.getByText(/اختیاری — برای برنامه تمرینی دقیق‌تر/)).toBeInTheDocument();
+});
+
 it("skips profile update when no values changed", async () => {
   const user = userEvent.setup();
   renderProfilePage();

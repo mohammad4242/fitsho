@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import authTrainingAccent from "../../assets/landing/auth-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
@@ -139,6 +140,12 @@ function ReadyProfilePage({
           <p>{t("profile.measurementTitle")}</p>
           <strong>{t("profile.weightValue", { weight: measuredWeight })}</strong>
           <span>{t("profile.measuredAt", { date: measuredAt })}</span>
+        </aside>
+
+        <aside className="measurement-card" aria-label={t("bodyPhotos.progressTitle")}>
+          <p>{t("bodyPhotos.progressTitle")}</p>
+          <strong>{t("bodyPhotos.optionalIntro")}</strong>
+          <Link className="secondary-button" to="/body-progress">{t("bodyPhotos.start")}</Link>
         </aside>
 
         <form className="profile-form profile-edit-form" noValidate onSubmit={handleSubmit}>
