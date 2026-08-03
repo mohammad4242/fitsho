@@ -35,3 +35,4 @@ class BodyPhotoConsentType(StrEnum):
 class BodyPhotoCleanupReason(StrEnum):
     REPLACEMENT = "replacement"
     SESSION_DELETE = "session_delete"
+    FAILED_UPLOAD_ROLLBACK = "failed_upload_rollback"

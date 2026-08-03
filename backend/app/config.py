@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     body_photo_min_width: int = Field(default=256, ge=64, le=4096)
     body_photo_min_height: int = Field(default=512, ge=64, le=8192)
     body_photo_min_crop_top_ratio: float = Field(default=0.15, ge=0.05, le=0.5)
+    body_photo_top_band_ratio: float = Field(default=0.2, ge=0.05, le=0.4)
+    body_photo_min_luma_stddev: float = Field(default=8.0, ge=0.0, le=64.0)
+    body_photo_min_top_band_luma_range: int = Field(default=16, ge=0, le=255)
+    body_photo_min_top_band_edge_mean: float = Field(default=1.0, ge=0.0, le=64.0)
     body_photo_read_chunk_bytes: int = Field(default=1024 * 1024, ge=1024, le=4 * 1024 * 1024)
     ffprobe_path: str = "ffprobe"
     ffprobe_timeout_seconds: float = 5.0

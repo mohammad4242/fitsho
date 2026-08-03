@@ -25,7 +25,9 @@ The browser owns preprocessing behind `BodyPhotoProcessor`: decode/orientation n
 
 - Separate `operational_processing` and `model_training` consent records carry versioned text, grants and revocations. Training consent is opt-in, revocable, and never changes eligibility of earlier sessions.
 - No raw upload body, credential, image path, provider request image data, or original image is logged.
-- Server image validation enforces signature, decoded image format, MIME, size, pixels, orientation normalization, EXIF removal, generated storage keys, and a crop-attestation check. It stores only a recompressed image.
+- Server image validation enforces signature, decoded image format, MIME, size, pixels, orientation normalization, EXIF removal, generated storage keys, mandatory client crop evidence, and a conservative top-boundary image-structure check. It stores only a recompressed image.
+- `client_crop_confirmed` records the browser processor and user-preview claim. `server_geometry_checked` records only server-observed dimensions, evidence binding, and boundary image structure; it is not proof that a head or person detector succeeded.
+- Because the original image never reaches the backend, the server cannot independently reconstruct the anatomical crop. A malicious or modified client can forge crop coordinates and content-bound digests. This residual client-adversary limitation is accepted to preserve the stronger privacy boundary; downstream analysis must remain fail-closed and non-medical.
 - Analysis is non-medical and marks all results provisional until independent coach and doctor approvals. Edited reviews create a new normalized-analysis version rather than overwriting AI output.
 
 ## Delivery phases

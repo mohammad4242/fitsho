@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -29,6 +30,7 @@ from app.body_photos.storage import (
     BodyPhotoStorageProtocol,
 )
 from app.config import Settings
+from app.database.session import get_engine
 
 EDITABLE_STATES = {
     BodyPhotoSessionState.DRAFT,
@@ -54,16 +56,23 @@ class BodyPhotoCleanupPendingError(RuntimeError):
     pass
 
 
+CleanupSessionFactory = Callable[[], Session]
+
+
 class BodyPhotoService:
     def __init__(
         self,
         db: Session,
         settings: Settings,
         storage: BodyPhotoStorageProtocol | None = None,
+        cleanup_session_factory: CleanupSessionFactory | None = None,
     ) -> None:
         self._db = db
         self.storage = storage or BodyPhotoStorage(settings)
         self._settings = settings
+        self._cleanup_session_factory = cleanup_session_factory or (
+            lambda: Session(get_engine(settings.database_url))
+        )
 
     def _owner_session(
         self,
@@ -128,7 +137,7 @@ class BodyPhotoService:
         view: BodyPhotoView,
         upload: UploadFile,
         *,
-        head_cropped: str | None,
+        client_crop_confirmed: str | None,
         crop_confidence: str | None,
         original_height: str | None,
         crop_top: str | None,
@@ -143,7 +152,7 @@ class BodyPhotoService:
         normalized = validate_and_normalize(
             upload,
             self._settings,
-            head_cropped=head_cropped,
+            client_crop_confirmed=client_crop_confirmed,
             crop_confidence=crop_confidence,
             original_height=original_height,
             crop_top=crop_top,
@@ -171,7 +180,8 @@ class BodyPhotoService:
         existing.width = normalized.width
         existing.height = normalized.height
         existing.crop_confidence = normalized.crop_confidence
-        existing.crop_geometry_verified = normalized.crop_geometry_verified
+        existing.client_crop_confirmed = normalized.client_crop_confirmed
+        existing.server_geometry_checked = normalized.server_geometry_checked
         existing.crop_original_height = normalized.crop_original_height
         existing.crop_top = normalized.crop_top
         existing.crop_bottom = normalized.crop_bottom
@@ -195,11 +205,32 @@ class BodyPhotoService:
             try:
                 self.storage.delete(stored.key)
             except BodyPhotoStorageError:
-                pass
+                self._persist_failed_upload_cleanup(session.id, stored.key)
             raise
         refreshed = self._owner_session(session.id, session.user_id)
         self._drain_pending_cleanup(refreshed)
         return self._owner_session(session.id, session.user_id)
+
+    def _persist_failed_upload_cleanup(self, session_id: UUID, storage_key: str) -> None:
+        with self._cleanup_session_factory() as cleanup_db:
+            existing = cleanup_db.scalar(
+                select(BodyPhotoStorageCleanup).where(
+                    BodyPhotoStorageCleanup.storage_key == storage_key
+                )
+            )
+            if existing is None:
+                cleanup_db.add(
+                    BodyPhotoStorageCleanup(
+                        session_id=session_id,
+                        storage_key=storage_key,
+                        reason=BodyPhotoCleanupReason.FAILED_UPLOAD_ROLLBACK,
+                    )
+                )
+            try:
+                cleanup_db.commit()
+            except SQLAlchemyError:
+                cleanup_db.rollback()
+                raise
 
     def _queue_cleanup(
         self,
@@ -246,7 +277,10 @@ class BodyPhotoService:
             return session
         if session.state not in EDITABLE_STATES:
             raise BodyPhotoSessionStateError
-        if {photo.view for photo in session.photos} != set(BodyPhotoView):
+        if {photo.view for photo in session.photos} != set(BodyPhotoView) or any(
+            not photo.client_crop_confirmed or not photo.server_geometry_checked
+            for photo in session.photos
+        ):
             raise BodyPhotoSessionValidationError
         if not payload.operational_processing.granted:
             raise BodyPhotoSessionValidationError

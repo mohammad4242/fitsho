@@ -26,12 +26,18 @@ def _png(
             + struct.pack(">I", zlib.crc32(kind + payload))
         )
 
-    rows = b"".join(b"\x00" + bytes(color) * width for _ in range(height))
+    rows = []
+    for y in range(height):
+        row = bytearray()
+        for x in range(width):
+            delta = 32 if (x // 24 + y // 24) % 2 else 0
+            row.extend(min(channel + delta, 255) for channel in color)
+        rows.append(b"\x00" + bytes(row))
     header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
     return (
         b"\x89PNG\r\n\x1a\n"
         + chunk(b"IHDR", header)
-        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IDAT", zlib.compress(b"".join(rows)))
         + chunk(b"IEND", b"")
     )
 
@@ -49,7 +55,7 @@ def _crop_headers(
     evidence = f"v1:{processed_sha256}:{original_height}:{crop_top}:{bottom}"
     return {
         **ORIGIN,
-        "X-Fitsho-Head-Cropped": "true",
+        "X-Fitsho-Client-Crop-Confirmed": "true",
         "X-Fitsho-Crop-Confidence": "0.97",
         "X-Fitsho-Original-Height": str(original_height),
         "X-Fitsho-Crop-Top": str(crop_top),
@@ -140,7 +146,7 @@ def test_every_session_mutation_rejects_missing_trusted_origin(client: TestClien
     upload = client.put(
         f"/api/v1/body-photo-sessions/{session_id}/photos/front",
         headers={
-            "X-Fitsho-Head-Cropped": "true",
+            "X-Fitsho-Client-Crop-Confirmed": "true",
             "X-Fitsho-Crop-Confidence": "0.97",
             "X-Fitsho-Original-Height": "800",
             "X-Fitsho-Crop-Top": "160",
@@ -175,7 +181,7 @@ def test_upload_cors_preflight_allows_private_photo_headers(client: TestClient) 
             "Origin": "http://localhost:5173",
             "Access-Control-Request-Method": "PUT",
             "Access-Control-Request-Headers": (
-                "content-type,x-fitsho-head-cropped,x-fitsho-crop-confidence,"
+                "content-type,x-fitsho-client-crop-confirmed,x-fitsho-crop-confidence,"
                 "x-fitsho-original-height,x-fitsho-crop-top,x-fitsho-crop-bottom,"
                 "x-fitsho-processed-sha256,x-fitsho-crop-evidence-sha256"
             ),
@@ -184,7 +190,10 @@ def test_upload_cors_preflight_allows_private_photo_headers(client: TestClient) 
 
     assert response.status_code == 200
     assert "PUT" in response.headers["access-control-allow-methods"]
-    assert "x-fitsho-head-cropped" in response.headers["access-control-allow-headers"].lower()
+    assert (
+        "x-fitsho-client-crop-confirmed"
+        in response.headers["access-control-allow-headers"].lower()
+    )
     assert "x-fitsho-processed-sha256" in response.headers["access-control-allow-headers"].lower()
     assert (
         "x-fitsho-crop-evidence-sha256" in response.headers["access-control-allow-headers"].lower()
@@ -257,6 +266,34 @@ def test_submit_requires_operational_consent_but_not_training_consent(
     assert submitted.json()["model_training_consent"]["granted"] is False
     assert submitted.json()["operational_processing_consent"]["recorded_at"]
     assert submitted.json()["model_training_consent"]["recorded_at"]
+
+
+def test_submit_rejects_any_photo_without_client_and_server_crop_checks(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    test_settings.body_photo_storage_root = Path(test_settings.media_root).parent / "body-private"
+    _register(client, "photo-unchecked@example.com")
+    created = _create_session(client)
+    for view in ("front", "side", "back"):
+        assert _upload(client, created["id"], view).status_code == 200
+    db.execute(
+        text(
+            "UPDATE body_photos SET server_geometry_checked = false "
+            "WHERE session_id = :session_id AND view = 'back'"
+        ),
+        {"session_id": UUID(str(created["id"]))},
+    )
+    db.commit()
+
+    submitted = client.post(
+        f"/api/v1/body-photo-sessions/{created['id']}/submit",
+        headers=ORIGIN,
+        json=_consents(),
+    )
+
+    assert submitted.status_code == 422
 
 
 def test_training_consent_revocation_is_a_separate_immutable_event(

@@ -51,7 +51,8 @@ class BodyPhotoResponse(BaseModel):
     width: int
     height: int
     crop_confidence: float
-    crop_geometry_verified: bool
+    client_crop_confirmed: bool
+    server_geometry_checked: bool
     content_url: str
     created_at: datetime
     updated_at: datetime

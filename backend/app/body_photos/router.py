@@ -81,7 +81,8 @@ def _session_response(session: BodyPhotoSession) -> BodyPhotoSessionResponse:
                 width=photo.width,
                 height=photo.height,
                 crop_confidence=photo.crop_confidence,
-                crop_geometry_verified=photo.crop_geometry_verified,
+                client_crop_confirmed=photo.client_crop_confirmed,
+                server_geometry_checked=photo.server_geometry_checked,
                 content_url=(
                     f"/api/v1/body-photo-sessions/{session.id}/photos/{photo.view.value}/content"
                 ),
@@ -160,7 +161,10 @@ def upload_photo(
     user: CurrentUser,
     settings: AppSettings,
     file: Annotated[UploadFile, File()],
-    head_cropped: Annotated[str | None, Header(alias="X-Fitsho-Head-Cropped")] = None,
+    client_crop_confirmed: Annotated[
+        str | None,
+        Header(alias="X-Fitsho-Client-Crop-Confirmed"),
+    ] = None,
     crop_confidence: Annotated[str | None, Header(alias="X-Fitsho-Crop-Confidence")] = None,
     original_height: Annotated[str | None, Header(alias="X-Fitsho-Original-Height")] = None,
     crop_top: Annotated[str | None, Header(alias="X-Fitsho-Crop-Top")] = None,
@@ -177,7 +181,7 @@ def upload_photo(
             user.id,
             view,
             file,
-            head_cropped=head_cropped,
+            client_crop_confirmed=client_crop_confirmed,
             crop_confidence=crop_confidence,
             original_height=original_height,
             crop_top=crop_top,

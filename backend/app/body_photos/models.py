@@ -121,12 +121,13 @@ class BodyPhoto(Base):
             name="ck_body_photos_crop_bottom_after_top",
         ),
         CheckConstraint(
-            "NOT crop_geometry_verified OR "
-            "(crop_original_height IS NOT NULL AND crop_top IS NOT NULL AND "
+            "NOT server_geometry_checked OR "
+            "(client_crop_confirmed AND crop_original_height IS NOT NULL AND "
+            "crop_top IS NOT NULL AND "
             "crop_bottom IS NOT NULL AND crop_bottom <= crop_original_height AND "
             "crop_bottom - crop_top = height AND char_length(processed_sha256) = 64 AND "
             "char_length(crop_evidence_sha256) = 64)",
-            name="ck_body_photos_verified_crop_evidence_complete",
+            name="ck_body_photos_checked_crop_evidence_complete",
         ),
     )
 
@@ -151,7 +152,10 @@ class BodyPhoto(Base):
     width: Mapped[int] = mapped_column(Integer, nullable=False)
     height: Mapped[int] = mapped_column(Integer, nullable=False)
     crop_confidence: Mapped[float] = mapped_column(Float, nullable=False)
-    crop_geometry_verified: Mapped[bool] = mapped_column(
+    client_crop_confirmed: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    server_geometry_checked: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=false(), nullable=False
     )
     crop_original_height: Mapped[int | None] = mapped_column(Integer)

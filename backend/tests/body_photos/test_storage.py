@@ -6,14 +6,16 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from PIL import Image
+from PIL import Image, ImageDraw
 from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.datastructures import Headers
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from app.auth.models import User
-from app.body_photos.enums import BodyPhotoPurpose, BodyPhotoView
+from app.body_photos.enums import BodyPhotoCleanupReason, BodyPhotoPurpose, BodyPhotoView
+from app.body_photos.models import BodyPhotoStorageCleanup
 from app.body_photos.service import BodyPhotoService
 from app.body_photos.storage import BodyPhotoStorage, BodyPhotoStorageError, StoredBodyPhoto
 from app.config import Settings
@@ -34,11 +36,17 @@ def _png(
             + struct.pack(">I", zlib.crc32(kind + payload))
         )
 
-    rows = b"".join(b"\x00" + bytes(color) * width for _ in range(height))
+    rows = []
+    for y in range(height):
+        row = bytearray()
+        for x in range(width):
+            delta = 32 if (x // 24 + y // 24) % 2 else 0
+            row.extend(min(channel + delta, 255) for channel in color)
+        rows.append(b"\x00" + bytes(row))
     return (
         b"\x89PNG\r\n\x1a\n"
         + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
-        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IDAT", zlib.compress(b"".join(rows)))
         + chunk(b"IEND", b"")
     )
 
@@ -56,7 +64,7 @@ def _crop_headers(
     evidence = f"v1:{processed_sha256}:{original_height}:{crop_top}:{bottom}"
     return {
         **ORIGIN,
-        "X-Fitsho-Head-Cropped": "true",
+        "X-Fitsho-Client-Crop-Confirmed": "true",
         "X-Fitsho-Crop-Confidence": "0.95",
         "X-Fitsho-Original-Height": str(original_height),
         "X-Fitsho-Crop-Top": str(crop_top),
@@ -82,6 +90,9 @@ def _png_with_declared_dimensions(width: int, height: int) -> bytes:
 def _jpeg_with_exif() -> bytes:
     output = BytesIO()
     image = Image.new("RGB", (320, 640), color=(30, 60, 90))
+    draw = ImageDraw.Draw(image)
+    for y in range(0, 640, 32):
+        draw.rectangle((0, y, 319, min(y + 15, 639)), fill=(90, 120, 150))
     exif = Image.Exif()
     exif[274] = 1
     exif[315] = "private source metadata"
@@ -212,7 +223,7 @@ def test_pillow_decompression_bomb_warning_is_sanitized_and_stores_nothing(
     "headers",
     [
         ORIGIN,
-        {**_crop_headers(_png()), "X-Fitsho-Head-Cropped": "false"},
+        {**_crop_headers(_png()), "X-Fitsho-Client-Crop-Confirmed": "false"},
         {key: value for key, value in _crop_headers(_png()).items() if key != "X-Fitsho-Crop-Top"},
         {**_crop_headers(_png()), "X-Fitsho-Crop-Confidence": "0.2"},
     ],
@@ -250,6 +261,36 @@ def test_landscape_geometry_is_rejected_without_storage(
     )
 
     assert response.status_code == 422
+    assert _stored_files(private_root) == []
+
+
+def test_flat_or_empty_top_boundary_is_rejected_without_storage(
+    client: TestClient,
+    test_settings: Settings,
+) -> None:
+    private_root = Path(test_settings.media_root).parent / "body-private"
+    test_settings.body_photo_storage_root = private_root
+    session_id = _register_and_create(client, "photo-boundary-content@example.com")
+    solid = Image.new("RGB", (320, 640), color=(30, 60, 90))
+    solid_output = BytesIO()
+    solid.save(solid_output, format="PNG")
+    blank_top = Image.new("RGB", (320, 640), color=(30, 60, 90))
+    draw = ImageDraw.Draw(blank_top)
+    for y in range(160, 640, 24):
+        draw.rectangle((0, y, 319, min(y + 11, 639)), fill=(110, 140, 170))
+    blank_top_output = BytesIO()
+    blank_top.save(blank_top_output, format="PNG")
+
+    for content in (solid_output.getvalue(), blank_top_output.getvalue()):
+        response = _upload(
+            client,
+            session_id,
+            content,
+            "image/png",
+            _crop_headers(content),
+        )
+        assert response.status_code == 422
+
     assert _stored_files(private_root) == []
 
 
@@ -355,7 +396,7 @@ def test_crop_top_safety_threshold_is_configurable(
     assert _stored_files(private_root) == []
 
 
-def test_verified_crop_evidence_is_recorded_but_digest_is_not_exposed(
+def test_client_confirmation_and_server_geometry_check_are_recorded(
     client: TestClient,
     db: Session,
     test_settings: Settings,
@@ -369,15 +410,21 @@ def test_verified_crop_evidence_is_recorded_but_digest_is_not_exposed(
     response = _upload(client, session_id, content, "image/png", headers)
 
     assert response.status_code == 200
-    assert response.json()["photos"][0]["crop_geometry_verified"] is True
+    photo = response.json()["photos"][0]
+    assert photo["client_crop_confirmed"] is True
+    assert photo["server_geometry_checked"] is True
+    assert "crop_geometry_verified" not in photo
     assert "processed_sha256" not in response.text
     stored = db.execute(
         text(
-            "SELECT crop_original_height, crop_top, crop_bottom, processed_sha256, "
+            "SELECT client_crop_confirmed, server_geometry_checked, "
+            "crop_original_height, crop_top, crop_bottom, processed_sha256, "
             "crop_evidence_sha256 FROM body_photos"
         )
     ).one()
     assert stored == (
+        True,
+        True,
         800,
         160,
         800,
@@ -474,7 +521,7 @@ def test_service_accepts_storage_interface_injection(
         user.id,
         BodyPhotoView.FRONT,
         upload,
-        head_cropped=headers["X-Fitsho-Head-Cropped"],
+        client_crop_confirmed=headers["X-Fitsho-Client-Crop-Confirmed"],
         crop_confidence=headers["X-Fitsho-Crop-Confidence"],
         original_height=headers["X-Fitsho-Original-Height"],
         crop_top=headers["X-Fitsho-Crop-Top"],
@@ -486,6 +533,94 @@ def test_service_accepts_storage_interface_injection(
     assert len(updated.photos) == 1
     assert updated.photos[0].storage_key in storage.objects
     assert _stored_files(test_settings.body_photo_storage_root) == []
+
+
+def test_failed_db_commit_and_failed_delete_persist_cleanup_in_separate_session(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailingDeleteStorage:
+        def __init__(self) -> None:
+            self.objects: dict[str, bytes] = {}
+
+        def store(self, content: bytes, extension: str) -> StoredBodyPhoto:
+            key = f"memory/uncommitted{extension}"
+            self.objects[key] = content
+            return StoredBodyPhoto(key=key)
+
+        def open(self, key: str) -> BytesIO:
+            return BytesIO(self.objects[key])
+
+        def delete(self, key: str) -> None:
+            raise BodyPhotoStorageError(f"cannot delete {key}")
+
+    assert (
+        client.post(
+            "/api/v1/auth/register",
+            headers=ORIGIN,
+            json={"email": "photo-commit-cleanup@example.com", "password": "long password"},
+        ).status_code
+        == 201
+    )
+    user = db.scalar(select(User).where(User.email == "photo-commit-cleanup@example.com"))
+    assert user is not None
+    cleanup_sessions: list[Session] = []
+
+    def cleanup_session_factory() -> Session:
+        session = Session(bind=db.connection(), join_transaction_mode="create_savepoint")
+        cleanup_sessions.append(session)
+        return session
+
+    storage = FailingDeleteStorage()
+    service = BodyPhotoService(
+        db,
+        test_settings,
+        storage=storage,
+        cleanup_session_factory=cleanup_session_factory,
+    )
+    session = service.create_session(user.id, BodyPhotoPurpose.INITIAL_PLAN)
+    original_commit = db.commit
+    commit_calls = 0
+
+    def fail_photo_commit() -> None:
+        nonlocal commit_calls
+        commit_calls += 1
+        if commit_calls == 2:
+            raise SQLAlchemyError("forced photo commit failure")
+        original_commit()
+
+    monkeypatch.setattr(db, "commit", fail_photo_commit)
+    content = _png()
+    headers = _crop_headers(content)
+    upload = StarletteUploadFile(
+        BytesIO(content),
+        filename="front.png",
+        headers=Headers({"content-type": "image/png"}),
+    )
+
+    with pytest.raises(SQLAlchemyError, match="forced photo commit failure"):
+        service.upload_processed_photo(
+            session.id,
+            user.id,
+            BodyPhotoView.FRONT,
+            upload,
+            client_crop_confirmed=headers["X-Fitsho-Client-Crop-Confirmed"],
+            crop_confidence=headers["X-Fitsho-Crop-Confidence"],
+            original_height=headers["X-Fitsho-Original-Height"],
+            crop_top=headers["X-Fitsho-Crop-Top"],
+            crop_bottom=headers["X-Fitsho-Crop-Bottom"],
+            processed_sha256=headers["X-Fitsho-Processed-SHA256"],
+            crop_evidence_sha256=headers["X-Fitsho-Crop-Evidence-SHA256"],
+        )
+
+    cleanup = db.scalar(select(BodyPhotoStorageCleanup))
+    assert cleanup_sessions
+    assert cleanup is not None
+    assert cleanup.storage_key == "memory/uncommitted.png"
+    assert cleanup.reason is BodyPhotoCleanupReason.FAILED_UPLOAD_ROLLBACK
+    assert cleanup.storage_key in storage.objects
 
 
 def test_replacement_retains_failed_cleanup_and_retries_it(

@@ -42,7 +42,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["DELETE", "GET", "PATCH", "POST", "PUT"],
         allow_headers=[
             "Content-Type",
-            "X-Fitsho-Head-Cropped",
+            "X-Fitsho-Client-Crop-Confirmed",
             "X-Fitsho-Crop-Confidence",
             "X-Fitsho-Original-Height",
             "X-Fitsho-Crop-Top",

@@ -8,7 +8,7 @@ from hmac import compare_digest
 from io import BytesIO
 
 from fastapi import UploadFile
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageChops, ImageOps, ImageStat, UnidentifiedImageError
 from pydantic import ValidationError
 
 from app.body_photos.schemas import BodyPhotoCropEvidenceInput
@@ -38,7 +38,8 @@ class NormalizedBodyPhoto:
     width: int
     height: int
     crop_confidence: float
-    crop_geometry_verified: bool
+    client_crop_confirmed: bool
+    server_geometry_checked: bool
     crop_original_height: int
     crop_top: int
     crop_bottom: int
@@ -48,6 +49,7 @@ class NormalizedBodyPhoto:
 
 @dataclass(frozen=True)
 class CropEvidence:
+    client_crop_confirmed: bool
     confidence: float
     original_height: int
     crop_top: int
@@ -72,7 +74,7 @@ def _read_limited(upload: UploadFile, settings: Settings) -> bytes:
 
 def _parse_crop_evidence(
     *,
-    head_cropped: str | None,
+    client_crop_confirmed: str | None,
     crop_confidence: str | None,
     original_height: str | None,
     crop_top: str | None,
@@ -81,7 +83,7 @@ def _parse_crop_evidence(
     crop_evidence_sha256: str | None,
 ) -> CropEvidence:
     if (
-        head_cropped != "true"
+        client_crop_confirmed != "true"
         or crop_confidence is None
         or original_height is None
         or crop_top is None
@@ -104,6 +106,7 @@ def _parse_crop_evidence(
     except ValidationError as error:
         raise BodyPhotoValidationError from error
     return CropEvidence(
+        client_crop_confirmed=True,
         confidence=parsed.confidence,
         original_height=parsed.original_height,
         crop_top=parsed.crop_top,
@@ -120,6 +123,35 @@ def _validate_output_geometry(width: int, height: int, settings: Settings) -> No
         or height < width
         or height > width * 3
     ):
+        raise BodyPhotoValidationError
+
+
+def _validate_server_geometry(image: Image.Image, settings: Settings) -> None:
+    """Reject output that lacks image structure at the claimed crop boundary.
+
+    This is deliberately a conservative image-geometry heuristic, not anatomical proof.
+    """
+    grayscale = image.convert("L")
+    grayscale.thumbnail((128, 256))
+    if ImageStat.Stat(grayscale).stddev[0] < settings.body_photo_min_luma_stddev:
+        raise BodyPhotoValidationError
+
+    band_height = max(8, round(grayscale.height * settings.body_photo_top_band_ratio))
+    top_band = grayscale.crop((0, 0, grayscale.width, band_height))
+    minimum, maximum = ImageStat.Stat(top_band).extrema[0]
+    if maximum - minimum < settings.body_photo_min_top_band_luma_range:
+        raise BodyPhotoValidationError
+
+    horizontal = ImageChops.difference(
+        top_band.crop((1, 0, top_band.width, top_band.height)),
+        top_band.crop((0, 0, top_band.width - 1, top_band.height)),
+    )
+    vertical = ImageChops.difference(
+        top_band.crop((0, 1, top_band.width, top_band.height)),
+        top_band.crop((0, 0, top_band.width, top_band.height - 1)),
+    )
+    edge_mean = (ImageStat.Stat(horizontal).mean[0] + ImageStat.Stat(vertical).mean[0]) / 2
+    if edge_mean < settings.body_photo_min_top_band_edge_mean:
         raise BodyPhotoValidationError
 
 
@@ -161,7 +193,7 @@ def validate_and_normalize(
     upload: UploadFile,
     settings: Settings,
     *,
-    head_cropped: str | None,
+    client_crop_confirmed: str | None,
     crop_confidence: str | None,
     original_height: str | None,
     crop_top: str | None,
@@ -170,7 +202,7 @@ def validate_and_normalize(
     crop_evidence_sha256: str | None,
 ) -> NormalizedBodyPhoto:
     evidence = _parse_crop_evidence(
-        head_cropped=head_cropped,
+        client_crop_confirmed=client_crop_confirmed,
         crop_confidence=crop_confidence,
         original_height=original_height,
         crop_top=crop_top,
@@ -201,6 +233,7 @@ def validate_and_normalize(
                 decoded.load()
                 oriented = ImageOps.exif_transpose(decoded)
                 _validate_output_geometry(*oriented.size, settings)
+                _validate_server_geometry(oriented, settings)
                 _verify_crop_evidence(content, oriented.height, evidence, settings)
                 normalized = _normalized_mode(oriented, image_format)
                 output = BytesIO()
@@ -229,7 +262,8 @@ def validate_and_normalize(
         width=normalized.width,
         height=normalized.height,
         crop_confidence=evidence.confidence,
-        crop_geometry_verified=True,
+        client_crop_confirmed=evidence.client_crop_confirmed,
+        server_geometry_checked=True,
         crop_original_height=evidence.original_height,
         crop_top=evidence.crop_top,
         crop_bottom=evidence.crop_bottom,
