@@ -28,6 +28,22 @@ function processed(view: "front" | "side" | "back"): ProcessedBodyPhoto {
     cropConfidence: 0.95,
     processedSha256: "a".repeat(64),
     cropEvidenceSha256: "b".repeat(64),
+    validation: {
+      isValid: true,
+      expectedView: view,
+      detectedView: view,
+      quality: {
+        overallScore: 0.9,
+        brightnessScore: 0.9,
+        sharpnessScore: 0.9,
+        poseScore: 0.9,
+        bodyCompletenessScore: 0.9,
+        clothingVisibilityScore: 0.9,
+        backgroundReliabilityScore: 0.9,
+      },
+      warnings: [],
+      crop: { headRemoved: true, confidence: 0.95 },
+    },
   };
 }
 
@@ -103,4 +119,22 @@ it("processes three views, allows retake, and never passes the original file to 
   expect(sentFiles).not.toContain(file);
   expect(sentFiles.map((item) => item.name)).toEqual(["front.jpg", "side.jpg", "back.jpg"]);
   expect(screen.getByRole("checkbox", { name: /future model-training/i })).not.toBeChecked();
+});
+
+it("revokes anonymized preview URLs when a photo is replaced and on unmount", async () => {
+  const user = userEvent.setup();
+  const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  const processor: BodyPhotoProcessor = {
+    process: vi.fn()
+      .mockResolvedValueOnce(processed("front"))
+      .mockResolvedValueOnce({ ...processed("front"), previewUrl: "blob:replacement" }),
+  };
+  const rendered = renderWizard(processor);
+
+  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  expect(revoke).toHaveBeenCalledWith("blob:preview-front");
+
+  rendered.unmount();
+  expect(revoke).toHaveBeenCalledWith("blob:replacement");
 });
