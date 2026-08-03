@@ -195,6 +195,32 @@ def test_execution_persists_validated_result_and_is_idempotent(db: Session) -> N
     assert versions[0].normalized_result["summary"]["priority_areas"] == ["shoulders"]
 
 
+def test_execution_creates_a_progress_comparison_for_the_new_result(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user, session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    analysis = service.queue(session.id, user.id, _config())
+    calls: list[tuple[object, object]] = []
+
+    class _ComparisonService:
+        def __init__(self, comparison_db: Session) -> None:
+            assert comparison_db is db
+
+        def create_for_result(self, result_version_id: object, owner_id: object) -> None:
+            calls.append((result_version_id, owner_id))
+
+    monkeypatch.setattr(
+        "app.body_analysis.service.BodyProgressComparisonService",
+        _ComparisonService,
+    )
+
+    asyncio.run(service.execute(analysis.id, _Provider(), _Storage()))
+
+    assert calls and calls[0][1] == user.id
+
+
 def test_completed_analysis_cannot_be_retried(db: Session) -> None:
     user, session = _submitted_session(db)
     service = BodyAnalysisService(db)

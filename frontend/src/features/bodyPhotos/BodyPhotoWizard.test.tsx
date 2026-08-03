@@ -14,6 +14,7 @@ const api = vi.hoisted(() => ({
   createBodyPhotoSession: vi.fn(),
   uploadBodyPhoto: vi.fn(),
   submitBodyPhotoSession: vi.fn(),
+  startBodyPhotoAnalysis: vi.fn(),
 }));
 
 vi.mock("./api", () => api);
@@ -65,6 +66,7 @@ beforeEach(async () => {
   api.createBodyPhotoSession.mockResolvedValue({ id: "session-1", state: "draft", photos: [] });
   api.uploadBodyPhoto.mockResolvedValue({ id: "session-1", state: "uploading", photos: [] });
   api.submitBodyPhotoSession.mockResolvedValue({ id: "session-1", state: "queued", photos: [] });
+  api.startBodyPhotoAnalysis.mockResolvedValue({ id: "analysis-1", status: "queued" });
 });
 
 it("keeps the photo workflow optional and offers a skip path", async () => {
@@ -125,6 +127,23 @@ it("processes three views, allows retake, and never passes the original file to 
   expect(sentFiles).not.toContain(file);
   expect(sentFiles.map((item) => item.name)).toEqual(["front.jpg", "side.jpg", "back.jpg"]);
   expect(screen.getByRole("checkbox", { name: /future model-training/i })).not.toBeChecked();
+});
+
+it("starts analysis immediately after a successful submission", async () => {
+  const user = userEvent.setup();
+  const processor: BodyPhotoProcessor = { process: vi.fn().mockImplementation((_, view) => processed(view)) };
+  renderWizard(processor);
+
+  for (const view of ["front", "side", "back"] as const) {
+    await user.upload(await screen.findByLabelText(new RegExp(`${view} photo upload`, "i")), file);
+    if (view === "front") {
+      await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
+    }
+    await user.click(screen.getByRole("button", { name: new RegExp(`confirm and upload ${view}`, "i") }));
+  }
+
+  await user.click(await screen.findByRole("button", { name: /submit photos/i }));
+  await waitFor(() => expect(api.startBodyPhotoAnalysis).toHaveBeenCalledWith("session-1"));
 });
 
 it("revokes anonymized preview URLs when a photo is replaced and on unmount", async () => {

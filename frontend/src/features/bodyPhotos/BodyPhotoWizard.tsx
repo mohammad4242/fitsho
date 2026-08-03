@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import {
   createBodyPhotoSession,
+  startBodyPhotoAnalysis,
   submitBodyPhotoSession,
   uploadBodyPhoto,
 } from "./api";
@@ -136,6 +137,7 @@ export function BodyPhotoWizard({
     try {
       const submitted = await submitBodyPhotoSession(session.id, true, modelTrainingConsent);
       setSession(submitted);
+      await startBodyPhotoAnalysis(submitted.id);
       setState("complete");
     } catch {
       setError(t("bodyPhotos.errors.submit"));

@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
+from app.body_analysis.comparison_service import BodyProgressComparisonService
 from app.body_analysis.enums import (
     BodyAnalysisResultSource,
     BodyAnalysisReviewDecision,
@@ -307,6 +308,17 @@ class BodyAnalysisService:
                 )
             )
             self._db.commit()
+            result_version = self._current_version(analysis.id)
+            if result_version is not None:
+                try:
+                    BodyProgressComparisonService(self._db).create_for_result(
+                        result_version.id,
+                        analysis.session.user_id,
+                    )
+                except Exception:
+                    # Comparisons are optional history. A comparison failure must
+                    # never discard a valid analysis or prevent plan generation.
+                    self._db.rollback()
         except Exception as error:
             self._db.rollback()
             analysis = self._analysis(analysis_id, lock=True)
