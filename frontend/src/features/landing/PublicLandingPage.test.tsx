@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
@@ -29,42 +30,44 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it("gives every landing chapter a registration CTA", () => {
+it("uses one fixed film while the product story scrolls", () => {
   render(
     <MemoryRouter>
       <PublicLandingPage />
     </MemoryRouter>,
   );
 
-  const ctas = screen.getAllByRole("link", { name: "شروع رایگان" });
-  expect(ctas).toHaveLength(3);
-  ctas.forEach((cta) => expect(cta).toHaveAttribute("href", "/register"));
+  const video = screen.getByTestId("landing-film");
+  expect(video).toHaveClass("landing-film");
+  expect(video.querySelector("source")).toHaveAttribute("src", "/image&videos/film.mp4");
+  expect(screen.getByRole("link", { name: /شروع کن/i })).toHaveAttribute("href", "/get-started");
+  expect(screen.getByText(/کم‌هزینه‌تر/)).toBeInTheDocument();
 });
 
-it("activates the chapter entering the viewport", async () => {
+it("shows stores and social destinations without inventing unavailable links", () => {
   render(
     <MemoryRouter>
       <PublicLandingPage />
     </MemoryRouter>,
   );
 
-  const planScene = document.getElementById("landing-plan");
-  if (planScene === null) throw new Error("expected plan scene");
-  observers[0]([
-    { isIntersecting: true, target: planScene } as unknown as IntersectionObserverEntry,
-  ]);
-
-  await waitFor(() => expect(planScene).toHaveAttribute("data-active", "true"));
+  expect(screen.getByText("Google Play")).toBeInTheDocument();
+  expect(screen.getByText("کافه‌بازار")).toBeInTheDocument();
+  expect(screen.getByText("App Store")).toBeInTheDocument();
+  expect(screen.getByLabelText("شبکه‌های اجتماعی")).toHaveTextContent("اینستاگرام");
+  expect(screen.getByLabelText("شبکه‌های اجتماعی")).toHaveTextContent("تلگرام");
 });
 
-it("uses stills for all scenes when reduced motion is requested", () => {
-  vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true })));
-
+it("opens a menu with the upcoming articles item", async () => {
+  const user = userEvent.setup();
   render(
     <MemoryRouter>
       <PublicLandingPage />
     </MemoryRouter>,
   );
 
-  expect(screen.getAllByRole("img")).toHaveLength(3);
+  await user.click(screen.getByRole("button", { name: "باز کردن منو" }));
+  expect(screen.getByRole("dialog", { name: "منوی اصلی" })).toBeInTheDocument();
+  expect(screen.getByText("مقالات روز دنیا")).toBeInTheDocument();
+  expect(screen.getAllByText("به‌زودی").length).toBeGreaterThan(0);
 });

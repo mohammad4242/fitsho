@@ -170,7 +170,7 @@ it("redirects a guest away from the protected dashboard", async () => {
 it("shows the public landing to a guest at the root route", () => {
   renderRoute("/");
 
-  expect(screen.getAllByRole("link", { name: "شروع رایگان" })).toHaveLength(3);
+  expect(screen.getByRole("link", { name: /شروع کن/ })).toHaveAttribute("href", "/get-started");
 });
 
 it("redirects a signed-in root visitor to Today", async () => {
