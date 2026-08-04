@@ -88,6 +88,8 @@ it("stacks branded social destinations inside one social card", () => {
 
   const socialCard = screen.getByLabelText("شبکه‌های اجتماعی");
   expect(socialCard).toHaveClass("landing-social-card");
+  expect(socialCard).toHaveClass("landing-social-card--fixed");
+  expect(screen.queryByText("با فیتشو همراه بمان")).not.toBeInTheDocument();
   expect(screen.getByAltText("Instagram")).toBeInTheDocument();
   expect(screen.getByAltText("Telegram")).toBeInTheDocument();
   expect(screen.getByAltText("Facebook")).toBeInTheDocument();

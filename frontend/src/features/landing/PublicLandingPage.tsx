@@ -16,7 +16,7 @@ const copy = {
       { id: "momentum", eyebrow: "هر روز، یک قدم", title: "قرار نیست یک‌شبه تغییر کنی.", body: "بدن دلخواه نتیجه انتخاب‌های کوچکی است که هر روز تکرار می‌کنی. ما مسیر را روشن می‌کنیم؛ تو فقط قدم بعدی را بردار." },
     ],
     download: { eyebrow: "همیشه همراهت", title: "فیتشو روی موبایل", body: "نسخه‌های موبایل در راه‌اند. تا آن زمان نسخه وب کامل در دسترس توست.", label: "فروشگاه‌های اپلیکیشن", soon: "به‌زودی" },
-    social: { label: "شبکه‌های اجتماعی", title: "با فیتشو همراه بمان", soon: "لینک به‌زودی اضافه می‌شود" },
+    social: { label: "شبکه‌های اجتماعی", soon: "لینک به‌زودی اضافه می‌شود" },
   },
   en: {
     menu: { open: "Open menu", close: "Close menu", label: "Main menu", about: "About Fitsho", download: "Get the app", articles: "Global fitness articles", signIn: "Member sign in" },
@@ -26,7 +26,7 @@ const copy = {
       { id: "momentum", eyebrow: "One step, every day", title: "You do not have to change overnight.", body: "The body you want is built through small choices repeated daily. We make the next step clear; you take it." },
     ],
     download: { eyebrow: "Always with you", title: "Fitsho on mobile", body: "Our mobile apps are on their way. Until then, the complete web experience is ready for you.", label: "App stores", soon: "Coming soon" },
-    social: { label: "Social media", title: "Stay close to Fitsho", soon: "Link coming soon" },
+    social: { label: "Social media", soon: "Link coming soon" },
   },
 } as const;
 
@@ -101,8 +101,9 @@ export function PublicLandingPage() {
       <div className="landing-story">
         <section className="landing-panel landing-hero" data-visible="true"><div className="landing-panel__content"><p className="landing-kicker">FITSHO · TRAIN SMARTER</p><h1 className="fitsho-display">{text.hero.title}</h1><p>{text.hero.body}</p><Link className="landing-primary-cta" to="/get-started">{text.hero.cta}<span aria-hidden="true">{language === "fa" ? "←" : "→"}</span></Link></div></section>
         {text.story.map((section, index) => <section key={section.id} id={index === 0 ? "about" : section.id} ref={(node) => { revealRefs.current[index] = node; }} className="landing-panel landing-copy-panel"><div className="landing-panel__content"><p className="landing-kicker">{section.eyebrow}</p><h2 className="fitsho-display">{section.title}</h2><p>{section.body}</p></div></section>)}
-        <section id="download" ref={(node) => { revealRefs.current[text.story.length] = node; }} className="landing-panel landing-download"><div className="landing-panel__content"><p className="landing-kicker">{text.download.eyebrow}</p><h2 className="fitsho-display">{text.download.title}</h2><p>{text.download.body}</p><div className="store-list" aria-label={text.download.label}>{stores.map((store) => <span key={store.id}><BrandIcon brand={store.id} alt={store.en} /><strong>{store[language]}</strong><small>{text.download.soon}</small></span>)}</div></div><footer className="landing-footer"><span>© 2026 Fitsho</span><nav className="landing-social-card" aria-label={text.social.label}><p>{text.social.title}</p>{socials.map((social) => <span className="landing-social-card__item" key={social.id} title={text.social.soon}><BrandIcon brand={social.id} alt={social.en} /><strong>{social[language]}</strong><small>{text.download.soon}</small></span>)}</nav></footer></section>
+        <section id="download" ref={(node) => { revealRefs.current[text.story.length] = node; }} className="landing-panel landing-download"><div className="landing-panel__content"><p className="landing-kicker">{text.download.eyebrow}</p><h2 className="fitsho-display">{text.download.title}</h2><p>{text.download.body}</p><div className="store-list" aria-label={text.download.label}>{stores.map((store) => <span key={store.id}><BrandIcon brand={store.id} alt={store.en} /><strong>{store[language]}</strong><small>{text.download.soon}</small></span>)}</div></div><footer className="landing-footer"><span>© 2026 Fitsho</span></footer></section>
       </div>
+      <nav className="landing-social-card landing-social-card--fixed" aria-label={text.social.label}>{socials.map((social) => <span className="landing-social-card__item" key={social.id} title={text.social.soon}><BrandIcon brand={social.id} alt={social.en} /><strong>{social[language]}</strong><small>{text.download.soon}</small></span>)}</nav>
     </main>
   );
 }
