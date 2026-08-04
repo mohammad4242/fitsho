@@ -17,6 +17,21 @@ def test_settings_accept_explicit_environment_values() -> None:
     assert settings.frontend_origin == "http://localhost:5173"
 
 
+def test_local_settings_accept_multiple_explicit_frontend_origins() -> None:
+    settings = Settings(
+        app_env="local",
+        frontend_origin="http://localhost:5173",
+        frontend_origins="http://localhost:5173,http://100.97.78.5:5173",
+        cookie_secure=False,
+        session_cookie_name="fitsho_session",
+    )
+
+    assert settings.allowed_frontend_origins == (
+        "http://localhost:5173",
+        "http://100.97.78.5:5173",
+    )
+
+
 def test_production_settings_accept_secure_cookie_contract() -> None:
     settings = Settings(
         app_env="production",

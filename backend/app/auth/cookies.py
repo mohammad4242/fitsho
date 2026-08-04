@@ -9,7 +9,7 @@ def require_trusted_origin(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> None:
-    if request.headers.get("origin") != settings.frontend_origin:
+    if request.headers.get("origin") not in settings.allowed_frontend_origins:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Untrusted request origin",

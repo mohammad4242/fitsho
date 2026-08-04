@@ -51,7 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.dependency_overrides[get_settings] = lambda: active_settings
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[active_settings.frontend_origin],
+        allow_origins=list(active_settings.allowed_frontend_origins),
         allow_credentials=True,
         allow_methods=["DELETE", "GET", "PATCH", "POST", "PUT"],
         allow_headers=[

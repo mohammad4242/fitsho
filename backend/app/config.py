@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho"
     frontend_origin: str = "http://localhost:5173"
+    frontend_origins: str | None = None
     app_env: Literal["local", "test", "production"] = "local"
     cookie_secure: bool = True
     session_cookie_name: str = "__Host-fitsho_session"
@@ -54,6 +55,21 @@ class Settings(BaseSettings):
     workout_warmup_minutes: int = Field(default=5, ge=0, le=30)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @property
+    def allowed_frontend_origins(self) -> tuple[str, ...]:
+        configured_origins = (
+            tuple(origin.strip().rstrip("/") for origin in self.frontend_origins.split(","))
+            if self.frontend_origins is not None
+            else ()
+        )
+        return tuple(
+            dict.fromkeys(
+                origin
+                for origin in (self.frontend_origin, *configured_origins)
+                if origin
+            )
+        )
 
     @model_validator(mode="after")
     def enforce_private_body_photo_storage(self) -> Self:
