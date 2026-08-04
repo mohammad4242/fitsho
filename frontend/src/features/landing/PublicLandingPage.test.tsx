@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { PublicLandingPage } from "./PublicLandingPage";
+import i18n from "../../i18n";
 
 type ObserverCallback = (entries: IntersectionObserverEntry[]) => void;
 
@@ -22,6 +23,7 @@ class LandingIntersectionObserver {
 
 beforeEach(() => {
   observers.length = 0;
+  void i18n.changeLanguage("fa");
   vi.stubGlobal("IntersectionObserver", LandingIntersectionObserver);
   vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
 });
@@ -42,6 +44,22 @@ it("uses one fixed film while the product story scrolls", () => {
   expect(video.querySelector("source")).toHaveAttribute("src", "/image&videos/landing.mp4");
   expect(screen.getByRole("link", { name: /شروع کن/i })).toHaveAttribute("href", "/get-started");
   expect(screen.getByText(/کم‌هزینه‌تر/)).toBeInTheDocument();
+  expect(screen.queryByText("برای ادامه اسکرول کن ↓")).not.toBeInTheDocument();
+});
+
+it("renders the landing copy and direction in English after changing language", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <PublicLandingPage />
+    </MemoryRouter>,
+  );
+
+  await user.click(screen.getByRole("button", { name: "English" }));
+
+  await waitFor(() => expect(screen.getByRole("heading", { name: /Your body\.\s*Your path\./ })).toBeInTheDocument());
+  expect(screen.getByRole("main")).toHaveAttribute("dir", "ltr");
+  expect(screen.getByRole("link", { name: /Get started/i })).toBeInTheDocument();
 });
 
 it("shows stores and social destinations without inventing unavailable links", () => {
@@ -54,8 +72,26 @@ it("shows stores and social destinations without inventing unavailable links", (
   expect(screen.getByText("Google Play")).toBeInTheDocument();
   expect(screen.getByText("کافه‌بازار")).toBeInTheDocument();
   expect(screen.getByText("App Store")).toBeInTheDocument();
+  expect(screen.getByAltText("Google Play")).toBeInTheDocument();
+  expect(screen.getByAltText("Cafe Bazaar")).toBeInTheDocument();
+  expect(screen.getByAltText("App Store")).toBeInTheDocument();
   expect(screen.getByLabelText("شبکه‌های اجتماعی")).toHaveTextContent("اینستاگرام");
   expect(screen.getByLabelText("شبکه‌های اجتماعی")).toHaveTextContent("تلگرام");
+});
+
+it("stacks branded social destinations inside one social card", () => {
+  render(
+    <MemoryRouter>
+      <PublicLandingPage />
+    </MemoryRouter>,
+  );
+
+  const socialCard = screen.getByLabelText("شبکه‌های اجتماعی");
+  expect(socialCard).toHaveClass("landing-social-card");
+  expect(screen.getByAltText("Instagram")).toBeInTheDocument();
+  expect(screen.getByAltText("Telegram")).toBeInTheDocument();
+  expect(screen.getByAltText("Facebook")).toBeInTheDocument();
+  expect(screen.getByAltText("X")).toBeInTheDocument();
 });
 
 it("opens a menu with the upcoming articles item", async () => {
