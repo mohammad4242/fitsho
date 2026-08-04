@@ -17,8 +17,10 @@ import type {
   MedicalConditionCode,
   NutritionProfileInput,
   SafetyDecision,
+  SafetyEvaluation,
   SafetyProfileInput,
 } from "./types";
+import type { OnboardingDraft } from "../publicOnboarding/onboardingDraft";
 
 type FlowStep =
   | "loading"
@@ -38,6 +40,11 @@ type Props = {
   onCreateTrainingProfile: (input: ProfileInput) => Promise<Profile>;
   onComplete: () => void;
   trainingProfileExists?: boolean;
+  draftMode?: boolean;
+  initialDraft?: OnboardingDraft;
+  onDraftChange?: (changes: Partial<OnboardingDraft>) => void;
+  onDraftComplete?: (changes: Partial<OnboardingDraft>) => void;
+  onExit?: () => void;
 };
 
 const emptyProfileValues: ProfileFormValues = {
@@ -47,6 +54,33 @@ const emptyProfileValues: ProfileFormValues = {
   training_location: "", home_training_setup: "", session_duration_minutes: "",
   physical_limitations: "", training_cautions: null, plan_duration_weeks: "4",
 };
+
+function draftValues(draft?: OnboardingDraft): ProfileFormValues {
+  const source = draft?.training ?? draft?.shared;
+  if (source === undefined) return emptyProfileValues;
+  return {
+    ...emptyProfileValues,
+    display_name: source.display_name,
+    birth_date: source.birth_date,
+    sex: source.sex,
+    height_cm: String(source.height_cm),
+    current_weight_kg: String(source.current_weight_kg),
+    fitness_goal: source.fitness_goal,
+    ...(draft?.training === undefined ? {} : {
+      shoulder_circumference_cm: draft.training.shoulder_circumference_cm === null ? "" : String(draft.training.shoulder_circumference_cm),
+      waist_circumference_cm: draft.training.waist_circumference_cm === null ? "" : String(draft.training.waist_circumference_cm),
+      hip_circumference_cm: draft.training.hip_circumference_cm === null ? "" : String(draft.training.hip_circumference_cm),
+      experience_level: draft.training.experience_level,
+      training_days_per_week: String(draft.training.training_days_per_week),
+      training_location: draft.training.training_location,
+      home_training_setup: draft.training.home_training_setup ?? "",
+      session_duration_minutes: String(draft.training.session_duration_minutes),
+      physical_limitations: draft.training.physical_limitations ?? "",
+      training_cautions: draft.training.training_cautions,
+      plan_duration_weeks: String(draft.training.plan_duration_weeks),
+    }),
+  };
+}
 
 const conditionOptions: Array<[MedicalConditionCode, string]> = [
   ["controlled_hypertension", "فشار خون کنترل‌شده"],
@@ -67,13 +101,18 @@ export function NutritionOnboardingFlow({
   onCreateTrainingProfile,
   onComplete,
   trainingProfileExists = false,
+  draftMode = false,
+  initialDraft,
+  onDraftChange,
+  onDraftComplete,
+  onExit,
 }: Props) {
-  const [step, setStep] = useState<FlowStep>("loading");
-  const [values, setValues] = useState<ProfileFormValues>(emptyProfileValues);
+  const [step, setStep] = useState<FlowStep>(draftMode ? "personal" : "loading");
+  const [values, setValues] = useState<ProfileFormValues>(() => draftValues(initialDraft));
   const [errors, setErrors] = useState<ProfileValidationErrors>({});
   const [busy, setBusy] = useState(false);
   const [requestError, setRequestError] = useState(false);
-  const [decision, setDecision] = useState<SafetyDecision | null>(null);
+  const [decision, setDecision] = useState<SafetyDecision | SafetyEvaluation | null>(null);
   const [conditions, setConditions] = useState<MedicalConditionCode[]>([]);
   const [safetyFlags, setSafetyFlags] = useState({
     dangerous_food_reaction_history: false,
@@ -113,6 +152,7 @@ export function NutritionOnboardingFlow({
   });
 
   useEffect(() => {
+    if (draftMode) return;
     let active = true;
     void Promise.all([
       profileApi.getSharedProfile(),
@@ -151,7 +191,7 @@ export function NutritionOnboardingFlow({
       }
     });
     return () => { active = false; };
-  }, [onComplete, productMode, trainingProfileExists]);
+  }, [draftMode, onComplete, productMode, trainingProfileExists]);
 
   function updateProfileValue(
     field: keyof ProfileFormValues,
@@ -181,16 +221,22 @@ export function NutritionOnboardingFlow({
     const nextErrors = validateStep(values, 2, new Date());
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    setBusy(true);
-    setRequestError(false);
-    void profileApi.saveSharedProfile({
+    const shared = {
       display_name: values.display_name.trim(),
       birth_date: values.birth_date,
       sex: values.sex as Exclude<typeof values.sex, "">,
       height_cm: Number(values.height_cm),
       current_weight_kg: Number(values.current_weight_kg),
       fitness_goal: values.fitness_goal as Exclude<typeof values.fitness_goal, "">,
-    }).then(() => setStep("safety")).catch(() => setRequestError(true)).finally(() => setBusy(false));
+    };
+    if (draftMode) {
+      onDraftChange?.({ shared });
+      setStep("safety");
+      return;
+    }
+    setBusy(true);
+    setRequestError(false);
+    void profileApi.saveSharedProfile(shared).then(() => setStep("safety")).catch(() => setRequestError(true)).finally(() => setBusy(false));
   }
 
   function safetyInput(): SafetyProfileInput {
@@ -207,7 +253,12 @@ export function NutritionOnboardingFlow({
     event.preventDefault();
     setBusy(true);
     setRequestError(false);
-    void nutritionApi.saveSafetyProfile(safetyInput()).then((result) => {
+    const input = safetyInput();
+    const request = draftMode
+      ? nutritionApi.evaluateSafetyProfile(input)
+      : nutritionApi.saveSafetyProfile(input);
+    void request.then((result) => {
+      if (draftMode) onDraftChange?.({ safety: input });
       setDecision(result);
       if (!result.can_continue_onboarding) setStep("blocked");
       else setStep(productMode === "both" && !trainingProfileExists ? "training" : "budget");
@@ -219,9 +270,15 @@ export function NutritionOnboardingFlow({
     const nextErrors = validateStep(values, 3, new Date());
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
+    const training = toProfileInput(values);
+    if (draftMode) {
+      onDraftChange?.({ training });
+      setStep("budget");
+      return;
+    }
     setBusy(true);
     setRequestError(false);
-    void onCreateTrainingProfile(toProfileInput(values))
+    void onCreateTrainingProfile(training)
       .then(() => setStep("budget"))
       .catch(() => setRequestError(true))
       .finally(() => setBusy(false));
@@ -263,6 +320,20 @@ export function NutritionOnboardingFlow({
 
   function finish(event: FormEvent) {
     event.preventDefault();
+    if (draftMode) {
+      onDraftComplete?.({
+        shared: {
+          display_name: values.display_name.trim(), birth_date: values.birth_date,
+          sex: values.sex as Exclude<typeof values.sex, "">, height_cm: Number(values.height_cm),
+          current_weight_kg: Number(values.current_weight_kg),
+          fitness_goal: values.fitness_goal as Exclude<typeof values.fitness_goal, "">,
+        },
+        safety: safetyInput(),
+        ...(productMode === "both" ? { training: toProfileInput(values) } : {}),
+        nutrition: nutritionInput,
+      });
+      return;
+    }
     setBusy(true);
     setRequestError(false);
     void nutritionApi.saveNutritionProfile(nutritionInput)
@@ -294,6 +365,7 @@ export function NutritionOnboardingFlow({
         <h2 className="fitsho-display">ادامه مسیر با پزشک فیتشو</h2>
         <p>{decision?.message}</p>
         <p>اطلاعات مجاز ذخیره شد و هیچ برنامه خودکاری ساخته نمی‌شود.</p>
+        {draftMode && <button className="primary-button" type="button" onClick={() => onDraftComplete?.({ safety: safetyInput() })}>ادامه و ساخت حساب</button>}
         <button className="secondary-button" type="button" onClick={() => setStep("safety")}>بازگشت و اصلاح پاسخ‌ها</button>
       </section>
     );
@@ -325,7 +397,7 @@ export function NutritionOnboardingFlow({
       {step === "personal" && (
         <form className="profile-form" noValidate onSubmit={nextFromPersonal}>
           <PersonalFields values={values} errors={errors} disabled={busy} onChange={updateProfileValue} />
-          <Actions busy={busy} nextLabel="ادامه" />
+          <Actions busy={busy} onBack={draftMode ? onExit : undefined} nextLabel="ادامه" />
         </form>
       )}
       {step === "body" && (

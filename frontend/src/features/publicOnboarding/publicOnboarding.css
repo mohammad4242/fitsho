@@ -1,0 +1,49 @@
+.public-onboarding {
+  min-height: 100svh;
+  color: #f4f1e9;
+  background:
+    radial-gradient(circle at 82% 14%, rgb(27 185 164 / 12%), transparent 30%),
+    radial-gradient(circle at 12% 88%, rgb(238 148 74 / 9%), transparent 30%),
+    #111515;
+}
+
+.public-onboarding__header {
+  min-height: 5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem clamp(1rem, 5vw, 4rem);
+  border-bottom: 1px solid rgb(255 255 255 / 9%);
+}
+.public-onboarding__header .brand-mark { color: #f4f1e9; }
+.public-onboarding__header > span { color: rgb(255 255 255 / 54%); font-size: 0.78rem; }
+.public-onboarding__stage { width: min(100% - 2rem, 68rem); margin: 0 auto; padding: clamp(2rem, 7vw, 5rem) 0; }
+.public-mode-selection { text-align: center; }
+.public-mode-selection > h1,
+.public-question-card > h1 { margin: 0.35rem 0 1rem; color: #f4f1e9; font-size: clamp(2.6rem, 7vw, 5.5rem); line-height: 0.95; }
+.public-mode-selection > p:not(.eyebrow),
+.public-question-card > p:not(.eyebrow) { color: rgb(255 255 255 / 65%); line-height: 1.9; }
+.public-onboarding .product-mode-cards { margin-top: 2rem; }
+.public-onboarding .product-mode-card { color: #f4f1e9; background: rgb(255 255 255 / 5%); border-color: rgb(255 255 255 / 12%); }
+.public-onboarding .product-mode-card:hover { border-color: var(--turquoise); background: rgb(27 185 164 / 8%); }
+.public-question-card { width: min(100%, 48rem); margin: 0 auto; }
+.public-onboarding .profile-fieldset { border-color: rgb(255 255 255 / 11%); background: rgb(255 255 255 / 3%); }
+.public-onboarding .profile-field input,
+.public-onboarding .profile-field select,
+.public-onboarding .auth-form input { color: #f4f1e9; background: #1d2222; border-color: rgb(255 255 255 / 18%); color-scheme: dark; }
+.public-onboarding .profile-field label,
+.public-onboarding .profile-fieldset legend,
+.public-onboarding .auth-form label { color: #f4f1e9; }
+.public-account-step { display: grid; place-items: center; padding: 2rem 1rem; }
+.account-providers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.65rem; margin: 2rem 0; }
+.account-providers button { min-height: 4rem; display: grid; place-items: center; border: 1px solid rgb(255 255 255 / 13%); border-radius: 0.9rem; color: rgb(255 255 255 / 48%); background: rgb(255 255 255 / 4%); }
+.account-providers small { color: var(--turquoise); }
+.account-divider { display: flex; align-items: center; gap: 1rem; margin: 1rem 0; color: rgb(255 255 255 / 52%); font-size: 0.78rem; }
+.account-divider::before,
+.account-divider::after { height: 1px; flex: 1; content: ""; background: rgb(255 255 255 / 12%); }
+
+@media (max-width: 650px) {
+  .public-onboarding__header > span { display: none; }
+  .account-providers { grid-template-columns: 1fr; }
+}

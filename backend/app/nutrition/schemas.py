@@ -80,6 +80,15 @@ class SafetyDecisionResponse(BaseModel):
     created_at: datetime
 
 
+class SafetyEvaluationResponse(BaseModel):
+    outcome: SafetyOutcome
+    policy_version: str
+    reason_codes: list[str]
+    requires_physician_review: bool
+    can_continue_onboarding: bool
+    message: str
+
+
 class FoodConstraintInput(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     details: str | None = Field(default=None, max_length=500)

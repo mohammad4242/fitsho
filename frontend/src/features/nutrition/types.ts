@@ -40,6 +40,8 @@ export type SafetyDecision = {
   created_at: string;
 };
 
+export type SafetyEvaluation = Omit<SafetyDecision, "id" | "created_at">;
+
 export type FoodConstraint = { name: string; details: string | null };
 
 export type NutritionProfileInput = {

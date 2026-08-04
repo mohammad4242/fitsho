@@ -3,10 +3,18 @@ import type {
   NutritionProfile,
   NutritionProfileInput,
   SafetyDecision,
+  SafetyEvaluation,
   SafetyProfileInput,
 } from "./types";
 
 const nutritionPath = "/api/v1/nutrition";
+
+export function evaluateSafetyProfile(input: SafetyProfileInput): Promise<SafetyEvaluation> {
+  return request<SafetyEvaluation>(`${nutritionPath}/safety/evaluate`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
 
 export function saveSafetyProfile(input: SafetyProfileInput): Promise<SafetyDecision> {
   return request<SafetyDecision>(`${nutritionPath}/safety`, {

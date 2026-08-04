@@ -28,6 +28,7 @@ import {
 } from "./features/profile/ProfileRouteGuards";
 import { DashboardPage } from "./pages/DashboardPage";
 import { PublicLandingRoute } from "./features/landing/PublicLandingRoute";
+import { PublicOnboardingPage } from "./features/publicOnboarding/PublicOnboardingPage";
 import { AppShell } from "./shared/AppShell";
 
 export function AppRoutes() {
@@ -64,6 +65,7 @@ export function AppRoutes() {
         </Route>
       </Route>
       <Route path="/" element={<PublicLandingRoute />} />
+      <Route path="/get-started" element={<PublicOnboardingPage />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

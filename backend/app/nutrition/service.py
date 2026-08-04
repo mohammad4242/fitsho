@@ -37,6 +37,7 @@ from app.nutrition.schemas import (
     NutritionProfileResponse,
     PhysicianReviewRequirementResponse,
     SafetyDecisionResponse,
+    SafetyEvaluationResponse,
     SafetyProfileInput,
 )
 from app.profile.enums import ProductMode
@@ -49,6 +50,51 @@ class NutritionSnapshot:
     equipment: tuple[NutritionCookingEquipment, ...]
     foods: tuple[NutritionFoodItem, ...]
     safety: NutritionSafetyDecision
+
+
+_SAFETY_MESSAGES = {
+    SafetyOutcome.STANDARD_AUTOMATIC: "عالی، می‌توانیم اطلاعات تغذیه‌ات را کامل کنیم.",
+    SafetyOutcome.AUTOMATIC_DRAFT_REQUIRES_PHYSICIAN_REVIEW: (
+        "برنامه اولیه آماده می‌شود اما برای فعال‌شدن به بررسی پزشک فیتشو نیاز دارد."
+    ),
+    SafetyOutcome.PHYSICIAN_MANUAL_PLAN_REQUIRED: (
+        "برای حفظ ایمنی، برنامه غذایی باید توسط پزشک فیتشو تنظیم شود."
+    ),
+    SafetyOutcome.UNSUPPORTED_OR_HARD_BLOCKED: (
+        "در حال حاضر امکان ارائه برنامه خودکار ایمن برای این شرایط وجود ندارد."
+    ),
+}
+
+
+def evaluate_safety_profile(payload: SafetyProfileInput) -> SafetyEvaluationResponse:
+    evaluation = evaluate_safety(_safety_answers(payload))
+    can_continue = evaluation.outcome in {
+        SafetyOutcome.STANDARD_AUTOMATIC,
+        SafetyOutcome.AUTOMATIC_DRAFT_REQUIRES_PHYSICIAN_REVIEW,
+    }
+    return SafetyEvaluationResponse(
+        outcome=evaluation.outcome,
+        policy_version=evaluation.policy_version,
+        reason_codes=list(evaluation.reason_codes),
+        requires_physician_review=evaluation.outcome is not SafetyOutcome.STANDARD_AUTOMATIC,
+        can_continue_onboarding=can_continue,
+        message=_SAFETY_MESSAGES[evaluation.outcome],
+    )
+
+
+def _safety_answers(payload: SafetyProfileInput) -> SafetyAnswers:
+    return SafetyAnswers(
+        conditions=tuple(item.code for item in payload.conditions),
+        dangerous_food_reaction_history=payload.dangerous_food_reaction_history,
+        pregnant=payload.pregnant,
+        breastfeeding=payload.breastfeeding,
+        eating_disorder_diagnosed=payload.eating_disorder_diagnosed,
+        eating_disorder_active_symptoms=payload.eating_disorder_active_symptoms,
+        emergency_or_danger_symptoms=payload.emergency_or_danger_symptoms,
+        physician_dietary_restrictions=payload.physician_dietary_restrictions is not None,
+        other_relevant_condition=payload.other_relevant_condition is not None,
+        complex_medication_food_interaction=payload.complex_medication_food_interaction,
+    )
 
 
 def _require_shared_profile(db: Session, user_id: UUID, *, lock: bool = False) -> UserProfile:
@@ -98,20 +144,7 @@ def save_safety_profile(
         for field_name, value in values.items():
             setattr(medical, field_name, value)
 
-    evaluation = evaluate_safety(
-        SafetyAnswers(
-            conditions=tuple(item.code for item in payload.conditions),
-            dangerous_food_reaction_history=payload.dangerous_food_reaction_history,
-            pregnant=payload.pregnant,
-            breastfeeding=payload.breastfeeding,
-            eating_disorder_diagnosed=payload.eating_disorder_diagnosed,
-            eating_disorder_active_symptoms=payload.eating_disorder_active_symptoms,
-            emergency_or_danger_symptoms=payload.emergency_or_danger_symptoms,
-            physician_dietary_restrictions=payload.physician_dietary_restrictions is not None,
-            other_relevant_condition=payload.other_relevant_condition is not None,
-            complex_medication_food_interaction=payload.complex_medication_food_interaction,
-        )
-    )
+    evaluation = evaluate_safety(_safety_answers(payload))
     try:
         db.flush()
         db.execute(
@@ -178,18 +211,6 @@ def safety_response(decision: NutritionSafetyDecision) -> SafetyDecisionResponse
         SafetyOutcome.STANDARD_AUTOMATIC,
         SafetyOutcome.AUTOMATIC_DRAFT_REQUIRES_PHYSICIAN_REVIEW,
     }
-    messages = {
-        SafetyOutcome.STANDARD_AUTOMATIC: "عالی، می‌توانیم اطلاعات تغذیه‌ات را کامل کنیم.",
-        SafetyOutcome.AUTOMATIC_DRAFT_REQUIRES_PHYSICIAN_REVIEW: (
-            "برنامه اولیه آماده می‌شود اما برای فعال‌شدن به بررسی پزشک فیتشو نیاز دارد."
-        ),
-        SafetyOutcome.PHYSICIAN_MANUAL_PLAN_REQUIRED: (
-            "برای حفظ ایمنی، برنامه غذایی باید توسط پزشک فیتشو تنظیم شود."
-        ),
-        SafetyOutcome.UNSUPPORTED_OR_HARD_BLOCKED: (
-            "در حال حاضر امکان ارائه برنامه خودکار ایمن برای این شرایط وجود ندارد."
-        ),
-    }
     return SafetyDecisionResponse(
         id=decision.id,
         outcome=decision.outcome,
@@ -197,7 +218,7 @@ def safety_response(decision: NutritionSafetyDecision) -> SafetyDecisionResponse
         reason_codes=[item.code for item in decision.reasons],
         requires_physician_review=decision.outcome is not SafetyOutcome.STANDARD_AUTOMATIC,
         can_continue_onboarding=can_continue,
-        message=messages[decision.outcome],
+        message=_SAFETY_MESSAGES[decision.outcome],
         created_at=decision.created_at,
     )
 

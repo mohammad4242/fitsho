@@ -215,6 +215,30 @@ def test_early_safety_screen_returns_structured_versioned_outcomes(
     assert result["requires_physician_review"] is (outcome != "standard_automatic")
 
 
+def test_public_safety_preview_is_deterministic_and_does_not_persist(
+    client: TestClient,
+    db: Session,
+) -> None:
+    response = client.post(
+        "/api/v1/nutrition/safety/evaluate",
+        json={
+            **standard_safety_payload(),
+            "conditions": [{"code": "kidney_disease", "details": None}],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "outcome": "physician_manual_plan_required",
+        "policy_version": "medical-condition-v1",
+        "reason_codes": ["kidney_disease"],
+        "requires_physician_review": True,
+        "can_continue_onboarding": False,
+        "message": "برای حفظ ایمنی، برنامه غذایی باید توسط پزشک فیتشو تنظیم شود.",
+    }
+    assert db.scalar(select(NutritionSafetyDecision)) is None
+
+
 def test_safety_screen_normalizes_conditions_and_medications(
     client: TestClient,
     db: Session,

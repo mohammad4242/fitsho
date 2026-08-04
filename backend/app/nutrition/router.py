@@ -19,10 +19,12 @@ from app.nutrition.schemas import (
     NutritionProfileResponse,
     PhysicianReviewRequirementResponse,
     SafetyDecisionResponse,
+    SafetyEvaluationResponse,
     SafetyProfileInput,
 )
 from app.nutrition.service import (
     current_safety_decision,
+    evaluate_safety_profile,
     get_nutrition_profile,
     nutrition_profile_response,
     physician_review_requirement,
@@ -42,6 +44,11 @@ def _domain_error(code: str, message: str) -> HTTPException:
         status_code=status.HTTP_409_CONFLICT,
         detail={"code": code, "message": message},
     )
+
+
+@router.post("/safety/evaluate", response_model=SafetyEvaluationResponse)
+def preview_safety(payload: SafetyProfileInput) -> SafetyEvaluationResponse:
+    return evaluate_safety_profile(payload)
 
 
 @router.put(
