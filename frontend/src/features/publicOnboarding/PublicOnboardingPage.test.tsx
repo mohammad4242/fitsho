@@ -24,11 +24,21 @@ it("starts with product mode and marks the combined path as recommended", () => 
   expect(screen.queryByLabelText("ایمیل")).not.toBeInTheDocument();
 });
 
+it("shows only the three prominent product paths without explanatory copy", () => {
+  render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
+
+  expect(screen.getByRole("button", { name: "برنامه تمرینی" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "برنامه تغذیه" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "تمرین و تغذیه" })).toBeInTheDocument();
+  expect(screen.queryByText("یکی را انتخاب کن؛ فقط سؤال‌های مرتبط با همان مسیر را از تو می‌پرسیم.")).not.toBeInTheDocument();
+  expect(screen.queryByText("برنامه ورزشی براساس بدن، هدف، زمان و تجهیزات")).not.toBeInTheDocument();
+});
+
 it("lets the user go back from the first question to mode selection", async () => {
   const user = userEvent.setup();
   render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
 
-  await user.click(screen.getByRole("button", { name: /تمرین$/ }));
+  await user.click(screen.getByRole("button", { name: "برنامه تمرینی" }));
   expect(screen.getByLabelText("نام نمایشی")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "بازگشت" }));
   expect(screen.getByRole("heading", { name: "تو چه زمینه‌ای به کمک نیاز داری؟" })).toBeInTheDocument();

@@ -63,26 +63,25 @@ export function PublicOnboardingPage() {
 
 function ModeSelection({ onChoose }: { onChoose: (mode: ProductMode) => void }) {
   const modes = [
-    ["training", "تمرین", "برنامه ورزشی براساس بدن، هدف، زمان و تجهیزات"],
-    ["nutrition", "تغذیه", "اطلاعات ضروری برای یک مسیر غذایی متناسب و ایمن"],
-    ["both", "تمرین و تغذیه", "دو مسیر هماهنگ برای نتیجه‌ای یکپارچه"],
+    ["training", "برنامه تمرینی"],
+    ["nutrition", "برنامه تغذیه"],
+    ["both", "تمرین و تغذیه"],
   ] as const;
   return (
     <section className="public-mode-selection">
       <p className="eyebrow eyebrow--accent">شروع با مربی فیتشو</p>
       <h1 className="fitsho-display">تو چه زمینه‌ای به کمک نیاز داری؟</h1>
-      <p>یکی را انتخاب کن؛ فقط سؤال‌های مرتبط با همان مسیر را از تو می‌پرسیم.</p>
       <div className="product-mode-cards">
-        {modes.map(([mode, title, description]) => (
+        {modes.map(([mode, title]) => (
           <button
             key={mode}
-            className={`product-mode-card ${mode === "both" ? "is-recommended" : ""}`}
+            className={`product-mode-card mode-${mode} ${mode === "both" ? "is-recommended" : ""}`}
             type="button"
             aria-label={title}
             onClick={() => onChoose(mode)}
           >
             {mode === "both" && <span>پیشنهاد فیتشو</span>}
-            <strong>{title}</strong><small>{description}</small>
+            <strong>{title}</strong>
           </button>
         ))}
       </div>
