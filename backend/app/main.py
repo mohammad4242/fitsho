@@ -19,6 +19,7 @@ from app.body_analysis.router import router as body_analysis_router
 from app.body_photos.router import router as body_photo_router
 from app.config import Settings, get_settings
 from app.exercises.router import router as exercises_router
+from app.nutrition.router import router as nutrition_router
 from app.profile.router import router as profile_router
 from app.workouts.router import router as workout_plans_router
 
@@ -81,6 +82,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         _request: Request,
         error: RequestValidationError,
     ) -> JSONResponse:
+        error_types = {item["type"] for item in error.errors()}
+        if "AGE_NOT_SUPPORTED" in error_types:
+            return JSONResponse(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                content={
+                    "detail": {
+                        "code": "AGE_NOT_SUPPORTED",
+                        "message": "فیتشو در حال حاضر فقط برای افراد ۱۸ سال و بالاتر ارائه می‌شود.",
+                    }
+                },
+            )
+        if "AGE_OUT_OF_RANGE" in error_types:
+            return JSONResponse(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                content={
+                    "detail": {
+                        "code": "AGE_OUT_OF_RANGE",
+                        "message": "تاریخ تولد واردشده پشتیبانی نمی‌شود.",
+                    }
+                },
+            )
         safe_errors = [
             {
                 "type": item["type"],
@@ -99,6 +121,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(body_analysis_router)
     app.include_router(body_progress_comparison_router)
     app.include_router(profile_router)
+    app.include_router(nutrition_router)
     app.include_router(workout_plans_router)
     app.include_router(exercises_router)
     app.include_router(admin_router)

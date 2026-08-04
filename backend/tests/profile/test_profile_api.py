@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 import pytest
@@ -133,6 +134,21 @@ def test_create_profile_rejects_unsupported_session_duration(client: TestClient)
     )
 
     assert response.status_code == 422
+
+
+def test_training_profile_under_18_uses_stable_age_domain_error(client: TestClient) -> None:
+    register(client, "minor-training@example.com")
+    today = date.today()
+    minor_birth_date = date(today.year - 17, today.month, min(today.day, 28)).isoformat()
+
+    response = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={**VALID_PROFILE, "birth_date": minor_birth_date},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "AGE_NOT_SUPPORTED"
 
 
 def test_get_profile_returns_404_until_onboarding_is_complete(client: TestClient) -> None:

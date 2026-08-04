@@ -518,6 +518,15 @@ class WorkoutGenerationService:
 
     def _to_generation_profile(self, source: ProfileSnapshot) -> WorkoutGenerationProfile:
         profile = source.profile
+        assert profile.fitness_goal is not None
+        assert profile.experience_level is not None
+        assert profile.training_days_per_week is not None
+        assert profile.training_location is not None
+        assert profile.session_duration_minutes is not None
+        assert profile.plan_duration_weeks is not None
+        assert profile.birth_date is not None
+        assert profile.sex is not None
+        assert profile.height_cm is not None
         return WorkoutGenerationProfile(
             fitness_goal=profile.fitness_goal,
             experience_level=profile.experience_level,
@@ -647,6 +656,15 @@ class WorkoutGenerationService:
         body_analysis_influence: BodyAnalysisInfluence | None = None,
     ) -> ProgramGenerationRequest:
         profile = source.profile
+        assert profile.training_location is not None
+        assert profile.experience_level is not None
+        assert profile.birth_date is not None
+        assert profile.sex is not None
+        assert profile.height_cm is not None
+        assert profile.fitness_goal is not None
+        assert profile.training_days_per_week is not None
+        assert profile.session_duration_minutes is not None
+        assert profile.plan_duration_weeks is not None
         equipment = self._available_equipment(
             profile.training_location,
             profile.home_training_setup,

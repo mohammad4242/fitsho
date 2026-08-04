@@ -4,6 +4,7 @@ from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
 from app.profile.enums import (
     ExperienceLevel,
@@ -28,6 +29,15 @@ def calculate_age(birth_date: date, today: date) -> int:
         - birth_date.year
         - ((today.month, today.day) < (birth_date.month, birth_date.day))
     )
+
+
+def validate_supported_age(birth_date: date) -> date:
+    age = calculate_age(birth_date, date.today())
+    if age < 18:
+        raise PydanticCustomError("AGE_NOT_SUPPORTED", "Age is not supported")
+    if age > 100:
+        raise PydanticCustomError("AGE_OUT_OF_RANGE", "Age is outside the supported range")
+    return birth_date
 
 
 class ProfileCreate(BaseModel):
@@ -84,10 +94,7 @@ class ProfileCreate(BaseModel):
     @field_validator("birth_date")
     @classmethod
     def validate_age(cls, birth_date: date) -> date:
-        age = calculate_age(birth_date, date.today())
-        if not 18 <= age <= 100:
-            raise ValueError("Age must be between 18 and 100 years")
-        return birth_date
+        return validate_supported_age(birth_date)
 
     @model_validator(mode="after")
     def normalize_workout_setup(self) -> "ProfileCreate":
@@ -156,10 +163,7 @@ class ProfileUpdate(BaseModel):
         if birth_date is None:
             return None
 
-        age = calculate_age(birth_date, date.today())
-        if not 18 <= age <= 100:
-            raise ValueError("Age must be between 18 and 100 years")
-        return birth_date
+        return validate_supported_age(birth_date)
 
     @model_validator(mode="after")
     def validate_supplied_fields(self) -> "ProfileUpdate":
@@ -212,6 +216,37 @@ class ProfileResponse(BaseModel):
 
 class ProductModeSelection(BaseModel):
     product_mode: ProductMode
+
+
+class SharedProfileUpsert(BaseModel):
+    display_name: str = Field(min_length=2, max_length=80)
+    birth_date: date
+    sex: Sex
+    height_cm: int = Field(ge=100, le=250)
+    current_weight_kg: Decimal = Field(
+        ge=Decimal("20"),
+        le=Decimal("500"),
+        max_digits=5,
+        decimal_places=2,
+    )
+    fitness_goal: FitnessGoal
+
+    @field_validator("display_name", mode="before")
+    @classmethod
+    def normalize_display_name(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+
+class SharedProfileResponse(BaseModel):
+    user_id: UUID
+    product_mode: ProductMode
+    display_name: str
+    birth_date: date
+    sex: Sex
+    height_cm: int
+    current_weight_kg: float
+    weight_measured_at: datetime
+    fitness_goal: FitnessGoal
 
 
 class ProfileStatusResponse(BaseModel):

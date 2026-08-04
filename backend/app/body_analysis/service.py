@@ -781,7 +781,7 @@ class BodyAnalysisService:
 
     def _profile_context(self, user_id: UUID) -> dict[str, object]:
         profile = self._db.get(UserProfile, user_id)
-        if profile is None:
+        if profile is None or profile.fitness_goal is None:
             return {}
         measurement = self._db.scalar(
             select(BodyMeasurement)

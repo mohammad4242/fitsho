@@ -29,6 +29,8 @@ def get_workout_generation_service(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> WorkoutGenerationService:
     method = get_profile(db, user.id).profile.workout_generation_method
+    if method is None:
+        raise RuntimeError("Completed fitness profile required")
     ai_coach_provider: OpenRouterAiCoachProvider | None = None
     provider_name = "fitsho_domain"
     model_id = "program_engine_v1"

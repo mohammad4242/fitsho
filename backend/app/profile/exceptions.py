@@ -12,3 +12,11 @@ class ProfileInvariantError(Exception):
 
 class InvalidWorkoutSetupError(Exception):
     pass
+
+
+class AgeNotSupportedError(Exception):
+    pass
+
+
+class AgeOutOfRangeError(Exception):
+    pass

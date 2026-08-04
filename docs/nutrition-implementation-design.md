@@ -319,3 +319,44 @@ preselected. Training users continue through the existing training form.
 Nutrition and both-mode users remain behind onboarding guards until their
 nutrition requirements are implemented in Task 2. Existing training-ready users
 continue to reach workouts, body analysis, exercises, and dashboard routes.
+
+## Task 2 implementation record
+
+Task 2 keeps shared identity, birth date, sex, height, current weight, and goal
+on the single `user_profiles` aggregate. Medical answers, medications, safety
+decisions, nutrition preferences, cooking equipment, and food constraints are
+stored in normalized nutrition tables. No duplicate training or nutrition user
+profile was introduced.
+
+The deterministic medical policy is seeded as immutable version
+`medical-condition-v1`. Every safety submission creates a new append-only
+decision with normalized reason codes. The four approved outcomes are returned
+as structured API data; manual-only and unsupported outcomes stop guided
+onboarding before budget and preference questions. These rules classify a
+workflow and do not diagnose a condition.
+
+The additive endpoints are:
+
+- `GET` and `PUT /api/v1/profile/shared`
+- `GET` and `PUT /api/v1/nutrition/safety`
+- `GET` and `PUT /api/v1/nutrition/profile`
+- `GET /api/v1/nutrition/review-requirement`
+
+The individual monthly budget is an integer number of IRR. The derived weekly
+allowance uses integer arithmetic exactly as
+`floor(monthly_budget_irr * 12 / 52)`. Allergies, intolerances, refusals, and
+other exclusions are typed relational rows so later planning stages can apply
+them as hard constraints.
+
+Nutrition and combined onboarding now follow a page-by-page coach flow: shared
+information, early safety screening, the training branch for combined mode,
+budget, cooking conditions, food preferences and exclusions, and confirmation.
+Optional free-text and preference questions provide explicit skip controls.
+Under-18 submissions return `AGE_NOT_SUPPORTED`; the established maximum age
+of 100 remains unchanged. Training APIs reject incomplete or nutrition-only
+profiles.
+
+The physician-review table and review-requirement API are foundations only.
+Task 2 does not create review assignments, professional decisions, meal plans,
+energy targets, or food recommendations; those remain in their later staged
+tasks.
