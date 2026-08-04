@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
-from app.profile.enums import TrainingLocation
+from app.profile.enums import ProductMode, ProfileCompletionState, TrainingLocation
 from app.profile.exceptions import (
     InvalidWorkoutSetupError,
     ProfileAlreadyExistsError,
@@ -26,31 +26,63 @@ class ProfileSnapshot:
     measurement: BodyMeasurement
 
 
+def profile_completion_state(profile: UserProfile | None) -> ProfileCompletionState:
+    if profile is None:
+        return ProfileCompletionState.PRODUCT_MODE_NOT_SELECTED
+    if profile.display_name is None:
+        return ProfileCompletionState.SHARED_PROFILE_INCOMPLETE
+    if profile.product_mode is ProductMode.TRAINING:
+        return ProfileCompletionState.TRAINING_READY
+    return ProfileCompletionState.NUTRITION_ONBOARDING_INCOMPLETE
+
+
+def select_product_mode(db: Session, user_id: UUID, product_mode: ProductMode) -> UserProfile:
+    profile = db.scalar(select(UserProfile).where(UserProfile.user_id == user_id).with_for_update())
+    if profile is None:
+        profile = UserProfile(user_id=user_id, product_mode=product_mode)
+        db.add(profile)
+    else:
+        profile.product_mode = product_mode
+    try:
+        db.commit()
+        db.refresh(profile)
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return profile
+
+
 def create_profile(
     db: Session,
     user_id: UUID,
     payload: ProfileCreate,
 ) -> ProfileSnapshot:
-    profile = UserProfile(
-        user_id=user_id,
-        display_name=payload.display_name,
-        birth_date=payload.birth_date,
-        sex=payload.sex,
-        height_cm=payload.height_cm,
-        fitness_goal=payload.fitness_goal,
-        experience_level=payload.experience_level,
-        training_days_per_week=payload.training_days_per_week,
-        training_location=payload.training_location,
-        home_training_setup=payload.home_training_setup,
-        session_duration_minutes=payload.session_duration_minutes,
-        physical_limitations=payload.physical_limitations,
-        plan_duration_weeks=payload.plan_duration_weeks,
-        workout_generation_method=payload.workout_generation_method,
-        training_caution_items=[
-            UserProfileTrainingCaution(caution=caution)
-            for caution in sorted(payload.training_cautions, key=lambda value: value.value)
-        ],
-    )
+    profile = db.scalar(select(UserProfile).where(UserProfile.user_id == user_id).with_for_update())
+    if profile is not None and profile.display_name is not None:
+        raise ProfileAlreadyExistsError
+    if profile is None:
+        profile = UserProfile(user_id=user_id, product_mode=ProductMode.TRAINING)
+        db.add(profile)
+    for field_name, value in {
+        "display_name": payload.display_name,
+        "birth_date": payload.birth_date,
+        "sex": payload.sex,
+        "height_cm": payload.height_cm,
+        "fitness_goal": payload.fitness_goal,
+        "experience_level": payload.experience_level,
+        "training_days_per_week": payload.training_days_per_week,
+        "training_location": payload.training_location,
+        "home_training_setup": payload.home_training_setup,
+        "session_duration_minutes": payload.session_duration_minutes,
+        "physical_limitations": payload.physical_limitations,
+        "plan_duration_weeks": payload.plan_duration_weeks,
+        "workout_generation_method": payload.workout_generation_method,
+    }.items():
+        setattr(profile, field_name, value)
+    profile.training_caution_items[:] = [
+        UserProfileTrainingCaution(caution=caution)
+        for caution in sorted(payload.training_cautions, key=lambda value: value.value)
+    ]
     measurement = BodyMeasurement(
         user_id=user_id,
         weight_kg=payload.current_weight_kg,

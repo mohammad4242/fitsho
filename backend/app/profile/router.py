@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.cookies import require_trusted_origin
@@ -13,11 +14,20 @@ from app.profile.exceptions import (
     ProfileInvariantError,
     ProfileNotFoundError,
 )
-from app.profile.schemas import ProfileCreate, ProfileResponse, ProfileUpdate
+from app.profile.models import UserProfile
+from app.profile.schemas import (
+    ProductModeSelection,
+    ProfileCreate,
+    ProfileResponse,
+    ProfileStatusResponse,
+    ProfileUpdate,
+)
 from app.profile.service import (
     ProfileSnapshot,
     create_profile,
     get_profile,
+    profile_completion_state,
+    select_product_mode,
     update_profile,
 )
 
@@ -25,6 +35,35 @@ router = APIRouter(prefix="/api/v1/profile", tags=["profile"])
 
 DatabaseSession = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+@router.post(
+    "/mode",
+    response_model=ProfileStatusResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def select_mode(
+    payload: ProductModeSelection,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> ProfileStatusResponse:
+    profile = select_product_mode(db, user.id, payload.product_mode)
+    return ProfileStatusResponse(
+        user_id=profile.user_id,
+        product_mode=profile.product_mode,
+        completion_state=profile_completion_state(profile),
+    )
+
+
+@router.get("/status", response_model=ProfileStatusResponse)
+def read_status(db: DatabaseSession, user: CurrentUser) -> ProfileStatusResponse:
+    profile = db.scalar(select(UserProfile).where(UserProfile.user_id == user.id))
+    return ProfileStatusResponse(
+        user_id=user.id,
+        product_mode=profile.product_mode if profile is not None else None,
+        completion_state=profile_completion_state(profile),
+    )
 
 
 def to_response(snapshot: ProfileSnapshot) -> ProfileResponse:

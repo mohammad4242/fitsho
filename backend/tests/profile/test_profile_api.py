@@ -143,6 +143,28 @@ def test_get_profile_returns_404_until_onboarding_is_complete(client: TestClient
     assert response.json() == {"detail": "Fitness profile not found"}
 
 
+def test_selecting_product_mode_creates_the_single_profile_draft(client: TestClient) -> None:
+    user_id = register(client, "mode-selection@example.com")
+
+    response = client.post(
+        "/api/v1/profile/mode",
+        headers=ORIGIN,
+        json={"product_mode": "both"},
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "user_id": str(user_id),
+        "product_mode": "both",
+        "completion_state": "shared_profile_incomplete",
+    }
+
+    profile = client.get("/api/v1/profile/status")
+    assert profile.status_code == 200
+    assert profile.json()["product_mode"] == "both"
+    assert profile.json()["completion_state"] == "shared_profile_incomplete"
+
+
 def test_profile_endpoints_require_authentication(client: TestClient) -> None:
     assert client.get("/api/v1/profile").status_code == 401
     assert client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE).status_code == 401

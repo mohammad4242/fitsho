@@ -9,6 +9,8 @@ from app.profile.enums import (
     ExperienceLevel,
     FitnessGoal,
     HomeTrainingSetup,
+    ProductMode,
+    ProfileCompletionState,
     Sex,
     TrainingCaution,
     TrainingLocation,
@@ -206,3 +208,13 @@ class ProfileResponse(BaseModel):
     session_duration_minutes: SessionDurationMinutes
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProductModeSelection(BaseModel):
+    product_mode: ProductMode
+
+
+class ProfileStatusResponse(BaseModel):
+    user_id: UUID
+    product_mode: ProductMode | None
+    completion_state: ProfileCompletionState

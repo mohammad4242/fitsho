@@ -1,6 +1,19 @@
 from enum import StrEnum
 
 
+class ProductMode(StrEnum):
+    TRAINING = "training"
+    NUTRITION = "nutrition"
+    BOTH = "both"
+
+
+class ProfileCompletionState(StrEnum):
+    PRODUCT_MODE_NOT_SELECTED = "product_mode_not_selected"
+    SHARED_PROFILE_INCOMPLETE = "shared_profile_incomplete"
+    TRAINING_READY = "training_ready"
+    NUTRITION_ONBOARDING_INCOMPLETE = "nutrition_onboarding_incomplete"
+
+
 class Sex(StrEnum):
     FEMALE = "female"
     MALE = "male"

@@ -22,6 +22,7 @@ from app.profile.enums import (
     ExperienceLevel,
     FitnessGoal,
     HomeTrainingSetup,
+    ProductMode,
     Sex,
     TrainingCaution,
     TrainingLocation,
@@ -63,9 +64,15 @@ class UserProfile(Base):
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
-    display_name: Mapped[str] = mapped_column(String(80), nullable=False)
-    birth_date: Mapped[date] = mapped_column(Date, nullable=False)
-    sex: Mapped[Sex] = mapped_column(
+    product_mode: Mapped[ProductMode] = mapped_column(
+        Enum(ProductMode, native_enum=False, create_constraint=True, validate_strings=True,
+             values_callable=lambda members: [member.value for member in members],
+             name="ck_user_profiles_product_mode_values"),
+        nullable=False,
+    )
+    display_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    sex: Mapped[Sex | None] = mapped_column(
         Enum(
             Sex,
             native_enum=False,
@@ -74,10 +81,10 @@ class UserProfile(Base):
             values_callable=lambda members: [member.value for member in members],
             name="ck_user_profiles_sex_values",
         ),
-        nullable=False,
+        nullable=True,
     )
-    height_cm: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    fitness_goal: Mapped[FitnessGoal] = mapped_column(
+    height_cm: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    fitness_goal: Mapped[FitnessGoal | None] = mapped_column(
         Enum(
             FitnessGoal,
             native_enum=False,
@@ -86,9 +93,9 @@ class UserProfile(Base):
             values_callable=lambda members: [member.value for member in members],
             name="ck_user_profiles_fitness_goal_values",
         ),
-        nullable=False,
+        nullable=True,
     )
-    experience_level: Mapped[ExperienceLevel] = mapped_column(
+    experience_level: Mapped[ExperienceLevel | None] = mapped_column(
         Enum(
             ExperienceLevel,
             native_enum=False,
@@ -97,10 +104,10 @@ class UserProfile(Base):
             values_callable=lambda members: [member.value for member in members],
             name="ck_user_profiles_experience_level_values",
         ),
-        nullable=False,
+        nullable=True,
     )
-    training_days_per_week: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    training_location: Mapped[TrainingLocation] = mapped_column(
+    training_days_per_week: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    training_location: Mapped[TrainingLocation | None] = mapped_column(
         Enum(
             TrainingLocation,
             native_enum=False,
@@ -109,7 +116,7 @@ class UserProfile(Base):
             values_callable=lambda members: [member.value for member in members],
             name="ck_user_profiles_training_location_values",
         ),
-        nullable=False,
+        nullable=True,
     )
     home_training_setup: Mapped[HomeTrainingSetup | None] = mapped_column(
         Enum(
@@ -122,15 +129,10 @@ class UserProfile(Base):
         ),
         nullable=True,
     )
-    session_duration_minutes: Mapped[int] = mapped_column(
-        SmallInteger,
-        nullable=False,
-    )
+    session_duration_minutes: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     physical_limitations: Mapped[str | None] = mapped_column(Text, nullable=True)
-    plan_duration_weeks: Mapped[int] = mapped_column(
-        SmallInteger, default=4, server_default="4", nullable=False
-    )
-    workout_generation_method: Mapped[WorkoutGenerationMethod] = mapped_column(
+    plan_duration_weeks: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    workout_generation_method: Mapped[WorkoutGenerationMethod | None] = mapped_column(
         Enum(
             WorkoutGenerationMethod,
             native_enum=False,
@@ -139,9 +141,7 @@ class UserProfile(Base):
             values_callable=lambda members: [member.value for member in members],
             name="ck_user_profiles_workout_generation_method_values",
         ),
-        default=WorkoutGenerationMethod.FITSHO_COACH,
-        server_default=WorkoutGenerationMethod.FITSHO_COACH.value,
-        nullable=False,
+        nullable=True,
     )
     training_caution_items: Mapped[list["UserProfileTrainingCaution"]] = relationship(
         back_populates="profile", cascade="all, delete-orphan", passive_deletes=True
