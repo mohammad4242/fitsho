@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -75,21 +75,26 @@ it("shows stores and social destinations without inventing unavailable links", (
   expect(screen.getByAltText("Google Play")).toBeInTheDocument();
   expect(screen.getByAltText("Cafe Bazaar")).toBeInTheDocument();
   expect(screen.getByAltText("App Store")).toBeInTheDocument();
-  expect(screen.getByLabelText("شبکه‌های اجتماعی")).toHaveTextContent("اینستاگرام");
-  expect(screen.getByLabelText("شبکه‌های اجتماعی")).toHaveTextContent("تلگرام");
 });
 
-it("stacks branded social destinations inside one social card", () => {
-  render(
+it("reveals social destinations only when the final section enters view", () => {
+  const { container } = render(
     <MemoryRouter>
       <PublicLandingPage />
     </MemoryRouter>,
   );
 
+  expect(screen.queryByLabelText("شبکه‌های اجتماعی")).not.toBeInTheDocument();
+  const downloadSection = container.querySelector("#download");
+  expect(downloadSection).not.toBeNull();
+  act(() => observers.forEach((callback) => callback([{ isIntersecting: true, target: downloadSection } as IntersectionObserverEntry])));
+
   const socialCard = screen.getByLabelText("شبکه‌های اجتماعی");
   expect(socialCard).toHaveClass("landing-social-card");
   expect(socialCard).toHaveClass("landing-social-card--fixed");
   expect(screen.queryByText("با فیتشو همراه بمان")).not.toBeInTheDocument();
+  expect(socialCard).toHaveTextContent("اینستاگرام");
+  expect(socialCard).toHaveTextContent("تلگرام");
   expect(screen.getByAltText("Instagram")).toBeInTheDocument();
   expect(screen.getByAltText("Telegram")).toBeInTheDocument();
   expect(screen.getByAltText("Facebook")).toBeInTheDocument();

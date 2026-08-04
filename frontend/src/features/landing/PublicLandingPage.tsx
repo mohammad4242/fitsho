@@ -67,16 +67,21 @@ export function PublicLandingPage() {
   const text = copy[language];
   const [menuOpen, setMenuOpen] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
+  const [socialVisible, setSocialVisible] = useState(false);
   const revealRefs = useRef<Array<HTMLElement | null>>([]);
   const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (reducedMotion || typeof IntersectionObserver === "undefined") {
       revealRefs.current.forEach((section) => section?.setAttribute("data-visible", "true"));
+      setSocialVisible(true);
       return;
     }
     const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => { if (entry.isIntersecting) entry.target.setAttribute("data-visible", "true"); });
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) entry.target.setAttribute("data-visible", "true");
+        if (entry.target.id === "download") setSocialVisible(entry.isIntersecting);
+      });
     }, { threshold: 0.4 });
     revealRefs.current.forEach((section) => section && observer.observe(section));
     return () => observer.disconnect();
@@ -103,7 +108,7 @@ export function PublicLandingPage() {
         {text.story.map((section, index) => <section key={section.id} id={index === 0 ? "about" : section.id} ref={(node) => { revealRefs.current[index] = node; }} className="landing-panel landing-copy-panel"><div className="landing-panel__content"><p className="landing-kicker">{section.eyebrow}</p><h2 className="fitsho-display">{section.title}</h2><p>{section.body}</p></div></section>)}
         <section id="download" ref={(node) => { revealRefs.current[text.story.length] = node; }} className="landing-panel landing-download"><div className="landing-panel__content"><p className="landing-kicker">{text.download.eyebrow}</p><h2 className="fitsho-display">{text.download.title}</h2><p>{text.download.body}</p><div className="store-list" aria-label={text.download.label}>{stores.map((store) => <span key={store.id}><BrandIcon brand={store.id} alt={store.en} /><strong>{store[language]}</strong><small>{text.download.soon}</small></span>)}</div></div><footer className="landing-footer"><span>© 2026 Fitsho</span></footer></section>
       </div>
-      <nav className="landing-social-card landing-social-card--fixed" aria-label={text.social.label}>{socials.map((social) => <span className="landing-social-card__item" key={social.id} title={text.social.soon}><BrandIcon brand={social.id} alt={social.en} /><strong>{social[language]}</strong><small>{text.download.soon}</small></span>)}</nav>
+      {socialVisible && <nav className="landing-social-card landing-social-card--fixed" aria-label={text.social.label}>{socials.map((social) => <span className="landing-social-card__item" key={social.id} title={text.social.soon}><BrandIcon brand={social.id} alt={social.en} /><strong>{social[language]}</strong><small>{text.download.soon}</small></span>)}</nav>}
     </main>
   );
 }
