@@ -2,6 +2,28 @@
   padding-block: 0.5rem;
 }
 
+.nutrition-step { display: grid; gap: 1rem; }
+.nutrition-step > h2 { margin-block: 0; }
+.nutrition-progress { display: grid; grid-template-columns: auto minmax(7rem, 1fr); align-items: center; gap: 0.75rem; color: var(--muted); font-size: 0.75rem; font-weight: 800; }
+.nutrition-progress progress { width: 100%; height: 0.45rem; accent-color: var(--persimmon); }
+.nutrition-feedback,
+.safety-result-card,
+.nutrition-review-card {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem;
+  border: 1px solid rgb(56 183 165 / 35%);
+  border-radius: 1rem;
+  background: rgb(56 183 165 / 10%);
+  line-height: 1.75;
+}
+.nutrition-feedback { margin: 0; }
+.nutrition-check { display: flex; align-items: center; gap: 0.55rem; font-weight: 700; }
+.nutrition-check input { width: 1rem; min-height: 1rem; }
+.text-button { justify-self: start; border: 0; color: var(--turquoise-dark); background: transparent; font: inherit; font-weight: 800; cursor: pointer; }
+.text-button:focus-visible { outline: 3px solid var(--saffron); outline-offset: 3px; }
+.nutrition-review-card span { color: var(--muted); }
+
 .product-mode-flow { display: grid; gap: 1rem; }
 .product-mode-cards { display: grid; gap: 0.75rem; }
 .product-mode-card { position: relative; display: grid; gap: 0.35rem; padding: 1.15rem; border: 1px solid var(--line); border-radius: 1.1rem 1.1rem 0.3rem 1.1rem; background: rgb(255 255 255 / 86%); color: var(--ink); text-align: start; cursor: pointer; }

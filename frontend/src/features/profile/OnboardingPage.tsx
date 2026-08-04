@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { AuthShell } from "../../shared/AuthShell";
+import { NutritionOnboardingFlow } from "../nutrition/NutritionOnboardingFlow";
 import {
   BodyGoalFields,
   ExperienceFields,
@@ -45,7 +46,7 @@ const stepKeys = ["personal", "bodyGoal", "experience"] as const;
 export function OnboardingPage() {
   const { i18n, t } = useTranslation();
   const navigate = useNavigate();
-  const { createProfile, productMode, selectProductMode, status } = useProfile();
+  const { createProfile, profile, productMode, retryProfile, selectProductMode, status } = useProfile();
   const [step, setStep] = useState<Step>(1);
   const [values, setValues] = useState<ProfileFormValues>(emptyValues);
   const [errors, setErrors] = useState<ProfileValidationErrors>({});
@@ -160,13 +161,16 @@ export function OnboardingPage() {
     );
   }
 
-  if (productMode === "nutrition") {
+  if (productMode === "nutrition" || productMode === "both") {
     return (
       <AuthShell>
         <main className="onboarding-flow">
-          <p className="eyebrow eyebrow--accent">مسیر تغذیه</p>
-          <h2 className="fitsho-display">از همین‌جا با هم شروع می‌کنیم.</h2>
-          <p>در گام بعد، اطلاعات لازم برای برنامهٔ غذایی را قدم‌به‌قدم و با امکان ردکردن سؤال‌های اختیاری می‌گیریم.</p>
+          <NutritionOnboardingFlow
+            productMode={productMode}
+            trainingProfileExists={profile !== null}
+            onCreateTrainingProfile={createProfile}
+            onComplete={retryProfile}
+          />
         </main>
       </AuthShell>
     );
@@ -215,20 +219,30 @@ export function OnboardingPage() {
             />
           )}
           {step === 2 && (
-            <BodyGoalFields
-              values={values}
-              errors={errors}
-              disabled={busy}
-              onChange={updateValue}
-            />
+            <>
+              <BodyGoalFields
+                values={values}
+                errors={errors}
+                disabled={busy}
+                onChange={updateValue}
+              />
+              <button className="text-button" type="button" onClick={() => {
+                updateValue("shoulder_circumference_cm", "");
+                updateValue("waist_circumference_cm", "");
+                updateValue("hip_circumference_cm", "");
+              }}>رد کردن اندازه‌گیری‌های اختیاری</button>
+            </>
           )}
           {step === 3 && (
-            <ExperienceFields
-              values={values}
-              errors={errors}
-              disabled={busy}
-              onChange={updateValue}
-            />
+            <>
+              <ExperienceFields
+                values={values}
+                errors={errors}
+                disabled={busy}
+                onChange={updateValue}
+              />
+              <button className="text-button" type="button" onClick={() => updateValue("physical_limitations", "")}>رد کردن توضیحات اختیاری</button>
+            </>
           )}
 
           {submitError && (

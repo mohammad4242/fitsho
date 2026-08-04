@@ -33,13 +33,30 @@ export type ProductMode = (typeof productModes)[number];
 export type ProfileCompletionState =
   | "product_mode_not_selected"
   | "shared_profile_incomplete"
+  | "training_onboarding_incomplete"
+  | "medical_review_information_incomplete"
   | "training_ready"
-  | "nutrition_onboarding_incomplete";
+  | "nutrition_onboarding_incomplete"
+  | "nutrition_draft_ready"
+  | "nutrition_pending_review"
+  | "nutrition_ready"
+  | "both_ready";
 
 export type ProfileStatusResponse = {
   user_id: string;
   product_mode: ProductMode | null;
   completion_state: ProfileCompletionState;
+};
+
+export type SharedProfileInput = Pick<
+  ProfileInput,
+  "display_name" | "birth_date" | "sex" | "height_cm" | "current_weight_kg" | "fitness_goal"
+>;
+
+export type SharedProfile = SharedProfileInput & {
+  user_id: string;
+  product_mode: ProductMode;
+  weight_measured_at: string;
 };
 
 export type ProfileInput = {

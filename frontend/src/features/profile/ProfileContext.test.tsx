@@ -148,6 +148,21 @@ it("marks an authenticated user without a profile as missing", async () => {
   expect(await screen.findByText("status:missing")).toBeInTheDocument();
 });
 
+it("keeps a nutrition draft in its capability onboarding route", async () => {
+  authUser = user;
+  vi.mocked(api.getProfileStatus).mockResolvedValue({
+    user_id: user.id,
+    product_mode: "nutrition",
+    completion_state: "nutrition_draft_ready",
+  });
+
+  renderProfile();
+
+  expect(await screen.findByText("status:mode_selected")).toBeInTheDocument();
+  expect(screen.getByText("name:none")).toBeInTheDocument();
+  expect(api.getProfile).not.toHaveBeenCalled();
+});
+
 it("keeps startup failures separate from a missing profile", async () => {
   authUser = user;
   vi.mocked(api.getProfileStatus).mockRejectedValue(new Error("offline"));

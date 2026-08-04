@@ -3,9 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../shared/apiClient";
 import {
   createProfile,
+  getSharedProfile,
   getProfile,
   getProfileStatus,
   selectProductMode,
+  saveSharedProfile,
   updateProfile,
 } from "./api";
 import type { Profile, ProfileInput } from "./types";
@@ -107,6 +109,39 @@ describe("profile api", () => {
         method: "PATCH",
         body: JSON.stringify({ current_weight_kg: 75.25 }),
       }),
+    );
+  });
+
+  it("reads and updates the shared profile without duplicating training fields", async () => {
+    const shared = {
+      user_id: profile.user_id,
+      product_mode: "nutrition" as const,
+      display_name: "Sara",
+      birth_date: "2000-05-14",
+      sex: "female" as const,
+      height_cm: 165,
+      current_weight_kg: 62.5,
+      fitness_goal: "maintain_weight" as const,
+      weight_measured_at: "2026-08-05T12:00:00Z",
+    };
+    const input = {
+      display_name: shared.display_name,
+      birth_date: shared.birth_date,
+      sex: shared.sex,
+      height_cm: shared.height_cm,
+      current_weight_kg: shared.current_weight_kg,
+      fitness_goal: shared.fitness_goal,
+    };
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json(shared))
+      .mockResolvedValueOnce(Response.json(shared));
+
+    await expect(getSharedProfile()).resolves.toEqual(shared);
+    await expect(saveSharedProfile(input)).resolves.toEqual(shared);
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/profile/shared",
+      expect.objectContaining({ method: "PUT", body: JSON.stringify(input) }),
     );
   });
 

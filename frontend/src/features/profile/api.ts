@@ -5,6 +5,8 @@ import type {
   ProfileInput,
   ProfilePatch,
   ProfileStatusResponse,
+  SharedProfile,
+  SharedProfileInput,
 } from "./types";
 
 const profilePath = "/api/v1/profile";
@@ -17,6 +19,22 @@ export function selectProductMode(productMode: ProductMode): Promise<ProfileStat
   return request<ProfileStatusResponse>(`${profilePath}/mode`, {
     method: "POST",
     body: JSON.stringify({ product_mode: productMode }),
+  });
+}
+
+export async function getSharedProfile(): Promise<SharedProfile | null> {
+  try {
+    return await request<SharedProfile>(`${profilePath}/shared`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export function saveSharedProfile(input: SharedProfileInput): Promise<SharedProfile> {
+  return request<SharedProfile>(`${profilePath}/shared`, {
+    method: "PUT",
+    body: JSON.stringify(input),
   });
 }
 

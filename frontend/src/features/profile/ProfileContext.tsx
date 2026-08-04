@@ -58,14 +58,24 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         if (active && generation === requestGeneration.current) {
           setProductMode(profileStatus.product_mode);
         }
-        const currentProfile = profileStatus.completion_state === "training_ready"
+        const readyStates = new Set([
+          "training_ready",
+          "both_ready",
+        ]);
+        const shouldLoadTrainingProfile = profileStatus.product_mode === "training"
+          ? profileStatus.completion_state === "training_ready"
+          : profileStatus.product_mode === "both"
+            && !["shared_profile_incomplete", "training_onboarding_incomplete"].includes(
+              profileStatus.completion_state,
+            );
+        const currentProfile = shouldLoadTrainingProfile
           ? await api.getProfile()
           : null;
         if (active && generation === requestGeneration.current) {
           setProfile(currentProfile);
           setStatus(profileStatus.completion_state === "product_mode_not_selected"
             ? "missing"
-            : currentProfile === null ? "mode_selected" : "ready");
+            : readyStates.has(profileStatus.completion_state) ? "ready" : "mode_selected");
         }
       })
       .catch(() => {
