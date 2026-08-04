@@ -68,6 +68,7 @@ class UserProfile(Base):
         Enum(ProductMode, native_enum=False, create_constraint=True, validate_strings=True,
              values_callable=lambda members: [member.value for member in members],
              name="ck_user_profiles_product_mode_values"),
+        default=ProductMode.TRAINING,
         nullable=False,
     )
     display_name: Mapped[str | None] = mapped_column(String(80), nullable=True)

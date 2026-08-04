@@ -28,6 +28,20 @@ export type PlanDurationWeeks = (typeof planDurations)[number];
 export const workoutGenerationMethods = ["fitsho_coach", "ai"] as const;
 export type WorkoutGenerationMethod = (typeof workoutGenerationMethods)[number];
 
+export const productModes = ["training", "nutrition", "both"] as const;
+export type ProductMode = (typeof productModes)[number];
+export type ProfileCompletionState =
+  | "product_mode_not_selected"
+  | "shared_profile_incomplete"
+  | "training_ready"
+  | "nutrition_onboarding_incomplete";
+
+export type ProfileStatusResponse = {
+  user_id: string;
+  product_mode: ProductMode | null;
+  completion_state: ProfileCompletionState;
+};
+
 export type ProfileInput = {
   display_name: string;
   birth_date: string;

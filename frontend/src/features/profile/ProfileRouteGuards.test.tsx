@@ -22,9 +22,11 @@ const contexts = vi.hoisted(() => ({
   profile: {
     profile: null as Profile | null,
     status: "idle" as "idle" | "loading" | "missing" | "ready" | "error",
+    productMode: null,
     retryProfile: vi.fn(),
     createProfile: vi.fn(),
     updateProfile: vi.fn(),
+    selectProductMode: vi.fn(),
   },
 }));
 
@@ -106,7 +108,7 @@ describe("profile route matrix", () => {
       renderRoute(path);
 
       expect(
-        await screen.findByRole("heading", { name: "پروفایل ورزشی‌ات را بساز" }),
+        await screen.findByRole("heading", { name: "بیشتر در چه زمینه‌ای به کمک نیاز داری؟" }),
       ).toBeInTheDocument();
     },
   );
@@ -117,10 +119,9 @@ describe("profile route matrix", () => {
     renderRoute("/onboarding");
 
     expect(
-      await screen.findByRole("heading", { name: "پروفایل ورزشی‌ات را بساز" }),
+      await screen.findByRole("heading", { name: "بیشتر در چه زمینه‌ای به کمک نیاز داری؟" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/سه مرحله/)).toBeInTheDocument();
-    expect(screen.getByLabelText("نام نمایشی")).toBeInTheDocument();
+    expect(screen.getByText("پیشنهاد فیتشو")).toBeInTheDocument();
   });
 
   it.each(["/onboarding", "/login"])(

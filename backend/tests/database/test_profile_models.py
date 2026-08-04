@@ -153,6 +153,7 @@ def test_profile_enum_constraints_reject_invalid_database_values(
     user = make_user(db, f"invalid-{column}@example.com")
     values = {
         "user_id": user.id,
+        "product_mode": "training",
         "display_name": "Test User",
         "birth_date": date(2000, 1, 1),
         "sex": Sex.PREFER_NOT_TO_SAY.value,
@@ -172,11 +173,13 @@ def test_profile_enum_constraints_reject_invalid_database_values(
             text(
                 """
                 INSERT INTO user_profiles (
-                    user_id, display_name, birth_date, sex, height_cm, fitness_goal,
+                        user_id, product_mode, display_name, birth_date, sex, height_cm,
+                        fitness_goal,
                     experience_level, training_days_per_week, training_location,
                     home_training_setup, session_duration_minutes, physical_limitations
                 ) VALUES (
-                    :user_id, :display_name, :birth_date, :sex, :height_cm, :fitness_goal,
+                        :user_id, :product_mode, :display_name, :birth_date, :sex, :height_cm,
+                        :fitness_goal,
                     :experience_level, :training_days_per_week, :training_location,
                     :home_training_setup, :session_duration_minutes, :physical_limitations
                 )

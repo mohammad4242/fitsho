@@ -11,15 +11,23 @@ import {
 
 import { useAuth } from "../auth/AuthContext";
 import * as api from "./api";
-import type { Profile, ProfileInput, ProfilePatch } from "./types";
+import type {
+  ProductMode,
+  Profile,
+  ProfileInput,
+  ProfilePatch,
+  ProfileStatusResponse,
+} from "./types";
 
-export type ProfileStatus = "idle" | "loading" | "missing" | "ready" | "error";
+export type ProfileStatus = "idle" | "loading" | "missing" | "mode_selected" | "ready" | "error";
 
 type ProfileContextValue = {
   profile: Profile | null;
   status: ProfileStatus;
+  productMode: ProductMode | null;
   retryProfile: () => void;
   createProfile: (input: ProfileInput) => Promise<Profile>;
+  selectProductMode: (mode: ProductMode) => Promise<ProfileStatusResponse>;
   updateProfile: (patch: ProfilePatch) => Promise<Profile>;
 };
 
@@ -30,6 +38,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const userId = user?.id ?? null;
   const [profile, setProfile] = useState<Profile | null>(null);
   const [status, setStatus] = useState<ProfileStatus>("idle");
+  const [productMode, setProductMode] = useState<ProductMode | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const requestGeneration = useRef(0);
 
@@ -37,18 +46,24 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     const generation = ++requestGeneration.current;
     if (userId === null) {
       setProfile(null);
+      setProductMode(null);
       setStatus("idle");
       return;
     }
 
     let active = true;
     setStatus("loading");
-    api
-      .getProfile()
-      .then((currentProfile) => {
+    api.getProfileStatus()
+      .then(async (profileStatus) => {
+        const currentProfile = profileStatus.completion_state === "training_ready"
+          ? await api.getProfile()
+          : null;
         if (active && generation === requestGeneration.current) {
           setProfile(currentProfile);
-          setStatus(currentProfile === null ? "missing" : "ready");
+          setProductMode(profileStatus.product_mode);
+          setStatus(profileStatus.completion_state === "product_mode_not_selected"
+            ? "missing"
+            : currentProfile === null ? "mode_selected" : "ready");
         }
       })
       .catch(() => {
@@ -67,6 +82,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     () => ({
       profile,
       status,
+      productMode,
       retryProfile: () => {
         requestGeneration.current += 1;
         setRetryAttempt((attempt) => attempt + 1);
@@ -77,7 +93,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           const createdProfile = await api.createProfile(input);
           if (generation === requestGeneration.current) {
             setProfile(createdProfile);
-            setStatus("ready");
+            setStatus(productMode === "training" ? "ready" : "mode_selected");
           }
           return createdProfile;
         } catch (error) {
@@ -87,6 +103,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           }
           throw error;
         }
+      },
+      selectProductMode: async (mode) => {
+        const selected = await api.selectProductMode(mode);
+        setProductMode(selected.product_mode);
+        setProfile(null);
+        setStatus("mode_selected");
+        return selected;
       },
       updateProfile: async (patch) => {
         const generation = ++requestGeneration.current;
@@ -105,7 +128,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [profile, status],
+    [productMode, profile, status],
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;

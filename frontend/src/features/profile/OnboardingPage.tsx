@@ -15,7 +15,7 @@ import {
   validateStep,
   type ProfileValidationErrors,
 } from "./profileValidation";
-import type { ProfileFormValues } from "./types";
+import type { ProductMode, ProfileFormValues } from "./types";
 import "./profile.css";
 
 type Step = 1 | 2 | 3;
@@ -45,12 +45,18 @@ const stepKeys = ["personal", "bodyGoal", "experience"] as const;
 export function OnboardingPage() {
   const { i18n, t } = useTranslation();
   const navigate = useNavigate();
-  const { createProfile } = useProfile();
+  const { createProfile, productMode, selectProductMode, status } = useProfile();
   const [step, setStep] = useState<Step>(1);
   const [values, setValues] = useState<ProfileFormValues>(emptyValues);
   const [errors, setErrors] = useState<ProfileValidationErrors>({});
   const [submitError, setSubmitError] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  function chooseMode(mode: ProductMode) {
+    if (busy) return;
+    setBusy(true);
+    void selectProductMode(mode).catch(() => setSubmitError(true)).finally(() => setBusy(false));
+  }
 
   useEffect(() => {
     const firstInvalidField = Object.keys(errors)[0];
@@ -127,6 +133,44 @@ export function OnboardingPage() {
 
   const locale = i18n.resolvedLanguage === "en" ? "en" : "fa-IR";
   const numberFormat = new Intl.NumberFormat(locale);
+
+  if (status === "missing") {
+    return (
+      <AuthShell>
+        <main className="onboarding-flow product-mode-flow">
+          <p className="eyebrow eyebrow--accent">شروع با مربی فیتشو</p>
+          <h2 className="fitsho-display">بیشتر در چه زمینه‌ای به کمک نیاز داری؟</h2>
+          <p>مسیرت را انتخاب کن؛ فقط همان سؤال‌هایی را می‌پرسیم که برای برنامه‌ات لازم است.</p>
+          <div className="product-mode-cards" role="list">
+            {([
+              ["training", "تمرین", "برنامه شخصی براساس بدن، هدف، سطح، زمان و تجهیزات"],
+              ["nutrition", "تغذیه", "برنامه غذایی متناسب با هدف، نیاز بدن، مواد در دسترس و بودجه"],
+              ["both", "تمرین و تغذیه", "یک برنامه هماهنگ برای نتیجه بهتر"],
+            ] as const).map(([mode, title, description]) => (
+              <button key={mode} className={`product-mode-card ${mode === "both" ? "is-recommended" : ""}`}
+                type="button" disabled={busy} onClick={() => chooseMode(mode)} role="listitem">
+                {mode === "both" && <span>پیشنهاد فیتشو</span>}
+                <strong>{title}</strong><small>{description}</small>
+              </button>
+            ))}
+          </div>
+          {submitError && <p className="form-error" role="alert">ارتباط با سرور برقرار نشد. دوباره تلاش کن.</p>}
+        </main>
+      </AuthShell>
+    );
+  }
+
+  if (productMode === "nutrition") {
+    return (
+      <AuthShell>
+        <main className="onboarding-flow">
+          <p className="eyebrow eyebrow--accent">مسیر تغذیه</p>
+          <h2 className="fitsho-display">از همین‌جا با هم شروع می‌کنیم.</h2>
+          <p>در گام بعد، اطلاعات لازم برای برنامهٔ غذایی را قدم‌به‌قدم و با امکان ردکردن سؤال‌های اختیاری می‌گیریم.</p>
+        </main>
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell>

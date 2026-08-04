@@ -14,6 +14,7 @@ import type { Profile } from "./types";
 
 const profileContext = vi.hoisted(() => ({
   createProfile: vi.fn(),
+  selectProductMode: vi.fn(),
   retryProfile: vi.fn(),
   updateProfile: vi.fn(),
 }));
@@ -21,7 +22,8 @@ const profileContext = vi.hoisted(() => ({
 vi.mock("./ProfileContext", () => ({
   useProfile: () => ({
     profile: null,
-    status: "missing",
+    productMode: "training",
+    status: "mode_selected",
     ...profileContext,
   }),
 }));
