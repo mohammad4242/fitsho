@@ -21,11 +21,19 @@ const profileContext = vi.hoisted(() => ({
   updateProfile: vi.fn(),
 }));
 
+const authContext = vi.hoisted(() => ({
+  logout: vi.fn(),
+}));
+
 vi.mock("./ProfileContext", () => ({
   useProfile: () => ({
     profile: null,
     ...profileContext,
   }),
+}));
+
+vi.mock("../auth/AuthContext", () => ({
+  useAuth: () => authContext,
 }));
 
 import { OnboardingPage } from "./OnboardingPage";
@@ -68,6 +76,7 @@ function renderOnboarding() {
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/dashboard" element={<Destination />} />
         <Route path="/body-progress/new" element={<Destination />} />
+        <Route path="/" element={<Destination />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -108,9 +117,20 @@ async function completeExperienceFields(user: UserEvent) {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  authContext.logout.mockResolvedValue(undefined);
   profileContext.status = "mode_selected";
   profileContext.productMode = "training";
   await i18n.changeLanguage("fa");
+});
+
+it("logs out from onboarding and returns to the public landing", async () => {
+  const user = userEvent.setup();
+  renderOnboarding();
+
+  await user.click(screen.getByRole("button", { name: "خروج" }));
+
+  expect(authContext.logout).toHaveBeenCalledOnce();
+  expect(await screen.findByRole("heading", { name: "REPLACE:/" })).toBeInTheDocument();
 });
 
 it("shows unselected product modes first and saves the chosen mode", async () => {

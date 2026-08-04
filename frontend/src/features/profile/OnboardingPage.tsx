@@ -1,8 +1,9 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { AuthShell } from "../../shared/AuthShell";
+import { useAuth } from "../auth/AuthContext";
 import { NutritionOnboardingFlow } from "../nutrition/NutritionOnboardingFlow";
 import {
   BodyGoalFields,
@@ -137,7 +138,7 @@ export function OnboardingPage() {
 
   if (status === "missing") {
     return (
-      <AuthShell>
+      <OnboardingShell>
         <main className="onboarding-flow product-mode-flow">
           <p className="eyebrow eyebrow--accent">شروع با مربی فیتشو</p>
           <h2 className="fitsho-display">بیشتر در چه زمینه‌ای به کمک نیاز داری؟</h2>
@@ -157,13 +158,13 @@ export function OnboardingPage() {
           </div>
           {submitError && <p className="form-error" role="alert">ارتباط با سرور برقرار نشد. دوباره تلاش کن.</p>}
         </main>
-      </AuthShell>
+      </OnboardingShell>
     );
   }
 
   if (productMode === "nutrition" || productMode === "both") {
     return (
-      <AuthShell>
+      <OnboardingShell>
         <main className="onboarding-flow">
           <NutritionOnboardingFlow
             productMode={productMode}
@@ -172,12 +173,12 @@ export function OnboardingPage() {
             onComplete={retryProfile}
           />
         </main>
-      </AuthShell>
+      </OnboardingShell>
     );
   }
 
   return (
-    <AuthShell>
+    <OnboardingShell>
       <div className="onboarding-flow">
         <div className="form-heading">
           <p className="eyebrow eyebrow--accent">{t("onboarding.eyebrow")}</p>
@@ -275,6 +276,35 @@ export function OnboardingPage() {
           </div>
         </form>
       </div>
+    </OnboardingShell>
+  );
+}
+
+function OnboardingShell({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+
+  function handleLogout() {
+    setBusy(true);
+    setError(false);
+    void logout()
+      .then(() => navigate("/", { replace: true }))
+      .catch(() => setError(true))
+      .finally(() => setBusy(false));
+  }
+
+  return (
+    <AuthShell>
+      <div className="onboarding-session-actions">
+        <button className="logout-button" type="button" disabled={busy} onClick={handleLogout}>
+          {busy ? t("header.loggingOut") : t("header.logout")}
+        </button>
+        {error && <p className="form-error" role="alert">{t("errors.generic")}</p>}
+      </div>
+      {children}
     </AuthShell>
   );
 }
