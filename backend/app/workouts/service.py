@@ -300,7 +300,7 @@ class WorkoutGenerationService:
         source_profile = get_profile(self._db, user_id)
         profile = self._to_generation_profile(source_profile)
         eligible_exercises = WorkoutCandidateSelector(
-            self._db, maximum_candidates=self._settings.max_candidates
+            self._db, maximum_candidates=None
         ).select(profile)
         if not eligible_exercises.is_sufficient:
             raise NoEligibleExercisesError("INSUFFICIENT_ELIGIBLE_EXERCISES")

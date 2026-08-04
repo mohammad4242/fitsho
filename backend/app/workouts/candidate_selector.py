@@ -46,11 +46,11 @@ _ALLOWED_DIFFICULTIES: dict[ExperienceLevel, frozenset[Difficulty]] = {
     ExperienceLevel.INTERMEDIATE: frozenset({Difficulty.BEGINNER, Difficulty.INTERMEDIATE}),
     ExperienceLevel.ADVANCED: frozenset(Difficulty),
 }
-_GYM_EQUIPMENT = frozenset(item for item in Equipment if item is not Equipment.OTHER)
+_GYM_EQUIPMENT = frozenset(Equipment)
 
 
 class WorkoutCandidateSelector:
-    def __init__(self, db: Session, *, maximum_candidates: int = 80) -> None:
+    def __init__(self, db: Session, *, maximum_candidates: int | None = 80) -> None:
         self._db = db
         self._maximum_candidates = maximum_candidates
 
@@ -176,6 +176,11 @@ class WorkoutCandidateSelector:
             for pattern in patterns:
                 if grouped[pattern]:
                     selected.append(grouped[pattern].pop(0))
-                    if len(selected) == self._maximum_candidates:
+                    if (
+                        self._maximum_candidates is not None
+                        and len(selected) == self._maximum_candidates
+                    ):
                         return tuple(selected)
+        if self._maximum_candidates is None:
+            return tuple(selected)
         return tuple(selected[: self._maximum_candidates])
