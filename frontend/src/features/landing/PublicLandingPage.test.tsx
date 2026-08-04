@@ -39,7 +39,7 @@ it("uses one fixed film while the product story scrolls", () => {
 
   const video = screen.getByTestId("landing-film");
   expect(video).toHaveClass("landing-film");
-  expect(video.querySelector("source")).toHaveAttribute("src", "/image&videos/film.mp4");
+  expect(video.querySelector("source")).toHaveAttribute("src", "/image&videos/landing.mp4");
   expect(screen.getByRole("link", { name: /شروع کن/i })).toHaveAttribute("href", "/get-started");
   expect(screen.getByText(/کم‌هزینه‌تر/)).toBeInTheDocument();
 });

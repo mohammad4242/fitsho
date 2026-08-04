@@ -1,3 +1,5 @@
-Place the landing background video here as `film.mp4`.
+The temporary landing background is `landing.mp4`.
 
-The file is intentionally not committed. The landing page uses a dark fallback when it is absent.
+Replace the source with `film.mp4` when the final video is supplied.
+
+The landing page uses a dark fallback when its configured video is absent.

@@ -71,7 +71,7 @@ export function PublicLandingPage() {
           aria-hidden="true"
           onError={() => setVideoFailed(true)}
         >
-          <source src="/image&videos/film.mp4" type="video/mp4" />
+          <source src="/image&videos/landing.mp4" type="video/mp4" />
         </video>
       )}
       <div className="landing-film-shade" aria-hidden="true" />
