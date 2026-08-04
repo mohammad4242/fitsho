@@ -48,10 +48,11 @@
   align-items: center;
   padding: 1.15rem clamp(1rem, 4vw, 4rem);
   background: linear-gradient(180deg, rgb(3 10 10 / 76%), transparent);
+  direction: ltr;
 }
 
 .landing-header .brand-mark { justify-self: center; color: var(--landing-ink); }
-.landing-header .language-switcher { justify-self: end; }
+.landing-header .language-switcher { justify-self: end; direction: rtl; }
 
 .landing-menu-button {
   width: 3rem;
