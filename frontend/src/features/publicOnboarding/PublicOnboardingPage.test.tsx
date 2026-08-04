@@ -10,10 +10,20 @@ vi.mock("../auth/AuthContext", () => ({
 }));
 
 import { PublicOnboardingPage } from "./PublicOnboardingPage";
+import i18n from "../../i18n";
 
 beforeEach(() => {
   sessionStorage.clear();
   vi.clearAllMocks();
+  void i18n.changeLanguage("fa");
+});
+
+it("uses English on the first public onboarding screen when English is selected", async () => {
+  await i18n.changeLanguage("en");
+  render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
+
+  expect(screen.getByRole("heading", { name: "What would you like help with?" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Training plan" })).toBeInTheDocument();
 });
 
 it("starts with product mode and marks the combined path as recommended", () => {

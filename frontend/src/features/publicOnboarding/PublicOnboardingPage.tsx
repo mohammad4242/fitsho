@@ -19,7 +19,27 @@ const emptyValues: ProfileFormValues = {
   physical_limitations: "", training_cautions: null, plan_duration_weeks: "4",
 };
 
+type Language = "fa" | "en";
+
+const publicCopy = {
+  fa: {
+    brand: "فیتشو", header: "اطلاعاتت تا زمان ساخت حساب فقط در همین تب نگه‌داری می‌شود.",
+    mode: { eyebrow: "شروع با مربی فیتشو", title: "تو چه زمینه‌ای به کمک نیاز داری؟", training: "برنامه تمرینی", nutrition: "برنامه تغذیه", both: "تمرین و تغذیه", recommended: "پیشنهاد فیتشو" },
+    training: { eyebrow: (step: number) => `مربی فیتشو · مرحله ${step} از ۳`, titles: ["اول کمی آشنا شویم", "بدن و هدفت", "سبک تمرین تو"], intro: "آرام و قدم‌به‌قدم جلو می‌رویم؛ سؤال‌های اختیاری را می‌توانی رد کنی.", skipMeasurements: "رد کردن اندازه‌گیری‌های اختیاری", skipNotes: "رد کردن توضیحات اختیاری", back: "بازگشت", next: "ادامه", finish: "ادامه و ساخت حساب" },
+    account: { eyebrow: "آخرین قدم", title: "حالا حسابت را بساز", intro: "پاسخ‌ها بعد از ورود امن به حساب فیتشو منتقل می‌شوند.", providers: "روش‌های ورود", soon: "به‌زودی", phone: "شماره تلفن", divider: "ایمیل فعال است", email: "ایمیل", password: "رمز عبور", confirmation: "تکرار رمز عبور", registering: "در حال ثبت…", register: "ساخت حساب و ذخیره پاسخ‌ها", login: "ورود و ذخیره پاسخ‌ها", existing: "قبلاً حساب ساخته‌ام", newAccount: "حساب جدید می‌سازم", mismatch: "تکرار رمز عبور با رمز عبور یکسان نیست." },
+  },
+  en: {
+    brand: "Fitsho", header: "Your answers stay in this tab until you create an account.",
+    mode: { eyebrow: "Start with your Fitsho coach", title: "What would you like help with?", training: "Training plan", nutrition: "Nutrition plan", both: "Training and nutrition", recommended: "Fitsho recommended" },
+    training: { eyebrow: (step: number) => `Your Fitsho coach · Step ${step} of 3`, titles: ["Let’s get to know each other", "Your body and goal", "Your training style"], intro: "We’ll take this step by step. You can skip optional questions.", skipMeasurements: "Skip optional measurements", skipNotes: "Skip optional notes", back: "Back", next: "Continue", finish: "Continue to account setup" },
+    account: { eyebrow: "Final step", title: "Create your account", intro: "Your answers will move securely into your Fitsho account after you sign in.", providers: "Sign-in methods", soon: "Coming soon", phone: "Phone number", divider: "Email is available", email: "Email", password: "Password", confirmation: "Confirm password", registering: "Creating account…", register: "Create account and save answers", login: "Sign in and save answers", existing: "I already have an account", newAccount: "Create a new account", mismatch: "Passwords do not match." },
+  },
+} as const;
+
 export function PublicOnboardingPage() {
+  const { i18n } = useTranslation();
+  const language: Language = i18n.resolvedLanguage === "en" ? "en" : "fa";
+  const text = publicCopy[language];
   const [draft, setDraft] = useState<OnboardingDraft | null>(() => loadOnboardingDraft());
 
   function updateDraft(next: OnboardingDraft | null) {
@@ -28,18 +48,19 @@ export function PublicOnboardingPage() {
     else saveOnboardingDraft(next);
   }
 
-  if (draft?.readyForAuth) return <FinalAccountStep draft={draft} />;
+  if (draft?.readyForAuth) return <FinalAccountStep draft={draft} language={language} />;
 
   return (
-    <main className="public-onboarding">
+    <main className="public-onboarding" dir={language === "fa" ? "rtl" : "ltr"}>
       <header className="public-onboarding__header">
-        <Link className="brand-mark" to="/"><span className="brand-mark__pulse" aria-hidden="true" />فیتشو</Link>
-        <span>اطلاعاتت تا زمان ساخت حساب فقط در همین تب نگه‌داری می‌شود.</span>
+        <Link className="brand-mark" to="/"><span className="brand-mark__pulse" aria-hidden="true" />{text.brand}</Link>
+        <span>{text.header}</span>
       </header>
       <div className="public-onboarding__stage">
-        {draft === null && <ModeSelection onChoose={(mode) => updateDraft({ mode })} />}
+        {draft === null && <ModeSelection language={language} onChoose={(mode) => updateDraft({ mode })} />}
         {draft?.mode === "training" && (
           <TrainingDraftFlow
+            language={language}
             onExit={() => updateDraft(null)}
             onComplete={(training) => updateDraft({ ...draft, training, readyForAuth: true })}
           />
@@ -61,16 +82,17 @@ export function PublicOnboardingPage() {
   );
 }
 
-function ModeSelection({ onChoose }: { onChoose: (mode: ProductMode) => void }) {
+function ModeSelection({ language, onChoose }: { language: Language; onChoose: (mode: ProductMode) => void }) {
+  const text = publicCopy[language].mode;
   const modes = [
-    ["training", "برنامه تمرینی"],
-    ["nutrition", "برنامه تغذیه"],
-    ["both", "تمرین و تغذیه"],
+    ["training", text.training],
+    ["nutrition", text.nutrition],
+    ["both", text.both],
   ] as const;
   return (
     <section className="public-mode-selection">
-      <p className="eyebrow eyebrow--accent">شروع با مربی فیتشو</p>
-      <h1 className="fitsho-display">تو چه زمینه‌ای به کمک نیاز داری؟</h1>
+      <p className="eyebrow eyebrow--accent">{text.eyebrow}</p>
+      <h1 className="fitsho-display">{text.title}</h1>
       <div className="product-mode-cards">
         {modes.map(([mode, title]) => (
           <button
@@ -80,7 +102,7 @@ function ModeSelection({ onChoose }: { onChoose: (mode: ProductMode) => void }) 
             aria-label={title}
             onClick={() => onChoose(mode)}
           >
-            {mode === "both" && <span>پیشنهاد فیتشو</span>}
+            {mode === "both" && <span>{text.recommended}</span>}
             <strong>{title}</strong>
           </button>
         ))}
@@ -89,7 +111,8 @@ function ModeSelection({ onChoose }: { onChoose: (mode: ProductMode) => void }) 
   );
 }
 
-function TrainingDraftFlow({ onExit, onComplete }: { onExit: () => void; onComplete: (input: ReturnType<typeof toProfileInput>) => void }) {
+function TrainingDraftFlow({ language, onExit, onComplete }: { language: Language; onExit: () => void; onComplete: (input: ReturnType<typeof toProfileInput>) => void }) {
+  const text = publicCopy[language].training;
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [values, setValues] = useState(emptyValues);
   const [errors, setErrors] = useState<ProfileValidationErrors>({});
@@ -115,24 +138,25 @@ function TrainingDraftFlow({ onExit, onComplete }: { onExit: () => void; onCompl
 
   return (
     <section className="public-question-card">
-      <p className="eyebrow eyebrow--accent">مربی فیتشو · مرحله {step} از ۳</p>
-      <h1 className="fitsho-display">{["اول کمی آشنا شویم", "بدن و هدفت", "سبک تمرین تو"][step - 1]}</h1>
-      <p>آرام و قدم‌به‌قدم جلو می‌رویم؛ سؤال‌های اختیاری را می‌توانی رد کنی.</p>
+      <p className="eyebrow eyebrow--accent">{text.eyebrow(step)}</p>
+      <h1 className="fitsho-display">{text.titles[step - 1]}</h1>
+      <p>{text.intro}</p>
       <form className="profile-form" noValidate onSubmit={submit}>
         {step === 1 && <PersonalFields values={values} errors={errors} onChange={update} />}
-        {step === 2 && <><BodyGoalFields values={values} errors={errors} onChange={update} /><button className="text-button" type="button" onClick={() => { update("shoulder_circumference_cm", ""); update("waist_circumference_cm", ""); update("hip_circumference_cm", ""); }}>رد کردن اندازه‌گیری‌های اختیاری</button></>}
-        {step === 3 && <><ExperienceFields values={values} errors={errors} onChange={update} /><button className="text-button" type="button" onClick={() => update("physical_limitations", "")}>رد کردن توضیحات اختیاری</button></>}
+        {step === 2 && <><BodyGoalFields values={values} errors={errors} onChange={update} /><button className="text-button" type="button" onClick={() => { update("shoulder_circumference_cm", ""); update("waist_circumference_cm", ""); update("hip_circumference_cm", ""); }}>{text.skipMeasurements}</button></>}
+        {step === 3 && <><ExperienceFields values={values} errors={errors} onChange={update} /><button className="text-button" type="button" onClick={() => update("physical_limitations", "")}>{text.skipNotes}</button></>}
         <div className="profile-actions">
-          <button className="secondary-button" type="button" onClick={() => step === 1 ? onExit() : setStep((step - 1) as 1 | 2)}>بازگشت</button>
-          <button className="primary-button" type="submit">{step === 3 ? "ادامه و ساخت حساب" : "ادامه"}</button>
+          <button className="secondary-button" type="button" onClick={() => step === 1 ? onExit() : setStep((step - 1) as 1 | 2)}>{text.back}</button>
+          <button className="primary-button" type="submit">{step === 3 ? text.finish : text.next}</button>
         </div>
       </form>
     </section>
   );
 }
 
-function FinalAccountStep({ draft }: { draft: OnboardingDraft }) {
+function FinalAccountStep({ draft, language }: { draft: OnboardingDraft; language: Language }) {
   const { t } = useTranslation();
+  const text = publicCopy[language].account;
   const { user, register, login } = useAuth();
   const navigate = useNavigate();
   const [accountMode, setAccountMode] = useState<"register" | "login">("register");
@@ -144,7 +168,7 @@ function FinalAccountStep({ draft }: { draft: OnboardingDraft }) {
     const data = new FormData(event.currentTarget);
     const credentials = { email: String(data.get("email") ?? ""), password: String(data.get("password") ?? "") };
     if (accountMode === "register" && credentials.password !== String(data.get("confirmation") ?? "")) {
-      setError("تکرار رمز عبور با رمز عبور یکسان نیست.");
+      setError(text.mismatch);
       return;
     }
     setBusy(true);
@@ -160,27 +184,27 @@ function FinalAccountStep({ draft }: { draft: OnboardingDraft }) {
   }
 
   return (
-    <main className="public-onboarding public-account-step">
+    <main className="public-onboarding public-account-step" dir={language === "fa" ? "rtl" : "ltr"}>
       <section className="public-question-card">
-        <p className="eyebrow eyebrow--accent">آخرین قدم</p>
-        <h1 className="fitsho-display">حالا حسابت را بساز</h1>
-        <p>پاسخ‌ها بعد از ورود امن به حساب فیتشو منتقل می‌شوند.</p>
-        <div className="account-providers" aria-label="روش‌های ورود">
-          <button type="button" disabled>Google <small>به‌زودی</small></button>
-          <button type="button" disabled>Apple <small>به‌زودی</small></button>
-          <button type="button" disabled>شماره تلفن <small>به‌زودی</small></button>
+        <p className="eyebrow eyebrow--accent">{text.eyebrow}</p>
+        <h1 className="fitsho-display">{text.title}</h1>
+        <p>{text.intro}</p>
+        <div className="account-providers" aria-label={text.providers}>
+          <button type="button" disabled>Google <small>{text.soon}</small></button>
+          <button type="button" disabled>Apple <small>{text.soon}</small></button>
+          <button type="button" disabled>{text.phone} <small>{text.soon}</small></button>
         </div>
-        <div className="account-divider"><span>ایمیل فعال است</span></div>
+        <div className="account-divider"><span>{text.divider}</span></div>
         <form className="auth-form" onSubmit={submit}>
-          <label htmlFor="public-account-email">ایمیل</label>
+          <label htmlFor="public-account-email">{text.email}</label>
           <input id="public-account-email" name="email" type="email" autoComplete="email" required />
-          <label htmlFor="public-account-password">رمز عبور</label>
+          <label htmlFor="public-account-password">{text.password}</label>
           <input id="public-account-password" name="password" type="password" minLength={8} maxLength={128} autoComplete={accountMode === "register" ? "new-password" : "current-password"} required />
-          {accountMode === "register" && <><label htmlFor="public-account-confirmation">تکرار رمز عبور</label><input id="public-account-confirmation" name="confirmation" type="password" minLength={8} maxLength={128} autoComplete="new-password" required /></>}
+          {accountMode === "register" && <><label htmlFor="public-account-confirmation">{text.confirmation}</label><input id="public-account-confirmation" name="confirmation" type="password" minLength={8} maxLength={128} autoComplete="new-password" required /></>}
           {error && <p className="form-error" role="alert">{error}</p>}
-          <button className="primary-button" type="submit" disabled={busy}>{busy ? "در حال ثبت…" : accountMode === "register" ? "ساخت حساب و ذخیره پاسخ‌ها" : "ورود و ذخیره پاسخ‌ها"}</button>
+          <button className="primary-button" type="submit" disabled={busy}>{busy ? text.registering : accountMode === "register" ? text.register : text.login}</button>
         </form>
-        <button className="text-button" type="button" onClick={() => setAccountMode((mode) => mode === "register" ? "login" : "register")}>{accountMode === "register" ? "قبلاً حساب ساخته‌ام" : "حساب جدید می‌سازم"}</button>
+        <button className="text-button" type="button" onClick={() => setAccountMode((mode) => mode === "register" ? "login" : "register")}>{accountMode === "register" ? text.existing : text.newAccount}</button>
       </section>
     </main>
   );
