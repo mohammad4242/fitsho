@@ -10,6 +10,8 @@ import type { Profile, ProfileInput } from "./types";
 
 vi.mock("../auth/AuthContext", () => ({ useAuth: vi.fn() }));
 vi.mock("./api", () => ({
+  getProfileStatus: vi.fn(),
+  selectProductMode: vi.fn(),
   getProfile: vi.fn(),
   createProfile: vi.fn(),
   updateProfile: vi.fn(),
@@ -56,6 +58,11 @@ let authUser: User | null;
 beforeEach(() => {
   vi.clearAllMocks();
   authUser = null;
+  vi.mocked(api.getProfileStatus).mockResolvedValue({
+    user_id: user.id,
+    product_mode: "training",
+    completion_state: "training_ready",
+  });
   vi.mocked(useAuth).mockImplementation(() => ({
     user: authUser,
     loading: false,
@@ -114,6 +121,7 @@ it("stays idle and skips profile loading for a guest", () => {
 
   expect(screen.getByText("status:idle")).toBeInTheDocument();
   expect(api.getProfile).not.toHaveBeenCalled();
+  expect(api.getProfileStatus).not.toHaveBeenCalled();
 });
 
 it("loads the authenticated user profile", async () => {
@@ -129,7 +137,11 @@ it("loads the authenticated user profile", async () => {
 
 it("marks an authenticated user without a profile as missing", async () => {
   authUser = user;
-  vi.mocked(api.getProfile).mockResolvedValue(null);
+  vi.mocked(api.getProfileStatus).mockResolvedValue({
+    user_id: user.id,
+    product_mode: null,
+    completion_state: "product_mode_not_selected",
+  });
 
   renderProfile();
 
@@ -138,7 +150,7 @@ it("marks an authenticated user without a profile as missing", async () => {
 
 it("keeps startup failures separate from a missing profile", async () => {
   authUser = user;
-  vi.mocked(api.getProfile).mockRejectedValue(new Error("offline"));
+  vi.mocked(api.getProfileStatus).mockRejectedValue(new Error("offline"));
 
   renderProfile();
 
@@ -148,9 +160,14 @@ it("keeps startup failures separate from a missing profile", async () => {
 
 it("retries profile loading after an error", async () => {
   authUser = user;
-  vi.mocked(api.getProfile)
+  vi.mocked(api.getProfileStatus)
     .mockRejectedValueOnce(new Error("offline"))
-    .mockResolvedValueOnce(profile);
+    .mockResolvedValueOnce({
+      user_id: user.id,
+      product_mode: "training",
+      completion_state: "training_ready",
+    });
+  vi.mocked(api.getProfile).mockResolvedValue(profile);
   const browserUser = userEvent.setup();
 
   renderProfile();
@@ -158,17 +175,21 @@ it("retries profile loading after an error", async () => {
   await browserUser.click(screen.getByRole("button", { name: "retry" }));
 
   expect(await screen.findByText("status:ready")).toBeInTheDocument();
-  expect(api.getProfile).toHaveBeenCalledTimes(2);
+  expect(api.getProfileStatus).toHaveBeenCalledTimes(2);
 });
 
 it("stores a successfully created profile", async () => {
   authUser = user;
-  vi.mocked(api.getProfile).mockResolvedValue(null);
+  vi.mocked(api.getProfileStatus).mockResolvedValue({
+    user_id: user.id,
+    product_mode: "training",
+    completion_state: "shared_profile_incomplete",
+  });
   vi.mocked(api.createProfile).mockResolvedValue(profile);
   const browserUser = userEvent.setup();
 
   renderProfile();
-  expect(await screen.findByText("status:missing")).toBeInTheDocument();
+  expect(await screen.findByText("status:mode_selected")).toBeInTheDocument();
   await browserUser.click(screen.getByRole("button", { name: "create" }));
 
   expect(await screen.findByText("status:ready")).toBeInTheDocument();
@@ -177,12 +198,16 @@ it("stores a successfully created profile", async () => {
 
 it("leaves a missing profile missing when creation fails", async () => {
   authUser = user;
-  vi.mocked(api.getProfile).mockResolvedValue(null);
+  vi.mocked(api.getProfileStatus).mockResolvedValue({
+    user_id: user.id,
+    product_mode: "training",
+    completion_state: "shared_profile_incomplete",
+  });
   vi.mocked(api.createProfile).mockRejectedValue(new Error("offline"));
   const browserUser = userEvent.setup();
 
   renderProfile();
-  expect(await screen.findByText("status:missing")).toBeInTheDocument();
+  expect(await screen.findByText("status:mode_selected")).toBeInTheDocument();
   await browserUser.click(screen.getByRole("button", { name: "create" }));
 
   await waitFor(() => expect(api.createProfile).toHaveBeenCalledWith(profileInput));

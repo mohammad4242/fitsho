@@ -165,6 +165,37 @@ def test_selecting_product_mode_creates_the_single_profile_draft(client: TestCli
     assert profile.json()["completion_state"] == "shared_profile_incomplete"
 
 
+def test_profile_status_requires_explicit_mode_for_a_new_user(client: TestClient) -> None:
+    user_id = register(client, "mode-required@example.com")
+
+    response = client.get("/api/v1/profile/status")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "user_id": str(user_id),
+        "product_mode": None,
+        "completion_state": "product_mode_not_selected",
+    }
+
+
+def test_changing_mode_preserves_the_completed_training_profile(client: TestClient) -> None:
+    register(client, "mode-change@example.com")
+    assert client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE).status_code == 201
+
+    changed = client.post(
+        "/api/v1/profile/mode",
+        headers=ORIGIN,
+        json={"product_mode": "both"},
+    )
+
+    assert changed.status_code == 201
+    assert changed.json()["completion_state"] == "nutrition_onboarding_incomplete"
+    profile = client.get("/api/v1/profile")
+    assert profile.status_code == 200
+    assert profile.json()["display_name"] == "Mohammad"
+    assert profile.json()["current_weight_kg"] == 76.5
+
+
 def test_profile_endpoints_require_authentication(client: TestClient) -> None:
     assert client.get("/api/v1/profile").status_code == 401
     assert client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE).status_code == 401

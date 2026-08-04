@@ -299,3 +299,23 @@ least-privilege roles, audit records, and no unsupported "live" or medical claim
 5. Medical classification mappings and specialist operating model.
 6. Photo confidence/confirmation, retention periods, and consent wording.
 7. Adherence formula, sufficiency threshold, and later adaptation limits.
+
+## Task 1 implementation record
+
+Task 1 stores `product_mode` on the single `user_profiles` row. Selecting a mode
+creates that row as an incomplete draft; it does not create a second profile.
+Existing profiles are backfilled to `training`, while the database has no
+permanent mode default. Legacy full-profile creation remains compatible and is
+treated as training onboarding.
+
+The additive endpoints are:
+
+- `GET /api/v1/profile/status` for product mode and capability completion state.
+- `POST /api/v1/profile/mode` for explicit mode selection or later mode changes.
+
+The frontend loads status before the full training profile. Users without a
+mode see the three unselected cards; `both` is visually recommended but not
+preselected. Training users continue through the existing training form.
+Nutrition and both-mode users remain behind onboarding guards until their
+nutrition requirements are implemented in Task 2. Existing training-ready users
+continue to reach workouts, body analysis, exercises, and dashboard routes.

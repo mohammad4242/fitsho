@@ -13,6 +13,8 @@ import i18n from "../../i18n";
 import type { Profile } from "./types";
 
 const profileContext = vi.hoisted(() => ({
+  status: "mode_selected" as "missing" | "mode_selected",
+  productMode: "training" as "training" | "nutrition" | "both" | null,
   createProfile: vi.fn(),
   selectProductMode: vi.fn(),
   retryProfile: vi.fn(),
@@ -22,8 +24,6 @@ const profileContext = vi.hoisted(() => ({
 vi.mock("./ProfileContext", () => ({
   useProfile: () => ({
     profile: null,
-    productMode: "training",
-    status: "mode_selected",
     ...profileContext,
   }),
 }));
@@ -108,7 +108,27 @@ async function completeExperienceFields(user: UserEvent) {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  profileContext.status = "mode_selected";
+  profileContext.productMode = "training";
   await i18n.changeLanguage("fa");
+});
+
+it("shows unselected product modes first and saves the chosen mode", async () => {
+  profileContext.status = "missing";
+  profileContext.productMode = null;
+  profileContext.selectProductMode.mockResolvedValue({
+    user_id: createdProfile.user_id,
+    product_mode: "both",
+    completion_state: "shared_profile_incomplete",
+  });
+  const user = userEvent.setup();
+  renderOnboarding();
+
+  expect(screen.getByRole("heading", { name: "بیشتر در چه زمینه‌ای به کمک نیاز داری؟" })).toBeInTheDocument();
+  expect(screen.getByText("پیشنهاد فیتشو")).toBeInTheDocument();
+  await user.click(screen.getByText("تمرین و تغذیه").closest("button")!);
+
+  expect(profileContext.selectProductMode).toHaveBeenCalledWith("both");
 });
 
 it("announces the first of three onboarding steps", () => {

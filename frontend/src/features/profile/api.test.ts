@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../shared/apiClient";
-import { createProfile, getProfile, updateProfile } from "./api";
+import {
+  createProfile,
+  getProfile,
+  getProfileStatus,
+  selectProductMode,
+  updateProfile,
+} from "./api";
 import type { Profile, ProfileInput } from "./types";
 
 const profileInput: ProfileInput = {
@@ -36,6 +42,33 @@ const profile: Profile = {
 afterEach(() => vi.restoreAllMocks());
 
 describe("profile api", () => {
+  it("reads profile status and explicitly selects product mode", async () => {
+    const missing = {
+      user_id: profile.user_id,
+      product_mode: null,
+      completion_state: "product_mode_not_selected",
+    } as const;
+    const selected = {
+      user_id: profile.user_id,
+      product_mode: "both",
+      completion_state: "shared_profile_incomplete",
+    } as const;
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json(missing))
+      .mockResolvedValueOnce(Response.json(selected, { status: 201 }));
+
+    await expect(getProfileStatus()).resolves.toEqual(missing);
+    await expect(selectProductMode("both")).resolves.toEqual(selected);
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/profile/mode",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ product_mode: "both" }),
+      }),
+    );
+  });
+
   it("catches a changed profile endpoint or HTTP method", async () => {
     const updated = { ...profile, current_weight_kg: 75.25 };
     vi.spyOn(globalThis, "fetch")

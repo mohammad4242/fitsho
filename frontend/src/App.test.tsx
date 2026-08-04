@@ -288,7 +288,9 @@ it.each(["/exercises", "/exercises/dumbbell-bench-press", "/workout-plan"])(
     renderRoute(path);
 
     expect(
-      await screen.findByRole("heading", { name: "پروفایل ورزشی‌ات را بساز" }),
+      await screen.findByRole("heading", {
+        name: "بیشتر در چه زمینه‌ای به کمک نیاز داری؟",
+      }),
     ).toBeInTheDocument();
   },
 );

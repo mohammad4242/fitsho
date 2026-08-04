@@ -55,12 +55,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setStatus("loading");
     api.getProfileStatus()
       .then(async (profileStatus) => {
+        if (active && generation === requestGeneration.current) {
+          setProductMode(profileStatus.product_mode);
+        }
         const currentProfile = profileStatus.completion_state === "training_ready"
           ? await api.getProfile()
           : null;
         if (active && generation === requestGeneration.current) {
           setProfile(currentProfile);
-          setProductMode(profileStatus.product_mode);
           setStatus(profileStatus.completion_state === "product_mode_not_selected"
             ? "missing"
             : currentProfile === null ? "mode_selected" : "ready");
