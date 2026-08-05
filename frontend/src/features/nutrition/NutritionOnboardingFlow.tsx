@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   BodyGoalFields,
@@ -96,6 +97,17 @@ const conditionOptions: Array<[MedicalConditionCode, string]> = [
 
 const splitNames = (value: string) => value.split(/[،,\n]/).map((item) => item.trim()).filter(Boolean);
 
+const flowCopy = {
+  fa: {
+    loading: "در حال آماده‌کردن مسیرت…", eyebrow: "مسیر تغذیه با مربی فیتشو", progress: "پیشرفت تکمیل پروفایل",
+    error: "درخواست انجام نشد. پاسخ‌ها حفظ شده‌اند؛ دوباره تلاش کن.",
+  },
+  en: {
+    loading: "Preparing your path…", eyebrow: "Nutrition with your Fitsho coach", progress: "Profile setup progress",
+    error: "The request could not be completed. Your answers are saved; please try again.",
+  },
+} as const;
+
 export function NutritionOnboardingFlow({
   productMode,
   onCreateTrainingProfile,
@@ -107,6 +119,9 @@ export function NutritionOnboardingFlow({
   onDraftComplete,
   onExit,
 }: Props) {
+  const { i18n } = useTranslation();
+  const language = i18n.resolvedLanguage === "en" ? "en" : "fa";
+  const copy = flowCopy[language];
   const [step, setStep] = useState<FlowStep>(draftMode ? "personal" : "loading");
   const [values, setValues] = useState<ProfileFormValues>(() => draftValues(initialDraft));
   const [errors, setErrors] = useState<ProfileValidationErrors>({});
@@ -357,7 +372,7 @@ export function NutritionOnboardingFlow({
   ];
   const progressIndex = Math.max(flowOrder.indexOf(step), 0) + 1;
 
-  if (step === "loading") return <p aria-live="polite">در حال آماده‌کردن مسیرت…</p>;
+  if (step === "loading") return <p aria-live="polite">{copy.loading}</p>;
   if (step === "blocked") {
     return (
       <section className="nutrition-step safety-result-card" aria-live="polite">
@@ -383,14 +398,14 @@ export function NutritionOnboardingFlow({
   }
 
   return (
-    <section className="nutrition-step">
-      <p className="eyebrow eyebrow--accent">مسیر تغذیه با مربی فیتشو</p>
-      <div className="nutrition-progress" aria-label="پیشرفت تکمیل پروفایل">
-        <span>مرحله {progressIndex} از {flowOrder.length}</span>
+    <section className="nutrition-step" dir={language === "fa" ? "rtl" : "ltr"}>
+      <p className="eyebrow eyebrow--accent">{copy.eyebrow}</p>
+      <div className="nutrition-progress" aria-label={copy.progress}>
+        <span>{language === "en" ? `Step ${progressIndex} of ${flowOrder.length}` : `مرحله ${progressIndex} از ${flowOrder.length}`}</span>
         <progress value={progressIndex} max={flowOrder.length} />
       </div>
-      <h2 className="fitsho-display">{stepTitle(step)}</h2>
-      <p>{stepIntro(step)}</p>
+      <h2 className="fitsho-display">{stepTitle(step, language)}</h2>
+      <p>{stepIntro(step, language)}</p>
       {decision?.requires_physician_review && step !== "safety" && (
         <p className="nutrition-feedback" role="status">{decision.message}</p>
       )}
@@ -461,22 +476,29 @@ export function NutritionOnboardingFlow({
           <Actions busy={busy} onBack={() => setStep("foods")} nextLabel="ثبت پروفایل تغذیه" />
         </form>
       )}
-      {requestError && <p className="form-error" role="alert">درخواست انجام نشد. پاسخ‌ها حفظ شده‌اند؛ دوباره تلاش کن.</p>}
+      {requestError && <p className="form-error" role="alert">{copy.error}</p>}
     </section>
   );
 }
 
-function stepTitle(step: FlowStep) {
-  return ({
+function stepTitle(step: FlowStep, language: "fa" | "en") {
+  const fa = {
     loading: "", personal: "اول کمی با هم آشنا شویم", body: "هدفت را دقیق کنیم",
     safety: "اول ایمنی، بعد برنامه", blocked: "", training: "حالا بخش تمرین را هماهنگ کنیم",
     budget: "بودجه و وعده‌ها", cooking: "آشپزی را با زندگی تو هماهنگ می‌کنیم",
     foods: "غذاهایی که می‌خوری و نمی‌خوری", review: "یک مرور کوتاه قبل از ثبت", complete: "",
-  })[step];
+  };
+  const en = {
+    loading: "", personal: "Let’s get to know each other", body: "Let’s define your goal",
+    safety: "Safety first, then your plan", blocked: "", training: "Let’s align your training",
+    budget: "Budget and meals", cooking: "Let’s fit cooking into your life",
+    foods: "Foods you eat and avoid", review: "A quick review before saving", complete: "",
+  };
+  return (language === "en" ? en : fa)[step];
 }
 
-function stepIntro(step: FlowStep) {
-  return ({
+function stepIntro(step: FlowStep, language: "fa" | "en") {
+  const fa = {
     loading: "", personal: "سؤال‌ها کوتاه‌اند و قدم‌به‌قدم پیش می‌رویم.",
     body: "این اطلاعات بین تمرین و تغذیه مشترک است و فقط یک‌بار ثبت می‌شود.",
     safety: "این پاسخ‌ها برای تشخیص پزشکی نیست؛ فقط مسیر ایمن برنامه را مشخص می‌کند.",
@@ -485,7 +507,18 @@ function stepIntro(step: FlowStep) {
     cooking: "با زمان و وسایل واقعی تو برنامه‌ریزی می‌کنیم.",
     foods: "هر مورد اختیاری را می‌توانی خالی بگذاری و رد کنی.",
     review: "بعد از ثبت، هنوز هیچ برنامه غذایی تولید نمی‌شود.", complete: "",
-  })[step];
+  };
+  const en = {
+    loading: "", personal: "The questions are short; we’ll take them one step at a time.",
+    body: "Training and nutrition share this information, so we only ask once.",
+    safety: "These answers do not provide a diagnosis; they only help keep your plan safe.",
+    blocked: "", training: "We’ll keep your current training details one screen at a time.",
+    budget: "Enter your personal food budget in IRR.",
+    cooking: "We’ll plan around your real time and equipment.",
+    foods: "Every optional answer can be left blank and skipped.",
+    review: "Saving this does not generate a meal plan yet.", complete: "",
+  };
+  return (language === "en" ? en : fa)[step];
 }
 
 type Flags = SafetyProfileInput extends infer _ ? {
