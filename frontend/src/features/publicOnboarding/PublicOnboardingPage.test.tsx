@@ -37,9 +37,9 @@ it("keeps English and asks one shared-profile question per screen", async () => 
   await user.type(screen.getByLabelText("Display name"), "Alex");
   await user.click(screen.getByRole("button", { name: "Continue" }));
   expect(screen.getByRole("heading", { name: "When were you born?" })).toBeInTheDocument();
-  expect(screen.getByLabelText("Day")).toBeInTheDocument();
-  expect(screen.getByLabelText("Month")).toBeInTheDocument();
-  expect(screen.getByLabelText("Year")).toBeInTheDocument();
+  expect(screen.getByLabelText("Day")).toHaveClass("birth-date-picker__select");
+  expect(screen.getByLabelText("Month")).toHaveClass("birth-date-picker__select");
+  expect(screen.getByLabelText("Year")).toHaveClass("birth-date-picker__select");
 });
 
 it("starts with product mode and marks the combined path as recommended", () => {

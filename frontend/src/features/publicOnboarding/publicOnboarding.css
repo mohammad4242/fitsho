@@ -68,6 +68,12 @@
 .birth-date-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; padding: 0; border: 0; }
 .birth-date-picker legend { width: 100%; margin-bottom: 0.8rem; color: rgb(255 255 255 / 72%); font-weight: 800; }
 .birth-date-picker label { display: grid; gap: 0.45rem; color: rgb(255 255 255 / 60%); font-size: 0.82rem; }
+.birth-date-picker__select,
+.birth-date-picker__select option {
+  color: #f4f1e9;
+  background-color: #1d2222;
+}
+.birth-date-picker__select option:checked { color: #071313; background-color: var(--turquoise); }
 .guided-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
 .guided-choice-grid button { min-height: 5rem; padding: 1rem; border: 1px solid rgb(255 255 255 / 14%); border-radius: 1rem; color: #f4f1e9; background: rgb(255 255 255 / 5%); font-weight: 850; cursor: pointer; }
 .guided-choice-grid button.is-selected { border-color: var(--turquoise); background: rgb(27 185 164 / 20%); box-shadow: inset 0 0 0 1px rgb(27 185 164 / 28%); }
