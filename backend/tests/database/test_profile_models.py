@@ -24,7 +24,7 @@ def test_body_measurement_model_defines_weight_range_constraint() -> None:
         if isinstance(constraint, CheckConstraint)
     }
 
-    assert constraints["ck_body_measurements_weight_kg_range"] == ("weight_kg BETWEEN 20 AND 500")
+    assert constraints["ck_body_measurements_weight_kg_range"] == ("weight_kg BETWEEN 35 AND 300")
 
 
 def make_user(db: Session, email: str) -> User:
@@ -96,8 +96,8 @@ def test_deleting_user_cascades_profile_and_measurements(db: Session) -> None:
     ("attribute", "invalid_value", "constraint_name"),
     [
         ("display_name", " ", "ck_user_profiles_display_name_length"),
-        ("height_cm", 99, "ck_user_profiles_height_cm_range"),
-        ("height_cm", 251, "ck_user_profiles_height_cm_range"),
+        ("height_cm", 119, "ck_user_profiles_height_cm_range"),
+        ("height_cm", 231, "ck_user_profiles_height_cm_range"),
         ("training_days_per_week", 0, "ck_user_profiles_training_days_range"),
         ("training_days_per_week", 8, "ck_user_profiles_training_days_range"),
         ("session_duration_minutes", 50, "ck_user_profiles_session_duration_values"),
@@ -121,8 +121,8 @@ def test_profile_range_constraints_reject_invalid_values(
 @pytest.mark.parametrize(
     ("invalid_weight", "constraint_name"),
     [
-        (Decimal("19.99"), "ck_body_measurements_weight_kg_range"),
-        (Decimal("500.01"), "ck_body_measurements_weight_kg_range"),
+        (Decimal("34.99"), "ck_body_measurements_weight_kg_range"),
+        (Decimal("300.01"), "ck_body_measurements_weight_kg_range"),
     ],
 )
 def test_weight_range_constraint_rejects_invalid_values(

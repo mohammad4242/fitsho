@@ -42,6 +42,30 @@ it("keeps English and asks one shared-profile question per screen", async () => 
   expect(screen.getByLabelText("Year")).toHaveClass("birth-date-picker__select");
 });
 
+it("groups height and weight with the selected valid ranges", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
+
+  await user.click(screen.getByRole("button", { name: "برنامه تمرینی" }));
+  await user.type(screen.getByLabelText("نام نمایشی"), "سارا");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.selectOptions(screen.getByLabelText("روز"), "14");
+  await user.selectOptions(screen.getByLabelText("ماه"), "5");
+  await user.selectOptions(screen.getByLabelText("سال"), "2000");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.click(screen.getByRole("button", { name: "زن" }));
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+
+  expect(screen.getByLabelText("قد (سانتی‌متر)")).toHaveAttribute("min", "120");
+  expect(screen.getByLabelText("قد (سانتی‌متر)")).toHaveAttribute("max", "230");
+  expect(screen.getByLabelText("وزن فعلی (کیلوگرم)")).toHaveAttribute("min", "35");
+  expect(screen.getByLabelText("وزن فعلی (کیلوگرم)")).toHaveAttribute("max", "300");
+  await user.type(screen.getByLabelText("قد (سانتی‌متر)"), "130");
+  await user.type(screen.getByLabelText("وزن فعلی (کیلوگرم)"), "36");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  expect(screen.getByLabelText("این مقادیر درست هستند.")).toBeInTheDocument();
+});
+
 it("starts with product mode and marks the combined path as recommended", () => {
   render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
 

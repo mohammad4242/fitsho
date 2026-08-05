@@ -81,31 +81,31 @@ describe("profile validation", () => {
     expect(validateStep({ ...validValues, birth_date: "1926-07-27" }, 1, today)).toEqual({});
   });
 
-  it("catches changed height and weight boundaries or weight precision", () => {
+  it("accepts the selected height and weight boundaries and rejects values outside them", () => {
     expect(
       validateStep(
-        { ...validValues, height_cm: "100", current_weight_kg: "20" },
+        { ...validValues, height_cm: "120", current_weight_kg: "35" },
         2,
         today,
       ),
     ).toEqual({});
     expect(
       validateStep(
-        { ...validValues, height_cm: "250", current_weight_kg: "500" },
+        { ...validValues, height_cm: "230", current_weight_kg: "300" },
         2,
         today,
       ),
     ).toEqual({});
-    expect(validateStep({ ...validValues, height_cm: "99" }, 2, today)).toEqual({
+    expect(validateStep({ ...validValues, height_cm: "119" }, 2, today)).toEqual({
       height_cm: "heightRange",
     });
-    expect(validateStep({ ...validValues, height_cm: "251" }, 2, today)).toEqual({
+    expect(validateStep({ ...validValues, height_cm: "231" }, 2, today)).toEqual({
       height_cm: "heightRange",
     });
-    expect(validateStep({ ...validValues, current_weight_kg: "19.99" }, 2, today)).toEqual({
+    expect(validateStep({ ...validValues, current_weight_kg: "34.99" }, 2, today)).toEqual({
       current_weight_kg: "weightRange",
     });
-    expect(validateStep({ ...validValues, current_weight_kg: "500.01" }, 2, today)).toEqual({
+    expect(validateStep({ ...validValues, current_weight_kg: "300.01" }, 2, today)).toEqual({
       current_weight_kg: "weightRange",
     });
     expect(validateStep({ ...validValues, current_weight_kg: "76.123" }, 2, today)).toEqual({

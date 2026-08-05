@@ -17,29 +17,33 @@ export function GuidedSharedProfileQuestions({ values, onChange, onBack, onCompl
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage === "en" ? "en" : "fa";
   const [question, setQuestion] = useState(0);
+  const [showBodyConfirmation, setShowBodyConfirmation] = useState(false);
+  const [bodyValuesConfirmed, setBodyValuesConfirmed] = useState(false);
   const [birthParts, setBirthParts] = useState(() => {
     const [year = "", month = "", day = ""] = values.birth_date.split("-");
     return { year, month, day };
   });
   const labels = language === "en"
-    ? ["What should we call you?", "When were you born?", "What is your sex?", "How tall are you?", "What is your current weight?", "What is your main goal?"]
-    : ["دوست داری چه صدایت کنیم؟", "چه تاریخی به دنیا آمدی؟", "جنسیتت چیست؟", "قدت چقدر است؟", "وزن فعلی‌ات چقدر است؟", "هدف اصلی تو چیست؟"];
+    ? ["What should we call you?", "When were you born?", "What is your sex?", "What are your height and weight?", "What is your main goal?"]
+    : ["دوست داری چه صدایت کنیم؟", "چه تاریخی به دنیا آمدی؟", "جنسیتت چیست؟", "قد و وزنت چقدر است؟", "هدف اصلی تو چیست؟"];
   const years = useMemo(() => Array.from({ length: 83 }, (_, index) => String(new Date().getFullYear() - 18 - index)), []);
   const daysInSelectedMonth = birthParts.year && birthParts.month
     ? new Date(Number(birthParts.year), Number(birthParts.month), 0).getDate()
     : 31;
   const next = language === "en" ? "Continue" : "ادامه";
   const back = language === "en" ? "Back" : "بازگشت";
-  const activeStage = question <= 2 ? 0 : question <= 4 ? 1 : 2;
+  const activeStage = question <= 2 ? 0 : question === 3 ? 1 : 2;
   const stages = language === "en" ? ["Personal", "Body", "Goal"] : ["شخصی", "بدن", "هدف"];
   const ready = [
     values.display_name.trim().length >= 2,
     Boolean(birthParts.year && birthParts.month && birthParts.day),
     values.sex !== "",
-    Number(values.height_cm) >= 100 && Number(values.height_cm) <= 250,
-    Number(values.current_weight_kg) >= 20 && Number(values.current_weight_kg) <= 500,
+    Number(values.height_cm) >= 120 && Number(values.height_cm) <= 230
+      && Number(values.current_weight_kg) >= 35 && Number(values.current_weight_kg) <= 300,
     values.fitness_goal !== "",
   ][question];
+  const needsBodyConfirmation = Number(values.height_cm) < 140 || Number(values.height_cm) > 210
+    || Number(values.current_weight_kg) < 40 || Number(values.current_weight_kg) > 180;
 
   useEffect(() => {
     if (Number(birthParts.day) > daysInSelectedMonth) {
@@ -53,8 +57,18 @@ export function GuidedSharedProfileQuestions({ values, onChange, onBack, onCompl
       if (!birthParts.year || !birthParts.month || !birthParts.day) return;
       onChange("birth_date", `${birthParts.year}-${birthParts.month.padStart(2, "0")}-${birthParts.day.padStart(2, "0")}`);
     }
+    if (question === 3 && needsBodyConfirmation && !bodyValuesConfirmed) {
+      setShowBodyConfirmation(true);
+      return;
+    }
     if (question === labels.length - 1) onComplete();
     else setQuestion((current) => current + 1);
+  }
+
+  function updateBodyValue(field: "height_cm" | "current_weight_kg", value: string) {
+    setShowBodyConfirmation(false);
+    setBodyValuesConfirmed(false);
+    onChange(field, value);
   }
 
   return (
@@ -73,9 +87,12 @@ export function GuidedSharedProfileQuestions({ values, onChange, onBack, onCompl
           <label>{language === "en" ? "Year" : "سال"}<select className="birth-date-picker__select" required value={birthParts.year} onChange={(event) => setBirthParts((current) => ({ ...current, year: event.target.value }))}><option value="" />{years.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
         </fieldset>}
         {question === 2 && <div className="guided-choice-grid">{sexes.map((sex) => <button className={values.sex === sex ? "is-selected" : ""} key={sex} type="button" onClick={() => onChange("sex", sex)}>{t(`onboarding.options.sex.${sex}`)}</button>)}</div>}
-        {question === 3 && <label>{t("onboarding.fields.height")}<input name="height_cm" type="number" inputMode="numeric" required min={100} max={250} value={values.height_cm} onChange={(event) => onChange("height_cm", event.target.value)} /></label>}
-        {question === 4 && <label>{t("onboarding.fields.weight")}<input name="current_weight_kg" type="number" inputMode="decimal" required min={20} max={500} step="0.01" value={values.current_weight_kg} onChange={(event) => onChange("current_weight_kg", event.target.value)} /></label>}
-        {question === 5 && <div className="guided-choice-grid">{goals.map((goal) => <button className={values.fitness_goal === goal ? "is-selected" : ""} key={goal} type="button" onClick={() => onChange("fitness_goal", goal)}>{t(`onboarding.options.fitnessGoal.${goal}`)}</button>)}</div>}
+        {question === 3 && <div className="guided-body-fields">
+          <label>{t("onboarding.fields.height")}<input aria-label={t("onboarding.fields.height")} name="height_cm" type="number" inputMode="numeric" required min={120} max={230} value={values.height_cm} onChange={(event) => updateBodyValue("height_cm", event.target.value)} /><small>{language === "en" ? "120–230 cm" : "۱۲۰ تا ۲۳۰ سانتی‌متر"}</small></label>
+          <label>{t("onboarding.fields.weight")}<input aria-label={t("onboarding.fields.weight")} name="current_weight_kg" type="number" inputMode="decimal" required min={35} max={300} step="0.01" value={values.current_weight_kg} onChange={(event) => updateBodyValue("current_weight_kg", event.target.value)} /><small>{language === "en" ? "35–300 kg" : "۳۵ تا ۳۰۰ کیلوگرم"}</small></label>
+          {showBodyConfirmation && <label className="guided-body-confirmation"><input type="checkbox" checked={bodyValuesConfirmed} onChange={(event) => setBodyValuesConfirmed(event.target.checked)} />{language === "en" ? "These values are correct." : "این مقادیر درست هستند."}</label>}
+        </div>}
+        {question === 4 && <div className="guided-choice-grid">{goals.map((goal) => <button className={values.fitness_goal === goal ? "is-selected" : ""} key={goal} type="button" onClick={() => onChange("fitness_goal", goal)}>{t(`onboarding.options.fitnessGoal.${goal}`)}</button>)}</div>}
         <div className="profile-actions">
           <button className="secondary-button" type="button" onClick={() => question === 0 ? onBack() : setQuestion((current) => current - 1)}>{back}</button>
           <button className="primary-button" type="submit" disabled={!ready}>{next}</button>

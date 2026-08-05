@@ -44,10 +44,10 @@ class ProfileCreate(BaseModel):
     display_name: str = Field(min_length=2, max_length=80)
     birth_date: date
     sex: Sex
-    height_cm: int = Field(ge=100, le=250)
+    height_cm: int = Field(ge=120, le=230)
     current_weight_kg: Decimal = Field(
-        ge=Decimal("20"),
-        le=Decimal("500"),
+        ge=Decimal("35"),
+        le=Decimal("300"),
         max_digits=5,
         decimal_places=2,
     )
@@ -109,11 +109,11 @@ class ProfileUpdate(BaseModel):
     display_name: str | None = Field(default=None, min_length=2, max_length=80)
     birth_date: date | None = None
     sex: Sex | None = None
-    height_cm: int | None = Field(default=None, ge=100, le=250)
+    height_cm: int | None = Field(default=None, ge=120, le=230)
     current_weight_kg: Decimal | None = Field(
         default=None,
-        ge=Decimal("20"),
-        le=Decimal("500"),
+        ge=Decimal("35"),
+        le=Decimal("300"),
         max_digits=5,
         decimal_places=2,
     )
@@ -222,10 +222,10 @@ class SharedProfileUpsert(BaseModel):
     display_name: str = Field(min_length=2, max_length=80)
     birth_date: date
     sex: Sex
-    height_cm: int = Field(ge=100, le=250)
+    height_cm: int = Field(ge=120, le=230)
     current_weight_kg: Decimal = Field(
-        ge=Decimal("20"),
-        le=Decimal("500"),
+        ge=Decimal("35"),
+        le=Decimal("300"),
         max_digits=5,
         decimal_places=2,
     )

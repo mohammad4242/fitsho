@@ -37,7 +37,7 @@ class UserProfile(Base):
             "char_length(btrim(display_name)) BETWEEN 2 AND 80",
             name="ck_user_profiles_display_name_length",
         ),
-        CheckConstraint("height_cm BETWEEN 100 AND 250", name="ck_user_profiles_height_cm_range"),
+        CheckConstraint("height_cm BETWEEN 120 AND 230", name="ck_user_profiles_height_cm_range"),
         CheckConstraint(
             "training_days_per_week BETWEEN 2 AND 6",
             name="ck_user_profiles_training_days_range",
@@ -183,7 +183,7 @@ class BodyMeasurement(Base):
     __tablename__ = "body_measurements"
     __table_args__ = (
         CheckConstraint(
-            "weight_kg BETWEEN 20 AND 500",
+            "weight_kg BETWEEN 35 AND 300",
             name="ck_body_measurements_weight_kg_range",
         ),
         CheckConstraint(

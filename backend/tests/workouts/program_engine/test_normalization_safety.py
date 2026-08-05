@@ -54,7 +54,7 @@ def test_goal_aliases_are_normalized(source: str, expected: Goal) -> None:
 
 @pytest.mark.parametrize(
     ("field", "value"),
-    [("age", 17), ("height_cm", 80), ("weight_kg", 20), ("available_training_days", 0)],
+    [("age", 17), ("height_cm", 119), ("weight_kg", 34), ("available_training_days", 0)],
 )
 def test_impossible_values_are_rejected(field: str, value: object) -> None:
     with pytest.raises(ValidationError):

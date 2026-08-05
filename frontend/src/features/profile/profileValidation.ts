@@ -103,7 +103,7 @@ function validateStepTwo(values: ProfileFormValues): ProfileValidationErrors {
   const height = values.height_cm.trim();
   if (height === "") {
     errors.height_cm = "required";
-  } else if (!/^\d+$/.test(height) || Number(height) < 100 || Number(height) > 250) {
+  } else if (!/^\d+$/.test(height) || Number(height) < 120 || Number(height) > 230) {
     errors.height_cm = "heightRange";
   }
 
@@ -135,7 +135,7 @@ function validateStepTwo(values: ProfileFormValues): ProfileValidationErrors {
       errors.current_weight_kg = "weightRange";
     } else if ((match[1]?.length ?? 0) > 2) {
       errors.current_weight_kg = "weightPrecision";
-    } else if (numericWeight < 20 || numericWeight > 500) {
+    } else if (numericWeight < 35 || numericWeight > 300) {
       errors.current_weight_kg = "weightRange";
     }
   }

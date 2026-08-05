@@ -195,8 +195,8 @@ it("keeps invalid body values on step two and focuses height first", async () =>
   await user.selectOptions(screen.getByLabelText("هدف ورزشی"), "build_muscle");
   await user.click(screen.getByRole("button", { name: "ادامه" }));
 
-  expect(screen.getByText("قد باید بین ۱۰۰ تا ۲۵۰ سانتی‌متر باشد.")).toBeInTheDocument();
-  expect(screen.getByText("وزن باید بین ۲۰ تا ۵۰۰ کیلوگرم باشد.")).toBeInTheDocument();
+  expect(screen.getByText("قد باید بین ۱۲۰ تا ۲۳۰ سانتی‌متر باشد.")).toBeInTheDocument();
+  expect(screen.getByText("وزن باید بین ۳۵ تا ۳۰۰ کیلوگرم باشد.")).toBeInTheDocument();
   await waitFor(() => expect(screen.getByLabelText("قد (سانتی‌متر)")).toHaveFocus());
   expect(screen.getByText("مرحله ۲ از ۳")).toBeInTheDocument();
 });

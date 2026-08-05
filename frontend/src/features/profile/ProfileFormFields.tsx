@@ -150,8 +150,8 @@ export function BodyGoalFields({
             type="number"
             inputMode="numeric"
             autoComplete="off"
-            min={100}
-            max={250}
+            min={120}
+            max={230}
             step={1}
             required
             value={values.height_cm}
@@ -169,8 +169,8 @@ export function BodyGoalFields({
             type="number"
             inputMode="decimal"
             autoComplete="off"
-            min={20}
-            max={500}
+            min={35}
+            max={300}
             step={0.01}
             required
             value={values.current_weight_kg}

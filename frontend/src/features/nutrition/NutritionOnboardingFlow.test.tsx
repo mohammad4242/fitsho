@@ -83,7 +83,6 @@ it("keeps nutrition safety questions in English after shared details", async () 
   await user.click(screen.getByRole("button", { name: "Female" }));
   await user.click(screen.getByRole("button", { name: "Continue" }));
   await user.type(screen.getByLabelText("Height (centimeters)"), "165");
-  await user.click(screen.getByRole("button", { name: "Continue" }));
   await user.type(screen.getByLabelText("Current weight (kilograms)"), "62.5");
   await user.click(screen.getByRole("button", { name: "Continue" }));
   await user.click(screen.getByRole("button", { name: "Maintain weight" }));
@@ -106,7 +105,6 @@ async function completeSharedQuestions(user: ReturnType<typeof userEvent.setup>)
   await user.click(screen.getByRole("button", { name: "زن" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.type(screen.getByLabelText("قد (سانتی‌متر)"), "165");
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.type(screen.getByLabelText("وزن فعلی (کیلوگرم)"), "62.5");
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.click(screen.getByRole("button", { name: "حفظ وزن" }));

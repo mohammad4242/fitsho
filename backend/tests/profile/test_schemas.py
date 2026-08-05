@@ -57,10 +57,10 @@ def test_calculate_age_handles_birthday_boundary() -> None:
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("height_cm", 99),
-        ("height_cm", 251),
-        ("current_weight_kg", "19.99"),
-        ("current_weight_kg", "500.01"),
+        ("height_cm", 119),
+        ("height_cm", 231),
+        ("current_weight_kg", "34.99"),
+        ("current_weight_kg", "300.01"),
         ("current_weight_kg", "70.123"),
         ("shoulder_circumference_cm", "39.99"),
         ("waist_circumference_cm", "250.01"),

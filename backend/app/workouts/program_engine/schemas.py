@@ -130,8 +130,8 @@ class ProgramGenerationRequest(BaseModel):
     user_id: UUID
     age: Annotated[int, Field(ge=18, le=100)]
     biological_sex_optional: str | None = None
-    height_cm: Annotated[int, Field(ge=100, le=250)]
-    weight_kg: Annotated[float, Field(ge=30, le=400)]
+    height_cm: Annotated[int, Field(ge=120, le=230)]
+    weight_kg: Annotated[float, Field(ge=35, le=300)]
     primary_goal: Goal
     secondary_goal_optional: Goal | None = None
     training_experience: TrainingExperience
