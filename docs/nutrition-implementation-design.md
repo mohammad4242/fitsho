@@ -1,8 +1,9 @@
 # Fitsho Nutrition implementation design
 
-Status: Task 0 proposal. No nutrition production code, migration, or API is
-approved by this document. The policy, tolerance, price, and medical tables
-below require explicit user approval before Task 1 and, where stated, Task 3.
+Status: Task 0 design with Task 1 and Task 2 implementation records. The Task 3
+scientific policy was explicitly approved on 2026-08-05. Later-task tolerance,
+price, photo, adherence, and operational policies still require their staged
+approvals before the corresponding production work.
 
 ## Current repository audit
 
@@ -149,20 +150,20 @@ task; this map is architectural grouping, not authorization to combine tasks.
 
 ## Scientific-policy approval table
 
-These are conservative adult-MVP proposals, not implemented policy. A personal
-clinical restriction always overrides them. `TBD clinician policy` means the
-engine must require review or report insufficient data rather than infer a rule.
+The following adult-MVP policy was explicitly approved on 2026-08-05 for Task 3.
+A personal clinical restriction always overrides it. The engine must require
+review or report insufficient data rather than infer a missing clinical rule.
 
 | Metric or rule | Formula / threshold | Population | Source | Hard floor / maximum | Preferred target / range | Planner tolerance | Confidence / fallback | Limitation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| BMR | Mifflin--St Jeor, sex field required by equation | 18--100, non-pregnant adults without manual-only status | Mifflin 1990, PubMed PMID 2305711 | none | report estimate, not measurement | n/a | lower confidence without stable weight; no estimate for unsupported state | equation error and body-composition variation |
-| TDEE | non-exercise estimate + weekly structured-exercise kcal / 7; never activity factor plus exercise | same | Task specification; calibrated against adherence later | none | show range, initially +/-10% | daily target +/-10% | structured-exercise missing -> low confidence/no plan if nutrition requires it | self-reported activity |
-| Goal energy change | initial fat-loss -10% to -20%; gain +5% to +15%; maintenance 0%; clinician policy overrides | automatic adults | task specification; individualized monitoring | no deficit below clinician-approved floor | start nearer -10% / +5% | see tolerance table | low confidence -> narrower change | no diagnosis; adaptation needs data |
-| Protein | 0.8 g/kg minimum; planner preferred 1.2--1.6 g/kg, with later approved training/deficit policy up to 2.2 g/kg | adults without renal/manual policy | National Academies DRI (0.8); later sports-policy review | 0.8 g/kg unless clinician policy says otherwise | 1.2--1.6 g/kg pending approval | min 0%; preferred -10% | kidney disease -> manual/review | upper range needs condition/goal policy |
-| Fat | 20% energy minimum; total fat <=30% energy for general healthy-diet proposal | automatic adults | WHO Healthy diet | >=20%; <=30% | 25--30% | min 0%; preferred +/-10% | missing fatty-acid data -> warn or exclude required-quality claim | not a treatment diet |
-| Carbohydrate | residual energy after protein/fat, with 130 g/day preliminary floor | automatic adults | National Academies DRI approval required | >=130 g/day unless clinician policy | individualized residual | +/-10% target | no plan if mandatory data absent | clinical low-carb diets excluded |
-| Fibre | 14 g/1000 kcal | automatic adults | National Academies DRI approval required | >=14 g/1000 kcal | meet or exceed | 0% daily deficit; weekly only for warning | missing fibre -> food cannot support claim | GI conditions need review |
-| Free sugar | <10% energy | automatic adults | WHO sugar guideline | <10% | <5% informational aspiration | 0% excess strict; no flexible excess | missing free-sugar -> cannot declare compliant | labels may only expose total/added sugar |
+| BMR | Mifflin--St Jeor using age, height, weight, and an optional metabolic equation basis | 18--100, non-pregnant adults without manual-only status | Mifflin 1990, PubMed PMID 2305711 | none | report estimate, not measurement | n/a | return the female/male coefficient range when basis is skipped; lower confidence outside ages 19--78 | equation error and body-composition variation |
+| TDEE | BMR x approved non-exercise multiplier (1.20/1.30/1.40/1.50) + weekly net structured-exercise kcal / 7 | same | NASEM 2023 energy context; 2024 Adult and Older Adult Compendia | never full activity factor plus exercise | report estimate and uncertainty | daily target +/-10% | explicit no-exercise is zero; missing required exercise input blocks an estimate | self-reported movement and intensity |
+| Goal energy change | loss/fat loss preferred -15% (allowed -10% to -20%); gain without exercise +5%; gain with exercise preferred +10% (allowed +5% to +15%); muscle gain +5% to +10%; recomp 0% to -5%; maintenance 0% | automatic adults with compatible goal/exercise state | approved Fitsho policy; individualized monitoring | automatic calorie target not below estimated BMR | conservative end of each range | see tolerance table | low confidence narrows change; incompatible no-training muscle goals require reselection | estimate requires outcome monitoring |
+| Protein | 0.8 g/kg calculation-weight minimum; preferred 1.0 no-training, 1.2 deficit/no-training, 1.4 endurance, 1.6 resistance/mixed, and 1.8 resistance/deficit; automatic ceiling 2.2 | adults without renal/manual policy | National Academies DRI; Morton 2018; Tagawa 2020; ESPEN adjusted-weight method | 0.8 g/kg; <=2.2 g/kg | goal- and training-specific value | min 0%; preferred -10% | BMI >25 uses reference weight at BMI 25 + 0.33 of excess; kidney/manual states block ordinary policy | predictive target, not measured need |
+| Fat | 15% energy minimum and 30% maximum | automatic adults | WHO Healthy diet, 2026 | >=15%; <=30% | 20--30% | min 0%; preferred +/-10% | missing fatty-acid data prevents a compliant food-plan claim | not a treatment diet |
+| Carbohydrate | 45--75% energy with 130 g/day floor | automatic adults | WHO Healthy diet, 2026; National Academies DRI | >=130 g/day and normally >=45% energy | individualized within range after protein and fat | +/-10% target only within hard limits | conflicting macro constraints return a structured conflict | clinical low-carb diets excluded |
+| Fibre | at least 25 g/day; preferred 14 g/1000 kcal | automatic adults | WHO Healthy diet, 2026; National Academies DRI | >=25 g/day | max(25 g, 14 g/1000 kcal) | 0% daily deficit; weekly only for warning | missing fibre prevents a compliant food-plan claim | GI conditions may require review |
+| Free sugar | <10% energy | automatic adults | WHO Healthy diet, 2026 | <10% | <=5% | 0% excess strict; no flexible excess | missing free-sugar data prevents a compliant claim | free and added sugar must not be added together |
 | Saturated fat | <10% energy | automatic adults | WHO Healthy diet | <10% | as low as practical with adequacy | 0% strict excess | unavailable data -> warning/exclusion from compliant plan | not disease-specific lipid treatment |
 | Trans fat | <1% energy and no industrial trans-fat claim | automatic adults | WHO Healthy diet | <1% | as close to zero as data permits | 0% strict excess | unavailable data -> no compliant claim | incomplete labels |
 | Sodium | <2,000 mg/day | automatic adults | WHO sodium guidance | <2,000 mg | lower only by clinician policy | 0% strict excess | missing sodium -> no strict plan | cooking salt/restaurant food uncertainty |
@@ -170,11 +171,13 @@ engine must require review or report insufficient data rather than infer a rule.
 
 Sources: [Mifflin--St Jeor original record](https://pubmed.ncbi.nlm.nih.gov/2305711/),
 [WHO Healthy diet](https://www.who.int/news-room/fact-sheets/detail/healthy-diet),
-[WHO sugars guideline](https://www.who.int/publications/i/item/WHO-NMH-NHD-15.3),
-and [WHO sodium recommendation](https://www.who.int/tools/elena/interventions/sodium-cvd-adults).
-The National Academies values above require the user to approve the exact cited
-DRI edition before implementation; they are deliberately not treated as a
-completed source audit in this task.
+[National Academies DRI collection](https://nap.nationalacademies.org/collection/57/dietary-reference-intakes),
+[2024 Adult Compendium](https://pmc.ncbi.nlm.nih.gov/articles/PMC10818145/),
+[Older Adult Compendium](https://pmc.ncbi.nlm.nih.gov/articles/PMC10818108/),
+[Morton protein meta-analysis](https://pubmed.ncbi.nlm.nih.gov/28698222/), and
+[ESPEN adjusted-weight guidance](https://www.espen.org/files/ESPEN-Guidelines/European_guideline_on_obesity_care_in_patients_with_gastrointestinal_and_liver_diseases_Joint_ESPEN_UEG%20guideline.pdf).
+The approved formulas, exact data flow, confidence rules, API, and persistence
+design are recorded in the dedicated Task 3 design document.
 
 ## Planner-tolerance proposal
 
@@ -289,7 +292,7 @@ operating policy. Mitigations are versioned snapshots, visible confidence and
 freshness, conservative blocking, explicit consent, private storage/cleanup,
 least-privilege roles, audit records, and no unsupported "live" or medical claim.
 
-## Explicit approvals required before the next task
+## Approval checklist and later-task gates
 
 1. Unified-profile migration and additive API/route-guard direction.
 2. The scientific-policy table and cited/source-audit gap for DRI values.
@@ -299,6 +302,18 @@ least-privilege roles, audit records, and no unsupported "live" or medical claim
 5. Medical classification mappings and specialist operating model.
 6. Photo confidence/confirmation, retention periods, and consent wording.
 7. Adherence formula, sufficiency threshold, and later adaptation limits.
+
+Task 3 approval record: on 2026-08-05 the user selected the current mixed-source
+policy (WHO, National Academies, Mifflin--St Jeor, and the 2024 activity
+Compendia), approved an optional metabolic-basis question with a coefficient
+range fallback, approved adjusted weight for high-BMI protein calculations, and
+approved a required usual-intensity question wherever structured training is
+part of the nutrition estimate.
+
+Items 1, 2, and 5 have been exercised by the approved Task 1--3 designs. The
+remaining entries continue to gate only the later tasks that consume them; the
+Task 3 approval does not authorize later planner, pricing, photo, or adherence
+work.
 
 ## Task 1 implementation record
 
