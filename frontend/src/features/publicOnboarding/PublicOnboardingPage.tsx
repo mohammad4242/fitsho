@@ -26,12 +26,12 @@ const publicCopy = {
   fa: {
     brand: "فیتشو", header: "اطلاعاتت تا زمان ساخت حساب فقط در همین تب نگه‌داری می‌شود.",
     mode: { eyebrow: "شروع با مربی فیتشو", title: "تو چه زمینه‌ای به کمک نیاز داری؟", training: "برنامه تمرینی", nutrition: "برنامه تغذیه", both: "تمرین و تغذیه", recommended: "پیشنهاد فیتشو" },
-    account: { eyebrow: "آخرین قدم", title: "حالا حسابت را بساز", intro: "پاسخ‌ها بعد از ورود امن به حساب فیتشو منتقل می‌شوند.", providers: "روش‌های ورود", soon: "به‌زودی", phone: "شماره تلفن", divider: "ایمیل فعال است", email: "ایمیل", password: "رمز عبور", confirmation: "تکرار رمز عبور", registering: "در حال ثبت…", register: "ساخت حساب و ذخیره پاسخ‌ها", login: "ورود و ذخیره پاسخ‌ها", existing: "قبلاً حساب ساخته‌ام", newAccount: "حساب جدید می‌سازم", mismatch: "تکرار رمز عبور با رمز عبور یکسان نیست." },
+    account: { eyebrow: "آخرین قدم", title: "حالا حسابت را بساز", intro: "پاسخ‌ها بعد از ورود امن به حساب فیتشو منتقل می‌شوند.", edit: "بازگشت و ویرایش پاسخ‌ها", providers: "روش‌های ورود", soon: "به‌زودی", phone: "شماره تلفن", divider: "ایمیل فعال است", email: "ایمیل", password: "رمز عبور", confirmation: "تکرار رمز عبور", registering: "در حال ثبت…", register: "ساخت حساب و ذخیره پاسخ‌ها", login: "ورود و ذخیره پاسخ‌ها", existing: "قبلاً حساب ساخته‌ام", newAccount: "حساب جدید می‌سازم", mismatch: "تکرار رمز عبور با رمز عبور یکسان نیست." },
   },
   en: {
     brand: "Fitsho", header: "Your answers stay in this tab until you create an account.",
     mode: { eyebrow: "Start with your Fitsho coach", title: "What would you like help with?", training: "Training plan", nutrition: "Nutrition plan", both: "Training and nutrition", recommended: "Fitsho recommended" },
-    account: { eyebrow: "Final step", title: "Create your account", intro: "Your answers will move securely into your Fitsho account after you sign in.", providers: "Sign-in methods", soon: "Coming soon", phone: "Phone number", divider: "Email is available", email: "Email", password: "Password", confirmation: "Confirm password", registering: "Creating account…", register: "Create account and save answers", login: "Sign in and save answers", existing: "I already have an account", newAccount: "Create a new account", mismatch: "Passwords do not match." },
+    account: { eyebrow: "Final step", title: "Create your account", intro: "Your answers will move securely into your Fitsho account after you sign in.", edit: "Back to edit answers", providers: "Sign-in methods", soon: "Coming soon", phone: "Phone number", divider: "Email is available", email: "Email", password: "Password", confirmation: "Confirm password", registering: "Creating account…", register: "Create account and save answers", login: "Sign in and save answers", existing: "I already have an account", newAccount: "Create a new account", mismatch: "Passwords do not match." },
   },
 } as const;
 
@@ -47,7 +47,7 @@ export function PublicOnboardingPage() {
     else saveOnboardingDraft(next);
   }
 
-  if (draft?.readyForAuth) return <FinalAccountStep draft={draft} language={language} />;
+  if (draft?.readyForAuth) return <FinalAccountStep draft={draft} language={language} onEdit={() => updateDraft({ ...draft, readyForAuth: false })} />;
 
   return (
     <main className="public-onboarding" dir={language === "fa" ? "rtl" : "ltr"}>
@@ -144,7 +144,7 @@ function TrainingDraftFlow({ onExit, onComplete }: { onExit: () => void; onCompl
   return <section className="public-question-card public-question-card--fullscreen"><GuidedTrainingQuestions values={values} onChange={update} onBack={() => setStep(1)} onComplete={completeTrainingQuestions} /></section>;
 }
 
-function FinalAccountStep({ draft, language }: { draft: OnboardingDraft; language: Language }) {
+function FinalAccountStep({ draft, language, onEdit }: { draft: OnboardingDraft; language: Language; onEdit: () => void }) {
   const { t } = useTranslation();
   const text = publicCopy[language].account;
   const { user, register, login } = useAuth();
@@ -179,6 +179,7 @@ function FinalAccountStep({ draft, language }: { draft: OnboardingDraft; languag
         <p className="eyebrow eyebrow--accent">{text.eyebrow}</p>
         <h1 className="fitsho-display">{text.title}</h1>
         <p>{text.intro}</p>
+        <button className="text-button" type="button" onClick={onEdit}>{text.edit}</button>
         <div className="account-providers" aria-label={text.providers}>
           <button type="button" disabled>Google <small>{text.soon}</small></button>
           <button type="button" disabled>Apple <small>{text.soon}</small></button>

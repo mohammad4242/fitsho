@@ -121,4 +121,5 @@ it("offers email at the final account step and labels other providers upcoming",
   expect(screen.getByRole("button", { name: /Google/ })).toBeDisabled();
   expect(screen.getByRole("button", { name: /Apple/ })).toBeDisabled();
   expect(screen.getByRole("button", { name: /شماره تلفن/ })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "بازگشت و ویرایش پاسخ‌ها" })).toBeInTheDocument();
 });
