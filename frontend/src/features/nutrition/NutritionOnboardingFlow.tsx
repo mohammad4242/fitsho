@@ -16,7 +16,7 @@ import type {
   SafetyEvaluation,
   SafetyProfileInput,
 } from "./types";
-import type { OnboardingDraft } from "../publicOnboarding/onboardingDraft";
+import type { OnboardingDraft, PreAccountNutritionBasics } from "../publicOnboarding/onboardingDraft";
 import { GuidedSharedProfileQuestions } from "../publicOnboarding/GuidedSharedProfileQuestions";
 import { GuidedTrainingQuestions } from "../publicOnboarding/GuidedTrainingQuestions";
 
@@ -25,6 +25,7 @@ type FlowStep =
   | "personal"
   | "body"
   | "safety"
+  | "pre_account"
   | "blocked"
   | "training"
   | "budget"
@@ -43,6 +44,8 @@ type Props = {
   onDraftChange?: (changes: Partial<OnboardingDraft>) => void;
   onDraftComplete?: (changes: Partial<OnboardingDraft>) => void;
   onExit?: () => void;
+  initialNutritionBasics?: PreAccountNutritionBasics;
+  onNutritionComplete?: () => void;
 };
 
 const emptyProfileValues: ProfileFormValues = {
@@ -115,6 +118,8 @@ export function NutritionOnboardingFlow({
   onDraftChange,
   onDraftComplete,
   onExit,
+  initialNutritionBasics,
+  onNutritionComplete,
 }: Props) {
   const { i18n } = useTranslation();
   const language = i18n.resolvedLanguage === "en" ? "en" : "fa";
@@ -138,12 +143,12 @@ export function NutritionOnboardingFlow({
   const [medications, setMedications] = useState("");
   const [physicianRestrictions, setPhysicianRestrictions] = useState("");
   const [otherCondition, setOtherCondition] = useState("");
-  const [budget, setBudget] = useState("");
-  const [budgetStyle, setBudgetStyle] = useState<"strict" | "flexible">("strict");
+  const [budget, setBudget] = useState(() => initialNutritionBasics === undefined ? "" : String(initialNutritionBasics.individual_monthly_food_budget_irr));
+  const [budgetStyle, setBudgetStyle] = useState<"strict" | "flexible">(() => initialNutritionBasics?.budget_style ?? "strict");
   const [mealCount, setMealCount] = useState("3");
   const [snackCount, setSnackCount] = useState("1");
   const [startDay, setStartDay] = useState<NutritionProfileInput["preferred_plan_start_day"]>("saturday");
-  const [planStyle, setPlanStyle] = useState<"economical" | "balanced" | "simple">("balanced");
+  const [planStyle, setPlanStyle] = useState<"economical" | "balanced" | "simple">(() => initialNutritionBasics?.plan_style ?? "balanced");
   const [cooking, setCooking] = useState<CookingState>({
     skill: "basic",
     maximumTime: "45",
@@ -157,8 +162,8 @@ export function NutritionOnboardingFlow({
   });
   const [foods, setFoods] = useState<FoodsState>({
     available: "", favourites: "", disliked: "", neverSuggest: "", refused: "",
-    allergies: "", intolerances: "", cultural: "", workContext: "",
-    dietaryPattern: "omnivore", variety: "medium",
+    allergies: initialNutritionBasics?.allergies.map((item) => item.name).join(", ") ?? "", intolerances: initialNutritionBasics?.intolerances.map((item) => item.name).join(", ") ?? "", cultural: "", workContext: "",
+    dietaryPattern: initialNutritionBasics?.dietary_pattern ?? "omnivore", variety: "medium",
     repetition: "2", leftovers: true, batchCooking: true,
     checkIn: false, checkInTime: "21:00",
   });
@@ -236,7 +241,7 @@ export function NutritionOnboardingFlow({
     if (draftMode) {
       onDraftChange?.({ shared });
       if (productMode === "both" && !trainingProfileExists) setStep("training");
-      else onDraftComplete?.({ shared });
+      else setStep("pre_account");
       return;
     }
     setBusy(true);
@@ -275,7 +280,8 @@ export function NutritionOnboardingFlow({
     if (Object.keys(nextErrors).length > 0) return;
     const training = toProfileInput(values);
     if (draftMode) {
-      onDraftComplete?.({ training });
+      onDraftChange?.({ training });
+      setStep("pre_account");
       return;
     }
     setBusy(true);
@@ -340,6 +346,7 @@ export function NutritionOnboardingFlow({
     setRequestError(false);
     void nutritionApi.saveNutritionProfile(nutritionInput)
       .then(() => {
+        onNutritionComplete?.();
         if (productMode === "both") onComplete();
         else setStep("complete");
       })
@@ -416,6 +423,15 @@ export function NutritionOnboardingFlow({
           onBack={() => setStep("personal")}
         />
       )}
+      {step === "pre_account" && <PreAccountNutritionQuestions
+        busy={busy} conditions={conditions} flags={safetyFlags} foods={foods} budget={budget} planStyle={planStyle}
+        onConditions={setConditions} onFlags={setSafetyFlags} onFoods={setFoods} onBudget={setBudget} onPlanStyle={setPlanStyle}
+        onBack={() => setStep(productMode === "both" ? "training" : "personal")}
+        onComplete={() => onDraftComplete?.({ safety: safetyInput(), nutritionBasics: {
+          individual_monthly_food_budget_irr: Number(budget), budget_style: budgetStyle, plan_style: planStyle,
+          allergies: splitNames(foods.allergies).map((name) => ({ name, details: null })), intolerances: splitNames(foods.intolerances).map((name) => ({ name, details: null })), dietary_pattern: foods.dietaryPattern,
+        } })}
+      />}
       {step === "training" && (
         <GuidedTrainingQuestions values={values} onChange={updateProfileValue} onBack={() => setStep("safety")} onComplete={saveTraining} />
       )}
@@ -453,13 +469,13 @@ export function NutritionOnboardingFlow({
 function stepTitle(step: FlowStep, language: "fa" | "en") {
   const fa = {
     loading: "", personal: "اول کمی با هم آشنا شویم", body: "هدفت را دقیق کنیم",
-    safety: "اول ایمنی، بعد برنامه", blocked: "", training: "حالا بخش تمرین را هماهنگ کنیم",
+    safety: "اول ایمنی، بعد برنامه", blocked: "", training: "حالا بخش تمرین را هماهنگ کنیم", pre_account: "چند سؤال کوتاه تغذیه",
     budget: "بودجه و وعده‌ها", cooking: "آشپزی را با زندگی تو هماهنگ می‌کنیم",
     foods: "غذاهایی که می‌خوری و نمی‌خوری", review: "یک مرور کوتاه قبل از ثبت", complete: "",
   };
   const en = {
     loading: "", personal: "Let’s get to know each other", body: "Let’s define your goal",
-    safety: "Safety first, then your plan", blocked: "", training: "Let’s align your training",
+    safety: "Safety first, then your plan", blocked: "", training: "Let’s align your training", pre_account: "A few quick nutrition questions",
     budget: "Budget and meals", cooking: "Let’s fit cooking into your life",
     foods: "Foods you eat and avoid", review: "A quick review before saving", complete: "",
   };
@@ -471,7 +487,7 @@ function stepIntro(step: FlowStep, language: "fa" | "en") {
     loading: "", personal: "سؤال‌ها کوتاه‌اند و قدم‌به‌قدم پیش می‌رویم.",
     body: "این اطلاعات بین تمرین و تغذیه مشترک است و فقط یک‌بار ثبت می‌شود.",
     safety: "این پاسخ‌ها برای تشخیص پزشکی نیست؛ فقط مسیر ایمن برنامه را مشخص می‌کند.",
-    blocked: "", training: "اطلاعات فعلی تمرینت را صفحه‌به‌صفحه نگه می‌داریم.",
+    blocked: "", training: "اطلاعات فعلی تمرینت را صفحه‌به‌صفحه نگه می‌داریم.", pre_account: "بعد از ساخت حساب، فقط جزئیات باقی‌ماندهٔ پروفایل را کامل می‌کنیم.",
     budget: "بودجه شخصی خودت را فقط به ریال وارد کن.",
     cooking: "با زمان و وسایل واقعی تو برنامه‌ریزی می‌کنیم.",
     foods: "هر مورد اختیاری را می‌توانی خالی بگذاری و رد کنی.",
@@ -481,7 +497,7 @@ function stepIntro(step: FlowStep, language: "fa" | "en") {
     loading: "", personal: "The questions are short; we’ll take them one step at a time.",
     body: "Training and nutrition share this information, so we only ask once.",
     safety: "These answers do not provide a diagnosis; they only help keep your plan safe.",
-    blocked: "", training: "We’ll keep your current training details one screen at a time.",
+    blocked: "", training: "We’ll keep your current training details one screen at a time.", pre_account: "After account setup, you will only complete the remaining profile details.",
     budget: "Enter your personal food budget in IRR.",
     cooking: "We’ll plan around your real time and equipment.",
     foods: "Every optional answer can be left blank and skipped.",
@@ -583,6 +599,35 @@ function SafetyForm(props: {
         {question === 4 && <TextArea label={l("شرایط مرتبط دیگر (اختیاری)", "Other relevant conditions (optional)")} value={props.otherCondition} onChange={props.onOtherCondition} />}
     </NutritionQuestionFrame>
   );
+}
+
+function PreAccountNutritionQuestions(props: {
+  busy: boolean; conditions: MedicalConditionCode[]; flags: Flags; foods: FoodsState; budget: string;
+  planStyle: "economical" | "balanced" | "simple";
+  onConditions: (value: MedicalConditionCode[]) => void; onFlags: (value: Flags) => void;
+  onFoods: (value: FoodsState) => void; onBudget: (value: string) => void;
+  onPlanStyle: (value: "economical" | "balanced" | "simple") => void; onBack: () => void; onComplete: () => void;
+}) {
+  const l = useLocalizer();
+  const [question, setQuestion] = useState(0);
+  const titles = [
+    l("آیا شرایط پزشکی مشخصی داری؟", "Do you have any medical conditions?"),
+    l("کدام موارد ایمنی دربارهٔ تو صدق می‌کند؟", "Do any of these safety considerations apply?"),
+    l("حساسیت یا عدم‌تحمل غذایی داری؟", "Do you have food allergies or intolerances?"),
+    l("بودجه ماهانه غذای تو چقدر است؟", "What is your monthly food budget?"),
+    l("چه سبک غذایی را ترجیح می‌دهی؟", "Which food style do you prefer?"),
+  ];
+  const advance = () => question === titles.length - 1 ? props.onComplete() : setQuestion((current) => current + 1);
+  const back = () => question === 0 ? props.onBack() : setQuestion((current) => current - 1);
+  return <NutritionQuestionFrame busy={props.busy} current={question} total={titles.length} title={titles[question]} stage={question < 2 ? 0 : question < 4 ? 1 : 2} optional={question === 2} nextLabel={question === titles.length - 1 ? l("ادامه و ساخت حساب", "Continue to account setup") : undefined} onBack={back} onSubmit={advance}>
+    {question === 0 && <div className="profile-checkboxes">{conditionOptions.map(([code, fa, en]) => <label key={code}><input type="checkbox" checked={props.conditions.includes(code)} onChange={() => props.onConditions(props.conditions.includes(code) ? props.conditions.filter((item) => item !== code) : [...props.conditions, code])} />{l(fa, en)}</label>)}</div>}
+    {question === 1 && <div className="profile-checkboxes">{([
+      ["dangerous_food_reaction_history", "سابقه واکنش خطرناک غذایی", "History of dangerous food reaction"], ["pregnant", "بارداری", "Pregnant"], ["breastfeeding", "شیردهی", "Breastfeeding"], ["eating_disorder_diagnosed", "تشخیص اختلال خوردن", "Diagnosed eating disorder"], ["eating_disorder_active_symptoms", "علائم فعال اختلال خوردن", "Active eating-disorder symptoms"], ["complex_medication_food_interaction", "تداخل پیچیده دارو و غذا", "Complex medication-food interaction"], ["emergency_or_danger_symptoms", "علائم خطر یا وضعیت اورژانسی", "Emergency or danger symptoms"],
+    ] as const).map(([field, fa, en]) => <label className="nutrition-check" key={field}><input type="checkbox" checked={props.flags[field]} onChange={(event) => props.onFlags({ ...props.flags, [field]: event.target.checked })} />{l(fa, en)}</label>)}</div>}
+    {question === 2 && <><TextArea label={l("حساسیت‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food allergies (optional, comma separated)")} value={props.foods.allergies} onChange={(allergies) => props.onFoods({ ...props.foods, allergies })} /><TextArea label={l("عدم‌تحمل‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food intolerances (optional, comma separated)")} value={props.foods.intolerances} onChange={(intolerances) => props.onFoods({ ...props.foods, intolerances })} /></>}
+    {question === 3 && <LabeledInput label={l("بودجه ماهانه غذا (مبلغ به ریال)", "Monthly food budget (IRR)")} type="number" min="0" required value={props.budget} onChange={props.onBudget} />}
+    {question === 4 && <SelectField label={l("سبک غذا", "Food style")} value={props.foods.dietaryPattern} onChange={(dietaryPattern) => props.onFoods({ ...props.foods, dietaryPattern: dietaryPattern as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />}
+  </NutritionQuestionFrame>;
 }
 
 function BudgetForm(props: {

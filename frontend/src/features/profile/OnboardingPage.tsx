@@ -18,6 +18,7 @@ import {
   type ProfileValidationErrors,
 } from "./profileValidation";
 import type { ProductMode, ProfileFormValues } from "./types";
+import { clearPendingNutritionBasics, loadPendingNutritionBasics } from "../publicOnboarding/onboardingDraft";
 import "./profile.css";
 
 type Step = 1 | 2 | 3;
@@ -53,6 +54,7 @@ export function OnboardingPage() {
   const [errors, setErrors] = useState<ProfileValidationErrors>({});
   const [submitError, setSubmitError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [pendingNutritionBasics] = useState(loadPendingNutritionBasics);
 
   function chooseMode(mode: ProductMode) {
     if (busy) return;
@@ -171,6 +173,8 @@ export function OnboardingPage() {
             trainingProfileExists={profile !== null}
             onCreateTrainingProfile={createProfile}
             onComplete={retryProfile}
+            initialNutritionBasics={pendingNutritionBasics ?? undefined}
+            onNutritionComplete={clearPendingNutritionBasics}
           />
         </main>
       </OnboardingShell>

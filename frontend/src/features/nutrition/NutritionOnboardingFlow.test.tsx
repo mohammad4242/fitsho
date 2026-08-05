@@ -62,7 +62,7 @@ it("keeps the selected English language in the nutrition path", async () => {
   expect(screen.getByLabelText("Personal details progress")).toBeInTheDocument();
 });
 
-it("moves nutrition safety questions until after account creation", async () => {
+it("asks medical questions before account creation", async () => {
   await i18n.changeLanguage("en");
   const user = userEvent.setup();
   const onDraftComplete = vi.fn();
@@ -87,13 +87,10 @@ it("moves nutrition safety questions until after account creation", async () => 
   await user.type(screen.getByLabelText("Height (centimeters)"), "165");
   await user.type(screen.getByLabelText("Current weight (kilograms)"), "62.5");
   await user.click(screen.getByRole("button", { name: "Continue" }));
-  await user.click(screen.getByRole("button", { name: "Fat loss" }));
+  await user.click(screen.getByRole("button", { name: "Fat loss 🔥" }));
   await user.click(screen.getByRole("button", { name: "Continue" }));
 
-  expect(onDraftComplete).toHaveBeenCalledWith(expect.objectContaining({
-    shared: expect.objectContaining({ fitness_goal: "fat_loss" }),
-  }));
-  expect(screen.queryByRole("heading", { name: "Do you have any medical conditions?" })).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Do you have any medical conditions?" })).toBeInTheDocument();
 });
 
 async function completeSharedQuestions(user: ReturnType<typeof userEvent.setup>) {
@@ -108,7 +105,7 @@ async function completeSharedQuestions(user: ReturnType<typeof userEvent.setup>)
   await user.type(screen.getByLabelText("قد (سانتی‌متر)"), "165");
   await user.type(screen.getByLabelText("وزن فعلی (کیلوگرم)"), "62.5");
   await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await user.click(screen.getByRole("button", { name: "چربی‌سوزی" }));
+  await user.click(screen.getByRole("button", { name: "چربی‌سوزی 🔥" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));
 }
 
@@ -175,6 +172,15 @@ it("asks safety before training in combined mode", async () => {
 
   await completeSafetyQuestions(user);
   expect(await screen.findByRole("heading", { name: "چقدر سابقه تمرین مداوم داری؟" })).toBeInTheDocument();
+});
+
+it("asks the medical check before account creation in draft nutrition mode", async () => {
+  const user = userEvent.setup();
+  render(<NutritionOnboardingFlow productMode="nutrition" draftMode onCreateTrainingProfile={vi.fn()} onComplete={vi.fn()} />);
+  await screen.findByRole("heading", { name: "دوست داری چه صدایت کنیم؟" });
+  await completeSharedQuestions(user);
+
+  expect(await screen.findByRole("heading", { name: "آیا شرایط پزشکی مشخصی داری؟" })).toBeInTheDocument();
 });
 
 it("completes the guided nutrition profile with IRR budget and optional skips", async () => {

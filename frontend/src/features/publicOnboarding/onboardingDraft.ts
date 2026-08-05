@@ -1,8 +1,15 @@
+import * as nutritionApi from "../nutrition/api";
 import type { NutritionProfileInput, SafetyProfileInput } from "../nutrition/types";
 import * as profileApi from "../profile/api";
 import type { ProductMode, ProfileInput, SharedProfileInput } from "../profile/types";
 
 export const ONBOARDING_DRAFT_KEY = "fitsho:onboarding-draft:v1";
+export const PENDING_NUTRITION_BASICS_KEY = "fitsho:pending-nutrition-basics:v1";
+
+export type PreAccountNutritionBasics = Pick<
+  NutritionProfileInput,
+  "individual_monthly_food_budget_irr" | "budget_style" | "plan_style" | "allergies" | "intolerances" | "dietary_pattern"
+>;
 
 export type OnboardingDraft = {
   mode: ProductMode;
@@ -10,6 +17,7 @@ export type OnboardingDraft = {
   safety?: SafetyProfileInput;
   training?: ProfileInput;
   nutrition?: NutritionProfileInput;
+  nutritionBasics?: PreAccountNutritionBasics;
   readyForAuth?: boolean;
 };
 
@@ -37,6 +45,16 @@ export function clearOnboardingDraft(): void {
   sessionStorage.removeItem(ONBOARDING_DRAFT_KEY);
 }
 
+export function loadPendingNutritionBasics(): PreAccountNutritionBasics | null {
+  const stored = sessionStorage.getItem(PENDING_NUTRITION_BASICS_KEY);
+  if (stored === null) return null;
+  try { return JSON.parse(stored) as PreAccountNutritionBasics; } catch { sessionStorage.removeItem(PENDING_NUTRITION_BASICS_KEY); return null; }
+}
+
+export function clearPendingNutritionBasics(): void {
+  sessionStorage.removeItem(PENDING_NUTRITION_BASICS_KEY);
+}
+
 function sharedFromTraining(training: ProfileInput): SharedProfileInput {
   return {
     display_name: training.display_name,
@@ -58,11 +76,13 @@ export async function hydrateOnboardingDraft(draft: OnboardingDraft): Promise<vo
   }
 
   const shared = draft.shared ?? (draft.training === undefined ? undefined : sharedFromTraining(draft.training));
-  if (shared === undefined) throw new Error("Nutrition draft is incomplete");
+  if (shared === undefined || draft.safety === undefined || draft.nutritionBasics === undefined) throw new Error("Nutrition draft is incomplete");
   await profileApi.saveSharedProfile(shared);
 
   if (draft.mode === "both" && draft.training !== undefined) {
     await profileApi.createProfile(draft.training);
   }
+  await nutritionApi.saveSafetyProfile(draft.safety);
+  sessionStorage.setItem(PENDING_NUTRITION_BASICS_KEY, JSON.stringify(draft.nutritionBasics));
   clearOnboardingDraft();
 }
