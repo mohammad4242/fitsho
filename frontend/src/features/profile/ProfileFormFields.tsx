@@ -135,7 +135,8 @@ export function BodyGoalFields({
   errors,
   disabled = false,
   onChange,
-}: FieldGroupProps) {
+  showCircumferences = true,
+}: FieldGroupProps & { showCircumferences?: boolean }) {
   const { t } = useTranslation();
   return (
     <fieldset className="profile-fieldset" disabled={disabled}>
@@ -185,7 +186,7 @@ export function BodyGoalFields({
         </div>
       </div>
 
-      <div className="profile-field profile-field--measurements">
+      {showCircumferences && <div className="profile-field profile-field--measurements">
         {([
           ["shoulder_circumference_cm", "shoulderCircumference"],
           ["waist_circumference_cm", "waistCircumference"],
@@ -213,7 +214,7 @@ export function BodyGoalFields({
             <FieldError field={field} error={errors[field]} />
           </div>
         ))}
-      </div>
+      </div>}
 
       <div className="profile-field">
         <label htmlFor="profile-fitness-goal">{t("onboarding.fields.fitnessGoal")}</label>

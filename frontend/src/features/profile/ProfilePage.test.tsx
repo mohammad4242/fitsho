@@ -9,17 +9,36 @@ import {
 import { beforeEach, expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
-import type { Profile } from "./types";
+import type { ProductMode, Profile, SharedProfile } from "./types";
 
 const context = vi.hoisted(() => ({
   profile: null as Profile | null,
+  productMode: "both" as ProductMode,
   updateProfile: vi.fn(),
   logout: vi.fn(),
+}));
+
+const profileApi = vi.hoisted(() => ({
+  getSharedProfile: vi.fn(),
+  saveSharedProfile: vi.fn(),
+}));
+
+vi.mock("./api", () => profileApi);
+
+vi.mock("../nutrition/NutritionOnboardingFlow", () => ({
+  NutritionOnboardingFlow: ({ onBack }: { onBack?: () => void }) => (
+    <section aria-label="اطلاعات تغذیه‌ای">
+      <h2>اطلاعات تغذیه‌ای</h2>
+      <p>فرم یکپارچه تغذیه</p>
+      <button type="button" onClick={onBack}>بازگشت</button>
+    </section>
+  ),
 }));
 
 vi.mock("./ProfileContext", () => ({
   useProfile: () => ({
     profile: context.profile,
+    productMode: context.productMode,
     status: "ready",
     retryProfile: vi.fn(),
     createProfile: vi.fn(),
@@ -74,6 +93,18 @@ const savedProfile: Profile = {
   updated_at: "2026-07-27T12:00:00Z",
 };
 
+const savedSharedProfile: SharedProfile = {
+  user_id: savedProfile.user_id,
+  product_mode: "nutrition",
+  display_name: savedProfile.display_name,
+  birth_date: savedProfile.birth_date,
+  sex: savedProfile.sex,
+  height_cm: savedProfile.height_cm,
+  current_weight_kg: savedProfile.current_weight_kg,
+  fitness_goal: savedProfile.fitness_goal,
+  weight_measured_at: savedProfile.weight_measured_at,
+};
+
 function Destination() {
   const location = useLocation();
   return <h1>{`destination:${location.pathname}`}</h1>;
@@ -99,13 +130,80 @@ function renderProfilePage(initialEntry = "/profile") {
   );
 }
 
+async function openTrainingPage(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "بعدی" }));
+  expect(screen.getByRole("heading", { name: "اطلاعات تمرینی" })).toBeInTheDocument();
+}
+
 beforeEach(async () => {
   vi.clearAllMocks();
   context.profile = savedProfile;
+  context.productMode = "both";
+  profileApi.getSharedProfile.mockResolvedValue(savedSharedProfile);
+  profileApi.saveSharedProfile.mockResolvedValue(savedSharedProfile);
   await i18n.changeLanguage("fa");
 });
 
-it("renders every saved profile value in editable controls", () => {
+it("shows signed-in profile information as three ordered full pages", async () => {
+  const user = userEvent.setup();
+  renderProfilePage();
+
+  expect(screen.getByRole("heading", { name: "اطلاعات شخصی" })).toBeInTheDocument();
+  expect(screen.getByText("مرحله ۱ از ۳")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "بعدی" }));
+  expect(screen.getByRole("heading", { name: "اطلاعات تمرینی" })).toBeInTheDocument();
+  expect(screen.getByText("مرحله ۲ از ۳")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "بعدی" }));
+  expect(screen.getByRole("heading", { name: "اطلاعات تغذیه‌ای" })).toBeInTheDocument();
+  expect(screen.getByText("مرحله ۳ از ۳")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "بازگشت" }));
+  expect(screen.getByRole("heading", { name: "اطلاعات تمرینی" })).toBeInTheDocument();
+});
+
+it("returns from the first profile page to the dashboard", async () => {
+  const user = userEvent.setup();
+  renderProfilePage();
+
+  await user.click(screen.getByRole("button", { name: "بازگشت" }));
+
+  expect(screen.getByRole("heading", { name: "destination:/dashboard" })).toBeInTheDocument();
+});
+
+it("keeps training optional for nutrition-only members and continues to nutrition", async () => {
+  context.profile = null;
+  context.productMode = "nutrition";
+  const user = userEvent.setup();
+  renderProfilePage();
+
+  expect(await screen.findByRole("heading", { name: "اطلاعات شخصی" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "بعدی" }));
+
+  expect(screen.getByRole("heading", { name: "اطلاعات تمرینی" })).toBeInTheDocument();
+  expect(screen.getByText("این بخش برای مسیر تغذیه اختیاری است.")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "بعدی" }));
+
+  expect(screen.getByRole("heading", { name: "اطلاعات تغذیه‌ای" })).toBeInTheDocument();
+});
+
+it("uses English labels and left-to-right layout for every signed-in profile page", async () => {
+  await i18n.changeLanguage("en");
+  const user = userEvent.setup();
+  renderProfilePage();
+
+  const heading = screen.getByRole("heading", { name: "Personal information" });
+  expect(heading.closest(".profile-page-shell")).toHaveAttribute("dir", "ltr");
+  expect(screen.getByText("Step 1 of 3")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Next" }));
+  expect(screen.getByRole("heading", { name: "Training information" })).toBeInTheDocument();
+  expect(screen.getByText("Step 2 of 3")).toBeInTheDocument();
+});
+
+it("renders every saved profile value in its editable profile page", async () => {
+  const user = userEvent.setup();
   renderProfilePage();
 
   expect(screen.getByLabelText("نام نمایشی")).toHaveValue("Mohammad");
@@ -114,6 +212,8 @@ it("renders every saved profile value in editable controls", () => {
   expect(screen.getByLabelText("قد (سانتی‌متر)")).toHaveValue(178);
   expect(screen.getByLabelText("وزن فعلی (کیلوگرم)")).toHaveValue(76.5);
   expect(screen.getByLabelText("هدف ورزشی")).toHaveValue("build_muscle");
+
+  await openTrainingPage(user);
   expect(screen.getByLabelText("سطح تجربه")).toHaveValue("beginner");
   expect(screen.getByLabelText("روزهای تمرین در هفته")).toHaveValue(3);
   expect(screen.getByLabelText("کجا تمرین می‌کنی؟")).toHaveValue("home");
@@ -193,6 +293,21 @@ it("sends only a changed display name", async () => {
   );
 });
 
+it("saves only fields from the active profile page", async () => {
+  context.updateProfile.mockResolvedValue({ ...savedProfile, display_name: "New Name" });
+  const user = userEvent.setup();
+  renderProfilePage();
+
+  await openTrainingPage(user);
+  await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "gym");
+  await user.click(screen.getByRole("button", { name: "بازگشت" }));
+  await user.clear(screen.getByLabelText("نام نمایشی"));
+  await user.type(screen.getByLabelText("نام نمایشی"), "New Name");
+  await user.click(screen.getByRole("button", { name: "بعدی" }));
+
+  await waitFor(() => expect(context.updateProfile).toHaveBeenCalledWith({ display_name: "New Name" }));
+});
+
 it("sends only a changed current weight", async () => {
   context.updateProfile.mockResolvedValue({
     ...savedProfile,
@@ -221,6 +336,7 @@ it("sends null when physical limitations are cleared", async () => {
   const user = userEvent.setup();
   renderProfilePage();
 
+  await openTrainingPage(user);
   await user.clear(screen.getByLabelText("محدودیت‌های جسمی (اختیاری)"));
   await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
 
@@ -241,6 +357,7 @@ it("clears home setup and serializes the workout preference edit", async () => {
   const user = userEvent.setup();
   renderProfilePage();
 
+  await openTrainingPage(user);
   await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "gym");
   expect(
     screen.queryByLabelText("برای تمرین در خانه چه امکاناتی داری؟"),

@@ -17,7 +17,7 @@ import { BodyPhotoWizard } from "./features/bodyPhotos/BodyPhotoWizard";
 import { BodyAnalysisResultPage } from "./features/bodyPhotos/BodyAnalysisResultPage";
 import { BodyProgressPage } from "./features/bodyPhotos/BodyProgressPage";
 import { OnboardingPage } from "./features/profile/OnboardingPage";
-import { NutritionProfilePage, ProfilePage } from "./features/profile/ProfilePage";
+import { ProfilePage } from "./features/profile/ProfilePage";
 import { ProfileProvider } from "./features/profile/ProfileContext";
 import { useProfile } from "./features/profile/ProfileContext";
 import { WorkoutPlanPage } from "./features/workouts/WorkoutPlanPage";
@@ -86,8 +86,7 @@ function WorkoutPlanRoute() {
 }
 
 function NutritionProfileRoute() {
-  const { createProfile, retryProfile } = useProfile();
-  return <NutritionProfilePage onCreateTrainingProfile={createProfile} onComplete={retryProfile} />;
+  return <Navigate to="/profile" replace />;
 }
 
 export default function App() {

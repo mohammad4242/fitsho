@@ -189,7 +189,7 @@ it("lets nutrition-only members opt out of training before medical questions", a
   expect(screen.queryByRole("heading", { name: "چند روز در هفته تمرین می‌کنی؟" })).not.toBeInTheDocument();
 });
 
-it("shows only the remaining nutrition details together after account creation", async () => {
+it("shows essential and remaining nutrition details together after account creation", async () => {
   vi.mocked(nutritionApi.getNutritionProfile).mockResolvedValue({
     daily_activity_level: "moderate", individual_monthly_food_budget_irr: 13_000_000,
     budget_style: "strict", meals_per_day: 3, snacks_per_day: 1,
@@ -208,9 +208,15 @@ it("shows only the remaining nutrition details together after account creation",
 
   render(<NutritionOnboardingFlow productMode="nutrition" editExisting onCreateTrainingProfile={vi.fn()} onComplete={vi.fn()} />);
 
-  expect(await screen.findByRole("heading", { name: "جزئیات اختیاری تغذیه" })).toBeInTheDocument();
-  expect(screen.queryByLabelText("بودجه ماهانه غذا (مبلغ به ریال)")).not.toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "اطلاعات تغذیه‌ای" })).toBeInTheDocument();
+  expect(screen.getByLabelText("میزان فعالیت روزانه")).toHaveValue("moderate");
+  expect(screen.getByLabelText("بودجه ماهانه غذا (ریال)")).toHaveValue(13_000_000);
+  expect(screen.getByLabelText("الگوی غذایی")).toHaveValue("omnivore");
   expect(screen.getByLabelText("وعده اصلی در روز")).toHaveValue(3);
+  expect(screen.getByLabelText("ترجیح آماده‌سازی غذا")).toHaveValue("mixed");
+  expect(screen.getByRole("group", { name: "تجهیزات آشپزی" })).toBeInTheDocument();
+  expect(screen.getByLabelText("تنوع برنامه غذایی")).toHaveValue("medium");
+  expect(screen.getByLabelText("بررسی روزانه")).not.toBeChecked();
 });
 
 it("completes the guided nutrition profile with IRR budget and optional skips", async () => {

@@ -48,6 +48,7 @@ type Props = {
   initialNutritionBasics?: PreAccountNutritionBasics;
   onNutritionComplete?: () => void;
   editExisting?: boolean;
+  onBack?: () => void;
 };
 
 const emptyProfileValues: ProfileFormValues = {
@@ -123,6 +124,7 @@ export function NutritionOnboardingFlow({
   initialNutritionBasics,
   onNutritionComplete,
   editExisting = false,
+  onBack,
 }: Props) {
   const { i18n } = useTranslation();
   const language = i18n.resolvedLanguage === "en" ? "en" : "fa";
@@ -132,6 +134,7 @@ export function NutritionOnboardingFlow({
   const [, setErrors] = useState<ProfileValidationErrors>({});
   const [busy, setBusy] = useState(false);
   const [requestError, setRequestError] = useState(false);
+  const [detailsSaved, setDetailsSaved] = useState(false);
   const [decision, setDecision] = useState<SafetyDecision | SafetyEvaluation | null>(null);
   const [conditions, setConditions] = useState<MedicalConditionCode[]>([]);
   const [safetyFlags, setSafetyFlags] = useState({
@@ -444,21 +447,33 @@ export function NutritionOnboardingFlow({
       <PostAccountNutritionDetails
         language={language}
         busy={busy}
+        dailyActivityLevel={dailyActivityLevel}
+        budget={budget}
+        budgetStyle={budgetStyle}
+        planStyle={planStyle}
         mealCount={mealCount}
         snackCount={snackCount}
         startDay={startDay}
         cooking={cooking}
         foods={foods}
+        saved={detailsSaved}
+        saveError={requestError}
+        onDailyActivityLevel={setDailyActivityLevel}
+        onBudget={setBudget}
+        onBudgetStyle={setBudgetStyle}
+        onPlanStyle={setPlanStyle}
         onMealCount={setMealCount}
         onSnackCount={setSnackCount}
         onStartDay={setStartDay}
         onCooking={setCooking}
         onFoods={setFoods}
+        onBack={onBack}
         onSave={() => {
           setBusy(true);
           setRequestError(false);
+          setDetailsSaved(false);
           void nutritionApi.saveNutritionProfile(nutritionInput)
-            .then(() => setStep("complete"))
+            .then(() => setDetailsSaved(true))
             .catch(() => setRequestError(true))
             .finally(() => setBusy(false));
         }}
@@ -555,28 +570,57 @@ export function NutritionOnboardingFlow({
 function PostAccountNutritionDetails(props: {
   language: "fa" | "en";
   busy: boolean;
+  dailyActivityLevel: NutritionProfileInput["daily_activity_level"];
+  budget: string;
+  budgetStyle: NutritionProfileInput["budget_style"];
+  planStyle: NutritionProfileInput["plan_style"];
   mealCount: string;
   snackCount: string;
   startDay: NutritionProfileInput["preferred_plan_start_day"];
   cooking: CookingState;
   foods: FoodsState;
+  saved: boolean;
+  saveError: boolean;
+  onDailyActivityLevel: (value: NutritionProfileInput["daily_activity_level"]) => void;
+  onBudget: (value: string) => void;
+  onBudgetStyle: (value: NutritionProfileInput["budget_style"]) => void;
+  onPlanStyle: (value: NutritionProfileInput["plan_style"]) => void;
   onMealCount: (value: string) => void;
   onSnackCount: (value: string) => void;
   onStartDay: (value: NutritionProfileInput["preferred_plan_start_day"]) => void;
   onCooking: (value: CookingState) => void;
   onFoods: (value: FoodsState) => void;
+  onBack?: () => void;
   onSave: () => void;
 }) {
   const l = (fa: string, en: string) => props.language === "en" ? en : fa;
   const updateCooking = <Key extends keyof CookingState>(key: Key, value: CookingState[Key]) => props.onCooking({ ...props.cooking, [key]: value });
   const updateFoods = <Key extends keyof FoodsState>(key: Key, value: FoodsState[Key]) => props.onFoods({ ...props.foods, [key]: value });
+  const toggleEquipment = (equipment: NutritionProfileInput["cooking_equipment"][number]) => updateCooking(
+    "equipment",
+    props.cooking.equipment.includes(equipment)
+      ? props.cooking.equipment.filter((item) => item !== equipment)
+      : [...props.cooking.equipment, equipment],
+  );
 
   return (
     <section className="nutrition-step profile-details-page" dir={props.language === "fa" ? "rtl" : "ltr"}>
       <p className="eyebrow eyebrow--accent">{l("پروفایل", "Profile")}</p>
-      <h1 className="fitsho-display">{l("جزئیات اختیاری تغذیه", "Optional nutrition details")}</h1>
-      <p>{l("پاسخ‌های ضروری قبلی ثبت شده‌اند. هر جزئیاتی را که خواستی اینجا به‌روزرسانی کن.", "Your essential answers are already saved. Update any extra details here when you want.")}</p>
+      <h2 className="fitsho-display">{l("اطلاعات تغذیه‌ای", "Nutrition information")}</h2>
+      <p>{l("همه اطلاعات تغذیه‌ای ثبت‌شده را در همین صفحه ببین و در صورت نیاز به‌روزرسانی کن.", "Review all saved nutrition information on this page and update it when needed.")}</p>
       <form className="profile-form nutrition-details-form" onSubmit={(event) => { event.preventDefault(); props.onSave(); }}>
+        <fieldset className="profile-fieldset" disabled={props.busy}>
+          <legend>{l("نیاز روزانه و سبک برنامه", "Daily needs and plan style")}</legend>
+          <div className="profile-field profile-field--paired">
+            <label>{l("میزان فعالیت روزانه", "Daily activity level")}<select value={props.dailyActivityLevel} onChange={(event) => props.onDailyActivityLevel(event.target.value as NutritionProfileInput["daily_activity_level"])}><option value="sedentary">{l("کم‌تحرک", "Sedentary")}</option><option value="light">{l("فعالیت سبک", "Light")}</option><option value="moderate">{l("فعالیت متوسط", "Moderate")}</option><option value="very_active">{l("بسیار فعال", "Very active")}</option></select></label>
+            <label>{l("بودجه ماهانه غذا (ریال)", "Monthly food budget (IRR)")}<input type="number" min="1" value={props.budget} onChange={(event) => props.onBudget(event.target.value)} /></label>
+            <label>{l("نحوه رعایت بودجه", "Budget preference")}<select value={props.budgetStyle} onChange={(event) => props.onBudgetStyle(event.target.value as NutritionProfileInput["budget_style"])}><option value="strict">{l("سخت‌گیرانه", "Strict")}</option><option value="flexible">{l("انعطاف‌پذیر", "Flexible")}</option></select></label>
+            <label>{l("سبک برنامه غذایی", "Meal-plan style")}<select value={props.planStyle} onChange={(event) => props.onPlanStyle(event.target.value as NutritionProfileInput["plan_style"])}><option value="economical">{l("اقتصادی", "Economical")}</option><option value="balanced">{l("متعادل", "Balanced")}</option><option value="simple">{l("ساده", "Simple")}</option></select></label>
+            <label>{l("الگوی غذایی", "Dietary pattern")}<select value={props.foods.dietaryPattern} onChange={(event) => updateFoods("dietaryPattern", event.target.value as FoodsState["dietaryPattern"])}><option value="omnivore">{l("همه‌چیزخوار", "Omnivore")}</option><option value="vegetarian">{l("گیاه‌خوار", "Vegetarian")}</option><option value="vegan">{l("وگان", "Vegan")}</option></select></label>
+          </div>
+          <label className="profile-field">{l("حساسیت‌های غذایی", "Food allergies")}<textarea value={props.foods.allergies} onChange={(event) => updateFoods("allergies", event.target.value)} /></label>
+          <label className="profile-field">{l("عدم تحمل غذایی", "Food intolerances")}<textarea value={props.foods.intolerances} onChange={(event) => updateFoods("intolerances", event.target.value)} /></label>
+        </fieldset>
         <fieldset className="profile-fieldset" disabled={props.busy}>
           <legend>{l("وعده‌ها و زمان‌بندی", "Meals and timing")}</legend>
           <div className="profile-field profile-field--paired">
@@ -592,11 +636,37 @@ function PostAccountNutritionDetails(props: {
             <label>{l("حداکثر زمان آشپزی (دقیقه)", "Maximum cooking time (minutes)")}<input type="number" min="0" max="360" value={props.cooking.maximumTime} onChange={(event) => updateCooking("maximumTime", event.target.value)} /></label>
             <label>{l("دفعات آشپزی در هفته", "Cooking days per week")}<input type="number" min="0" max="7" value={props.cooking.frequency} onChange={(event) => updateCooking("frequency", event.target.value)} /></label>
             <label>{l("وعده آماده در هفته", "Provided meals per week")}<input type="number" min="0" max="35" value={props.cooking.suppliedMeals} onChange={(event) => updateCooking("suppliedMeals", event.target.value)} /></label>
+            <label>{l("ترجیح آماده‌سازی غذا", "Meal preparation preference")}<select value={props.cooking.preparation} onChange={(event) => updateCooking("preparation", event.target.value as CookingState["preparation"])}><option value="daily">{l("روزانه", "Daily")}</option><option value="batch">{l("آماده‌سازی چند وعده", "Batch cooking")}</option><option value="mixed">{l("ترکیبی", "Mixed")}</option><option value="no_cooking">{l("بدون آشپزی", "No cooking")}</option></select></label>
           </div>
           <label className="profile-field">{l("منبع وعده‌های آماده", "Provided meal source")}<input value={props.cooking.suppliedSource} onChange={(event) => updateCooking("suppliedSource", event.target.value)} /></label>
+          <div className="profile-checkboxes">
+            <label><input type="checkbox" checked={props.cooking.refrigerator} onChange={(event) => updateCooking("refrigerator", event.target.checked)} />{l("دسترسی به یخچال", "Refrigerator access")}</label>
+            <label><input type="checkbox" checked={props.cooking.freezer} onChange={(event) => updateCooking("freezer", event.target.checked)} />{l("دسترسی به فریزر", "Freezer access")}</label>
+          </div>
+          <div className="profile-field" role="group" aria-label={l("تجهیزات آشپزی", "Cooking equipment")}>
+            <strong>{l("تجهیزات آشپزی", "Cooking equipment")}</strong>
+            <div className="profile-checkboxes">
+              {([
+                ["stove", l("اجاق", "Stove")], ["oven", l("فر", "Oven")],
+                ["microwave", l("مایکروویو", "Microwave")], ["air_fryer", l("هواپز", "Air fryer")],
+                ["rice_cooker", l("پلوپز", "Rice cooker")], ["blender", l("مخلوط‌کن", "Blender")],
+                ["refrigerator", l("یخچال", "Refrigerator")],
+              ] as Array<[NutritionProfileInput["cooking_equipment"][number], string]>).map(([value, label]) => <label key={value}><input type="checkbox" checked={props.cooking.equipment.includes(value)} onChange={() => toggleEquipment(value)} />{label}</label>)}
+            </div>
+          </div>
         </fieldset>
         <fieldset className="profile-fieldset" disabled={props.busy}>
           <legend>{l("غذا و ترجیحات", "Food preferences")}</legend>
+          <div className="profile-field profile-field--paired">
+            <label>{l("تنوع برنامه غذایی", "Meal-plan variety")}<select value={props.foods.variety} onChange={(event) => updateFoods("variety", event.target.value as FoodsState["variety"])}><option value="low">{l("کم", "Low")}</option><option value="medium">{l("متوسط", "Medium")}</option><option value="high">{l("زیاد", "High")}</option></select></label>
+            <label>{l("حداکثر تکرار هر غذا در هفته", "Maximum meal repetition per week")}<input type="number" min="1" max="7" value={props.foods.repetition} onChange={(event) => updateFoods("repetition", event.target.value)} /></label>
+          </div>
+          <div className="profile-checkboxes">
+            <label><input type="checkbox" checked={props.foods.leftovers} onChange={(event) => updateFoods("leftovers", event.target.checked)} />{l("استفاده از غذای باقی‌مانده", "Accept leftovers")}</label>
+            <label><input type="checkbox" checked={props.foods.batchCooking} onChange={(event) => updateFoods("batchCooking", event.target.checked)} />{l("آشپزی چندوعده‌ای", "Accept batch cooking")}</label>
+            <label><input type="checkbox" checked={props.foods.checkIn} onChange={(event) => updateFoods("checkIn", event.target.checked)} />{l("بررسی روزانه", "Daily check-in")}</label>
+          </div>
+          {props.foods.checkIn && <label className="profile-field">{l("زمان بررسی روزانه", "Daily check-in time")}<input type="time" value={props.foods.checkInTime} onChange={(event) => updateFoods("checkInTime", event.target.value)} /></label>}
           {([
             ["available", l("مواد غذایی موجود در خانه", "Foods available at home")],
             ["favourites", l("غذاهای محبوب", "Favourite foods")],
@@ -607,7 +677,12 @@ function PostAccountNutritionDetails(props: {
             ["workContext", l("شرایط شیفت کاری", "Work-shift context")],
           ] as Array<[keyof FoodsState, string]>).map(([field, label]) => <label className="profile-field" key={field}>{label}<textarea value={props.foods[field] as string} onChange={(event) => updateFoods(field, event.target.value)} /></label>)}
         </fieldset>
-        <button className="primary-button profile-save-button" type="submit" disabled={props.busy}>{props.busy ? l("در حال ذخیره…", "Saving…") : l("ذخیره جزئیات", "Save details")}</button>
+        {props.saveError && <p className="form-error" role="alert">{l("تغییرات ذخیره نشد. دوباره تلاش کن.", "Changes were not saved. Try again.")}</p>}
+        {props.saved && <p className="profile-save-message profile-save-message--success" role="status">{l("اطلاعات تغذیه‌ای ذخیره شد.", "Nutrition information was saved.")}</p>}
+        <div className="profile-actions profile-wizard__actions">
+          {props.onBack && <button className="secondary-button" type="button" disabled={props.busy} onClick={props.onBack}>{l("بازگشت", "Back")}</button>}
+          <button className="primary-button" type="submit" disabled={props.busy}>{props.busy ? l("در حال ذخیره…", "Saving…") : l("ذخیره اطلاعات", "Save information")}</button>
+        </div>
       </form>
     </section>
   );

@@ -300,6 +300,13 @@ it("renders the protected profile route for a member with a profile", async () =
   ).toBeInTheDocument();
 });
 
+it("redirects the legacy nutrition profile route into the unified profile flow", async () => {
+  setReadyMember();
+  renderRoute("/nutrition-profile");
+
+  expect(await screen.findByRole("heading", { name: "اطلاعات شخصی" })).toBeInTheDocument();
+});
+
 it.each(["/exercises", "/exercises/dumbbell-bench-press", "/workout-plan"])(
   "redirects a guest from %s to login",
   async (path) => {
