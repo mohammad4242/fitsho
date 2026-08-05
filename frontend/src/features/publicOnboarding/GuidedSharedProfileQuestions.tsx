@@ -11,7 +11,13 @@ type Props = {
 };
 
 const sexes = ["female", "male", "other", "prefer_not_to_say"] as const;
-const goals = ["lose_weight", "gain_weight", "fat_loss", "build_muscle", "body_recomposition"] as const;
+const goals = [
+  ["lose_weight", "🔻⬆️"],
+  ["gain_weight", "🔺️⬇️"],
+  ["fat_loss", "🔥"],
+  ["build_muscle", "💪"],
+  ["body_recomposition", "🔥💪"],
+] as const;
 
 export function GuidedSharedProfileQuestions({ values, onChange, onBack, onComplete }: Props) {
   const { t, i18n } = useTranslation();
@@ -92,7 +98,7 @@ export function GuidedSharedProfileQuestions({ values, onChange, onBack, onCompl
           <label>{t("onboarding.fields.weight")}<input aria-label={t("onboarding.fields.weight")} name="current_weight_kg" type="number" inputMode="decimal" required min={35} max={300} step="0.01" value={values.current_weight_kg} onChange={(event) => updateBodyValue("current_weight_kg", event.target.value)} /><small>{language === "en" ? "35–300 kg" : "۳۵ تا ۳۰۰ کیلوگرم"}</small></label>
           {showBodyConfirmation && <label className="guided-body-confirmation"><input type="checkbox" checked={bodyValuesConfirmed} onChange={(event) => setBodyValuesConfirmed(event.target.checked)} />{language === "en" ? "These values are correct." : "این مقادیر درست هستند."}</label>}
         </div>}
-        {question === 4 && <div className="guided-choice-grid">{goals.map((goal) => <button className={values.fitness_goal === goal ? "is-selected" : ""} key={goal} type="button" onClick={() => onChange("fitness_goal", goal)}>{t(`onboarding.options.fitnessGoal.${goal}`)}</button>)}</div>}
+        {question === 4 && <div className="guided-choice-grid">{goals.map(([goal, emoji]) => <button className={values.fitness_goal === goal ? "is-selected" : ""} key={goal} type="button" onClick={() => onChange("fitness_goal", goal)}>{t(`onboarding.options.fitnessGoal.${goal}`)} {emoji}</button>)}</div>}
         <div className="profile-actions">
           <button className="secondary-button" type="button" onClick={() => question === 0 ? onBack() : setQuestion((current) => current - 1)}>{back}</button>
           <button className="primary-button" type="submit" disabled={!ready}>{next}</button>
