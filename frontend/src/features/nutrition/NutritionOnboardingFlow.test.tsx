@@ -5,6 +5,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import * as profileApi from "../profile/api";
 import * as nutritionApi from "./api";
 import type { SafetyDecision } from "./types";
+import i18n from "../../i18n";
 
 vi.mock("../profile/api", () => ({
   getSharedProfile: vi.fn(),
@@ -30,7 +31,8 @@ const standardDecision: SafetyDecision = {
   created_at: "2026-08-05T12:00:00Z",
 };
 
-beforeEach(() => {
+beforeEach(async () => {
+  await i18n.changeLanguage("fa");
   vi.clearAllMocks();
   vi.mocked(profileApi.getSharedProfile).mockResolvedValue(null);
   vi.mocked(nutritionApi.getSafetyDecision).mockResolvedValue(null);
@@ -44,6 +46,73 @@ beforeEach(() => {
   vi.mocked(nutritionApi.saveSafetyProfile).mockResolvedValue(standardDecision);
 });
 
+it("keeps the selected English language in the nutrition path", async () => {
+  await i18n.changeLanguage("en");
+  render(
+    <NutritionOnboardingFlow
+      productMode="nutrition"
+      draftMode
+      onCreateTrainingProfile={vi.fn()}
+      onComplete={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByRole("heading", { name: "What should we call you?" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Display name")).toBeInTheDocument();
+  expect(screen.getByLabelText("Personal details progress")).toBeInTheDocument();
+});
+
+it("keeps nutrition safety questions in English after shared details", async () => {
+  await i18n.changeLanguage("en");
+  const user = userEvent.setup();
+  render(
+    <NutritionOnboardingFlow
+      productMode="nutrition"
+      draftMode
+      onCreateTrainingProfile={vi.fn()}
+      onComplete={vi.fn()}
+    />,
+  );
+
+  await user.type(screen.getByLabelText("Display name"), "Sara");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.selectOptions(screen.getByLabelText("Day"), "14");
+  await user.selectOptions(screen.getByLabelText("Month"), "5");
+  await user.selectOptions(screen.getByLabelText("Year"), "2000");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(screen.getByRole("button", { name: "Female" }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.type(screen.getByLabelText("Height (centimeters)"), "165");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.type(screen.getByLabelText("Current weight (kilograms)"), "62.5");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(screen.getByRole("button", { name: "Maintain weight" }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+
+  expect(screen.getByRole("heading", { name: "Do you have any medical conditions?" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Nutrition questions progress")).toHaveTextContent("Question 1 of 5");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByRole("heading", { name: "Do any of these safety considerations apply?" })).toBeInTheDocument();
+  expect(screen.queryByText("علائم خطر یا وضعیت اورژانسی")).not.toBeInTheDocument();
+});
+
+async function completeSharedQuestions(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText("نام نمایشی"), "سارا");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.selectOptions(screen.getByLabelText("روز"), "14");
+  await user.selectOptions(screen.getByLabelText("ماه"), "5");
+  await user.selectOptions(screen.getByLabelText("سال"), "2000");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.click(screen.getByRole("button", { name: "زن" }));
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.type(screen.getByLabelText("قد (سانتی‌متر)"), "165");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.type(screen.getByLabelText("وزن فعلی (کیلوگرم)"), "62.5");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.click(screen.getByRole("button", { name: "حفظ وزن" }));
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+}
+
 async function reachSafety() {
   const user = userEvent.setup();
   render(
@@ -53,17 +122,18 @@ async function reachSafety() {
       onComplete={vi.fn()}
     />,
   );
-  await screen.findByRole("heading", { name: "اول کمی با هم آشنا شویم" });
-  await user.type(screen.getByLabelText("نام نمایشی"), "سارا");
-  await user.type(screen.getByLabelText("تاریخ تولد"), "2000-05-14");
-  await user.selectOptions(screen.getByLabelText("جنسیت"), "female");
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await user.type(screen.getByLabelText("قد (سانتی‌متر)"), "165");
-  await user.type(screen.getByLabelText("وزن فعلی (کیلوگرم)"), "62.5");
-  await user.selectOptions(screen.getByLabelText("هدف ورزشی"), "maintain_weight");
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await screen.findByRole("heading", { name: "اول ایمنی، بعد برنامه" });
+  await screen.findByRole("heading", { name: "دوست داری چه صدایت کنیم؟" });
+  await completeSharedQuestions(user);
+  await screen.findByRole("heading", { name: "آیا شرایط پزشکی مشخصی داری؟" });
   return user;
+}
+
+async function completeSafetyQuestions(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.click(screen.getByRole("button", { name: "رد کردن این سؤال" }));
+  await user.click(screen.getByRole("button", { name: "رد کردن این سؤال" }));
+  await user.click(screen.getByRole("button", { name: "ثبت ارزیابی ایمنی" }));
 }
 
 it("saves shared data before showing the early safety screen", async () => {
@@ -85,7 +155,7 @@ it("stops unnecessary questions for a manual-only safety outcome", async () => {
   });
   const user = await reachSafety();
   await user.click(screen.getByLabelText("بیماری کلیه"));
-  await user.click(screen.getByRole("button", { name: "ثبت ارزیابی ایمنی" }));
+  await completeSafetyQuestions(user);
 
   expect(await screen.findByRole("heading", { name: "ادامه مسیر با پزشک فیتشو" })).toBeInTheDocument();
   expect(screen.queryByLabelText("بودجه ماهانه غذا (مبلغ به ریال)")).not.toBeInTheDocument();
@@ -100,19 +170,12 @@ it("asks safety before training in combined mode", async () => {
       onComplete={vi.fn()}
     />,
   );
-  await screen.findByRole("heading", { name: "اول کمی با هم آشنا شویم" });
-  await user.type(screen.getByLabelText("نام نمایشی"), "سارا");
-  await user.type(screen.getByLabelText("تاریخ تولد"), "2000-05-14");
-  await user.selectOptions(screen.getByLabelText("جنسیت"), "female");
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await user.type(screen.getByLabelText("قد (سانتی‌متر)"), "165");
-  await user.type(screen.getByLabelText("وزن فعلی (کیلوگرم)"), "62.5");
-  await user.selectOptions(screen.getByLabelText("هدف ورزشی"), "maintain_weight");
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  expect(await screen.findByRole("heading", { name: "اول ایمنی، بعد برنامه" })).toBeInTheDocument();
+  await screen.findByRole("heading", { name: "دوست داری چه صدایت کنیم؟" });
+  await completeSharedQuestions(user);
+  expect(await screen.findByRole("heading", { name: "آیا شرایط پزشکی مشخصی داری؟" })).toBeInTheDocument();
 
-  await user.click(screen.getByRole("button", { name: "ثبت ارزیابی ایمنی" }));
-  expect(await screen.findByRole("heading", { name: "حالا بخش تمرین را هماهنگ کنیم" })).toBeInTheDocument();
+  await completeSafetyQuestions(user);
+  expect(await screen.findByRole("heading", { name: "چه‌قدر تجربهٔ تمرین داری؟" })).toBeInTheDocument();
 });
 
 it("completes the guided nutrition profile with IRR budget and optional skips", async () => {
@@ -126,22 +189,26 @@ it("completes the guided nutrition profile with IRR budget and optional skips", 
       onComplete={onComplete}
     />,
   );
-  await screen.findByRole("heading", { name: "اول کمی با هم آشنا شویم" });
-  await user.type(screen.getByLabelText("نام نمایشی"), "سارا");
-  await user.type(screen.getByLabelText("تاریخ تولد"), "2000-05-14");
-  await user.selectOptions(screen.getByLabelText("جنسیت"), "female");
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await user.type(screen.getByLabelText("قد (سانتی‌متر)"), "165");
-  await user.type(screen.getByLabelText("وزن فعلی (کیلوگرم)"), "62.5");
-  await user.selectOptions(screen.getByLabelText("هدف ورزشی"), "maintain_weight");
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await user.click(screen.getByRole("button", { name: "ثبت ارزیابی ایمنی" }));
+  await screen.findByRole("heading", { name: "دوست داری چه صدایت کنیم؟" });
+  await completeSharedQuestions(user);
+  await completeSafetyQuestions(user);
 
   await user.type(await screen.findByLabelText("بودجه ماهانه غذا (مبلغ به ریال)"), "13000000");
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  expect(screen.getByRole("heading", { name: "آشپزی را با زندگی تو هماهنگ می‌کنیم" })).toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  for (let index = 0; index < 6; index += 1) {
+    await user.click(screen.getByRole("button", { name: "ادامه" }));
+  }
+  expect(screen.getByRole("heading", { name: "چقدر با آشپزی راحتی؟" })).toBeInTheDocument();
+  for (let index = 0; index < 8; index += 1) {
+    await user.click(screen.getByRole("button", { name: "ادامه" }));
+  }
+  for (let index = 0; index < 5; index += 1) {
+    await user.click(screen.getByRole("button", { name: "ادامه" }));
+  }
   await user.type(screen.getByLabelText("حساسیت‌های غذایی (اختیاری، با ویرگول جدا کن)"), "بادام زمینی");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  for (let index = 0; index < 8; index += 1) {
+    await user.click(screen.getByRole("button", { name: "ادامه" }));
+  }
   await user.click(screen.getByRole("button", { name: "مرور پاسخ‌ها" }));
   await user.click(screen.getByRole("button", { name: "ثبت پروفایل تغذیه" }));
 

@@ -1,11 +1,6 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  BodyGoalFields,
-  ExperienceFields,
-  PersonalFields,
-} from "../profile/ProfileFormFields";
 import * as profileApi from "../profile/api";
 import {
   toProfileInput,
@@ -22,6 +17,8 @@ import type {
   SafetyProfileInput,
 } from "./types";
 import type { OnboardingDraft } from "../publicOnboarding/onboardingDraft";
+import { GuidedSharedProfileQuestions } from "../publicOnboarding/GuidedSharedProfileQuestions";
+import { GuidedTrainingQuestions } from "../publicOnboarding/GuidedTrainingQuestions";
 
 type FlowStep =
   | "loading"
@@ -83,16 +80,16 @@ function draftValues(draft?: OnboardingDraft): ProfileFormValues {
   };
 }
 
-const conditionOptions: Array<[MedicalConditionCode, string]> = [
-  ["controlled_hypertension", "فشار خون کنترل‌شده"],
-  ["lipid_disorder", "اختلال چربی خون"],
-  ["type_2_diabetes_non_insulin", "دیابت نوع ۲ بدون انسولین"],
-  ["stable_gastrointestinal", "مشکل پایدار گوارشی"],
-  ["kidney_disease", "بیماری کلیه"],
-  ["dialysis", "دیالیز"],
-  ["liver_disease", "بیماری کبد"],
-  ["insulin_treated_diabetes", "دیابت با درمان انسولین"],
-  ["other", "بیماری یا شرایط دیگر"],
+const conditionOptions: Array<[MedicalConditionCode, string, string]> = [
+  ["controlled_hypertension", "فشار خون کنترل‌شده", "Controlled high blood pressure"],
+  ["lipid_disorder", "اختلال چربی خون", "Lipid disorder"],
+  ["type_2_diabetes_non_insulin", "دیابت نوع ۲ بدون انسولین", "Type 2 diabetes without insulin"],
+  ["stable_gastrointestinal", "مشکل پایدار گوارشی", "Stable gastrointestinal condition"],
+  ["kidney_disease", "بیماری کلیه", "Kidney disease"],
+  ["dialysis", "دیالیز", "Dialysis"],
+  ["liver_disease", "بیماری کبد", "Liver disease"],
+  ["insulin_treated_diabetes", "دیابت با درمان انسولین", "Insulin-treated diabetes"],
+  ["other", "بیماری یا شرایط دیگر", "Other condition"],
 ];
 
 const splitNames = (value: string) => value.split(/[،,\n]/).map((item) => item.trim()).filter(Boolean);
@@ -124,7 +121,7 @@ export function NutritionOnboardingFlow({
   const copy = flowCopy[language];
   const [step, setStep] = useState<FlowStep>(draftMode ? "personal" : "loading");
   const [values, setValues] = useState<ProfileFormValues>(() => draftValues(initialDraft));
-  const [errors, setErrors] = useState<ProfileValidationErrors>({});
+  const [, setErrors] = useState<ProfileValidationErrors>({});
   const [busy, setBusy] = useState(false);
   const [requestError, setRequestError] = useState(false);
   const [decision, setDecision] = useState<SafetyDecision | SafetyEvaluation | null>(null);
@@ -224,16 +221,8 @@ export function NutritionOnboardingFlow({
     });
   }
 
-  function nextFromPersonal(event: FormEvent) {
-    event.preventDefault();
-    const nextErrors = validateStep(values, 1, new Date());
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length === 0) setStep("body");
-  }
-
-  function saveShared(event: FormEvent) {
-    event.preventDefault();
-    const nextErrors = validateStep(values, 2, new Date());
+  function saveShared() {
+    const nextErrors = { ...validateStep(values, 1, new Date()), ...validateStep(values, 2, new Date()) };
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
     const shared = {
@@ -264,8 +253,7 @@ export function NutritionOnboardingFlow({
     };
   }
 
-  function saveSafety(event: FormEvent) {
-    event.preventDefault();
+  function saveSafety() {
     setBusy(true);
     setRequestError(false);
     const input = safetyInput();
@@ -280,8 +268,7 @@ export function NutritionOnboardingFlow({
     }).catch(() => setRequestError(true)).finally(() => setBusy(false));
   }
 
-  function saveTraining(event: FormEvent) {
-    event.preventDefault();
+  function saveTraining() {
     const nextErrors = validateStep(values, 3, new Date());
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -362,7 +349,6 @@ export function NutritionOnboardingFlow({
 
   const flowOrder: FlowStep[] = [
     "personal",
-    "body",
     "safety",
     ...(productMode === "both" && !trainingProfileExists ? (["training"] as FlowStep[]) : []),
     "budget",
@@ -371,60 +357,47 @@ export function NutritionOnboardingFlow({
     "review",
   ];
   const progressIndex = Math.max(flowOrder.indexOf(step), 0) + 1;
+  const guidedStep = step !== "review";
 
   if (step === "loading") return <p aria-live="polite">{copy.loading}</p>;
   if (step === "blocked") {
     return (
       <section className="nutrition-step safety-result-card" aria-live="polite">
-        <p className="eyebrow eyebrow--accent">نتیجه ارزیابی ایمنی</p>
-        <h2 className="fitsho-display">ادامه مسیر با پزشک فیتشو</h2>
-        <p>{decision?.message}</p>
-        <p>اطلاعات مجاز ذخیره شد و هیچ برنامه خودکاری ساخته نمی‌شود.</p>
-        {draftMode && <button className="primary-button" type="button" onClick={() => onDraftComplete?.({ safety: safetyInput() })}>ادامه و ساخت حساب</button>}
-        <button className="secondary-button" type="button" onClick={() => setStep("safety")}>بازگشت و اصلاح پاسخ‌ها</button>
+        <p className="eyebrow eyebrow--accent">{language === "en" ? "Safety assessment result" : "نتیجه ارزیابی ایمنی"}</p>
+        <h2 className="fitsho-display">{language === "en" ? "Continue with a Fitsho physician" : "ادامه مسیر با پزشک فیتشو"}</h2>
+        <p>{language === "en" ? "For your safety, this path needs review by a Fitsho physician." : decision?.message}</p>
+        <p>{language === "en" ? "Allowed information is saved and no automatic plan will be created." : "اطلاعات مجاز ذخیره شد و هیچ برنامه خودکاری ساخته نمی‌شود."}</p>
+        {draftMode && <button className="primary-button" type="button" onClick={() => onDraftComplete?.({ safety: safetyInput() })}>{language === "en" ? "Continue to account setup" : "ادامه و ساخت حساب"}</button>}
+        <button className="secondary-button" type="button" onClick={() => setStep("safety")}>{language === "en" ? "Back and edit answers" : "بازگشت و اصلاح پاسخ‌ها"}</button>
       </section>
     );
   }
   if (step === "complete") {
     return (
       <section className="nutrition-step safety-result-card" aria-live="polite">
-        <p className="eyebrow eyebrow--accent">پروفایل تغذیه</p>
-        <h2 className="fitsho-display">پروفایل تغذیه‌ات ثبت شد</h2>
-        <p>اطلاعات ایمنی، بودجه و ترجیحاتت ذخیره شد.</p>
-        {decision?.requires_physician_review && <p>{decision.message}</p>}
-        <p>در Task 2 هیچ برنامه غذایی تولید نشده است.</p>
+        <p className="eyebrow eyebrow--accent">{language === "en" ? "Nutrition profile" : "پروفایل تغذیه"}</p>
+        <h2 className="fitsho-display">{language === "en" ? "Your nutrition profile is saved" : "پروفایل تغذیه‌ات ثبت شد"}</h2>
+        <p>{language === "en" ? "Your safety, budget, and preference information is saved." : "اطلاعات ایمنی، بودجه و ترجیحاتت ذخیره شد."}</p>
+        {decision?.requires_physician_review && <p>{language === "en" ? "A Fitsho physician will review your nutrition path." : decision.message}</p>}
+        <p>{language === "en" ? "No meal plan has been generated yet." : "هنوز هیچ برنامه غذایی تولید نشده است."}</p>
       </section>
     );
   }
 
   return (
     <section className="nutrition-step" dir={language === "fa" ? "rtl" : "ltr"}>
-      <p className="eyebrow eyebrow--accent">{copy.eyebrow}</p>
+      {!guidedStep && <><p className="eyebrow eyebrow--accent">{copy.eyebrow}</p>
       <div className="nutrition-progress" aria-label={copy.progress}>
         <span>{language === "en" ? `Step ${progressIndex} of ${flowOrder.length}` : `مرحله ${progressIndex} از ${flowOrder.length}`}</span>
         <progress value={progressIndex} max={flowOrder.length} />
       </div>
       <h2 className="fitsho-display">{stepTitle(step, language)}</h2>
-      <p>{stepIntro(step, language)}</p>
+      <p>{stepIntro(step, language)}</p></>}
       {decision?.requires_physician_review && step !== "safety" && (
-        <p className="nutrition-feedback" role="status">{decision.message}</p>
+        <p className="nutrition-feedback" role="status">{language === "en" ? "A Fitsho physician review is required for your nutrition path." : decision.message}</p>
       )}
       {step === "personal" && (
-        <form className="profile-form" noValidate onSubmit={nextFromPersonal}>
-          <PersonalFields values={values} errors={errors} disabled={busy} onChange={updateProfileValue} />
-          <Actions busy={busy} onBack={draftMode ? onExit : undefined} nextLabel="ادامه" />
-        </form>
-      )}
-      {step === "body" && (
-        <form className="profile-form" noValidate onSubmit={saveShared}>
-          <BodyGoalFields values={values} errors={errors} disabled={busy} onChange={updateProfileValue} />
-          <button className="text-button" type="button" onClick={() => {
-            updateProfileValue("shoulder_circumference_cm", "");
-            updateProfileValue("waist_circumference_cm", "");
-            updateProfileValue("hip_circumference_cm", "");
-          }}>رد کردن اندازه‌گیری‌های اختیاری</button>
-          <Actions busy={busy} onBack={() => setStep("personal")} nextLabel="ادامه" />
-        </form>
+        <GuidedSharedProfileQuestions values={values} onChange={(field, value) => updateProfileValue(field, value)} onBack={onExit ?? (() => undefined)} onComplete={saveShared} />
       )}
       {step === "safety" && (
         <SafetyForm
@@ -439,16 +412,12 @@ export function NutritionOnboardingFlow({
           onMedications={setMedications}
           onPhysicianRestrictions={setPhysicianRestrictions}
           onOtherCondition={setOtherCondition}
-          onSubmit={saveSafety}
-          onBack={() => setStep("body")}
+          onComplete={saveSafety}
+          onBack={() => setStep("personal")}
         />
       )}
       {step === "training" && (
-        <form className="profile-form" noValidate onSubmit={saveTraining}>
-          <ExperienceFields values={values} errors={errors} disabled={busy} onChange={updateProfileValue} />
-          <button className="text-button" type="button" onClick={() => updateProfileValue("physical_limitations", "")}>رد کردن توضیحات اختیاری</button>
-          <Actions busy={busy} onBack={() => setStep("safety")} nextLabel="ثبت اطلاعات تمرین و ادامه" />
-        </form>
+        <GuidedTrainingQuestions values={values} onChange={updateProfileValue} onBack={() => setStep("safety")} onComplete={saveTraining} />
       )}
       {step === "budget" && (
         <BudgetForm
@@ -468,12 +437,12 @@ export function NutritionOnboardingFlow({
       {step === "review" && (
         <form className="profile-form" onSubmit={finish}>
           <div className="nutrition-review-card">
-            <strong>بودجه ماهانه: {new Intl.NumberFormat("fa-IR").format(Number(budget))} ریال</strong>
-            <span>{mealCount} وعده اصلی و {snackCount} میان‌وعده در روز</span>
-            <span>سیاست ایمنی: {decision?.policy_version}</span>
-            <span>حساسیت ثبت‌شده: {splitNames(foods.allergies).join("، ") || "ندارد"}</span>
+            <strong>{language === "en" ? `Monthly budget: ${new Intl.NumberFormat("en-US").format(Number(budget))} IRR` : `بودجه ماهانه: ${new Intl.NumberFormat("fa-IR").format(Number(budget))} ریال`}</strong>
+            <span>{language === "en" ? `${mealCount} meals and ${snackCount} snacks per day` : `${mealCount} وعده اصلی و ${snackCount} میان‌وعده در روز`}</span>
+            <span>{language === "en" ? "Safety policy" : "سیاست ایمنی"}: {decision?.policy_version}</span>
+            <span>{language === "en" ? `Allergies: ${splitNames(foods.allergies).join(", ") || "None"}` : `حساسیت ثبت‌شده: ${splitNames(foods.allergies).join("، ") || "ندارد"}`}</span>
           </div>
-          <Actions busy={busy} onBack={() => setStep("foods")} nextLabel="ثبت پروفایل تغذیه" />
+          <Actions busy={busy} onBack={() => setStep("foods")} nextLabel={language === "en" ? "Save nutrition profile" : "ثبت پروفایل تغذیه"} />
         </form>
       )}
       {requestError && <p className="form-error" role="alert">{copy.error}</p>}
@@ -527,44 +496,92 @@ type Flags = SafetyProfileInput extends infer _ ? {
   emergency_or_danger_symptoms: boolean; complex_medication_food_interaction: boolean;
 } : never;
 
+function useLocalizer() {
+  const { i18n } = useTranslation();
+  return (fa: string, en: string) => i18n.resolvedLanguage === "en" ? en : fa;
+}
+
+function NutritionQuestionFrame(props: {
+  busy: boolean;
+  current: number;
+  total: number;
+  title: string;
+  stage: 0 | 1 | 2;
+  optional?: boolean;
+  nextLabel?: string;
+  onBack: () => void;
+  onSubmit: () => void;
+  children: ReactNode;
+}) {
+  const l = useLocalizer();
+  const stages = [l("ایمنی", "Safety"), l("سبک زندگی", "Routine"), l("غذاها", "Food")];
+  return (
+    <section className="guided-question nutrition-question" aria-labelledby="nutrition-question-title">
+      <ol className="guided-stage-track" aria-label={l("بخش‌های تغذیه", "Nutrition sections")}>
+        {stages.map((stage, index) => (
+          <li className={index < props.stage ? "is-complete" : index === props.stage ? "is-active" : ""} key={stage}>
+            <span aria-hidden="true">{index < props.stage ? "✓" : index + 1}</span>{stage}
+          </li>
+        ))}
+      </ol>
+      <div className="public-onboarding-progress" aria-label={l("پیشرفت سؤال‌های تغذیه", "Nutrition questions progress")}>
+        <span>{l(`سؤال ${props.current + 1} از ${props.total}`, `Question ${props.current + 1} of ${props.total}`)}</span>
+        <progress value={props.current + 1} max={props.total} />
+      </div>
+      <h1 className="fitsho-display" id="nutrition-question-title">{props.title}</h1>
+      <form className="guided-question__form" onSubmit={(event) => { event.preventDefault(); props.onSubmit(); }}>
+        <fieldset className="nutrition-question__control" disabled={props.busy}>{props.children}</fieldset>
+        {props.optional && <button className="text-button" type="submit">{l("رد کردن این سؤال", "Skip this question")}</button>}
+        <Actions busy={props.busy} onBack={props.onBack} nextLabel={props.nextLabel ?? l("ادامه", "Continue")} />
+      </form>
+    </section>
+  );
+}
+
 function SafetyForm(props: {
   busy: boolean; conditions: MedicalConditionCode[]; flags: Flags; medications: string;
   physicianRestrictions: string; otherCondition: string;
   onConditions: (value: MedicalConditionCode[]) => void; onFlags: (value: Flags) => void;
   onMedications: (value: string) => void; onPhysicianRestrictions: (value: string) => void;
-  onOtherCondition: (value: string) => void; onSubmit: (event: FormEvent) => void; onBack: () => void;
+  onOtherCondition: (value: string) => void; onComplete: () => void; onBack: () => void;
 }) {
+  const l = useLocalizer();
+  const [question, setQuestion] = useState(0);
+  const titles = [
+    l("آیا شرایط پزشکی مشخصی داری؟", "Do you have any medical conditions?"),
+    l("کدام موارد ایمنی دربارهٔ تو صدق می‌کند؟", "Do any of these safety considerations apply?"),
+    l("در حال حاضر چه داروهایی مصرف می‌کنی؟", "Which medications do you currently take?"),
+    l("پزشک محدودیت غذایی خاصی برایت تعیین کرده؟", "Has a physician prescribed dietary restrictions?"),
+    l("شرایط دیگری هست که مربی باید بداند؟", "Is there anything else your coach should know?"),
+  ];
+  const advance = () => question === titles.length - 1 ? props.onComplete() : setQuestion((current) => current + 1);
+  const back = () => question === 0 ? props.onBack() : setQuestion((current) => current - 1);
   return (
-    <form className="profile-form" onSubmit={props.onSubmit}>
-      <fieldset className="profile-fieldset" disabled={props.busy}>
-        <legend>شرایط پزشکی و ایمنی</legend>
-        <div className="profile-checkboxes">
-          {conditionOptions.map(([code, label]) => (
+    <NutritionQuestionFrame busy={props.busy} current={question} total={titles.length} title={titles[question]} stage={0}
+      optional={question >= 2} nextLabel={question === titles.length - 1 ? l("ثبت ارزیابی ایمنی", "Save safety assessment") : undefined}
+      onBack={back} onSubmit={advance}>
+        {question === 0 && <div className="profile-checkboxes">
+          {conditionOptions.map(([code, fa, en]) => (
             <label key={code}><input type="checkbox" checked={props.conditions.includes(code)}
               onChange={() => props.onConditions(props.conditions.includes(code)
-                ? props.conditions.filter((item) => item !== code) : [...props.conditions, code])} />{label}</label>
+                ? props.conditions.filter((item) => item !== code) : [...props.conditions, code])} />{l(fa, en)}</label>
           ))}
-        </div>
-        {([
-          ["dangerous_food_reaction_history", "سابقه واکنش خطرناک غذایی"],
-          ["pregnant", "بارداری"], ["breastfeeding", "شیردهی"],
-          ["eating_disorder_diagnosed", "تشخیص اختلال خوردن"],
-          ["eating_disorder_active_symptoms", "علائم فعال اختلال خوردن"],
-          ["complex_medication_food_interaction", "تداخل پیچیده دارو و غذا"],
-          ["emergency_or_danger_symptoms", "علائم خطر یا وضعیت اورژانسی"],
-        ] as const).map(([field, label]) => (
+        </div>}
+        {question === 1 && <div className="profile-checkboxes">{([
+          ["dangerous_food_reaction_history", "سابقه واکنش خطرناک غذایی", "History of dangerous food reaction"],
+          ["pregnant", "بارداری", "Pregnant"], ["breastfeeding", "شیردهی", "Breastfeeding"],
+          ["eating_disorder_diagnosed", "تشخیص اختلال خوردن", "Diagnosed eating disorder"],
+          ["eating_disorder_active_symptoms", "علائم فعال اختلال خوردن", "Active eating-disorder symptoms"],
+          ["complex_medication_food_interaction", "تداخل پیچیده دارو و غذا", "Complex medication-food interaction"],
+          ["emergency_or_danger_symptoms", "علائم خطر یا وضعیت اورژانسی", "Emergency or danger symptoms"],
+        ] as const).map(([field, fa, en]) => (
           <label className="nutrition-check" key={field}><input type="checkbox" checked={props.flags[field]}
-            onChange={(event) => props.onFlags({ ...props.flags, [field]: event.target.checked })} />{label}</label>
-        ))}
-        <TextArea label="داروهای فعلی (اختیاری، هر دارو یک خط)" value={props.medications} onChange={props.onMedications} />
-        <TextArea label="محدودیت غذایی تجویزشده توسط پزشک (اختیاری)" value={props.physicianRestrictions} onChange={props.onPhysicianRestrictions} />
-        <TextArea label="شرایط مرتبط دیگر (اختیاری)" value={props.otherCondition} onChange={props.onOtherCondition} />
-        <button className="text-button" type="button" onClick={() => {
-          props.onMedications(""); props.onPhysicianRestrictions(""); props.onOtherCondition("");
-        }}>رد کردن توضیحات اختیاری</button>
-      </fieldset>
-      <Actions busy={props.busy} onBack={props.onBack} nextLabel="ثبت ارزیابی ایمنی" />
-    </form>
+            onChange={(event) => props.onFlags({ ...props.flags, [field]: event.target.checked })} />{l(fa, en)}</label>
+        ))}</div>}
+        {question === 2 && <TextArea label={l("داروهای فعلی (اختیاری، هر دارو یک خط)", "Current medications (optional, one per line)")} value={props.medications} onChange={props.onMedications} />}
+        {question === 3 && <TextArea label={l("محدودیت غذایی تجویزشده توسط پزشک (اختیاری)", "Physician-prescribed dietary restrictions (optional)")} value={props.physicianRestrictions} onChange={props.onPhysicianRestrictions} />}
+        {question === 4 && <TextArea label={l("شرایط مرتبط دیگر (اختیاری)", "Other relevant conditions (optional)")} value={props.otherCondition} onChange={props.onOtherCondition} />}
+    </NutritionQuestionFrame>
   );
 }
 
@@ -578,19 +595,28 @@ function BudgetForm(props: {
   onPlanStyle: (value: "economical" | "balanced" | "simple") => void;
   onBack: () => void; onNext: () => void;
 }) {
+  const l = useLocalizer();
+  const [question, setQuestion] = useState(0);
+  const titles = [
+    l("بودجه ماهانه غذای تو چقدر است؟", "What is your monthly food budget?"),
+    l("بودجه را چقدر سخت‌گیرانه رعایت کنیم؟", "How strictly should we follow your budget?"),
+    l("روزانه چند وعده اصلی می‌خوری؟", "How many main meals do you eat each day?"),
+    l("روزانه چند میان‌وعده می‌خواهی؟", "How many snacks would you like each day?"),
+    l("برنامه غذایی از چه روزی شروع شود؟", "Which day should your plan start?"),
+    l("چه سبک برنامه‌ای برایت مناسب‌تر است؟", "Which plan style suits you best?"),
+  ];
+  const advance = () => question === titles.length - 1 ? props.onNext() : setQuestion((current) => current + 1);
+  const back = () => question === 0 ? props.onBack() : setQuestion((current) => current - 1);
   return (
-    <form className="profile-form" onSubmit={(event) => { event.preventDefault(); if (Number(props.budget) >= 0 && props.budget !== "") props.onNext(); }}>
-      <fieldset className="profile-fieldset" disabled={props.busy}>
-        <legend>بودجه شخصی و تعداد وعده‌ها</legend>
-        <LabeledInput label="بودجه ماهانه غذا (مبلغ به ریال)" type="number" min="0" required value={props.budget} onChange={props.onBudget} />
-        <SelectField label="نوع بودجه" value={props.budgetStyle} onChange={(value) => props.onBudgetStyle(value as "strict" | "flexible")} options={[["strict", "سخت‌گیرانه"], ["flexible", "انعطاف‌پذیر"]]} />
-        <LabeledInput label="وعده اصلی در روز" type="number" min="1" max="8" value={props.mealCount} onChange={props.onMealCount} />
-        <LabeledInput label="میان‌وعده در روز" type="number" min="0" max="6" value={props.snackCount} onChange={props.onSnackCount} />
-        <SelectField label="روز شروع برنامه" value={props.startDay} onChange={(value) => props.onStartDay(value as NutritionProfileInput["preferred_plan_start_day"])} options={[["saturday", "شنبه"], ["sunday", "یکشنبه"], ["monday", "دوشنبه"], ["tuesday", "سه‌شنبه"], ["wednesday", "چهارشنبه"], ["thursday", "پنجشنبه"], ["friday", "جمعه"]]} />
-        <SelectField label="سبک برنامه" value={props.planStyle} onChange={(value) => props.onPlanStyle(value as typeof props.planStyle)} options={[["balanced", "متعادل"], ["economical", "اقتصادی"], ["simple", "ساده"]]} />
-      </fieldset>
-      <Actions busy={props.busy} onBack={props.onBack} nextLabel="ادامه" />
-    </form>
+    <NutritionQuestionFrame busy={props.busy} current={question} total={titles.length} title={titles[question]} stage={1}
+      onBack={back} onSubmit={advance}>
+      {question === 0 && <LabeledInput label={l("بودجه ماهانه غذا (مبلغ به ریال)", "Monthly food budget (IRR)")} type="number" min="0" required value={props.budget} onChange={props.onBudget} />}
+      {question === 1 && <SelectField label={l("نوع بودجه", "Budget style")} value={props.budgetStyle} onChange={(value) => props.onBudgetStyle(value as "strict" | "flexible")} options={[["strict", l("سخت‌گیرانه", "Strict")], ["flexible", l("انعطاف‌پذیر", "Flexible")]]} />}
+      {question === 2 && <LabeledInput label={l("وعده اصلی در روز", "Meals per day")} type="number" min="1" max="8" required value={props.mealCount} onChange={props.onMealCount} />}
+      {question === 3 && <LabeledInput label={l("میان‌وعده در روز", "Snacks per day")} type="number" min="0" max="6" required value={props.snackCount} onChange={props.onSnackCount} />}
+      {question === 4 && <SelectField label={l("روز شروع برنامه", "Plan start day")} value={props.startDay} onChange={(value) => props.onStartDay(value as NutritionProfileInput["preferred_plan_start_day"])} options={[["saturday", l("شنبه", "Saturday")], ["sunday", l("یکشنبه", "Sunday")], ["monday", l("دوشنبه", "Monday")], ["tuesday", l("سه‌شنبه", "Tuesday")], ["wednesday", l("چهارشنبه", "Wednesday")], ["thursday", l("پنجشنبه", "Thursday")], ["friday", l("جمعه", "Friday")]]} />}
+      {question === 5 && <SelectField label={l("سبک برنامه", "Plan style")} value={props.planStyle} onChange={(value) => props.onPlanStyle(value as typeof props.planStyle)} options={[["balanced", l("متعادل", "Balanced")], ["economical", l("اقتصادی", "Economical")], ["simple", l("ساده", "Simple")]]} />}
+    </NutritionQuestionFrame>
   );
 }
 
@@ -602,29 +628,41 @@ type CookingState = {
 };
 
 function CookingForm(props: { busy: boolean; value: CookingState; onChange: (value: CookingState) => void; onBack: () => void; onNext: () => void }) {
+  const l = useLocalizer();
+  const [question, setQuestion] = useState(0);
+  const titles = [
+    l("چقدر با آشپزی راحتی؟", "How comfortable are you with cooking?"),
+    l("ترجیح می‌دهی غذاها چطور آماده شوند؟", "How do you prefer to prepare meals?"),
+    l("برای هر بار آشپزی چقدر زمان داری؟", "How much time can you spend cooking?"),
+    l("چند بار در هفته آشپزی می‌کنی؟", "How often do you cook each week?"),
+    l("به یخچال و فریزر دسترسی داری؟", "Do you have access to a fridge and freezer?"),
+    l("چه وسایل آشپزی در اختیار داری؟", "Which cooking equipment do you have?"),
+    l("چند وعده در هفته از جای دیگری تأمین می‌شود؟", "How many meals are provided elsewhere each week?"),
+    l("این وعده‌ها معمولاً از کجا تأمین می‌شوند؟", "Where are those meals usually provided?"),
+  ];
+  const advance = () => question === titles.length - 1 ? props.onNext() : setQuestion((current) => current + 1);
+  const back = () => question === 0 ? props.onBack() : setQuestion((current) => current - 1);
   return (
-    <form className="profile-form" onSubmit={(event) => { event.preventDefault(); props.onNext(); }}>
-      <fieldset className="profile-fieldset" disabled={props.busy}>
-        <legend>زمان، مهارت و امکانات</legend>
-        <SelectField label="مهارت آشپزی" value={props.value.skill} onChange={(skill) => props.onChange({ ...props.value, skill: skill as CookingState["skill"] })} options={[["none", "آشپزی نمی‌کنم"], ["basic", "پایه"], ["confident", "مسلط"]]} />
-        <SelectField label="روش آماده‌سازی ترجیحی" value={props.value.preparation} onChange={(preparation) => props.onChange({ ...props.value, preparation: preparation as CookingState["preparation"] })} options={[["daily", "روزانه"], ["batch", "چندوعده‌ای"], ["mixed", "ترکیبی"], ["no_cooking", "بدون آشپزی"]]} />
-        <LabeledInput label="حداکثر زمان آشپزی (دقیقه)" type="number" min="0" max="360" value={props.value.maximumTime} onChange={(maximumTime) => props.onChange({ ...props.value, maximumTime })} />
-        <LabeledInput label="دفعات آشپزی در هفته" type="number" min="0" max="7" value={props.value.frequency} onChange={(frequency) => props.onChange({ ...props.value, frequency })} />
-        <label className="nutrition-check"><input type="checkbox" checked={props.value.refrigerator} onChange={(event) => props.onChange({ ...props.value, refrigerator: event.target.checked })} />دسترسی به یخچال</label>
-        <label className="nutrition-check"><input type="checkbox" checked={props.value.freezer} onChange={(event) => props.onChange({ ...props.value, freezer: event.target.checked })} />دسترسی به فریزر</label>
-        <div className="profile-checkboxes" aria-label="وسایل آشپزی موجود">
+    <NutritionQuestionFrame busy={props.busy} current={question} total={titles.length} title={titles[question]} stage={1}
+      optional={question === 7} onBack={back} onSubmit={advance}>
+        {question === 0 && <SelectField label={l("مهارت آشپزی", "Cooking skill")} value={props.value.skill} onChange={(skill) => props.onChange({ ...props.value, skill: skill as CookingState["skill"] })} options={[["none", l("آشپزی نمی‌کنم", "I do not cook")], ["basic", l("پایه", "Basic")], ["confident", l("مسلط", "Confident")]]} />}
+        {question === 1 && <SelectField label={l("روش آماده‌سازی ترجیحی", "Preferred preparation")} value={props.value.preparation} onChange={(preparation) => props.onChange({ ...props.value, preparation: preparation as CookingState["preparation"] })} options={[["daily", l("روزانه", "Daily")], ["batch", l("چندوعده‌ای", "Batch")], ["mixed", l("ترکیبی", "Mixed")], ["no_cooking", l("بدون آشپزی", "No cooking")]]} />}
+        {question === 2 && <LabeledInput label={l("حداکثر زمان آشپزی (دقیقه)", "Maximum cooking time (minutes)")} type="number" min="0" max="360" required value={props.value.maximumTime} onChange={(maximumTime) => props.onChange({ ...props.value, maximumTime })} />}
+        {question === 3 && <LabeledInput label={l("دفعات آشپزی در هفته", "Cooking sessions per week")} type="number" min="0" max="7" required value={props.value.frequency} onChange={(frequency) => props.onChange({ ...props.value, frequency })} />}
+        {question === 4 && <div className="profile-checkboxes">
+          <label className="nutrition-check"><input type="checkbox" checked={props.value.refrigerator} onChange={(event) => props.onChange({ ...props.value, refrigerator: event.target.checked })} />{l("دسترسی به یخچال", "Refrigerator access")}</label>
+          <label className="nutrition-check"><input type="checkbox" checked={props.value.freezer} onChange={(event) => props.onChange({ ...props.value, freezer: event.target.checked })} />{l("دسترسی به فریزر", "Freezer access")}</label>
+        </div>}
+        {question === 5 && <div className="profile-checkboxes" aria-label={l("وسایل آشپزی موجود", "Available cooking equipment")}>
           {([[
-            "stove", "اجاق"
-          ], ["oven", "فر"], ["microwave", "مایکروویو"], ["air_fryer", "هواپز"], ["rice_cooker", "پلوپز"], ["blender", "مخلوط‌کن"], ["refrigerator", "یخچال"]] as Array<[NutritionProfileInput["cooking_equipment"][number], string]>).map(([equipment, label]) => (
+            "stove", l("اجاق", "Stove")
+          ], ["oven", l("فر", "Oven")], ["microwave", l("مایکروویو", "Microwave")], ["air_fryer", l("هواپز", "Air fryer")], ["rice_cooker", l("پلوپز", "Rice cooker")], ["blender", l("مخلوط‌کن", "Blender")], ["refrigerator", l("یخچال", "Refrigerator")]] as Array<[NutritionProfileInput["cooking_equipment"][number], string]>).map(([equipment, label]) => (
             <label key={equipment}><input type="checkbox" checked={props.value.equipment.includes(equipment)} onChange={() => props.onChange({ ...props.value, equipment: props.value.equipment.includes(equipment) ? props.value.equipment.filter((item) => item !== equipment) : [...props.value.equipment, equipment] })} />{label}</label>
           ))}
-        </div>
-        <LabeledInput label="وعده تأمین‌شده در هفته" type="number" min="0" max="35" value={props.value.suppliedMeals} onChange={(suppliedMeals) => props.onChange({ ...props.value, suppliedMeals })} />
-        <LabeledInput label="منبع وعده تأمین‌شده (اختیاری)" value={props.value.suppliedSource} onChange={(suppliedSource) => props.onChange({ ...props.value, suppliedSource })} />
-        <button className="text-button" type="button" onClick={() => props.onChange({ ...props.value, suppliedSource: "" })}>رد کردن مورد اختیاری</button>
-      </fieldset>
-      <Actions busy={props.busy} onBack={props.onBack} nextLabel="ادامه" />
-    </form>
+        </div>}
+        {question === 6 && <LabeledInput label={l("وعده تأمین‌شده در هفته", "Provided meals per week")} type="number" min="0" max="35" required value={props.value.suppliedMeals} onChange={(suppliedMeals) => props.onChange({ ...props.value, suppliedMeals })} />}
+        {question === 7 && <LabeledInput label={l("منبع وعده تأمین‌شده (اختیاری)", "Provided meal source (optional)")} value={props.value.suppliedSource} onChange={(suppliedSource) => props.onChange({ ...props.value, suppliedSource })} />}
+    </NutritionQuestionFrame>
   );
 }
 
@@ -637,29 +675,57 @@ type FoodsState = {
 };
 
 function FoodsForm(props: { busy: boolean; value: FoodsState; onChange: (value: FoodsState) => void; onBack: () => void; onNext: () => void }) {
+  const l = useLocalizer();
   const fields: Array<[keyof Pick<FoodsState, "available" | "favourites" | "disliked" | "neverSuggest" | "refused" | "allergies" | "intolerances" | "cultural" | "workContext">, string]> = [
-    ["available", "مواد غذایی موجود در خانه (اختیاری)"], ["favourites", "غذاهای محبوب (اختیاری)"],
-    ["disliked", "غذاهای دوست‌نداشتنی (اختیاری)"], ["neverSuggest", "دیگر هرگز پیشنهاد نشود (اختیاری)"],
-    ["refused", "غذاهایی که نمی‌خوری (اختیاری)"], ["allergies", "حساسیت‌های غذایی (اختیاری، با ویرگول جدا کن)"],
-    ["intolerances", "عدم تحمل غذایی (اختیاری)"], ["cultural", "محدودیت مذهبی یا فرهنگی (اختیاری)"],
-    ["workContext", "شرایط کار یا شیفت (اختیاری)"],
+    ["available", l("مواد غذایی موجود در خانه (اختیاری)", "Foods available at home (optional)")], ["favourites", l("غذاهای محبوب (اختیاری)", "Favourite foods (optional)")],
+    ["disliked", l("غذاهای دوست‌نداشتنی (اختیاری)", "Disliked foods (optional)")], ["neverSuggest", l("دیگر هرگز پیشنهاد نشود (اختیاری)", "Never suggest again (optional)")],
+    ["refused", l("غذاهایی که نمی‌خوری (اختیاری)", "Foods you refuse (optional)")], ["allergies", l("حساسیت‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food allergies (optional, comma-separated)")],
+    ["intolerances", l("عدم تحمل غذایی (اختیاری)", "Food intolerances (optional)")], ["cultural", l("محدودیت مذهبی یا فرهنگی (اختیاری)", "Religious or cultural exclusions (optional)")],
+    ["workContext", l("شرایط کار یا شیفت (اختیاری)", "Work or shift context (optional)")],
   ];
+  const questions = [...fields.map(([field]) => field), "dietaryPattern", "variety", "repetition", "leftovers", "batchCooking", "checkIn", ...(props.value.checkIn ? ["checkInTime"] : [])] as const;
+  const [question, setQuestion] = useState(0);
+  const current = questions[Math.min(question, questions.length - 1)];
+  const field = fields.find(([name]) => name === current);
+  const titles: Record<string, string> = {
+    available: l("الان چه مواد غذایی در خانه داری؟", "Which foods do you have at home?"),
+    favourites: l("چه غذاهایی را بیشتر دوست داری؟", "Which foods do you enjoy most?"),
+    disliked: l("چه غذاهایی را دوست نداری؟", "Which foods do you dislike?"),
+    neverSuggest: l("چه غذایی دیگر هرگز پیشنهاد نشود؟", "Which foods should never be suggested again?"),
+    refused: l("چه غذاهایی را اصلاً نمی‌خوری؟", "Which foods do you refuse to eat?"),
+    allergies: l("حساسیت غذایی داری؟", "Do you have any food allergies?"),
+    intolerances: l("عدم تحمل غذایی داری؟", "Do you have any food intolerances?"),
+    cultural: l("محدودیت مذهبی یا فرهنگی داری؟", "Do you have religious or cultural exclusions?"),
+    workContext: l("برنامه کار یا شیفت روی غذایت اثر می‌گذارد؟", "Does work or shift timing affect your meals?"),
+    dietaryPattern: l("الگوی غذایی تو کدام است؟", "Which dietary pattern do you follow?"),
+    variety: l("چقدر تنوع غذایی می‌خواهی؟", "How much food variety would you like?"),
+    repetition: l("هر وعده حداکثر چند بار تکرار شود؟", "How often may a meal repeat each week?"),
+    leftovers: l("با خوردن باقی‌مانده غذا راحتی؟", "Are you comfortable eating leftovers?"),
+    batchCooking: l("با آشپزی برای چند وعده راحتی؟", "Are you comfortable batch cooking?"),
+    checkIn: l("یادآوری بررسی روزانه می‌خواهی؟", "Would you like a daily check-in reminder?"),
+    checkInTime: l("یادآوری چه ساعتی باشد؟", "What time should we remind you?"),
+  };
+  const advance = () => question === questions.length - 1 ? props.onNext() : setQuestion((value) => value + 1);
+  const back = () => question === 0 ? props.onBack() : setQuestion((value) => value - 1);
+  const booleanChoice = (key: "leftovers" | "batchCooking" | "checkIn") => (
+    <div className="guided-choice-grid">
+      <button className={props.value[key] ? "is-selected" : ""} type="button" onClick={() => props.onChange({ ...props.value, [key]: true })}>{l("بله", "Yes")}</button>
+      <button className={!props.value[key] ? "is-selected" : ""} type="button" onClick={() => props.onChange({ ...props.value, [key]: false })}>{l("نه", "No")}</button>
+    </div>
+  );
   return (
-    <form className="profile-form" onSubmit={(event) => { event.preventDefault(); props.onNext(); }}>
-      <fieldset className="profile-fieldset" disabled={props.busy}>
-        <legend>ترجیحات و حذف‌های قطعی</legend>
-        {fields.map(([field, label]) => <LabeledInput key={field} label={label} value={props.value[field]} onChange={(value) => props.onChange({ ...props.value, [field]: value })} />)}
-        <SelectField label="الگوی غذایی" value={props.value.dietaryPattern} onChange={(dietaryPattern) => props.onChange({ ...props.value, dietaryPattern: dietaryPattern as FoodsState["dietaryPattern"] })} options={[["omnivore", "همه‌چیزخوار"], ["vegetarian", "گیاه‌خوار"], ["vegan", "وگان"]]} />
-        <SelectField label="تنوع ترجیحی" value={props.value.variety} onChange={(variety) => props.onChange({ ...props.value, variety: variety as FoodsState["variety"] })} options={[["low", "کم"], ["medium", "متوسط"], ["high", "زیاد"]]} />
-        <LabeledInput label="حداکثر تکرار هر وعده در هفته" type="number" min="1" max="7" value={props.value.repetition} onChange={(repetition) => props.onChange({ ...props.value, repetition })} />
-        <label className="nutrition-check"><input type="checkbox" checked={props.value.leftovers} onChange={(event) => props.onChange({ ...props.value, leftovers: event.target.checked })} />باقی‌مانده غذا را می‌پذیرم</label>
-        <label className="nutrition-check"><input type="checkbox" checked={props.value.batchCooking} onChange={(event) => props.onChange({ ...props.value, batchCooking: event.target.checked })} />آشپزی چندوعده‌ای را می‌پذیرم</label>
-        <label className="nutrition-check"><input type="checkbox" checked={props.value.checkIn} onChange={(event) => props.onChange({ ...props.value, checkIn: event.target.checked })} />یادآوری بررسی کوتاه روزانه</label>
-        {props.value.checkIn && <LabeledInput label="زمان یادآوری روزانه" type="time" value={props.value.checkInTime} onChange={(checkInTime) => props.onChange({ ...props.value, checkInTime })} />}
-        <button className="text-button" type="button" onClick={() => props.onChange({ ...props.value, available: "", favourites: "", disliked: "", neverSuggest: "", refused: "", allergies: "", intolerances: "", cultural: "", workContext: "" })}>رد کردن همه موارد اختیاری</button>
-      </fieldset>
-      <Actions busy={props.busy} onBack={props.onBack} nextLabel="مرور پاسخ‌ها" />
-    </form>
+    <NutritionQuestionFrame busy={props.busy} current={question} total={questions.length} title={titles[current]} stage={2}
+      optional={field !== undefined} nextLabel={question === questions.length - 1 ? l("مرور پاسخ‌ها", "Review answers") : undefined}
+      onBack={back} onSubmit={advance}>
+      {field && <LabeledInput label={field[1]} value={props.value[field[0]]} onChange={(value) => props.onChange({ ...props.value, [field[0]]: value })} />}
+      {current === "dietaryPattern" && <SelectField label={l("الگوی غذایی", "Dietary pattern")} value={props.value.dietaryPattern} onChange={(dietaryPattern) => props.onChange({ ...props.value, dietaryPattern: dietaryPattern as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />}
+      {current === "variety" && <SelectField label={l("تنوع ترجیحی", "Preferred variety")} value={props.value.variety} onChange={(variety) => props.onChange({ ...props.value, variety: variety as FoodsState["variety"] })} options={[["low", l("کم", "Low")], ["medium", l("متوسط", "Medium")], ["high", l("زیاد", "High")]]} />}
+      {current === "repetition" && <LabeledInput label={l("حداکثر تکرار هر وعده در هفته", "Maximum repetitions per meal each week")} type="number" min="1" max="7" required value={props.value.repetition} onChange={(repetition) => props.onChange({ ...props.value, repetition })} />}
+      {current === "leftovers" && booleanChoice("leftovers")}
+      {current === "batchCooking" && booleanChoice("batchCooking")}
+      {current === "checkIn" && booleanChoice("checkIn")}
+      {current === "checkInTime" && <LabeledInput label={l("زمان یادآوری روزانه", "Daily reminder time")} type="time" required value={props.value.checkInTime} onChange={(checkInTime) => props.onChange({ ...props.value, checkInTime })} />}
+    </NutritionQuestionFrame>
   );
 }
 
@@ -676,5 +742,6 @@ function SelectField(props: { label: string; value: string; options: Array<[stri
 }
 
 function Actions({ busy, onBack, nextLabel }: { busy: boolean; onBack?: () => void; nextLabel: string }) {
-  return <div className="profile-actions">{onBack && <button className="secondary-button" type="button" disabled={busy} onClick={onBack}>بازگشت</button>}<button className="primary-button" type="submit" disabled={busy}>{busy ? "در حال ذخیره…" : nextLabel}</button></div>;
+  const l = useLocalizer();
+  return <div className="profile-actions">{onBack && <button className="secondary-button" type="button" disabled={busy} onClick={onBack}>{l("بازگشت", "Back")}</button>}<button className="primary-button" type="submit" disabled={busy}>{busy ? l("در حال ذخیره…", "Saving…") : nextLabel}</button></div>;
 }

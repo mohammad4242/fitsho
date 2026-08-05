@@ -5,10 +5,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { authErrorMessage } from "../auth/authError";
 import { useAuth } from "../auth/AuthContext";
 import { NutritionOnboardingFlow } from "../nutrition/NutritionOnboardingFlow";
-import { BodyGoalFields, ExperienceFields, PersonalFields } from "../profile/ProfileFormFields";
 import { toProfileInput, validateStep, type ProfileValidationErrors } from "../profile/profileValidation";
 import type { ProductMode, ProfileFormValues } from "../profile/types";
 import { clearOnboardingDraft, hydrateOnboardingDraft, loadOnboardingDraft, saveOnboardingDraft, type OnboardingDraft } from "./onboardingDraft";
+import { GuidedSharedProfileQuestions } from "./GuidedSharedProfileQuestions";
+import { GuidedTrainingQuestions } from "./GuidedTrainingQuestions";
 import "./publicOnboarding.css";
 
 const emptyValues: ProfileFormValues = {
@@ -25,13 +26,11 @@ const publicCopy = {
   fa: {
     brand: "فیتشو", header: "اطلاعاتت تا زمان ساخت حساب فقط در همین تب نگه‌داری می‌شود.",
     mode: { eyebrow: "شروع با مربی فیتشو", title: "تو چه زمینه‌ای به کمک نیاز داری؟", training: "برنامه تمرینی", nutrition: "برنامه تغذیه", both: "تمرین و تغذیه", recommended: "پیشنهاد فیتشو" },
-    training: { eyebrow: (step: number) => `مربی فیتشو · مرحله ${step} از ۳`, titles: ["اول کمی آشنا شویم", "بدن و هدفت", "سبک تمرین تو"], intro: "آرام و قدم‌به‌قدم جلو می‌رویم؛ سؤال‌های اختیاری را می‌توانی رد کنی.", skipMeasurements: "رد کردن اندازه‌گیری‌های اختیاری", skipNotes: "رد کردن توضیحات اختیاری", back: "بازگشت", next: "ادامه", finish: "ادامه و ساخت حساب" },
     account: { eyebrow: "آخرین قدم", title: "حالا حسابت را بساز", intro: "پاسخ‌ها بعد از ورود امن به حساب فیتشو منتقل می‌شوند.", providers: "روش‌های ورود", soon: "به‌زودی", phone: "شماره تلفن", divider: "ایمیل فعال است", email: "ایمیل", password: "رمز عبور", confirmation: "تکرار رمز عبور", registering: "در حال ثبت…", register: "ساخت حساب و ذخیره پاسخ‌ها", login: "ورود و ذخیره پاسخ‌ها", existing: "قبلاً حساب ساخته‌ام", newAccount: "حساب جدید می‌سازم", mismatch: "تکرار رمز عبور با رمز عبور یکسان نیست." },
   },
   en: {
     brand: "Fitsho", header: "Your answers stay in this tab until you create an account.",
     mode: { eyebrow: "Start with your Fitsho coach", title: "What would you like help with?", training: "Training plan", nutrition: "Nutrition plan", both: "Training and nutrition", recommended: "Fitsho recommended" },
-    training: { eyebrow: (step: number) => `Your Fitsho coach · Step ${step} of 3`, titles: ["Let’s get to know each other", "Your body and goal", "Your training style"], intro: "We’ll take this step by step. You can skip optional questions.", skipMeasurements: "Skip optional measurements", skipNotes: "Skip optional notes", back: "Back", next: "Continue", finish: "Continue to account setup" },
     account: { eyebrow: "Final step", title: "Create your account", intro: "Your answers will move securely into your Fitsho account after you sign in.", providers: "Sign-in methods", soon: "Coming soon", phone: "Phone number", divider: "Email is available", email: "Email", password: "Password", confirmation: "Confirm password", registering: "Creating account…", register: "Create account and save answers", login: "Sign in and save answers", existing: "I already have an account", newAccount: "Create a new account", mismatch: "Passwords do not match." },
   },
 } as const;
@@ -60,7 +59,6 @@ export function PublicOnboardingPage() {
         {draft === null && <ModeSelection language={language} onChoose={(mode) => updateDraft({ mode })} />}
         {draft?.mode === "training" && (
           <TrainingDraftFlow
-            language={language}
             onExit={() => updateDraft(null)}
             onComplete={(training) => updateDraft({ ...draft, training, readyForAuth: true })}
           />
@@ -111,8 +109,7 @@ function ModeSelection({ language, onChoose }: { language: Language; onChoose: (
   );
 }
 
-function TrainingDraftFlow({ language, onExit, onComplete }: { language: Language; onExit: () => void; onComplete: (input: ReturnType<typeof toProfileInput>) => void }) {
-  const text = publicCopy[language].training;
+function TrainingDraftFlow({ onExit, onComplete }: { onExit: () => void; onComplete: (input: ReturnType<typeof toProfileInput>) => void }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [values, setValues] = useState(emptyValues);
   const [errors, setErrors] = useState<ProfileValidationErrors>({});
@@ -127,31 +124,24 @@ function TrainingDraftFlow({ language, onExit, onComplete }: { language: Languag
     setErrors((current) => { const next = { ...current }; delete next[field]; return next; });
   }
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    const nextErrors = validateStep(values, step, new Date());
+  function completeTrainingQuestions() {
+    const nextErrors = validateStep(values, 3, new Date());
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    if (step < 3) setStep((step + 1) as 2 | 3);
-    else onComplete(toProfileInput(values));
+    onComplete(toProfileInput(values));
   }
 
-  return (
-    <section className="public-question-card">
-      <p className="eyebrow eyebrow--accent">{text.eyebrow(step)}</p>
-      <h1 className="fitsho-display">{text.titles[step - 1]}</h1>
-      <p>{text.intro}</p>
-      <form className="profile-form" noValidate onSubmit={submit}>
-        {step === 1 && <PersonalFields values={values} errors={errors} onChange={update} />}
-        {step === 2 && <><BodyGoalFields values={values} errors={errors} onChange={update} /><button className="text-button" type="button" onClick={() => { update("shoulder_circumference_cm", ""); update("waist_circumference_cm", ""); update("hip_circumference_cm", ""); }}>{text.skipMeasurements}</button></>}
-        {step === 3 && <><ExperienceFields values={values} errors={errors} onChange={update} /><button className="text-button" type="button" onClick={() => update("physical_limitations", "")}>{text.skipNotes}</button></>}
-        <div className="profile-actions">
-          <button className="secondary-button" type="button" onClick={() => step === 1 ? onExit() : setStep((step - 1) as 1 | 2)}>{text.back}</button>
-          <button className="primary-button" type="submit">{step === 3 ? text.finish : text.next}</button>
-        </div>
-      </form>
-    </section>
-  );
+  function completeSharedQuestions() {
+    const nextErrors = { ...validateStep(values, 1, new Date()), ...validateStep(values, 2, new Date()) };
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length === 0) setStep(3);
+  }
+
+  if (step === 1) {
+    return <section className="public-question-card public-question-card--fullscreen"><GuidedSharedProfileQuestions values={values} onChange={(field, value) => update(field, value)} onBack={onExit} onComplete={completeSharedQuestions} /></section>;
+  }
+
+  return <section className="public-question-card public-question-card--fullscreen"><GuidedTrainingQuestions values={values} onChange={update} onBack={() => setStep(1)} onComplete={completeTrainingQuestions} /></section>;
 }
 
 function FinalAccountStep({ draft, language }: { draft: OnboardingDraft; language: Language }) {

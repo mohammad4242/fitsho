@@ -31,6 +31,46 @@
 .public-onboarding .product-mode-card.mode-both { border-color: rgb(61 221 201 / 60%); background: rgb(27 185 164 / 20%); }
 .public-onboarding .product-mode-card:hover, .public-onboarding .product-mode-card:focus-visible { border-color: #f4f1e9; background: rgb(255 255 255 / 13%); }
 .public-question-card { width: min(100%, 48rem); margin: 0 auto; }
+.public-question-card--fullscreen {
+  min-height: calc(100svh - 5rem);
+  display: grid;
+  align-content: center;
+  gap: 1.5rem;
+  padding: clamp(2rem, 7vw, 5rem) 0;
+}
+.public-question-card--fullscreen .profile-fieldset {
+  min-height: 17rem;
+  display: grid;
+  align-content: center;
+}
+.public-onboarding-progress { display: grid; gap: 0.65rem; color: rgb(255 255 255 / 68%); font-size: 0.82rem; }
+.public-onboarding-progress progress { width: 100%; height: 0.35rem; accent-color: var(--turquoise); }
+.guided-stage-track { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7rem; margin: 0; padding: 0; list-style: none; }
+.guided-stage-track li { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0.5rem; color: rgb(255 255 255 / 42%); font-size: 0.78rem; font-weight: 800; }
+.guided-stage-track li > span { width: 1.8rem; aspect-ratio: 1; display: grid; place-items: center; border: 1px solid rgb(255 255 255 / 14%); border-radius: 50%; }
+.guided-stage-track li.is-active { color: #f4f1e9; }
+.guided-stage-track li.is-active > span { border-color: var(--turquoise); color: #071313; background: var(--turquoise); }
+.guided-stage-track li.is-complete { color: var(--turquoise); }
+.guided-stage-track li.is-complete > span { border-color: rgb(27 185 164 / 44%); background: rgb(27 185 164 / 15%); }
+.guided-question { min-height: calc(100svh - 10rem); display: grid; align-content: center; gap: 1.4rem; }
+.guided-question > h1 { max-width: 15ch; margin: 0; font-size: clamp(2.8rem, 7vw, 5.6rem); line-height: 1; }
+.guided-question__form { display: grid; gap: 1.5rem; }
+.nutrition-question__control { min-width: 0; display: grid; gap: 1rem; padding: 0; border: 0; }
+.nutrition-question .profile-fieldset,
+.nutrition-question .profile-checkboxes { max-height: min(38svh, 24rem); overflow: auto; }
+.nutrition-question textarea { min-height: 9rem; }
+.public-onboarding .nutrition-step { min-height: calc(100svh - 10rem); display: grid; align-content: center; }
+.public-onboarding .nutrition-review-card { color: #f4f1e9; }
+.public-onboarding .nutrition-review-card span { color: rgb(255 255 255 / 65%); }
+.guided-question__form > label { display: grid; gap: 0.7rem; color: rgb(255 255 255 / 72%); font-weight: 800; }
+.guided-question__form input,
+.guided-question__form select { min-height: 4.2rem; padding: 0.8rem 1rem; border: 1px solid rgb(255 255 255 / 18%); border-radius: 1rem; color: #f4f1e9; background: rgb(255 255 255 / 7%); font: inherit; color-scheme: dark; }
+.birth-date-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; padding: 0; border: 0; }
+.birth-date-picker legend { width: 100%; margin-bottom: 0.8rem; color: rgb(255 255 255 / 72%); font-weight: 800; }
+.birth-date-picker label { display: grid; gap: 0.45rem; color: rgb(255 255 255 / 60%); font-size: 0.82rem; }
+.guided-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
+.guided-choice-grid button { min-height: 5rem; padding: 1rem; border: 1px solid rgb(255 255 255 / 14%); border-radius: 1rem; color: #f4f1e9; background: rgb(255 255 255 / 5%); font-weight: 850; cursor: pointer; }
+.guided-choice-grid button.is-selected { border-color: var(--turquoise); background: rgb(27 185 164 / 20%); box-shadow: inset 0 0 0 1px rgb(27 185 164 / 28%); }
 .public-onboarding .profile-fieldset { border-color: rgb(255 255 255 / 11%); background: rgb(255 255 255 / 3%); }
 .public-onboarding .profile-field input,
 .public-onboarding .profile-field select,
@@ -49,4 +89,6 @@
 @media (max-width: 650px) {
   .public-onboarding__header > span { display: none; }
   .account-providers { grid-template-columns: 1fr; }
+  .birth-date-picker { grid-template-columns: 1fr; }
+  .guided-choice-grid { grid-template-columns: 1fr; }
 }

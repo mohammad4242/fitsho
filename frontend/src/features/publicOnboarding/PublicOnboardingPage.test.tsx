@@ -12,10 +12,10 @@ vi.mock("../auth/AuthContext", () => ({
 import { PublicOnboardingPage } from "./PublicOnboardingPage";
 import i18n from "../../i18n";
 
-beforeEach(() => {
+beforeEach(async () => {
   sessionStorage.clear();
   vi.clearAllMocks();
-  void i18n.changeLanguage("fa");
+  await i18n.changeLanguage("fa");
 });
 
 it("uses English on the first public onboarding screen when English is selected", async () => {
@@ -24,6 +24,22 @@ it("uses English on the first public onboarding screen when English is selected"
 
   expect(screen.getByRole("heading", { name: "What would you like help with?" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Training plan" })).toBeInTheDocument();
+});
+
+it("keeps English and asks one shared-profile question per screen", async () => {
+  const user = userEvent.setup();
+  await i18n.changeLanguage("en");
+  render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
+
+  await user.click(screen.getByRole("button", { name: "Training plan" }));
+  expect(screen.getByRole("heading", { name: "What should we call you?" })).toBeInTheDocument();
+  expect(screen.queryByLabelText("Birth date")).not.toBeInTheDocument();
+  await user.type(screen.getByLabelText("Display name"), "Alex");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByRole("heading", { name: "When were you born?" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Day")).toBeInTheDocument();
+  expect(screen.getByLabelText("Month")).toBeInTheDocument();
+  expect(screen.getByLabelText("Year")).toBeInTheDocument();
 });
 
 it("starts with product mode and marks the combined path as recommended", () => {
