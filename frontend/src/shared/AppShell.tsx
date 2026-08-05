@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
+import { useProfile } from "../features/profile/ProfileContext";
+
 type AppShellProps = {
   children: ReactNode;
 };
@@ -15,24 +17,31 @@ const navigation = [
 
 export function AppShell({ children }: AppShellProps) {
   const { t } = useTranslation();
+  const { status } = useProfile();
 
   return (
     <div className="app-shell">
       <div className="app-shell__content">{children}</div>
       <nav className="app-shell__nav" aria-label={t("header.primaryNavigation")}>
-        {navigation.map((item) => (
+        {navigation.map((item) => {
+          const isProfile = item.to === "/profile";
+          const to = isProfile && status !== "ready" ? "/onboarding" : item.to;
+          const label = isProfile && status !== "ready" ? "header.completeProfile" : item.label;
+
+          return (
           <NavLink
             className={({ isActive }) =>
               `app-shell__nav-link${isActive ? " app-shell__nav-link--active" : ""}`
             }
-            end={item.to === "/dashboard"}
+            end={to === "/dashboard"}
             key={item.to}
-            to={item.to}
+            to={to}
           >
             <span className={`app-shell__nav-icon app-shell__nav-icon--${item.icon}`} aria-hidden="true" />
-            <span>{t(item.label)}</span>
+            <span>{t(label)}</span>
           </NavLink>
-        ))}
+          );
+        })}
       </nav>
     </div>
   );

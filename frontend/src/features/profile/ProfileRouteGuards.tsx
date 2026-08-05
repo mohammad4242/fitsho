@@ -58,7 +58,7 @@ export function GuestRoute() {
     return startupState;
   }
 
-  return <Navigate to={status === "ready" ? "/dashboard" : "/onboarding"} replace />;
+  return <Navigate to={status === "missing" ? "/onboarding" : "/dashboard"} replace />;
 }
 
 export function OnboardingRoute() {
@@ -80,5 +80,5 @@ export function CompletedProfileRoute() {
     return startupState;
   }
 
-  return status === "ready" ? <Outlet /> : <Navigate to="/onboarding" replace />;
+  return status === "missing" ? <Navigate to="/onboarding" replace /> : <Outlet />;
 }

@@ -18,7 +18,7 @@ import "./dashboard.css";
 type PlanState = "loading" | "empty" | "ready" | "error";
 
 export function DashboardPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { profile } = useProfile();
@@ -58,7 +58,7 @@ export function DashboardPage() {
     return () => observer.disconnect();
   }, []);
 
-  if (user === null || profile === null) {
+  if (user === null) {
     return null;
   }
 
@@ -82,10 +82,10 @@ export function DashboardPage() {
         <div className="today-hero__content">
           <p className="today-kicker">{t("dashboard.kicker")}</p>
           <h1 id="today-title" className="fitsho-display">
-            {t("dashboard.greeting", { name: profile.display_name })}
+            {t("dashboard.greeting", { name: profile?.display_name ?? (i18n.language === "en" ? "there" : "دوست" ) })}
           </h1>
           <p>{t("dashboard.intro")}</p>
-          <PrimaryAction state={planState} generating={generating} onStart={startWorkout} />
+          {profile === null ? <Link className="primary-button" to="/onboarding">{i18n.language === "en" ? "Complete profile" : "تکمیل پروفایل"}</Link> : <PrimaryAction state={planState} generating={generating} onStart={startWorkout} />}
         </div>
         <p className="today-hero__hint" aria-hidden="true">{t("dashboard.scrollHint")}</p>
       </section>

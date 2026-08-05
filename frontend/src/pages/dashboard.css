@@ -22,6 +22,7 @@
 .today-shell .brand-mark--dark { color: var(--fitsho-mist); }
 .today-shell .authenticated-nav a { color: rgb(234 244 241 / 70%); }
 .today-shell .authenticated-nav a[aria-current="page"] { color: var(--fitsho-aqua); }
+.today-shell .member-menu-button { color: var(--fitsho-mist); border-color: rgb(234 244 241 / 24%); background: rgb(3 28 27 / 38%); }
 
 .today-hero {
   position: relative;

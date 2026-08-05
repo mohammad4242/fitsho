@@ -44,7 +44,7 @@ const profile = vi.hoisted(() => ({
       created_at: string;
       updated_at: string;
     },
-    status: "idle" as "idle" | "loading" | "missing" | "ready" | "error",
+    status: "idle" as "idle" | "loading" | "missing" | "mode_selected" | "ready" | "error",
     retryProfile: vi.fn(),
     createProfile: vi.fn(),
     updateProfile: vi.fn(),
@@ -178,6 +178,24 @@ it("redirects a signed-in root visitor to Today", async () => {
   renderRoute("/");
 
   expect(await screen.findByRole("heading", { name: "سلام، Mohammad" })).toBeInTheDocument();
+});
+
+it("opens the dashboard after sign-in and keeps profile completion in the account menu", async () => {
+  const user = userEvent.setup();
+  auth.value.user = member;
+  profile.value.status = "mode_selected";
+  profile.value.profile = null;
+  renderRoute("/dashboard");
+
+  expect(await screen.findByRole("heading", { name: "سلام، دوست" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "بیشتر در چه زمینه‌ای به کمک نیاز داری؟" })).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "باز کردن منوی حساب" }));
+
+  const accountMenu = screen.getByRole("navigation", { name: "منوی حساب" });
+  expect(accountMenu.querySelector('[href="/onboarding"]')).toHaveTextContent("تکمیل پروفایل");
+  expect(accountMenu.querySelector('[href="/exercises"]')).toHaveTextContent("حرکات");
+  expect(screen.getByRole("button", { name: /مقالات روز دنیا/ })).toBeDisabled();
 });
 
 it("logs a signed-in user out from Today", async () => {

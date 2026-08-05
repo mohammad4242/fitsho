@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../features/auth/AuthContext";
+import { useProfile } from "../features/profile/ProfileContext";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function AuthenticatedHeader() {
@@ -10,8 +11,10 @@ export function AuthenticatedHeader() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { status } = useProfile();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   if (user === null) {
     return null;
@@ -34,6 +37,49 @@ export function AuthenticatedHeader() {
           {t("common.brand")}
         </Link>
         <div className="dashboard-header__actions">
+          <div className="member-menu-wrap">
+            <button
+              className="member-menu-button"
+              type="button"
+              aria-label={menuOpen ? t("header.closeAccountMenu") : t("header.openAccountMenu")}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              <span aria-hidden="true">☰</span>
+            </button>
+            {menuOpen && (
+              <nav className="member-menu" aria-label={t("header.accountMenu")}>
+                <Link
+                  to={status === "ready" ? "/profile" : "/onboarding"}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {status === "ready" ? t("header.profile") : t("header.completeProfile")}
+                </Link>
+                <Link to="/workout-plan" onClick={() => setMenuOpen(false)}>
+                  {t("header.workoutPlan")}
+                </Link>
+                <Link to="/exercises" onClick={() => setMenuOpen(false)}>
+                  {t("header.exercises")}
+                </Link>
+                <button type="button" disabled>
+                  {t("header.articles")} <small>{t("header.comingSoon")}</small>
+                </button>
+                <span className="member-menu__section-label">{t("header.socialNetworks")}</span>
+                <a href="https://instagram.com" target="_blank" rel="noreferrer">Instagram</a>
+                <a href="https://t.me" target="_blank" rel="noreferrer">Telegram</a>
+                <a href="https://facebook.com" target="_blank" rel="noreferrer">Facebook</a>
+                <a href="https://x.com" target="_blank" rel="noreferrer">X</a>
+                {user.is_admin && (
+                  <Link to="/admin/exercises" onClick={() => setMenuOpen(false)}>
+                    {t("header.adminExercises")}
+                  </Link>
+                )}
+                <button className="member-menu__logout" type="button" onClick={handleLogout} disabled={busy}>
+                  {busy ? t("header.loggingOut") : t("header.logout")}
+                </button>
+              </nav>
+            )}
+          </div>
           <nav className="authenticated-nav" aria-label={t("header.navigation")}>
             <Link
               to="/dashboard"
@@ -56,10 +102,10 @@ export function AuthenticatedHeader() {
               {t("header.exercises")}
             </Link>
             <Link
-              to="/profile"
+              to={status === "ready" ? "/profile" : "/onboarding"}
               aria-current={location.pathname === "/profile" ? "page" : undefined}
             >
-              {t("header.profile")}
+              {status === "ready" ? t("header.profile") : t("header.completeProfile")}
             </Link>
             {user.is_admin && (
               <>
