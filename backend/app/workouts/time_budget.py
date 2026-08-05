@@ -33,7 +33,7 @@ class WorkoutGenerationPolicy:
         *,
         warmup_minutes: int = 5,
     ) -> WorkoutGenerationPolicy:
-        maximums = {30: 3, 45: 4, 60: 6, 75: 7, 90: 8}
+        maximums = {30: 3, 45: 4, 60: 6, 75: 7, 90: 8, 120: 9}
         return cls(
             session_duration_minutes=session_duration_minutes,
             warmup_minutes=warmup_minutes,

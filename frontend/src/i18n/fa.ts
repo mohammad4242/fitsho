@@ -84,7 +84,10 @@ const fa = {
         },
         fitnessGoal: {
           lose_weight: "کاهش وزن",
+          gain_weight: "افزایش وزن",
+          fat_loss: "چربی‌سوزی",
           build_muscle: "عضله‌سازی",
+          body_recomposition: "چربی‌سوزی + عضله‌سازی",
           improve_fitness: "بهبود آمادگی جسمانی",
           maintain_weight: "حفظ وزن",
         },
@@ -107,6 +110,7 @@ const fa = {
           60: "۶۰ دقیقه",
           75: "۷۵ دقیقه",
           90: "۹۰ دقیقه",
+          120: "بیش از ۹۰ دقیقه",
         },
         trainingCaution: {
           none: "ندارم",

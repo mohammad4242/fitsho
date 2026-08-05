@@ -47,7 +47,7 @@ class UserProfile(Base):
             name="ck_user_profiles_limitations_length",
         ),
         CheckConstraint(
-            "session_duration_minutes IN (30, 45, 60, 75, 90)",
+            "session_duration_minutes IN (30, 45, 60, 75, 90, 120)",
             name="ck_user_profiles_session_duration_values",
         ),
         CheckConstraint(

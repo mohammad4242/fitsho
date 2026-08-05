@@ -62,15 +62,17 @@ it("keeps the selected English language in the nutrition path", async () => {
   expect(screen.getByLabelText("Personal details progress")).toBeInTheDocument();
 });
 
-it("keeps nutrition safety questions in English after shared details", async () => {
+it("moves nutrition safety questions until after account creation", async () => {
   await i18n.changeLanguage("en");
   const user = userEvent.setup();
+  const onDraftComplete = vi.fn();
   render(
     <NutritionOnboardingFlow
       productMode="nutrition"
       draftMode
       onCreateTrainingProfile={vi.fn()}
       onComplete={vi.fn()}
+      onDraftComplete={onDraftComplete}
     />,
   );
 
@@ -85,14 +87,13 @@ it("keeps nutrition safety questions in English after shared details", async () 
   await user.type(screen.getByLabelText("Height (centimeters)"), "165");
   await user.type(screen.getByLabelText("Current weight (kilograms)"), "62.5");
   await user.click(screen.getByRole("button", { name: "Continue" }));
-  await user.click(screen.getByRole("button", { name: "Maintain weight" }));
+  await user.click(screen.getByRole("button", { name: "Fat loss" }));
   await user.click(screen.getByRole("button", { name: "Continue" }));
 
-  expect(screen.getByRole("heading", { name: "Do you have any medical conditions?" })).toBeInTheDocument();
-  expect(screen.getByLabelText("Nutrition questions progress")).toHaveTextContent("Question 1 of 5");
-  await user.click(screen.getByRole("button", { name: "Continue" }));
-  expect(screen.getByRole("heading", { name: "Do any of these safety considerations apply?" })).toBeInTheDocument();
-  expect(screen.queryByText("علائم خطر یا وضعیت اورژانسی")).not.toBeInTheDocument();
+  expect(onDraftComplete).toHaveBeenCalledWith(expect.objectContaining({
+    shared: expect.objectContaining({ fitness_goal: "fat_loss" }),
+  }));
+  expect(screen.queryByRole("heading", { name: "Do you have any medical conditions?" })).not.toBeInTheDocument();
 });
 
 async function completeSharedQuestions(user: ReturnType<typeof userEvent.setup>) {
@@ -107,7 +108,7 @@ async function completeSharedQuestions(user: ReturnType<typeof userEvent.setup>)
   await user.type(screen.getByLabelText("قد (سانتی‌متر)"), "165");
   await user.type(screen.getByLabelText("وزن فعلی (کیلوگرم)"), "62.5");
   await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await user.click(screen.getByRole("button", { name: "حفظ وزن" }));
+  await user.click(screen.getByRole("button", { name: "چربی‌سوزی" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));
 }
 
@@ -139,7 +140,7 @@ it("saves shared data before showing the early safety screen", async () => {
 
   expect(profileApi.saveSharedProfile).toHaveBeenCalledWith({
     display_name: "سارا", birth_date: "2000-05-14", sex: "female",
-    height_cm: 165, current_weight_kg: 62.5, fitness_goal: "maintain_weight",
+    height_cm: 165, current_weight_kg: 62.5, fitness_goal: "fat_loss",
   });
 });
 
@@ -173,7 +174,7 @@ it("asks safety before training in combined mode", async () => {
   expect(await screen.findByRole("heading", { name: "آیا شرایط پزشکی مشخصی داری؟" })).toBeInTheDocument();
 
   await completeSafetyQuestions(user);
-  expect(await screen.findByRole("heading", { name: "چه‌قدر تجربهٔ تمرین داری؟" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "چقدر سابقه تمرین مداوم داری؟" })).toBeInTheDocument();
 });
 
 it("completes the guided nutrition profile with IRR budget and optional skips", async () => {

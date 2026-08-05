@@ -93,6 +93,24 @@ def test_profile_create_accepts_six_training_days() -> None:
 
 
 @pytest.mark.parametrize(
+    "goal",
+    ["lose_weight", "gain_weight", "fat_loss", "build_muscle", "body_recomposition"],
+)
+def test_profile_create_accepts_the_five_supported_goals(goal: str) -> None:
+    payload = valid_payload()
+    payload["fitness_goal"] = goal
+
+    assert ProfileCreate.model_validate(payload).fitness_goal.value == goal
+
+
+def test_profile_create_accepts_the_ninety_plus_workout_duration() -> None:
+    payload = valid_payload()
+    payload["session_duration_minutes"] = 120
+
+    assert ProfileCreate.model_validate(payload).session_duration_minutes == 120
+
+
+@pytest.mark.parametrize(
     ("field", "value"),
     [
         ("display_name", " x "),

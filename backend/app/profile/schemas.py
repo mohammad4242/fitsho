@@ -18,7 +18,7 @@ from app.profile.enums import (
     WorkoutGenerationMethod,
 )
 
-SessionDurationMinutes = Literal[30, 45, 60, 75, 90]
+SessionDurationMinutes = Literal[30, 45, 60, 75, 90, 120]
 PlanDurationWeeks = Literal[4, 6, 8]
 CircumferenceCm = Decimal
 

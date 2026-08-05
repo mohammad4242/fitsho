@@ -42,7 +42,10 @@ GOAL_ALIASES: dict[str, Goal] = {
     "weight_loss": Goal.FAT_LOSS,
     "lose_weight": Goal.FAT_LOSS,
     "weight_gain": Goal.MUSCLE_GAIN,
+    "gain_weight": Goal.MUSCLE_GAIN,
     "build_muscle": Goal.MUSCLE_GAIN,
+    "fat_loss": Goal.FAT_LOSS,
+    "body_recomposition": Goal.BODY_RECOMPOSITION,
     "improve_fitness": Goal.GENERAL_FITNESS,
     "maintain_weight": Goal.GENERAL_FITNESS,
 }

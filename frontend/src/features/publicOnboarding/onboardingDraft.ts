@@ -1,4 +1,3 @@
-import * as nutritionApi from "../nutrition/api";
 import type { NutritionProfileInput, SafetyProfileInput } from "../nutrition/types";
 import * as profileApi from "../profile/api";
 import type { ProductMode, ProfileInput, SharedProfileInput } from "../profile/types";
@@ -59,15 +58,11 @@ export async function hydrateOnboardingDraft(draft: OnboardingDraft): Promise<vo
   }
 
   const shared = draft.shared ?? (draft.training === undefined ? undefined : sharedFromTraining(draft.training));
-  if (shared === undefined || draft.safety === undefined) throw new Error("Nutrition draft is incomplete");
+  if (shared === undefined) throw new Error("Nutrition draft is incomplete");
   await profileApi.saveSharedProfile(shared);
-  const decision = await nutritionApi.saveSafetyProfile(draft.safety);
 
   if (draft.mode === "both" && draft.training !== undefined) {
     await profileApi.createProfile(draft.training);
-  }
-  if (decision.can_continue_onboarding && draft.nutrition !== undefined) {
-    await nutritionApi.saveNutritionProfile(draft.nutrition);
   }
   clearOnboardingDraft();
 }

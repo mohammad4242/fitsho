@@ -84,7 +84,10 @@ const en = {
         },
         fitnessGoal: {
           lose_weight: "Lose weight",
+          gain_weight: "Gain weight",
+          fat_loss: "Fat loss",
           build_muscle: "Build muscle",
+          body_recomposition: "Fat loss + build muscle",
           improve_fitness: "Improve fitness",
           maintain_weight: "Maintain weight",
         },
@@ -107,6 +110,7 @@ const en = {
           60: "60 minutes",
           75: "75 minutes",
           90: "90 minutes",
+          120: "More than 90 minutes",
         },
         trainingCaution: {
           none: "None",

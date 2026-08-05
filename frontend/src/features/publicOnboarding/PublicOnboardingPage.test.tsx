@@ -64,6 +64,14 @@ it("groups height and weight with the selected valid ranges", async () => {
   await user.type(screen.getByLabelText("وزن فعلی (کیلوگرم)"), "36");
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   expect(screen.getByLabelText("این مقادیر درست هستند.")).toBeInTheDocument();
+  await user.click(screen.getByLabelText("این مقادیر درست هستند."));
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+
+  expect(screen.getByRole("button", { name: "کاهش وزن" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "افزایش وزن" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "چربی‌سوزی" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "عضله‌سازی" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "چربی‌سوزی + عضله‌سازی" })).toBeInTheDocument();
 });
 
 it("starts with product mode and marks the combined path as recommended", () => {

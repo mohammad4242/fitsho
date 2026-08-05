@@ -29,7 +29,11 @@ class Sex(StrEnum):
 
 class FitnessGoal(StrEnum):
     LOSE_WEIGHT = "lose_weight"
+    GAIN_WEIGHT = "gain_weight"
+    FAT_LOSS = "fat_loss"
     BUILD_MUSCLE = "build_muscle"
+    BODY_RECOMPOSITION = "body_recomposition"
+    # Kept for profiles created before the five-goal onboarding update.
     IMPROVE_FITNESS = "improve_fitness"
     MAINTAIN_WEIGHT = "maintain_weight"
 

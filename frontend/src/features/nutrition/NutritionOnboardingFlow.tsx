@@ -235,7 +235,8 @@ export function NutritionOnboardingFlow({
     };
     if (draftMode) {
       onDraftChange?.({ shared });
-      setStep("safety");
+      if (productMode === "both" && !trainingProfileExists) setStep("training");
+      else onDraftComplete?.({ shared });
       return;
     }
     setBusy(true);
@@ -274,8 +275,7 @@ export function NutritionOnboardingFlow({
     if (Object.keys(nextErrors).length > 0) return;
     const training = toProfileInput(values);
     if (draftMode) {
-      onDraftChange?.({ training });
-      setStep("budget");
+      onDraftComplete?.({ training });
       return;
     }
     setBusy(true);

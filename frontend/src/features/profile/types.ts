@@ -3,11 +3,16 @@ export type Sex = (typeof sexes)[number];
 
 export const fitnessGoals = [
   "lose_weight",
+  "gain_weight",
+  "fat_loss",
   "build_muscle",
+  "body_recomposition",
+] as const;
+const legacyFitnessGoals = [
   "improve_fitness",
   "maintain_weight",
 ] as const;
-export type FitnessGoal = (typeof fitnessGoals)[number];
+export type FitnessGoal = (typeof fitnessGoals)[number] | (typeof legacyFitnessGoals)[number];
 
 export const experienceLevels = ["beginner", "intermediate", "advanced"] as const;
 export type ExperienceLevel = (typeof experienceLevels)[number];
@@ -18,7 +23,7 @@ export type TrainingLocation = (typeof trainingLocations)[number];
 export const homeTrainingSetups = ["bodyweight_only", "dumbbells_available"] as const;
 export type HomeTrainingSetup = (typeof homeTrainingSetups)[number];
 
-export const sessionDurations = [30, 45, 60, 75, 90] as const;
+export const sessionDurations = [30, 45, 60, 75, 90, 120] as const;
 export type SessionDurationMinutes = (typeof sessionDurations)[number];
 export const trainingCautions = ["lower_back", "knee", "shoulder", "neck", "wrist", "other"] as const;
 export type TrainingCaution = (typeof trainingCautions)[number];

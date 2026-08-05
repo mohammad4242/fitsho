@@ -11,7 +11,7 @@ type Props = {
 };
 
 const sexes = ["female", "male", "other", "prefer_not_to_say"] as const;
-const goals = ["lose_weight", "build_muscle", "improve_fitness", "maintain_weight"] as const;
+const goals = ["lose_weight", "gain_weight", "fat_loss", "build_muscle", "body_recomposition"] as const;
 
 export function GuidedSharedProfileQuestions({ values, onChange, onBack, onComplete }: Props) {
   const { t, i18n } = useTranslation();
