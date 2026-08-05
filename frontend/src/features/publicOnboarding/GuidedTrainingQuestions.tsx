@@ -29,6 +29,9 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete }
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (question === "cautions" && values.training_cautions === null) {
+      onChange("training_cautions", []);
+    }
     if (index === questions.length - 1) onComplete();
     else setIndex((current) => current + 1);
   }
@@ -70,7 +73,7 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete }
       ] as const).map(([value, label]) => choice("session_duration_minutes", String(value), label))}</div>}
       {question === "cautions" && <div className="guided-choice-grid">{(["lower_back", "knee", "shoulder", "neck", "wrist", "other"] as TrainingCaution[]).map((value) => <button className={cautions.includes(value) ? "is-selected" : ""} key={value} type="button" onClick={() => toggle(value)}>{t(`onboarding.options.trainingCaution.${value}`)}</button>)}</div>}
       {question === "weeks" && <div className="guided-choice-grid">{[4, 6, 8].map((value) => choice("plan_duration_weeks", String(value), t(`onboarding.options.planDuration.${value}`)))}</div>}
-      {question === "cautions" && <button className="text-button" type="submit" onClick={() => values.training_cautions === null && onChange("training_cautions", [])}>{language === "en" ? "Skip this question" : "رد کردن این سؤال"}</button>}
+      {question === "cautions" && <button className="text-button" type="submit">{language === "en" ? "Skip this question" : "رد کردن این سؤال"}</button>}
       <div className="profile-actions"><button className="secondary-button" type="button" onClick={back}>{language === "en" ? "Back" : "بازگشت"}</button><button className="primary-button" type="submit" disabled={!ready}>{language === "en" ? "Continue" : "ادامه"}</button></div>
     </form>
   </section>;
