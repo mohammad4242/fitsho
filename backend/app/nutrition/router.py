@@ -7,20 +7,34 @@ from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.database.session import get_db
+from app.nutrition.estimate_service import (
+    create_estimate,
+    current_estimate,
+    get_structured_exercise,
+    save_structured_exercise,
+)
 from app.nutrition.exceptions import (
+    GoalReselectionRequiredDomainError,
+    NutritionEstimateBlockedError,
+    NutritionEstimateNotFoundError,
     NutritionOnboardingBlockedError,
+    NutritionProductModeError,
     NutritionProfileNotFoundError,
     SafetyDecisionNotFoundError,
     SafetyScreenRequiredError,
     SharedProfileRequiredError,
+    StructuredExerciseRequiredError,
 )
 from app.nutrition.schemas import (
+    NutritionEstimateResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
     PhysicianReviewRequirementResponse,
     SafetyDecisionResponse,
     SafetyEvaluationResponse,
     SafetyProfileInput,
+    StructuredExerciseInput,
+    StructuredExerciseResponse,
 )
 from app.nutrition.service import (
     current_safety_decision,
@@ -120,6 +134,108 @@ def read_nutrition_profile(
             detail={
                 "code": "NUTRITION_PROFILE_NOT_FOUND",
                 "message": "پروفایل تغذیه ثبت نشده است.",
+            },
+        ) from None
+
+
+@router.put(
+    "/structured-exercise",
+    response_model=StructuredExerciseResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_structured_exercise(
+    payload: StructuredExerciseInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> StructuredExerciseResponse:
+    try:
+        return save_structured_exercise(db, user.id, payload)
+    except NutritionProfileNotFoundError:
+        raise _domain_error(
+            "NUTRITION_PROFILE_REQUIRED",
+            "ابتدا اطلاعات تغذیه را کامل کنید.",
+        ) from None
+    except NutritionProductModeError:
+        raise _domain_error(
+            "NUTRITION_PRODUCT_MODE_REQUIRED",
+            "این اطلاعات فقط در مسیر تغذیه ثبت می‌شود.",
+        ) from None
+
+
+@router.get("/structured-exercise", response_model=StructuredExerciseResponse)
+def read_structured_exercise(
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> StructuredExerciseResponse:
+    try:
+        return get_structured_exercise(db, user.id)
+    except (NutritionProfileNotFoundError, StructuredExerciseRequiredError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "STRUCTURED_EXERCISE_NOT_FOUND",
+                "message": "اطلاعات تمرین ساختاریافته ثبت نشده است.",
+            },
+        ) from None
+    except NutritionProductModeError:
+        raise _domain_error(
+            "NUTRITION_PRODUCT_MODE_REQUIRED",
+            "برآورد تغذیه برای این مسیر فعال نیست.",
+        ) from None
+
+
+@router.post(
+    "/estimates",
+    response_model=NutritionEstimateResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def generate_estimate(
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> NutritionEstimateResponse:
+    try:
+        return create_estimate(db, user.id)
+    except NutritionEstimateBlockedError:
+        raise _domain_error(
+            "NUTRITION_ESTIMATE_BLOCKED",
+            "به‌دلیل وضعیت ایمنی، برآورد عمومی تغذیه برای این حساب مجاز نیست.",
+        ) from None
+    except GoalReselectionRequiredDomainError:
+        raise _domain_error(
+            "GOAL_RESELECTION_REQUIRED",
+            "برای فردی که تمرین نمی‌کند، هدف عضله‌سازی قابل برآورد نیست.",
+        ) from None
+    except StructuredExerciseRequiredError:
+        raise _domain_error(
+            "STRUCTURED_EXERCISE_REQUIRED",
+            "اطلاعات تمرین برای محاسبه دقیق انرژی لازم است.",
+        ) from None
+    except NutritionProfileNotFoundError:
+        raise _domain_error(
+            "NUTRITION_PROFILE_REQUIRED",
+            "اطلاعات لازم برای برآورد تغذیه کامل نیست.",
+        ) from None
+    except NutritionProductModeError:
+        raise _domain_error(
+            "NUTRITION_PRODUCT_MODE_REQUIRED",
+            "برآورد تغذیه برای این مسیر فعال نیست.",
+        ) from None
+
+
+@router.get("/estimates/current", response_model=NutritionEstimateResponse)
+def read_current_estimate(
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> NutritionEstimateResponse:
+    try:
+        return current_estimate(db, user.id)
+    except NutritionEstimateNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "NUTRITION_ESTIMATE_NOT_FOUND",
+                "message": "هنوز برآورد تغذیه‌ای ثبت نشده است.",
             },
         ) from None
 

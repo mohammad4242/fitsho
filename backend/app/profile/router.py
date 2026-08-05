@@ -146,6 +146,7 @@ def to_response(snapshot: ProfileSnapshot) -> ProfileResponse:
         training_location=profile.training_location,
         home_training_setup=profile.home_training_setup,
         session_duration_minutes=profile.session_duration_minutes,
+        training_intensity=profile.training_intensity,
         physical_limitations=profile.physical_limitations,
         training_cautions=sorted(
             (item.caution for item in profile.training_caution_items),

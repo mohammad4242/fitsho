@@ -119,6 +119,7 @@ def create_profile(
         "training_location": payload.training_location,
         "home_training_setup": payload.home_training_setup,
         "session_duration_minutes": payload.session_duration_minutes,
+        "training_intensity": payload.training_intensity,
         "physical_limitations": payload.physical_limitations,
         "plan_duration_weeks": payload.plan_duration_weeks,
         "workout_generation_method": payload.workout_generation_method,

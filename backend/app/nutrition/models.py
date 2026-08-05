@@ -1,8 +1,10 @@
 from datetime import datetime, time
+from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -10,6 +12,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Numeric,
     SmallInteger,
     String,
     Text,
@@ -26,17 +29,24 @@ from app.nutrition.enums import (
     CookingSkill,
     DailyActivityLevel,
     DietaryPattern,
+    EstimateConfidence,
     FoodItemKind,
     MealPreparationPreference,
     MedicalConditionCode,
+    MetabolicBasis,
+    NutritionEstimateStatus,
     NutritionOnboardingStatus,
     NutritionPlanStyle,
+    NutritionTargetMetric,
     PhysicianReviewMode,
     PhysicianReviewStatus,
     PreferredVariety,
     SafetyOutcome,
+    StructuredExerciseSource,
+    StructuredExerciseType,
     Weekday,
 )
+from app.profile.enums import TrainingIntensity
 
 
 def enum_values(members: type[StrEnum]) -> list[str]:
@@ -59,6 +69,19 @@ class MedicalConditionPolicy(Base):
 
     version: Mapped[str] = mapped_column(String(64), primary_key=True)
     description: Mapped[str] = mapped_column(String(300), nullable=False)
+    effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class NutritionPolicyVersion(Base):
+    __tablename__ = "nutrition_policy_versions"
+
+    version: Mapped[str] = mapped_column(String(64), primary_key=True)
+    formula_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    description: Mapped[str] = mapped_column(String(300), nullable=False)
+    source_manifest: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
     effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -223,6 +246,9 @@ class NutritionProfile(Base):
         enum_column(DailyActivityLevel, "ck_nutrition_profiles_daily_activity_level_values"),
         nullable=False,
     )
+    metabolic_basis: Mapped[MetabolicBasis | None] = mapped_column(
+        enum_column(MetabolicBasis, "ck_nutrition_profiles_metabolic_basis_values")
+    )
     individual_monthly_food_budget_irr: Mapped[int] = mapped_column(BigInteger, nullable=False)
     budget_style: Mapped[BudgetStyle] = mapped_column(
         enum_column(BudgetStyle, "ck_nutrition_profiles_budget_style_values"), nullable=False
@@ -266,6 +292,141 @@ class NutritionProfile(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class NutritionStructuredExercise(Base):
+    __tablename__ = "nutrition_structured_exercises"
+    __table_args__ = (
+        CheckConstraint(
+            "(trains = false AND exercise_type IS NULL AND days_per_week IS NULL "
+            "AND minutes_per_session IS NULL AND intensity IS NULL) OR "
+            "(trains = true AND exercise_type IS NOT NULL AND days_per_week IS NOT NULL "
+            "AND minutes_per_session IS NOT NULL AND intensity IS NOT NULL)",
+            name="ck_nutrition_structured_exercises_complete_when_training",
+        ),
+        CheckConstraint(
+            "days_per_week IS NULL OR days_per_week BETWEEN 1 AND 7",
+            name="ck_nutrition_structured_exercises_days_range",
+        ),
+        CheckConstraint(
+            "minutes_per_session IS NULL OR minutes_per_session BETWEEN 1 AND 360",
+            name="ck_nutrition_structured_exercises_minutes_range",
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_profiles.user_id", ondelete="CASCADE"), primary_key=True
+    )
+    trains: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    exercise_type: Mapped[StructuredExerciseType | None] = mapped_column(
+        enum_column(
+            StructuredExerciseType,
+            "ck_nutrition_structured_exercises_type_values",
+        )
+    )
+    days_per_week: Mapped[int | None] = mapped_column(SmallInteger)
+    minutes_per_session: Mapped[int | None] = mapped_column(SmallInteger)
+    intensity: Mapped[TrainingIntensity | None] = mapped_column(
+        enum_column(TrainingIntensity, "ck_nutrition_structured_exercises_intensity_values")
+    )
+    source: Mapped[StructuredExerciseSource] = mapped_column(
+        enum_column(
+            StructuredExerciseSource,
+            "ck_nutrition_structured_exercises_source_values",
+        ),
+        nullable=False,
+    )
+    confirmed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class NutritionEstimate(Base):
+    __tablename__ = "nutrition_estimates"
+    __table_args__ = (
+        UniqueConstraint("user_id", "revision", name="uq_nutrition_estimates_user_revision"),
+        UniqueConstraint(
+            "user_id",
+            "input_signature",
+            "policy_version",
+            name="uq_nutrition_estimates_user_signature_policy",
+        ),
+        CheckConstraint("revision > 0", name="ck_nutrition_estimates_revision_positive"),
+        CheckConstraint(
+            "char_length(input_signature) = 64",
+            name="ck_nutrition_estimates_signature_length",
+        ),
+        Index("ix_nutrition_estimates_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_profiles.user_id", ondelete="CASCADE"), nullable=False
+    )
+    safety_decision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_safety_decisions.id", ondelete="RESTRICT"), nullable=False
+    )
+    policy_version: Mapped[str] = mapped_column(
+        ForeignKey("nutrition_policy_versions.version", ondelete="RESTRICT"), nullable=False
+    )
+    formula_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    revision: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    input_signature: Mapped[str] = mapped_column(String(64), nullable=False)
+    input_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    status: Mapped[NutritionEstimateStatus] = mapped_column(
+        enum_column(NutritionEstimateStatus, "ck_nutrition_estimates_status_values"),
+        nullable=False,
+    )
+    overall_confidence: Mapped[EstimateConfidence] = mapped_column(
+        enum_column(EstimateConfidence, "ck_nutrition_estimates_confidence_values"),
+        nullable=False,
+    )
+    confidence_reasons: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    targets: Mapped[list["NutritionEstimateTarget"]] = relationship(
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="NutritionEstimateTarget.metric",
+    )
+
+
+class NutritionEstimateTarget(Base):
+    __tablename__ = "nutrition_estimate_targets"
+    __table_args__ = (
+        CheckConstraint(
+            "(minimum_value IS NULL OR minimum_value >= 0) AND "
+            "(preferred_value IS NULL OR preferred_value >= 0) AND "
+            "(preferred_maximum_value IS NULL OR preferred_maximum_value >= 0) AND "
+            "(maximum_value IS NULL OR maximum_value >= 0)",
+            name="ck_nutrition_estimate_targets_nonnegative",
+        ),
+    )
+
+    estimate_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_estimates.id", ondelete="CASCADE"), primary_key=True
+    )
+    metric: Mapped[NutritionTargetMetric] = mapped_column(
+        enum_column(NutritionTargetMetric, "ck_nutrition_estimate_targets_metric_values"),
+        primary_key=True,
+    )
+    unit: Mapped[str] = mapped_column(String(24), nullable=False)
+    minimum_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
+    preferred_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
+    preferred_maximum_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
+    maximum_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
+    confidence: Mapped[EstimateConfidence] = mapped_column(
+        enum_column(EstimateConfidence, "ck_nutrition_estimate_targets_confidence_values"),
+        nullable=False,
+    )
+    source_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    applicable_population: Mapped[str] = mapped_column(String(200), nullable=False)
+    rounding_rule: Mapped[str] = mapped_column(String(100), nullable=False)
+    explanation_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
 
 
 class NutritionCookingEquipment(Base):

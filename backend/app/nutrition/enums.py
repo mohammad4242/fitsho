@@ -32,6 +32,52 @@ class DailyActivityLevel(StrEnum):
     VERY_ACTIVE = "very_active"
 
 
+class MetabolicBasis(StrEnum):
+    FEMALE_COEFFICIENT = "female_coefficient"
+    MALE_COEFFICIENT = "male_coefficient"
+
+
+class StructuredExerciseType(StrEnum):
+    RESISTANCE = "resistance"
+    ENDURANCE = "endurance"
+    MIXED = "mixed"
+    OTHER = "other"
+
+
+class StructuredExerciseSource(StrEnum):
+    USER_REPORTED = "user_reported"
+    TRAINING_PROFILE = "training_profile"
+    ACTIVE_FITSHO_PLAN = "active_fitsho_plan"
+
+
+class EstimateConfidence(StrEnum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class NutritionEstimateStatus(StrEnum):
+    ACTIVE = "active"
+    REVIEW_REQUIRED = "review_required"
+
+
+class NutritionTargetMetric(StrEnum):
+    BMR = "bmr"
+    NON_EXERCISE_ENERGY = "non_exercise_energy"
+    EXERCISE_ENERGY = "exercise_energy"
+    TDEE = "tdee"
+    GOAL_CALORIES = "goal_calories"
+    PROTEIN = "protein"
+    CARBOHYDRATE = "carbohydrate"
+    TOTAL_FAT = "total_fat"
+    FIBRE = "fibre"
+    FREE_SUGAR = "free_sugar"
+    ADDED_SUGAR = "added_sugar"
+    SATURATED_FAT = "saturated_fat"
+    TRANS_FAT = "trans_fat"
+    SODIUM = "sodium"
+
+
 class Weekday(StrEnum):
     SATURDAY = "saturday"
     SUNDAY = "sunday"

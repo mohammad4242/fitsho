@@ -14,6 +14,7 @@ from app.profile.enums import (
     ProfileCompletionState,
     Sex,
     TrainingCaution,
+    TrainingIntensity,
     TrainingLocation,
     WorkoutGenerationMethod,
 )
@@ -69,6 +70,7 @@ class ProfileCreate(BaseModel):
     plan_duration_weeks: PlanDurationWeeks = 4
     workout_generation_method: WorkoutGenerationMethod = WorkoutGenerationMethod.FITSHO_COACH
     session_duration_minutes: SessionDurationMinutes
+    training_intensity: TrainingIntensity | None = None
     physical_limitations: str | None = Field(default=None, max_length=1000)
 
     @field_validator("display_name", "physical_limitations", mode="before")
@@ -135,6 +137,7 @@ class ProfileUpdate(BaseModel):
     plan_duration_weeks: PlanDurationWeeks | None = None
     workout_generation_method: WorkoutGenerationMethod | None = None
     session_duration_minutes: SessionDurationMinutes | None = None
+    training_intensity: TrainingIntensity | None = None
     physical_limitations: str | None = Field(default=None, max_length=1000)
 
     @field_validator("display_name", "physical_limitations", mode="before")
@@ -210,6 +213,7 @@ class ProfileResponse(BaseModel):
     plan_duration_weeks: PlanDurationWeeks
     workout_generation_method: WorkoutGenerationMethod
     session_duration_minutes: SessionDurationMinutes
+    training_intensity: TrainingIntensity | None
 
     model_config = ConfigDict(from_attributes=True)
 

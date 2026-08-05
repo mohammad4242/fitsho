@@ -403,6 +403,7 @@ def nutrition_profile_response(snapshot: NutritionSnapshot) -> NutritionProfileR
         user_id=profile.user_id,
         onboarding_status=profile.onboarding_status,
         daily_activity_level=profile.daily_activity_level,
+        metabolic_basis=profile.metabolic_basis,
         individual_monthly_food_budget_irr=profile.individual_monthly_food_budget_irr,
         currency="IRR",
         weekly_budget_irr=profile.individual_monthly_food_budget_irr * 12 // 52,

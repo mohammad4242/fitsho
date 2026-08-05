@@ -9,16 +9,22 @@ from app.nutrition.enums import (
     CookingSkill,
     DailyActivityLevel,
     DietaryPattern,
+    EstimateConfidence,
     MealPreparationPreference,
     MedicalConditionCode,
+    MetabolicBasis,
+    NutritionEstimateStatus,
     NutritionOnboardingStatus,
     NutritionPlanStyle,
     PhysicianReviewMode,
     PhysicianReviewStatus,
     PreferredVariety,
     SafetyOutcome,
+    StructuredExerciseSource,
+    StructuredExerciseType,
     Weekday,
 )
+from app.profile.enums import TrainingIntensity
 
 
 def normalize_optional_text(value: object) -> object:
@@ -99,6 +105,7 @@ class FoodConstraintInput(BaseModel):
 
 class NutritionProfileInput(BaseModel):
     daily_activity_level: DailyActivityLevel
+    metabolic_basis: MetabolicBasis | None = None
     individual_monthly_food_budget_irr: int = Field(ge=0, le=100_000_000_000)
     budget_style: BudgetStyle
     meals_per_day: int = Field(ge=1, le=8)
@@ -179,6 +186,61 @@ class NutritionProfileResponse(NutritionProfileInput):
     physician_review_required: bool
     created_at: datetime
     updated_at: datetime
+
+
+class StructuredExerciseInput(BaseModel):
+    trains: bool
+    exercise_type: StructuredExerciseType | None = None
+    days_per_week: int | None = Field(default=None, ge=1, le=7)
+    minutes_per_session: int | None = Field(default=None, ge=1, le=360)
+    intensity: TrainingIntensity | None = None
+
+    @model_validator(mode="after")
+    def validate_training_details(self) -> "StructuredExerciseInput":
+        details = (
+            self.exercise_type,
+            self.days_per_week,
+            self.minutes_per_session,
+            self.intensity,
+        )
+        if self.trains and any(value is None for value in details):
+            raise ValueError("Complete structured exercise details are required")
+        if not self.trains and any(value is not None for value in details):
+            raise ValueError("Exercise details must be empty when the member does not train")
+        return self
+
+
+class StructuredExerciseResponse(BaseModel):
+    trains: bool
+    exercise_type: StructuredExerciseType | None
+    days_per_week: int | None
+    minutes_per_session: int | None
+    intensity: TrainingIntensity | None
+    source: StructuredExerciseSource
+
+
+class NutritionTargetResponse(BaseModel):
+    unit: str
+    minimum: float | None
+    preferred: float | None
+    preferred_maximum: float | None
+    maximum: float | None
+    confidence: EstimateConfidence
+    source_ids: list[str]
+    explanation_codes: list[str]
+
+
+class NutritionEstimateResponse(BaseModel):
+    id: UUID
+    revision: int
+    status: NutritionEstimateStatus
+    policy_version: str
+    formula_version: str
+    confidence: EstimateConfidence
+    confidence_reasons: list[str]
+    is_stale: bool
+    targets: dict[str, NutritionTargetResponse]
+    created_at: datetime
 
 
 class PhysicianReviewRequirementResponse(BaseModel):

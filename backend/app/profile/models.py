@@ -25,6 +25,7 @@ from app.profile.enums import (
     ProductMode,
     Sex,
     TrainingCaution,
+    TrainingIntensity,
     TrainingLocation,
     WorkoutGenerationMethod,
 )
@@ -131,6 +132,17 @@ class UserProfile(Base):
         nullable=True,
     )
     session_duration_minutes: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    training_intensity: Mapped[TrainingIntensity | None] = mapped_column(
+        Enum(
+            TrainingIntensity,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=lambda members: [member.value for member in members],
+            name="ck_user_profiles_training_intensity_values",
+        ),
+        nullable=True,
+    )
     physical_limitations: Mapped[str | None] = mapped_column(Text, nullable=True)
     plan_duration_weeks: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     workout_generation_method: Mapped[WorkoutGenerationMethod | None] = mapped_column(

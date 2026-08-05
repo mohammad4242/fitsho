@@ -44,6 +44,12 @@ class ExperienceLevel(StrEnum):
     ADVANCED = "advanced"
 
 
+class TrainingIntensity(StrEnum):
+    LIGHT = "light"
+    MODERATE = "moderate"
+    VIGOROUS = "vigorous"
+
+
 class TrainingLocation(StrEnum):
     HOME = "home"
     GYM = "gym"
