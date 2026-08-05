@@ -183,6 +183,30 @@ it("asks the medical check before account creation in draft nutrition mode", asy
   expect(await screen.findByRole("heading", { name: "آیا شرایط پزشکی مشخصی داری؟" })).toBeInTheDocument();
 });
 
+it("shows only the remaining nutrition details together after account creation", async () => {
+  vi.mocked(nutritionApi.getNutritionProfile).mockResolvedValue({
+    daily_activity_level: "moderate", individual_monthly_food_budget_irr: 13_000_000,
+    budget_style: "strict", meals_per_day: 3, snacks_per_day: 1,
+    preferred_plan_start_day: "saturday", plan_style: "balanced", cooking_skill: "basic",
+    maximum_cooking_time_minutes: 45, cooking_frequency_per_week: 4,
+    meal_preparation_preference: "mixed", refrigerator_access: true, freezer_access: true,
+    cooking_equipment: ["stove", "refrigerator"], supplied_meals_per_week: 0,
+    supplied_meal_source: null, foods_available_at_home: [], favourite_foods: [],
+    disliked_foods: [], never_suggest_foods: [], refused_foods: [], allergies: [], intolerances: [],
+    dietary_pattern: "omnivore", religious_cultural_exclusions: [], preferred_variety: "medium",
+    maximum_meal_repetition_per_week: 2, accepts_leftovers: true, accepts_batch_cooking: true,
+    work_shift_context: null, daily_check_in_enabled: false, preferred_check_in_time: null,
+    user_id: "user-1", onboarding_status: "completed", currency: "IRR", weekly_budget_irr: 3_000_000,
+    physician_review_required: false, created_at: "2026-08-05T12:00:00Z", updated_at: "2026-08-05T12:00:00Z",
+  });
+
+  render(<NutritionOnboardingFlow productMode="nutrition" editExisting onCreateTrainingProfile={vi.fn()} onComplete={vi.fn()} />);
+
+  expect(await screen.findByRole("heading", { name: "جزئیات اختیاری تغذیه" })).toBeInTheDocument();
+  expect(screen.queryByLabelText("بودجه ماهانه غذا (مبلغ به ریال)")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("وعده اصلی در روز")).toHaveValue(3);
+});
+
 it("completes the guided nutrition profile with IRR budget and optional skips", async () => {
   vi.mocked(nutritionApi.saveNutritionProfile).mockResolvedValue({} as never);
   const onComplete = vi.fn();

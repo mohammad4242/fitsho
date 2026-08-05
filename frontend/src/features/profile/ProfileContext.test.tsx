@@ -148,7 +148,7 @@ it("marks an authenticated user without a profile as missing", async () => {
   expect(await screen.findByText("status:missing")).toBeInTheDocument();
 });
 
-it("keeps a nutrition draft in its capability onboarding route", async () => {
+it("treats a saved nutrition profile as ready for the member profile route", async () => {
   authUser = user;
   vi.mocked(api.getProfileStatus).mockResolvedValue({
     user_id: user.id,
@@ -158,7 +158,7 @@ it("keeps a nutrition draft in its capability onboarding route", async () => {
 
   renderProfile();
 
-  expect(await screen.findByText("status:mode_selected")).toBeInTheDocument();
+  expect(await screen.findByText("status:ready")).toBeInTheDocument();
   expect(screen.getByText("name:none")).toBeInTheDocument();
   expect(api.getProfile).not.toHaveBeenCalled();
 });

@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import authTrainingAccent from "../../assets/landing/auth-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
+import { NutritionOnboardingFlow } from "../nutrition/NutritionOnboardingFlow";
 import {
   BodyGoalFields,
   ExperienceFields,
@@ -23,21 +24,49 @@ import "./profile.css";
 type SaveStatus = "idle" | "saved" | "unchanged";
 
 export function ProfilePage() {
-  const { profile, updateProfile } = useProfile();
+  const { createProfile, productMode, profile, retryProfile, updateProfile } = useProfile();
 
   if (profile === null) {
+    if (productMode === "nutrition") {
+      return <NutritionProfilePage onCreateTrainingProfile={createProfile} onComplete={retryProfile} />;
+    }
     return null;
   }
 
-  return <ReadyProfilePage initialProfile={profile} updateProfile={updateProfile} />;
+  return <ReadyProfilePage initialProfile={profile} updateProfile={updateProfile} productMode={productMode} />;
+}
+
+export function NutritionProfilePage({
+  onCreateTrainingProfile,
+  onComplete,
+}: {
+  onCreateTrainingProfile: ReturnType<typeof useProfile>["createProfile"];
+  onComplete: () => void;
+}) {
+  return (
+    <div className="profile-page-shell">
+      <MemberHeaderMedia imageSrc={authTrainingAccent} className="member-page-background" />
+      <AuthenticatedHeader />
+      <main className="profile-page-main">
+        <NutritionOnboardingFlow
+          productMode="nutrition"
+          editExisting
+          onCreateTrainingProfile={onCreateTrainingProfile}
+          onComplete={onComplete}
+        />
+      </main>
+    </div>
+  );
 }
 
 function ReadyProfilePage({
   initialProfile,
   updateProfile,
+  productMode,
 }: {
   initialProfile: Profile;
   updateProfile: (patch: ProfilePatch) => Promise<Profile>;
+  productMode: ReturnType<typeof useProfile>["productMode"];
 }) {
   const { i18n, t } = useTranslation();
   const [baseline, setBaseline] = useState(initialProfile);
@@ -46,6 +75,7 @@ function ReadyProfilePage({
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [section, setSection] = useState<"personal" | "training">("personal");
 
   useEffect(() => {
     const firstInvalidField = Object.keys(errors)[0];
@@ -148,25 +178,20 @@ function ReadyProfilePage({
           <Link className="secondary-button" to="/body-progress">{t("bodyPhotos.start")}</Link>
         </aside>
 
+        <nav className="profile-section-nav" aria-label={i18n.resolvedLanguage === "en" ? "Profile sections" : "بخش‌های پروفایل"}>
+          <button className={section === "personal" ? "is-active" : undefined} type="button" onClick={() => setSection("personal")}>{i18n.resolvedLanguage === "en" ? "Personal" : "اطلاعات شخصی"}</button>
+          <button className={section === "training" ? "is-active" : undefined} type="button" onClick={() => setSection("training")}>{i18n.resolvedLanguage === "en" ? "Training" : "اطلاعات تمرینی"}</button>
+          {productMode === "both" && <Link to="/nutrition-profile">{i18n.resolvedLanguage === "en" ? "Nutrition" : "اطلاعات تغذیه"}</Link>}
+        </nav>
+
         <form className="profile-form profile-edit-form" noValidate onSubmit={handleSubmit}>
-          <PersonalFields
-            values={values}
-            errors={errors}
-            disabled={busy}
-            onChange={updateValue}
-          />
-          <BodyGoalFields
-            values={values}
-            errors={errors}
-            disabled={busy}
-            onChange={updateValue}
-          />
-          <ExperienceFields
-            values={values}
-            errors={errors}
-            disabled={busy}
-            onChange={updateValue}
-          />
+          <div hidden={section !== "personal"}>
+            <PersonalFields values={values} errors={errors} disabled={busy} onChange={updateValue} />
+            <BodyGoalFields values={values} errors={errors} disabled={busy} onChange={updateValue} />
+          </div>
+          <div hidden={section !== "training"}>
+            <ExperienceFields values={values} errors={errors} disabled={busy} onChange={updateValue} />
+          </div>
 
           {saveError && (
             <p className="form-error profile-save-message" role="alert">

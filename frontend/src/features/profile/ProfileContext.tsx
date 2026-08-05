@@ -63,6 +63,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         const readyStates = new Set([
           "training_ready",
           "both_ready",
+          "nutrition_draft_ready",
+          "nutrition_ready",
         ]);
         const shouldLoadTrainingProfile = profileStatus.product_mode === "training"
           ? profileStatus.completion_state === "training_ready"

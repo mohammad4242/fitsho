@@ -17,7 +17,7 @@ import { BodyPhotoWizard } from "./features/bodyPhotos/BodyPhotoWizard";
 import { BodyAnalysisResultPage } from "./features/bodyPhotos/BodyAnalysisResultPage";
 import { BodyProgressPage } from "./features/bodyPhotos/BodyProgressPage";
 import { OnboardingPage } from "./features/profile/OnboardingPage";
-import { ProfilePage } from "./features/profile/ProfilePage";
+import { NutritionProfilePage, ProfilePage } from "./features/profile/ProfilePage";
 import { ProfileProvider } from "./features/profile/ProfileContext";
 import { useProfile } from "./features/profile/ProfileContext";
 import { WorkoutPlanPage } from "./features/workouts/WorkoutPlanPage";
@@ -55,6 +55,7 @@ export function AppRoutes() {
           <Route element={<CompletedAppShellRoute />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/nutrition-profile" element={<NutritionProfileRoute />} />
             <Route path="/body-progress" element={<BodyProgressPage />} />
             <Route path="/body-progress/new" element={<BodyPhotoWizard />} />
             <Route path="/body-progress/:sessionId" element={<BodyAnalysisResultPage />} />
@@ -82,6 +83,11 @@ function CompletedAppShellRoute() {
 function WorkoutPlanRoute() {
   const { profile } = useProfile();
   return <WorkoutPlanPage planDurationWeeks={profile?.plan_duration_weeks ?? 4} />;
+}
+
+function NutritionProfileRoute() {
+  const { createProfile, retryProfile } = useProfile();
+  return <NutritionProfilePage onCreateTrainingProfile={createProfile} onComplete={retryProfile} />;
 }
 
 export default function App() {
