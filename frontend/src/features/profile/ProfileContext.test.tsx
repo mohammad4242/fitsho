@@ -4,6 +4,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 import { useAuth } from "../auth/AuthContext";
 import type { User } from "../auth/types";
+import { HYDRATED_ACCOUNT_EVENT, HYDRATED_ACCOUNT_KEY } from "../publicOnboarding/onboardingDraft";
 import * as api from "./api";
 import { ProfileProvider, useProfile } from "./ProfileContext";
 import type { Profile, ProfileInput } from "./types";
@@ -161,6 +162,32 @@ it("treats a saved nutrition profile as ready for the member profile route", asy
   expect(await screen.findByText("status:ready")).toBeInTheDocument();
   expect(screen.getByText("name:none")).toBeInTheDocument();
   expect(api.getProfile).not.toHaveBeenCalled();
+});
+
+it("refreshes profile status after onboarding hydration without clearing the dashboard guard early", async () => {
+  authUser = user;
+  sessionStorage.setItem(HYDRATED_ACCOUNT_KEY, "true");
+  vi.mocked(api.getProfileStatus)
+    .mockResolvedValueOnce({
+      user_id: user.id,
+      product_mode: null,
+      completion_state: "product_mode_not_selected",
+    })
+    .mockResolvedValueOnce({
+      user_id: user.id,
+      product_mode: "nutrition",
+      completion_state: "nutrition_draft_ready",
+    });
+
+  renderProfile();
+  expect(await screen.findByText("status:missing")).toBeInTheDocument();
+  expect(sessionStorage.getItem(HYDRATED_ACCOUNT_KEY)).toBe("true");
+
+  act(() => window.dispatchEvent(new Event(HYDRATED_ACCOUNT_EVENT)));
+
+  expect(await screen.findByText("status:ready")).toBeInTheDocument();
+  expect(api.getProfileStatus).toHaveBeenCalledTimes(2);
+  expect(sessionStorage.getItem(HYDRATED_ACCOUNT_KEY)).toBeNull();
 });
 
 it("keeps startup failures separate from a missing profile", async () => {

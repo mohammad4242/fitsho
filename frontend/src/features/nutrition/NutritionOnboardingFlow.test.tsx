@@ -62,7 +62,7 @@ it("keeps the selected English language in the nutrition path", async () => {
   expect(screen.getByLabelText("Personal details progress")).toBeInTheDocument();
 });
 
-it("asks medical questions before account creation", async () => {
+it("asks training status and medical questions before account creation", async () => {
   await i18n.changeLanguage("en");
   const user = userEvent.setup();
   const onDraftComplete = vi.fn();
@@ -88,6 +88,8 @@ it("asks medical questions before account creation", async () => {
   await user.type(screen.getByLabelText("Current weight (kilograms)"), "62.5");
   await user.click(screen.getByRole("button", { name: "Continue" }));
   await user.click(screen.getByRole("button", { name: "Fat loss 🔥" }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(screen.getByRole("button", { name: "I do not train" }));
   await user.click(screen.getByRole("button", { name: "Continue" }));
 
   expect(screen.getByRole("heading", { name: "Do you have any medical conditions?" })).toBeInTheDocument();
@@ -174,13 +176,17 @@ it("asks safety before training in combined mode", async () => {
   expect(await screen.findByRole("heading", { name: "چقدر سابقه تمرین مداوم داری؟" })).toBeInTheDocument();
 });
 
-it("asks the medical check before account creation in draft nutrition mode", async () => {
+it("lets nutrition-only members opt out of training before medical questions", async () => {
   const user = userEvent.setup();
   render(<NutritionOnboardingFlow productMode="nutrition" draftMode onCreateTrainingProfile={vi.fn()} onComplete={vi.fn()} />);
   await screen.findByRole("heading", { name: "دوست داری چه صدایت کنیم؟" });
   await completeSharedQuestions(user);
 
+  expect(await screen.findByRole("heading", { name: "چقدر سابقه تمرین مداوم داری؟" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "تمرین نمی‌کنم" }));
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
   expect(await screen.findByRole("heading", { name: "آیا شرایط پزشکی مشخصی داری؟" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "چند روز در هفته تمرین می‌کنی؟" })).not.toBeInTheDocument();
 });
 
 it("shows only the remaining nutrition details together after account creation", async () => {

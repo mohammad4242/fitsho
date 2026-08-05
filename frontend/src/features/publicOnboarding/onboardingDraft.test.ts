@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 import * as nutritionApi from "../nutrition/api";
 import * as profileApi from "../profile/api";
-import { clearOnboardingDraft, hydrateOnboardingDraft, loadOnboardingDraft, saveOnboardingDraft } from "./onboardingDraft";
+import { clearOnboardingDraft, HYDRATED_ACCOUNT_KEY, hydrateOnboardingDraft, loadOnboardingDraft, saveOnboardingDraft } from "./onboardingDraft";
 
 vi.mock("../nutrition/api");
 vi.mock("../profile/api");
@@ -57,6 +57,9 @@ it("hydrates the selected mode before its profile and clears only after success"
 
   expect(profileApi.selectProductMode).toHaveBeenCalledWith("training");
   expect(profileApi.createProfile).toHaveBeenCalledWith(trainingInput);
+  expect(nutritionApi.saveSafetyProfile).not.toHaveBeenCalled();
+  expect(nutritionApi.saveNutritionProfile).not.toHaveBeenCalled();
+  expect(sessionStorage.getItem(HYDRATED_ACCOUNT_KEY)).toBe("true");
   expect(loadOnboardingDraft()).toBeNull();
 });
 

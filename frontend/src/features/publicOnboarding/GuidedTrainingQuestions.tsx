@@ -8,13 +8,16 @@ type Props = {
   onChange: (field: keyof ProfileFormValues, value: string | ProfileFormValues["training_cautions"]) => void;
   onBack: () => void;
   onComplete: () => void;
+  allowNoTraining?: boolean;
+  onNoTraining?: () => void;
 };
 
-export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete }: Props) {
+export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete, allowNoTraining = false, onNoTraining }: Props) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage === "en" ? "en" : "fa";
   const questions = useMemo(() => ["experience", "days", "location", ...(values.training_location === "home" ? ["home"] : []), "duration", "cautions", "weeks"] as const, [values.training_location]);
   const [index, setIndex] = useState(0);
+  const [noTrainingSelected, setNoTrainingSelected] = useState(false);
   const question = questions[Math.min(index, questions.length - 1)];
   const title = ({
     experience: language === "en" ? "How much consistent training experience do you have?" : "چقدر سابقه تمرین مداوم داری؟",
@@ -25,10 +28,14 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete }
     cautions: language === "en" ? "Any training considerations?" : "برای تمرین مورد احتیاطی داری؟",
     weeks: language === "en" ? "How long should this plan run?" : "این برنامه چند هفته باشد؟",
   })[question];
-  const choice = (field: keyof ProfileFormValues, value: string, label: string) => <button className={values[field] === value ? "is-selected" : ""} key={value} type="button" onClick={() => onChange(field, value)}>{label}</button>;
+  const choice = (field: keyof ProfileFormValues, value: string, label: string) => <button className={values[field] === value ? "is-selected" : ""} key={value} type="button" onClick={() => { if (field === "experience_level") setNoTrainingSelected(false); onChange(field, value); }}>{label}</button>;
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (question === "experience" && noTrainingSelected) {
+      onNoTraining?.();
+      return;
+    }
     if (question === "cautions" && values.training_cautions === null) {
       onChange("training_cautions", []);
     }
@@ -39,7 +46,7 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete }
   const cautions = values.training_cautions ?? [];
   function toggle(caution: TrainingCaution) { onChange("training_cautions", cautions.includes(caution) ? cautions.filter((item) => item !== caution) : [...cautions, caution]); }
   const ready = ({
-    experience: values.experience_level !== "",
+    experience: values.experience_level !== "" || noTrainingSelected,
     days: Number(values.training_days_per_week) >= 2 && Number(values.training_days_per_week) <= 6,
     location: values.training_location !== "",
     home: values.home_training_setup !== "",
@@ -59,7 +66,7 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete }
         ["beginner", language === "en" ? "Beginner (under 6 months)" : "مبتدی (زیر ۶ ماه)"],
         ["intermediate", language === "en" ? "Intermediate (6 months to 2 years)" : "متوسط (۶ ماه تا ۲ سال)"],
         ["advanced", language === "en" ? "Advanced (over 2 years)" : "پیشرفته (بیش از ۲ سال)"],
-      ] as const).map(([value, label]) => choice("experience_level", value, label))}</div>}
+      ] as const).map(([value, label]) => choice("experience_level", value, label))}{allowNoTraining && <button className={noTrainingSelected ? "is-selected" : ""} type="button" onClick={() => { setNoTrainingSelected(true); onChange("experience_level", ""); }}>{language === "en" ? "I do not train" : "تمرین نمی‌کنم"}</button>}</div>}
       {question === "days" && <div className="guided-choice-grid">{[2, 3, 4, 5, 6].map((value) => choice("training_days_per_week", String(value), language === "en" ? `${value} days per week` : `${new Intl.NumberFormat("fa-IR").format(value)} روز در هفته`))}</div>}
       {question === "location" && <div className="guided-choice-grid">{["home", "gym"].map((value) => choice("training_location", value, t(`onboarding.options.trainingLocation.${value}`)))}</div>}
       {question === "home" && <div className="guided-choice-grid">{["bodyweight_only", "dumbbells_available"].map((value) => choice("home_training_setup", value, t(`onboarding.options.homeTrainingSetup.${value}`)))}</div>}

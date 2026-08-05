@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
 import { GuidedTrainingQuestions } from "./GuidedTrainingQuestions";
@@ -15,7 +15,7 @@ const values = {
   training_cautions: null, plan_duration_weeks: "4",
 };
 
-function TrainingHarness() {
+function TrainingHarness({ allowNoTraining = false, onNoTraining = vi.fn() }: { allowNoTraining?: boolean; onNoTraining?: () => void }) {
   const [formValues, setFormValues] = useState(values);
   const [completed, setCompleted] = useState(false);
   return <>
@@ -24,6 +24,8 @@ function TrainingHarness() {
       onChange={(field, value) => setFormValues((current) => ({ ...current, [field]: value }))}
       onBack={() => undefined}
       onComplete={() => setCompleted(true)}
+      allowNoTraining={allowNoTraining}
+      onNoTraining={onNoTraining}
     />
     {formValues.training_cautions !== null && <p>cautions-set</p>}
     {completed && <p>completed</p>}
@@ -55,4 +57,24 @@ it("uses fixed experience, weekly-day, and workout-time choices", async () => {
   await user.click(screen.getByRole("button", { name: "ادامه" }));
 
   expect(screen.getByText("completed")).toBeInTheDocument();
+});
+
+it("offers no-training only for nutrition and skips all training details", async () => {
+  await i18n.changeLanguage("fa");
+  const user = userEvent.setup();
+  const onNoTraining = vi.fn();
+  render(<TrainingHarness allowNoTraining onNoTraining={onNoTraining} />);
+
+  await user.click(screen.getByRole("button", { name: "تمرین نمی‌کنم" }));
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+
+  expect(onNoTraining).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("heading", { name: "چند روز در هفته تمرین می‌کنی؟" })).not.toBeInTheDocument();
+});
+
+it("does not offer no-training in the required training flow", async () => {
+  await i18n.changeLanguage("fa");
+  render(<TrainingHarness />);
+
+  expect(screen.queryByRole("button", { name: "تمرین نمی‌کنم" })).not.toBeInTheDocument();
 });

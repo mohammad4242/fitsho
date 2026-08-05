@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import { useAuth } from "../auth/AuthContext";
-import { HYDRATED_ACCOUNT_KEY } from "../publicOnboarding/onboardingDraft";
+import { HYDRATED_ACCOUNT_EVENT, HYDRATED_ACCOUNT_KEY } from "../publicOnboarding/onboardingDraft";
 import * as api from "./api";
 import type {
   ProductMode,
@@ -42,6 +42,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [productMode, setProductMode] = useState<ProductMode | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const requestGeneration = useRef(0);
+
+  useEffect(() => {
+    const refreshAfterHydration = () => setRetryAttempt((attempt) => attempt + 1);
+    window.addEventListener(HYDRATED_ACCOUNT_EVENT, refreshAfterHydration);
+    return () => window.removeEventListener(HYDRATED_ACCOUNT_EVENT, refreshAfterHydration);
+  }, []);
 
   useEffect(() => {
     const generation = ++requestGeneration.current;
@@ -76,7 +82,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           ? await api.getProfile()
           : null;
         if (active && generation === requestGeneration.current) {
-          sessionStorage.removeItem(HYDRATED_ACCOUNT_KEY);
+          if (profileStatus.completion_state !== "product_mode_not_selected") {
+            sessionStorage.removeItem(HYDRATED_ACCOUNT_KEY);
+          }
           setProfile(currentProfile);
           setStatus(profileStatus.completion_state === "product_mode_not_selected"
             ? "missing"

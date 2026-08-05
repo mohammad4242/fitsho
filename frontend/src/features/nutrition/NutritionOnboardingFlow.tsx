@@ -288,8 +288,7 @@ export function NutritionOnboardingFlow({
     };
     if (draftMode) {
       onDraftChange?.({ shared });
-      if (productMode === "both" && !trainingProfileExists) setStep("training");
-      else setStep("pre_account");
+      setStep("training");
       return;
     }
     setBusy(true);
@@ -503,14 +502,24 @@ export function NutritionOnboardingFlow({
         busy={busy} conditions={conditions} flags={safetyFlags} foods={foods} budget={budget} planStyle={planStyle} dailyActivityLevel={dailyActivityLevel}
         onConditions={setConditions} onFlags={setSafetyFlags} onFoods={setFoods} onBudget={setBudget} onPlanStyle={setPlanStyle}
         onDailyActivityLevel={setDailyActivityLevel}
-        onBack={() => setStep(productMode === "both" ? "training" : "personal")}
+        onBack={() => setStep("training")}
         onComplete={() => onDraftComplete?.({ safety: safetyInput(), nutritionBasics: {
           daily_activity_level: dailyActivityLevel, individual_monthly_food_budget_irr: Number(budget), budget_style: budgetStyle, plan_style: planStyle,
           allergies: splitNames(foods.allergies).map((name) => ({ name, details: null })), intolerances: splitNames(foods.intolerances).map((name) => ({ name, details: null })), dietary_pattern: foods.dietaryPattern,
         } })}
       />}
       {step === "training" && (
-        <GuidedTrainingQuestions values={values} onChange={updateProfileValue} onBack={() => setStep("safety")} onComplete={saveTraining} />
+        <GuidedTrainingQuestions
+          values={values}
+          onChange={updateProfileValue}
+          onBack={() => setStep(draftMode ? "personal" : "safety")}
+          onComplete={saveTraining}
+          allowNoTraining={draftMode && productMode === "nutrition"}
+          onNoTraining={() => {
+            onDraftChange?.({ training: undefined });
+            setStep("pre_account");
+          }}
+        />
       )}
       {step === "budget" && (
         <BudgetForm

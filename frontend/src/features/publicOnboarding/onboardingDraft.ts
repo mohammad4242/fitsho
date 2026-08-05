@@ -6,6 +6,7 @@ import type { ProductMode, ProfileInput, SharedProfileInput } from "../profile/t
 export const ONBOARDING_DRAFT_KEY = "fitsho:onboarding-draft:v1";
 export const PENDING_NUTRITION_BASICS_KEY = "fitsho:pending-nutrition-basics:v1";
 export const HYDRATED_ACCOUNT_KEY = "fitsho:onboarding-hydrated:v1";
+export const HYDRATED_ACCOUNT_EVENT = "fitsho:profile-hydrated";
 
 export type PreAccountNutritionBasics = Pick<
   NutritionProfileInput,
@@ -72,6 +73,7 @@ export async function hydrateOnboardingDraft(draft: OnboardingDraft): Promise<vo
   if (draft.mode === "training") {
     if (draft.training === undefined) throw new Error("Training draft is incomplete");
     await profileApi.createProfile(draft.training);
+    markAccountHydrated();
     clearOnboardingDraft();
     return;
   }
@@ -80,13 +82,18 @@ export async function hydrateOnboardingDraft(draft: OnboardingDraft): Promise<vo
   if (shared === undefined || draft.safety === undefined || draft.nutritionBasics === undefined) throw new Error("Nutrition draft is incomplete");
   await profileApi.saveSharedProfile(shared);
 
-  if (draft.mode === "both" && draft.training !== undefined) {
+  if (draft.training !== undefined) {
     await profileApi.createProfile(draft.training);
   }
   await nutritionApi.saveSafetyProfile(draft.safety);
   await nutritionApi.saveNutritionProfile(starterNutritionProfile(draft.nutritionBasics));
-  sessionStorage.setItem(HYDRATED_ACCOUNT_KEY, "true");
+  markAccountHydrated();
   clearOnboardingDraft();
+}
+
+function markAccountHydrated(): void {
+  sessionStorage.setItem(HYDRATED_ACCOUNT_KEY, "true");
+  window.dispatchEvent(new Event(HYDRATED_ACCOUNT_EVENT));
 }
 
 function starterNutritionProfile(basics: PreAccountNutritionBasics): NutritionProfileInput {
