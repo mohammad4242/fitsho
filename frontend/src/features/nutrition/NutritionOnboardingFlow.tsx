@@ -12,6 +12,7 @@ import * as nutritionApi from "./api";
 import type {
   MedicalConditionCode,
   NutritionProfileInput,
+  NutritionProfile,
   SafetyDecision,
   SafetyEvaluation,
   SafetyProfileInput,
@@ -46,6 +47,7 @@ type Props = {
   onExit?: () => void;
   initialNutritionBasics?: PreAccountNutritionBasics;
   onNutritionComplete?: () => void;
+  editExisting?: boolean;
 };
 
 const emptyProfileValues: ProfileFormValues = {
@@ -120,6 +122,7 @@ export function NutritionOnboardingFlow({
   onExit,
   initialNutritionBasics,
   onNutritionComplete,
+  editExisting = false,
 }: Props) {
   const { i18n } = useTranslation();
   const language = i18n.resolvedLanguage === "en" ? "en" : "fa";
@@ -143,6 +146,7 @@ export function NutritionOnboardingFlow({
   const [medications, setMedications] = useState("");
   const [physicianRestrictions, setPhysicianRestrictions] = useState("");
   const [otherCondition, setOtherCondition] = useState("");
+  const [dailyActivityLevel, setDailyActivityLevel] = useState<NutritionProfileInput["daily_activity_level"]>(() => initialNutritionBasics?.daily_activity_level ?? "moderate");
   const [budget, setBudget] = useState(() => initialNutritionBasics === undefined ? "" : String(initialNutritionBasics.individual_monthly_food_budget_irr));
   const [budgetStyle, setBudgetStyle] = useState<"strict" | "flexible">(() => initialNutritionBasics?.budget_style ?? "strict");
   const [mealCount, setMealCount] = useState("3");
@@ -179,7 +183,12 @@ export function NutritionOnboardingFlow({
       if (!active) return;
       if (nutrition !== null) {
         setDecision(savedDecision);
-        setStep("complete");
+        if (!editExisting) {
+          setStep("complete");
+          return;
+        }
+        populateExistingNutrition(nutrition);
+        setStep("budget");
         return;
       }
       if (shared !== null) {
@@ -208,7 +217,46 @@ export function NutritionOnboardingFlow({
       }
     });
     return () => { active = false; };
-  }, [draftMode, onComplete, productMode, trainingProfileExists]);
+  }, [draftMode, editExisting, onComplete, productMode, trainingProfileExists]);
+
+  function populateExistingNutrition(nutrition: NutritionProfile) {
+    setDailyActivityLevel(nutrition.daily_activity_level);
+    setBudget(String(nutrition.individual_monthly_food_budget_irr));
+    setBudgetStyle(nutrition.budget_style);
+    setMealCount(String(nutrition.meals_per_day));
+    setSnackCount(String(nutrition.snacks_per_day));
+    setStartDay(nutrition.preferred_plan_start_day);
+    setPlanStyle(nutrition.plan_style);
+    setCooking({
+      skill: nutrition.cooking_skill,
+      maximumTime: String(nutrition.maximum_cooking_time_minutes),
+      frequency: String(nutrition.cooking_frequency_per_week),
+      preparation: nutrition.meal_preparation_preference,
+      refrigerator: nutrition.refrigerator_access,
+      freezer: nutrition.freezer_access,
+      equipment: nutrition.cooking_equipment,
+      suppliedMeals: String(nutrition.supplied_meals_per_week),
+      suppliedSource: nutrition.supplied_meal_source ?? "",
+    });
+    setFoods({
+      available: nutrition.foods_available_at_home.join(", "),
+      favourites: nutrition.favourite_foods.join(", "),
+      disliked: nutrition.disliked_foods.join(", "),
+      neverSuggest: nutrition.never_suggest_foods.join(", "),
+      refused: nutrition.refused_foods.join(", "),
+      allergies: nutrition.allergies.map((item) => item.name).join(", "),
+      intolerances: nutrition.intolerances.map((item) => item.name).join(", "),
+      cultural: nutrition.religious_cultural_exclusions.join(", "),
+      workContext: nutrition.work_shift_context ?? "",
+      dietaryPattern: nutrition.dietary_pattern,
+      variety: nutrition.preferred_variety,
+      repetition: String(nutrition.maximum_meal_repetition_per_week),
+      leftovers: nutrition.accepts_leftovers,
+      batchCooking: nutrition.accepts_batch_cooking,
+      checkIn: nutrition.daily_check_in_enabled,
+      checkInTime: nutrition.preferred_check_in_time?.slice(0, 5) ?? "21:00",
+    });
+  }
 
   function updateProfileValue(
     field: keyof ProfileFormValues,
@@ -293,6 +341,7 @@ export function NutritionOnboardingFlow({
   }
 
   const nutritionInput = useMemo<NutritionProfileInput>(() => ({
+    daily_activity_level: dailyActivityLevel,
     individual_monthly_food_budget_irr: Number(budget),
     budget_style: budgetStyle,
     meals_per_day: Number(mealCount),
@@ -324,7 +373,7 @@ export function NutritionOnboardingFlow({
     work_shift_context: foods.workContext.trim() || null,
     daily_check_in_enabled: foods.checkIn,
     preferred_check_in_time: foods.checkIn ? `${foods.checkInTime}:00` : null,
-  }), [budget, budgetStyle, cooking, foods, mealCount, planStyle, snackCount, startDay]);
+  }), [budget, budgetStyle, cooking, dailyActivityLevel, foods, mealCount, planStyle, snackCount, startDay]);
 
   function finish(event: FormEvent) {
     event.preventDefault();
@@ -424,11 +473,12 @@ export function NutritionOnboardingFlow({
         />
       )}
       {step === "pre_account" && <PreAccountNutritionQuestions
-        busy={busy} conditions={conditions} flags={safetyFlags} foods={foods} budget={budget} planStyle={planStyle}
+        busy={busy} conditions={conditions} flags={safetyFlags} foods={foods} budget={budget} planStyle={planStyle} dailyActivityLevel={dailyActivityLevel}
         onConditions={setConditions} onFlags={setSafetyFlags} onFoods={setFoods} onBudget={setBudget} onPlanStyle={setPlanStyle}
+        onDailyActivityLevel={setDailyActivityLevel}
         onBack={() => setStep(productMode === "both" ? "training" : "personal")}
         onComplete={() => onDraftComplete?.({ safety: safetyInput(), nutritionBasics: {
-          individual_monthly_food_budget_irr: Number(budget), budget_style: budgetStyle, plan_style: planStyle,
+          daily_activity_level: dailyActivityLevel, individual_monthly_food_budget_irr: Number(budget), budget_style: budgetStyle, plan_style: planStyle,
           allergies: splitNames(foods.allergies).map((name) => ({ name, details: null })), intolerances: splitNames(foods.intolerances).map((name) => ({ name, details: null })), dietary_pattern: foods.dietaryPattern,
         } })}
       />}
@@ -603,10 +653,10 @@ function SafetyForm(props: {
 
 function PreAccountNutritionQuestions(props: {
   busy: boolean; conditions: MedicalConditionCode[]; flags: Flags; foods: FoodsState; budget: string;
-  planStyle: "economical" | "balanced" | "simple";
+  planStyle: "economical" | "balanced" | "simple"; dailyActivityLevel: NutritionProfileInput["daily_activity_level"];
   onConditions: (value: MedicalConditionCode[]) => void; onFlags: (value: Flags) => void;
   onFoods: (value: FoodsState) => void; onBudget: (value: string) => void;
-  onPlanStyle: (value: "economical" | "balanced" | "simple") => void; onBack: () => void; onComplete: () => void;
+  onPlanStyle: (value: "economical" | "balanced" | "simple") => void; onDailyActivityLevel: (value: NutritionProfileInput["daily_activity_level"]) => void; onBack: () => void; onComplete: () => void;
 }) {
   const l = useLocalizer();
   const [question, setQuestion] = useState(0);
@@ -614,19 +664,21 @@ function PreAccountNutritionQuestions(props: {
     l("آیا شرایط پزشکی مشخصی داری؟", "Do you have any medical conditions?"),
     l("کدام موارد ایمنی دربارهٔ تو صدق می‌کند؟", "Do any of these safety considerations apply?"),
     l("حساسیت یا عدم‌تحمل غذایی داری؟", "Do you have food allergies or intolerances?"),
+    l("میزان فعالیت روزانه‌ات چقدر است؟", "How active are you on a typical day?"),
     l("بودجه ماهانه غذای تو چقدر است؟", "What is your monthly food budget?"),
     l("چه سبک غذایی را ترجیح می‌دهی؟", "Which food style do you prefer?"),
   ];
   const advance = () => question === titles.length - 1 ? props.onComplete() : setQuestion((current) => current + 1);
   const back = () => question === 0 ? props.onBack() : setQuestion((current) => current - 1);
-  return <NutritionQuestionFrame busy={props.busy} current={question} total={titles.length} title={titles[question]} stage={question < 2 ? 0 : question < 4 ? 1 : 2} optional={question === 2} nextLabel={question === titles.length - 1 ? l("ادامه و ساخت حساب", "Continue to account setup") : undefined} onBack={back} onSubmit={advance}>
+  return <NutritionQuestionFrame busy={props.busy} current={question} total={titles.length} title={titles[question]} stage={question < 2 ? 0 : question < 5 ? 1 : 2} optional={question === 2} nextLabel={question === titles.length - 1 ? l("ادامه و ساخت حساب", "Continue to account setup") : undefined} onBack={back} onSubmit={advance}>
     {question === 0 && <div className="profile-checkboxes">{conditionOptions.map(([code, fa, en]) => <label key={code}><input type="checkbox" checked={props.conditions.includes(code)} onChange={() => props.onConditions(props.conditions.includes(code) ? props.conditions.filter((item) => item !== code) : [...props.conditions, code])} />{l(fa, en)}</label>)}</div>}
     {question === 1 && <div className="profile-checkboxes">{([
       ["dangerous_food_reaction_history", "سابقه واکنش خطرناک غذایی", "History of dangerous food reaction"], ["pregnant", "بارداری", "Pregnant"], ["breastfeeding", "شیردهی", "Breastfeeding"], ["eating_disorder_diagnosed", "تشخیص اختلال خوردن", "Diagnosed eating disorder"], ["eating_disorder_active_symptoms", "علائم فعال اختلال خوردن", "Active eating-disorder symptoms"], ["complex_medication_food_interaction", "تداخل پیچیده دارو و غذا", "Complex medication-food interaction"], ["emergency_or_danger_symptoms", "علائم خطر یا وضعیت اورژانسی", "Emergency or danger symptoms"],
     ] as const).map(([field, fa, en]) => <label className="nutrition-check" key={field}><input type="checkbox" checked={props.flags[field]} onChange={(event) => props.onFlags({ ...props.flags, [field]: event.target.checked })} />{l(fa, en)}</label>)}</div>}
     {question === 2 && <><TextArea label={l("حساسیت‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food allergies (optional, comma separated)")} value={props.foods.allergies} onChange={(allergies) => props.onFoods({ ...props.foods, allergies })} /><TextArea label={l("عدم‌تحمل‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food intolerances (optional, comma separated)")} value={props.foods.intolerances} onChange={(intolerances) => props.onFoods({ ...props.foods, intolerances })} /></>}
-    {question === 3 && <LabeledInput label={l("بودجه ماهانه غذا (مبلغ به ریال)", "Monthly food budget (IRR)")} type="number" min="0" required value={props.budget} onChange={props.onBudget} />}
-    {question === 4 && <SelectField label={l("سبک غذا", "Food style")} value={props.foods.dietaryPattern} onChange={(dietaryPattern) => props.onFoods({ ...props.foods, dietaryPattern: dietaryPattern as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />}
+    {question === 3 && <SelectField label={l("فعالیت روزانه", "Daily activity")} value={props.dailyActivityLevel} onChange={(value) => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"])} options={[["sedentary", l("کم‌تحرک", "Mostly sedentary")], ["light", l("کمی فعال", "Lightly active")], ["moderate", l("فعالیت متوسط", "Moderately active")], ["very_active", l("بسیار فعال", "Very active")]]} />}
+    {question === 4 && <LabeledInput label={l("بودجه ماهانه غذا (مبلغ به ریال)", "Monthly food budget (IRR)")} type="number" min="0" required value={props.budget} onChange={props.onBudget} />}
+    {question === 5 && <SelectField label={l("سبک غذا", "Food style")} value={props.foods.dietaryPattern} onChange={(dietaryPattern) => props.onFoods({ ...props.foods, dietaryPattern: dietaryPattern as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />}
   </NutritionQuestionFrame>;
 }
 

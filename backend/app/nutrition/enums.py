@@ -25,6 +25,13 @@ class BudgetStyle(StrEnum):
     FLEXIBLE = "flexible"
 
 
+class DailyActivityLevel(StrEnum):
+    SEDENTARY = "sedentary"
+    LIGHT = "light"
+    MODERATE = "moderate"
+    VERY_ACTIVE = "very_active"
+
+
 class Weekday(StrEnum):
     SATURDAY = "saturday"
     SUNDAY = "sunday"

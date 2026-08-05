@@ -71,6 +71,7 @@ def standard_safety_payload() -> dict[str, object]:
 
 def nutrition_payload() -> dict[str, object]:
     return {
+        "daily_activity_level": "moderate",
         "individual_monthly_food_budget_irr": 13_000_000,
         "budget_style": "strict",
         "meals_per_day": 3,
@@ -316,6 +317,7 @@ def test_nutrition_profile_persists_budget_and_normalized_food_constraints(
     assert response.status_code == 200
     body = response.json()
     assert body["currency"] == "IRR"
+    assert body["daily_activity_level"] == "moderate"
     assert body["individual_monthly_food_budget_irr"] == 13_000_000
     assert body["weekly_budget_irr"] == 3_000_000
     assert body["allergies"] == [{"name": "بادام زمینی", "details": "واکنش شدید"}]

@@ -5,10 +5,11 @@ import type { ProductMode, ProfileInput, SharedProfileInput } from "../profile/t
 
 export const ONBOARDING_DRAFT_KEY = "fitsho:onboarding-draft:v1";
 export const PENDING_NUTRITION_BASICS_KEY = "fitsho:pending-nutrition-basics:v1";
+export const HYDRATED_ACCOUNT_KEY = "fitsho:onboarding-hydrated:v1";
 
 export type PreAccountNutritionBasics = Pick<
   NutritionProfileInput,
-  "individual_monthly_food_budget_irr" | "budget_style" | "plan_style" | "allergies" | "intolerances" | "dietary_pattern"
+  "daily_activity_level" | "individual_monthly_food_budget_irr" | "budget_style" | "plan_style" | "allergies" | "intolerances" | "dietary_pattern"
 >;
 
 export type OnboardingDraft = {
@@ -83,6 +84,44 @@ export async function hydrateOnboardingDraft(draft: OnboardingDraft): Promise<vo
     await profileApi.createProfile(draft.training);
   }
   await nutritionApi.saveSafetyProfile(draft.safety);
-  sessionStorage.setItem(PENDING_NUTRITION_BASICS_KEY, JSON.stringify(draft.nutritionBasics));
+  await nutritionApi.saveNutritionProfile(starterNutritionProfile(draft.nutritionBasics));
+  sessionStorage.setItem(HYDRATED_ACCOUNT_KEY, "true");
   clearOnboardingDraft();
+}
+
+function starterNutritionProfile(basics: PreAccountNutritionBasics): NutritionProfileInput {
+  return {
+    daily_activity_level: basics.daily_activity_level,
+    individual_monthly_food_budget_irr: basics.individual_monthly_food_budget_irr,
+    budget_style: basics.budget_style,
+    meals_per_day: 3,
+    snacks_per_day: 1,
+    preferred_plan_start_day: "saturday",
+    plan_style: basics.plan_style,
+    cooking_skill: "basic",
+    maximum_cooking_time_minutes: 45,
+    cooking_frequency_per_week: 4,
+    meal_preparation_preference: "mixed",
+    refrigerator_access: true,
+    freezer_access: true,
+    cooking_equipment: ["stove", "refrigerator"],
+    supplied_meals_per_week: 0,
+    supplied_meal_source: null,
+    foods_available_at_home: [],
+    favourite_foods: [],
+    disliked_foods: [],
+    never_suggest_foods: [],
+    refused_foods: [],
+    allergies: basics.allergies,
+    intolerances: basics.intolerances,
+    dietary_pattern: basics.dietary_pattern,
+    religious_cultural_exclusions: [],
+    preferred_variety: "medium",
+    maximum_meal_repetition_per_week: 2,
+    accepts_leftovers: true,
+    accepts_batch_cooking: true,
+    work_shift_context: null,
+    daily_check_in_enabled: false,
+    preferred_check_in_time: null,
+  };
 }

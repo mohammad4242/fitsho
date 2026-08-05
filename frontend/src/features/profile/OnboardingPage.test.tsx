@@ -30,6 +30,7 @@ vi.mock("./ProfileContext", () => ({
     profile: null,
     ...profileContext,
   }),
+  useOptionalProfile: () => ({ status: "ready" }),
 }));
 
 vi.mock("../auth/AuthContext", () => ({

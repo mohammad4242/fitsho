@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../features/auth/AuthContext";
-import { useProfile } from "../features/profile/ProfileContext";
+import { useOptionalProfile } from "../features/profile/ProfileContext";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function AuthenticatedHeader() {
@@ -11,7 +11,8 @@ export function AuthenticatedHeader() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { status } = useProfile();
+  const profileContext = useOptionalProfile();
+  const status = profileContext?.status ?? "ready";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);

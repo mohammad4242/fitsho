@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 
 import type { ExerciseCategories, ExerciseDetail, PaginatedExercises } from "./features/exercises/types";
+import { HYDRATED_ACCOUNT_KEY } from "./features/publicOnboarding/onboardingDraft";
 
 const auth = vi.hoisted(() => ({
   value: {
@@ -68,6 +69,7 @@ vi.mock("./features/auth/AuthContext", () => ({
 
 vi.mock("./features/profile/ProfileContext", () => ({
   useProfile: () => profile.value,
+  useOptionalProfile: () => profile.value,
 }));
 
 vi.mock("./features/exercises/api", () => exerciseApi);
@@ -117,6 +119,7 @@ const exerciseDetail: ExerciseDetail = {
 };
 
 beforeEach(() => {
+  sessionStorage.clear();
   auth.value.user = null;
   auth.value.loading = false;
   auth.value.startupError = false;
@@ -196,6 +199,16 @@ it("opens the dashboard after sign-in and keeps profile completion in the accoun
   expect(accountMenu.querySelector('[href="/onboarding"]')).toHaveTextContent("تکمیل پروفایل");
   expect(accountMenu.querySelector('[href="/exercises"]')).toHaveTextContent("حرکات");
   expect(screen.getByRole("button", { name: /مقالات روز دنیا/ })).toBeDisabled();
+});
+
+it("keeps a newly hydrated member on the dashboard while profile status refreshes", async () => {
+  sessionStorage.setItem(HYDRATED_ACCOUNT_KEY, "true");
+  auth.value.user = member;
+  profile.value.status = "missing";
+  profile.value.profile = null;
+  renderRoute("/dashboard");
+
+  expect(await screen.findByRole("heading", { name: "سلام، دوست" })).toBeInTheDocument();
 });
 
 it("logs a signed-in user out from Today", async () => {

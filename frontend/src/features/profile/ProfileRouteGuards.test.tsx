@@ -36,6 +36,7 @@ vi.mock("../auth/AuthContext", () => ({
 
 vi.mock("./ProfileContext", () => ({
   useProfile: () => contexts.profile,
+  useOptionalProfile: () => contexts.profile,
 }));
 
 import { AppRoutes } from "../../App";

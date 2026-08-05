@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { useAuth } from "../auth/AuthContext";
+import { HYDRATED_ACCOUNT_KEY } from "../publicOnboarding/onboardingDraft";
 import * as api from "./api";
 import type {
   ProductMode,
@@ -45,6 +46,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const generation = ++requestGeneration.current;
     if (userId === null) {
+      sessionStorage.removeItem(HYDRATED_ACCOUNT_KEY);
       setProfile(null);
       setProductMode(null);
       setStatus("idle");
@@ -72,6 +74,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           ? await api.getProfile()
           : null;
         if (active && generation === requestGeneration.current) {
+          sessionStorage.removeItem(HYDRATED_ACCOUNT_KEY);
           setProfile(currentProfile);
           setStatus(profileStatus.completion_state === "product_mode_not_selected"
             ? "missing"
@@ -152,4 +155,8 @@ export function useProfile(): ProfileContextValue {
     throw new Error("useProfile must be used within ProfileProvider");
   }
   return context;
+}
+
+export function useOptionalProfile(): ProfileContextValue | null {
+  return useContext(ProfileContext);
 }

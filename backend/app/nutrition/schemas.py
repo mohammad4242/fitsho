@@ -7,6 +7,7 @@ from app.nutrition.enums import (
     BudgetStyle,
     CookingEquipment,
     CookingSkill,
+    DailyActivityLevel,
     DietaryPattern,
     MealPreparationPreference,
     MedicalConditionCode,
@@ -97,6 +98,7 @@ class FoodConstraintInput(BaseModel):
 
 
 class NutritionProfileInput(BaseModel):
+    daily_activity_level: DailyActivityLevel
     individual_monthly_food_budget_irr: int = Field(ge=0, le=100_000_000_000)
     budget_style: BudgetStyle
     meals_per_day: int = Field(ge=1, le=8)

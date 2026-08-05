@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
-import { useProfile } from "../features/profile/ProfileContext";
+import { useOptionalProfile } from "../features/profile/ProfileContext";
 
 type AppShellProps = {
   children: ReactNode;
@@ -17,7 +17,8 @@ const navigation = [
 
 export function AppShell({ children }: AppShellProps) {
   const { t } = useTranslation();
-  const { status } = useProfile();
+  const profileContext = useOptionalProfile();
+  const status = profileContext?.status ?? "ready";
 
   return (
     <div className="app-shell">

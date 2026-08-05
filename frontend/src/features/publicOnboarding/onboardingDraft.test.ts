@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 
+import * as nutritionApi from "../nutrition/api";
 import * as profileApi from "../profile/api";
 import { clearOnboardingDraft, hydrateOnboardingDraft, loadOnboardingDraft, saveOnboardingDraft } from "./onboardingDraft";
 
@@ -37,6 +38,8 @@ beforeEach(() => {
     user_id: "u1", weight_measured_at: "now", circumferences_measured_at: null,
     created_at: "now", updated_at: "now",
   });
+  vi.mocked(nutritionApi.saveSafetyProfile).mockResolvedValue({} as never);
+  vi.mocked(nutritionApi.saveNutritionProfile).mockResolvedValue({} as never);
 });
 
 it("keeps a pre-auth draft only in the current browser session", () => {
@@ -65,4 +68,35 @@ it("preserves the draft when server hydration fails", async () => {
   await expect(hydrateOnboardingDraft(draft)).rejects.toThrow("offline");
 
   expect(loadOnboardingDraft()).toEqual(draft);
+});
+
+it("creates the starter nutrition profile during account hydration", async () => {
+  const draft = {
+    mode: "nutrition" as const,
+    shared: {
+      display_name: "سارا", birth_date: "2000-05-14", sex: "female" as const,
+      height_cm: 165, current_weight_kg: 62.5, fitness_goal: "fat_loss" as const,
+    },
+    safety: {
+      conditions: [], medications: [], dangerous_food_reaction_history: false, pregnant: false,
+      breastfeeding: false, eating_disorder_diagnosed: false, eating_disorder_active_symptoms: false,
+      emergency_or_danger_symptoms: false, complex_medication_food_interaction: false,
+      physician_dietary_restrictions: null, other_relevant_condition: null,
+    },
+    nutritionBasics: {
+      daily_activity_level: "moderate" as const,
+      individual_monthly_food_budget_irr: 13_000_000, budget_style: "strict" as const,
+      plan_style: "balanced" as const, allergies: [], intolerances: [], dietary_pattern: "omnivore" as const,
+    },
+  };
+
+  await hydrateOnboardingDraft(draft);
+
+  expect(nutritionApi.saveNutritionProfile).toHaveBeenCalledWith(expect.objectContaining({
+    daily_activity_level: "moderate",
+    individual_monthly_food_budget_irr: 13_000_000,
+    dietary_pattern: "omnivore",
+    allergies: [],
+    intolerances: [],
+  }));
 });

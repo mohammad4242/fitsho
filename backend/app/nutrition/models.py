@@ -24,6 +24,7 @@ from app.nutrition.enums import (
     BudgetStyle,
     CookingEquipment,
     CookingSkill,
+    DailyActivityLevel,
     DietaryPattern,
     FoodItemKind,
     MealPreparationPreference,
@@ -216,6 +217,10 @@ class NutritionProfile(Base):
     )
     onboarding_status: Mapped[NutritionOnboardingStatus] = mapped_column(
         enum_column(NutritionOnboardingStatus, "ck_nutrition_profiles_status_values"),
+        nullable=False,
+    )
+    daily_activity_level: Mapped[DailyActivityLevel] = mapped_column(
+        enum_column(DailyActivityLevel, "ck_nutrition_profiles_daily_activity_level_values"),
         nullable=False,
     )
     individual_monthly_food_budget_irr: Mapped[int] = mapped_column(BigInteger, nullable=False)

@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Navigate, Outlet } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
+import { HYDRATED_ACCOUNT_KEY } from "../publicOnboarding/onboardingDraft";
 import { useProfile, type ProfileStatus } from "./ProfileContext";
 
 function StartupState({
@@ -80,5 +81,8 @@ export function CompletedProfileRoute() {
     return startupState;
   }
 
-  return status === "missing" ? <Navigate to="/onboarding" replace /> : <Outlet />;
+  const hasJustHydratedAccount = sessionStorage.getItem(HYDRATED_ACCOUNT_KEY) === "true";
+  return status === "missing" && !hasJustHydratedAccount
+    ? <Navigate to="/onboarding" replace />
+    : <Outlet />;
 }

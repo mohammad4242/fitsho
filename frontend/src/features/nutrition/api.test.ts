@@ -12,6 +12,7 @@ const safetyInput: SafetyProfileInput = {
 };
 
 const nutritionInput = {
+  daily_activity_level: "moderate",
   individual_monthly_food_budget_irr: 13_000_000, budget_style: "strict",
   meals_per_day: 3, snacks_per_day: 1, preferred_plan_start_day: "saturday",
   plan_style: "balanced", cooking_skill: "basic", maximum_cooking_time_minutes: 45,

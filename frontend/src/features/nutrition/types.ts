@@ -45,6 +45,7 @@ export type SafetyEvaluation = Omit<SafetyDecision, "id" | "created_at">;
 export type FoodConstraint = { name: string; details: string | null };
 
 export type NutritionProfileInput = {
+  daily_activity_level: "sedentary" | "light" | "moderate" | "very_active";
   individual_monthly_food_budget_irr: number;
   budget_style: "strict" | "flexible";
   meals_per_day: number;
