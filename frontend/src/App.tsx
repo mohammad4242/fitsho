@@ -31,6 +31,8 @@ import { PublicLandingRoute } from "./features/landing/PublicLandingRoute";
 import { PublicOnboardingPage } from "./features/publicOnboarding/PublicOnboardingPage";
 import { NutritionEstimatePage } from "./features/nutrition/NutritionEstimatePage";
 import { NutritionTrackingPage } from "./features/nutrition/NutritionTrackingPage";
+import { NutritionLabsPage } from "./features/nutrition/NutritionLabsPage";
+import { PhysicianNutritionReviewPage } from "./features/nutrition/PhysicianNutritionReviewPage";
 import { AppShell } from "./shared/AppShell";
 
 export function AppRoutes() {
@@ -41,6 +43,7 @@ export function AppRoutes() {
         <Route path="/register" element={<RegisterPage />} />
       </Route>
       <Route element={<ProtectedRoute />}>
+        <Route path="/physician/nutrition" element={<PhysicianNutritionReviewPage />} />
         <Route element={<AdminRoute />}>
           <Route path="/admin/ai-settings" element={<AdminAiSettingsPage />} />
           <Route path="/admin/training-program-templates" element={<AdminTrainingTemplatesPage />} />
@@ -60,6 +63,7 @@ export function AppRoutes() {
             <Route path="/nutrition-profile" element={<NutritionProfileRoute />} />
             <Route path="/nutrition-estimate" element={<NutritionEstimatePage />} />
             <Route path="/nutrition-tracking" element={<NutritionTrackingPage />} />
+            <Route path="/nutrition-labs" element={<NutritionLabsPage />} />
             <Route path="/body-progress" element={<BodyProgressPage />} />
             <Route path="/body-progress/new" element={<BodyPhotoWizard />} />
             <Route path="/body-progress/:sessionId" element={<BodyAnalysisResultPage />} />

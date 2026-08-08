@@ -1159,6 +1159,15 @@ class NutritionPlanPhysicianReview(Base):
     invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     invalidation_reason: Mapped[str | None] = mapped_column(String(64))
     expected_plan_revision: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    priority: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    target_review_by: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reassignment_count: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    internal_notes: Mapped[str | None] = mapped_column(String(4000))
+    structured_change_summary: Mapped[list[dict[str, object]]] = mapped_column(
+        JSON, nullable=False, default=list
+    )
 
 
 class NutritionMealFeedback(Base):
@@ -1197,6 +1206,21 @@ class NutritionLabDocument(Base):
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+    test_date: Mapped[date | None] = mapped_column()
+    laboratory_name: Mapped[str | None] = mapped_column(String(160))
+    user_note: Mapped[str | None] = mapped_column(String(1000))
+    category: Mapped[str | None] = mapped_column(String(80))
+    review_status: Mapped[str] = mapped_column(String(24), nullable=False, default="unreviewed")
+    request_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_lab_requests.id", ondelete="SET NULL")
+    )
+    assigned_physician_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    retained_until: Mapped[date | None] = mapped_column()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
 
@@ -1369,6 +1393,23 @@ class NutritionTargetUpdateConsent(Base):
     confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     estimate_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("nutrition_estimates.id", ondelete="SET NULL")
+    )
+
+
+class NutritionReviewAuditEvent(Base):
+    __tablename__ = "nutrition_review_audit_events"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    review_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_plan_physician_reviews.id", ondelete="CASCADE"), nullable=False
+    )
+    actor_user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    metadata_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
 

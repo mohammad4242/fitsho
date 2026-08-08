@@ -3,7 +3,18 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.admin.dependencies import AdminUser
@@ -17,6 +28,16 @@ from app.nutrition.adherence_service import (
     adaptive_preferences,
     adherence_history,
     confirm_target_update,
+)
+from app.nutrition.clinical_service import (
+    ClinicalError,
+    claim_review,
+    delete_lab,
+    list_labs,
+    open_lab,
+    request_labs,
+    review_queue,
+    upload_lab,
 )
 from app.nutrition.estimate_service import (
     create_estimate,
@@ -53,6 +74,7 @@ from app.nutrition.plan_editing import (
     PlanEditError,
     confirm_remove_meal,
     physician_action,
+    physician_remove_meal,
     preview_remove_meal,
     save_feedback,
     set_meal_lock,
@@ -80,6 +102,7 @@ from app.nutrition.schemas import (
     NutritionEstimateResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
+    PhysicianLabRequestInput,
     PhysicianPlanActionInput,
     PhysicianReviewRequirementResponse,
     QuickApproximationInput,
@@ -551,6 +574,25 @@ def review_plan(
         raise _plan_edit_error(error) from None
 
 
+@router.post(
+    "/physician/plans/{plan_id}/edits/remove-meal",
+    response_model=WeeklyPlanResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def physician_edit_remove_meal(
+    plan_id: UUID,
+    payload: RemoveMealConfirmationInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> WeeklyPlanResponse:
+    try:
+        return physician_remove_meal(
+            db, user.id, plan_id, payload.expected_plan_revision_id, payload.meal_id
+        )
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
 def _tracking_error(error: TrackingError) -> HTTPException:
     error_status = (
         status.HTTP_404_NOT_FOUND if error.code.endswith("NOT_FOUND") else status.HTTP_409_CONFLICT
@@ -722,3 +764,124 @@ def update_confirmed_target(
         return confirm_target_update(db, user.id, payload.requested_goal, payload.confirmed)
     except AdherenceError as error:
         raise HTTPException(status_code=409, detail={"code": error.code}) from None
+
+
+def _clinical_error(error: ClinicalError) -> HTTPException:
+    error_status = (
+        status.HTTP_404_NOT_FOUND if error.code.endswith("NOT_FOUND") else status.HTTP_409_CONFLICT
+    )
+    if error.code == "PHYSICIAN_ROLE_REQUIRED":
+        error_status = status.HTTP_403_FORBIDDEN
+    if error.code in {"INVALID_LAB_DOCUMENT", "LAB_DOCUMENT_TOO_LARGE"}:
+        error_status = status.HTTP_422_UNPROCESSABLE_CONTENT
+    return HTTPException(status_code=error_status, detail={"code": error.code})
+
+
+@router.post(
+    "/labs",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def create_lab_document(
+    db: DatabaseSession,
+    user: CurrentUser,
+    settings: AppSettings,
+    file: Annotated[UploadFile, File()],
+    test_date: Annotated[date | None, Form()] = None,
+    laboratory_name: Annotated[str | None, Form()] = None,
+    user_note: Annotated[str | None, Form()] = None,
+    category: Annotated[str | None, Form()] = None,
+    request_id: Annotated[UUID | None, Form()] = None,
+) -> dict[str, object]:
+    try:
+        return await upload_lab(
+            db,
+            user.id,
+            file,
+            settings,
+            test_date=test_date,
+            laboratory_name=laboratory_name,
+            user_note=user_note,
+            category=category,
+            request_id=request_id,
+        )
+    except ClinicalError as error:
+        raise _clinical_error(error) from None
+
+
+@router.get("/labs")
+def read_lab_documents(db: DatabaseSession, user: CurrentUser) -> list[dict[str, object]]:
+    return list_labs(db, user.id)
+
+
+@router.get("/labs/{document_id}/file")
+def download_lab_document(
+    document_id: UUID, db: DatabaseSession, user: CurrentUser, settings: AppSettings
+) -> StreamingResponse:
+    try:
+        handle, content_type, filename = open_lab(db, user.id, document_id, settings)
+    except ClinicalError as error:
+        raise _clinical_error(error) from None
+    return StreamingResponse(
+        handle,
+        media_type=content_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
+@router.delete(
+    "/labs/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def remove_lab_document(
+    document_id: UUID, db: DatabaseSession, user: CurrentUser, settings: AppSettings
+) -> None:
+    try:
+        delete_lab(db, user.id, document_id, settings)
+    except ClinicalError as error:
+        raise _clinical_error(error) from None
+
+
+@router.get("/physician/reviews")
+def read_physician_queue(db: DatabaseSession, user: CurrentUser) -> list[dict[str, object]]:
+    try:
+        return review_queue(db, user.id)
+    except ClinicalError as error:
+        raise _clinical_error(error) from None
+
+
+@router.post(
+    "/physician/reviews/{review_id}/claim",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def claim_physician_review(
+    review_id: UUID, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        return claim_review(db, user.id, review_id)
+    except ClinicalError as error:
+        raise _clinical_error(error) from None
+
+
+@router.post(
+    "/physician/plans/{plan_id}/request-labs",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def create_physician_lab_request(
+    plan_id: UUID,
+    payload: PhysicianLabRequestInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, object]:
+    try:
+        return request_labs(
+            db,
+            user.id,
+            plan_id,
+            payload.expected_plan_revision_id,
+            payload.requested_tests,
+            payload.user_visible_reason,
+        )
+    except ClinicalError as error:
+        raise _clinical_error(error) from None

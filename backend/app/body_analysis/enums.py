@@ -54,6 +54,7 @@ class BodyAnalysisReviewDecision(StrEnum):
 class SpecialistRole(StrEnum):
     COACH = "coach"
     DOCTOR = "doctor"
+    PHYSICIAN = "physician"
 
 
 class TrainingEmphasis(StrEnum):

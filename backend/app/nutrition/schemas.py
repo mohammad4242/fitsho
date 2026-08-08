@@ -484,3 +484,9 @@ class FoodPhotoConfirmInput(BaseModel):
 class TargetUpdateConfirmationInput(BaseModel):
     requested_goal: FitnessGoal
     confirmed: bool
+
+
+class PhysicianLabRequestInput(BaseModel):
+    expected_plan_revision_id: UUID
+    requested_tests: list[str] = Field(min_length=1, max_length=30)
+    user_visible_reason: str = Field(min_length=1, max_length=2000)

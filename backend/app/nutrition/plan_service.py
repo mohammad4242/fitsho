@@ -305,6 +305,28 @@ def latest_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanResponse:
 
 
 def active_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanResponse:
+    due = db.scalar(
+        _plan_query()
+        .where(
+            NutritionWeeklyPlan.user_id == user_id,
+            NutritionWeeklyPlan.lifecycle_status == NutritionPlanLifecycleStatus.PHYSICIAN_APPROVED,
+            NutritionWeeklyPlan.start_date <= date.today(),
+        )
+        .order_by(NutritionWeeklyPlan.revision.desc())
+        .limit(1)
+        .with_for_update()
+    )
+    if due is not None and due.review and due.review.status == NutritionPlanReviewStatus.APPROVED:
+        for current in db.scalars(
+            select(NutritionWeeklyPlan).where(
+                NutritionWeeklyPlan.user_id == user_id,
+                NutritionWeeklyPlan.id != due.id,
+                NutritionWeeklyPlan.lifecycle_status == NutritionPlanLifecycleStatus.ACTIVE,
+            )
+        ):
+            current.lifecycle_status = NutritionPlanLifecycleStatus.ARCHIVED
+        due.lifecycle_status = NutritionPlanLifecycleStatus.ACTIVE
+        db.commit()
     plan = db.scalar(
         _plan_query()
         .where(

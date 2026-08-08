@@ -151,3 +151,21 @@ export function getNutritionAdherence(start: string, end: string): Promise<Nutri
   const query = new URLSearchParams({ start, end });
   return request<NutritionAdherence>(`${nutritionPath}/adherence?${query}`);
 }
+
+export function listLabDocuments(): Promise<Array<{ id: string; original_filename: string; review_status: string; uploaded_at: string }>> {
+  return request(`${nutritionPath}/labs`);
+}
+
+export function uploadLabDocument(file: File): Promise<unknown> {
+  const body = new FormData();
+  body.append("file", file);
+  return request(`${nutritionPath}/labs`, { method: "POST", body });
+}
+
+export function listPhysicianReviews(): Promise<Array<{ review_id: string; plan_id: string; status: string; priority: number; overdue: boolean }>> {
+  return request(`${nutritionPath}/physician/reviews`);
+}
+
+export function claimPhysicianReview(reviewId: string): Promise<unknown> {
+  return request(`${nutritionPath}/physician/reviews/${reviewId}/claim`, { method: "POST" });
+}

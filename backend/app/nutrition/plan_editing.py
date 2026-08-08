@@ -9,8 +9,7 @@ from uuid import UUID
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.body_analysis.enums import SpecialistRole
-from app.body_analysis.models import UserSpecialistRole
+from app.nutrition.clinical_service import ClinicalError, require_physician
 from app.nutrition.enums import (
     NutritionMealFeedbackType,
     NutritionPlanGenerationOutcome,
@@ -21,6 +20,7 @@ from app.nutrition.models import (
     NutritionMealFeedback,
     NutritionPlanGeneration,
     NutritionPlanPhysicianReview,
+    NutritionReviewAuditEvent,
     NutritionWeeklyPlan,
     NutritionWeeklyPlanDay,
     NutritionWeeklyPlanFood,
@@ -191,12 +191,22 @@ def _sum_maps(maps: list[dict[str, object]]) -> dict[str, str]:
 
 
 def confirm_remove_meal(
-    db: Session, user_id: UUID, plan_id: UUID, expected_plan_revision_id: UUID, meal_id: UUID
+    db: Session,
+    user_id: UUID,
+    plan_id: UUID,
+    expected_plan_revision_id: UUID,
+    meal_id: UUID,
+    *,
+    physician_id: UUID | None = None,
 ) -> WeeklyPlanResponse:
     plan = owned_plan(db, user_id, plan_id, lock=True)
     if plan.id != expected_plan_revision_id:
         raise PlanEditError("STALE_PLAN_REVISION")
-    if plan.review and plan.review.status == NutritionPlanReviewStatus.IN_REVIEW:
+    if (
+        physician_id is None
+        and plan.review
+        and plan.review.status == NutritionPlanReviewStatus.IN_REVIEW
+    ):
         raise PlanEditError("PLAN_REVIEW_IN_PROGRESS")
     if not any(meal.id == meal_id for day in plan.days for meal in day.meals):
         raise PlanEditError("MEAL_NOT_FOUND")
@@ -294,11 +304,23 @@ def confirm_remove_meal(
             for row in plan.nutrients
         ],
         review=NutritionPlanPhysicianReview(
-            status=NutritionPlanReviewStatus.PENDING, expected_plan_revision=revision
+            status=(
+                NutritionPlanReviewStatus.IN_REVIEW
+                if physician_id
+                else NutritionPlanReviewStatus.PENDING
+            ),
+            expected_plan_revision=revision,
+            physician_user_id=physician_id,
+            assigned_at=datetime.now(UTC) if physician_id else None,
+            review_started_at=datetime.now(UTC) if physician_id else None,
+            structured_change_summary=[
+                {"operation": "remove_meal", "source_plan_id": str(plan.id)}
+            ],
         ),
     )
     if plan.review and plan.review.status in {
         NutritionPlanReviewStatus.PENDING,
+        NutritionPlanReviewStatus.IN_REVIEW,
         NutritionPlanReviewStatus.CHANGES_REQUESTED,
     }:
         plan.review.status = NutritionPlanReviewStatus.INVALIDATED_BY_REVISION
@@ -311,6 +333,30 @@ def confirm_remove_meal(
     return weekly_plan_response(owned_plan(db, user_id, new_plan.id))
 
 
+def physician_remove_meal(
+    db: Session,
+    physician_id: UUID,
+    plan_id: UUID,
+    expected_plan_revision_id: UUID,
+    meal_id: UUID,
+) -> WeeklyPlanResponse:
+    try:
+        require_physician(db, physician_id)
+    except ClinicalError as error:
+        raise PlanEditError("PHYSICIAN_ROLE_REQUIRED") from error
+    plan = db.scalar(select(NutritionWeeklyPlan).where(NutritionWeeklyPlan.id == plan_id))
+    if plan is None:
+        raise PlanEditError("NUTRITION_PLAN_NOT_FOUND")
+    return confirm_remove_meal(
+        db,
+        plan.user_id,
+        plan_id,
+        expected_plan_revision_id,
+        meal_id,
+        physician_id=physician_id,
+    )
+
+
 def physician_action(
     db: Session,
     physician_id: UUID,
@@ -319,16 +365,10 @@ def physician_action(
     action: str,
     notes: str | None,
 ) -> WeeklyPlanResponse:
-    if (
-        db.scalar(
-            select(UserSpecialistRole).where(
-                UserSpecialistRole.user_id == physician_id,
-                UserSpecialistRole.role == SpecialistRole.DOCTOR,
-            )
-        )
-        is None
-    ):
-        raise PlanEditError("PHYSICIAN_ROLE_REQUIRED")
+    try:
+        require_physician(db, physician_id)
+    except ClinicalError as error:
+        raise PlanEditError("PHYSICIAN_ROLE_REQUIRED") from error
     plan = db.scalar(_query().where(NutritionWeeklyPlan.id == plan_id).with_for_update())
     if plan is None:
         raise PlanEditError("NUTRITION_PLAN_NOT_FOUND")
@@ -344,18 +384,22 @@ def physician_action(
     if action == "start_review":
         plan.review.status = NutritionPlanReviewStatus.IN_REVIEW
         plan.lifecycle_status = NutritionPlanLifecycleStatus.PHYSICIAN_REVIEW_IN_PROGRESS
+        plan.review.review_started_at = now
     elif action == "approve":
         plan.review.status = NutritionPlanReviewStatus.APPROVED
         plan.review.reviewed_at = now
-        plan.lifecycle_status = NutritionPlanLifecycleStatus.ACTIVE
-        for old in db.scalars(
-            select(NutritionWeeklyPlan).where(
-                NutritionWeeklyPlan.user_id == plan.user_id,
-                NutritionWeeklyPlan.id != plan.id,
-                NutritionWeeklyPlan.lifecycle_status == NutritionPlanLifecycleStatus.ACTIVE,
-            )
-        ):
-            old.lifecycle_status = NutritionPlanLifecycleStatus.ARCHIVED
+        if plan.start_date <= now.date():
+            plan.lifecycle_status = NutritionPlanLifecycleStatus.ACTIVE
+            for old in db.scalars(
+                select(NutritionWeeklyPlan).where(
+                    NutritionWeeklyPlan.user_id == plan.user_id,
+                    NutritionWeeklyPlan.id != plan.id,
+                    NutritionWeeklyPlan.lifecycle_status == NutritionPlanLifecycleStatus.ACTIVE,
+                )
+            ):
+                old.lifecycle_status = NutritionPlanLifecycleStatus.ARCHIVED
+        else:
+            plan.lifecycle_status = NutritionPlanLifecycleStatus.PHYSICIAN_APPROVED
     elif action == "request_changes":
         plan.review.status = NutritionPlanReviewStatus.CHANGES_REQUESTED
         plan.lifecycle_status = NutritionPlanLifecycleStatus.CHANGES_REQUESTED
@@ -365,5 +409,13 @@ def physician_action(
         plan.lifecycle_status = NutritionPlanLifecycleStatus.REJECTED
     else:
         raise PlanEditError("INVALID_REVIEW_ACTION")
+    db.add(
+        NutritionReviewAuditEvent(
+            review_id=plan.review.id,
+            actor_user_id=physician_id,
+            action=action,
+            metadata_snapshot={"plan_id": str(plan.id), "revision": plan.revision},
+        )
+    )
     db.commit()
     return weekly_plan_response(owned_plan(db, plan.user_id, plan.id))

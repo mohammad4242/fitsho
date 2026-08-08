@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     food_photo_storage_root: Path = Path("var/private/food-photos")
     food_photo_max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=20 * 1024 * 1024)
     food_photo_retention_days: int = Field(default=30, ge=1, le=365)
+    nutrition_lab_storage_root: Path = Path("var/private/nutrition-labs")
+    nutrition_lab_max_bytes: int = Field(default=12 * 1024 * 1024, ge=1024, le=30 * 1024 * 1024)
+    nutrition_lab_retention_days: int = Field(default=365 * 7, ge=30, le=365 * 20)
     ffprobe_path: str = "ffprobe"
     ffprobe_timeout_seconds: float = 5.0
     opencode_zen_api_key: SecretStr | None = Field(default=None, repr=False)
@@ -90,6 +93,9 @@ class Settings(BaseSettings):
         food_private_root = self.food_photo_storage_root.resolve()
         if food_private_root == public_root or food_private_root.is_relative_to(public_root):
             raise ValueError("Food photo storage must be outside public media storage")
+        lab_root = self.nutrition_lab_storage_root.resolve()
+        if lab_root == public_root or lab_root.is_relative_to(public_root):
+            raise ValueError("Nutrition lab storage must be outside public media storage")
         return self
 
     @model_validator(mode="after")
