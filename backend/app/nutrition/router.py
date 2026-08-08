@@ -3,13 +3,14 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.admin.dependencies import AdminUser
 from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
+from app.config import Settings, get_settings
 from app.database.session import get_db
 from app.nutrition.estimate_service import (
     create_estimate,
@@ -36,6 +37,12 @@ from app.nutrition.food_catalogue import (
     save_catalogue_food,
     save_catalogue_meal,
 )
+from app.nutrition.food_photo_service import (
+    FoodPhotoError,
+    confirm_photo,
+    delete_photo,
+    estimate_photo,
+)
 from app.nutrition.plan_editing import (
     PlanEditError,
     confirm_remove_meal,
@@ -61,6 +68,7 @@ from app.nutrition.schemas import (
     CatalogueMealResponse,
     CatalogueMealWrite,
     DailyCheckInInput,
+    FoodPhotoConfirmInput,
     MealFeedbackInput,
     MealLockInput,
     NutritionEstimateResponse,
@@ -103,6 +111,7 @@ router = APIRouter(prefix="/api/v1/nutrition", tags=["nutrition"])
 
 DatabaseSession = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
+AppSettings = Annotated[Settings, Depends(get_settings)]
 
 
 def _domain_error(code: str, message: str) -> HTTPException:
@@ -617,3 +626,65 @@ def remove_consumption_entry(entry_id: UUID, db: DatabaseSession, user: CurrentU
         delete_entry(db, user.id, entry_id)
     except TrackingError as error:
         raise _tracking_error(error) from None
+
+
+def _food_photo_error(error: FoodPhotoError) -> HTTPException:
+    error_status = (
+        status.HTTP_404_NOT_FOUND if error.code.endswith("NOT_FOUND") else status.HTTP_409_CONFLICT
+    )
+    if error.code in {"INVALID_FOOD_PHOTO", "FOOD_PHOTO_TOO_LARGE"}:
+        error_status = status.HTTP_422_UNPROCESSABLE_CONTENT
+    if error.code == "FOOD_PHOTO_PROVIDER_UNAVAILABLE":
+        error_status = status.HTTP_503_SERVICE_UNAVAILABLE
+    return HTTPException(status_code=error_status, detail={"code": error.code})
+
+
+@router.post(
+    "/tracking/photo-estimates",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def create_food_photo_estimate(
+    request: Request,
+    db: DatabaseSession,
+    user: CurrentUser,
+    settings: AppSettings,
+    file: Annotated[UploadFile, File()],
+    consent: Annotated[bool, Header(alias="X-Fitsho-Food-Photo-Consent")],
+) -> dict[str, object]:
+    try:
+        return await estimate_photo(
+            db, user.id, file, consent, settings, request.app.state.ai_http_client
+        )
+    except FoodPhotoError as error:
+        raise _food_photo_error(error) from None
+
+
+@router.post(
+    "/tracking/photo-estimates/{estimate_id}/confirm",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def confirm_food_photo_estimate(
+    estimate_id: UUID,
+    payload: FoodPhotoConfirmInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> list[dict[str, object]]:
+    try:
+        return confirm_photo(db, user.id, estimate_id, payload.entry_date)
+    except FoodPhotoError as error:
+        raise _food_photo_error(error) from None
+
+
+@router.delete(
+    "/tracking/photo-estimates/{estimate_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def remove_food_photo_estimate(
+    estimate_id: UUID, db: DatabaseSession, user: CurrentUser, settings: AppSettings
+) -> None:
+    try:
+        delete_photo(db, user.id, estimate_id, settings)
+    except FoodPhotoError as error:
+        raise _food_photo_error(error) from None

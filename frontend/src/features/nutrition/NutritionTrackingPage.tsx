@@ -15,6 +15,8 @@ export function NutritionTrackingPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [calories, setCalories] = useState("");
+  const [photoConsent, setPhotoConsent] = useState(false);
+  const [photoEstimate, setPhotoEstimate] = useState<Awaited<ReturnType<typeof api.estimateFoodPhoto>> | null>(null);
 
   const load = () => api.getDailyTracking(today).then(setSummary).catch(() => setError(l("دریافت اطلاعات ممکن نشد.", "Could not load tracking.")));
   useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -34,6 +36,22 @@ export function NutritionTrackingPage() {
       await api.addQuickApproximation({ entry_date: today, display_name: l("وعده تقریبی", "Approximate meal"), calories: value, protein_g: null });
       setCalories(""); await load();
     } finally { setBusy(false); }
+  }
+
+  async function analyzePhoto(file: File | undefined) {
+    if (!file || !photoConsent) return;
+    setBusy(true); setError(null);
+    try { setPhotoEstimate(await api.estimateFoodPhoto(file)); }
+    catch { setError(l("برآورد عکس فعلاً در دسترس نیست؛ ثبت دستی همچنان کار می‌کند.", "Photo estimation is unavailable; manual tracking still works.")); }
+    finally { setBusy(false); }
+  }
+
+  async function confirmPhoto() {
+    if (!photoEstimate) return;
+    setBusy(true);
+    try { await api.confirmFoodPhoto(photoEstimate.id, today); setPhotoEstimate(null); await load(); }
+    catch { setError(l("موارد نامشخص را اول ویرایش کن.", "Resolve uncertain items before confirming.")); }
+    finally { setBusy(false); }
   }
 
   return <main className="nutrition-estimate-page" dir={fa ? "rtl" : "ltr"}>
@@ -59,6 +77,17 @@ export function NutritionTrackingPage() {
         <input aria-label={l("کالری تقریبی", "Approximate calories")} inputMode="numeric" value={calories} onChange={(event) => setCalories(event.target.value)} />
         <button className="primary-button" disabled={busy} onClick={() => void addApproximation()}>{l("ثبت تقریبی", "Add estimate")}</button>
       </div>
+    </section>
+    <section className="nutrition-estimate-notes">
+      <h2>{l("برآورد از عکس غذا", "Estimate from a food photo")}</h2>
+      <p>{l("عکس برای شناسایی تقریبی غذا به OpenRouter فرستاده می‌شود؛ اطلاعات حساب یا پزشکی ارسال نمی‌شود.", "The image is sent to OpenRouter only for approximate food identification; account and medical data are not sent.")}</p>
+      <label><input type="checkbox" checked={photoConsent} onChange={(event) => setPhotoConsent(event.target.checked)} /> {l("با پردازش عکس توسط سرویس ثالث موافقم", "I consent to third-party image processing")}</label>
+      <input type="file" accept="image/jpeg,image/png,image/webp" disabled={!photoConsent || busy} onChange={(event) => void analyzePhoto(event.target.files?.[0])} />
+      {photoEstimate && <div>
+        <p>{l("این نتیجه تقریبی است و فقط بعد از تأیید تو ثبت می‌شود.", "This is approximate and is saved only after your confirmation.")}</p>
+        <ul>{photoEstimate.items.map((item, index) => <li key={`${item.name_guess}-${index}`}>{item.name_guess} — {item.estimated_amount} {item.unit} ({item.mapping_status})</li>)}</ul>
+        <button className="primary-button" disabled={busy} onClick={() => void confirmPhoto()}>{l("تأیید و ثبت", "Confirm and log")}</button>
+      </div>}
     </section>
     <section className="nutrition-estimate-summary">
       <article className="nutrition-calorie-card"><span>{l("کالری ثبت‌شده", "Logged calories")}</span><strong>{Math.round(summary?.actual_totals.energy_kcal ?? 0)}</strong></article>

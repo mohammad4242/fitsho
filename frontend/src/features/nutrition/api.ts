@@ -123,3 +123,25 @@ export function addQuickApproximation(input: {
     body: JSON.stringify(input),
   });
 }
+
+export function estimateFoodPhoto(file: File): Promise<{
+  id: string;
+  items: Array<{ name_guess: string; estimated_amount: number; unit: string; mapping_status: string }>;
+  overall_confidence: number;
+  needs_user_confirmation: true;
+}> {
+  const body = new FormData();
+  body.append("file", file);
+  return request(`${nutritionPath}/tracking/photo-estimates`, {
+    method: "POST",
+    headers: { "X-Fitsho-Food-Photo-Consent": "true" },
+    body,
+  });
+}
+
+export function confirmFoodPhoto(estimateId: string, entryDate: string): Promise<unknown> {
+  return request(`${nutritionPath}/tracking/photo-estimates/${estimateId}/confirm`, {
+    method: "POST",
+    body: JSON.stringify({ entry_date: entryDate }),
+  });
+}

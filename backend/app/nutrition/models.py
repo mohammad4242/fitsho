@@ -1327,6 +1327,35 @@ class NutritionConsumptionEntry(Base):
     )
 
 
+class NutritionFoodPhotoEstimate(Base):
+    __tablename__ = "nutrition_food_photo_estimates"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    storage_key: Mapped[str] = mapped_column(String(500), nullable=False, unique=True)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    byte_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    model_id: Mapped[str | None] = mapped_column(String(300))
+    provider_request_id: Mapped[str | None] = mapped_column(String(160))
+    raw_estimate: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    mapped_items: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
+    input_tokens: Mapped[int | None] = mapped_column(BigInteger)
+    output_tokens: Mapped[int | None] = mapped_column(BigInteger)
+    estimated_cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    consented_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class NutritionPhysicianReview(Base):
     __tablename__ = "nutrition_physician_reviews"
 

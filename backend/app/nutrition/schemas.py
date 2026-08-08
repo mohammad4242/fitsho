@@ -475,3 +475,7 @@ class QuickApproximationInput(BaseModel):
     display_name: str = Field(min_length=1, max_length=160)
     calories: float = Field(gt=0, le=10000)
     protein_g: float | None = Field(default=None, ge=0, le=1000)
+
+
+class FoodPhotoConfirmInput(BaseModel):
+    entry_date: date

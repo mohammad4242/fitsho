@@ -6,6 +6,7 @@ class AITaskType(StrEnum):
     BODY_PHOTO_ANALYSIS = "body_photo_analysis"
     PROGRESS_COMPARISON = "progress_comparison"
     SPECIALIST_SUMMARY = "specialist_summary"
+    FOOD_PHOTO_ESTIMATION = "food_photo_estimation"
 
 
 class AIProviderName(StrEnum):

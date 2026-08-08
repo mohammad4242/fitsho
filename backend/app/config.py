@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     body_photo_min_top_band_luma_range: int = Field(default=16, ge=0, le=255)
     body_photo_min_top_band_edge_mean: float = Field(default=1.0, ge=0.0, le=64.0)
     body_photo_read_chunk_bytes: int = Field(default=1024 * 1024, ge=1024, le=4 * 1024 * 1024)
+    food_photo_storage_root: Path = Path("var/private/food-photos")
+    food_photo_max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=20 * 1024 * 1024)
+    food_photo_retention_days: int = Field(default=30, ge=1, le=365)
     ffprobe_path: str = "ffprobe"
     ffprobe_timeout_seconds: float = 5.0
     opencode_zen_api_key: SecretStr | None = Field(default=None, repr=False)
@@ -74,9 +77,7 @@ class Settings(BaseSettings):
         )
         return tuple(
             dict.fromkeys(
-                origin
-                for origin in (self.frontend_origin, *configured_origins)
-                if origin
+                origin for origin in (self.frontend_origin, *configured_origins) if origin
             )
         )
 
@@ -86,6 +87,9 @@ class Settings(BaseSettings):
         private_root = self.body_photo_storage_root.resolve()
         if private_root == public_root or private_root.is_relative_to(public_root):
             raise ValueError("Body photo storage must be outside public media storage")
+        food_private_root = self.food_photo_storage_root.resolve()
+        if food_private_root == public_root or food_private_root.is_relative_to(public_root):
+            raise ValueError("Food photo storage must be outside public media storage")
         return self
 
     @model_validator(mode="after")
