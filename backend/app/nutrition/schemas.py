@@ -10,6 +10,7 @@ from app.nutrition.enums import (
     DailyActivityLevel,
     DietaryPattern,
     EstimateConfidence,
+    FoodMeasurementBasis,
     MainMealCountBucket,
     MealPreparationPreference,
     MedicalConditionCode,
@@ -286,6 +287,14 @@ class CatalogueFoodWrite(BaseModel):
     source_name: str = Field(min_length=1, max_length=160)
     source_reference: str = Field(min_length=1, max_length=500)
     source_food_id: str | None = Field(default=None, max_length=120)
+    category: str = Field(default="uncategorized", min_length=1, max_length=64)
+    measurement_basis: FoodMeasurementBasis = FoodMeasurementBasis.AS_PURCHASED
+    canonical_quantity: float = Field(default=100, gt=0)
+    canonical_unit: str = Field(default="g", min_length=1, max_length=16)
+    edible_portion: float = Field(default=1, gt=0, le=1)
+    data_version: str = Field(default="unversioned", min_length=1, max_length=64)
+    source_access_date: date | None = None
+    aliases: list[str] = Field(default_factory=list, max_length=50)
     dietary_patterns: list[str] = Field(
         default_factory=lambda: ["omnivore", "vegetarian", "vegan"],
         min_length=1,

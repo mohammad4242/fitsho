@@ -71,6 +71,12 @@ class FoodVerificationStatus(StrEnum):
     RETIRED = "retired"
 
 
+class FoodMeasurementBasis(StrEnum):
+    RAW = "raw"
+    DRY = "dry"
+    AS_PURCHASED = "as_purchased"
+
+
 class FoodRole(StrEnum):
     MAIN_PROTEIN = "main_protein"
     MAIN_STAPLE = "main_staple"

@@ -131,7 +131,7 @@ def test_update_run_is_idempotent_and_preserves_previous_price_on_review(db) -> 
     from app.nutrition.price_update_service import run_price_update
 
     food = NutritionCatalogueFood(
-        slug="chicken-breast", name_fa="سینه مرغ", name_en="Chicken breast",
+        slug="price-test-chicken-breast", name_fa="سینه مرغ", name_en="Chicken breast",
         verification_status=FoodVerificationStatus.VERIFIED, source_name="test", source_reference="test",
     )
     provider = NutritionPriceProvider(code="provider-a", kind=PriceProviderKind.PUBLIC_CATALOG, name="Provider A", enabled=True)

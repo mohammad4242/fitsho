@@ -1,14 +1,30 @@
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.nutrition.enums import EstimateConfidence, FoodVerificationStatus, MealSlotRole
+from app.nutrition.catalogue_seed_data import (
+    APPROVED_FOODS,
+    NUTRIENT_UNITS,
+    USDA_ACCESS_DATE,
+    USDA_DATA_VERSION,
+    USDA_SOURCE_NAME,
+    USDA_SOURCE_REFERENCE,
+    composition_for,
+)
+from app.nutrition.enums import (
+    EstimateConfidence,
+    FoodMeasurementBasis,
+    FoodVerificationStatus,
+    MealSlotRole,
+)
 from app.nutrition.enums import FoodRole as FoodRoleEnum
 from app.nutrition.models import (
     NutritionCatalogueFood,
+    NutritionCatalogueFoodAlias,
     NutritionCatalogueFoodRole,
     NutritionCatalogueMeal,
     NutritionCatalogueMealItem,
@@ -108,6 +124,7 @@ def list_verified_foods(db: Session) -> list[CatalogueFoodResponse]:
         .options(
             selectinload(NutritionCatalogueFood.roles),
             selectinload(NutritionCatalogueFood.compositions),
+            selectinload(NutritionCatalogueFood.aliases),
         )
         .order_by(NutritionCatalogueFood.name_en)
     ).all()
@@ -123,6 +140,11 @@ def save_catalogue_food(db: Session, payload: CatalogueFoodWrite) -> CatalogueFo
         raise ValueError("Unknown dietary pattern")
     if len(payload.dietary_patterns) != len(set(payload.dietary_patterns)):
         raise ValueError("Dietary patterns must be unique")
+    normalized_aliases = [normalize_food_alias(alias) for alias in payload.aliases]
+    if any(not alias for alias in normalized_aliases):
+        raise ValueError("Food aliases cannot be empty")
+    if len(normalized_aliases) != len(set(normalized_aliases)):
+        raise ValueError("Food aliases must be unique")
     nutrients = payload.nutrients
     if len({nutrient.nutrient_code for nutrient in nutrients}) != len(nutrients):
         raise ValueError("Nutrient codes must be unique")
@@ -132,6 +154,7 @@ def save_catalogue_food(db: Session, payload: CatalogueFoodWrite) -> CatalogueFo
         .options(
             selectinload(NutritionCatalogueFood.roles),
             selectinload(NutritionCatalogueFood.compositions),
+            selectinload(NutritionCatalogueFood.aliases),
         )
     )
     if food is None:
@@ -143,8 +166,23 @@ def save_catalogue_food(db: Session, payload: CatalogueFoodWrite) -> CatalogueFo
     food.source_name = payload.source_name
     food.source_reference = payload.source_reference
     food.source_food_id = payload.source_food_id
+    food.category = payload.category
+    food.measurement_basis = payload.measurement_basis
+    food.canonical_quantity = Decimal(str(payload.canonical_quantity))
+    food.canonical_unit = payload.canonical_unit
+    food.edible_portion = Decimal(str(payload.edible_portion))
+    food.data_version = payload.data_version
+    food.source_access_date = payload.source_access_date
     food.dietary_patterns = payload.dietary_patterns
     food.roles = [NutritionCatalogueFoodRole(role=role) for role in roles]
+    food.aliases = [
+        NutritionCatalogueFoodAlias(
+            alias=alias,
+            normalized_alias=normalized,
+            language="fa" if any("\u0600" <= char <= "\u06ff" for char in alias) else "en",
+        )
+        for alias, normalized in zip(payload.aliases, normalized_aliases, strict=True)
+    ]
     food.compositions = [
         NutritionFoodComposition(
             nutrient_code=nutrient.nutrient_code,
@@ -153,6 +191,9 @@ def save_catalogue_food(db: Session, payload: CatalogueFoodWrite) -> CatalogueFo
             unit_form=nutrient.unit_form,
             source_name=nutrient.source_name,
             source_reference=nutrient.source_reference,
+            source_food_id=payload.source_food_id,
+            data_version=payload.data_version,
+            source_access_date=payload.source_access_date,
             confidence=EstimateConfidence(nutrient.confidence),
         )
         for nutrient in nutrients
@@ -230,6 +271,14 @@ def _food_response(food: NutritionCatalogueFood) -> CatalogueFoodResponse:
         source_name=food.source_name,
         source_reference=food.source_reference,
         source_food_id=food.source_food_id,
+        category=food.category,
+        measurement_basis=food.measurement_basis,
+        canonical_quantity=float(food.canonical_quantity),
+        canonical_unit=food.canonical_unit,
+        edible_portion=float(food.edible_portion),
+        data_version=food.data_version,
+        source_access_date=food.source_access_date,
+        aliases=[alias.alias for alias in food.aliases],
         dietary_patterns=food.dietary_patterns,
         roles=[role.role.value for role in food.roles],
         nutrients=[
@@ -311,104 +360,89 @@ def seed_verified_iranian_foods(db: Session) -> list[CatalogueFoodResponse]:
     ]
 
 
-def seed_base_iranian_food_catalogue(db: Session) -> list[NutritionCatalogueFood]:
-    """Create the approved base-food vocabulary; composition verification is separate."""
-    groups: dict[str, tuple[tuple[str, str, str], ...]] = {
-        FoodRole.MAIN_PROTEIN: (
-            ("chicken-breast", "سینه مرغ", "Chicken breast"),
-            ("chicken-thigh-skinless", "ران مرغ بدون پوست", "Skinless chicken thigh"),
-            ("beef", "گوشت گوساله", "Beef"),
-            ("lamb", "گوشت گوسفند", "Lamb"),
-            ("white-fish", "ماهی سفید", "White fish"),
-            ("rainbow-trout", "ماهی قزل‌آلا", "Rainbow trout"),
-            ("canned-tuna", "تن ماهی", "Canned tuna"),
-            ("egg", "تخم‌مرغ", "Egg"),
-            ("lentils", "عدس", "Lentils"),
-            ("chickpeas", "نخود", "Chickpeas"),
-            ("pinto-beans", "لوبیا چیتی", "Pinto beans"),
-            ("red-kidney-beans", "لوبیا قرمز", "Red kidney beans"),
-            ("white-beans", "لوبیا سفید", "White beans"),
-            ("black-eyed-peas", "لوبیا چشم‌بلبلی", "Black-eyed peas"),
-            ("split-peas", "لپه", "Split peas"),
-            ("mung-beans", "ماش", "Mung beans"),
-            ("soybeans", "سویا", "Soybeans"),
-        ),
-        FoodRole.MAIN_STAPLE: (
-            ("basmati-rice", "برنج", "Basmati rice"),
-            ("sangak-bread", "نان سنگک", "Sangak bread"),
-            ("barbari-bread", "نان بربری", "Barbari bread"),
-            ("lavash-bread", "نان لواش", "Lavash bread"),
-            ("taftoon-bread", "نان تافتون", "Taftoon bread"),
-            ("oats", "جو دوسر", "Oats"),
-            ("barley", "جو", "Barley"),
-            ("potato", "سیب‌زمینی", "Potato"),
-            ("corn", "ذرت", "Corn"),
-            ("pasta", "ماکارونی", "Pasta"),
-        ),
-        FoodRole.FLEXIBLE: (
-            ("milk", "شیر", "Milk"),
-            ("plain-yogurt", "ماست ساده", "Plain yogurt"),
-            ("low-fat-cheese", "پنیر کم‌چرب", "Low-fat cheese"),
-            ("tomato", "گوجه‌فرنگی", "Tomato"),
-            ("cucumber", "خیار", "Cucumber"),
-            ("onion", "پیاز", "Onion"),
-            ("carrot", "هویج", "Carrot"),
-            ("lettuce", "کاهو", "Lettuce"),
-            ("cabbage", "کلم", "Cabbage"),
-            ("spinach", "اسفناج", "Spinach"),
-            ("zucchini", "کدو سبز", "Zucchini"),
-            ("eggplant", "بادمجان", "Eggplant"),
-            ("bell-pepper", "فلفل دلمه‌ای", "Bell pepper"),
-            ("mushroom", "قارچ", "Mushroom"),
-            ("celery", "کرفس", "Celery"),
-            ("broccoli", "بروکلی", "Broccoli"),
-            ("cauliflower", "گل‌کلم", "Cauliflower"),
-            ("mixed-herbs", "سبزی خوردن", "Mixed fresh herbs"),
-            ("olive-oil", "روغن زیتون", "Olive oil"),
-            ("vegetable-oil", "روغن مایع", "Vegetable oil"),
-            ("butter", "کره", "Butter"),
-            ("walnuts", "گردو", "Walnuts"),
-            ("almonds", "بادام", "Almonds"),
-            ("peanuts", "بادام‌زمینی", "Peanuts"),
-            ("sesame", "کنجد", "Sesame"),
-            ("tahini", "ارده", "Tahini"),
-        ),
-        FoodRole.SNACK: (
-            ("apple", "سیب", "Apple"),
-            ("banana", "موز", "Banana"),
-            ("orange", "پرتقال", "Orange"),
-            ("tangerine", "نارنگی", "Tangerine"),
-            ("kiwi", "کیوی", "Kiwi"),
-            ("pomegranate", "انار", "Pomegranate"),
-            ("grapes", "انگور", "Grapes"),
-            ("dates", "خرما", "Dates"),
-            ("raisins", "کشمش", "Raisins"),
-            ("strawberries", "توت‌فرنگی", "Strawberries"),
-            ("watermelon", "هندوانه", "Watermelon"),
-            ("melon", "خربزه", "Melon"),
-        ),
-    }
-    created: list[NutritionCatalogueFood] = []
-    for role, foods in groups.items():
-        for slug, name_fa, name_en in foods:
-            food = db.scalar(
-                select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == slug)
+def seed_base_iranian_food_catalogue(
+    db: Session, *, commit: bool = True
+) -> list[NutritionCatalogueFood]:
+    """Upsert the approved identities and only verify source-backed compositions."""
+    for legacy_slug in ("cooked-basmati-rice", "grilled-chicken-breast"):
+        legacy = db.scalar(
+            select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == legacy_slug)
+        )
+        if legacy is not None:
+            legacy.verification_status = FoodVerificationStatus.RETIRED
+
+    seeded: list[NutritionCatalogueFood] = []
+    for item in APPROVED_FOODS:
+        nutrients = composition_for(item.slug)
+        food = db.scalar(
+            select(NutritionCatalogueFood)
+            .where(NutritionCatalogueFood.slug == item.slug)
+            .options(
+                selectinload(NutritionCatalogueFood.roles),
+                selectinload(NutritionCatalogueFood.aliases),
+                selectinload(NutritionCatalogueFood.compositions),
             )
-            if food is None:
-                food = NutritionCatalogueFood(
-                    slug=slug,
-                    name_fa=name_fa,
-                    name_en=name_en,
-                    verification_status=FoodVerificationStatus.DRAFT,
-                    source_name="Fitsho approved Iranian base-food vocabulary",
-                    source_reference="https://fdc.nal.usda.gov/",
-                    dietary_patterns=_dietary_patterns_for_slug(slug),
-                    roles=[NutritionCatalogueFoodRole(role=FoodRoleEnum(role))],
-                )
-                db.add(food)
-                created.append(food)
-    db.commit()
-    return created
+        )
+        if food is None:
+            food = NutritionCatalogueFood(slug=item.slug)
+            db.add(food)
+        else:
+            food.roles.clear()
+            food.aliases.clear()
+            food.compositions.clear()
+            db.flush()
+        food.name_fa = item.name_fa
+        food.name_en = item.name_en
+        food.category = item.category
+        food.measurement_basis = FoodMeasurementBasis(item.measurement_basis)
+        food.canonical_quantity = Decimal("100")
+        food.canonical_unit = "g"
+        food.edible_portion = Decimal("1")
+        food.source_name = USDA_SOURCE_NAME if nutrients else "Fitsho approved vocabulary"
+        food.source_reference = USDA_SOURCE_REFERENCE
+        food.source_food_id = item.source_food_id
+        food.data_version = USDA_DATA_VERSION if nutrients else "awaiting-regional-source"
+        food.source_access_date = date.fromisoformat(USDA_ACCESS_DATE) if nutrients else None
+        food.verification_status = (
+            FoodVerificationStatus.VERIFIED if nutrients else FoodVerificationStatus.DRAFT
+        )
+        food.dietary_patterns = _dietary_patterns_for_slug(item.slug)
+        food.roles = [NutritionCatalogueFoodRole(role=FoodRoleEnum(role)) for role in item.roles]
+        food.aliases = [
+            NutritionCatalogueFoodAlias(
+                alias=alias,
+                normalized_alias=normalize_food_alias(alias),
+                language="fa" if any("\u0600" <= char <= "\u06ff" for char in alias) else "en",
+            )
+            for alias in dict.fromkeys(item.aliases)
+        ]
+        food.compositions = [
+            NutritionFoodComposition(
+                nutrient_code=code,
+                value_per_100g=value,
+                unit=NUTRIENT_UNITS[code],
+                unit_form=(
+                    "dietary_folate_equivalents" if code == "folate_dfe_mcg" else "nutrient_mass"
+                ),
+                source_name=USDA_SOURCE_NAME,
+                source_reference=USDA_SOURCE_REFERENCE,
+                source_food_id=item.source_food_id,
+                data_version=USDA_DATA_VERSION,
+                source_access_date=date.fromisoformat(USDA_ACCESS_DATE),
+                confidence=EstimateConfidence.HIGH,
+            )
+            for code, value in nutrients.items()
+        ]
+        seeded.append(food)
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+    return seeded
+
+
+def normalize_food_alias(value: str) -> str:
+    return " ".join(value.strip().casefold().replace("ي", "ی").replace("ك", "ک").split())
 
 
 def _dietary_patterns_for_slug(slug: str) -> list[str]:

@@ -22,7 +22,11 @@ def test_authenticated_member_lists_verified_foods(client: TestClient) -> None:
     response = client.get("/api/v1/nutrition/foods")
 
     assert response.status_code == 200
-    assert {item["slug"] for item in response.json()} >= {"plain-yogurt"}
+    foods = response.json()
+    assert {item["slug"] for item in foods} >= {"plain-yogurt", "chicken-breast", "lentils"}
+    chicken = next(item for item in foods if item["slug"] == "chicken-breast")
+    assert chicken["measurement_basis"] == "raw"
+    assert set(chicken["aliases"]) >= {"سینه مرغ", "فیله مرغ"}
 
 
 def test_admin_can_create_verified_food_with_provenance(client: TestClient, db: Session) -> None:
@@ -43,6 +47,9 @@ def test_admin_can_create_verified_food_with_provenance(client: TestClient, db: 
             "source_name": "Verified regional composition",
             "source_reference": "https://example.test/lentils",
             "source_food_id": "regional-lentils",
+            "category": "legumes",
+            "measurement_basis": "dry",
+            "aliases": ["عدس خشک"],
             "roles": ["main_protein", "flexible"],
             "nutrients": [
                 {

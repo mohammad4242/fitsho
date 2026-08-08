@@ -32,6 +32,7 @@ from app.nutrition.enums import (
     DietaryPattern,
     EstimateConfidence,
     FoodItemKind,
+    FoodMeasurementBasis,
     FoodRole,
     FoodVerificationStatus,
     MainMealCountBucket,
@@ -614,6 +615,21 @@ class NutritionCatalogueFood(Base):
     source_name: Mapped[str] = mapped_column(String(160), nullable=False)
     source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
     source_food_id: Mapped[str | None] = mapped_column(String(120))
+    category: Mapped[str] = mapped_column(String(64), nullable=False, default="uncategorized")
+    measurement_basis: Mapped[FoodMeasurementBasis] = mapped_column(
+        enum_column(FoodMeasurementBasis, "ck_nutrition_catalogue_food_basis_values"),
+        nullable=False,
+        default=FoodMeasurementBasis.AS_PURCHASED,
+    )
+    canonical_quantity: Mapped[Decimal] = mapped_column(
+        Numeric(12, 4), nullable=False, default=Decimal("100")
+    )
+    canonical_unit: Mapped[str] = mapped_column(String(16), nullable=False, default="g")
+    edible_portion: Mapped[Decimal] = mapped_column(
+        Numeric(8, 6), nullable=False, default=Decimal("1")
+    )
+    data_version: Mapped[str] = mapped_column(String(64), nullable=False, default="unversioned")
+    source_access_date: Mapped[date | None] = mapped_column()
     dietary_patterns: Mapped[list[str]] = mapped_column(
         JSON,
         nullable=False,
@@ -631,6 +647,24 @@ class NutritionCatalogueFood(Base):
     compositions: Mapped[list["NutritionFoodComposition"]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
     )
+    aliases: Mapped[list["NutritionCatalogueFoodAlias"]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class NutritionCatalogueFoodAlias(Base):
+    __tablename__ = "nutrition_catalogue_food_aliases"
+    __table_args__ = (
+        UniqueConstraint("food_id", "normalized_alias", name="uq_nutrition_food_alias"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    alias: Mapped[str] = mapped_column(String(160), nullable=False)
+    normalized_alias: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    language: Mapped[str] = mapped_column(String(8), nullable=False, default="und")
 
 
 class NutritionCatalogueFoodRole(Base):
@@ -661,6 +695,9 @@ class NutritionFoodComposition(Base):
     unit_form: Mapped[str] = mapped_column(String(48), nullable=False, default="nutrient_mass")
     source_name: Mapped[str] = mapped_column(String(160), nullable=False)
     source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_food_id: Mapped[str | None] = mapped_column(String(120))
+    data_version: Mapped[str] = mapped_column(String(64), nullable=False, default="unversioned")
+    source_access_date: Mapped[date | None] = mapped_column()
     confidence: Mapped[EstimateConfidence] = mapped_column(
         enum_column(EstimateConfidence, "ck_nutrition_food_composition_confidence_values"),
         nullable=False,
