@@ -440,3 +440,20 @@ Food composition mapping is reserved for USDA FoodData Central (or a verified
 regional source with equivalent provenance). Requirement targets never come
 from food-composition records; every future mapping must preserve source,
 serving unit, nutrient form, confidence, and unit-conversion metadata.
+
+## Task 3 implementation record
+
+The deterministic estimate engine now resolves the selected adult
+micronutrient RDA/AI rows from `micronutrient-dri-v1` by age, sex, and explicit
+dietary pattern, then persists the selected reference, unit/form, aggregation
+window, UL/CDRR metadata, source, policy version, and non-diagnostic
+explanation with the estimate. `BOTH` mode uses an active Fitsho training plan
+first and the training profile as an explicit fallback; nutrition-only mode
+requires an explicit structured-exercise answer and supports no-training.
+
+Macro minima are checked jointly against the calorie target before returning a
+result. Preferred values are never allowed to hide a hard-minimum conflict;
+the API returns `TARGET_INFEASIBLE` with reason codes when the configured
+minimums cannot fit. Sodium exposes the 1,500 mg AI and 2,300 mg CDRR rather
+than treating CDRR as a toxicity UL. All estimates retain formula/policy
+versions, input snapshots, confidence, and explanation metadata.

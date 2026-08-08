@@ -24,10 +24,13 @@ from app.nutrition.exceptions import (
     NutritionEstimateNotFoundError,
     NutritionProductModeError,
     NutritionProfileNotFoundError,
+    NutritionTargetInfeasibleDomainError,
     StructuredExerciseRequiredError,
 )
 from app.nutrition.models import (
+    MicronutrientReference,
     NutritionEstimate,
+    NutritionEstimateMicronutrientTarget,
     NutritionEstimateTarget,
     NutritionProfile,
     NutritionSafetyDecision,
@@ -35,6 +38,7 @@ from app.nutrition.models import (
 )
 from app.nutrition.schemas import (
     NutritionEstimateResponse,
+    NutritionMicronutrientTargetResponse,
     NutritionTargetResponse,
     StructuredExerciseInput,
     StructuredExerciseResponse,
@@ -46,6 +50,7 @@ from app.nutrition.scientific import (
     ScientificInputs,
     ScientificResult,
     StructuredExercise,
+    TargetInfeasibleError,
     calculate_targets,
 )
 from app.nutrition.service import current_safety_decision
@@ -56,6 +61,7 @@ from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan
 
 AUTOMATIC_POPULATION = "Adults 18-100 without a manual-only nutrition safety state"
+MICRONUTRIENT_POLICY_VERSION = "micronutrient-dri-v1"
 
 _ADULT_MET_VALUES = {
     TrainingIntensity.LIGHT: Decimal("2.5"),
@@ -92,6 +98,7 @@ class ResolvedStructuredExercise:
 
 @dataclass(frozen=True)
 class EstimateContext:
+    db: Session
     profile: UserProfile
     nutrition_profile: NutritionProfile
     safety: NutritionSafetyDecision
@@ -150,6 +157,7 @@ def create_estimate(db: Session, user_id: UUID) -> NutritionEstimateResponse:
             NutritionEstimate.policy_version == POLICY_VERSION,
         )
         .options(selectinload(NutritionEstimate.targets))
+        .options(selectinload(NutritionEstimate.micronutrient_targets))
     )
     if existing is not None:
         return estimate_response(existing, is_stale=False)
@@ -158,6 +166,8 @@ def create_estimate(db: Session, user_id: UUID) -> NutritionEstimateResponse:
         result = calculate_targets(context.inputs)
     except GoalReselectionRequiredError as error:
         raise GoalReselectionRequiredDomainError from error
+    except TargetInfeasibleError as error:
+        raise NutritionTargetInfeasibleDomainError(error.reason_codes) from error
     latest_revision = db.scalar(
         select(NutritionEstimate.revision)
         .where(NutritionEstimate.user_id == user_id)
@@ -182,6 +192,7 @@ def create_estimate(db: Session, user_id: UUID) -> NutritionEstimateResponse:
         overall_confidence=EstimateConfidence(result.confidence),
         confidence_reasons=list(result.confidence_reasons),
         targets=_target_rows(estimate_id, result),
+        micronutrient_targets=_micronutrient_rows(estimate_id, context),
     )
     db.add(estimate)
     try:
@@ -196,6 +207,7 @@ def create_estimate(db: Session, user_id: UUID) -> NutritionEstimateResponse:
                 NutritionEstimate.policy_version == POLICY_VERSION,
             )
             .options(selectinload(NutritionEstimate.targets))
+            .options(selectinload(NutritionEstimate.micronutrient_targets))
         )
         if raced is None:
             raise
@@ -208,6 +220,7 @@ def current_estimate(db: Session, user_id: UUID) -> NutritionEstimateResponse:
         select(NutritionEstimate)
         .where(NutritionEstimate.user_id == user_id)
         .options(selectinload(NutritionEstimate.targets))
+        .options(selectinload(NutritionEstimate.micronutrient_targets))
         .order_by(NutritionEstimate.revision.desc())
         .limit(1)
     )
@@ -242,6 +255,24 @@ def estimate_response(
         )
         for target in estimate.targets
     }
+    micronutrients = {
+        target.nutrient_code: NutritionMicronutrientTargetResponse(
+            reference_kind=target.reference_kind,
+            target_value=float(target.target_value),
+            unit=target.unit,
+            unit_form=target.unit_form,
+            upper_limit_value=_float_or_none(target.upper_limit_value),
+            upper_limit_kind=target.upper_limit_kind,
+            upper_limit_scope=target.upper_limit_scope,
+            aggregation_window=target.aggregation_window,
+            policy_version=target.policy_version,
+            source_reference=target.source_reference,
+            applicable_population=target.applicable_population,
+            confidence=target.confidence,
+            explanation_codes=target.explanation_codes,
+        )
+        for target in estimate.micronutrient_targets
+    }
     return NutritionEstimateResponse(
         id=estimate.id,
         revision=estimate.revision,
@@ -252,6 +283,7 @@ def estimate_response(
         confidence_reasons=estimate.confidence_reasons,
         is_stale=is_stale,
         targets=targets,
+        micronutrients=micronutrients,
         created_at=estimate.created_at,
     )
 
@@ -314,6 +346,7 @@ def _estimate_context(db: Session, user_id: UUID) -> EstimateContext:
         json.dumps(snapshot, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
     return EstimateContext(
+        db=db,
         profile=profile,
         nutrition_profile=nutrition_profile,
         safety=safety,
@@ -483,6 +516,86 @@ def _target_rows(estimate_id: UUID, result: ScientificResult) -> list[NutritionE
     ]
 
 
+def _micronutrient_rows(
+    estimate_id: UUID, context: EstimateContext
+) -> list[NutritionEstimateMicronutrientTarget]:
+    sex = context.profile.sex.value if context.profile.sex is not None else "all"
+    references = context.db.scalars(
+        select(MicronutrientReference).where(
+            MicronutrientReference.policy_version == MICRONUTRIENT_POLICY_VERSION,
+            MicronutrientReference.age_min <= context.inputs.age,
+            (MicronutrientReference.age_max.is_(None))
+            | (MicronutrientReference.age_max >= context.inputs.age),
+        )
+    ).all()
+    selected: dict[str, MicronutrientReference] = {}
+    for reference in references:
+        if reference.sex.value not in {"all", sex}:
+            continue
+        if reference.dietary_pattern_modifier not in {
+            "none",
+            context.nutrition_profile.dietary_pattern.value,
+        }:
+            continue
+        if reference.reference_kind.value not in {"rda", "ai", "medical_override"}:
+            continue
+        current = selected.get(reference.nutrient_code)
+        rank = (
+            reference.reference_kind.value == "medical_override",
+            reference.reference_kind.value == "rda",
+            reference.sex.value == sex,
+            reference.dietary_pattern_modifier != "none",
+            reference.age_min,
+        )
+        if current is None or rank > (
+            current.reference_kind.value == "medical_override",
+            current.reference_kind.value == "rda",
+            current.sex.value == sex,
+            current.dietary_pattern_modifier != "none",
+            current.age_min,
+        ):
+            selected[reference.nutrient_code] = reference
+
+    rows: list[NutritionEstimateMicronutrientTarget] = []
+    for nutrient, reference in selected.items():
+        upper = next(
+            (
+                candidate
+                for candidate in references
+                if candidate.nutrient_code == nutrient
+                and candidate.reference_kind.value in {"ul", "cdrr"}
+                and candidate.sex.value in {"all", sex}
+            ),
+            None,
+        )
+        rows.append(
+            NutritionEstimateMicronutrientTarget(
+                estimate_id=estimate_id,
+                nutrient_code=nutrient,
+                reference_kind=reference.reference_kind.value,
+                target_value=reference.target_value,
+                unit=reference.unit,
+                unit_form=reference.unit_form,
+                upper_limit_value=upper.target_value if upper else None,
+                upper_limit_kind=upper.reference_kind.value if upper else None,
+                upper_limit_scope=upper.upper_limit_scope.value if upper else "none",
+                aggregation_window=reference.aggregation_window.value,
+                policy_version=reference.policy_version,
+                source_reference=reference.source_reference,
+                applicable_population=(
+                    f"age {reference.age_min}-{reference.age_max or 'plus'}, "
+                    f"sex {reference.sex.value}, life stage {reference.life_stage}"
+                ),
+                confidence=EstimateConfidence.HIGH,
+                explanation_codes=[
+                    "MICRONUTRIENT_REFERENCE_SELECTED",
+                    "DIETARY_INTAKE_IS_NOT_DIAGNOSIS",
+                ],
+            )
+        )
+    return rows
+
+
 def _source_ids(metric: NutritionTargetMetric) -> list[str]:
     if metric is NutritionTargetMetric.BMR:
         return ["mifflin-1990-pmid-2305711"]
@@ -495,6 +608,8 @@ def _source_ids(metric: NutritionTargetMetric) -> list[str]:
         return ["nasem-energy-2023", "compendium-2024"]
     if metric is NutritionTargetMetric.PROTEIN:
         return ["nasem-dri-2005", "morton-pmid-28698222", "espen-adjusted-weight-2022"]
+    if metric is NutritionTargetMetric.SODIUM:
+        return ["nasem-sodium-potassium-2019"]
     return ["who-healthy-diet-2026"]
 
 

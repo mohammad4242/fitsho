@@ -512,6 +512,11 @@ class NutritionEstimate(Base):
         passive_deletes=True,
         order_by="NutritionEstimateTarget.metric",
     )
+    micronutrient_targets: Mapped[list["NutritionEstimateMicronutrientTarget"]] = relationship(
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="NutritionEstimateMicronutrientTarget.nutrient_code",
+    )
 
 
 class NutritionEstimateTarget(Base):
@@ -545,6 +550,41 @@ class NutritionEstimateTarget(Base):
     source_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     applicable_population: Mapped[str] = mapped_column(String(200), nullable=False)
     rounding_rule: Mapped[str] = mapped_column(String(100), nullable=False)
+    explanation_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+
+
+class NutritionEstimateMicronutrientTarget(Base):
+    __tablename__ = "nutrition_estimate_micronutrient_targets"
+    __table_args__ = (
+        CheckConstraint("target_value >= 0", name="ck_nutrition_estimate_micro_target_nonnegative"),
+        CheckConstraint(
+            "upper_limit_value IS NULL OR upper_limit_value >= 0",
+            name="ck_nutrition_estimate_micro_upper_nonnegative",
+        ),
+        UniqueConstraint(
+            "estimate_id", "nutrient_code", name="uq_nutrition_estimate_micro_nutrient"
+        ),
+    )
+
+    estimate_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_estimates.id", ondelete="CASCADE"), primary_key=True
+    )
+    nutrient_code: Mapped[str] = mapped_column(String(48), primary_key=True)
+    reference_kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    target_value: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    unit: Mapped[str] = mapped_column(String(24), nullable=False)
+    unit_form: Mapped[str] = mapped_column(String(48), nullable=False)
+    upper_limit_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
+    upper_limit_kind: Mapped[str | None] = mapped_column(String(24))
+    upper_limit_scope: Mapped[str] = mapped_column(String(32), nullable=False)
+    aggregation_window: Mapped[str] = mapped_column(String(24), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    applicable_population: Mapped[str] = mapped_column(String(200), nullable=False)
+    confidence: Mapped[EstimateConfidence] = mapped_column(
+        enum_column(EstimateConfidence, "ck_nutrition_estimate_micro_confidence_values"),
+        nullable=False,
+    )
     explanation_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
 
 

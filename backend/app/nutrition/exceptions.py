@@ -38,5 +38,10 @@ class GoalReselectionRequiredDomainError(Exception):
     pass
 
 
+class NutritionTargetInfeasibleDomainError(Exception):
+    def __init__(self, reason_codes: tuple[str, ...]) -> None:
+        self.reason_codes = reason_codes
+
+
 class NutritionProductModeError(Exception):
     pass

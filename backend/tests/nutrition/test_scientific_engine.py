@@ -113,7 +113,8 @@ def test_who_targets_are_derived_from_goal_calories() -> None:
     assert targets.free_sugar.maximum == Decimal("50")
     assert targets.saturated_fat.maximum == Decimal("22.22222222222222222222222222")
     assert targets.trans_fat.maximum == Decimal("2.222222222222222222222222222")
-    assert targets.sodium.maximum == Decimal("2000")
+    assert targets.sodium.preferred == Decimal("1500")
+    assert targets.sodium.maximum == Decimal("2300")
 
 
 def test_no_training_rejects_muscle_building_goal() -> None:
@@ -123,3 +124,25 @@ def test_no_training_rejects_muscle_building_goal() -> None:
         scientific.calculate_targets(
             make_inputs(fitness_goal="build_muscle", structured_exercise=None)
         )
+
+
+def test_macro_energy_conflict_is_structured_as_target_infeasible() -> None:
+    scientific = scientific_module()
+
+    with pytest.raises(scientific.TargetInfeasibleError) as error:
+        scientific.validate_macro_energy_feasibility(
+            Decimal("1200"),
+            scientific.TargetBand(unit="g/day", minimum=Decimal("200")),
+            scientific.NutrientTargets(
+                carbohydrate=scientific.TargetBand(unit="g", minimum=Decimal("130")),
+                total_fat=scientific.TargetBand(unit="g", minimum=Decimal("40")),
+                fibre=scientific.TargetBand(unit="g"),
+                free_sugar=scientific.TargetBand(unit="g"),
+                added_sugar=scientific.TargetBand(unit="g"),
+                saturated_fat=scientific.TargetBand(unit="g"),
+                trans_fat=scientific.TargetBand(unit="g"),
+                sodium=scientific.TargetBand(unit="mg"),
+            ),
+        )
+
+    assert "PROTEIN_MINIMUM_EXCEEDS_CALORIE_BUDGET" in error.value.reason_codes

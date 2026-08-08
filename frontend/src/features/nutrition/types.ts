@@ -76,6 +76,21 @@ export type NutritionTarget = {
   source_ids: string[];
   explanation_codes: string[];
 };
+export type NutritionMicronutrientTarget = {
+  reference_kind: string;
+  target_value: number;
+  unit: string;
+  unit_form: string;
+  upper_limit_value: number | null;
+  upper_limit_kind: string | null;
+  upper_limit_scope: string;
+  aggregation_window: string;
+  policy_version: string;
+  source_reference: string;
+  applicable_population: string;
+  confidence: EstimateConfidence;
+  explanation_codes: string[];
+};
 
 export type NutritionEstimate = {
   id: string;
@@ -87,6 +102,7 @@ export type NutritionEstimate = {
   confidence_reasons: string[];
   is_stale: boolean;
   targets: Record<string, NutritionTarget>;
+  micronutrients?: Record<string, NutritionMicronutrientTarget>;
   created_at: string;
 };
 

@@ -138,7 +138,10 @@ def test_nutrition_only_no_training_creates_an_idempotent_estimate(
     assert first.json()["targets"]["exercise_energy"]["preferred"] == 0
     assert first.json()["targets"]["protein"]["minimum"] == 50
     assert first.json()["targets"]["protein"]["preferred"] == 62.5
-    assert first.json()["targets"]["sodium"]["maximum"] == 2000
+    assert first.json()["targets"]["sodium"]["preferred"] == 1500
+    assert first.json()["targets"]["sodium"]["maximum"] == 2300
+    assert first.json()["micronutrients"]["potassium"]["reference_kind"] == "ai"
+    assert first.json()["micronutrients"]["potassium"]["upper_limit_value"] is None
 
     current = client.get("/api/v1/nutrition/estimates/current")
     assert current.status_code == 200

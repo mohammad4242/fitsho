@@ -35,6 +35,12 @@ class GoalReselectionRequiredError(ValueError):
     pass
 
 
+class TargetInfeasibleError(ValueError):
+    def __init__(self, reason_codes: tuple[str, ...]) -> None:
+        self.reason_codes = reason_codes
+        super().__init__("Configured macro hard minimums exceed the calorie target")
+
+
 @dataclass(frozen=True)
 class TargetBand:
     unit: str
@@ -144,7 +150,7 @@ def nutrient_targets_for_calories(calories: Decimal) -> NutrientTargets:
         trans_fat=TargetBand(
             unit="g", maximum=calories * Decimal("0.01") / Decimal("9")
         ),
-        sodium=TargetBand(unit="mg", maximum=Decimal("2000")),
+        sodium=TargetBand(unit="mg", preferred=Decimal("1500"), maximum=Decimal("2300")),
     )
 
 
@@ -178,6 +184,7 @@ def calculate_targets(inputs: ScientificInputs) -> ScientificResult:
     )
     assert goal_calories.preferred is not None
     nutrients = nutrient_targets_for_calories(goal_calories.preferred)
+    validate_macro_energy_feasibility(goal_calories.preferred, protein, nutrients)
     confidence, reasons = _confidence(inputs)
     return ScientificResult(
         policy_version=POLICY_VERSION,
@@ -304,6 +311,27 @@ def _preferred_protein_multiplier(inputs: ScientificInputs) -> Decimal:
     if exercise_type == "endurance":
         return Decimal("1.4")
     return Decimal("1.2") if deficit else Decimal("1.0")
+
+
+def validate_macro_energy_feasibility(
+    calories: Decimal, protein: TargetBand, nutrients: NutrientTargets
+) -> None:
+    assert protein.minimum is not None
+    assert nutrients.carbohydrate.minimum is not None
+    assert nutrients.total_fat.minimum is not None
+    hard_minimum_energy = (
+        protein.minimum * Decimal("4")
+        + nutrients.carbohydrate.minimum * Decimal("4")
+        + nutrients.total_fat.minimum * Decimal("9")
+    )
+    if hard_minimum_energy > calories:
+        raise TargetInfeasibleError(
+            (
+                "PROTEIN_MINIMUM_EXCEEDS_CALORIE_BUDGET",
+                "CARBOHYDRATE_MINIMUM_EXCEEDS_CALORIE_BUDGET",
+                "FAT_MINIMUM_EXCEEDS_CALORIE_BUDGET",
+            )
+        )
 
 
 def _confidence(inputs: ScientificInputs) -> tuple[Confidence, tuple[str, ...]]:

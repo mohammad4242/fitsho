@@ -20,6 +20,7 @@ from app.nutrition.exceptions import (
     NutritionOnboardingBlockedError,
     NutritionProductModeError,
     NutritionProfileNotFoundError,
+    NutritionTargetInfeasibleDomainError,
     SafetyDecisionNotFoundError,
     SafetyScreenRequiredError,
     SharedProfileRequiredError,
@@ -205,6 +206,15 @@ def generate_estimate(
         raise _domain_error(
             "GOAL_RESELECTION_REQUIRED",
             "برای فردی که تمرین نمی‌کند، هدف عضله‌سازی قابل برآورد نیست.",
+        ) from None
+    except NutritionTargetInfeasibleDomainError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "TARGET_INFEASIBLE",
+                "message": "حداقل‌های علمی در بازه کالری انتخاب‌شده قابل جمع نیستند.",
+                "reason_codes": list(error.reason_codes),
+            },
         ) from None
     except StructuredExerciseRequiredError:
         raise _domain_error(

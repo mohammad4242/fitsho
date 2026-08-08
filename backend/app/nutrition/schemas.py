@@ -252,6 +252,22 @@ class NutritionTargetResponse(BaseModel):
     explanation_codes: list[str]
 
 
+class NutritionMicronutrientTargetResponse(BaseModel):
+    reference_kind: str
+    target_value: float
+    unit: str
+    unit_form: str
+    upper_limit_value: float | None
+    upper_limit_kind: str | None
+    upper_limit_scope: str
+    aggregation_window: str
+    policy_version: str
+    source_reference: str
+    applicable_population: str
+    confidence: EstimateConfidence
+    explanation_codes: list[str]
+
+
 class NutritionEstimateResponse(BaseModel):
     id: UUID
     revision: int
@@ -262,6 +278,7 @@ class NutritionEstimateResponse(BaseModel):
     confidence_reasons: list[str]
     is_stale: bool
     targets: dict[str, NutritionTargetResponse]
+    micronutrients: dict[str, NutritionMicronutrientTargetResponse]
     created_at: datetime
 
 
