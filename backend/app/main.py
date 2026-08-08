@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -19,6 +20,7 @@ from app.body_analysis.router import router as body_analysis_router
 from app.body_photos.router import router as body_photo_router
 from app.config import Settings, get_settings
 from app.exercises.router import router as exercises_router
+from app.nutrition.price_scheduler import scheduler_loop
 from app.nutrition.router import router as nutrition_router
 from app.profile.router import router as profile_router
 from app.workouts.router import router as workout_plans_router
@@ -32,6 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         zen_timeout = httpx.Timeout(active_settings.opencode_zen_timeout_seconds)
         ai_timeout = httpx.Timeout(active_settings.openrouter_timeout_seconds)
+        food_price_timeout = httpx.Timeout(active_settings.food_price_provider_timeout_seconds)
         async with (
             httpx.AsyncClient(
                 timeout=zen_timeout,
@@ -43,10 +46,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 proxy=active_settings.openrouter_proxy_url,
                 trust_env=False,
             ) as ai_client,
+            httpx.AsyncClient(timeout=food_price_timeout, trust_env=False) as food_price_client,
         ):
             app.state.zen_http_client = zen_client
             app.state.ai_http_client = ai_client
-            yield
+            app.state.food_price_http_client = food_price_client
+            scheduler_task = asyncio.create_task(scheduler_loop(active_settings, food_price_client))
+            try:
+                yield
+            finally:
+                scheduler_task.cancel()
+                try:
+                    await scheduler_task
+                except asyncio.CancelledError:
+                    pass
 
     app = FastAPI(title="Fitsho API", lifespan=lifespan)
     app.dependency_overrides[get_settings] = lambda: active_settings

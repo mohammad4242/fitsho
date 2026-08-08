@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from datetime import date, datetime, time
 from decimal import Decimal
 from enum import StrEnum
@@ -49,6 +50,10 @@ from app.nutrition.enums import (
     PhysicianReviewMode,
     PhysicianReviewStatus,
     PreferredVariety,
+    PriceProviderKind,
+    PriceQuoteStatus,
+    PriceReferenceStatus,
+    PriceUpdateRunStatus,
     SafetyOutcome,
     SnackCountBucket,
     StructuredExerciseSource,
@@ -685,6 +690,134 @@ class NutritionCatalogueMealItem(Base):
         ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), nullable=False
     )
     grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+
+
+class NutritionPriceProvider(Base):
+    __tablename__ = "nutrition_price_providers"
+    code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[PriceProviderKind] = mapped_column(
+        enum_column(PriceProviderKind, "ck_nutrition_price_provider_kind_values"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    priority: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=100)
+    fresh_hours: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=24)
+    stale_hours: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=168)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(String(500))
+
+
+class NutritionFoodPriceMapping(Base):
+    __tablename__ = "nutrition_food_price_mappings"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider_code", "provider_product_id", name="uq_price_mapping_provider_product"
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="CASCADE"), nullable=False
+    )
+    provider_code: Mapped[str] = mapped_column(
+        ForeignKey("nutrition_price_providers.code", ondelete="CASCADE"), nullable=False
+    )
+    provider_product_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    region: Mapped[str | None] = mapped_column(String(120))
+    match_alias: Mapped[str | None] = mapped_column(String(160))
+    match_confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False, default=Decimal("1"))
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class NutritionFoodPriceQuote(Base):
+    __tablename__ = "nutrition_food_price_quotes"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    provider_code: Mapped[str] = mapped_column(
+        ForeignKey("nutrition_price_providers.code", ondelete="RESTRICT"), nullable=False
+    )
+    provider_product_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    package_quantity: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    package_unit: Mapped[str] = mapped_column(String(12), nullable=False)
+    normal_price_irr: Mapped[Decimal | None] = mapped_column(Numeric(20, 2))
+    promotional_price_irr: Mapped[Decimal | None] = mapped_column(Numeric(20, 2))
+    normalized_normal_irr: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
+    normalized_promotional_irr: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    effective_date: Mapped[date] = mapped_column(nullable=False)
+    status: Mapped[PriceQuoteStatus] = mapped_column(
+        enum_column(PriceQuoteStatus, "ck_nutrition_price_quote_status_values"), nullable=False
+    )
+    raw_quote: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+
+
+class NutritionFoodPriceReference(Base):
+    __tablename__ = "nutrition_food_price_references"
+    food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), primary_key=True
+    )
+    canonical_unit: Mapped[str] = mapped_column(String(24), nullable=False)
+    reference_price_toman: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    sample_count: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    confidence: Mapped[EstimateConfidence] = mapped_column(
+        enum_column(EstimateConfidence, "ck_nutrition_price_ref_confidence_values"), nullable=False
+    )
+    status: Mapped[PriceReferenceStatus] = mapped_column(
+        enum_column(PriceReferenceStatus, "ck_nutrition_price_ref_status_values"), nullable=False
+    )
+    calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class NutritionFoodPriceHistory(Base):
+    __tablename__ = "nutrition_food_price_history"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    canonical_unit: Mapped[str] = mapped_column(String(24), nullable=False)
+    reference_price_toman: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    sample_count: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    confidence: Mapped[EstimateConfidence] = mapped_column(
+        enum_column(EstimateConfidence, "ck_nutrition_price_history_confidence_values"), nullable=False
+    )
+    accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source_quote_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+
+
+class NutritionFoodPriceUpdateRun(Base):
+    __tablename__ = "nutrition_food_price_update_runs"
+    __table_args__ = (UniqueConstraint("scheduled_for", name="uq_nutrition_price_run_scheduled_for"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    scheduled_for: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[PriceUpdateRunStatus] = mapped_column(
+        enum_column(PriceUpdateRunStatus, "ck_nutrition_price_run_status_values"), nullable=False
+    )
+    foods_attempted: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    foods_updated: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    foods_unchanged: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    foods_needing_review: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    provider_failures: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    details: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+
+
+class NutritionFoodPriceReview(Base):
+    __tablename__ = "nutrition_food_price_reviews"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    run_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_food_price_update_runs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    reason_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    candidate_reference_price_toman: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class NutritionCookingEquipment(Base):

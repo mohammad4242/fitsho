@@ -83,6 +83,35 @@ class MealSlotRole(StrEnum):
     SNACK = "snack"
 
 
+class PriceProviderKind(StrEnum):
+    DATABASE = "database"
+    IMPORT = "import"
+    SEED = "seed"
+    PUBLIC_CATALOG = "public_catalog"
+    FUTURE_API = "future_api"
+
+
+class PriceQuoteStatus(StrEnum):
+    FRESH = "fresh"
+    STALE = "stale"
+    ESTIMATED = "estimated"
+    UNAVAILABLE = "unavailable"
+
+
+class PriceReferenceStatus(StrEnum):
+    ACCEPTED = "accepted"
+    NEEDS_REVIEW = "needs_review"
+    UNAVAILABLE = "unavailable"
+
+
+class PriceUpdateRunStatus(StrEnum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    COMPLETED_WITH_ERRORS = "completed_with_errors"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
 def main_meal_effective_slots(bucket: MainMealCountBucket) -> int:
     return {
         MainMealCountBucket.TWO: 2,

@@ -53,6 +53,15 @@ class Settings(BaseSettings):
     workout_max_candidates: int = Field(default=80, ge=3, le=200)
     workout_max_request_bytes: int = Field(default=262144, ge=1024, le=1048576)
     workout_warmup_minutes: int = Field(default=5, ge=0, le=30)
+    food_price_update_enabled: bool = True
+    food_price_update_timezone: str = "Asia/Tehran"
+    food_price_update_hour: int = Field(default=12, ge=0, le=23)
+    food_price_update_minute: int = Field(default=0, ge=0, le=59)
+    food_price_provider_timeout_seconds: float = Field(default=15.0, gt=0, le=60)
+    food_price_provider_retries: int = Field(default=3, ge=1, le=5)
+    food_price_public_source_url: str | None = Field(default=None, max_length=500, repr=False)
+    food_price_api_key: SecretStr | None = Field(default=None, repr=False)
+    food_price_api_base_url: str | None = Field(default=None, max_length=500, repr=False)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
