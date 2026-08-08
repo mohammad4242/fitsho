@@ -132,6 +132,7 @@
   text-decoration: none;
 }
 .today-actions__card--aqua { color: var(--fitsho-petrol); background: var(--fitsho-aqua); }
+.today-actions__card--nutrition { color: var(--fitsho-petrol); background: var(--fitsho-coral); }
 .today-actions__card > span { font-family: "Sora Variable", sans-serif; font-size: 0.75rem; font-weight: 800; opacity: 0.7; }
 .today-actions__card p { margin: 0 0 0.45rem; font-size: 0.8rem; opacity: 0.75; }
 .today-actions__card h2 { margin: 0; font-size: clamp(1.5rem, 3vw, 2.25rem); }

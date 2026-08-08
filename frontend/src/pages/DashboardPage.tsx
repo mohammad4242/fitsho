@@ -21,7 +21,9 @@ export function DashboardPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { profile } = useProfile();
+  const { profile, productMode } = useProfile();
+  const hasTraining = productMode === undefined || productMode === "training" || productMode === "both";
+  const hasNutrition = productMode === "nutrition" || productMode === "both";
   const [planState, setPlanState] = useState<PlanState>("loading");
   const [generating, setGenerating] = useState(false);
   const [storyStage, setStoryStage] = useState<"plan" | "progress">("plan");
@@ -29,6 +31,10 @@ export function DashboardPage() {
   const progressChapter = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    if (!hasTraining) {
+      setPlanState("empty");
+      return;
+    }
     let active = true;
     void getActiveWorkoutPlan()
       .then((plan) => {
@@ -40,7 +46,7 @@ export function DashboardPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [hasTraining]);
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
@@ -85,7 +91,7 @@ export function DashboardPage() {
             {t("dashboard.greeting", { name: profile?.display_name ?? (i18n.language === "en" ? "there" : "دوست" ) })}
           </h1>
           <p>{t("dashboard.intro")}</p>
-          {profile === null ? <Link className="primary-button" to="/onboarding">{i18n.language === "en" ? "Complete profile" : "تکمیل پروفایل"}</Link> : <PrimaryAction state={planState} generating={generating} onStart={startWorkout} />}
+          {profile === null ? <Link className="primary-button" to="/onboarding">{i18n.language === "en" ? "Complete profile" : "تکمیل پروفایل"}</Link> : hasTraining ? <PrimaryAction state={planState} generating={generating} onStart={startWorkout} /> : <Link className="today-primary-action" to="/nutrition-estimate">{i18n.language === "en" ? "View nutrition targets" : "دیدن هدف‌های تغذیه"}</Link>}
         </div>
         <p className="today-hero__hint" aria-hidden="true">{t("dashboard.scrollHint")}</p>
       </section>
@@ -126,22 +132,27 @@ export function DashboardPage() {
       </section>
 
       <section className="today-actions" aria-label={t("dashboard.quickActions")}>
-        <Link to="/workout-plan" className="today-actions__card">
+        {hasTraining && <Link to="/workout-plan" className="today-actions__card">
           <span>01</span>
           <div>
             <p>{t("dashboard.planCardEyebrow")}</p>
             <h2>{t("dashboard.planCardTitle")}</h2>
           </div>
           <b aria-hidden="true">↖</b>
-        </Link>
-        <Link to="/exercises" className="today-actions__card today-actions__card--aqua">
+        </Link>}
+        {hasTraining && <Link to="/exercises" className="today-actions__card today-actions__card--aqua">
           <span>02</span>
           <div>
             <p>{t("dashboard.catalogEyebrow")}</p>
             <h2>{t("dashboard.catalogTitle")}</h2>
           </div>
           <b aria-hidden="true">↖</b>
-        </Link>
+        </Link>}
+        {hasNutrition && <Link to="/nutrition-estimate" className="today-actions__card today-actions__card--nutrition" aria-label={i18n.language === "en" ? "Daily nutrition targets" : "هدف روزانه تغذیه"}>
+          <span>{hasTraining ? "03" : "01"}</span>
+          <div><p>{i18n.language === "en" ? "Scientific estimate" : "برآورد علمی"}</p><h2>{i18n.language === "en" ? "Daily nutrition targets" : "هدف روزانه تغذیه"}</h2></div>
+          <b aria-hidden="true">↖</b>
+        </Link>}
       </section>
     </main>
   );

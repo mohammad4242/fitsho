@@ -13,6 +13,7 @@ const auth = vi.hoisted(() => ({
 }));
 const profile = vi.hoisted(() => ({
   profile: { display_name: "محمد", plan_duration_weeks: 4 },
+  productMode: "training" as "training" | "nutrition" | "both",
 }));
 const workoutApi = vi.hoisted(() => ({
   getActiveWorkoutPlan: vi.fn(),
@@ -30,6 +31,19 @@ import { DashboardPage } from "./DashboardPage";
 beforeEach(() => {
   workoutApi.getActiveWorkoutPlan.mockReset();
   workoutApi.generateWorkoutPlan.mockReset();
+  profile.productMode = "training";
+});
+
+it("shows nutrition targets and skips workout loading for nutrition-only members", async () => {
+  profile.productMode = "nutrition";
+  render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+
+  expect(await screen.findByRole("link", { name: /هدف روزانه تغذیه/ })).toHaveAttribute(
+    "href",
+    "/nutrition-estimate",
+  );
+  expect(workoutApi.getActiveWorkoutPlan).not.toHaveBeenCalled();
+  expect(screen.queryByRole("link", { name: "برنامه تمرینی" })).not.toBeInTheDocument();
 });
 
 it("starts generating a plan when the member has no active plan", async () => {

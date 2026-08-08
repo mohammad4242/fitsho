@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import date, datetime, time
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -286,6 +286,11 @@ class CatalogueFoodWrite(BaseModel):
     source_name: str = Field(min_length=1, max_length=160)
     source_reference: str = Field(min_length=1, max_length=500)
     source_food_id: str | None = Field(default=None, max_length=120)
+    dietary_patterns: list[str] = Field(
+        default_factory=lambda: ["omnivore", "vegetarian", "vegan"],
+        min_length=1,
+        max_length=3,
+    )
     roles: list[str] = Field(min_length=1, max_length=4)
     nutrients: list[CatalogueNutrientInput] = Field(default_factory=list, max_length=64)
 
@@ -331,3 +336,90 @@ class PhysicianReviewRequirementResponse(BaseModel):
     mode: PhysicianReviewMode
     status: PhysicianReviewStatus
     safety_decision_id: UUID
+
+
+class WeeklyPlanFoodResponse(BaseModel):
+    food_id: UUID
+    slug: str
+    name_fa: str
+    name_en: str
+    grams: float
+    cost_irr: int
+    nutrients: dict[str, float]
+
+
+class WeeklyPlanMealResponse(BaseModel):
+    id: UUID
+    slot_role: str
+    slot_index: int
+    target_distribution: dict[str, float]
+    nutrient_totals: dict[str, float]
+    cost_irr: int
+    foods: list[WeeklyPlanFoodResponse]
+
+
+class WeeklyPlanDayResponse(BaseModel):
+    day_index: int
+    plan_date: date
+    nutrient_totals: dict[str, float]
+    cost_irr: int
+    meals: list[WeeklyPlanMealResponse]
+
+
+class WeeklyPlanNutrientResponse(BaseModel):
+    nutrient_code: str
+    unit: str
+    reference_kind: str | None
+    preferred: float | None
+    minimum_or_maximum: float | None
+    planned: float
+    difference_from_preferred: float | None
+    difference_from_limit: float | None
+    status: str
+    reason_codes: list[str]
+    data_confidence: str
+    explanation_codes: list[str]
+
+
+class WeeklyPlanResponse(BaseModel):
+    id: UUID
+    revision: int
+    lifecycle_status: str
+    is_user_visible: bool
+    physician_approved: bool
+    review_status: str
+    start_date: date
+    planner_policy_version: str
+    planner_version: str
+    scientific_policy_version: str
+    formula_version: str
+    weekly_cost_irr: int
+    weekly_budget_irr: int
+    budget_status: str
+    warning_codes: list[str]
+    explanation_codes: list[str]
+    input_snapshot: dict[str, object]
+    price_snapshot: dict[str, object]
+    repair_actions: list[dict[str, object]]
+    nutrients: dict[str, WeeklyPlanNutrientResponse]
+    days: list[WeeklyPlanDayResponse]
+    created_at: datetime
+
+
+class WeeklyPlanGenerationResponse(BaseModel):
+    generation_id: UUID
+    outcome: str
+    reason_codes: list[str]
+    warning_codes: list[str]
+    plan: WeeklyPlanResponse | None
+
+
+class WeeklyPlanHistoryItemResponse(BaseModel):
+    id: UUID
+    revision: int
+    lifecycle_status: str
+    review_status: str
+    weekly_cost_irr: int
+    weekly_budget_irr: int
+    budget_status: str
+    created_at: datetime

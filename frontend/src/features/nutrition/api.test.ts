@@ -1,6 +1,16 @@
 import { afterEach, expect, it, vi } from "vitest";
 
-import { getSafetyDecision, saveNutritionProfile, saveSafetyProfile } from "./api";
+import {
+  createNutritionEstimate,
+  createWeeklyNutritionPlan,
+  getCurrentNutritionEstimate,
+  getLatestWeeklyNutritionPlan,
+  getSafetyDecision,
+  getStructuredExercise,
+  saveNutritionProfile,
+  saveSafetyProfile,
+  saveStructuredExercise,
+} from "./api";
 import type { NutritionProfileInput, SafetyProfileInput } from "./types";
 
 const safetyInput: SafetyProfileInput = {
@@ -33,13 +43,31 @@ it("uses the dedicated safety and nutrition endpoints", async () => {
   vi.spyOn(globalThis, "fetch")
     .mockResolvedValueOnce(Response.json(decision))
     .mockResolvedValueOnce(Response.json(decision))
-    .mockResolvedValueOnce(Response.json({ ...nutritionInput, currency: "IRR" }));
+    .mockResolvedValueOnce(Response.json({ ...nutritionInput, currency: "IRR" }))
+    .mockResolvedValueOnce(Response.json({ trains: false, source: "user_reported" }))
+    .mockResolvedValueOnce(Response.json({ trains: false, source: "user_reported" }))
+    .mockResolvedValueOnce(Response.json({ id: "estimate-1" }, { status: 201 }))
+    .mockResolvedValueOnce(Response.json({ id: "estimate-1" }))
+    .mockResolvedValueOnce(Response.json({ outcome: "success", plan: { id: "plan-1" } }))
+    .mockResolvedValueOnce(Response.json({ id: "plan-1" }));
 
   await saveSafetyProfile(safetyInput);
   await getSafetyDecision();
   await saveNutritionProfile(nutritionInput);
+  await saveStructuredExercise({ trains: false });
+  await getStructuredExercise();
+  await createNutritionEstimate();
+  await getCurrentNutritionEstimate();
+  await createWeeklyNutritionPlan();
+  await getLatestWeeklyNutritionPlan();
 
   expect(fetch).toHaveBeenNthCalledWith(1, "/api/v1/nutrition/safety", expect.objectContaining({ method: "PUT" }));
   expect(fetch).toHaveBeenNthCalledWith(2, "/api/v1/nutrition/safety", expect.objectContaining({ credentials: "include" }));
   expect(fetch).toHaveBeenNthCalledWith(3, "/api/v1/nutrition/profile", expect.objectContaining({ method: "PUT" }));
+  expect(fetch).toHaveBeenNthCalledWith(4, "/api/v1/nutrition/structured-exercise", expect.objectContaining({ method: "PUT" }));
+  expect(fetch).toHaveBeenNthCalledWith(5, "/api/v1/nutrition/structured-exercise", expect.objectContaining({ credentials: "include" }));
+  expect(fetch).toHaveBeenNthCalledWith(6, "/api/v1/nutrition/estimates", expect.objectContaining({ method: "POST" }));
+  expect(fetch).toHaveBeenNthCalledWith(7, "/api/v1/nutrition/estimates/current", expect.objectContaining({ credentials: "include" }));
+  expect(fetch).toHaveBeenNthCalledWith(8, "/api/v1/nutrition/plans", expect.objectContaining({ method: "POST" }));
+  expect(fetch).toHaveBeenNthCalledWith(9, "/api/v1/nutrition/plans/latest", expect.objectContaining({ credentials: "include" }));
 });

@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -33,6 +34,15 @@ from app.nutrition.food_catalogue import (
     save_catalogue_food,
     save_catalogue_meal,
 )
+from app.nutrition.plan_service import (
+    ActiveWeeklyPlanNotFoundError,
+    WeeklyPlanNotFoundError,
+    active_weekly_plan,
+    generate_weekly_plan,
+    latest_weekly_plan,
+    weekly_plan_by_id,
+    weekly_plan_history,
+)
 from app.nutrition.schemas import (
     CatalogueFoodResponse,
     CatalogueFoodWrite,
@@ -47,6 +57,9 @@ from app.nutrition.schemas import (
     SafetyProfileInput,
     StructuredExerciseInput,
     StructuredExerciseResponse,
+    WeeklyPlanGenerationResponse,
+    WeeklyPlanHistoryItemResponse,
+    WeeklyPlanResponse,
 )
 from app.nutrition.service import (
     current_safety_decision,
@@ -335,4 +348,80 @@ def read_review_requirement(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "SAFETY_DECISION_NOT_FOUND", "message": "ارزیابی ایمنی ثبت نشده است."},
+        ) from None
+
+
+@router.post(
+    "/plans",
+    response_model=WeeklyPlanGenerationResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def generate_plan(
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> WeeklyPlanGenerationResponse:
+    try:
+        return generate_weekly_plan(db, user.id)
+    except SafetyDecisionNotFoundError:
+        raise _domain_error(
+            "SAFETY_SCREEN_REQUIRED", "پیش از ساخت برنامه، ارزیابی ایمنی را کامل کنید."
+        ) from None
+    except StructuredExerciseRequiredError:
+        raise _domain_error(
+            "STRUCTURED_EXERCISE_REQUIRED",
+            "اطلاعات تمرین برای محاسبه برنامه لازم است.",
+        ) from None
+
+
+@router.get("/plans/latest", response_model=WeeklyPlanResponse)
+def read_latest_plan(db: DatabaseSession, user: CurrentUser) -> WeeklyPlanResponse:
+    try:
+        return latest_weekly_plan(db, user.id)
+    except WeeklyPlanNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "NUTRITION_PLAN_NOT_FOUND",
+                "message": "هنوز برنامه غذایی هفتگی ساخته نشده است.",
+            },
+        ) from None
+
+
+@router.get("/plans/active", response_model=WeeklyPlanResponse)
+def read_active_plan(db: DatabaseSession, user: CurrentUser) -> WeeklyPlanResponse:
+    try:
+        return active_weekly_plan(db, user.id)
+    except ActiveWeeklyPlanNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "ACTIVE_NUTRITION_PLAN_NOT_FOUND",
+                "message": "هنوز برنامه تأییدشده و فعالی وجود ندارد.",
+            },
+        ) from None
+
+
+@router.get("/plans/history", response_model=list[WeeklyPlanHistoryItemResponse])
+def read_plan_history(
+    db: DatabaseSession, user: CurrentUser
+) -> list[WeeklyPlanHistoryItemResponse]:
+    return weekly_plan_history(db, user.id)
+
+
+@router.get("/plans/{plan_id}", response_model=WeeklyPlanResponse)
+def read_plan_revision(
+    plan_id: str,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> WeeklyPlanResponse:
+    try:
+        return weekly_plan_by_id(db, user.id, UUID(plan_id))
+    except (ValueError, WeeklyPlanNotFoundError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "NUTRITION_PLAN_NOT_FOUND",
+                "message": "نسخه برنامه غذایی پیدا نشد.",
+            },
         ) from None

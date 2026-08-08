@@ -163,6 +163,7 @@ const fa = {
       plan: "برنامه",
       exercises: "حرکات",
       workoutPlan: "برنامه",
+      nutritionTargets: "هدف‌های تغذیه",
       profile: "پروفایل",
       adminExercises: "مدیریت حرکات",
       adminAiModels: "مدل‌های هوش مصنوعی",

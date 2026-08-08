@@ -13,6 +13,9 @@ export function AuthenticatedHeader() {
   const { user, logout } = useAuth();
   const profileContext = useOptionalProfile();
   const status = profileContext?.status ?? "ready";
+  const productMode = profileContext?.productMode;
+  const hasTraining = productMode === undefined || productMode === null || productMode === "training" || productMode === "both";
+  const hasNutrition = productMode === "nutrition" || productMode === "both";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -56,12 +59,13 @@ export function AuthenticatedHeader() {
                 >
                   {status === "ready" ? t("header.profile") : t("header.completeProfile")}
                 </Link>
-                <Link to="/workout-plan" onClick={() => setMenuOpen(false)}>
+                {hasTraining && <Link to="/workout-plan" onClick={() => setMenuOpen(false)}>
                   {t("header.workoutPlan")}
-                </Link>
-                <Link to="/exercises" onClick={() => setMenuOpen(false)}>
+                </Link>}
+                {hasTraining && <Link to="/exercises" onClick={() => setMenuOpen(false)}>
                   {t("header.exercises")}
-                </Link>
+                </Link>}
+                {hasNutrition && <Link to="/nutrition-estimate" onClick={() => setMenuOpen(false)}>{t("header.nutritionTargets")}</Link>}
                 <button type="button" disabled>
                   {t("header.articles")} <small>{t("header.comingSoon")}</small>
                 </button>
@@ -88,20 +92,24 @@ export function AuthenticatedHeader() {
             >
               {t("header.dashboard")}
             </Link>
-            <Link
+            {hasTraining && <Link
               to="/workout-plan"
               aria-current={location.pathname.startsWith("/workout-plan") ? "page" : undefined}
             >
               {t("header.workoutPlan")}
-            </Link>
-            <Link
+            </Link>}
+            {hasTraining && <Link
               to="/exercises"
               aria-current={
                 location.pathname.startsWith("/exercises") ? "page" : undefined
               }
             >
               {t("header.exercises")}
-            </Link>
+            </Link>}
+            {hasNutrition && <Link
+              to="/nutrition-estimate"
+              aria-current={location.pathname === "/nutrition-estimate" ? "page" : undefined}
+            >{t("header.nutritionTargets")}</Link>}
             <Link
               to={status === "ready" ? "/profile" : "/onboarding"}
               aria-current={location.pathname === "/profile" ? "page" : undefined}

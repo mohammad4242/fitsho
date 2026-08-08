@@ -118,6 +118,11 @@ def save_catalogue_food(db: Session, payload: CatalogueFoodWrite) -> CatalogueFo
     roles = [FoodRoleEnum(role) for role in payload.roles]
     if len(roles) != len(set(roles)):
         raise ValueError("Food roles must be unique")
+    allowed_patterns = {"omnivore", "vegetarian", "vegan"}
+    if set(payload.dietary_patterns) - allowed_patterns:
+        raise ValueError("Unknown dietary pattern")
+    if len(payload.dietary_patterns) != len(set(payload.dietary_patterns)):
+        raise ValueError("Dietary patterns must be unique")
     nutrients = payload.nutrients
     if len({nutrient.nutrient_code for nutrient in nutrients}) != len(nutrients):
         raise ValueError("Nutrient codes must be unique")
@@ -138,6 +143,7 @@ def save_catalogue_food(db: Session, payload: CatalogueFoodWrite) -> CatalogueFo
     food.source_name = payload.source_name
     food.source_reference = payload.source_reference
     food.source_food_id = payload.source_food_id
+    food.dietary_patterns = payload.dietary_patterns
     food.roles = [NutritionCatalogueFoodRole(role=role) for role in roles]
     food.compositions = [
         NutritionFoodComposition(
@@ -224,6 +230,7 @@ def _food_response(food: NutritionCatalogueFood) -> CatalogueFoodResponse:
         source_name=food.source_name,
         source_reference=food.source_reference,
         source_food_id=food.source_food_id,
+        dietary_patterns=food.dietary_patterns,
         roles=[role.role.value for role in food.roles],
         nutrients=[
             {
@@ -287,6 +294,7 @@ def seed_verified_iranian_foods(db: Session) -> list[CatalogueFoodResponse]:
                 source_name=source,
                 source_reference=reference,
                 source_food_id=None,
+                dietary_patterns=_dietary_patterns_for_slug(food["slug"]),
                 nutrients=[
                     {
                         **nutrient,
@@ -338,29 +346,46 @@ def seed_base_iranian_food_catalogue(db: Session) -> list[NutritionCatalogueFood
             ("pasta", "ماکارونی", "Pasta"),
         ),
         FoodRole.FLEXIBLE: (
-            ("milk", "شیر", "Milk"), ("plain-yogurt", "ماست ساده", "Plain yogurt"),
+            ("milk", "شیر", "Milk"),
+            ("plain-yogurt", "ماست ساده", "Plain yogurt"),
             ("low-fat-cheese", "پنیر کم‌چرب", "Low-fat cheese"),
-            ("tomato", "گوجه‌فرنگی", "Tomato"), ("cucumber", "خیار", "Cucumber"),
-            ("onion", "پیاز", "Onion"), ("carrot", "هویج", "Carrot"),
-            ("lettuce", "کاهو", "Lettuce"), ("cabbage", "کلم", "Cabbage"),
-            ("spinach", "اسفناج", "Spinach"), ("zucchini", "کدو سبز", "Zucchini"),
-            ("eggplant", "بادمجان", "Eggplant"), ("bell-pepper", "فلفل دلمه‌ای", "Bell pepper"),
-            ("mushroom", "قارچ", "Mushroom"), ("celery", "کرفس", "Celery"),
-            ("broccoli", "بروکلی", "Broccoli"), ("cauliflower", "گل‌کلم", "Cauliflower"),
+            ("tomato", "گوجه‌فرنگی", "Tomato"),
+            ("cucumber", "خیار", "Cucumber"),
+            ("onion", "پیاز", "Onion"),
+            ("carrot", "هویج", "Carrot"),
+            ("lettuce", "کاهو", "Lettuce"),
+            ("cabbage", "کلم", "Cabbage"),
+            ("spinach", "اسفناج", "Spinach"),
+            ("zucchini", "کدو سبز", "Zucchini"),
+            ("eggplant", "بادمجان", "Eggplant"),
+            ("bell-pepper", "فلفل دلمه‌ای", "Bell pepper"),
+            ("mushroom", "قارچ", "Mushroom"),
+            ("celery", "کرفس", "Celery"),
+            ("broccoli", "بروکلی", "Broccoli"),
+            ("cauliflower", "گل‌کلم", "Cauliflower"),
             ("mixed-herbs", "سبزی خوردن", "Mixed fresh herbs"),
             ("olive-oil", "روغن زیتون", "Olive oil"),
             ("vegetable-oil", "روغن مایع", "Vegetable oil"),
-            ("butter", "کره", "Butter"), ("walnuts", "گردو", "Walnuts"),
-            ("almonds", "بادام", "Almonds"), ("peanuts", "بادام‌زمینی", "Peanuts"),
-            ("sesame", "کنجد", "Sesame"), ("tahini", "ارده", "Tahini"),
+            ("butter", "کره", "Butter"),
+            ("walnuts", "گردو", "Walnuts"),
+            ("almonds", "بادام", "Almonds"),
+            ("peanuts", "بادام‌زمینی", "Peanuts"),
+            ("sesame", "کنجد", "Sesame"),
+            ("tahini", "ارده", "Tahini"),
         ),
         FoodRole.SNACK: (
-            ("apple", "سیب", "Apple"), ("banana", "موز", "Banana"),
-            ("orange", "پرتقال", "Orange"), ("tangerine", "نارنگی", "Tangerine"),
-            ("kiwi", "کیوی", "Kiwi"), ("pomegranate", "انار", "Pomegranate"),
-            ("grapes", "انگور", "Grapes"), ("dates", "خرما", "Dates"),
-            ("raisins", "کشمش", "Raisins"), ("strawberries", "توت‌فرنگی", "Strawberries"),
-            ("watermelon", "هندوانه", "Watermelon"), ("melon", "خربزه", "Melon"),
+            ("apple", "سیب", "Apple"),
+            ("banana", "موز", "Banana"),
+            ("orange", "پرتقال", "Orange"),
+            ("tangerine", "نارنگی", "Tangerine"),
+            ("kiwi", "کیوی", "Kiwi"),
+            ("pomegranate", "انار", "Pomegranate"),
+            ("grapes", "انگور", "Grapes"),
+            ("dates", "خرما", "Dates"),
+            ("raisins", "کشمش", "Raisins"),
+            ("strawberries", "توت‌فرنگی", "Strawberries"),
+            ("watermelon", "هندوانه", "Watermelon"),
+            ("melon", "خربزه", "Melon"),
         ),
     }
     created: list[NutritionCatalogueFood] = []
@@ -371,13 +396,35 @@ def seed_base_iranian_food_catalogue(db: Session) -> list[NutritionCatalogueFood
             )
             if food is None:
                 food = NutritionCatalogueFood(
-                    slug=slug, name_fa=name_fa, name_en=name_en,
+                    slug=slug,
+                    name_fa=name_fa,
+                    name_en=name_en,
                     verification_status=FoodVerificationStatus.DRAFT,
                     source_name="Fitsho approved Iranian base-food vocabulary",
                     source_reference="https://fdc.nal.usda.gov/",
+                    dietary_patterns=_dietary_patterns_for_slug(slug),
                     roles=[NutritionCatalogueFoodRole(role=FoodRoleEnum(role))],
                 )
                 db.add(food)
                 created.append(food)
     db.commit()
     return created
+
+
+def _dietary_patterns_for_slug(slug: str) -> list[str]:
+    omnivore_only = {
+        "chicken-breast",
+        "chicken-thigh-skinless",
+        "beef",
+        "lamb",
+        "white-fish",
+        "rainbow-trout",
+        "canned-tuna",
+        "grilled-chicken-breast",
+    }
+    vegetarian = {"egg", "milk", "plain-yogurt", "low-fat-cheese", "butter"}
+    if slug in omnivore_only:
+        return ["omnivore"]
+    if slug in vegetarian:
+        return ["omnivore", "vegetarian"]
+    return ["omnivore", "vegetarian", "vegan"]

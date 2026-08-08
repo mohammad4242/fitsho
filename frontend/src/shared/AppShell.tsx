@@ -10,8 +10,9 @@ type AppShellProps = {
 
 const navigation = [
   { to: "/dashboard", label: "header.today", icon: "pulse" },
-  { to: "/workout-plan", label: "header.plan", icon: "plan" },
-  { to: "/exercises", label: "header.exercises", icon: "exercise" },
+  { to: "/workout-plan", label: "header.plan", icon: "plan", capability: "training" },
+  { to: "/exercises", label: "header.exercises", icon: "exercise", capability: "training" },
+  { to: "/nutrition-estimate", label: "header.nutritionTargets", icon: "plan", capability: "nutrition" },
   { to: "/profile", label: "header.profile", icon: "profile" },
 ] as const;
 
@@ -19,12 +20,18 @@ export function AppShell({ children }: AppShellProps) {
   const { t } = useTranslation();
   const profileContext = useOptionalProfile();
   const status = profileContext?.status ?? "ready";
+  const productMode = profileContext?.productMode;
+  const visibleNavigation = navigation.filter((item) =>
+    !("capability" in item) || productMode === undefined || productMode === null
+      || item.capability === "training" && (productMode === "training" || productMode === "both")
+      || item.capability === "nutrition" && (productMode === "nutrition" || productMode === "both"),
+  );
 
   return (
     <div className="app-shell">
       <div className="app-shell__content">{children}</div>
       <nav className="app-shell__nav" aria-label={t("header.primaryNavigation")}>
-        {navigation.map((item) => {
+        {visibleNavigation.map((item) => {
           const isProfile = item.to === "/profile";
           const to = isProfile && status !== "ready" ? "/onboarding" : item.to;
           const label = isProfile && status !== "ready" ? "header.completeProfile" : item.label;

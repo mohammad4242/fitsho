@@ -163,6 +163,7 @@ const en = {
       plan: "Plan",
       exercises: "Exercises",
       workoutPlan: "Plan",
+      nutritionTargets: "Nutrition targets",
       profile: "Profile",
       adminExercises: "Manage exercises",
       adminAiModels: "AI models",

@@ -112,6 +112,43 @@ class PriceUpdateRunStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+class NutritionPlanGenerationOutcome(StrEnum):
+    SUCCESS = "success"
+    FAILED = "failed"
+    SAFETY_BLOCKED = "safety_blocked"
+    INFEASIBLE = "infeasible"
+    TARGET_INFEASIBLE = "target_infeasible"
+    LIVE_PRICE_UNAVAILABLE = "live_price_unavailable"
+
+
+class NutritionPlanLifecycleStatus(StrEnum):
+    DRAFT = "draft"
+    GENERATED = "generated"
+    PENDING_PHYSICIAN_REVIEW = "pending_physician_review"
+    PHYSICIAN_REVIEW_IN_PROGRESS = "physician_review_in_progress"
+    AWAITING_LAB_INFORMATION = "awaiting_lab_information"
+    CHANGES_REQUESTED = "changes_requested"
+    PHYSICIAN_APPROVED = "physician_approved"
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+    REJECTED = "rejected"
+
+
+class NutritionPlanReviewStatus(StrEnum):
+    PENDING = "pending"
+    IN_REVIEW = "in_review"
+    AWAITING_LAB_INFORMATION = "awaiting_lab_information"
+    CHANGES_REQUESTED = "changes_requested"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class NutritionPlanBudgetStatus(StrEnum):
+    WITHIN_BUDGET = "within_budget"
+    FLEXIBLE_OVERAGE = "flexible_overage"
+    OVER_BUDGET = "over_budget"
+
+
 def main_meal_effective_slots(bucket: MainMealCountBucket) -> int:
     return {
         MainMealCountBucket.TWO: 2,

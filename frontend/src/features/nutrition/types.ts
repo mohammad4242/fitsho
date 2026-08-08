@@ -106,6 +106,84 @@ export type NutritionEstimate = {
   created_at: string;
 };
 
+export type WeeklyPlanNutrient = {
+  nutrient_code: string;
+  unit: string;
+  reference_kind: string | null;
+  preferred: number | null;
+  minimum_or_maximum: number | null;
+  planned: number;
+  difference_from_preferred: number | null;
+  difference_from_limit: number | null;
+  status: string;
+  reason_codes: string[];
+  data_confidence: string;
+  explanation_codes: string[];
+};
+
+export type WeeklyPlanFood = {
+  food_id: string;
+  slug: string;
+  name_fa: string;
+  name_en: string;
+  grams: number;
+  cost_irr: number;
+  nutrients: Record<string, number>;
+};
+
+export type WeeklyPlan = {
+  id: string;
+  revision: number;
+  lifecycle_status: string;
+  is_user_visible: boolean;
+  physician_approved: boolean;
+  review_status: string;
+  start_date: string;
+  planner_policy_version: string;
+  planner_version: string;
+  scientific_policy_version: string;
+  formula_version: string;
+  weekly_cost_irr: number;
+  weekly_budget_irr: number;
+  budget_status: string;
+  warning_codes: string[];
+  explanation_codes: string[];
+  input_snapshot: Record<string, unknown>;
+  price_snapshot: Record<string, unknown>;
+  repair_actions: Array<Record<string, unknown>>;
+  nutrients: Record<string, WeeklyPlanNutrient>;
+  days: Array<{
+    day_index: number;
+    plan_date: string;
+    nutrient_totals: Record<string, number>;
+    cost_irr: number;
+    meals: Array<{
+      id: string;
+      slot_role: "main_meal" | "snack";
+      slot_index: number;
+      target_distribution: Record<string, number>;
+      nutrient_totals: Record<string, number>;
+      cost_irr: number;
+      foods: WeeklyPlanFood[];
+    }>;
+  }>;
+  created_at: string;
+};
+
+export type WeeklyPlanGeneration = {
+  generation_id: string;
+  outcome:
+    | "success"
+    | "failed"
+    | "safety_blocked"
+    | "infeasible"
+    | "target_infeasible"
+    | "live_price_unavailable";
+  reason_codes: string[];
+  warning_codes: string[];
+  plan: WeeklyPlan | null;
+};
+
 export type NutritionProfileInput = {
   daily_activity_level: "sedentary" | "light" | "moderate" | "very_active";
   metabolic_basis?: "female_coefficient" | "male_coefficient" | null;
