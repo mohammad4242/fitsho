@@ -1,0 +1,266 @@
+from __future__ import annotations
+
+from collections import defaultdict
+from collections.abc import Iterator
+from datetime import date
+from decimal import Decimal
+from uuid import UUID
+
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session, selectinload
+
+from app.nutrition.enums import (
+    EstimateConfidence,
+    FoodItemKind,
+    NutritionConsumptionSource,
+    NutritionDailyCheckInStatus,
+    NutritionPlanLifecycleStatus,
+)
+from app.nutrition.models import (
+    NutritionCatalogueFood,
+    NutritionConsumptionEntry,
+    NutritionDailyCheckIn,
+    NutritionFoodItem,
+    NutritionWeeklyPlan,
+    NutritionWeeklyPlanDay,
+    NutritionWeeklyPlanMeal,
+)
+
+
+class TrackingError(Exception):
+    def __init__(self, code: str) -> None:
+        self.code = code
+
+
+def _active_plan_for_date(
+    db: Session, user_id: UUID, entry_date: date
+) -> NutritionWeeklyPlan | None:
+    return db.scalar(
+        select(NutritionWeeklyPlan)
+        .where(
+            NutritionWeeklyPlan.user_id == user_id,
+            NutritionWeeklyPlan.lifecycle_status == NutritionPlanLifecycleStatus.ACTIVE,
+            NutritionWeeklyPlan.start_date <= entry_date,
+        )
+        .options(
+            selectinload(NutritionWeeklyPlan.days)
+            .selectinload(NutritionWeeklyPlanDay.meals)
+            .selectinload(NutritionWeeklyPlanMeal.foods)
+        )
+        .order_by(NutritionWeeklyPlan.start_date.desc(), NutritionWeeklyPlan.revision.desc())
+    )
+
+
+def _entry_response(entry: NutritionConsumptionEntry) -> dict[str, object]:
+    return {
+        "id": entry.id,
+        "entry_date": entry.entry_date,
+        "plan_revision_id": entry.plan_revision_id,
+        "planned_meal_id": entry.planned_meal_id,
+        "food_id": entry.food_id,
+        "display_name": entry.display_name,
+        "quantity_grams": float(entry.quantity_grams) if entry.quantity_grams else None,
+        "source": entry.source.value,
+        "confidence": entry.confidence.value,
+        "user_confirmed": entry.user_confirmed,
+        "nutrients": {key: float(str(value)) for key, value in entry.nutrients.items()},
+        "warning_codes": entry.warning_codes,
+        "note": entry.note,
+    }
+
+
+def submit_check_in(
+    db: Session,
+    user_id: UUID,
+    entry_date: date,
+    status: NutritionDailyCheckInStatus,
+    note: str | None,
+) -> dict[str, object]:
+    existing = db.scalar(
+        select(NutritionDailyCheckIn).where(
+            NutritionDailyCheckIn.user_id == user_id,
+            NutritionDailyCheckIn.entry_date == entry_date,
+        )
+    )
+    plan = None
+    if status in {NutritionDailyCheckInStatus.ON_PLAN, NutritionDailyCheckInStatus.MOSTLY_ON_PLAN}:
+        plan = _active_plan_for_date(db, user_id, entry_date)
+        if plan is None:
+            raise TrackingError("ACTIVE_PLAN_REQUIRED")
+        day_index = (entry_date - plan.start_date).days % 7
+        day = next((row for row in plan.days if row.day_index == day_index), None)
+        if day is None:
+            raise TrackingError("ACTIVE_PLAN_DAY_NOT_FOUND")
+        db.execute(
+            delete(NutritionConsumptionEntry).where(
+                NutritionConsumptionEntry.user_id == user_id,
+                NutritionConsumptionEntry.entry_date == entry_date,
+                NutritionConsumptionEntry.source.in_(
+                    [
+                        NutritionConsumptionSource.PLANNED_CONFIRMED,
+                        NutritionConsumptionSource.PLANNED_ADJUSTED,
+                    ]
+                ),
+            )
+        )
+        for meal in day.meals:
+            db.add(
+                NutritionConsumptionEntry(
+                    user_id=user_id,
+                    entry_date=entry_date,
+                    plan_revision_id=plan.id,
+                    planned_meal_id=meal.id,
+                    display_name=f"{meal.slot_role.value} {meal.slot_index + 1}",
+                    quantity_grams=sum((food.grams for food in meal.foods), Decimal()),
+                    source=NutritionConsumptionSource.PLANNED_CONFIRMED,
+                    confidence=EstimateConfidence.MEDIUM,
+                    user_confirmed=True,
+                    nutrients=dict(meal.nutrient_totals),
+                    warning_codes=[],
+                )
+            )
+    if existing is None:
+        existing = NutritionDailyCheckIn(
+            user_id=user_id,
+            entry_date=entry_date,
+            status=status,
+            plan_revision_id=plan.id if plan else None,
+            note=note,
+        )
+        db.add(existing)
+    else:
+        existing.status = status
+        existing.plan_revision_id = plan.id if plan else None
+        existing.note = note
+    db.commit()
+    return daily_summary(db, user_id, entry_date)
+
+
+def add_catalogue_food(
+    db: Session,
+    user_id: UUID,
+    entry_date: date,
+    food_id: UUID,
+    grams: Decimal,
+    note: str | None,
+) -> dict[str, object]:
+    food = db.scalar(
+        select(NutritionCatalogueFood)
+        .where(NutritionCatalogueFood.id == food_id)
+        .options(selectinload(NutritionCatalogueFood.compositions))
+    )
+    if food is None:
+        raise TrackingError("FOOD_NOT_FOUND")
+    factor = grams / Decimal("100")
+    nutrients = {row.nutrient_code: str(row.value_per_100g * factor) for row in food.compositions}
+    exclusions = db.scalars(
+        select(NutritionFoodItem).where(
+            NutritionFoodItem.user_id == user_id,
+            NutritionFoodItem.kind.in_(
+                [FoodItemKind.ALLERGY, FoodItemKind.NEVER_SUGGEST, FoodItemKind.REFUSED]
+            ),
+        )
+    ).all()
+    searchable = f"{food.name_fa} {food.name_en} {food.slug}".casefold()
+    warnings = [
+        "ACTUAL_INTAKE_HARD_EXCLUSION"
+        for exclusion in exclusions
+        if exclusion.normalized_name.casefold() in searchable
+    ]
+    entry = NutritionConsumptionEntry(
+        user_id=user_id,
+        entry_date=entry_date,
+        food_id=food.id,
+        display_name=food.name_fa,
+        quantity_grams=grams,
+        source=NutritionConsumptionSource.CATALOGUE_MANUAL,
+        confidence=EstimateConfidence.HIGH,
+        user_confirmed=True,
+        nutrients=nutrients,
+        warning_codes=warnings,
+        note=note,
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return _entry_response(entry)
+
+
+def save_quick_approximation(
+    db: Session,
+    user_id: UUID,
+    entry_date: date,
+    display_name: str,
+    calories: Decimal,
+    protein: Decimal | None,
+) -> dict[str, object]:
+    nutrients = {"energy_kcal": str(calories)}
+    if protein is not None:
+        nutrients["protein_g"] = str(protein)
+    entry = NutritionConsumptionEntry(
+        user_id=user_id,
+        entry_date=entry_date,
+        display_name=display_name,
+        source=NutritionConsumptionSource.QUICK_APPROXIMATION,
+        confidence=EstimateConfidence.LOW,
+        user_confirmed=True,
+        nutrients=nutrients,
+        warning_codes=["APPROXIMATE_INTAKE"],
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return _entry_response(entry)
+
+
+def daily_summary(db: Session, user_id: UUID, entry_date: date) -> dict[str, object]:
+    check_in = db.scalar(
+        select(NutritionDailyCheckIn).where(
+            NutritionDailyCheckIn.user_id == user_id,
+            NutritionDailyCheckIn.entry_date == entry_date,
+        )
+    )
+    entries = db.scalars(
+        select(NutritionConsumptionEntry)
+        .where(
+            NutritionConsumptionEntry.user_id == user_id,
+            NutritionConsumptionEntry.entry_date == entry_date,
+        )
+        .order_by(NutritionConsumptionEntry.created_at)
+    ).all()
+    totals: defaultdict[str, Decimal] = defaultdict(Decimal)
+    for entry in entries:
+        for code, value in entry.nutrients.items():
+            totals[code] += Decimal(str(value))
+    return {
+        "entry_date": entry_date,
+        "check_in_status": check_in.status.value if check_in else "not_recorded",
+        "plan_revision_id": check_in.plan_revision_id if check_in else None,
+        "data_status": "sufficient" if entries else "insufficient_data",
+        "actual_totals": {code: float(value) for code, value in totals.items()},
+        "entries": [_entry_response(entry) for entry in entries],
+    }
+
+
+def history(db: Session, user_id: UUID, start: date, end: date) -> list[dict[str, object]]:
+    return [daily_summary(db, user_id, current) for current in _date_range(start, end)]
+
+
+def _date_range(start: date, end: date) -> Iterator[date]:
+    current = start
+    while current <= end:
+        yield current
+        current = date.fromordinal(current.toordinal() + 1)
+
+
+def delete_entry(db: Session, user_id: UUID, entry_id: UUID) -> None:
+    entry = db.scalar(
+        select(NutritionConsumptionEntry).where(
+            NutritionConsumptionEntry.id == entry_id,
+            NutritionConsumptionEntry.user_id == user_id,
+        )
+    )
+    if entry is None:
+        raise TrackingError("CONSUMPTION_ENTRY_NOT_FOUND")
+    db.delete(entry)
+    db.commit()

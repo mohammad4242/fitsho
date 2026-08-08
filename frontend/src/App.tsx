@@ -30,6 +30,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { PublicLandingRoute } from "./features/landing/PublicLandingRoute";
 import { PublicOnboardingPage } from "./features/publicOnboarding/PublicOnboardingPage";
 import { NutritionEstimatePage } from "./features/nutrition/NutritionEstimatePage";
+import { NutritionTrackingPage } from "./features/nutrition/NutritionTrackingPage";
 import { AppShell } from "./shared/AppShell";
 
 export function AppRoutes() {
@@ -58,6 +59,7 @@ export function AppRoutes() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/nutrition-profile" element={<NutritionProfileRoute />} />
             <Route path="/nutrition-estimate" element={<NutritionEstimatePage />} />
+            <Route path="/nutrition-tracking" element={<NutritionTrackingPage />} />
             <Route path="/body-progress" element={<BodyProgressPage />} />
             <Route path="/body-progress/new" element={<BodyPhotoWizard />} />
             <Route path="/body-progress/:sessionId" element={<BodyAnalysisResultPage />} />

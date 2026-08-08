@@ -15,6 +15,7 @@ from app.nutrition.enums import (
     MealPreparationPreference,
     MedicalConditionCode,
     MetabolicBasis,
+    NutritionDailyCheckInStatus,
     NutritionEstimateStatus,
     NutritionMealFeedbackType,
     NutritionOnboardingStatus,
@@ -454,3 +455,23 @@ class PhysicianPlanActionInput(BaseModel):
     expected_plan_revision_id: UUID
     action: str = Field(pattern="^(start_review|approve|request_changes|reject)$")
     notes: str | None = Field(default=None, max_length=2000)
+
+
+class DailyCheckInInput(BaseModel):
+    entry_date: date
+    status: NutritionDailyCheckInStatus
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class CatalogueConsumptionInput(BaseModel):
+    entry_date: date
+    food_id: UUID
+    grams: float = Field(gt=0, le=5000)
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class QuickApproximationInput(BaseModel):
+    entry_date: date
+    display_name: str = Field(min_length=1, max_length=160)
+    calories: float = Field(gt=0, le=10000)
+    protein_g: float | None = Field(default=None, ge=0, le=1000)

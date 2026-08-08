@@ -178,6 +178,23 @@ class NutritionSupplementOrderStatus(StrEnum):
     STOPPED = "stopped"
 
 
+class NutritionDailyCheckInStatus(StrEnum):
+    ON_PLAN = "on_plan"
+    MOSTLY_ON_PLAN = "mostly_on_plan"
+    OFF_PLAN = "off_plan"
+    NOT_RECORDED = "not_recorded"
+
+
+class NutritionConsumptionSource(StrEnum):
+    PLANNED_CONFIRMED = "planned_confirmed"
+    PLANNED_ADJUSTED = "planned_adjusted"
+    CATALOGUE_MANUAL = "catalogue_manual"
+    PHOTO_ESTIMATED_CONFIRMED = "photo_estimated_confirmed"
+    PHOTO_ESTIMATED_EDITED = "photo_estimated_edited"
+    QUICK_APPROXIMATION = "quick_approximation"
+    PROFESSIONAL_ENTRY = "professional_entry"
+
+
 class NutritionPlanBudgetStatus(StrEnum):
     WITHIN_BUDGET = "within_budget"
     FLEXIBLE_OVERAGE = "flexible_overage"

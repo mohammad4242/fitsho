@@ -1,3 +1,5 @@
+from datetime import date
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
@@ -53,10 +55,12 @@ from app.nutrition.plan_service import (
     weekly_plan_history,
 )
 from app.nutrition.schemas import (
+    CatalogueConsumptionInput,
     CatalogueFoodResponse,
     CatalogueFoodWrite,
     CatalogueMealResponse,
     CatalogueMealWrite,
+    DailyCheckInInput,
     MealFeedbackInput,
     MealLockInput,
     NutritionEstimateResponse,
@@ -64,6 +68,7 @@ from app.nutrition.schemas import (
     NutritionProfileResponse,
     PhysicianPlanActionInput,
     PhysicianReviewRequirementResponse,
+    QuickApproximationInput,
     RemoveMealConfirmationInput,
     SafetyDecisionResponse,
     SafetyEvaluationResponse,
@@ -83,6 +88,15 @@ from app.nutrition.service import (
     safety_response,
     save_nutrition_profile,
     save_safety_profile,
+)
+from app.nutrition.tracking_service import (
+    TrackingError,
+    add_catalogue_food,
+    daily_summary,
+    delete_entry,
+    history,
+    save_quick_approximation,
+    submit_check_in,
 )
 
 router = APIRouter(prefix="/api/v1/nutrition", tags=["nutrition"])
@@ -519,3 +533,87 @@ def review_plan(
         )
     except PlanEditError as error:
         raise _plan_edit_error(error) from None
+
+
+def _tracking_error(error: TrackingError) -> HTTPException:
+    error_status = (
+        status.HTTP_404_NOT_FOUND if error.code.endswith("NOT_FOUND") else status.HTTP_409_CONFLICT
+    )
+    return HTTPException(status_code=error_status, detail={"code": error.code})
+
+
+@router.put("/tracking/check-in", dependencies=[Depends(require_trusted_origin)])
+def update_daily_check_in(
+    payload: DailyCheckInInput, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        return submit_check_in(db, user.id, payload.entry_date, payload.status, payload.note)
+    except TrackingError as error:
+        raise _tracking_error(error) from None
+
+
+@router.post(
+    "/tracking/entries/catalogue",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def create_catalogue_consumption(
+    payload: CatalogueConsumptionInput, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        return add_catalogue_food(
+            db,
+            user.id,
+            payload.entry_date,
+            payload.food_id,
+            Decimal(str(payload.grams)),
+            payload.note,
+        )
+    except TrackingError as error:
+        raise _tracking_error(error) from None
+
+
+@router.post(
+    "/tracking/entries/quick",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def create_quick_consumption(
+    payload: QuickApproximationInput, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    return save_quick_approximation(
+        db,
+        user.id,
+        payload.entry_date,
+        payload.display_name,
+        Decimal(str(payload.calories)),
+        Decimal(str(payload.protein_g)) if payload.protein_g is not None else None,
+    )
+
+
+@router.get("/tracking/days/{entry_date}")
+def read_daily_tracking(
+    entry_date: date, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    return daily_summary(db, user.id, entry_date)
+
+
+@router.get("/tracking/history")
+def read_tracking_history(
+    start: date, end: date, db: DatabaseSession, user: CurrentUser
+) -> list[dict[str, object]]:
+    if end < start or (end - start).days > 366:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_DATE_RANGE"})
+    return history(db, user.id, start, end)
+
+
+@router.delete(
+    "/tracking/entries/{entry_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def remove_consumption_entry(entry_id: UUID, db: DatabaseSession, user: CurrentUser) -> None:
+    try:
+        delete_entry(db, user.id, entry_id)
+    except TrackingError as error:
+        raise _tracking_error(error) from None

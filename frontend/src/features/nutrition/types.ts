@@ -184,6 +184,22 @@ export type WeeklyPlanGeneration = {
   plan: WeeklyPlan | null;
 };
 
+export type DailyTrackingSummary = {
+  entry_date: string;
+  check_in_status: "on_plan" | "mostly_on_plan" | "off_plan" | "not_recorded";
+  plan_revision_id: string | null;
+  data_status: "sufficient" | "insufficient_data";
+  actual_totals: Record<string, number>;
+  entries: Array<{
+    id: string;
+    display_name: string;
+    source: string;
+    confidence: "high" | "medium" | "low";
+    nutrients: Record<string, number>;
+    warning_codes: string[];
+  }>;
+};
+
 export type NutritionProfileInput = {
   daily_activity_level: "sedentary" | "light" | "moderate" | "very_active";
   metabolic_basis?: "female_coefficient" | "male_coefficient" | null;

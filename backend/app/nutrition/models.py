@@ -44,6 +44,8 @@ from app.nutrition.enums import (
     MicronutrientReferenceKind,
     MicronutrientSex,
     MicronutrientUpperLimitScope,
+    NutritionConsumptionSource,
+    NutritionDailyCheckInStatus,
     NutritionEstimateStatus,
     NutritionLabRequestStatus,
     NutritionMealFeedbackType,
@@ -1164,7 +1166,9 @@ class NutritionMealFeedback(Base):
     __table_args__ = (UniqueConstraint("user_id", "meal_id", name="uq_nutrition_meal_feedback"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     meal_id: Mapped[UUID] = mapped_column(
         ForeignKey("nutrition_weekly_plan_meals.id", ondelete="CASCADE"), nullable=False
     )
@@ -1183,47 +1187,144 @@ class NutritionLabDocument(Base):
     __tablename__ = "nutrition_lab_documents"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     storage_key: Mapped[str] = mapped_column(String(500), nullable=False, unique=True)
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
     byte_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
-    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class NutritionLabRequest(Base):
     __tablename__ = "nutrition_lab_requests"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    plan_id: Mapped[UUID] = mapped_column(ForeignKey("nutrition_weekly_plans.id", ondelete="CASCADE"), nullable=False)
-    physician_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    plan_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_weekly_plans.id", ondelete="CASCADE"), nullable=False
+    )
+    physician_user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
     status: Mapped[NutritionLabRequestStatus] = mapped_column(
-        enum_column(NutritionLabRequestStatus, "ck_nutrition_lab_request_status_values"), nullable=False
+        enum_column(NutritionLabRequestStatus, "ck_nutrition_lab_request_status_values"),
+        nullable=False,
     )
     requested_tests: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     notes: Mapped[str | None] = mapped_column(String(2000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class NutritionSupplementOrder(Base):
     __tablename__ = "nutrition_supplement_orders"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    plan_id: Mapped[UUID] = mapped_column(ForeignKey("nutrition_weekly_plans.id", ondelete="RESTRICT"), nullable=False)
-    physician_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    plan_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_weekly_plans.id", ondelete="RESTRICT"), nullable=False
+    )
+    physician_user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     dose: Mapped[str] = mapped_column(String(160), nullable=False)
     status: Mapped[NutritionSupplementOrderStatus] = mapped_column(
-        enum_column(NutritionSupplementOrderStatus, "ck_nutrition_supplement_order_status_values"), nullable=False
+        enum_column(NutritionSupplementOrderStatus, "ck_nutrition_supplement_order_status_values"),
+        nullable=False,
     )
-    nutrient_contribution: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+    nutrient_contribution: Mapped[dict[str, object]] = mapped_column(
+        JSON, nullable=False, default=dict
+    )
     audit_metadata: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class NutritionDailyCheckIn(Base):
+    __tablename__ = "nutrition_daily_check_ins"
+    __table_args__ = (
+        UniqueConstraint("user_id", "entry_date", name="uq_nutrition_daily_check_in"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    entry_date: Mapped[date] = mapped_column(nullable=False)
+    status: Mapped[NutritionDailyCheckInStatus] = mapped_column(
+        enum_column(NutritionDailyCheckInStatus, "ck_nutrition_daily_check_in_status_values"),
+        nullable=False,
+    )
+    plan_revision_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_weekly_plans.id", ondelete="RESTRICT")
+    )
+    note: Mapped[str | None] = mapped_column(String(1000))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class NutritionConsumptionEntry(Base):
+    __tablename__ = "nutrition_consumption_entries"
+    __table_args__ = (
+        CheckConstraint(
+            "quantity_grams IS NULL OR quantity_grams > 0",
+            name="ck_nutrition_consumption_quantity",
+        ),
+        Index("ix_nutrition_consumption_user_date", "user_id", "entry_date"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    entry_date: Mapped[date] = mapped_column(nullable=False)
+    plan_revision_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_weekly_plans.id", ondelete="RESTRICT")
+    )
+    planned_meal_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_weekly_plan_meals.id", ondelete="SET NULL")
+    )
+    food_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT")
+    )
+    display_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    quantity_grams: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
+    source: Mapped[NutritionConsumptionSource] = mapped_column(
+        enum_column(NutritionConsumptionSource, "ck_nutrition_consumption_source_values"),
+        nullable=False,
+    )
+    confidence: Mapped[EstimateConfidence] = mapped_column(
+        enum_column(EstimateConfidence, "ck_nutrition_consumption_confidence_values"),
+        nullable=False,
+    )
+    user_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    nutrients: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    warning_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    note: Mapped[str | None] = mapped_column(String(1000))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
 
 class NutritionPhysicianReview(Base):

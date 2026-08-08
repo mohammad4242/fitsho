@@ -10,6 +10,7 @@ import type {
   StructuredExerciseInput,
   WeeklyPlan,
   WeeklyPlanGeneration,
+  DailyTrackingSummary,
 } from "./types";
 
 const nutritionPath = "/api/v1/nutrition";
@@ -95,4 +96,30 @@ export async function getLatestWeeklyNutritionPlan(): Promise<WeeklyPlan | null>
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
   }
+}
+
+export function getDailyTracking(entryDate: string): Promise<DailyTrackingSummary> {
+  return request<DailyTrackingSummary>(`${nutritionPath}/tracking/days/${entryDate}`);
+}
+
+export function saveDailyCheckIn(
+  entryDate: string,
+  status: DailyTrackingSummary["check_in_status"],
+): Promise<DailyTrackingSummary> {
+  return request<DailyTrackingSummary>(`${nutritionPath}/tracking/check-in`, {
+    method: "PUT",
+    body: JSON.stringify({ entry_date: entryDate, status }),
+  });
+}
+
+export function addQuickApproximation(input: {
+  entry_date: string;
+  display_name: string;
+  calories: number;
+  protein_g: number | null;
+}): Promise<unknown> {
+  return request(`${nutritionPath}/tracking/entries/quick`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
