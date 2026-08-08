@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import date, datetime, time
 from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID, uuid4
@@ -35,6 +35,10 @@ from app.nutrition.enums import (
     MealPreparationPreference,
     MedicalConditionCode,
     MetabolicBasis,
+    MicronutrientAggregationWindow,
+    MicronutrientReferenceKind,
+    MicronutrientSex,
+    MicronutrientUpperLimitScope,
     NutritionEstimateStatus,
     NutritionOnboardingStatus,
     NutritionPlanStyle,
@@ -88,6 +92,103 @@ class NutritionPolicyVersion(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class MicronutrientPolicyVersion(Base):
+    __tablename__ = "nutrition_micronutrient_policy_versions"
+
+    version: Mapped[str] = mapped_column(String(64), primary_key=True)
+    description: Mapped[str] = mapped_column(String(300), nullable=False)
+    source_manifest: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    adequacy_scoring: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    completeness_thresholds: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    repair_tolerances: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    medical_override_precedence: Mapped[str] = mapped_column(String(300), nullable=False)
+    effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MicronutrientSource(Base):
+    __tablename__ = "nutrition_micronutrient_sources"
+
+    source_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    organization: Mapped[str] = mapped_column(String(160), nullable=False)
+    reference_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    publication_date: Mapped[date | None] = mapped_column()
+    access_date: Mapped[date] = mapped_column(nullable=False)
+    policy_version: Mapped[str] = mapped_column(
+        ForeignKey("nutrition_micronutrient_policy_versions.version", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    notes: Mapped[str | None] = mapped_column(String(1000))
+
+
+class MicronutrientReference(Base):
+    __tablename__ = "nutrition_micronutrient_references"
+    __table_args__ = (
+        CheckConstraint("age_min >= 0", name="ck_nutrition_micro_refs_age_min"),
+        CheckConstraint(
+            "age_max IS NULL OR age_max >= age_min", name="ck_nutrition_micro_refs_age_order"
+        ),
+        CheckConstraint("target_value >= 0", name="ck_nutrition_micro_refs_target_nonnegative"),
+        UniqueConstraint(
+            "policy_version",
+            "nutrient_code",
+            "reference_kind",
+            "age_min",
+            "age_max",
+            "sex",
+            "life_stage",
+            "dietary_pattern_modifier",
+            name="uq_nutrition_micro_refs_population",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    policy_version: Mapped[str] = mapped_column(
+        ForeignKey("nutrition_micronutrient_policy_versions.version", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    nutrient_code: Mapped[str] = mapped_column(String(48), nullable=False, index=True)
+    reference_kind: Mapped[MicronutrientReferenceKind] = mapped_column(
+        enum_column(MicronutrientReferenceKind, "ck_nutrition_micro_refs_kind_values"),
+        nullable=False,
+    )
+    target_value: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    unit: Mapped[str] = mapped_column(String(24), nullable=False)
+    unit_form: Mapped[str] = mapped_column(String(48), nullable=False, default="unspecified")
+    unit_conversion: Mapped[dict[str, object] | None] = mapped_column(JSON)
+    age_min: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    age_max: Mapped[int | None] = mapped_column(SmallInteger)
+    sex: Mapped[MicronutrientSex] = mapped_column(
+        enum_column(MicronutrientSex, "ck_nutrition_micro_refs_sex_values"), nullable=False
+    )
+    life_stage: Mapped[str] = mapped_column(String(48), nullable=False, default="adult")
+    dietary_pattern_modifier: Mapped[str] = mapped_column(
+        String(48), nullable=False, default="none"
+    )
+    modifier_multiplier_or_delta: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
+    upper_limit_scope: Mapped[MicronutrientUpperLimitScope] = mapped_column(
+        enum_column(MicronutrientUpperLimitScope, "ck_nutrition_micro_refs_ul_scope_values"),
+        nullable=False,
+    )
+    aggregation_window: Mapped[MicronutrientAggregationWindow] = mapped_column(
+        enum_column(MicronutrientAggregationWindow, "ck_nutrition_micro_refs_window_values"),
+        nullable=False,
+    )
+    source_organization: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_date: Mapped[date | None] = mapped_column()
+    access_date: Mapped[date] = mapped_column(nullable=False)
+    source_id: Mapped[str] = mapped_column(
+        ForeignKey("nutrition_micronutrient_sources.source_id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    notes: Mapped[str | None] = mapped_column(String(1000))
 
 
 class NutritionMedicalProfile(Base):

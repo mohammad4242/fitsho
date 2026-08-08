@@ -38,6 +38,33 @@ class SnackCountBucket(StrEnum):
     THREE_OR_MORE = "three_or_more_snacks"
 
 
+class MicronutrientReferenceKind(StrEnum):
+    RDA = "rda"
+    AI = "ai"
+    EAR = "ear"
+    UL = "ul"
+    CDRR = "cdrr"
+    MEDICAL_OVERRIDE = "medical_override"
+
+
+class MicronutrientSex(StrEnum):
+    ALL = "all"
+    MALE = "male"
+    FEMALE = "female"
+
+
+class MicronutrientAggregationWindow(StrEnum):
+    DAILY = "daily"
+    WEEKLY_AVERAGE = "weekly_average"
+
+
+class MicronutrientUpperLimitScope(StrEnum):
+    NONE = "none"
+    TOTAL_INTAKE = "total_intake"
+    SUPPLEMENTAL_ONLY = "supplemental_only"
+    SOURCE_FORM_SPECIFIC = "source_form_specific"
+
+
 def main_meal_effective_slots(bucket: MainMealCountBucket) -> int:
     return {
         MainMealCountBucket.TWO: 2,

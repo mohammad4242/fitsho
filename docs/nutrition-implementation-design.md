@@ -390,3 +390,53 @@ and zero, one, two, or three-plus snacks. The migration backfills those buckets
 and their effective planner slot counts from existing numeric values. Numeric
 fields remain accepted as deprecated compatibility inputs and are normalized to
 the typed buckets.
+
+## Task 2B implementation record
+
+Task 2B adds the immutable `micronutrient-dri-v1` policy foundation without
+activating micronutrient-aware meal planning. It includes normalized policy
+versions, source registry rows, and reference rows for the core adult MVP
+nutrients: calcium, potassium, magnesium, iron, zinc, sodium, vitamin C,
+vitamin D, vitamin B12, and folate/DFE.
+
+Reference kinds remain distinct: `RDA`, `AI`, `EAR`, `UL`, and `CDRR` are
+stored as typed values, and the schema also supports `MEDICAL_OVERRIDE`.
+Potassium is represented with AI and no fabricated healthy-population UL.
+Sodium stores AI and CDRR separately and has no sodium UL row. Magnesium's
+seeded UL is marked supplemental-only. Most adequacy rows use a weekly-average
+aggregation window; safety limits use a daily window. A dietary-reference gap
+is explicitly non-diagnostic in the policy manifest.
+
+The source registry records NASEM as the primary DRI authority and NIH ODS as
+the cross-check source. Research/access date is 2026-08-08. Primary sources:
+
+- https://nap.nationalacademies.org/collection/57/dietary-reference-intakes
+- https://nap.nationalacademies.org/catalog/25353/dietary-reference-intakes-for-sodium-and-potassium
+- https://ods.od.nih.gov/factsheets/Zinc-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/Calcium-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/Potassium-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/Magnesium-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/VitaminC-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/VitaminB12-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/Folate-HealthProfessional/
+
+The policy is a source and reference foundation only. Task 2B does not yet
+select user-specific rows in the estimate engine, score food candidates, or
+perform micronutrient repair.
+
+The policy manifest also records the deterministic interpretation boundary:
+RDA is preferred over AI, EAR is never an individual hard minimum, and an UL
+is only a safety ceiling within its stored scope. Medical overrides take
+precedence over nutrient-specific safety limits, which take precedence over
+healthy-population DRI rows. Adequacy is represented on a 0–100 scale with
+weekly-average defaults; a weekly result requires four measured days and at
+least 80% supported-nutrient coverage. Missing data is not treated as zero.
+Repair remains bounded to three iterations, with five-percent calorie/macro
+tolerances and rejection of any new hard safety violation.
+
+Food composition mapping is reserved for USDA FoodData Central (or a verified
+regional source with equivalent provenance). Requirement targets never come
+from food-composition records; every future mapping must preserve source,
+serving unit, nutrient form, confidence, and unit-conversion metadata.
