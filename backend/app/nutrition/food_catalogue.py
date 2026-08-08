@@ -301,3 +301,83 @@ def seed_verified_iranian_foods(db: Session) -> list[CatalogueFoodResponse]:
         )
         for food in seeds
     ]
+
+
+def seed_base_iranian_food_catalogue(db: Session) -> list[NutritionCatalogueFood]:
+    """Create the approved base-food vocabulary; composition verification is separate."""
+    groups: dict[str, tuple[tuple[str, str, str], ...]] = {
+        FoodRole.MAIN_PROTEIN: (
+            ("chicken-breast", "سینه مرغ", "Chicken breast"),
+            ("chicken-thigh-skinless", "ران مرغ بدون پوست", "Skinless chicken thigh"),
+            ("beef", "گوشت گوساله", "Beef"),
+            ("lamb", "گوشت گوسفند", "Lamb"),
+            ("white-fish", "ماهی سفید", "White fish"),
+            ("rainbow-trout", "ماهی قزل‌آلا", "Rainbow trout"),
+            ("canned-tuna", "تن ماهی", "Canned tuna"),
+            ("egg", "تخم‌مرغ", "Egg"),
+            ("lentils", "عدس", "Lentils"),
+            ("chickpeas", "نخود", "Chickpeas"),
+            ("pinto-beans", "لوبیا چیتی", "Pinto beans"),
+            ("red-kidney-beans", "لوبیا قرمز", "Red kidney beans"),
+            ("white-beans", "لوبیا سفید", "White beans"),
+            ("black-eyed-peas", "لوبیا چشم‌بلبلی", "Black-eyed peas"),
+            ("split-peas", "لپه", "Split peas"),
+            ("mung-beans", "ماش", "Mung beans"),
+            ("soybeans", "سویا", "Soybeans"),
+        ),
+        FoodRole.MAIN_STAPLE: (
+            ("basmati-rice", "برنج", "Basmati rice"),
+            ("sangak-bread", "نان سنگک", "Sangak bread"),
+            ("barbari-bread", "نان بربری", "Barbari bread"),
+            ("lavash-bread", "نان لواش", "Lavash bread"),
+            ("taftoon-bread", "نان تافتون", "Taftoon bread"),
+            ("oats", "جو دوسر", "Oats"),
+            ("barley", "جو", "Barley"),
+            ("potato", "سیب‌زمینی", "Potato"),
+            ("corn", "ذرت", "Corn"),
+            ("pasta", "ماکارونی", "Pasta"),
+        ),
+        FoodRole.FLEXIBLE: (
+            ("milk", "شیر", "Milk"), ("plain-yogurt", "ماست ساده", "Plain yogurt"),
+            ("low-fat-cheese", "پنیر کم‌چرب", "Low-fat cheese"),
+            ("tomato", "گوجه‌فرنگی", "Tomato"), ("cucumber", "خیار", "Cucumber"),
+            ("onion", "پیاز", "Onion"), ("carrot", "هویج", "Carrot"),
+            ("lettuce", "کاهو", "Lettuce"), ("cabbage", "کلم", "Cabbage"),
+            ("spinach", "اسفناج", "Spinach"), ("zucchini", "کدو سبز", "Zucchini"),
+            ("eggplant", "بادمجان", "Eggplant"), ("bell-pepper", "فلفل دلمه‌ای", "Bell pepper"),
+            ("mushroom", "قارچ", "Mushroom"), ("celery", "کرفس", "Celery"),
+            ("broccoli", "بروکلی", "Broccoli"), ("cauliflower", "گل‌کلم", "Cauliflower"),
+            ("mixed-herbs", "سبزی خوردن", "Mixed fresh herbs"),
+            ("olive-oil", "روغن زیتون", "Olive oil"),
+            ("vegetable-oil", "روغن مایع", "Vegetable oil"),
+            ("butter", "کره", "Butter"), ("walnuts", "گردو", "Walnuts"),
+            ("almonds", "بادام", "Almonds"), ("peanuts", "بادام‌زمینی", "Peanuts"),
+            ("sesame", "کنجد", "Sesame"), ("tahini", "ارده", "Tahini"),
+        ),
+        FoodRole.SNACK: (
+            ("apple", "سیب", "Apple"), ("banana", "موز", "Banana"),
+            ("orange", "پرتقال", "Orange"), ("tangerine", "نارنگی", "Tangerine"),
+            ("kiwi", "کیوی", "Kiwi"), ("pomegranate", "انار", "Pomegranate"),
+            ("grapes", "انگور", "Grapes"), ("dates", "خرما", "Dates"),
+            ("raisins", "کشمش", "Raisins"), ("strawberries", "توت‌فرنگی", "Strawberries"),
+            ("watermelon", "هندوانه", "Watermelon"), ("melon", "خربزه", "Melon"),
+        ),
+    }
+    created: list[NutritionCatalogueFood] = []
+    for role, foods in groups.items():
+        for slug, name_fa, name_en in foods:
+            food = db.scalar(
+                select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == slug)
+            )
+            if food is None:
+                food = NutritionCatalogueFood(
+                    slug=slug, name_fa=name_fa, name_en=name_en,
+                    verification_status=FoodVerificationStatus.DRAFT,
+                    source_name="Fitsho approved Iranian base-food vocabulary",
+                    source_reference="https://fdc.nal.usda.gov/",
+                    roles=[NutritionCatalogueFoodRole(role=FoodRoleEnum(role))],
+                )
+                db.add(food)
+                created.append(food)
+    db.commit()
+    return created

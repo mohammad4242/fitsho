@@ -63,3 +63,23 @@ def test_verified_iranian_seed_foods_have_provenance(db: Session) -> None:
         "plain-yogurt",
     }
     assert all(food.source_reference for food in foods)
+
+
+def test_base_catalogue_seed_contains_user_approved_iranian_ingredients(db: Session) -> None:
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.models import NutritionCatalogueFood
+
+    seed_base_iranian_food_catalogue(db)
+
+    foods = db.scalars(select(NutritionCatalogueFood)).all()
+    assert {food.slug for food in foods} >= {
+        "chicken-breast",
+        "beef",
+        "lentils",
+        "basmati-rice",
+        "tomato",
+        "apple",
+        "olive-oil",
+    }
+    approved = [food for food in foods if food.slug in {"chicken-breast", "beef", "lentils"}]
+    assert all(food.verification_status.value == "draft" for food in approved)
