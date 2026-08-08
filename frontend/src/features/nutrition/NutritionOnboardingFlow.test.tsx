@@ -14,8 +14,11 @@ vi.mock("../profile/api", () => ({
 vi.mock("./api", () => ({
   getSafetyDecision: vi.fn(),
   getNutritionProfile: vi.fn(),
+  getStructuredExercise: vi.fn(),
   saveSafetyProfile: vi.fn(),
   saveNutritionProfile: vi.fn(),
+  saveStructuredExercise: vi.fn(),
+  createNutritionEstimate: vi.fn(),
 }));
 
 import { NutritionOnboardingFlow } from "./NutritionOnboardingFlow";
@@ -37,6 +40,7 @@ beforeEach(async () => {
   vi.mocked(profileApi.getSharedProfile).mockResolvedValue(null);
   vi.mocked(nutritionApi.getSafetyDecision).mockResolvedValue(null);
   vi.mocked(nutritionApi.getNutritionProfile).mockResolvedValue(null);
+  vi.mocked(nutritionApi.getStructuredExercise).mockResolvedValue(null);
   vi.mocked(profileApi.saveSharedProfile).mockResolvedValue({
     user_id: "user-1", product_mode: "nutrition", display_name: "سارا",
     birth_date: "2000-05-14", sex: "female", height_cm: 165,
@@ -44,6 +48,8 @@ beforeEach(async () => {
     weight_measured_at: "2026-08-05T12:00:00Z",
   });
   vi.mocked(nutritionApi.saveSafetyProfile).mockResolvedValue(standardDecision);
+  vi.mocked(nutritionApi.saveStructuredExercise).mockResolvedValue({} as never);
+  vi.mocked(nutritionApi.createNutritionEstimate).mockResolvedValue({} as never);
 });
 
 it("keeps the selected English language in the nutrition path", async () => {
@@ -131,7 +137,8 @@ async function completeSafetyQuestions(user: ReturnType<typeof userEvent.setup>)
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.click(screen.getByRole("button", { name: "رد کردن این سؤال" }));
   await user.click(screen.getByRole("button", { name: "رد کردن این سؤال" }));
-  await user.click(screen.getByRole("button", { name: "ثبت ارزیابی ایمنی" }));
+  await user.click(screen.getByRole("button", { name: "رد کردن این سؤال" }));
+  await user.click(screen.getByRole("button", { name: "رد کردن این سؤال" }));
 }
 
 it("saves shared data before showing the early safety screen", async () => {
@@ -182,7 +189,7 @@ it("lets nutrition-only members opt out of training before medical questions", a
   await screen.findByRole("heading", { name: "دوست داری چه صدایت کنیم؟" });
   await completeSharedQuestions(user);
 
-  expect(await screen.findByRole("heading", { name: "چقدر سابقه تمرین مداوم داری؟" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "در حال حاضر تمرین منظم داری؟" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "تمرین نمی‌کنم" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   expect(await screen.findByRole("heading", { name: "آیا شرایط پزشکی مشخصی داری؟" })).toBeInTheDocument();
@@ -190,6 +197,10 @@ it("lets nutrition-only members opt out of training before medical questions", a
 });
 
 it("shows essential and remaining nutrition details together after account creation", async () => {
+  vi.mocked(nutritionApi.getStructuredExercise).mockResolvedValue({
+    trains: false, exercise_type: null, days_per_week: null,
+    minutes_per_session: null, intensity: null, source: "user_reported",
+  });
   vi.mocked(nutritionApi.getNutritionProfile).mockResolvedValue({
     daily_activity_level: "moderate", individual_monthly_food_budget_irr: 13_000_000,
     budget_style: "strict", meals_per_day: 3, snacks_per_day: 1,
@@ -212,11 +223,12 @@ it("shows essential and remaining nutrition details together after account creat
   expect(screen.getByLabelText("میزان فعالیت روزانه")).toHaveValue("moderate");
   expect(screen.getByLabelText("بودجه ماهانه غذا (ریال)")).toHaveValue(13_000_000);
   expect(screen.getByLabelText("الگوی غذایی")).toHaveValue("omnivore");
-  expect(screen.getByLabelText("وعده اصلی در روز")).toHaveValue(3);
-  expect(screen.getByLabelText("ترجیح آماده‌سازی غذا")).toHaveValue("mixed");
-  expect(screen.getByRole("group", { name: "تجهیزات آشپزی" })).toBeInTheDocument();
-  expect(screen.getByLabelText("تنوع برنامه غذایی")).toHaveValue("medium");
-  expect(screen.getByLabelText("بررسی روزانه")).not.toBeChecked();
+  expect(screen.getByLabelText("وعده اصلی در روز")).toHaveValue("3");
+  expect(screen.queryByLabelText("ترجیح آماده‌سازی غذا")).not.toBeInTheDocument();
+  expect(screen.queryByRole("group", { name: "تجهیزات آشپزی" })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("تنوع برنامه غذایی")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("غذاهایی که دوست داری (اختیاری)")).toBeInTheDocument();
+  expect(screen.getByLabelText("غذاهایی که دوست نداری (اختیاری)")).toBeInTheDocument();
 });
 
 it("completes the guided nutrition profile with IRR budget and optional skips", async () => {
@@ -234,30 +246,19 @@ it("completes the guided nutrition profile with IRR budget and optional skips", 
   await completeSharedQuestions(user);
   await completeSafetyQuestions(user);
 
-  await user.type(await screen.findByLabelText("بودجه ماهانه غذا (مبلغ به ریال)"), "13000000");
-  for (let index = 0; index < 6; index += 1) {
-    await user.click(screen.getByRole("button", { name: "ادامه" }));
-  }
-  expect(screen.getByRole("heading", { name: "چقدر با آشپزی راحتی؟" })).toBeInTheDocument();
-  for (let index = 0; index < 8; index += 1) {
-    await user.click(screen.getByRole("button", { name: "ادامه" }));
-  }
-  for (let index = 0; index < 5; index += 1) {
-    await user.click(screen.getByRole("button", { name: "ادامه" }));
-  }
-  await user.type(screen.getByLabelText("حساسیت‌های غذایی (اختیاری، با ویرگول جدا کن)"), "بادام زمینی");
+  await user.click(await screen.findByRole("button", { name: "تمرین نمی‌کنم" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));
-  for (let index = 0; index < 8; index += 1) {
-    await user.click(screen.getByRole("button", { name: "ادامه" }));
-  }
-  await user.click(screen.getByRole("button", { name: "مرور پاسخ‌ها" }));
+
+  await user.type(await screen.findByLabelText("بودجه ماهانه غذا (مبلغ به ریال)"), "13000000");
+  for (let index = 0; index < 5; index += 1) await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.click(screen.getByRole("button", { name: "ثبت پروفایل تغذیه" }));
 
   await waitFor(() => expect(nutritionApi.saveNutritionProfile).toHaveBeenCalledOnce());
   expect(nutritionApi.saveNutritionProfile).toHaveBeenCalledWith(
     expect.objectContaining({
       individual_monthly_food_budget_irr: 13_000_000,
-      allergies: [{ name: "بادام زمینی", details: null }],
+      main_meal_count_bucket: "three_main_meals",
+      snack_count_bucket: "one_snack",
     }),
   );
   expect(onComplete).not.toHaveBeenCalled();

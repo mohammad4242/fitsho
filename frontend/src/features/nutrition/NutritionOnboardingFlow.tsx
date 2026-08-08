@@ -16,10 +16,14 @@ import type {
   SafetyDecision,
   SafetyEvaluation,
   SafetyProfileInput,
+  StructuredExerciseType,
+  TrainingIntensity,
 } from "./types";
 import type { OnboardingDraft, PreAccountNutritionBasics } from "../publicOnboarding/onboardingDraft";
 import { GuidedSharedProfileQuestions } from "../publicOnboarding/GuidedSharedProfileQuestions";
 import { GuidedTrainingQuestions } from "../publicOnboarding/GuidedTrainingQuestions";
+import { NutritionExerciseQuestions } from "./NutritionExerciseQuestions";
+import type { StructuredExerciseInput } from "./types";
 
 type FlowStep =
   | "loading"
@@ -30,7 +34,6 @@ type FlowStep =
   | "blocked"
   | "training"
   | "budget"
-  | "cooking"
   | "foods"
   | "review"
   | "complete";
@@ -51,11 +54,20 @@ type Props = {
   onBack?: () => void;
 };
 
+type LegacyStructuredExercise = {
+  trains: boolean;
+  exercise_type?: StructuredExerciseType | null;
+  days_per_week?: number | null;
+  minutes_per_session?: number | null;
+  intensity?: TrainingIntensity | null;
+};
+
 const emptyProfileValues: ProfileFormValues = {
   display_name: "", birth_date: "", sex: "", height_cm: "", current_weight_kg: "",
   shoulder_circumference_cm: "", waist_circumference_cm: "", hip_circumference_cm: "",
   fitness_goal: "", experience_level: "", training_days_per_week: "",
   training_location: "", home_training_setup: "", session_duration_minutes: "",
+  training_intensity: "",
   physical_limitations: "", training_cautions: null, plan_duration_weeks: "4",
 };
 
@@ -79,6 +91,7 @@ function draftValues(draft?: OnboardingDraft): ProfileFormValues {
       training_location: draft.training.training_location,
       home_training_setup: draft.training.home_training_setup ?? "",
       session_duration_minutes: String(draft.training.session_duration_minutes),
+      training_intensity: draft.training.training_intensity ?? "",
       physical_limitations: draft.training.physical_limitations ?? "",
       training_cautions: draft.training.training_cautions,
       plan_duration_weeks: String(draft.training.plan_duration_weeks),
@@ -150,6 +163,7 @@ export function NutritionOnboardingFlow({
   const [physicianRestrictions, setPhysicianRestrictions] = useState("");
   const [otherCondition, setOtherCondition] = useState("");
   const [dailyActivityLevel, setDailyActivityLevel] = useState<NutritionProfileInput["daily_activity_level"]>(() => initialNutritionBasics?.daily_activity_level ?? "moderate");
+  const [structuredExercise, setStructuredExercise] = useState<StructuredExerciseInput | undefined>(() => initialDraft?.structuredExercise);
   const [budget, setBudget] = useState(() => initialNutritionBasics === undefined ? "" : String(initialNutritionBasics.individual_monthly_food_budget_irr));
   const [budgetStyle, setBudgetStyle] = useState<"strict" | "flexible">(() => initialNutritionBasics?.budget_style ?? "strict");
   const [mealCount, setMealCount] = useState("3");
@@ -182,8 +196,18 @@ export function NutritionOnboardingFlow({
       profileApi.getSharedProfile(),
       nutritionApi.getSafetyDecision(),
       nutritionApi.getNutritionProfile(),
-    ]).then(([shared, savedDecision, nutrition]) => {
+      nutritionApi.getStructuredExercise(),
+    ]).then(([shared, savedDecision, nutrition, savedExercise]) => {
       if (!active) return;
+      if (savedExercise !== null) {
+        setStructuredExercise(savedExercise.trains ? {
+          trains: true,
+          exercise_type: savedExercise.exercise_type ?? "other",
+          days_per_week: savedExercise.days_per_week ?? 1,
+          minutes_per_session: savedExercise.minutes_per_session ?? 30,
+          intensity: savedExercise.intensity ?? "moderate",
+        } : { trains: false });
+      }
       if (nutrition !== null) {
         setDecision(savedDecision);
         if (!editExisting) {
@@ -209,7 +233,7 @@ export function NutritionOnboardingFlow({
       if (savedDecision !== null && !savedDecision.can_continue_onboarding) {
         setStep("blocked");
       } else if (savedDecision !== null) {
-        setStep(productMode === "both" && !trainingProfileExists ? "training" : "budget");
+        setStep(productMode === "nutrition" || !trainingProfileExists ? "training" : "budget");
       } else {
         setStep(shared === null ? "personal" : "safety");
       }
@@ -226,8 +250,8 @@ export function NutritionOnboardingFlow({
     setDailyActivityLevel(nutrition.daily_activity_level);
     setBudget(String(nutrition.individual_monthly_food_budget_irr));
     setBudgetStyle(nutrition.budget_style);
-    setMealCount(String(nutrition.meals_per_day));
-    setSnackCount(String(nutrition.snacks_per_day));
+    setMealCount(String(nutrition.effective_main_meal_slots ?? nutrition.meals_per_day));
+    setSnackCount(String(nutrition.effective_snack_slots ?? nutrition.snacks_per_day));
     setStartDay(nutrition.preferred_plan_start_day);
     setPlanStyle(nutrition.plan_style);
     setCooking({
@@ -320,7 +344,7 @@ export function NutritionOnboardingFlow({
       if (draftMode) onDraftChange?.({ safety: input });
       setDecision(result);
       if (!result.can_continue_onboarding) setStep("blocked");
-      else setStep(productMode === "both" && !trainingProfileExists ? "training" : "budget");
+      else setStep(productMode === "nutrition" || !trainingProfileExists ? "training" : "budget");
     }).catch(() => setRequestError(true)).finally(() => setBusy(false));
   }
 
@@ -342,10 +366,22 @@ export function NutritionOnboardingFlow({
       .finally(() => setBusy(false));
   }
 
+  function saveNutritionExercise(input: StructuredExerciseInput) {
+    setStructuredExercise(input);
+    if (draftMode) {
+      onDraftChange?.({ structuredExercise: input, training: undefined });
+      setStep("pre_account");
+      return;
+    }
+    setStep("budget");
+  }
+
   const nutritionInput = useMemo<NutritionProfileInput>(() => ({
     daily_activity_level: dailyActivityLevel,
     individual_monthly_food_budget_irr: Number(budget),
     budget_style: budgetStyle,
+    main_meal_count_bucket: mealCount === "2" ? "two_main_meals" : mealCount === "3" ? "three_main_meals" : "four_or_more_main_meals",
+    snack_count_bucket: snackCount === "0" ? "zero_snacks" : snackCount === "1" ? "one_snack" : snackCount === "2" ? "two_snacks" : "three_or_more_snacks",
     meals_per_day: Number(mealCount),
     snacks_per_day: Number(snackCount),
     preferred_plan_start_day: startDay,
@@ -397,6 +433,14 @@ export function NutritionOnboardingFlow({
     setRequestError(false);
     void nutritionApi.saveNutritionProfile(nutritionInput)
       .then(() => {
+        if (productMode === "nutrition") {
+          if (structuredExercise === undefined) throw new Error("Structured exercise is required");
+          return nutritionApi.saveStructuredExercise(structuredExercise);
+        }
+        return undefined;
+      })
+      .then(() => nutritionApi.createNutritionEstimate())
+      .then(() => {
         onNutritionComplete?.();
         if (productMode === "both") onComplete();
         else setStep("complete");
@@ -408,10 +452,8 @@ export function NutritionOnboardingFlow({
   const flowOrder: FlowStep[] = [
     "personal",
     "safety",
-    ...(productMode === "both" && !trainingProfileExists ? (["training"] as FlowStep[]) : []),
+    ...(productMode === "nutrition" || !trainingProfileExists ? (["training"] as FlowStep[]) : []),
     "budget",
-    "cooking",
-    "foods",
     "review",
   ];
   const progressIndex = Math.max(flowOrder.indexOf(step), 0) + 1;
@@ -456,6 +498,8 @@ export function NutritionOnboardingFlow({
         startDay={startDay}
         cooking={cooking}
         foods={foods}
+        structuredExercise={structuredExercise}
+        productMode={productMode}
         saved={detailsSaved}
         saveError={requestError}
         onDailyActivityLevel={setDailyActivityLevel}
@@ -467,12 +511,20 @@ export function NutritionOnboardingFlow({
         onStartDay={setStartDay}
         onCooking={setCooking}
         onFoods={setFoods}
+        onStructuredExercise={setStructuredExercise}
         onBack={onBack}
         onSave={() => {
           setBusy(true);
           setRequestError(false);
           setDetailsSaved(false);
           void nutritionApi.saveNutritionProfile(nutritionInput)
+            .then(() => {
+              if (productMode === "nutrition" && structuredExercise !== undefined) {
+                return nutritionApi.saveStructuredExercise(structuredExercise);
+              }
+              return undefined;
+            })
+            .then(() => nutritionApi.createNutritionEstimate())
             .then(() => setDetailsSaved(true))
             .catch(() => setRequestError(true))
             .finally(() => setBusy(false));
@@ -504,6 +556,8 @@ export function NutritionOnboardingFlow({
           medications={medications}
           physicianRestrictions={physicianRestrictions}
           otherCondition={otherCondition}
+          foods={foods}
+          onFoods={setFoods}
           onConditions={setConditions}
           onFlags={setSafetyFlags}
           onMedications={setMedications}
@@ -518,38 +572,36 @@ export function NutritionOnboardingFlow({
         onConditions={setConditions} onFlags={setSafetyFlags} onFoods={setFoods} onBudget={setBudget} onPlanStyle={setPlanStyle}
         onDailyActivityLevel={setDailyActivityLevel}
         onBack={() => setStep("training")}
-        onComplete={() => onDraftComplete?.({ safety: safetyInput(), nutritionBasics: {
+        onComplete={() => onDraftComplete?.({ safety: safetyInput(), structuredExercise, nutritionBasics: {
           daily_activity_level: dailyActivityLevel, individual_monthly_food_budget_irr: Number(budget), budget_style: budgetStyle, plan_style: planStyle,
           allergies: splitNames(foods.allergies).map((name) => ({ name, details: null })), intolerances: splitNames(foods.intolerances).map((name) => ({ name, details: null })), dietary_pattern: foods.dietaryPattern,
         } })}
       />}
       {step === "training" && (
-        <GuidedTrainingQuestions
-          values={values}
-          onChange={updateProfileValue}
-          onBack={() => setStep(draftMode ? "personal" : "safety")}
-          onComplete={saveTraining}
-          allowNoTraining={draftMode && productMode === "nutrition"}
-          onNoTraining={() => {
-            onDraftChange?.({ training: undefined });
-            setStep("pre_account");
-          }}
-        />
+        productMode === "nutrition" ? (
+          <NutritionExerciseQuestions
+            initialValue={structuredExercise}
+            fitnessGoal={values.fitness_goal}
+            onBack={() => setStep(draftMode ? "personal" : "safety")}
+            onComplete={saveNutritionExercise}
+          />
+        ) : (
+          <GuidedTrainingQuestions
+            values={values}
+            onChange={updateProfileValue}
+            onBack={() => setStep(draftMode ? "personal" : "safety")}
+            onComplete={saveTraining}
+          />
+        )
       )}
       {step === "budget" && (
         <BudgetForm
           busy={busy} budget={budget} budgetStyle={budgetStyle} mealCount={mealCount}
           snackCount={snackCount} startDay={startDay} planStyle={planStyle} onBudget={setBudget}
           onBudgetStyle={setBudgetStyle} onMealCount={setMealCount} onSnackCount={setSnackCount}
-          onStartDay={setStartDay} onPlanStyle={setPlanStyle} onBack={() => setStep(productMode === "both" && !trainingProfileExists ? "training" : "safety")}
-          onNext={() => setStep("cooking")}
+          onStartDay={setStartDay} onPlanStyle={setPlanStyle} onBack={() => setStep(productMode === "nutrition" || !trainingProfileExists ? "training" : "safety")}
+    onNext={() => setStep("review")}
         />
-      )}
-      {step === "cooking" && (
-        <CookingForm busy={busy} value={cooking} onChange={setCooking} onBack={() => setStep("budget")} onNext={() => setStep("foods")} />
-      )}
-      {step === "foods" && (
-        <FoodsForm busy={busy} value={foods} onChange={setFoods} onBack={() => setStep("cooking")} onNext={() => setStep("review")} />
       )}
       {step === "review" && (
         <form className="profile-form" onSubmit={finish}>
@@ -559,7 +611,7 @@ export function NutritionOnboardingFlow({
             <span>{language === "en" ? "Safety policy" : "سیاست ایمنی"}: {decision?.policy_version}</span>
             <span>{language === "en" ? `Allergies: ${splitNames(foods.allergies).join(", ") || "None"}` : `حساسیت ثبت‌شده: ${splitNames(foods.allergies).join("، ") || "ندارد"}`}</span>
           </div>
-          <Actions busy={busy} onBack={() => setStep("foods")} nextLabel={language === "en" ? "Save nutrition profile" : "ثبت پروفایل تغذیه"} />
+          <Actions busy={busy} onBack={() => setStep("budget")} nextLabel={language === "en" ? "Save nutrition profile" : "ثبت پروفایل تغذیه"} />
         </form>
       )}
       {requestError && <p className="form-error" role="alert">{copy.error}</p>}
@@ -579,6 +631,8 @@ function PostAccountNutritionDetails(props: {
   startDay: NutritionProfileInput["preferred_plan_start_day"];
   cooking: CookingState;
   foods: FoodsState;
+  structuredExercise: LegacyStructuredExercise | undefined;
+  productMode: Extract<ProductMode, "nutrition" | "both">;
   saved: boolean;
   saveError: boolean;
   onDailyActivityLevel: (value: NutritionProfileInput["daily_activity_level"]) => void;
@@ -590,10 +644,42 @@ function PostAccountNutritionDetails(props: {
   onStartDay: (value: NutritionProfileInput["preferred_plan_start_day"]) => void;
   onCooking: (value: CookingState) => void;
   onFoods: (value: FoodsState) => void;
+  onStructuredExercise: (value: StructuredExerciseInput) => void;
   onBack?: () => void;
   onSave: () => void;
 }) {
   const l = (fa: string, en: string) => props.language === "en" ? en : fa;
+  return (
+    <section className="nutrition-step profile-details-page" dir={props.language === "fa" ? "rtl" : "ltr"}>
+      <p className="eyebrow eyebrow--accent">{l("پروفایل", "Profile")}</p>
+      <h2 className="fitsho-display">{l("اطلاعات تغذیه‌ای", "Nutrition information")}</h2>
+      <form className="profile-form nutrition-details-form" onSubmit={(event) => { event.preventDefault(); props.onSave(); }}>
+        <fieldset className="profile-fieldset" disabled={props.busy}>
+          <legend>{l("نیاز روزانه و وعده‌ها", "Daily needs and meals")}</legend>
+          <SelectField label={l("میزان فعالیت روزانه", "Daily activity level")} value={props.dailyActivityLevel} onChange={(value) => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"])} options={[["sedentary", l("کم‌تحرک", "Sedentary")], ["light", l("فعالیت سبک", "Light")], ["moderate", l("فعالیت متوسط", "Moderate")], ["very_active", l("بسیار فعال", "Very active")]]} />
+          <LabeledInput label={l("بودجه ماهانه غذا (ریال)", "Monthly food budget (IRR)")} type="number" min="0" required value={props.budget} onChange={props.onBudget} />
+          <SelectField label={l("نوع بودجه", "Budget style")} value={props.budgetStyle} onChange={(value) => props.onBudgetStyle(value as NutritionProfileInput["budget_style"])} options={[["strict", l("سخت‌گیرانه", "Strict")], ["flexible", l("انعطاف‌پذیر", "Flexible")]]} />
+          <SelectField label={l("وعده اصلی در روز", "Main meals per day")} value={props.mealCount} onChange={props.onMealCount} options={[["2", l("۲ وعده", "2 meals")], ["3", l("۳ وعده", "3 meals")], ["4", l("۴ وعده یا بیشتر", "4 or more meals")]]} />
+          <SelectField label={l("میان‌وعده در روز", "Snacks per day")} value={props.snackCount} onChange={props.onSnackCount} options={[["0", l("هیچ‌کدام", "None")], ["1", l("۱ میان‌وعده", "1 snack")], ["2", l("۲ میان‌وعده", "2 snacks")], ["3", l("۳ میان‌وعده یا بیشتر", "3 or more snacks")]]} />
+          <SelectField label={l("الگوی غذایی", "Dietary pattern")} value={props.foods.dietaryPattern} onChange={(value) => props.onFoods({ ...props.foods, dietaryPattern: value as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />
+        </fieldset>
+        <fieldset className="profile-fieldset" disabled={props.busy}>
+          <legend>{l("ترجیحات غذایی", "Food preferences")}</legend>
+          <TextArea label={l("غذاهایی که دوست داری (اختیاری)", "Foods you like (optional)")} value={props.foods.favourites} onChange={(favourites) => props.onFoods({ ...props.foods, favourites })} />
+          <TextArea label={l("غذاهایی که دوست نداری (اختیاری)", "Foods you dislike (optional)")} value={props.foods.disliked} onChange={(disliked) => props.onFoods({ ...props.foods, disliked })} />
+          <TextArea label={l("محدودیت مذهبی یا فرهنگی (اختیاری)", "Religious or cultural exclusions (optional)")} value={props.foods.cultural} onChange={(cultural) => props.onFoods({ ...props.foods, cultural })} />
+        </fieldset>
+        {props.saveError && <p className="form-error" role="alert">{l("تغییرات ذخیره نشد.", "Changes were not saved.")}</p>}
+        {props.saved && <p className="profile-save-message profile-save-message--success" role="status">{l("اطلاعات تغذیه‌ای ذخیره شد.", "Nutrition information was saved.")}</p>}
+        <div className="profile-actions profile-wizard__actions">
+          {props.onBack && <button className="secondary-button" type="button" disabled={props.busy} onClick={props.onBack}>{l("بازگشت", "Back")}</button>}
+          <button className="primary-button" type="submit" disabled={props.busy}>{props.busy ? l("در حال ذخیره…", "Saving…") : l("ذخیره اطلاعات", "Save information")}</button>
+        </div>
+      </form>
+    </section>
+  );
+  // Legacy Cooking-domain profile rendering below is intentionally unreachable.
+  const legacyExercise = props.structuredExercise ?? { trains: false };
   const updateCooking = <Key extends keyof CookingState>(key: Key, value: CookingState[Key]) => props.onCooking({ ...props.cooking, [key]: value });
   const updateFoods = <Key extends keyof FoodsState>(key: Key, value: FoodsState[Key]) => props.onFoods({ ...props.foods, [key]: value });
   const toggleEquipment = (equipment: NutritionProfileInput["cooking_equipment"][number]) => updateCooking(
@@ -609,6 +695,26 @@ function PostAccountNutritionDetails(props: {
       <h2 className="fitsho-display">{l("اطلاعات تغذیه‌ای", "Nutrition information")}</h2>
       <p>{l("همه اطلاعات تغذیه‌ای ثبت‌شده را در همین صفحه ببین و در صورت نیاز به‌روزرسانی کن.", "Review all saved nutrition information on this page and update it when needed.")}</p>
       <form className="profile-form nutrition-details-form" onSubmit={(event) => { event.preventDefault(); props.onSave(); }}>
+        <fieldset className="profile-fieldset" disabled={props.busy}>
+          <legend>{l("تمرین ساختاریافته", "Structured exercise")}</legend>
+          {props.productMode === "both" ? (
+            <p>{l("این اطلاعات از صفحه تمرین استفاده می‌شود تا انرژی تمرین دوباره‌شماری نشود.", "These details come from your training profile so exercise energy is not counted twice.")}</p>
+          ) : <>
+            <label className="profile-field">{l("وضعیت تمرین", "Exercise status")}
+              <select required value={legacyExercise.trains ? "training" : "no_training"} onChange={(event) => props.onStructuredExercise(event.target.value === "training" ? { trains: true, exercise_type: "mixed", days_per_week: 3, minutes_per_session: 60, intensity: "moderate" } : { trains: false })}>
+                <option value="" disabled>{l("انتخاب کن", "Select")}</option>
+                <option value="no_training">{l("تمرین نمی‌کنم", "I do not train")}</option>
+                <option value="training">{l("منظم تمرین می‌کنم", "I train regularly")}</option>
+              </select>
+            </label>
+            {legacyExercise.trains === true && <div className="profile-field profile-field--paired">
+              <label>{l("نوع تمرین", "Exercise type")}<select value={legacyExercise.exercise_type ?? "mixed"} onChange={(event) => props.onStructuredExercise({ trains: true, exercise_type: event.target.value as Extract<StructuredExerciseInput, { trains: true }>["exercise_type"], days_per_week: legacyExercise.days_per_week ?? 3, minutes_per_session: legacyExercise.minutes_per_session ?? 60, intensity: legacyExercise.intensity ?? "moderate" })}><option value="resistance">{l("مقاومتی", "Resistance")}</option><option value="endurance">{l("هوازی و استقامتی", "Endurance")}</option><option value="mixed">{l("ترکیبی", "Mixed")}</option><option value="other">{l("سایر", "Other")}</option></select></label>
+              <label>{l("روز در هفته", "Days per week")}<input type="number" min="1" max="7" value={legacyExercise.days_per_week ?? 3} onChange={(event) => props.onStructuredExercise({ trains: true, exercise_type: legacyExercise.exercise_type ?? "mixed", days_per_week: Number(event.target.value), minutes_per_session: legacyExercise.minutes_per_session ?? 60, intensity: legacyExercise.intensity ?? "moderate" })} /></label>
+              <label>{l("دقیقه هر جلسه", "Minutes per session")}<input type="number" min="1" max="360" value={legacyExercise.minutes_per_session ?? 60} onChange={(event) => props.onStructuredExercise({ trains: true, exercise_type: legacyExercise.exercise_type ?? "mixed", days_per_week: legacyExercise.days_per_week ?? 3, minutes_per_session: Number(event.target.value), intensity: legacyExercise.intensity ?? "moderate" })} /></label>
+              <label>{l("شدت", "Intensity")}<select value={legacyExercise.intensity ?? "moderate"} onChange={(event) => props.onStructuredExercise({ trains: true, exercise_type: legacyExercise.exercise_type ?? "mixed", days_per_week: legacyExercise.days_per_week ?? 3, minutes_per_session: legacyExercise.minutes_per_session ?? 60, intensity: event.target.value as Extract<StructuredExerciseInput, { trains: true }>["intensity"] })}><option value="light">{l("سبک", "Light")}</option><option value="moderate">{l("متوسط", "Moderate")}</option><option value="vigorous">{l("شدید", "Vigorous")}</option></select></label>
+            </div>}
+          </>}
+        </fieldset>
         <fieldset className="profile-fieldset" disabled={props.busy}>
           <legend>{l("نیاز روزانه و سبک برنامه", "Daily needs and plan style")}</legend>
           <div className="profile-field profile-field--paired">
@@ -692,14 +798,12 @@ function stepTitle(step: FlowStep, language: "fa" | "en") {
   const fa = {
     loading: "", personal: "اول کمی با هم آشنا شویم", body: "هدفت را دقیق کنیم",
     safety: "اول ایمنی، بعد برنامه", blocked: "", training: "حالا بخش تمرین را هماهنگ کنیم", pre_account: "چند سؤال کوتاه تغذیه",
-    budget: "بودجه و وعده‌ها", cooking: "آشپزی را با زندگی تو هماهنگ می‌کنیم",
-    foods: "غذاهایی که می‌خوری و نمی‌خوری", review: "یک مرور کوتاه قبل از ثبت", complete: "",
+    budget: "بودجه و وعده‌ها", foods: "", review: "یک مرور کوتاه قبل از ثبت", complete: "",
   };
   const en = {
     loading: "", personal: "Let’s get to know each other", body: "Let’s define your goal",
     safety: "Safety first, then your plan", blocked: "", training: "Let’s align your training", pre_account: "A few quick nutrition questions",
-    budget: "Budget and meals", cooking: "Let’s fit cooking into your life",
-    foods: "Foods you eat and avoid", review: "A quick review before saving", complete: "",
+    budget: "Budget and meals", foods: "", review: "A quick review before saving", complete: "",
   };
   return (language === "en" ? en : fa)[step];
 }
@@ -710,9 +814,7 @@ function stepIntro(step: FlowStep, language: "fa" | "en") {
     body: "این اطلاعات بین تمرین و تغذیه مشترک است و فقط یک‌بار ثبت می‌شود.",
     safety: "این پاسخ‌ها برای تشخیص پزشکی نیست؛ فقط مسیر ایمن برنامه را مشخص می‌کند.",
     blocked: "", training: "اطلاعات فعلی تمرینت را صفحه‌به‌صفحه نگه می‌داریم.", pre_account: "بعد از ساخت حساب، فقط جزئیات باقی‌ماندهٔ پروفایل را کامل می‌کنیم.",
-    budget: "بودجه شخصی خودت را فقط به ریال وارد کن.",
-    cooking: "با زمان و وسایل واقعی تو برنامه‌ریزی می‌کنیم.",
-    foods: "هر مورد اختیاری را می‌توانی خالی بگذاری و رد کنی.",
+    budget: "بودجه شخصی خودت را فقط به ریال وارد کن.", foods: "",
     review: "بعد از ثبت، هنوز هیچ برنامه غذایی تولید نمی‌شود.", complete: "",
   };
   const en = {
@@ -720,9 +822,7 @@ function stepIntro(step: FlowStep, language: "fa" | "en") {
     body: "Training and nutrition share this information, so we only ask once.",
     safety: "These answers do not provide a diagnosis; they only help keep your plan safe.",
     blocked: "", training: "We’ll keep your current training details one screen at a time.", pre_account: "After account setup, you will only complete the remaining profile details.",
-    budget: "Enter your personal food budget in IRR.",
-    cooking: "We’ll plan around your real time and equipment.",
-    foods: "Every optional answer can be left blank and skipped.",
+    budget: "Enter your personal food budget in IRR.", foods: "",
     review: "Saving this does not generate a meal plan yet.", complete: "",
   };
   return (language === "en" ? en : fa)[step];
@@ -778,10 +878,10 @@ function NutritionQuestionFrame(props: {
 
 function SafetyForm(props: {
   busy: boolean; conditions: MedicalConditionCode[]; flags: Flags; medications: string;
-  physicianRestrictions: string; otherCondition: string;
+  physicianRestrictions: string; otherCondition: string; foods: FoodsState;
   onConditions: (value: MedicalConditionCode[]) => void; onFlags: (value: Flags) => void;
   onMedications: (value: string) => void; onPhysicianRestrictions: (value: string) => void;
-  onOtherCondition: (value: string) => void; onComplete: () => void; onBack: () => void;
+  onOtherCondition: (value: string) => void; onFoods: (value: FoodsState) => void; onComplete: () => void; onBack: () => void;
 }) {
   const l = useLocalizer();
   const [question, setQuestion] = useState(0);
@@ -791,6 +891,7 @@ function SafetyForm(props: {
     l("در حال حاضر چه داروهایی مصرف می‌کنی؟", "Which medications do you currently take?"),
     l("پزشک محدودیت غذایی خاصی برایت تعیین کرده؟", "Has a physician prescribed dietary restrictions?"),
     l("شرایط دیگری هست که مربی باید بداند؟", "Is there anything else your coach should know?"),
+    l("حساسیت یا عدم‌تحمل غذایی داری؟", "Do you have food allergies or intolerances?"),
   ];
   const advance = () => question === titles.length - 1 ? props.onComplete() : setQuestion((current) => current + 1);
   const back = () => question === 0 ? props.onBack() : setQuestion((current) => current - 1);
@@ -819,6 +920,7 @@ function SafetyForm(props: {
         {question === 2 && <TextArea label={l("داروهای فعلی (اختیاری، هر دارو یک خط)", "Current medications (optional, one per line)")} value={props.medications} onChange={props.onMedications} />}
         {question === 3 && <TextArea label={l("محدودیت غذایی تجویزشده توسط پزشک (اختیاری)", "Physician-prescribed dietary restrictions (optional)")} value={props.physicianRestrictions} onChange={props.onPhysicianRestrictions} />}
         {question === 4 && <TextArea label={l("شرایط مرتبط دیگر (اختیاری)", "Other relevant conditions (optional)")} value={props.otherCondition} onChange={props.onOtherCondition} />}
+        {question === 5 && <><TextArea label={l("حساسیت‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food allergies (optional, comma separated)")} value={props.foods.allergies} onChange={(allergies) => props.onFoods({ ...props.foods, allergies })} /><TextArea label={l("عدم‌تحمل‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food intolerances (optional, comma separated)")} value={props.foods.intolerances} onChange={(intolerances) => props.onFoods({ ...props.foods, intolerances })} /></>}
     </NutritionQuestionFrame>
   );
 }
@@ -872,7 +974,6 @@ function BudgetForm(props: {
     l("روزانه چند وعده اصلی می‌خوری؟", "How many main meals do you eat each day?"),
     l("روزانه چند میان‌وعده می‌خواهی؟", "How many snacks would you like each day?"),
     l("برنامه غذایی از چه روزی شروع شود؟", "Which day should your plan start?"),
-    l("چه سبک برنامه‌ای برایت مناسب‌تر است؟", "Which plan style suits you best?"),
   ];
   const advance = () => question === titles.length - 1 ? props.onNext() : setQuestion((current) => current + 1);
   const back = () => question === 0 ? props.onBack() : setQuestion((current) => current - 1);
@@ -881,10 +982,9 @@ function BudgetForm(props: {
       onBack={back} onSubmit={advance}>
       {question === 0 && <LabeledInput label={l("بودجه ماهانه غذا (مبلغ به ریال)", "Monthly food budget (IRR)")} type="number" min="0" required value={props.budget} onChange={props.onBudget} />}
       {question === 1 && <SelectField label={l("نوع بودجه", "Budget style")} value={props.budgetStyle} onChange={(value) => props.onBudgetStyle(value as "strict" | "flexible")} options={[["strict", l("سخت‌گیرانه", "Strict")], ["flexible", l("انعطاف‌پذیر", "Flexible")]]} />}
-      {question === 2 && <LabeledInput label={l("وعده اصلی در روز", "Meals per day")} type="number" min="1" max="8" required value={props.mealCount} onChange={props.onMealCount} />}
-      {question === 3 && <LabeledInput label={l("میان‌وعده در روز", "Snacks per day")} type="number" min="0" max="6" required value={props.snackCount} onChange={props.onSnackCount} />}
+      {question === 2 && <SelectField label={l("وعده اصلی در روز", "Main meals per day")} value={props.mealCount} onChange={props.onMealCount} options={[["2", l("۲ وعده", "2 meals")], ["3", l("۳ وعده", "3 meals")], ["4", l("۴ وعده یا بیشتر", "4 or more meals")]]} />}
+      {question === 3 && <SelectField label={l("میان‌وعده در روز", "Snacks per day")} value={props.snackCount} onChange={props.onSnackCount} options={[["0", l("هیچ‌کدام", "None")], ["1", l("۱ میان‌وعده", "1 snack")], ["2", l("۲ میان‌وعده", "2 snacks")], ["3", l("۳ میان‌وعده یا بیشتر", "3 or more snacks")]]} />}
       {question === 4 && <SelectField label={l("روز شروع برنامه", "Plan start day")} value={props.startDay} onChange={(value) => props.onStartDay(value as NutritionProfileInput["preferred_plan_start_day"])} options={[["saturday", l("شنبه", "Saturday")], ["sunday", l("یکشنبه", "Sunday")], ["monday", l("دوشنبه", "Monday")], ["tuesday", l("سه‌شنبه", "Tuesday")], ["wednesday", l("چهارشنبه", "Wednesday")], ["thursday", l("پنجشنبه", "Thursday")], ["friday", l("جمعه", "Friday")]]} />}
-      {question === 5 && <SelectField label={l("سبک برنامه", "Plan style")} value={props.planStyle} onChange={(value) => props.onPlanStyle(value as typeof props.planStyle)} options={[["balanced", l("متعادل", "Balanced")], ["economical", l("اقتصادی", "Economical")], ["simple", l("ساده", "Simple")]]} />}
     </NutritionQuestionFrame>
   );
 }
@@ -997,6 +1097,11 @@ function FoodsForm(props: { busy: boolean; value: FoodsState; onChange: (value: 
     </NutritionQuestionFrame>
   );
 }
+
+// Kept only to render legacy saved profiles in older builds; Task 2A no longer routes
+// Nutrition onboarding through these Cooking-domain forms.
+void CookingForm;
+void FoodsForm;
 
 function LabeledInput(props: { label: string; value: string; onChange: (value: string) => void; type?: string; min?: string; max?: string; required?: boolean }) {
   return <div className="profile-field"><label>{props.label}<input type={props.type ?? "text"} min={props.min} max={props.max} required={props.required} value={props.value} onChange={(event) => props.onChange(event.target.value)} /></label></div>;

@@ -6,11 +6,17 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
 from app.nutrition.enums import (
+    CookingSkill,
     FoodItemKind,
+    MealPreparationPreference,
     NutritionOnboardingStatus,
+    NutritionPlanStyle,
     PhysicianReviewMode,
     PhysicianReviewStatus,
+    PreferredVariety,
     SafetyOutcome,
+    main_meal_effective_slots,
+    snack_effective_slots,
 )
 from app.nutrition.exceptions import (
     NutritionOnboardingBlockedError,
@@ -283,6 +289,34 @@ def save_nutrition_profile(
             "religious_cultural_exclusions",
         }
     )
+    scalar_values["meals_per_day"] = payload.meals_per_day
+    scalar_values["snacks_per_day"] = payload.snacks_per_day
+    scalar_values["main_meal_count_bucket"] = payload.main_meal_count_bucket
+    scalar_values["snack_count_bucket"] = payload.snack_count_bucket
+    assert payload.main_meal_count_bucket is not None
+    assert payload.snack_count_bucket is not None
+    scalar_values["effective_main_meal_slots"] = main_meal_effective_slots(
+        payload.main_meal_count_bucket
+    )
+    scalar_values["effective_snack_slots"] = snack_effective_slots(payload.snack_count_bucket)
+    if profile is None:
+        # These columns predate Task 2A. Keep safe defaults for old non-null columns,
+        # but never expose or ask them as Nutrition inputs.
+        scalar_values.update(
+            plan_style=NutritionPlanStyle.BALANCED,
+            cooking_skill=CookingSkill.NONE,
+            maximum_cooking_time_minutes=0,
+            cooking_frequency_per_week=0,
+            meal_preparation_preference=MealPreparationPreference.NO_COOKING,
+            refrigerator_access=True,
+            freezer_access=True,
+            supplied_meals_per_week=0,
+            supplied_meal_source=None,
+            preferred_variety=PreferredVariety.MEDIUM,
+            maximum_meal_repetition_per_week=3,
+            accepts_leftovers=True,
+            accepts_batch_cooking=False,
+        )
     scalar_values["onboarding_status"] = NutritionOnboardingStatus.COMPLETED
     if profile is None:
         profile = NutritionProfile(user_id=user_id, **scalar_values)
@@ -293,16 +327,8 @@ def save_nutrition_profile(
 
     try:
         db.flush()
-        db.execute(
-            delete(NutritionCookingEquipment).where(NutritionCookingEquipment.user_id == user_id)
-        )
+        # Cooking/preparation data is legacy-only and is deliberately not rewritten.
         db.execute(delete(NutritionFoodItem).where(NutritionFoodItem.user_id == user_id))
-        db.add_all(
-            [
-                NutritionCookingEquipment(user_id=user_id, equipment=item)
-                for item in payload.cooking_equipment
-            ]
-        )
         db.add_all(_food_items(user_id, payload))
         db.commit()
     except SQLAlchemyError:
@@ -314,11 +340,8 @@ def save_nutrition_profile(
 def _food_items(user_id: UUID, payload: NutritionProfileInput) -> list[NutritionFoodItem]:
     items: list[NutritionFoodItem] = []
     string_collections = {
-        FoodItemKind.AVAILABLE_AT_HOME: payload.foods_available_at_home,
         FoodItemKind.FAVOURITE: payload.favourite_foods,
         FoodItemKind.DISLIKED: payload.disliked_foods,
-        FoodItemKind.NEVER_SUGGEST: payload.never_suggest_foods,
-        FoodItemKind.REFUSED: payload.refused_foods,
         FoodItemKind.RELIGIOUS_CULTURAL_EXCLUSION: payload.religious_cultural_exclusions,
     }
     for kind, names in string_collections.items():
@@ -410,6 +433,8 @@ def nutrition_profile_response(snapshot: NutritionSnapshot) -> NutritionProfileR
         budget_style=profile.budget_style,
         meals_per_day=profile.meals_per_day,
         snacks_per_day=profile.snacks_per_day,
+        main_meal_count_bucket=profile.main_meal_count_bucket,
+        snack_count_bucket=profile.snack_count_bucket,
         preferred_plan_start_day=profile.preferred_plan_start_day,
         plan_style=profile.plan_style,
         cooking_skill=profile.cooking_skill,
@@ -438,6 +463,8 @@ def nutrition_profile_response(snapshot: NutritionSnapshot) -> NutritionProfileR
         physician_review_required=(snapshot.safety.outcome is not SafetyOutcome.STANDARD_AUTOMATIC),
         daily_check_in_enabled=profile.daily_check_in_enabled,
         preferred_check_in_time=profile.preferred_check_in_time,
+        effective_main_meal_slots=profile.effective_main_meal_slots,
+        effective_snack_slots=profile.effective_snack_slots,
         created_at=profile.created_at,
         updated_at=profile.updated_at,
     )

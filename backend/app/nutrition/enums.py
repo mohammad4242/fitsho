@@ -25,6 +25,54 @@ class BudgetStyle(StrEnum):
     FLEXIBLE = "flexible"
 
 
+class MainMealCountBucket(StrEnum):
+    TWO = "two_main_meals"
+    THREE = "three_main_meals"
+    FOUR_OR_MORE = "four_or_more_main_meals"
+
+
+class SnackCountBucket(StrEnum):
+    ZERO = "zero_snacks"
+    ONE = "one_snack"
+    TWO = "two_snacks"
+    THREE_OR_MORE = "three_or_more_snacks"
+
+
+def main_meal_effective_slots(bucket: MainMealCountBucket) -> int:
+    return {
+        MainMealCountBucket.TWO: 2,
+        MainMealCountBucket.THREE: 3,
+        MainMealCountBucket.FOUR_OR_MORE: 4,
+    }[bucket]
+
+
+def snack_effective_slots(bucket: SnackCountBucket) -> int:
+    return {
+        SnackCountBucket.ZERO: 0,
+        SnackCountBucket.ONE: 1,
+        SnackCountBucket.TWO: 2,
+        SnackCountBucket.THREE_OR_MORE: 3,
+    }[bucket]
+
+
+def main_meal_bucket_from_legacy(value: int) -> MainMealCountBucket:
+    if value <= 2:
+        return MainMealCountBucket.TWO
+    if value == 3:
+        return MainMealCountBucket.THREE
+    return MainMealCountBucket.FOUR_OR_MORE
+
+
+def snack_bucket_from_legacy(value: int) -> SnackCountBucket:
+    if value <= 0:
+        return SnackCountBucket.ZERO
+    if value == 1:
+        return SnackCountBucket.ONE
+    if value == 2:
+        return SnackCountBucket.TWO
+    return SnackCountBucket.THREE_OR_MORE
+
+
 class DailyActivityLevel(StrEnum):
     SEDENTARY = "sedentary"
     LIGHT = "light"

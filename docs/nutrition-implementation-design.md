@@ -375,3 +375,18 @@ The physician-review table and review-requirement API are foundations only.
 Task 2 does not create review assignments, professional decisions, meal plans,
 energy targets, or food recommendations; those remain in their later staged
 tasks.
+
+## Task 2A implementation record
+
+Nutrition onboarding no longer asks Cooking-domain questions. The existing
+non-null Cooking columns and equipment rows remain in the database as legacy
+data for backward compatibility, but new Nutrition writes do not require or
+rewrite them. Ordinary preference capture is limited to liked and disliked
+foods; allergies, intolerances, medical restrictions, and cultural exclusions
+remain safety/nutrition context.
+
+Meal structure now uses typed buckets for two, three, or four-plus main meals
+and zero, one, two, or three-plus snacks. The migration backfills those buckets
+and their effective planner slot counts from existing numeric values. Numeric
+fields remain accepted as deprecated compatibility inputs and are normalized to
+the typed buckets.

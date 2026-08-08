@@ -31,6 +31,7 @@ from app.nutrition.enums import (
     DietaryPattern,
     EstimateConfidence,
     FoodItemKind,
+    MainMealCountBucket,
     MealPreparationPreference,
     MedicalConditionCode,
     MetabolicBasis,
@@ -42,6 +43,7 @@ from app.nutrition.enums import (
     PhysicianReviewStatus,
     PreferredVariety,
     SafetyOutcome,
+    SnackCountBucket,
     StructuredExerciseSource,
     StructuredExerciseType,
     Weekday,
@@ -255,6 +257,22 @@ class NutritionProfile(Base):
     )
     meals_per_day: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     snacks_per_day: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    main_meal_count_bucket: Mapped[MainMealCountBucket] = mapped_column(
+        enum_column(MainMealCountBucket, "ck_nutrition_profiles_main_meal_bucket_values"),
+        nullable=False,
+        server_default="three_main_meals",
+    )
+    snack_count_bucket: Mapped[SnackCountBucket] = mapped_column(
+        enum_column(SnackCountBucket, "ck_nutrition_profiles_snack_bucket_values"),
+        nullable=False,
+        server_default="one_snack",
+    )
+    effective_main_meal_slots: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, server_default="3"
+    )
+    effective_snack_slots: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, server_default="1"
+    )
     preferred_plan_start_day: Mapped[Weekday] = mapped_column(
         enum_column(Weekday, "ck_nutrition_profiles_start_day_values"), nullable=False
     )

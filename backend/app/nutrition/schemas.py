@@ -10,6 +10,7 @@ from app.nutrition.enums import (
     DailyActivityLevel,
     DietaryPattern,
     EstimateConfidence,
+    MainMealCountBucket,
     MealPreparationPreference,
     MedicalConditionCode,
     MetabolicBasis,
@@ -20,9 +21,14 @@ from app.nutrition.enums import (
     PhysicianReviewStatus,
     PreferredVariety,
     SafetyOutcome,
+    SnackCountBucket,
     StructuredExerciseSource,
     StructuredExerciseType,
     Weekday,
+    main_meal_bucket_from_legacy,
+    main_meal_effective_slots,
+    snack_bucket_from_legacy,
+    snack_effective_slots,
 )
 from app.profile.enums import TrainingIntensity
 
@@ -108,18 +114,22 @@ class NutritionProfileInput(BaseModel):
     metabolic_basis: MetabolicBasis | None = None
     individual_monthly_food_budget_irr: int = Field(ge=0, le=100_000_000_000)
     budget_style: BudgetStyle
-    meals_per_day: int = Field(ge=1, le=8)
-    snacks_per_day: int = Field(ge=0, le=6)
+    main_meal_count_bucket: MainMealCountBucket | None = None
+    snack_count_bucket: SnackCountBucket | None = None
+    # Deprecated compatibility inputs. New clients must use the typed buckets.
+    meals_per_day: int | None = Field(default=None, ge=1, le=8)
+    snacks_per_day: int | None = Field(default=None, ge=0, le=6)
     preferred_plan_start_day: Weekday
-    plan_style: NutritionPlanStyle
-    cooking_skill: CookingSkill
-    maximum_cooking_time_minutes: int = Field(ge=0, le=360)
-    cooking_frequency_per_week: int = Field(ge=0, le=7)
-    meal_preparation_preference: MealPreparationPreference
-    refrigerator_access: bool
-    freezer_access: bool
-    cooking_equipment: list[CookingEquipment] = Field(max_length=10)
-    supplied_meals_per_week: int = Field(ge=0, le=35)
+    # Cooking and preparation fields below are accepted only for old clients and are ignored.
+    plan_style: NutritionPlanStyle = NutritionPlanStyle.BALANCED
+    cooking_skill: CookingSkill = CookingSkill.NONE
+    maximum_cooking_time_minutes: int = Field(default=0, ge=0, le=360)
+    cooking_frequency_per_week: int = Field(default=0, ge=0, le=7)
+    meal_preparation_preference: MealPreparationPreference = MealPreparationPreference.NO_COOKING
+    refrigerator_access: bool = True
+    freezer_access: bool = True
+    cooking_equipment: list[CookingEquipment] = Field(default_factory=list, max_length=10)
+    supplied_meals_per_week: int = Field(default=0, ge=0, le=35)
     supplied_meal_source: str | None = Field(default=None, max_length=300)
     foods_available_at_home: list[str] = Field(default_factory=list, max_length=100)
     favourite_foods: list[str] = Field(default_factory=list, max_length=100)
@@ -130,10 +140,10 @@ class NutritionProfileInput(BaseModel):
     intolerances: list[FoodConstraintInput] = Field(default_factory=list, max_length=100)
     dietary_pattern: DietaryPattern
     religious_cultural_exclusions: list[str] = Field(default_factory=list, max_length=100)
-    preferred_variety: PreferredVariety
-    maximum_meal_repetition_per_week: int = Field(ge=1, le=7)
-    accepts_leftovers: bool
-    accepts_batch_cooking: bool
+    preferred_variety: PreferredVariety = PreferredVariety.MEDIUM
+    maximum_meal_repetition_per_week: int = Field(default=3, ge=1, le=7)
+    accepts_leftovers: bool = True
+    accepts_batch_cooking: bool = False
     work_shift_context: str | None = Field(default=None, max_length=500)
     daily_check_in_enabled: bool
     preferred_check_in_time: time | None = None
@@ -159,6 +169,16 @@ class NutritionProfileInput(BaseModel):
 
     @model_validator(mode="after")
     def validate_unique_collections(self) -> "NutritionProfileInput":
+        if self.main_meal_count_bucket is None:
+            if self.meals_per_day is None:
+                raise ValueError("Main-meal count is required")
+            self.main_meal_count_bucket = main_meal_bucket_from_legacy(self.meals_per_day)
+        if self.snack_count_bucket is None:
+            if self.snacks_per_day is None:
+                raise ValueError("Snack count is required")
+            self.snack_count_bucket = snack_bucket_from_legacy(self.snacks_per_day)
+        self.meals_per_day = main_meal_effective_slots(self.main_meal_count_bucket)
+        self.snacks_per_day = snack_effective_slots(self.snack_count_bucket)
         if len(self.cooking_equipment) != len(set(self.cooking_equipment)):
             raise ValueError("Cooking equipment must be unique")
         collections: tuple[list[str], ...] = (
@@ -183,6 +203,8 @@ class NutritionProfileResponse(NutritionProfileInput):
     onboarding_status: NutritionOnboardingStatus
     currency: str
     weekly_budget_irr: int
+    effective_main_meal_slots: int
+    effective_snack_slots: int
     physician_review_required: bool
     created_at: datetime
     updated_at: datetime
