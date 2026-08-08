@@ -65,6 +65,24 @@ class MicronutrientUpperLimitScope(StrEnum):
     SOURCE_FORM_SPECIFIC = "source_form_specific"
 
 
+class FoodVerificationStatus(StrEnum):
+    DRAFT = "draft"
+    VERIFIED = "verified"
+    RETIRED = "retired"
+
+
+class FoodRole(StrEnum):
+    MAIN_PROTEIN = "main_protein"
+    MAIN_STAPLE = "main_staple"
+    SNACK = "snack"
+    FLEXIBLE = "flexible"
+
+
+class MealSlotRole(StrEnum):
+    MAIN_MEAL = "main_meal"
+    SNACK = "snack"
+
+
 def main_meal_effective_slots(bucket: MainMealCountBucket) -> int:
     return {
         MainMealCountBucket.TWO: 2,

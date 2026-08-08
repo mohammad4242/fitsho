@@ -31,8 +31,11 @@ from app.nutrition.enums import (
     DietaryPattern,
     EstimateConfidence,
     FoodItemKind,
+    FoodRole,
+    FoodVerificationStatus,
     MainMealCountBucket,
     MealPreparationPreference,
+    MealSlotRole,
     MedicalConditionCode,
     MetabolicBasis,
     MicronutrientAggregationWindow,
@@ -586,6 +589,102 @@ class NutritionEstimateMicronutrientTarget(Base):
         nullable=False,
     )
     explanation_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+
+
+class NutritionCatalogueFood(Base):
+    __tablename__ = "nutrition_catalogue_foods"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
+    name_en: Mapped[str] = mapped_column(String(160), nullable=False)
+    verification_status: Mapped[FoodVerificationStatus] = mapped_column(
+        enum_column(FoodVerificationStatus, "ck_nutrition_catalogue_food_status_values"),
+        nullable=False,
+    )
+    source_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_food_id: Mapped[str | None] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    roles: Mapped[list["NutritionCatalogueFoodRole"]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True
+    )
+    compositions: Mapped[list["NutritionFoodComposition"]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class NutritionCatalogueFoodRole(Base):
+    __tablename__ = "nutrition_catalogue_food_roles"
+
+    food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="CASCADE"), primary_key=True
+    )
+    role: Mapped[FoodRole] = mapped_column(
+        enum_column(FoodRole, "ck_nutrition_catalogue_food_roles_values"), primary_key=True
+    )
+
+
+class NutritionFoodComposition(Base):
+    __tablename__ = "nutrition_food_compositions"
+    __table_args__ = (
+        UniqueConstraint("food_id", "nutrient_code", name="uq_nutrition_food_composition"),
+        CheckConstraint("value_per_100g >= 0", name="ck_nutrition_food_composition_nonnegative"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    nutrient_code: Mapped[str] = mapped_column(String(48), nullable=False)
+    value_per_100g: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    unit: Mapped[str] = mapped_column(String(24), nullable=False)
+    unit_form: Mapped[str] = mapped_column(String(48), nullable=False, default="nutrient_mass")
+    source_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    confidence: Mapped[EstimateConfidence] = mapped_column(
+        enum_column(EstimateConfidence, "ck_nutrition_food_composition_confidence_values"),
+        nullable=False,
+    )
+
+
+class NutritionCatalogueMeal(Base):
+    __tablename__ = "nutrition_catalogue_meals"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
+    name_en: Mapped[str] = mapped_column(String(160), nullable=False)
+    slot_role: Mapped[MealSlotRole] = mapped_column(
+        enum_column(MealSlotRole, "ck_nutrition_catalogue_meal_slot_values"), nullable=False
+    )
+    verification_status: Mapped[FoodVerificationStatus] = mapped_column(
+        enum_column(FoodVerificationStatus, "ck_nutrition_catalogue_meal_status_values"),
+        nullable=False,
+    )
+    items: Mapped[list["NutritionCatalogueMealItem"]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class NutritionCatalogueMealItem(Base):
+    __tablename__ = "nutrition_catalogue_meal_items"
+    __table_args__ = (
+        CheckConstraint("grams > 0", name="ck_nutrition_catalogue_meal_item_grams_positive"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    meal_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_meals.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), nullable=False
+    )
+    grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
 
 
 class NutritionCookingEquipment(Base):

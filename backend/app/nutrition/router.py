@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.admin.dependencies import AdminUser
 from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
@@ -26,7 +27,17 @@ from app.nutrition.exceptions import (
     SharedProfileRequiredError,
     StructuredExerciseRequiredError,
 )
+from app.nutrition.food_catalogue import (
+    list_verified_foods,
+    retire_catalogue_food,
+    save_catalogue_food,
+    save_catalogue_meal,
+)
 from app.nutrition.schemas import (
+    CatalogueFoodResponse,
+    CatalogueFoodWrite,
+    CatalogueMealResponse,
+    CatalogueMealWrite,
     NutritionEstimateResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
@@ -59,6 +70,66 @@ def _domain_error(code: str, message: str) -> HTTPException:
         status_code=status.HTTP_409_CONFLICT,
         detail={"code": code, "message": message},
     )
+
+
+@router.get("/foods", response_model=list[CatalogueFoodResponse])
+def read_verified_foods(db: DatabaseSession, user: CurrentUser) -> list[CatalogueFoodResponse]:
+    return list_verified_foods(db)
+
+
+@router.post(
+    "/admin/foods",
+    response_model=CatalogueFoodResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def create_or_update_catalogue_food(
+    payload: CatalogueFoodWrite,
+    db: DatabaseSession,
+    admin: AdminUser,
+) -> CatalogueFoodResponse:
+    del admin
+    try:
+        return save_catalogue_food(db, payload)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from None
+
+
+@router.post(
+    "/admin/meals",
+    response_model=CatalogueMealResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def create_catalogue_meal(
+    payload: CatalogueMealWrite,
+    db: DatabaseSession,
+    admin: AdminUser,
+) -> CatalogueMealResponse:
+    del admin
+    try:
+        return save_catalogue_meal(db, payload)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from None
+
+
+@router.delete(
+    "/admin/foods/{slug}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def retire_food(
+    slug: str,
+    db: DatabaseSession,
+    admin: AdminUser,
+) -> None:
+    del admin
+    try:
+        retire_catalogue_food(db, slug)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from None
 
 
 @router.post("/safety/evaluate", response_model=SafetyEvaluationResponse)

@@ -457,3 +457,20 @@ the API returns `TARGET_INFEASIBLE` with reason codes when the configured
 minimums cannot fit. Sodium exposes the 1,500 mg AI and 2,300 mg CDRR rather
 than treating CDRR as a toxicity UL. All estimates retain formula/policy
 versions, input snapshots, confidence, and explanation metadata.
+
+## Task 4 implementation record
+
+The verified food catalogue uses canonical gram quantities and per-100g
+composition rows. Each composition row retains nutrient code, unit/form,
+source, and confidence; a missing composition row remains unavailable rather
+than becoming zero. Foods carry verified/draft/retired state and deterministic
+roles for substantial main proteins, main staples, snacks, and flexible foods.
+
+Structured catalogue meals store exact food grams and validate `MAIN_MEAL` or
+`SNACK` role eligibility before calculating deterministic nutrient totals. The
+initial migration contains a deliberately limited verified seed for cooked
+basmati rice, grilled chicken breast, and plain yogurt, each with documented
+FoodData Central mapping provenance. The import normalizer accepts only
+verified gram/kilogram quantity conversion and rejects duplicate nutrients or
+unsupported units. No price, package, shopping-list, or meal-plan optimisation
+behaviour is included; those remain outside Task 4.

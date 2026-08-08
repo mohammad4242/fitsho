@@ -268,6 +268,50 @@ class NutritionMicronutrientTargetResponse(BaseModel):
     explanation_codes: list[str]
 
 
+class CatalogueNutrientInput(BaseModel):
+    nutrient_code: str = Field(min_length=1, max_length=48)
+    value_per_100g: float = Field(ge=0)
+    unit: str = Field(min_length=1, max_length=24)
+    unit_form: str = Field(default="nutrient_mass", min_length=1, max_length=48)
+    source_name: str = Field(min_length=1, max_length=160)
+    source_reference: str = Field(min_length=1, max_length=500)
+    confidence: EstimateConfidence
+
+
+class CatalogueFoodWrite(BaseModel):
+    slug: str = Field(min_length=1, max_length=120, pattern=r"^[a-z0-9-]+$")
+    name_fa: str = Field(min_length=1, max_length=160)
+    name_en: str = Field(min_length=1, max_length=160)
+    verification_status: str
+    source_name: str = Field(min_length=1, max_length=160)
+    source_reference: str = Field(min_length=1, max_length=500)
+    source_food_id: str | None = Field(default=None, max_length=120)
+    roles: list[str] = Field(min_length=1, max_length=4)
+    nutrients: list[CatalogueNutrientInput] = Field(default_factory=list, max_length=64)
+
+
+class CatalogueFoodResponse(CatalogueFoodWrite):
+    id: UUID
+
+
+class CatalogueMealItemInput(BaseModel):
+    food_id: UUID
+    grams: float = Field(gt=0)
+
+
+class CatalogueMealWrite(BaseModel):
+    name_fa: str = Field(min_length=1, max_length=160)
+    name_en: str = Field(min_length=1, max_length=160)
+    slot_role: str
+    verification_status: str
+    items: list[CatalogueMealItemInput] = Field(min_length=1, max_length=20)
+
+
+class CatalogueMealResponse(CatalogueMealWrite):
+    id: UUID
+    totals: dict[str, float | None]
+
+
 class NutritionEstimateResponse(BaseModel):
     id: UUID
     revision: int
