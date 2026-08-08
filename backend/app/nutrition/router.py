@@ -34,6 +34,15 @@ from app.nutrition.food_catalogue import (
     save_catalogue_food,
     save_catalogue_meal,
 )
+from app.nutrition.plan_editing import (
+    PlanEditError,
+    confirm_remove_meal,
+    physician_action,
+    preview_remove_meal,
+    save_feedback,
+    set_meal_lock,
+    shopping_list,
+)
 from app.nutrition.plan_service import (
     ActiveWeeklyPlanNotFoundError,
     WeeklyPlanNotFoundError,
@@ -48,10 +57,14 @@ from app.nutrition.schemas import (
     CatalogueFoodWrite,
     CatalogueMealResponse,
     CatalogueMealWrite,
+    MealFeedbackInput,
+    MealLockInput,
     NutritionEstimateResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
+    PhysicianPlanActionInput,
     PhysicianReviewRequirementResponse,
+    RemoveMealConfirmationInput,
     SafetyDecisionResponse,
     SafetyEvaluationResponse,
     SafetyProfileInput,
@@ -425,3 +438,84 @@ def read_plan_revision(
                 "message": "نسخه برنامه غذایی پیدا نشد.",
             },
         ) from None
+
+
+def _plan_edit_error(error: PlanEditError) -> HTTPException:
+    status_code = (
+        status.HTTP_404_NOT_FOUND if error.code.endswith("NOT_FOUND") else status.HTTP_409_CONFLICT
+    )
+    if error.code == "PHYSICIAN_ROLE_REQUIRED":
+        status_code = status.HTTP_403_FORBIDDEN
+    return HTTPException(status_code=status_code, detail={"code": error.code})
+
+
+@router.get("/plans/{plan_id}/shopping-list")
+def read_shopping_list(plan_id: UUID, db: DatabaseSession, user: CurrentUser) -> dict[str, object]:
+    try:
+        return shopping_list(db, user.id, plan_id)
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.put("/plans/{plan_id}/meals/{meal_id}/lock", dependencies=[Depends(require_trusted_origin)])
+def update_meal_lock(
+    plan_id: UUID, meal_id: UUID, payload: MealLockInput, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        return set_meal_lock(db, user.id, plan_id, meal_id, payload.is_locked)
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.put(
+    "/plans/{plan_id}/meals/{meal_id}/feedback", dependencies=[Depends(require_trusted_origin)]
+)
+def update_meal_feedback(
+    plan_id: UUID, meal_id: UUID, payload: MealFeedbackInput, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        return save_feedback(db, user.id, plan_id, meal_id, payload.feedback_type, payload.notes)
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.post("/plans/{plan_id}/edits/remove-meal/preview")
+def preview_meal_removal(
+    plan_id: UUID, meal_id: UUID, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        return preview_remove_meal(db, user.id, plan_id, meal_id)
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.post(
+    "/plans/{plan_id}/edits/remove-meal/confirm",
+    response_model=WeeklyPlanResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def confirm_meal_removal(
+    plan_id: UUID, payload: RemoveMealConfirmationInput, db: DatabaseSession, user: CurrentUser
+) -> WeeklyPlanResponse:
+    try:
+        return confirm_remove_meal(
+            db, user.id, plan_id, payload.expected_plan_revision_id, payload.meal_id
+        )
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.post(
+    "/physician/plans/{plan_id}/action",
+    response_model=WeeklyPlanResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def review_plan(
+    plan_id: UUID, payload: PhysicianPlanActionInput, db: DatabaseSession, user: CurrentUser
+) -> WeeklyPlanResponse:
+    try:
+        return physician_action(
+            db, user.id, plan_id, payload.expected_plan_revision_id, payload.action, payload.notes
+        )
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None

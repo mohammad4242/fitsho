@@ -420,12 +420,13 @@ def _persist_successful_plan(
         .limit(1)
     )
     start_date = _next_weekday(date.today(), profile.preferred_plan_start_day)
+    plan_revision = (latest_revision or 0) + 1
     plan = NutritionWeeklyPlan(
         user_id=profile.user_id,
         generation_id=generation.id,
         estimate_id=estimate.id,
         safety_decision_id=safety.id,
-        revision=(latest_revision or 0) + 1,
+        revision=plan_revision,
         lifecycle_status=NutritionPlanLifecycleStatus.PENDING_PHYSICIAN_REVIEW,
         is_user_visible=True,
         start_date=start_date,
@@ -510,7 +511,10 @@ def _persist_successful_plan(
             )
             for code, comparison in sorted((result.nutrient_comparisons or {}).items())
         ],
-        review=NutritionPlanPhysicianReview(status=NutritionPlanReviewStatus.PENDING),
+        review=NutritionPlanPhysicianReview(
+            status=NutritionPlanReviewStatus.PENDING,
+            expected_plan_revision=plan_revision,
+        ),
     )
     db.add(plan)
     db.flush()
@@ -762,6 +766,7 @@ def weekly_plan_response(plan: NutritionWeeklyPlan) -> WeeklyPlanResponse:
                         target_distribution=_float_map(meal.target_distribution),
                         nutrient_totals=_float_map(meal.nutrient_totals),
                         cost_irr=meal.cost_irr,
+                        is_locked=meal.is_locked,
                         foods=[
                             WeeklyPlanFoodResponse(
                                 food_id=food.food_id,

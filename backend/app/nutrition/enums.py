@@ -147,6 +147,35 @@ class NutritionPlanReviewStatus(StrEnum):
     CHANGES_REQUESTED = "changes_requested"
     APPROVED = "approved"
     REJECTED = "rejected"
+    INVALIDATED_BY_REVISION = "invalidated_by_revision"
+
+
+class NutritionPlanChangeKind(StrEnum):
+    CONSUMPTION_ONLY = "consumption_only"
+    PLAN_CONTROL_METADATA = "plan_control_metadata"
+    PLAN_DEFINING = "plan_defining"
+
+
+class NutritionMealFeedbackType(StrEnum):
+    LIKED = "liked"
+    DISLIKED = "disliked"
+    DO_NOT_SUGGEST_AGAIN = "do_not_suggest_again"
+    PREFER_MORE_OFTEN = "prefer_more_often"
+    TOO_LARGE = "too_large"
+    TOO_SMALL = "too_small"
+
+
+class NutritionLabRequestStatus(StrEnum):
+    REQUESTED = "requested"
+    UPLOADED = "uploaded"
+    REVIEWED = "reviewed"
+    CANCELLED = "cancelled"
+
+
+class NutritionSupplementOrderStatus(StrEnum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    STOPPED = "stopped"
 
 
 class NutritionPlanBudgetStatus(StrEnum):

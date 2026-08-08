@@ -16,6 +16,7 @@ from app.nutrition.enums import (
     MedicalConditionCode,
     MetabolicBasis,
     NutritionEstimateStatus,
+    NutritionMealFeedbackType,
     NutritionOnboardingStatus,
     NutritionPlanStyle,
     PhysicianReviewMode,
@@ -364,6 +365,7 @@ class WeeklyPlanMealResponse(BaseModel):
     target_distribution: dict[str, float]
     nutrient_totals: dict[str, float]
     cost_irr: int
+    is_locked: bool
     foods: list[WeeklyPlanFoodResponse]
 
 
@@ -432,3 +434,23 @@ class WeeklyPlanHistoryItemResponse(BaseModel):
     weekly_budget_irr: int
     budget_status: str
     created_at: datetime
+
+
+class MealLockInput(BaseModel):
+    is_locked: bool
+
+
+class MealFeedbackInput(BaseModel):
+    feedback_type: NutritionMealFeedbackType
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class RemoveMealConfirmationInput(BaseModel):
+    expected_plan_revision_id: UUID
+    meal_id: UUID
+
+
+class PhysicianPlanActionInput(BaseModel):
+    expected_plan_revision_id: UUID
+    action: str = Field(pattern="^(start_review|approve|request_changes|reject)$")
+    notes: str | None = Field(default=None, max_length=2000)
