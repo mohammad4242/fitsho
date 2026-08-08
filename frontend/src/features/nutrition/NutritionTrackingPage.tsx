@@ -3,9 +3,11 @@ import { useTranslation } from "react-i18next";
 
 import * as api from "./api";
 import type { DailyTrackingSummary } from "./types";
+import type { NutritionAdherence } from "./types";
 import "./nutritionEstimate.css";
 
 const today = new Date().toISOString().slice(0, 10);
+const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
 
 export function NutritionTrackingPage() {
   const { i18n } = useTranslation();
@@ -17,9 +19,12 @@ export function NutritionTrackingPage() {
   const [calories, setCalories] = useState("");
   const [photoConsent, setPhotoConsent] = useState(false);
   const [photoEstimate, setPhotoEstimate] = useState<Awaited<ReturnType<typeof api.estimateFoodPhoto>> | null>(null);
+  const [adherence, setAdherence] = useState<NutritionAdherence | null>(null);
+  const [rangeStart, setRangeStart] = useState(weekAgo);
 
   const load = () => api.getDailyTracking(today).then(setSummary).catch(() => setError(l("دریافت اطلاعات ممکن نشد.", "Could not load tracking.")));
   useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void api.getNutritionAdherence(rangeStart, today).then(setAdherence); }, [rangeStart]);
 
   async function checkIn(status: DailyTrackingSummary["check_in_status"]) {
     setBusy(true); setError(null);
@@ -92,6 +97,21 @@ export function NutritionTrackingPage() {
     <section className="nutrition-estimate-summary">
       <article className="nutrition-calorie-card"><span>{l("کالری ثبت‌شده", "Logged calories")}</span><strong>{Math.round(summary?.actual_totals.energy_kcal ?? 0)}</strong></article>
       <div className="nutrition-confidence-card"><span>{summary?.data_status === "sufficient" ? l("داده کافی", "Sufficient data") : l("داده ناکافی", "Insufficient data")}</span><strong>{summary?.entries.length ?? 0} {l("مورد", "entries")}</strong></div>
+    </section>
+    <section className="nutrition-estimate-notes">
+      <h2>{l("روند پایبندی", "Adherence trend")}</h2>
+      <label>{l("از تاریخ", "From")} <input type="date" value={rangeStart} max={today} onChange={(event) => setRangeStart(event.target.value)} /></label>
+      <div className="nutrition-adherence-chart" aria-label={l("نمودار کالری و پروتئین", "Calories and protein chart")}>
+        {adherence?.days.map((day) => <article key={day.date}>
+          <small>{day.date.slice(5)}</small>
+          {day.status === "insufficient_data" ? <span>{l("داده ناکافی", "No data")}</span> : <>
+            <label>{l("کالری", "Calories")} <progress max="100" value={day.calorie_adherence ?? 0} /></label>
+            <label>{l("پروتئین", "Protein")} <progress max="100" value={day.protein_adherence ?? 0} /></label>
+            <small>{l("کامل بودن ثبت", "Completeness")}: {Math.round(day.tracking_completeness)}٪</small>
+          </>}
+        </article>)}
+      </div>
+      {adherence?.weight_trend.length ? <p>{l("روند وزن کنار پایبندی نمایش داده می‌شود و به‌تنهایی رابطه علت و معلولی را ثابت نمی‌کند.", "Weight is shown beside adherence and does not imply causation.")}</p> : null}
     </section>
   </main>;
 }

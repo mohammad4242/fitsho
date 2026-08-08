@@ -33,7 +33,7 @@ from app.nutrition.enums import (
     snack_bucket_from_legacy,
     snack_effective_slots,
 )
-from app.profile.enums import TrainingIntensity
+from app.profile.enums import FitnessGoal, TrainingIntensity
 
 
 def normalize_optional_text(value: object) -> object:
@@ -479,3 +479,8 @@ class QuickApproximationInput(BaseModel):
 
 class FoodPhotoConfirmInput(BaseModel):
     entry_date: date
+
+
+class TargetUpdateConfirmationInput(BaseModel):
+    requested_goal: FitnessGoal
+    confirmed: bool

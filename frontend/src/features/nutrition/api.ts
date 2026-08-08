@@ -11,6 +11,7 @@ import type {
   WeeklyPlan,
   WeeklyPlanGeneration,
   DailyTrackingSummary,
+  NutritionAdherence,
 } from "./types";
 
 const nutritionPath = "/api/v1/nutrition";
@@ -144,4 +145,9 @@ export function confirmFoodPhoto(estimateId: string, entryDate: string): Promise
     method: "POST",
     body: JSON.stringify({ entry_date: entryDate }),
   });
+}
+
+export function getNutritionAdherence(start: string, end: string): Promise<NutritionAdherence> {
+  const query = new URLSearchParams({ start, end });
+  return request<NutritionAdherence>(`${nutritionPath}/adherence?${query}`);
 }

@@ -1356,6 +1356,22 @@ class NutritionFoodPhotoEstimate(Base):
     )
 
 
+class NutritionTargetUpdateConsent(Base):
+    __tablename__ = "nutrition_target_update_consents"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    previous_goal: Mapped[str] = mapped_column(String(48), nullable=False)
+    requested_goal: Mapped[str] = mapped_column(String(48), nullable=False)
+    reason_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    estimate_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_estimates.id", ondelete="SET NULL")
+    )
+
+
 class NutritionPhysicianReview(Base):
     __tablename__ = "nutrition_physician_reviews"
 

@@ -65,4 +65,8 @@
 @media (max-width: 800px) { .nutrition-estimate-summary { grid-template-columns: 1fr; } .nutrition-target-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 800px) { .weekly-plan__heading, .weekly-plan__meals { grid-template-columns: 1fr; } .weekly-plan__nutrients > div { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .nutrition-target-grid, .nutrition-estimate-notes dl, .weekly-plan__ledger, .weekly-plan__nutrients > div { grid-template-columns: 1fr; } .weekly-plan__ledger > div + div { border-inline-start: 0; border-top: 1px solid rgb(234 244 241 / 12%); } }
+.nutrition-adherence-chart { display: grid; gap: .75rem; margin-top: 1rem; }
+.nutrition-adherence-chart article { display: grid; grid-template-columns: 5rem 1fr 1fr; gap: .65rem; align-items: center; padding: .8rem; border: 1px solid rgb(255 255 255 / 10%); border-radius: 1rem; }
+.nutrition-adherence-chart label { display: grid; gap: .3rem; font-size: .8rem; }
+.nutrition-adherence-chart progress { width: 100%; accent-color: #63e6be; }
 @media (prefers-reduced-motion: reduce) { .weekly-plan__days button { transform: none !important; } }

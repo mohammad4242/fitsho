@@ -200,6 +200,26 @@ export type DailyTrackingSummary = {
   }>;
 };
 
+export type NutritionAdherence = {
+  start: string;
+  end: string;
+  days: Array<{
+    date: string;
+    status: "sufficient" | "insufficient_data";
+    calorie_adherence: number | null;
+    protein_adherence: number | null;
+    meal_adherence: number | null;
+    tracking_completeness: number;
+    exact_entry_ratio: number | null;
+    composite_score: number | null;
+    formula_version: string;
+    planned: Record<string, number>;
+    actual: Record<string, number>;
+  }>;
+  weight_trend: Array<{ measured_at: string; weight_kg: number }>;
+  weight_causality_claimed: false;
+};
+
 export type NutritionProfileInput = {
   daily_activity_level: "sedentary" | "light" | "moderate" | "very_active";
   metabolic_basis?: "female_coefficient" | "male_coefficient" | null;

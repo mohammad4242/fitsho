@@ -12,6 +12,12 @@ from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.config import Settings, get_settings
 from app.database.session import get_db
+from app.nutrition.adherence_service import (
+    AdherenceError,
+    adaptive_preferences,
+    adherence_history,
+    confirm_target_update,
+)
 from app.nutrition.estimate_service import (
     create_estimate,
     current_estimate,
@@ -83,6 +89,7 @@ from app.nutrition.schemas import (
     SafetyProfileInput,
     StructuredExerciseInput,
     StructuredExerciseResponse,
+    TargetUpdateConfirmationInput,
     WeeklyPlanGenerationResponse,
     WeeklyPlanHistoryItemResponse,
     WeeklyPlanResponse,
@@ -688,3 +695,30 @@ def remove_food_photo_estimate(
         delete_photo(db, user.id, estimate_id, settings)
     except FoodPhotoError as error:
         raise _food_photo_error(error) from None
+
+
+@router.get("/adherence")
+def read_adherence(
+    start: date, end: date, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    if end < start or (end - start).days > 366:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_DATE_RANGE"})
+    return adherence_history(db, user.id, start, end)
+
+
+@router.get("/adaptive-preferences")
+def read_adaptive_preferences(db: DatabaseSession, user: CurrentUser) -> dict[str, object]:
+    return adaptive_preferences(db, user.id)
+
+
+@router.post(
+    "/targets/confirm-update",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_confirmed_target(
+    payload: TargetUpdateConfirmationInput, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        return confirm_target_update(db, user.id, payload.requested_goal, payload.confirmed)
+    except AdherenceError as error:
+        raise HTTPException(status_code=409, detail={"code": error.code}) from None
