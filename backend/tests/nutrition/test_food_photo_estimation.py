@@ -137,6 +137,14 @@ def test_photo_estimate_maps_catalogue_and_writes_only_after_confirmation(
     assert grant.status_code == 200
     assert client.get(grant.json()["access_url"]).headers["content-type"] == "image/jpeg"
 
+    corrected = client.patch(
+        f"/api/v1/nutrition/tracking/photo-estimates/{body['id']}/items/{body['items'][0]['item_id']}",
+        headers=ORIGIN,
+        json={"estimated_amount": 90},
+    )
+    assert corrected.status_code == 200, corrected.text
+    assert corrected.json()["items"][0]["estimated_amount"] == 90
+
     confirmed = client.post(
         f"/api/v1/nutrition/tracking/photo-estimates/{body['id']}/confirm",
         headers=ORIGIN,
@@ -145,6 +153,7 @@ def test_photo_estimate_maps_catalogue_and_writes_only_after_confirmation(
     assert confirmed.status_code == 200
     entry = db.scalar(select(NutritionConsumptionEntry))
     assert entry is not None
+    assert float(entry.quantity_grams or 0) == 90
     assert entry.source.value == "photo_estimated_confirmed"
     assert entry.warning_codes == ["PHOTO_ESTIMATE_APPROXIMATE"]
 

@@ -577,8 +577,46 @@ class QuickApproximationInput(BaseModel):
     protein_g: float | None = Field(default=None, ge=0, le=1000)
 
 
+class ConsumptionEntryEditInput(BaseModel):
+    grams: float | None = Field(default=None, gt=0, le=5000)
+    display_name: str | None = Field(default=None, min_length=1, max_length=160)
+    calories: float | None = Field(default=None, gt=0, le=10000)
+    protein_g: float | None = Field(default=None, ge=0, le=1000)
+    note: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def require_edit(self) -> "ConsumptionEntryEditInput":
+        if not self.model_fields_set:
+            raise ValueError("At least one entry field is required")
+        return self
+
+
+class PlannedMealTrackingInput(BaseModel):
+    entry_date: date
+    status: Literal["consumed", "adjusted", "skipped"]
+    portion_ratio: float | None = Field(default=None, gt=0, le=3)
+
+    @model_validator(mode="after")
+    def require_adjusted_ratio(self) -> "PlannedMealTrackingInput":
+        if self.status == "adjusted" and self.portion_ratio is None:
+            raise ValueError("Adjusted planned meal requires a portion ratio")
+        return self
+
+
 class FoodPhotoConfirmInput(BaseModel):
     entry_date: date
+
+
+class FoodPhotoItemCorrectionInput(BaseModel):
+    food_id: UUID | None = None
+    estimated_amount: float | None = Field(default=None, gt=0, le=10000)
+    remove: bool = False
+
+    @model_validator(mode="after")
+    def require_correction(self) -> "FoodPhotoItemCorrectionInput":
+        if not self.remove and self.food_id is None and self.estimated_amount is None:
+            raise ValueError("A photo item correction is required")
+        return self
 
 
 class TargetUpdateConfirmationInput(BaseModel):

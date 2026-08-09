@@ -67,11 +67,11 @@
 - Test: `backend/tests/nutrition/test_tracking_api.py`
 - Test: `backend/tests/nutrition/test_food_photo_estimation.py`
 
-- [ ] Add failing tests for edit-own-entry, recent foods, planned-meal adjustment, and resolved photo-item corrections.
-- [ ] Add ownership-safe entry editing and recent-food APIs.
-- [ ] Add photo item remove/replace/quantity correction before confirmation.
-- [ ] Preserve allergen warning semantics for truthful actual intake.
-- [ ] Run focused checks, commit, and push.
+- [x] Add failing tests for edit-own-entry, recent foods, planned-meal adjustment, and resolved photo-item corrections.
+- [x] Add ownership-safe entry editing and recent-food APIs.
+- [x] Add photo item remove/replace/quantity correction before confirmation.
+- [x] Preserve allergen warning semantics for truthful actual intake.
+- [x] Run focused checks, commit, and push.
 
 ### Task 4: Complete coordinated Nutrition frontend behavior
 

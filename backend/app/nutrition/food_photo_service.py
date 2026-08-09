@@ -29,7 +29,11 @@ from app.body_analysis.providers.models import (
     StructuredGenerationRequest,
 )
 from app.config import Settings
-from app.nutrition.enums import EstimateConfidence, NutritionConsumptionSource
+from app.nutrition.enums import (
+    EstimateConfidence,
+    FoodVerificationStatus,
+    NutritionConsumptionSource,
+)
 from app.nutrition.food_catalogue import normalize_food_alias
 from app.nutrition.models import (
     NutritionCatalogueFood,
@@ -37,6 +41,7 @@ from app.nutrition.models import (
     NutritionFoodPhotoEstimate,
 )
 from app.nutrition.security import audit_security_event, record_operational_event
+from app.nutrition.tracking_service import actual_intake_warnings
 
 
 class FoodPhotoError(Exception):
@@ -130,7 +135,9 @@ def _store(root: Path, content: bytes) -> str:
 
 def _map_items(db: Session, output: FoodPhotoOutput) -> list[dict[str, object]]:
     foods = db.scalars(
-        select(NutritionCatalogueFood).options(selectinload(NutritionCatalogueFood.aliases))
+        select(NutritionCatalogueFood)
+        .where(NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED)
+        .options(selectinload(NutritionCatalogueFood.aliases))
     ).all()
     names: dict[str, NutritionCatalogueFood] = {}
     for food in foods:
@@ -147,6 +154,7 @@ def _map_items(db: Session, output: FoodPhotoOutput) -> list[dict[str, object]]:
         mapped.append(
             {
                 **item.model_dump(),
+                "item_id": str(uuid4()),
                 "food_id": str(matched_food.id) if matched_food else None,
                 "food_slug": matched_food.slug if matched_food else None,
                 "mapping_status": "resolved" if matched_food else "unresolved",
@@ -281,15 +289,91 @@ async def estimate_photo(
 
 
 def photo_response(row: NutritionFoodPhotoEstimate) -> dict[str, object]:
+    items = [
+        {**item, "item_id": item.get("item_id") or f"legacy-{index}"}
+        for index, item in enumerate(row.mapped_items)
+    ]
     return {
         "id": row.id,
         "status": row.status,
-        "items": row.mapped_items,
+        "items": items,
         "overall_confidence": row.raw_estimate.get("overall_confidence"),
         "needs_user_confirmation": True,
         "model_id": row.model_id,
         "expires_at": row.expires_at,
     }
+
+
+def correct_photo_item(
+    db: Session,
+    user_id: UUID,
+    estimate_id: UUID,
+    item_id: str,
+    *,
+    food_id: UUID | None,
+    estimated_amount: Decimal | None,
+    remove: bool,
+) -> dict[str, object]:
+    row = db.scalar(
+        select(NutritionFoodPhotoEstimate)
+        .where(
+            NutritionFoodPhotoEstimate.id == estimate_id,
+            NutritionFoodPhotoEstimate.user_id == user_id,
+            NutritionFoodPhotoEstimate.status == "estimated",
+        )
+        .with_for_update()
+    )
+    if row is None:
+        raise FoodPhotoError("FOOD_PHOTO_ESTIMATE_NOT_FOUND")
+    items = [dict(item) for item in row.mapped_items]
+    index = next(
+        (
+            position
+            for position, item in enumerate(items)
+            if (item.get("item_id") or f"legacy-{position}") == item_id
+        ),
+        None,
+    )
+    if index is None:
+        raise FoodPhotoError("FOOD_PHOTO_ITEM_NOT_FOUND")
+    if remove:
+        items.pop(index)
+    else:
+        item = items[index]
+        item["item_id"] = item.get("item_id") or item_id
+        if estimated_amount is not None:
+            item["estimated_amount"] = float(estimated_amount)
+        if food_id is not None:
+            food = db.scalar(
+                select(NutritionCatalogueFood).where(
+                    NutritionCatalogueFood.id == food_id,
+                    NutritionCatalogueFood.verification_status
+                    == FoodVerificationStatus.VERIFIED,
+                )
+            )
+            if food is None:
+                raise FoodPhotoError("FOOD_NOT_FOUND")
+            item.update(
+                food_id=str(food.id),
+                food_slug=food.slug,
+                name_guess=food.name_fa,
+                unit="g",
+                mapping_status="resolved",
+            )
+        items[index] = item
+    row.mapped_items = items
+    audit_security_event(
+        db,
+        actor_user_id=user_id,
+        owner_user_id=user_id,
+        event_type="food_photo_item_corrected",
+        resource_type="food_photo_estimate",
+        resource_id=row.id,
+        metadata={"item_id": item_id, "removed": remove},
+    )
+    db.commit()
+    db.refresh(row)
+    return photo_response(row)
 
 
 def confirm_photo(
@@ -311,7 +395,11 @@ def confirm_photo(
             continue
         food = db.scalar(
             select(NutritionCatalogueFood)
-            .where(NutritionCatalogueFood.id == UUID(str(food_id)))
+            .where(
+                NutritionCatalogueFood.id == UUID(str(food_id)),
+                NutritionCatalogueFood.verification_status
+                == FoodVerificationStatus.VERIFIED,
+            )
             .options(selectinload(NutritionCatalogueFood.compositions))
         )
         if food is None:
@@ -333,7 +421,11 @@ def confirm_photo(
             confidence=EstimateConfidence.LOW,
             user_confirmed=True,
             nutrients=nutrients,
-            warning_codes=["PHOTO_ESTIMATE_APPROXIMATE"],
+            warning_codes=list(
+                dict.fromkeys(
+                    ["PHOTO_ESTIMATE_APPROXIMATE", *actual_intake_warnings(db, user_id, food)]
+                )
+            ),
         )
         db.add(entry)
         created.append(entry)

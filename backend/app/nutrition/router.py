@@ -81,6 +81,7 @@ from app.nutrition.food_photo_service import (
     FoodPhotoError,
     authorize_photo_access,
     confirm_photo,
+    correct_photo_item,
     delete_photo,
     estimate_photo,
     open_photo,
@@ -133,9 +134,11 @@ from app.nutrition.schemas import (
     CatalogueFoodWrite,
     CatalogueMealResponse,
     CatalogueMealWrite,
+    ConsumptionEntryEditInput,
     DailyCheckInInput,
     FoodCataloguePageResponse,
     FoodPhotoConfirmInput,
+    FoodPhotoItemCorrectionInput,
     FoodPriceOverrideInput,
     FoodPriceOverrideResponse,
     MealFeedbackInput,
@@ -151,6 +154,7 @@ from app.nutrition.schemas import (
     PhysicianPlanActionInput,
     PhysicianReviewRequirementResponse,
     PhysicianSupplementOrderInput,
+    PlannedMealTrackingInput,
     QuickApproximationInput,
     RemoveMealConfirmationInput,
     ReplaceFoodInput,
@@ -197,9 +201,12 @@ from app.nutrition.supplement_service import (
 from app.nutrition.tracking_service import (
     TrackingError,
     add_catalogue_food,
+    adjust_planned_meal,
     daily_summary,
     delete_entry,
+    edit_entry,
     history,
+    recent_foods,
     save_quick_approximation,
     submit_check_in,
 )
@@ -1077,6 +1084,64 @@ def read_tracking_history(
     return history(db, user.id, start, end)
 
 
+@router.get("/tracking/recent-foods")
+def read_recent_foods(
+    db: DatabaseSession,
+    user: CurrentUser,
+    limit: int = Query(default=20, ge=1, le=50),
+) -> list[dict[str, object]]:
+    return recent_foods(db, user.id, limit)
+
+
+@router.put(
+    "/tracking/entries/{entry_id}",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_consumption_entry(
+    entry_id: UUID,
+    payload: ConsumptionEntryEditInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, object]:
+    try:
+        return edit_entry(
+            db,
+            user.id,
+            entry_id,
+            grams=Decimal(str(payload.grams)) if payload.grams is not None else None,
+            display_name=payload.display_name,
+            calories=Decimal(str(payload.calories)) if payload.calories is not None else None,
+            protein=Decimal(str(payload.protein_g)) if payload.protein_g is not None else None,
+            note=payload.note,
+            fields=set(payload.model_fields_set),
+        )
+    except TrackingError as error:
+        raise _tracking_error(error) from None
+
+
+@router.put(
+    "/tracking/planned-meals/{meal_id}",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_planned_meal_tracking(
+    meal_id: UUID,
+    payload: PlannedMealTrackingInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, object]:
+    try:
+        return adjust_planned_meal(
+            db,
+            user.id,
+            meal_id,
+            payload.entry_date,
+            payload.status,
+            Decimal(str(payload.portion_ratio)) if payload.portion_ratio is not None else None,
+        )
+    except TrackingError as error:
+        raise _tracking_error(error) from None
+
+
 @router.delete(
     "/tracking/entries/{entry_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -1142,6 +1207,35 @@ async def create_food_photo_estimate(
             detail={"code": "RATE_LIMIT_EXCEEDED"},
             headers={"Retry-After": str(error.retry_after_seconds)},
         ) from None
+    except FoodPhotoError as error:
+        raise _food_photo_error(error) from None
+
+
+@router.patch(
+    "/tracking/photo-estimates/{estimate_id}/items/{item_id}",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def correct_food_photo_estimate_item(
+    estimate_id: UUID,
+    item_id: str,
+    payload: FoodPhotoItemCorrectionInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, object]:
+    try:
+        return correct_photo_item(
+            db,
+            user.id,
+            estimate_id,
+            item_id,
+            food_id=payload.food_id,
+            estimated_amount=(
+                Decimal(str(payload.estimated_amount))
+                if payload.estimated_amount is not None
+                else None
+            ),
+            remove=payload.remove,
+        )
     except FoodPhotoError as error:
         raise _food_photo_error(error) from None
 
