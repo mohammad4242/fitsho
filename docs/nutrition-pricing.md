@@ -55,3 +55,21 @@ uv run python -m app.nutrition.price_update --catch-up
 
 Optional credential providers remain off unless their matching `*_ENABLED` setting is explicitly
 enabled. The public weekly workflow does not require any API key.
+
+## Member food catalogue
+
+Authenticated members whose product mode is `nutrition` or `both` can open `/food-catalogue`.
+Training-only members are excluded in both the React route guard and
+`GET /api/v1/nutrition/food-catalogue`. The view combines verified composition with the latest
+accepted effective price without joining or mutating the underlying nutrition-source records.
+
+The catalogue always shows energy, protein, carbohydrate, fat, and fibre per 100 g, with the full
+verified nutrient list and provenance available in the detail dialog. When no fresh accepted price
+exists, the API returns `not_found` and the UI renders `یافت نشد` / `Not found`; no estimated market
+price is created.
+
+Admins use the same page to add a verified catalogue food or create a temporary price override.
+Each override stores the food, positive price, canonical unit, reason, acting admin, creation time,
+active state, and eventual expiry metadata. Overrides are fallback-only: they take precedence while
+active, remain in the audit history permanently, and expire after the next successful automatic
+market refresh. Automatic quotes and accepted reference-price history remain immutable.
