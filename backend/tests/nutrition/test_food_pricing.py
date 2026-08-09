@@ -270,3 +270,108 @@ def test_public_price_provider_registry_is_seeded_disabled_until_live_probe(db) 
     assert all(provider.enabled is False for provider in providers)
     assert all(provider.minimum_sources == 3 for provider in providers)
     assert all(provider.parser_version == "public-page-v1" for provider in providers)
+
+
+def test_first_public_run_discovers_mappings_and_accepts_three_source_mean(db) -> None:
+    from app.nutrition.enums import FoodVerificationStatus, PriceUpdateRunStatus
+    from app.nutrition.models import (
+        NutritionCatalogueFood,
+        NutritionCatalogueFoodAlias,
+        NutritionFoodPriceHistory,
+        NutritionFoodPriceMapping,
+        NutritionFoodPriceReference,
+        NutritionPriceProvider,
+    )
+    from app.nutrition.price_update_service import run_price_update
+    from app.nutrition.public_price_sources import PublicProductCandidate
+
+    food = NutritionCatalogueFood(
+        slug="discovery-test-grain",
+        name_fa="دانه آزمایشی فیتشو",
+        name_en="Fitsho test grain",
+        verification_status=FoodVerificationStatus.VERIFIED,
+        source_name="test",
+        source_reference="test",
+        category="grains",
+    )
+    db.add(food)
+    db.flush()
+    db.add(
+        NutritionCatalogueFoodAlias(
+            food_id=food.id,
+            alias="دانه کشف قیمت",
+            normalized_alias="دانه کشف قیمت",
+            language="fa",
+        )
+    )
+    db.commit()
+
+    class DiscoveryProvider:
+        uses_public_locators = True
+
+        def __init__(self, code: str, price: str) -> None:
+            self.code = code
+            self.price = Decimal(price)
+
+        async def discover(self, _alias: str):
+            return [
+                PublicProductCandidate(
+                    provider_code=self.code,
+                    product_id=f"{self.code}-rice",
+                    title="دانه آزمایشی فیتشو ۱۰ کیلوگرم",
+                    public_url=f"https://{self.code}.example/rice",
+                    currency="TOMAN",
+                    normal_price=self.price,
+                    promotional_price=None,
+                    package_quantity=Decimal("10"),
+                    package_unit="kg",
+                    observed_at=datetime(2026, 8, 9, 8, tzinfo=UTC),
+                )
+            ]
+
+        async def get_quotes(self, _locators):
+            raise AssertionError("newly discovered quotes must be reused")
+
+    providers = [
+        DiscoveryProvider("digikala", "2500000"),
+        DiscoveryProvider("torob", "2600000"),
+        DiscoveryProvider("basalam_public", "2550000"),
+    ]
+    run = run_price_update(
+        db,
+        providers=providers,
+        scheduled_for=datetime(2026, 8, 9, 9, tzinfo=UTC),
+    )
+
+    reference = db.get(NutritionFoodPriceReference, food.id)
+    history = db.scalar(
+        select(NutritionFoodPriceHistory).where(NutritionFoodPriceHistory.food_id == food.id)
+    )
+    mappings = db.scalars(
+        select(NutritionFoodPriceMapping).where(NutritionFoodPriceMapping.food_id == food.id)
+    ).all()
+    assert run.status == PriceUpdateRunStatus.COMPLETED_WITH_ERRORS
+    assert run.foods_updated == 1
+    assert reference is not None
+    assert reference.reference_price_toman == Decimal("255000")
+    assert len(mappings) == 3
+    assert all(mapping.public_product_url for mapping in mappings)
+    assert history is not None
+    assert len(history.accepted_quote_ids) == 3
+    assert history.rejected_quote_ids == []
+    assert all(db.get(NutritionPriceProvider, provider.code).enabled for provider in providers)
+
+
+def test_zero_provider_run_is_observable_error_not_success(db) -> None:
+    from app.nutrition.enums import PriceUpdateRunStatus
+    from app.nutrition.price_update_service import run_price_update
+
+    run = run_price_update(
+        db,
+        providers=[],
+        scheduled_for=datetime(2026, 8, 9, 10, tzinfo=UTC),
+    )
+
+    assert run.status == PriceUpdateRunStatus.COMPLETED_WITH_ERRORS
+    assert "NO_PROVIDERS" in run.failure_codes
+    assert "NO_USABLE_OBSERVATIONS" in run.failure_codes

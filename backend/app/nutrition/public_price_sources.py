@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from html.parser import HTMLParser
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 from urllib.parse import quote_plus, urljoin
 
 import httpx
@@ -81,6 +81,14 @@ class PublicProductCandidate:
             observed_at=self.observed_at,
             region=self.region,
         )
+
+
+@runtime_checkable
+class PublicDiscoveryProvider(Protocol):
+    code: str
+    uses_public_locators: bool
+
+    async def discover(self, alias: str) -> list[PublicProductCandidate]: ...
 
 
 PUBLIC_SOURCE_DEFINITIONS: tuple[PublicSourceDefinition, ...] = (
@@ -288,6 +296,8 @@ def parse_public_products(
 
 
 class PublicPageProvider:
+    uses_public_locators = True
+
     def __init__(self, definition: PublicSourceDefinition, client: httpx.AsyncClient) -> None:
         self.definition = definition
         self.code = definition.code
