@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../features/auth/AuthContext";
 import { useOptionalProfile } from "../features/profile/ProfileContext";
+import { verifyCoachAccess } from "../features/workoutReviews/api";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function AuthenticatedHeader() {
@@ -19,6 +20,16 @@ export function AuthenticatedHeader() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isCoach, setIsCoach] = useState(false);
+
+  useEffect(() => {
+    if (user === null) return;
+    let active = true;
+    void Promise.resolve(verifyCoachAccess())
+      .then(() => { if (active) setIsCoach(true); })
+      .catch(() => { if (active) setIsCoach(false); });
+    return () => { active = false; };
+  }, [user]);
 
   if (user === null) {
     return null;
@@ -65,6 +76,9 @@ export function AuthenticatedHeader() {
                 {hasTraining && <Link to="/exercises" onClick={() => setMenuOpen(false)}>
                   {t("header.exercises")}
                 </Link>}
+                {isCoach && <Link to="/coach/workouts" onClick={() => setMenuOpen(false)}>
+                  {i18n.resolvedLanguage === "en" ? "Coach workspace" : "پنل مربی"}
+                </Link>}
                 {hasNutrition && <Link to="/nutrition-estimate" onClick={() => setMenuOpen(false)}>{t("header.nutritionTargets")}</Link>}
                 {hasNutrition && <Link to="/food-catalogue" onClick={() => setMenuOpen(false)}>⌁ {t("header.foodCatalogue")}</Link>}
                 <button type="button" disabled>
@@ -96,6 +110,12 @@ export function AuthenticatedHeader() {
               aria-current={location.pathname.startsWith("/workout-plan") ? "page" : undefined}
             >
               {t("header.workoutPlan")}
+            </Link>}
+            {isCoach && <Link
+              to="/coach/workouts"
+              aria-current={location.pathname.startsWith("/coach/workouts") ? "page" : undefined}
+            >
+              {i18n.resolvedLanguage === "en" ? "Coach workspace" : "پنل مربی"}
             </Link>}
             {hasTraining && <Link
               to="/exercises"

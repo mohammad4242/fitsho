@@ -63,6 +63,11 @@ const workoutApi = vi.hoisted(() => ({
   generateWorkoutPlan: vi.fn(),
 }));
 
+const workoutReviewApi = vi.hoisted(() => ({
+  verifyCoachAccess: vi.fn(),
+  listWorkoutReviews: vi.fn(),
+}));
+
 vi.mock("./features/auth/AuthContext", () => ({
   useAuth: () => auth.value,
 }));
@@ -74,6 +79,7 @@ vi.mock("./features/profile/ProfileContext", () => ({
 
 vi.mock("./features/exercises/api", () => exerciseApi);
 vi.mock("./features/workouts/api", () => workoutApi);
+vi.mock("./features/workoutReviews/api", () => workoutReviewApi);
 
 import { AppRoutes } from "./App";
 
@@ -135,6 +141,10 @@ beforeEach(() => {
   exerciseApi.getExercise.mockReset();
   workoutApi.getActiveWorkoutPlan.mockReset();
   workoutApi.generateWorkoutPlan.mockReset();
+  workoutReviewApi.verifyCoachAccess.mockReset();
+  workoutReviewApi.verifyCoachAccess.mockRejectedValue(new Error("not a coach"));
+  workoutReviewApi.listWorkoutReviews.mockReset();
+  workoutReviewApi.listWorkoutReviews.mockResolvedValue([]);
   exerciseApi.getExerciseCategories.mockResolvedValue(exerciseCategories);
   exerciseApi.getExercises.mockResolvedValue(emptyExercisePage);
   exerciseApi.getExercise.mockResolvedValue(exerciseDetail);
@@ -377,6 +387,19 @@ it("hides admin navigation from regular members", async () => {
   renderRoute("/dashboard");
 
   expect(screen.queryByRole("link", { name: "مدیریت حرکات" })).not.toBeInTheDocument();
+});
+
+it("shows the workout review workspace in the account menu for coaches", async () => {
+  workoutReviewApi.verifyCoachAccess.mockResolvedValue({ authorized: true });
+  setReadyMember();
+  const user = userEvent.setup();
+  renderRoute("/dashboard");
+
+  await user.click(screen.getByRole("button", { name: "باز کردن منوی حساب" }));
+
+  const coachLinks = await screen.findAllByRole("link", { name: "پنل مربی" });
+  expect(coachLinks).not.toHaveLength(0);
+  expect(coachLinks[0]).toHaveAttribute("href", "/coach/workouts");
 });
 
 it("redirects a guest away from the admin route", async () => {
