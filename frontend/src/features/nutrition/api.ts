@@ -18,6 +18,83 @@ import type {
 
 const nutritionPath = "/api/v1/nutrition";
 
+export type FoodCatalogueNutrient = {
+  nutrient_code: string;
+  value_per_100g: number;
+  unit: string;
+  unit_form: string;
+  source_name: string;
+  source_reference: string;
+  confidence: "low" | "medium" | "high";
+};
+
+export type FoodCatalogueItem = {
+  id: string;
+  slug: string;
+  name_fa: string;
+  name_en: string;
+  category: string;
+  measurement_basis: "raw" | "dry" | "as_purchased";
+  nutrient_basis: { quantity: string; unit: string };
+  price: {
+    status: "accepted" | "not_found";
+    reference_price_toman?: string;
+    canonical_unit?: string;
+    accepted_at?: string;
+    source?: "automatic" | "manual_override";
+  };
+  macros: Record<"energy_kcal" | "protein_g" | "carbohydrate_g" | "total_fat_g" | "fibre_g", string | null>;
+  nutrients: FoodCatalogueNutrient[];
+  source: {
+    name: string;
+    reference: string;
+    source_food_id: string | null;
+    data_version: string;
+    access_date: string | null;
+  };
+};
+
+export type FoodCatalogueResponse = {
+  items: FoodCatalogueItem[];
+  page: number;
+  page_size: number;
+  total: number;
+  categories: string[];
+};
+
+export type FoodCatalogueQuery = {
+  query?: string;
+  category?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export function getFoodCatalogue(input: FoodCatalogueQuery = {}): Promise<FoodCatalogueResponse> {
+  const parameters = new URLSearchParams();
+  if (input.query) parameters.set("q", input.query);
+  if (input.category) parameters.set("category", input.category);
+  parameters.set("page", String(input.page ?? 1));
+  parameters.set("page_size", String(input.pageSize ?? 24));
+  return request<FoodCatalogueResponse>(`${nutritionPath}/food-catalogue?${parameters}`);
+}
+
+export function saveCatalogueFood(input: Record<string, unknown>): Promise<unknown> {
+  return request(`${nutritionPath}/admin/foods`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function saveFoodPriceOverride(
+  slug: string,
+  input: { reference_price_toman: string; canonical_unit: string; reason: string },
+): Promise<{ id: string; source: "manual_override" }> {
+  return request(`${nutritionPath}/admin/foods/${slug}/price-override`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export function evaluateSafetyProfile(input: SafetyProfileInput): Promise<SafetyEvaluation> {
   return request<SafetyEvaluation>(`${nutritionPath}/safety/evaluate`, {
     method: "POST",

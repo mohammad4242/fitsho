@@ -6,6 +6,10 @@
 .nutrition-estimate-hero h1 { max-width: 10ch; margin: .4rem 0 1rem; font-size: clamp(3.5rem, 9vw, 7.5rem); }
 .nutrition-estimate-hero > p:last-child { max-width: 42rem; color: rgb(234 244 241 / 75%); line-height: 1.9; }
 .nutrition-estimate-back { color: var(--fitsho-aqua); text-decoration: none; font-weight: 800; }
+.nutrition-catalogue-entry { display: inline-grid; grid-template-columns: auto 1fr; gap: .05rem .55rem; align-items: center; margin-inline-start: .5rem; padding: .55rem .8rem; color: #ffd798; border: 1px solid rgb(255 215 152 / 24%); border-radius: .85rem; background: rgb(255 215 152 / 7%); text-decoration: none; vertical-align: middle; }
+.nutrition-catalogue-entry > span { grid-row: span 2; font-size: 1.35rem; }
+.nutrition-catalogue-entry strong, .nutrition-catalogue-entry small { line-height: 1.15; }
+.nutrition-catalogue-entry small { color: rgb(234 244 241 / 56%); font-size: .62rem; }
 .nutrition-estimate-state { padding: 2rem; border: 1px solid rgb(234 244 241 / 12%); border-radius: var(--fitsho-radius-card); background: rgb(3 28 27 / 70%); }
 .nutrition-estimate-summary { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(16rem, .6fr); gap: 1rem; }
 .nutrition-calorie-card, .nutrition-confidence-card, .nutrition-target-card, .nutrition-estimate-notes { border: 1px solid rgb(234 244 241 / 12%); border-radius: var(--fitsho-radius-card); background: rgb(9 54 51 / 82%); box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 16%); }

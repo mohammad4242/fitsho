@@ -24,6 +24,7 @@ import { WorkoutPlanPage } from "./features/workouts/WorkoutPlanPage";
 import {
   CompletedProfileRoute,
   GuestRoute,
+  NutritionCapabilityRoute,
   OnboardingRoute,
 } from "./features/profile/ProfileRouteGuards";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -36,6 +37,7 @@ import { PhysicianNutritionReviewPage } from "./features/nutrition/PhysicianNutr
 import { NutritionSupplementsPage } from "./features/nutrition/NutritionSupplementsPage";
 import { AdminSupplementsPage } from "./features/admin/AdminSupplementsPage";
 import { AdminNutritionMonitoringPage } from "./features/admin/AdminNutritionMonitoringPage";
+import { FoodCataloguePage } from "./features/nutrition/FoodCataloguePage";
 import { AppShell } from "./shared/AppShell";
 
 export function AppRoutes() {
@@ -70,6 +72,9 @@ export function AppRoutes() {
             <Route path="/nutrition-tracking" element={<NutritionTrackingPage />} />
             <Route path="/nutrition-labs" element={<NutritionLabsPage />} />
             <Route path="/nutrition-supplements" element={<NutritionSupplementsPage />} />
+            <Route element={<NutritionCapabilityRoute />}>
+              <Route path="/food-catalogue" element={<FoodCataloguePage />} />
+            </Route>
             <Route path="/body-progress" element={<BodyProgressPage />} />
             <Route path="/body-progress/new" element={<BodyPhotoWizard />} />
             <Route path="/body-progress/:sessionId" element={<BodyAnalysisResultPage />} />

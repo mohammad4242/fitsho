@@ -1,0 +1,165 @@
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
+
+import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { useAuth } from "../auth/AuthContext";
+import * as api from "./api";
+import type { FoodCatalogueItem, FoodCatalogueResponse } from "./api";
+import "./foodCatalogue.css";
+
+type LoadState = "loading" | "ready" | "error";
+
+const macroDefinitions = [
+  ["energy_kcal", "کالری", "Calories", "kcal"],
+  ["protein_g", "پروتئین", "Protein", "g"],
+  ["carbohydrate_g", "کربوهیدرات", "Carbs", "g"],
+  ["total_fat_g", "چربی", "Fat", "g"],
+  ["fibre_g", "فیبر", "Fibre", "g"],
+] as const;
+
+export function FoodCataloguePage() {
+  const { i18n } = useTranslation();
+  const { user } = useAuth();
+  const language = i18n.resolvedLanguage === "en" ? "en" : "fa";
+  const fa = language === "fa";
+  const l = (persian: string, english: string) => fa ? persian : english;
+  const [state, setState] = useState<LoadState>("loading");
+  const [data, setData] = useState<FoodCatalogueResponse | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("");
+  const [page, setPage] = useState(1);
+  const [reload, setReload] = useState(0);
+  const [details, setDetails] = useState<FoodCatalogueItem | null>(null);
+  const [priceFood, setPriceFood] = useState<FoodCatalogueItem | null>(null);
+  const [addingFood, setAddingFood] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setState("loading");
+    void api.getFoodCatalogue({ query, category, page, pageSize: 24 })
+      .then((result) => {
+        if (!active) return;
+        setData(result);
+        setState("ready");
+      })
+      .catch(() => {
+        if (active) setState("error");
+      });
+    return () => { active = false; };
+  }, [category, page, query, reload]);
+
+  function search(event: FormEvent) {
+    event.preventDefault();
+    setPage(1);
+    setQuery(searchInput.trim());
+  }
+
+  function saved() {
+    setAddingFood(false);
+    setPriceFood(null);
+    setReload((value) => value + 1);
+  }
+
+  const pageCount = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
+  return (
+    <main className="food-catalogue-page" dir={fa ? "rtl" : "ltr"}>
+      <AuthenticatedHeader />
+      <section className="food-catalogue-hero">
+        <div>
+          <Link className="food-catalogue-back" to="/nutrition-estimate">
+            <span aria-hidden="true">←</span> {l("بازگشت به تغذیه", "Back to Nutrition")}
+          </Link>
+          <p className="eyebrow eyebrow--accent">{l("قیمت بازار × ترکیب علمی", "Market price × verified nutrition")}</p>
+          <h1 className="fitsho-display">{l("کاتالوگ مواد غذایی", "Food catalogue")}</h1>
+          <p>{l("قیمت معتبر همین هفته و ارزش غذایی هر ۱۰۰ گرم را کنار هم ببین.", "Compare this week's accepted price with verified nutrition per 100 grams.")}</p>
+        </div>
+        <CatalogueIcon />
+      </section>
+
+      <section className="food-catalogue-toolbar" aria-label={l("جست‌وجو و فیلتر", "Search and filter")}>
+        <form onSubmit={search} role="search">
+          <label htmlFor="food-search">{l("جست‌وجوی ماده غذایی", "Search foods")}</label>
+          <div>
+            <input id="food-search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder={l("مثلاً عدس یا سینه مرغ", "Try lentils or chicken breast")} />
+            <button type="submit">{l("جست‌وجو", "Search")}</button>
+          </div>
+        </form>
+        <label>
+          {l("گروه غذایی", "Category")}
+          <select value={category} onChange={(event) => { setCategory(event.target.value); setPage(1); }}>
+            <option value="">{l("همه گروه‌ها", "All categories")}</option>
+            {data?.categories.map((value) => <option key={value} value={value}>{categoryLabel(value, language)}</option>)}
+          </select>
+        </label>
+        {user?.is_admin && <button aria-label={l("افزودن ماده غذایی", "Add food")} className="food-catalogue-add" type="button" onClick={() => setAddingFood(true)}>＋ {l("افزودن ماده غذایی", "Add food")}</button>}
+      </section>
+
+      {state === "loading" && <p className="food-catalogue-state" role="status">{l("در حال چیدن قفسه…", "Stocking the shelf…")}</p>}
+      {state === "error" && <section className="food-catalogue-state" role="alert"><strong>{l("کاتالوگ دریافت نشد", "Catalogue unavailable")}</strong><button type="button" onClick={() => setReload((value) => value + 1)}>{l("تلاش دوباره", "Try again")}</button></section>}
+      {state === "ready" && data?.items.length === 0 && <p className="food-catalogue-state">{l("ماده‌ای با این مشخصات پیدا نشد.", "No food matched these filters.")}</p>}
+      {state === "ready" && data && data.items.length > 0 && (
+        <section className="food-catalogue-grid" aria-label={l("مواد غذایی", "Foods")}>
+          {data.items.map((food) => <FoodCard food={food} isAdmin={Boolean(user?.is_admin)} key={food.id} language={language} onDetails={() => setDetails(food)} onPrice={() => setPriceFood(food)} />)}
+        </section>
+      )}
+
+      {state === "ready" && data && pageCount > 1 && <nav className="food-catalogue-pagination" aria-label={l("صفحه‌بندی", "Pagination")}><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} type="button">{l("قبلی", "Previous")}</button><span>{formatNumber(page, language)} / {formatNumber(pageCount, language)}</span><button disabled={page === pageCount} onClick={() => setPage((value) => value + 1)} type="button">{l("بعدی", "Next")}</button></nav>}
+
+      {details && <FoodDetails food={details} language={language} onClose={() => setDetails(null)} />}
+      {priceFood && <PriceOverrideDialog food={priceFood} language={language} onClose={() => setPriceFood(null)} onSaved={saved} />}
+      {addingFood && <AddFoodDialog language={language} onClose={() => setAddingFood(false)} onSaved={saved} />}
+    </main>
+  );
+}
+
+function FoodCard({ food, isAdmin, language, onDetails, onPrice }: { food: FoodCatalogueItem; isAdmin: boolean; language: "fa" | "en"; onDetails: () => void; onPrice: () => void }) {
+  const fa = language === "fa";
+  const l = (persian: string, english: string) => fa ? persian : english;
+  return <article className="food-shelf-card">
+    <header><div><span>{categoryLabel(food.category, language)}</span><h2>{fa ? food.name_fa : food.name_en}</h2><small>{fa ? food.name_en : food.name_fa}</small></div><span className="food-shelf-card__basis">{l("در هر ۱۰۰ گرم", "per 100 g")}</span></header>
+    <div className={`food-price-ticket${food.price.status === "not_found" ? " is-missing" : ""}`}><span>{l("قیمت این هفته", "This week's price")}</span><strong>{food.price.status === "accepted" && food.price.reference_price_toman ? `${formatNumber(Number(food.price.reference_price_toman), language)} ${l("تومان", "Toman")}` : l("یافت نشد", "Not found")}</strong>{food.price.canonical_unit && <small>{priceUnit(food.price.canonical_unit, language)}</small>}</div>
+    <div className="food-macro-strip">{macroDefinitions.map(([code, faLabel, enLabel, unit]) => <div key={code}><span>{fa ? faLabel : enLabel}</span><strong>{macroValue(food.macros[code], unit, language)}</strong></div>)}</div>
+    <footer><button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>{isAdmin && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}</footer>
+  </article>;
+}
+
+function FoodDetails({ food, language, onClose }: { food: FoodCatalogueItem; language: "fa" | "en"; onClose: () => void }) {
+  const fa = language === "fa";
+  const l = (persian: string, english: string) => fa ? persian : english;
+  const name = fa ? food.name_fa : food.name_en;
+  return <div className="food-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section aria-label={l(`جزئیات ${food.name_fa}`, `${food.name_en} details`)} aria-modal="true" className="food-dialog" role="dialog"><button className="food-dialog__close" type="button" onClick={onClose} aria-label={l("بستن", "Close")}>×</button><p className="eyebrow eyebrow--accent">{l("ریز‌مغذی‌ها", "Micronutrients")}</p><h2>{name}</h2><div className="food-detail-grid">{food.nutrients.map((nutrient) => <article key={nutrient.nutrient_code}><span>{nutrientName(nutrient.nutrient_code, language)}</span><strong>{formatNumber(nutrient.value_per_100g, language)} {nutrient.unit}</strong></article>)}</div><footer><span>{l("منبع", "Source")}: {food.source.name}</span><a href={food.source.reference} target="_blank" rel="noreferrer">{l("مشاهده منبع", "View source")}</a></footer></section></div>;
+}
+
+function PriceOverrideDialog({ food, language, onClose, onSaved }: { food: FoodCatalogueItem; language: "fa" | "en"; onClose: () => void; onSaved: () => void }) {
+  const fa = language === "fa";
+  const l = (persian: string, english: string) => fa ? persian : english;
+  const [price, setPrice] = useState(food.price.reference_price_toman ?? "");
+  const [unit, setUnit] = useState(food.price.canonical_unit ?? "TOMAN_PER_KG");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
+  function submit(event: FormEvent) { event.preventDefault(); setSaving(true); setError(false); void api.saveFoodPriceOverride(food.slug, { reference_price_toman: price, canonical_unit: unit, reason }).then(onSaved).catch(() => setError(true)).finally(() => setSaving(false)); }
+  return <DialogFrame label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)} onClose={onClose}><h2>{l("قیمت دستی موقت", "Temporary manual price")}</h2><p>{l("این قیمت با اجرای موفق بعدی بازار منقضی می‌شود.", "This price expires after the next successful market refresh.")}</p><form className="food-admin-form" onSubmit={submit}><label>{l("قیمت (تومان)", "Price (Toman)")}<input inputMode="decimal" min="1" required value={price} onChange={(event) => setPrice(event.target.value)} /></label><label>{l("واحد", "Unit")}<select value={unit} onChange={(event) => setUnit(event.target.value)}><option value="TOMAN_PER_KG">{l("تومان/کیلوگرم", "Toman/kg")}</option><option value="TOMAN_PER_LITER">{l("تومان/لیتر", "Toman/litre")}</option><option value="TOMAN_PER_UNIT">{l("تومان/عدد", "Toman/unit")}</option></select></label><label>{l("دلیل ویرایش", "Reason")}<textarea minLength={5} required value={reason} onChange={(event) => setReason(event.target.value)} /></label>{error && <p role="alert">{l("قیمت ذخیره نشد.", "Price was not saved.")}</p>}<button disabled={saving} type="submit">{saving ? l("در حال ذخیره…", "Saving…") : l("ذخیره قیمت", "Save price")}</button></form></DialogFrame>;
+}
+
+function AddFoodDialog({ language, onClose, onSaved }: { language: "fa" | "en"; onClose: () => void; onSaved: () => void }) {
+  const fa = language === "fa";
+  const l = (persian: string, english: string) => fa ? persian : english;
+  const [identity, setIdentity] = useState({ slug: "", name_fa: "", name_en: "", category: "", source_name: "", source_reference: "" });
+  const [macros, setMacros] = useState<Record<string, string>>({ energy_kcal: "", protein_g: "", carbohydrate_g: "", total_fat_g: "", fibre_g: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
+  function submit(event: FormEvent) { event.preventDefault(); setSaving(true); setError(false); const nutrientUnits: Record<string, string> = { energy_kcal: "kcal", protein_g: "g", carbohydrate_g: "g", total_fat_g: "g", fibre_g: "g" }; void api.saveCatalogueFood({ ...identity, verification_status: "verified", measurement_basis: "as_purchased", canonical_quantity: 100, canonical_unit: "g", edible_portion: 1, data_version: "admin-verified-v1", source_food_id: null, source_access_date: new Date().toISOString().slice(0, 10), aliases: [], dietary_patterns: ["omnivore", "vegetarian", "vegan"], roles: ["flexible"], nutrients: Object.entries(macros).map(([nutrient_code, value_per_100g]) => ({ nutrient_code, value_per_100g: Number(value_per_100g), unit: nutrientUnits[nutrient_code], unit_form: "nutrient_mass", source_name: identity.source_name, source_reference: identity.source_reference, confidence: "high" })) }).then(onSaved).catch(() => setError(true)).finally(() => setSaving(false)); }
+  return <DialogFrame label={l("افزودن ماده غذایی", "Add food")} onClose={onClose}><h2>{l("ماده غذایی تأییدشده", "Verified food")}</h2><p>{l("برای انتشار، مشخصات و پنج مقدار اصلی باید کامل باشند.", "Identity, provenance, and all five primary values are required.")}</p><form className="food-admin-form food-admin-form--wide" onSubmit={submit}>{(["slug", "name_fa", "name_en", "category", "source_name", "source_reference"] as const).map((field) => <label key={field}>{fieldLabel(field, language)}<input required type={field === "source_reference" ? "url" : "text"} value={identity[field]} onChange={(event) => setIdentity((value) => ({ ...value, [field]: event.target.value }))} /></label>)}{macroDefinitions.map(([code, faLabel, enLabel, unit]) => <label key={code}>{fa ? faLabel : enLabel} ({unit})<input inputMode="decimal" min="0" required value={macros[code]} onChange={(event) => setMacros((value) => ({ ...value, [code]: event.target.value }))} /></label>)}{error && <p role="alert">{l("ماده غذایی ذخیره نشد.", "Food was not saved.")}</p>}<button disabled={saving} type="submit">{saving ? l("در حال ذخیره…", "Saving…") : l("افزودن به کاتالوگ", "Add to catalogue")}</button></form></DialogFrame>;
+}
+
+function DialogFrame({ children, label, onClose }: { children: ReactNode; label: string; onClose: () => void }) { return <div className="food-dialog-backdrop"><section aria-label={label} aria-modal="true" className="food-dialog" role="dialog"><button className="food-dialog__close" type="button" onClick={onClose} aria-label="Close">×</button>{children}</section></div>; }
+function CatalogueIcon() { return <svg aria-hidden="true" className="food-catalogue-icon" viewBox="0 0 180 180"><path d="M30 70h120l-13 70H43L30 70Z"/><path d="M58 70c0-24 13-40 32-40s32 16 32 40M67 94v24m23-24v24m23-24v24"/><circle cx="48" cy="53" r="10"/><path d="M45 43c6-12 16-14 25-7"/></svg>; }
+function formatNumber(value: number, language: "fa" | "en") { return new Intl.NumberFormat(language === "fa" ? "fa-IR" : "en-US", { maximumFractionDigits: 1 }).format(value); }
+function macroValue(value: string | null, unit: string, language: "fa" | "en") { return value === null ? "—" : `${formatNumber(Number(value), language)} ${language === "fa" && unit === "g" ? "گرم" : unit}`; }
+function priceUnit(unit: string, language: "fa" | "en") { const labels: Record<string, [string, string]> = { TOMAN_PER_KG: ["برای هر کیلوگرم", "per kilogram"], TOMAN_PER_LITER: ["برای هر لیتر", "per litre"], TOMAN_PER_UNIT: ["برای هر عدد", "per unit"] }; return labels[unit]?.[language === "fa" ? 0 : 1] ?? unit; }
+function nutrientName(code: string, language: "fa" | "en") { const labels: Record<string, [string, string]> = { calcium_mg: ["کلسیم", "Calcium"], iron_mg: ["آهن", "Iron"], zinc_mg: ["روی", "Zinc"], sodium_mg: ["سدیم", "Sodium"], potassium_mg: ["پتاسیم", "Potassium"], magnesium_mg: ["منیزیم", "Magnesium"] }; return labels[code]?.[language === "fa" ? 0 : 1] ?? code.replaceAll("_", " "); }
+function categoryLabel(category: string, language: "fa" | "en") { const labels: Record<string, [string, string]> = { poultry: ["مرغ و ماکیان", "Poultry"], grains: ["غلات", "Grains"], legumes: ["حبوبات", "Legumes"], vegetables: ["سبزیجات", "Vegetables"], fruit: ["میوه", "Fruit"], dairy: ["لبنیات", "Dairy"], fats: ["چربی‌ها", "Fats"], nuts_seeds: ["مغزها و دانه‌ها", "Nuts & seeds"] }; return labels[category]?.[language === "fa" ? 0 : 1] ?? category.replaceAll("_", " "); }
+function fieldLabel(field: string, language: "fa" | "en") { const labels: Record<string, [string, string]> = { slug: ["شناسه انگلیسی", "Slug"], name_fa: ["نام فارسی", "Persian name"], name_en: ["نام انگلیسی", "English name"], category: ["گروه غذایی", "Category"], source_name: ["نام منبع", "Source name"], source_reference: ["لینک منبع", "Source URL"] }; return labels[field][language === "fa" ? 0 : 1]; }

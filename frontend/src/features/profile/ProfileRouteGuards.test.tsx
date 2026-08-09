@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Profile } from "./types";
+import type { ProductMode, Profile } from "./types";
 
 const contexts = vi.hoisted(() => ({
   auth: {
@@ -22,7 +22,7 @@ const contexts = vi.hoisted(() => ({
   profile: {
     profile: null as Profile | null,
     status: "idle" as "idle" | "loading" | "missing" | "ready" | "error",
-    productMode: null,
+    productMode: null as ProductMode | null,
     retryProfile: vi.fn(),
     createProfile: vi.fn(),
     updateProfile: vi.fn(),
@@ -86,6 +86,7 @@ beforeEach(() => {
   contexts.auth.startupError = false;
   contexts.profile.profile = null;
   contexts.profile.status = "idle";
+  contexts.profile.productMode = null;
   contexts.profile.retryProfile.mockReset();
 });
 
@@ -168,5 +169,16 @@ describe("profile route matrix", () => {
     expect(
       screen.queryByRole("heading", { name: "پروفایل ورزشی‌ات را بساز" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("redirects a training-only member away from the food catalogue", async () => {
+    contexts.auth.user = member;
+    contexts.profile.status = "ready";
+    contexts.profile.profile = readyProfile;
+    contexts.profile.productMode = "training";
+
+    renderRoute("/food-catalogue");
+
+    expect(await screen.findByRole("heading", { name: "سلام، Mohammad" })).toBeVisible();
   });
 });

@@ -66,6 +66,7 @@ export function AuthenticatedHeader() {
                   {t("header.exercises")}
                 </Link>}
                 {hasNutrition && <Link to="/nutrition-estimate" onClick={() => setMenuOpen(false)}>{t("header.nutritionTargets")}</Link>}
+                {hasNutrition && <Link to="/food-catalogue" onClick={() => setMenuOpen(false)}>⌁ {t("header.foodCatalogue")}</Link>}
                 <button type="button" disabled>
                   {t("header.articles")} <small>{t("header.comingSoon")}</small>
                 </button>
@@ -108,6 +109,10 @@ export function AuthenticatedHeader() {
               to="/nutrition-estimate"
               aria-current={location.pathname === "/nutrition-estimate" ? "page" : undefined}
             >{t("header.nutritionTargets")}</Link>}
+            {hasNutrition && <Link
+              to="/food-catalogue"
+              aria-current={location.pathname === "/food-catalogue" ? "page" : undefined}
+            >⌁ {t("header.foodCatalogue")}</Link>}
             <Link
               to={status === "ready" ? "/profile" : "/onboarding"}
               aria-current={location.pathname === "/profile" ? "page" : undefined}

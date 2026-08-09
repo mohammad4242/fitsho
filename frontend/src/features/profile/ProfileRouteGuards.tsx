@@ -86,3 +86,10 @@ export function CompletedProfileRoute() {
     ? <Navigate to="/onboarding" replace />
     : <Outlet />;
 }
+
+export function NutritionCapabilityRoute() {
+  const { productMode } = useProfile();
+  return productMode === "nutrition" || productMode === "both"
+    ? <Outlet />
+    : <Navigate to="/dashboard" replace />;
+}

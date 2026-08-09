@@ -13,6 +13,7 @@ const navigation = [
   { to: "/workout-plan", label: "header.plan", icon: "plan", capability: "training" },
   { to: "/exercises", label: "header.exercises", icon: "exercise", capability: "training" },
   { to: "/nutrition-estimate", label: "header.nutritionTargets", icon: "plan", capability: "nutrition" },
+  { to: "/food-catalogue", label: "header.foodCatalogue", icon: "food", capability: "nutrition" },
   { to: "/profile", label: "header.profile", icon: "profile" },
 ] as const;
 
