@@ -60,6 +60,8 @@ const exerciseApi = vi.hoisted(() => ({
 
 const workoutApi = vi.hoisted(() => ({
   getActiveWorkoutPlan: vi.fn(),
+  getWorkoutPlanHistory: vi.fn(),
+  getWorkoutPlan: vi.fn(),
   generateWorkoutPlan: vi.fn(),
 }));
 
@@ -140,6 +142,8 @@ beforeEach(() => {
   exerciseApi.getExercises.mockReset();
   exerciseApi.getExercise.mockReset();
   workoutApi.getActiveWorkoutPlan.mockReset();
+  workoutApi.getWorkoutPlanHistory.mockReset();
+  workoutApi.getWorkoutPlan.mockReset();
   workoutApi.generateWorkoutPlan.mockReset();
   workoutReviewApi.verifyCoachAccess.mockReset();
   workoutReviewApi.verifyCoachAccess.mockRejectedValue(new Error("not a coach"));
@@ -149,6 +153,7 @@ beforeEach(() => {
   exerciseApi.getExercises.mockResolvedValue(emptyExercisePage);
   exerciseApi.getExercise.mockResolvedValue(exerciseDetail);
   workoutApi.getActiveWorkoutPlan.mockImplementation(() => new Promise(() => {}));
+  workoutApi.getWorkoutPlanHistory.mockResolvedValue([]);
 });
 
 it("shows a retry action when the initial session check is unavailable", async () => {

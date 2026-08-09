@@ -1,6 +1,11 @@
 import { afterEach, expect, it, vi } from "vitest";
 
-import { generateWorkoutPlan, getActiveWorkoutPlan } from "./api";
+import {
+  generateWorkoutPlan,
+  getActiveWorkoutPlan,
+  getWorkoutPlan,
+  getWorkoutPlanHistory,
+} from "./api";
 import type { WorkoutPlan } from "./types";
 
 const plan: WorkoutPlan = {
@@ -40,6 +45,33 @@ it("requests generation from Fitsho instead of an AI provider", async () => {
   expect(fetch).toHaveBeenCalledWith(
     "/api/v1/workout-plans/generate",
     expect.objectContaining({ credentials: "include", method: "POST" }),
+  );
+});
+
+it("reads member plan history and a selected immutable version", async () => {
+  const history = [{
+    id: plan.id,
+    created_at: plan.created_at,
+    activated_at: plan.activated_at,
+    is_active: true,
+    coach_review: { state: "coach_approved", coach_display_name: "Coach", coach_note: null, approved_at: plan.activated_at },
+  }];
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(jsonResponse(history))
+    .mockResolvedValueOnce(jsonResponse(plan));
+
+  await expect(getWorkoutPlanHistory()).resolves.toEqual(history);
+  await expect(getWorkoutPlan(plan.id)).resolves.toEqual(plan);
+
+  expect(fetch).toHaveBeenNthCalledWith(
+    1,
+    "/api/v1/workout-plans/history",
+    expect.objectContaining({ credentials: "include" }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    `/api/v1/workout-plans/${plan.id}`,
+    expect.objectContaining({ credentials: "include" }),
   );
 });
 

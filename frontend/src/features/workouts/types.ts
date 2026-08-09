@@ -54,3 +54,11 @@ export type WorkoutPlanGeneration = {
   plan: WorkoutPlan;
   reused: boolean;
 };
+
+export type WorkoutPlanVersionSummary = {
+  id: string;
+  created_at: string;
+  activated_at: string | null;
+  is_active: boolean;
+  coach_review: NonNullable<WorkoutPlan["coach_review"]>;
+};

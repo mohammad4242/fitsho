@@ -8,6 +8,8 @@ import type { WorkoutPlan } from "./types";
 
 const api = vi.hoisted(() => ({
   getActiveWorkoutPlan: vi.fn(),
+  getWorkoutPlanHistory: vi.fn(),
+  getWorkoutPlan: vi.fn(),
   generateWorkoutPlan: vi.fn(),
 }));
 
@@ -84,8 +86,75 @@ const plan: WorkoutPlan = {
 
 beforeEach(() => {
   api.getActiveWorkoutPlan.mockReset();
+  api.getWorkoutPlanHistory.mockReset();
+  api.getWorkoutPlan.mockReset();
   api.generateWorkoutPlan.mockReset();
+  api.getWorkoutPlanHistory.mockResolvedValue([]);
   api.generateWorkoutPlan.mockResolvedValue({ plan, reused: false });
+});
+
+it("keeps the initial version visible while coach approval is pending", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue({
+    ...plan,
+    coach_review: {
+      state: "pending_coach_review",
+      coach_display_name: null,
+      coach_note: null,
+      approved_at: null,
+    },
+  });
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByText("در انتظار تأیید مربی")).toBeInTheDocument();
+  expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
+});
+
+it("lets the member inspect old and coach-approved immutable versions", async () => {
+  const approvedPlan: WorkoutPlan = {
+    ...plan,
+    id: "018f0000-0000-7000-8000-000000000010",
+    coach_review: {
+      state: "coach_approved",
+      coach_display_name: "مربی سارا",
+      coach_note: "فشار جلسه دوم کمتر شد.",
+      approved_at: "2026-08-09T12:00:00Z",
+    },
+  };
+  api.getActiveWorkoutPlan.mockResolvedValue(approvedPlan);
+  api.getWorkoutPlanHistory.mockResolvedValue([
+    {
+      id: approvedPlan.id,
+      created_at: approvedPlan.created_at,
+      activated_at: approvedPlan.activated_at,
+      is_active: true,
+      coach_review: approvedPlan.coach_review,
+    },
+    {
+      id: plan.id,
+      created_at: plan.created_at,
+      activated_at: plan.activated_at,
+      is_active: false,
+      coach_review: {
+        state: "initial_generated",
+        coach_display_name: null,
+        coach_note: null,
+        approved_at: null,
+      },
+    },
+  ]);
+  api.getWorkoutPlan.mockResolvedValue({ ...plan, status: "superseded" });
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByText("تأییدشده توسط مربی سارا")).toBeInTheDocument();
+  expect(screen.getByText("فشار جلسه دوم کمتر شد.")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /نسخه اولیه/ }));
+
+  expect(api.getWorkoutPlan).toHaveBeenCalledWith(plan.id);
+  expect(await screen.findByText("در حال مشاهده نسخه قبلی")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "به‌روزرسانی برنامه" })).not.toBeInTheDocument();
 });
 
 it("shows the fixed start guide and a generate action when no plan exists", async () => {

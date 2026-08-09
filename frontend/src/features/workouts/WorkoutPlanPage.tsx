@@ -10,8 +10,13 @@ import { getProfile, updateProfile } from "../profile/api";
 import type { WorkoutGenerationMethod } from "../profile/types";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
-import { generateWorkoutPlan, getActiveWorkoutPlan } from "./api";
-import type { WorkoutPlan } from "./types";
+import {
+  generateWorkoutPlan,
+  getActiveWorkoutPlan,
+  getWorkoutPlan,
+  getWorkoutPlanHistory,
+} from "./api";
+import type { WorkoutPlan, WorkoutPlanVersionSummary } from "./types";
 import "./workoutPlan.css";
 
 type PlanState = "loading" | "empty" | "ready" | "error";
@@ -19,6 +24,9 @@ type PlanState = "loading" | "empty" | "ready" | "error";
 export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: number }) {
   const { i18n, t } = useTranslation();
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [history, setHistory] = useState<WorkoutPlanVersionSummary[]>([]);
+  const [selectingVersionId, setSelectingVersionId] = useState<string | null>(null);
   const [state, setState] = useState<PlanState>("loading");
   const [generating, setGenerating] = useState(false);
   const [reused, setReused] = useState(false);
@@ -27,15 +35,22 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   const [generationMethod, setGenerationMethod] = useState<WorkoutGenerationMethod>("fitsho_coach");
   const [savingGenerationMethod, setSavingGenerationMethod] = useState(false);
   const isEnglish = i18n.resolvedLanguage === "en";
+  const l = (fa: string, en: string) => isEnglish ? en : fa;
   const displayedPlanDuration = plan?.plan_duration_weeks ?? planDurationWeeks;
+  const isViewingHistorical = plan !== null && activePlanId !== null && plan.id !== activePlanId;
 
   useEffect(() => {
     let active = true;
     setState("loading");
-    void getActiveWorkoutPlan()
-      .then((currentPlan) => {
+    void Promise.all([
+      getActiveWorkoutPlan(),
+      getWorkoutPlanHistory().catch(() => [] as WorkoutPlanVersionSummary[]),
+    ])
+      .then(([currentPlan, versions]) => {
         if (!active) return;
         setPlan(currentPlan);
+        setActivePlanId(currentPlan?.id ?? null);
+        setHistory(versions);
         setState(currentPlan === null ? "empty" : "ready");
       })
       .catch(() => {
@@ -68,8 +83,10 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
     void generateWorkoutPlan()
       .then((result) => {
         setPlan(result.plan);
+        setActivePlanId(result.plan.id);
         setState("ready");
         setReused(result.reused);
+        void getWorkoutPlanHistory().then(setHistory).catch(() => undefined);
       })
       .catch((error: unknown) => {
         const errorKind = error instanceof ApiError && error.status === 429 ? "cooldown" : "failed";
@@ -77,6 +94,15 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         setGenerationError(errorKind);
       })
       .finally(() => setGenerating(false));
+  }
+
+  function selectVersion(version: WorkoutPlanVersionSummary) {
+    if (version.id === plan?.id) return;
+    setSelectingVersionId(version.id);
+    void getWorkoutPlan(version.id)
+      .then(setPlan)
+      .catch(() => undefined)
+      .finally(() => setSelectingVersionId(null));
   }
 
   return (
@@ -150,6 +176,36 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         )}
         {state === "ready" && plan !== null && (
           <>
+            <CoachReviewBanner plan={plan} isEnglish={isEnglish} historical={isViewingHistorical} />
+            {history.length > 1 && (
+              <section className="workout-version-history" aria-labelledby="workout-version-history-title">
+                <div>
+                  <p className="eyebrow eyebrow--accent">{l("نسخه‌های برنامه", "Plan versions")}</p>
+                  <h2 id="workout-version-history-title">{l("تاریخچه برنامه", "Plan history")}</h2>
+                </div>
+                <div className="workout-version-history__list">
+                  {history.map((version) => {
+                    const approved = version.coach_review.state === "coach_approved";
+                    const label = approved
+                      ? l("نسخه تأیید مربی", "Coach-approved version")
+                      : l("نسخه اولیه", "Initial version");
+                    return (
+                      <button
+                        type="button"
+                        key={version.id}
+                        className={version.id === plan.id ? "workout-version-history__active" : undefined}
+                        disabled={selectingVersionId !== null}
+                        aria-label={`${label} — ${new Intl.DateTimeFormat(isEnglish ? "en" : "fa-IR", { dateStyle: "medium" }).format(new Date(version.created_at))}`}
+                        onClick={() => selectVersion(version)}
+                      >
+                        <strong>{label}</strong>
+                        <span>{version.is_active ? l("فعال", "Active") : l("آرشیو", "Archived")}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
             {reused && <p className="workout-reused" role="status">{t("workoutPlan.reused")}</p>}
             {plan.is_stale && (
               <p className="workout-stale" role="status">{t("workoutPlan.stale")}</p>
@@ -183,12 +239,14 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                   <p className="eyebrow eyebrow--accent">{t("workoutPlan.weekly")}</p>
                   <h2 id="workout-schedule-title" className="fitsho-display">{t("workoutPlan.scheduleTitle")}</h2>
                 </div>
-                <GenerateButton
-                  generating={generating}
-                  onClick={generate}
-                  update
-                  disabled={generationError === "cooldown"}
-                />
+                {!isViewingHistorical && (
+                  <GenerateButton
+                    generating={generating}
+                    onClick={generate}
+                    update
+                    disabled={generationError === "cooldown"}
+                  />
+                )}
               </div>
               {generating && <p className="workout-generating" role="status">{t("workoutPlan.generating")}</p>}
               <div className="workout-days">
@@ -280,6 +338,33 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
       </main>
     </div>
   );
+}
+
+function CoachReviewBanner({ plan, isEnglish, historical }: { plan: WorkoutPlan; isEnglish: boolean; historical: boolean }) {
+  const review = plan.coach_review;
+  const l = (fa: string, en: string) => isEnglish ? en : fa;
+  if (historical) {
+    return <p className="workout-review-banner workout-review-banner--history" role="status">{l("در حال مشاهده نسخه قبلی", "Viewing a previous version")}</p>;
+  }
+  if (review?.state === "pending_coach_review") {
+    return (
+      <aside className="workout-review-banner workout-review-banner--pending" role="status">
+        <strong>{l("در انتظار تأیید مربی", "Waiting for coach approval")}</strong>
+        <span>{l("نسخه اولیه فعال است و بعد از تأیید، نسخه جدید جایگزین آن می‌شود.", "The initial version stays active until the approved version is ready.")}</span>
+      </aside>
+    );
+  }
+  if (review?.state === "coach_approved") {
+    const coach = review.coach_display_name ?? l("مربی فیتشو", "Fitsho coach");
+    return (
+      <aside className="workout-review-banner workout-review-banner--approved" role="status">
+        <strong>{l(`تأییدشده توسط ${coach}`, `Approved by ${coach}`)}</strong>
+        {review.approved_at && <time dateTime={review.approved_at}>{new Intl.DateTimeFormat(isEnglish ? "en" : "fa-IR", { dateStyle: "long" }).format(new Date(review.approved_at))}</time>}
+        {review.coach_note && <p>{review.coach_note}</p>}
+      </aside>
+    );
+  }
+  return null;
 }
 
 function FixedGuidance() {
