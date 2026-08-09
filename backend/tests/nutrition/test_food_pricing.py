@@ -42,7 +42,9 @@ def test_normalizes_liters_and_units_and_keeps_promotion_separate() -> None:
     )
     eggs = normalize_observation(
         observation(
-            package_quantity=Decimal("12"), package_unit="unit", normal_price=Decimal("180000"),
+            package_quantity=Decimal("12"),
+            package_unit="unit",
+            normal_price=Decimal("180000"),
             promotional_price=Decimal("150000"),
         )
     )
@@ -150,8 +152,12 @@ def test_update_run_is_idempotent_and_preserves_previous_price_on_review(db) -> 
     from app.nutrition.price_update_service import run_price_update
 
     food = NutritionCatalogueFood(
-        slug="price-test-chicken-breast", name_fa="سینه مرغ", name_en="Chicken breast",
-        verification_status=FoodVerificationStatus.VERIFIED, source_name="test", source_reference="test",
+        slug="price-test-chicken-breast",
+        name_fa="سینه مرغ",
+        name_en="Chicken breast",
+        verification_status=FoodVerificationStatus.VERIFIED,
+        source_name="test",
+        source_reference="test",
     )
     providers = [
         NutritionPriceProvider(
@@ -196,8 +202,12 @@ def test_update_run_is_idempotent_and_preserves_previous_price_on_review(db) -> 
         Provider("provider-b", "sku-2", "250000"),
         Provider("provider-c", "sku-3", "247000"),
     ]
-    first = run_price_update(db, providers=provider_adapters, scheduled_for=datetime(2026, 8, 8, 9, tzinfo=UTC))
-    same = run_price_update(db, providers=provider_adapters, scheduled_for=datetime(2026, 8, 8, 9, tzinfo=UTC))
+    first = run_price_update(
+        db, providers=provider_adapters, scheduled_for=datetime(2026, 8, 8, 9, tzinfo=UTC)
+    )
+    same = run_price_update(
+        db, providers=provider_adapters, scheduled_for=datetime(2026, 8, 8, 9, tzinfo=UTC)
+    )
 
     assert same.id == first.id
     assert first.foods_updated == 1
@@ -217,10 +227,12 @@ def test_scheduler_uses_one_tehran_saturday_slot(test_settings) -> None:
 
     saturday_after_noon = datetime(2026, 8, 8, 9, 30, tzinfo=UTC)  # 13:00 Tehran
     assert is_due(saturday_after_noon, test_settings) is True
-    assert weekly_slot(saturday_after_noon, test_settings) == datetime(2026, 8, 8, 8, 30, tzinfo=UTC)
+    assert weekly_slot(saturday_after_noon, test_settings) == datetime(
+        2026, 8, 8, 8, 30, tzinfo=UTC
+    )
 
 
-def test_empty_optional_api_key_does_not_enable_a_provider(test_settings) -> None:
+def test_empty_optional_api_key_keeps_only_keyless_public_providers(test_settings) -> None:
     import asyncio
 
     import httpx
@@ -229,7 +241,9 @@ def test_empty_optional_api_key_does_not_enable_a_provider(test_settings) -> Non
 
     async def check() -> None:
         async with httpx.AsyncClient(trust_env=False) as client:
-            assert configured_providers(test_settings, client) == []
+            providers = configured_providers(test_settings, client)
+            assert len(providers) == 10
+            assert all(provider.code != "public_catalog" for provider in providers)
 
     asyncio.run(check())
 
@@ -237,7 +251,9 @@ def test_empty_optional_api_key_does_not_enable_a_provider(test_settings) -> Non
 def test_public_price_provider_registry_is_seeded_disabled_until_live_probe(db) -> None:
     from app.nutrition.models import NutritionPriceProvider
 
-    providers = db.scalars(select(NutritionPriceProvider).order_by(NutritionPriceProvider.code)).all()
+    providers = db.scalars(
+        select(NutritionPriceProvider).order_by(NutritionPriceProvider.code)
+    ).all()
 
     assert [provider.code for provider in providers] == [
         "basalam_public",
