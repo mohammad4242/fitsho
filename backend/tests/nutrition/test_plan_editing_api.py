@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.nutrition.enums import NutritionPlanReviewStatus
 from app.nutrition.models import NutritionPlanPhysicianReview, NutritionWeeklyPlan
+from tests.nutrition.test_clinical_review_api import _login_physician
 from tests.nutrition.test_weekly_plan_api import (
     ORIGIN,
     _register_and_estimate,
@@ -179,3 +180,44 @@ def test_food_replacement_and_partial_regeneration_preserve_immutable_history(
     assert {item["id"] for item in history}.issuperset(
         {plan["id"], revision["id"], regenerated.json()["id"]}
     )
+
+
+def test_physician_quantity_edit_rebinds_review_to_new_revision(
+    client: TestClient,
+    db: Session,
+) -> None:
+    plan = _generated_plan(client, db)
+    physician = _login_physician(client, db, "quantity-physician@example.com")
+    review = next(
+        item
+        for item in client.get("/api/v1/nutrition/physician/reviews").json()
+        if item["plan_id"] == plan["id"]
+    )
+    assert client.post(
+        f"/api/v1/nutrition/physician/reviews/{review['review_id']}/claim",
+        headers=ORIGIN,
+    ).status_code == 200
+    meal = plan["days"][0]["meals"][0]
+    food = meal["foods"][0]
+
+    response = client.post(
+        f"/api/v1/nutrition/physician/plans/{plan['id']}/edits/food-quantity",
+        headers=ORIGIN,
+        json={
+            "expected_plan_revision_id": plan["id"],
+            "meal_id": meal["id"],
+            "food_id": food["food_id"],
+            "grams": float(food["grams"]) + 10,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    revised = response.json()
+    assert revised["id"] != plan["id"]
+    assert revised["review_status"] == "in_review"
+    new_review = db.scalar(
+        select(NutritionPlanPhysicianReview).where(
+            NutritionPlanPhysicianReview.plan_id == revised["id"]
+        )
+    )
+    assert new_review is not None and new_review.physician_user_id == physician.id

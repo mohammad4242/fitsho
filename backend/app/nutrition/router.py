@@ -39,12 +39,19 @@ from app.nutrition.clinical_service import (
     delete_lab,
     list_lab_requests,
     list_labs,
+    list_physician_labs,
     open_lab,
     request_labs,
+    review_lab_document,
     review_queue,
+    transition_lab_request,
     upload_lab,
 )
-from app.nutrition.enums import NutritionSupplementOrderStatus, PriceUpdateTriggerKind
+from app.nutrition.enums import (
+    NutritionLabRequestStatus,
+    NutritionSupplementOrderStatus,
+    PriceUpdateTriggerKind,
+)
 from app.nutrition.estimate_service import (
     create_estimate,
     current_estimate,
@@ -97,8 +104,10 @@ from app.nutrition.plan_editing import (
     confirm_replace_meal,
     partial_regenerate,
     physician_action,
+    physician_adjust_food_quantity,
     physician_plan,
     physician_remove_meal,
+    physician_replace_food,
     preview_remove_meal,
     preview_replace_food,
     preview_replace_meal,
@@ -135,7 +144,10 @@ from app.nutrition.schemas import (
     NutritionProfileInput,
     NutritionProfileResponse,
     PartialRegenerationInput,
+    PhysicianFoodQuantityInput,
     PhysicianLabRequestInput,
+    PhysicianLabRequestTransitionInput,
+    PhysicianLabReviewInput,
     PhysicianPlanActionInput,
     PhysicianReviewRequirementResponse,
     PhysicianSupplementOrderInput,
@@ -943,6 +955,56 @@ def physician_edit_remove_meal(
         raise _plan_edit_error(error) from None
 
 
+@router.post(
+    "/physician/plans/{plan_id}/edits/food-quantity",
+    response_model=WeeklyPlanResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def physician_edit_food_quantity(
+    plan_id: UUID,
+    payload: PhysicianFoodQuantityInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> WeeklyPlanResponse:
+    try:
+        return physician_adjust_food_quantity(
+            db,
+            user.id,
+            plan_id,
+            payload.expected_plan_revision_id,
+            payload.meal_id,
+            payload.food_id,
+            Decimal(str(payload.grams)),
+        )
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.post(
+    "/physician/plans/{plan_id}/edits/replace-food",
+    response_model=WeeklyPlanResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def physician_edit_food_replacement(
+    plan_id: UUID,
+    payload: ReplaceFoodInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> WeeklyPlanResponse:
+    try:
+        return physician_replace_food(
+            db,
+            user.id,
+            plan_id,
+            payload.expected_plan_revision_id,
+            payload.meal_id,
+            payload.food_id,
+            payload.replacement_food_id,
+        )
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
 def _tracking_error(error: TrackingError) -> HTTPException:
     error_status = (
         status.HTTP_404_NOT_FOUND if error.code.endswith("NOT_FOUND") else status.HTTP_409_CONFLICT
@@ -1335,6 +1397,61 @@ def read_physician_queue(db: DatabaseSession, user: CurrentUser) -> list[dict[st
 @router.get("/lab-requests")
 def read_user_lab_requests(db: DatabaseSession, user: CurrentUser) -> list[dict[str, object]]:
     return list_lab_requests(db, user.id)
+
+
+@router.get("/physician/plans/{plan_id}/labs")
+def read_physician_lab_documents(
+    plan_id: UUID,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> list[dict[str, object]]:
+    try:
+        return list_physician_labs(db, user.id, plan_id)
+    except ClinicalError as error:
+        raise _clinical_error(error) from None
+
+
+@router.put(
+    "/physician/labs/{document_id}/review",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_physician_lab_review(
+    document_id: UUID,
+    payload: PhysicianLabReviewInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, object]:
+    try:
+        return review_lab_document(
+            db,
+            user.id,
+            document_id,
+            payload.review_status,
+            payload.notes,
+        )
+    except ClinicalError as error:
+        raise _clinical_error(error) from None
+
+
+@router.put(
+    "/physician/lab-requests/{request_id}",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_physician_lab_request(
+    request_id: UUID,
+    payload: PhysicianLabRequestTransitionInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, object]:
+    if payload.status not in {
+        NutritionLabRequestStatus.REVIEWED,
+        NutritionLabRequestStatus.CANCELLED,
+    }:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_LAB_REQUEST_TRANSITION"})
+    try:
+        return transition_lab_request(db, user.id, request_id, payload.status)
+    except ClinicalError as error:
+        raise _clinical_error(error) from None
 
 
 @router.post(

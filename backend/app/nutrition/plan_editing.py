@@ -231,7 +231,7 @@ def _create_revision(
         safety_decision_id=generation.safety_decision_id,
         outcome=NutritionPlanGenerationOutcome.SUCCESS,
         reason_codes=[],
-        warning_codes=["USER_PLAN_EDIT"],
+        warning_codes=["PHYSICIAN_PLAN_EDIT" if physician_id else "USER_PLAN_EDIT"],
         input_signature=generation.input_signature,
         input_snapshot=dict(generation.input_snapshot),
         diagnostic_snapshot={"source_plan_id": str(plan.id), "operation": operation},
@@ -260,7 +260,12 @@ def _create_revision(
         input_snapshot=dict(plan.input_snapshot),
         price_snapshot=dict(plan.price_snapshot),
         repair_snapshot=list(plan.repair_snapshot),
-        warning_codes=list(set(plan.warning_codes + ["USER_PLAN_EDIT"])),
+        warning_codes=list(
+            set(
+                plan.warning_codes
+                + ["PHYSICIAN_PLAN_EDIT" if physician_id else "USER_PLAN_EDIT"]
+            )
+        ),
         explanation_codes=list(plan.explanation_codes),
         weekly_cost_irr=sum(day.cost_irr for day in days),
         weekly_budget_irr=plan.weekly_budget_irr,
@@ -287,6 +292,7 @@ def _create_revision(
     if plan.review and plan.review.status in {
         NutritionPlanReviewStatus.PENDING,
         NutritionPlanReviewStatus.IN_REVIEW,
+        NutritionPlanReviewStatus.AWAITING_LAB_INFORMATION,
         NutritionPlanReviewStatus.CHANGES_REQUESTED,
     }:
         plan.review.status = NutritionPlanReviewStatus.INVALIDATED_BY_REVISION
@@ -507,9 +513,20 @@ def confirm_replace_food(
     meal_id: UUID,
     food_id: UUID,
     replacement_food_id: UUID,
+    *,
+    physician_id: UUID | None = None,
 ) -> WeeklyPlanResponse:
     plan = owned_plan(db, user_id, plan_id, lock=True)
-    _assert_editable(plan, expected_plan_revision_id)
+    if physician_id is None:
+        _assert_editable(plan, expected_plan_revision_id)
+    elif plan.id != expected_plan_revision_id:
+        raise PlanEditError("STALE_PLAN_REVISION")
+    elif (
+        plan.review is None
+        or plan.review.physician_user_id != physician_id
+        or plan.review.status != NutritionPlanReviewStatus.IN_REVIEW
+    ):
+        raise PlanEditError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
     target_meal = next(
         (meal for day in plan.days for meal in day.meals if meal.id == meal_id), None
     )
@@ -549,7 +566,14 @@ def confirm_replace_food(
         )
 
     days = [_copy_day(day, transform) for day in plan.days]
-    return _create_revision(db, plan, user_id, days, "replace_food")
+    return _create_revision(
+        db,
+        plan,
+        user_id,
+        days,
+        "replace_food",
+        physician_id=physician_id,
+    )
 
 
 def partial_regenerate(
@@ -644,12 +668,113 @@ def physician_remove_meal(
     plan = db.scalar(select(NutritionWeeklyPlan).where(NutritionWeeklyPlan.id == plan_id))
     if plan is None:
         raise PlanEditError("NUTRITION_PLAN_NOT_FOUND")
+    review = db.scalar(
+        select(NutritionPlanPhysicianReview).where(
+            NutritionPlanPhysicianReview.plan_id == plan_id
+        )
+    )
+    if review is None or review.physician_user_id != physician_id:
+        raise PlanEditError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
+    if review.status != NutritionPlanReviewStatus.IN_REVIEW:
+        raise PlanEditError("REVIEW_NOT_IN_PROGRESS")
     return confirm_remove_meal(
         db,
         plan.user_id,
         plan_id,
         expected_plan_revision_id,
         meal_id,
+        physician_id=physician_id,
+    )
+
+
+def physician_adjust_food_quantity(
+    db: Session,
+    physician_id: UUID,
+    plan_id: UUID,
+    expected_plan_revision_id: UUID,
+    meal_id: UUID,
+    food_id: UUID,
+    grams: Decimal,
+) -> WeeklyPlanResponse:
+    try:
+        require_physician(db, physician_id)
+    except ClinicalError as error:
+        raise PlanEditError("PHYSICIAN_ROLE_REQUIRED") from error
+    plan = db.scalar(_query().where(NutritionWeeklyPlan.id == plan_id).with_for_update())
+    if plan is None:
+        raise PlanEditError("NUTRITION_PLAN_NOT_FOUND")
+    if plan.id != expected_plan_revision_id:
+        raise PlanEditError("STALE_PLAN_REVISION")
+    if (
+        plan.review is None
+        or plan.review.physician_user_id != physician_id
+        or plan.review.status != NutritionPlanReviewStatus.IN_REVIEW
+    ):
+        raise PlanEditError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
+    target_meal = next(
+        (meal for day in plan.days for meal in day.meals if meal.id == meal_id),
+        None,
+    )
+    if target_meal is None:
+        raise PlanEditError("MEAL_NOT_FOUND")
+    target_food = next((food for food in target_meal.foods if food.food_id == food_id), None)
+    if target_food is None:
+        raise PlanEditError("FOOD_REPLACEMENT_NOT_FOUND")
+
+    def transform(meal: NutritionWeeklyPlanMeal) -> NutritionWeeklyPlanMeal:
+        if meal.id != target_meal.id:
+            return _copy_meal(meal)
+        foods = [
+            _scaled_food(food, grams) if food.food_id == target_food.food_id else _copy_food(food)
+            for food in meal.foods
+        ]
+        return NutritionWeeklyPlanMeal(
+            slot_role=meal.slot_role,
+            slot_index=meal.slot_index,
+            target_distribution=dict(meal.target_distribution),
+            nutrient_totals=_sum_maps([food.nutrient_snapshot for food in foods]),
+            cost_irr=sum(food.cost_irr for food in foods),
+            is_locked=meal.is_locked,
+            foods=foods,
+        )
+
+    days = [_copy_day(day, transform) for day in plan.days]
+    return _create_revision(
+        db,
+        plan,
+        plan.user_id,
+        days,
+        "adjust_food_quantity",
+        physician_id=physician_id,
+    )
+
+
+def physician_replace_food(
+    db: Session,
+    physician_id: UUID,
+    plan_id: UUID,
+    expected_plan_revision_id: UUID,
+    meal_id: UUID,
+    food_id: UUID,
+    replacement_food_id: UUID,
+) -> WeeklyPlanResponse:
+    try:
+        require_physician(db, physician_id)
+    except ClinicalError as error:
+        raise PlanEditError("PHYSICIAN_ROLE_REQUIRED") from error
+    user_id = db.scalar(
+        select(NutritionWeeklyPlan.user_id).where(NutritionWeeklyPlan.id == plan_id)
+    )
+    if user_id is None:
+        raise PlanEditError("NUTRITION_PLAN_NOT_FOUND")
+    return confirm_replace_food(
+        db,
+        user_id,
+        plan_id,
+        expected_plan_revision_id,
+        meal_id,
+        food_id,
+        replacement_food_id,
         physician_id=physician_id,
     )
 
@@ -662,7 +787,7 @@ def physician_plan(db: Session, physician_id: UUID, plan_id: UUID) -> WeeklyPlan
     plan = db.scalar(_query().where(NutritionWeeklyPlan.id == plan_id))
     if plan is None or plan.review is None:
         raise PlanEditError("NUTRITION_PLAN_NOT_FOUND")
-    if plan.review.physician_user_id not in {None, physician_id}:
+    if plan.review.physician_user_id != physician_id:
         raise PlanEditError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
     return weekly_plan_response(plan)
 
@@ -689,13 +814,32 @@ def physician_action(
     ):
         raise PlanEditError("STALE_PLAN_REVISION")
     now = datetime.now(UTC)
-    plan.review.physician_user_id = physician_id
+    if plan.review.physician_user_id not in {None, physician_id}:
+        raise PlanEditError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
+    if action != "start_review" and plan.review.physician_user_id is None:
+        raise PlanEditError("REVIEW_NOT_CLAIMED")
+    if action != "start_review" and plan.review.physician_user_id != physician_id:
+        raise PlanEditError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
     plan.review.user_visible_notes = notes
     if action == "start_review":
+        if plan.review.status not in {
+            NutritionPlanReviewStatus.PENDING,
+            NutritionPlanReviewStatus.CHANGES_REQUESTED,
+        }:
+            raise PlanEditError("INVALID_REVIEW_TRANSITION")
+        plan.review.physician_user_id = physician_id
+        plan.review.assigned_at = plan.review.assigned_at or now
         plan.review.status = NutritionPlanReviewStatus.IN_REVIEW
         plan.lifecycle_status = NutritionPlanLifecycleStatus.PHYSICIAN_REVIEW_IN_PROGRESS
         plan.review.review_started_at = now
     elif action == "approve":
+        if plan.review.status != NutritionPlanReviewStatus.IN_REVIEW:
+            raise PlanEditError("REVIEW_NOT_IN_PROGRESS")
+        if any(
+            nutrient.status in {"below_minimum", "above_applicable_limit"}
+            for nutrient in plan.nutrients
+        ) or plan.budget_status == NutritionPlanBudgetStatus.OVER_BUDGET:
+            raise PlanEditError("PLAN_HARD_INVARIANTS_FAILED")
         plan.review.status = NutritionPlanReviewStatus.APPROVED
         plan.review.reviewed_at = now
         if plan.start_date <= now.date():
@@ -711,9 +855,23 @@ def physician_action(
         else:
             plan.lifecycle_status = NutritionPlanLifecycleStatus.PHYSICIAN_APPROVED
     elif action == "request_changes":
+        if not notes:
+            raise PlanEditError("REVIEW_NOTES_REQUIRED")
+        if plan.review.status not in {
+            NutritionPlanReviewStatus.IN_REVIEW,
+            NutritionPlanReviewStatus.AWAITING_LAB_INFORMATION,
+        }:
+            raise PlanEditError("REVIEW_NOT_IN_PROGRESS")
         plan.review.status = NutritionPlanReviewStatus.CHANGES_REQUESTED
         plan.lifecycle_status = NutritionPlanLifecycleStatus.CHANGES_REQUESTED
     elif action == "reject":
+        if not notes:
+            raise PlanEditError("REVIEW_NOTES_REQUIRED")
+        if plan.review.status not in {
+            NutritionPlanReviewStatus.IN_REVIEW,
+            NutritionPlanReviewStatus.AWAITING_LAB_INFORMATION,
+        }:
+            raise PlanEditError("REVIEW_NOT_IN_PROGRESS")
         plan.review.status = NutritionPlanReviewStatus.REJECTED
         plan.review.reviewed_at = now
         plan.lifecycle_status = NutritionPlanLifecycleStatus.REJECTED

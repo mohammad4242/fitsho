@@ -19,6 +19,7 @@ from app.nutrition.enums import (
     MetabolicBasis,
     NutritionDailyCheckInStatus,
     NutritionEstimateStatus,
+    NutritionLabRequestStatus,
     NutritionMealFeedbackType,
     NutritionOnboardingStatus,
     NutritionPlanStyle,
@@ -549,6 +550,13 @@ class PhysicianPlanActionInput(BaseModel):
     notes: str | None = Field(default=None, max_length=2000)
 
 
+class PhysicianFoodQuantityInput(BaseModel):
+    expected_plan_revision_id: UUID
+    meal_id: UUID
+    food_id: UUID
+    grams: float = Field(gt=0, le=5000)
+
+
 class DailyCheckInInput(BaseModel):
     entry_date: date
     status: NutritionDailyCheckInStatus
@@ -582,6 +590,15 @@ class PhysicianLabRequestInput(BaseModel):
     expected_plan_revision_id: UUID
     requested_tests: list[str] = Field(min_length=1, max_length=30)
     user_visible_reason: str = Field(min_length=1, max_length=2000)
+
+
+class PhysicianLabReviewInput(BaseModel):
+    review_status: str = Field(pattern="^(reviewed|requires_follow_up)$")
+    notes: str | None = Field(default=None, max_length=2000)
+
+
+class PhysicianLabRequestTransitionInput(BaseModel):
+    status: NutritionLabRequestStatus
 
 
 class SupplementCatalogueInput(BaseModel):

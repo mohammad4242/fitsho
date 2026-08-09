@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 
 from fastapi import UploadFile
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.body_analysis.enums import SpecialistRole
@@ -120,6 +120,9 @@ def lab_response(row: NutritionLabDocument) -> dict[str, object]:
         "user_note": row.user_note,
         "category": row.category,
         "review_status": row.review_status,
+        "reviewed_at": row.reviewed_at,
+        "reviewed_by_user_id": row.reviewed_by_user_id,
+        "review_notes": row.review_notes,
         "request_id": row.request_id,
         "uploaded_at": row.uploaded_at,
         "retained_until": row.retained_until,
@@ -223,6 +226,91 @@ def list_labs(db: Session, user_id: UUID) -> list[dict[str, object]]:
     ]
 
 
+def _assigned_plan(
+    db: Session,
+    physician_id: UUID,
+    plan_id: UUID,
+) -> NutritionWeeklyPlan:
+    require_physician(db, physician_id)
+    plan = db.scalar(
+        select(NutritionWeeklyPlan)
+        .where(NutritionWeeklyPlan.id == plan_id)
+        .options(selectinload(NutritionWeeklyPlan.review))
+    )
+    if plan is None or plan.review is None:
+        raise ClinicalError("NUTRITION_PLAN_NOT_FOUND")
+    if plan.review.physician_user_id != physician_id:
+        raise ClinicalError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
+    return plan
+
+
+def list_physician_labs(
+    db: Session,
+    physician_id: UUID,
+    plan_id: UUID,
+) -> list[dict[str, object]]:
+    plan = _assigned_plan(db, physician_id, plan_id)
+    return [
+        lab_response(row)
+        for row in db.scalars(
+            select(NutritionLabDocument)
+            .where(
+                NutritionLabDocument.user_id == plan.user_id,
+                NutritionLabDocument.purged_at.is_(None),
+            )
+            .order_by(NutritionLabDocument.uploaded_at.desc())
+        )
+    ]
+
+
+def review_lab_document(
+    db: Session,
+    physician_id: UUID,
+    document_id: UUID,
+    review_status: str,
+    notes: str | None,
+) -> dict[str, object]:
+    require_physician(db, physician_id)
+    row = authorize_lab_access(db, physician_id, document_id)
+    assigned = db.scalar(
+        select(NutritionPlanPhysicianReview)
+        .join(NutritionWeeklyPlan, NutritionWeeklyPlan.id == NutritionPlanPhysicianReview.plan_id)
+        .where(
+            NutritionWeeklyPlan.user_id == row.user_id,
+            NutritionPlanPhysicianReview.physician_user_id == physician_id,
+            NutritionPlanPhysicianReview.status.in_(
+                [
+                    NutritionPlanReviewStatus.IN_REVIEW,
+                    NutritionPlanReviewStatus.AWAITING_LAB_INFORMATION,
+                ]
+            ),
+        )
+    )
+    if assigned is None:
+        raise ClinicalError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
+    row.review_status = review_status
+    row.reviewed_at = datetime.now(UTC)
+    row.reviewed_by_user_id = physician_id
+    row.review_notes = notes
+    if row.request_id is not None:
+        request = db.get(NutritionLabRequest, row.request_id)
+        if request is not None and request.physician_user_id == physician_id:
+            request.status = NutritionLabRequestStatus.REVIEWED
+            request.reviewed_at = row.reviewed_at
+    audit_security_event(
+        db,
+        actor_user_id=physician_id,
+        owner_user_id=row.user_id,
+        event_type="lab_reviewed",
+        resource_type="lab_document",
+        resource_id=row.id,
+        metadata={"review_status": review_status},
+    )
+    db.commit()
+    db.refresh(row)
+    return lab_response(row)
+
+
 def authorize_lab_access(db: Session, actor_id: UUID, document_id: UUID) -> NutritionLabDocument:
     row = db.get(NutritionLabDocument, document_id)
     if row is None or row.purged_at is not None:
@@ -296,6 +384,10 @@ def review_queue(db: Session, physician_id: UUID) -> list[dict[str, object]]:
     reviews = db.scalars(
         select(NutritionPlanPhysicianReview)
         .where(
+            or_(
+                NutritionPlanPhysicianReview.physician_user_id.is_(None),
+                NutritionPlanPhysicianReview.physician_user_id == physician_id,
+            ),
             NutritionPlanPhysicianReview.status.in_(
                 [
                     NutritionPlanReviewStatus.PENDING,
@@ -336,6 +428,12 @@ def claim_review(db: Session, physician_id: UUID, review_id: UUID) -> dict[str, 
         raise ClinicalError("REVIEW_NOT_FOUND")
     if review.physician_user_id and review.physician_user_id != physician_id:
         raise ClinicalError("REVIEW_ALREADY_ASSIGNED")
+    if review.status not in {
+        NutritionPlanReviewStatus.PENDING,
+        NutritionPlanReviewStatus.CHANGES_REQUESTED,
+        NutritionPlanReviewStatus.IN_REVIEW,
+    }:
+        raise ClinicalError("INVALID_REVIEW_TRANSITION")
     now = datetime.now(UTC)
     review.physician_user_id = physician_id
     review.assigned_at = review.assigned_at or now
@@ -374,8 +472,10 @@ def request_labs(
     )
     if plan is None or plan.id != expected_plan_revision_id or plan.review is None:
         raise ClinicalError("STALE_PLAN_REVISION")
-    if plan.review.physician_user_id not in {None, physician_id}:
+    if plan.review.physician_user_id != physician_id:
         raise ClinicalError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
+    if plan.review.status != NutritionPlanReviewStatus.IN_REVIEW:
+        raise ClinicalError("REVIEW_NOT_IN_PROGRESS")
     row = NutritionLabRequest(
         user_id=plan.user_id,
         plan_id=plan.id,
@@ -385,7 +485,6 @@ def request_labs(
         notes=user_visible_reason,
     )
     db.add(row)
-    plan.review.physician_user_id = physician_id
     plan.review.status = NutritionPlanReviewStatus.AWAITING_LAB_INFORMATION
     plan.review.user_visible_notes = user_visible_reason
     plan.lifecycle_status = NutritionPlanLifecycleStatus.AWAITING_LAB_INFORMATION
@@ -416,6 +515,43 @@ def list_lab_requests(db: Session, user_id: UUID) -> list[dict[str, object]]:
             "requested_tests": row.requested_tests,
             "user_visible_reason": row.notes,
             "created_at": row.created_at,
+            "reviewed_at": row.reviewed_at,
+            "cancelled_at": row.cancelled_at,
         }
         for row in rows
     ]
+
+
+def transition_lab_request(
+    db: Session,
+    physician_id: UUID,
+    request_id: UUID,
+    status: NutritionLabRequestStatus,
+) -> dict[str, object]:
+    require_physician(db, physician_id)
+    row = db.scalar(
+        select(NutritionLabRequest)
+        .where(NutritionLabRequest.id == request_id)
+        .with_for_update()
+    )
+    if row is None:
+        raise ClinicalError("LAB_REQUEST_NOT_FOUND")
+    if row.physician_user_id != physician_id:
+        raise ClinicalError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
+    now = datetime.now(UTC)
+    if (
+        status is NutritionLabRequestStatus.REVIEWED
+        and row.status is NutritionLabRequestStatus.UPLOADED
+    ):
+        row.status = status
+        row.reviewed_at = now
+    elif status is NutritionLabRequestStatus.CANCELLED and row.status in {
+        NutritionLabRequestStatus.REQUESTED,
+        NutritionLabRequestStatus.UPLOADED,
+    }:
+        row.status = status
+        row.cancelled_at = now
+    else:
+        raise ClinicalError("INVALID_LAB_REQUEST_TRANSITION")
+    db.commit()
+    return {"id": row.id, "status": row.status.value}

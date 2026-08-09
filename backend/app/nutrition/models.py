@@ -21,6 +21,9 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy import (
+    text as sql_text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -1053,6 +1056,12 @@ class NutritionWeeklyPlan(Base):
         UniqueConstraint("generation_id", name="uq_nutrition_weekly_plan_generation"),
         CheckConstraint("revision > 0", name="ck_nutrition_weekly_plan_revision_positive"),
         Index("ix_nutrition_weekly_plans_user_created", "user_id", "created_at"),
+        Index(
+            "uq_nutrition_weekly_plans_one_active_per_user",
+            "user_id",
+            unique=True,
+            postgresql_where=sql_text("lifecycle_status = 'active'"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -1294,6 +1303,11 @@ class NutritionLabDocument(Base):
     user_note: Mapped[str | None] = mapped_column(String(1000))
     category: Mapped[str | None] = mapped_column(String(80))
     review_status: Mapped[str] = mapped_column(String(24), nullable=False, default="unreviewed")
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    review_notes: Mapped[str | None] = mapped_column(String(2000))
     request_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("nutrition_lab_requests.id", ondelete="SET NULL")
     )
@@ -1326,6 +1340,8 @@ class NutritionLabRequest(Base):
     )
     requested_tests: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     notes: Mapped[str | None] = mapped_column(String(2000))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

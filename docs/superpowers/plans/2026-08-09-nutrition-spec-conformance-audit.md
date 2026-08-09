@@ -50,12 +50,12 @@
 - Modify: `backend/app/nutrition/schemas.py`
 - Test: `backend/tests/nutrition/test_clinical_review_api.py`
 
-- [ ] Add failing tests for assignment isolation, exact-revision approval, effective-date activation, atomic supersession, lab review, and same-session physician revision rebind.
-- [ ] Prevent one physician from taking over another physician's review.
-- [ ] Add structured physician food/quantity editing with complete deterministic revalidation and immutable revision history.
-- [ ] Add laboratory metadata/review endpoints for the assigned physician and explicit request transitions.
-- [ ] Persist explicit approval metadata and activation-safe audit events.
-- [ ] Run focused checks, commit, and push.
+- [x] Add failing tests for assignment isolation, exact-revision approval, effective-date activation, atomic supersession, lab review, and same-session physician revision rebind.
+- [x] Prevent one physician from taking over another physician's review.
+- [x] Add structured physician food/quantity editing with complete deterministic revalidation and immutable revision history.
+- [x] Add laboratory metadata/review endpoints for the assigned physician and explicit request transitions.
+- [x] Persist explicit approval metadata and activation-safe audit events.
+- [x] Run focused checks, commit, and push.
 
 ### Task 3: Complete tracking and photo correction contracts
 

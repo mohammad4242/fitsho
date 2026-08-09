@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -5,7 +7,12 @@ from sqlalchemy.orm import Session
 from app.auth.models import User
 from app.body_analysis.enums import SpecialistRole
 from app.body_analysis.models import UserSpecialistRole
-from app.nutrition.models import NutritionLabRequest, NutritionWeeklyPlan
+from app.nutrition.models import (
+    NutritionLabDocument,
+    NutritionLabRequest,
+    NutritionPlanPhysicianReview,
+    NutritionWeeklyPlan,
+)
 from tests.nutrition.test_weekly_plan_api import (
     ORIGIN,
     _register_and_estimate,
@@ -21,17 +28,21 @@ def _member_plan(client: TestClient, db: Session) -> dict[str, object]:
     return response.json()["plan"]
 
 
-def _login_physician(client: TestClient, db: Session) -> User:
+def _login_physician(
+    client: TestClient,
+    db: Session,
+    email: str = "physician@example.com",
+) -> User:
     assert client.post("/api/v1/auth/logout", headers=ORIGIN).status_code == 204
     assert (
         client.post(
             "/api/v1/auth/register",
             headers=ORIGIN,
-            json={"email": "physician@example.com", "password": "long password"},
+            json={"email": email, "password": "long password"},
         ).status_code
         == 201
     )
-    physician = db.scalar(select(User).where(User.email == "physician@example.com"))
+    physician = db.scalar(select(User).where(User.email == email))
     assert physician is not None
     db.add(UserSpecialistRole(user_id=physician.id, role=SpecialistRole.PHYSICIAN))
     db.flush()
@@ -108,3 +119,130 @@ def test_non_physician_cannot_access_review_queue(client: TestClient, db: Sessio
     _member_plan(client, db)
     response = client.get("/api/v1/nutrition/physician/reviews")
     assert response.status_code == 403
+
+
+def test_assigned_review_cannot_be_taken_over_or_approved_by_another_physician(
+    client: TestClient,
+    db: Session,
+) -> None:
+    plan = _member_plan(client, db)
+    first = _login_physician(client, db, "first-physician@example.com")
+    review = next(
+        item
+        for item in client.get("/api/v1/nutrition/physician/reviews").json()
+        if item["plan_id"] == plan["id"]
+    )
+    assert (
+        client.post(
+            f"/api/v1/nutrition/physician/reviews/{review['review_id']}/claim",
+            headers=ORIGIN,
+        ).status_code
+        == 200
+    )
+
+    second = _login_physician(client, db, "second-physician@example.com")
+    response = client.post(
+        f"/api/v1/nutrition/physician/plans/{plan['id']}/action",
+        headers=ORIGIN,
+        json={
+            "expected_plan_revision_id": plan["id"],
+            "action": "approve",
+            "notes": "تأیید",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN"
+    persisted = db.scalar(
+        select(NutritionPlanPhysicianReview).where(
+            NutritionPlanPhysicianReview.plan_id == plan["id"]
+        )
+    )
+    assert persisted is not None and persisted.physician_user_id == first.id
+    assert persisted.physician_user_id != second.id
+
+
+def test_approval_requires_claim_and_activates_exact_due_revision(
+    client: TestClient,
+    db: Session,
+) -> None:
+    plan = _member_plan(client, db)
+    _login_physician(client, db, "approval-physician@example.com")
+    payload = {
+        "expected_plan_revision_id": plan["id"],
+        "action": "approve",
+        "notes": "از نظر پزشکی تأیید شد",
+    }
+    unclaimed = client.post(
+        f"/api/v1/nutrition/physician/plans/{plan['id']}/action",
+        headers=ORIGIN,
+        json=payload,
+    )
+    assert unclaimed.status_code == 409
+    assert unclaimed.json()["detail"]["code"] == "REVIEW_NOT_CLAIMED"
+
+    review = next(
+        item
+        for item in client.get("/api/v1/nutrition/physician/reviews").json()
+        if item["plan_id"] == plan["id"]
+    )
+    assert (
+        client.post(
+            f"/api/v1/nutrition/physician/reviews/{review['review_id']}/claim",
+            headers=ORIGIN,
+        ).status_code
+        == 200
+    )
+    persisted = db.get(NutritionWeeklyPlan, plan["id"])
+    assert persisted is not None
+    persisted.start_date = date.today()
+    db.commit()
+
+    approved = client.post(
+        f"/api/v1/nutrition/physician/plans/{plan['id']}/action",
+        headers=ORIGIN,
+        json=payload,
+    )
+
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["lifecycle_status"] == "active"
+    assert approved.json()["physician_approved"] is True
+
+
+def test_assigned_physician_can_list_and_review_member_labs(
+    client: TestClient,
+    db: Session,
+) -> None:
+    plan = _member_plan(client, db)
+    uploaded = client.post(
+        "/api/v1/nutrition/labs",
+        headers=ORIGIN,
+        files={"file": ("blood.pdf", b"%PDF-1.4\n%%EOF", "application/pdf")},
+        data={"category": "blood_panel", "laboratory_name": "آزمایشگاه"},
+    )
+    assert uploaded.status_code == 201
+    document_id = uploaded.json()["id"]
+    _login_physician(client, db, "lab-review-physician@example.com")
+    review = next(
+        item
+        for item in client.get("/api/v1/nutrition/physician/reviews").json()
+        if item["plan_id"] == plan["id"]
+    )
+    assert client.post(
+        f"/api/v1/nutrition/physician/reviews/{review['review_id']}/claim",
+        headers=ORIGIN,
+    ).status_code == 200
+
+    listed = client.get(f"/api/v1/nutrition/physician/plans/{plan['id']}/labs")
+    reviewed = client.put(
+        f"/api/v1/nutrition/physician/labs/{document_id}/review",
+        headers=ORIGIN,
+        json={"review_status": "reviewed", "notes": "بررسی شد"},
+    )
+
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()] == [document_id]
+    assert reviewed.status_code == 200, reviewed.text
+    row = db.get(NutritionLabDocument, document_id)
+    assert row is not None and row.review_status == "reviewed"
+    assert row.reviewed_at is not None
