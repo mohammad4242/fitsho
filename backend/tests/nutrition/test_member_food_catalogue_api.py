@@ -113,6 +113,7 @@ def test_both_member_sees_current_accepted_price(client: TestClient, db: Session
     else:
         reference.reference_price_toman = Decimal("590000")
         reference.status = PriceReferenceStatus.ACCEPTED
+        reference.calculated_at = now
         reference.accepted_at = now
     db.commit()
 
@@ -122,6 +123,9 @@ def test_both_member_sees_current_accepted_price(client: TestClient, db: Session
     item = next(row for row in response.json()["items"] if row["slug"] == "basmati-rice")
     assert item["price"]["status"] == "accepted"
     assert item["price"]["reference_price_toman"] == "590000.00000000"
+    assert item["price"]["reference_price_irr"] == "5900000.00000000"
+    assert item["price"]["reference_unit"] == "IRR_PER_KG"
+    assert item["price"]["observed_at"] == now.isoformat().replace("+00:00", "Z")
     assert item["price"]["source"] == "automatic"
 
 

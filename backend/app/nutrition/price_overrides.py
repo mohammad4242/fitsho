@@ -29,6 +29,7 @@ class EffectivePrice:
     reference_price_toman: Decimal
     canonical_unit: str
     accepted_at: datetime
+    observed_at: datetime
     source: str
     sample_count: int
     confidence: str
@@ -59,6 +60,7 @@ def effective_prices(
             reference_price_toman=reference.reference_price_toman,
             canonical_unit=reference.canonical_unit,
             accepted_at=reference.accepted_at,
+            observed_at=reference.calculated_at,
             source="automatic",
             sample_count=reference.sample_count,
             confidence=reference.confidence.value,
@@ -78,6 +80,7 @@ def effective_prices(
             reference_price_toman=override.reference_price_toman,
             canonical_unit=override.canonical_unit,
             accepted_at=override.created_at,
+            observed_at=override.created_at,
             source="manual_override",
             sample_count=1,
             confidence="medium",

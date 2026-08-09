@@ -315,6 +315,10 @@ class CatalogueFoodResponse(CatalogueFoodWrite):
 
 class FoodCataloguePriceResponse(BaseModel):
     status: Literal["accepted", "not_found"]
+    reference_price_irr: Decimal | None = None
+    reference_unit: Literal["IRR_PER_KG", "IRR_PER_LITER", "IRR_PER_UNIT"] | None = None
+    observed_at: datetime | None = None
+    # Deprecated compatibility fields. Member clients must display the IRR fields above.
     reference_price_toman: Decimal | None = None
     canonical_unit: str | None = None
     accepted_at: datetime | None = None

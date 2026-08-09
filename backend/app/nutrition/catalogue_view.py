@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -18,6 +20,11 @@ from app.nutrition.schemas import (
 )
 
 PRIMARY_NUTRIENTS = tuple(sorted(REQUIRED_PRIMARY_NUTRIENTS))
+TOMAN_TO_IRR = Decimal("10")
+
+
+def _irr_reference_unit(canonical_unit: str) -> str:
+    return canonical_unit.replace("TOMAN_", "IRR_", 1)
 
 
 def member_food_catalogue(
@@ -68,6 +75,9 @@ def member_food_catalogue(
             if effective is None
             else FoodCataloguePriceResponse(
                 status="accepted",
+                reference_price_irr=effective.reference_price_toman * TOMAN_TO_IRR,
+                reference_unit=_irr_reference_unit(effective.canonical_unit),
+                observed_at=effective.observed_at,
                 reference_price_toman=effective.reference_price_toman,
                 canonical_unit=effective.canonical_unit,
                 accepted_at=effective.accepted_at,

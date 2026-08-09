@@ -38,6 +38,10 @@ export type FoodCatalogueItem = {
   nutrient_basis: { quantity: string; unit: string };
   price: {
     status: "accepted" | "not_found";
+    reference_price_irr?: string;
+    reference_unit?: "IRR_PER_KG" | "IRR_PER_LITER" | "IRR_PER_UNIT";
+    observed_at?: string;
+    /** Deprecated compatibility fields; member UI displays IRR. */
     reference_price_toman?: string;
     canonical_unit?: string;
     accepted_at?: string;

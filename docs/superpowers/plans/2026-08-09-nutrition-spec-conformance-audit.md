@@ -101,10 +101,10 @@
 - Modify: `frontend/src/features/nutrition/api.ts`
 - Test: member catalogue backend/frontend tests
 
-- [ ] Add failing tests that current member-facing money is expressed in IRR and missing prices remain unavailable.
-- [ ] Keep legacy Toman storage fields for compatibility but expose an exact IRR reference in the member read model.
-- [ ] Render weekly prices in IRR with source and observation/acceptance date.
-- [ ] Run focused checks, commit, and push.
+- [x] Add failing tests that current member-facing money is expressed in IRR and missing prices remain unavailable.
+- [x] Keep legacy Toman storage fields for compatibility but expose an exact IRR reference in the member read model.
+- [x] Render weekly prices in IRR with source and observation/acceptance date.
+- [x] Run focused checks, commit, and push.
 
 ### Task 6: Final conformance verification and documentation
 

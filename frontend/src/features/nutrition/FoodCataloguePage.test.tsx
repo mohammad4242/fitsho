@@ -105,3 +105,27 @@ it("uses English copy and left-to-right flow", async () => {
   expect(screen.getByText("Not found")).toBeVisible();
   expect(container.querySelector("main")).toHaveAttribute("dir", "ltr");
 });
+
+it("shows accepted member prices in IRR with source and date", async () => {
+  await i18n.changeLanguage("en");
+  vi.mocked(api.getFoodCatalogue).mockResolvedValue({
+    ...response,
+    items: [{
+      ...response.items[0],
+      price: {
+        status: "accepted",
+        reference_price_irr: "5900000.00000000",
+        reference_unit: "IRR_PER_KG",
+        observed_at: "2026-08-09T12:00:00Z",
+        accepted_at: "2026-08-09T12:05:00Z",
+        source: "automatic",
+      },
+    }],
+  });
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  expect(await screen.findByText("5,900,000 IRR")).toBeVisible();
+  expect(screen.getByText(/Automatic market update/)).toBeVisible();
+  expect(screen.getByText(/8\/9\/26/)).toBeVisible();
+  expect(screen.queryByText(/Toman/)).not.toBeInTheDocument();
+});
