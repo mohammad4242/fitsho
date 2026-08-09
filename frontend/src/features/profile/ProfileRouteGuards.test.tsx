@@ -30,6 +30,11 @@ const contexts = vi.hoisted(() => ({
   },
 }));
 
+const workoutReviewApi = vi.hoisted(() => ({
+  verifyCoachAccess: vi.fn(),
+  listWorkoutReviews: vi.fn(),
+}));
+
 vi.mock("../auth/AuthContext", () => ({
   useAuth: () => contexts.auth,
 }));
@@ -38,6 +43,8 @@ vi.mock("./ProfileContext", () => ({
   useProfile: () => contexts.profile,
   useOptionalProfile: () => contexts.profile,
 }));
+
+vi.mock("../workoutReviews/api", () => workoutReviewApi);
 
 import { AppRoutes } from "../../App";
 
@@ -88,9 +95,35 @@ beforeEach(() => {
   contexts.profile.status = "idle";
   contexts.profile.productMode = null;
   contexts.profile.retryProfile.mockReset();
+  workoutReviewApi.verifyCoachAccess.mockReset();
+  workoutReviewApi.listWorkoutReviews.mockReset();
+  workoutReviewApi.listWorkoutReviews.mockResolvedValue([]);
 });
 
 describe("profile route matrix", () => {
+  it("lets an authorized coach open the workspace without a member profile", async () => {
+    contexts.auth.user = member;
+    contexts.profile.status = "missing";
+    workoutReviewApi.verifyCoachAccess.mockResolvedValue({ authorized: true });
+
+    renderRoute("/coach/workouts");
+
+    expect(
+      await screen.findByRole("heading", { name: "بازبینی برنامه‌های تمرینی" }),
+    ).toBeVisible();
+  });
+
+  it("redirects a non-coach away from the coach workspace", async () => {
+    contexts.auth.user = member;
+    contexts.profile.status = "ready";
+    contexts.profile.profile = readyProfile;
+    workoutReviewApi.verifyCoachAccess.mockRejectedValue(new Error("forbidden"));
+
+    renderRoute("/coach/workouts");
+
+    expect(await screen.findByRole("heading", { name: "سلام، Mohammad" })).toBeVisible();
+  });
+
   it.each(["/dashboard", "/onboarding"])(
     "redirects a guest from %s to login",
     async (path) => {

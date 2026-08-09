@@ -21,8 +21,10 @@ import { ProfilePage } from "./features/profile/ProfilePage";
 import { ProfileProvider } from "./features/profile/ProfileContext";
 import { useProfile } from "./features/profile/ProfileContext";
 import { WorkoutPlanPage } from "./features/workouts/WorkoutPlanPage";
+import { CoachWorkoutReviewPage } from "./features/workoutReviews/CoachWorkoutReviewPage";
 import {
   CompletedProfileRoute,
+  CoachRoute,
   GuestRoute,
   NutritionCapabilityRoute,
   OnboardingRoute,
@@ -49,6 +51,9 @@ export function AppRoutes() {
         <Route path="/register" element={<RegisterPage />} />
       </Route>
       <Route element={<ProtectedRoute />}>
+        <Route element={<CoachRoute />}>
+          <Route path="/coach/workouts" element={<CoachWorkoutReviewPage />} />
+        </Route>
         <Route element={<PhysicianRoute />}>
           <Route path="/physician/nutrition" element={<PhysicianNutritionReviewPage />} />
         </Route>
