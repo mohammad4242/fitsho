@@ -173,7 +173,7 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
               <div className="weekly-plan__meal-actions">
                 <button disabled={busyMeal === meal.id} type="button" onClick={() => void toggleLock(meal.id, !meal.is_locked)}>{meal.is_locked ? l("بازکردن قفل", "Unlock") : l("قفل وعده", "Lock meal")}</button>
                 <button type="button" onClick={() => void api.saveMealFeedback(currentPlan.id, meal.id, "liked")}>{l("پسندیدم", "Liked")}</button>
-                <button type="button" onClick={() => void api.saveMealFeedback(currentPlan.id, meal.id, "too_expensive")}>{l("گران است", "Too expensive")}</button>
+                <button type="button" onClick={() => void api.saveMealFeedback(currentPlan.id, meal.id, "disliked")}>{l("کمتر پیشنهاد بده", "Suggest less often")}</button>
                 <button disabled={meal.is_locked || busyMeal === meal.id} type="button" onClick={() => void beginRemoval(meal.id)}>{l("پیش‌نمایش حذف", "Preview removal")}</button>
                 {findMealAlternative(currentPlan, meal.id, meal.slot_role) && <button disabled={meal.is_locked || busyMeal === meal.id} type="button" onClick={() => void beginMealReplacement(meal.id, findMealAlternative(currentPlan, meal.id, meal.slot_role)!.id)}>{l("پیش‌نمایش تعویض وعده", "Preview meal replacement")}</button>}
                 {meal.foods[0] && findFoodAlternative(currentPlan, meal.foods[0].food_id) && <button disabled={meal.is_locked || busyMeal === meal.id} type="button" onClick={() => void beginFoodReplacement(meal.id, meal.foods[0].food_id, findFoodAlternative(currentPlan, meal.foods[0].food_id)!.food_id)}>{l("پیش‌نمایش تعویض ماده", "Preview food replacement")}</button>}

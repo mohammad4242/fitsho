@@ -42,6 +42,7 @@ from app.nutrition.clinical_service import (
     list_physician_labs,
     open_lab,
     request_labs,
+    require_physician,
     review_lab_document,
     review_queue,
     transition_lab_request,
@@ -1486,6 +1487,15 @@ def read_physician_queue(db: DatabaseSession, user: CurrentUser) -> list[dict[st
         return review_queue(db, user.id)
     except ClinicalError as error:
         raise _clinical_error(error) from None
+
+
+@router.get("/physician/access")
+def read_physician_access(db: DatabaseSession, user: CurrentUser) -> dict[str, bool]:
+    try:
+        require_physician(db, user.id)
+    except ClinicalError as error:
+        raise _clinical_error(error) from None
+    return {"authorized": True}
 
 
 @router.get("/lab-requests")

@@ -171,13 +171,19 @@ describe("profile route matrix", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("redirects a training-only member away from the food catalogue", async () => {
+  it.each([
+    "/food-catalogue",
+    "/nutrition-estimate",
+    "/nutrition-tracking",
+    "/nutrition-labs",
+    "/nutrition-supplements",
+  ])("redirects a training-only member away from %s", async (path) => {
     contexts.auth.user = member;
     contexts.profile.status = "ready";
     contexts.profile.profile = readyProfile;
     contexts.profile.productMode = "training";
 
-    renderRoute("/food-catalogue");
+    renderRoute(path);
 
     expect(await screen.findByRole("heading", { name: "سلام، Mohammad" })).toBeVisible();
   });

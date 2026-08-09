@@ -26,6 +26,7 @@ import {
   GuestRoute,
   NutritionCapabilityRoute,
   OnboardingRoute,
+  PhysicianRoute,
 } from "./features/profile/ProfileRouteGuards";
 import { DashboardPage } from "./pages/DashboardPage";
 import { PublicLandingRoute } from "./features/landing/PublicLandingRoute";
@@ -48,7 +49,9 @@ export function AppRoutes() {
         <Route path="/register" element={<RegisterPage />} />
       </Route>
       <Route element={<ProtectedRoute />}>
-        <Route path="/physician/nutrition" element={<PhysicianNutritionReviewPage />} />
+        <Route element={<PhysicianRoute />}>
+          <Route path="/physician/nutrition" element={<PhysicianNutritionReviewPage />} />
+        </Route>
         <Route element={<AdminRoute />}>
           <Route path="/admin/ai-settings" element={<AdminAiSettingsPage />} />
           <Route path="/admin/training-program-templates" element={<AdminTrainingTemplatesPage />} />
@@ -68,11 +71,11 @@ export function AppRoutes() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/nutrition-profile" element={<NutritionProfileRoute />} />
-            <Route path="/nutrition-estimate" element={<NutritionEstimatePage />} />
-            <Route path="/nutrition-tracking" element={<NutritionTrackingPage />} />
-            <Route path="/nutrition-labs" element={<NutritionLabsPage />} />
-            <Route path="/nutrition-supplements" element={<NutritionSupplementsPage />} />
             <Route element={<NutritionCapabilityRoute />}>
+              <Route path="/nutrition-estimate" element={<NutritionEstimatePage />} />
+              <Route path="/nutrition-tracking" element={<NutritionTrackingPage />} />
+              <Route path="/nutrition-labs" element={<NutritionLabsPage />} />
+              <Route path="/nutrition-supplements" element={<NutritionSupplementsPage />} />
               <Route path="/food-catalogue" element={<FoodCataloguePage />} />
             </Route>
             <Route path="/body-progress" element={<BodyProgressPage />} />

@@ -197,7 +197,7 @@ export function setMealLock(planId: string, mealId: string, isLocked: boolean): 
   });
 }
 
-export function saveMealFeedback(planId: string, mealId: string, feedbackType: "liked" | "disliked" | "too_complex" | "too_expensive"): Promise<unknown> {
+export function saveMealFeedback(planId: string, mealId: string, feedbackType: "liked" | "disliked" | "do_not_suggest_again" | "prefer_more_often" | "too_large" | "too_small"): Promise<unknown> {
   return request(`${nutritionPath}/plans/${planId}/meals/${mealId}/feedback`, {
     method: "PUT",
     body: JSON.stringify({ feedback_type: feedbackType, notes: null }),
@@ -252,10 +252,14 @@ export type CatalogueFood = { id: string; slug: string; name_fa: string; name_en
 export function listCatalogueFoods(): Promise<CatalogueFood[]> { return request(`${nutritionPath}/foods`); }
 export function addCatalogueFoodEntry(input: { entry_date: string; food_id: string; grams: number; note: string | null }): Promise<unknown> { return request(`${nutritionPath}/tracking/entries/catalogue`, { method: "POST", body: JSON.stringify(input) }); }
 export function deleteTrackingEntry(entryId: string): Promise<void> { return request(`${nutritionPath}/tracking/entries/${entryId}`, { method: "DELETE" }); }
+export function editTrackingEntry(entryId: string, input: { grams?: number; display_name?: string; calories?: number; protein_g?: number | null; note?: string | null }): Promise<DailyTrackingSummary["entries"][number]> { return request(`${nutritionPath}/tracking/entries/${entryId}`, { method: "PUT", body: JSON.stringify(input) }); }
+export function listRecentFoods(): Promise<Array<{ food_id: string; display_name: string; last_quantity_grams: number | null; last_entry_date: string }>> { return request(`${nutritionPath}/tracking/recent-foods`); }
+export function getTrackingHistory(start: string, end: string): Promise<DailyTrackingSummary[]> { return request(`${nutritionPath}/tracking/history?${new URLSearchParams({ start, end })}`); }
+export function adjustPlannedMeal(mealId: string, input: { entry_date: string; status: "consumed" | "adjusted" | "skipped"; portion_ratio: number | null }): Promise<DailyTrackingSummary> { return request(`${nutritionPath}/tracking/planned-meals/${mealId}`, { method: "PUT", body: JSON.stringify(input) }); }
 
 export function estimateFoodPhoto(file: File): Promise<{
   id: string;
-  items: Array<{ name_guess: string; estimated_amount: number; unit: string; mapping_status: string }>;
+  items: Array<{ item_id: string; food_id: string | null; name_guess: string; estimated_amount: number; unit: string; mapping_status: string }>;
   overall_confidence: number;
   needs_user_confirmation: true;
 }> {
@@ -265,6 +269,13 @@ export function estimateFoodPhoto(file: File): Promise<{
     method: "POST",
     headers: { "X-Fitsho-Food-Photo-Consent": "true" },
     body,
+  });
+}
+
+export function correctFoodPhotoItem(estimateId: string, itemId: string, input: { food_id?: string; estimated_amount?: number; remove?: boolean }): ReturnType<typeof estimateFoodPhoto> {
+  return request(`${nutritionPath}/tracking/photo-estimates/${estimateId}/items/${itemId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
   });
 }
 
@@ -280,16 +291,22 @@ export function getNutritionAdherence(start: string, end: string): Promise<Nutri
   return request<NutritionAdherence>(`${nutritionPath}/adherence?${query}`);
 }
 
-export function listLabDocuments(): Promise<Array<{ id: string; original_filename: string; review_status: string; uploaded_at: string }>> {
+export type LabDocument = { id: string; original_filename: string; content_type: string; byte_size: number; test_date: string | null; laboratory_name: string | null; user_note: string | null; category: string | null; review_status: string; review_notes: string | null; uploaded_at: string };
+export function listLabDocuments(): Promise<LabDocument[]> {
   return request(`${nutritionPath}/labs`);
 }
 
-export function uploadLabDocument(file: File, requestId?: string): Promise<unknown> {
+export function uploadLabDocument(file: File, input: { requestId?: string; testDate?: string; laboratoryName?: string; userNote?: string; category?: string } = {}): Promise<unknown> {
   const body = new FormData();
   body.append("file", file);
-  if (requestId) body.append("request_id", requestId);
+  if (input.requestId) body.append("request_id", input.requestId);
+  if (input.testDate) body.append("test_date", input.testDate);
+  if (input.laboratoryName) body.append("laboratory_name", input.laboratoryName);
+  if (input.userNote) body.append("user_note", input.userNote);
+  if (input.category) body.append("category", input.category);
   return request(`${nutritionPath}/labs`, { method: "POST", body });
 }
+export function deleteLabDocument(documentId: string): Promise<void> { return request(`${nutritionPath}/labs/${documentId}`, { method: "DELETE" }); }
 export function grantLabDocumentAccess(documentId: string): Promise<{ access_url: string; expires_in_seconds: number }> {
   return request(`${nutritionPath}/labs/${documentId}/access-grant`, { method: "POST" });
 }
@@ -301,6 +318,7 @@ export function listLabRequests(): Promise<Array<{ id: string; plan_id: string; 
 export function listPhysicianReviews(): Promise<Array<{ review_id: string; plan_id: string; status: string; priority: number; overdue: boolean }>> {
   return request(`${nutritionPath}/physician/reviews`);
 }
+export function verifyPhysicianAccess(): Promise<{ authorized: true }> { return request(`${nutritionPath}/physician/access`); }
 
 export function claimPhysicianReview(reviewId: string): Promise<unknown> {
   return request(`${nutritionPath}/physician/reviews/${reviewId}/claim`, { method: "POST" });
@@ -309,6 +327,10 @@ export function claimPhysicianReview(reviewId: string): Promise<unknown> {
 export function getPhysicianPlan(planId: string): Promise<WeeklyPlan> { return request(`${nutritionPath}/physician/plans/${planId}`); }
 export function actOnPhysicianPlan(planId: string, action: "start_review" | "approve" | "request_changes" | "reject", notes: string | null): Promise<WeeklyPlan> { return request(`${nutritionPath}/physician/plans/${planId}/action`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, action, notes }) }); }
 export function requestPhysicianLabs(planId: string, requestedTests: string[], reason: string): Promise<unknown> { return request(`${nutritionPath}/physician/plans/${planId}/request-labs`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, requested_tests: requestedTests, user_visible_reason: reason }) }); }
+export function listPhysicianLabs(planId: string): Promise<LabDocument[]> { return request(`${nutritionPath}/physician/plans/${planId}/labs`); }
+export function reviewPhysicianLab(documentId: string, reviewStatus: "reviewed" | "requires_follow_up", notes: string | null): Promise<LabDocument> { return request(`${nutritionPath}/physician/labs/${documentId}/review`, { method: "PUT", body: JSON.stringify({ review_status: reviewStatus, notes }) }); }
+export function adjustPhysicianFoodQuantity(planId: string, mealId: string, foodId: string, grams: number): Promise<WeeklyPlan> { return request(`${nutritionPath}/physician/plans/${planId}/edits/food-quantity`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, meal_id: mealId, food_id: foodId, grams }) }); }
+export function replacePhysicianFood(planId: string, mealId: string, foodId: string, replacementFoodId: string): Promise<WeeklyPlan> { return request(`${nutritionPath}/physician/plans/${planId}/edits/replace-food`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, meal_id: mealId, food_id: foodId, replacement_food_id: replacementFoodId }) }); }
 
 export type SupplementOrder = { id: string; plan_id: string; name: string; dose_amount: number; dose_unit: string; frequency: string; duration_days: number; instructions: string; rationale: string | null; status: string; acknowledged_at: string | null; supplement_nutrient_contribution: Record<string, string>; combined_exposure_safety: { food_contribution?: Record<string, string>; supplement_contribution?: Record<string, string>; combined_exposure?: Record<string, string>; hard_blocks?: string[] } };
 export type SupplementCatalogueItem = { id: string; slug: string; name_fa: string; name_en: string };

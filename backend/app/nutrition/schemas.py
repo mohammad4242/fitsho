@@ -487,6 +487,7 @@ class WeeklyPlanResponse(BaseModel):
     explanation_codes: list[str]
     input_snapshot: dict[str, object]
     price_snapshot: dict[str, object]
+    food_data_manifest: dict[str, object]
     repair_actions: list[dict[str, object]]
     nutrients: dict[str, WeeklyPlanNutrientResponse]
     days: list[WeeklyPlanDayResponse]

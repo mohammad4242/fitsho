@@ -155,6 +155,7 @@ export type WeeklyPlan = {
   explanation_codes: string[];
   input_snapshot: Record<string, unknown>;
   price_snapshot: Record<string, unknown>;
+  food_data_manifest: Record<string, unknown>;
   repair_actions: Array<Record<string, unknown>>;
   nutrients: Record<string, WeeklyPlanNutrient>;
   days: Array<{
@@ -217,7 +218,12 @@ export type DailyTrackingSummary = {
   actual_totals: Record<string, number>;
   entries: Array<{
     id: string;
+    entry_date: string;
+    plan_revision_id: string | null;
+    planned_meal_id: string | null;
+    food_id: string | null;
     display_name: string;
+    quantity_grams: number | null;
     source: string;
     confidence: "high" | "medium" | "low";
     nutrients: Record<string, number>;

@@ -1,8 +1,10 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, Outlet } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
 import { HYDRATED_ACCOUNT_KEY } from "../publicOnboarding/onboardingDraft";
+import { verifyPhysicianAccess } from "../nutrition/api";
 import { useProfile, type ProfileStatus } from "./ProfileContext";
 
 function StartupState({
@@ -92,4 +94,17 @@ export function NutritionCapabilityRoute() {
   return productMode === "nutrition" || productMode === "both"
     ? <Outlet />
     : <Navigate to="/dashboard" replace />;
+}
+
+export function PhysicianRoute() {
+  const [status, setStatus] = useState<"loading" | "authorized" | "denied">("loading");
+  useEffect(() => {
+    let active = true;
+    void verifyPhysicianAccess()
+      .then(() => { if (active) setStatus("authorized"); })
+      .catch(() => { if (active) setStatus("denied"); });
+    return () => { active = false; };
+  }, []);
+  if (status === "loading") return <StartupState error={false} onRetry={() => undefined} />;
+  return status === "authorized" ? <Outlet /> : <Navigate to="/dashboard" replace />;
 }

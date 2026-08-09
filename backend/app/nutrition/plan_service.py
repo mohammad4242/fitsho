@@ -768,6 +768,7 @@ def weekly_plan_response(plan: NutritionWeeklyPlan) -> WeeklyPlanResponse:
         explanation_codes=plan.explanation_codes,
         input_snapshot=plan.input_snapshot,
         price_snapshot=plan.price_snapshot,
+        food_data_manifest=plan.food_data_manifest,
         repair_actions=plan.repair_snapshot,
         nutrients={
             nutrient.nutrient_code: WeeklyPlanNutrientResponse(

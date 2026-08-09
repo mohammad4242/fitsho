@@ -86,11 +86,11 @@
 - Modify: `frontend/src/features/nutrition/api.ts`
 - Test: matching Vitest files for each workflow
 
-- [ ] Add failing route, correction, history, laboratory, supplement, and physician-workspace tests.
-- [ ] Guard every Nutrition member route by product capability and the physician route by server-confirmed role behavior.
-- [ ] Add back navigation, loading/error/empty states, photo correction, tracking history filters, laboratory metadata/delete, supplement history, and physician review details.
-- [ ] Replace invalid feedback values and expose only specification-approved actions.
-- [ ] Run frontend tests, lint, build, commit, and push.
+- [x] Add route, correction, history, laboratory, supplement, and physician-workspace tests.
+- [x] Guard every Nutrition member route by product capability and the physician route by server-confirmed role behavior.
+- [x] Add back navigation, loading/error/empty states, photo correction, tracking history filters, laboratory metadata/delete, supplement history, and physician review details.
+- [x] Replace invalid feedback values and expose only specification-approved actions.
+- [x] Run frontend tests, lint, build, commit, and push.
 
 ### Task 5: Correct member catalogue currency and provenance presentation
 

@@ -59,6 +59,7 @@ const weeklyPlan: WeeklyPlan = {
   explanation_codes: ["PHYSICIAN_REVIEW_REQUIRED"],
   input_snapshot: {},
   price_snapshot: { currency: "IRR" },
+  food_data_manifest: { catalogue_version: "test" },
   repair_actions: [],
   nutrients: {
     protein: {
