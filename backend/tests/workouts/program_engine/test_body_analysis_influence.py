@@ -16,7 +16,7 @@ from app.workouts.program_engine.schemas import (
 from app.workouts.program_engine.split_selector import select_split
 from app.workouts.program_engine.template_selector import select_template_reference
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
-from workouts.program_engine.golden_fixtures import full_catalog, request
+from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
 def influence(

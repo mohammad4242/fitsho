@@ -67,6 +67,19 @@ def test_photo_requires_explicit_consent(client: TestClient) -> None:
     assert response.json()["detail"]["code"] == "THIRD_PARTY_PROCESSING_CONSENT_REQUIRED"
 
 
+def test_photo_estimation_is_safely_disabled_without_openrouter_task_config(
+    client: TestClient,
+) -> None:
+    _register(client)
+    response = client.post(
+        "/api/v1/nutrition/tracking/photo-estimates",
+        headers={**ORIGIN, "X-Fitsho-Food-Photo-Consent": "true"},
+        files={"file": ("meal.png", _image(), "image/png")},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "FOOD_PHOTO_ESTIMATION_DISABLED"
+
+
 def test_photo_estimate_maps_catalogue_and_writes_only_after_confirmation(
     client: TestClient, db: Session, monkeypatch, test_settings
 ) -> None:  # type: ignore[no-untyped-def]

@@ -4,7 +4,7 @@ from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-from workouts.program_engine.golden_fixtures import (
+from tests.workouts.program_engine.golden_fixtures import (
     full_catalog,
     golden_scenarios,
     impossible_equipment_request,

@@ -38,6 +38,7 @@ def test_production_settings_accept_secure_cookie_contract() -> None:
         frontend_origin="https://fitsho.example",
         cookie_secure=True,
         session_cookie_name="__Host-fitsho_session",
+        private_file_signing_key="production-private-file-signing-key-for-tests",
     )
 
     assert settings.app_env == "production"
@@ -49,6 +50,7 @@ def test_production_settings_normalize_a_trailing_origin_slash() -> None:
         frontend_origin="https://fitsho.example/",
         cookie_secure=True,
         session_cookie_name="__Host-fitsho_session",
+        private_file_signing_key="production-private-file-signing-key-for-tests",
     )
 
     assert settings.frontend_origin == "https://fitsho.example"
@@ -84,11 +86,22 @@ def test_production_settings_reject_insecure_cookie_contract(
         "frontend_origin": "https://fitsho.example",
         "cookie_secure": True,
         "session_cookie_name": "__Host-fitsho_session",
+        "private_file_signing_key": "production-private-file-signing-key-for-tests",
     }
     values.update(override)
 
     with pytest.raises(ValidationError, match=expected_message):
         Settings(**values)  # type: ignore[arg-type]
+
+
+def test_production_settings_reject_default_private_file_signing_key() -> None:
+    with pytest.raises(ValidationError, match="strong private file signing key"):
+        Settings(
+            app_env="production",
+            frontend_origin="https://fitsho.example",
+            cookie_secure=True,
+            session_cookie_name="__Host-fitsho_session",
+        )
 
 
 def test_settings_redact_zen_api_key_in_repr() -> None:

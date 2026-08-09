@@ -8,7 +8,7 @@ from app.workouts.program_engine.enums import (
 )
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import RecentTrainingHistory
-from workouts.program_engine.golden_fixtures import full_catalog, request
+from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
 def test_regression_novice_poor_recovery_never_gets_six_demanding_days() -> None:

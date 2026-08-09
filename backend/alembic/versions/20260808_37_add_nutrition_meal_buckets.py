@@ -50,7 +50,8 @@ def upgrade() -> None:
     op.create_check_constraint(
         "ck_nutrition_profiles_main_meal_bucket_values",
         "nutrition_profiles",
-        "main_meal_count_bucket IN ('two_main_meals', 'three_main_meals', 'four_or_more_main_meals')",
+        "main_meal_count_bucket IN "
+        "('two_main_meals', 'three_main_meals', 'four_or_more_main_meals')",
     )
     op.create_check_constraint(
         "ck_nutrition_profiles_snack_bucket_values",

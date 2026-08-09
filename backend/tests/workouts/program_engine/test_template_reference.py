@@ -6,7 +6,7 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceDay,
     TemplateReferenceSlot,
 )
-from workouts.program_engine.golden_fixtures import full_catalog, request
+from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
 def test_safe_matching_template_becomes_deterministic_program_reference() -> None:

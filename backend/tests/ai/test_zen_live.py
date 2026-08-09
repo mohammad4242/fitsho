@@ -3,12 +3,12 @@ import os
 
 import httpx
 import pytest
-from workouts.evaluation_fixtures import evaluation_fixtures
 
 from app.ai.opencode_zen import OpenCodeZenWorkoutPlanProvider
 from app.ai.schemas import WorkoutGenerationModelResponse
 from app.config import Settings
 from app.workouts.prompt_builder import build_workout_generation_model_request
+from tests.workouts.evaluation_fixtures import evaluation_fixtures
 
 
 @pytest.mark.skipif(

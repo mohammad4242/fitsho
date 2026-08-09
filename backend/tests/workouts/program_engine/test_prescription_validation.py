@@ -30,7 +30,7 @@ from app.workouts.program_engine.schemas import ExerciseCandidate, ProgramGenera
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from app.workouts.program_engine.volume_repair import repair_weekly_volume
-from workouts.program_engine.golden_fixtures import full_catalog
+from tests.workouts.program_engine.golden_fixtures import full_catalog
 
 
 def request(**overrides: object) -> ProgramGenerationRequest:
