@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.workout_reviews.enums import WorkoutReviewStatus
 
 
 class WorkoutReviewExerciseDraft(BaseModel):
@@ -37,3 +41,45 @@ class WorkoutReviewDraftUpdate(BaseModel):
     expected_revision: int = Field(ge=1)
     coach_note: str | None = Field(default=None, max_length=2000)
     days: list[WorkoutReviewDayDraft] = Field(min_length=1, max_length=6)
+
+
+class WorkoutReviewApproveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+
+
+class WorkoutReviewExerciseOption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    name_en: str
+    name_fa: str
+
+
+class WorkoutReviewQueueItemResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    source_plan_id: UUID
+    user_id: UUID
+    member_display_name: str | None
+    fitness_goal: str | None
+    experience_level: str | None
+    status: WorkoutReviewStatus
+    claimed_by_user_id: UUID | None
+    lease_expires_at: datetime | None
+    draft_revision: int
+    created_at: datetime
+    approved_at: datetime | None
+
+
+class WorkoutReviewDetailResponse(WorkoutReviewQueueItemResponse):
+    coach_note: str | None
+    draft: dict[str, object] | None
+    source_plan: dict[str, object]
+    exercise_options: list[WorkoutReviewExerciseOption]
+
+
+class WorkoutReviewAccessResponse(BaseModel):
+    authorized: Literal[True] = True

@@ -2,6 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai.schemas import ProviderErrorCode
@@ -11,6 +12,8 @@ from app.database.session import get_db
 from app.exercises.dependencies import require_completed_profile
 from app.exercises.models import Exercise
 from app.exercises.schemas import ExerciseSummary
+from app.profile.models import UserProfile
+from app.workout_reviews.enums import WorkoutReviewStatus
 from app.workouts.dependencies import WorkoutGenerationServiceDependency
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
 from app.workouts.program_engine.session_targets import (
@@ -18,14 +21,16 @@ from app.workouts.program_engine.session_targets import (
     persian_session_title_for_targets,
     target_muscles_from_values,
 )
-from app.workouts.repository import get_plan_for_user
+from app.workouts.repository import get_plan_for_user, list_plans_for_user
 from app.workouts.schemas import (
     ProgramGenerationOverrides,
     WorkoutDayResponse,
+    WorkoutPlanCoachReviewResponse,
     WorkoutPlanExerciseAlternativeResponse,
     WorkoutPlanExerciseResponse,
     WorkoutPlanGenerateResponse,
     WorkoutPlanResponse,
+    WorkoutPlanVersionSummaryResponse,
 )
 from app.workouts.service import (
     GenerationCooldownError,
@@ -44,12 +49,13 @@ CurrentUser = Annotated[User, Depends(require_completed_profile)]
 @router.get("/active", response_model=WorkoutPlanResponse)
 def read_active_plan(
     service: WorkoutGenerationServiceDependency,
+    db: DatabaseSession,
     user: CurrentUser,
 ) -> WorkoutPlanResponse:
     active = service.get_active(user.id)
     if active is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active workout plan")
-    return to_plan_response(active.plan, is_stale=active.is_stale)
+    return to_plan_response(active.plan, is_stale=active.is_stale, db=db)
 
 
 @router.post(
@@ -105,6 +111,23 @@ async def generate_plan(
     return WorkoutPlanGenerateResponse(plan=to_plan_response(result.plan), reused=result.reused)
 
 
+@router.get("/history", response_model=list[WorkoutPlanVersionSummaryResponse])
+def read_plan_history(
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> list[WorkoutPlanVersionSummaryResponse]:
+    return [
+        WorkoutPlanVersionSummaryResponse(
+            id=plan.id,
+            created_at=plan.created_at,
+            activated_at=plan.activated_at,
+            is_active=plan.status.value == "active",
+            coach_review=_coach_review_response(plan, db),
+        )
+        for plan in list_plans_for_user(db, user.id)
+    ]
+
+
 @router.get("/{plan_id}", response_model=WorkoutPlanResponse)
 def read_plan(
     plan_id: UUID,
@@ -114,10 +137,15 @@ def read_plan(
     plan = get_plan_for_user(db, plan_id=plan_id, user_id=user.id)
     if plan is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workout plan not found")
-    return to_plan_response(plan)
+    return to_plan_response(plan, db=db)
 
 
-def to_plan_response(plan: WorkoutPlan, *, is_stale: bool = False) -> WorkoutPlanResponse:
+def to_plan_response(
+    plan: WorkoutPlan,
+    *,
+    is_stale: bool = False,
+    db: Session | None = None,
+) -> WorkoutPlanResponse:
     return WorkoutPlanResponse(
         id=plan.id,
         status=plan.status,
@@ -174,7 +202,40 @@ def to_plan_response(plan: WorkoutPlan, *, is_stale: bool = False) -> WorkoutPla
         body_analysis_provenance=plan.body_analysis_provenance,
         ai_coach_template_slug=plan.ai_coach_template_slug,
         ai_coach_program_explanation_fa=plan.ai_coach_program_explanation_fa,
+        coach_review=_coach_review_response(plan, db),
     )
+
+
+def _coach_review_response(
+    plan: WorkoutPlan,
+    db: Session | None,
+) -> WorkoutPlanCoachReviewResponse:
+    approval = plan.approval_review
+    if approval is not None and approval.status is WorkoutReviewStatus.APPROVED:
+        return WorkoutPlanCoachReviewResponse(
+            state="coach_approved",
+            coach_display_name=_coach_display_name(db, approval.claimed_by_user_id),
+            coach_note=approval.coach_note,
+            approved_at=approval.approved_at,
+        )
+    source = plan.source_review
+    if source is None:
+        return WorkoutPlanCoachReviewResponse(state="none")
+    if source.status in {WorkoutReviewStatus.PENDING, WorkoutReviewStatus.CLAIMED}:
+        return WorkoutPlanCoachReviewResponse(state="pending_coach_review")
+    if source.status is WorkoutReviewStatus.APPROVED:
+        return WorkoutPlanCoachReviewResponse(
+            state="initial_generated",
+            coach_display_name=_coach_display_name(db, source.claimed_by_user_id),
+            approved_at=source.approved_at,
+        )
+    return WorkoutPlanCoachReviewResponse(state="none")
+
+
+def _coach_display_name(db: Session | None, coach_id: UUID | None) -> str | None:
+    if db is None or coach_id is None:
+        return None
+    return db.scalar(select(UserProfile.display_name).where(UserProfile.user_id == coach_id))
 
 
 def _day_titles(plan: WorkoutPlan, day: WorkoutDay) -> tuple[str, str]:

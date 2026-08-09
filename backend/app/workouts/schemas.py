@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -156,6 +157,20 @@ class WorkoutDayResponse(BaseModel):
     ai_coach_explanation_fa: str | None = None
 
 
+class WorkoutPlanCoachReviewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    state: Literal[
+        "pending_coach_review",
+        "initial_generated",
+        "coach_approved",
+        "none",
+    ]
+    coach_display_name: str | None = None
+    coach_note: str | None = None
+    approved_at: datetime | None = None
+
+
 class WorkoutPlanResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -182,6 +197,19 @@ class WorkoutPlanResponse(BaseModel):
     body_analysis_provenance: dict[str, object] = Field(default_factory=dict)
     ai_coach_template_slug: str | None = None
     ai_coach_program_explanation_fa: str | None = None
+    coach_review: WorkoutPlanCoachReviewResponse = Field(
+        default_factory=lambda: WorkoutPlanCoachReviewResponse(state="none")
+    )
+
+
+class WorkoutPlanVersionSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    created_at: datetime
+    activated_at: datetime | None
+    is_active: bool
+    coach_review: WorkoutPlanCoachReviewResponse
 
 
 class WorkoutPlanGenerateResponse(BaseModel):

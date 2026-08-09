@@ -8,6 +8,12 @@ class WorkoutReviewStatus(StrEnum):
     SUPERSEDED = "superseded"
 
 
+class WorkoutReviewQueueView(StrEnum):
+    PENDING = "pending"
+    MINE = "mine"
+    APPROVED = "approved"
+
+
 class WorkoutReviewErrorCode(StrEnum):
     COACH_ROLE_REQUIRED = "COACH_ROLE_REQUIRED"
     REVIEW_NOT_FOUND = "REVIEW_NOT_FOUND"

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.exercises.models import Exercise
+from app.workout_reviews.enums import WorkoutReviewQueueView, WorkoutReviewStatus
 from app.workout_reviews.models import WorkoutPlanReview
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
 
@@ -63,3 +65,46 @@ def get_exercises(db: Session, exercise_ids: set[UUID]) -> list[Exercise]:
     if not exercise_ids:
         return []
     return list(db.scalars(select(Exercise).where(Exercise.id.in_(exercise_ids))).all())
+
+
+def list_reviews(
+    db: Session,
+    *,
+    view: WorkoutReviewQueueView,
+    coach_id: UUID,
+    now: datetime,
+) -> list[WorkoutPlanReview]:
+    statement = select(WorkoutPlanReview).options(
+        selectinload(WorkoutPlanReview.source_plan)
+    )
+    if view is WorkoutReviewQueueView.PENDING:
+        statement = statement.where(
+            (WorkoutPlanReview.status == WorkoutReviewStatus.PENDING)
+            | (
+                (WorkoutPlanReview.status == WorkoutReviewStatus.CLAIMED)
+                & (WorkoutPlanReview.lease_expires_at <= now)
+            )
+        )
+    elif view is WorkoutReviewQueueView.MINE:
+        statement = statement.where(
+            WorkoutPlanReview.status == WorkoutReviewStatus.CLAIMED,
+            WorkoutPlanReview.claimed_by_user_id == coach_id,
+        )
+    else:
+        statement = statement.where(WorkoutPlanReview.status == WorkoutReviewStatus.APPROVED)
+    return list(db.scalars(statement.order_by(WorkoutPlanReview.created_at.asc())).all())
+
+
+def supersede_open_review(db: Session, plan_id: UUID) -> None:
+    review = db.scalar(
+        select(WorkoutPlanReview)
+        .where(
+            WorkoutPlanReview.source_plan_id == plan_id,
+            WorkoutPlanReview.status.in_(
+                [WorkoutReviewStatus.PENDING, WorkoutReviewStatus.CLAIMED]
+            ),
+        )
+        .with_for_update()
+    )
+    if review is not None:
+        review.status = WorkoutReviewStatus.SUPERSEDED

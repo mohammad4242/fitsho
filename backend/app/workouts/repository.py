@@ -91,6 +91,9 @@ def activate_plan(
         .with_for_update()
     )
     if previous is not None:
+        from app.workout_reviews.repository import supersede_open_review
+
+        supersede_open_review(db, previous.id)
         previous.status = WorkoutPlanStatus.SUPERSEDED
         previous.superseded_at = datetime.now(UTC)
         db.flush()
@@ -100,6 +103,9 @@ def activate_plan(
     generation.workout_plan = plan
     generation.status = WorkoutGenerationStatus.SUCCEEDED
     generation.completed_at = datetime.now(UTC)
+    from app.workout_reviews.repository import ensure_pending_review
+
+    ensure_pending_review(db, plan)
     db.flush()
     return plan
 
@@ -120,4 +126,18 @@ def get_plan_for_user(
             .selectinload(Exercise.alternatives)
             .selectinload(ExerciseAlternative.alternative_exercise)
         )
+    )
+
+
+def list_plans_for_user(db: Session, user_id: UUID) -> list[WorkoutPlan]:
+    return list(
+        db.scalars(
+            select(WorkoutPlan)
+            .where(WorkoutPlan.user_id == user_id)
+            .options(
+                selectinload(WorkoutPlan.source_review),
+                selectinload(WorkoutPlan.approval_review),
+            )
+            .order_by(WorkoutPlan.created_at.desc(), WorkoutPlan.id.desc())
+        ).all()
     )

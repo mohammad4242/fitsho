@@ -24,6 +24,7 @@ from app.nutrition.price_scheduler import scheduler_loop
 from app.nutrition.retention_scheduler import retention_scheduler_loop
 from app.nutrition.router import router as nutrition_router
 from app.profile.router import router as profile_router
+from app.workout_reviews.router import router as workout_reviews_router
 from app.workouts.router import router as workout_plans_router
 
 
@@ -147,6 +148,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(profile_router)
     app.include_router(nutrition_router)
     app.include_router(workout_plans_router)
+    app.include_router(workout_reviews_router)
     app.include_router(exercises_router)
     app.include_router(admin_router)
     app.include_router(admin_ai_settings_router)

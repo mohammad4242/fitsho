@@ -1,8 +1,11 @@
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
+from app.workout_reviews.enums import WorkoutReviewStatus
+from app.workout_reviews.models import WorkoutPlanReview
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan
 from app.workouts.repository import activate_plan, create_generation, get_active_plan
@@ -51,3 +54,30 @@ def test_activate_plan_supersedes_previous_active_plan(db: Session) -> None:
     assert replacement.status is WorkoutPlanStatus.ACTIVE
     assert generation.status is WorkoutGenerationStatus.SUCCEEDED
     assert get_active_plan(db, user.id) is replacement
+
+
+def test_activate_plan_creates_review_and_supersedes_previous_open_review(db: Session) -> None:
+    user = make_user(db)
+    previous = new_plan(user.id, "a" * 64)
+    previous.status = WorkoutPlanStatus.ACTIVE
+    db.add(previous)
+    db.flush()
+    previous_review = WorkoutPlanReview(source_plan=previous, user_id=user.id)
+    db.add(previous_review)
+    generation = create_generation(
+        db,
+        user_id=user.id,
+        provider="fake",
+        model_id="fake-model",
+        candidate_count=1,
+    )
+    replacement = new_plan(user.id, "c" * 64)
+
+    activate_plan(db, replacement, generation)
+
+    replacement_review = db.scalar(
+        select(WorkoutPlanReview).where(WorkoutPlanReview.source_plan_id == replacement.id)
+    )
+    assert previous_review.status is WorkoutReviewStatus.SUPERSEDED
+    assert replacement_review is not None
+    assert replacement_review.status is WorkoutReviewStatus.PENDING

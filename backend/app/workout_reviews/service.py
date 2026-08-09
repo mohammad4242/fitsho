@@ -7,9 +7,18 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.workout_reviews.enums import WorkoutReviewErrorCode, WorkoutReviewStatus
+from app.workout_reviews.enums import (
+    WorkoutReviewErrorCode,
+    WorkoutReviewQueueView,
+    WorkoutReviewStatus,
+)
 from app.workout_reviews.models import WorkoutPlanReview
-from app.workout_reviews.repository import get_active_plan_for_update, get_review_for_update
+from app.workout_reviews.repository import (
+    get_active_plan_for_update,
+    get_review,
+    get_review_for_update,
+    list_reviews,
+)
 from app.workout_reviews.schemas import WorkoutReviewDraftUpdate
 from app.workout_reviews.validation import ValidatedDraft, WorkoutReviewDraftValidator
 from app.workouts.enums import WorkoutPlanStatus
@@ -34,6 +43,19 @@ class WorkoutReviewService:
         self._db = db
         self._clock = clock or (lambda: datetime.now(UTC))
         self._validator = WorkoutReviewDraftValidator(db)
+
+    def detail(self, review_id: UUID) -> WorkoutPlanReview:
+        review = get_review(self._db, review_id)
+        if review is None:
+            raise ReviewConflict(WorkoutReviewErrorCode.REVIEW_NOT_FOUND)
+        return review
+
+    def queue(
+        self,
+        view: WorkoutReviewQueueView,
+        coach_id: UUID,
+    ) -> list[WorkoutPlanReview]:
+        return list_reviews(self._db, view=view, coach_id=coach_id, now=self._clock())
 
     def claim(self, review_id: UUID, coach_id: UUID) -> WorkoutPlanReview:
         review = self._required_review(review_id)
