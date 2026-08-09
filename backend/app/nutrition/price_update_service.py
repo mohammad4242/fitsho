@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -37,6 +38,7 @@ from app.nutrition.pricing import (
     normalize_observation,
     retry_quotes,
 )
+from app.nutrition.security import record_operational_event
 
 
 def update_slot(now: datetime) -> datetime:
@@ -44,7 +46,11 @@ def update_slot(now: datetime) -> datetime:
 
 
 def run_price_update(
-    db: Session, *, providers: Iterable[FoodPriceProvider], scheduled_for: datetime | None = None
+    db: Session,
+    *,
+    providers: Iterable[FoodPriceProvider],
+    scheduled_for: datetime | None = None,
+    retry_attempts: int = 3,
 ) -> NutritionFoodPriceUpdateRun:
     now = datetime.now(UTC)
     slot = scheduled_for or update_slot(now)
@@ -71,6 +77,7 @@ def run_price_update(
         if provider is None:
             continue
         provider_instance = enabled[code]
+        provider_started = time.perf_counter()
         try:
             product_ids = [mapping.provider_product_id for mapping in provider_mappings]
 
@@ -83,7 +90,7 @@ def run_price_update(
             result = asyncio.run(
                 retry_quotes(
                     collect,
-                    attempts=3,
+                    attempts=retry_attempts,
                     base_delay_seconds=0.1,
                 )
             )
@@ -94,11 +101,29 @@ def run_price_update(
             if record is not None:
                 record.last_success_at = now
                 record.last_error = None
+            record_operational_event(
+                db,
+                category="price_provider",
+                event_name="quote_collection",
+                status="success",
+                provider=code,
+                counters={"quotes": len(result), "products": len(product_ids)},
+                duration_ms=int((time.perf_counter() - provider_started) * 1000),
+            )
         except Exception:  # Provider isolation: an outage never aborts other providers.
             failures.append(code)
             record = db.get(NutritionPriceProvider, code)
             if record is not None:
                 record.last_error = "provider collection failed"
+            record_operational_event(
+                db,
+                category="price_provider",
+                event_name="quote_collection",
+                status="error",
+                provider=code,
+                counters={"products": len(provider_mappings)},
+                duration_ms=int((time.perf_counter() - provider_started) * 1000),
+            )
 
     run.foods_attempted = len({mapping.food_id for mapping in mappings})
     run.provider_failures = len(failures)
@@ -174,6 +199,18 @@ def run_price_update(
     run.status = PriceUpdateRunStatus.COMPLETED_WITH_ERRORS if failures else PriceUpdateRunStatus.COMPLETED
     run.finished_at = datetime.now(UTC)
     run.details = {"provider_failures": failures}
+    record_operational_event(
+        db,
+        category="background_job",
+        event_name="food_price_update",
+        status=run.status.value,
+        counters={
+            "foods_attempted": run.foods_attempted,
+            "foods_updated": run.foods_updated,
+            "foods_needing_review": run.foods_needing_review,
+            "provider_failures": run.provider_failures,
+        },
+    )
     db.commit()
     db.refresh(run)
     return run

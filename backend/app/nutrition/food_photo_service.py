@@ -8,6 +8,7 @@ import tempfile
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path, PurePosixPath
+from typing import BinaryIO
 from uuid import UUID, uuid4
 
 import httpx
@@ -35,6 +36,7 @@ from app.nutrition.models import (
     NutritionConsumptionEntry,
     NutritionFoodPhotoEstimate,
 )
+from app.nutrition.security import audit_security_event, record_operational_event
 
 
 class FoodPhotoError(Exception):
@@ -63,7 +65,22 @@ class FoodPhotoOutput(BaseModel):
 RESPONSE_SCHEMA = FoodPhotoOutput.model_json_schema()
 
 
-def _private_path(root: Path, key: str) -> Path:
+def replay_idempotent_photo(
+    db: Session, user_id: UUID, idempotency_key: str | None
+) -> dict[str, object] | None:
+    if idempotency_key is None:
+        return None
+    key_hash = hashlib.sha256(idempotency_key.encode()).hexdigest()
+    previous = db.scalar(
+        select(NutritionFoodPhotoEstimate).where(
+            NutritionFoodPhotoEstimate.user_id == user_id,
+            NutritionFoodPhotoEstimate.idempotency_key_hash == key_hash,
+        )
+    )
+    return photo_response(previous) if previous is not None else None
+
+
+def food_photo_storage_path(root: Path, key: str) -> Path:
     resolved_root = root.resolve()
     relative = PurePosixPath(key)
     if relative.is_absolute() or len(relative.parts) != 2 or ".." in relative.parts:
@@ -74,9 +91,11 @@ def _private_path(root: Path, key: str) -> Path:
     return path
 
 
-def _normalize_image(content: bytes) -> tuple[bytes, str]:
+def _normalize_image(content: bytes, max_pixels: int) -> tuple[bytes, str]:
     try:
         with Image.open(io.BytesIO(content)) as image:
+            if image.width * image.height > max_pixels:
+                raise FoodPhotoError("INVALID_FOOD_PHOTO")
             image.load()
             converted = image.convert("RGB")
             output = io.BytesIO()
@@ -92,7 +111,7 @@ def _normalize_image(content: bytes) -> tuple[bytes, str]:
 def _store(root: Path, content: bytes) -> str:
     identifier = uuid4().hex
     key = f"{identifier[:2]}/{identifier}.jpg"
-    destination = _private_path(root, key)
+    destination = food_photo_storage_path(root, key)
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
     try:
@@ -143,9 +162,14 @@ async def estimate_photo(
     consent: bool,
     settings: Settings,
     client: httpx.AsyncClient,
+    idempotency_key: str | None = None,
 ) -> dict[str, object]:
     if not consent:
         raise FoodPhotoError("THIRD_PARTY_PROCESSING_CONSENT_REQUIRED")
+    key_hash = hashlib.sha256(idempotency_key.encode()).hexdigest() if idempotency_key else None
+    replayed = replay_idempotent_photo(db, user_id, idempotency_key)
+    if replayed is not None:
+        return replayed
     config = db.scalar(
         select(AITaskConfig).where(AITaskConfig.task_type == AITaskType.FOOD_PHOTO_ESTIMATION)
     )
@@ -154,7 +178,7 @@ async def estimate_photo(
     content = await file.read(settings.food_photo_max_bytes + 1)
     if len(content) > settings.food_photo_max_bytes:
         raise FoodPhotoError("FOOD_PHOTO_TOO_LARGE")
-    normalized, mime_type = _normalize_image(content)
+    normalized, mime_type = _normalize_image(content, settings.food_photo_max_pixels)
     key = _store(settings.food_photo_storage_root, normalized)
     provider = openrouter_provider(
         client,
@@ -196,7 +220,16 @@ async def estimate_photo(
         )
         output = FoodPhotoOutput.model_validate(result.payload)
     except (AIProviderError, ValueError) as error:
-        _private_path(settings.food_photo_storage_root, key).unlink(missing_ok=True)
+        food_photo_storage_path(settings.food_photo_storage_root, key).unlink(missing_ok=True)
+        record_operational_event(
+            db,
+            category="ai",
+            event_name="food_photo_estimation",
+            status="error",
+            provider="openrouter",
+            counters={"requests": 1, "errors": 1},
+        )
+        db.commit()
         raise FoodPhotoError("FOOD_PHOTO_PROVIDER_UNAVAILABLE") from error
     now = datetime.now(UTC)
     row = NutritionFoodPhotoEstimate(
@@ -205,6 +238,7 @@ async def estimate_photo(
         sha256=hashlib.sha256(normalized).hexdigest(),
         content_type=mime_type,
         byte_size=len(normalized),
+        idempotency_key_hash=key_hash,
         status="estimated",
         provider="openrouter",
         model_id=result.model_id,
@@ -218,6 +252,29 @@ async def estimate_photo(
         expires_at=now + timedelta(days=settings.food_photo_retention_days),
     )
     db.add(row)
+    db.flush()
+    audit_security_event(
+        db,
+        actor_user_id=user_id,
+        owner_user_id=user_id,
+        event_type="food_photo_estimated",
+        resource_type="food_photo_estimate",
+        resource_id=row.id,
+        metadata={"provider": "openrouter", "byte_size": len(normalized)},
+    )
+    record_operational_event(
+        db,
+        category="ai",
+        event_name="food_photo_estimation",
+        status="success",
+        provider="openrouter",
+        counters={
+            "requests": 1,
+            "errors": 0,
+            "input_tokens": result.input_tokens or 0,
+            "output_tokens": result.output_tokens or 0,
+        },
+    )
     db.commit()
     db.refresh(row)
     return photo_response(row)
@@ -297,9 +354,55 @@ def delete_photo(db: Session, user_id: UUID, estimate_id: UUID, settings: Settin
     )
     if row is None:
         raise FoodPhotoError("FOOD_PHOTO_ESTIMATE_NOT_FOUND")
-    _private_path(settings.food_photo_storage_root, row.storage_key).unlink(missing_ok=True)
+    food_photo_storage_path(settings.food_photo_storage_root, row.storage_key).unlink(
+        missing_ok=True
+    )
     row.status = "deleted"
     row.deleted_at = datetime.now(UTC)
     row.raw_estimate = {}
     row.mapped_items = []
+    audit_security_event(
+        db,
+        actor_user_id=user_id,
+        owner_user_id=user_id,
+        event_type="food_photo_deleted",
+        resource_type="food_photo_estimate",
+        resource_id=row.id,
+    )
     db.commit()
+
+
+def authorize_photo_access(
+    db: Session, user_id: UUID, estimate_id: UUID
+) -> NutritionFoodPhotoEstimate:
+    row = db.scalar(
+        select(NutritionFoodPhotoEstimate).where(
+            NutritionFoodPhotoEstimate.id == estimate_id,
+            NutritionFoodPhotoEstimate.user_id == user_id,
+            NutritionFoodPhotoEstimate.deleted_at.is_(None),
+        )
+    )
+    if row is None:
+        raise FoodPhotoError("FOOD_PHOTO_ESTIMATE_NOT_FOUND")
+    return row
+
+
+def open_photo(
+    db: Session, user_id: UUID, estimate_id: UUID, settings: Settings
+) -> tuple[BinaryIO, str]:
+    row = authorize_photo_access(db, user_id, estimate_id)
+    try:
+        path = food_photo_storage_path(settings.food_photo_storage_root, row.storage_key)
+        handle = path.open("rb")
+    except OSError as error:
+        raise FoodPhotoError("FOOD_PHOTO_STORAGE_UNAVAILABLE") from error
+    audit_security_event(
+        db,
+        actor_user_id=user_id,
+        owner_user_id=user_id,
+        event_type="food_photo_accessed",
+        resource_type="food_photo_estimate",
+        resource_id=row.id,
+    )
+    db.commit()
+    return handle, row.content_type

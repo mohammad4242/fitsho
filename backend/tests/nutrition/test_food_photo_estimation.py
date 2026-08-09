@@ -3,7 +3,7 @@ from datetime import date
 
 from fastapi.testclient import TestClient
 from PIL import Image
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.body_analysis.admin_config.enums import AIProviderName, AITaskType
@@ -68,8 +68,9 @@ def test_photo_requires_explicit_consent(client: TestClient) -> None:
 
 
 def test_photo_estimate_maps_catalogue_and_writes_only_after_confirmation(
-    client: TestClient, db: Session, monkeypatch
+    client: TestClient, db: Session, monkeypatch, test_settings
 ) -> None:  # type: ignore[no-untyped-def]
+    test_settings.food_photo_rate_limit = 1
     _register(client)
     _seed_foods_and_prices(db)
     db.add(
@@ -91,7 +92,11 @@ def test_photo_estimate_maps_catalogue_and_writes_only_after_confirmation(
 
     estimated = client.post(
         "/api/v1/nutrition/tracking/photo-estimates",
-        headers={**ORIGIN, "X-Fitsho-Food-Photo-Consent": "true"},
+        headers={
+            **ORIGIN,
+            "X-Fitsho-Food-Photo-Consent": "true",
+            "Idempotency-Key": "meal-photo-request-1",
+        },
         files={"file": ("meal.png", _image(), "image/png")},
     )
     assert estimated.status_code == 201, estimated.text
@@ -99,6 +104,25 @@ def test_photo_estimate_maps_catalogue_and_writes_only_after_confirmation(
     assert body["needs_user_confirmation"] is True
     assert body["items"][0]["mapping_status"] == "resolved"
     assert db.scalar(select(NutritionConsumptionEntry)) is None
+    replayed = client.post(
+        "/api/v1/nutrition/tracking/photo-estimates",
+        headers={
+            **ORIGIN,
+            "X-Fitsho-Food-Photo-Consent": "true",
+            "Idempotency-Key": "meal-photo-request-1",
+        },
+        files={"file": ("meal.png", _image(), "image/png")},
+    )
+    assert replayed.status_code == 201
+    assert replayed.json()["id"] == body["id"]
+    assert db.scalar(select(func.count()).select_from(NutritionFoodPhotoEstimate)) == 1
+
+    grant = client.post(
+        f"/api/v1/nutrition/tracking/photo-estimates/{body['id']}/access-grant",
+        headers=ORIGIN,
+    )
+    assert grant.status_code == 200
+    assert client.get(grant.json()["access_url"]).headers["content-type"] == "image/jpeg"
 
     confirmed = client.post(
         f"/api/v1/nutrition/tracking/photo-estimates/{body['id']}/confirm",

@@ -1194,6 +1194,9 @@ class NutritionMealFeedback(Base):
 
 class NutritionLabDocument(Base):
     __tablename__ = "nutrition_lab_documents"
+    __table_args__ = (
+        UniqueConstraint("user_id", "sha256", name="uq_nutrition_lab_user_sha256"),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(
@@ -1219,6 +1222,7 @@ class NutritionLabDocument(Base):
         ForeignKey("users.id", ondelete="SET NULL")
     )
     retained_until: Mapped[date | None] = mapped_column()
+    purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -1414,6 +1418,11 @@ class NutritionConsumptionEntry(Base):
 
 class NutritionFoodPhotoEstimate(Base):
     __tablename__ = "nutrition_food_photo_estimates"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "idempotency_key_hash", name="uq_nutrition_photo_user_idempotency"
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(
@@ -1423,6 +1432,7 @@ class NutritionFoodPhotoEstimate(Base):
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
     byte_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    idempotency_key_hash: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(24), nullable=False)
     provider: Mapped[str] = mapped_column(String(32), nullable=False)
     model_id: Mapped[str | None] = mapped_column(String(300))
@@ -1438,6 +1448,61 @@ class NutritionFoodPhotoEstimate(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class NutritionSecurityAuditEvent(Base):
+    __tablename__ = "nutrition_security_audit_events"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    actor_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    owner_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    resource_type: Mapped[str] = mapped_column(String(48), nullable=False)
+    resource_id: Mapped[UUID | None] = mapped_column()
+    outcome: Mapped[str] = mapped_column(String(24), nullable=False)
+    metadata_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+
+class NutritionOperationRateLimit(Base):
+    __tablename__ = "nutrition_operation_rate_limits"
+    __table_args__ = (
+        UniqueConstraint(
+            "actor_user_id", "operation", "window_started_at", name="uq_nutrition_rate_window"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    actor_user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    operation: Mapped[str] = mapped_column(String(64), nullable=False)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    request_count: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class NutritionOperationalEvent(Base):
+    __tablename__ = "nutrition_operational_events"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    category: Mapped[str] = mapped_column(String(48), nullable=False, index=True)
+    event_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(48))
+    counters: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+    duration_ms: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
 
 

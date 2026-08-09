@@ -29,6 +29,7 @@ from app.nutrition.models import (
     NutritionReviewAuditEvent,
     NutritionWeeklyPlan,
 )
+from app.nutrition.security import audit_security_event
 
 
 class ClinicalError(Exception):
@@ -53,7 +54,7 @@ def require_physician(db: Session, user_id: UUID) -> None:
         raise ClinicalError("PHYSICIAN_ROLE_REQUIRED")
 
 
-def _path(root: Path, key: str) -> Path:
+def lab_storage_path(root: Path, key: str) -> Path:
     resolved = root.resolve()
     relative = PurePosixPath(key)
     if relative.is_absolute() or len(relative.parts) != 2 or ".." in relative.parts:
@@ -64,11 +65,22 @@ def _path(root: Path, key: str) -> Path:
     return path
 
 
-def _normalize(content: bytes, content_type: str | None) -> tuple[bytes, str, str]:
-    if content_type == "application/pdf" and content.startswith(b"%PDF-"):
+def _normalize(
+    content: bytes, content_type: str | None, max_pixels: int
+) -> tuple[bytes, str, str]:
+    if (
+        content_type == "application/pdf"
+        and content.startswith(b"%PDF-")
+        and b"%%EOF" in content[-1024:]
+        and not any(marker in content for marker in (b"/JavaScript", b"/Launch", b"/EmbeddedFile"))
+    ):
         return content, "application/pdf", ".pdf"
+    if content_type not in {"image/jpeg", "image/png"}:
+        raise ClinicalError("INVALID_LAB_DOCUMENT")
     try:
         with Image.open(io.BytesIO(content)) as image:
+            if image.width * image.height > max_pixels:
+                raise ClinicalError("INVALID_LAB_DOCUMENT")
             image.load()
             output = io.BytesIO()
             image.convert("RGB").save(output, "JPEG", quality=90, optimize=True)
@@ -80,7 +92,7 @@ def _normalize(content: bytes, content_type: str | None) -> tuple[bytes, str, st
 def _store(root: Path, content: bytes, extension: str) -> str:
     identifier = uuid4().hex
     key = f"{identifier[:2]}/{identifier}{extension}"
-    destination = _path(root, key)
+    destination = lab_storage_path(root, key)
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
     try:
@@ -129,7 +141,29 @@ async def upload_lab(
     content = await file.read(settings.nutrition_lab_max_bytes + 1)
     if len(content) > settings.nutrition_lab_max_bytes:
         raise ClinicalError("LAB_DOCUMENT_TOO_LARGE")
-    normalized, content_type, extension = _normalize(content, file.content_type)
+    normalized, content_type, extension = _normalize(
+        content, file.content_type, settings.nutrition_lab_max_pixels
+    )
+    digest = hashlib.sha256(normalized).hexdigest()
+    duplicate = db.scalar(
+        select(NutritionLabDocument).where(
+            NutritionLabDocument.user_id == user_id,
+            NutritionLabDocument.sha256 == digest,
+            NutritionLabDocument.purged_at.is_(None),
+        )
+    )
+    if duplicate is not None:
+        audit_security_event(
+            db,
+            actor_user_id=user_id,
+            owner_user_id=user_id,
+            event_type="lab_duplicate_reused",
+            resource_type="lab_document",
+            resource_id=duplicate.id,
+            metadata={"content_type": duplicate.content_type, "byte_size": duplicate.byte_size},
+        )
+        db.commit()
+        return {**lab_response(duplicate), "duplicate": True}
     request = None
     if request_id:
         request = db.scalar(
@@ -147,7 +181,7 @@ async def upload_lab(
         original_filename=(file.filename or f"lab{extension}")[:255],
         content_type=content_type,
         byte_size=len(normalized),
-        sha256=hashlib.sha256(normalized).hexdigest(),
+        sha256=digest,
         test_date=test_date,
         laboratory_name=laboratory_name,
         user_note=user_note,
@@ -160,9 +194,19 @@ async def upload_lab(
     db.add(row)
     if request:
         request.status = NutritionLabRequestStatus.UPLOADED
+    db.flush()
+    audit_security_event(
+        db,
+        actor_user_id=user_id,
+        owner_user_id=user_id,
+        event_type="lab_uploaded",
+        resource_type="lab_document",
+        resource_id=row.id,
+        metadata={"content_type": content_type, "byte_size": len(normalized)},
+    )
     db.commit()
     db.refresh(row)
-    return lab_response(row)
+    return {**lab_response(row), "duplicate": False}
 
 
 def list_labs(db: Session, user_id: UUID) -> list[dict[str, object]]:
@@ -170,17 +214,18 @@ def list_labs(db: Session, user_id: UUID) -> list[dict[str, object]]:
         lab_response(row)
         for row in db.scalars(
             select(NutritionLabDocument)
-            .where(NutritionLabDocument.user_id == user_id)
+            .where(
+                NutritionLabDocument.user_id == user_id,
+                NutritionLabDocument.purged_at.is_(None),
+            )
             .order_by(NutritionLabDocument.uploaded_at.desc())
         )
     ]
 
 
-def open_lab(
-    db: Session, actor_id: UUID, document_id: UUID, settings: Settings
-) -> tuple[BinaryIO, str, str]:
+def authorize_lab_access(db: Session, actor_id: UUID, document_id: UUID) -> NutritionLabDocument:
     row = db.get(NutritionLabDocument, document_id)
-    if row is None:
+    if row is None or row.purged_at is not None:
         raise ClinicalError("LAB_DOCUMENT_NOT_FOUND")
     if row.user_id != actor_id:
         authorized = (
@@ -200,10 +245,26 @@ def open_lab(
         )
         if not authorized or not is_physician(db, actor_id):
             raise ClinicalError("LAB_DOCUMENT_NOT_FOUND")
+    return row
+
+
+def open_lab(
+    db: Session, actor_id: UUID, document_id: UUID, settings: Settings
+) -> tuple[BinaryIO, str, str]:
+    row = authorize_lab_access(db, actor_id, document_id)
     try:
-        handle = _path(settings.nutrition_lab_storage_root, row.storage_key).open("rb")
+        handle = lab_storage_path(settings.nutrition_lab_storage_root, row.storage_key).open("rb")
     except OSError as error:
         raise ClinicalError("LAB_STORAGE_UNAVAILABLE") from error
+    audit_security_event(
+        db,
+        actor_user_id=actor_id,
+        owner_user_id=row.user_id,
+        event_type="lab_accessed",
+        resource_type="lab_document",
+        resource_id=row.id,
+    )
+    db.commit()
     return handle, row.content_type, row.original_filename
 
 
@@ -216,8 +277,16 @@ def delete_lab(db: Session, user_id: UUID, document_id: UUID, settings: Settings
     )
     if row is None:
         raise ClinicalError("LAB_DOCUMENT_NOT_FOUND")
-    _path(settings.nutrition_lab_storage_root, row.storage_key).unlink(missing_ok=True)
-    db.delete(row)
+    lab_storage_path(settings.nutrition_lab_storage_root, row.storage_key).unlink(missing_ok=True)
+    row.purged_at = datetime.now(UTC)
+    audit_security_event(
+        db,
+        actor_user_id=user_id,
+        owner_user_id=user_id,
+        event_type="lab_deleted",
+        resource_type="lab_document",
+        resource_id=row.id,
+    )
     db.commit()
 
 

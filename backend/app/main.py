@@ -21,6 +21,7 @@ from app.body_photos.router import router as body_photo_router
 from app.config import Settings, get_settings
 from app.exercises.router import router as exercises_router
 from app.nutrition.price_scheduler import scheduler_loop
+from app.nutrition.retention_scheduler import retention_scheduler_loop
 from app.nutrition.router import router as nutrition_router
 from app.profile.router import router as profile_router
 from app.workouts.router import router as workout_plans_router
@@ -52,12 +53,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.ai_http_client = ai_client
             app.state.food_price_http_client = food_price_client
             scheduler_task = asyncio.create_task(scheduler_loop(active_settings, food_price_client))
+            background_tasks = [scheduler_task]
+            if active_settings.app_env != "test":
+                background_tasks.append(
+                    asyncio.create_task(retention_scheduler_loop(active_settings))
+                )
             try:
                 yield
             finally:
-                scheduler_task.cancel()
+                for task in background_tasks:
+                    task.cancel()
                 try:
-                    await scheduler_task
+                    await asyncio.gather(*background_tasks)
                 except asyncio.CancelledError:
                     pass
 
@@ -70,6 +77,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["DELETE", "GET", "PATCH", "POST", "PUT"],
         allow_headers=[
             "Content-Type",
+            "Idempotency-Key",
+            "X-Fitsho-Food-Photo-Consent",
             "X-Fitsho-Client-Crop-Confirmed",
             "X-Fitsho-Client-Crop-Confidence",
             "X-Fitsho-Original-Height",

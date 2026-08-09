@@ -19,10 +19,14 @@ export function NutritionLabsPage() {
     setBusy(true);
     try { await api.uploadLabDocument(file, requests.find((request) => request.status === "requested")?.id); await load(); } finally { setBusy(false); }
   }
+  async function openLab(lab: Lab) {
+    const grant = await api.grantLabDocumentAccess(lab.id);
+    window.open(grant.access_url, "_blank", "noopener,noreferrer");
+  }
   return <main className="nutrition-estimate-page" dir={fa ? "rtl" : "ltr"}>
     <section className="nutrition-estimate-hero"><h1>{l("آزمایش‌های من", "My lab documents")}</h1><p>{l("آپلود برای همه اختیاری است؛ فقط خودت و پزشک مسئول به فایل دسترسی دارید.", "Uploads are optional. Only you and the assigned physician can access them.")}</p></section>
     <section className="nutrition-estimate-notes"><input disabled={busy} type="file" accept="application/pdf,image/jpeg,image/png" onChange={(event) => void upload(event.target.files?.[0])} /></section>
     <section className="nutrition-estimate-notes"><h2>{l("درخواست‌های پزشک", "Physician requests")}</h2>{requests.length === 0 ? <p>{l("درخواستی ثبت نشده است.", "No request has been recorded.")}</p> : requests.map((request) => <article key={request.id}><strong>{request.requested_tests.join("، ")}</strong><p>{request.user_visible_reason}</p><small>{request.status}</small></article>)}</section>
-    <section className="nutrition-target-grid">{labs.map((lab) => <a className="nutrition-target-card" href={`/api/v1/nutrition/labs/${lab.id}/file`} key={lab.id}><strong>{lab.original_filename}</strong><small>{lab.review_status}</small></a>)}</section>
+    <section className="nutrition-target-grid">{labs.map((lab) => <button className="nutrition-target-card" onClick={() => void openLab(lab)} type="button" key={lab.id}><strong>{lab.original_filename}</strong><small>{lab.review_status}</small></button>)}</section>
   </main>;
 }

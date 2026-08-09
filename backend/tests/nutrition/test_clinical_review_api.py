@@ -50,7 +50,9 @@ def test_lab_upload_is_private_and_physician_request_has_explicit_state(
     )
     assert uploaded.status_code == 201, uploaded.text
     document_id = uploaded.json()["id"]
-    assert client.get(f"/api/v1/nutrition/labs/{document_id}/file").status_code == 200
+    grant = client.post(f"/api/v1/nutrition/labs/{document_id}/access-grant", headers=ORIGIN)
+    assert grant.status_code == 200
+    assert client.get(grant.json()["access_url"]).status_code == 200
 
     physician = _login_physician(client, db)
     queue = client.get("/api/v1/nutrition/physician/reviews")
@@ -81,7 +83,11 @@ def test_lab_upload_is_private_and_physician_request_has_explicit_state(
     assert persisted is not None and persisted.lifecycle_status.value == "awaiting_lab_information"
     lab_request = db.scalar(select(NutritionLabRequest))
     assert lab_request is not None and lab_request.physician_user_id == physician.id
-    assert client.get(f"/api/v1/nutrition/labs/{document_id}/file").status_code == 200
+    physician_grant = client.post(
+        f"/api/v1/nutrition/labs/{document_id}/access-grant", headers=ORIGIN
+    )
+    assert physician_grant.status_code == 200
+    assert client.get(physician_grant.json()["access_url"]).status_code == 200
 
     assert client.post("/api/v1/auth/logout", headers=ORIGIN).status_code == 204
     assert (

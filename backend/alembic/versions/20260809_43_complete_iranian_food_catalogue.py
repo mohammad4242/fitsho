@@ -16,6 +16,22 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # Repair databases that were historically stamped at Task 12 before this Task 12
+    # column was persisted. A normal migration path already has the column.
+    existing_columns = {
+        column["name"]
+        for column in sa.inspect(op.get_bind()).get_columns("nutrition_catalogue_foods")
+    }
+    if "dietary_patterns" not in existing_columns:
+        op.add_column(
+            "nutrition_catalogue_foods",
+            sa.Column(
+                "dietary_patterns",
+                sa.JSON(),
+                nullable=False,
+                server_default=sa.text("'[\"omnivore\"]'::json"),
+            ),
+        )
     op.add_column(
         "nutrition_catalogue_foods",
         sa.Column("category", sa.String(64), nullable=False, server_default="uncategorized"),

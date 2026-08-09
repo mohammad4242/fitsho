@@ -16,7 +16,11 @@ async def main() -> None:
     settings = get_settings()
     async with httpx.AsyncClient(timeout=settings.food_price_provider_timeout_seconds, trust_env=False) as client:
         with Session(get_engine(settings.database_url)) as db:
-            run_price_update(db, providers=configured_providers(settings, client))
+            run_price_update(
+                db,
+                providers=configured_providers(settings, client),
+                retry_attempts=settings.food_price_provider_retries,
+            )
 
 
 if __name__ == "__main__":

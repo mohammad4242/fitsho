@@ -474,3 +474,12 @@ FoodData Central mapping provenance. The import normalizer accepts only
 verified gram/kilogram quantity conversion and rejects duplicate nutrients or
 unsupported units. No price, package, shopping-list, or meal-plan optimisation
 behaviour is included; those remain outside Task 4.
+
+## Task 14 security boundary
+
+Nutrition private-file access is session-authenticated and additionally protected by short-lived,
+actor-bound signed grants. Upload abuse limits and idempotency are persisted in PostgreSQL so they
+work across workers and restarts. Food photos and lab binaries are stored outside public media and
+removed by the retention scheduler while minimal audit history is retained. AI usage and price
+provider health are persisted as content-free operational counters. See
+`docs/nutrition-security-privacy.md` for the operational contract.

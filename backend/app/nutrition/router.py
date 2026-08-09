@@ -10,6 +10,7 @@ from fastapi import (
     Form,
     Header,
     HTTPException,
+    Query,
     Request,
     UploadFile,
     status,
@@ -32,6 +33,7 @@ from app.nutrition.adherence_service import (
 )
 from app.nutrition.clinical_service import (
     ClinicalError,
+    authorize_lab_access,
     claim_review,
     delete_lab,
     list_lab_requests,
@@ -69,9 +71,12 @@ from app.nutrition.food_catalogue import (
 )
 from app.nutrition.food_photo_service import (
     FoodPhotoError,
+    authorize_photo_access,
     confirm_photo,
     delete_photo,
     estimate_photo,
+    open_photo,
+    replay_idempotent_photo,
 )
 from app.nutrition.models import (
     NutritionCatalogueFood,
@@ -79,6 +84,8 @@ from app.nutrition.models import (
     NutritionFoodPriceReference,
     NutritionFoodPriceReview,
     NutritionFoodPriceUpdateRun,
+    NutritionOperationalEvent,
+    NutritionPriceProvider,
     NutritionSupplementCatalogue,
 )
 from app.nutrition.plan_editing import (
@@ -140,6 +147,13 @@ from app.nutrition.schemas import (
     WeeklyPlanGenerationResponse,
     WeeklyPlanHistoryItemResponse,
     WeeklyPlanResponse,
+)
+from app.nutrition.security import (
+    PrivateAccessError,
+    RateLimitExceeded,
+    consume_rate_limit,
+    create_private_access_token,
+    verify_private_access_token,
 )
 from app.nutrition.service import (
     current_safety_decision,
@@ -252,6 +266,12 @@ def read_nutrition_monitoring(db: DatabaseSession, admin: AdminUser) -> dict[str
         .order_by(NutritionFoodPriceUpdateRun.started_at.desc())
         .limit(10)
     ).all()
+    providers = db.scalars(
+        select(NutritionPriceProvider).order_by(NutritionPriceProvider.code)
+    ).all()
+    ai_events = db.scalars(
+        select(NutritionOperationalEvent).where(NutritionOperationalEvent.category == "ai")
+    ).all()
     return {
         "counts": {
             "foods": db.scalar(select(func.count()).select_from(NutritionCatalogueFood)) or 0,
@@ -278,6 +298,25 @@ def read_nutrition_monitoring(db: DatabaseSession, admin: AdminUser) -> dict[str
             }
             for run in latest_runs
         ],
+        "provider_health": [
+            {
+                "code": provider.code,
+                "enabled": provider.enabled,
+                "last_success_at": provider.last_success_at,
+                "last_error": provider.last_error,
+            }
+            for provider in providers
+        ],
+        "ai_usage": {
+            "requests": sum(int(str(event.counters.get("requests", 0))) for event in ai_events),
+            "errors": sum(int(str(event.counters.get("errors", 0))) for event in ai_events),
+            "input_tokens": sum(
+                int(str(event.counters.get("input_tokens", 0))) for event in ai_events
+            ),
+            "output_tokens": sum(
+                int(str(event.counters.get("output_tokens", 0))) for event in ai_events
+            ),
+        },
     }
 
 
@@ -863,11 +902,36 @@ async def create_food_photo_estimate(
     settings: AppSettings,
     file: Annotated[UploadFile, File()],
     consent: Annotated[bool, Header(alias="X-Fitsho-Food-Photo-Consent")],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
     try:
-        return await estimate_photo(
-            db, user.id, file, consent, settings, request.app.state.ai_http_client
+        if idempotency_key is not None and not 8 <= len(idempotency_key) <= 128:
+            raise FoodPhotoError("INVALID_IDEMPOTENCY_KEY")
+        replayed = replay_idempotent_photo(db, user.id, idempotency_key)
+        if replayed is not None:
+            return replayed
+        consume_rate_limit(
+            db,
+            actor_user_id=user.id,
+            operation="food_photo_estimation",
+            limit=settings.food_photo_rate_limit,
+            window_seconds=settings.nutrition_upload_rate_window_seconds,
         )
+        return await estimate_photo(
+            db,
+            user.id,
+            file,
+            consent,
+            settings,
+            request.app.state.ai_http_client,
+            idempotency_key,
+        )
+    except RateLimitExceeded as error:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "RATE_LIMIT_EXCEEDED"},
+            headers={"Retry-After": str(error.retry_after_seconds)},
+        ) from None
     except FoodPhotoError as error:
         raise _food_photo_error(error) from None
 
@@ -900,6 +964,59 @@ def remove_food_photo_estimate(
         delete_photo(db, user.id, estimate_id, settings)
     except FoodPhotoError as error:
         raise _food_photo_error(error) from None
+
+
+@router.post(
+    "/tracking/photo-estimates/{estimate_id}/access-grant",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def grant_food_photo_access(
+    estimate_id: UUID, db: DatabaseSession, user: CurrentUser, settings: AppSettings
+) -> dict[str, object]:
+    try:
+        authorize_photo_access(db, user.id, estimate_id)
+    except FoodPhotoError as error:
+        raise _food_photo_error(error) from None
+    token = create_private_access_token(
+        settings,
+        actor_user_id=user.id,
+        resource_id=estimate_id,
+        purpose="food_photo",
+    )
+    return {
+        "access_url": (
+            f"/api/v1/nutrition/tracking/photo-estimates/{estimate_id}/file?token={token}"
+        ),
+        "expires_in_seconds": settings.private_file_access_ttl_seconds,
+    }
+
+
+@router.get("/tracking/photo-estimates/{estimate_id}/file")
+def download_food_photo(
+    estimate_id: UUID,
+    db: DatabaseSession,
+    user: CurrentUser,
+    settings: AppSettings,
+    token: Annotated[str | None, Query()] = None,
+) -> StreamingResponse:
+    try:
+        if token is None:
+            raise PrivateAccessError
+        verify_private_access_token(
+            settings,
+            token,
+            actor_user_id=user.id,
+            resource_id=estimate_id,
+            purpose="food_photo",
+        )
+        handle, content_type = open_photo(db, user.id, estimate_id, settings)
+    except PrivateAccessError:
+        raise HTTPException(
+            status_code=403, detail={"code": "PRIVATE_ACCESS_TOKEN_REQUIRED"}
+        ) from None
+    except FoodPhotoError as error:
+        raise _food_photo_error(error) from None
+    return StreamingResponse(handle, media_type=content_type)
 
 
 @router.get("/adherence")
@@ -957,6 +1074,13 @@ async def create_lab_document(
     request_id: Annotated[UUID | None, Form()] = None,
 ) -> dict[str, object]:
     try:
+        consume_rate_limit(
+            db,
+            actor_user_id=user.id,
+            operation="nutrition_lab_upload",
+            limit=settings.nutrition_lab_upload_rate_limit,
+            window_seconds=settings.nutrition_upload_rate_window_seconds,
+        )
         return await upload_lab(
             db,
             user.id,
@@ -968,6 +1092,12 @@ async def create_lab_document(
             category=category,
             request_id=request_id,
         )
+    except RateLimitExceeded as error:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "RATE_LIMIT_EXCEEDED"},
+            headers={"Retry-After": str(error.retry_after_seconds)},
+        ) from None
     except ClinicalError as error:
         raise _clinical_error(error) from None
 
@@ -979,10 +1109,27 @@ def read_lab_documents(db: DatabaseSession, user: CurrentUser) -> list[dict[str,
 
 @router.get("/labs/{document_id}/file")
 def download_lab_document(
-    document_id: UUID, db: DatabaseSession, user: CurrentUser, settings: AppSettings
+    document_id: UUID,
+    db: DatabaseSession,
+    user: CurrentUser,
+    settings: AppSettings,
+    token: Annotated[str | None, Query()] = None,
 ) -> StreamingResponse:
     try:
+        if token is None:
+            raise PrivateAccessError
+        verify_private_access_token(
+            settings,
+            token,
+            actor_user_id=user.id,
+            resource_id=document_id,
+            purpose="nutrition_lab",
+        )
         handle, content_type, filename = open_lab(db, user.id, document_id, settings)
+    except PrivateAccessError:
+        raise HTTPException(
+            status_code=403, detail={"code": "PRIVATE_ACCESS_TOKEN_REQUIRED"}
+        ) from None
     except ClinicalError as error:
         raise _clinical_error(error) from None
     return StreamingResponse(
@@ -990,6 +1137,29 @@ def download_lab_document(
         media_type=content_type,
         headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
+
+
+@router.post(
+    "/labs/{document_id}/access-grant",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def grant_lab_document_access(
+    document_id: UUID, db: DatabaseSession, user: CurrentUser, settings: AppSettings
+) -> dict[str, object]:
+    try:
+        authorize_lab_access(db, user.id, document_id)
+    except ClinicalError as error:
+        raise _clinical_error(error) from None
+    token = create_private_access_token(
+        settings,
+        actor_user_id=user.id,
+        resource_id=document_id,
+        purpose="nutrition_lab",
+    )
+    return {
+        "access_url": f"/api/v1/nutrition/labs/{document_id}/file?token={token}",
+        "expires_in_seconds": settings.private_file_access_ttl_seconds,
+    }
 
 
 @router.delete(

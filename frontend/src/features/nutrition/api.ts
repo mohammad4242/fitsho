@@ -213,6 +213,9 @@ export function uploadLabDocument(file: File, requestId?: string): Promise<unkno
   if (requestId) body.append("request_id", requestId);
   return request(`${nutritionPath}/labs`, { method: "POST", body });
 }
+export function grantLabDocumentAccess(documentId: string): Promise<{ access_url: string; expires_in_seconds: number }> {
+  return request(`${nutritionPath}/labs/${documentId}/access-grant`, { method: "POST" });
+}
 
 export function listLabRequests(): Promise<Array<{ id: string; plan_id: string; status: string; requested_tests: string[]; user_visible_reason: string | null; created_at: string }>> {
   return request(`${nutritionPath}/lab-requests`);

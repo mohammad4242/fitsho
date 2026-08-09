@@ -46,6 +46,7 @@ async def trigger_scheduled_update(settings: Settings, client: httpx.AsyncClient
                     db,
                     providers=configured_providers(settings, client),
                     scheduled_for=weekly_slot(datetime.now(UTC), settings),
+                    retry_attempts=settings.food_price_provider_retries,
                 )
         finally:
             connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": _LOCK_KEY})

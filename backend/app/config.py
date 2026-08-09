@@ -34,10 +34,19 @@ class Settings(BaseSettings):
     body_photo_read_chunk_bytes: int = Field(default=1024 * 1024, ge=1024, le=4 * 1024 * 1024)
     food_photo_storage_root: Path = Path("var/private/food-photos")
     food_photo_max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=20 * 1024 * 1024)
+    food_photo_max_pixels: int = Field(default=20_000_000, ge=1, le=40_000_000)
     food_photo_retention_days: int = Field(default=30, ge=1, le=365)
+    food_photo_rate_limit: int = Field(default=10, ge=1, le=1000)
     nutrition_lab_storage_root: Path = Path("var/private/nutrition-labs")
     nutrition_lab_max_bytes: int = Field(default=12 * 1024 * 1024, ge=1024, le=30 * 1024 * 1024)
+    nutrition_lab_max_pixels: int = Field(default=20_000_000, ge=1, le=40_000_000)
     nutrition_lab_retention_days: int = Field(default=365 * 7, ge=30, le=365 * 20)
+    nutrition_lab_upload_rate_limit: int = Field(default=20, ge=1, le=1000)
+    nutrition_upload_rate_window_seconds: int = Field(default=3600, ge=60, le=86400)
+    private_file_access_ttl_seconds: int = Field(default=300, ge=30, le=900)
+    private_file_signing_key: SecretStr = Field(
+        default=SecretStr("fitsho-local-private-file-signing-key-change-me"), repr=False
+    )
     ffprobe_path: str = "ffprobe"
     ffprobe_timeout_seconds: float = 5.0
     opencode_zen_api_key: SecretStr | None = Field(default=None, repr=False)
@@ -121,6 +130,12 @@ class Settings(BaseSettings):
             raise ValueError("Production requires secure cookies")
         if self.session_cookie_name != "__Host-fitsho_session":
             raise ValueError("Production requires the __Host-fitsho_session cookie name")
+        signing_key = self.private_file_signing_key.get_secret_value()
+        if (
+            signing_key == "fitsho-local-private-file-signing-key-change-me"
+            or len(signing_key) < 32
+        ):
+            raise ValueError("Production requires a strong private file signing key")
         self.frontend_origin = f"https://{origin.netloc}"
         return self
 

@@ -34,3 +34,10 @@ def test_admin_monitoring_requires_admin_and_reports_catalogues(
         "supplements",
     }
     assert isinstance(response.json()["recent_price_runs"], list)
+    assert isinstance(response.json()["provider_health"], list)
+    assert response.json()["ai_usage"] == {
+        "requests": 0,
+        "errors": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+    }

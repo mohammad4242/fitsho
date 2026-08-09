@@ -126,6 +126,7 @@ def test_update_run_is_idempotent_and_preserves_previous_price_on_review(db) -> 
         NutritionCatalogueFood,
         NutritionFoodPriceHistory,
         NutritionFoodPriceMapping,
+        NutritionOperationalEvent,
         NutritionPriceProvider,
     )
     from app.nutrition.price_update_service import run_price_update
@@ -158,6 +159,14 @@ def test_update_run_is_idempotent_and_preserves_previous_price_on_review(db) -> 
     assert same.id == first.id
     assert first.foods_updated == 1
     assert db.scalar(select(NutritionFoodPriceHistory)) is not None
+    provider_event = db.scalar(
+        select(NutritionOperationalEvent).where(
+            NutritionOperationalEvent.category == "price_provider"
+        )
+    )
+    assert provider_event is not None
+    assert provider_event.provider == "provider-a"
+    assert provider_event.status == "success"
 
 
 def test_scheduler_uses_one_tehran_saturday_slot(test_settings) -> None:
