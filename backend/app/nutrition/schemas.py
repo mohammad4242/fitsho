@@ -490,3 +490,41 @@ class PhysicianLabRequestInput(BaseModel):
     expected_plan_revision_id: UUID
     requested_tests: list[str] = Field(min_length=1, max_length=30)
     user_visible_reason: str = Field(min_length=1, max_length=2000)
+
+
+class SupplementCatalogueInput(BaseModel):
+    slug: str = Field(min_length=1, max_length=120, pattern=r"^[a-z0-9-]+$")
+    name_fa: str = Field(min_length=1, max_length=160)
+    name_en: str = Field(min_length=1, max_length=160)
+    verification_status: str = Field(pattern="^(draft|verified|retired)$")
+    source_name: str = Field(min_length=1, max_length=160)
+    source_reference: str = Field(min_length=1, max_length=500)
+    active_ingredients: list[dict[str, object]] = Field(min_length=1, max_length=20)
+    nutrient_contribution_per_unit: dict[str, object]
+    contraindication_codes: list[str] = Field(default_factory=list, max_length=50)
+    allergen_codes: list[str] = Field(default_factory=list, max_length=50)
+    interaction_codes: list[str] = Field(default_factory=list, max_length=50)
+    upper_bound_rules: list[dict[str, object]] = Field(default_factory=list, max_length=30)
+
+
+class PhysicianSupplementOrderInput(BaseModel):
+    supplement_id: UUID
+    dose_amount: float = Field(gt=0, le=10000)
+    dose_unit: str = Field(min_length=1, max_length=32)
+    daily_units: float = Field(gt=0, le=100)
+    frequency: str = Field(min_length=1, max_length=120)
+    duration_days: int = Field(ge=1, le=730)
+    starts_on: date | None = None
+    instructions: str = Field(min_length=1, max_length=2000)
+    rationale: str = Field(min_length=1, max_length=2000)
+    rationale_user_visible: bool = True
+    linked_gap_codes: list[str] = Field(default_factory=list, max_length=30)
+    linked_lab_document_ids: list[UUID] = Field(default_factory=list, max_length=30)
+
+
+class SupplementTransitionInput(BaseModel):
+    status: str = Field(pattern="^(active|completed|discontinued|cancelled)$")
+
+
+class SupplementAcknowledgementInput(BaseModel):
+    adherence_note: str | None = Field(default=None, max_length=1000)

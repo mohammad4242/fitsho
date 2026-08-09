@@ -83,6 +83,7 @@ export function NutritionEstimatePage() {
         <Link className="nutrition-estimate-back" to="/dashboard">{l("بازگشت به امروز", "Back to Today")}</Link>
         <Link className="secondary-button" to="/nutrition-tracking">{l("ثبت تغذیه امروز", "Track today's food")}</Link>
         <Link className="secondary-button" to="/nutrition-labs">{l("آزمایش‌های من", "My lab documents")}</Link>
+        <Link className="secondary-button" to="/nutrition-supplements">{l("مکمل‌های من", "My supplements")}</Link>
         <p className="eyebrow eyebrow--accent">{l("موتور علمی فیتشو", "Fitsho scientific engine")}</p>
         <h1 className="fitsho-display">{l("هدف روزانه تغذیه", "Daily nutrition targets")}</h1>
         <p>{l("انرژی و مواد مغذی براساس مشخصات فعلی، فعالیت روزانه و تمرینت محاسبه شده‌اند.", "Energy and nutrients are calculated from your current body data, daily activity, and structured exercise.")}</p>

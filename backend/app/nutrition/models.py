@@ -1259,11 +1259,31 @@ class NutritionSupplementOrder(Base):
     plan_id: Mapped[UUID] = mapped_column(
         ForeignKey("nutrition_weekly_plans.id", ondelete="RESTRICT"), nullable=False
     )
+    supplement_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_supplement_catalogue.id", ondelete="RESTRICT")
+    )
     physician_user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     dose: Mapped[str] = mapped_column(String(160), nullable=False)
+    dose_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
+    daily_units: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
+    dose_unit: Mapped[str | None] = mapped_column(String(32))
+    frequency: Mapped[str | None] = mapped_column(String(120))
+    duration_days: Mapped[int | None] = mapped_column(SmallInteger)
+    starts_on: Mapped[date | None] = mapped_column()
+    ends_on: Mapped[date | None] = mapped_column()
+    instructions: Mapped[str | None] = mapped_column(String(2000))
+    rationale: Mapped[str | None] = mapped_column(String(2000))
+    rationale_user_visible: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    linked_gap_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    linked_lab_document_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    follow_up_lab_request_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_lab_requests.id", ondelete="SET NULL")
+    )
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    adherence_note: Mapped[str | None] = mapped_column(String(1000))
     status: Mapped[NutritionSupplementOrderStatus] = mapped_column(
         enum_column(NutritionSupplementOrderStatus, "ck_nutrition_supplement_order_status_values"),
         nullable=False,
@@ -1275,6 +1295,47 @@ class NutritionSupplementOrder(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class NutritionSupplementCatalogue(Base):
+    __tablename__ = "nutrition_supplement_catalogue"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    slug: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
+    name_en: Mapped[str] = mapped_column(String(160), nullable=False)
+    verification_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    source_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    active_ingredients: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
+    nutrient_contribution_per_unit: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    contraindication_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    allergen_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    interaction_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    upper_bound_rules: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class NutritionSupplementOrderAudit(Base):
+    __tablename__ = "nutrition_supplement_order_audits"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    order_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_supplement_orders.id", ondelete="CASCADE"), nullable=False
+    )
+    actor_user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
 

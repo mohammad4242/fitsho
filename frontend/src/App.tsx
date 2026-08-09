@@ -33,6 +33,8 @@ import { NutritionEstimatePage } from "./features/nutrition/NutritionEstimatePag
 import { NutritionTrackingPage } from "./features/nutrition/NutritionTrackingPage";
 import { NutritionLabsPage } from "./features/nutrition/NutritionLabsPage";
 import { PhysicianNutritionReviewPage } from "./features/nutrition/PhysicianNutritionReviewPage";
+import { NutritionSupplementsPage } from "./features/nutrition/NutritionSupplementsPage";
+import { AdminSupplementsPage } from "./features/admin/AdminSupplementsPage";
 import { AppShell } from "./shared/AppShell";
 
 export function AppRoutes() {
@@ -52,6 +54,7 @@ export function AppRoutes() {
           <Route path="/admin/exercises" element={<AdminExercisesPage />} />
           <Route path="/admin/exercises/new" element={<AdminExerciseNewPage />} />
           <Route path="/admin/exercises/:exerciseId/edit" element={<AdminExerciseEditPage />} />
+          <Route path="/admin/nutrition-supplements" element={<AdminSupplementsPage />} />
         </Route>
         <Route element={<OnboardingRoute />}>
           <Route path="/onboarding" element={<OnboardingPage />} />
@@ -64,6 +67,7 @@ export function AppRoutes() {
             <Route path="/nutrition-estimate" element={<NutritionEstimatePage />} />
             <Route path="/nutrition-tracking" element={<NutritionTrackingPage />} />
             <Route path="/nutrition-labs" element={<NutritionLabsPage />} />
+            <Route path="/nutrition-supplements" element={<NutritionSupplementsPage />} />
             <Route path="/body-progress" element={<BodyProgressPage />} />
             <Route path="/body-progress/new" element={<BodyPhotoWizard />} />
             <Route path="/body-progress/:sessionId" element={<BodyAnalysisResultPage />} />

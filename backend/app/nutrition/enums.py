@@ -174,8 +174,11 @@ class NutritionLabRequestStatus(StrEnum):
 
 class NutritionSupplementOrderStatus(StrEnum):
     DRAFT = "draft"
+    PRESCRIBED = "prescribed"
     ACTIVE = "active"
-    STOPPED = "stopped"
+    COMPLETED = "completed"
+    DISCONTINUED = "discontinued"
+    CANCELLED = "cancelled"
 
 
 class NutritionDailyCheckInStatus(StrEnum):

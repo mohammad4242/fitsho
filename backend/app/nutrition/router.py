@@ -39,6 +39,7 @@ from app.nutrition.clinical_service import (
     review_queue,
     upload_lab,
 )
+from app.nutrition.enums import NutritionSupplementOrderStatus
 from app.nutrition.estimate_service import (
     create_estimate,
     current_estimate,
@@ -105,6 +106,7 @@ from app.nutrition.schemas import (
     PhysicianLabRequestInput,
     PhysicianPlanActionInput,
     PhysicianReviewRequirementResponse,
+    PhysicianSupplementOrderInput,
     QuickApproximationInput,
     RemoveMealConfirmationInput,
     SafetyDecisionResponse,
@@ -112,6 +114,9 @@ from app.nutrition.schemas import (
     SafetyProfileInput,
     StructuredExerciseInput,
     StructuredExerciseResponse,
+    SupplementAcknowledgementInput,
+    SupplementCatalogueInput,
+    SupplementTransitionInput,
     TargetUpdateConfirmationInput,
     WeeklyPlanGenerationResponse,
     WeeklyPlanHistoryItemResponse,
@@ -126,6 +131,15 @@ from app.nutrition.service import (
     safety_response,
     save_nutrition_profile,
     save_safety_profile,
+)
+from app.nutrition.supplement_service import (
+    SupplementError,
+    acknowledge_order,
+    create_order,
+    list_catalogue,
+    list_user_orders,
+    save_catalogue,
+    transition_order,
 )
 from app.nutrition.tracking_service import (
     TrackingError,
@@ -885,3 +899,87 @@ def create_physician_lab_request(
         )
     except ClinicalError as error:
         raise _clinical_error(error) from None
+
+
+def _supplement_error(error: SupplementError) -> HTTPException:
+    error_status = (
+        status.HTTP_403_FORBIDDEN
+        if error.code == "PHYSICIAN_ROLE_REQUIRED"
+        else status.HTTP_409_CONFLICT
+    )
+    if error.code.endswith("NOT_FOUND"):
+        error_status = status.HTTP_404_NOT_FOUND
+    return HTTPException(status_code=error_status, detail={"code": error.code, **error.details})
+
+
+@router.get("/supplements/catalogue")
+def read_supplement_catalogue(db: DatabaseSession, user: CurrentUser) -> list[dict[str, object]]:
+    return list_catalogue(db)
+
+
+@router.put(
+    "/admin/supplements/catalogue",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_supplement_catalogue(
+    payload: SupplementCatalogueInput, db: DatabaseSession, admin: AdminUser
+) -> dict[str, object]:
+    del admin
+    return save_catalogue(db, payload.model_dump(mode="json"))
+
+
+@router.post(
+    "/physician/plans/{plan_id}/supplement-orders",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def create_physician_supplement_order(
+    plan_id: UUID,
+    payload: PhysicianSupplementOrderInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, object]:
+    try:
+        data = payload.model_dump(mode="python", exclude={"supplement_id"})
+        return create_order(db, user.id, plan_id, payload.supplement_id, data)
+    except SupplementError as error:
+        raise _supplement_error(error) from None
+
+
+@router.post(
+    "/physician/supplement-orders/{order_id}/transition",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_supplement_order_status(
+    order_id: UUID,
+    payload: SupplementTransitionInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, object]:
+    try:
+        return transition_order(
+            db, user.id, order_id, NutritionSupplementOrderStatus(payload.status)
+        )
+    except SupplementError as error:
+        raise _supplement_error(error) from None
+
+
+@router.get("/supplement-orders")
+def read_user_supplement_orders(db: DatabaseSession, user: CurrentUser) -> list[dict[str, object]]:
+    return list_user_orders(db, user.id)
+
+
+@router.post(
+    "/supplement-orders/{order_id}/acknowledge",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def acknowledge_supplement_order(
+    order_id: UUID,
+    payload: SupplementAcknowledgementInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, object]:
+    try:
+        return acknowledge_order(db, user.id, order_id, payload.adherence_note)
+    except SupplementError as error:
+        raise _supplement_error(error) from None

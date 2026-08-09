@@ -169,3 +169,14 @@ export function listPhysicianReviews(): Promise<Array<{ review_id: string; plan_
 export function claimPhysicianReview(reviewId: string): Promise<unknown> {
   return request(`${nutritionPath}/physician/reviews/${reviewId}/claim`, { method: "POST" });
 }
+
+export type SupplementOrder = { id: string; plan_id: string; name: string; dose_amount: number; dose_unit: string; frequency: string; duration_days: number; instructions: string; rationale: string | null; status: string; acknowledged_at: string | null };
+export type SupplementCatalogueItem = { id: string; slug: string; name_fa: string; name_en: string };
+
+export function listSupplementOrders(): Promise<SupplementOrder[]> { return request(`${nutritionPath}/supplement-orders`); }
+export function acknowledgeSupplementOrder(orderId: string): Promise<SupplementOrder> { return request(`${nutritionPath}/supplement-orders/${orderId}/acknowledge`, { method: "POST", body: JSON.stringify({ adherence_note: null }) }); }
+export function listSupplementCatalogue(): Promise<SupplementCatalogueItem[]> { return request(`${nutritionPath}/supplements/catalogue`); }
+export function createPhysicianSupplementOrder(planId: string, supplementId: string): Promise<SupplementOrder> {
+  return request(`${nutritionPath}/physician/plans/${planId}/supplement-orders`, { method: "POST", body: JSON.stringify({ supplement_id: supplementId, dose_amount: 1, dose_unit: "unit", daily_units: 1, frequency: "once_daily", duration_days: 30, instructions: "Follow physician instructions", rationale: "Physician-reviewed indication", rationale_user_visible: true, linked_gap_codes: [], linked_lab_document_ids: [] }) });
+}
+export function saveSupplementCatalogue(input: Record<string, unknown>): Promise<unknown> { return request(`${nutritionPath}/admin/supplements/catalogue`, { method: "PUT", body: JSON.stringify(input) }); }
