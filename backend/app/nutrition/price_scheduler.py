@@ -91,8 +91,12 @@ async def trigger_scheduled_update(
                     retry_attempts=settings.food_price_provider_retries,
                     trigger_kind=trigger_kind,
                 )
+                connection.commit()
         finally:
+            if connection.in_transaction():
+                connection.rollback()
             connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": _LOCK_KEY})
+            connection.commit()
     return True
 
 

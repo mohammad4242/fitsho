@@ -211,10 +211,11 @@ async def run_price_update_async(
             observations.setdefault(key, []).append(candidate.to_observation())
             discovered_keys.add(key)
         record = db.get(NutritionPriceProvider, provider.code)
-        if record is not None and provider.code in successful_probes:
-            record.enabled = True
-            record.last_success_at = now
-            record.last_error = None
+        if record is not None:
+            if provider.code in successful_probes:
+                record.enabled = True
+                record.last_success_at = now
+            record.last_error = "provider discovery failed" if provider_failed else None
 
     by_provider: dict[str, list[NutritionFoodPriceMapping]] = {}
     for mapping in mappings:

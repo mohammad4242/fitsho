@@ -257,6 +257,43 @@ def test_empty_optional_api_key_keeps_only_keyless_public_providers(test_setting
     asyncio.run(check())
 
 
+def test_scheduler_commits_run_outside_advisory_lock_transaction(
+    db, test_settings, monkeypatch
+) -> None:
+    import asyncio
+
+    import httpx
+    from sqlalchemy import delete
+
+    from app.nutrition import price_scheduler
+    from app.nutrition.models import NutritionFoodPriceUpdateRun
+
+    engine = db.get_bind().engine
+    monkeypatch.setattr(price_scheduler, "get_engine", lambda _url: engine)
+    monkeypatch.setattr(price_scheduler, "configured_providers", lambda _settings, _client: [])
+    due_now = datetime(2035, 8, 4, 8, 30, tzinfo=UTC)
+
+    async def trigger() -> bool:
+        async with httpx.AsyncClient(trust_env=False) as client:
+            return await price_scheduler.trigger_scheduled_update(
+                test_settings, client, now=due_now
+            )
+
+    assert asyncio.run(trigger()) is True
+    with engine.begin() as connection:
+        persisted = connection.scalar(
+            select(NutritionFoodPriceUpdateRun.id).where(
+                NutritionFoodPriceUpdateRun.scheduled_for == due_now
+            )
+        )
+        assert persisted is not None
+        connection.execute(
+            delete(NutritionFoodPriceUpdateRun).where(
+                NutritionFoodPriceUpdateRun.scheduled_for == due_now
+            )
+        )
+
+
 def test_public_price_provider_registry_is_seeded_disabled_until_live_probe(db) -> None:
     from app.nutrition.models import NutritionPriceProvider
 
@@ -384,3 +421,29 @@ def test_zero_provider_run_is_observable_error_not_success(db) -> None:
     assert run.status == PriceUpdateRunStatus.COMPLETED_WITH_ERRORS
     assert "NO_PROVIDERS" in run.failure_codes
     assert "NO_USABLE_OBSERVATIONS" in run.failure_codes
+
+
+def test_discovery_failure_is_visible_in_provider_health(db) -> None:
+    from app.nutrition.models import NutritionPriceProvider
+    from app.nutrition.price_update_service import run_price_update
+
+    class FailingDiscoveryProvider:
+        code = "digikala"
+        uses_public_locators = True
+
+        async def discover(self, _alias: str):
+            raise RuntimeError("temporary public source failure")
+
+        async def get_quotes(self, _locators):
+            return []
+
+    run = run_price_update(
+        db,
+        providers=[FailingDiscoveryProvider()],
+        scheduled_for=datetime(2026, 8, 9, 11, tzinfo=UTC),
+    )
+
+    provider = db.get(NutritionPriceProvider, "digikala")
+    assert run.provider_failures == 1
+    assert provider is not None
+    assert provider.last_error == "provider discovery failed"
