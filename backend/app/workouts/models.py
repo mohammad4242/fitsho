@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -25,6 +26,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
 from app.exercises.models import Exercise
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
+
+if TYPE_CHECKING:
+    from app.workout_reviews.models import WorkoutPlanReview
 
 
 def enum_values(members: type[StrEnum]) -> list[str]:
@@ -140,6 +144,16 @@ class WorkoutPlan(Base):
     )
     generation_records: Mapped[list[WorkoutPlanGeneration]] = relationship(
         back_populates="workout_plan"
+    )
+    source_review: Mapped[WorkoutPlanReview | None] = relationship(
+        foreign_keys="WorkoutPlanReview.source_plan_id",
+        back_populates="source_plan",
+        uselist=False,
+    )
+    approval_review: Mapped[WorkoutPlanReview | None] = relationship(
+        foreign_keys="WorkoutPlanReview.approved_plan_id",
+        back_populates="approved_plan",
+        uselist=False,
     )
 
 
