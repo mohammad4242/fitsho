@@ -982,6 +982,11 @@ class NutritionFoodItem(Base):
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("nutrition_profiles.user_id", ondelete="CASCADE"), nullable=False
     )
+    catalogue_food_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     kind: Mapped[FoodItemKind] = mapped_column(
         enum_column(FoodItemKind, "ck_nutrition_food_items_kind_values"), nullable=False
     )

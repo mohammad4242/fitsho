@@ -62,8 +62,8 @@ def _input(**changes: object):
         "weekly_budget_irr": 100_000_000,
         "budget_mode": "strict",
         "excluded_terms": (),
-        "liked_terms": (),
-        "disliked_terms": (),
+        "liked_food_ids": (),
+        "disliked_food_ids": (),
         "dietary_pattern": "omnivore",
         "maximum_meal_repetition_per_week": 2,
     }

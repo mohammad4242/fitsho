@@ -261,6 +261,11 @@ it("completes the guided nutrition profile with IRR budget and optional skips", 
       snack_count_bucket: "one_snack",
     }),
   );
+  const submitted = vi.mocked(nutritionApi.saveNutritionProfile).mock.calls[0][0];
+  expect(submitted).not.toHaveProperty("cooking_skill");
+  expect(submitted).not.toHaveProperty("meal_preparation_preference");
+  expect(submitted).not.toHaveProperty("foods_available_at_home");
+  expect(submitted).not.toHaveProperty("preferred_variety");
   expect(onComplete).not.toHaveBeenCalled();
   expect(screen.getByRole("heading", { name: "پروفایل تغذیه‌ات ثبت شد" })).toBeInTheDocument();
 });

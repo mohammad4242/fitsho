@@ -57,8 +57,8 @@ class PlannerInput:
     weekly_budget_irr: int
     budget_mode: str
     excluded_terms: tuple[str, ...]
-    liked_terms: tuple[str, ...]
-    disliked_terms: tuple[str, ...]
+    liked_food_ids: tuple[str, ...]
+    disliked_food_ids: tuple[str, ...]
     dietary_pattern: str
     maximum_meal_repetition_per_week: int
 
@@ -284,14 +284,9 @@ def _rank_candidates(
             ),
             ZERO,
         )
-        name = f"{food.slug} {food.name_fa}".casefold()
-        preference = sum(
-            (Decimal("1") for term in inputs.liked_terms if term.casefold() in name),
-            ZERO,
-        ) - sum(
-            (Decimal("1") for term in inputs.disliked_terms if term.casefold() in name),
-            ZERO,
-        )
+        preference = (
+            Decimal("1") if food.food_id in inputs.liked_food_ids else ZERO
+        ) - (Decimal("1") if food.food_id in inputs.disliked_food_ids else ZERO)
         cost_per_kcal = food.price_irr_per_gram * HUNDRED / energy
         value = (
             micronutrient_adequacy * policy.micronutrient_score_weight

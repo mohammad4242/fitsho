@@ -192,11 +192,15 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
     exclusions = tuple(
         item.normalized_name for item in food_items if item.kind in _HARD_EXCLUSION_KINDS
     )
-    liked_terms = tuple(
-        item.normalized_name for item in food_items if item.kind is FoodItemKind.FAVOURITE
+    liked_food_ids = tuple(
+        str(item.catalogue_food_id)
+        for item in food_items
+        if item.kind is FoodItemKind.FAVOURITE and item.catalogue_food_id is not None
     )
-    disliked_terms = tuple(
-        item.normalized_name for item in food_items if item.kind is FoodItemKind.DISLIKED
+    disliked_food_ids = tuple(
+        str(item.catalogue_food_id)
+        for item in food_items
+        if item.kind is FoodItemKind.DISLIKED and item.catalogue_food_id is not None
     )
     foods, price_snapshot, food_manifest = _planner_foods(db)
     minimums, maximums = _daily_limits(estimate.targets)
@@ -221,8 +225,8 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         "micronutrient_upper_limits": _json_decimal_map(upper_limits),
         "micronutrient_reference_rows": micro_metadata,
         "hard_exclusions": list(exclusions),
-        "liked_foods": list(liked_terms),
-        "disliked_foods": list(disliked_terms),
+        "liked_food_ids": list(liked_food_ids),
+        "disliked_food_ids": list(disliked_food_ids),
         "dietary_pattern": profile.dietary_pattern.value,
         "maximum_meal_repetition_per_week": profile.maximum_meal_repetition_per_week,
         "meal_distribution_policy_version": "meal-distribution-v1",
@@ -240,8 +244,8 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
             weekly_budget_irr=weekly_budget,
             budget_mode=profile.budget_style.value,
             excluded_terms=exclusions,
-            liked_terms=liked_terms,
-            disliked_terms=disliked_terms,
+            liked_food_ids=liked_food_ids,
+            disliked_food_ids=disliked_food_ids,
             dietary_pattern=profile.dietary_pattern.value,
             maximum_meal_repetition_per_week=profile.maximum_meal_repetition_per_week,
         ),

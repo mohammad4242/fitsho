@@ -34,11 +34,11 @@
 - Test: `backend/tests/nutrition/test_nutrition_scope_cleanup.py`
 - Test: `frontend/src/features/nutrition/NutritionOnboardingFlow.test.tsx`
 
-- [ ] Add failing tests proving legacy Cooking values are ignored, only liked/disliked ordinary preferences are current, and unresolved text does not score.
-- [ ] Add nullable canonical food references to preference rows and deterministic alias resolution.
-- [ ] Preserve deprecated database/API compatibility while removing current-client Cooking payloads and dead Cooking UI.
-- [ ] Route planner preferences only through resolved canonical food IDs.
-- [ ] Run focused backend/frontend checks, commit, and push.
+- [x] Add failing tests proving legacy Cooking values are ignored, only liked/disliked ordinary preferences are current, and unresolved text does not score.
+- [x] Add nullable canonical food references to preference rows and deterministic alias resolution.
+- [x] Preserve deprecated database/API compatibility while removing current-client Cooking payloads and dead Cooking UI.
+- [x] Route planner preferences only through resolved canonical food IDs.
+- [x] Run focused backend/frontend checks, commit, and push.
 
 ### Task 2: Complete physician lifecycle and laboratory workflow
 

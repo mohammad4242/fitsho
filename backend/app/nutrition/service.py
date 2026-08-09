@@ -25,7 +25,9 @@ from app.nutrition.exceptions import (
     SafetyScreenRequiredError,
     SharedProfileRequiredError,
 )
+from app.nutrition.food_catalogue import normalize_food_alias
 from app.nutrition.models import (
+    NutritionCatalogueFood,
     NutritionCookingEquipment,
     NutritionFoodItem,
     NutritionMedicalCondition,
@@ -279,6 +281,15 @@ def save_nutrition_profile(
     scalar_values = payload.model_dump(
         exclude={
             "cooking_equipment",
+            "plan_style",
+            "cooking_skill",
+            "maximum_cooking_time_minutes",
+            "cooking_frequency_per_week",
+            "meal_preparation_preference",
+            "refrigerator_access",
+            "freezer_access",
+            "supplied_meals_per_week",
+            "supplied_meal_source",
             "foods_available_at_home",
             "favourite_foods",
             "disliked_foods",
@@ -287,6 +298,10 @@ def save_nutrition_profile(
             "allergies",
             "intolerances",
             "religious_cultural_exclusions",
+            "preferred_variety",
+            "maximum_meal_repetition_per_week",
+            "accepts_leftovers",
+            "accepts_batch_cooking",
         }
     )
     scalar_values["meals_per_day"] = payload.meals_per_day
@@ -329,7 +344,7 @@ def save_nutrition_profile(
         db.flush()
         # Cooking/preparation data is legacy-only and is deliberately not rewritten.
         db.execute(delete(NutritionFoodItem).where(NutritionFoodItem.user_id == user_id))
-        db.add_all(_food_items(user_id, payload))
+        db.add_all(_food_items(db, user_id, payload))
         db.commit()
     except SQLAlchemyError:
         db.rollback()
@@ -337,15 +352,37 @@ def save_nutrition_profile(
     return get_nutrition_profile(db, user_id)
 
 
-def _food_items(user_id: UUID, payload: NutritionProfileInput) -> list[NutritionFoodItem]:
+def _food_items(
+    db: Session,
+    user_id: UUID,
+    payload: NutritionProfileInput,
+) -> list[NutritionFoodItem]:
     items: list[NutritionFoodItem] = []
+    canonical_foods = db.scalars(
+        select(NutritionCatalogueFood).options(selectinload(NutritionCatalogueFood.aliases))
+    ).all()
+    candidates: dict[str, set[UUID]] = {}
+    for food in canonical_foods:
+        catalogue_names = (
+            food.name_fa,
+            food.name_en,
+            food.slug,
+            *(alias.alias for alias in food.aliases),
+        )
+        for value in catalogue_names:
+            candidates.setdefault(normalize_food_alias(value), set()).add(food.id)
+    resolved_food_ids = {
+        key: next(iter(food_ids))
+        for key, food_ids in candidates.items()
+        if len(food_ids) == 1
+    }
     string_collections = {
         FoodItemKind.FAVOURITE: payload.favourite_foods,
         FoodItemKind.DISLIKED: payload.disliked_foods,
         FoodItemKind.RELIGIOUS_CULTURAL_EXCLUSION: payload.religious_cultural_exclusions,
     }
     for kind, names in string_collections.items():
-        items.extend(_named_items(user_id, kind, names))
+        items.extend(_named_items(user_id, kind, names, resolved_food_ids))
     items.extend(_constraint_items(user_id, FoodItemKind.ALLERGY, payload.allergies))
     items.extend(_constraint_items(user_id, FoodItemKind.INTOLERANCE, payload.intolerances))
     return items
@@ -355,13 +392,19 @@ def _named_items(
     user_id: UUID,
     kind: FoodItemKind,
     names: list[str],
+    resolved_food_ids: dict[str, UUID],
 ) -> list[NutritionFoodItem]:
     return [
         NutritionFoodItem(
             user_id=user_id,
             kind=kind,
             name=name,
-            normalized_name=name.casefold(),
+            normalized_name=normalize_food_alias(name),
+            catalogue_food_id=(
+                resolved_food_ids.get(normalize_food_alias(name))
+                if kind in {FoodItemKind.FAVOURITE, FoodItemKind.DISLIKED}
+                else None
+            ),
         )
         for name in names
     ]
