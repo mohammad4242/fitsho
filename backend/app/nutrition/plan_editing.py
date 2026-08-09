@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -845,7 +845,7 @@ def physician_action(
             raise PlanEditError("PLAN_HARD_INVARIANTS_FAILED")
         plan.review.status = NutritionPlanReviewStatus.APPROVED
         plan.review.reviewed_at = now
-        if plan.start_date <= now.date():
+        if plan.start_date <= date.today():
             plan.lifecycle_status = NutritionPlanLifecycleStatus.ACTIVE
             for old in db.scalars(
                 select(NutritionWeeklyPlan).where(
