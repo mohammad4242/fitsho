@@ -59,7 +59,7 @@ the existing non-active status rather than being deleted.
 A dedicated workout review table records:
 
 - source plan and member
-- review status: `pending`, `claimed`, or `approved`
+- review status: `pending`, `claimed`, `approved`, or `superseded`
 - claiming coach
 - lease acquisition and expiration times
 - coach note
@@ -70,6 +70,9 @@ A dedicated workout review table records:
 
 Only one open review may exist for a source plan. The draft is not a member-visible workout plan
 until approval succeeds.
+
+If a later generated plan supersedes the source before coach approval, the open review becomes
+`superseded` and can no longer be claimed, edited, or approved. Its audit data remains available.
 
 ### Roles
 
@@ -156,6 +159,7 @@ and LTR behavior.
 - Expired or stolen leases return an explicit conflict and never accept edits.
 - Missing/deactivated exercises block approval with field-level validation details.
 - Duplicate generation/retry paths do not create duplicate open reviews.
+- A newer generated plan closes the older open review and cannot be replaced by its stale draft.
 
 ## Testing
 
