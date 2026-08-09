@@ -178,6 +178,7 @@ def order_response(row: NutritionSupplementOrder) -> dict[str, object]:
         "linked_lab_document_ids": row.linked_lab_document_ids,
         "food_nutrient_contribution": {},
         "supplement_nutrient_contribution": row.nutrient_contribution,
+        "combined_exposure_safety": row.audit_metadata.get("pre_activation_exposure", {}),
         "acknowledged_at": row.acknowledged_at,
     }
 

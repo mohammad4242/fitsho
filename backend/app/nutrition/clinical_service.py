@@ -331,3 +331,22 @@ def request_labs(
     )
     db.commit()
     return {"id": row.id, "status": row.status.value, "requested_tests": requested_tests}
+
+
+def list_lab_requests(db: Session, user_id: UUID) -> list[dict[str, object]]:
+    rows = db.scalars(
+        select(NutritionLabRequest)
+        .where(NutritionLabRequest.user_id == user_id)
+        .order_by(NutritionLabRequest.created_at.desc())
+    ).all()
+    return [
+        {
+            "id": row.id,
+            "plan_id": row.plan_id,
+            "status": row.status.value,
+            "requested_tests": row.requested_tests,
+            "user_visible_reason": row.notes,
+            "created_at": row.created_at,
+        }
+        for row in rows
+    ]

@@ -138,6 +138,11 @@ export type WeeklyPlan = {
   is_user_visible: boolean;
   physician_approved: boolean;
   review_status: string;
+  physician_approved_at: string | null;
+  physician_display_name: string | null;
+  physician_user_visible_notes: string | null;
+  physician_change_summary: Array<Record<string, unknown>>;
+  supersedes_plan_id: string | null;
   start_date: string;
   planner_policy_version: string;
   planner_version: string;
@@ -164,10 +169,30 @@ export type WeeklyPlan = {
       target_distribution: Record<string, number>;
       nutrient_totals: Record<string, number>;
       cost_irr: number;
+      is_locked: boolean;
       foods: WeeklyPlanFood[];
     }>;
   }>;
   created_at: string;
+};
+
+export type WeeklyPlanHistoryItem = Pick<WeeklyPlan, "id" | "revision" | "lifecycle_status" | "review_status" | "weekly_cost_irr" | "weekly_budget_irr" | "budget_status" | "created_at">;
+
+export type ShoppingList = {
+  plan_id: string;
+  plan_revision: number;
+  approval_status: string;
+  warning_codes: string[];
+  total_cost_irr: number;
+  items: Array<{
+    food_id: string;
+    slug: string;
+    name_fa: string;
+    name_en: string;
+    required_quantity: number;
+    canonical_unit: string;
+    cost_irr: number;
+  }>;
 };
 
 export type WeeklyPlanGeneration = {

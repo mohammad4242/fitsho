@@ -7,7 +7,7 @@ import { useOptionalProfile } from "../features/profile/ProfileContext";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function AuthenticatedHeader() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -75,9 +75,7 @@ export function AuthenticatedHeader() {
                 <a href="https://facebook.com" target="_blank" rel="noreferrer">Facebook</a>
                 <a href="https://x.com" target="_blank" rel="noreferrer">X</a>
                 {user.is_admin && (
-                  <Link to="/admin/exercises" onClick={() => setMenuOpen(false)}>
-                    {t("header.adminExercises")}
-                  </Link>
+                  <><Link to="/admin/exercises" onClick={() => setMenuOpen(false)}>{t("header.adminExercises")}</Link><Link to="/admin/nutrition-monitoring" onClick={() => setMenuOpen(false)}>{i18n.resolvedLanguage === "en" ? "Nutrition monitoring" : "پایش تغذیه"}</Link></>
                 )}
                 <button className="member-menu__logout" type="button" onClick={handleLogout} disabled={busy}>
                   {busy ? t("header.loggingOut") : t("header.logout")}
@@ -126,6 +124,7 @@ export function AuthenticatedHeader() {
                 >
                   {t("header.adminExercises")}
                 </Link>
+                <Link to="/admin/nutrition-monitoring">{i18n.resolvedLanguage === "en" ? "Nutrition monitoring" : "پایش تغذیه"}</Link>
                 <Link
                   to="/admin/ai-settings"
                   aria-current={

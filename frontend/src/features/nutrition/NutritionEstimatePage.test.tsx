@@ -42,6 +42,11 @@ const weeklyPlan: WeeklyPlan = {
   is_user_visible: true,
   physician_approved: false,
   review_status: "pending",
+  physician_approved_at: null,
+  physician_display_name: null,
+  physician_user_visible_notes: null,
+  physician_change_summary: [],
+  supersedes_plan_id: null,
   start_date: "2026-08-08",
   planner_policy_version: "weekly-planner-v1",
   planner_version: "deterministic-heuristic-v1",
@@ -83,6 +88,7 @@ const weeklyPlan: WeeklyPlan = {
       target_distribution: { goal_calories: 700 },
       nutrient_totals: { energy_kcal: 700 },
       cost_irr: 300_000,
+      is_locked: false,
       foods: [{
         food_id: "food-1",
         slug: "chicken-breast",
@@ -101,6 +107,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(nutritionApi.getCurrentNutritionEstimate).mockResolvedValue(estimate);
   vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(null);
+  vi.mocked(nutritionApi.getShoppingList).mockResolvedValue({ plan_id: "plan-1", plan_revision: 1, approval_status: "pending", warning_codes: ["PLAN_NOT_ACTIVE"], total_cost_irr: 1_400_000, items: [{ food_id: "food-1", slug: "chicken-breast", name_fa: "سینه مرغ", name_en: "Chicken breast", required_quantity: 1050, canonical_unit: "g", cost_irr: 1_400_000 }] });
+  vi.mocked(nutritionApi.listWeeklyNutritionPlans).mockResolvedValue([]);
 });
 
 it("generates and displays a seven-day draft without claiming physician approval", async () => {
@@ -120,7 +128,7 @@ it("generates and displays a seven-day draft without claiming physician approval
   expect(screen.getByText("در انتظار بررسی پزشک")).toBeInTheDocument();
   expect(screen.queryByText("تأییدشده توسط پزشک")).not.toBeInTheDocument();
   expect(screen.getAllByRole("tab")).toHaveLength(7);
-  expect(screen.getByText("سینه مرغ")).toBeInTheDocument();
+  expect(screen.getAllByText("سینه مرغ")).toHaveLength(2);
 });
 
 it("shows the scientific calorie and nutrient estimate with its limits in Persian", async () => {
@@ -143,4 +151,25 @@ it("uses complete English copy and left-to-right layout", async () => {
   expect(heading.closest("main")).toHaveAttribute("dir", "ltr");
   expect(screen.getByText("High confidence")).toBeInTheDocument();
   expect(screen.getByText(/scientific estimate, not a diagnosis or medical prescription/i)).toBeInTheDocument();
+});
+
+it("supports locking, feedback, and a confirmed revision-safe meal removal", async () => {
+  await i18n.changeLanguage("en");
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
+  vi.mocked(nutritionApi.setMealLock).mockResolvedValue({ is_locked: true });
+  vi.mocked(nutritionApi.saveMealFeedback).mockResolvedValue({});
+  vi.mocked(nutritionApi.previewMealRemoval).mockResolvedValue({ expected_plan_revision_id: "plan-1", meal_id: "meal-0", daily_delta: { energy_kcal: -700 }, weekly_cost_delta_irr: -300_000, new_warning_codes: ["MEAL_REMOVAL_MAY_REDUCE_ADEQUACY"] });
+  vi.mocked(nutritionApi.confirmMealRemoval).mockResolvedValue({ ...weeklyPlan, id: "plan-2", revision: 2, supersedes_plan_id: "plan-1" });
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  await userEvent.click(await screen.findByRole("button", { name: "Lock meal" }));
+  expect(nutritionApi.setMealLock).toHaveBeenCalledWith("plan-1", "meal-0", true);
+  await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
+  await userEvent.click(screen.getByRole("button", { name: "Liked" }));
+  expect(nutritionApi.saveMealFeedback).toHaveBeenCalledWith("plan-1", "meal-0", "liked");
+  await userEvent.click(screen.getByRole("button", { name: "Preview removal" }));
+  expect(await screen.findByRole("dialog", { name: "Confirm meal removal" })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Create new revision" }));
+  expect(nutritionApi.confirmMealRemoval).toHaveBeenCalledWith("plan-1", "meal-0", "plan-1");
+  expect(await screen.findByText("Revision 2")).toBeInTheDocument();
 });

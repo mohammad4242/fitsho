@@ -1,0 +1,36 @@
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.auth.models import User
+from tests.nutrition.test_weekly_plan_api import ORIGIN
+
+
+def test_admin_monitoring_requires_admin_and_reports_catalogues(
+    client: TestClient, db: Session
+) -> None:
+    assert (
+        client.post(
+            "/api/v1/auth/register",
+            headers=ORIGIN,
+            json={"email": "monitor@example.com", "password": "long password"},
+        ).status_code
+        == 201
+    )
+    assert client.get("/api/v1/nutrition/admin/monitoring").status_code == 403
+    user = db.scalar(select(User).where(User.email == "monitor@example.com"))
+    assert user is not None
+    user.is_admin = True
+    db.flush()
+
+    response = client.get("/api/v1/nutrition/admin/monitoring")
+
+    assert response.status_code == 200
+    assert set(response.json()["counts"]) == {
+        "foods",
+        "meals",
+        "accepted_price_references",
+        "price_reviews",
+        "supplements",
+    }
+    assert isinstance(response.json()["recent_price_runs"], list)

@@ -21,10 +21,14 @@ export function NutritionTrackingPage() {
   const [photoEstimate, setPhotoEstimate] = useState<Awaited<ReturnType<typeof api.estimateFoodPhoto>> | null>(null);
   const [adherence, setAdherence] = useState<NutritionAdherence | null>(null);
   const [rangeStart, setRangeStart] = useState(weekAgo);
+  const [foods, setFoods] = useState<api.CatalogueFood[]>([]);
+  const [foodId, setFoodId] = useState("");
+  const [grams, setGrams] = useState("100");
 
   const load = () => api.getDailyTracking(today).then(setSummary).catch(() => setError(l("دریافت اطلاعات ممکن نشد.", "Could not load tracking.")));
   useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void api.getNutritionAdherence(rangeStart, today).then(setAdherence); }, [rangeStart]);
+  useEffect(() => { void api.listCatalogueFoods().then((items) => { setFoods(items); setFoodId(items[0]?.id ?? ""); }); }, []);
 
   async function checkIn(status: DailyTrackingSummary["check_in_status"]) {
     setBusy(true); setError(null);
@@ -51,6 +55,13 @@ export function NutritionTrackingPage() {
     finally { setBusy(false); }
   }
 
+  async function addCatalogueFood() {
+    if (!foodId || Number(grams) <= 0) return;
+    setBusy(true);
+    try { await api.addCatalogueFoodEntry({ entry_date: today, food_id: foodId, grams: Number(grams), note: null }); await load(); }
+    finally { setBusy(false); }
+  }
+
   async function confirmPhoto() {
     if (!photoEstimate) return;
     setBusy(true);
@@ -70,6 +81,7 @@ export function NutritionTrackingPage() {
         ["on_plan", "طبق برنامه بودم", "I followed the plan"],
         ["mostly_on_plan", "تقریباً طبق برنامه بودم", "Mostly on plan"],
         ["off_plan", "امروز برنامه را رعایت نکردم", "Off plan today"],
+        ["not_recorded", "امروز ثبت نمی‌کنم", "Not recording today"],
       ] as const).map(([value, persian, english]) =>
         <button className="nutrition-target-card" disabled={busy} key={value} onClick={() => void checkIn(value)}>{l(persian, english)}</button>
       )}
@@ -77,7 +89,8 @@ export function NutritionTrackingPage() {
     {error && <p role="alert" className="nutrition-estimate-state">{error}</p>}
     <section className="nutrition-estimate-notes">
       <h2>{l("یک وعده خارج از برنامه", "Food outside the plan")}</h2>
-      <p>{l("اگر جزئیات یادت نیست، فقط کالری تقریبی وعده را وارد کن.", "If details are unclear, enter an approximate meal calorie value.")}</p>
+      <p>{l("از کاتالوگ معتبر انتخاب کن؛ اگر جزئیات یادت نیست ثبت تقریبی هم در دسترس است.", "Choose from the verified catalogue, or use an approximation when details are unclear.")}</p>
+      <div className="nutrition-tracking-quick"><select aria-label={l("ماده غذایی", "Food")} value={foodId} onChange={(event) => setFoodId(event.target.value)}>{foods.map((food) => <option key={food.id} value={food.id}>{fa ? food.name_fa : food.name_en}</option>)}</select><input aria-label={l("مقدار به گرم", "Amount in grams")} min="1" max="5000" type="number" value={grams} onChange={(event) => setGrams(event.target.value)} /><button disabled={busy || !foodId} onClick={() => void addCatalogueFood()}>{l("ثبت از کاتالوگ", "Add catalogue food")}</button></div>
       <div className="nutrition-tracking-quick">
         <input aria-label={l("کالری تقریبی", "Approximate calories")} inputMode="numeric" value={calories} onChange={(event) => setCalories(event.target.value)} />
         <button className="primary-button" disabled={busy} onClick={() => void addApproximation()}>{l("ثبت تقریبی", "Add estimate")}</button>
@@ -98,6 +111,7 @@ export function NutritionTrackingPage() {
       <article className="nutrition-calorie-card"><span>{l("کالری ثبت‌شده", "Logged calories")}</span><strong>{Math.round(summary?.actual_totals.energy_kcal ?? 0)}</strong></article>
       <div className="nutrition-confidence-card"><span>{summary?.data_status === "sufficient" ? l("داده کافی", "Sufficient data") : l("داده ناکافی", "Insufficient data")}</span><strong>{summary?.entries.length ?? 0} {l("مورد", "entries")}</strong></div>
     </section>
+    {summary && summary.entries.length > 0 && <section className="nutrition-estimate-notes"><h2>{l("ثبت‌های امروز", "Today's entries")}</h2><ul>{summary.entries.map((entry) => <li key={entry.id}><span>{entry.display_name} · {entry.confidence}</span><button disabled={busy} onClick={() => void api.deleteTrackingEntry(entry.id).then(load)}>{l("حذف", "Delete")}</button></li>)}</ul></section>}
     <section className="nutrition-estimate-notes">
       <h2>{l("روند پایبندی", "Adherence trend")}</h2>
       <label>{l("از تاریخ", "From")} <input type="date" value={rangeStart} max={today} onChange={(event) => setRangeStart(event.target.value)} /></label>

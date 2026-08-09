@@ -744,6 +744,19 @@ def weekly_plan_response(plan: NutritionWeeklyPlan) -> WeeklyPlanResponse:
             and review_status == NutritionPlanReviewStatus.APPROVED.value
         ),
         review_status=review_status,
+        physician_approved_at=(
+            plan.review.reviewed_at
+            if plan.review and plan.review.status == NutritionPlanReviewStatus.APPROVED
+            else None
+        ),
+        physician_display_name=(
+            "Fitsho physician"
+            if plan.review and plan.review.status == NutritionPlanReviewStatus.APPROVED
+            else None
+        ),
+        physician_user_visible_notes=plan.review.user_visible_notes if plan.review else None,
+        physician_change_summary=(plan.review.structured_change_summary if plan.review else []),
+        supersedes_plan_id=plan.supersedes_plan_id,
         start_date=plan.start_date,
         planner_policy_version=plan.planner_policy_version,
         planner_version=plan.planner_version,

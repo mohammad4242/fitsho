@@ -54,9 +54,7 @@ def test_metadata_changes_do_not_invalidate_review(client: TestClient, db: Sessi
     assert lock.status_code == 200
     assert lock.json()["change_kind"] == "plan_control_metadata"
     assert feedback.status_code == 200
-    persisted = db.scalar(
-        select(NutritionWeeklyPlan).where(NutritionWeeklyPlan.id == plan["id"])
-    )
+    persisted = db.scalar(select(NutritionWeeklyPlan).where(NutritionWeeklyPlan.id == plan["id"]))
     assert persisted is not None
     assert persisted.review is not None
     assert persisted.review.status == NutritionPlanReviewStatus.PENDING
@@ -86,6 +84,10 @@ def test_plan_defining_edit_creates_immutable_revision_and_rejects_stale_confirm
     assert revised["revision"] == plan["revision"] + 1
     assert revised["review_status"] == "pending"
     assert revised["weekly_cost_irr"] < plan["weekly_cost_irr"]
+    assert (
+        revised["nutrients"]["goal_calories"]["planned"]
+        < plan["nutrients"]["goal_calories"]["planned"]
+    )
 
     old_review = db.scalar(
         select(NutritionPlanPhysicianReview).where(
@@ -102,3 +104,78 @@ def test_plan_defining_edit_creates_immutable_revision_and_rejects_stale_confirm
     )
     assert stale.status_code == 409
     assert stale.json()["detail"]["code"] == "STALE_PLAN_REVISION"
+
+
+def test_meal_replacement_preview_and_confirmation_create_revision(
+    client: TestClient, db: Session
+) -> None:
+    plan = _generated_plan(client, db)
+    target = plan["days"][0]["meals"][0]
+    replacement = next(
+        meal
+        for meal in plan["days"][1]["meals"]
+        if meal["slot_role"] == target["slot_role"] and meal["id"] != target["id"]
+    )
+    payload = {
+        "expected_plan_revision_id": plan["id"],
+        "meal_id": target["id"],
+        "replacement_meal_id": replacement["id"],
+    }
+    preview = client.post(
+        f"/api/v1/nutrition/plans/{plan['id']}/edits/replace-meal/preview", json=payload
+    )
+    assert preview.status_code == 200
+    assert preview.json()["change_kind"] == "plan_defining"
+    confirmed = client.post(
+        f"/api/v1/nutrition/plans/{plan['id']}/edits/replace-meal/confirm",
+        headers=ORIGIN,
+        json=payload,
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["revision"] == plan["revision"] + 1
+    assert confirmed.json()["physician_change_summary"][0]["operation"] == "replace_meal"
+
+
+def test_food_replacement_and_partial_regeneration_preserve_immutable_history(
+    client: TestClient, db: Session
+) -> None:
+    plan = _generated_plan(client, db)
+    target_meal = plan["days"][0]["meals"][0]
+    target_food = target_meal["foods"][0]
+    replacement_food = next(
+        food
+        for day in plan["days"]
+        for meal in day["meals"]
+        for food in meal["foods"]
+        if food["food_id"] != target_food["food_id"]
+    )
+    payload = {
+        "expected_plan_revision_id": plan["id"],
+        "meal_id": target_meal["id"],
+        "food_id": target_food["food_id"],
+        "replacement_food_id": replacement_food["food_id"],
+    }
+    assert (
+        client.post(
+            f"/api/v1/nutrition/plans/{plan['id']}/edits/replace-food/preview", json=payload
+        ).status_code
+        == 200
+    )
+    replaced = client.post(
+        f"/api/v1/nutrition/plans/{plan['id']}/edits/replace-food/confirm",
+        headers=ORIGIN,
+        json=payload,
+    )
+    assert replaced.status_code == 200, replaced.text
+    revision = replaced.json()
+    regenerated = client.post(
+        f"/api/v1/nutrition/plans/{revision['id']}/edits/partial-regenerate",
+        headers=ORIGIN,
+        json={"expected_plan_revision_id": revision["id"], "day_indexes": [0]},
+    )
+    assert regenerated.status_code == 200, regenerated.text
+    assert regenerated.json()["revision"] == plan["revision"] + 2
+    history = client.get("/api/v1/nutrition/plans/history").json()
+    assert {item["id"] for item in history}.issuperset(
+        {plan["id"], revision["id"], regenerated.json()["id"]}
+    )

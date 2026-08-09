@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.nutrition.clinical_service import ClinicalError, require_physician
 from app.nutrition.enums import (
     NutritionMealFeedbackType,
+    NutritionPlanBudgetStatus,
     NutritionPlanGenerationOutcome,
     NutritionPlanLifecycleStatus,
     NutritionPlanReviewStatus,
@@ -190,26 +191,29 @@ def _sum_maps(maps: list[dict[str, object]]) -> dict[str, str]:
     return {key: str(value) for key, value in totals.items()}
 
 
-def confirm_remove_meal(
+def _copy_meal(
+    meal: NutritionWeeklyPlanMeal, *, slot_index: int | None = None
+) -> NutritionWeeklyPlanMeal:
+    return NutritionWeeklyPlanMeal(
+        slot_role=meal.slot_role,
+        slot_index=meal.slot_index if slot_index is None else slot_index,
+        target_distribution=dict(meal.target_distribution),
+        nutrient_totals=dict(meal.nutrient_totals),
+        cost_irr=meal.cost_irr,
+        is_locked=meal.is_locked,
+        foods=[_copy_food(food) for food in meal.foods],
+    )
+
+
+def _create_revision(
     db: Session,
+    plan: NutritionWeeklyPlan,
     user_id: UUID,
-    plan_id: UUID,
-    expected_plan_revision_id: UUID,
-    meal_id: UUID,
+    days: list[NutritionWeeklyPlanDay],
+    operation: str,
     *,
     physician_id: UUID | None = None,
 ) -> WeeklyPlanResponse:
-    plan = owned_plan(db, user_id, plan_id, lock=True)
-    if plan.id != expected_plan_revision_id:
-        raise PlanEditError("STALE_PLAN_REVISION")
-    if (
-        physician_id is None
-        and plan.review
-        and plan.review.status == NutritionPlanReviewStatus.IN_REVIEW
-    ):
-        raise PlanEditError("PLAN_REVIEW_IN_PROGRESS")
-    if not any(meal.id == meal_id for day in plan.days for meal in day.meals):
-        raise PlanEditError("MEAL_NOT_FOUND")
     latest = (
         db.scalar(
             select(func.max(NutritionWeeklyPlan.revision)).where(
@@ -230,36 +234,12 @@ def confirm_remove_meal(
         warning_codes=["USER_PLAN_EDIT"],
         input_signature=generation.input_signature,
         input_snapshot=dict(generation.input_snapshot),
-        diagnostic_snapshot={"source_plan_id": str(plan.id), "operation": "remove_meal"},
+        diagnostic_snapshot={"source_plan_id": str(plan.id), "operation": operation},
         planner_policy_version=generation.planner_policy_version,
         planner_version=generation.planner_version,
     )
     db.add(copied_generation)
     db.flush()
-    days: list[NutritionWeeklyPlanDay] = []
-    for day in plan.days:
-        meals = [
-            NutritionWeeklyPlanMeal(
-                slot_role=meal.slot_role,
-                slot_index=meal.slot_index,
-                target_distribution=dict(meal.target_distribution),
-                nutrient_totals=dict(meal.nutrient_totals),
-                cost_irr=meal.cost_irr,
-                is_locked=meal.is_locked,
-                foods=[_copy_food(food) for food in meal.foods],
-            )
-            for meal in day.meals
-            if meal.id != meal_id
-        ]
-        days.append(
-            NutritionWeeklyPlanDay(
-                day_index=day.day_index,
-                plan_date=day.plan_date,
-                cost_irr=sum(meal.cost_irr for meal in meals),
-                nutrient_totals=_sum_maps([meal.nutrient_totals for meal in meals]),
-                meals=meals,
-            )
-        )
     revision = latest + 1
     new_plan = NutritionWeeklyPlan(
         user_id=user_id,
@@ -284,38 +264,24 @@ def confirm_remove_meal(
         explanation_codes=list(plan.explanation_codes),
         weekly_cost_irr=sum(day.cost_irr for day in days),
         weekly_budget_irr=plan.weekly_budget_irr,
-        budget_status=plan.budget_status,
+        budget_status=_budget_status(
+            sum(day.cost_irr for day in days),
+            plan.weekly_budget_irr,
+            str(plan.input_snapshot.get("budget_mode", "strict")),
+        ),
         days=days,
         nutrients=[
-            NutritionWeeklyPlanNutrient(
-                nutrient_code=row.nutrient_code,
-                unit=row.unit,
-                reference_kind=row.reference_kind,
-                preferred_value=row.preferred_value,
-                minimum_or_maximum_value=row.minimum_or_maximum_value,
-                planned_value=row.planned_value,
-                difference_from_preferred=row.difference_from_preferred,
-                difference_from_limit=row.difference_from_limit,
-                status=row.status,
-                reason_codes=list(row.reason_codes),
-                data_confidence=row.data_confidence,
-                explanation_codes=list(row.explanation_codes),
-            )
-            for row in plan.nutrients
+            _recalculated_nutrient(row, days, plan.input_snapshot) for row in plan.nutrients
         ],
         review=NutritionPlanPhysicianReview(
-            status=(
-                NutritionPlanReviewStatus.IN_REVIEW
-                if physician_id
-                else NutritionPlanReviewStatus.PENDING
-            ),
+            status=NutritionPlanReviewStatus.IN_REVIEW
+            if physician_id
+            else NutritionPlanReviewStatus.PENDING,
             expected_plan_revision=revision,
             physician_user_id=physician_id,
             assigned_at=datetime.now(UTC) if physician_id else None,
             review_started_at=datetime.now(UTC) if physician_id else None,
-            structured_change_summary=[
-                {"operation": "remove_meal", "source_plan_id": str(plan.id)}
-            ],
+            structured_change_summary=[{"operation": operation, "source_plan_id": str(plan.id)}],
         ),
     )
     if plan.review and plan.review.status in {
@@ -331,6 +297,337 @@ def confirm_remove_meal(
     db.commit()
     db.refresh(new_plan)
     return weekly_plan_response(owned_plan(db, user_id, new_plan.id))
+
+
+def _budget_status(cost: int, budget: int, mode: str) -> NutritionPlanBudgetStatus:
+    if cost <= budget:
+        return NutritionPlanBudgetStatus.WITHIN_BUDGET
+    if mode == "flexible" and cost <= round(budget * 1.1):
+        return NutritionPlanBudgetStatus.FLEXIBLE_OVERAGE
+    return NutritionPlanBudgetStatus.OVER_BUDGET
+
+
+def _recalculated_nutrient(
+    row: NutritionWeeklyPlanNutrient,
+    days: list[NutritionWeeklyPlanDay],
+    input_snapshot: dict[str, object],
+) -> NutritionWeeklyPlanNutrient:
+    code_map = {
+        "goal_calories": "energy_kcal",
+        "protein": "protein_g",
+        "carbohydrate": "carbohydrate_g",
+        "total_fat": "fat_g",
+        "fibre": "fibre_g",
+    }
+    planned = sum(
+        (
+            Decimal(
+                str(day.nutrient_totals.get(code_map.get(row.nutrient_code, row.nutrient_code), 0))
+            )
+            for day in days
+        ),
+        Decimal(),
+    ) / Decimal(len(days))
+    preferred = row.preferred_value
+    minimums = input_snapshot.get("daily_minimums", {})
+    maximums = input_snapshot.get("daily_maximums", {})
+    upper_limits = input_snapshot.get("micronutrient_upper_limits", {})
+    minimum = (
+        Decimal(str(minimums[row.nutrient_code]))
+        if isinstance(minimums, dict) and row.nutrient_code in minimums
+        else None
+    )
+    maximum_source = (
+        maximums if isinstance(maximums, dict) and row.nutrient_code in maximums else upper_limits
+    )
+    maximum = (
+        Decimal(str(maximum_source[row.nutrient_code]))
+        if isinstance(maximum_source, dict) and row.nutrient_code in maximum_source
+        else None
+    )
+    if maximum is not None and planned > maximum:
+        status, reasons = "above_applicable_limit", ["ABOVE_APPLICABLE_LIMIT"]
+    elif minimum is not None and planned < minimum:
+        status, reasons = "below_minimum", ["BELOW_MINIMUM"]
+    elif preferred is not None and planned < preferred:
+        status, reasons = (
+            ("below_preferred_but_acceptable" if minimum is not None else "below_reference_target"),
+            ["DIETARY_REFERENCE_GAP"],
+        )
+    else:
+        status, reasons = "within_target", []
+    limit = maximum if maximum is not None else minimum
+    return NutritionWeeklyPlanNutrient(
+        nutrient_code=row.nutrient_code,
+        unit=row.unit,
+        reference_kind=row.reference_kind,
+        preferred_value=preferred,
+        minimum_or_maximum_value=limit,
+        planned_value=planned,
+        difference_from_preferred=planned - preferred if preferred is not None else None,
+        difference_from_limit=planned - limit if limit is not None else None,
+        status=status,
+        reason_codes=reasons,
+        data_confidence=row.data_confidence,
+        explanation_codes=["DIETARY_REFERENCE_GAP"] if "DIETARY_REFERENCE_GAP" in reasons else [],
+    )
+
+
+def confirm_remove_meal(
+    db: Session,
+    user_id: UUID,
+    plan_id: UUID,
+    expected_plan_revision_id: UUID,
+    meal_id: UUID,
+    *,
+    physician_id: UUID | None = None,
+) -> WeeklyPlanResponse:
+    plan = owned_plan(db, user_id, plan_id, lock=True)
+    if plan.id != expected_plan_revision_id:
+        raise PlanEditError("STALE_PLAN_REVISION")
+    if (
+        physician_id is None
+        and plan.review
+        and plan.review.status == NutritionPlanReviewStatus.IN_REVIEW
+    ):
+        raise PlanEditError("PLAN_REVIEW_IN_PROGRESS")
+    if not any(meal.id == meal_id for day in plan.days for meal in day.meals):
+        raise PlanEditError("MEAL_NOT_FOUND")
+    days: list[NutritionWeeklyPlanDay] = []
+    for day in plan.days:
+        meals = [_copy_meal(meal) for meal in day.meals if meal.id != meal_id]
+        days.append(
+            NutritionWeeklyPlanDay(
+                day_index=day.day_index,
+                plan_date=day.plan_date,
+                cost_irr=sum(meal.cost_irr for meal in meals),
+                nutrient_totals=_sum_maps([meal.nutrient_totals for meal in meals]),
+                meals=meals,
+            )
+        )
+    return _create_revision(db, plan, user_id, days, "remove_meal", physician_id=physician_id)
+
+
+def preview_replace_meal(
+    db: Session, user_id: UUID, plan_id: UUID, meal_id: UUID, replacement_meal_id: UUID
+) -> dict[str, object]:
+    plan = owned_plan(db, user_id, plan_id)
+    meals = {meal.id: meal for day in plan.days for meal in day.meals}
+    target, replacement = meals.get(meal_id), meals.get(replacement_meal_id)
+    if target is None or replacement is None:
+        raise PlanEditError("MEAL_NOT_FOUND")
+    if target.slot_role != replacement.slot_role or target.id == replacement.id:
+        raise PlanEditError("INCOMPATIBLE_MEAL_REPLACEMENT")
+    return {
+        "plan_id": plan.id,
+        "expected_plan_revision_id": plan.id,
+        "meal_id": target.id,
+        "replacement_meal_id": replacement.id,
+        "daily_delta": _delta(target.nutrient_totals, replacement.nutrient_totals),
+        "weekly_cost_delta_irr": replacement.cost_irr - target.cost_irr,
+        "requires_physician_review": True,
+        "change_kind": "plan_defining",
+    }
+
+
+def confirm_replace_meal(
+    db: Session,
+    user_id: UUID,
+    plan_id: UUID,
+    expected_plan_revision_id: UUID,
+    meal_id: UUID,
+    replacement_meal_id: UUID,
+) -> WeeklyPlanResponse:
+    plan = owned_plan(db, user_id, plan_id, lock=True)
+    _assert_editable(plan, expected_plan_revision_id)
+    meals = {meal.id: meal for day in plan.days for meal in day.meals}
+    target, replacement = meals.get(meal_id), meals.get(replacement_meal_id)
+    if target is None or replacement is None:
+        raise PlanEditError("MEAL_NOT_FOUND")
+    if target.slot_role != replacement.slot_role or target.id == replacement.id or target.is_locked:
+        raise PlanEditError("INCOMPATIBLE_MEAL_REPLACEMENT")
+    days = [
+        _copy_day(
+            day,
+            lambda meal: (
+                _copy_meal(replacement, slot_index=target.slot_index)
+                if meal.id == target.id
+                else _copy_meal(meal)
+            ),
+        )
+        for day in plan.days
+    ]
+    return _create_revision(db, plan, user_id, days, "replace_meal")
+
+
+def preview_replace_food(
+    db: Session,
+    user_id: UUID,
+    plan_id: UUID,
+    meal_id: UUID,
+    food_id: UUID,
+    replacement_food_id: UUID,
+) -> dict[str, object]:
+    plan = owned_plan(db, user_id, plan_id)
+    meal = next((meal for day in plan.days for meal in day.meals if meal.id == meal_id), None)
+    if meal is None:
+        raise PlanEditError("MEAL_NOT_FOUND")
+    target = next((food for food in meal.foods if food.food_id == food_id), None)
+    replacement = next(
+        (
+            food
+            for day in plan.days
+            for candidate in day.meals
+            for food in candidate.foods
+            if food.food_id == replacement_food_id
+        ),
+        None,
+    )
+    if target is None or replacement is None or target.food_id == replacement.food_id:
+        raise PlanEditError("FOOD_REPLACEMENT_NOT_FOUND")
+    scaled = _scaled_food(replacement, target.grams)
+    return {
+        "plan_id": plan.id,
+        "expected_plan_revision_id": plan.id,
+        "meal_id": meal.id,
+        "food_id": target.food_id,
+        "replacement_food_id": replacement.food_id,
+        "meal_delta": _delta(target.nutrient_snapshot, scaled.nutrient_snapshot),
+        "cost_delta_irr": scaled.cost_irr - target.cost_irr,
+        "requires_physician_review": True,
+        "change_kind": "plan_defining",
+    }
+
+
+def confirm_replace_food(
+    db: Session,
+    user_id: UUID,
+    plan_id: UUID,
+    expected_plan_revision_id: UUID,
+    meal_id: UUID,
+    food_id: UUID,
+    replacement_food_id: UUID,
+) -> WeeklyPlanResponse:
+    plan = owned_plan(db, user_id, plan_id, lock=True)
+    _assert_editable(plan, expected_plan_revision_id)
+    target_meal = next(
+        (meal for day in plan.days for meal in day.meals if meal.id == meal_id), None
+    )
+    replacement = next(
+        (
+            food
+            for day in plan.days
+            for meal in day.meals
+            for food in meal.foods
+            if food.food_id == replacement_food_id
+        ),
+        None,
+    )
+    if target_meal is None or replacement is None or target_meal.is_locked:
+        raise PlanEditError("FOOD_REPLACEMENT_NOT_FOUND")
+    target = next((food for food in target_meal.foods if food.food_id == food_id), None)
+    if target is None or target.food_id == replacement.food_id:
+        raise PlanEditError("FOOD_REPLACEMENT_NOT_FOUND")
+
+    def transform(meal: NutritionWeeklyPlanMeal) -> NutritionWeeklyPlanMeal:
+        if meal.id != target_meal.id:
+            return _copy_meal(meal)
+        foods = [
+            _scaled_food(replacement, target.grams)
+            if food.food_id == target.food_id
+            else _copy_food(food)
+            for food in meal.foods
+        ]
+        return NutritionWeeklyPlanMeal(
+            slot_role=meal.slot_role,
+            slot_index=meal.slot_index,
+            target_distribution=dict(meal.target_distribution),
+            nutrient_totals=_sum_maps([food.nutrient_snapshot for food in foods]),
+            cost_irr=sum(food.cost_irr for food in foods),
+            is_locked=False,
+            foods=foods,
+        )
+
+    days = [_copy_day(day, transform) for day in plan.days]
+    return _create_revision(db, plan, user_id, days, "replace_food")
+
+
+def partial_regenerate(
+    db: Session,
+    user_id: UUID,
+    plan_id: UUID,
+    expected_plan_revision_id: UUID,
+    day_indexes: list[int],
+) -> WeeklyPlanResponse:
+    plan = owned_plan(db, user_id, plan_id, lock=True)
+    _assert_editable(plan, expected_plan_revision_id)
+    selected = set(day_indexes)
+    if not selected or not selected.issubset(set(range(7))):
+        raise PlanEditError("INVALID_DAY_SELECTION")
+    source_by_key = {
+        (day.day_index, meal.slot_role, meal.slot_index): meal
+        for day in plan.days
+        for meal in day.meals
+    }
+
+    def transform_for(day_index: int, meal: NutritionWeeklyPlanMeal) -> NutritionWeeklyPlanMeal:
+        if day_index not in selected or meal.is_locked:
+            return _copy_meal(meal)
+        for offset in range(1, 7):
+            candidate = source_by_key.get(
+                ((day_index + offset) % 7, meal.slot_role, meal.slot_index)
+            )
+            if candidate is not None and candidate.id != meal.id:
+                return _copy_meal(candidate, slot_index=meal.slot_index)
+        return _copy_meal(meal)
+
+    days = [
+        _copy_day(day, lambda meal, index=day.day_index: transform_for(index, meal))
+        for day in plan.days
+    ]
+    return _create_revision(db, plan, user_id, days, "partial_regeneration")
+
+
+def _assert_editable(plan: NutritionWeeklyPlan, expected: UUID) -> None:
+    if plan.id != expected:
+        raise PlanEditError("STALE_PLAN_REVISION")
+    if plan.review and plan.review.status == NutritionPlanReviewStatus.IN_REVIEW:
+        raise PlanEditError("PLAN_REVIEW_IN_PROGRESS")
+
+
+def _copy_day(day: NutritionWeeklyPlanDay, transform: Any) -> NutritionWeeklyPlanDay:
+    meals = [transform(meal) for meal in day.meals]
+    return NutritionWeeklyPlanDay(
+        day_index=day.day_index,
+        plan_date=day.plan_date,
+        cost_irr=sum(meal.cost_irr for meal in meals),
+        nutrient_totals=_sum_maps([meal.nutrient_totals for meal in meals]),
+        meals=meals,
+    )
+
+
+def _delta(before: dict[str, object], after: dict[str, object]) -> dict[str, float]:
+    keys = set(before) | set(after)
+    return {
+        key: float(Decimal(str(after.get(key, 0))) - Decimal(str(before.get(key, 0))))
+        for key in keys
+    }
+
+
+def _scaled_food(food: NutritionWeeklyPlanFood, grams: Decimal) -> NutritionWeeklyPlanFood:
+    ratio = grams / food.grams
+    return NutritionWeeklyPlanFood(
+        food_id=food.food_id,
+        food_slug=food.food_slug,
+        food_name_fa=food.food_name_fa,
+        food_name_en=food.food_name_en,
+        grams=grams,
+        cost_irr=round(food.cost_irr * float(ratio)),
+        nutrient_snapshot={
+            key: str(Decimal(str(value)) * ratio) for key, value in food.nutrient_snapshot.items()
+        },
+        price_snapshot=dict(food.price_snapshot),
+    )
 
 
 def physician_remove_meal(
@@ -355,6 +652,19 @@ def physician_remove_meal(
         meal_id,
         physician_id=physician_id,
     )
+
+
+def physician_plan(db: Session, physician_id: UUID, plan_id: UUID) -> WeeklyPlanResponse:
+    try:
+        require_physician(db, physician_id)
+    except ClinicalError as error:
+        raise PlanEditError("PHYSICIAN_ROLE_REQUIRED") from error
+    plan = db.scalar(_query().where(NutritionWeeklyPlan.id == plan_id))
+    if plan is None or plan.review is None:
+        raise PlanEditError("NUTRITION_PLAN_NOT_FOUND")
+    if plan.review.physician_user_id not in {None, physician_id}:
+        raise PlanEditError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
+    return weekly_plan_response(plan)
 
 
 def physician_action(

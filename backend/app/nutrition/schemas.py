@@ -400,6 +400,11 @@ class WeeklyPlanResponse(BaseModel):
     is_user_visible: bool
     physician_approved: bool
     review_status: str
+    physician_approved_at: datetime | None
+    physician_display_name: str | None
+    physician_user_visible_notes: str | None
+    physician_change_summary: list[dict[str, object]]
+    supersedes_plan_id: UUID | None
     start_date: date
     planner_policy_version: str
     planner_version: str
@@ -449,6 +454,24 @@ class MealFeedbackInput(BaseModel):
 class RemoveMealConfirmationInput(BaseModel):
     expected_plan_revision_id: UUID
     meal_id: UUID
+
+
+class ReplaceMealInput(BaseModel):
+    expected_plan_revision_id: UUID
+    meal_id: UUID
+    replacement_meal_id: UUID
+
+
+class ReplaceFoodInput(BaseModel):
+    expected_plan_revision_id: UUID
+    meal_id: UUID
+    food_id: UUID
+    replacement_food_id: UUID
+
+
+class PartialRegenerationInput(BaseModel):
+    expected_plan_revision_id: UUID
+    day_indexes: list[int] = Field(min_length=1, max_length=7)
 
 
 class PhysicianPlanActionInput(BaseModel):

@@ -35,6 +35,7 @@ import { NutritionLabsPage } from "./features/nutrition/NutritionLabsPage";
 import { PhysicianNutritionReviewPage } from "./features/nutrition/PhysicianNutritionReviewPage";
 import { NutritionSupplementsPage } from "./features/nutrition/NutritionSupplementsPage";
 import { AdminSupplementsPage } from "./features/admin/AdminSupplementsPage";
+import { AdminNutritionMonitoringPage } from "./features/admin/AdminNutritionMonitoringPage";
 import { AppShell } from "./shared/AppShell";
 
 export function AppRoutes() {
@@ -55,6 +56,7 @@ export function AppRoutes() {
           <Route path="/admin/exercises/new" element={<AdminExerciseNewPage />} />
           <Route path="/admin/exercises/:exerciseId/edit" element={<AdminExerciseEditPage />} />
           <Route path="/admin/nutrition-supplements" element={<AdminSupplementsPage />} />
+          <Route path="/admin/nutrition-monitoring" element={<AdminNutritionMonitoringPage />} />
         </Route>
         <Route element={<OnboardingRoute />}>
           <Route path="/onboarding" element={<OnboardingPage />} />

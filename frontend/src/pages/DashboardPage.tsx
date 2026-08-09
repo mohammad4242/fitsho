@@ -11,6 +11,7 @@ import progressDriveVideo from "../assets/landing/progress-drive.mp4";
 import { useAuth } from "../features/auth/AuthContext";
 import { useProfile } from "../features/profile/ProfileContext";
 import { generateWorkoutPlan, getActiveWorkoutPlan } from "../features/workouts/api";
+import { getLatestWeeklyNutritionPlan } from "../features/nutrition/api";
 import { AuthenticatedHeader } from "../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../shared/MemberHeaderMedia";
 import "./dashboard.css";
@@ -26,6 +27,7 @@ export function DashboardPage() {
   const hasNutrition = productMode === "nutrition" || productMode === "both";
   const [planState, setPlanState] = useState<PlanState>("loading");
   const [generating, setGenerating] = useState(false);
+  const [nutritionCapability, setNutritionCapability] = useState<"loading" | "pending" | "ready" | "empty">("loading");
   const [storyStage, setStoryStage] = useState<"plan" | "progress">("plan");
   const planChapter = useRef<HTMLElement>(null);
   const progressChapter = useRef<HTMLElement>(null);
@@ -47,6 +49,16 @@ export function DashboardPage() {
       active = false;
     };
   }, [hasTraining]);
+
+  useEffect(() => {
+    if (!hasNutrition) { setNutritionCapability("empty"); return; }
+    let active = true;
+    void getLatestWeeklyNutritionPlan().then((plan) => {
+      if (!active) return;
+      setNutritionCapability(plan === null ? "empty" : plan.physician_approved ? "ready" : "pending");
+    }).catch(() => { if (active) setNutritionCapability("empty"); });
+    return () => { active = false; };
+  }, [hasNutrition]);
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
@@ -150,12 +162,17 @@ export function DashboardPage() {
         </Link>}
         {hasNutrition && <Link to="/nutrition-estimate" className="today-actions__card today-actions__card--nutrition" aria-label={i18n.language === "en" ? "Daily nutrition targets" : "هدف روزانه تغذیه"}>
           <span>{hasTraining ? "03" : "01"}</span>
-          <div><p>{i18n.language === "en" ? "Scientific estimate" : "برآورد علمی"}</p><h2>{i18n.language === "en" ? "Daily nutrition targets" : "هدف روزانه تغذیه"}</h2></div>
+          <div><p>{nutritionCapabilityLabel(nutritionCapability, i18n.language === "en")}</p><h2>{i18n.language === "en" ? "Nutrition plan and tracking" : "برنامه و پایش تغذیه"}</h2></div>
           <b aria-hidden="true">↖</b>
         </Link>}
       </section>
     </main>
   );
+}
+
+function nutritionCapabilityLabel(status: "loading" | "pending" | "ready" | "empty", english: boolean) {
+  const labels = { loading: ["در حال بررسی", "Checking"], pending: ["در انتظار بررسی پزشک", "Pending physician review"], ready: ["برنامه تغذیه آماده", "Nutrition ready"], empty: ["ساخت برنامه تغذیه", "Build nutrition plan"] } as const;
+  return labels[status][english ? 1 : 0];
 }
 
 function PrimaryAction({ state, generating, onStart }: { state: PlanState; generating: boolean; onStart: () => void }) {

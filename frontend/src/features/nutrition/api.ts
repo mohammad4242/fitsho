@@ -12,6 +12,8 @@ import type {
   WeeklyPlanGeneration,
   DailyTrackingSummary,
   NutritionAdherence,
+  ShoppingList,
+  WeeklyPlanHistoryItem,
 } from "./types";
 
 const nutritionPath = "/api/v1/nutrition";
@@ -99,6 +101,50 @@ export async function getLatestWeeklyNutritionPlan(): Promise<WeeklyPlan | null>
   }
 }
 
+export function getWeeklyNutritionPlan(planId: string): Promise<WeeklyPlan> {
+  return request(`${nutritionPath}/plans/${planId}`);
+}
+
+export function listWeeklyNutritionPlans(): Promise<WeeklyPlanHistoryItem[]> {
+  return request(`${nutritionPath}/plans/history`);
+}
+
+export function getShoppingList(planId: string): Promise<ShoppingList> {
+  return request(`${nutritionPath}/plans/${planId}/shopping-list`);
+}
+
+export function setMealLock(planId: string, mealId: string, isLocked: boolean): Promise<{ is_locked: boolean }> {
+  return request(`${nutritionPath}/plans/${planId}/meals/${mealId}/lock`, {
+    method: "PUT",
+    body: JSON.stringify({ is_locked: isLocked }),
+  });
+}
+
+export function saveMealFeedback(planId: string, mealId: string, feedbackType: "liked" | "disliked" | "too_complex" | "too_expensive"): Promise<unknown> {
+  return request(`${nutritionPath}/plans/${planId}/meals/${mealId}/feedback`, {
+    method: "PUT",
+    body: JSON.stringify({ feedback_type: feedbackType, notes: null }),
+  });
+}
+
+export function previewMealRemoval(planId: string, mealId: string): Promise<{ expected_plan_revision_id: string; meal_id: string; daily_delta: Record<string, number>; weekly_cost_delta_irr: number; new_warning_codes: string[] }> {
+  return request(`${nutritionPath}/plans/${planId}/edits/remove-meal/preview?meal_id=${mealId}`, { method: "POST" });
+}
+
+export function confirmMealRemoval(planId: string, mealId: string, expectedPlanRevisionId: string): Promise<WeeklyPlan> {
+  return request(`${nutritionPath}/plans/${planId}/edits/remove-meal/confirm`, {
+    method: "POST",
+    body: JSON.stringify({ meal_id: mealId, expected_plan_revision_id: expectedPlanRevisionId }),
+  });
+}
+
+export type PlanEditPreview = { expected_plan_revision_id: string; meal_id: string; weekly_cost_delta_irr?: number; cost_delta_irr?: number };
+export function previewMealReplacement(planId: string, mealId: string, replacementMealId: string): Promise<PlanEditPreview> { return request(`${nutritionPath}/plans/${planId}/edits/replace-meal/preview`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, meal_id: mealId, replacement_meal_id: replacementMealId }) }); }
+export function confirmMealReplacement(planId: string, mealId: string, replacementMealId: string): Promise<WeeklyPlan> { return request(`${nutritionPath}/plans/${planId}/edits/replace-meal/confirm`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, meal_id: mealId, replacement_meal_id: replacementMealId }) }); }
+export function previewFoodReplacement(planId: string, mealId: string, foodId: string, replacementFoodId: string): Promise<PlanEditPreview> { return request(`${nutritionPath}/plans/${planId}/edits/replace-food/preview`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, meal_id: mealId, food_id: foodId, replacement_food_id: replacementFoodId }) }); }
+export function confirmFoodReplacement(planId: string, mealId: string, foodId: string, replacementFoodId: string): Promise<WeeklyPlan> { return request(`${nutritionPath}/plans/${planId}/edits/replace-food/confirm`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, meal_id: mealId, food_id: foodId, replacement_food_id: replacementFoodId }) }); }
+export function partialRegeneratePlan(planId: string, dayIndexes: number[]): Promise<WeeklyPlan> { return request(`${nutritionPath}/plans/${planId}/edits/partial-regenerate`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, day_indexes: dayIndexes }) }); }
+
 export function getDailyTracking(entryDate: string): Promise<DailyTrackingSummary> {
   return request<DailyTrackingSummary>(`${nutritionPath}/tracking/days/${entryDate}`);
 }
@@ -124,6 +170,11 @@ export function addQuickApproximation(input: {
     body: JSON.stringify(input),
   });
 }
+
+export type CatalogueFood = { id: string; slug: string; name_fa: string; name_en: string; canonical_unit: string };
+export function listCatalogueFoods(): Promise<CatalogueFood[]> { return request(`${nutritionPath}/foods`); }
+export function addCatalogueFoodEntry(input: { entry_date: string; food_id: string; grams: number; note: string | null }): Promise<unknown> { return request(`${nutritionPath}/tracking/entries/catalogue`, { method: "POST", body: JSON.stringify(input) }); }
+export function deleteTrackingEntry(entryId: string): Promise<void> { return request(`${nutritionPath}/tracking/entries/${entryId}`, { method: "DELETE" }); }
 
 export function estimateFoodPhoto(file: File): Promise<{
   id: string;
@@ -156,10 +207,15 @@ export function listLabDocuments(): Promise<Array<{ id: string; original_filenam
   return request(`${nutritionPath}/labs`);
 }
 
-export function uploadLabDocument(file: File): Promise<unknown> {
+export function uploadLabDocument(file: File, requestId?: string): Promise<unknown> {
   const body = new FormData();
   body.append("file", file);
+  if (requestId) body.append("request_id", requestId);
   return request(`${nutritionPath}/labs`, { method: "POST", body });
+}
+
+export function listLabRequests(): Promise<Array<{ id: string; plan_id: string; status: string; requested_tests: string[]; user_visible_reason: string | null; created_at: string }>> {
+  return request(`${nutritionPath}/lab-requests`);
 }
 
 export function listPhysicianReviews(): Promise<Array<{ review_id: string; plan_id: string; status: string; priority: number; overdue: boolean }>> {
@@ -170,7 +226,11 @@ export function claimPhysicianReview(reviewId: string): Promise<unknown> {
   return request(`${nutritionPath}/physician/reviews/${reviewId}/claim`, { method: "POST" });
 }
 
-export type SupplementOrder = { id: string; plan_id: string; name: string; dose_amount: number; dose_unit: string; frequency: string; duration_days: number; instructions: string; rationale: string | null; status: string; acknowledged_at: string | null };
+export function getPhysicianPlan(planId: string): Promise<WeeklyPlan> { return request(`${nutritionPath}/physician/plans/${planId}`); }
+export function actOnPhysicianPlan(planId: string, action: "start_review" | "approve" | "request_changes" | "reject", notes: string | null): Promise<WeeklyPlan> { return request(`${nutritionPath}/physician/plans/${planId}/action`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, action, notes }) }); }
+export function requestPhysicianLabs(planId: string, requestedTests: string[], reason: string): Promise<unknown> { return request(`${nutritionPath}/physician/plans/${planId}/request-labs`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, requested_tests: requestedTests, user_visible_reason: reason }) }); }
+
+export type SupplementOrder = { id: string; plan_id: string; name: string; dose_amount: number; dose_unit: string; frequency: string; duration_days: number; instructions: string; rationale: string | null; status: string; acknowledged_at: string | null; supplement_nutrient_contribution: Record<string, string>; combined_exposure_safety: { food_contribution?: Record<string, string>; supplement_contribution?: Record<string, string>; combined_exposure?: Record<string, string>; hard_blocks?: string[] } };
 export type SupplementCatalogueItem = { id: string; slug: string; name_fa: string; name_en: string };
 
 export function listSupplementOrders(): Promise<SupplementOrder[]> { return request(`${nutritionPath}/supplement-orders`); }
@@ -180,3 +240,9 @@ export function createPhysicianSupplementOrder(planId: string, supplementId: str
   return request(`${nutritionPath}/physician/plans/${planId}/supplement-orders`, { method: "POST", body: JSON.stringify({ supplement_id: supplementId, dose_amount: 1, dose_unit: "unit", daily_units: 1, frequency: "once_daily", duration_days: 30, instructions: "Follow physician instructions", rationale: "Physician-reviewed indication", rationale_user_visible: true, linked_gap_codes: [], linked_lab_document_ids: [] }) });
 }
 export function saveSupplementCatalogue(input: Record<string, unknown>): Promise<unknown> { return request(`${nutritionPath}/admin/supplements/catalogue`, { method: "PUT", body: JSON.stringify(input) }); }
+
+export type NutritionMonitoring = {
+  counts: { foods: number; meals: number; accepted_price_references: number; price_reviews: number; supplements: number };
+  recent_price_runs: Array<{ id: string; status: string; started_at: string; finished_at: string | null; foods_attempted: number; foods_updated: number; foods_needing_review: number; provider_failures: number }>;
+};
+export function getNutritionMonitoring(): Promise<NutritionMonitoring> { return request(`${nutritionPath}/admin/monitoring`); }

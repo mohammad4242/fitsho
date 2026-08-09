@@ -62,6 +62,9 @@ def test_lab_upload_is_private_and_physician_request_has_explicit_state(
         ).status_code
         == 200
     )
+    physician_view = client.get(f"/api/v1/nutrition/physician/plans/{plan['id']}")
+    assert physician_view.status_code == 200
+    assert physician_view.json()["id"] == plan["id"]
 
     request = client.post(
         f"/api/v1/nutrition/physician/plans/{plan['id']}/request-labs",
@@ -79,6 +82,20 @@ def test_lab_upload_is_private_and_physician_request_has_explicit_state(
     lab_request = db.scalar(select(NutritionLabRequest))
     assert lab_request is not None and lab_request.physician_user_id == physician.id
     assert client.get(f"/api/v1/nutrition/labs/{document_id}/file").status_code == 200
+
+    assert client.post("/api/v1/auth/logout", headers=ORIGIN).status_code == 204
+    assert (
+        client.post(
+            "/api/v1/auth/login",
+            headers=ORIGIN,
+            json={"email": "clinical-member@example.com", "password": "long password"},
+        ).status_code
+        == 200
+    )
+    requests = client.get("/api/v1/nutrition/lab-requests")
+    assert requests.status_code == 200
+    assert requests.json()[0]["requested_tests"] == ["CBC"]
+    assert requests.json()[0]["user_visible_reason"] == "برای بررسی ایمن‌تر برنامه"
 
 
 def test_non_physician_cannot_access_review_queue(client: TestClient, db: Session) -> None:

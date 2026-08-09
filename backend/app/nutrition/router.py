@@ -15,6 +15,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.admin.dependencies import AdminUser
@@ -33,6 +34,7 @@ from app.nutrition.clinical_service import (
     ClinicalError,
     claim_review,
     delete_lab,
+    list_lab_requests,
     list_labs,
     open_lab,
     request_labs,
@@ -71,12 +73,26 @@ from app.nutrition.food_photo_service import (
     delete_photo,
     estimate_photo,
 )
+from app.nutrition.models import (
+    NutritionCatalogueFood,
+    NutritionCatalogueMeal,
+    NutritionFoodPriceReference,
+    NutritionFoodPriceReview,
+    NutritionFoodPriceUpdateRun,
+    NutritionSupplementCatalogue,
+)
 from app.nutrition.plan_editing import (
     PlanEditError,
     confirm_remove_meal,
+    confirm_replace_food,
+    confirm_replace_meal,
+    partial_regenerate,
     physician_action,
+    physician_plan,
     physician_remove_meal,
     preview_remove_meal,
+    preview_replace_food,
+    preview_replace_meal,
     save_feedback,
     set_meal_lock,
     shopping_list,
@@ -103,12 +119,15 @@ from app.nutrition.schemas import (
     NutritionEstimateResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
+    PartialRegenerationInput,
     PhysicianLabRequestInput,
     PhysicianPlanActionInput,
     PhysicianReviewRequirementResponse,
     PhysicianSupplementOrderInput,
     QuickApproximationInput,
     RemoveMealConfirmationInput,
+    ReplaceFoodInput,
+    ReplaceMealInput,
     SafetyDecisionResponse,
     SafetyEvaluationResponse,
     SafetyProfileInput,
@@ -223,6 +242,43 @@ def retire_food(
         retire_catalogue_food(db, slug)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from None
+
+
+@router.get("/admin/monitoring")
+def read_nutrition_monitoring(db: DatabaseSession, admin: AdminUser) -> dict[str, object]:
+    del admin
+    latest_runs = db.scalars(
+        select(NutritionFoodPriceUpdateRun)
+        .order_by(NutritionFoodPriceUpdateRun.started_at.desc())
+        .limit(10)
+    ).all()
+    return {
+        "counts": {
+            "foods": db.scalar(select(func.count()).select_from(NutritionCatalogueFood)) or 0,
+            "meals": db.scalar(select(func.count()).select_from(NutritionCatalogueMeal)) or 0,
+            "accepted_price_references": db.scalar(
+                select(func.count()).select_from(NutritionFoodPriceReference)
+            )
+            or 0,
+            "price_reviews": db.scalar(select(func.count()).select_from(NutritionFoodPriceReview))
+            or 0,
+            "supplements": db.scalar(select(func.count()).select_from(NutritionSupplementCatalogue))
+            or 0,
+        },
+        "recent_price_runs": [
+            {
+                "id": run.id,
+                "status": run.status.value,
+                "started_at": run.started_at,
+                "finished_at": run.finished_at,
+                "foods_attempted": run.foods_attempted,
+                "foods_updated": run.foods_updated,
+                "foods_needing_review": run.foods_needing_review,
+                "provider_failures": run.provider_failures,
+            }
+            for run in latest_runs
+        ],
+    }
 
 
 @router.post("/safety/evaluate", response_model=SafetyEvaluationResponse)
@@ -572,6 +628,89 @@ def confirm_meal_removal(
         raise _plan_edit_error(error) from None
 
 
+@router.post("/plans/{plan_id}/edits/replace-meal/preview")
+def preview_meal_replacement(
+    plan_id: UUID, payload: ReplaceMealInput, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        return preview_replace_meal(
+            db, user.id, plan_id, payload.meal_id, payload.replacement_meal_id
+        )
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.post(
+    "/plans/{plan_id}/edits/replace-meal/confirm",
+    response_model=WeeklyPlanResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def confirm_meal_replacement(
+    plan_id: UUID, payload: ReplaceMealInput, db: DatabaseSession, user: CurrentUser
+) -> WeeklyPlanResponse:
+    try:
+        return confirm_replace_meal(
+            db,
+            user.id,
+            plan_id,
+            payload.expected_plan_revision_id,
+            payload.meal_id,
+            payload.replacement_meal_id,
+        )
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.post("/plans/{plan_id}/edits/replace-food/preview")
+def preview_food_replacement(
+    plan_id: UUID, payload: ReplaceFoodInput, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        return preview_replace_food(
+            db, user.id, plan_id, payload.meal_id, payload.food_id, payload.replacement_food_id
+        )
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.post(
+    "/plans/{plan_id}/edits/replace-food/confirm",
+    response_model=WeeklyPlanResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def confirm_food_replacement(
+    plan_id: UUID, payload: ReplaceFoodInput, db: DatabaseSession, user: CurrentUser
+) -> WeeklyPlanResponse:
+    try:
+        return confirm_replace_food(
+            db,
+            user.id,
+            plan_id,
+            payload.expected_plan_revision_id,
+            payload.meal_id,
+            payload.food_id,
+            payload.replacement_food_id,
+        )
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.post(
+    "/plans/{plan_id}/edits/partial-regenerate",
+    response_model=WeeklyPlanResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def regenerate_plan_partially(
+    plan_id: UUID, payload: PartialRegenerationInput, db: DatabaseSession, user: CurrentUser
+) -> WeeklyPlanResponse:
+    try:
+        return partial_regenerate(
+            db, user.id, plan_id, payload.expected_plan_revision_id, payload.day_indexes
+        )
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
 @router.post(
     "/physician/plans/{plan_id}/action",
     response_model=WeeklyPlanResponse,
@@ -584,6 +723,16 @@ def review_plan(
         return physician_action(
             db, user.id, plan_id, payload.expected_plan_revision_id, payload.action, payload.notes
         )
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.get("/physician/plans/{plan_id}", response_model=WeeklyPlanResponse)
+def read_physician_plan(
+    plan_id: UUID, db: DatabaseSession, user: CurrentUser
+) -> WeeklyPlanResponse:
+    try:
+        return physician_plan(db, user.id, plan_id)
     except PlanEditError as error:
         raise _plan_edit_error(error) from None
 
@@ -863,6 +1012,11 @@ def read_physician_queue(db: DatabaseSession, user: CurrentUser) -> list[dict[st
         return review_queue(db, user.id)
     except ClinicalError as error:
         raise _clinical_error(error) from None
+
+
+@router.get("/lab-requests")
+def read_user_lab_requests(db: DatabaseSession, user: CurrentUser) -> list[dict[str, object]]:
+    return list_lab_requests(db, user.id)
 
 
 @router.post(

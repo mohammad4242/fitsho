@@ -195,13 +195,21 @@ function EstimateContent({ estimate, language, onRefresh }: { estimate: Nutritio
       <TargetCard title={l("سدیم", "Sodium")} value={maximum("sodium")} note={l("حداکثر روزانه", "Daily maximum")} />
     </section>
 
+    {estimate.micronutrients && Object.keys(estimate.micronutrients).length > 0 && <section className="nutrition-estimate-notes"><h2>{l("مرجع ریزمغذی‌ها", "Micronutrient references")}</h2><p>{l("کمتر بودن دریافت غذایی از مقدار مرجع، تشخیص کمبود بالینی نیست؛ این بخش فقط برای سنجش کفایت رژیم و ترمیم برنامه است.", "Dietary intake below a reference is not a clinical deficiency diagnosis; it is used only to assess diet adequacy and guide plan repair.")}</p><div className="nutrition-micronutrient-grid">{Object.entries(estimate.micronutrients).map(([code, item]) => <article key={code}><strong>{nutrientDisplayName(code, language)}</strong><span>{number.format(item.target_value)} {item.unit}</span><small>{item.reference_kind} · {l("اطمینان", "Confidence")}: {item.confidence}</small></article>)}</div></section>}
+
     <section className="nutrition-estimate-notes">
       <h2>{l("این اعداد چه معنایی دارند؟", "What these numbers mean")}</h2>
       <p>{l("این یک برآورد علمی است، نه تشخیص یا نسخه پزشکی. نتیجه واقعی با پایش وزن، انرژی و عملکرد اصلاح می‌شود.", "This is a scientific estimate, not a diagnosis or medical prescription. Real outcomes should refine it through weight, energy, and performance monitoring.")}</p>
+      <p>{l("هدف انرژی با توجه به هدف بدنی انتخاب‌شده و سهم فعالیت روزانه و تمرین ساختاریافته تنظیم می‌شود؛ پروتئین و درشت‌مغذی‌ها سپس در همان محدوده علمی هماهنگ می‌شوند.", "Energy is adjusted for the selected body goal, daily activity, and structured exercise; protein and other macronutrients are then coordinated within scientific bounds.")}</p>
       <p>{l("قند افزوده جداگانه ردیابی می‌شود؛ برای محدودیت سلامتی، سقف قند آزاد معیار کنترل است.", "Added sugar is tracked separately; the free-sugar ceiling is the controlling health limit.")}</p>
       <dl><div><dt>{l("نسخه سیاست", "Policy version")}</dt><dd>{estimate.policy_version}</dd></div><div><dt>{l("نسخه فرمول", "Formula version")}</dt><dd>{estimate.formula_version}</dd></div><div><dt>{l("بازبینی", "Revision")}</dt><dd>{new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR").format(estimate.revision)}</dd></div></dl>
     </section>
   </>;
+}
+
+function nutrientDisplayName(code: string, language: "fa" | "en") {
+  const labels: Record<string, [string, string]> = { calcium_mg: ["کلسیم", "Calcium"], iron_mg: ["آهن", "Iron"], zinc_mg: ["روی", "Zinc"], vitamin_d_mcg: ["ویتامین D", "Vitamin D"], vitamin_b12_mcg: ["ویتامین B12", "Vitamin B12"], folate_mcg_dfe: ["فولات", "Folate"], potassium_mg: ["پتاسیم", "Potassium"], magnesium_mg: ["منیزیم", "Magnesium"] };
+  return labels[code]?.[language === "en" ? 1 : 0] ?? code.replaceAll("_", " ");
 }
 
 function TargetCard({ title, value, note }: { title: string; value: string; note: string }) {
