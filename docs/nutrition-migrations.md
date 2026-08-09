@@ -12,6 +12,8 @@ Key migration milestones:
 - `20260809_44` to `20260809_49`: plan editing, tracking, photo estimates, review, labs, and supplements.
 - `20260809_50`: security audit, operational metrics, upload limits, and private-file lifecycle.
 - `20260809_51`: idempotent repair for legacy databases stamped during a partial Task 12 rollout.
+- `20260809_52`: public-source registry, parser/discovery metadata, immutable accepted/rejected quote
+  links, run trigger kind, policy version, and safe failure codes.
 
 Legacy cooked/grilled food identities are retired rather than deleted. Historical plan, quote,
 review, lab, supplement, and tracking snapshots remain immutable or audit-preserving. Composition and
@@ -26,5 +28,5 @@ uv run alembic heads
 ```
 
 Production deployment should back up PostgreSQL, run the migration as a single release step, verify
-one head, and then start application workers. Migration `20260809_51` is safe on both complete and
-historically drifted Task 12 schemas because it inspects existing columns and indexes before repair.
+one head, and then start application workers. Migration `20260809_52` is additive: existing quotes,
+references, and history are preserved, and ten public providers are seeded disabled until probed.

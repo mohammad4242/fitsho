@@ -39,10 +39,11 @@ uv run python -m app.nutrition.retention_cleanup
 uv run pytest tests/nutrition
 ```
 
-Automatic food-price refresh runs Saturday at 12:00 `Asia/Tehran` when an approved provider URL is
-configured. The planner always reads accepted prices from Fitsho's database and never contacts a
-marketplace during a user request. Private-file retention cleanup runs daily with a PostgreSQL
-advisory lock.
+Automatic food-price refresh checks ten isolated public sources every Saturday at 12:00
+`Asia/Tehran`, with restart catch-up and a PostgreSQL advisory lock. It requires three distinct
+sources, removes outliers, and stores the mean plus immutable history. No API key is enabled or
+required by default. The planner always reads accepted prices from Fitsho's database and never
+contacts a marketplace during a user request. Private-file retention cleanup runs daily.
 
 Nutrition documentation:
 

@@ -25,7 +25,14 @@ an authenticated session unless the route is explicitly an admin or physician ro
 
 Physician routes expose the review queue, claim, exact plan revision, plan action, lab request, and
 supplement-order creation/transition under `/physician`. The physician role is checked independently
-of administrator status. Admin routes manage canonical foods/meals, supplements, and monitoring.
+of administrator status. Admin routes manage canonical foods/meals and supplements.
+
+Price operations are admin-only:
+
+- `GET /admin/monitoring` returns counts, provider health, coverage warnings, review reasons, broken
+  mappings, and recent manual/scheduled/catch-up runs. It never returns credential values.
+- `POST /admin/prices/refresh` starts the same database-backed workflow as the weekly scheduler.
+  Browser calls require a trusted origin.
 
 ## Important outcomes
 
