@@ -92,6 +92,7 @@ beforeEach(async () => {
   vi.mocked(api.listSupplementOrders).mockResolvedValue([]);
   vi.mocked(api.listPhysicianReviews).mockResolvedValue([]);
   vi.mocked(api.listSupplementCatalogue).mockResolvedValue([]);
+  vi.mocked(api.listPhysicianSupplementOrders).mockResolvedValue([]);
 });
 
 it("shows planned versus actual tracking and saves photo corrections before confirmation", async () => {
@@ -147,8 +148,8 @@ it("uploads laboratory metadata and can delete an owned document", async () => {
 it("filters the member supplement history without exposing dose editing", async () => {
   const user = userEvent.setup();
   vi.mocked(api.listSupplementOrders).mockResolvedValue([
-    { id: "order-1", plan_id: "plan-1", name: "Vitamin D", dose_amount: 1, dose_unit: "unit", frequency: "daily", duration_days: 30, instructions: "After food", rationale: null, status: "active", acknowledged_at: null, supplement_nutrient_contribution: {}, combined_exposure_safety: {} },
-    { id: "order-2", plan_id: "plan-0", name: "Iron", dose_amount: 1, dose_unit: "unit", frequency: "daily", duration_days: 14, instructions: "As directed", rationale: null, status: "completed", acknowledged_at: today, supplement_nutrient_contribution: {}, combined_exposure_safety: {} },
+    { id: "order-1", plan_id: "plan-1", supplement_id: "supplement-1", name: "Vitamin D", dose_amount: 1, dose_unit: "unit", daily_units: 1, frequency: "daily", duration_days: 30, instructions: "After food", rationale: null, status: "active", acknowledged_at: null, supplement_nutrient_contribution: {}, combined_exposure_safety: {} },
+    { id: "order-2", plan_id: "plan-0", supplement_id: "supplement-2", name: "Iron", dose_amount: 1, dose_unit: "unit", daily_units: 1, frequency: "daily", duration_days: 14, instructions: "As directed", rationale: null, status: "completed", acknowledged_at: today, supplement_nutrient_contribution: {}, combined_exposure_safety: {} },
   ]);
   render(<MemoryRouter><NutritionSupplementsPage /></MemoryRouter>);
 

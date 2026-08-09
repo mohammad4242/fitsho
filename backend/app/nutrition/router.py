@@ -195,9 +195,11 @@ from app.nutrition.supplement_service import (
     acknowledge_order,
     create_order,
     list_catalogue,
+    list_physician_orders,
     list_user_orders,
     save_catalogue,
     transition_order,
+    update_order,
 )
 from app.nutrition.tracking_service import (
     TrackingError,
@@ -928,7 +930,13 @@ def review_plan(
 ) -> WeeklyPlanResponse:
     try:
         return physician_action(
-            db, user.id, plan_id, payload.expected_plan_revision_id, payload.action, payload.notes
+            db,
+            user.id,
+            plan_id,
+            payload.expected_plan_revision_id,
+            payload.action,
+            payload.notes,
+            payload.internal_notes,
         )
     except PlanEditError as error:
         raise _plan_edit_error(error) from None
@@ -1635,6 +1643,33 @@ def create_physician_supplement_order(
     try:
         data = payload.model_dump(mode="python", exclude={"supplement_id"})
         return create_order(db, user.id, plan_id, payload.supplement_id, data)
+    except SupplementError as error:
+        raise _supplement_error(error) from None
+
+
+@router.get("/physician/plans/{plan_id}/supplement-orders")
+def read_physician_supplement_orders(
+    plan_id: UUID, db: DatabaseSession, user: CurrentUser
+) -> list[dict[str, object]]:
+    try:
+        return list_physician_orders(db, user.id, plan_id)
+    except SupplementError as error:
+        raise _supplement_error(error) from None
+
+
+@router.put(
+    "/physician/supplement-orders/{order_id}",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def modify_physician_supplement_order(
+    order_id: UUID,
+    payload: PhysicianSupplementOrderInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, object]:
+    try:
+        data = payload.model_dump(mode="python", exclude={"supplement_id"})
+        return update_order(db, user.id, order_id, payload.supplement_id, data)
     except SupplementError as error:
         raise _supplement_error(error) from None
 

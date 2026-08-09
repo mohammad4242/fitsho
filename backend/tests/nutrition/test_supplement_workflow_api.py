@@ -113,3 +113,38 @@ def test_combined_exposure_over_upper_limit_is_hard_blocked(
     )
     assert response.status_code == 409
     assert response.json()["detail"]["code"] == "SUPPLEMENT_UPPER_LIMIT_HARD_BLOCK"
+
+
+def test_assigned_physician_lists_and_modifies_plan_supplement_orders(
+    client: TestClient, db: Session
+) -> None:
+    plan, _physician = _setup(client, db)
+    supplement = _catalogue(db, calcium=100)
+    created = client.post(
+        f"/api/v1/nutrition/physician/plans/{plan.id}/supplement-orders",
+        headers=ORIGIN,
+        json=_payload(str(supplement.id)),
+    )
+    assert created.status_code == 201
+    order_id = created.json()["id"]
+
+    listed = client.get(f"/api/v1/nutrition/physician/plans/{plan.id}/supplement-orders")
+    assert listed.status_code == 200
+    assert [row["id"] for row in listed.json()] == [order_id]
+
+    payload = _payload(str(supplement.id))
+    payload.update({"dose_amount": 2, "daily_units": 2, "duration_days": 14})
+    modified = client.put(
+        f"/api/v1/nutrition/physician/supplement-orders/{order_id}",
+        headers=ORIGIN,
+        json=payload,
+    )
+    assert modified.status_code == 200, modified.text
+    assert modified.json()["dose_amount"] == 2
+    assert modified.json()["duration_days"] == 14
+    audits = db.scalars(
+        select(NutritionSupplementOrderAudit).where(
+            NutritionSupplementOrderAudit.order_id == order_id
+        )
+    ).all()
+    assert [audit.action for audit in audits] == ["prescribed", "modified"]

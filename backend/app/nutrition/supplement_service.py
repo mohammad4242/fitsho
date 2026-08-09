@@ -314,6 +314,100 @@ def transition_order(
     return order_response(row)
 
 
+def list_physician_orders(
+    db: Session, physician_id: UUID, plan_id: UUID
+) -> list[dict[str, object]]:
+    try:
+        require_physician(db, physician_id)
+    except ClinicalError as error:
+        raise SupplementError("PHYSICIAN_ROLE_REQUIRED") from error
+    review = db.scalar(
+        select(NutritionPlanPhysicianReview).where(
+            NutritionPlanPhysicianReview.plan_id == plan_id,
+            NutritionPlanPhysicianReview.physician_user_id == physician_id,
+        )
+    )
+    if review is None:
+        raise SupplementError("ASSIGNED_REVIEW_REQUIRED")
+    return [
+        order_response(row)
+        for row in db.scalars(
+            select(NutritionSupplementOrder)
+            .where(NutritionSupplementOrder.plan_id == plan_id)
+            .order_by(NutritionSupplementOrder.created_at.desc())
+        )
+    ]
+
+
+def update_order(
+    db: Session,
+    physician_id: UUID,
+    order_id: UUID,
+    supplement_id: UUID,
+    payload: dict[str, object],
+) -> dict[str, object]:
+    try:
+        require_physician(db, physician_id)
+    except ClinicalError as error:
+        raise SupplementError("PHYSICIAN_ROLE_REQUIRED") from error
+    row = db.scalar(
+        select(NutritionSupplementOrder).where(
+            NutritionSupplementOrder.id == order_id,
+            NutritionSupplementOrder.physician_user_id == physician_id,
+        )
+    )
+    if row is None or row.status not in {
+        NutritionSupplementOrderStatus.PRESCRIBED,
+        NutritionSupplementOrderStatus.ACTIVE,
+    }:
+        raise SupplementError("SUPPLEMENT_ORDER_NOT_FOUND")
+    plan = db.scalar(
+        select(NutritionWeeklyPlan)
+        .where(NutritionWeeklyPlan.id == row.plan_id)
+        .options(selectinload(NutritionWeeklyPlan.nutrients))
+    )
+    supplement = db.get(NutritionSupplementCatalogue, supplement_id)
+    if plan is None or supplement is None or supplement.verification_status != "verified":
+        raise SupplementError("VERIFIED_SUPPLEMENT_OR_PLAN_NOT_FOUND")
+    daily_units = Decimal(str(payload["daily_units"]))
+    exposure = _safety_check(
+        db, plan, supplement, daily_units, excluding_order_id=row.id
+    )
+    starts_on = cast(date | None, payload.get("starts_on")) or row.starts_on or date.today()
+    duration_days = int(str(payload["duration_days"]))
+    row.supplement_id = supplement.id
+    row.name = supplement.name_fa
+    row.dose_amount = Decimal(str(payload["dose_amount"]))
+    row.dose_unit = str(payload["dose_unit"])
+    row.dose = f"{payload['dose_amount']} {payload['dose_unit']}"
+    row.daily_units = daily_units
+    row.frequency = str(payload["frequency"])
+    row.duration_days = duration_days
+    row.starts_on = starts_on
+    row.ends_on = starts_on + timedelta(days=duration_days - 1)
+    row.instructions = str(payload["instructions"])
+    row.rationale = str(payload["rationale"])
+    row.rationale_user_visible = bool(payload["rationale_user_visible"])
+    row.linked_gap_codes = list(cast(list[str], payload.get("linked_gap_codes", [])))
+    row.linked_lab_document_ids = [
+        str(value) for value in cast(list[UUID], payload.get("linked_lab_document_ids", []))
+    ]
+    row.nutrient_contribution = {
+        code: str(value) for code, value in _daily_contribution(supplement, daily_units).items()
+    }
+    row.audit_metadata = {**row.audit_metadata, "pre_activation_exposure": exposure}
+    db.add(
+        NutritionSupplementOrderAudit(
+            order_id=row.id,
+            actor_user_id=physician_id,
+            action="modified",
+            snapshot=_audit_snapshot(row),
+        )
+    )
+    db.commit()
+    return order_response(row)
+
+
 def list_user_orders(db: Session, user_id: UUID) -> list[dict[str, object]]:
     return [
         order_response(row)

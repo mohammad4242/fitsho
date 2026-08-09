@@ -172,6 +172,7 @@ def test_approval_requires_claim_and_activates_exact_due_revision(
         "expected_plan_revision_id": plan["id"],
         "action": "approve",
         "notes": "از نظر پزشکی تأیید شد",
+        "internal_notes": "یادداشت محرمانه پزشک",
     }
     unclaimed = client.post(
         f"/api/v1/nutrition/physician/plans/{plan['id']}/action",
@@ -207,6 +208,10 @@ def test_approval_requires_claim_and_activates_exact_due_revision(
     assert approved.status_code == 200, approved.text
     assert approved.json()["lifecycle_status"] == "active"
     assert approved.json()["physician_approved"] is True
+    assert "internal_notes" not in approved.json()
+    persisted = db.get(NutritionWeeklyPlan, plan["id"])
+    assert persisted is not None and persisted.review is not None
+    assert persisted.review.internal_notes == "یادداشت محرمانه پزشک"
 
 
 def test_assigned_physician_can_list_and_review_member_labs(

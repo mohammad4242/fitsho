@@ -553,6 +553,7 @@ class PhysicianPlanActionInput(BaseModel):
     expected_plan_revision_id: UUID
     action: str = Field(pattern="^(start_review|approve|request_changes|reject)$")
     notes: str | None = Field(default=None, max_length=2000)
+    internal_notes: str | None = Field(default=None, max_length=4000)
 
 
 class PhysicianFoodQuantityInput(BaseModel):

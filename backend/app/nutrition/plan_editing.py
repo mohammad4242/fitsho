@@ -799,6 +799,7 @@ def physician_action(
     expected_plan_revision_id: UUID,
     action: str,
     notes: str | None,
+    internal_notes: str | None = None,
 ) -> WeeklyPlanResponse:
     try:
         require_physician(db, physician_id)
@@ -821,6 +822,8 @@ def physician_action(
     if action != "start_review" and plan.review.physician_user_id != physician_id:
         raise PlanEditError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
     plan.review.user_visible_notes = notes
+    if internal_notes is not None:
+        plan.review.internal_notes = internal_notes
     if action == "start_review":
         if plan.review.status not in {
             NutritionPlanReviewStatus.PENDING,
