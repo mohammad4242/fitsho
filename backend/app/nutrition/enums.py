@@ -118,6 +118,12 @@ class PriceUpdateRunStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+class PriceUpdateTriggerKind(StrEnum):
+    MANUAL = "manual"
+    SCHEDULED = "scheduled"
+    CATCH_UP = "catch_up"
+
+
 class NutritionPlanGenerationOutcome(StrEnum):
     SUCCESS = "success"
     FAILED = "failed"

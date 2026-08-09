@@ -64,6 +64,10 @@ def run_price_update(
         select(NutritionFoodPriceMapping).join(NutritionCatalogueFood).where(
             NutritionFoodPriceMapping.active.is_(True),
             NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED,
+        ).order_by(
+            NutritionFoodPriceMapping.provider_code,
+            NutritionFoodPriceMapping.food_id,
+            NutritionFoodPriceMapping.provider_product_id,
         )
     ).all()
     by_provider: dict[str, list[NutritionFoodPriceMapping]] = {}

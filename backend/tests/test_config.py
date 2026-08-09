@@ -120,3 +120,18 @@ def test_settings_accept_an_explicit_zen_proxy_url() -> None:
     settings = Settings(opencode_zen_proxy_url="socks5://127.0.0.1:10808")
 
     assert settings.opencode_zen_proxy_url == "socks5://127.0.0.1:10808"
+
+
+def test_food_price_api_credentials_are_disabled_and_redacted_by_default() -> None:
+    settings = Settings(
+        food_price_persianapi_api_key="persian-secret",
+        food_price_basalam_api_key="basalam-secret",
+        food_price_provider_api_key="future-secret",
+    )
+
+    assert settings.food_price_persianapi_enabled is False
+    assert settings.food_price_basalam_api_enabled is False
+    assert settings.food_price_provider_api_enabled is False
+    assert "persian-secret" not in repr(settings)
+    assert "basalam-secret" not in repr(settings)
+    assert "future-secret" not in repr(settings)

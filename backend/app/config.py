@@ -77,6 +77,13 @@ class Settings(BaseSettings):
     food_price_public_source_url: str | None = Field(default=None, max_length=500, repr=False)
     food_price_api_key: SecretStr | None = Field(default=None, repr=False)
     food_price_api_base_url: str | None = Field(default=None, max_length=500, repr=False)
+    food_price_persianapi_enabled: bool = False
+    food_price_persianapi_api_key: SecretStr | None = Field(default=None, repr=False)
+    food_price_basalam_api_enabled: bool = False
+    food_price_basalam_api_key: SecretStr | None = Field(default=None, repr=False)
+    food_price_provider_api_enabled: bool = False
+    food_price_provider_api_key: SecretStr | None = Field(default=None, repr=False)
+    food_price_provider_base_url: str | None = Field(default=None, max_length=500, repr=False)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

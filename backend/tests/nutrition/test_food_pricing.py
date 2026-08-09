@@ -232,3 +232,25 @@ def test_empty_optional_api_key_does_not_enable_a_provider(test_settings) -> Non
             assert configured_providers(test_settings, client) == []
 
     asyncio.run(check())
+
+
+def test_public_price_provider_registry_is_seeded_disabled_until_live_probe(db) -> None:
+    from app.nutrition.models import NutritionPriceProvider
+
+    providers = db.scalars(select(NutritionPriceProvider).order_by(NutritionPriceProvider.code)).all()
+
+    assert [provider.code for provider in providers] == [
+        "basalam_public",
+        "digikala",
+        "emalls",
+        "hyperstar",
+        "okala",
+        "refah",
+        "shahrvand",
+        "snapp_market",
+        "tehran_market_official",
+        "torob",
+    ]
+    assert all(provider.enabled is False for provider in providers)
+    assert all(provider.minimum_sources == 3 for provider in providers)
+    assert all(provider.parser_version == "public-page-v1" for provider in providers)
