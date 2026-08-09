@@ -3,11 +3,10 @@
 ## Provider boundary
 
 `FoodPriceProvider` adapters return observations only. They cannot write plans or nutrition
-composition. Ten isolated keyless public-page adapters are registered for Digikala, Torob, Basalam,
-Okala, Snapp Market, Hyperstar, Shahrvand, Refah, Emalls, and Tehran's official market source. Each
-source starts disabled in the database and becomes healthy only after a successful public probe.
-Failures remain isolated; no paid key, private endpoint, authenticated customer session, CAPTCHA
-bypass, or whole-market crawl is used.
+composition. Three isolated keyless adapters are active: Basalam's public product API, Digikala's
+public catalogue API, and Tapsi Shop's anonymous guest catalogue. Each source starts disabled in the database and becomes healthy only
+after a successful public probe. Failures remain isolated; no paid key, authenticated customer
+session, CAPTCHA bypass, or whole-market crawl is used.
 
 Future providers can implement the same adapter and use the disabled backend-only PersianAPI,
 Basalam API, or generic provider credential slots. Empty keys are supported and never appear in the
@@ -21,12 +20,13 @@ effective date, observation time, and raw quote remain immutable. Decimal arithm
 TOMAN per kg, litre, or unit internally; persisted quote fields retain comparable IRR values.
 Promotions stay explicit and do not replace the normal reference price.
 
-Reference policy `public-price-v2` requires at least three distinct sources. It removes statistical
+Reference policy `public-price-v3` requires at least three distinct sources. It removes statistical
 outliers using MAD with a deterministic IQR fallback, then calculates the Decimal arithmetic mean of
 the remaining normal prices. Promotional prices remain traceable but are excluded from the normal
-reference. Invalid units, insufficient sources, or a change over 50% create a review record and
-preserve the previous trusted price. Provider failures and 429s use bounded backoff and cannot
-corrupt existing quotes.
+reference. Invalid units, insufficient sources, source spread over 75%, or a change over 50% create
+a review record and preserve the previous trusted price. Stored mapping titles are revalidated on
+every run so a previously matched prepared or irrelevant product cannot remain silently active.
+Provider failures and 429s use bounded backoff and cannot corrupt existing quotes.
 
 ## Freshness and planning
 

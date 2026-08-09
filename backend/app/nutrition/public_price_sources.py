@@ -133,7 +133,13 @@ def _decimal(value: object) -> Decimal | None:
 
 
 def parse_package(title: str) -> tuple[Decimal, str] | None:
-    match = _PACKAGE_PATTERN.search(title.replace("‌", ""))
+    normalized_title = title.replace("‌", "")
+    normalized_title = re.sub(
+        r"(?<!\S)یک\s*(?=کیلوگرم|کیلو|گرم|میلی\s*لیتر|لیتر|عدد)",
+        "1 ",
+        normalized_title,
+    )
+    match = _PACKAGE_PATTERN.search(normalized_title)
     if match is None:
         return None
     quantity = _decimal(match.group("quantity"))

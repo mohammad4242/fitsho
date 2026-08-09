@@ -114,6 +114,18 @@ def test_large_change_requires_review_and_preserves_previous_price() -> None:
     assert decision.reference_price == Decimal("270000")
 
 
+def test_extreme_source_disagreement_requires_review() -> None:
+    from app.nutrition.pricing import PriceReviewReason, decide_reference_price
+
+    decision = decide_reference_price(
+        [Decimal("386000"), Decimal("733000"), Decimal("1660000")],
+        distinct_source_count=3,
+    )
+
+    assert decision.accepted is False
+    assert PriceReviewReason.SOURCE_DISAGREEMENT in decision.review_reasons
+
+
 def test_insufficient_sources_requires_review() -> None:
     from app.nutrition.pricing import PriceReviewReason, decide_reference_price
 
@@ -222,6 +234,93 @@ def test_update_run_is_idempotent_and_preserves_previous_price_on_review(db) -> 
     assert provider_event.status == "success"
 
 
+def test_refresh_disables_mapping_when_product_no_longer_matches_canonical_food(db) -> None:
+    from app.nutrition.enums import (
+        EstimateConfidence,
+        FoodVerificationStatus,
+        PriceReferenceStatus,
+    )
+    from app.nutrition.models import (
+        NutritionCatalogueFood,
+        NutritionFoodPriceMapping,
+        NutritionFoodPriceQuote,
+        NutritionFoodPriceReference,
+        NutritionFoodPriceReview,
+    )
+    from app.nutrition.price_update_service import run_price_update
+
+    food = NutritionCatalogueFood(
+        slug="mapping-drift-apple",
+        name_fa="سیب",
+        name_en="Apple",
+        category="fruit",
+        verification_status=FoodVerificationStatus.VERIFIED,
+        source_name="test",
+        source_reference="test",
+    )
+    db.add(food)
+    db.flush()
+    mapping = NutritionFoodPriceMapping(
+        food_id=food.id,
+        provider_code="digikala",
+        provider_product_id="apple-vinegar",
+        public_product_url="https://example.test/product/apple-vinegar",
+        active=True,
+    )
+    db.add(mapping)
+    reference = NutritionFoodPriceReference(
+        food_id=food.id,
+        canonical_unit="TOMAN_PER_KG",
+        reference_price_toman=Decimal("120000"),
+        sample_count=3,
+        confidence=EstimateConfidence.HIGH,
+        status=PriceReferenceStatus.ACCEPTED,
+        calculated_at=datetime(2026, 8, 8, 8, tzinfo=UTC),
+        accepted_at=datetime(2026, 8, 8, 8, tzinfo=UTC),
+    )
+    db.add(reference)
+    db.commit()
+
+    class DriftedProvider:
+        code = "digikala"
+
+        async def get_quotes(self, _ids):
+            return [
+                observation(
+                    provider_code=self.code,
+                    provider_product_id="apple-vinegar",
+                    product_title="سرکه سیب طبیعی 1 لیتر",
+                    package_quantity=Decimal("1"),
+                    package_unit="l",
+                    normal_price=Decimal("320000"),
+                )
+            ]
+
+    run_price_update(
+        db,
+        providers=[DriftedProvider()],
+        scheduled_for=datetime(2026, 8, 9, 12, tzinfo=UTC),
+    )
+
+    db.refresh(mapping)
+    db.refresh(reference)
+    review = db.scalar(
+        select(NutritionFoodPriceReview).where(NutritionFoodPriceReview.food_id == food.id)
+    )
+    quote_count = len(
+        db.scalars(
+            select(NutritionFoodPriceQuote).where(NutritionFoodPriceQuote.food_id == food.id)
+        ).all()
+    )
+    assert mapping.active is False
+    assert mapping.broken_at is not None
+    assert reference.status == PriceReferenceStatus.NEEDS_REVIEW
+    assert reference.reference_price_toman == Decimal("120000")
+    assert review is not None
+    assert "ambiguous_match" in review.reason_codes
+    assert quote_count == 0
+
+
 def test_scheduler_uses_one_tehran_saturday_slot(test_settings) -> None:
     from app.nutrition.price_scheduler import is_due, most_recent_due_slot, weekly_slot
 
@@ -251,7 +350,11 @@ def test_empty_optional_api_key_keeps_only_keyless_public_providers(test_setting
     async def check() -> None:
         async with httpx.AsyncClient(trust_env=False) as client:
             providers = configured_providers(test_settings, client)
-            assert len(providers) == 10
+            assert [provider.code for provider in providers] == [
+                "basalam_public",
+                "digikala",
+                "tapsi_shop",
+            ]
             assert all(provider.code != "public_catalog" for provider in providers)
 
     asyncio.run(check())
@@ -310,12 +413,15 @@ def test_public_price_provider_registry_is_seeded_disabled_until_live_probe(db) 
         "refah",
         "shahrvand",
         "snapp_market",
+        "tapsi_shop",
         "tehran_market_official",
         "torob",
     ]
     assert all(provider.enabled is False for provider in providers)
     assert all(provider.minimum_sources == 3 for provider in providers)
-    assert all(provider.parser_version == "public-page-v1" for provider in providers)
+    assert next(provider for provider in providers if provider.code == "tapsi_shop").parser_version == (
+        "tapsi-guest-v1"
+    )
 
 
 def test_first_public_run_discovers_mappings_and_accepts_three_source_mean(db) -> None:
@@ -406,6 +512,73 @@ def test_first_public_run_discovers_mappings_and_accepts_three_source_mean(db) -
     assert len(history.accepted_quote_ids) == 3
     assert history.rejected_quote_ids == []
     assert all(db.get(NutritionPriceProvider, provider.code).enabled for provider in providers)
+
+
+def test_public_refresh_reuses_existing_sku_from_bounded_search_without_detail_batch(db) -> None:
+    from app.nutrition.enums import FoodVerificationStatus
+    from app.nutrition.models import (
+        NutritionCatalogueFood,
+        NutritionFoodPriceMapping,
+        NutritionFoodPriceQuote,
+    )
+    from app.nutrition.price_update_service import run_price_update
+    from app.nutrition.public_price_sources import PublicProductCandidate
+
+    food = NutritionCatalogueFood(
+        slug="search-refresh-lentil",
+        name_fa="عدس تست قیمت",
+        name_en="Price test lentil",
+        category="legumes",
+        verification_status=FoodVerificationStatus.VERIFIED,
+        source_name="test",
+        source_reference="test",
+    )
+    db.add(food)
+    db.flush()
+    mapping = NutritionFoodPriceMapping(
+        food_id=food.id,
+        provider_code="digikala",
+        provider_product_id="same-sku",
+        public_product_url="https://example.test/product/same-sku",
+        active=True,
+    )
+    db.add(mapping)
+    db.commit()
+
+    class SearchProvider:
+        code = "digikala"
+        uses_public_locators = True
+
+        async def discover(self, _alias: str):
+            return [
+                PublicProductCandidate(
+                    provider_code=self.code,
+                    product_id="same-sku",
+                    title="عدس تست قیمت 900 گرم",
+                    public_url="https://example.test/product/same-sku",
+                    currency="TOMAN",
+                    normal_price=Decimal("300000"),
+                    promotional_price=None,
+                    package_quantity=Decimal("900"),
+                    package_unit="g",
+                    observed_at=datetime(2026, 8, 9, 8, tzinfo=UTC),
+                )
+            ]
+
+        async def get_quotes(self, _locators):
+            raise AssertionError("bounded search observation must avoid detail refresh")
+
+    run_price_update(
+        db,
+        providers=[SearchProvider()],
+        scheduled_for=datetime(2026, 8, 9, 13, tzinfo=UTC),
+    )
+
+    quotes = db.scalars(
+        select(NutritionFoodPriceQuote).where(NutritionFoodPriceQuote.food_id == food.id)
+    ).all()
+    assert len(quotes) == 1
+    assert quotes[0].provider_product_id == "same-sku"
 
 
 def test_zero_provider_run_is_observable_error_not_success(db) -> None:

@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from hashlib import sha256
 from typing import cast
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -34,6 +35,7 @@ from app.nutrition.models import (
     NutritionPriceProvider,
 )
 from app.nutrition.pricing import (
+    DEFAULT_PUBLIC_PRICE_POLICY,
     FoodPriceProvider,
     PriceObservation,
     PriceReviewReason,
@@ -87,7 +89,7 @@ async def run_price_update_async(
         started_at=now,
         status=PriceUpdateRunStatus.RUNNING,
         trigger_kind=trigger_kind,
-        policy_version="public-price-v2",
+        policy_version=DEFAULT_PUBLIC_PRICE_POLICY.version,
     )
     db.add(run)
     db.flush()
@@ -97,12 +99,12 @@ async def run_price_update_async(
         .where(NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED)
         .order_by(NutritionCatalogueFood.slug)
     ).all()
-    mappings = list(
+    foods_by_id = {food.id: food for food in foods}
+    all_mappings = list(
         db.scalars(
             select(NutritionFoodPriceMapping)
             .join(NutritionCatalogueFood)
             .where(
-                NutritionFoodPriceMapping.active.is_(True),
                 NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED,
             )
             .order_by(
@@ -112,24 +114,108 @@ async def run_price_update_async(
             )
         ).all()
     )
+    stored_quotes = list(
+        db.scalars(
+            select(NutritionFoodPriceQuote).order_by(NutritionFoodPriceQuote.observed_at.desc())
+        ).all()
+    )
+    latest_stored_quotes: dict[tuple[str, str], NutritionFoodPriceQuote] = {}
+    stored_quotes_by_id = {str(quote.id): quote for quote in stored_quotes}
+    for quote in stored_quotes:
+        latest_stored_quotes.setdefault((quote.provider_code, quote.provider_product_id), quote)
+    latest_histories: dict[UUID, NutritionFoodPriceHistory] = {}
+    for history in db.scalars(
+        select(NutritionFoodPriceHistory).order_by(NutritionFoodPriceHistory.accepted_at.desc())
+    ).all():
+        latest_histories.setdefault(history.food_id, history)
+    current_references = {
+        reference.food_id: reference
+        for reference in db.scalars(select(NutritionFoodPriceReference)).all()
+    }
+    for food_id, history in latest_histories.items():
+        reference = current_references.get(food_id)
+        if reference is None or reference.status != PriceReferenceStatus.ACCEPTED:
+            continue
+        support_quotes = [
+            stored_quotes_by_id[quote_id]
+            for quote_id in (*history.accepted_quote_ids, *history.rejected_quote_ids)
+            if quote_id in stored_quotes_by_id
+            and stored_quotes_by_id[quote_id].normalized_normal_irr is not None
+        ]
+        if not support_quotes:
+            continue
+        support_values = [
+            cast(Decimal, quote.normalized_normal_irr) / Decimal("10") for quote in support_quotes
+        ]
+        audit_decision = decide_reference_price(
+            support_values,
+            distinct_source_count=len({quote.provider_code for quote in support_quotes}),
+        )
+        if not audit_decision.accepted:
+            reference.status = PriceReferenceStatus.NEEDS_REVIEW
+            reference.calculated_at = now
+    for mapping in all_mappings:
+        if not mapping.active:
+            continue
+        food = foods_by_id.get(mapping.food_id)
+        stored_quote = latest_stored_quotes.get(
+            (mapping.provider_code, mapping.provider_product_id)
+        )
+        if food is None or stored_quote is None:
+            continue
+        title = stored_quote.raw_quote.get("title")
+        if not isinstance(title, str):
+            continue
+        stored_match = match_candidate(
+            CanonicalFoodIdentity(
+                slug=food.slug,
+                name_fa=food.name_fa,
+                category=food.category,
+                aliases=tuple(alias.alias for alias in food.aliases),
+            ),
+            PublicProductCandidate(
+                provider_code=mapping.provider_code,
+                product_id=mapping.provider_product_id,
+                title=title,
+                public_url=mapping.public_product_url or "",
+                currency="IRR",
+                normal_price=None,
+                promotional_price=None,
+                package_quantity=Decimal("1"),
+                package_unit="unit",
+                observed_at=stored_quote.observed_at,
+                region=mapping.region,
+            ),
+        )
+        if not stored_match.accepted:
+            mapping.active = False
+            mapping.broken_at = now
+    mappings = [mapping for mapping in all_mappings if mapping.active]
     enabled = {provider.code: provider for provider in provider_list}
     observations: dict[tuple[str, str], list[PriceObservation]] = {}
     discovered_keys: set[tuple[str, str]] = set()
     failures: set[str] = set()
     successful_probes: set[str] = set()
 
-    mapped_food_providers = {(mapping.food_id, mapping.provider_code) for mapping in mappings}
     mapped_provider_products = {
         (mapping.provider_code, mapping.provider_product_id) for mapping in mappings
     }
+    mapping_by_food_provider: dict[tuple[object, str], NutritionFoodPriceMapping] = {}
+    for mapping in mappings:
+        mapping_key = (mapping.food_id, mapping.provider_code)
+        current = mapping_by_food_provider.get(mapping_key)
+        if current is None or (mapping.match_confidence, mapping.provider_product_id) > (
+            current.match_confidence,
+            current.provider_product_id,
+        ):
+            mapping_by_food_provider[mapping_key] = mapping
     for provider in provider_list:
         if not isinstance(provider, PublicDiscoveryProvider):
             continue
         discovery_provider = cast(PublicDiscoveryProvider, provider)
         provider_failed = False
         for food in foods:
-            if (food.id, provider.code) in mapped_food_providers:
-                continue
+            existing_mapping = mapping_by_food_provider.get((food.id, provider.code))
             identity = CanonicalFoodIdentity(
                 slug=food.slug,
                 name_fa=food.name_fa,
@@ -145,6 +231,7 @@ async def run_price_update_async(
                 )
             )[:2]
             selected: tuple[PublicProductCandidate, Decimal, str] | None = None
+            refreshed_existing = False
             for alias in aliases:
                 try:
 
@@ -167,15 +254,29 @@ async def run_price_update_async(
                 matches: list[tuple[PublicProductCandidate, Decimal, str]] = []
                 for candidate in candidates[:10]:
                     match = match_candidate(identity, candidate)
+                    if not match.accepted:
+                        continue
+                    matched_alias = match.matched_alias or alias
                     if (
-                        match.accepted
-                        and (
-                            provider.code,
-                            candidate.product_id,
-                        )
-                        not in mapped_provider_products
+                        existing_mapping is not None
+                        and candidate.product_id == existing_mapping.provider_product_id
                     ):
-                        matches.append((candidate, match.confidence, match.matched_alias or alias))
+                        existing_mapping.public_product_url = candidate.public_url
+                        existing_mapping.region = candidate.region
+                        existing_mapping.match_alias = matched_alias
+                        existing_mapping.match_confidence = match.confidence
+                        existing_mapping.last_verified_at = now
+                        observation_key = (provider.code, candidate.product_id)
+                        observations.setdefault(observation_key, []).append(
+                            candidate.to_observation()
+                        )
+                        discovered_keys.add(observation_key)
+                        refreshed_existing = True
+                        break
+                    if (provider.code, candidate.product_id) not in mapped_provider_products:
+                        matches.append((candidate, match.confidence, matched_alias))
+                if refreshed_existing:
+                    break
                 if matches:
                     selected = max(
                         matches,
@@ -188,6 +289,8 @@ async def run_price_update_async(
                     break
             if provider_failed:
                 break
+            if refreshed_existing or existing_mapping is not None:
+                continue
             if selected is None:
                 continue
             candidate, match_confidence, matched_alias = selected
@@ -205,11 +308,12 @@ async def run_price_update_async(
             )
             db.add(mapping)
             mappings.append(mapping)
-            mapped_food_providers.add((food.id, provider.code))
+            all_mappings.append(mapping)
             mapped_provider_products.add((provider.code, candidate.product_id))
-            key = (provider.code, candidate.product_id)
-            observations.setdefault(key, []).append(candidate.to_observation())
-            discovered_keys.add(key)
+            mapping_by_food_provider[(food.id, provider.code)] = mapping
+            observation_key = (provider.code, candidate.product_id)
+            observations.setdefault(observation_key, []).append(candidate.to_observation())
+            discovered_keys.add(observation_key)
         record = db.get(NutritionPriceProvider, provider.code)
         if record is not None:
             if provider.code in successful_probes:
@@ -303,6 +407,7 @@ async def run_price_update_async(
         priced_quotes: list[tuple[NutritionFoodPriceQuote, Decimal]] = []
         unit: str | None = None
         invalid = False
+        ambiguous_mapping = False
         mappings_by_provider: dict[str, list[NutritionFoodPriceMapping]] = {}
         for mapping in food_mappings:
             mappings_by_provider.setdefault(mapping.provider_code, []).append(mapping)
@@ -317,6 +422,35 @@ async def run_price_update_async(
             for observed in sorted(
                 provider_observations, key=lambda item: item.observed_at, reverse=True
             )[:1]:
+                canonical_food = foods_by_id.get(food_id)
+                if canonical_food is None:
+                    continue
+                mapping_match = match_candidate(
+                    CanonicalFoodIdentity(
+                        slug=canonical_food.slug,
+                        name_fa=canonical_food.name_fa,
+                        category=canonical_food.category,
+                        aliases=tuple(alias.alias for alias in canonical_food.aliases),
+                    ),
+                    PublicProductCandidate(
+                        provider_code=observed.provider_code,
+                        product_id=observed.provider_product_id,
+                        title=observed.product_title,
+                        public_url=mapping.public_product_url or "",
+                        currency=observed.currency,
+                        normal_price=observed.normal_price,
+                        promotional_price=observed.promotional_price,
+                        package_quantity=observed.package_quantity,
+                        package_unit=observed.package_unit,
+                        observed_at=observed.observed_at,
+                        region=observed.region,
+                    ),
+                )
+                if not mapping_match.accepted:
+                    mapping.active = False
+                    mapping.broken_at = now
+                    ambiguous_mapping = True
+                    continue
                 try:
                     normalized = normalize_observation(observed)
                 except PriceValidationError:
@@ -387,6 +521,8 @@ async def run_price_update_async(
         )
         if invalid:
             reasons.append(PriceReviewReason.UNIT_PARSE_ERROR)
+        if ambiguous_mapping:
+            reasons.append(PriceReviewReason.AMBIGUOUS_MATCH)
         if decision is not None and decision.accepted and unit is not None:
             estimate_confidence = (
                 EstimateConfidence.HIGH if decision.sample_count >= 3 else EstimateConfidence.MEDIUM
@@ -448,6 +584,16 @@ async def run_price_update_async(
             )
             run.foods_needing_review += 1
             if previous is not None:
+                broken_support = any(
+                    mapping.food_id == food_id
+                    and not mapping.active
+                    and mapping.broken_at is not None
+                    and mapping.broken_at >= previous.accepted_at
+                    for mapping in all_mappings
+                )
+                if ambiguous_mapping or broken_support:
+                    previous.status = PriceReferenceStatus.NEEDS_REVIEW
+                    previous.calculated_at = now
                 run.foods_unchanged += 1
     failure_codes: list[str] = []
     if not provider_list:

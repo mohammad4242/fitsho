@@ -41,7 +41,7 @@ def test_admin_monitoring_requires_admin_and_reports_catalogues(
         "input_tokens": 0,
         "output_tokens": 0,
     }
-    assert len(response.json()["provider_health"]) == 10
+    assert len(response.json()["provider_health"]) == 11
     assert all("api_key" not in provider for provider in response.json()["provider_health"])
     assert "coverage_warning" in response.json()
     assert "price_reviews" in response.json()

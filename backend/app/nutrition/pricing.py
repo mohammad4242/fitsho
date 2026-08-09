@@ -83,10 +83,11 @@ class ReferencePriceDecision:
 
 @dataclass(frozen=True)
 class PublicPricePolicy:
-    version: str = "public-price-v2"
+    version: str = "public-price-v3"
     minimum_distinct_sources: int = 3
     mad_multiplier: Decimal = Decimal("3.5")
     maximum_jump_fraction: Decimal = Decimal("0.50")
+    maximum_source_spread_fraction: Decimal = Decimal("0.75")
 
 
 DEFAULT_PUBLIC_PRICE_POLICY = PublicPricePolicy()
@@ -198,6 +199,13 @@ def decide_reference_price(
     source_count = distinct_source_count if distinct_source_count is not None else len(values)
     if source_count < policy.minimum_distinct_sources:
         reasons.append(PriceReviewReason.INSUFFICIENT_SOURCES)
+    if len(result.accepted_values) >= 2:
+        accepted_median = Decimal(str(median(result.accepted_values)))
+        source_spread = (
+            max(result.accepted_values) - min(result.accepted_values)
+        ) / accepted_median
+        if source_spread > policy.maximum_source_spread_fraction:
+            reasons.append(PriceReviewReason.SOURCE_DISAGREEMENT)
     if previous_reference and abs(result.reference_price - previous_reference) / previous_reference > policy.maximum_jump_fraction:
         reasons.append(PriceReviewReason.PRICE_JUMP)
     accepted = not reasons

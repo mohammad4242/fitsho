@@ -9,8 +9,12 @@ from decimal import Decimal
 import httpx
 
 from app.config import Settings
-from app.nutrition.pricing import PriceObservation, ProviderRateLimitedError
-from app.nutrition.public_price_sources import PUBLIC_SOURCE_DEFINITIONS, PublicPageProvider
+from app.nutrition.marketplace_price_providers import (
+    BasalamPublicProvider,
+    DigikalaPublicProvider,
+    TapsiShopProvider,
+)
+from app.nutrition.pricing import FoodPriceProvider, PriceObservation, ProviderRateLimitedError
 
 
 class PublicJsonCatalogProvider:
@@ -60,10 +64,13 @@ class PublicJsonCatalogProvider:
 
 
 def configured_providers(
-    settings: Settings, client: httpx.AsyncClient
-) -> list[PublicJsonCatalogProvider | PublicPageProvider]:
-    providers: list[PublicJsonCatalogProvider | PublicPageProvider] = [
-        PublicPageProvider(definition, client) for definition in PUBLIC_SOURCE_DEFINITIONS
+    settings: Settings,
+    client: httpx.AsyncClient,
+) -> list[FoodPriceProvider]:
+    providers: list[FoodPriceProvider] = [
+        BasalamPublicProvider(client),
+        DigikalaPublicProvider(client),
+        TapsiShopProvider(client),
     ]
     if settings.food_price_public_source_url:
         providers.append(PublicJsonCatalogProvider(client, settings.food_price_public_source_url))
