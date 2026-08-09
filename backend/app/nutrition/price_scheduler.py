@@ -14,7 +14,7 @@ from app.database.session import get_engine
 from app.nutrition.enums import PriceUpdateTriggerKind
 from app.nutrition.models import NutritionFoodPriceUpdateRun
 from app.nutrition.price_providers import configured_providers
-from app.nutrition.price_update_service import run_price_update
+from app.nutrition.price_update_service import run_price_update_async
 
 _LOCK_KEY = 58421091
 
@@ -84,7 +84,7 @@ async def trigger_scheduled_update(
                     if local_now.date() == local_slot.date()
                     else PriceUpdateTriggerKind.CATCH_UP
                 )
-                run_price_update(
+                await run_price_update_async(
                     db,
                     providers=configured_providers(settings, client),
                     scheduled_for=due_slot,

@@ -66,7 +66,7 @@ def _observation_key(observation: PriceObservation) -> str:
     return sha256(payload.encode()).hexdigest()
 
 
-def run_price_update(
+async def run_price_update_async(
     db: Session,
     *,
     providers: Iterable[FoodPriceProvider],
@@ -154,12 +154,10 @@ def run_price_update(
                     ) -> list[PublicProductCandidate]:
                         return await selected_provider.discover(selected_alias)
 
-                    candidates = asyncio.run(
-                        retry_quotes(
-                            discover,
-                            attempts=retry_attempts,
-                            base_delay_seconds=0.1,
-                        )
+                    candidates = await retry_quotes(
+                        discover,
+                        attempts=retry_attempts,
+                        base_delay_seconds=0.1,
                     )
                     successful_probes.add(provider.code)
                 except Exception:
@@ -251,12 +249,10 @@ def run_price_update(
             ) -> list[PriceObservation]:
                 return await selected_provider.get_quotes(selected_product_ids)
 
-            collected_quotes = asyncio.run(
-                retry_quotes(
-                    collect,
-                    attempts=retry_attempts,
-                    base_delay_seconds=0.1,
-                )
+            collected_quotes = await retry_quotes(
+                collect,
+                attempts=retry_attempts,
+                base_delay_seconds=0.1,
             )
             for item in collected_quotes:
                 if isinstance(item, PriceObservation):
@@ -490,6 +486,25 @@ def run_price_update(
     db.commit()
     db.refresh(run)
     return run
+
+
+def run_price_update(
+    db: Session,
+    *,
+    providers: Iterable[FoodPriceProvider],
+    scheduled_for: datetime | None = None,
+    retry_attempts: int = 3,
+    trigger_kind: PriceUpdateTriggerKind = PriceUpdateTriggerKind.MANUAL,
+) -> NutritionFoodPriceUpdateRun:
+    return asyncio.run(
+        run_price_update_async(
+            db,
+            providers=providers,
+            scheduled_for=scheduled_for,
+            retry_attempts=retry_attempts,
+            trigger_kind=trigger_kind,
+        )
+    )
 
 
 def current_reference_prices(

@@ -41,3 +41,38 @@ def test_admin_monitoring_requires_admin_and_reports_catalogues(
         "input_tokens": 0,
         "output_tokens": 0,
     }
+    assert len(response.json()["provider_health"]) == 10
+    assert all("api_key" not in provider for provider in response.json()["provider_health"])
+    assert "coverage_warning" in response.json()
+    assert "price_reviews" in response.json()
+    assert "broken_mappings" in response.json()
+
+
+def test_admin_can_trigger_manual_price_update_without_live_credentials(
+    client: TestClient, db: Session, monkeypatch
+) -> None:
+    from app.nutrition import router as nutrition_router
+
+    assert (
+        client.post(
+            "/api/v1/auth/register",
+            headers=ORIGIN,
+            json={"email": "price-admin@example.com", "password": "long password"},
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post("/api/v1/nutrition/admin/prices/refresh", headers=ORIGIN).status_code == 403
+    )
+    user = db.scalar(select(User).where(User.email == "price-admin@example.com"))
+    assert user is not None
+    user.is_admin = True
+    db.flush()
+    monkeypatch.setattr(nutrition_router, "configured_providers", lambda _settings, _client: [])
+
+    response = client.post("/api/v1/nutrition/admin/prices/refresh", headers=ORIGIN)
+
+    assert response.status_code == 200
+    assert response.json()["trigger_kind"] == "manual"
+    assert response.json()["status"] == "completed_with_errors"
+    assert "NO_PROVIDERS" in response.json()["failure_codes"]

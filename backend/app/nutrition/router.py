@@ -43,7 +43,7 @@ from app.nutrition.clinical_service import (
     review_queue,
     upload_lab,
 )
-from app.nutrition.enums import NutritionSupplementOrderStatus
+from app.nutrition.enums import NutritionSupplementOrderStatus, PriceUpdateTriggerKind
 from app.nutrition.estimate_service import (
     create_estimate,
     current_estimate,
@@ -81,6 +81,7 @@ from app.nutrition.food_photo_service import (
 from app.nutrition.models import (
     NutritionCatalogueFood,
     NutritionCatalogueMeal,
+    NutritionFoodPriceMapping,
     NutritionFoodPriceReference,
     NutritionFoodPriceReview,
     NutritionFoodPriceUpdateRun,
@@ -113,6 +114,8 @@ from app.nutrition.plan_service import (
     weekly_plan_by_id,
     weekly_plan_history,
 )
+from app.nutrition.price_providers import configured_providers
+from app.nutrition.price_update_service import run_price_update_async
 from app.nutrition.schemas import (
     CatalogueConsumptionInput,
     CatalogueFoodResponse,
@@ -272,14 +275,32 @@ def read_nutrition_monitoring(db: DatabaseSession, admin: AdminUser) -> dict[str
     ai_events = db.scalars(
         select(NutritionOperationalEvent).where(NutritionOperationalEvent.category == "ai")
     ).all()
+    reviews = db.execute(
+        select(NutritionFoodPriceReview, NutritionCatalogueFood.slug)
+        .join(NutritionCatalogueFood, NutritionCatalogueFood.id == NutritionFoodPriceReview.food_id)
+        .order_by(NutritionFoodPriceReview.created_at.desc())
+        .limit(50)
+    ).all()
+    broken_mappings = db.execute(
+        select(NutritionFoodPriceMapping, NutritionCatalogueFood.slug)
+        .join(
+            NutritionCatalogueFood, NutritionCatalogueFood.id == NutritionFoodPriceMapping.food_id
+        )
+        .where(
+            (NutritionFoodPriceMapping.broken_at.is_not(None))
+            | (NutritionFoodPriceMapping.active.is_(False))
+        )
+        .order_by(NutritionFoodPriceMapping.provider_code, NutritionCatalogueFood.slug)
+    ).all()
+    food_count = db.scalar(select(func.count()).select_from(NutritionCatalogueFood)) or 0
+    accepted_reference_count = (
+        db.scalar(select(func.count()).select_from(NutritionFoodPriceReference)) or 0
+    )
     return {
         "counts": {
-            "foods": db.scalar(select(func.count()).select_from(NutritionCatalogueFood)) or 0,
+            "foods": food_count,
             "meals": db.scalar(select(func.count()).select_from(NutritionCatalogueMeal)) or 0,
-            "accepted_price_references": db.scalar(
-                select(func.count()).select_from(NutritionFoodPriceReference)
-            )
-            or 0,
+            "accepted_price_references": accepted_reference_count,
             "price_reviews": db.scalar(select(func.count()).select_from(NutritionFoodPriceReview))
             or 0,
             "supplements": db.scalar(select(func.count()).select_from(NutritionSupplementCatalogue))
@@ -295,6 +316,8 @@ def read_nutrition_monitoring(db: DatabaseSession, admin: AdminUser) -> dict[str
                 "foods_updated": run.foods_updated,
                 "foods_needing_review": run.foods_needing_review,
                 "provider_failures": run.provider_failures,
+                "trigger_kind": run.trigger_kind.value,
+                "failure_codes": run.failure_codes,
             }
             for run in latest_runs
         ],
@@ -304,8 +327,34 @@ def read_nutrition_monitoring(db: DatabaseSession, admin: AdminUser) -> dict[str
                 "enabled": provider.enabled,
                 "last_success_at": provider.last_success_at,
                 "last_error": provider.last_error,
+                "parser_version": provider.parser_version,
             }
             for provider in providers
+        ],
+        "coverage_warning": (
+            "INSUFFICIENT_PRICE_COVERAGE"
+            if food_count and accepted_reference_count < food_count
+            else None
+        ),
+        "price_reviews": [
+            {
+                "id": review.id,
+                "food_slug": food_slug,
+                "reason_codes": review.reason_codes,
+                "candidate_reference_price_toman": review.candidate_reference_price_toman,
+                "created_at": review.created_at,
+            }
+            for review, food_slug in reviews
+        ],
+        "broken_mappings": [
+            {
+                "id": mapping.id,
+                "food_slug": food_slug,
+                "provider_code": mapping.provider_code,
+                "provider_product_id": mapping.provider_product_id,
+                "broken_at": mapping.broken_at,
+            }
+            for mapping, food_slug in broken_mappings
         ],
         "ai_usage": {
             "requests": sum(int(str(event.counters.get("requests", 0))) for event in ai_events),
@@ -317,6 +366,37 @@ def read_nutrition_monitoring(db: DatabaseSession, admin: AdminUser) -> dict[str
                 int(str(event.counters.get("output_tokens", 0))) for event in ai_events
             ),
         },
+    }
+
+
+@router.post(
+    "/admin/prices/refresh",
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def trigger_manual_price_refresh(
+    request: Request,
+    db: DatabaseSession,
+    admin: AdminUser,
+    settings: AppSettings,
+) -> dict[str, object]:
+    del admin
+    run = await run_price_update_async(
+        db,
+        providers=configured_providers(settings, request.app.state.food_price_http_client),
+        retry_attempts=settings.food_price_provider_retries,
+        trigger_kind=PriceUpdateTriggerKind.MANUAL,
+    )
+    return {
+        "id": run.id,
+        "status": run.status.value,
+        "trigger_kind": run.trigger_kind.value,
+        "started_at": run.started_at,
+        "finished_at": run.finished_at,
+        "foods_attempted": run.foods_attempted,
+        "foods_updated": run.foods_updated,
+        "foods_needing_review": run.foods_needing_review,
+        "provider_failures": run.provider_failures,
+        "failure_codes": run.failure_codes,
     }
 
 

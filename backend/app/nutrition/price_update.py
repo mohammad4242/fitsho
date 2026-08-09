@@ -9,14 +9,16 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database.session import get_engine
 from app.nutrition.price_providers import configured_providers
-from app.nutrition.price_update_service import run_price_update
+from app.nutrition.price_update_service import run_price_update_async
 
 
 async def main() -> None:
     settings = get_settings()
-    async with httpx.AsyncClient(timeout=settings.food_price_provider_timeout_seconds, trust_env=False) as client:
+    async with httpx.AsyncClient(
+        timeout=settings.food_price_provider_timeout_seconds, trust_env=False
+    ) as client:
         with Session(get_engine(settings.database_url)) as db:
-            run_price_update(
+            await run_price_update_async(
                 db,
                 providers=configured_providers(settings, client),
                 retry_attempts=settings.food_price_provider_retries,

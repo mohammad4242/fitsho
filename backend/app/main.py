@@ -52,9 +52,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.zen_http_client = zen_client
             app.state.ai_http_client = ai_client
             app.state.food_price_http_client = food_price_client
-            scheduler_task = asyncio.create_task(scheduler_loop(active_settings, food_price_client))
-            background_tasks = [scheduler_task]
+            background_tasks: list[asyncio.Task[None]] = []
             if active_settings.app_env != "test":
+                background_tasks.append(
+                    asyncio.create_task(scheduler_loop(active_settings, food_price_client))
+                )
                 background_tasks.append(
                     asyncio.create_task(retention_scheduler_loop(active_settings))
                 )

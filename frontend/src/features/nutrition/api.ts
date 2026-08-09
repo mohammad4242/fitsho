@@ -246,6 +246,11 @@ export function saveSupplementCatalogue(input: Record<string, unknown>): Promise
 
 export type NutritionMonitoring = {
   counts: { foods: number; meals: number; accepted_price_references: number; price_reviews: number; supplements: number };
-  recent_price_runs: Array<{ id: string; status: string; started_at: string; finished_at: string | null; foods_attempted: number; foods_updated: number; foods_needing_review: number; provider_failures: number }>;
+  recent_price_runs: Array<{ id: string; status: string; trigger_kind: string; started_at: string; finished_at: string | null; foods_attempted: number; foods_updated: number; foods_needing_review: number; provider_failures: number; failure_codes: string[] }>;
+  provider_health: Array<{ code: string; enabled: boolean; last_success_at: string | null; last_error: string | null; parser_version: string | null }>;
+  coverage_warning: string | null;
+  price_reviews: Array<{ id: string; food_slug: string; reason_codes: string[]; candidate_reference_price_toman: string | null; created_at: string }>;
+  broken_mappings: Array<{ id: string; food_slug: string; provider_code: string; provider_product_id: string; broken_at: string | null }>;
 };
 export function getNutritionMonitoring(): Promise<NutritionMonitoring> { return request(`${nutritionPath}/admin/monitoring`); }
+export function triggerNutritionPriceRefresh(): Promise<{ status: string }> { return request(`${nutritionPath}/admin/prices/refresh`, { method: "POST" }); }
