@@ -12,8 +12,9 @@ an authenticated session unless the route is explicitly an admin or physician ro
 - `GET /plans/{id}`, `GET /plans/{id}/shopping-list`
 - Plan meal lock, feedback, remove/replace previews and confirmations, and partial regeneration under
   `/plans/{id}`
-- Tracking check-ins, quick/catalogue entries, day/history views, deletion, adherence, and adaptive
-  preferences under `/tracking`, `/adherence`, and `/adaptive-preferences`
+- Tracking check-ins, quick/catalogue entries, recent foods, exact edits, planned-meal adjustments,
+  day/history views, deletion, adherence, and adaptive preferences under `/tracking`, `/adherence`,
+  and `/adaptive-preferences`
 - Food-photo estimate, confirmation, deletion, access grant, and signed file access under
   `/tracking/photo-estimates`
 - Lab upload/list/delete, access grant, signed file access, and physician requests under `/labs` and
@@ -23,9 +24,15 @@ an authenticated session unless the route is explicitly an admin or physician ro
 
 ## Physician and admin resources
 
-Physician routes expose the review queue, claim, exact plan revision, plan action, lab request, and
-supplement-order creation/transition under `/physician`. The physician role is checked independently
-of administrator status. Admin routes manage canonical foods/meals and supplements.
+Physician routes expose server-side access verification, the review queue, claim, exact plan
+revision, structured food edits, plan action, lab request/review, and supplement-order
+list/create/update/transition under `/physician`. User-visible and internal physician notes are
+separate; internal notes never appear in member plan responses. The physician role is checked
+independently of administrator status. Admin routes manage canonical foods/meals and supplements.
+
+`GET /food-catalogue` returns verified foods only. Accepted member prices include
+`reference_price_irr`, an `IRR_PER_*` unit, source, observation time, and acceptance time. Deprecated
+Toman fields remain temporarily for older clients. Missing fresh prices return `status=not_found`.
 
 Price operations are admin-only:
 

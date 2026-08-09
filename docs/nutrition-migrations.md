@@ -14,6 +14,11 @@ Key migration milestones:
 - `20260809_51`: idempotent repair for legacy databases stamped during a partial Task 12 rollout.
 - `20260809_52`: public-source registry, parser/discovery metadata, immutable accepted/rejected quote
   links, run trigger kind, policy version, and safe failure codes.
+- `20260809_53` to `20260809_54`: Tapsi Shop public-provider registration and anonymous guest parser.
+- `20260809_55`: audited temporary admin price overrides.
+- `20260809_56`: nullable canonical-food references for legacy liked/disliked food rows, with
+  deterministic unique-alias backfill.
+- `20260809_57`: physician/laboratory review metadata and the one-active-Nutrition-plan invariant.
 
 Legacy cooked/grilled food identities are retired rather than deleted. Historical plan, quote,
 review, lab, supplement, and tracking snapshots remain immutable or audit-preserving. Composition and
@@ -28,5 +33,6 @@ uv run alembic heads
 ```
 
 Production deployment should back up PostgreSQL, run the migration as a single release step, verify
-one head, and then start application workers. Migration `20260809_52` is additive: existing quotes,
-references, and history are preserved, and ten public providers are seeded disabled until probed.
+one head, and then start application workers. Migrations through `20260809_57` are additive or
+backward-compatible: existing preferences, quotes, references, plan revisions, and history are
+preserved. Public providers remain disabled until a successful probe/explicit enablement.

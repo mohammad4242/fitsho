@@ -365,7 +365,7 @@ them as hard constraints.
 
 Nutrition and combined onboarding now follow a page-by-page coach flow: shared
 information, early safety screening, the training branch for combined mode,
-budget, cooking conditions, food preferences and exclusions, and confirmation.
+meal structure, budget, food preferences and exclusions, and confirmation.
 Optional free-text and preference questions provide explicit skip controls.
 Under-18 submissions return `AGE_NOT_SUPPORTED`; the established maximum age
 of 100 remains unchanged. Training APIs reject incomplete or nutrition-only
@@ -468,12 +468,30 @@ roles for substantial main proteins, main staples, snacks, and flexible foods.
 
 Structured catalogue meals store exact food grams and validate `MAIN_MEAL` or
 `SNACK` role eligibility before calculating deterministic nutrient totals. The
-initial migration contains a deliberately limited verified seed for cooked
-basmati rice, grilled chicken breast, and plain yogurt, each with documented
-FoodData Central mapping provenance. The import normalizer accepts only
-verified gram/kilogram quantity conversion and rejects duplicate nutrients or
-unsupported units. No price, package, shopping-list, or meal-plan optimisation
-behaviour is included; those remain outside Task 4.
+current Iranian ingredient catalogue stores canonical unprepared food identities;
+prepared dishes remain in a separate table and retired legacy cooked/grilled
+identities stay readable only for history. Each composition row retains its
+documented mapping provenance. The import normalizer accepts only verified
+gram/kilogram quantity conversion and rejects duplicate nutrients or unsupported
+units. Composition and pricing remain separate domains.
+
+## Final conformance record
+
+The completed Nutrition flow uses deterministic estimate, safety, catalogue,
+price, planner, tracking, review, laboratory, and supplement services. A generated
+safe plan is immediately visible but cannot become the adherence baseline before
+exact-revision physician approval. Physician edits create immutable revisions and
+rerun deterministic validation. Review assignment, effective-date activation,
+one-active-plan enforcement, private/user-visible notes, and supplement changes
+are authorization checked and audit preserving.
+
+All member Nutrition routes are product-capability guarded. The physician UI is
+server-role guarded and exposes exact plan data, input/safety snapshot, nutrient
+validation, price/food provenance, structured food edits, laboratory review, and
+structured supplement create/edit/status workflows. Tracking supports recent
+foods, exact edits, planned-meal adjustments, date-range history, and user-confirmed
+photo corrections. Member catalogue money is displayed in IRR; deprecated Toman
+fields remain storage/API compatibility only.
 
 ## Task 14 security boundary
 

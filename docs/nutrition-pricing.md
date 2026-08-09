@@ -62,6 +62,9 @@ Authenticated members whose product mode is `nutrition` or `both` can open `/foo
 Training-only members are excluded in both the React route guard and
 `GET /api/v1/nutrition/food-catalogue`. The view combines verified composition with the latest
 accepted effective price without joining or mutating the underlying nutrition-source records.
+Member responses and cards present exact IRR values and `IRR_PER_KG`, `IRR_PER_LITER`, or
+`IRR_PER_UNIT`, plus source and observation date. Legacy Toman storage/response fields remain only
+for backward compatibility and admin fallback input.
 
 The catalogue always shows energy, protein, carbohydrate, fat, and fibre per 100 g, with the full
 verified nutrient list and provenance available in the detail dialog. When no fresh accepted price

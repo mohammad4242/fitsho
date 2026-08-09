@@ -19,10 +19,13 @@ mandatory physician-review request.
 ## Review lifecycle
 
 A safe generated revision is immediately visible as pending review but is not active, approved, or a
-tracking adherence baseline. Only an authorized physician action on the exact revision can approve
-it. User or physician plan-defining edits create a new immutable revision and invalidate approval for
-that changed revision. Consumption-only tracking does not mutate approval. Historical revisions and
-review audit events are preserved.
+tracking adherence baseline. Only the assigned authorized physician can approve the exact revision.
+An approved due revision activates atomically; a future revision waits for its effective date, and
+activation archives any overlapping previous active baseline. User or physician plan-defining edits
+create a new immutable revision and invalidate or rebind review according to the authorized workflow.
+Consumption-only tracking does not mutate approval. Historical revisions and review audit events are
+preserved. User-visible notes and private physician notes are stored separately; private notes are
+never serialized in member plan responses.
 
 ## Laboratory records
 
@@ -34,8 +37,9 @@ upload alone never silently changes a plan.
 
 ## Physician supplement orders
 
-Only a physician can create or transition an order. Each order is linked to the exact plan, verified
-catalogue ingredient, dose, duration, rationale, dietary gaps and optional lab documents. Food and
-supplement nutrient contributions remain separate. Applicable total-intake and supplemental-only
+Only the assigned physician can create, modify, or transition an order. Each order is linked to the
+exact plan, verified catalogue ingredient, dose, duration, rationale, dietary gaps and optional lab
+documents. Food and supplement nutrient contributions remain separate. Applicable total-intake and
+supplemental-only
 upper-limit scopes are checked before activation. Every transition has a dedicated immutable audit
 snapshot; internal rationale is hidden unless explicitly marked user-visible.

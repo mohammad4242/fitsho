@@ -35,6 +35,9 @@ uv run python -m app.nutrition.retention_cleanup
 Security audit events contain IDs, action, outcome, content type, and byte count only. They never
 contain image bytes, lab contents, user notes, medical free text, credentials, or signed tokens.
 Physician review and supplement workflows retain their dedicated immutable audit records.
+Physician professional notes have separate private and user-visible fields. Member APIs serialize
+only the user-visible field. Supplement modifications and state transitions require the assigned
+physician and append immutable audit snapshots.
 
 ## Operations
 

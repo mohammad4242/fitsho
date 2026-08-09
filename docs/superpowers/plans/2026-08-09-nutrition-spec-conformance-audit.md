@@ -115,7 +115,7 @@
 - Modify: `docs/nutrition-medical-review.md`
 - Modify: `docs/nutrition-security-privacy.md`
 
-- [ ] Recheck every Section 48 task and Section 49 acceptance scenario against executable code/tests.
-- [ ] Run Alembic one-head, current upgrade, and fresh-zero migration checks.
-- [ ] Run full backend tests, ruff, mypy, frontend tests, lint, and build.
-- [ ] Recreate the local backend, verify OpenAPI and frontend routes, review the complete diff, commit, push, and report remaining external-only limitations truthfully.
+- [x] Recheck every Section 48 task and Section 49 acceptance scenario against executable code/tests.
+- [x] Run Alembic one-head, current upgrade, and fresh-zero migration checks.
+- [x] Run full backend tests, ruff, mypy, frontend tests, lint, and build.
+- [x] Recreate the local backend, verify OpenAPI and frontend routes, review the complete diff, commit, push, and report remaining external-only limitations truthfully.
