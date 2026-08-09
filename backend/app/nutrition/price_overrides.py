@@ -12,10 +12,12 @@ from sqlalchemy.orm import Session
 
 from app.nutrition.enums import PriceReferenceStatus
 from app.nutrition.models import (
+    NutritionCatalogueFood,
     NutritionFoodPriceOverride,
     NutritionFoodPriceReference,
     NutritionFoodPriceUpdateRun,
 )
+from app.nutrition.schemas import FoodPriceOverrideInput
 
 DEFAULT_PRICE_MAX_AGE_HOURS = 168
 
@@ -90,12 +92,43 @@ def expire_active_overrides(
     expired_at: datetime,
 ) -> int:
     overrides = db.scalars(
-        select(NutritionFoodPriceOverride).where(
-            NutritionFoodPriceOverride.active.is_(True)
-        )
+        select(NutritionFoodPriceOverride).where(NutritionFoodPriceOverride.active.is_(True))
     ).all()
     for override in overrides:
         override.active = False
         override.expired_at = expired_at
         override.expired_by_run_id = run.id
     return len(overrides)
+
+
+def create_price_override(
+    db: Session,
+    *,
+    food: NutritionCatalogueFood,
+    admin_user_id: UUID,
+    payload: FoodPriceOverrideInput,
+    created_at: datetime | None = None,
+) -> NutritionFoodPriceOverride:
+    timestamp = created_at or datetime.now(UTC)
+    active = db.scalars(
+        select(NutritionFoodPriceOverride).where(
+            NutritionFoodPriceOverride.food_id == food.id,
+            NutritionFoodPriceOverride.active.is_(True),
+        )
+    ).all()
+    for previous in active:
+        previous.active = False
+        previous.expired_at = timestamp
+    override = NutritionFoodPriceOverride(
+        food_id=food.id,
+        reference_price_toman=payload.reference_price_toman,
+        canonical_unit=payload.canonical_unit,
+        reason=payload.reason,
+        created_by_user_id=admin_user_id,
+        created_at=timestamp,
+        active=True,
+    )
+    db.add(override)
+    db.commit()
+    db.refresh(override)
+    return override

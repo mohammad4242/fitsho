@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from hashlib import sha256
 from uuid import UUID
@@ -18,7 +18,6 @@ from app.nutrition.enums import (
     NutritionPlanLifecycleStatus,
     NutritionPlanReviewStatus,
     NutritionTargetMetric,
-    PriceReferenceStatus,
     SafetyOutcome,
     Weekday,
 )
@@ -35,7 +34,6 @@ from app.nutrition.models import (
     NutritionEstimateMicronutrientTarget,
     NutritionEstimateTarget,
     NutritionFoodItem,
-    NutritionFoodPriceReference,
     NutritionPlanGeneration,
     NutritionPlanPhysicianReview,
     NutritionProfile,
@@ -58,6 +56,7 @@ from app.nutrition.planner_policy import (
     PLANNER_POLICY_VERSION,
     PLANNER_VERSION,
 )
+from app.nutrition.price_overrides import effective_prices
 from app.nutrition.schemas import (
     WeeklyPlanDayResponse,
     WeeklyPlanFoodResponse,
@@ -555,16 +554,11 @@ def _planner_foods(
         )
         .order_by(NutritionCatalogueFood.slug)
     ).all()
-    fresh_after = datetime.now(UTC) - timedelta(hours=DEFAULT_POLICY.maximum_price_age_hours)
-    references = {
-        reference.food_id: reference
-        for reference in db.scalars(
-            select(NutritionFoodPriceReference).where(
-                NutritionFoodPriceReference.status == PriceReferenceStatus.ACCEPTED,
-                NutritionFoodPriceReference.accepted_at >= fresh_after,
-            )
-        )
-    }
+    references = effective_prices(
+        db,
+        [food.id for food in foods],
+        maximum_age_hours=DEFAULT_POLICY.maximum_price_age_hours,
+    )
     candidates: list[PlannerFood] = []
     snapshots: list[dict[str, object]] = []
     manifest: list[dict[str, object]] = []
@@ -585,20 +579,21 @@ def _planner_foods(
                     for composition in food.compositions
                 },
                 price_irr_per_gram=price_irr_per_gram,
-                price_reference_id=str(reference.food_id),
+                price_reference_id=reference.reference_id,
                 dietary_patterns=tuple(food.dietary_patterns),
             )
         )
         snapshots.append(
             {
                 "food_id": str(food.id),
-                "reference_id": str(reference.food_id),
+                "reference_id": reference.reference_id,
                 "reference_price_toman": str(reference.reference_price_toman),
                 "canonical_unit": reference.canonical_unit,
                 "price_irr_per_gram": str(price_irr_per_gram),
                 "sample_count": reference.sample_count,
-                "confidence": reference.confidence.value,
+                "confidence": reference.confidence,
                 "accepted_at": reference.accepted_at.isoformat(),
+                "source": reference.source,
                 "freshness_policy_hours": DEFAULT_POLICY.maximum_price_age_hours,
             }
         )

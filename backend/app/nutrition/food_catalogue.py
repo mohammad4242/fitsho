@@ -37,6 +37,10 @@ from app.nutrition.schemas import (
     CatalogueMealWrite,
 )
 
+REQUIRED_PRIMARY_NUTRIENTS = frozenset(
+    {"energy_kcal", "protein_g", "carbohydrate_g", "total_fat_g", "fibre_g"}
+)
+
 
 class FoodImportValidationError(ValueError):
     pass
@@ -148,6 +152,15 @@ def save_catalogue_food(db: Session, payload: CatalogueFoodWrite) -> CatalogueFo
     nutrients = payload.nutrients
     if len({nutrient.nutrient_code for nutrient in nutrients}) != len(nutrients):
         raise ValueError("Nutrient codes must be unique")
+    if payload.verification_status == FoodVerificationStatus.VERIFIED.value:
+        missing_primary = REQUIRED_PRIMARY_NUTRIENTS - {
+            nutrient.nutrient_code for nutrient in nutrients
+        }
+        if missing_primary:
+            raise ValueError(
+                "Verified food requires complete primary nutrients: "
+                + ", ".join(sorted(missing_primary))
+            )
     food = db.scalar(
         select(NutritionCatalogueFood)
         .where(NutritionCatalogueFood.slug == payload.slug)

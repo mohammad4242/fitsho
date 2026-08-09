@@ -1,4 +1,6 @@
 from datetime import date, datetime, time
+from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -308,6 +310,73 @@ class CatalogueFoodWrite(BaseModel):
 
 class CatalogueFoodResponse(CatalogueFoodWrite):
     id: UUID
+
+
+class FoodCataloguePriceResponse(BaseModel):
+    status: Literal["accepted", "not_found"]
+    reference_price_toman: Decimal | None = None
+    canonical_unit: str | None = None
+    accepted_at: datetime | None = None
+    source: Literal["automatic", "manual_override"] | None = None
+
+
+class FoodCatalogueNutrientBasis(BaseModel):
+    quantity: Decimal
+    unit: str
+
+
+class FoodCatalogueSourceResponse(BaseModel):
+    name: str
+    reference: str
+    source_food_id: str | None
+    data_version: str
+    access_date: date | None
+
+
+class FoodCatalogueItemResponse(BaseModel):
+    id: UUID
+    slug: str
+    name_fa: str
+    name_en: str
+    category: str
+    measurement_basis: FoodMeasurementBasis
+    nutrient_basis: FoodCatalogueNutrientBasis
+    price: FoodCataloguePriceResponse
+    macros: dict[str, Decimal | None]
+    nutrients: list[CatalogueNutrientInput]
+    source: FoodCatalogueSourceResponse
+
+
+class FoodCataloguePageResponse(BaseModel):
+    items: list[FoodCatalogueItemResponse]
+    page: int
+    page_size: int
+    total: int
+    categories: list[str]
+
+
+class FoodPriceOverrideInput(BaseModel):
+    reference_price_toman: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
+    canonical_unit: Literal["TOMAN_PER_KG", "TOMAN_PER_LITER", "TOMAN_PER_UNIT"]
+    reason: str = Field(min_length=5, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 5:
+            raise ValueError("Override reason is too short")
+        return normalized
+
+
+class FoodPriceOverrideResponse(BaseModel):
+    id: UUID
+    food_id: UUID
+    reference_price_toman: Decimal
+    canonical_unit: str
+    reason: str
+    source: Literal["manual_override"] = "manual_override"
+    created_at: datetime
 
 
 class CatalogueMealItemInput(BaseModel):

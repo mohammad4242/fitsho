@@ -31,6 +31,7 @@ from app.nutrition.adherence_service import (
     adherence_history,
     confirm_target_update,
 )
+from app.nutrition.catalogue_view import member_food_catalogue
 from app.nutrition.clinical_service import (
     ClinicalError,
     authorize_lab_access,
@@ -114,6 +115,7 @@ from app.nutrition.plan_service import (
     weekly_plan_by_id,
     weekly_plan_history,
 )
+from app.nutrition.price_overrides import create_price_override
 from app.nutrition.price_providers import configured_providers
 from app.nutrition.price_update_service import run_price_update_async
 from app.nutrition.schemas import (
@@ -123,7 +125,10 @@ from app.nutrition.schemas import (
     CatalogueMealResponse,
     CatalogueMealWrite,
     DailyCheckInInput,
+    FoodCataloguePageResponse,
     FoodPhotoConfirmInput,
+    FoodPriceOverrideInput,
+    FoodPriceOverrideResponse,
     MealFeedbackInput,
     MealLockInput,
     NutritionEstimateResponse,
@@ -186,6 +191,8 @@ from app.nutrition.tracking_service import (
     save_quick_approximation,
     submit_check_in,
 )
+from app.profile.enums import ProductMode
+from app.profile.models import UserProfile
 
 router = APIRouter(prefix="/api/v1/nutrition", tags=["nutrition"])
 
@@ -206,6 +213,31 @@ def read_verified_foods(db: DatabaseSession, user: CurrentUser) -> list[Catalogu
     return list_verified_foods(db)
 
 
+@router.get(
+    "/food-catalogue",
+    response_model=FoodCataloguePageResponse,
+    response_model_exclude_none=True,
+)
+def read_member_food_catalogue(
+    db: DatabaseSession,
+    user: CurrentUser,
+    q: str | None = Query(default=None, max_length=160),
+    category: str | None = Query(default=None, max_length=64),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=24, ge=1, le=60),
+) -> FoodCataloguePageResponse:
+    profile = db.get(UserProfile, user.id)
+    if profile is None or profile.product_mode not in {ProductMode.NUTRITION, ProductMode.BOTH}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Nutrition mode required")
+    return member_food_catalogue(
+        db,
+        query=q,
+        category=category,
+        page=page,
+        page_size=page_size,
+    )
+
+
 @router.post(
     "/admin/foods",
     response_model=CatalogueFoodResponse,
@@ -223,6 +255,42 @@ def create_or_update_catalogue_food(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
         ) from None
+
+
+@router.post(
+    "/admin/foods/{slug}/price-override",
+    response_model=FoodPriceOverrideResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def create_food_price_override(
+    slug: str,
+    payload: FoodPriceOverrideInput,
+    db: DatabaseSession,
+    admin: AdminUser,
+) -> FoodPriceOverrideResponse:
+    food = db.scalar(
+        select(NutritionCatalogueFood).where(
+            NutritionCatalogueFood.slug == slug,
+            NutritionCatalogueFood.verification_status == "verified",
+        )
+    )
+    if food is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food not found")
+    override = create_price_override(
+        db,
+        food=food,
+        admin_user_id=admin.id,
+        payload=payload,
+    )
+    return FoodPriceOverrideResponse(
+        id=override.id,
+        food_id=override.food_id,
+        reference_price_toman=override.reference_price_toman,
+        canonical_unit=override.canonical_unit,
+        reason=override.reason,
+        created_at=override.created_at,
+    )
 
 
 @router.post(
