@@ -75,7 +75,7 @@ def run_price_update(
     trigger_kind: PriceUpdateTriggerKind = PriceUpdateTriggerKind.MANUAL,
 ) -> NutritionFoodPriceUpdateRun:
     now = datetime.now(UTC)
-    slot = scheduled_for or update_slot(now)
+    slot = scheduled_for or now
     existing = db.scalar(
         select(NutritionFoodPriceUpdateRun).where(NutritionFoodPriceUpdateRun.scheduled_for == slot)
     )

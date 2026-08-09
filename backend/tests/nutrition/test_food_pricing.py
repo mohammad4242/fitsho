@@ -223,11 +223,20 @@ def test_update_run_is_idempotent_and_preserves_previous_price_on_review(db) -> 
 
 
 def test_scheduler_uses_one_tehran_saturday_slot(test_settings) -> None:
-    from app.nutrition.price_scheduler import is_due, weekly_slot
+    from app.nutrition.price_scheduler import is_due, most_recent_due_slot, weekly_slot
 
     saturday_after_noon = datetime(2026, 8, 8, 9, 30, tzinfo=UTC)  # 13:00 Tehran
     assert is_due(saturday_after_noon, test_settings) is True
     assert weekly_slot(saturday_after_noon, test_settings) == datetime(
+        2026, 8, 8, 8, 30, tzinfo=UTC
+    )
+    assert most_recent_due_slot(datetime(2026, 8, 9, 8, tzinfo=UTC), test_settings) == datetime(
+        2026, 8, 8, 8, 30, tzinfo=UTC
+    )
+    assert most_recent_due_slot(datetime(2026, 8, 8, 7, tzinfo=UTC), test_settings) == datetime(
+        2026, 8, 1, 8, 30, tzinfo=UTC
+    )
+    assert most_recent_due_slot(datetime(2026, 8, 8, 8, 30, tzinfo=UTC), test_settings) == datetime(
         2026, 8, 8, 8, 30, tzinfo=UTC
     )
 
