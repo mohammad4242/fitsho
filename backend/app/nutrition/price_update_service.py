@@ -34,6 +34,7 @@ from app.nutrition.models import (
     NutritionFoodPriceUpdateRun,
     NutritionPriceProvider,
 )
+from app.nutrition.price_overrides import expire_active_overrides
 from app.nutrition.pricing import (
     DEFAULT_PUBLIC_PRICE_POLICY,
     FoodPriceProvider,
@@ -618,6 +619,8 @@ async def run_price_update_async(
         "providers_succeeded": sorted(successful_probes),
         "usable_observations": usable_observation_count,
     }
+    if successful_probes and not failures and usable_observation_count > 0:
+        expire_active_overrides(db, run=run, expired_at=run.finished_at)
     record_operational_event(
         db,
         category="background_job",

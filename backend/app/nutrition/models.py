@@ -889,6 +889,51 @@ class NutritionFoodPriceUpdateRun(Base):
     details: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
 
 
+class NutritionFoodPriceOverride(Base):
+    __tablename__ = "nutrition_food_price_overrides"
+    __table_args__ = (
+        CheckConstraint(
+            "reference_price_toman > 0",
+            name="ck_nutrition_price_override_positive",
+        ),
+        CheckConstraint(
+            "canonical_unit IN ('TOMAN_PER_KG', 'TOMAN_PER_LITER', 'TOMAN_PER_UNIT')",
+            name="ck_nutrition_price_override_unit_values",
+        ),
+        CheckConstraint(
+            "char_length(btrim(reason)) BETWEEN 5 AND 500",
+            name="ck_nutrition_price_override_reason_length",
+        ),
+        Index(
+            "uq_nutrition_active_price_override_food",
+            "food_id",
+            unique=True,
+            postgresql_where="active",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    reference_price_toman: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    canonical_unit: Mapped[str] = mapped_column(String(24), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_by_user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expired_by_run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_food_price_update_runs.id", ondelete="SET NULL"), index=True
+    )
+
+
 class NutritionFoodPriceReview(Base):
     __tablename__ = "nutrition_food_price_reviews"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)

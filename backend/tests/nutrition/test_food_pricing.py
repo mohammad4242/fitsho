@@ -425,12 +425,14 @@ def test_public_price_provider_registry_is_seeded_disabled_until_live_probe(db) 
 
 
 def test_first_public_run_discovers_mappings_and_accepts_three_source_mean(db) -> None:
+    from app.auth.models import User
     from app.nutrition.enums import FoodVerificationStatus, PriceUpdateRunStatus
     from app.nutrition.models import (
         NutritionCatalogueFood,
         NutritionCatalogueFoodAlias,
         NutritionFoodPriceHistory,
         NutritionFoodPriceMapping,
+        NutritionFoodPriceOverride,
         NutritionFoodPriceReference,
         NutritionPriceProvider,
     )
@@ -446,7 +448,8 @@ def test_first_public_run_discovers_mappings_and_accepts_three_source_mean(db) -
         source_reference="test",
         category="grains",
     )
-    db.add(food)
+    admin = User(email="discovery-price-admin@example.com", password_hash="hash", is_admin=True)
+    db.add_all([food, admin])
     db.flush()
     db.add(
         NutritionCatalogueFoodAlias(
@@ -456,6 +459,16 @@ def test_first_public_run_discovers_mappings_and_accepts_three_source_mean(db) -
             language="fa",
         )
     )
+    override = NutritionFoodPriceOverride(
+        food_id=food.id,
+        reference_price_toman=Decimal("245000"),
+        canonical_unit="TOMAN_PER_KG",
+        reason="اصلاح موقت پیش از بروزرسانی بازار",
+        created_by_user_id=admin.id,
+        created_at=datetime(2026, 8, 8, 8, tzinfo=UTC),
+        active=True,
+    )
+    db.add(override)
     db.commit()
 
     class DiscoveryProvider:
@@ -511,6 +524,8 @@ def test_first_public_run_discovers_mappings_and_accepts_three_source_mean(db) -
     assert history is not None
     assert len(history.accepted_quote_ids) == 3
     assert history.rejected_quote_ids == []
+    assert override.active is False
+    assert override.expired_by_run_id == run.id
     assert all(db.get(NutritionPriceProvider, provider.code).enabled for provider in providers)
 
 
