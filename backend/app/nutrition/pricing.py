@@ -26,6 +26,7 @@ class PriceReviewReason(StrEnum):
     AMBIGUOUS_MATCH = "ambiguous_match"
     OUTLIER = "outlier"
     INVALID_VALUE = "invalid_value"
+    INSUFFICIENT_SOURCES = "insufficient_sources"
 
 
 class PriceValidationError(ValueError):
@@ -77,6 +78,18 @@ class ReferencePriceDecision:
     accepted: bool
     sample_count: int
     review_reasons: tuple[PriceReviewReason, ...]
+    outliers: tuple[Decimal, ...] = ()
+
+
+@dataclass(frozen=True)
+class PublicPricePolicy:
+    version: str = "public-price-v2"
+    minimum_distinct_sources: int = 3
+    mad_multiplier: Decimal = Decimal("3.5")
+    maximum_jump_fraction: Decimal = Decimal("0.50")
+
+
+DEFAULT_PUBLIC_PRICE_POLICY = PublicPricePolicy()
 
 
 _UNITS: dict[str, tuple[str, Decimal]] = {
@@ -136,18 +149,40 @@ def classify_freshness(
     return PriceFreshness.UNAVAILABLE
 
 
-def calculate_reference_price(values: list[Decimal]) -> ReferencePriceResult:
+def calculate_reference_price(
+    values: list[Decimal],
+    policy: PublicPricePolicy = DEFAULT_PUBLIC_PRICE_POLICY,
+) -> ReferencePriceResult:
     if not values:
         raise PriceValidationError("No price quotes")
     ordered = sorted(values)
     centre = Decimal(str(median(ordered)))
-    # Median-relative filtering remains stable for the small weekly sample sizes we expect.
-    accepted = tuple(value for value in ordered if value <= centre * Decimal("1.75"))
+    deviations = [abs(value - centre) for value in ordered]
+    mad = Decimal(str(median(deviations)))
+    if mad > 0:
+        accepted = tuple(
+            value for value in ordered if abs(value - centre) <= mad * policy.mad_multiplier
+        )
+    else:
+        lower_half = ordered[: len(ordered) // 2]
+        upper_half = ordered[(len(ordered) + 1) // 2 :]
+        lower_quartile = Decimal(str(median(lower_half))) if lower_half else centre
+        upper_quartile = Decimal(str(median(upper_half))) if upper_half else centre
+        iqr = upper_quartile - lower_quartile
+        accepted = tuple(
+            value
+            for value in ordered
+            if lower_quartile - Decimal("1.5") * iqr
+            <= value
+            <= upper_quartile + Decimal("1.5") * iqr
+        )
     outliers = tuple(value for value in ordered if value not in accepted)
     if not accepted:
         accepted = tuple(ordered)
     return ReferencePriceResult(
-        reference_price=Decimal(str(median(accepted))), accepted_values=accepted, outliers=outliers
+        reference_price=sum(accepted, Decimal()) / Decimal(len(accepted)),
+        accepted_values=accepted,
+        outliers=outliers,
     )
 
 
@@ -155,16 +190,15 @@ def decide_reference_price(
     values: list[Decimal],
     *,
     previous_reference: Decimal | None = None,
-    minimum_samples: int = 2,
-    maximum_jump_fraction: Decimal = Decimal("0.50"),
+    distinct_source_count: int | None = None,
+    policy: PublicPricePolicy = DEFAULT_PUBLIC_PRICE_POLICY,
 ) -> ReferencePriceDecision:
-    result = calculate_reference_price(values)
+    result = calculate_reference_price(values, policy)
     reasons: list[PriceReviewReason] = []
-    if len(result.accepted_values) < minimum_samples:
-        reasons.append(PriceReviewReason.INSUFFICIENT_SAMPLES)
-    if result.outliers:
-        reasons.append(PriceReviewReason.OUTLIER)
-    if previous_reference and abs(result.reference_price - previous_reference) / previous_reference > maximum_jump_fraction:
+    source_count = distinct_source_count if distinct_source_count is not None else len(values)
+    if source_count < policy.minimum_distinct_sources:
+        reasons.append(PriceReviewReason.INSUFFICIENT_SOURCES)
+    if previous_reference and abs(result.reference_price - previous_reference) / previous_reference > policy.maximum_jump_fraction:
         reasons.append(PriceReviewReason.PRICE_JUMP)
     accepted = not reasons
     return ReferencePriceDecision(
@@ -172,6 +206,7 @@ def decide_reference_price(
         accepted=accepted,
         sample_count=len(result.accepted_values),
         review_reasons=tuple(reasons),
+        outliers=result.outliers,
     )
 
 

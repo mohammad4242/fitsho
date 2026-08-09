@@ -71,15 +71,33 @@ def test_classifies_fresh_stale_estimated_and_unavailable() -> None:
     assert classify_freshness(None, now, 24, 168) is PriceFreshness.UNAVAILABLE
 
 
-def test_reference_price_uses_median_after_outlier_rejection() -> None:
+def test_reference_price_uses_mean_after_robust_outlier_rejection() -> None:
     from app.nutrition.pricing import calculate_reference_price
 
     result = calculate_reference_price(
         [Decimal("270000"), Decimal("285000"), Decimal("275000"), Decimal("920000")]
     )
 
-    assert result.reference_price == Decimal("275000")
+    assert result.reference_price == Decimal("276666.6666666666666666666667")
     assert result.outliers == (Decimal("920000"),)
+
+
+def test_reference_requires_three_distinct_sources() -> None:
+    from app.nutrition.pricing import PriceReviewReason, decide_reference_price
+
+    insufficient = decide_reference_price(
+        [Decimal("270000"), Decimal("275000")], distinct_source_count=2
+    )
+    accepted = decide_reference_price(
+        [Decimal("270000"), Decimal("275000"), Decimal("285000"), Decimal("920000")],
+        distinct_source_count=4,
+    )
+
+    assert insufficient.accepted is False
+    assert PriceReviewReason.INSUFFICIENT_SOURCES in insufficient.review_reasons
+    assert accepted.accepted is True
+    assert accepted.reference_price == Decimal("276666.6666666666666666666667")
+    assert accepted.outliers == (Decimal("920000"),)
 
 
 def test_large_change_requires_review_and_preserves_previous_price() -> None:
@@ -94,13 +112,13 @@ def test_large_change_requires_review_and_preserves_previous_price() -> None:
     assert decision.reference_price == Decimal("270000")
 
 
-def test_insufficient_samples_requires_review() -> None:
+def test_insufficient_sources_requires_review() -> None:
     from app.nutrition.pricing import PriceReviewReason, decide_reference_price
 
     decision = decide_reference_price([Decimal("270000")])
 
     assert decision.accepted is False
-    assert PriceReviewReason.INSUFFICIENT_SAMPLES in decision.review_reasons
+    assert PriceReviewReason.INSUFFICIENT_SOURCES in decision.review_reasons
 
 
 def test_retries_rate_limited_provider_without_fabricating_quote() -> None:
@@ -135,26 +153,51 @@ def test_update_run_is_idempotent_and_preserves_previous_price_on_review(db) -> 
         slug="price-test-chicken-breast", name_fa="سینه مرغ", name_en="Chicken breast",
         verification_status=FoodVerificationStatus.VERIFIED, source_name="test", source_reference="test",
     )
-    provider = NutritionPriceProvider(code="provider-a", kind=PriceProviderKind.PUBLIC_CATALOG, name="Provider A", enabled=True)
-    db.add_all([food, provider])
+    providers = [
+        NutritionPriceProvider(
+            code=f"provider-{suffix}",
+            kind=PriceProviderKind.PUBLIC_CATALOG,
+            name=f"Provider {suffix.upper()}",
+            enabled=True,
+        )
+        for suffix in ("a", "b", "c")
+    ]
+    db.add_all([food, *providers])
     db.flush()
-    db.add_all([
-        NutritionFoodPriceMapping(food_id=food.id, provider_code=provider.code, provider_product_id="sku-1"),
-        NutritionFoodPriceMapping(food_id=food.id, provider_code=provider.code, provider_product_id="sku-2"),
-    ])
+    db.add_all(
+        [
+            NutritionFoodPriceMapping(
+                food_id=food.id,
+                provider_code=provider.code,
+                provider_product_id=f"sku-{index}",
+            )
+            for index, provider in enumerate(providers, start=1)
+        ]
+    )
     db.commit()
 
     class Provider:
-        code = "provider-a"
+        def __init__(self, code: str, product_id: str, price: str) -> None:
+            self.code = code
+            self.product_id = product_id
+            self.price = price
 
         async def get_quotes(self, _ids):
             return [
-                observation(provider_code=self.code),
-                observation(provider_code=self.code, provider_product_id="sku-2", normal_price=Decimal("250000")),
+                observation(
+                    provider_code=self.code,
+                    provider_product_id=self.product_id,
+                    normal_price=Decimal(self.price),
+                ),
             ]
 
-    first = run_price_update(db, providers=[Provider()], scheduled_for=datetime(2026, 8, 8, 9, tzinfo=UTC))
-    same = run_price_update(db, providers=[Provider()], scheduled_for=datetime(2026, 8, 8, 9, tzinfo=UTC))
+    provider_adapters = [
+        Provider("provider-a", "sku-1", "243000"),
+        Provider("provider-b", "sku-2", "250000"),
+        Provider("provider-c", "sku-3", "247000"),
+    ]
+    first = run_price_update(db, providers=provider_adapters, scheduled_for=datetime(2026, 8, 8, 9, tzinfo=UTC))
+    same = run_price_update(db, providers=provider_adapters, scheduled_for=datetime(2026, 8, 8, 9, tzinfo=UTC))
 
     assert same.id == first.id
     assert first.foods_updated == 1
