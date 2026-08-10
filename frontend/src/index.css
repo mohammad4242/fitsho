@@ -44,10 +44,25 @@ html[lang="en"] .fitsho-display {
   box-sizing: border-box;
 }
 
+html {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 body {
   margin: 0;
+  width: 100%;
+  max-width: 100%;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: clip;
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 button,
@@ -137,11 +152,22 @@ a:focus-visible {
 }
 
 .app-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 100svh;
 }
 
 .app-shell__content {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 100svh;
+}
+
+.app-shell__content > * {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .app-shell__nav {
@@ -782,17 +808,20 @@ html[dir="ltr"] .primary-button span:last-child {
 
 @media (max-width: 620px) {
   .app-shell__content {
-    padding-block-end: 5.8rem;
+    padding-block-end: calc(5.8rem + env(safe-area-inset-bottom));
   }
 
   .app-shell__nav {
     position: fixed;
     z-index: 10;
     inset: auto 0 0;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(3.5rem, 1fr));
     gap: 0.2rem;
-    padding: 0.55rem max(0.8rem, env(safe-area-inset-right)) calc(0.55rem + env(safe-area-inset-bottom)) max(0.8rem, env(safe-area-inset-left));
+    padding: 0.55rem max(0.4rem, env(safe-area-inset-right)) calc(0.55rem + env(safe-area-inset-bottom)) max(0.4rem, env(safe-area-inset-left));
     border-top: 1px solid rgb(80 223 206 / 18%);
     background: rgb(10 31 30 / 93%);
     box-shadow: 0 -1rem 2.5rem rgb(10 31 30 / 20%);
@@ -800,15 +829,24 @@ html[dir="ltr"] .primary-button span:last-child {
   }
 
   .app-shell__nav-link {
+    min-width: 0;
     min-height: 3.7rem;
     display: grid;
     place-items: center;
     gap: 0.18rem;
+    padding: 0.3rem 0.15rem;
     border-radius: 1rem;
     color: rgb(234 244 241 / 62%);
     font-size: 0.68rem;
     font-weight: 750;
     transition: color 180ms ease, background 180ms ease;
+  }
+
+  .app-shell__nav-link > span:last-child {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .app-shell__nav-link--active {
@@ -885,22 +923,84 @@ html[dir="ltr"] .primary-button span:last-child {
     content: "";
   }
 
+  .app-shell__more {
+    position: relative;
+    min-width: 0;
+    display: grid;
+  }
+
+  .app-shell__more-button {
+    width: 100%;
+    border: 0;
+    color: rgb(234 244 241 / 62%);
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .app-shell__more-button[aria-expanded="true"] {
+    color: var(--fitsho-aqua);
+    background: rgb(80 223 206 / 12%);
+  }
+
+  .app-shell__nav-icon--more {
+    width: 1.45rem;
+    border: 0;
+  }
+
+  .app-shell__nav-icon--more::after {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 0.28rem;
+    height: 0.28rem;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: -0.48rem 0 currentColor, 0.48rem 0 currentColor;
+    transform: translate(-50%, -50%);
+    content: "";
+  }
+
+  .app-shell__more-menu {
+    position: absolute;
+    z-index: 1;
+    inset: auto 0 calc(100% + 0.75rem) auto;
+    width: min(17rem, calc(100vw - 1.6rem));
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.55rem;
+    border: 1px solid rgb(80 223 206 / 20%);
+    border-radius: 1rem;
+    background: rgb(10 31 30 / 98%);
+    box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 32%);
+  }
+
+  .app-shell__more-menu .app-shell__nav-link {
+    min-height: 3rem;
+    display: flex;
+    justify-content: flex-start;
+    gap: 0.7rem;
+    padding-inline: 0.8rem;
+  }
+
   .dashboard-shell {
     padding-inline: 0.8rem;
   }
 
   .dashboard-header {
-    align-items: flex-start;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
   }
 
   .dashboard-header__actions {
-    align-items: flex-end;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
   }
 
+  .authenticated-nav,
   .dashboard-header .language-switcher,
-  .logout-button {
-    min-height: 2.4rem;
+  .dashboard-header .logout-button {
+    display: none;
   }
 
   .dashboard-grid {
@@ -938,6 +1038,8 @@ html[dir="ltr"] .primary-button span:last-child {
   position: absolute;
   z-index: 0;
   inset: 0;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   pointer-events: none;
 }
@@ -959,8 +1061,14 @@ html[dir="ltr"] .primary-button span:last-child {
   position: fixed;
   z-index: 0;
   inset: 0;
-  width: 100vw;
+  width: 100%;
   height: 100svh;
+}
+
+@supports (height: 100dvh) {
+  .member-page-background {
+    height: 100dvh;
+  }
 }
 
 .member-page-background .member-header-media__asset {
