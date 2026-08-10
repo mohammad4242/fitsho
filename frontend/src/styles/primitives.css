@@ -129,11 +129,36 @@
 .fitsho-status--danger { border-inline-start-color: var(--fitsho-coral); }
 .fitsho-status--success { border-inline-start-color: var(--fitsho-success); }
 
+.route-loading {
+  min-height: 50vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--fitsho-space-3);
+  color: var(--fitsho-muted);
+  background: var(--fitsho-canvas);
+}
+
+.route-loading__indicator {
+  width: 2rem;
+  aspect-ratio: 1;
+  border: 0.2rem solid var(--fitsho-line-strong);
+  border-block-start-color: var(--fitsho-aqua);
+  border-radius: 50%;
+  animation: route-loading-spin 700ms linear infinite;
+}
+
+@keyframes route-loading-spin {
+  to { transform: rotate(1turn); }
+}
+
 @media (max-width: 620px) {
   .fitsho-container { width: min(calc(100% - 1.5rem), var(--fitsho-content)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .route-loading__indicator { animation: none; }
+
   .fitsho-button,
   .fitsho-button-secondary {
     transition: none;

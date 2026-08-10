@@ -195,6 +195,13 @@ it("redirects a guest away from the protected dashboard", async () => {
   ).toBeInTheDocument();
 });
 
+it("shows an accessible loading state while a route chunk loads", async () => {
+  renderRoute("/");
+
+  expect(screen.getByRole("status")).toHaveTextContent("در حال آماده‌سازی فیتشو…");
+  expect(await screen.findByRole("heading", { name: "هر بدن، برنامه خودش را می‌خواهد." })).toBeInTheDocument();
+});
+
 it("shows the public landing to a guest at the root route", () => {
   renderRoute("/");
 
