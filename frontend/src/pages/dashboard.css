@@ -1,11 +1,16 @@
 .today-shell {
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 100svh;
   color: var(--fitsho-mist);
   background: var(--fitsho-petrol);
 }
 
 .today-shell > :not(.member-page-background) {
+  max-width: 100%;
+  min-width: 0;
   position: relative;
   z-index: 1;
 }
@@ -36,6 +41,7 @@
 .today-hero__content {
   position: relative;
   z-index: 1;
+  min-width: 0;
   width: min(100% - 2rem, 82rem);
   margin: 0 auto;
   padding: clamp(4rem, 10vw, 9rem) 0 clamp(3rem, 7vw, 6rem);
@@ -98,11 +104,23 @@
 .today-story__chapters { position: absolute; inset: 0; width: min(100% - 2rem, 82rem); margin: 0 auto; }
 
 .today-story__chapter {
+  min-width: 0;
   min-height: 80svh;
   display: grid;
   grid-template-columns: 3rem minmax(0, 1fr);
   align-content: center;
   gap: clamp(1rem, 5vw, 5rem);
+}
+
+.today-story__chapter > div,
+.today-actions__card {
+  min-width: 0;
+}
+
+.today-hero h1,
+.today-story__chapter h2,
+.today-actions__card h2 {
+  overflow-wrap: anywhere;
 }
 
 .today-story__chapter > span { color: var(--fitsho-coral); font-family: "Sora Variable", sans-serif; font-size: 0.8rem; font-weight: 800; }
@@ -140,8 +158,6 @@
 
 @media (max-width: 620px) {
   .today-shell .dashboard-header { padding: 1rem; }
-  .today-shell .authenticated-nav,
-  .today-shell .logout-button { display: none; }
   .today-hero { min-height: calc(100svh - 4rem); }
   .today-hero h1 { font-size: clamp(4rem, 20vw, 6rem); }
   .today-hero__hint { display: none; }
