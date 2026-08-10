@@ -228,6 +228,7 @@ it("opens the dashboard after sign-in and keeps profile completion in the accoun
   await user.click(screen.getByRole("button", { name: "باز کردن منوی حساب" }));
 
   const accountMenu = screen.getByRole("navigation", { name: "منوی حساب" });
+  expect(accountMenu.closest("header")).toHaveClass("dashboard-header--menu-open");
   const productGroup = within(accountMenu).getByRole("group", { name: "محصول" });
   const accountGroup = within(accountMenu).getByRole("group", { name: "حساب" });
   const socialGroup = within(accountMenu).getByRole("group", { name: "شبکه‌های اجتماعی" });

@@ -25,6 +25,11 @@
 
 .member-menu-wrap { position: relative; }
 
+.dashboard-header--menu-open {
+  position: relative;
+  z-index: 50;
+}
+
 .member-menu-button {
   width: 2.65rem;
   height: 2.65rem;
@@ -42,7 +47,7 @@
 
 .member-menu {
   position: absolute;
-  z-index: 10;
+  z-index: 60;
   inset-block-start: calc(100% + 0.65rem);
   inset-inline-end: 0;
   width: min(22rem, calc(100vw - 2rem));
@@ -132,5 +137,15 @@
   .dashboard-header__actions { gap: 0.45rem; }
   .authenticated-nav { order: 2; }
   .authenticated-nav a { padding-inline: 0.65rem; }
-  .member-menu { width: min(22rem, calc(100vw - 1.6rem)); }
+  .member-menu {
+    position: fixed;
+    inset-block-start: calc(4.75rem + env(safe-area-inset-top));
+    inset-block-end: auto;
+    inset-inline: auto;
+    left: max(0.8rem, env(safe-area-inset-left));
+    right: max(0.8rem, env(safe-area-inset-right));
+    width: auto;
+    max-height: calc(100svh - 6rem - env(safe-area-inset-top));
+    overscroll-behavior: contain;
+  }
 }

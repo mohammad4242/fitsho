@@ -566,6 +566,10 @@ html[dir="ltr"] .exercise-card__link span {
   z-index: 1;
 }
 
+.exercise-catalog-shell > .dashboard-header--menu-open {
+  z-index: 50;
+}
+
 .exercise-catalog-hero {
   background: rgb(10 31 30 / 52%);
   backdrop-filter: blur(8px);
@@ -1024,19 +1028,3 @@ html[dir="rtl"] .catalog-dashboard-card__copy h2 {
 .exercise-detail-media video { border-radius: 1rem; }
 .exercise-instructions,
 .exercise-safety { border-radius: 1.25rem; }
-
-.exercise-catalog-shell {
-  position: relative;
-  isolation: isolate;
-  background: transparent;
-}
-
-.exercise-catalog-shell > :not(.member-page-background) {
-  position: relative;
-  z-index: 1;
-}
-
-.exercise-catalog-hero {
-  background: rgb(10 31 30 / 52%);
-  backdrop-filter: blur(8px);
-}

@@ -114,7 +114,7 @@ export function AuthenticatedHeader() {
 
   return (
     <>
-      <header className="dashboard-header">
+      <header className={`dashboard-header${menuOpen ? " dashboard-header--menu-open" : ""}`}>
         <Link className="brand-mark brand-mark--dark" to="/dashboard">
           <span className="brand-mark__pulse" aria-hidden="true" />
           {t("common.brand")}
