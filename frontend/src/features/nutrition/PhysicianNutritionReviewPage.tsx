@@ -8,6 +8,7 @@ import type { WeeklyPlan } from "./types";
 import "./nutritionEstimate.css";
 
 type Review = Awaited<ReturnType<typeof api.listPhysicianReviews>>[number];
+type QueueView = api.PhysicianQueueView;
 
 const emptyOrder = {
   supplementId: "",
@@ -26,6 +27,9 @@ export function PhysicianNutritionReviewPage() {
   const l = (persian: string, english: string) => fa ? persian : english;
   const navigate = useNavigate();
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [queues, setQueues] = useState<Record<QueueView, Review[]>>({ pending: [], claimed: [], approved: [] });
+  const [activeView, setActiveView] = useState<QueueView>("pending");
+  const [readOnly, setReadOnly] = useState(false);
   const [error, setError] = useState(false);
   const [supplementCatalogue, setSupplementCatalogue] = useState<Awaited<ReturnType<typeof api.listSupplementCatalogue>>>([]);
   const [foodCatalogue, setFoodCatalogue] = useState<api.CatalogueFood[]>([]);
@@ -39,12 +43,23 @@ export function PhysicianNutritionReviewPage() {
   const [orderForm, setOrderForm] = useState(emptyOrder);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
-  const load = () => api.listPhysicianReviews()
-    .then((items) => { setReviews(items); setError(false); })
+  const load = (view: QueueView = activeView) => api.listPhysicianReviews(view)
+    .then((items) => { setReviews(items); setQueues((current) => ({ ...current, [view]: items })); setError(false); })
     .catch(() => setError(true))
     .finally(() => setLoading(false));
 
-  useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    void Promise.all(([
+      "pending", "claimed", "approved",
+    ] as QueueView[]).map((view) => api.listPhysicianReviews(view)))
+      .then(([pending, claimed, approved]) => {
+        setQueues({ pending, claimed, approved });
+        setReviews(pending);
+        setError(false);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, []);
   useEffect(() => {
     void Promise.all([api.listSupplementCatalogue(), api.listCatalogueFoods()])
       .then(([supplements, foods]) => {
@@ -57,7 +72,7 @@ export function PhysicianNutritionReviewPage() {
   async function claimAndOpen(review: Review) {
     setError(false);
     try {
-      await api.claimPhysicianReview(review.review_id);
+      if (activeView === "pending") await api.claimPhysicianReview(review.review_id);
       const [plan, documents, planOrders] = await Promise.all([
         api.getPhysicianPlan(review.plan_id),
         api.listPhysicianLabs(review.plan_id),
@@ -66,7 +81,8 @@ export function PhysicianNutritionReviewPage() {
       setSelectedPlan(plan);
       setLabs(documents);
       setOrders(planOrders);
-      await load();
+      setReadOnly(activeView === "approved");
+      await load(activeView);
     } catch { setError(true); }
   }
 
@@ -79,7 +95,7 @@ export function PhysicianNutritionReviewPage() {
         notes.trim() || null,
         internalNotes.trim() || null,
       ));
-      await load();
+      await load(activeView);
     } catch { setError(true); }
   }
 
@@ -143,23 +159,30 @@ export function PhysicianNutritionReviewPage() {
     </section>
     {loading && <p role="status">{l("در حال دریافت صف بررسی…", "Loading review queue…")}</p>}
     {error && <p role="alert">{l("عملیات پزشک انجام نشد.", "The physician operation failed.")}</p>}
-    {!loading && reviews.length === 0 && <p>{l("پرونده‌ای در صف نیست.", "The queue is empty.")}</p>}
-    <section className="nutrition-target-grid">{reviews.map((review) => <article className="nutrition-target-card" key={review.review_id}><strong>{review.status}</strong><small>{review.plan_id}</small>{review.overdue && <span>{l("گذشته از موعد", "Overdue")}</span>}<button className="primary-button" onClick={() => void claimAndOpen(review)}>{l("ثبت مسئولیت و مشاهده نسخه", "Claim and view revision")}</button></article>)}</section>
+    <section className="physician-queue-tabs" role="tablist" aria-label={l("صف‌های پزشک", "Physician queues")}>
+      {(["pending", "claimed", "approved"] as QueueView[]).map((view) => (
+        <button key={view} type="button" role="tab" aria-selected={activeView === view} onClick={() => { setActiveView(view); setReviews(queues[view]); setSelectedPlan(null); setReadOnly(view === "approved"); }}>
+          {view === "pending" ? l("در انتظار بررسی", "Pending") : view === "claimed" ? l("در حال بررسی", "Claimed") : l("تأییدشده", "Approved")} ({queues[view].length})
+        </button>
+      ))}
+    </section>
+    {!loading && reviews.length === 0 && <p>{l("پرونده‌ای در این صف نیست.", "This queue is empty.")}</p>}
+    <section className="nutrition-target-grid">{reviews.map((review) => <article className="nutrition-target-card" key={review.review_id}><strong>{review.member_display_name ?? l("کاربر", "Member")}</strong><small>{review.status} · {review.plan_id}</small>{review.overdue && <span>{l("گذشته از موعد", "Overdue")}</span>}<button className="primary-button" onClick={() => void claimAndOpen(review)}>{activeView === "pending" ? l("ثبت مسئولیت و مشاهده نسخه", "Claim and view revision") : l("مشاهده نسخه", "View revision")}</button></article>)}</section>
     {selectedPlan && <section className="nutrition-estimate-notes">
       <h2>{l("نسخه در حال بررسی", "Revision under review")} {selectedPlan.revision}</h2>
       <p>{l("هزینه هفتگی", "Weekly cost")}: {selectedPlan.weekly_cost_irr.toLocaleString()} IRR · {selectedPlan.days.length} {l("روز", "days")}</p>
       <details><summary>{l("پروفایل، ایمنی، بودجه و منشأ داده", "Profile, safety, budget, and provenance")}</summary><pre>{JSON.stringify({ input_snapshot: selectedPlan.input_snapshot, budget: selectedPlan.budget_status, price_snapshot: selectedPlan.price_snapshot, food_data_manifest: selectedPlan.food_data_manifest }, null, 2)}</pre></details>
       <section><h3>{l("وضعیت مواد مغذی", "Nutrient validation")}</h3>{Object.values(selectedPlan.nutrients).map((nutrient) => <p key={nutrient.nutrient_code}>{nutrient.nutrient_code}: {nutrient.planned} {nutrient.unit} · {nutrient.status}</p>)}</section>
-      <div className="physician-plan-days">{selectedPlan.days.map((day) => <article key={day.plan_date}><strong>{day.plan_date}</strong>{day.meals.map((meal) => <div key={meal.id}>{meal.foods.map((food) => <p key={food.food_id}><span>{fa ? food.name_fa : food.name_en}</span><input aria-label={l(`مقدار ${food.name_fa}`, `${food.name_en} quantity`)} type="number" min="1" max="5000" defaultValue={food.grams} onBlur={(event) => { const grams = Number(event.target.value); if (grams !== food.grams) void api.adjustPhysicianFoodQuantity(selectedPlan.id, meal.id, food.food_id, grams).then(setSelectedPlan).catch(() => setError(true)); }} /><select aria-label={l(`جایگزین ${food.name_fa}`, `Replace ${food.name_en}`)} value={food.food_id} onChange={(event) => { if (event.target.value !== food.food_id) void api.replacePhysicianFood(selectedPlan.id, meal.id, food.food_id, event.target.value).then(setSelectedPlan).catch(() => setError(true)); }}><option value={food.food_id}>{fa ? food.name_fa : food.name_en}</option>{foodCatalogue.filter((candidate) => candidate.id !== food.food_id).map((candidate) => <option key={candidate.id} value={candidate.id}>{fa ? candidate.name_fa : candidate.name_en}</option>)}</select></p>)}</div>)}</article>)}</div>
-      <label>{l("یادداشت قابل مشاهده برای کاربر", "User-visible note")}<textarea value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
-      <label>{l("یادداشت محرمانه پزشک", "Private physician note")}<textarea value={internalNotes} onChange={(event) => setInternalNotes(event.target.value)} /></label>
-      <div className="weekly-plan__meal-actions"><button onClick={() => void act("approve")}>{l("تأیید این نسخه", "Approve this revision")}</button><button disabled={!notes.trim()} onClick={() => void act("request_changes")}>{l("درخواست تغییر", "Request changes")}</button><button disabled={!notes.trim()} onClick={() => void act("reject")}>{l("رد", "Reject")}</button></div>
-      <section><h3>{l("آزمایش‌های کاربر", "Member lab documents")}</h3>{labs.length === 0 ? <p>{l("آزمایشی ثبت نشده است.", "No lab documents are available.")}</p> : labs.map((lab) => <article key={lab.id}><strong>{lab.original_filename}</strong><span>{lab.review_status}</span><button onClick={() => void api.reviewPhysicianLab(lab.id, "reviewed", notes || null).then((updated) => setLabs((items) => items.map((item) => item.id === updated.id ? updated : item)))}>{l("ثبت بررسی", "Mark reviewed")}</button></article>)}</section>
-      <label>{l("آزمایش‌های درخواستی", "Requested tests")}<input value={tests} onChange={(event) => setTests(event.target.value)} /></label>
-      <button onClick={() => void api.requestPhysicianLabs(selectedPlan.id, tests.split(",").map((item) => item.trim()).filter(Boolean), notes || l("برای بررسی ایمن‌تر برنامه", "For a safer plan review"))}>{l("درخواست آزمایش", "Request labs")}</button>
+      <div className="physician-plan-days">{selectedPlan.days.map((day) => <article key={day.plan_date}><strong>{day.plan_date}</strong>{day.meals.map((meal) => <div key={meal.id}>{meal.foods.map((food) => <p key={food.food_id}><span>{fa ? food.name_fa : food.name_en}</span><input disabled={readOnly} aria-label={l(`مقدار ${food.name_fa}`, `${food.name_en} quantity`)} type="number" min="1" max="5000" defaultValue={food.grams} onBlur={(event) => { const grams = Number(event.target.value); if (!readOnly && grams !== food.grams) void api.adjustPhysicianFoodQuantity(selectedPlan.id, meal.id, food.food_id, grams).then(setSelectedPlan).catch(() => setError(true)); }} /><select disabled={readOnly} aria-label={l(`جایگزین ${food.name_fa}`, `Replace ${food.name_en}`)} value={food.food_id} onChange={(event) => { if (!readOnly && event.target.value !== food.food_id) void api.replacePhysicianFood(selectedPlan.id, meal.id, food.food_id, event.target.value).then(setSelectedPlan).catch(() => setError(true)); }}><option value={food.food_id}>{fa ? food.name_fa : food.name_en}</option>{foodCatalogue.filter((candidate) => candidate.id !== food.food_id).map((candidate) => <option key={candidate.id} value={candidate.id}>{fa ? candidate.name_fa : candidate.name_en}</option>)}</select></p>)}</div>)}</article>)}</div>
+      <label>{l("یادداشت قابل مشاهده برای کاربر", "User-visible note")}<textarea disabled={readOnly} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
+      <label>{l("یادداشت محرمانه پزشک", "Private physician note")}<textarea disabled={readOnly} value={internalNotes} onChange={(event) => setInternalNotes(event.target.value)} /></label>
+      {!readOnly && <div className="weekly-plan__meal-actions"><button onClick={() => void act("approve")}>{l("تأیید این نسخه", "Approve this revision")}</button><button disabled={!notes.trim()} onClick={() => void act("request_changes")}>{l("درخواست تغییر", "Request changes")}</button><button disabled={!notes.trim()} onClick={() => void act("reject")}>{l("رد", "Reject")}</button></div>}
+      <section><h3>{l("آزمایش‌های کاربر", "Member lab documents")}</h3>{labs.length === 0 ? <p>{l("آزمایشی ثبت نشده است.", "No lab documents are available.")}</p> : labs.map((lab) => <article key={lab.id}><strong>{lab.original_filename}</strong><span>{lab.review_status}</span>{!readOnly && <button onClick={() => void api.reviewPhysicianLab(lab.id, "reviewed", notes || null).then((updated) => setLabs((items) => items.map((item) => item.id === updated.id ? updated : item)))}>{l("ثبت بررسی", "Mark reviewed")}</button>}</article>)}</section>
+      <label>{l("آزمایش‌های درخواستی", "Requested tests")}<input disabled={readOnly} value={tests} onChange={(event) => setTests(event.target.value)} /></label>
+      {!readOnly && <button onClick={() => void api.requestPhysicianLabs(selectedPlan.id, tests.split(",").map((item) => item.trim()).filter(Boolean), notes || l("برای بررسی ایمن‌تر برنامه", "For a safer plan review"))}>{l("درخواست آزمایش", "Request labs")}</button>}
       <hr />
-      <section><h3>{l("دستورهای مکمل", "Supplement orders")}</h3>{orders.length === 0 ? <p>{l("دستوری ثبت نشده است.", "No order has been recorded.")}</p> : orders.map((order) => <article key={order.id}><strong>{order.name}</strong><span>{order.dose_amount} {order.dose_unit} · {order.frequency} · {order.status}</span>{["prescribed", "active"].includes(order.status) && <button onClick={() => editOrder(order)}>{l("ویرایش", "Edit")}</button>}{order.status === "prescribed" && <><button onClick={() => void transitionOrder(order.id, "active")}>{l("فعال‌سازی", "Activate")}</button><button onClick={() => void transitionOrder(order.id, "cancelled")}>{l("لغو", "Cancel")}</button></>}{order.status === "active" && <><button onClick={() => void transitionOrder(order.id, "completed")}>{l("تکمیل", "Complete")}</button><button onClick={() => void transitionOrder(order.id, "discontinued")}>{l("قطع", "Discontinue")}</button></>}</article>)}</section>
-      <div className="food-admin-form">
+      <section><h3>{l("دستورهای مکمل", "Supplement orders")}</h3>{orders.length === 0 ? <p>{l("دستوری ثبت نشده است.", "No order has been recorded.")}</p> : orders.map((order) => <article key={order.id}><strong>{order.name}</strong><span>{order.dose_amount} {order.dose_unit} · {order.frequency} · {order.status}</span>{!readOnly && ["prescribed", "active"].includes(order.status) && <button onClick={() => editOrder(order)}>{l("ویرایش", "Edit")}</button>}{!readOnly && order.status === "prescribed" && <><button onClick={() => void transitionOrder(order.id, "active")}>{l("فعال‌سازی", "Activate")}</button><button onClick={() => void transitionOrder(order.id, "cancelled")}>{l("لغو", "Cancel")}</button></>}{!readOnly && order.status === "active" && <><button onClick={() => void transitionOrder(order.id, "completed")}>{l("تکمیل", "Complete")}</button><button onClick={() => void transitionOrder(order.id, "discontinued")}>{l("قطع", "Discontinue")}</button></>}</article>)}</section>
+      <fieldset disabled={readOnly} className="food-admin-form">
         <label>{l("مکمل", "Supplement")}<select value={orderForm.supplementId} onChange={(event) => setOrderForm((value) => ({ ...value, supplementId: event.target.value }))}><option value="">{l("انتخاب مکمل", "Select supplement")}</option>{supplementCatalogue.map((item) => <option value={item.id} key={item.id}>{fa ? item.name_fa : item.name_en}</option>)}</select></label>
         <label>{l("مقدار دوز", "Dose amount")}<input type="number" min="0.01" value={orderForm.doseAmount} onChange={(event) => setOrderForm((value) => ({ ...value, doseAmount: event.target.value }))} /></label>
         <label>{l("واحد دوز", "Dose unit")}<input value={orderForm.doseUnit} onChange={(event) => setOrderForm((value) => ({ ...value, doseUnit: event.target.value }))} /></label>
@@ -168,8 +191,8 @@ export function PhysicianNutritionReviewPage() {
         <label>{l("مدت به روز", "Duration in days")}<input type="number" min="1" value={orderForm.durationDays} onChange={(event) => setOrderForm((value) => ({ ...value, durationDays: event.target.value }))} /></label>
         <label>{l("دستور مصرف", "Instructions")}<textarea value={orderForm.instructions} onChange={(event) => setOrderForm((value) => ({ ...value, instructions: event.target.value }))} /></label>
         <label>{l("دلیل بالینی", "Clinical rationale")}<textarea value={orderForm.rationale} onChange={(event) => setOrderForm((value) => ({ ...value, rationale: event.target.value }))} /></label>
-        <button disabled={!orderPayload()} onClick={() => void saveOrder()}>{editingOrderId ? l("ذخیره ویرایش", "Save changes") : l("ثبت دستور مکمل", "Prescribe supplement")}</button>
-      </div>
+        {!readOnly && <button disabled={!orderPayload()} onClick={() => void saveOrder()}>{editingOrderId ? l("ذخیره ویرایش", "Save changes") : l("ثبت دستور مکمل", "Prescribe supplement")}</button>}
+      </fieldset>
     </section>}
   </main>;
 }

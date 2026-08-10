@@ -319,8 +319,23 @@ export function listLabRequests(): Promise<Array<{ id: string; plan_id: string; 
   return request(`${nutritionPath}/lab-requests`);
 }
 
-export function listPhysicianReviews(): Promise<Array<{ review_id: string; plan_id: string; status: string; priority: number; overdue: boolean }>> {
-  return request(`${nutritionPath}/physician/reviews`);
+export type PhysicianQueueView = "pending" | "claimed" | "approved";
+export type PhysicianReviewQueueItem = {
+  review_id: string;
+  plan_id: string;
+  user_id: string;
+  member_display_name: string | null;
+  status: string;
+  priority: number;
+  physician_user_id: string | null;
+  requested_at: string;
+  target_review_by: string | null;
+  reviewed_at: string | null;
+  overdue: boolean;
+};
+
+export function listPhysicianReviews(view: PhysicianQueueView = "pending"): Promise<PhysicianReviewQueueItem[]> {
+  return request(`${nutritionPath}/physician/reviews?view=${view}`);
 }
 export function verifyPhysicianAccess(): Promise<{ authorized: true }> { return request(`${nutritionPath}/physician/access`); }
 

@@ -162,7 +162,7 @@ it("filters the member supplement history without exposing dose editing", async 
 
 it("lets a physician claim an exact revision and choose replacements from the canonical catalogue", async () => {
   const user = userEvent.setup();
-  vi.mocked(api.listPhysicianReviews).mockResolvedValue([{ review_id: "review-1", plan_id: "plan-1", status: "pending", priority: 1, overdue: false }]);
+  vi.mocked(api.listPhysicianReviews).mockResolvedValue([{ review_id: "review-1", plan_id: "plan-1", user_id: "user-1", member_display_name: "Member One", status: "pending", priority: 1, physician_user_id: null, requested_at: today, target_review_by: null, reviewed_at: null, overdue: false }]);
   vi.mocked(api.claimPhysicianReview).mockResolvedValue({});
   vi.mocked(api.getPhysicianPlan).mockResolvedValue(physicianPlan);
   vi.mocked(api.listPhysicianLabs).mockResolvedValue([]);
@@ -174,4 +174,22 @@ it("lets a physician claim an exact revision and choose replacements from the ca
   expect(screen.getByText("Nutrient validation")).toBeInTheDocument();
   await user.selectOptions(screen.getByRole("combobox", { name: "Replace Chicken breast" }), "food-2");
   await waitFor(() => expect(api.replacePhysicianFood).toHaveBeenCalledWith("plan-1", "meal-1", "food-1", "food-2"));
+});
+
+it("separates physician queue views and keeps approved revisions read-only", async () => {
+  const user = userEvent.setup();
+  vi.mocked(api.listPhysicianReviews).mockImplementation(async (view = "pending") => view === "approved"
+    ? [{ review_id: "approved-1", plan_id: "plan-1", user_id: "user-1", member_display_name: "Member One", status: "approved", priority: 1, physician_user_id: "physician-1", requested_at: today, target_review_by: null, reviewed_at: today, overdue: false }]
+    : []);
+  vi.mocked(api.getPhysicianPlan).mockResolvedValue(physicianPlan);
+  vi.mocked(api.listPhysicianLabs).mockResolvedValue([]);
+  vi.mocked(api.listPhysicianSupplementOrders).mockResolvedValue([]);
+  render(<MemoryRouter><PhysicianNutritionReviewPage /></MemoryRouter>);
+
+  expect(await screen.findByRole("tab", { name: /Approved \(1\)/ })).toBeInTheDocument();
+  await user.click(screen.getByRole("tab", { name: /Approved/ }));
+  await user.click(screen.getByRole("button", { name: "View revision" }));
+  expect(await screen.findByText("Revision under review 1")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Approve this revision" })).not.toBeInTheDocument();
+  expect(screen.getByRole("spinbutton", { name: "Chicken breast quantity" })).toBeDisabled();
 });
