@@ -963,7 +963,9 @@ html[dir="ltr"] .primary-button span:last-child {
   .app-shell__more-menu {
     position: absolute;
     z-index: 1;
-    inset: auto 0 calc(100% + 0.75rem) auto;
+    inset: auto;
+    inset-block-end: calc(100% + 0.75rem);
+    inset-inline-end: 0;
     width: min(17rem, calc(100vw - 1.6rem));
     display: grid;
     gap: 0.25rem;
