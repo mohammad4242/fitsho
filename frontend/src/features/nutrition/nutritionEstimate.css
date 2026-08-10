@@ -1,9 +1,9 @@
-.nutrition-estimate-page { min-height: 100svh; color: var(--fitsho-mist); background: radial-gradient(circle at 80% 5%, rgb(80 223 206 / 16%), transparent 30rem), var(--fitsho-petrol); }
+.nutrition-estimate-page { min-height: 100svh; color: var(--fitsho-mist); background: var(--fitsho-canvas); }
 .nutrition-estimate-page .dashboard-header { max-width: 82rem; margin: 0 auto; padding: 1.25rem clamp(1rem, 4vw, 3rem); color: var(--fitsho-mist); }
 .nutrition-estimate-page .brand-mark--dark, .nutrition-estimate-page .authenticated-nav a { color: var(--fitsho-mist); }
 .nutrition-estimate-hero, .nutrition-estimate-summary, .nutrition-target-grid, .nutrition-estimate-notes, .nutrition-estimate-state, .nutrition-science-details { width: min(100% - 2rem, 76rem); margin-inline: auto; }
-.nutrition-estimate-hero { padding: clamp(3rem, 8vw, 7rem) 0 2.5rem; }
-.nutrition-estimate-hero h1 { max-width: 12ch; margin: .4rem 0 1rem; font-size: clamp(3rem, 7vw, 5.8rem); }
+.nutrition-estimate-hero { padding: clamp(2rem, 5vw, 4.5rem) 0 2rem; }
+.nutrition-estimate-hero h1 { max-width: 12ch; margin: .4rem 0 1rem; font-size: clamp(2.7rem, 5vw, 4.5rem); }
 .nutrition-estimate-hero > p:last-child { max-width: 42rem; color: rgb(234 244 241 / 75%); line-height: 1.9; }
 .nutrition-estimate-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: 2rem; }
 .nutrition-estimate-back { color: var(--fitsho-aqua); text-decoration: none; font-weight: 800; }
@@ -13,7 +13,7 @@
 .nutrition-catalogue-entry small { color: rgb(234 244 241 / 56%); font-size: .62rem; }
 .nutrition-estimate-state { padding: 2rem; border: 1px solid rgb(234 244 241 / 12%); border-radius: var(--fitsho-radius-card); background: rgb(3 28 27 / 70%); }
 .nutrition-estimate-summary { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(16rem, .6fr); gap: 1rem; }
-.nutrition-calorie-card, .nutrition-confidence-card, .nutrition-target-card, .nutrition-estimate-notes { border: 1px solid rgb(234 244 241 / 12%); border-radius: var(--fitsho-radius-card); background: rgb(9 54 51 / 82%); box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 16%); }
+.nutrition-calorie-card, .nutrition-confidence-card, .nutrition-target-card, .nutrition-estimate-notes { border: 1px solid rgb(234 244 241 / 12%); border-radius: var(--fitsho-radius-card); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
 .nutrition-calorie-card { min-height: 15rem; display: flex; flex-direction: column; justify-content: center; padding: clamp(1.5rem, 5vw, 3.5rem); background: linear-gradient(135deg, var(--fitsho-aqua), #8ff3df); color: var(--fitsho-petrol); }
 .nutrition-calorie-card strong { margin: .45rem 0; font-family: "Sora Variable", sans-serif; font-size: clamp(2.4rem, 6vw, 5rem); }
 .nutrition-confidence-card { display: flex; flex-direction: column; justify-content: center; padding: 2rem; }

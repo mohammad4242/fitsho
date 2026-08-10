@@ -3,7 +3,7 @@
 .workout-plan-main > * { min-width: 0; }
 
 .workout-plan-hero { display: flex; align-items: end; justify-content: space-between; gap: 2rem; padding-block: clamp(1.5rem, 4vw, 3.5rem); border-bottom: 1px solid var(--fitsho-line); }
-.workout-plan-hero h1, .workout-schedule h2, .workout-empty h2 { margin: 0; color: var(--fitsho-ink); font-size: clamp(2.5rem, 6vw, 5rem); line-height: 1; }
+.workout-plan-hero h1, .workout-schedule h2, .workout-empty h2 { margin: 0; color: var(--fitsho-ink); font-size: clamp(2.5rem, 5vw, 4.4rem); line-height: 1; }
 .workout-plan-hero__content > p:last-child { max-width: 42rem; margin: 1rem 0 0; color: var(--fitsho-muted); line-height: 1.8; }
 .workout-plan-duration { min-width: 7.5rem; padding: 1rem; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-md); text-align: center; }
 .workout-plan-duration strong { display: block; color: var(--fitsho-aqua); font-size: 2.5rem; line-height: 1; }
@@ -58,7 +58,7 @@
 .workout-ai-coach p { color: var(--fitsho-aqua); font-size: .75rem; font-weight: 900; }
 .workout-ai-coach strong { display: block; margin-top: .25rem; line-height: 1.7; }
 
-.workout-schedule { margin-block: 2.5rem; }
+.workout-schedule { margin-block: 2rem; }
 .workout-schedule__heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .workout-schedule__heading h2 { font-size: clamp(2rem, 4vw, 3.5rem); }
 .workout-days { display: grid; gap: .75rem; }

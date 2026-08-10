@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-import bodyHeroFallback from "../../assets/landing/fitsho-body-hero.jpg";
-import bodyHero from "../../assets/landing/fitsho-body-hero.webp";
+import bodyHeroFallback from "../../assets/landing/fitsho-body-hero-3d.jpg";
+import bodyHero from "../../assets/landing/fitsho-body-hero-3d.webp";
 import { LanguageSwitcher } from "../../shared/LanguageSwitcher";
 import "./publicLanding.css";
 
@@ -99,8 +99,8 @@ export function PublicLandingPage() {
               src={bodyHeroFallback}
               alt=""
               aria-hidden="true"
-              width="1600"
-              height="900"
+              width="1672"
+              height="941"
               fetchPriority="high"
             />
           </picture>
@@ -108,15 +108,16 @@ export function PublicLandingPage() {
             <span>{t("landing.callouts.shoulders")}</span>
             <strong>{t("landing.callouts.priority")}</strong>
           </div>
-          <div className="landing-callout landing-callout--training">
-            <span>{t("landing.callouts.training")}</span>
-            <strong>{t("landing.callouts.fourDays")}</strong>
+          <div className="landing-callout landing-callout--back">
+            <span>{t("landing.callouts.back")}</span>
+            <strong>{t("landing.callouts.balanced")}</strong>
           </div>
-          <div className="landing-callout landing-callout--nutrition">
-            <span>{t("landing.callouts.nutrition")}</span>
-            <strong>{t("landing.callouts.calories")}</strong>
+          <div className="landing-callout landing-callout--confidence">
+            <span>{t("landing.intelligence.confidence")}</span>
+            <strong>{t("landing.intelligence.confidenceValue")}</strong>
           </div>
         </div>
+        <PlanBuilder compact />
         <p className="landing-hero__note">{t("landing.hero.note")}</p>
       </section>
 
@@ -125,15 +126,6 @@ export function PublicLandingPage() {
           <p className="landing-kicker">{t("landing.system.eyebrow")}</p>
           <h2 id="landing-system-title" className="fitsho-display">{t("landing.system.title")}</h2>
           <p>{t("landing.system.body")}</p>
-        </div>
-
-        <div className="landing-inputs" aria-label={t("landing.inputs.label")}>
-          {inputs.map((input) => (
-            <article key={input}>
-              <span>{t(`landing.inputs.${input}.label`)}</span>
-              <strong>{t(`landing.inputs.${input}.value`)}</strong>
-            </article>
-          ))}
         </div>
 
         <ol className="landing-progression" aria-label={t("landing.progression.label")}>
@@ -146,25 +138,40 @@ export function PublicLandingPage() {
           ))}
         </ol>
 
-        <div className="landing-builder" aria-label={t("landing.builder.label")}>
-          <div>
-            <span className="landing-builder__pulse" aria-hidden="true" />
-            <div><strong>{t("landing.builder.title")}</strong><small>{t("landing.builder.body")}</small></div>
-          </div>
-          <ul>
-            {(["structure", "exercise", "targets", "revision"] as const).map((item) => (
-              <li key={item}><span aria-hidden="true">✓</span>{t(`landing.builder.items.${item}`)}</li>
+        <div className="landing-transformation">
+          <div className="landing-inputs" aria-label={t("landing.inputs.label")}>
+            <header>{t("landing.inputs.label")}</header>
+            {inputs.map((input) => (
+              <article key={input}>
+                <span>{t(`landing.inputs.${input}.label`)}</span>
+                <strong>{t(`landing.inputs.${input}.value`)}</strong>
+              </article>
             ))}
-          </ul>
+          </div>
+          <span className="landing-transformation__flow" aria-hidden="true">←</span>
+          <PlanBuilder />
         </div>
       </section>
 
       <section className="landing-intelligence" aria-labelledby="landing-intelligence-title">
-        <div className="landing-body-map" aria-hidden="true">
-          <span className="landing-body-map__head" />
-          <span className="landing-body-map__torso" />
-          <i className="landing-body-map__marker landing-body-map__marker--shoulder" />
-          <i className="landing-body-map__marker landing-body-map__marker--back" />
+        <div className="landing-body-interface" aria-hidden="true">
+          <picture>
+            <source srcSet={bodyHero} type="image/webp" />
+            <img
+              data-testid="fitsho-body-intelligence"
+              src={bodyHeroFallback}
+              alt=""
+              width="1672"
+              height="941"
+              loading="lazy"
+            />
+          </picture>
+          <span className="landing-body-interface__highlight" data-testid="fitsho-body-highlight" />
+          <span className="landing-body-interface__line" />
+          <div className="landing-callout landing-callout--intelligence">
+            <span>{t("landing.callouts.shoulders")}</span>
+            <strong>{t("landing.callouts.priority")}</strong>
+          </div>
         </div>
         <div className="landing-section-heading">
           <p className="landing-kicker">{t("landing.intelligence.eyebrow")}</p>
@@ -214,10 +221,81 @@ export function PublicLandingPage() {
   );
 }
 
+function PlanBuilder({ compact = false }: { compact?: boolean }) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className={`landing-builder${compact ? " landing-builder--compact" : ""}`}
+      aria-label={t("landing.builder.label")}
+    >
+      <div className="landing-builder__heading">
+        <span className="landing-builder__pulse" aria-hidden="true" />
+        <div><strong>{t("landing.builder.title")}</strong><small>{t("landing.builder.body")}</small></div>
+      </div>
+      <ul>
+        {(["structure", "exercise", "targets", "revision"] as const).map((item) => (
+          <li key={item}><span aria-hidden="true">✓</span>{t(`landing.builder.items.${item}`)}</li>
+        ))}
+      </ul>
+      <div className="landing-builder__summary">
+        <span><small>{t("landing.callouts.training")}</small><strong>{t("landing.callouts.fourDays")}</strong></span>
+        <span><small>{t("landing.callouts.nutrition")}</small><strong>{t("landing.callouts.calories")}</strong></span>
+      </div>
+      <span className="landing-builder__progress" aria-hidden="true"><i /></span>
+    </div>
+  );
+}
+
 function ProductPreview({ type }: { type: "dashboard" | "workout" | "nutrition" | "body" | "catalogue" }) {
-  if (type === "workout") return <div className="landing-preview landing-preview--workout"><i /><i /><i /></div>;
-  if (type === "nutrition") return <div className="landing-preview landing-preview--nutrition"><strong>2340</strong><i /><i /><i /></div>;
-  if (type === "body") return <div className="landing-preview landing-preview--body"><i /><span /><b /></div>;
-  if (type === "catalogue") return <div className="landing-preview landing-preview--catalogue"><i /><i /><i /><i /></div>;
-  return <div className="landing-preview landing-preview--dashboard"><strong>01</strong><span /><span /><span /></div>;
+  const { t } = useTranslation();
+
+  if (type === "workout") {
+    return (
+      <div className="landing-preview landing-preview--workout">
+        {(["pushDay", "pullDay", "legDay"] as const).map((day, index) => (
+          <span key={day} data-active={index === 0 ? "true" : undefined}>
+            <b>{t(`landing.product.sample.${day}`)}</b><small>{t("landing.product.sample.session")}</small>
+          </span>
+        ))}
+      </div>
+    );
+  }
+  if (type === "nutrition") {
+    return (
+      <div className="landing-preview landing-preview--nutrition">
+        <strong>2,340 <small>kcal</small></strong>
+        <span>{t("landing.product.sample.protein")}</span>
+        <span>{t("landing.product.sample.carbs")}</span>
+        <span>{t("landing.product.sample.fat")}</span>
+      </div>
+    );
+  }
+  if (type === "body") {
+    return (
+      <div className="landing-preview landing-preview--body">
+        <i /><span /><b />
+        <ul>
+          <li>{t("landing.product.sample.shouldersPriority")}</li>
+          <li>{t("landing.product.sample.backBalanced")}</li>
+          <li>{t("landing.product.sample.confidence")}</li>
+        </ul>
+      </div>
+    );
+  }
+  if (type === "catalogue") {
+    return (
+      <div className="landing-preview landing-preview--catalogue">
+        <span><b>{t("landing.product.sample.milk")}</b><small>61 kcal</small></span>
+        <span><b>{t("landing.product.sample.chicken")}</b><small>165 kcal</small></span>
+      </div>
+    );
+  }
+  return (
+    <div className="landing-preview landing-preview--dashboard">
+      <span><small>{t("landing.product.sample.todayWorkout")}</small><strong>{t("landing.product.sample.pushDay")}</strong></span>
+      <span><small>{t("landing.callouts.nutrition")}</small><strong>{t("landing.callouts.calories")}</strong></span>
+      <span><small>{t("landing.intelligence.confidence")}</small><strong>{t("landing.intelligence.confidenceValue")}</strong></span>
+    </div>
+  );
 }

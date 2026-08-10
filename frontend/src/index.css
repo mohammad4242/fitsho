@@ -823,10 +823,9 @@ html[dir="ltr"] .primary-button span:last-child {
     grid-template-columns: repeat(auto-fit, minmax(3.5rem, 1fr));
     gap: 0.2rem;
     padding: 0.55rem max(0.4rem, env(safe-area-inset-right)) calc(0.55rem + env(safe-area-inset-bottom)) max(0.4rem, env(safe-area-inset-left));
-    border-top: 1px solid rgb(80 223 206 / 18%);
-    background: rgb(10 31 30 / 93%);
-    box-shadow: 0 -1rem 2.5rem rgb(10 31 30 / 20%);
-    backdrop-filter: blur(18px);
+    border-top: 1px solid rgb(80 223 206 / 16%);
+    background: rgb(2 11 12 / 98%);
+    box-shadow: 0 -0.8rem 2rem rgb(0 0 0 / 24%);
   }
 
   .app-shell__nav-link {
@@ -836,7 +835,7 @@ html[dir="ltr"] .primary-button span:last-child {
     place-items: center;
     gap: 0.18rem;
     padding: 0.3rem 0.15rem;
-    border-radius: 1rem;
+    border-radius: 0.7rem;
     color: rgb(234 244 241 / 62%);
     font-size: 0.68rem;
     font-weight: 750;
@@ -852,7 +851,7 @@ html[dir="ltr"] .primary-button span:last-child {
 
   .app-shell__nav-link--active {
     color: var(--fitsho-aqua);
-    background: rgb(80 223 206 / 12%);
+    background: rgb(80 223 206 / 9%);
   }
 
   .app-shell__nav-icon {
@@ -972,8 +971,8 @@ html[dir="ltr"] .primary-button span:last-child {
     gap: 0.25rem;
     padding: 0.55rem;
     border: 1px solid rgb(80 223 206 / 20%);
-    border-radius: 1rem;
-    background: rgb(10 31 30 / 98%);
+    border-radius: 0.8rem;
+    background: rgb(2 11 12 / 99%);
     box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 32%);
   }
 

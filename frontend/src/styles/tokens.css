@@ -1,8 +1,8 @@
 :root {
-  --fitsho-canvas: #061513;
+  --fitsho-canvas: #020b0c;
   --fitsho-petrol: #0a211f;
   --fitsho-teal: #102b28;
-  --fitsho-surface: #102b28;
+  --fitsho-surface: #0b201f;
   --fitsho-surface-raised: #163431;
   --fitsho-aqua: #50dfce;
   --fitsho-coral: #f67859;
@@ -23,12 +23,12 @@
   --fitsho-space-7: 3rem;
   --fitsho-space-8: 4.5rem;
   --fitsho-radius-sm: 0.625rem;
-  --fitsho-radius-md: 1rem;
-  --fitsho-radius-lg: 1.5rem;
-  --fitsho-radius-card: 1.5rem;
+  --fitsho-radius-md: 0.875rem;
+  --fitsho-radius-lg: 1.125rem;
+  --fitsho-radius-card: 1.125rem;
   --fitsho-radius-pill: 999px;
-  --fitsho-shadow: 0 1.25rem 3.5rem rgb(0 0 0 / 24%);
-  --fitsho-shadow-soft: 0 0.75rem 2.5rem rgb(0 0 0 / 16%);
+  --fitsho-shadow: 0 1.25rem 3.5rem rgb(0 0 0 / 20%);
+  --fitsho-shadow-soft: 0 0.75rem 2.5rem rgb(0 0 0 / 13%);
   --fitsho-duration-fast: 160ms;
   --fitsho-duration-medium: 280ms;
   --fitsho-ease: cubic-bezier(0.2, 0.8, 0.2, 1);

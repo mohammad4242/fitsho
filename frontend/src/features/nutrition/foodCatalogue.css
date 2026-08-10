@@ -1,11 +1,11 @@
 .food-catalogue-page { min-height: 100svh; color: var(--fitsho-ink); background: var(--fitsho-canvas); }
 .food-catalogue-hero, .food-catalogue-toolbar, .food-catalogue-grid, .food-catalogue-state, .food-catalogue-pagination { width: min(100% - 2rem, 78rem); margin-inline: auto; }
-.food-catalogue-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2rem; padding: clamp(2rem, 5vw, 4.5rem) 0 2rem; }
-.food-catalogue-hero h1 { max-width: 12ch; margin: .45rem 0 1rem; font-size: clamp(3rem, 7vw, 5.8rem); line-height: .95; }
+.food-catalogue-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2rem; padding: clamp(1.8rem, 4vw, 3.5rem) 0 1.5rem; }
+.food-catalogue-hero h1 { max-width: 12ch; margin: .4rem 0 .75rem; font-size: clamp(2.7rem, 5vw, 4.5rem); line-height: .98; }
 .food-catalogue-hero p:last-child { max-width: 44rem; color: rgb(234 244 241 / 72%); line-height: 1.9; }
 .food-catalogue-back { display: inline-flex; align-items: center; gap: .5rem; color: var(--fitsho-aqua); text-decoration: none; font-weight: 850; }
 .food-catalogue-icon { width: 9rem; justify-self: end; fill: none; stroke: var(--fitsho-aqua); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; opacity: .72; }
-.food-catalogue-toolbar { position: sticky; z-index: 4; inset-block-start: .5rem; display: grid; grid-template-columns: minmax(16rem, 1fr) minmax(12rem, .35fr) auto; gap: .8rem; align-items: end; padding: 1rem; border: 1px solid rgb(234 244 241 / 12%); border-radius: 1.35rem; background: var(--fitsho-surface); }
+.food-catalogue-toolbar { position: sticky; z-index: 4; inset-block-start: .5rem; display: grid; grid-template-columns: minmax(16rem, 1fr) minmax(12rem, .35fr) auto; gap: .8rem; align-items: end; padding: .8rem; border: 1px solid rgb(234 244 241 / 12%); border-radius: var(--fitsho-radius-md); background: var(--fitsho-surface); }
 .food-catalogue-toolbar label, .food-catalogue-toolbar form { display: grid; gap: .45rem; color: rgb(234 244 241 / 68%); font-size: .78rem; font-weight: 700; }
 .food-catalogue-toolbar form > div { display: grid; grid-template-columns: 1fr auto; }
 .food-catalogue-toolbar input, .food-catalogue-toolbar select, .food-admin-form input, .food-admin-form select, .food-admin-form textarea { width: 100%; min-height: 3rem; box-sizing: border-box; padding: .7rem .85rem; color: var(--fitsho-mist); border: 1px solid rgb(234 244 241 / 16%); border-radius: .75rem; background: rgb(255 255 255 / 6%); }
@@ -17,11 +17,11 @@
 .food-catalogue-add { white-space: nowrap; background: #ffd798 !important; }
 .food-catalogue-state { display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-block: 1rem 6rem; padding: 1.5rem; border: 1px solid rgb(234 244 241 / 12%); border-radius: 1.2rem; background: rgb(9 54 51 / 72%); }
 .food-catalogue-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; padding-block: 1.2rem 2rem; }
-.food-shelf-card { overflow: hidden; border: 1px solid rgb(234 244 241 / 13%); border-radius: 1.2rem; background: var(--fitsho-surface); transition: border-color .2s ease; }
+.food-shelf-card { overflow: hidden; border: 1px solid rgb(234 244 241 / 13%); border-radius: var(--fitsho-radius-md); background: var(--fitsho-surface); transition: border-color .2s ease; }
 .food-shelf-card:hover { border-color: rgb(80 223 206 / 32%); }
-.food-shelf-card > header { display: flex; justify-content: space-between; gap: 1rem; align-items: start; padding: 1.25rem 1.3rem 1rem; }
+.food-shelf-card > header { display: flex; justify-content: space-between; gap: 1rem; align-items: start; padding: 1rem 1.05rem .8rem; }
 .food-shelf-card header span, .food-shelf-card header small { color: rgb(234 244 241 / 54%); font-size: .72rem; }
-.food-shelf-card h2 { margin: .25rem 0; font-size: clamp(1.4rem, 3vw, 2.15rem); }
+.food-shelf-card h2 { margin: .2rem 0; font-size: clamp(1.25rem, 2.2vw, 1.65rem); }
 .food-shelf-card__basis { padding: .35rem .55rem; border: 1px solid rgb(234 244 241 / 10%); border-radius: 99rem; white-space: nowrap; }
 .food-price-ticket { display: grid; grid-template-columns: 1fr auto; gap: .2rem 1rem; align-items: center; margin-inline: 1.3rem; padding: .9rem 1rem; color: #261800; border-radius: .9rem; background: #ffd798; transform: rotate(-.5deg); }
 .food-price-ticket span { font-size: .75rem; font-weight: 750; }
