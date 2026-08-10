@@ -7,6 +7,7 @@ import type {
   VisualPhysiqueAssessmentV3,
 } from "./types";
 import { SpecialistReviewStatus } from "./SpecialistReviewStatus";
+import { BodyAreaMap } from "./BodyAreaMap";
 
 const findingGroups: Array<{
   classification: BodyAnalysisClassification;
@@ -40,6 +41,8 @@ export function BodyAnalysisResult({ analysis }: { analysis: BodyAnalysis }) {
         </div>
         <p>{t("bodyPhotos.results.confidenceHelp")}</p>
       </section>
+
+      <BodyAreaMap findings={result.findings} />
 
       {analysis.visual_result !== null && analysis.visual_result !== undefined && (
         <section className="body-analysis-overview" aria-labelledby="body-analysis-coach-title">

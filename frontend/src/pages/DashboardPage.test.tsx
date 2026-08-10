@@ -77,7 +77,7 @@ it("links the primary CTA to the active workout plan", async () => {
   );
 });
 
-it("keeps the scrolling chapters and uses two different videos instead of images", async () => {
+it("presents a focused command center without cinematic media", async () => {
   workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
 
   render(
@@ -87,19 +87,16 @@ it("keeps the scrolling chapters and uses two different videos instead of images
   );
 
   await screen.findByRole("heading", { name: "سلام، محمد" });
-  expect(screen.getByLabelText("مسیر امروز")).toBeInTheDocument();
-  expect(document.querySelector(".today-story__image")).not.toBeInTheDocument();
-  expect(document.querySelector(".today-story__video--plan video")).toHaveAttribute(
-    "poster",
-    expect.stringContaining("plan-focus-fallback"),
+  expect(screen.getByRole("region", { name: "وضعیت امروز" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "تمرین امروز" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "مشاهده پیشرفت بدنی" })).toHaveAttribute(
+    "href",
+    "/body-progress",
   );
-  expect(document.querySelector(".today-story__video--progress video")).toHaveAttribute(
-    "poster",
-    expect.stringContaining("progress-drive-fallback"),
-  );
+  expect(document.querySelector("video")).not.toBeInTheDocument();
 });
 
-it("uses the supplied strength video behind the Today page", async () => {
+it("shows real profile context in the workout status", async () => {
   workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
 
   render(
@@ -109,11 +106,5 @@ it("uses the supplied strength video behind the Today page", async () => {
   );
 
   await screen.findByRole("heading", { name: "سلام، محمد" });
-  const background = document.querySelector(".member-page-background video");
-  if (background === null) throw new Error("Today background video is missing");
-  expect(background).toHaveAttribute(
-    "poster",
-    expect.stringContaining("hero-strength-fallback"),
-  );
-  expect(background.parentElement).toHaveClass("member-page-background");
+  expect(screen.getByText("دوره ۴ هفته‌ای")).toBeInTheDocument();
 });

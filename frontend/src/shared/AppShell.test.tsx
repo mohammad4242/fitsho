@@ -55,7 +55,6 @@ it("moves secondary combined-mode destinations behind More", async () => {
 });
 
 it.each([
-  ["training", ["امروز", "برنامه", "حرکات", "پروفایل"], "تغذیه"],
   ["nutrition", ["امروز", "تغذیه", "کاتالوگ مواد غذایی", "پروفایل"], "برنامه"],
 ] as const)("shows direct links without More for %s mode", (productMode, visibleLabels, hiddenLabel) => {
   vi.spyOn(profileContextModule, "useOptionalProfile").mockReturnValue({
@@ -81,4 +80,23 @@ it.each([
   }
   expect(screen.queryByRole("link", { name: hiddenLabel })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "بیشتر" })).not.toBeInTheDocument();
+});
+
+it("keeps body progress in the compact More menu for training members", async () => {
+  const user = userEvent.setup();
+  vi.spyOn(profileContextModule, "useOptionalProfile").mockReturnValue({
+    profile: null,
+    status: "ready",
+    productMode: "training",
+    retryProfile: vi.fn(),
+    createProfile: vi.fn(async () => { throw new Error("not used"); }),
+    selectProductMode: vi.fn(async () => { throw new Error("not used"); }),
+    updateProfile: vi.fn(async () => { throw new Error("not used"); }),
+  });
+
+  render(<MemoryRouter initialEntries={["/dashboard"]}><AppShell><p>محتوا</p></AppShell></MemoryRouter>);
+
+  await user.click(screen.getByRole("button", { name: "بیشتر" }));
+  expect(screen.getByRole("link", { name: "پیشرفت بدن" })).toHaveAttribute("href", "/body-progress");
+  expect(screen.getByRole("link", { name: "پروفایل" })).toHaveAttribute("href", "/profile");
 });

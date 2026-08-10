@@ -1,18 +1,41 @@
 :root {
-  --fitsho-petrol: #0a1f1e;
-  --fitsho-teal: #102a2a;
+  --fitsho-canvas: #061513;
+  --fitsho-petrol: #0a211f;
+  --fitsho-teal: #102b28;
+  --fitsho-surface: #102b28;
+  --fitsho-surface-raised: #163431;
   --fitsho-aqua: #50dfce;
   --fitsho-coral: #f67859;
-  --fitsho-mist: #eaf4f1;
-  --fitsho-ink: #102422;
-  --fitsho-surface: #f7fbf9;
-  --fitsho-line: #d4e4df;
-  --fitsho-muted: #607571;
+  --fitsho-amber: #f2b85b;
+  --fitsho-success: #66c89f;
+  --fitsho-danger: #f67859;
+  --fitsho-mist: #e8f4f1;
+  --fitsho-ink: #e8f4f1;
+  --fitsho-muted: #8ca39e;
+  --fitsho-line: rgb(232 244 241 / 12%);
+  --fitsho-line-strong: rgb(80 223 206 / 28%);
+  --fitsho-space-1: 0.25rem;
+  --fitsho-space-2: 0.5rem;
+  --fitsho-space-3: 0.75rem;
+  --fitsho-space-4: 1rem;
+  --fitsho-space-5: 1.5rem;
+  --fitsho-space-6: 2rem;
+  --fitsho-space-7: 3rem;
+  --fitsho-space-8: 4.5rem;
+  --fitsho-radius-sm: 0.625rem;
+  --fitsho-radius-md: 1rem;
+  --fitsho-radius-lg: 1.5rem;
   --fitsho-radius-card: 1.5rem;
   --fitsho-radius-pill: 999px;
-  --fitsho-shadow: 0 1.25rem 3.5rem rgb(10 31 30 / 12%);
+  --fitsho-shadow: 0 1.25rem 3.5rem rgb(0 0 0 / 24%);
+  --fitsho-shadow-soft: 0 0.75rem 2.5rem rgb(0 0 0 / 16%);
+  --fitsho-duration-fast: 160ms;
+  --fitsho-duration-medium: 280ms;
+  --fitsho-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --fitsho-content: 82rem;
+  --fitsho-content-max: 82rem;
 }
 
 .fitsho-app {
-  color-scheme: light;
+  color-scheme: dark;
 }

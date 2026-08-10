@@ -169,18 +169,15 @@ it("shows the fixed start guide and a generate action when no plan exists", asyn
   expect(api.generateWorkoutPlan).toHaveBeenCalledOnce();
 });
 
-it("uses the supplied plan video behind the workout page", async () => {
-  api.getActiveWorkoutPlan.mockResolvedValue(null);
+it("shows plan context without cinematic background media", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
 
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
-  expect(await screen.findByTestId("member-header-video")).toHaveAttribute(
-    "poster",
-    expect.stringContaining("plan-focus-fallback"),
-  );
-  expect(screen.getByTestId("member-header-video").parentElement).toHaveClass(
-    "member-page-background",
-  );
+  expect(await screen.findByRole("region", { name: "خلاصه برنامه فعال" })).toBeInTheDocument();
+  expect(screen.getByText("۱ روز تمرین")).toBeInTheDocument();
+  expect(screen.getByText("۴۵ دقیقه برای هر جلسه")).toBeInTheDocument();
+  expect(document.querySelector("video")).not.toBeInTheDocument();
 });
 
 it("explains the generation cooldown instead of showing a generic failure", async () => {

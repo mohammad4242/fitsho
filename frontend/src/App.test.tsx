@@ -198,7 +198,7 @@ it("redirects a guest away from the protected dashboard", async () => {
 it("shows the public landing to a guest at the root route", () => {
   renderRoute("/");
 
-  expect(screen.getByRole("link", { name: /شروع کن/ })).toHaveAttribute("href", "/get-started");
+  expect(screen.getAllByRole("link", { name: "برنامه من را بساز" })[0]).toHaveAttribute("href", "/get-started");
 });
 
 it("redirects a signed-in root visitor to Today", async () => {
@@ -274,9 +274,7 @@ it("logs a signed-in user out from Today", async () => {
     </MemoryRouter>,
   );
 
-  expect(
-    screen.getByRole("link", { name: /برنامهٔ من/ }),
-  ).toHaveAttribute("href", "/workout-plan");
+  expect(screen.getByRole("heading", { name: "تمرین امروز" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "خروج" }));
 
   expect(auth.value.logout).toHaveBeenCalledOnce();
@@ -388,12 +386,12 @@ it("renders detail with active exercise navigation for a ready member", async ()
   );
 });
 
-it("links the dashboard exercise card to the catalog", async () => {
+it("links the dashboard quick action to the exercise catalog", async () => {
   setReadyMember();
   renderRoute("/dashboard");
 
   expect(
-    screen.getByRole("link", { name: /حرکت مناسب را پیدا کن/ }),
+    screen.getByRole("navigation", { name: "دسترسی سریع" }).querySelector('[href="/exercises"]'),
   ).toHaveAttribute("href", "/exercises");
 });
 

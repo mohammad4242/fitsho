@@ -94,11 +94,11 @@ export function BodyAnalysisResultPage() {
   }
 
   if (loading) {
-    return <main className="body-analysis-page"><p role="status">{t("bodyPhotos.results.loading")}</p></main>;
+    return <main className="body-analysis-page fitsho-page"><p role="status">{t("bodyPhotos.results.loading")}</p></main>;
   }
   if (failed || session === null) {
     return (
-      <main className="body-analysis-page">
+      <main className="body-analysis-page fitsho-page">
         <p className="form-error" role="alert">{t("bodyPhotos.results.loadError")}</p>
         <button className="secondary-button" type="button" onClick={() => {
           setLoading(true);
@@ -120,7 +120,7 @@ export function BodyAnalysisResultPage() {
     });
 
   return (
-    <main className="body-analysis-page">
+    <main className="body-analysis-page fitsho-page">
       <header className="body-analysis-page__header">
         <Link className="body-photo-link-button" to="/body-progress">{t("bodyPhotos.results.back")}</Link>
         <p className="eyebrow eyebrow--accent">{t("bodyPhotos.eyebrow")}</p>

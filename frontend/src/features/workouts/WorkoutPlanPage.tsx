@@ -2,13 +2,10 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-import planFocusFallback from "../../assets/landing/plan-focus-fallback.jpg";
-import planFocusVideo from "../../assets/landing/plan-focus.mp4";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { ApiError } from "../../shared/apiClient";
 import { getProfile, updateProfile } from "../profile/api";
 import type { WorkoutGenerationMethod } from "../profile/types";
-import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import {
   generateWorkoutPlan,
@@ -38,6 +35,10 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   const l = (fa: string, en: string) => isEnglish ? en : fa;
   const displayedPlanDuration = plan?.plan_duration_weeks ?? planDurationWeeks;
   const isViewingHistorical = plan !== null && activePlanId !== null && plan.id !== activePlanId;
+  const number = new Intl.NumberFormat(isEnglish ? "en-US" : "fa-IR");
+  const sessionDurations = plan?.days.map((day) => day.estimated_duration_minutes) ?? [];
+  const shortestSession = sessionDurations.length > 0 ? Math.min(...sessionDurations) : null;
+  const longestSession = sessionDurations.length > 0 ? Math.max(...sessionDurations) : null;
 
   useEffect(() => {
     let active = true;
@@ -106,12 +107,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   }
 
   return (
-    <div className="workout-plan-shell">
-      <MemberHeaderMedia
-        imageSrc={planFocusFallback}
-        videoSrc={planFocusVideo}
-        className="member-page-background"
-      />
+    <div className="workout-plan-shell fitsho-page">
       <AuthenticatedHeader />
       <main className="workout-plan-main">
         <header className="workout-plan-hero">
@@ -125,6 +121,20 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
             <span>{t("workoutPlan.weeks")}</span>
           </div>
         </header>
+
+        {plan !== null && shortestSession !== null && longestSession !== null && (
+          <section className="workout-plan-context" aria-label={t("workoutPlan.contextLabel")}>
+            <span><small>{t("workoutPlan.currentPlan")}</small><strong>{t("workoutPlan.active")}</strong></span>
+            <span><small>{t("workoutPlan.cycle")}</small><strong>{t("workoutPlan.duration", { count: number.format(displayedPlanDuration) })}</strong></span>
+            <span><small>{t("workoutPlan.trainingDays")}</small><strong>{t("workoutPlan.daysCount", { count: number.format(plan.days.length) })}</strong></span>
+            <span>
+              <small>{t("workoutPlan.sessionDuration")}</small>
+              <strong>{shortestSession === longestSession
+                ? t("workoutPlan.perSession", { count: number.format(shortestSession) })
+                : t("workoutPlan.sessionRange", { min: number.format(shortestSession), max: number.format(longestSession) })}</strong>
+            </span>
+          </section>
+        )}
 
         <FixedGuidance />
 

@@ -9,7 +9,7 @@ import { verifyCoachAccess } from "../features/workoutReviews/api";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function AuthenticatedHeader() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -87,11 +87,14 @@ export function AuthenticatedHeader() {
                 {hasTraining && <Link to="/exercises" onClick={() => setMenuOpen(false)}>
                   {t("header.exercises")}
                 </Link>}
+                {hasTraining && <Link to="/body-progress" onClick={() => setMenuOpen(false)}>
+                  {t("header.bodyProgress")}
+                </Link>}
                 {isCoach && <Link to="/coach/workouts" onClick={() => setMenuOpen(false)}>
-                  {i18n.resolvedLanguage === "en" ? "Coach workspace" : "پنل مربی"}
+                  {t("header.coachWorkspace")}
                 </Link>}
                 {isPhysician && <Link to="/physician/nutrition" onClick={() => setMenuOpen(false)}>
-                  {i18n.resolvedLanguage === "en" ? "Physician workspace" : "پنل پزشک"}
+                  {t("header.physicianWorkspace")}
                 </Link>}
                 {hasNutrition && <Link to="/nutrition-estimate" onClick={() => setMenuOpen(false)}>{t("header.nutritionTargets")}</Link>}
                 {hasNutrition && <Link to="/food-catalogue" onClick={() => setMenuOpen(false)}>⌁ {t("header.foodCatalogue")}</Link>}
@@ -104,7 +107,7 @@ export function AuthenticatedHeader() {
                 <a href="https://facebook.com" target="_blank" rel="noreferrer">Facebook</a>
                 <a href="https://x.com" target="_blank" rel="noreferrer">X</a>
                 {user.is_admin && (
-                  <><Link to="/admin/exercises" onClick={() => setMenuOpen(false)}>{t("header.adminExercises")}</Link><Link to="/admin/nutrition-monitoring" onClick={() => setMenuOpen(false)}>{i18n.resolvedLanguage === "en" ? "Nutrition monitoring" : "پایش تغذیه"}</Link></>
+                  <><Link to="/admin/exercises" onClick={() => setMenuOpen(false)}>{t("header.adminExercises")}</Link><Link to="/admin/nutrition-monitoring" onClick={() => setMenuOpen(false)}>{t("header.nutritionMonitoring")}</Link></>
                 )}
                 <button className="member-menu__logout" type="button" onClick={handleLogout} disabled={busy}>
                   {busy ? t("header.loggingOut") : t("header.logout")}
@@ -129,13 +132,13 @@ export function AuthenticatedHeader() {
               to="/coach/workouts"
               aria-current={location.pathname.startsWith("/coach/workouts") ? "page" : undefined}
             >
-              {i18n.resolvedLanguage === "en" ? "Coach workspace" : "پنل مربی"}
+              {t("header.coachWorkspace")}
             </Link>}
             {isPhysician && <Link
               to="/physician/nutrition"
               aria-current={location.pathname.startsWith("/physician/nutrition") ? "page" : undefined}
             >
-              {i18n.resolvedLanguage === "en" ? "Physician workspace" : "پنل پزشک"}
+              {t("header.physicianWorkspace")}
             </Link>}
             {hasTraining && <Link
               to="/exercises"
@@ -144,6 +147,12 @@ export function AuthenticatedHeader() {
               }
             >
               {t("header.exercises")}
+            </Link>}
+            {hasTraining && <Link
+              to="/body-progress"
+              aria-current={location.pathname.startsWith("/body-progress") ? "page" : undefined}
+            >
+              {t("header.bodyProgress")}
             </Link>}
             {hasNutrition && <Link
               to="/nutrition-estimate"
@@ -169,7 +178,7 @@ export function AuthenticatedHeader() {
                 >
                   {t("header.adminExercises")}
                 </Link>
-                <Link to="/admin/nutrition-monitoring">{i18n.resolvedLanguage === "en" ? "Nutrition monitoring" : "پایش تغذیه"}</Link>
+                <Link to="/admin/nutrition-monitoring">{t("header.nutritionMonitoring")}</Link>
                 <Link
                   to="/admin/ai-settings"
                   aria-current={

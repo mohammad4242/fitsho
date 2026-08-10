@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import authTrainingAccent from "../assets/landing/auth-training-accent.jpg";
+import fitshoBodyHero from "../assets/landing/fitsho-body-hero.webp";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 
 type AuthShellProps = {
@@ -12,10 +12,10 @@ export function AuthShell({ children }: AuthShellProps) {
   const { t } = useTranslation();
 
   return (
-    <main className="auth-shell">
+    <main className="auth-shell fitsho-page">
       <section className="brand-panel" aria-labelledby="fitsho-promise">
         <img
-          src={authTrainingAccent}
+          src={fitshoBodyHero}
           alt=""
           aria-hidden="true"
           data-testid="auth-training-accent"

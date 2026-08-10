@@ -65,7 +65,7 @@ export function FoodCataloguePage() {
 
   const pageCount = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
   return (
-    <main className="food-catalogue-page" dir={fa ? "rtl" : "ltr"}>
+    <main className="food-catalogue-page fitsho-page" dir={fa ? "rtl" : "ltr"}>
       <AuthenticatedHeader />
       <section className="food-catalogue-hero">
         <div>

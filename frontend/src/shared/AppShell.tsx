@@ -15,10 +15,11 @@ const navigation = [
   { to: "/nutrition-estimate", label: "header.nutritionTargets", icon: "plan", capability: "nutrition" },
   { to: "/food-catalogue", label: "header.foodCatalogue", icon: "food", capability: "nutrition" },
   { to: "/profile", label: "header.profile", icon: "profile" },
+  { to: "/body-progress", label: "header.bodyProgress", icon: "profile", capability: "training" },
 ] as const;
 
 export function AppShell({ children }: AppShellProps) {
-  const { i18n, t } = useTranslation();
+  const { t } = useTranslation();
   const [moreOpen, setMoreOpen] = useState(false);
   const profileContext = useOptionalProfile();
   const status = profileContext?.status ?? "ready";
@@ -68,7 +69,7 @@ export function AppShell({ children }: AppShellProps) {
               onClick={() => setMoreOpen((open) => !open)}
             >
               <span className="app-shell__nav-icon app-shell__nav-icon--more" aria-hidden="true" />
-              <span>{i18n.resolvedLanguage === "en" ? "More" : "بیشتر"}</span>
+              <span>{t("header.more")}</span>
             </button>
             {moreOpen && (
               <div className="app-shell__more-menu" id="app-shell-more-menu">

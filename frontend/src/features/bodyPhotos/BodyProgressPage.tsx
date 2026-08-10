@@ -17,7 +17,7 @@ export function BodyProgressPage() {
       .catch(() => setFailed(true));
   }, []);
 
-  return <main className="body-progress-page">
+  return <main className="body-progress-page fitsho-page">
     <header><p className="eyebrow eyebrow--accent">{t("bodyPhotos.eyebrow")}</p><h1 className="fitsho-display">{t("bodyPhotos.progressTitle")}</h1><p>{t("bodyPhotos.optionalIntro")}</p></header>
     <Link className="primary-button" to="/body-progress/new">{t("bodyPhotos.start")}</Link>
     {sessions === null && !failed && <p role="status">{t("bodyPhotos.loading")}</p>}

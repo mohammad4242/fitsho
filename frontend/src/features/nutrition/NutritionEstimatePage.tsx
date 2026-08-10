@@ -77,14 +77,16 @@ export function NutritionEstimatePage() {
   }
 
   return (
-    <main className="nutrition-estimate-page" dir={language === "fa" ? "rtl" : "ltr"}>
+    <main className="nutrition-estimate-page fitsho-page" dir={language === "fa" ? "rtl" : "ltr"}>
       <AuthenticatedHeader />
       <section className="nutrition-estimate-hero">
-        <Link className="nutrition-estimate-back" to="/dashboard">{l("بازگشت به امروز", "Back to Today")}</Link>
-        <Link className="secondary-button" to="/nutrition-tracking">{l("ثبت تغذیه امروز", "Track today's food")}</Link>
-        <Link className="secondary-button" to="/nutrition-labs">{l("آزمایش‌های من", "My lab documents")}</Link>
-        <Link className="secondary-button" to="/nutrition-supplements">{l("مکمل‌های من", "My supplements")}</Link>
-        <Link className="nutrition-catalogue-entry" to="/food-catalogue"><span aria-hidden="true">⌁</span><strong>{l("کاتالوگ مواد غذایی", "Food catalogue")}</strong><small>{l("قیمت این هفته و ارزش غذایی", "Weekly prices and nutrition")}</small></Link>
+        <nav className="nutrition-estimate-tools" aria-label={l("ابزارهای تغذیه", "Nutrition tools")}>
+          <Link className="nutrition-estimate-back" to="/dashboard">{l("بازگشت به امروز", "Back to Today")}</Link>
+          <Link className="secondary-button" to="/nutrition-tracking">{l("ثبت تغذیه امروز", "Track today's food")}</Link>
+          <Link className="secondary-button" to="/nutrition-labs">{l("آزمایش‌های من", "My lab documents")}</Link>
+          <Link className="secondary-button" to="/nutrition-supplements">{l("مکمل‌های من", "My supplements")}</Link>
+          <Link className="nutrition-catalogue-entry" to="/food-catalogue"><span aria-hidden="true">⌁</span><strong>{l("کاتالوگ مواد غذایی", "Food catalogue")}</strong><small>{l("قیمت این هفته و ارزش غذایی", "Weekly prices and nutrition")}</small></Link>
+        </nav>
         <p className="eyebrow eyebrow--accent">{l("موتور علمی فیتشو", "Fitsho scientific engine")}</p>
         <h1 className="fitsho-display">{l("هدف روزانه تغذیه", "Daily nutrition targets")}</h1>
         <p>{l("انرژی و مواد مغذی براساس مشخصات فعلی، فعالیت روزانه و تمرینت محاسبه شده‌اند.", "Energy and nutrients are calculated from your current body data, daily activity, and structured exercise.")}</p>
@@ -185,26 +187,32 @@ function EstimateContent({ estimate, language, onRefresh }: { estimate: Nutritio
       </div>
     </section>
 
-    <section className="nutrition-target-grid" aria-label={l("اهداف مواد مغذی", "Nutrient targets")}>
+    <section className="nutrition-target-grid nutrition-target-grid--primary" aria-label={l("درشت‌مغذی‌های اصلی", "Primary macronutrient targets")}>
       <TargetCard title={l("پروتئین", "Protein")} value={preferred("protein")} note={l(`حداقل ${formatValue(target("protein")?.minimum, target("protein")?.unit, number, language)}`, `Minimum ${formatValue(target("protein")?.minimum, target("protein")?.unit, number, language)}`)} />
       <TargetCard title={l("کربوهیدرات", "Carbohydrate")} value={range("carbohydrate")} note={l("بازه علمی روزانه", "Scientific daily range")} />
       <TargetCard title={l("چربی کل", "Total fat")} value={range("total_fat")} note={l("بازه علمی روزانه", "Scientific daily range")} />
-      <TargetCard title={l("فیبر", "Fibre")} value={preferred("fibre")} note={l(`حداقل مطلق ${formatValue(target("fibre")?.minimum, target("fibre")?.unit, number, language)}`, `Absolute minimum ${formatValue(target("fibre")?.minimum, target("fibre")?.unit, number, language)}`)} />
-      <TargetCard title={l("قند آزاد", "Free sugar")} value={maximum("free_sugar")} note={l(`حد ترجیحی ${formatValue(target("free_sugar")?.preferred_maximum, target("free_sugar")?.unit, number, language)}`, `Preferred limit ${formatValue(target("free_sugar")?.preferred_maximum, target("free_sugar")?.unit, number, language)}`)} />
-      <TargetCard title={l("چربی اشباع", "Saturated fat")} value={maximum("saturated_fat")} note={l("حداکثر روزانه", "Daily maximum")} />
-      <TargetCard title={l("چربی ترانس", "Trans fat")} value={maximum("trans_fat")} note={l("حداکثر روزانه", "Daily maximum")} />
-      <TargetCard title={l("سدیم", "Sodium")} value={maximum("sodium")} note={l("حداکثر روزانه", "Daily maximum")} />
     </section>
 
-    {estimate.micronutrients && Object.keys(estimate.micronutrients).length > 0 && <section className="nutrition-estimate-notes"><h2>{l("مرجع ریزمغذی‌ها", "Micronutrient references")}</h2><p>{l("کمتر بودن دریافت غذایی از مقدار مرجع، تشخیص کمبود بالینی نیست؛ این بخش فقط برای سنجش کفایت رژیم و ترمیم برنامه است.", "Dietary intake below a reference is not a clinical deficiency diagnosis; it is used only to assess diet adequacy and guide plan repair.")}</p><div className="nutrition-micronutrient-grid">{Object.entries(estimate.micronutrients).map(([code, item]) => <article key={code}><strong>{nutrientDisplayName(code, language)}</strong><span>{number.format(item.target_value)} {item.unit}</span><small>{item.reference_kind} · {l("اطمینان", "Confidence")}: {item.confidence}</small></article>)}</div></section>}
+    <details className="nutrition-science-details">
+      <summary>{l("جزئیات علمی و حدود ایمنی", "Scientific details and safety limits")}</summary>
+      <div className="nutrition-target-grid nutrition-target-grid--secondary" aria-label={l("هدف‌های تغذیه تکمیلی", "Secondary nutrition targets")}>
+        <TargetCard title={l("فیبر", "Fibre")} value={preferred("fibre")} note={l(`حداقل مطلق ${formatValue(target("fibre")?.minimum, target("fibre")?.unit, number, language)}`, `Absolute minimum ${formatValue(target("fibre")?.minimum, target("fibre")?.unit, number, language)}`)} />
+        <TargetCard title={l("قند آزاد", "Free sugar")} value={maximum("free_sugar")} note={l(`حد ترجیحی ${formatValue(target("free_sugar")?.preferred_maximum, target("free_sugar")?.unit, number, language)}`, `Preferred limit ${formatValue(target("free_sugar")?.preferred_maximum, target("free_sugar")?.unit, number, language)}`)} />
+        <TargetCard title={l("چربی اشباع", "Saturated fat")} value={maximum("saturated_fat")} note={l("حداکثر روزانه", "Daily maximum")} />
+        <TargetCard title={l("چربی ترانس", "Trans fat")} value={maximum("trans_fat")} note={l("حداکثر روزانه", "Daily maximum")} />
+        <TargetCard title={l("سدیم", "Sodium")} value={maximum("sodium")} note={l("حداکثر روزانه", "Daily maximum")} />
+      </div>
 
-    <section className="nutrition-estimate-notes">
-      <h2>{l("این اعداد چه معنایی دارند؟", "What these numbers mean")}</h2>
-      <p>{l("این یک برآورد علمی است، نه تشخیص یا نسخه پزشکی. نتیجه واقعی با پایش وزن، انرژی و عملکرد اصلاح می‌شود.", "This is a scientific estimate, not a diagnosis or medical prescription. Real outcomes should refine it through weight, energy, and performance monitoring.")}</p>
-      <p>{l("هدف انرژی با توجه به هدف بدنی انتخاب‌شده و سهم فعالیت روزانه و تمرین ساختاریافته تنظیم می‌شود؛ پروتئین و درشت‌مغذی‌ها سپس در همان محدوده علمی هماهنگ می‌شوند.", "Energy is adjusted for the selected body goal, daily activity, and structured exercise; protein and other macronutrients are then coordinated within scientific bounds.")}</p>
-      <p>{l("قند افزوده جداگانه ردیابی می‌شود؛ برای محدودیت سلامتی، سقف قند آزاد معیار کنترل است.", "Added sugar is tracked separately; the free-sugar ceiling is the controlling health limit.")}</p>
-      <dl><div><dt>{l("نسخه سیاست", "Policy version")}</dt><dd>{estimate.policy_version}</dd></div><div><dt>{l("نسخه فرمول", "Formula version")}</dt><dd>{estimate.formula_version}</dd></div><div><dt>{l("بازبینی", "Revision")}</dt><dd>{new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR").format(estimate.revision)}</dd></div></dl>
-    </section>
+      {estimate.micronutrients && Object.keys(estimate.micronutrients).length > 0 && <section className="nutrition-estimate-notes"><h2>{l("مرجع ریزمغذی‌ها", "Micronutrient references")}</h2><p>{l("کمتر بودن دریافت غذایی از مقدار مرجع، تشخیص کمبود بالینی نیست؛ این بخش فقط برای سنجش کفایت رژیم و ترمیم برنامه است.", "Dietary intake below a reference is not a clinical deficiency diagnosis; it is used only to assess diet adequacy and guide plan repair.")}</p><div className="nutrition-micronutrient-grid">{Object.entries(estimate.micronutrients).map(([code, item]) => <article key={code}><strong>{nutrientDisplayName(code, language)}</strong><span>{number.format(item.target_value)} {item.unit}</span><small>{item.reference_kind} · {l("اطمینان", "Confidence")}: {item.confidence}</small></article>)}</div></section>}
+
+      <section className="nutrition-estimate-notes">
+        <h2>{l("این اعداد چه معنایی دارند؟", "What these numbers mean")}</h2>
+        <p>{l("این یک برآورد علمی است، نه تشخیص یا نسخه پزشکی. نتیجه واقعی با پایش وزن، انرژی و عملکرد اصلاح می‌شود.", "This is a scientific estimate, not a diagnosis or medical prescription. Real outcomes should refine it through weight, energy, and performance monitoring.")}</p>
+        <p>{l("هدف انرژی با توجه به هدف بدنی انتخاب‌شده و سهم فعالیت روزانه و تمرین ساختاریافته تنظیم می‌شود؛ پروتئین و درشت‌مغذی‌ها سپس در همان محدوده علمی هماهنگ می‌شوند.", "Energy is adjusted for the selected body goal, daily activity, and structured exercise; protein and other macronutrients are then coordinated within scientific bounds.")}</p>
+        <p>{l("قند افزوده جداگانه ردیابی می‌شود؛ برای محدودیت سلامتی، سقف قند آزاد معیار کنترل است.", "Added sugar is tracked separately; the free-sugar ceiling is the controlling health limit.")}</p>
+        <dl><div><dt>{l("نسخه سیاست", "Policy version")}</dt><dd>{estimate.policy_version}</dd></div><div><dt>{l("نسخه فرمول", "Formula version")}</dt><dd>{estimate.formula_version}</dd></div><div><dt>{l("بازبینی", "Revision")}</dt><dd>{new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR").format(estimate.revision)}</dd></div></dl>
+      </section>
+    </details>
   </>;
 }
 

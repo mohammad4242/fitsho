@@ -1,10 +1,11 @@
 .nutrition-estimate-page { min-height: 100svh; color: var(--fitsho-mist); background: radial-gradient(circle at 80% 5%, rgb(80 223 206 / 16%), transparent 30rem), var(--fitsho-petrol); }
 .nutrition-estimate-page .dashboard-header { max-width: 82rem; margin: 0 auto; padding: 1.25rem clamp(1rem, 4vw, 3rem); color: var(--fitsho-mist); }
 .nutrition-estimate-page .brand-mark--dark, .nutrition-estimate-page .authenticated-nav a { color: var(--fitsho-mist); }
-.nutrition-estimate-hero, .nutrition-estimate-summary, .nutrition-target-grid, .nutrition-estimate-notes, .nutrition-estimate-state { width: min(100% - 2rem, 76rem); margin-inline: auto; }
+.nutrition-estimate-hero, .nutrition-estimate-summary, .nutrition-target-grid, .nutrition-estimate-notes, .nutrition-estimate-state, .nutrition-science-details { width: min(100% - 2rem, 76rem); margin-inline: auto; }
 .nutrition-estimate-hero { padding: clamp(3rem, 8vw, 7rem) 0 2.5rem; }
-.nutrition-estimate-hero h1 { max-width: 10ch; margin: .4rem 0 1rem; font-size: clamp(3.5rem, 9vw, 7.5rem); }
+.nutrition-estimate-hero h1 { max-width: 12ch; margin: .4rem 0 1rem; font-size: clamp(3rem, 7vw, 5.8rem); }
 .nutrition-estimate-hero > p:last-child { max-width: 42rem; color: rgb(234 244 241 / 75%); line-height: 1.9; }
+.nutrition-estimate-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: 2rem; }
 .nutrition-estimate-back { color: var(--fitsho-aqua); text-decoration: none; font-weight: 800; }
 .nutrition-catalogue-entry { display: inline-grid; grid-template-columns: auto 1fr; gap: .05rem .55rem; align-items: center; margin-inline-start: .5rem; padding: .55rem .8rem; color: #ffd798; border: 1px solid rgb(255 215 152 / 24%); border-radius: .85rem; background: rgb(255 215 152 / 7%); text-decoration: none; vertical-align: middle; }
 .nutrition-catalogue-entry > span { grid-row: span 2; font-size: 1.35rem; }
@@ -18,7 +19,8 @@
 .nutrition-confidence-card { display: flex; flex-direction: column; justify-content: center; padding: 2rem; }
 .nutrition-confidence { align-self: start; padding: .5rem .8rem; border-radius: 99rem; background: rgb(80 223 206 / 15%); color: var(--fitsho-aqua); font-weight: 850; }
 .nutrition-confidence-card p { color: rgb(234 244 241 / 70%); line-height: 1.8; }
-.nutrition-target-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; padding-block: 1rem; }
+.nutrition-target-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; padding-block: 1rem; }
+.nutrition-target-grid--secondary { width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .nutrition-target-card { min-height: 10rem; display: flex; flex-direction: column; justify-content: space-between; padding: 1.35rem; }
 .nutrition-target-card span, .nutrition-target-card small { color: rgb(234 244 241 / 66%); }
 .nutrition-target-card strong { font-family: "Sora Variable", sans-serif; font-size: clamp(1.3rem, 2.5vw, 2rem); }
@@ -31,6 +33,11 @@
 .nutrition-micronutrient-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
 .nutrition-micronutrient-grid article { display: flex; flex-direction: column; gap: .3rem; padding: .8rem; border-radius: .8rem; background: rgb(255 255 255 / 5%); }
 .nutrition-micronutrient-grid small { color: rgb(234 244 241 / 58%); }
+.nutrition-science-details { margin-block: .5rem 1rem; border: 1px solid rgb(234 244 241 / 12%); border-radius: var(--fitsho-radius-card); background: rgb(9 54 51 / 52%); }
+.nutrition-science-details > summary { padding: 1.1rem 1.3rem; color: var(--fitsho-aqua); font-weight: 850; cursor: pointer; }
+.nutrition-science-details[open] > summary { border-bottom: 1px solid rgb(234 244 241 / 10%); }
+.nutrition-science-details .nutrition-estimate-notes { width: auto; margin: 1rem; box-shadow: none; }
+.nutrition-science-details .nutrition-target-grid { padding-inline: 1rem; }
 .weekly-plan, .weekly-plan-empty { width: min(100% - 2rem, 76rem); margin-inline: auto; }
 .weekly-plan-empty { margin-block: 1rem 6rem; padding: clamp(1.5rem, 4vw, 2.5rem); border: 1px solid rgb(128 255 232 / 18%); border-radius: var(--fitsho-radius-card); background: linear-gradient(125deg, rgb(9 54 51 / 88%), rgb(3 28 27 / 88%)); }
 .weekly-plan-empty h2 { max-width: 24ch; margin: .4rem 0 .8rem; font-size: clamp(1.8rem, 4vw, 3.4rem); }

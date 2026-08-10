@@ -8,4 +8,5 @@ it("marks the document root as the Fitsho application", () => {
   applyDesignSystem(documentElement);
 
   expect(documentElement).toHaveClass("fitsho-app");
+  expect(documentElement).toHaveAttribute("data-fitsho-theme", "dark");
 });

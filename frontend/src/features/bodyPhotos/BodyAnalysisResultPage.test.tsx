@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -207,6 +207,16 @@ it("shows protected thumbnails, confidence, four labeled finding groups, and rev
   expect(screen.getByLabelText(/doctor review pending/i)).toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent(/not yet been approved by both/i);
   expect(screen.getByRole("link", { name: /view workout plan/i })).toHaveAttribute("href", "/workout-plan");
+});
+
+it("maps only real analysis findings onto the body interface", async () => {
+  renderPage();
+
+  const bodyMap = await screen.findByRole("region", { name: "Body findings map" });
+  expect(within(bodyMap).getAllByRole("listitem")).toHaveLength(4);
+  expect(within(bodyMap).getByText("Shoulders")).toBeInTheDocument();
+  expect(within(bodyMap).getByText("Arms")).toBeInTheDocument();
+  expect(within(bodyMap).queryByText("Chest")).not.toBeInTheDocument();
 });
 
 it("shows the v3 goal suggestion and three-view assessment checklist", async () => {

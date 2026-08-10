@@ -1,19 +1,20 @@
 @import "./styles/tokens.css";
+@import "./styles/primitives.css";
 
 :root {
   --petrol-950: var(--fitsho-petrol);
   --petrol-900: var(--fitsho-teal);
   --petrol-800: #173d3b;
-  --mist-100: var(--fitsho-mist);
-  --mist-50: var(--fitsho-surface);
+  --mist-100: #eaf4f1;
+  --mist-50: #f7fbf9;
   --paper: #ffffff;
   --turquoise: var(--fitsho-aqua);
   --turquoise-dark: #1cae9d;
   --persimmon: var(--fitsho-coral);
   --saffron: #f4b942;
-  --ink: var(--fitsho-ink);
-  --muted: var(--fitsho-muted);
-  --line: var(--fitsho-line);
+  --ink: #102422;
+  --muted: #607571;
+  --line: #d4e4df;
   --danger: #a13f32;
   font-family: "Vazirmatn Variable", Tahoma, sans-serif;
   color: var(--ink);
@@ -1075,4 +1076,101 @@ html[dir="ltr"] .primary-button span:last-child {
 
 .member-page-background .member-header-media__asset {
   object-fit: cover;
+}
+
+/* Shared public-account identity */
+.auth-shell.fitsho-page {
+  color: var(--fitsho-ink);
+  background: var(--fitsho-canvas);
+}
+
+.auth-shell .brand-panel {
+  background: var(--fitsho-petrol);
+}
+
+.auth-shell .brand-panel__photo {
+  object-position: 58% center;
+  opacity: 0.74;
+  filter: saturate(0.75) contrast(1.08);
+}
+
+.auth-shell .brand-panel::before {
+  background: linear-gradient(105deg, rgb(6 21 19 / 96%), rgb(6 21 19 / 54%) 65%, rgb(6 21 19 / 22%));
+}
+
+.auth-shell .form-panel {
+  color: var(--fitsho-ink);
+  background: var(--fitsho-canvas);
+}
+
+.auth-shell .form-heading h2,
+.auth-shell .next-step-card h2,
+.auth-shell .auth-form label,
+.auth-shell .label-row {
+  color: var(--fitsho-ink);
+}
+
+.auth-shell .form-heading > p:last-child,
+.auth-shell .form-alternative,
+.auth-shell .label-row span {
+  color: var(--fitsho-muted);
+}
+
+.auth-shell .auth-form input {
+  border-color: var(--fitsho-line);
+  color: var(--fitsho-ink);
+  background: var(--fitsho-surface);
+  color-scheme: dark;
+}
+
+.auth-shell .auth-form input:focus {
+  border-color: var(--fitsho-aqua);
+  box-shadow: 0 0 0 4px rgb(80 223 206 / 12%);
+}
+
+.auth-shell .primary-button {
+  color: var(--fitsho-canvas);
+  background: var(--fitsho-aqua);
+  box-shadow: none;
+}
+
+.auth-shell .primary-button:hover:not(:disabled) { background: #68eadb; }
+.auth-shell .form-alternative a { color: var(--fitsho-aqua); }
+.auth-shell .brand-mark--dark { color: var(--fitsho-ink); }
+
+@media (max-width: 760px) {
+  .auth-shell .form-panel { background: var(--fitsho-canvas); }
+  .auth-shell .form-panel__mobile-nav { border-bottom-color: var(--fitsho-line); }
+}
+
+.fitsho-page .dashboard-header {
+  width: min(100% - 2rem, var(--fitsho-content-max));
+  max-width: none;
+  margin-inline: auto;
+  padding-block: 1rem;
+  border-bottom: 1px solid var(--fitsho-line);
+}
+
+.fitsho-page .dashboard-header .brand-mark--dark { color: var(--fitsho-ink); }
+.fitsho-page .authenticated-nav a { color: var(--fitsho-muted); }
+.fitsho-page .authenticated-nav a[aria-current="page"] { color: var(--fitsho-aqua); }
+.fitsho-page .dashboard-header .language-switcher,
+.fitsho-page .dashboard-header .logout-button {
+  border-color: var(--fitsho-line);
+  color: var(--fitsho-ink);
+  background: var(--fitsho-surface);
+}
+
+.fitsho-page .member-menu-button {
+  border-color: var(--fitsho-line);
+  color: var(--fitsho-ink);
+  background: var(--fitsho-surface);
+}
+
+.fitsho-page .member-menu {
+  max-height: min(70svh, 34rem);
+  overflow-y: auto;
+  border-color: var(--fitsho-line);
+  color: var(--fitsho-ink);
+  background: var(--fitsho-surface-raised);
 }

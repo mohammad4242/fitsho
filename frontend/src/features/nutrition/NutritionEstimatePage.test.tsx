@@ -142,6 +142,7 @@ it("shows the scientific calorie and nutrient estimate with its limits in Persia
   expect(screen.getByText("اطمینان بالا")).toBeInTheDocument();
   expect(screen.getByText(/برآورد علمی است، نه تشخیص یا نسخه پزشکی/)).toBeInTheDocument();
   expect(screen.getByText(/nutrition-science-v1/)).toBeInTheDocument();
+  expect(screen.getByText("جزئیات علمی و حدود ایمنی").closest("details")).not.toHaveAttribute("open");
 });
 
 it("uses complete English copy and left-to-right layout", async () => {

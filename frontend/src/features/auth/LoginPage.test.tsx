@@ -24,7 +24,11 @@ function renderPage() {
 it("keeps the login form usable beside the decorative training photo", () => {
   renderPage();
 
-  expect(screen.getByTestId("auth-training-accent")).toHaveAttribute("aria-hidden", "true");
+  expect(screen.getByTestId("auth-training-accent")).toHaveAttribute(
+    "src",
+    expect.stringContaining("fitsho-body-hero"),
+  );
+  expect(document.querySelector(".auth-shell")).toHaveClass("fitsho-page");
   expect(screen.getByLabelText("ایمیل")).toBeVisible();
   expect(screen.getByRole("button", { name: "ورود به فیتشو" })).toBeEnabled();
 });

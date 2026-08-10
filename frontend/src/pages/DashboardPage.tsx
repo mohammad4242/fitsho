@@ -1,22 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
-import heroStrengthFallback from "../assets/landing/hero-strength-fallback.jpg";
-import heroStrengthVideo from "../assets/landing/hero-strength.mp4";
-import planFocusFallback from "../assets/landing/plan-focus-fallback.jpg";
-import planFocusVideo from "../assets/landing/plan-focus.mp4";
-import progressDriveFallback from "../assets/landing/progress-drive-fallback.jpg";
-import progressDriveVideo from "../assets/landing/progress-drive.mp4";
 import { useAuth } from "../features/auth/AuthContext";
+import { getLatestWeeklyNutritionPlan } from "../features/nutrition/api";
 import { useProfile } from "../features/profile/ProfileContext";
 import { generateWorkoutPlan, getActiveWorkoutPlan } from "../features/workouts/api";
-import { getLatestWeeklyNutritionPlan } from "../features/nutrition/api";
 import { AuthenticatedHeader } from "../shared/AuthenticatedHeader";
-import { MemberHeaderMedia } from "../shared/MemberHeaderMedia";
 import "./dashboard.css";
 
 type PlanState = "loading" | "empty" | "ready" | "error";
+type NutritionState = "loading" | "pending" | "ready" | "empty";
 
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
@@ -27,10 +21,7 @@ export function DashboardPage() {
   const hasNutrition = productMode === "nutrition" || productMode === "both";
   const [planState, setPlanState] = useState<PlanState>("loading");
   const [generating, setGenerating] = useState(false);
-  const [nutritionCapability, setNutritionCapability] = useState<"loading" | "pending" | "ready" | "empty">("loading");
-  const [storyStage, setStoryStage] = useState<"plan" | "progress">("plan");
-  const planChapter = useRef<HTMLElement>(null);
-  const progressChapter = useRef<HTMLElement>(null);
+  const [nutritionState, setNutritionState] = useState<NutritionState>("loading");
 
   useEffect(() => {
     if (!hasTraining) {
@@ -39,46 +30,26 @@ export function DashboardPage() {
     }
     let active = true;
     void getActiveWorkoutPlan()
-      .then((plan) => {
-        if (active) setPlanState(plan === null ? "empty" : "ready");
-      })
-      .catch(() => {
-        if (active) setPlanState("error");
-      });
-    return () => {
-      active = false;
-    };
+      .then((plan) => { if (active) setPlanState(plan === null ? "empty" : "ready"); })
+      .catch(() => { if (active) setPlanState("error"); });
+    return () => { active = false; };
   }, [hasTraining]);
 
   useEffect(() => {
-    if (!hasNutrition) { setNutritionCapability("empty"); return; }
+    if (!hasNutrition) {
+      setNutritionState("empty");
+      return;
+    }
     let active = true;
-    void getLatestWeeklyNutritionPlan().then((plan) => {
-      if (!active) return;
-      setNutritionCapability(plan === null ? "empty" : plan.physician_approved ? "ready" : "pending");
-    }).catch(() => { if (active) setNutritionCapability("empty"); });
+    void getLatestWeeklyNutritionPlan()
+      .then((plan) => {
+        if (active) setNutritionState(plan === null ? "empty" : plan.physician_approved ? "ready" : "pending");
+      })
+      .catch(() => { if (active) setNutritionState("empty"); });
     return () => { active = false; };
   }, [hasNutrition]);
 
-  useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          setStoryStage(entry.target === progressChapter.current ? "progress" : "plan");
-        });
-      },
-      { threshold: 0.55 },
-    );
-    if (planChapter.current) observer.observe(planChapter.current);
-    if (progressChapter.current) observer.observe(progressChapter.current);
-    return () => observer.disconnect();
-  }, []);
-
-  if (user === null) {
-    return null;
-  }
+  if (user === null) return null;
 
   function startWorkout() {
     setGenerating(true);
@@ -87,103 +58,91 @@ export function DashboardPage() {
       .finally(() => setGenerating(false));
   }
 
+  const english = i18n.resolvedLanguage === "en";
+  const planDuration = profile?.plan_duration_weeks;
+
   return (
-    <main className="today-shell">
-      <MemberHeaderMedia
-        imageSrc={heroStrengthFallback}
-        videoSrc={heroStrengthVideo}
-        className="member-page-background"
-      />
+    <main className="command-center fitsho-page">
       <AuthenticatedHeader />
+      <div className="command-center__container">
+        <header className="command-center__welcome">
+          <p className="fitsho-section-heading__eyebrow">{t("dashboard.kicker")}</p>
+          <h1 className="fitsho-display">{t("dashboard.greeting", { name: profile?.display_name ?? (english ? "there" : "دوست") })}</h1>
+          <p>{t("dashboard.commandIntro")}</p>
+        </header>
 
-      <section className="today-hero" aria-labelledby="today-title">
-        <div className="today-hero__content">
-          <p className="today-kicker">{t("dashboard.kicker")}</p>
-          <h1 id="today-title" className="fitsho-display">
-            {t("dashboard.greeting", { name: profile?.display_name ?? (i18n.language === "en" ? "there" : "دوست" ) })}
-          </h1>
-          <p>{t("dashboard.intro")}</p>
-          {profile === null ? <Link className="primary-button" to="/onboarding">{i18n.language === "en" ? "Complete profile" : "تکمیل پروفایل"}</Link> : hasTraining ? <PrimaryAction state={planState} generating={generating} onStart={startWorkout} /> : <Link className="today-primary-action" to="/nutrition-estimate">{i18n.language === "en" ? "View nutrition targets" : "دیدن هدف‌های تغذیه"}</Link>}
-        </div>
-        <p className="today-hero__hint" aria-hidden="true">{t("dashboard.scrollHint")}</p>
-      </section>
+        {profile === null && (
+          <Link className="fitsho-button" to="/onboarding">{t("dashboard.completeProfile")}</Link>
+        )}
 
-      <section className="today-story" aria-label={t("dashboard.storyLabel")} data-stage={storyStage}>
-        <div className="today-story__sticky" aria-hidden="true">
-          <MemberHeaderMedia
-            imageSrc={planFocusFallback}
-            videoSrc={planFocusVideo}
-            active={storyStage === "plan"}
-            className="today-story__video today-story__video--plan"
-          />
-          <MemberHeaderMedia
-            imageSrc={progressDriveFallback}
-            videoSrc={progressDriveVideo}
-            active={storyStage === "progress"}
-            className="today-story__video today-story__video--progress"
-          />
-        </div>
-        <div className="today-story__chapters">
-          <article className="today-story__chapter" ref={planChapter}>
-            <span>01</span>
-            <div>
-              <p className="today-kicker">{t("dashboard.storyOneEyebrow")}</p>
-              <h2 className="fitsho-display">{t("dashboard.storyOneTitle")}</h2>
-              <p>{t("dashboard.storyOneBody")}</p>
+        <section className="command-center__grid" aria-label={t("dashboard.statusLabel")}>
+          {hasTraining && (
+            <article className="command-card command-card--primary">
+              <div className="command-card__head">
+                <div>
+                  <p>{t("dashboard.trainingEyebrow")}</p>
+                  <h2>{t("dashboard.todayWorkout")}</h2>
+                </div>
+                <span className={`fitsho-status fitsho-status--${planState === "ready" ? "success" : "neutral"}`}>
+                  {t(`dashboard.planState.${planState}`)}
+                </span>
+              </div>
+              {planDuration !== undefined && (
+                <p className="command-card__context">
+                  {t("dashboard.planDuration", { count: planDuration.toLocaleString(english ? "en-US" : "fa-IR") })}
+                </p>
+              )}
+              <p className="command-card__body">{t("dashboard.trainingBody")}</p>
+              <PrimaryAction state={planState} generating={generating} onStart={startWorkout} />
+            </article>
+          )}
+
+          {hasNutrition && (
+            <Link
+              className="command-card command-card--nutrition"
+              to="/nutrition-estimate"
+              aria-label={t("dashboard.nutritionAria")}
+            >
+              <div className="command-card__head">
+                <div><p>{t("dashboard.nutritionEyebrow")}</p><h2>{t("dashboard.nutritionTitle")}</h2></div>
+                <span className="fitsho-status fitsho-status--neutral">{t(`dashboard.nutritionState.${nutritionState}`)}</span>
+              </div>
+              <p className="command-card__body">{t("dashboard.nutritionBody")}</p>
+              <span className="command-card__link">{t("dashboard.viewTargets")} <b aria-hidden="true">←</b></span>
+            </Link>
+          )}
+
+          <Link
+            className="command-card command-card--progress"
+            to="/body-progress"
+            aria-label={t("workoutPlan.body.action")}
+          >
+            <div className="command-card__head">
+              <div><p>{t("dashboard.progressEyebrow")}</p><h2>{t("dashboard.progressTitle")}</h2></div>
             </div>
-          </article>
-          <article className="today-story__chapter today-story__chapter--progress" ref={progressChapter}>
-            <span>02</span>
-            <div>
-              <p className="today-kicker">{t("dashboard.storyTwoEyebrow")}</p>
-              <h2 className="fitsho-display">{t("dashboard.storyTwoTitle")}</h2>
-              <p>{t("dashboard.storyTwoBody")}</p>
-            </div>
-          </article>
-        </div>
-      </section>
+            <p className="command-card__body">{t("dashboard.progressBody")}</p>
+            <span className="command-card__link">{t("workoutPlan.body.action")} <b aria-hidden="true">←</b></span>
+          </Link>
+        </section>
 
-      <section className="today-actions" aria-label={t("dashboard.quickActions")}>
-        {hasTraining && <Link to="/workout-plan" className="today-actions__card">
-          <span>01</span>
-          <div>
-            <p>{t("dashboard.planCardEyebrow")}</p>
-            <h2>{t("dashboard.planCardTitle")}</h2>
-          </div>
-          <b aria-hidden="true">↖</b>
-        </Link>}
-        {hasTraining && <Link to="/exercises" className="today-actions__card today-actions__card--aqua">
-          <span>02</span>
-          <div>
-            <p>{t("dashboard.catalogEyebrow")}</p>
-            <h2>{t("dashboard.catalogTitle")}</h2>
-          </div>
-          <b aria-hidden="true">↖</b>
-        </Link>}
-        {hasNutrition && <Link to="/nutrition-estimate" className="today-actions__card today-actions__card--nutrition" aria-label={i18n.language === "en" ? "Daily nutrition targets" : "هدف روزانه تغذیه"}>
-          <span>{hasTraining ? "03" : "01"}</span>
-          <div><p>{nutritionCapabilityLabel(nutritionCapability, i18n.language === "en")}</p><h2>{i18n.language === "en" ? "Nutrition plan and tracking" : "برنامه و پایش تغذیه"}</h2></div>
-          <b aria-hidden="true">↖</b>
-        </Link>}
-      </section>
+        <nav className="command-center__quick" aria-label={t("dashboard.quickActions") }>
+          {hasTraining && <Link to="/workout-plan">{t("header.workoutPlan")}</Link>}
+          {hasTraining && <Link to="/exercises">{t("header.exercises")}</Link>}
+          {hasNutrition && <Link to="/food-catalogue">{t("header.foodCatalogue")}</Link>}
+          <Link to="/profile">{t("header.profile")}</Link>
+        </nav>
+      </div>
     </main>
   );
 }
 
-function nutritionCapabilityLabel(status: "loading" | "pending" | "ready" | "empty", english: boolean) {
-  const labels = { loading: ["در حال بررسی", "Checking"], pending: ["در انتظار بررسی پزشک", "Pending physician review"], ready: ["برنامه تغذیه آماده", "Nutrition ready"], empty: ["ساخت برنامه تغذیه", "Build nutrition plan"] } as const;
-  return labels[status][english ? 1 : 0];
-}
-
 function PrimaryAction({ state, generating, onStart }: { state: PlanState; generating: boolean; onStart: () => void }) {
   const { t } = useTranslation();
-
   if (state === "ready") {
-    return <Link className="today-primary-action" to="/workout-plan">{t("dashboard.start")}</Link>;
+    return <Link className="fitsho-button command-card__action" to="/workout-plan">{t("dashboard.start")}</Link>;
   }
-
   return (
-    <button className="today-primary-action" type="button" onClick={onStart} disabled={state === "loading" || generating}>
+    <button className="fitsho-button command-card__action" type="button" onClick={onStart} disabled={state === "loading" || generating}>
       {generating ? t("dashboard.generating") : t("dashboard.start")}
     </button>
   );
