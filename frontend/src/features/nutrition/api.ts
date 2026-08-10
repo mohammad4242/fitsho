@@ -36,6 +36,30 @@ export type FoodCatalogueItem = {
   category: string;
   measurement_basis: "raw" | "dry" | "as_purchased";
   nutrient_basis: { quantity: string; unit: string };
+  portions: FoodCataloguePortion[];
+  macros: Record<"energy_kcal" | "protein_g" | "carbohydrate_g" | "total_fat_g" | "fibre_g", string | null>;
+  nutrients: FoodCatalogueNutrient[];
+  source: {
+    name: string;
+    reference: string;
+    source_food_id: string | null;
+    data_version: string;
+    access_date: string | null;
+  };
+};
+
+export type FoodCataloguePortion = {
+  code: "piece" | "palm" | "cup" | "tablespoon" | "teaspoon";
+  quantity: string;
+  label_fa: string;
+  label_en: string;
+  grams: string;
+  is_default: boolean;
+  source_name: string;
+  source_reference: string;
+};
+
+export type AdminFoodCatalogueItem = FoodCatalogueItem & {
   price: {
     status: "accepted" | "not_found";
     reference_price_irr?: string;
@@ -46,15 +70,6 @@ export type FoodCatalogueItem = {
     canonical_unit?: string;
     accepted_at?: string;
     source?: "automatic" | "manual_override";
-  };
-  macros: Record<"energy_kcal" | "protein_g" | "carbohydrate_g" | "total_fat_g" | "fibre_g", string | null>;
-  nutrients: FoodCatalogueNutrient[];
-  source: {
-    name: string;
-    reference: string;
-    source_food_id: string | null;
-    data_version: string;
-    access_date: string | null;
   };
 };
 
@@ -73,13 +88,25 @@ export type FoodCatalogueQuery = {
   pageSize?: number;
 };
 
+export type AdminFoodCatalogueResponse = Omit<FoodCatalogueResponse, "items"> & {
+  items: AdminFoodCatalogueItem[];
+};
+
 export function getFoodCatalogue(input: FoodCatalogueQuery = {}): Promise<FoodCatalogueResponse> {
+  return getCatalogueAtPath<FoodCatalogueResponse>("food-catalogue", input);
+}
+
+export function getAdminFoodCatalogue(input: FoodCatalogueQuery = {}): Promise<AdminFoodCatalogueResponse> {
+  return getCatalogueAtPath<AdminFoodCatalogueResponse>("admin/food-catalogue", input);
+}
+
+function getCatalogueAtPath<T>(path: string, input: FoodCatalogueQuery): Promise<T> {
   const parameters = new URLSearchParams();
   if (input.query) parameters.set("q", input.query);
   if (input.category) parameters.set("category", input.category);
   parameters.set("page", String(input.page ?? 1));
   parameters.set("page_size", String(input.pageSize ?? 24));
-  return request<FoodCatalogueResponse>(`${nutritionPath}/food-catalogue?${parameters}`);
+  return request<T>(`${nutritionPath}/${path}?${parameters}`);
 }
 
 export function saveCatalogueFood(input: Record<string, unknown>): Promise<unknown> {

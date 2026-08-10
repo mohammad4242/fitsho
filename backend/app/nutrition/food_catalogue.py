@@ -29,6 +29,7 @@ from app.nutrition.models import (
     NutritionCatalogueMeal,
     NutritionCatalogueMealItem,
     NutritionFoodComposition,
+    NutritionFoodPortion,
 )
 from app.nutrition.schemas import (
     CatalogueFoodResponse,
@@ -107,6 +108,10 @@ def calculate_meal_totals(
     return totals
 
 
+def scale_nutrient_value_for_grams(value_per_100g: Decimal, grams: Decimal) -> Decimal:
+    return value_per_100g * grams / Decimal("100")
+
+
 def validate_meal_roles(slot_role: str, food_roles: list[str]) -> None:
     if not food_roles:
         raise ValueError("Meal requires at least one food")
@@ -129,6 +134,7 @@ def list_verified_foods(db: Session) -> list[CatalogueFoodResponse]:
             selectinload(NutritionCatalogueFood.roles),
             selectinload(NutritionCatalogueFood.compositions),
             selectinload(NutritionCatalogueFood.aliases),
+            selectinload(NutritionCatalogueFood.portions),
         )
         .order_by(NutritionCatalogueFood.name_en)
     ).all()
@@ -211,6 +217,9 @@ def save_catalogue_food(db: Session, payload: CatalogueFoodWrite) -> CatalogueFo
         )
         for nutrient in nutrients
     ]
+    if len([portion for portion in payload.portions if portion.is_default]) > 1:
+        raise ValueError("Only one default food portion is allowed")
+    food.portions = [NutritionFoodPortion(**portion.model_dump()) for portion in payload.portions]
     db.commit()
     db.refresh(food)
     return _food_response(food)
@@ -306,6 +315,20 @@ def _food_response(food: NutritionCatalogueFood) -> CatalogueFoodResponse:
             }
             for item in food.compositions
         ],
+        portions=[
+            {
+                "code": item.code,
+                "quantity": item.quantity,
+                "label_fa": item.label_fa,
+                "label_en": item.label_en,
+                "grams": item.grams,
+                "is_default": item.is_default,
+                "sort_order": item.sort_order,
+                "source_name": item.source_name,
+                "source_reference": item.source_reference,
+            }
+            for item in food.portions
+        ],
     )
 
 
@@ -394,6 +417,7 @@ def seed_base_iranian_food_catalogue(
                 selectinload(NutritionCatalogueFood.roles),
                 selectinload(NutritionCatalogueFood.aliases),
                 selectinload(NutritionCatalogueFood.compositions),
+                selectinload(NutritionCatalogueFood.portions),
             )
         )
         if food is None:
@@ -403,6 +427,7 @@ def seed_base_iranian_food_catalogue(
             food.roles.clear()
             food.aliases.clear()
             food.compositions.clear()
+            food.portions.clear()
             db.flush()
         food.name_fa = item.name_fa
         food.name_en = item.name_en
@@ -445,6 +470,20 @@ def seed_base_iranian_food_catalogue(
                 confidence=EstimateConfidence.HIGH,
             )
             for code, value in nutrients.items()
+        ]
+        food.portions = [
+            NutritionFoodPortion(
+                code=portion.code,
+                quantity=portion.quantity,
+                label_fa=portion.label_fa,
+                label_en=portion.label_en,
+                grams=portion.grams,
+                is_default=portion.is_default,
+                sort_order=portion.sort_order,
+                source_name=portion.source_name,
+                source_reference=portion.source_reference,
+            )
+            for portion in item.portions
         ]
         seeded.append(food)
     if commit:

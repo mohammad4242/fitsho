@@ -34,9 +34,20 @@ notes. User-visible and internal physician notes are separate; internal notes ne
 member plan responses. The physician role is checked independently of administrator status. Admin
 routes manage canonical foods/meals and supplements.
 
-`GET /food-catalogue` returns verified foods only. Accepted member prices include
-`reference_price_irr`, an `IRR_PER_*` unit, source, observation time, and acceptance time. Deprecated
-Toman fields remain temporarily for older clients. Missing fresh prices return `status=not_found`.
+`GET /food-catalogue` returns verified foods only and is member-safe: it never serializes a
+catalogue `price` field. It includes bilingual identity, aliases/search results, category, complete
+available nutrient composition, provenance, and household display portions. Price data is available
+only through `GET /admin/food-catalogue`, which uses the same search, category, and pagination
+semantics and adds the accepted/not-found price view for administrators.
+
+Food composition remains canonical per 100 g in storage, planner inputs, tracking, and snapshots.
+`portions` are source-backed display metadata with an exact gram conversion; clients rescale a
+nutrient as `per_100g * portion_grams / 100` and always label the selected basis. If no defensible
+portion exists, clients use the explicit 100 g fallback. Portion provenance is required and missing
+nutrients remain missing rather than becoming zero.
+
+Only foods with all five required primary nutrients (energy, protein, carbohydrate, total fat, and
+fibre) may be `verified` and appear in the public catalogue. Incomplete identities remain `draft`.
 
 Price operations are admin-only:
 

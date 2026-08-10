@@ -43,6 +43,10 @@
 .food-dialog { position: relative; width: min(100%, 48rem); max-height: min(88svh, 50rem); overflow: auto; box-sizing: border-box; padding: clamp(1.3rem, 4vw, 2.3rem); color: var(--fitsho-mist); border: 1px solid rgb(234 244 241 / 16%); border-radius: 1.4rem; background: #073431; box-shadow: 0 2rem 6rem rgb(0 0 0 / 44%); }
 .food-dialog__close { position: absolute; inset-block-start: .8rem; inset-inline-end: .8rem; width: 2.5rem; height: 2.5rem; color: var(--fitsho-mist); border: 1px solid rgb(234 244 241 / 15%); border-radius: 50%; background: rgb(255 255 255 / 6%); font-size: 1.4rem; cursor: pointer; }
 .food-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin-block: 1.2rem; }
+.food-basis-selector { display: flex; gap: .5rem; margin-top: 1rem; }
+.food-basis-selector button { padding: .45rem .7rem; color: var(--fitsho-mist); border: 1px solid rgb(234 244 241 / 18%); border-radius: .65rem; background: transparent; cursor: pointer; }
+.food-basis-selector button.is-selected { color: var(--fitsho-petrol); border-color: var(--fitsho-aqua); background: var(--fitsho-aqua); }
+.food-detail-basis { margin: .8rem 0 0; color: rgb(234 244 241 / 68%); }
 .food-detail-grid article { display: grid; gap: .3rem; padding: .8rem; border-radius: .8rem; background: rgb(255 255 255 / 5%); }
 .food-detail-grid span { color: rgb(234 244 241 / 56%); font-size: .72rem; }
 .food-dialog > footer { display: flex; justify-content: space-between; gap: 1rem; padding-top: 1rem; border-top: 1px solid rgb(234 244 241 / 10%); }

@@ -64,6 +64,20 @@ class ApprovedFoodSeed:
     aliases: tuple[str, ...]
     measurement_basis: str
     source_food_id: str | None
+    portions: tuple["FoodPortionSeed", ...] = ()
+
+
+@dataclass(frozen=True)
+class FoodPortionSeed:
+    code: str
+    quantity: Decimal
+    label_fa: str
+    label_en: str
+    grams: Decimal
+    is_default: bool
+    sort_order: int
+    source_name: str
+    source_reference: str
 
 
 def _food(
@@ -75,6 +89,7 @@ def _food(
     basis: str,
     source_food_id: str | None,
     *aliases: str,
+    portions: tuple[FoodPortionSeed, ...] = (),
 ) -> ApprovedFoodSeed:
     return ApprovedFoodSeed(
         slug=slug,
@@ -85,6 +100,7 @@ def _food(
         aliases=(name_fa, name_en, *aliases),
         measurement_basis=basis,
         source_food_id=source_food_id,
+        portions=portions,
     )
 
 
@@ -132,7 +148,10 @@ APPROVED_FOODS = (
         "173709",
         "کنسرو تن ماهی",
     ),
-    _food("egg", "تخم‌مرغ", "Egg", "eggs", "main_protein", "raw", "171287", "تخم مرغ"),
+    _food(
+        "egg", "تخم‌مرغ", "Egg", "eggs", "main_protein", "raw", "171287", "تخم مرغ",
+        portions=(FoodPortionSeed("piece", Decimal("1"), "۱ عدد", "1 piece", Decimal("50"), True, 0, USDA_SOURCE_NAME, USDA_SOURCE_REFERENCE),),
+    ),
     _food("lentils", "عدس", "Lentils", "legumes", "main_protein", "dry", "172420", "عدس خشک"),
     _food("chickpeas", "نخود", "Chickpeas", "legumes", "main_protein", "dry", "173756", "نخود خشک"),
     _food("pinto-beans", "لوبیا چیتی", "Pinto beans", "legumes", "main_protein", "dry", "175199"),

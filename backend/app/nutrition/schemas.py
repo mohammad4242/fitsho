@@ -13,6 +13,7 @@ from app.nutrition.enums import (
     DietaryPattern,
     EstimateConfidence,
     FoodMeasurementBasis,
+    FoodPortionUnit,
     MainMealCountBucket,
     MealPreparationPreference,
     MedicalConditionCode,
@@ -284,6 +285,18 @@ class CatalogueNutrientInput(BaseModel):
     confidence: EstimateConfidence
 
 
+class CatalogueFoodPortionInput(BaseModel):
+    code: FoodPortionUnit
+    quantity: Decimal = Field(default=Decimal("1"), gt=0)
+    label_fa: str = Field(min_length=1, max_length=80)
+    label_en: str = Field(min_length=1, max_length=80)
+    grams: Decimal = Field(gt=0)
+    is_default: bool = False
+    sort_order: int = Field(default=0, ge=0)
+    source_name: str = Field(min_length=1, max_length=160)
+    source_reference: str = Field(min_length=1, max_length=500)
+
+
 class CatalogueFoodWrite(BaseModel):
     slug: str = Field(min_length=1, max_length=120, pattern=r"^[a-z0-9-]+$")
     name_fa: str = Field(min_length=1, max_length=160)
@@ -307,6 +320,7 @@ class CatalogueFoodWrite(BaseModel):
     )
     roles: list[str] = Field(min_length=1, max_length=4)
     nutrients: list[CatalogueNutrientInput] = Field(default_factory=list, max_length=64)
+    portions: list[CatalogueFoodPortionInput] = Field(default_factory=list, max_length=12)
 
 
 class CatalogueFoodResponse(CatalogueFoodWrite):
@@ -338,6 +352,17 @@ class FoodCatalogueSourceResponse(BaseModel):
     access_date: date | None
 
 
+class FoodCataloguePortionResponse(BaseModel):
+    code: FoodPortionUnit
+    quantity: Decimal
+    label_fa: str
+    label_en: str
+    grams: Decimal
+    is_default: bool
+    source_name: str
+    source_reference: str
+
+
 class FoodCatalogueItemResponse(BaseModel):
     id: UUID
     slug: str
@@ -346,14 +371,26 @@ class FoodCatalogueItemResponse(BaseModel):
     category: str
     measurement_basis: FoodMeasurementBasis
     nutrient_basis: FoodCatalogueNutrientBasis
-    price: FoodCataloguePriceResponse
     macros: dict[str, Decimal | None]
     nutrients: list[CatalogueNutrientInput]
+    portions: list[FoodCataloguePortionResponse]
     source: FoodCatalogueSourceResponse
+
+
+class AdminFoodCatalogueItemResponse(FoodCatalogueItemResponse):
+    price: FoodCataloguePriceResponse
 
 
 class FoodCataloguePageResponse(BaseModel):
     items: list[FoodCatalogueItemResponse]
+    page: int
+    page_size: int
+    total: int
+    categories: list[str]
+
+
+class AdminFoodCataloguePageResponse(BaseModel):
+    items: list[AdminFoodCatalogueItemResponse]
     page: int
     page_size: int
     total: int

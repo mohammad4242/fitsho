@@ -47,7 +47,7 @@ def test_training_member_cannot_read_food_catalogue(client: TestClient, db: Sess
     assert response.status_code == 403
 
 
-def test_nutrition_member_sees_macros_search_and_missing_price(
+def test_nutrition_member_sees_macros_search_and_no_price_data(
     client: TestClient, db: Session
 ) -> None:
     _register_with_mode(
@@ -78,11 +78,11 @@ def test_nutrition_member_sees_macros_search_and_missing_price(
         "fibre_g",
     }
     assert item["nutrient_basis"] == {"quantity": "100.0000", "unit": "g"}
-    assert item["price"] == {"status": "not_found"}
+    assert "price" not in item
     assert any(nutrient["nutrient_code"] == "iron_mg" for nutrient in item["nutrients"])
 
 
-def test_both_member_sees_current_accepted_price(client: TestClient, db: Session) -> None:
+def test_member_never_receives_an_accepted_catalogue_price(client: TestClient, db: Session) -> None:
     from app.nutrition.enums import EstimateConfidence, PriceReferenceStatus
     from app.nutrition.models import NutritionCatalogueFood, NutritionFoodPriceReference
 
@@ -121,12 +121,44 @@ def test_both_member_sees_current_accepted_price(client: TestClient, db: Session
 
     assert response.status_code == 200
     item = next(row for row in response.json()["items"] if row["slug"] == "basmati-rice")
+    assert "price" not in item
+
+
+def test_admin_reads_catalogue_with_price_data(client: TestClient, db: Session) -> None:
+    from app.nutrition.enums import EstimateConfidence, PriceReferenceStatus
+    from app.nutrition.models import NutritionCatalogueFood, NutritionFoodPriceReference
+
+    _register_with_mode(
+        client,
+        db,
+        email="admin-catalogue-read@example.com",
+        mode=ProductMode.NUTRITION,
+        admin=True,
+    )
+    rice = db.scalar(
+        select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "basmati-rice")
+    )
+    assert rice is not None
+    now = datetime.now(UTC)
+    db.merge(
+        NutritionFoodPriceReference(
+            food_id=rice.id,
+            canonical_unit="TOMAN_PER_KG",
+            reference_price_toman=Decimal("590000"),
+            sample_count=3,
+            confidence=EstimateConfidence.HIGH,
+            status=PriceReferenceStatus.ACCEPTED,
+            calculated_at=now,
+            accepted_at=now,
+        )
+    )
+    db.commit()
+
+    response = client.get("/api/v1/nutrition/admin/food-catalogue?q=Rice")
+
+    assert response.status_code == 200
+    item = next(row for row in response.json()["items"] if row["slug"] == "basmati-rice")
     assert item["price"]["status"] == "accepted"
-    assert item["price"]["reference_price_toman"] == "590000.00000000"
-    assert item["price"]["reference_price_irr"] == "5900000.00000000"
-    assert item["price"]["reference_unit"] == "IRR_PER_KG"
-    assert item["price"]["observed_at"] == now.isoformat().replace("+00:00", "Z")
-    assert item["price"]["source"] == "automatic"
 
 
 def test_only_admin_can_create_audited_price_override(client: TestClient, db: Session) -> None:

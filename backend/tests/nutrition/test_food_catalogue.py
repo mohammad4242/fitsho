@@ -41,6 +41,12 @@ def test_meal_totals_keep_missing_nutrients_unavailable() -> None:
     assert totals["sodium_mg"] is None
 
 
+def test_portion_scaling_keeps_the_canonical_100g_values_immutable() -> None:
+    from app.nutrition.food_catalogue import scale_nutrient_value_for_grams
+
+    assert scale_nutrient_value_for_grams(Decimal("12.56"), Decimal("50")) == Decimal("6.28")
+
+
 def test_main_meal_requires_a_substantial_main_food() -> None:
     from app.nutrition.food_catalogue import FoodRole, validate_meal_roles
 
@@ -148,3 +154,17 @@ def test_prepared_meals_remain_a_distinct_table() -> None:
 
     assert NutritionCatalogueFood.__tablename__ == "nutrition_catalogue_foods"
     assert NutritionCatalogueMeal.__tablename__ == "nutrition_catalogue_meals"
+
+
+def test_seeded_egg_has_a_default_documented_portion(db: Session) -> None:
+    from app.nutrition.models import NutritionCatalogueFood
+
+    egg = db.scalar(select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "egg"))
+
+    assert egg is not None
+    assert len(egg.portions) == 1
+    portion = egg.portions[0]
+    assert portion.code == "piece"
+    assert portion.grams == Decimal("50")
+    assert portion.is_default is True
+    assert portion.source_reference

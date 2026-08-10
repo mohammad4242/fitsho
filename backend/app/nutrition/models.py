@@ -36,6 +36,7 @@ from app.nutrition.enums import (
     EstimateConfidence,
     FoodItemKind,
     FoodMeasurementBasis,
+    FoodPortionUnit,
     FoodRole,
     FoodVerificationStatus,
     MainMealCountBucket,
@@ -659,6 +660,11 @@ class NutritionCatalogueFood(Base):
     aliases: Mapped[list["NutritionCatalogueFoodAlias"]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
     )
+    portions: Mapped[list["NutritionFoodPortion"]] = relationship(
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="NutritionFoodPortion.sort_order",
+    )
 
 
 class NutritionCatalogueFoodAlias(Base):
@@ -685,6 +691,33 @@ class NutritionCatalogueFoodRole(Base):
     role: Mapped[FoodRole] = mapped_column(
         enum_column(FoodRole, "ck_nutrition_catalogue_food_roles_values"), primary_key=True
     )
+
+
+class NutritionFoodPortion(Base):
+    """A display portion; compositions always remain canonical per 100 g."""
+
+    __tablename__ = "nutrition_food_portions"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_nutrition_food_portion_quantity_positive"),
+        CheckConstraint("grams > 0", name="ck_nutrition_food_portion_grams_positive"),
+        UniqueConstraint("food_id", "code", name="uq_nutrition_food_portion_code"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    code: Mapped[FoodPortionUnit] = mapped_column(
+        enum_column(FoodPortionUnit, "ck_nutrition_food_portion_code_values"), nullable=False
+    )
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False, default=Decimal("1"))
+    label_fa: Mapped[str] = mapped_column(String(80), nullable=False)
+    label_en: Mapped[str] = mapped_column(String(80), nullable=False)
+    grams: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    is_default: Mapped[bool] = mapped_column(nullable=False, default=False)
+    sort_order: Mapped[int] = mapped_column(nullable=False, default=0)
+    source_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
 
 
 class NutritionFoodComposition(Base):

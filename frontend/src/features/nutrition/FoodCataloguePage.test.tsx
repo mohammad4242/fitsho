@@ -35,7 +35,6 @@ const response: api.FoodCatalogueResponse = {
       category: "poultry",
       measurement_basis: "raw",
       nutrient_basis: { quantity: "100.0000", unit: "g" },
-      price: { status: "not_found" },
       macros: {
         energy_kcal: "120.00000000",
         protein_g: "22.50000000",
@@ -54,6 +53,18 @@ const response: api.FoodCatalogueResponse = {
           confidence: "high",
         },
       ],
+      portions: [
+        {
+          code: "piece",
+          quantity: "1.0000",
+          label_fa: "۱ عدد",
+          label_en: "1 piece",
+          grams: "50.0000",
+          is_default: true,
+          source_name: "USDA FoodData Central SR Legacy",
+          source_reference: "https://fdc.nal.usda.gov/download-datasets/",
+        },
+      ],
       source: {
         name: "USDA FoodData Central",
         reference: "https://fdc.nal.usda.gov/",
@@ -70,31 +81,38 @@ beforeEach(async () => {
   auth.isAdmin = false;
   await i18n.changeLanguage("fa");
   vi.mocked(api.getFoodCatalogue).mockResolvedValue(response);
+  vi.mocked(api.getAdminFoodCatalogue).mockResolvedValue({ ...response, items: [{ ...response.items[0], price: { status: "not_found" } }] });
 });
 
-it("shows the weekly shelf card and micronutrient details to a member", async () => {
+it("shows nutrient data and never shows catalogue price information to a member", async () => {
   const user = userEvent.setup();
   render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
 
   expect(await screen.findByRole("heading", { name: "کاتالوگ مواد غذایی" })).toBeVisible();
   expect(screen.getByRole("heading", { name: "سینه مرغ" })).toBeVisible();
-  expect(screen.getByText("یافت نشد")).toBeVisible();
-  expect(screen.getByText("۲۲٫۵ گرم")).toBeVisible();
+  expect(screen.queryByText("یافت نشد")).not.toBeInTheDocument();
+  expect(screen.getByText("۱۱٫۳ گرم")).toBeVisible();
   expect(screen.queryByRole("button", { name: "افزودن ماده غذایی" })).not.toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "جزئیات بیشتر" }));
   expect(screen.getByRole("dialog", { name: "جزئیات سینه مرغ" })).toBeVisible();
   expect(screen.getByText("آهن")).toBeVisible();
   expect(screen.getByText(/USDA FoodData Central/)).toBeVisible();
+  expect(screen.getByText("در ۱ عدد")).toBeVisible();
+  expect(screen.getByText(/۱ عدد ≈ ۵۰ گرم/)).toBeVisible();
+  expect(screen.getByText("۰٫۲ mg")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "۱۰۰ گرم" }));
+  expect(screen.getByText("۰٫۴ mg")).toBeVisible();
 });
 
-it("shows add-food and price controls only to an admin", async () => {
+it("shows price and price controls only to an admin", async () => {
   auth.isAdmin = true;
   render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
 
   await screen.findByRole("heading", { name: "کاتالوگ مواد غذایی" });
   expect(screen.getByRole("button", { name: "افزودن ماده غذایی" })).toBeVisible();
   expect(screen.getByRole("button", { name: "ویرایش قیمت سینه مرغ" })).toBeVisible();
+  expect(screen.getByText("یافت نشد")).toBeVisible();
 });
 
 it("uses English copy and left-to-right flow", async () => {
@@ -102,13 +120,14 @@ it("uses English copy and left-to-right flow", async () => {
   const { container } = render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
 
   expect(await screen.findByRole("heading", { name: "Food catalogue" })).toBeVisible();
-  expect(screen.getByText("Not found")).toBeVisible();
+  expect(screen.queryByText("Not found")).not.toBeInTheDocument();
   expect(container.querySelector("main")).toHaveAttribute("dir", "ltr");
 });
 
-it("shows accepted member prices in Toman with source and date", async () => {
+it("shows accepted catalogue prices to an admin only", async () => {
   await i18n.changeLanguage("en");
-  vi.mocked(api.getFoodCatalogue).mockResolvedValue({
+  auth.isAdmin = true;
+  vi.mocked(api.getAdminFoodCatalogue).mockResolvedValue({
     ...response,
     items: [{
       ...response.items[0],

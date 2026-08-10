@@ -31,7 +31,7 @@ from app.nutrition.adherence_service import (
     adherence_history,
     confirm_target_update,
 )
-from app.nutrition.catalogue_view import member_food_catalogue
+from app.nutrition.catalogue_view import admin_food_catalogue, member_food_catalogue
 from app.nutrition.clinical_service import (
     ClinicalError,
     authorize_lab_access,
@@ -130,6 +130,7 @@ from app.nutrition.price_overrides import create_price_override
 from app.nutrition.price_providers import configured_providers
 from app.nutrition.price_update_service import run_price_update_async
 from app.nutrition.schemas import (
+    AdminFoodCataloguePageResponse,
     CatalogueConsumptionInput,
     CatalogueFoodResponse,
     CatalogueFoodWrite,
@@ -260,6 +261,23 @@ def read_member_food_catalogue(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get(
+    "/admin/food-catalogue",
+    response_model=AdminFoodCataloguePageResponse,
+    response_model_exclude_none=True,
+)
+def read_admin_food_catalogue(
+    db: DatabaseSession,
+    admin: AdminUser,
+    q: str | None = Query(default=None, max_length=160),
+    category: str | None = Query(default=None, max_length=64),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=24, ge=1, le=60),
+) -> AdminFoodCataloguePageResponse:
+    del admin
+    return admin_food_catalogue(db, query=q, category=category, page=page, page_size=page_size)
 
 
 @router.post(

@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { useAuth } from "../auth/AuthContext";
 import * as api from "./api";
-import type { FoodCatalogueItem, FoodCatalogueResponse } from "./api";
+import type { AdminFoodCatalogueItem, AdminFoodCatalogueResponse, FoodCatalogueItem, FoodCatalogueResponse } from "./api";
 import "./foodCatalogue.css";
 
 type LoadState = "loading" | "ready" | "error";
@@ -25,20 +25,21 @@ export function FoodCataloguePage() {
   const fa = language === "fa";
   const l = (persian: string, english: string) => fa ? persian : english;
   const [state, setState] = useState<LoadState>("loading");
-  const [data, setData] = useState<FoodCatalogueResponse | null>(null);
+  const [data, setData] = useState<FoodCatalogueResponse | AdminFoodCatalogueResponse | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
   const [details, setDetails] = useState<FoodCatalogueItem | null>(null);
-  const [priceFood, setPriceFood] = useState<FoodCatalogueItem | null>(null);
+  const [priceFood, setPriceFood] = useState<AdminFoodCatalogueItem | null>(null);
   const [addingFood, setAddingFood] = useState(false);
 
   useEffect(() => {
     let active = true;
     setState("loading");
-    void api.getFoodCatalogue({ query, category, page, pageSize: 24 })
+    const getCatalogue = user?.is_admin ? api.getAdminFoodCatalogue : api.getFoodCatalogue;
+    void getCatalogue({ query, category, page, pageSize: 24 })
       .then((result) => {
         if (!active) return;
         setData(result);
@@ -48,7 +49,7 @@ export function FoodCataloguePage() {
         if (active) setState("error");
       });
     return () => { active = false; };
-  }, [category, page, query, reload]);
+  }, [category, page, query, reload, user?.is_admin]);
 
   function search(event: FormEvent) {
     event.preventDefault();
@@ -71,9 +72,9 @@ export function FoodCataloguePage() {
           <Link className="food-catalogue-back" to="/nutrition-estimate">
             <span aria-hidden="true">←</span> {l("بازگشت به تغذیه", "Back to Nutrition")}
           </Link>
-          <p className="eyebrow eyebrow--accent">{l("قیمت بازار × ترکیب علمی", "Market price × verified nutrition")}</p>
+          <p className="eyebrow eyebrow--accent">{l("ترکیب علمیِ تأییدشده", "Verified nutrition reference")}</p>
           <h1 className="fitsho-display">{l("کاتالوگ مواد غذایی", "Food catalogue")}</h1>
-          <p>{l("قیمت معتبر همین هفته و ارزش غذایی هر ۱۰۰ گرم را کنار هم ببین.", "Compare this week's accepted price with verified nutrition per 100 grams.")}</p>
+          <p>{l("ترکیب غذایی و ریزمغذی‌های موجود را با مبنای روشن ببین.", "Explore verified composition and available micronutrients with a clear basis.")}</p>
         </div>
         <CatalogueIcon />
       </section>
@@ -101,7 +102,7 @@ export function FoodCataloguePage() {
       {state === "ready" && data?.items.length === 0 && <p className="food-catalogue-state">{l("ماده‌ای با این مشخصات پیدا نشد.", "No food matched these filters.")}</p>}
       {state === "ready" && data && data.items.length > 0 && (
         <section className="food-catalogue-grid" aria-label={l("مواد غذایی", "Foods")}>
-          {data.items.map((food) => <FoodCard food={food} isAdmin={Boolean(user?.is_admin)} key={food.id} language={language} onDetails={() => setDetails(food)} onPrice={() => setPriceFood(food)} />)}
+          {data.items.map((food) => <FoodCard food={food} key={food.id} language={language} onDetails={() => setDetails(food)} onPrice={isAdminFood(food) ? () => setPriceFood(food) : undefined} />)}
         </section>
       )}
 
@@ -114,14 +115,15 @@ export function FoodCataloguePage() {
   );
 }
 
-function FoodCard({ food, isAdmin, language, onDetails, onPrice }: { food: FoodCatalogueItem; isAdmin: boolean; language: "fa" | "en"; onDetails: () => void; onPrice: () => void }) {
+function FoodCard({ food, language, onDetails, onPrice }: { food: FoodCatalogueItem; language: "fa" | "en"; onDetails: () => void; onPrice?: () => void }) {
   const fa = language === "fa";
   const l = (persian: string, english: string) => fa ? persian : english;
+  const portion = defaultPortion(food);
   return <article className="food-shelf-card">
-    <header><div><span>{categoryLabel(food.category, language)}</span><h2>{fa ? food.name_fa : food.name_en}</h2><small>{fa ? food.name_en : food.name_fa}</small></div><span className="food-shelf-card__basis">{l("در هر ۱۰۰ گرم", "per 100 g")}</span></header>
-    <div className={`food-price-ticket${food.price.status === "not_found" ? " is-missing" : ""}`}><span>{l("قیمت این هفته", "This week's price")}</span><strong>{food.price.status === "accepted" && food.price.reference_price_irr ? `${formatNumber(Number(food.price.reference_price_irr) / 10, language)} ${l("تومان", "Toman")}` : l("یافت نشد", "Not found")}</strong>{food.price.reference_unit && <small>{priceUnit(food.price.reference_unit, language)}</small>}{food.price.status === "accepted" && <small>{food.price.source === "manual_override" ? l("جایگزین موقت ادمین", "Temporary admin override") : l("به‌روزرسانی خودکار بازار", "Automatic market update")}{food.price.observed_at ? ` · ${formatDate(food.price.observed_at, language)}` : ""}</small>}</div>
-    <div className="food-macro-strip">{macroDefinitions.map(([code, faLabel, enLabel, unit]) => <div key={code}><span>{fa ? faLabel : enLabel}</span><strong>{macroValue(food.macros[code], unit, language)}</strong></div>)}</div>
-    <footer><button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>{isAdmin && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}</footer>
+    <header><div><span>{categoryLabel(food.category, language)}</span><h2>{fa ? food.name_fa : food.name_en}</h2><small>{fa ? food.name_en : food.name_fa}</small></div><span className="food-shelf-card__basis">{basisLabel(portion, language)}</span></header>
+    {isAdminFood(food) && <PriceTicket food={food} language={language} />}
+    <div className="food-macro-strip">{macroDefinitions.map(([code, faLabel, enLabel, unit]) => <div key={code}><span>{fa ? faLabel : enLabel}</span><strong>{macroValue(scale(food.macros[code], portion), unit, language)}</strong></div>)}</div>
+    <footer><button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>{onPrice && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}</footer>
   </article>;
 }
 
@@ -129,10 +131,13 @@ function FoodDetails({ food, language, onClose }: { food: FoodCatalogueItem; lan
   const fa = language === "fa";
   const l = (persian: string, english: string) => fa ? persian : english;
   const name = fa ? food.name_fa : food.name_en;
-  return <div className="food-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section aria-label={l(`جزئیات ${food.name_fa}`, `${food.name_en} details`)} aria-modal="true" className="food-dialog" role="dialog"><button className="food-dialog__close" type="button" onClick={onClose} aria-label={l("بستن", "Close")}>×</button><p className="eyebrow eyebrow--accent">{l("ریز‌مغذی‌ها", "Micronutrients")}</p><h2>{name}</h2><div className="food-detail-grid">{food.nutrients.map((nutrient) => <article key={nutrient.nutrient_code}><span>{nutrientName(nutrient.nutrient_code, language)}</span><strong>{formatNumber(nutrient.value_per_100g, language)} {nutrient.unit}</strong></article>)}</div><footer><span>{l("منبع", "Source")}: {food.source.name}</span><a href={food.source.reference} target="_blank" rel="noreferrer">{l("مشاهده منبع", "View source")}</a></footer></section></div>;
+  const [portion, setPortion] = useState(defaultPortion(food));
+  return <div className="food-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section aria-label={l(`جزئیات ${food.name_fa}`, `${food.name_en} details`)} aria-modal="true" className="food-dialog" role="dialog"><button className="food-dialog__close" type="button" onClick={onClose} aria-label={l("بستن", "Close")}>×</button><p className="eyebrow eyebrow--accent">{l("ریز‌مغذی‌ها", "Micronutrients")}</p><h2>{name}</h2>{food.portions.length > 0 && <div className="food-basis-selector"><button type="button" className={portion ? "is-selected" : ""} onClick={() => setPortion(defaultPortion(food))}>{l("واحد معمول", "Common portion")}</button><button type="button" className={!portion ? "is-selected" : ""} onClick={() => setPortion(null)}>{l("۱۰۰ گرم", "100 g")}</button></div>}<p className="food-detail-basis">{basisLabel(portion, language)}{portion && ` · ${portionLabel(portion, language)} ≈ ${formatNumber(Number(portion.grams), language)} ${l("گرم", "g")}`}</p><div className="food-detail-grid">{food.nutrients.map((nutrient) => <article key={nutrient.nutrient_code}><span>{nutrientName(nutrient.nutrient_code, language)}</span><strong>{formatNumber(scale(nutrient.value_per_100g, portion) ?? 0, language)} {nutrient.unit}</strong></article>)}</div><footer><span>{l("منبع", "Source")}: {food.source.name}</span><a href={food.source.reference} target="_blank" rel="noreferrer">{l("مشاهده منبع", "View source")}</a></footer></section></div>;
 }
 
-function PriceOverrideDialog({ food, language, onClose, onSaved }: { food: FoodCatalogueItem; language: "fa" | "en"; onClose: () => void; onSaved: () => void }) {
+function PriceTicket({ food, language }: { food: AdminFoodCatalogueItem; language: "fa" | "en" }) { const fa = language === "fa"; const l = (persian: string, english: string) => fa ? persian : english; return <div className={`food-price-ticket${food.price.status === "not_found" ? " is-missing" : ""}`}><span>{l("قیمت این هفته", "This week's price")}</span><strong>{food.price.status === "accepted" && food.price.reference_price_irr ? `${formatNumber(Number(food.price.reference_price_irr) / 10, language)} ${l("تومان", "Toman")}` : l("یافت نشد", "Not found")}</strong>{food.price.reference_unit && <small>{priceUnit(food.price.reference_unit, language)}</small>}{food.price.status === "accepted" && <small>{food.price.source === "manual_override" ? l("جایگزین موقت ادمین", "Temporary admin override") : l("به‌روزرسانی خودکار بازار", "Automatic market update")}{food.price.observed_at ? ` · ${formatDate(food.price.observed_at, language)}` : ""}</small>}</div>; }
+
+function PriceOverrideDialog({ food, language, onClose, onSaved }: { food: AdminFoodCatalogueItem; language: "fa" | "en"; onClose: () => void; onSaved: () => void }) {
   const fa = language === "fa";
   const l = (persian: string, english: string) => fa ? persian : english;
   const [price, setPrice] = useState(food.price.reference_price_toman ?? "");
@@ -158,7 +163,12 @@ function AddFoodDialog({ language, onClose, onSaved }: { language: "fa" | "en"; 
 function DialogFrame({ children, label, onClose }: { children: ReactNode; label: string; onClose: () => void }) { return <div className="food-dialog-backdrop"><section aria-label={label} aria-modal="true" className="food-dialog" role="dialog"><button className="food-dialog__close" type="button" onClick={onClose} aria-label="Close">×</button>{children}</section></div>; }
 function CatalogueIcon() { return <svg aria-hidden="true" className="food-catalogue-icon" viewBox="0 0 180 180"><path d="M30 70h120l-13 70H43L30 70Z"/><path d="M58 70c0-24 13-40 32-40s32 16 32 40M67 94v24m23-24v24m23-24v24"/><circle cx="48" cy="53" r="10"/><path d="M45 43c6-12 16-14 25-7"/></svg>; }
 function formatNumber(value: number, language: "fa" | "en") { return new Intl.NumberFormat(language === "fa" ? "fa-IR" : "en-US", { maximumFractionDigits: 1 }).format(value); }
-function macroValue(value: string | null, unit: string, language: "fa" | "en") { return value === null ? "—" : `${formatNumber(Number(value), language)} ${language === "fa" && unit === "g" ? "گرم" : unit}`; }
+function macroValue(value: string | number | null, unit: string, language: "fa" | "en") { return value === null ? "—" : `${formatNumber(Number(value), language)} ${language === "fa" && unit === "g" ? "گرم" : unit}`; }
+function isAdminFood(food: FoodCatalogueItem): food is AdminFoodCatalogueItem { return "price" in food; }
+function defaultPortion(food: FoodCatalogueItem) { return food.portions.find((portion) => portion.is_default) ?? null; }
+function scale(value: string | number | null, portion: api.FoodCataloguePortion | null) { return value === null ? null : Number(value) * (portion ? Number(portion.grams) / 100 : 1); }
+function portionLabel(portion: api.FoodCataloguePortion, language: "fa" | "en") { return language === "fa" ? portion.label_fa : portion.label_en; }
+function basisLabel(portion: api.FoodCataloguePortion | null, language: "fa" | "en") { return portion ? `${language === "fa" ? "در " : "per "}${portionLabel(portion, language)}` : language === "fa" ? "در هر ۱۰۰ گرم" : "per 100 g"; }
 function priceUnit(unit: string, language: "fa" | "en") { const labels: Record<string, [string, string]> = { IRR_PER_KG: ["تومان برای هر کیلوگرم", "Toman per kilogram"], IRR_PER_LITER: ["تومان برای هر لیتر", "Toman per litre"], IRR_PER_UNIT: ["تومان برای هر عدد", "Toman per unit"] }; return labels[unit]?.[language === "fa" ? 0 : 1] ?? unit; }
 function formatDate(value: string, language: "fa" | "en") { return new Intl.DateTimeFormat(language === "fa" ? "fa-IR" : "en-US", { dateStyle: "short" }).format(new Date(value)); }
 function nutrientName(code: string, language: "fa" | "en") { const labels: Record<string, [string, string]> = { calcium_mg: ["کلسیم", "Calcium"], iron_mg: ["آهن", "Iron"], zinc_mg: ["روی", "Zinc"], sodium_mg: ["سدیم", "Sodium"], potassium_mg: ["پتاسیم", "Potassium"], magnesium_mg: ["منیزیم", "Magnesium"] }; return labels[code]?.[language === "fa" ? 0 : 1] ?? code.replaceAll("_", " "); }

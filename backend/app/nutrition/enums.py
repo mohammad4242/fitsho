@@ -77,6 +77,14 @@ class FoodMeasurementBasis(StrEnum):
     AS_PURCHASED = "as_purchased"
 
 
+class FoodPortionUnit(StrEnum):
+    PIECE = "piece"
+    PALM = "palm"
+    CUP = "cup"
+    TABLESPOON = "tablespoon"
+    TEASPOON = "teaspoon"
+
+
 class FoodRole(StrEnum):
     MAIN_PROTEIN = "main_protein"
     MAIN_STAPLE = "main_staple"
