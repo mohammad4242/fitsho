@@ -193,3 +193,22 @@ it("separates physician queue views and keeps approved revisions read-only", asy
   expect(screen.queryByRole("button", { name: "Approve this revision" })).not.toBeInTheDocument();
   expect(screen.getByRole("spinbutton", { name: "Chicken breast quantity" })).toBeDisabled();
 });
+
+it("lays out physician cases in a desk sidebar with clinical workspace tabs", async () => {
+  const user = userEvent.setup();
+  vi.mocked(api.listPhysicianReviews).mockResolvedValue([
+    { review_id: "review-1", plan_id: "plan-1", user_id: "user-1", member_display_name: "Member One", status: "pending", priority: 1, physician_user_id: null, requested_at: today, target_review_by: null, reviewed_at: null, overdue: false },
+  ]);
+  render(<MemoryRouter><PhysicianNutritionReviewPage /></MemoryRouter>);
+
+  expect(await screen.findByText("Physician desk")).toBeInTheDocument();
+  expect(screen.getByText("Member One").closest("aside")).toHaveClass("physician-review-queue");
+  vi.mocked(api.claimPhysicianReview).mockResolvedValue({});
+  vi.mocked(api.getPhysicianPlan).mockResolvedValue(physicianPlan);
+  vi.mocked(api.listPhysicianLabs).mockResolvedValue([]);
+  await user.click(screen.getByRole("button", { name: "Claim and view revision" }));
+  expect(screen.getByRole("tab", { name: "Plan review" })).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: "Laboratory review" })).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: "Supplements" })).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: "Notes" })).toBeInTheDocument();
+});
