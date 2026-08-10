@@ -8,17 +8,37 @@ Backend behavior and database schemas are out of scope. Admin and specialist wor
 
 ## Approved direction
 
-Use a body-led editorial landing story. A new Fitsho-exclusive, photorealistic editorial body image is the signature asset. The subject is athletic but not bodybuilder-extreme, wears minimal neutral sports clothing, has no emphasized gender cues, and is framed without facial emphasis. The image must leave usable negative space for Persian RTL and English LTR copy.
+The landing hierarchy is deliberately weighted rather than mixing three ideas equally:
 
-The body supports the product story; it is not presented as a medical scan. At most three restrained callouts appear near it. Landing callouts and product previews use representative product examples and are clearly separate from authenticated user results.
+1. The real input-to-plan product story is the landing backbone.
+2. A premium 3D human body is the recognizable Fitsho identity.
+3. The body becomes an interface only in one or two signature moments.
+
+The signature asset is a Fitsho-exclusive stylized-realism 3D athletic body render, not stock photography and not a medical scanner. It uses realistic proportions, controlled Aqua rim light, neutral dark training clothing, and no visible face emphasis. The composition leaves usable negative space for Persian RTL and English LTR layouts.
+
+The body visualizes how Fitsho understands the user; it is not itself the product. The decision engine remains the product story. At most three restrained callouts appear near the body, while a separate plan-building panel makes the transformation into training and nutrition explicit. Landing examples are clearly separate from authenticated user results.
+
+### Design signature
+
+The memorable interaction is a localized Aqua body-area highlight connected to a real Fitsho priority and a visible plan adjustment. It appears in the hero and Body Intelligence section only. It must never imply medical diagnosis, future-physique prediction, or continuous body scanning.
+
+### Layout thesis
+
+Desktop hero uses three coordinated zones: product message, central 3D body, and plan-building state. Persian mirrors the reading order without changing the underlying meaning. Mobile stacks message, body, then plan state, keeping the CTA in the first viewport.
+
+The visual sequence is:
+
+`User context -> Understand -> Plan -> Train -> Adapt`
+
+The interface transformation below the hero uses only real Fitsho concepts: goal, experience, available days, session duration, considerations, training structure, exercise selection, nutrition targets, and revision.
 
 ## Shared visual system
 
 Evolve the existing tokens instead of creating a parallel system.
 
-- Canvas: `#061513`
+- Canvas: `#020B0C`
 - Deep Petrol: `#0A211F`
-- Surface: `#102B28`
+- Surface: `#0B201F`
 - Raised surface: `#163431`
 - Primary text: `#E8F4F1`
 - Muted text: `#8CA39E`
@@ -34,13 +54,12 @@ Use large negative space, opaque or lightly translucent surfaces, low-contrast b
 ## Landing information architecture
 
 1. Header with Fitsho mark, language control, sign-in, and a compact mobile menu.
-2. Full-height body-led hero with the approved bilingual headline, concise product explanation, CTA to `/get-started`, and two or three restrained callouts.
-3. Real Fitsho inputs: goal, experience, training days, session duration, and training considerations.
-4. Ordered product progression: Understand, Plan, Train, Adapt.
-5. A lightweight plan-building state showing training structure, exercise selection, nutrition targets, and revision without claiming live AI work.
-6. Body-intelligence section using a restrained body-area marker and honest priority, uncertainty, and confidence language.
-7. Responsive real-product previews based on Dashboard, Workout Plan, Nutrition, Body Analysis/Progress, and Food Catalogue.
-8. Final adaptive-plan statement and repeated CTA.
+2. Full-height three-zone hero with the approved bilingual headline, concise product explanation, CTA to `/get-started`, central 3D body, two or three restrained callouts, and a plan-building panel.
+3. Ordered product progression: Understand, Plan, Train, Adapt.
+4. A visible transformation from real Fitsho inputs into training structure, exercise selection, nutrition targets, and revision without claiming live AI work.
+5. Body-intelligence section using the same 3D identity with one localized body-area highlight and honest priority, uncertainty, and confidence language.
+6. Responsive real-product previews based on Dashboard, Workout Plan, Nutrition, Body Analysis/Progress, and Food Catalogue.
+7. Final adaptive-plan statement and repeated CTA.
 
 The current fixed background film, app-store placeholders, social card, and cinematic scrolling panels are removed because they do not explain the real product.
 
@@ -96,7 +115,7 @@ All animation is optional. Reduced-motion mode removes parallax, reveal movement
 
 ## Performance
 
-Add no animation or 3D dependency. Use CSS transitions and small React state only. The generated hero image is exported in responsive WebP sizes with a JPEG fallback and explicit dimensions. Route-level lazy loading is allowed if it does not alter routing behavior and is verified separately.
+Add no runtime 3D or animation dependency. The body is a pre-rendered high-quality 3D asset; CSS supplies only restrained depth and localized highlight motion. Use CSS transitions and small React state only. Export responsive WebP sizes with a JPEG fallback and explicit dimensions. Route-level lazy loading is allowed if it does not alter routing behavior and is verified separately.
 
 ## Testing
 
