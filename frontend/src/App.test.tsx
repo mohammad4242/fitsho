@@ -70,6 +70,11 @@ const workoutReviewApi = vi.hoisted(() => ({
   listWorkoutReviews: vi.fn(),
 }));
 
+const physicianApi = vi.hoisted(() => ({
+  verifyPhysicianAccess: vi.fn(),
+  listPhysicianReviews: vi.fn(),
+}));
+
 vi.mock("./features/auth/AuthContext", () => ({
   useAuth: () => auth.value,
 }));
@@ -82,6 +87,7 @@ vi.mock("./features/profile/ProfileContext", () => ({
 vi.mock("./features/exercises/api", () => exerciseApi);
 vi.mock("./features/workouts/api", () => workoutApi);
 vi.mock("./features/workoutReviews/api", () => workoutReviewApi);
+vi.mock("./features/nutrition/api", () => physicianApi);
 
 import { AppRoutes } from "./App";
 
@@ -149,6 +155,10 @@ beforeEach(() => {
   workoutReviewApi.verifyCoachAccess.mockRejectedValue(new Error("not a coach"));
   workoutReviewApi.listWorkoutReviews.mockReset();
   workoutReviewApi.listWorkoutReviews.mockResolvedValue([]);
+  physicianApi.verifyPhysicianAccess.mockReset();
+  physicianApi.verifyPhysicianAccess.mockRejectedValue(new Error("not a physician"));
+  physicianApi.listPhysicianReviews.mockReset();
+  physicianApi.listPhysicianReviews.mockResolvedValue([]);
   exerciseApi.getExerciseCategories.mockResolvedValue(exerciseCategories);
   exerciseApi.getExercises.mockResolvedValue(emptyExercisePage);
   exerciseApi.getExercise.mockResolvedValue(exerciseDetail);
@@ -405,6 +415,19 @@ it("shows the workout review workspace in the account menu for coaches", async (
   const coachLinks = await screen.findAllByRole("link", { name: "پنل مربی" });
   expect(coachLinks).not.toHaveLength(0);
   expect(coachLinks[0]).toHaveAttribute("href", "/coach/workouts");
+});
+
+it("shows the physician workspace only for physicians", async () => {
+  physicianApi.verifyPhysicianAccess.mockResolvedValue({ authorized: true });
+  setReadyMember();
+  const user = userEvent.setup();
+  renderRoute("/dashboard");
+
+  await user.click(screen.getByRole("button", { name: "باز کردن منوی حساب" }));
+
+  const physicianLinks = await screen.findAllByRole("link", { name: "پنل پزشک" });
+  expect(physicianLinks).not.toHaveLength(0);
+  expect(physicianLinks[0]).toHaveAttribute("href", "/physician/nutrition");
 });
 
 it("redirects a guest away from the admin route", async () => {

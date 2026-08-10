@@ -35,6 +35,13 @@ const workoutReviewApi = vi.hoisted(() => ({
   listWorkoutReviews: vi.fn(),
 }));
 
+const physicianApi = vi.hoisted(() => ({
+  verifyPhysicianAccess: vi.fn(),
+  listPhysicianReviews: vi.fn(),
+  listSupplementCatalogue: vi.fn(),
+  listCatalogueFoods: vi.fn(),
+}));
+
 vi.mock("../auth/AuthContext", () => ({
   useAuth: () => contexts.auth,
 }));
@@ -45,6 +52,7 @@ vi.mock("./ProfileContext", () => ({
 }));
 
 vi.mock("../workoutReviews/api", () => workoutReviewApi);
+vi.mock("../nutrition/api", () => physicianApi);
 
 import { AppRoutes } from "../../App";
 
@@ -98,6 +106,14 @@ beforeEach(() => {
   workoutReviewApi.verifyCoachAccess.mockReset();
   workoutReviewApi.listWorkoutReviews.mockReset();
   workoutReviewApi.listWorkoutReviews.mockResolvedValue([]);
+  physicianApi.verifyPhysicianAccess.mockReset();
+  physicianApi.verifyPhysicianAccess.mockRejectedValue(new Error("forbidden"));
+  physicianApi.listSupplementCatalogue.mockReset();
+  physicianApi.listSupplementCatalogue.mockResolvedValue([]);
+  physicianApi.listCatalogueFoods.mockReset();
+  physicianApi.listCatalogueFoods.mockResolvedValue([]);
+  physicianApi.listPhysicianReviews.mockReset();
+  physicianApi.listPhysicianReviews.mockResolvedValue([]);
 });
 
 describe("profile route matrix", () => {
@@ -122,6 +138,18 @@ describe("profile route matrix", () => {
     renderRoute("/coach/workouts");
 
     expect(await screen.findByRole("heading", { name: "سلام، Mohammad" })).toBeVisible();
+  });
+
+  it("lets an authorized physician open the workspace without a member profile", async () => {
+    contexts.auth.user = member;
+    contexts.profile.status = "missing";
+    physicianApi.verifyPhysicianAccess.mockResolvedValue({ authorized: true });
+
+    renderRoute("/physician/nutrition");
+
+    expect(
+      await screen.findByRole("heading", { name: "صف بررسی برنامه‌های تغذیه" }),
+    ).toBeVisible();
   });
 
   it.each(["/dashboard", "/onboarding"])(
