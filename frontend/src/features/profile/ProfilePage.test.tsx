@@ -435,6 +435,7 @@ it("navigates from the dashboard header to profile", async () => {
   const user = userEvent.setup();
   renderProfilePage("/dashboard");
 
+  await user.click(screen.getByRole("button", { name: "باز کردن منوی حساب" }));
   await user.click(screen.getByRole("link", { name: "پروفایل" }));
 
   expect(

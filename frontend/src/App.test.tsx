@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -228,9 +228,23 @@ it("opens the dashboard after sign-in and keeps profile completion in the accoun
   await user.click(screen.getByRole("button", { name: "باز کردن منوی حساب" }));
 
   const accountMenu = screen.getByRole("navigation", { name: "منوی حساب" });
+  const productGroup = within(accountMenu).getByRole("group", { name: "محصول" });
+  const accountGroup = within(accountMenu).getByRole("group", { name: "حساب" });
+  const socialGroup = within(accountMenu).getByRole("group", { name: "شبکه‌های اجتماعی" });
   expect(accountMenu.querySelector('[href="/onboarding"]')).toHaveTextContent("تکمیل پروفایل");
-  expect(accountMenu.querySelector('[href="/exercises"]')).toHaveTextContent("حرکات");
+  expect(within(productGroup).getByRole("link", { name: "حرکات" })).toHaveAttribute("href", "/exercises");
+  expect(within(accountGroup).getByRole("link", { name: "تکمیل پروفایل" })).toHaveAttribute("href", "/onboarding");
+  expect(within(socialGroup).getAllByRole("link")).toHaveLength(4);
   expect(screen.getByRole("button", { name: /مقالات روز دنیا/ })).toBeDisabled();
+});
+
+it("keeps the desktop account navigation to four primary destinations", async () => {
+  auth.value.user = member;
+  profile.value.status = "ready";
+  renderRoute("/dashboard");
+
+  const navigation = await screen.findByRole("navigation", { name: "ناوبری حساب" });
+  expect(within(navigation).getAllByRole("link")).toHaveLength(4);
 });
 
 it("keeps a newly hydrated member on the dashboard while profile status refreshes", async () => {

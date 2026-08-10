@@ -7,6 +7,7 @@ import { useOptionalProfile } from "../features/profile/ProfileContext";
 import { verifyPhysicianAccess } from "../features/nutrition/api";
 import { verifyCoachAccess } from "../features/workoutReviews/api";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import "./authenticatedHeader.css";
 
 export function AuthenticatedHeader() {
   const { t } = useTranslation();
@@ -55,6 +56,62 @@ export function AuthenticatedHeader() {
       .finally(() => setBusy(false));
   }
 
+  const primaryNavigationCandidates = [
+    {
+      to: "/dashboard",
+      label: t("header.dashboard"),
+      active: location.pathname === "/dashboard",
+      visible: true,
+    },
+    {
+      to: "/workout-plan",
+      label: t("header.workoutPlan"),
+      active: location.pathname.startsWith("/workout-plan"),
+      visible: hasTraining,
+    },
+    {
+      to: "/exercises",
+      label: t("header.exercises"),
+      active: location.pathname.startsWith("/exercises"),
+      visible: hasTraining,
+    },
+    {
+      to: "/nutrition-estimate",
+      label: t("header.nutritionTargets"),
+      active: location.pathname === "/nutrition-estimate",
+      visible: hasNutrition,
+    },
+    {
+      to: "/food-catalogue",
+      label: t("header.foodCatalogue"),
+      active: location.pathname === "/food-catalogue",
+      visible: hasNutrition,
+    },
+    {
+      to: "/body-progress",
+      label: t("header.bodyProgress"),
+      active: location.pathname.startsWith("/body-progress"),
+      visible: hasTraining,
+    },
+    {
+      to: status === "ready" ? "/profile" : "/onboarding",
+      label: status === "ready" ? t("header.profile") : t("header.completeProfile"),
+      active: location.pathname === "/profile" || location.pathname === "/onboarding",
+      visible: true,
+    },
+  ].filter((item) => item.visible);
+  const contextualNavigation = [
+    { to: "/coach/workouts", label: t("header.coachWorkspace"), active: location.pathname.startsWith("/coach/workouts"), visible: isCoach },
+    { to: "/physician/nutrition", label: t("header.physicianWorkspace"), active: location.pathname.startsWith("/physician/nutrition"), visible: isPhysician },
+    { to: "/admin/exercises", label: t("header.adminExercises"), active: location.pathname.startsWith("/admin/exercises"), visible: user.is_admin },
+    { to: "/admin/nutrition-monitoring", label: t("header.nutritionMonitoring"), active: location.pathname.startsWith("/admin/nutrition-monitoring"), visible: user.is_admin },
+    { to: "/admin/ai-settings", label: t("header.adminAiSettings"), active: location.pathname.startsWith("/admin/ai-settings"), visible: user.is_admin },
+    { to: "/admin/training-program-templates", label: t("header.adminTrainingTemplates"), active: location.pathname.startsWith("/admin/training-program-templates"), visible: user.is_admin },
+  ].find((item) => item.visible && item.active);
+  const primaryNavigation = contextualNavigation
+    ? [...primaryNavigationCandidates.slice(0, 3), contextualNavigation]
+    : primaryNavigationCandidates.slice(0, 4);
+
   return (
     <>
       <header className="dashboard-header">
@@ -75,130 +132,51 @@ export function AuthenticatedHeader() {
             </button>
             {menuOpen && (
               <nav className="member-menu" aria-label={t("header.accountMenu")}>
-                <Link
-                  to={status === "ready" ? "/profile" : "/onboarding"}
-                  onClick={() => setMenuOpen(false)}
-                >
-                  {status === "ready" ? t("header.profile") : t("header.completeProfile")}
-                </Link>
-                {hasTraining && <Link to="/workout-plan" onClick={() => setMenuOpen(false)}>
-                  {t("header.workoutPlan")}
-                </Link>}
-                {hasTraining && <Link to="/exercises" onClick={() => setMenuOpen(false)}>
-                  {t("header.exercises")}
-                </Link>}
-                {hasTraining && <Link to="/body-progress" onClick={() => setMenuOpen(false)}>
-                  {t("header.bodyProgress")}
-                </Link>}
-                {isCoach && <Link to="/coach/workouts" onClick={() => setMenuOpen(false)}>
-                  {t("header.coachWorkspace")}
-                </Link>}
-                {isPhysician && <Link to="/physician/nutrition" onClick={() => setMenuOpen(false)}>
-                  {t("header.physicianWorkspace")}
-                </Link>}
-                {hasNutrition && <Link to="/nutrition-estimate" onClick={() => setMenuOpen(false)}>{t("header.nutritionTargets")}</Link>}
-                {hasNutrition && <Link to="/food-catalogue" onClick={() => setMenuOpen(false)}>⌁ {t("header.foodCatalogue")}</Link>}
-                <button type="button" disabled>
-                  {t("header.articles")} <small>{t("header.comingSoon")}</small>
-                </button>
-                <span className="member-menu__section-label">{t("header.socialNetworks")}</span>
-                <a href="https://instagram.com" target="_blank" rel="noreferrer">Instagram</a>
-                <a href="https://t.me" target="_blank" rel="noreferrer">Telegram</a>
-                <a href="https://facebook.com" target="_blank" rel="noreferrer">Facebook</a>
-                <a href="https://x.com" target="_blank" rel="noreferrer">X</a>
+                <div className="member-menu__group" role="group" aria-label={t("header.productLinks")}>
+                  <span className="member-menu__section-label">{t("header.productLinks")}</span>
+                  {hasTraining && <Link to="/workout-plan" onClick={() => setMenuOpen(false)}>{t("header.workoutPlan")}</Link>}
+                  {hasTraining && <Link to="/exercises" onClick={() => setMenuOpen(false)}>{t("header.exercises")}</Link>}
+                  {hasTraining && <Link to="/body-progress" onClick={() => setMenuOpen(false)}>{t("header.bodyProgress")}</Link>}
+                  {hasNutrition && <Link to="/nutrition-estimate" onClick={() => setMenuOpen(false)}>{t("header.nutritionTargets")}</Link>}
+                  {hasNutrition && <Link to="/food-catalogue" onClick={() => setMenuOpen(false)}>{t("header.foodCatalogue")}</Link>}
+                  {isCoach && <Link to="/coach/workouts" onClick={() => setMenuOpen(false)}>{t("header.coachWorkspace")}</Link>}
+                  {isPhysician && <Link to="/physician/nutrition" onClick={() => setMenuOpen(false)}>{t("header.physicianWorkspace")}</Link>}
+                </div>
+                <div className="member-menu__group" role="group" aria-label={t("header.accountLinks")}>
+                  <span className="member-menu__section-label">{t("header.accountLinks")}</span>
+                  <Link to={status === "ready" ? "/profile" : "/onboarding"} onClick={() => setMenuOpen(false)}>
+                    {status === "ready" ? t("header.profile") : t("header.completeProfile")}
+                  </Link>
+                  <button type="button" disabled>{t("header.articles")} <small>{t("header.comingSoon")}</small></button>
+                  <button className="member-menu__logout" type="button" onClick={handleLogout} disabled={busy}>
+                    {busy ? t("header.loggingOut") : t("header.logout")}
+                  </button>
+                </div>
+                <div className="member-menu__group member-menu__group--social" role="group" aria-label={t("header.socialNetworks")}>
+                  <span className="member-menu__section-label">{t("header.socialNetworks")}</span>
+                  <a href="https://instagram.com" target="_blank" rel="noreferrer">Instagram</a>
+                  <a href="https://t.me" target="_blank" rel="noreferrer">Telegram</a>
+                  <a href="https://facebook.com" target="_blank" rel="noreferrer">Facebook</a>
+                  <a href="https://x.com" target="_blank" rel="noreferrer">X</a>
+                </div>
                 {user.is_admin && (
-                  <><Link to="/admin/exercises" onClick={() => setMenuOpen(false)}>{t("header.adminExercises")}</Link><Link to="/admin/nutrition-monitoring" onClick={() => setMenuOpen(false)}>{t("header.nutritionMonitoring")}</Link></>
+                  <div className="member-menu__group" role="group" aria-label={t("header.adminLinks")}>
+                    <span className="member-menu__section-label">{t("header.adminLinks")}</span>
+                    <Link to="/admin/exercises" onClick={() => setMenuOpen(false)}>{t("header.adminExercises")}</Link>
+                    <Link to="/admin/nutrition-monitoring" onClick={() => setMenuOpen(false)}>{t("header.nutritionMonitoring")}</Link>
+                    <Link to="/admin/ai-settings" onClick={() => setMenuOpen(false)}>{t("header.adminAiSettings")}</Link>
+                    <Link to="/admin/training-program-templates" onClick={() => setMenuOpen(false)}>{t("header.adminTrainingTemplates")}</Link>
+                  </div>
                 )}
-                <button className="member-menu__logout" type="button" onClick={handleLogout} disabled={busy}>
-                  {busy ? t("header.loggingOut") : t("header.logout")}
-                </button>
               </nav>
             )}
           </div>
           <nav className="authenticated-nav" aria-label={t("header.navigation")}>
-            <Link
-              to="/dashboard"
-              aria-current={location.pathname === "/dashboard" ? "page" : undefined}
-            >
-              {t("header.dashboard")}
-            </Link>
-            {hasTraining && <Link
-              to="/workout-plan"
-              aria-current={location.pathname.startsWith("/workout-plan") ? "page" : undefined}
-            >
-              {t("header.workoutPlan")}
-            </Link>}
-            {isCoach && <Link
-              to="/coach/workouts"
-              aria-current={location.pathname.startsWith("/coach/workouts") ? "page" : undefined}
-            >
-              {t("header.coachWorkspace")}
-            </Link>}
-            {isPhysician && <Link
-              to="/physician/nutrition"
-              aria-current={location.pathname.startsWith("/physician/nutrition") ? "page" : undefined}
-            >
-              {t("header.physicianWorkspace")}
-            </Link>}
-            {hasTraining && <Link
-              to="/exercises"
-              aria-current={
-                location.pathname.startsWith("/exercises") ? "page" : undefined
-              }
-            >
-              {t("header.exercises")}
-            </Link>}
-            {hasTraining && <Link
-              to="/body-progress"
-              aria-current={location.pathname.startsWith("/body-progress") ? "page" : undefined}
-            >
-              {t("header.bodyProgress")}
-            </Link>}
-            {hasNutrition && <Link
-              to="/nutrition-estimate"
-              aria-current={location.pathname === "/nutrition-estimate" ? "page" : undefined}
-            >{t("header.nutritionTargets")}</Link>}
-            {hasNutrition && <Link
-              to="/food-catalogue"
-              aria-current={location.pathname === "/food-catalogue" ? "page" : undefined}
-            >⌁ {t("header.foodCatalogue")}</Link>}
-            <Link
-              to={status === "ready" ? "/profile" : "/onboarding"}
-              aria-current={location.pathname === "/profile" ? "page" : undefined}
-            >
-              {status === "ready" ? t("header.profile") : t("header.completeProfile")}
-            </Link>
-            {user.is_admin && (
-              <>
-                <Link
-                  to="/admin/exercises"
-                  aria-current={
-                    location.pathname.startsWith("/admin/exercises") ? "page" : undefined
-                  }
-                >
-                  {t("header.adminExercises")}
-                </Link>
-                <Link to="/admin/nutrition-monitoring">{t("header.nutritionMonitoring")}</Link>
-                <Link
-                  to="/admin/ai-settings"
-                  aria-current={
-                    location.pathname.startsWith("/admin/ai-settings") ? "page" : undefined
-                  }
-                >
-                  {t("header.adminAiSettings")}
-                </Link>
-                <Link
-                  to="/admin/training-program-templates"
-                  aria-current={
-                    location.pathname.startsWith("/admin/training-program-templates")
-                      ? "page"
-                      : undefined
-                  }
-                >
-                  {t("header.adminTrainingTemplates")}
-                </Link>
-              </>
-            )}
+            {primaryNavigation.map((item) => (
+              <Link key={item.to} to={item.to} aria-current={item.active ? "page" : undefined}>
+                {item.label}
+              </Link>
+            ))}
           </nav>
           <LanguageSwitcher />
           <button

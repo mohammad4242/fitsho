@@ -1167,9 +1167,24 @@ html[dir="ltr"] .primary-button span:last-child {
 }
 
 .fitsho-page .member-menu {
-  max-height: min(70svh, 34rem);
+  max-height: min(76svh, 38rem);
   overflow-y: auto;
   border-color: var(--fitsho-line);
   color: var(--fitsho-ink);
   background: var(--fitsho-surface-raised);
+}
+
+.fitsho-page .member-menu__group + .member-menu__group {
+  border-block-start-color: var(--fitsho-line);
+}
+
+.fitsho-page .member-menu a,
+.fitsho-page .member-menu button {
+  border-color: rgb(80 223 206 / 7%);
+  color: var(--fitsho-ink);
+  background: rgb(255 255 255 / 3%);
+}
+
+.fitsho-page .member-menu__section-label {
+  color: var(--fitsho-muted);
 }
