@@ -556,6 +556,23 @@ class PhysicianPlanActionInput(BaseModel):
     internal_notes: str | None = Field(default=None, max_length=4000)
 
 
+PhysicianQueueView = Literal["pending", "claimed", "approved"]
+
+
+class PhysicianReviewQueueItemResponse(BaseModel):
+    review_id: UUID
+    plan_id: UUID
+    user_id: UUID
+    member_display_name: str | None
+    status: str
+    priority: int
+    physician_user_id: UUID | None
+    requested_at: datetime
+    target_review_by: datetime | None
+    reviewed_at: datetime | None
+    overdue: bool
+
+
 class PhysicianFoodQuantityInput(BaseModel):
     expected_plan_revision_id: UUID
     meal_id: UUID

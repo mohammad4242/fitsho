@@ -153,6 +153,8 @@ from app.nutrition.schemas import (
     PhysicianLabRequestTransitionInput,
     PhysicianLabReviewInput,
     PhysicianPlanActionInput,
+    PhysicianQueueView,
+    PhysicianReviewQueueItemResponse,
     PhysicianReviewRequirementResponse,
     PhysicianSupplementOrderInput,
     PlannedMealTrackingInput,
@@ -1489,10 +1491,17 @@ def remove_lab_document(
         raise _clinical_error(error) from None
 
 
-@router.get("/physician/reviews")
-def read_physician_queue(db: DatabaseSession, user: CurrentUser) -> list[dict[str, object]]:
+@router.get("/physician/reviews", response_model=list[PhysicianReviewQueueItemResponse])
+def read_physician_queue(
+    db: DatabaseSession,
+    user: CurrentUser,
+    view: PhysicianQueueView = "pending",
+) -> list[PhysicianReviewQueueItemResponse]:
     try:
-        return review_queue(db, user.id)
+        return [
+            PhysicianReviewQueueItemResponse.model_validate(item)
+            for item in review_queue(db, user.id, view)
+        ]
     except ClinicalError as error:
         raise _clinical_error(error) from None
 

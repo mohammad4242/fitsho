@@ -13,6 +13,7 @@ from fastapi import UploadFile
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.body_analysis.enums import SpecialistRole
 from app.body_analysis.models import UserSpecialistRole
@@ -29,7 +30,9 @@ from app.nutrition.models import (
     NutritionReviewAuditEvent,
     NutritionWeeklyPlan,
 )
+from app.nutrition.schemas import PhysicianQueueView
 from app.nutrition.security import audit_security_event
+from app.profile.models import UserProfile
 
 
 class ClinicalError(Exception):
@@ -378,25 +381,45 @@ def delete_lab(db: Session, user_id: UUID, document_id: UUID, settings: Settings
     db.commit()
 
 
-def review_queue(db: Session, physician_id: UUID) -> list[dict[str, object]]:
+def review_queue(
+    db: Session,
+    physician_id: UUID,
+    view: PhysicianQueueView = "pending",
+) -> list[dict[str, object]]:
     require_physician(db, physician_id)
     now = datetime.now(UTC)
-    reviews = db.scalars(
-        select(NutritionPlanPhysicianReview)
-        .where(
-            or_(
-                NutritionPlanPhysicianReview.physician_user_id.is_(None),
-                NutritionPlanPhysicianReview.physician_user_id == physician_id,
-            ),
-            NutritionPlanPhysicianReview.status.in_(
-                [
-                    NutritionPlanReviewStatus.PENDING,
-                    NutritionPlanReviewStatus.IN_REVIEW,
-                    NutritionPlanReviewStatus.AWAITING_LAB_INFORMATION,
-                    NutritionPlanReviewStatus.CHANGES_REQUESTED,
-                ]
-            )
+    if view == "pending":
+        status_filter: ColumnElement[bool] = NutritionPlanPhysicianReview.status.in_(
+            [NutritionPlanReviewStatus.PENDING, NutritionPlanReviewStatus.CHANGES_REQUESTED]
         )
+        owner_filter: ColumnElement[bool] = or_(
+            NutritionPlanPhysicianReview.physician_user_id.is_(None),
+            NutritionPlanPhysicianReview.physician_user_id == physician_id,
+        )
+    elif view == "claimed":
+        status_filter = NutritionPlanPhysicianReview.status.in_(
+            [
+                NutritionPlanReviewStatus.IN_REVIEW,
+                NutritionPlanReviewStatus.AWAITING_LAB_INFORMATION,
+            ]
+        )
+        owner_filter = NutritionPlanPhysicianReview.physician_user_id == physician_id
+    else:
+        status_filter = NutritionPlanPhysicianReview.status == NutritionPlanReviewStatus.APPROVED
+        owner_filter = NutritionPlanPhysicianReview.physician_user_id == physician_id
+
+    reviews = db.execute(
+        select(
+            NutritionPlanPhysicianReview,
+            NutritionWeeklyPlan.user_id,
+            UserProfile.display_name,
+        )
+        .join(
+            NutritionWeeklyPlan,
+            NutritionWeeklyPlan.id == NutritionPlanPhysicianReview.plan_id,
+        )
+        .outerjoin(UserProfile, UserProfile.user_id == NutritionWeeklyPlan.user_id)
+        .where(status_filter, owner_filter)
         .order_by(
             NutritionPlanPhysicianReview.priority.desc(),
             NutritionPlanPhysicianReview.requested_at,
@@ -404,16 +427,19 @@ def review_queue(db: Session, physician_id: UUID) -> list[dict[str, object]]:
     ).all()
     return [
         {
-            "review_id": row.id,
-            "plan_id": row.plan_id,
-            "status": row.status.value,
-            "priority": row.priority,
-            "physician_user_id": row.physician_user_id,
-            "requested_at": row.requested_at,
-            "target_review_by": row.target_review_by,
-            "overdue": bool(row.target_review_by and row.target_review_by < now),
+            "review_id": review.id,
+            "plan_id": review.plan_id,
+            "user_id": user_id,
+            "member_display_name": display_name,
+            "status": review.status.value,
+            "priority": review.priority,
+            "physician_user_id": review.physician_user_id,
+            "requested_at": review.requested_at,
+            "target_review_by": review.target_review_by,
+            "reviewed_at": review.reviewed_at,
+            "overdue": bool(review.target_review_by and review.target_review_by < now),
         }
-        for row in reviews
+        for review, user_id, display_name in reviews
     ]
 
 

@@ -214,6 +214,65 @@ def test_approval_requires_claim_and_activates_exact_due_revision(
     assert persisted.review.internal_notes == "یادداشت محرمانه پزشک"
 
 
+def test_physician_queue_views_move_a_case_from_pending_to_claimed_to_approved(
+    client: TestClient,
+    db: Session,
+) -> None:
+    plan = _member_plan(client, db)
+    physician = _login_physician(client, db, "queue-physician@example.com")
+
+    pending = client.get("/api/v1/nutrition/physician/reviews?view=pending")
+
+    assert pending.status_code == 200
+    pending_case = next(item for item in pending.json() if item["plan_id"] == plan["id"])
+    assert pending_case["member_display_name"] == "کاربر برنامه"
+    assert pending_case["status"] == "pending"
+    assert "internal_notes" not in pending_case
+    assert client.get("/api/v1/nutrition/physician/reviews?view=claimed").json() == []
+
+    claimed = client.post(
+        f"/api/v1/nutrition/physician/reviews/{pending_case['review_id']}/claim",
+        headers=ORIGIN,
+    )
+
+    assert claimed.status_code == 200
+    claimed_cases = client.get("/api/v1/nutrition/physician/reviews?view=claimed").json()
+    claimed_case = next(item for item in claimed_cases if item["plan_id"] == plan["id"])
+    assert claimed_case["physician_user_id"] == str(physician.id)
+    assert not any(
+        item["plan_id"] == plan["id"]
+        for item in client.get("/api/v1/nutrition/physician/reviews?view=pending").json()
+    )
+
+    persisted = db.get(NutritionWeeklyPlan, plan["id"])
+    assert persisted is not None
+    persisted.start_date = date.today()
+    db.commit()
+    approved = client.post(
+        f"/api/v1/nutrition/physician/plans/{plan['id']}/action",
+        headers=ORIGIN,
+        json={
+            "expected_plan_revision_id": plan["id"],
+            "action": "approve",
+            "notes": "نسخه نهایی تأیید شد",
+            "internal_notes": "یادداشت خصوصی",
+        },
+    )
+
+    assert approved.status_code == 200
+    approved_cases = client.get("/api/v1/nutrition/physician/reviews?view=approved").json()
+    approved_case = next(item for item in approved_cases if item["plan_id"] == plan["id"])
+    assert approved_case["status"] == "approved"
+    assert approved_case["reviewed_at"] is not None
+    assert "internal_notes" not in approved_case
+
+    _login_physician(client, db, "other-queue-physician@example.com")
+    assert not any(
+        item["plan_id"] == plan["id"]
+        for item in client.get("/api/v1/nutrition/physician/reviews?view=approved").json()
+    )
+
+
 def test_assigned_physician_can_list_and_review_member_labs(
     client: TestClient,
     db: Session,
