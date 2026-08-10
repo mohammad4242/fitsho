@@ -52,6 +52,15 @@ const response: api.FoodCatalogueResponse = {
           source_reference: "https://fdc.nal.usda.gov/",
           confidence: "high",
         },
+        {
+          nutrient_code: "vitamin_c_mg",
+          value_per_100g: 12,
+          unit: "mg",
+          unit_form: "nutrient_mass",
+          source_name: "USDA FoodData Central",
+          source_reference: "https://fdc.nal.usda.gov/",
+          confidence: "high",
+        },
       ],
       portions: [
         {
@@ -97,6 +106,7 @@ it("shows nutrient data and never shows catalogue price information to a member"
   await user.click(screen.getByRole("button", { name: "جزئیات بیشتر" }));
   expect(screen.getByRole("dialog", { name: "جزئیات سینه مرغ" })).toBeVisible();
   expect(screen.getByText("آهن")).toBeVisible();
+  expect(screen.getByText("ویتامین C")).toBeVisible();
   expect(screen.getByText(/USDA FoodData Central/)).toBeVisible();
   expect(screen.getByText("در ۱ عدد")).toBeVisible();
   expect(screen.getByText(/۱ عدد ≈ ۵۰ گرم/)).toBeVisible();
@@ -116,12 +126,15 @@ it("shows price and price controls only to an admin", async () => {
 });
 
 it("uses English copy and left-to-right flow", async () => {
+  const user = userEvent.setup();
   await i18n.changeLanguage("en");
   const { container } = render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
 
   expect(await screen.findByRole("heading", { name: "Food catalogue" })).toBeVisible();
   expect(screen.queryByText("Not found")).not.toBeInTheDocument();
   expect(container.querySelector("main")).toHaveAttribute("dir", "ltr");
+  await user.click(screen.getByRole("button", { name: "More details" }));
+  expect(screen.getByText("Vitamin C")).toBeVisible();
 });
 
 it("shows accepted catalogue prices to an admin only", async () => {

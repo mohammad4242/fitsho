@@ -49,6 +49,22 @@ nutrients remain missing rather than becoming zero.
 Only foods with all five required primary nutrients (energy, protein, carbohydrate, total fat, and
 fibre) may be `verified` and appear in the public catalogue. Incomplete identities remain `draft`.
 
+### USDA Foundation Foods import
+
+The curated base-food expansion uses the official FoodData Central Foundation Foods JSON release,
+version `foundation-2026-04`. Download and extract the April 2026 JSON archive from the
+[USDA dataset page](https://fdc.nal.usda.gov/download-datasets/), then run from `backend/`:
+
+```bash
+uv run python -m app.nutrition.usda_foundation_import <foundation-foods.json>
+```
+
+The import is idempotent and keeps the FDC record ID, release version, access date, nutrient-level
+source, and canonical 100 g basis. It imports only the explicitly curated Iranian-relevant base-food
+vocabulary, never variable prepared dishes. A mapped record missing any required primary nutrient
+is stored as `draft`; optional nutrients absent from USDA remain absent. The downloaded source file
+is intentionally not committed and no FoodData Central API key is required for this workflow.
+
 Price operations are admin-only:
 
 - `GET /admin/monitoring` returns counts, provider health, coverage warnings, review reasons, broken

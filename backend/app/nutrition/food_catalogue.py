@@ -174,11 +174,18 @@ def save_catalogue_food(db: Session, payload: CatalogueFoodWrite) -> CatalogueFo
             selectinload(NutritionCatalogueFood.roles),
             selectinload(NutritionCatalogueFood.compositions),
             selectinload(NutritionCatalogueFood.aliases),
+            selectinload(NutritionCatalogueFood.portions),
         )
     )
     if food is None:
         food = NutritionCatalogueFood(slug=payload.slug)
         db.add(food)
+    else:
+        food.roles.clear()
+        food.aliases.clear()
+        food.compositions.clear()
+        food.portions.clear()
+        db.flush()
     food.name_fa = payload.name_fa
     food.name_en = payload.name_en
     food.verification_status = FoodVerificationStatus(payload.verification_status)
