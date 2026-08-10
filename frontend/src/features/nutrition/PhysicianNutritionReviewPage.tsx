@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import * as api from "./api";
 import type { PhysicianSupplementOrderInput, SupplementOrder } from "./api";
 import type { WeeklyPlan } from "./types";
+import { irrToToman } from "./money";
 import "./nutritionEstimate.css";
 
 type Review = Awaited<ReturnType<typeof api.listPhysicianReviews>>[number];
@@ -176,7 +177,7 @@ export function PhysicianNutritionReviewPage() {
           {!selectedPlan && <div className="physician-review-placeholder"><span aria-hidden="true">✦</span><h2>{l("یک پرونده را انتخاب کن", "Choose a case from the queue")}</h2><p>{l("نسخه، آزمایش‌ها، مکمل‌ها و یادداشت‌های بالینی اینجا نمایش داده می‌شوند.", "The plan, lab documents, supplements, and clinical notes will appear here.")}</p></div>}
           {selectedPlan && <>
             <header className="physician-review-case-header"><div><small>{l("پرونده تغذیه", "Nutrition case")}</small><h2>{l("نسخه در حال بررسی", "Revision under review")} {selectedPlan.revision}</h2></div><span data-status={readOnly ? "approved" : "claimed"}>{readOnly ? l("تأییدشده", "Approved") : l("در حال بررسی", "In review")}</span></header>
-            <div className="physician-review-profile-strip"><span>{l("هزینه هفتگی", "Weekly cost")}<strong>{selectedPlan.weekly_cost_irr.toLocaleString()} IRR</strong></span><span>{l("مدت", "Duration")}<strong>{selectedPlan.days.length} {l("روز", "days")}</strong></span><span>{l("حالت", "Mode")}<strong>{readOnly ? l("فقط‌خواندنی", "Read only") : l("قابل ویرایش", "Editable")}</strong></span></div>
+            <div className="physician-review-profile-strip"><span>{l("هزینه هفتگی", "Weekly cost")}<strong>{irrToToman(selectedPlan.weekly_cost_irr)} {l("تومان", "Toman")}</strong></span><span>{l("مدت", "Duration")}<strong>{selectedPlan.days.length} {l("روز", "days")}</strong></span><span>{l("حالت", "Mode")}<strong>{readOnly ? l("فقط‌خواندنی", "Read only") : l("قابل ویرایش", "Editable")}</strong></span></div>
             <div className="physician-clinical-tabs" role="tablist" aria-label={l("بخش‌های پرونده", "Case sections")}>{(["plan", "labs", "supplements", "notes"] as ClinicalTab[]).map((tab) => <button key={tab} type="button" role="tab" aria-selected={clinicalTab === tab} onClick={() => setClinicalTab(tab)}>{tabTitle(tab)}</button>)}</div>
             {clinicalTab === "plan" && <section className="physician-review-section">
               <details><summary>{l("پروفایل، ایمنی، بودجه و منشأ داده", "Profile, safety, budget, and provenance")}</summary><pre>{JSON.stringify({ input_snapshot: selectedPlan.input_snapshot, budget: selectedPlan.budget_status, price_snapshot: selectedPlan.price_snapshot, food_data_manifest: selectedPlan.food_data_manifest }, null, 2)}</pre></details>

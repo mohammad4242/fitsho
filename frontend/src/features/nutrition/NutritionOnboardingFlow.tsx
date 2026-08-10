@@ -21,6 +21,7 @@ import type { OnboardingDraft, PreAccountNutritionBasics } from "../publicOnboar
 import { GuidedSharedProfileQuestions } from "../publicOnboarding/GuidedSharedProfileQuestions";
 import { GuidedTrainingQuestions } from "../publicOnboarding/GuidedTrainingQuestions";
 import { NutritionExerciseQuestions } from "./NutritionExerciseQuestions";
+import { formatTomanInput, irrToToman, tomanToIrr } from "./money";
 import type { StructuredExerciseInput } from "./types";
 
 type FlowStep =
@@ -154,7 +155,7 @@ export function NutritionOnboardingFlow({
   const [otherCondition, setOtherCondition] = useState("");
   const [dailyActivityLevel, setDailyActivityLevel] = useState<NutritionProfileInput["daily_activity_level"]>(() => initialNutritionBasics?.daily_activity_level ?? "moderate");
   const [structuredExercise, setStructuredExercise] = useState<StructuredExerciseInput | undefined>(() => initialDraft?.structuredExercise);
-  const [budget, setBudget] = useState(() => initialNutritionBasics === undefined ? "" : String(initialNutritionBasics.individual_monthly_food_budget_irr));
+  const [budget, setBudget] = useState(() => initialNutritionBasics === undefined ? "" : irrToToman(initialNutritionBasics.individual_monthly_food_budget_irr));
   const [budgetStyle, setBudgetStyle] = useState<"strict" | "flexible">(() => initialNutritionBasics?.budget_style ?? "strict");
   const [mealCount, setMealCount] = useState("3");
   const [snackCount, setSnackCount] = useState("1");
@@ -226,7 +227,7 @@ export function NutritionOnboardingFlow({
 
   function populateExistingNutrition(nutrition: NutritionProfile) {
     setDailyActivityLevel(nutrition.daily_activity_level);
-    setBudget(String(nutrition.individual_monthly_food_budget_irr));
+    setBudget(irrToToman(nutrition.individual_monthly_food_budget_irr));
     setBudgetStyle(nutrition.budget_style);
     setMealCount(String(nutrition.effective_main_meal_slots ?? nutrition.meals_per_day));
     setSnackCount(String(nutrition.effective_snack_slots ?? nutrition.snacks_per_day));
@@ -337,7 +338,7 @@ export function NutritionOnboardingFlow({
 
   const nutritionInput = useMemo<NutritionProfileInput>(() => ({
     daily_activity_level: dailyActivityLevel,
-    individual_monthly_food_budget_irr: Number(budget),
+    individual_monthly_food_budget_irr: tomanToIrr(budget),
     budget_style: budgetStyle,
     main_meal_count_bucket: mealCount === "2" ? "two_main_meals" : mealCount === "3" ? "three_main_meals" : "four_or_more_main_meals",
     snack_count_bucket: snackCount === "0" ? "zero_snacks" : snackCount === "1" ? "one_snack" : snackCount === "2" ? "two_snacks" : "three_or_more_snacks",
@@ -503,12 +504,12 @@ export function NutritionOnboardingFlow({
         />
       )}
       {step === "pre_account" && <PreAccountNutritionQuestions
-        busy={busy} conditions={conditions} flags={safetyFlags} foods={foods} budget={budget} dailyActivityLevel={dailyActivityLevel}
-        onConditions={setConditions} onFlags={setSafetyFlags} onFoods={setFoods} onBudget={setBudget}
+          busy={busy} conditions={conditions} flags={safetyFlags} foods={foods} budget={budget} dailyActivityLevel={dailyActivityLevel}
+        onConditions={setConditions} onFlags={setSafetyFlags} onFoods={setFoods} onBudget={(value) => setBudget(formatTomanInput(value))}
         onDailyActivityLevel={setDailyActivityLevel}
         onBack={() => setStep("training")}
         onComplete={() => onDraftComplete?.({ safety: safetyInput(), structuredExercise, nutritionBasics: {
-          daily_activity_level: dailyActivityLevel, individual_monthly_food_budget_irr: Number(budget), budget_style: budgetStyle, plan_style: planStyle,
+          daily_activity_level: dailyActivityLevel, individual_monthly_food_budget_irr: tomanToIrr(budget), budget_style: budgetStyle, plan_style: planStyle,
           allergies: splitNames(foods.allergies).map((name) => ({ name, details: null })), intolerances: splitNames(foods.intolerances).map((name) => ({ name, details: null })), dietary_pattern: foods.dietaryPattern,
         } })}
       />}
@@ -532,7 +533,7 @@ export function NutritionOnboardingFlow({
       {step === "budget" && (
         <BudgetForm
           busy={busy} budget={budget} budgetStyle={budgetStyle} mealCount={mealCount}
-          snackCount={snackCount} startDay={startDay} onBudget={setBudget}
+          snackCount={snackCount} startDay={startDay} onBudget={(value) => setBudget(formatTomanInput(value))}
           onBudgetStyle={setBudgetStyle} onMealCount={setMealCount} onSnackCount={setSnackCount}
           onStartDay={setStartDay} onBack={() => setStep(productMode === "nutrition" || !trainingProfileExists ? "training" : "safety")}
     onNext={() => setStep("review")}
@@ -541,7 +542,7 @@ export function NutritionOnboardingFlow({
       {step === "review" && (
         <form className="profile-form" onSubmit={finish}>
           <div className="nutrition-review-card">
-            <strong>{language === "en" ? `Monthly budget: ${new Intl.NumberFormat("en-US").format(Number(budget))} IRR` : `بودجه ماهانه: ${new Intl.NumberFormat("fa-IR").format(Number(budget))} ریال`}</strong>
+            <strong>{language === "en" ? `Monthly budget: ${budget} Toman` : `بودجه ماهانه: ${new Intl.NumberFormat("fa-IR").format(Number(budget.replaceAll(",", "")))} تومان`}</strong>
             <span>{language === "en" ? `${mealCount} meals and ${snackCount} snacks per day` : `${mealCount} وعده اصلی و ${snackCount} میان‌وعده در روز`}</span>
             <span>{language === "en" ? "Safety policy" : "سیاست ایمنی"}: {decision?.policy_version}</span>
             <span>{language === "en" ? `Allergies: ${splitNames(foods.allergies).join(", ") || "None"}` : `حساسیت ثبت‌شده: ${splitNames(foods.allergies).join("، ") || "ندارد"}`}</span>
@@ -585,7 +586,7 @@ function PostAccountNutritionDetails(props: {
         <fieldset className="profile-fieldset" disabled={props.busy}>
           <legend>{l("نیاز روزانه و وعده‌ها", "Daily needs and meals")}</legend>
           <SelectField label={l("میزان فعالیت روزانه", "Daily activity level")} value={props.dailyActivityLevel} onChange={(value) => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"])} options={[["sedentary", l("کم‌تحرک", "Sedentary")], ["light", l("فعالیت سبک", "Light")], ["moderate", l("فعالیت متوسط", "Moderate")], ["very_active", l("بسیار فعال", "Very active")]]} />
-          <LabeledInput label={l("بودجه ماهانه غذا (ریال)", "Monthly food budget (IRR)")} type="number" min="0" required value={props.budget} onChange={props.onBudget} />
+          <LabeledInput label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")} inputMode="numeric" required value={props.budget} onChange={props.onBudget} />
           <SelectField label={l("نوع بودجه", "Budget style")} value={props.budgetStyle} onChange={(value) => props.onBudgetStyle(value as NutritionProfileInput["budget_style"])} options={[["strict", l("سخت‌گیرانه", "Strict")], ["flexible", l("انعطاف‌پذیر", "Flexible")]]} />
           <SelectField label={l("وعده اصلی در روز", "Main meals per day")} value={props.mealCount} onChange={props.onMealCount} options={[["2", l("۲ وعده", "2 meals")], ["3", l("۳ وعده", "3 meals")], ["4", l("۴ وعده یا بیشتر", "4 or more meals")]]} />
           <SelectField label={l("میان‌وعده در روز", "Snacks per day")} value={props.snackCount} onChange={props.onSnackCount} options={[["0", l("هیچ‌کدام", "None")], ["1", l("۱ میان‌وعده", "1 snack")], ["2", l("۲ میان‌وعده", "2 snacks")], ["3", l("۳ میان‌وعده یا بیشتر", "3 or more snacks")]]} />
@@ -628,7 +629,7 @@ function stepIntro(step: FlowStep, language: "fa" | "en") {
     body: "این اطلاعات بین تمرین و تغذیه مشترک است و فقط یک‌بار ثبت می‌شود.",
     safety: "این پاسخ‌ها برای تشخیص پزشکی نیست؛ فقط مسیر ایمن برنامه را مشخص می‌کند.",
     blocked: "", training: "اطلاعات فعلی تمرینت را صفحه‌به‌صفحه نگه می‌داریم.", pre_account: "بعد از ساخت حساب، فقط جزئیات باقی‌ماندهٔ پروفایل را کامل می‌کنیم.",
-    budget: "بودجه شخصی خودت را فقط به ریال وارد کن.", foods: "",
+    budget: "بودجه شخصی خودت را فقط به تومان وارد کن.", foods: "",
     review: "بعد از ثبت، هنوز هیچ برنامه غذایی تولید نمی‌شود.", complete: "",
   };
   const en = {
@@ -636,7 +637,7 @@ function stepIntro(step: FlowStep, language: "fa" | "en") {
     body: "Training and nutrition share this information, so we only ask once.",
     safety: "These answers do not provide a diagnosis; they only help keep your plan safe.",
     blocked: "", training: "We’ll keep your current training details one screen at a time.", pre_account: "After account setup, you will only complete the remaining profile details.",
-    budget: "Enter your personal food budget in IRR.", foods: "",
+    budget: "Enter your personal food budget in Toman.", foods: "",
     review: "Saving this does not generate a meal plan yet.", complete: "",
   };
   return (language === "en" ? en : fa)[step];
@@ -765,7 +766,7 @@ function PreAccountNutritionQuestions(props: {
     ] as const).map(([field, fa, en]) => <label className="nutrition-check" key={field}><input type="checkbox" checked={props.flags[field]} onChange={(event) => props.onFlags({ ...props.flags, [field]: event.target.checked })} />{l(fa, en)}</label>)}</div>}
     {question === 2 && <><TextArea label={l("حساسیت‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food allergies (optional, comma separated)")} value={props.foods.allergies} onChange={(allergies) => props.onFoods({ ...props.foods, allergies })} /><TextArea label={l("عدم‌تحمل‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food intolerances (optional, comma separated)")} value={props.foods.intolerances} onChange={(intolerances) => props.onFoods({ ...props.foods, intolerances })} /></>}
     {question === 3 && <SelectField label={l("فعالیت روزانه", "Daily activity")} value={props.dailyActivityLevel} onChange={(value) => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"])} options={[["sedentary", l("کم‌تحرک", "Mostly sedentary")], ["light", l("کمی فعال", "Lightly active")], ["moderate", l("فعالیت متوسط", "Moderately active")], ["very_active", l("بسیار فعال", "Very active")]]} />}
-    {question === 4 && <LabeledInput label={l("بودجه ماهانه غذا (مبلغ به ریال)", "Monthly food budget (IRR)")} type="number" min="0" required value={props.budget} onChange={props.onBudget} />}
+    {question === 4 && <LabeledInput label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")} inputMode="numeric" required value={props.budget} onChange={props.onBudget} />}
     {question === 5 && <SelectField label={l("سبک غذا", "Food style")} value={props.foods.dietaryPattern} onChange={(dietaryPattern) => props.onFoods({ ...props.foods, dietaryPattern: dietaryPattern as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />}
   </NutritionQuestionFrame>;
 }
@@ -792,7 +793,7 @@ function BudgetForm(props: {
   return (
     <NutritionQuestionFrame busy={props.busy} current={question} total={titles.length} title={titles[question]} stage={1}
       onBack={back} onSubmit={advance}>
-      {question === 0 && <LabeledInput label={l("بودجه ماهانه غذا (مبلغ به ریال)", "Monthly food budget (IRR)")} type="number" min="0" required value={props.budget} onChange={props.onBudget} />}
+      {question === 0 && <LabeledInput label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")} inputMode="numeric" required value={props.budget} onChange={props.onBudget} />}
       {question === 1 && <SelectField label={l("نوع بودجه", "Budget style")} value={props.budgetStyle} onChange={(value) => props.onBudgetStyle(value as "strict" | "flexible")} options={[["strict", l("سخت‌گیرانه", "Strict")], ["flexible", l("انعطاف‌پذیر", "Flexible")]]} />}
       {question === 2 && <SelectField label={l("وعده اصلی در روز", "Main meals per day")} value={props.mealCount} onChange={props.onMealCount} options={[["2", l("۲ وعده", "2 meals")], ["3", l("۳ وعده", "3 meals")], ["4", l("۴ وعده یا بیشتر", "4 or more meals")]]} />}
       {question === 3 && <SelectField label={l("میان‌وعده در روز", "Snacks per day")} value={props.snackCount} onChange={props.onSnackCount} options={[["0", l("هیچ‌کدام", "None")], ["1", l("۱ میان‌وعده", "1 snack")], ["2", l("۲ میان‌وعده", "2 snacks")], ["3", l("۳ میان‌وعده یا بیشتر", "3 or more snacks")]]} />}
@@ -808,8 +809,8 @@ type FoodsState = {
   checkIn: boolean; checkInTime: string;
 };
 
-function LabeledInput(props: { label: string; value: string; onChange: (value: string) => void; type?: string; min?: string; max?: string; required?: boolean }) {
-  return <div className="profile-field"><label>{props.label}<input type={props.type ?? "text"} min={props.min} max={props.max} required={props.required} value={props.value} onChange={(event) => props.onChange(event.target.value)} /></label></div>;
+function LabeledInput(props: { label: string; value: string; onChange: (value: string) => void; type?: string; min?: string; max?: string; required?: boolean; inputMode?: "numeric" | "decimal" | "text" }) {
+  return <div className="profile-field"><label>{props.label}<input type={props.type ?? "text"} inputMode={props.inputMode} min={props.min} max={props.max} required={props.required} value={props.value} onChange={(event) => props.onChange(event.target.value)} /></label></div>;
 }
 
 function TextArea(props: { label: string; value: string; onChange: (value: string) => void }) {

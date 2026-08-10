@@ -120,11 +120,11 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
       <div className="weekly-plan__ledger" aria-label={l("بودجه برنامه", "Plan budget")}>
         <div>
           <span>{l("هزینه برآوردی هفته", "Estimated weekly cost")}</span>
-          <strong>{number.format(currentPlan.weekly_cost_irr)} {l("ریال", "IRR")}</strong>
+          <strong>{number.format(Math.floor(currentPlan.weekly_cost_irr / 10))} {l("تومان", "Toman")}</strong>
         </div>
         <div>
           <span>{l("بودجه هفتگی", "Weekly budget")}</span>
-          <strong>{number.format(currentPlan.weekly_budget_irr)} {l("ریال", "IRR")}</strong>
+          <strong>{number.format(Math.floor(currentPlan.weekly_budget_irr / 10))} {l("تومان", "Toman")}</strong>
         </div>
         <div>
           <span>{l("وضعیت بودجه", "Budget status")}</span>
@@ -149,7 +149,7 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
       </div>
 
       {day && (
-        <><div className="weekly-plan__daily-summary"><strong>{l("جمع روز", "Daily total")}: {number.format(day.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</strong><span>{number.format(day.cost_irr)} {l("ریال", "IRR")}</span><span>{l("پروتئین", "Protein")}: {number.format(day.nutrient_totals.protein_g ?? 0)} g</span><span>{l("کربوهیدرات", "Carbohydrate")}: {number.format(day.nutrient_totals.carbohydrate_g ?? 0)} g</span></div><div className="weekly-plan__day-actions"><button disabled={busyMeal === "regenerate" || day.meals.every((meal) => meal.is_locked)} type="button" onClick={() => void regenerateDay()}>{l("بازسازی وعده‌های باز این روز", "Regenerate unlocked meals for this day")}</button></div><div className="weekly-plan__meals" role="tabpanel">
+        <><div className="weekly-plan__daily-summary"><strong>{l("جمع روز", "Daily total")}: {number.format(day.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</strong><span>{number.format(Math.floor(day.cost_irr / 10))} {l("تومان", "Toman")}</span><span>{l("پروتئین", "Protein")}: {number.format(day.nutrient_totals.protein_g ?? 0)} g</span><span>{l("کربوهیدرات", "Carbohydrate")}: {number.format(day.nutrient_totals.carbohydrate_g ?? 0)} g</span></div><div className="weekly-plan__day-actions"><button disabled={busyMeal === "regenerate" || day.meals.every((meal) => meal.is_locked)} type="button" onClick={() => void regenerateDay()}>{l("بازسازی وعده‌های باز این روز", "Regenerate unlocked meals for this day")}</button></div><div className="weekly-plan__meals" role="tabpanel">
           {day.meals.map((meal) => (
             <article className="weekly-plan__meal" key={meal.id}>
               <header>
@@ -157,7 +157,7 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
                   <span>{meal.slot_role === "snack" ? l("میان‌وعده", "Snack") : l("وعده اصلی", "Main meal")}</span>
                   <strong>{number.format(meal.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</strong>
                 </div>
-                <small>{number.format(meal.cost_irr)} {l("ریال", "IRR")}</small>
+                <small>{number.format(Math.floor(meal.cost_irr / 10))} {l("تومان", "Toman")}</small>
               </header>
               <ul>
                 {meal.foods.map((food) => (
@@ -198,12 +198,12 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
         </div>
       </div>
 
-      {preview && <section className="weekly-plan__confirm" role="dialog" aria-modal="true" aria-labelledby="edit-preview-title"><h3 id="edit-preview-title">{preview.kind === "remove" ? l("تأیید حذف وعده", "Confirm meal removal") : preview.kind === "meal" ? l("تأیید تعویض وعده", "Confirm meal replacement") : l("تأیید تعویض ماده غذایی", "Confirm food replacement")}</h3><p>{l("این تغییر یک نسخه جدید می‌سازد و باید دوباره توسط پزشک بررسی شود.", "This creates a new revision that requires physician review again.")}</p><p>{l("تغییر هزینه", "Cost change")}: {number.format(editPreviewCost(preview.data))} {l("ریال", "IRR")}</p><button className="primary-button" type="button" onClick={() => void confirmRemoval()}>{l("ساخت نسخه جدید", "Create new revision")}</button><button type="button" onClick={() => setPreview(null)}>{l("انصراف", "Cancel")}</button></section>}
+      {preview && <section className="weekly-plan__confirm" role="dialog" aria-modal="true" aria-labelledby="edit-preview-title"><h3 id="edit-preview-title">{preview.kind === "remove" ? l("تأیید حذف وعده", "Confirm meal removal") : preview.kind === "meal" ? l("تأیید تعویض وعده", "Confirm meal replacement") : l("تأیید تعویض ماده غذایی", "Confirm food replacement")}</h3><p>{l("این تغییر یک نسخه جدید می‌سازد و باید دوباره توسط پزشک بررسی شود.", "This creates a new revision that requires physician review again.")}</p><p>{l("تغییر هزینه", "Cost change")}: {number.format(Math.floor(editPreviewCost(preview.data) / 10))} {l("تومان", "Toman")}</p><button className="primary-button" type="button" onClick={() => void confirmRemoval()}>{l("ساخت نسخه جدید", "Create new revision")}</button><button type="button" onClick={() => setPreview(null)}>{l("انصراف", "Cancel")}</button></section>}
 
       <section className="weekly-plan__shopping">
         <h3>{l("لیست خرید دقیق", "Exact shopping list")}</h3>
         {!currentPlan.physician_approved && <p className="weekly-plan__warning">{l("تا تأیید پزشک، خرید نهایی را انجام نده.", "Wait for physician approval before making final purchases.")}</p>}
-        {shopping === null ? <p role="status">{l("در حال دریافت…", "Loading…")}</p> : <><ul>{shopping.items.map((item) => <li key={item.food_id}><span>{language === "en" ? item.name_en : item.name_fa}</span><strong>{number.format(item.required_quantity)} {item.canonical_unit}</strong><small>{number.format(item.cost_irr)} {l("ریال", "IRR")}</small></li>)}</ul><strong>{l("جمع", "Total")}: {number.format(shopping.total_cost_irr)} {l("ریال", "IRR")}</strong></>}
+        {shopping === null ? <p role="status">{l("در حال دریافت…", "Loading…")}</p> : <><ul>{shopping.items.map((item) => <li key={item.food_id}><span>{language === "en" ? item.name_en : item.name_fa}</span><strong>{number.format(item.required_quantity)} {item.canonical_unit}</strong><small>{number.format(Math.floor(item.cost_irr / 10))} {l("تومان", "Toman")}</small></li>)}</ul><strong>{l("جمع", "Total")}: {number.format(Math.floor(shopping.total_cost_irr / 10))} {l("تومان", "Toman")}</strong></>}
       </section>
 
       <section className="weekly-plan__history">

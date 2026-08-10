@@ -163,7 +163,7 @@ it("stops unnecessary questions for a manual-only safety outcome", async () => {
   await completeSafetyQuestions(user);
 
   expect(await screen.findByRole("heading", { name: "ادامه مسیر با پزشک فیتشو" })).toBeInTheDocument();
-  expect(screen.queryByLabelText("بودجه ماهانه غذا (مبلغ به ریال)")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("بودجه ماهانه غذا (تومان)")).not.toBeInTheDocument();
 });
 
 it("asks safety before training in combined mode", async () => {
@@ -221,7 +221,7 @@ it("shows essential and remaining nutrition details together after account creat
 
   expect(await screen.findByRole("heading", { name: "اطلاعات تغذیه‌ای" })).toBeInTheDocument();
   expect(screen.getByLabelText("میزان فعالیت روزانه")).toHaveValue("moderate");
-  expect(screen.getByLabelText("بودجه ماهانه غذا (ریال)")).toHaveValue(13_000_000);
+  expect(screen.getByLabelText("بودجه ماهانه غذا (تومان)")).toHaveValue("1,300,000");
   expect(screen.getByLabelText("الگوی غذایی")).toHaveValue("omnivore");
   expect(screen.getByLabelText("وعده اصلی در روز")).toHaveValue("3");
   expect(screen.queryByLabelText("ترجیح آماده‌سازی غذا")).not.toBeInTheDocument();
@@ -231,7 +231,7 @@ it("shows essential and remaining nutrition details together after account creat
   expect(screen.getByLabelText("غذاهایی که دوست نداری (اختیاری)")).toBeInTheDocument();
 });
 
-it("completes the guided nutrition profile with IRR budget and optional skips", async () => {
+it("converts a grouped Toman budget to the existing IRR payload", async () => {
   vi.mocked(nutritionApi.saveNutritionProfile).mockResolvedValue({} as never);
   const onComplete = vi.fn();
   const user = userEvent.setup();
@@ -249,7 +249,7 @@ it("completes the guided nutrition profile with IRR budget and optional skips", 
   await user.click(await screen.findByRole("button", { name: "تمرین نمی‌کنم" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));
 
-  await user.type(await screen.findByLabelText("بودجه ماهانه غذا (مبلغ به ریال)"), "13000000");
+  await user.type(await screen.findByLabelText("بودجه ماهانه غذا (تومان)"), "1300000");
   for (let index = 0; index < 5; index += 1) await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.click(screen.getByRole("button", { name: "ثبت پروفایل تغذیه" }));
 
