@@ -26,9 +26,13 @@ an authenticated session unless the route is explicitly an admin or physician ro
 
 Physician routes expose server-side access verification, the review queue, claim, exact plan
 revision, structured food edits, plan action, lab request/review, and supplement-order
-list/create/update/transition under `/physician`. User-visible and internal physician notes are
-separate; internal notes never appear in member plan responses. The physician role is checked
-independently of administrator status. Admin routes manage canonical foods/meals and supplements.
+list/create/update/transition under `/physician`. `GET /physician/reviews?view=pending|claimed|approved`
+returns separate queue views scoped to the authenticated physician. Pending cases may be claimed;
+claimed cases expose the clinical editing workspace; approved cases are historical, read-only
+snapshots. The response includes a safe member display name and never exposes private physician
+notes. User-visible and internal physician notes are separate; internal notes never appear in
+member plan responses. The physician role is checked independently of administrator status. Admin
+routes manage canonical foods/meals and supplements.
 
 `GET /food-catalogue` returns verified foods only. Accepted member prices include
 `reference_price_irr`, an `IRR_PER_*` unit, source, observation time, and acceptance time. Deprecated
