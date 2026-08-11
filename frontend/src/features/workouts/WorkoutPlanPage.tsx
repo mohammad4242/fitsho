@@ -257,9 +257,9 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 )}
               </div>
               {generating && <p className="workout-generating" role="status">{t("workoutPlan.generating")}</p>}
-              <div className="workout-days">
-                {plan.days.map((day) => (
-                  <article className="workout-day" key={day.day_number}>
+              <div className="workout-days" role="list" aria-labelledby="workout-schedule-title">
+                {plan.days.map((day, dayIndex) => (
+                  <article className={`workout-day${dayIndex === 0 ? " workout-day--focus" : ""}`} key={day.day_number} role="listitem">
                     <header>
                       <span>{String(day.day_number).padStart(2, "0")}</span>
                       <div>

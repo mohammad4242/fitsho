@@ -99,7 +99,7 @@ export function FoodCataloguePage() {
       {state === "error" && <section className="food-catalogue-state" role="alert"><strong>{l("کاتالوگ دریافت نشد", "Catalogue unavailable")}</strong><button type="button" onClick={() => setReload((value) => value + 1)}>{l("تلاش دوباره", "Try again")}</button></section>}
       {state === "ready" && data?.items.length === 0 && <p className="food-catalogue-state">{l("ماده‌ای با این مشخصات پیدا نشد.", "No food matched these filters.")}</p>}
       {state === "ready" && data && data.items.length > 0 && (
-        <section className="food-catalogue-grid" aria-label={l("مواد غذایی", "Foods")}>
+        <section className="food-catalogue-grid" aria-label={l("مواد غذایی", "Foods")} role="list">
           {data.items.map((food) => <FoodCard food={food} key={food.id} language={language} onDetails={() => setDetails(food)} onPrice={isAdminFood(food) ? () => setPriceFood(food) : undefined} />)}
         </section>
       )}
@@ -117,7 +117,7 @@ function FoodCard({ food, language, onDetails, onPrice }: { food: FoodCatalogueI
   const fa = language === "fa";
   const l = (persian: string, english: string) => fa ? persian : english;
   const portion = defaultPortion(food);
-  return <article className="food-shelf-card">
+  return <article className="food-shelf-card" role="listitem">
     <header><div><span>{categoryLabel(food.category, language)}</span><h2>{fa ? food.name_fa : food.name_en}</h2><small>{fa ? food.name_en : food.name_fa}</small></div><span className="food-shelf-card__basis">{basisLabel(portion, language)}</span></header>
     {isAdminFood(food) && <PriceTicket food={food} language={language} />}
     <div className="food-macro-strip">{macroDefinitions.map(([code, faLabel, enLabel, unit]) => <div key={code}><span>{fa ? faLabel : enLabel}</span><strong>{macroValue(scale(food.macros[code], portion), unit, language)}</strong></div>)}</div>

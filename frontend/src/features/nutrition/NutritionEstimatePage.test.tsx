@@ -137,10 +137,12 @@ it("shows the scientific calorie and nutrient estimate with its limits in Persia
   render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
 
   expect(await screen.findByRole("heading", { name: "هدف روزانه تغذیه" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "هدف انرژی روزانه" })).toBeInTheDocument();
   expect(screen.getByText(/۲٬۱۰۰/)).toBeInTheDocument();
   expect(screen.getByText(/۱۲۰/)).toBeInTheDocument();
   expect(screen.getByText("اطمینان بالا")).toBeInTheDocument();
   expect(screen.getByText(/برآورد علمی است، نه تشخیص یا نسخه پزشکی/)).toBeInTheDocument();
+  expect(screen.queryByText(/قیمت این هفته/)).not.toBeInTheDocument();
   expect(screen.getByText(/nutrition-science-v1/)).toBeInTheDocument();
   expect(screen.getByText("جزئیات علمی و حدود ایمنی").closest("details")).not.toHaveAttribute("open");
 });

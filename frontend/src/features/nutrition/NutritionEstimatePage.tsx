@@ -83,7 +83,7 @@ export function NutritionEstimatePage() {
           <Link className="secondary-button" to="/nutrition-tracking">{l("ثبت تغذیه امروز", "Track today's food")}</Link>
           <Link className="secondary-button" to="/nutrition-labs">{l("آزمایش‌های من", "My lab documents")}</Link>
           <Link className="secondary-button" to="/nutrition-supplements">{l("مکمل‌های من", "My supplements")}</Link>
-          <Link className="nutrition-catalogue-entry" to="/food-catalogue"><span aria-hidden="true">⌁</span><strong>{l("کاتالوگ مواد غذایی", "Food catalogue")}</strong><small>{l("قیمت این هفته و ارزش غذایی", "Weekly prices and nutrition")}</small></Link>
+          <Link className="nutrition-catalogue-entry" to="/food-catalogue"><span aria-hidden="true">⌁</span><strong>{l("کاتالوگ مواد غذایی", "Food catalogue")}</strong><small>{l("مرجع ترکیب و ارزش غذایی", "Composition and nutrition reference")}</small></Link>
         </nav>
         <p className="eyebrow eyebrow--accent">{l("موتور علمی فیتشو", "Fitsho scientific engine")}</p>
         <h1 className="fitsho-display">{l("هدف روزانه تغذیه", "Daily nutrition targets")}</h1>
@@ -173,7 +173,7 @@ function EstimateContent({ estimate, language, onRefresh }: { estimate: Nutritio
 
   return <>
     <section className="nutrition-estimate-summary" aria-label={l("خلاصه هدف‌ها", "Target summary")}>
-      <article className="nutrition-calorie-card">
+      <article className="nutrition-calorie-card" aria-label={l("هدف انرژی روزانه", "Daily energy target")} role="region">
         <span>{l("هدف انرژی", "Energy target")}</span>
         <strong>{preferred("goal_calories")}</strong>
         <small>{l("میانگین روزانه", "daily average")}</small>

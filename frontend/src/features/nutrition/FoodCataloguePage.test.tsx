@@ -98,6 +98,7 @@ it("shows nutrient data and never shows catalogue price information to a member"
   render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
 
   expect(await screen.findByRole("heading", { name: "کاتالوگ مواد غذایی" })).toBeVisible();
+  expect(screen.getByRole("list", { name: "مواد غذایی" })).toBeVisible();
   expect(screen.getByRole("heading", { name: "سینه مرغ" })).toBeVisible();
   expect(screen.queryByText("یافت نشد")).not.toBeInTheDocument();
   expect(screen.getByText("۱۱٫۳ گرم")).toBeVisible();

@@ -177,6 +177,7 @@ it("shows plan context without cinematic background media", async () => {
   expect(await screen.findByRole("region", { name: "خلاصه برنامه فعال" })).toBeInTheDocument();
   expect(screen.getByText("۱ روز تمرین")).toBeInTheDocument();
   expect(screen.getByText("۴۵ دقیقه برای هر جلسه")).toBeInTheDocument();
+  expect(screen.getByRole("list", { name: "روزهای تمرین تو" })).toBeInTheDocument();
   expect(document.querySelector("video")).not.toBeInTheDocument();
 });
 

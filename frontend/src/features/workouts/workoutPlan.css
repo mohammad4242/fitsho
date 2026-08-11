@@ -1,21 +1,22 @@
-.workout-plan-shell { min-height: 100svh; padding: 0 clamp(1rem, 4vw, 4rem) 7rem; background: var(--fitsho-canvas); }
-.workout-plan-main { width: min(100%, var(--fitsho-content-max)); margin: clamp(1.5rem, 5vw, 4rem) auto 0; }
+.workout-plan-shell { min-height: 100svh; padding: 0 clamp(1rem, 3vw, 3rem) var(--fitsho-space-8); background: var(--fitsho-canvas); }
+.workout-plan-main { width: min(100%, 76rem); margin: clamp(1.25rem, 4vw, 3rem) auto 0; }
 .workout-plan-main > * { min-width: 0; }
 
 .workout-plan-hero { display: flex; align-items: end; justify-content: space-between; gap: 2rem; padding-block: clamp(1.5rem, 4vw, 3.5rem); border-bottom: 1px solid var(--fitsho-line); }
-.workout-plan-hero h1, .workout-schedule h2, .workout-empty h2 { margin: 0; color: var(--fitsho-ink); font-size: clamp(2.5rem, 5vw, 4.4rem); line-height: 1; }
+.workout-plan-hero h1, .workout-schedule h2, .workout-empty h2 { margin: 0; color: var(--fitsho-ink); font-family: inherit; font-size: clamp(2.2rem, 4.5vw, 3.6rem); font-weight: 850; letter-spacing: -.045em; line-height: 1.08; }
+html[dir="rtl"] .workout-plan-hero h1, html[dir="rtl"] .workout-schedule h2, html[dir="rtl"] .workout-empty h2 { letter-spacing: 0; }
 .workout-plan-hero__content > p:last-child { max-width: 42rem; margin: 1rem 0 0; color: var(--fitsho-muted); line-height: 1.8; }
-.workout-plan-duration { min-width: 7.5rem; padding: 1rem; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-md); text-align: center; }
+.workout-plan-duration { min-width: 7.5rem; padding: 1rem; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-xl); background: rgb(80 223 206 / 6%); text-align: center; }
 .workout-plan-duration strong { display: block; color: var(--fitsho-aqua); font-size: 2.5rem; line-height: 1; }
 .workout-plan-duration span { color: var(--fitsho-muted); font-size: .78rem; font-weight: 800; }
 
-.workout-plan-context { display: grid; grid-template-columns: repeat(4, 1fr); margin-block: 1.25rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-md); background: var(--fitsho-surface); }
+.workout-plan-context { display: grid; grid-template-columns: repeat(4, 1fr); margin-block: 1.25rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-xl); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
 .workout-plan-context > span { min-width: 0; display: grid; gap: .35rem; padding: 1rem; }
 .workout-plan-context > span + span { border-inline-start: 1px solid var(--fitsho-line); }
 .workout-plan-context small { color: var(--fitsho-muted); }
 .workout-plan-context strong { overflow-wrap: anywhere; }
 
-.workout-guidance, .workout-generation-method, .workout-status, .workout-empty, .workout-version-history { margin-block: 1rem; padding: clamp(1.1rem, 3vw, 1.7rem); border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-md); background: var(--fitsho-surface); }
+.workout-guidance, .workout-generation-method, .workout-status, .workout-empty, .workout-version-history { margin-block: 1rem; padding: clamp(1.1rem, 3vw, 1.7rem); border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-xl); background: var(--fitsho-surface); }
 .workout-guidance { border-inline-start: .3rem solid var(--fitsho-coral); }
 .workout-guidance > div { display: flex; align-items: center; gap: .75rem; }
 .workout-guidance h2 { margin: 0; font-size: 1.2rem; }
@@ -60,11 +61,13 @@
 
 .workout-schedule { margin-block: 2rem; }
 .workout-schedule__heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-.workout-schedule__heading h2 { font-size: clamp(2rem, 4vw, 3.5rem); }
+.workout-schedule__heading h2 { font-size: clamp(1.8rem, 3.5vw, 2.8rem); }
 .workout-days { display: grid; gap: .75rem; }
-.workout-day { overflow: hidden; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-md); background: var(--fitsho-surface); }
+.workout-day { position: relative; overflow: hidden; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-xl); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
+.workout-day--focus { border-color: var(--fitsho-line-strong); box-shadow: var(--fitsho-shadow-focus); }
+.workout-day--focus::before { position: absolute; z-index: 1; inset-block: 1rem; inset-inline-start: 0; width: .2rem; border-radius: 99rem; background: var(--fitsho-aqua); content: ""; }
 .workout-day > header { display: flex; align-items: center; gap: 1rem; padding: .9rem 1rem; border-bottom: 1px solid var(--fitsho-line); }
-.workout-day > header > span { width: 2.5rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; color: var(--fitsho-canvas); background: var(--fitsho-aqua); font-weight: 900; }
+.workout-day > header > span { width: 2.5rem; aspect-ratio: 1; display: grid; place-items: center; border: 1px solid var(--fitsho-line-strong); border-radius: .8rem; color: var(--fitsho-aqua); background: rgb(80 223 206 / 8%); font-family: "Sora Variable", sans-serif; font-weight: 900; }
 .workout-day h3, .workout-day p { margin: 0; }
 .workout-day > header p { margin-top: .2rem; color: var(--fitsho-muted); font-size: .8rem; }
 .workout-day ol { margin: 0; padding: 0; list-style: none; }
@@ -102,6 +105,16 @@
   .workout-guidance ul, .workout-future > div { grid-template-columns: 1fr; }
   .workout-exercise { grid-template-columns: 5rem minmax(0, 1fr); }
   .workout-exercise > img, .workout-exercise > video { width: 5rem; height: 4.6rem; }
+}
+
+@media (max-width: 430px) {
+  .workout-plan-shell { padding-inline: .75rem; }
+  .workout-plan-hero { align-items: flex-start; }
+  .workout-plan-context { border-radius: 1.1rem; }
+  .workout-plan-context > span { padding: .8rem; }
+  .workout-exercise { grid-template-columns: 4.25rem minmax(0, 1fr); gap: .75rem; padding: .85rem; }
+  .workout-exercise > img, .workout-exercise > video { width: 4.25rem; height: 4.25rem; }
+  .workout-exercise dl { gap: .45rem .75rem; }
 }
 
 @media (prefers-reduced-motion: reduce) { .workout-plan-shell * { transition: none !important; animation: none !important; } }
