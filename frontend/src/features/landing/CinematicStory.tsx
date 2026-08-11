@@ -57,9 +57,17 @@ function SupervisionMoment({ type }: { type: "training" | "nutrition" }) {
         <p>{type.toUpperCase()}</p>
         <h2 id={titleId} className="fitsho-display">{t(`landing.supervision.${type}.title`)}</h2>
       </div>
-      <div className={`plan-paper plan-paper--${type}`} aria-hidden="true">
+      <div
+        className={`plan-paper plan-paper--${type}`}
+        data-testid="plan-document"
+        aria-hidden="true"
+      >
         <div className="plan-paper__head"><i /><span /></div>
-        <div className="plan-paper__lines"><i /><i /><i /><i /><i /></div>
+        <div className="plan-paper__content">
+          <div className="plan-paper__group"><i /><i /><i /></div>
+          <div className="plan-paper__group"><i /><i /></div>
+          <div className="plan-paper__group"><i /><i /><i /></div>
+        </div>
         <VerificationSeal type={type} />
       </div>
     </section>
@@ -71,11 +79,13 @@ function VerificationSeal({ type }: { type: "training" | "nutrition" }) {
 
   return (
     <div className="verification-seal" data-testid="verification-seal">
-      <svg viewBox="0 0 120 120" aria-hidden="true">
-        <circle className="verification-seal__track" cx="60" cy="60" r="52" />
-        <circle className="verification-seal__ring" cx="60" cy="60" r="52" pathLength="100" />
-        <path className="verification-seal__check" pathLength="100" d="M35 60 52 77 87 40" />
-      </svg>
+      <div className="verification-seal__medallion">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle className="verification-seal__track" cx="60" cy="60" r="52" />
+          <circle className="verification-seal__ring" cx="60" cy="60" r="52" pathLength="100" />
+          <path className="verification-seal__check" pathLength="100" d="M35 60 52 77 87 40" />
+        </svg>
+      </div>
       <small>{t(`landing.supervision.${type}.seal`)}</small>
     </div>
   );

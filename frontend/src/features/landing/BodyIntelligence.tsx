@@ -25,7 +25,11 @@ export function BodyIntelligence({ reducedMotion }: { reducedMotion: boolean }) 
         <p>{t("landing.intelligence.body")}</p>
       </header>
 
-      <div className="body-interface" data-active-muscle={activeMuscle}>
+      <div
+        className="body-interface"
+        data-testid="body-interface"
+        data-active-muscle={activeMuscle}
+      >
         <picture className="body-interface__image">
           <source srcSet={bodyImage} type="image/webp" />
           <img
@@ -38,14 +42,38 @@ export function BodyIntelligence({ reducedMotion }: { reducedMotion: boolean }) 
           />
         </picture>
 
-        <svg className="body-interface__muscles" viewBox="0 0 100 150" preserveAspectRatio="none" aria-hidden="true">
-          <path className="muscle-shape muscle-shape--shoulders" d="M25 38 C31 29 39 29 48 35 C40 38 34 44 29 50 C24 48 21 44 25 38 Z M52 35 C61 29 69 29 75 38 C79 44 76 48 71 50 C66 44 60 38 52 35 Z" />
-          <path className="muscle-shape muscle-shape--back" d="M36 38 C43 34 47 37 50 41 C53 37 57 34 64 38 L67 62 C61 71 56 74 50 75 C44 74 39 71 33 62 Z" />
+        <svg className="body-interface__muscles" viewBox="0 0 100 150" aria-hidden="true">
+          <defs>
+            <radialGradient id="body-muscle-aqua" cx="50%" cy="42%" r="68%">
+              <stop offset="0" stopColor="#9ff8ed" stopOpacity=".55" />
+              <stop offset=".48" stopColor="#50dfce" stopOpacity=".26" />
+              <stop offset="1" stopColor="#50dfce" stopOpacity="0" />
+            </radialGradient>
+            <filter id="body-muscle-soft" x="-45%" y="-45%" width="190%" height="190%">
+              <feGaussianBlur stdDeviation="1.8" />
+            </filter>
+          </defs>
+          <g
+            className="muscle-region muscle-region--shoulders"
+            data-region="shoulders"
+            data-active={activeMuscle === "shoulders"}
+          >
+            <path className="muscle-region__glow" filter="url(#body-muscle-soft)" d="M22 35 C22 27 29 23 38 25 C43 26 47 30 49 35 C42 34 36 36 30 43 C25 43 22 40 22 35 Z M51 35 C53 30 57 26 62 25 C71 23 78 27 78 35 C78 40 75 43 70 43 C64 36 58 34 51 35 Z" />
+            <path className="muscle-region__light" d="M24 34 C25 28 31 26 38 27 C42 28 45 31 47 34 C40 34 34 37 30 41 C27 41 24 38 24 34 Z M53 34 C55 31 58 28 62 27 C69 26 75 28 76 34 C76 38 73 41 70 41 C66 37 60 34 53 34 Z" />
+          </g>
+          <g
+            className="muscle-region muscle-region--back"
+            data-region="back"
+            data-active={activeMuscle === "back"}
+          >
+            <path className="muscle-region__glow" filter="url(#body-muscle-soft)" d="M33 36 C39 32 45 33 50 39 C55 33 61 32 67 36 L69 58 C64 68 58 74 50 77 C42 74 36 68 31 58 Z" />
+            <path className="muscle-region__light" d="M36 37 C41 34 46 36 50 41 C54 36 59 34 64 37 L66 56 C62 64 57 69 50 72 C43 69 38 64 34 56 Z" />
+          </g>
         </svg>
 
-        <svg className="body-interface__connectors" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <path className="connector connector--shoulders" d="M68 30 C79 30 81 22 92 22" pathLength="100" />
-          <path className="connector connector--back" d="M52 43 C70 43 77 61 92 61" pathLength="100" />
+        <svg className="body-interface__connectors" viewBox="0 0 100 150" aria-hidden="true">
+          <path className="connector connector--shoulders" d="M72 34 C80 34 82 30 90 30" pathLength="100" />
+          <path className="connector connector--back" d="M58 57 C73 57 78 74 90 74" pathLength="100" />
         </svg>
 
         <div className="body-interface__hotspots">

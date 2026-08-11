@@ -57,6 +57,10 @@ it("presents coach and physician supervision with schematic documents", () => {
   expect(within(nutrition).getByText("NUTRITION")).toBeInTheDocument();
   expect(within(nutrition).getByText("Physician supervised")).toBeInTheDocument();
   expect(screen.getAllByTestId("verification-seal")).toHaveLength(2);
+  expect(screen.getAllByTestId("plan-document")).toHaveLength(2);
+  screen.getAllByTestId("plan-document").forEach((document) => {
+    expect(document.querySelectorAll(".plan-paper__group")).toHaveLength(3);
+  });
   expect(screen.queryByText("Bench Press")).not.toBeInTheDocument();
 });
 
@@ -82,27 +86,39 @@ it("uses the supplied body asset and updates interactive muscle callouts", async
   );
   const shoulders = screen.getByRole("button", { name: "سرشانه" });
   const back = screen.getByRole("button", { name: "پشت" });
+  const bodyInterface = screen.getByTestId("body-interface");
+  const shoulderHighlight = bodyInterface.querySelector('[data-region="shoulders"]');
+  const backHighlight = bodyInterface.querySelector('[data-region="back"]');
   expect(shoulders).toHaveAttribute("aria-pressed", "true");
+  expect(shoulderHighlight).toHaveAttribute("data-active", "true");
+  expect(backHighlight).toHaveAttribute("data-active", "false");
 
   await user.click(back);
 
   expect(back).toHaveAttribute("aria-pressed", "true");
   expect(shoulders).toHaveAttribute("aria-pressed", "false");
+  expect(shoulderHighlight).toHaveAttribute("data-active", "false");
+  expect(backHighlight).toHaveAttribute("data-active", "true");
   expect(screen.getByRole("status")).toHaveTextContent("پشت");
+
+  await user.hover(shoulders);
+
+  expect(shoulders).toHaveAttribute("aria-pressed", "true");
+  expect(back).toHaveAttribute("aria-pressed", "false");
 });
 
-it("previews real product areas and repeats the onboarding CTA", () => {
+it("presents three large product previews and repeats the onboarding CTA", () => {
   render(<MemoryRouter><PublicLandingPage /></MemoryRouter>);
 
-  expect(screen.getByText("امروز")).toBeInTheDocument();
-  expect(screen.getByText("برنامه تمرینی")).toBeInTheDocument();
-  expect(screen.getByText("هدف تغذیه")).toBeInTheDocument();
-  expect(screen.getByText("تحلیل بدن")).toBeInTheDocument();
-  expect(screen.getByText("کاتالوگ غذا")).toBeInTheDocument();
+  const product = screen.getByRole("region", { name: "همان تجربه‌ای که بعد از ورود ادامه پیدا می‌کند." });
+  expect(within(product).getAllByRole("article")).toHaveLength(3);
+  expect(within(product).getByText("امروز")).toBeInTheDocument();
+  expect(within(product).getByText("برنامه تمرینی")).toBeInTheDocument();
+  expect(within(product).getByText("هدف تغذیه")).toBeInTheDocument();
+  expect(within(product).queryByText("تحلیل بدن")).not.toBeInTheDocument();
+  expect(within(product).queryByText("کاتالوگ غذا")).not.toBeInTheDocument();
   expect(screen.getByText("تمرین امروز")).toBeInTheDocument();
   expect(screen.getByText("۱۶۵ گرم پروتئین")).toBeInTheDocument();
-  expect(screen.getByText("سرشانه · اولویت")).toBeInTheDocument();
-  expect(screen.getByText("سینه مرغ")).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "بدنت تغییر می‌کند. برنامه‌ات هم باید تغییر کند." })).toBeInTheDocument();
   expect(screen.getAllByRole("link", { name: "برنامه من را بساز" }).length).toBeGreaterThanOrEqual(2);
 });

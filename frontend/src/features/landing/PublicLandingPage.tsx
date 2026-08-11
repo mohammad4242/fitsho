@@ -32,7 +32,7 @@ export function PublicLandingPage() {
   const reducedMotion = useReducedMotion();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const previews = ["dashboard", "workout", "nutrition", "body", "catalogue"] as const;
+  const previews = ["dashboard", "workout", "nutrition"] as const;
 
   return (
     <main
@@ -91,7 +91,7 @@ export function PublicLandingPage() {
           <h2 id="landing-product-title" className="fitsho-display">{t("landing.product.title")}</h2>
           <p>{t("landing.product.body")}</p>
         </div>
-        <div className="landing-product-grid">
+        <div className="landing-product-rail">
           {previews.map((preview, index) => (
             <article className={`landing-product-card landing-product-card--${preview}`} key={preview}>
               <header><span>{String(index + 1).padStart(2, "0")}</span><h3>{t(`landing.product.previews.${preview}`)}</h3></header>
@@ -118,7 +118,7 @@ export function PublicLandingPage() {
   );
 }
 
-function ProductPreview({ type }: { type: "dashboard" | "workout" | "nutrition" | "body" | "catalogue" }) {
+function ProductPreview({ type }: { type: "dashboard" | "workout" | "nutrition" }) {
   const { t } = useTranslation();
 
   if (type === "workout") {
@@ -139,26 +139,6 @@ function ProductPreview({ type }: { type: "dashboard" | "workout" | "nutrition" 
         <span>{t("landing.product.sample.protein")}</span>
         <span>{t("landing.product.sample.carbs")}</span>
         <span>{t("landing.product.sample.fat")}</span>
-      </div>
-    );
-  }
-  if (type === "body") {
-    return (
-      <div className="landing-preview landing-preview--body">
-        <i /><span /><b />
-        <ul>
-          <li>{t("landing.product.sample.shouldersPriority")}</li>
-          <li>{t("landing.product.sample.backBalanced")}</li>
-          <li>{t("landing.product.sample.confidence")}</li>
-        </ul>
-      </div>
-    );
-  }
-  if (type === "catalogue") {
-    return (
-      <div className="landing-preview landing-preview--catalogue">
-        <span><b>{t("landing.product.sample.milk")}</b><small>61 kcal</small></span>
-        <span><b>{t("landing.product.sample.chicken")}</b><small>165 kcal</small></span>
       </div>
     );
   }
