@@ -74,7 +74,7 @@ html[dir="rtl"] .food-catalogue-hero h1 { letter-spacing: 0; }
 .food-shelf-card > header { align-items: center; padding: .7rem .8rem .55rem; }
 .food-shelf-card h2 { margin: .1rem 0; font-size: 1rem; }
 .food-shelf-card__basis { font-size: .62rem !important; }
-.food-macro-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: .35rem; }
+.food-macro-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: .35rem; }
 .food-macro-strip div { padding: .55rem .25rem; }
 .food-macro-strip span { min-height: auto; font-size: .6rem; }
 .food-macro-strip strong { margin-top: .15rem; font-size: .7rem; }

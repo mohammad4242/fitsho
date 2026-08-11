@@ -115,7 +115,7 @@ function FoodCard({ food, language, onDetails, onPrice }: { food: FoodCatalogueI
   return <article className="food-shelf-card" role="listitem">
     <header><div><span>{categoryLabel(food.category, language)}</span><h2>{fa ? food.name_fa : food.name_en}</h2><small>{fa ? food.name_en : food.name_fa}</small></div><span className="food-shelf-card__basis">{basisLabel(portion, language)}</span></header>
     {isAdminFood(food) && <PriceTicket food={food} language={language} />}
-    <div className="food-macro-strip">{macroDefinitions.slice(0, 4).map(([code, faLabel, enLabel, unit]) => <div key={code}><span>{fa ? faLabel : enLabel}</span><strong>{macroValue(scale(food.macros[code], portion), unit, language)}</strong></div>)}</div>
+    <div className="food-macro-strip">{macroDefinitions.map(([code, faLabel, enLabel, unit]) => <div key={code}><span>{fa ? faLabel : enLabel}</span><strong>{macroValue(scale(food.macros[code], portion), unit, language)}</strong></div>)}</div>
     <footer><button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>{onPrice && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}</footer>
   </article>;
 }

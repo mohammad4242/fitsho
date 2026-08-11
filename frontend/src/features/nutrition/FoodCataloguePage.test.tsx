@@ -100,6 +100,7 @@ it("shows nutrient data and never shows catalogue price information to a member"
   expect(await screen.findByRole("heading", { name: "کاتالوگ مواد غذایی" })).toBeVisible();
   expect(screen.getByRole("list", { name: "مواد غذایی" })).toBeVisible();
   expect(screen.getByRole("heading", { name: "سینه مرغ" })).toBeVisible();
+  expect(screen.getByText("فیبر")).toBeVisible();
   expect(screen.queryByText("یافت نشد")).not.toBeInTheDocument();
   expect(screen.getByText("۱۱٫۳ گرم")).toBeVisible();
   expect(screen.queryByRole("button", { name: "افزودن ماده غذایی" })).not.toBeInTheDocument();
