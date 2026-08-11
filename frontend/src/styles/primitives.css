@@ -58,7 +58,8 @@
   place-items: center;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--fitsho-surface) 57%, transparent 59%), conic-gradient(var(--fitsho-aqua) var(--ring-progress), rgb(255 255 255 / 8%) 0);
+  background: radial-gradient(circle, var(--fitsho-surface) 61%, transparent 63%), conic-gradient(var(--fitsho-aqua) var(--ring-progress), rgb(255 255 255 / 8%) 0);
+  box-shadow: 0 0 1.25rem rgb(80 223 206 / 8%);
 }
 
 .fitsho-progress-ring strong { color: var(--fitsho-ink); font: 800 0.82rem "Sora Variable", sans-serif; }

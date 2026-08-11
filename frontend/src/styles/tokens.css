@@ -42,5 +42,9 @@
 }
 
 .fitsho-app {
+  --fitsho-radius-md: 0.75rem;
+  --fitsho-radius-lg: 0.9rem;
+  --fitsho-radius-xl: 1.1rem;
+  --fitsho-radius-card: 0.9rem;
   color-scheme: dark;
 }
