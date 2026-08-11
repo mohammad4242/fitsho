@@ -70,3 +70,18 @@ it.each([
     expect(screen.queryByRole("link", { name: label })).not.toBeInTheDocument();
   }
 });
+
+it.each([
+  ["/exercises", "برنامه"],
+  ["/nutrition-tracking", "تغذیه"],
+  ["/food-catalogue", "تغذیه"],
+  ["/profile", "بیشتر"],
+] as const)("keeps the related primary destination active on %s", (pathname, label) => {
+  render(
+    <MemoryRouter initialEntries={[pathname]}>
+      <AppShell><p>content</p></AppShell>
+    </MemoryRouter>,
+  );
+
+  expect(screen.getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
+});

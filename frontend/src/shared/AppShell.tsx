@@ -4,14 +4,15 @@ import { Link, useLocation } from "react-router-dom";
 
 import { useOptionalProfile } from "../features/profile/ProfileContext";
 import { AuthenticatedHeader } from "./AuthenticatedHeader";
+import { AppIcon } from "./AppIcon";
 
 type AppShellProps = {
   children: ReactNode;
 };
 
 const navigation = [
-  { to: "/dashboard", label: "header.today", icon: "pulse" },
-  { to: "/workout-plan", label: "header.plan", icon: "plan", capability: "training" },
+  { to: "/dashboard", label: "header.today", icon: "home" },
+  { to: "/workout-plan", label: "header.plan", icon: "dumbbell", capability: "training" },
   { to: "/nutrition-estimate", label: "header.nutritionTargets", icon: "nutrition", capability: "nutrition" },
   { to: "/body-progress", label: "header.bodyProgress", icon: "progress", capability: "training" },
   { to: "/more", label: "header.more", icon: "more" },
@@ -43,7 +44,7 @@ export function AppShell({ children }: AppShellProps) {
               key={item.to}
               to={item.to}
             >
-              <span className={`app-shell__nav-icon app-shell__nav-icon--${item.icon}`} aria-hidden="true" />
+              <AppIcon className="app-shell__nav-icon" name={item.icon} />
               <span>{t(item.label)}</span>
             </Link>
           );
@@ -57,16 +58,18 @@ function isMoreRoute(pathname: string) {
   return [
     "/more",
     "/profile",
-    "/exercises",
-    "/food-catalogue",
-    "/nutrition-tracking",
-    "/nutrition-labs",
-    "/nutrition-supplements",
   ].some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
 
 function isPrimaryRouteActive(route: string, pathname: string) {
   if (route === "/dashboard") return pathname === route;
   if (route === "/more") return isMoreRoute(pathname);
+  if (route === "/workout-plan") {
+    return ["/workout-plan", "/exercises"].some((item) => pathname === item || pathname.startsWith(`${item}/`));
+  }
+  if (route === "/nutrition-estimate") {
+    return ["/nutrition-estimate", "/nutrition-tracking", "/food-catalogue", "/nutrition-labs", "/nutrition-supplements"]
+      .some((item) => pathname === item || pathname.startsWith(`${item}/`));
+  }
   return pathname === route || pathname.startsWith(`${route}/`);
 }

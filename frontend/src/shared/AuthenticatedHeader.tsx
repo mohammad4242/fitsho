@@ -7,10 +7,11 @@ import { useOptionalProfile } from "../features/profile/ProfileContext";
 import { verifyPhysicianAccess } from "../features/nutrition/api";
 import { verifyCoachAccess } from "../features/workoutReviews/api";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { AppIcon } from "./AppIcon";
 import "./authenticatedHeader.css";
 
 export function AuthenticatedHeader() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -111,15 +112,30 @@ export function AuthenticatedHeader() {
   const primaryNavigation = contextualNavigation
     ? [...primaryNavigationCandidates.slice(0, 3), contextualNavigation]
     : primaryNavigationCandidates.slice(0, 4);
+  const isFa = i18n.language.startsWith("fa");
+  const mobileContext = getMobileContext(location.pathname, t, isFa);
+  const initial = (user.email?.trim().charAt(0) || t("common.brand").charAt(0)).toUpperCase();
 
   return (
     <>
       <header className={`dashboard-header${menuOpen ? " dashboard-header--menu-open" : ""}`}>
-        <Link className="brand-mark brand-mark--dark" to="/dashboard">
-          <span className="brand-mark__pulse" aria-hidden="true" />
-          {t("common.brand")}
-        </Link>
-        <div className="dashboard-header__actions">
+        <div className="authenticated-header__mobile">
+          <div className="authenticated-header__context">
+            {mobileContext.backTo ? (
+              <Link className="authenticated-header__back" to={mobileContext.backTo} aria-label={isFa ? "بازگشت" : "Back"}>
+                <AppIcon name="arrow" />
+              </Link>
+            ) : <span className="authenticated-header__pulse" aria-hidden="true" />}
+            <span className="authenticated-header__title">{mobileContext.title}</span>
+          </div>
+          <Link className="authenticated-header__account" to="/more" aria-label={t("header.accountMenu")}>{initial}</Link>
+        </div>
+        <div className="authenticated-header__desktop">
+          <Link className="brand-mark brand-mark--dark" to="/dashboard">
+            <span className="brand-mark__pulse" aria-hidden="true" />
+            {t("common.brand")}
+          </Link>
+          <div className="dashboard-header__actions">
           <div className="member-menu-wrap">
             <button
               className="member-menu-button"
@@ -187,6 +203,7 @@ export function AuthenticatedHeader() {
           >
             {busy ? t("header.loggingOut") : t("header.logout")}
           </button>
+          </div>
         </div>
       </header>
       {error && (
@@ -196,4 +213,23 @@ export function AuthenticatedHeader() {
       )}
     </>
   );
+}
+
+function getMobileContext(pathname: string, t: (key: string) => string, isFa: boolean): { title: string; backTo?: string } {
+  const contexts: Array<{ prefix: string; title: string; backTo?: string }> = [
+    { prefix: "/nutrition-tracking", title: isFa ? "ثبت تغذیه" : "Nutrition tracking", backTo: "/nutrition-estimate" },
+    { prefix: "/food-catalogue", title: t("header.foodCatalogue"), backTo: "/nutrition-estimate" },
+    { prefix: "/nutrition-labs", title: isFa ? "آزمایش‌ها" : "Lab results", backTo: "/nutrition-estimate" },
+    { prefix: "/nutrition-supplements", title: isFa ? "مکمل‌ها" : "Supplements", backTo: "/nutrition-estimate" },
+    { prefix: "/exercises", title: t("header.exercises"), backTo: "/workout-plan" },
+    { prefix: "/body-progress/", title: isFa ? "تحلیل بدن" : "Body analysis", backTo: "/body-progress" },
+    { prefix: "/profile", title: t("header.profile"), backTo: "/more" },
+    { prefix: "/dashboard", title: t("header.today") },
+    { prefix: "/workout-plan", title: t("header.workoutPlan") },
+    { prefix: "/nutrition-estimate", title: t("header.nutritionTargets") },
+    { prefix: "/body-progress", title: t("header.bodyProgress") },
+    { prefix: "/more", title: t("header.more") },
+  ];
+  return contexts.find((item) => pathname === item.prefix || pathname.startsWith(item.prefix))
+    ?? { title: t("common.brand") };
 }

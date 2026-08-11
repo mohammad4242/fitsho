@@ -17,6 +17,40 @@
   box-shadow: var(--fitsho-shadow-soft);
 }
 
+.fitsho-data-panel {
+  min-width: 0;
+  padding: clamp(0.9rem, 2.5vw, 1.25rem);
+  border: 1px solid var(--fitsho-line);
+  border-radius: var(--fitsho-radius-lg);
+  background: var(--fitsho-surface-subtle);
+}
+
+.fitsho-metric-strip {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--fitsho-line);
+  border-radius: var(--fitsho-radius-md);
+  background: var(--fitsho-surface-subtle);
+}
+
+.fitsho-metric-strip > * {
+  min-width: 0;
+  padding: 0.8rem;
+  text-align: center;
+}
+
+.fitsho-metric-strip > * + * { border-inline-start: 1px solid var(--fitsho-line); }
+.fitsho-metric-strip strong { display: block; color: var(--fitsho-ink); font-size: 1.05rem; }
+.fitsho-metric-strip small { color: var(--fitsho-muted); font-size: 0.7rem; }
+
+.fitsho-grouped-list {
+  overflow: hidden;
+  border: 1px solid var(--fitsho-line);
+  border-radius: var(--fitsho-radius-lg);
+  background: var(--fitsho-surface);
+}
+
 .fitsho-card--interactive {
   transition:
     border-color var(--fitsho-duration-fast) var(--fitsho-ease),
