@@ -236,6 +236,12 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
   padding-block-start: clamp(1.25rem, 3vw, 2rem);
 }
 
+.body-progress-page.fitsho-page {
+  min-height: auto;
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+
 .body-progress-page > header,
 .body-analysis-page__header {
   border-block-end-color: var(--fitsho-line);

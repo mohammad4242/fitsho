@@ -281,7 +281,7 @@ function ReadyProfilePage({
             <strong>{t("profile.weightValue", { weight: measuredWeight })}</strong>
             <span>{t("profile.measuredAt", { date: measuredAt })}</span>
           </aside>
-          <aside className="measurement-card" aria-label={t("bodyPhotos.progressTitle")}>
+          <aside className="measurement-card measurement-card--body-progress" aria-label={t("bodyPhotos.progressTitle")}>
             <p>{t("bodyPhotos.progressTitle")}</p>
             <strong>{t("bodyPhotos.optionalIntro")}</strong>
             <Link className="secondary-button" to="/body-progress">{t("bodyPhotos.start")}</Link>

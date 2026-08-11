@@ -653,6 +653,31 @@ html[dir="rtl"] .profile-page-heading h1 { letter-spacing: 0; }
 .measurement-card p, .measurement-card span { color: var(--fitsho-muted); }
 .measurement-card .secondary-button { width: fit-content; margin-block-start: .75rem; }
 
+.measurement-card--body-progress {
+  align-content: center;
+  gap: .45rem;
+}
+
+.measurement-card--body-progress strong {
+  max-width: 34rem;
+  color: var(--fitsho-ink);
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.measurement-card--body-progress .secondary-button {
+  min-height: 2.85rem;
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 1rem;
+  border-color: var(--fitsho-line-strong);
+  border-radius: var(--fitsho-radius-pill);
+  color: var(--fitsho-aqua);
+  background: transparent;
+  text-decoration: none;
+}
+
 .profile-wizard .profile-progress,
 .profile-wizard__page {
   border-color: var(--fitsho-line);
