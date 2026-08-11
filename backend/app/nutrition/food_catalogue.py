@@ -107,6 +107,20 @@ def scale_nutrient_value_for_grams(value_per_100g: Decimal, grams: Decimal) -> D
     return value_per_100g * grams / Decimal("100")
 
 
+def validate_meal_roles(slot_role: str, food_roles: list[str]) -> None:
+    if not food_roles:
+        raise ValueError("Meal requires at least one food")
+    if slot_role == "main_meal" and not {
+        FoodRole.MAIN_PROTEIN,
+        FoodRole.MAIN_STAPLE,
+    }.intersection(food_roles):
+        raise ValueError("Main meal requires a main eligible food")
+    if slot_role == "snack" and any(
+        role in {FoodRole.MAIN_PROTEIN, FoodRole.MAIN_STAPLE} for role in food_roles
+    ):
+        raise ValueError("Snack can only contain snack or flexible foods")
+
+
 def list_verified_foods(db: Session) -> list[CatalogueFoodResponse]:
     foods = db.scalars(
         select(NutritionCatalogueFood)
