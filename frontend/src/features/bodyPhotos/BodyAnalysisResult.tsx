@@ -28,16 +28,16 @@ export function BodyAnalysisResult({ analysis }: { analysis: BodyAnalysis }) {
 
   return (
     <div className="body-analysis-result">
+      <section className="body-analysis-stage" aria-labelledby="body-analysis-overview-title">
+        <BodyAreaMap findings={result.findings} />
+        <div className="body-analysis-overview"><div><p className="eyebrow eyebrow--accent">{t("bodyPhotos.results.confidenceLabel")}</p><h2 id="body-analysis-overview-title">{formatPercent(result.overall_confidence)}</h2></div><p>{t("bodyPhotos.results.confidenceHelp")}</p></div>
+      </section>
+
       {analysis.unverified_warning && (
         <p className="body-analysis-warning" role="alert">
           {t("bodyPhotos.results.unverifiedWarning")}
         </p>
       )}
-
-      <section className="body-analysis-stage" aria-labelledby="body-analysis-overview-title">
-        <BodyAreaMap findings={result.findings} />
-        <div className="body-analysis-overview"><div><p className="eyebrow eyebrow--accent">{t("bodyPhotos.results.confidenceLabel")}</p><h2 id="body-analysis-overview-title">{formatPercent(result.overall_confidence)}</h2></div><p>{t("bodyPhotos.results.confidenceHelp")}</p></div>
-      </section>
 
       {analysis.visual_result !== null && analysis.visual_result !== undefined && (
         <section className="body-analysis-overview" aria-labelledby="body-analysis-coach-title">

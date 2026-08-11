@@ -140,6 +140,9 @@
 .body-progress-list { gap: .45rem; }
 .body-progress-list > li { min-height: 3.8rem; padding: .65rem .75rem; border-radius: var(--fitsho-radius-md); background: var(--fitsho-surface); box-shadow: none; }
 .body-progress-list > li.body-progress-list__latest { min-height: 7.5rem; border-color: var(--fitsho-line-strong); background: linear-gradient(135deg, rgb(80 223 206 / 7%), var(--fitsho-surface)); }
+.body-progress-list__latest:has(figure) { grid-template-columns: 6.5rem minmax(0, 1fr) auto; }
+.body-progress-list__latest figure { grid-row: span 2; width: 6.5rem; height: 7rem; overflow: hidden; margin: 0; border-radius: var(--fitsho-radius-sm); background: var(--fitsho-canvas); }
+.body-progress-list__latest figure img { width: 100%; height: 100%; object-fit: cover; }
 .body-progress-list__latest small { color: var(--fitsho-aqua); font-size: .65rem; font-weight: 850; }
 .body-progress-list > li > a { min-height: 2.35rem; }
 .body-analysis-page__header { padding-block: .5rem .8rem; }
@@ -155,6 +158,9 @@
 @media (max-width: 640px) {
   .body-progress-page > header { grid-template-columns: 1fr auto; }
   .body-progress-list > li.body-progress-list__latest { grid-template-columns: 1fr auto; }
+  .body-progress-list > li.body-progress-list__latest:has(figure) { grid-template-columns: 5.5rem minmax(0, 1fr) auto; }
+  .body-progress-list__latest figure { width: 5.5rem; height: 6.25rem; }
+  .body-progress-list__latest:has(figure) > a { grid-column: 2 / -1; }
   .body-analysis-stage .body-area-map { padding-top: 4.2rem; }
   .body-analysis-stage .body-analysis-overview { width: calc(100% - 1.6rem); grid-template-columns: auto 1fr; }
   .body-analysis-stage .body-analysis-overview > p { align-self: center; }

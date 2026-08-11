@@ -24,7 +24,7 @@ export function BodyProgressPage() {
     {failed && <p className="form-error" role="alert">{t("bodyPhotos.errors.load")}</p>}
     {sessions?.length === 0 && <p>{t("bodyPhotos.empty")}</p>}
     <ul className="body-progress-list" aria-label={t("bodyPhotos.progressTitle")}>
-      {sessions?.map((session, index) => <li className={index === 0 ? "body-progress-list__latest" : undefined} key={session.id}><div>{index === 0 && <small>{l("آخرین تحلیل", "Latest analysis")}</small>}<strong>{new Intl.DateTimeFormat().format(new Date(session.created_at))}</strong><span>{t(`bodyPhotos.status.${session.state}`)}</span></div><span>{session.photos.length}/3</span><Link to={`/body-progress/${session.id}`}>{t("bodyPhotos.results.viewAnalysis")}</Link></li>)}
+      {sessions?.map((session, index) => <li className={index === 0 ? "body-progress-list__latest" : undefined} key={session.id}>{index === 0 && session.photos[0] && <figure><img src={session.photos[0].content_url} alt={l("آخرین عکس پیشرفت", "Latest progress photo")} /></figure>}<div>{index === 0 && <small>{l("آخرین تحلیل", "Latest analysis")}</small>}<strong>{new Intl.DateTimeFormat().format(new Date(session.created_at))}</strong><span>{t(`bodyPhotos.status.${session.state}`)}</span></div><span>{session.photos.length}/3</span><Link to={`/body-progress/${session.id}`}>{t("bodyPhotos.results.viewAnalysis")}</Link></li>)}
     </ul>
   </main>;
 }

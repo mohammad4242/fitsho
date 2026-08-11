@@ -20,7 +20,12 @@ it("links each photo session to its result and keeps the workflow optional", asy
       id: "session-1",
       purpose: "initial_plan",
       state: "review_pending",
-      photos: [],
+      photos: [{
+        id: "photo-1",
+        view: "front",
+        content_url: "/api/v1/body-photos/photos/photo-1/content",
+        created_at: "2026-08-03T10:00:00Z",
+      }],
       operational_processing_consent: null,
       model_training_consent: null,
       submitted_at: "2026-08-03T10:00:00Z",
@@ -35,5 +40,6 @@ it("links each photo session to its result and keeps the workflow optional", asy
     "/body-progress/session-1",
   );
   expect(screen.getByRole("list", { name: "Body progress" })).toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "Latest progress photo" })).toHaveAttribute("src", "/api/v1/body-photos/photos/photo-1/content");
   expect(screen.getByText(/Optional — add standardized/i)).toBeInTheDocument();
 });
