@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -126,6 +126,70 @@ it("shows planned versus actual tracking and saves photo corrections before conf
   await user.tab();
 
   await waitFor(() => expect(api.correctFoodPhotoItem).toHaveBeenCalledWith("estimate-1", "item-1", { estimated_amount: 150 }));
+});
+
+it("keeps adherence rows collapsed while the date filter remains active", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+  const toggle = await screen.findByRole("button", { name: "Adherence trend" });
+  const date = screen.getByLabelText("From");
+  const contentId = toggle.getAttribute("aria-controls");
+  const content = contentId ? document.getElementById(contentId) : null;
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(content).toHaveAttribute("aria-hidden", "true");
+  expect(date).toBeEnabled();
+
+  await user.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(content).toHaveAttribute("aria-hidden", "false");
+
+  await user.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+  await waitFor(() => expect(api.getTrackingHistory).toHaveBeenCalled());
+  vi.mocked(api.getNutritionAdherence).mockClear();
+  vi.mocked(api.getTrackingHistory).mockClear();
+  const selectedStart = `${today.slice(0, 8)}01`;
+  fireEvent.change(date, { target: { value: selectedStart } });
+
+  await waitFor(() => {
+    expect(api.getNutritionAdherence).toHaveBeenCalledWith(selectedStart, today);
+    expect(api.getTrackingHistory).toHaveBeenCalledWith(selectedStart, today);
+  });
+});
+
+it("keeps exact catalogue and quick estimate submissions unchanged", async () => {
+  const user = userEvent.setup();
+  vi.mocked(api.addCatalogueFoodEntry).mockResolvedValue({});
+  vi.mocked(api.addQuickApproximation).mockResolvedValue({});
+  render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+  await user.click(await screen.findByText("Log food manually"));
+  const catalogueGroup = screen.getByRole("group", { name: "Exact catalogue entry" });
+  await user.selectOptions(within(catalogueGroup).getByRole("combobox", { name: "Food" }), "food-2");
+  const grams = within(catalogueGroup).getByRole("spinbutton", { name: "Amount in grams" });
+  await user.clear(grams);
+  await user.type(grams, "175");
+  await user.click(within(catalogueGroup).getByRole("button", { name: "Add catalogue food" }));
+
+  await waitFor(() => expect(api.addCatalogueFoodEntry).toHaveBeenCalledWith({
+    entry_date: today,
+    food_id: "food-2",
+    grams: 175,
+    note: null,
+  }));
+
+  const estimateGroup = screen.getByRole("group", { name: "Quick estimate" });
+  await user.type(within(estimateGroup).getByRole("textbox", { name: "Approximate calories" }), "430");
+  await user.click(within(estimateGroup).getByRole("button", { name: "Add estimate" }));
+
+  await waitFor(() => expect(api.addQuickApproximation).toHaveBeenCalledWith({
+    entry_date: today,
+    display_name: "Approximate meal",
+    calories: 430,
+    protein_g: null,
+  }));
 });
 
 it("uploads laboratory metadata and can delete an owned document", async () => {

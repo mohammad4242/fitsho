@@ -30,6 +30,7 @@ export function NutritionTrackingPage() {
   const [history, setHistory] = useState<DailyTrackingSummary[]>([]);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [adherenceOpen, setAdherenceOpen] = useState(false);
 
   const load = () => api.getDailyTracking(today).then(setSummary).catch(() => setError(l("دریافت اطلاعات ممکن نشد.", "Could not load tracking."))).finally(() => setLoading(false));
   useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -154,23 +155,67 @@ export function NutritionTrackingPage() {
     </section>
     {error && <p role="alert" className="nutrition-estimate-state">{error}</p>}
     {recentFoods.length > 0 && <div className="nutrition-tracking-quick nutrition-recent-foods" aria-label={l("غذاهای اخیر", "Recent foods")}>{recentFoods.map((item) => <button disabled={busy} key={item.food_id} onClick={() => void addRecentFood(item)}>{item.display_name} · {item.last_quantity_grams ?? 100} g</button>)}</div>}
-    <details className="nutrition-manual-entry"><summary>{l("ثبت دستی وعده", "Log food manually")}</summary><section className="nutrition-estimate-notes"><h2>{l("یک وعده خارج از برنامه", "Food outside the plan")}</h2><div className="nutrition-tracking-quick"><select aria-label={l("ماده غذایی", "Food")} value={foodId} onChange={(event) => setFoodId(event.target.value)}>{foods.map((food) => <option key={food.id} value={food.id}>{fa ? food.name_fa : food.name_en}</option>)}</select><input aria-label={l("مقدار به گرم", "Amount in grams")} min="1" max="5000" type="number" value={grams} onChange={(event) => setGrams(event.target.value)} /><button disabled={busy || !foodId} onClick={() => void addCatalogueFood()}>{l("ثبت از کاتالوگ", "Add catalogue food")}</button></div><div className="nutrition-tracking-quick"><input aria-label={l("کالری تقریبی", "Approximate calories")} inputMode="numeric" value={calories} onChange={(event) => setCalories(event.target.value)} /><button className="primary-button" disabled={busy} onClick={() => void addApproximation()}>{l("ثبت تقریبی", "Add estimate")}</button></div></section></details>
+    <details className="nutrition-manual-entry">
+      <summary><span>{l("ثبت دستی وعده", "Log food manually")}</span><i aria-hidden="true" /></summary>
+      <section className="nutrition-off-plan-card">
+        <header><h2>{l("وعده خارج از برنامه", "Food outside the plan")}</h2><p>{l("غذا را دقیق از کاتالوگ ثبت کن یا فقط یک برآورد سریع وارد کن.", "Log an exact catalogue food or enter a quick estimate.")}</p></header>
+        <fieldset className="nutrition-off-plan-group" aria-label={l("ثبت دقیق از کاتالوگ", "Exact catalogue entry")}>
+          <legend>{l("ثبت دقیق از کاتالوگ", "Exact catalogue entry")}</legend>
+          <div className="nutrition-off-plan-fields nutrition-off-plan-fields--catalogue">
+            <label className="nutrition-off-plan-field nutrition-off-plan-field--food">
+              <span>{l("انتخاب ماده غذایی", "Choose food")}</span>
+              <span className="nutrition-off-plan-control nutrition-off-plan-control--select">
+                <select aria-label={l("ماده غذایی", "Food")} value={foodId} onChange={(event) => setFoodId(event.target.value)}>{foods.map((food) => <option key={food.id} value={food.id}>{fa ? food.name_fa : food.name_en}</option>)}</select>
+                <i aria-hidden="true" />
+              </span>
+            </label>
+            <label className="nutrition-off-plan-field">
+              <span>{l("مقدار", "Amount")}</span>
+              <span className="nutrition-off-plan-control">
+                <input aria-label={l("مقدار به گرم", "Amount in grams")} min="1" max="5000" type="number" value={grams} onChange={(event) => setGrams(event.target.value)} />
+                <b>{l("گرم", "g")}</b>
+              </span>
+            </label>
+            <button className="nutrition-catalogue-submit" disabled={busy || !foodId} onClick={() => void addCatalogueFood()} type="button">{l("ثبت از کاتالوگ", "Add catalogue food")}</button>
+          </div>
+        </fieldset>
+        <fieldset className="nutrition-off-plan-group nutrition-off-plan-group--estimate" aria-label={l("ثبت تقریبی سریع", "Quick estimate")}>
+          <legend>{l("ثبت تقریبی سریع", "Quick estimate")}</legend>
+          <div className="nutrition-off-plan-fields nutrition-off-plan-fields--estimate">
+            <label className="nutrition-off-plan-field">
+              <span>{l("کالری تقریبی", "Approximate calories")}</span>
+              <span className="nutrition-off-plan-control">
+                <input aria-label={l("کالری تقریبی", "Approximate calories")} inputMode="numeric" value={calories} onChange={(event) => setCalories(event.target.value)} />
+                <b>{l("کیلوکالری", "kcal")}</b>
+              </span>
+            </label>
+            <button className="primary-button nutrition-off-plan-primary" disabled={busy} onClick={() => void addApproximation()} type="button">{l("ثبت تقریبی", "Add estimate")}</button>
+          </div>
+        </fieldset>
+      </section>
+    </details>
     {summary && summary.entries.length > 0 && <section className="nutrition-estimate-notes"><h2>{l("ثبت‌های امروز", "Today's entries")}</h2><label>{l("نوع ثبت", "Entry source")} <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}><option value="all">{l("همه", "All")}</option><option value="catalogue_manual">{l("دقیق از کاتالوگ", "Exact catalogue")}</option><option value="quick_approximation">{l("تقریبی", "Approximate")}</option><option value="photo_estimated_confirmed">{l("عکس تأییدشده", "Confirmed photo")}</option><option value="planned_confirmed">{l("طبق برنامه", "Planned")}</option><option value="planned_adjusted">{l("برنامه اصلاح‌شده", "Adjusted plan")}</option></select></label><ul>{visibleEntries.map((entry) => <li key={entry.id}><span>{entry.display_name} · {entry.confidence} · {entry.source}</span>{entry.quantity_grams && !entry.planned_meal_id ? <input aria-label={l(`ویرایش مقدار ${entry.display_name}`, `Edit ${entry.display_name} amount`)} type="number" min="1" defaultValue={entry.quantity_grams} onBlur={(event) => void editEntry(entry, Number(event.target.value))} /> : null}{entry.planned_meal_id && <><button disabled={busy} onClick={() => void adjustPlanned(entry, "adjusted")}>{l("نصف مقدار", "Half portion")}</button><button disabled={busy} onClick={() => void adjustPlanned(entry, "skipped")}>{l("نخوردم", "Skipped")}</button></>}<button disabled={busy} onClick={() => void api.deleteTrackingEntry(entry.id).then(load)}>{l("حذف", "Delete")}</button></li>)}</ul></section>}
-    <section className="nutrition-estimate-notes">
-      <h2>{l("روند پایبندی", "Adherence trend")}</h2>
-      <label>{l("از تاریخ", "From")} <input type="date" value={rangeStart} max={today} onChange={(event) => setRangeStart(event.target.value)} /></label>
-      <div className="nutrition-adherence-chart" aria-label={l("نمودار کالری و پروتئین", "Calories and protein chart")}>
-        {adherence?.days.map((day) => <article key={day.date}>
-          <small>{day.date.slice(5)}</small>
-          {day.status === "insufficient_data" ? <span>{l("داده ناکافی", "No data")}</span> : <>
-            <label>{l("کالری", "Calories")} <progress max="100" value={day.calorie_adherence ?? 0} /></label>
-            <label>{l("پروتئین", "Protein")} <progress max="100" value={day.protein_adherence ?? 0} /></label>
-            <small>{l("کامل بودن ثبت", "Completeness")}: {Math.round(day.tracking_completeness)}٪</small>
-          </>}
-        </article>)}
+    <section className={`nutrition-adherence-card${adherenceOpen ? " is-open" : ""}`}>
+      <header className="nutrition-adherence-header">
+        <h2><button aria-controls="nutrition-adherence-content" aria-expanded={adherenceOpen} onClick={() => setAdherenceOpen((open) => !open)} type="button"><span>{l("روند پایبندی", "Adherence trend")}</span><i aria-hidden="true" /></button></h2>
+        <label className="nutrition-adherence-date"><span>{l("از تاریخ", "From")}</span><input type="date" value={rangeStart} max={today} onChange={(event) => setRangeStart(event.target.value)} /></label>
+      </header>
+      <div aria-hidden={!adherenceOpen} className="nutrition-adherence-content" id="nutrition-adherence-content" inert={!adherenceOpen}>
+        <div className="nutrition-adherence-content__inner">
+          <div className="nutrition-adherence-chart" aria-label={l("نمودار کالری و پروتئین", "Calories and protein chart")}>
+            {adherence?.days.map((day) => <article key={day.date}>
+              <small>{day.date.slice(5)}</small>
+              {day.status === "insufficient_data" ? <span>{l("داده ناکافی", "No data")}</span> : <>
+                <label>{l("کالری", "Calories")} <progress max="100" value={day.calorie_adherence ?? 0} /></label>
+                <label>{l("پروتئین", "Protein")} <progress max="100" value={day.protein_adherence ?? 0} /></label>
+                <small>{l("کامل بودن ثبت", "Completeness")}: {Math.round(day.tracking_completeness)}٪</small>
+              </>}
+            </article>)}
+          </div>
+          {adherence?.weight_trend.length ? <p>{l("روند وزن کنار پایبندی نمایش داده می‌شود و به‌تنهایی رابطه علت و معلولی را ثابت نمی‌کند.", "Weight is shown beside adherence and does not imply causation.")}</p> : null}
+          <details className="nutrition-adherence-history"><summary>{l("تاریخچه ثبت‌ها", "Entry history")}</summary>{history.length === 0 ? <p>{l("در این بازه ثبتی وجود ندارد.", "There are no entries in this range.")}</p> : history.map((day) => <article key={day.entry_date}><strong>{day.entry_date}</strong><span>{day.entries.length} {l("مورد", "entries")}</span></article>)}</details>
+        </div>
       </div>
-      {adherence?.weight_trend.length ? <p>{l("روند وزن کنار پایبندی نمایش داده می‌شود و به‌تنهایی رابطه علت و معلولی را ثابت نمی‌کند.", "Weight is shown beside adherence and does not imply causation.")}</p> : null}
-      <details><summary>{l("تاریخچه ثبت‌ها", "Entry history")}</summary>{history.length === 0 ? <p>{l("در این بازه ثبتی وجود ندارد.", "There are no entries in this range.")}</p> : history.map((day) => <article key={day.entry_date}><strong>{day.entry_date}</strong><span>{day.entries.length} {l("مورد", "entries")}</span></article>)}</details>
     </section>
   </main>;
 }
