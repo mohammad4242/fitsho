@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 
+import i18n from "../../i18n";
 import { ApiError } from "../../shared/apiClient";
 import type { WorkoutPlan } from "./types";
 
@@ -12,8 +13,13 @@ const api = vi.hoisted(() => ({
   getWorkoutPlan: vi.fn(),
   generateWorkoutPlan: vi.fn(),
 }));
+const profileApi = vi.hoisted(() => ({
+  getProfile: vi.fn(),
+  updateProfile: vi.fn(),
+}));
 
 vi.mock("./api", () => api);
+vi.mock("../profile/api", () => profileApi);
 vi.mock("../../shared/AuthenticatedHeader", () => ({
   AuthenticatedHeader: () => <header>Fitsho</header>,
 }));
@@ -89,8 +95,56 @@ beforeEach(() => {
   api.getWorkoutPlanHistory.mockReset();
   api.getWorkoutPlan.mockReset();
   api.generateWorkoutPlan.mockReset();
+  profileApi.getProfile.mockReset();
+  profileApi.updateProfile.mockReset();
   api.getWorkoutPlanHistory.mockResolvedValue([]);
   api.generateWorkoutPlan.mockResolvedValue({ plan, reused: false });
+  profileApi.getProfile.mockResolvedValue({ workout_generation_method: "fitsho_coach" });
+  profileApi.updateProfile.mockResolvedValue({ workout_generation_method: "ai" });
+});
+
+it("places the compact generation selector between coach status and workout days and persists both choices", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue({
+    ...plan,
+    coach_review: {
+      state: "pending_coach_review",
+      coach_display_name: null,
+      coach_note: null,
+      approved_at: null,
+    },
+  });
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  const coachStatus = await screen.findByText("در انتظار تایید مربی");
+  const selector = screen.getByRole("group", { name: "چه کسی برنامه‌ات را بنویسد؟" });
+  const schedule = screen.getByRole("list", { name: "روزهای تمرین تو" });
+  const coachBanner = coachStatus.closest("aside");
+  expect(coachBanner).not.toBeNull();
+  expect(coachBanner!.compareDocumentPosition(selector) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(selector.compareDocumentPosition(schedule) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+  const internalEngine = screen.getByRole("radio", { name: "موتور داخلی" });
+  const ai = screen.getByRole("radio", { name: "هوش مصنوعی" });
+  expect(internalEngine).toBeChecked();
+  await user.click(ai);
+  expect(profileApi.updateProfile).toHaveBeenCalledWith({ workout_generation_method: "ai" });
+  await user.click(internalEngine);
+  expect(profileApi.updateProfile).toHaveBeenLastCalledWith({ workout_generation_method: "fitsho_coach" });
+});
+
+it("uses the compact English generation labels", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  await i18n.changeLanguage("en");
+  try {
+    render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+    expect(await screen.findByRole("radio", { name: "Internal Engine" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "AI" })).toBeInTheDocument();
+  } finally {
+    await i18n.changeLanguage("fa");
+  }
 });
 
 it("keeps the initial version visible while coach approval is pending", async () => {

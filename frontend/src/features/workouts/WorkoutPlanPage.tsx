@@ -170,8 +170,23 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
           </>
         )}
         {state === "ready" && plan !== null && (
+          <CoachReviewBanner plan={plan} isEnglish={isEnglish} historical={isViewingHistorical} />
+        )}
+        <section className="workout-generation-method" aria-labelledby="workout-generation-method-title">
+          <h2 id="workout-generation-method-title">{t("workoutPlan.generationMethodTitle")}</h2>
+          <div className="workout-generation-method__choices" role="group" aria-labelledby="workout-generation-method-title">
+            <label>
+              <input type="radio" name="workout-generation-method" checked={generationMethod === "fitsho_coach"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("fitsho_coach")} />
+              <span>{t("workoutPlan.fitshoCoach")}</span>
+            </label>
+            <label>
+              <input type="radio" name="workout-generation-method" checked={generationMethod === "ai"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("ai")} />
+              <span>{t("workoutPlan.aiOption")}</span>
+            </label>
+          </div>
+        </section>
+        {state === "ready" && plan !== null && (
           <>
-            <CoachReviewBanner plan={plan} isEnglish={isEnglish} historical={isViewingHistorical} />
             <section className="workout-schedule" aria-labelledby="workout-schedule-title">
               <div className="workout-schedule__heading">
                 <div>
@@ -284,17 +299,6 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
           <summary>{l("جزئیات و تنظیمات برنامه", "Plan details and settings")}</summary>
           <div className="workout-secondary__content">
             <FixedGuidance />
-            <section className="workout-generation-method" aria-labelledby="workout-generation-method-title">
-              <div>
-                <p className="eyebrow eyebrow--accent">{t("workoutPlan.generationMethodEyebrow")}</p>
-                <h2 id="workout-generation-method-title">{t("workoutPlan.generationMethodTitle")}</h2>
-                <p>{t("workoutPlan.generationMethodBody")}</p>
-              </div>
-              <div className="workout-generation-method__choices">
-                <label><input type="radio" name="workout-generation-method" checked={generationMethod === "fitsho_coach"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("fitsho_coach")} />{t("workoutPlan.fitshoCoach")}</label>
-                <label><input type="radio" name="workout-generation-method" checked={generationMethod === "ai"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("ai")} />{t("workoutPlan.aiCoach")}</label>
-              </div>
-            </section>
             {plan?.ai_coach_program_explanation_fa && (
               <aside className="workout-ai-coach" aria-label={t("workoutPlan.aiCoach")}>
                 <span className="workout-ai-coach__icon" aria-hidden="true">✦</span>
