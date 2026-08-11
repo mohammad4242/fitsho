@@ -33,6 +33,7 @@ export type FoodCatalogueItem = {
   slug: string;
   name_fa: string;
   name_en: string;
+  image_url: string | null;
   category: string;
   measurement_basis: "raw" | "dry" | "as_purchased";
   nutrient_basis: { quantity: string; unit: string };
@@ -113,6 +114,18 @@ export function saveCatalogueFood(input: Record<string, unknown>): Promise<unkno
   return request(`${nutritionPath}/admin/foods`, {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export function uploadCatalogueFoodImage(
+  slug: string,
+  file: File,
+): Promise<{ image_url: string }> {
+  const body = new FormData();
+  body.append("file", file);
+  return request(`${nutritionPath}/admin/foods/${slug}/image`, {
+    method: "POST",
+    body,
   });
 }
 

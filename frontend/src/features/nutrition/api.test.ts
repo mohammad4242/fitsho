@@ -10,6 +10,7 @@ import {
   saveNutritionProfile,
   saveSafetyProfile,
   saveStructuredExercise,
+  uploadCatalogueFoodImage,
 } from "./api";
 import type { NutritionProfileInput, SafetyProfileInput } from "./types";
 
@@ -70,4 +71,24 @@ it("uses the dedicated safety and nutrition endpoints", async () => {
   expect(fetch).toHaveBeenNthCalledWith(7, "/api/v1/nutrition/estimates/current", expect.objectContaining({ credentials: "include" }));
   expect(fetch).toHaveBeenNthCalledWith(8, "/api/v1/nutrition/plans", expect.objectContaining({ method: "POST" }));
   expect(fetch).toHaveBeenNthCalledWith(9, "/api/v1/nutrition/plans/latest", expect.objectContaining({ credentials: "include" }));
+});
+
+it("uploads a catalogue food image as multipart form data", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    Response.json({ image_url: "/media/food-catalogue/chicken.png" }),
+  );
+  const file = new File(["image"], "chicken.png", { type: "image/png" });
+
+  await uploadCatalogueFoodImage("chicken-breast", file);
+
+  const requestInit = vi.mocked(fetch).mock.calls[0]?.[1];
+  expect(requestInit).toBeDefined();
+  if (!requestInit) throw new Error("Expected upload request options");
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/nutrition/admin/foods/chicken-breast/image",
+    expect.objectContaining({ method: "POST", credentials: "include" }),
+  );
+  expect(requestInit.body).toBeInstanceOf(FormData);
+  expect((requestInit.body as FormData).get("file")).toBe(file);
+  expect(new Headers(requestInit.headers).has("Content-Type")).toBe(false);
 });

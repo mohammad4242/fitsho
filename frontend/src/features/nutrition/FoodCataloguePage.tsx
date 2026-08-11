@@ -32,6 +32,7 @@ export function FoodCataloguePage() {
   const [reload, setReload] = useState(0);
   const [details, setDetails] = useState<FoodCatalogueItem | null>(null);
   const [priceFood, setPriceFood] = useState<AdminFoodCatalogueItem | null>(null);
+  const [imageFood, setImageFood] = useState<AdminFoodCatalogueItem | null>(null);
   const [addingFood, setAddingFood] = useState(false);
 
   useEffect(() => {
@@ -59,6 +60,7 @@ export function FoodCataloguePage() {
   function saved() {
     setAddingFood(false);
     setPriceFood(null);
+    setImageFood(null);
     setReload((value) => value + 1);
   }
 
@@ -95,7 +97,7 @@ export function FoodCataloguePage() {
       {state === "ready" && data?.items.length === 0 && <p className="food-catalogue-state">{l("ماده‌ای با این مشخصات پیدا نشد.", "No food matched these filters.")}</p>}
       {state === "ready" && data && data.items.length > 0 && (
         <section className="food-catalogue-grid" aria-label={l("مواد غذایی", "Foods")} role="list">
-          {data.items.map((food) => <FoodCard food={food} key={food.id} language={language} onDetails={() => setDetails(food)} onPrice={isAdminFood(food) ? () => setPriceFood(food) : undefined} />)}
+          {data.items.map((food) => <FoodCard food={food} key={food.id} language={language} onDetails={() => setDetails(food)} onImage={isAdminFood(food) ? () => setImageFood(food) : undefined} onPrice={isAdminFood(food) ? () => setPriceFood(food) : undefined} />)}
         </section>
       )}
 
@@ -103,21 +105,33 @@ export function FoodCataloguePage() {
 
       {details && <FoodDetails food={details} language={language} onClose={() => setDetails(null)} />}
       {priceFood && <PriceOverrideDialog food={priceFood} language={language} onClose={() => setPriceFood(null)} onSaved={saved} />}
+      {imageFood && <FoodImageDialog food={imageFood} language={language} onClose={() => setImageFood(null)} onSaved={saved} />}
       {addingFood && <AddFoodDialog language={language} onClose={() => setAddingFood(false)} onSaved={saved} />}
     </main>
   );
 }
 
-function FoodCard({ food, language, onDetails, onPrice }: { food: FoodCatalogueItem; language: "fa" | "en"; onDetails: () => void; onPrice?: () => void }) {
+function FoodCard({ food, language, onDetails, onImage, onPrice }: { food: FoodCatalogueItem; language: "fa" | "en"; onDetails: () => void; onImage?: () => void; onPrice?: () => void }) {
   const fa = language === "fa";
   const l = (persian: string, english: string) => fa ? persian : english;
   const portion = defaultPortion(food);
   return <article className="food-shelf-card" role="listitem">
+    <FoodImage food={food} language={language} />
     <header><div><span>{categoryLabel(food.category, language)}</span><h2>{fa ? food.name_fa : food.name_en}</h2><small>{fa ? food.name_en : food.name_fa}</small></div><span className="food-shelf-card__basis">{basisLabel(portion, language)}</span></header>
     {isAdminFood(food) && <PriceTicket food={food} language={language} />}
     <div className="food-macro-strip">{macroDefinitions.map(([code, faLabel, enLabel, unit]) => <div key={code}><span>{fa ? faLabel : enLabel}</span><strong>{macroValue(scale(food.macros[code], portion), unit, language)}</strong></div>)}</div>
-    <footer><button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>{onPrice && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}</footer>
+    <footer><button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>{onImage && <button type="button" onClick={onImage} aria-label={l(`${food.image_url ? "جایگزینی" : "بارگذاری"} تصویر ${food.name_fa}`, `${food.image_url ? "Replace" : "Upload"} image for ${food.name_en}`)}>{l(food.image_url ? "جایگزینی تصویر" : "بارگذاری تصویر", food.image_url ? "Replace image" : "Upload image")}</button>}{onPrice && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}</footer>
   </article>;
+}
+
+function FoodImage({ food, language }: { food: FoodCatalogueItem; language: "fa" | "en" }) {
+  const [failed, setFailed] = useState(false);
+  const name = language === "fa" ? food.name_fa : food.name_en;
+  useEffect(() => setFailed(false), [food.image_url]);
+  if (!food.image_url || failed) {
+    return <div className="food-shelf-card__image food-shelf-card__image--fallback" role="img" aria-label={language === "fa" ? `تصویر پیش‌فرض ${food.name_fa}` : `Default image for ${food.name_en}`}><span aria-hidden="true">◇</span></div>;
+  }
+  return <img className="food-shelf-card__image" src={food.image_url} alt={name} onError={() => setFailed(true)} />;
 }
 
 function FoodDetails({ food, language, onClose }: { food: FoodCatalogueItem; language: "fa" | "en"; onClose: () => void }) {
@@ -140,6 +154,22 @@ function PriceOverrideDialog({ food, language, onClose, onSaved }: { food: Admin
   const [error, setError] = useState(false);
   function submit(event: FormEvent) { event.preventDefault(); setSaving(true); setError(false); void api.saveFoodPriceOverride(food.slug, { reference_price_toman: price, canonical_unit: unit, reason }).then(onSaved).catch(() => setError(true)).finally(() => setSaving(false)); }
   return <DialogFrame label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)} onClose={onClose}><h2>{l("قیمت دستی موقت", "Temporary manual price")}</h2><p>{l("این قیمت با اجرای موفق بعدی بازار منقضی می‌شود.", "This price expires after the next successful market refresh.")}</p><form className="food-admin-form" onSubmit={submit}><label>{l("قیمت (تومان)", "Price (Toman)")}<input inputMode="decimal" min="1" required value={price} onChange={(event) => setPrice(event.target.value)} /></label><label>{l("واحد", "Unit")}<select value={unit} onChange={(event) => setUnit(event.target.value)}><option value="TOMAN_PER_KG">{l("تومان/کیلوگرم", "Toman/kg")}</option><option value="TOMAN_PER_LITER">{l("تومان/لیتر", "Toman/litre")}</option><option value="TOMAN_PER_UNIT">{l("تومان/عدد", "Toman/unit")}</option></select></label><label>{l("دلیل ویرایش", "Reason")}<textarea minLength={5} required value={reason} onChange={(event) => setReason(event.target.value)} /></label>{error && <p role="alert">{l("قیمت ذخیره نشد.", "Price was not saved.")}</p>}<button disabled={saving} type="submit">{saving ? l("در حال ذخیره…", "Saving…") : l("ذخیره قیمت", "Save price")}</button></form></DialogFrame>;
+}
+
+function FoodImageDialog({ food, language, onClose, onSaved }: { food: AdminFoodCatalogueItem; language: "fa" | "en"; onClose: () => void; onSaved: () => void }) {
+  const fa = language === "fa";
+  const l = (persian: string, english: string) => fa ? persian : english;
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!file) return;
+    setSaving(true);
+    setError(false);
+    void api.uploadCatalogueFoodImage(food.slug, file).then(onSaved).catch(() => setError(true)).finally(() => setSaving(false));
+  }
+  return <DialogFrame label={l(`تصویر ${food.name_fa}`, `Image for ${food.name_en}`)} onClose={onClose}><h2>{l(food.image_url ? "جایگزینی تصویر غذا" : "بارگذاری تصویر غذا", food.image_url ? "Replace food image" : "Upload food image")}</h2><p>{l("فایل JPEG، PNG، WebP یا GIF انتخاب کنید.", "Choose a JPEG, PNG, WebP, or GIF file.")}</p><form className="food-admin-form" onSubmit={submit}><label>{l("تصویر غذا", "Food image")}<input accept="image/gif,image/jpeg,image/png,image/webp" type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>{file && <p className="food-image-file">{file.name}</p>}{error && <p role="alert">{l("تصویر ذخیره نشد.", "Image was not saved.")}</p>}<button disabled={saving || !file} type="submit">{saving ? l("در حال ذخیره…", "Saving…") : l("ذخیره تصویر", "Save image")}</button></form></DialogFrame>;
 }
 
 function AddFoodDialog({ language, onClose, onSaved }: { language: "fa" | "en"; onClose: () => void; onSaved: () => void }) {

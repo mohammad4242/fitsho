@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -32,6 +32,7 @@ const response: api.FoodCatalogueResponse = {
       slug: "chicken-breast",
       name_fa: "سینه مرغ",
       name_en: "Chicken breast",
+      image_url: "/media/food-catalogue/chicken.png",
       category: "poultry",
       measurement_basis: "raw",
       nutrient_basis: { quantity: "100.0000", unit: "g" },
@@ -91,6 +92,7 @@ beforeEach(async () => {
   await i18n.changeLanguage("fa");
   vi.mocked(api.getFoodCatalogue).mockResolvedValue(response);
   vi.mocked(api.getAdminFoodCatalogue).mockResolvedValue({ ...response, items: [{ ...response.items[0], price: { status: "not_found" } }] });
+  vi.mocked(api.uploadCatalogueFoodImage).mockResolvedValue({ image_url: "/media/food-catalogue/replacement.png" });
 });
 
 it("shows nutrient data and never shows catalogue price information to a member", async () => {
@@ -100,10 +102,15 @@ it("shows nutrient data and never shows catalogue price information to a member"
   expect(await screen.findByRole("heading", { name: "کاتالوگ مواد غذایی" })).toBeVisible();
   expect(screen.getByRole("list", { name: "مواد غذایی" })).toBeVisible();
   expect(screen.getByRole("heading", { name: "سینه مرغ" })).toBeVisible();
+  expect(screen.getByRole("img", { name: "سینه مرغ" })).toHaveAttribute(
+    "src",
+    "/media/food-catalogue/chicken.png",
+  );
   expect(screen.getByText("فیبر")).toBeVisible();
   expect(screen.queryByText("یافت نشد")).not.toBeInTheDocument();
   expect(screen.getByText("۱۱٫۳ گرم")).toBeVisible();
   expect(screen.queryByRole("button", { name: "افزودن ماده غذایی" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "جایگزینی تصویر سینه مرغ" })).not.toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "جزئیات بیشتر" }));
   expect(screen.getByRole("dialog", { name: "جزئیات سینه مرغ" })).toBeVisible();
@@ -124,7 +131,39 @@ it("shows price and price controls only to an admin", async () => {
   await screen.findByRole("heading", { name: "کاتالوگ مواد غذایی" });
   expect(screen.getByRole("button", { name: "افزودن ماده غذایی" })).toBeVisible();
   expect(screen.getByRole("button", { name: "ویرایش قیمت سینه مرغ" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "جایگزینی تصویر سینه مرغ" })).toBeVisible();
   expect(screen.getByText("یافت نشد")).toBeVisible();
+});
+
+it("shows a stable fallback for missing and broken food images", async () => {
+  vi.mocked(api.getFoodCatalogue).mockResolvedValueOnce({
+    ...response,
+    items: [{ ...response.items[0], image_url: null }],
+  });
+  const { unmount } = render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  expect(await screen.findByRole("img", { name: "تصویر پیش‌فرض سینه مرغ" })).toBeVisible();
+  unmount();
+
+  vi.mocked(api.getFoodCatalogue).mockResolvedValueOnce(response);
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+  const image = await screen.findByRole("img", { name: "سینه مرغ" });
+  fireEvent.error(image);
+  expect(await screen.findByRole("img", { name: "تصویر پیش‌فرض سینه مرغ" })).toBeVisible();
+});
+
+it("lets an admin replace a food image and reloads the catalogue", async () => {
+  const user = userEvent.setup();
+  auth.isAdmin = true;
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+  await user.click(await screen.findByRole("button", { name: "جایگزینی تصویر سینه مرغ" }));
+  const file = new File(["replacement"], "replacement.png", { type: "image/png" });
+
+  await user.upload(screen.getByLabelText("تصویر غذا"), file);
+  await user.click(screen.getByRole("button", { name: "ذخیره تصویر" }));
+
+  await waitFor(() => expect(api.uploadCatalogueFoodImage).toHaveBeenCalledWith("chicken-breast", file));
+  await waitFor(() => expect(api.getAdminFoodCatalogue).toHaveBeenCalledTimes(2));
 });
 
 it("uses English copy and left-to-right flow", async () => {
