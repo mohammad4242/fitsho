@@ -108,8 +108,52 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(nutritionApi.getCurrentNutritionEstimate).mockResolvedValue(estimate);
   vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(null);
+  vi.mocked(nutritionApi.getDailyTracking).mockResolvedValue({
+    entry_date: "2026-08-11",
+    check_in_status: "not_recorded",
+    plan_revision_id: null,
+    data_status: "insufficient_data",
+    actual_totals: {},
+    entries: [],
+  });
   vi.mocked(nutritionApi.getShoppingList).mockResolvedValue({ plan_id: "plan-1", plan_revision: 1, approval_status: "pending", warning_codes: ["PLAN_NOT_ACTIVE"], total_cost_irr: 1_400_000, items: [{ food_id: "food-1", slug: "chicken-breast", name_fa: "سینه مرغ", name_en: "Chicken breast", required_quantity: 1050, canonical_unit: "g", cost_irr: 1_400_000 }] });
   vi.mocked(nutritionApi.listWeeklyNutritionPlans).mockResolvedValue([]);
+});
+
+it("puts real tracked calories and macros in one daily panel", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.getDailyTracking).mockResolvedValue({
+    entry_date: "2026-08-11",
+    check_in_status: "on_plan",
+    plan_revision_id: null,
+    data_status: "sufficient",
+    actual_totals: {
+      energy_kcal: 1050,
+      protein_g: 61,
+      carbohydrate_g: 118,
+      total_fat_g: 38,
+    },
+    entries: [{
+      id: "entry-1",
+      entry_date: "2026-08-11",
+      plan_revision_id: null,
+      planned_meal_id: null,
+      food_id: null,
+      display_name: "ناهار",
+      quantity_grams: null,
+      source: "manual",
+      confidence: "high",
+      nutrients: { energy_kcal: 1050 },
+      warning_codes: [],
+    }],
+  });
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  expect(await screen.findByText("۱٬۰۵۰")).toBeInTheDocument();
+  expect(screen.getByText("از ۲٬۱۰۰ کیلوکالری")).toBeInTheDocument();
+  expect(screen.getByText("۶۱ گرم")).toBeInTheDocument();
+  expect(screen.getByRole("progressbar", { name: "پیشرفت کالری امروز" })).toHaveAttribute("aria-valuemax", "2100");
 });
 
 it("generates and displays a seven-day draft without claiming physician approval", async () => {
@@ -136,7 +180,7 @@ it("shows the scientific calorie and nutrient estimate with its limits in Persia
   await i18n.changeLanguage("fa");
   render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
 
-  expect(await screen.findByRole("heading", { name: "هدف روزانه تغذیه" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "تغذیه" })).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "هدف انرژی روزانه" })).toBeInTheDocument();
   expect(screen.getByText(/۲٬۱۰۰/)).toBeInTheDocument();
   expect(screen.getByText(/۱۲۰/)).toBeInTheDocument();
@@ -151,7 +195,7 @@ it("uses complete English copy and left-to-right layout", async () => {
   await i18n.changeLanguage("en");
   render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
 
-  const heading = await screen.findByRole("heading", { name: "Daily nutrition targets" });
+  const heading = await screen.findByRole("heading", { name: "Nutrition" });
   expect(heading.closest("main")).toHaveAttribute("dir", "ltr");
   expect(screen.getByText("High confidence")).toBeInTheDocument();
   expect(screen.getByText(/scientific estimate, not a diagnosis or medical prescription/i)).toBeInTheDocument();

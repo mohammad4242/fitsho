@@ -191,6 +191,23 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-tool-link small { color: var(--fitsho-muted); font-size: .6rem; }
 .nutrition-tool-link--primary { border-color: var(--fitsho-line-strong); color: var(--fitsho-aqua); }
 .nutrition-estimate-summary { grid-template-columns: minmax(0, 1.4fr) minmax(15rem, .6fr); }
+.nutrition-today-panel, .nutrition-meal-summary { width: min(100% - 2rem, 72rem); margin-inline: auto; }
+.nutrition-today-panel { overflow: hidden; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
+.nutrition-today-panel__top { min-height: 9rem; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 1rem; padding: 1rem; }
+.nutrition-today-panel .nutrition-calorie-card { min-height: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.nutrition-today-panel .nutrition-calorie-card strong { display: block; margin-block: .25rem; font: 850 clamp(2.2rem, 6vw, 3.4rem)/1 "Sora Variable", sans-serif; }
+.nutrition-today-panel .nutrition-confidence-card { min-width: 8rem; align-self: stretch; display: grid; align-content: center; justify-items: start; padding: .75rem; border: 0; border-inline-start: 1px solid var(--fitsho-line); border-radius: 0; background: transparent; box-shadow: none; }
+.nutrition-today-panel .nutrition-target-grid--primary { width: auto; margin: 0; border: 0; border-top: 1px solid var(--fitsho-line); border-radius: 0; background: rgb(255 255 255 / 2%); box-shadow: none; }
+.nutrition-meal-summary { margin-top: .65rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-md); background: var(--fitsho-surface-subtle); }
+.nutrition-meal-summary header { display: flex; align-items: center; justify-content: space-between; padding: .75rem .85rem; border-bottom: 1px solid var(--fitsho-line); }
+.nutrition-meal-summary h2 { margin: 0; font-size: .9rem; }
+.nutrition-meal-summary a { color: var(--fitsho-aqua); font-size: .7rem; font-weight: 850; text-decoration: none; }
+.nutrition-meal-summary article { min-height: 2.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .55rem .85rem; }
+.nutrition-meal-summary article + article { border-top: 1px solid var(--fitsho-line); }
+.nutrition-meal-summary article span { color: var(--fitsho-muted); font-size: .75rem; }
+.nutrition-meal-summary article strong { font: 750 .78rem "Sora Variable", sans-serif; }
+.nutrition-science-links { display: flex; gap: .45rem; margin: .8rem 1rem 0; }
+.nutrition-science-links a { padding: .5rem .7rem; border: 1px solid var(--fitsho-line); border-radius: .6rem; color: var(--fitsho-aqua); font-size: .72rem; font-weight: 800; text-decoration: none; }
 .nutrition-calorie-card { min-height: 8.5rem; padding: 1rem; border-radius: var(--fitsho-radius-lg); }
 .nutrition-calorie-card strong { font-size: clamp(2rem, 6vw, 3.25rem); }
 .nutrition-confidence-card { min-height: 0; padding: 1rem; border-radius: var(--fitsho-radius-lg); }
@@ -243,6 +260,10 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
   .nutrition-confidence-card p { display: none; }
   .nutrition-target-grid--primary.fitsho-metric-strip { display: grid; grid-template-columns: repeat(3, 1fr); }
   .nutrition-calorie-card { min-height: 7.5rem; }
+  .nutrition-today-panel, .nutrition-meal-summary { width: min(100% - 1.5rem, 72rem); }
+  .nutrition-today-panel__top { min-height: 7.6rem; grid-template-columns: minmax(0, 1fr) auto; gap: .65rem; padding: .8rem; }
+  .nutrition-today-panel .nutrition-confidence-card { grid-column: 1 / -1; min-width: 0; min-height: 2rem; display: flex; align-items: center; justify-content: space-between; padding: .45rem 0 0; border: 0; border-top: 1px solid var(--fitsho-line); }
+  .nutrition-today-panel .fitsho-progress-ring { width: 4.4rem; }
   .nutrition-tracking-header { flex-direction: row; }
   .nutrition-daily-panel, .nutrition-photo-entry, .nutrition-checkin, .nutrition-manual-entry, .nutrition-recent-foods { width: min(100% - 1.5rem, 72rem); }
   .nutrition-daily-panel { grid-template-columns: 1fr; gap: .75rem; }

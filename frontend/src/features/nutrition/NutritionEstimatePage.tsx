@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { ProgressRing } from "../../shared/ProgressRing";
 import * as nutritionApi from "./api";
 import type {
+  DailyTrackingSummary,
   NutritionEstimate,
   NutritionTarget,
   WeeklyPlan,
@@ -20,6 +22,7 @@ export function NutritionEstimatePage() {
   const [state, setState] = useState<ViewState>("loading");
   const [estimate, setEstimate] = useState<NutritionEstimate | null>(null);
   const [plan, setPlan] = useState<WeeklyPlan | null>(null);
+  const [tracking, setTracking] = useState<DailyTrackingSummary | null>(null);
   const [planOutcome, setPlanOutcome] = useState<WeeklyPlanGeneration | null>(null);
   const [calculating, setCalculating] = useState(false);
   const [generatingPlan, setGeneratingPlan] = useState(false);
@@ -30,11 +33,13 @@ export function NutritionEstimatePage() {
     void Promise.all([
       nutritionApi.getCurrentNutritionEstimate(),
       nutritionApi.getLatestWeeklyNutritionPlan(),
+      nutritionApi.getDailyTracking(new Date().toISOString().slice(0, 10)).catch(() => null),
     ])
-      .then(([result, latestPlan]) => {
+      .then(([result, latestPlan, dailyTracking]) => {
         if (!active) return;
         setEstimate(result);
         setPlan(latestPlan);
+        setTracking(dailyTracking);
         setState(result === null ? "empty" : "ready");
       })
       .catch(() => {
@@ -78,12 +83,10 @@ export function NutritionEstimatePage() {
   return (
     <main className="nutrition-estimate-page fitsho-page" dir={language === "fa" ? "rtl" : "ltr"}>
       <section className="nutrition-estimate-hero">
-        <div><p className="eyebrow eyebrow--accent">{l("امروز", "Today")}</p><h1 className="fitsho-display">{l("هدف روزانه تغذیه", "Daily nutrition targets")}</h1></div>
+        <div><p className="eyebrow eyebrow--accent">{l("امروز", "Today")}</p><h1 className="fitsho-display">{l("تغذیه", "Nutrition")}</h1></div>
         <nav className="nutrition-estimate-tools" aria-label={l("ابزارهای تغذیه", "Nutrition tools")}>
           <Link className="nutrition-tool-link nutrition-tool-link--primary" to="/nutrition-tracking"><strong>{l("ثبت تغذیه", "Track food")}</strong><small>{l("دستی یا با عکس", "Manual or photo")}</small></Link>
           <Link className="nutrition-tool-link" to="/food-catalogue"><strong>{l("کاتالوگ", "Catalogue")}</strong><small>{l("مرجع مواد غذایی", "Food reference")}</small></Link>
-          <Link className="nutrition-tool-link" to="/nutrition-labs"><strong>{l("آزمایش‌ها", "Labs")}</strong></Link>
-          <Link className="nutrition-tool-link" to="/nutrition-supplements"><strong>{l("مکمل‌ها", "Supplements")}</strong></Link>
         </nav>
       </section>
 
@@ -92,7 +95,7 @@ export function NutritionEstimatePage() {
       {state === "error" && <section className="nutrition-estimate-state" role="alert"><h2>{l("محاسبه انجام نشد", "Estimate unavailable")}</h2><p>{l("اطلاعات ضروری یا وضعیت ایمنی را در پروفایل بررسی کن.", "Review required profile details and your safety status.")}</p><Link className="secondary-button" to="/profile">{l("رفتن به پروفایل", "Open profile")}</Link></section>}
       {state === "ready" && estimate !== null && (
         <>
-          <EstimateContent estimate={estimate} language={language} onRefresh={calculate} />
+          <EstimateContent estimate={estimate} language={language} onRefresh={calculate} plan={plan} tracking={tracking} />
           <PlanArea
             generating={generatingPlan}
             language={language}
@@ -159,7 +162,7 @@ function generationMessage(outcome: WeeklyPlanGeneration["outcome"], language: "
   return values[outcome][language === "en" ? 1 : 0];
 }
 
-function EstimateContent({ estimate, language, onRefresh }: { estimate: NutritionEstimate; language: "fa" | "en"; onRefresh: () => void }) {
+function EstimateContent({ estimate, language, onRefresh, plan, tracking }: { estimate: NutritionEstimate; language: "fa" | "en"; onRefresh: () => void; plan: WeeklyPlan | null; tracking: DailyTrackingSummary | null }) {
   const l = (fa: string, en: string) => language === "en" ? en : fa;
   const number = new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR", { maximumFractionDigits: 1 });
   const target = (metric: string) => estimate.targets[metric];
@@ -167,29 +170,54 @@ function EstimateContent({ estimate, language, onRefresh }: { estimate: Nutritio
   const range = (metric: string) => formatRange(target(metric), number, language);
   const maximum = (metric: string) => formatValue(target(metric)?.maximum, target(metric)?.unit, number, language);
   const confidence = { high: l("اطمینان بالا", "High confidence"), medium: l("اطمینان متوسط", "Medium confidence"), low: l("اطمینان پایین", "Low confidence") }[estimate.confidence];
+  const currentDate = new Date().toISOString().slice(0, 10);
+  const todayPlan = plan?.days.find((day) => day.plan_date === currentDate) ?? plan?.days[0];
+  const energyTarget = todayPlan?.nutrient_totals.energy_kcal ?? target("goal_calories")?.preferred ?? null;
+  const tracked = tracking?.actual_totals;
+  const hasTrackedData = tracked !== undefined && (
+    tracking?.data_status === "sufficient"
+    || (tracking?.entries.length ?? 0) > 0
+    || Object.values(tracked).some((value) => value > 0)
+  );
+  const energyNow = hasTrackedData ? tracked.energy_kcal ?? 0 : energyTarget;
+  const macro = (key: string, estimateMetric: string) => hasTrackedData && tracked[key] !== undefined
+    ? formatValue(tracked[key], "g/day", number, language)
+    : preferred(estimateMetric) !== (language === "en" ? "Not set" : "تعیین نشده")
+      ? preferred(estimateMetric)
+      : range(estimateMetric);
 
   return <>
-    <section className="nutrition-estimate-summary" aria-label={l("خلاصه هدف‌ها", "Target summary")}>
-      <article className="nutrition-calorie-card" aria-label={l("هدف انرژی روزانه", "Daily energy target")} role="region">
-        <span>{l("هدف انرژی", "Energy target")}</span>
-        <strong>{preferred("goal_calories")}</strong>
-        <small>{l("میانگین روزانه", "daily average")}</small>
-      </article>
-      <div className="nutrition-confidence-card">
-        <span className={`nutrition-confidence nutrition-confidence--${estimate.confidence}`}>{confidence}</span>
-        <p>{l("هر تغییر مهم در وزن، فعالیت یا تمرین یک نسخه جدید می‌سازد.", "A material change in weight, activity, or exercise creates a new revision.")}</p>
-        {estimate.is_stale && <button className="text-button" type="button" onClick={onRefresh}>{l("به‌روزرسانی برآورد", "Refresh estimate")}</button>}
+    <section className="nutrition-today-panel" aria-label={l("خلاصه هدف‌ها", "Target summary")}>
+      <div className="nutrition-today-panel__top">
+        <article className="nutrition-calorie-card" aria-label={l("هدف انرژی روزانه", "Daily energy target")} role="region">
+          <span>{hasTrackedData ? l("دریافت امروز", "Consumed today") : l("هدف انرژی", "Energy target")}</span>
+          <strong>{energyNow === null ? l("تعیین نشده", "Not set") : number.format(energyNow)}</strong>
+          <small>{hasTrackedData && energyTarget !== null ? l(`از ${number.format(energyTarget)} کیلوکالری`, `of ${number.format(energyTarget)} kcal`) : l("کیلوکالری روزانه", "daily kcal")}</small>
+        </article>
+        {energyTarget !== null && <ProgressRing value={hasTrackedData ? tracked?.energy_kcal ?? 0 : 0} max={energyTarget} label={l("پیشرفت کالری امروز", "Today's calorie progress")} />}
+        <div className="nutrition-confidence-card">
+          <span className={`nutrition-confidence nutrition-confidence--${estimate.confidence}`}>{confidence}</span>
+          {estimate.is_stale && <button className="text-button" type="button" onClick={onRefresh}>{l("به‌روزرسانی", "Refresh")}</button>}
+        </div>
+      </div>
+      <div className="nutrition-target-grid nutrition-target-grid--primary fitsho-metric-strip" aria-label={l("درشت‌مغذی‌های اصلی", "Primary macronutrient targets")}>
+        <TargetCard title={l("پروتئین", "Protein")} value={macro("protein_g", "protein")} note="" />
+        <TargetCard title={l("کربوهیدرات", "Carbohydrate")} value={macro("carbohydrate_g", "carbohydrate")} note="" />
+        <TargetCard title={l("چربی", "Fat")} value={macro("total_fat_g", "total_fat")} note="" />
       </div>
     </section>
 
-    <section className="nutrition-target-grid nutrition-target-grid--primary fitsho-metric-strip" aria-label={l("درشت‌مغذی‌های اصلی", "Primary macronutrient targets")}>
-      <TargetCard title={l("پروتئین", "Protein")} value={preferred("protein")} note={l(`حداقل ${formatValue(target("protein")?.minimum, target("protein")?.unit, number, language)}`, `Minimum ${formatValue(target("protein")?.minimum, target("protein")?.unit, number, language)}`)} />
-      <TargetCard title={l("کربوهیدرات", "Carbohydrate")} value={range("carbohydrate")} note={l("بازه علمی روزانه", "Scientific daily range")} />
-      <TargetCard title={l("چربی کل", "Total fat")} value={range("total_fat")} note={l("بازه علمی روزانه", "Scientific daily range")} />
-    </section>
+    {todayPlan && <section className="nutrition-meal-summary" aria-label={l("وعده‌های امروز", "Today's meals")}>
+      <header><h2>{l("وعده‌های امروز", "Today's meals")}</h2><Link to="/nutrition-tracking">{l("ثبت وعده", "Track meal")}</Link></header>
+      <div>{todayPlan.meals.map((meal) => <article key={meal.id}><span>{mealLabel(meal.slot_role, meal.slot_index, language)}</span><strong>{meal.nutrient_totals.energy_kcal === undefined ? "—" : `${number.format(meal.nutrient_totals.energy_kcal)} ${l("کیلوکالری", "kcal")}`}</strong></article>)}</div>
+    </section>}
 
     <details className="nutrition-science-details">
       <summary>{l("جزئیات علمی و حدود ایمنی", "Scientific details and safety limits")}</summary>
+      <nav className="nutrition-science-links" aria-label={l("ابزارهای علمی تغذیه", "Scientific nutrition tools")}>
+        <Link to="/nutrition-labs">{l("آزمایش‌ها", "Labs")}</Link>
+        <Link to="/nutrition-supplements">{l("مکمل‌ها", "Supplements")}</Link>
+      </nav>
       <div className="nutrition-target-grid nutrition-target-grid--secondary" aria-label={l("هدف‌های تغذیه تکمیلی", "Secondary nutrition targets")}>
         <TargetCard title={l("فیبر", "Fibre")} value={preferred("fibre")} note={l(`حداقل مطلق ${formatValue(target("fibre")?.minimum, target("fibre")?.unit, number, language)}`, `Absolute minimum ${formatValue(target("fibre")?.minimum, target("fibre")?.unit, number, language)}`)} />
         <TargetCard title={l("قند آزاد", "Free sugar")} value={maximum("free_sugar")} note={l(`حد ترجیحی ${formatValue(target("free_sugar")?.preferred_maximum, target("free_sugar")?.unit, number, language)}`, `Preferred limit ${formatValue(target("free_sugar")?.preferred_maximum, target("free_sugar")?.unit, number, language)}`)} />
@@ -209,6 +237,12 @@ function EstimateContent({ estimate, language, onRefresh }: { estimate: Nutritio
       </section>
     </details>
   </>;
+}
+
+function mealLabel(role: "main_meal" | "snack", index: number, language: "fa" | "en") {
+  if (role === "snack") return language === "en" ? `Snack ${index + 1}` : `میان‌وعده ${new Intl.NumberFormat("fa-IR").format(index + 1)}`;
+  const labels = language === "en" ? ["Breakfast", "Lunch", "Dinner"] : ["صبحانه", "ناهار", "شام"];
+  return labels[index] ?? (language === "en" ? `Meal ${index + 1}` : `وعده ${new Intl.NumberFormat("fa-IR").format(index + 1)}`);
 }
 
 function nutrientDisplayName(code: string, language: "fa" | "en") {
