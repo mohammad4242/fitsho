@@ -51,6 +51,18 @@
   background: var(--fitsho-surface);
 }
 
+.fitsho-progress-ring {
+  width: 4.25rem;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--fitsho-surface) 57%, transparent 59%), conic-gradient(var(--fitsho-aqua) var(--ring-progress), rgb(255 255 255 / 8%) 0);
+}
+
+.fitsho-progress-ring strong { color: var(--fitsho-ink); font: 800 0.82rem "Sora Variable", sans-serif; }
+
 .fitsho-card--interactive {
   transition:
     border-color var(--fitsho-duration-fast) var(--fitsho-ease),

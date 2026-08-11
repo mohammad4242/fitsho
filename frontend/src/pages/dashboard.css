@@ -1,90 +1,52 @@
-.command-center {
-  min-height: 100svh;
-  padding-block-end: var(--fitsho-space-8);
-}
-
-.command-center__container {
-  width: min(100% - 2rem, var(--fitsho-content-max));
-  margin-inline: auto;
-  padding-block: clamp(1.75rem, 4vw, 3.5rem);
-}
-
-.command-center__welcome { max-width: 48rem; }
-.command-center__welcome h1 { margin: 0.35rem 0 0.75rem; font-family: inherit; font-size: clamp(2.25rem, 5vw, 3.55rem); font-weight: 850; letter-spacing: -0.045em; line-height: 1.12; }
-html[dir="rtl"] .command-center__welcome h1 { letter-spacing: 0; }
-.command-center__welcome > p:last-child { max-width: 42rem; color: var(--fitsho-muted); line-height: 1.85; }
-
-.command-center__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(17rem, 0.75fr);
-  gap: var(--fitsho-space-3);
-  margin-block-start: clamp(1.5rem, 3vw, 2.25rem);
-}
-
-.command-card {
-  min-width: 0;
-  padding: clamp(1.1rem, 2.5vw, 1.55rem);
-  border: 1px solid var(--fitsho-line);
-  border-radius: var(--fitsho-radius-xl);
-  color: var(--fitsho-ink);
-  background: var(--fitsho-surface);
-  text-decoration: none;
-  box-shadow: var(--fitsho-shadow-soft);
-  transition: border-color var(--fitsho-duration-fast) ease, background var(--fitsho-duration-fast) ease, transform var(--fitsho-duration-fast) ease;
-}
-
-.command-card--primary {
-  grid-row: span 2;
-  min-height: 20rem;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background:
-    linear-gradient(145deg, rgb(80 223 206 / 9%), transparent 48%),
-    var(--fitsho-surface);
-  box-shadow: var(--fitsho-shadow-focus);
-}
-
-.command-card--primary::before {
-  width: 3.5rem;
-  height: 0.22rem;
-  margin-block-end: clamp(3rem, 7vw, 5.5rem);
-  border-radius: 99rem;
-  background: var(--fitsho-aqua);
-  content: "";
-}
-
-.command-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-.command-card__head p { margin: 0 0 0.45rem; color: var(--fitsho-muted); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.07em; }
-.command-card__head h2 { margin: 0; font-size: clamp(1.45rem, 3vw, 2.25rem); }
-.command-card__head .fitsho-status { width: fit-content; padding: 0.4rem 0.65rem; border-inline-start-width: 1px; border-color: var(--fitsho-line); border-radius: var(--fitsho-radius-pill); color: var(--fitsho-muted); background: rgb(255 255 255 / 3%); font-size: 0.72rem; line-height: 1.35; }
-.command-card__context { margin: 1rem 0 0; color: var(--fitsho-aqua); font-weight: 800; }
-.command-card__body { margin: 1rem 0 1.5rem; color: var(--fitsho-muted); line-height: 1.75; }
-.command-card__action { align-self: flex-start; margin-block-start: auto; }
-.command-card__link { display: inline-flex; gap: 0.5rem; color: var(--fitsho-aqua); font-weight: 800; }
-html[dir="ltr"] .command-card__link b { transform: rotate(180deg); }
-.command-card:where(a):hover { border-color: var(--fitsho-line-strong); background: var(--fitsho-surface-interactive); transform: translateY(-1px); }
-
-.command-center__quick { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-block-start: 1.2rem; }
-.command-center__quick a { padding: 0.65rem 1rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-pill); color: var(--fitsho-muted); text-decoration: none; }
-.command-center__quick a:hover { color: var(--fitsho-ink); border-color: var(--fitsho-line-strong); }
+.command-center { min-height: 100svh; padding-block-end: 6rem; }
+.command-center__container { width: min(100% - 2rem, 72rem); margin-inline: auto; padding-block: clamp(1rem, 3vw, 2rem); }
+.command-center__welcome { display: grid; gap: .2rem; margin-bottom: 1rem; }
+.command-center__welcome h1 { margin: 0; font: 850 clamp(1.45rem, 4vw, 2.15rem)/1.25 inherit; letter-spacing: 0; }
+.command-center__welcome p { margin: 0; color: var(--fitsho-muted); font-size: .86rem; }
+.command-center__grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(18rem, .8fr); gap: .75rem; }
+.command-card { min-width: 0; padding: 1rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); color: var(--fitsho-ink); background: var(--fitsho-surface); text-decoration: none; box-shadow: var(--fitsho-shadow-soft); }
+.command-card--primary { grid-row: span 2; min-height: 17rem; display: flex; flex-direction: column; background: linear-gradient(145deg, rgb(80 223 206 / 7%), transparent 48%), var(--fitsho-surface); }
+.command-card__head { min-width: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.command-card__head p { margin: 0 0 .25rem; color: var(--fitsho-muted); font-size: .68rem; font-weight: 850; }
+.command-card__head h2 { margin: 0; font-size: 1rem; }
+.command-card__head .fitsho-status { width: fit-content; padding: .28rem .55rem; border: 1px solid var(--fitsho-line); border-radius: 99rem; color: var(--fitsho-muted); background: transparent; font-size: .66rem; line-height: 1.3; }
+.command-card__workout { display: flex; align-items: center; gap: .9rem; margin-block: auto 1rem; }
+.command-card__workout > span { width: 3.25rem; aspect-ratio: 1; display: grid; place-items: center; border: 1px solid var(--fitsho-line-strong); border-radius: .9rem; color: var(--fitsho-aqua); background: rgb(80 223 206 / 7%); font: 900 1.15rem "Sora Variable", sans-serif; }
+.command-card__workout h3 { margin: 0; font-size: clamp(1.35rem, 3vw, 2rem); }
+.command-card__workout p { margin: .25rem 0 0; color: var(--fitsho-muted); font-size: .78rem; }
+.command-card__context { margin-block: auto 1rem; color: var(--fitsho-aqua); font-weight: 850; }
+.command-card__action { align-self: flex-start; min-height: 2.75rem; margin-top: auto; padding: .6rem 1.1rem; }
+.command-card__calories { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: .85rem 0; }
+.command-card__calories > div { display: grid; }
+.command-card__calories > div strong { font: 850 clamp(1.7rem, 5vw, 2.35rem)/1 "Sora Variable", sans-serif; }
+.command-card__calories > div span, .command-card__empty { margin-top: .3rem; color: var(--fitsho-muted); font-size: .72rem; }
+.command-card__progress-metric { display: flex; align-items: baseline; gap: .45rem; margin-top: .8rem; }
+.command-card__progress-metric strong { font: 850 1.65rem/1 "Sora Variable", sans-serif; }
+.command-card__progress-metric span { color: var(--fitsho-muted); font-size: .72rem; }
+.command-card__arrow { color: var(--fitsho-aqua); font-size: 1.2rem; }
+[dir="ltr"] .command-card__arrow { transform: scaleX(-1); }
+.command-card:where(a) { transition: border-color 160ms ease, transform 160ms ease; }
+.command-card:where(a):hover { border-color: var(--fitsho-line-strong); transform: translateY(-1px); }
+.command-center__quick { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .8rem; }
+.command-center__quick a { padding: .5rem .75rem; border: 1px solid var(--fitsho-line); border-radius: 99rem; color: var(--fitsho-muted); font-size: .75rem; text-decoration: none; }
 
 @media (max-width: 760px) {
-  .command-center__grid { grid-template-columns: 1fr; }
-  .command-center__container { padding-block-start: 1.4rem; }
-  .command-center__welcome h1 { font-size: clamp(2rem, 9.5vw, 2.8rem); }
-  .command-card--primary { grid-row: auto; min-height: 18rem; }
-  .command-card--primary::before { margin-block-end: 3.5rem; }
+  .command-center__container { width: min(100% - 1.5rem, 72rem); padding-block: .8rem; }
+  .command-center__grid { grid-template-columns: 1fr 1fr; }
+  .command-card--primary { grid-column: 1 / -1; grid-row: auto; min-height: 11.75rem; }
+  .command-card--nutrition { grid-column: 1 / -1; }
+  .command-card--progress { grid-column: 1 / -1; }
   .command-center__quick { display: none; }
 }
 
 @media (max-width: 430px) {
-  .command-center__container { width: min(100% - 1.5rem, var(--fitsho-content-max)); }
-  .command-card { padding: 1rem; border-radius: 1.2rem; }
-  .command-card__head { align-items: flex-start; }
-  .command-card__head .fitsho-status { max-width: 8.5rem; text-align: center; }
+  .command-center__welcome { margin-bottom: .75rem; }
+  .command-center__welcome h1 { font-size: 1.35rem; }
+  .command-card { padding: .85rem; }
+  .command-card--primary { min-height: 10.75rem; }
+  .command-card__workout { margin-block: .8rem; }
+  .command-card__workout h3 { font-size: 1.25rem; }
+  .fitsho-progress-ring { width: 3.8rem; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .command-card { transition: none; }
-}
+@media (prefers-reduced-motion: reduce) { .command-card { transition: none; } }

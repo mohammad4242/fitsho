@@ -179,6 +179,9 @@ it("shows plan context without cinematic background media", async () => {
   expect(screen.getByText("۴۵ دقیقه برای هر جلسه")).toBeInTheDocument();
   expect(screen.getByRole("list", { name: "روزهای تمرین تو" })).toBeInTheDocument();
   expect(document.querySelector("video")).not.toBeInTheDocument();
+  const schedule = screen.getByRole("list", { name: "روزهای تمرین تو" });
+  const guidance = screen.getByText("قبل از شروع");
+  expect(schedule.compareDocumentPosition(guidance) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
 it("explains the generation cooldown instead of showing a generic failure", async () => {

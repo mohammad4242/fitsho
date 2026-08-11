@@ -134,20 +134,6 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
           </section>
         )}
 
-        <FixedGuidance />
-
-        <section className="workout-generation-method" aria-labelledby="workout-generation-method-title">
-          <div>
-            <p className="eyebrow eyebrow--accent">{t("workoutPlan.generationMethodEyebrow")}</p>
-            <h2 id="workout-generation-method-title">{t("workoutPlan.generationMethodTitle")}</h2>
-            <p>{t("workoutPlan.generationMethodBody")}</p>
-          </div>
-          <div className="workout-generation-method__choices">
-            <label><input type="radio" name="workout-generation-method" checked={generationMethod === "fitsho_coach"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("fitsho_coach")} />{t("workoutPlan.fitshoCoach")}</label>
-            <label><input type="radio" name="workout-generation-method" checked={generationMethod === "ai"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("ai")} />{t("workoutPlan.aiCoach")}</label>
-          </div>
-        </section>
-
         {state === "loading" && <StatusPanel role="status" message={t("workoutPlan.loading")} />}
         {state === "error" && plan === null && (
           <StatusPanel
@@ -185,35 +171,6 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         {state === "ready" && plan !== null && (
           <>
             <CoachReviewBanner plan={plan} isEnglish={isEnglish} historical={isViewingHistorical} />
-            {history.length > 1 && (
-              <section className="workout-version-history" aria-labelledby="workout-version-history-title">
-                <div>
-                  <p className="eyebrow eyebrow--accent">{l("نسخه‌های برنامه", "Plan versions")}</p>
-                  <h2 id="workout-version-history-title">{l("تاریخچه برنامه", "Plan history")}</h2>
-                </div>
-                <div className="workout-version-history__list">
-                  {history.map((version) => {
-                    const approved = version.coach_review.state === "coach_approved";
-                    const label = approved
-                      ? l("نسخه تأیید مربی", "Coach-approved version")
-                      : l("نسخه اولیه", "Initial version");
-                    return (
-                      <button
-                        type="button"
-                        key={version.id}
-                        className={version.id === plan.id ? "workout-version-history__active" : undefined}
-                        disabled={selectingVersionId !== null}
-                        aria-label={`${label} — ${new Intl.DateTimeFormat(isEnglish ? "en" : "fa-IR", { dateStyle: "medium" }).format(new Date(version.created_at))}`}
-                        onClick={() => selectVersion(version)}
-                      >
-                        <strong>{label}</strong>
-                        <span>{version.is_active ? l("فعال", "Active") : l("آرشیو", "Archived")}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
             {reused && <p className="workout-reused" role="status">{t("workoutPlan.reused")}</p>}
             {plan.is_stale && (
               <p className="workout-stale" role="status">{t("workoutPlan.stale")}</p>
@@ -235,12 +192,6 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 onAction={generationError === "failed" ? generate : undefined}
               />
             )}
-            {plan.ai_coach_program_explanation_fa && (
-              <aside className="workout-ai-coach" aria-label={t("workoutPlan.aiCoach")}>
-                <span className="workout-ai-coach__icon" aria-hidden="true">✦</span>
-                <div><p>{t("workoutPlan.aiCoach")}</p><strong>{plan.ai_coach_program_explanation_fa}</strong></div>
-              </aside>
-            )}
             <section className="workout-schedule" aria-labelledby="workout-schedule-title">
               <div className="workout-schedule__heading">
                 <div>
@@ -259,14 +210,15 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
               {generating && <p className="workout-generating" role="status">{t("workoutPlan.generating")}</p>}
               <div className="workout-days" role="list" aria-labelledby="workout-schedule-title">
                 {plan.days.map((day, dayIndex) => (
-                  <article className={`workout-day${dayIndex === 0 ? " workout-day--focus" : ""}`} key={day.day_number} role="listitem">
-                    <header>
+                  <details className={`workout-day${dayIndex === 0 ? " workout-day--focus" : ""}`} key={day.day_number} role="listitem" open={dayIndex === 0}>
+                    <summary>
                       <span>{String(day.day_number).padStart(2, "0")}</span>
                       <div>
+                        {dayIndex === 0 && <small>{l("جلسه بعد", "Next session")}</small>}
                         <h3>{isEnglish ? day.title_en : day.title_fa}</h3>
                         <p>{t("workoutPlan.sessionMinutes", { count: day.estimated_duration_minutes })}</p>
                       </div>
-                    </header>
+                    </summary>
                     {day.ai_coach_explanation_fa && (
                       <aside className="workout-ai-coach workout-ai-coach--day">
                         <span className="workout-ai-coach__icon" aria-hidden="true">✦</span>
@@ -314,12 +266,47 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                         </li>
                       ))}
                     </ol>
-                  </article>
+                  </details>
                 ))}
               </div>
             </section>
           </>
         )}
+
+        <details className="workout-secondary">
+          <summary>{l("جزئیات و تنظیمات برنامه", "Plan details and settings")}</summary>
+          <div className="workout-secondary__content">
+            <FixedGuidance />
+            <section className="workout-generation-method" aria-labelledby="workout-generation-method-title">
+              <div>
+                <p className="eyebrow eyebrow--accent">{t("workoutPlan.generationMethodEyebrow")}</p>
+                <h2 id="workout-generation-method-title">{t("workoutPlan.generationMethodTitle")}</h2>
+                <p>{t("workoutPlan.generationMethodBody")}</p>
+              </div>
+              <div className="workout-generation-method__choices">
+                <label><input type="radio" name="workout-generation-method" checked={generationMethod === "fitsho_coach"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("fitsho_coach")} />{t("workoutPlan.fitshoCoach")}</label>
+                <label><input type="radio" name="workout-generation-method" checked={generationMethod === "ai"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("ai")} />{t("workoutPlan.aiCoach")}</label>
+              </div>
+            </section>
+            {plan?.ai_coach_program_explanation_fa && (
+              <aside className="workout-ai-coach" aria-label={t("workoutPlan.aiCoach")}>
+                <span className="workout-ai-coach__icon" aria-hidden="true">✦</span>
+                <div><p>{t("workoutPlan.aiCoach")}</p><strong>{plan.ai_coach_program_explanation_fa}</strong></div>
+              </aside>
+            )}
+            {plan !== null && history.length > 1 && (
+              <section className="workout-version-history" aria-labelledby="workout-version-history-title">
+                <div><p className="eyebrow eyebrow--accent">{l("نسخه‌های برنامه", "Plan versions")}</p><h2 id="workout-version-history-title">{l("تاریخچه برنامه", "Plan history")}</h2></div>
+                <div className="workout-version-history__list">
+                  {history.map((version) => {
+                    const label = version.coach_review.state === "coach_approved" ? l("نسخه تأیید مربی", "Coach-approved version") : l("نسخه اولیه", "Initial version");
+                    return <button type="button" key={version.id} className={version.id === plan.id ? "workout-version-history__active" : undefined} disabled={selectingVersionId !== null} aria-label={`${label} — ${new Intl.DateTimeFormat(isEnglish ? "en" : "fa-IR", { dateStyle: "medium" }).format(new Date(version.created_at))}`} onClick={() => selectVersion(version)}><strong>{label}</strong><span>{version.is_active ? l("فعال", "Active") : l("آرشیو", "Archived")}</span></button>;
+                  })}
+                </div>
+              </section>
+            )}
+          </div>
+        </details>
 
         <section className="workout-future" aria-labelledby="workout-future-title">
           <h2 id="workout-future-title">{t("workoutPlan.futureTitle")}</h2>
