@@ -34,5 +34,6 @@ it("links each photo session to its result and keeps the workflow optional", asy
     "href",
     "/body-progress/session-1",
   );
+  expect(screen.getByRole("list", { name: "Body progress" })).toBeInTheDocument();
   expect(screen.getByText(/Optional — add standardized/i)).toBeInTheDocument();
 });

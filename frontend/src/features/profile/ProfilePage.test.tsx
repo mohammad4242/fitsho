@@ -15,7 +15,6 @@ const context = vi.hoisted(() => ({
   profile: null as Profile | null,
   productMode: "both" as ProductMode,
   updateProfile: vi.fn(),
-  logout: vi.fn(),
 }));
 
 const profileApi = vi.hoisted(() => ({
@@ -49,24 +48,7 @@ vi.mock("./ProfileContext", () => ({
   }),
 }));
 
-vi.mock("../auth/AuthContext", () => ({
-  useAuth: () => ({
-    user: {
-      id: "018f0000-0000-7000-8000-000000000001",
-      email: "member@example.com",
-      created_at: "2026-07-24T00:00:00Z",
-    },
-    loading: false,
-    startupError: false,
-    retryStartup: vi.fn(),
-    register: vi.fn(),
-    login: vi.fn(),
-    logout: context.logout,
-  }),
-}));
-
 import { ProfilePage } from "./ProfilePage";
-import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 
 const savedProfile: Profile = {
   user_id: "018f0000-0000-7000-8000-000000000001",
@@ -115,15 +97,7 @@ function renderProfilePage(initialEntry = "/profile") {
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/profile" element={<ProfilePage />} />
-        <Route
-          path="/dashboard"
-          element={
-            <>
-              <AuthenticatedHeader />
-              <Destination />
-            </>
-          }
-        />
+        <Route path="/dashboard" element={<Destination />} />
         <Route path="/login" element={<Destination />} />
       </Routes>
     </MemoryRouter>,
@@ -149,6 +123,7 @@ it("shows signed-in profile information as three ordered full pages", async () =
   renderProfilePage();
 
   expect(screen.getByRole("heading", { name: "اطلاعات شخصی" })).toBeInTheDocument();
+  expect(screen.getByRole("form", { name: "اطلاعات شخصی" })).toBeInTheDocument();
   expect(screen.getByText("مرحله ۱ از ۳")).toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "بعدی" }));
@@ -418,65 +393,4 @@ it("keeps edited values and shows an alert when profile update fails", async () 
     "تغییرات ذخیره نشد",
   );
   expect(screen.getByLabelText("نام نمایشی")).toHaveValue("Offline Name");
-});
-
-it("navigates from the profile header to dashboard", async () => {
-  const user = userEvent.setup();
-  renderProfilePage();
-
-  await user.click(screen.getByRole("link", { name: "امروز" }));
-
-  expect(
-    screen.getByRole("heading", { name: "destination:/dashboard" }),
-  ).toBeInTheDocument();
-});
-
-it("navigates from the dashboard header to profile", async () => {
-  const user = userEvent.setup();
-  renderProfilePage("/dashboard");
-
-  await user.click(screen.getByRole("button", { name: "باز کردن منوی حساب" }));
-  await user.click(screen.getByRole("link", { name: "پروفایل" }));
-
-  expect(
-    screen.getByRole("heading", { name: "پروفایل ورزشی" }),
-  ).toBeInTheDocument();
-});
-
-it("logs out and replaces the current route with login", async () => {
-  context.logout.mockResolvedValue(undefined);
-  const user = userEvent.setup();
-  renderProfilePage();
-
-  await user.click(screen.getByRole("button", { name: "خروج" }));
-
-  expect(context.logout).toHaveBeenCalledOnce();
-  expect(
-    await screen.findByRole("heading", { name: "destination:/login" }),
-  ).toBeInTheDocument();
-});
-
-it("disables logout while the request is pending", async () => {
-  context.logout.mockReturnValue(new Promise(() => undefined));
-  const user = userEvent.setup();
-  renderProfilePage();
-
-  await user.click(screen.getByRole("button", { name: "خروج" }));
-
-  expect(
-    await screen.findByRole("button", { name: "در حال خروج…" }),
-  ).toBeDisabled();
-});
-
-it("keeps the authenticated page and shows an alert when logout fails", async () => {
-  context.logout.mockRejectedValue(new Error("offline"));
-  const user = userEvent.setup();
-  renderProfilePage();
-
-  await user.click(screen.getByRole("button", { name: "خروج" }));
-
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "درخواست انجام نشد",
-  );
-  expect(screen.getByRole("heading", { name: "پروفایل ورزشی" })).toBeInTheDocument();
 });

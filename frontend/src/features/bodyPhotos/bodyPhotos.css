@@ -200,3 +200,69 @@
   .body-area-map { grid-template-columns: 1fr; }
   .body-area-map__figure { min-height: 20rem; }
 }
+
+/* Authenticated body intelligence */
+.body-photo-wizard {
+  width: min(calc(100% - 2rem), 48rem);
+  margin: clamp(1rem, 4vw, 2.5rem) auto 7rem;
+  border-color: var(--fitsho-line);
+  color: var(--fitsho-ink);
+  background: var(--fitsho-surface);
+  box-shadow: var(--fitsho-shadow-focus);
+}
+
+.body-photo-wizard h1,
+.body-photo-wizard h2,
+.body-progress-page h1,
+.body-analysis-page__header h1 {
+  font-family: inherit;
+  font-size: clamp(2.15rem, 4.5vw, 3.5rem);
+  font-weight: 850;
+  letter-spacing: -.045em;
+  line-height: 1.08;
+}
+
+html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress-page h1, .body-analysis-page__header h1) { letter-spacing: 0; }
+.body-photo-clothing-guide, .body-analysis-warning { border-color: rgb(242 184 91 / 26%); color: var(--fitsho-ink); background: rgb(242 184 91 / 8%); }
+.body-photo-steps li, .body-photo-quality, .body-analysis-status, .body-photo-source-preview, .body-photo-camera { border-color: var(--fitsho-line); color: var(--fitsho-ink); background: var(--fitsho-surface-subtle); }
+.body-photo-steps li[aria-current="step"] { border-color: var(--fitsho-aqua); color: var(--fitsho-aqua); background: var(--fitsho-surface-interactive); }
+.body-photo-upload-control { border-color: var(--fitsho-line-strong); }
+.body-photo-modal { color: var(--fitsho-ink); background: var(--fitsho-surface); }
+.body-photo-link-button, .body-photo-skip, .body-progress-list a { color: var(--fitsho-aqua); }
+
+.body-progress-page.fitsho-page,
+.body-analysis-page.fitsho-page {
+  margin-block-start: 0;
+  padding-block-start: clamp(1.25rem, 3vw, 2rem);
+}
+
+.body-progress-page > header,
+.body-analysis-page__header {
+  border-block-end-color: var(--fitsho-line);
+}
+
+.body-progress-page > .primary-button { width: fit-content; min-height: 3.2rem; margin: .25rem 0 .5rem; }
+.body-progress-list { gap: .75rem; }
+.body-progress-list > li { min-width: 0; padding: 1rem; border-radius: var(--fitsho-radius-lg); background: linear-gradient(125deg, rgb(80 223 206 / 6%), var(--fitsho-surface)); box-shadow: var(--fitsho-shadow-soft); }
+.body-progress-list > li > div span, .body-progress-list > li > span { color: var(--fitsho-muted); font-size: .8rem; }
+.body-progress-list > li > a { min-height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; padding-inline: .8rem; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-pill); text-decoration: none; }
+
+.body-analysis-photos figure { overflow: hidden; padding: .4rem; border-radius: var(--fitsho-radius-lg); box-shadow: var(--fitsho-shadow-soft); }
+.body-analysis-overview { padding: 1.25rem; border-radius: var(--fitsho-radius-xl); background: linear-gradient(135deg, rgb(80 223 206 / 8%), var(--fitsho-surface)); box-shadow: var(--fitsho-shadow-soft); }
+.body-analysis-overview h2 { color: var(--fitsho-aqua); font-family: "Sora Variable", sans-serif; }
+.body-area-map { border-color: var(--fitsho-line-strong); border-radius: var(--fitsho-radius-xl); background: linear-gradient(145deg, rgb(80 223 206 / 7%), var(--fitsho-surface)); box-shadow: var(--fitsho-shadow-focus); }
+.body-area-map__figure { position: relative; overflow: hidden; background: radial-gradient(circle, rgb(80 223 206 / 12%), transparent 62%), var(--fitsho-canvas); }
+.body-area-map__figure::after { position: absolute; inset: 10% 18%; border: 1px solid rgb(80 223 206 / 12%); border-radius: 50%; filter: blur(.2px); content: ""; pointer-events: none; }
+.body-area-map li { background: rgb(255 255 255 / 2%); }
+.body-analysis-group, .body-checklist__area, .body-analysis-review, .body-analysis-disclaimer, .body-progress-comparison > ul > li { border-radius: var(--fitsho-radius-lg); box-shadow: var(--fitsho-shadow-soft); }
+
+@media (max-width: 640px) {
+  .body-photo-wizard,
+  .body-progress-page.fitsho-page,
+  .body-analysis-page.fitsho-page { width: min(calc(100% - 1.5rem), 72rem); padding: 1rem; }
+  .body-progress-page > header, .body-analysis-page__header { padding-block-start: .5rem; }
+  .body-progress-list > li { grid-template-columns: 1fr auto; gap: .65rem; }
+  .body-progress-list > li > a { grid-column: 1 / -1; }
+  .body-area-map { padding: .85rem; }
+  .body-area-map__figure { min-height: 18rem; }
+}

@@ -597,3 +597,92 @@ html[dir="rtl"] .profile-page-heading h1 {
     border-radius: 1.35rem 0.35rem 1.35rem 1.35rem;
   }
 }
+
+/* Authenticated profile surface */
+.profile-page-shell {
+  padding: 0 clamp(1rem, 3vw, 3rem) var(--fitsho-space-8);
+  color: var(--fitsho-ink);
+  background: var(--fitsho-canvas);
+}
+
+.profile-page-shell .member-page-background {
+  opacity: .12;
+  filter: saturate(.65) contrast(1.1);
+}
+
+.profile-page-main {
+  width: min(100%, 72rem);
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, .38fr);
+  gap: .85rem;
+  margin-block-start: clamp(1.25rem, 4vw, 3rem);
+}
+
+.profile-page-heading {
+  padding: clamp(1.4rem, 3vw, 2.25rem);
+  border: 1px solid var(--fitsho-line);
+  border-radius: var(--fitsho-radius-xl);
+  background: linear-gradient(135deg, rgb(80 223 206 / 8%), rgb(11 32 31 / 90%));
+  box-shadow: var(--fitsho-shadow-focus);
+  backdrop-filter: blur(12px);
+}
+
+.profile-page-heading h1 {
+  font-family: inherit;
+  font-size: clamp(2.2rem, 4.5vw, 3.6rem);
+  font-weight: 850;
+  letter-spacing: -.045em;
+  line-height: 1.08;
+}
+
+html[dir="rtl"] .profile-page-heading h1 { letter-spacing: 0; }
+.profile-page-heading > p:last-child { color: var(--fitsho-muted); }
+
+.measurement-card {
+  min-height: 10rem;
+  justify-content: center;
+  padding: 1.25rem;
+  border: 1px solid var(--fitsho-line);
+  border-radius: var(--fitsho-radius-xl);
+  color: var(--fitsho-ink);
+  background: var(--fitsho-surface);
+  box-shadow: var(--fitsho-shadow-soft);
+}
+
+.measurement-card:first-of-type { border-color: var(--fitsho-line-strong); background: linear-gradient(135deg, rgb(80 223 206 / 12%), var(--fitsho-surface)); }
+.measurement-card strong { color: var(--fitsho-aqua); font-family: "Sora Variable", sans-serif; font-size: clamp(1.6rem, 3vw, 2.5rem); }
+.measurement-card p, .measurement-card span { color: var(--fitsho-muted); }
+.measurement-card .secondary-button { width: fit-content; margin-block-start: .75rem; }
+
+.profile-wizard .profile-progress,
+.profile-wizard__page {
+  border-color: var(--fitsho-line);
+  color: var(--fitsho-ink);
+  background: rgb(11 32 31 / 94%);
+  box-shadow: var(--fitsho-shadow-soft);
+}
+
+.profile-wizard .profile-progress { backdrop-filter: blur(12px); }
+.profile-progress ol::before { background: var(--fitsho-line); }
+.profile-progress li > span { border-color: var(--fitsho-line); color: var(--fitsho-muted); background: var(--fitsho-surface-raised); }
+.profile-progress li > strong { color: var(--fitsho-muted); }
+.profile-progress li.is-active > span { color: var(--fitsho-canvas); background: var(--fitsho-aqua); }
+.profile-progress li.is-active > strong { color: var(--fitsho-ink); }
+.profile-wizard__page > h2 { color: var(--fitsho-ink); font-family: inherit; font-size: clamp(1.55rem, 3vw, 2.25rem); font-weight: 850; }
+.profile-fieldset { border-color: var(--fitsho-line); background: var(--fitsho-surface-subtle); box-shadow: none; }
+.profile-fieldset legend { color: var(--fitsho-aqua); }
+.profile-field :is(input, select, textarea) { border-color: var(--fitsho-line); color: var(--fitsho-ink); background: var(--fitsho-canvas); }
+.profile-field__hint { color: var(--fitsho-muted); }
+.profile-wizard__actions { background: linear-gradient(transparent, rgb(11 32 31 / 98%) 30%); }
+.profile-optional-state { border-color: var(--fitsho-line-strong); color: var(--fitsho-ink); background: var(--fitsho-surface-interactive); }
+
+@media (max-width: 900px) {
+  .profile-page-main { grid-template-columns: 1fr; }
+  .measurement-card { min-height: 8rem; }
+}
+
+@media (max-width: 620px) {
+  .profile-page-shell { padding-inline: .75rem; }
+  .profile-page-heading, .measurement-card, .profile-wizard__page, .profile-wizard .profile-progress { border-radius: 1.15rem; }
+  .profile-wizard__page { max-height: none; overflow: visible; padding: .9rem; }
+  .profile-edit-form { grid-template-columns: 1fr; }
+}

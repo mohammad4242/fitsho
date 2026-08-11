@@ -23,7 +23,7 @@ export function BodyProgressPage() {
     {sessions === null && !failed && <p role="status">{t("bodyPhotos.loading")}</p>}
     {failed && <p className="form-error" role="alert">{t("bodyPhotos.errors.load")}</p>}
     {sessions?.length === 0 && <p>{t("bodyPhotos.empty")}</p>}
-    <ul className="body-progress-list">
+    <ul className="body-progress-list" aria-label={t("bodyPhotos.progressTitle")}>
       {sessions?.map((session) => <li key={session.id}><div><strong>{new Intl.DateTimeFormat().format(new Date(session.created_at))}</strong><span>{t(`bodyPhotos.status.${session.state}`)}</span></div><span>{session.photos.length}/3</span><Link to={`/body-progress/${session.id}`}>{t("bodyPhotos.results.viewAnalysis")}</Link></li>)}
     </ul>
   </main>;

@@ -292,8 +292,8 @@ function ReadyProfilePage({
           <ProfileProgress section={section} language={language} />
 
           {section !== "nutrition" && (
-            <form className="profile-form profile-edit-form profile-wizard__page" noValidate onSubmit={handleSubmit}>
-              <h2 className="fitsho-display">{section === "personal"
+            <form className="profile-form profile-edit-form profile-wizard__page" aria-labelledby="profile-active-section" noValidate onSubmit={handleSubmit}>
+              <h2 className="fitsho-display" id="profile-active-section">{section === "personal"
                 ? l("اطلاعات شخصی", "Personal information")
                 : l("اطلاعات تمرینی", "Training information")}</h2>
 
