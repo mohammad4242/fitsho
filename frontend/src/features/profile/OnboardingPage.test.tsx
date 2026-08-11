@@ -10,6 +10,12 @@ import {
 import { beforeEach, expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
+import type { SafetyProfileInput } from "../nutrition/types";
+import {
+  PENDING_NUTRITION_BASICS_KEY,
+  type OnboardingDraft,
+  type PreAccountNutritionBasics,
+} from "../publicOnboarding/onboardingDraft";
 import type { Profile } from "./types";
 
 const profileContext = vi.hoisted(() => ({
@@ -25,6 +31,8 @@ const authContext = vi.hoisted(() => ({
   logout: vi.fn(),
 }));
 
+const nutritionFlow = vi.hoisted(() => ({ props: null as unknown }));
+
 vi.mock("./ProfileContext", () => ({
   useProfile: () => ({
     profile: null,
@@ -35,6 +43,13 @@ vi.mock("./ProfileContext", () => ({
 
 vi.mock("../auth/AuthContext", () => ({
   useAuth: () => authContext,
+}));
+
+vi.mock("../nutrition/NutritionOnboardingFlow", () => ({
+  NutritionOnboardingFlow: (props: unknown) => {
+    nutritionFlow.props = props;
+    return <h1>Nutrition flow</h1>;
+  },
 }));
 
 import { OnboardingPage } from "./OnboardingPage";
@@ -118,10 +133,52 @@ async function completeExperienceFields(user: UserEvent) {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  sessionStorage.clear();
+  nutritionFlow.props = null;
   authContext.logout.mockResolvedValue(undefined);
   profileContext.status = "mode_selected";
   profileContext.productMode = "training";
   await i18n.changeLanguage("fa");
+});
+
+it("resumes pending nutrition safety data after registration", () => {
+  const safety: SafetyProfileInput = {
+    conditions: [{ code: "type_2_diabetes_non_insulin", details: null }],
+    medications: [],
+    dangerous_food_reaction_history: false,
+    pregnant: true,
+    breastfeeding: false,
+    eating_disorder_diagnosed: false,
+    eating_disorder_active_symptoms: false,
+    emergency_or_danger_symptoms: false,
+    complex_medication_food_interaction: false,
+    physician_dietary_restrictions: null,
+    other_relevant_condition: null,
+  };
+  const nutritionBasics: PreAccountNutritionBasics = {
+    daily_activity_level: "moderate",
+    individual_monthly_food_budget_irr: 8_000_000,
+    budget_style: "flexible",
+    plan_style: "balanced",
+    allergies: [],
+    intolerances: [],
+    dietary_pattern: "omnivore",
+  };
+  sessionStorage.setItem(
+    PENDING_NUTRITION_BASICS_KEY,
+    JSON.stringify({ safety, nutritionBasics }),
+  );
+  profileContext.productMode = "nutrition";
+
+  renderOnboarding();
+
+  expect(screen.getByRole("heading", { name: "Nutrition flow" })).toBeInTheDocument();
+  const props = nutritionFlow.props as {
+    initialDraft?: OnboardingDraft;
+    initialNutritionBasics?: PreAccountNutritionBasics;
+  };
+  expect(props.initialDraft).toMatchObject({ mode: "nutrition", safety });
+  expect(props.initialNutritionBasics).toEqual(nutritionBasics);
 });
 
 it("logs out from onboarding and returns to the public landing", async () => {

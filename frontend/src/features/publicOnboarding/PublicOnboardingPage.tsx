@@ -172,7 +172,7 @@ function FinalAccountStep({ draft, language, onEdit }: { draft: OnboardingDraft;
       : (accountMode === "register" ? register(credentials) : login(credentials));
     void authenticate
       .then(() => hydrateOnboardingDraft(draft))
-      .then(() => navigate("/dashboard", { replace: true }))
+      .then(() => navigate(draft.mode === "training" ? "/dashboard" : "/onboarding", { replace: true }))
       .catch((reason: unknown) => setError(authErrorMessage(reason, t)))
       .finally(() => setBusy(false));
   }

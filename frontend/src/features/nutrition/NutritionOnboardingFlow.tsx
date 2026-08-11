@@ -23,6 +23,7 @@ import { GuidedTrainingQuestions } from "../publicOnboarding/GuidedTrainingQuest
 import { NutritionExerciseQuestions } from "./NutritionExerciseQuestions";
 import { formatTomanInput, irrToToman, tomanToIrr } from "./money";
 import type { StructuredExerciseInput } from "./types";
+import "./nutritionOnboarding.css";
 
 type FlowStep =
   | "loading"
@@ -140,19 +141,19 @@ export function NutritionOnboardingFlow({
   const [requestError, setRequestError] = useState(false);
   const [detailsSaved, setDetailsSaved] = useState(false);
   const [decision, setDecision] = useState<SafetyDecision | SafetyEvaluation | null>(null);
-  const [conditions, setConditions] = useState<MedicalConditionCode[]>([]);
+  const [conditions, setConditions] = useState<MedicalConditionCode[]>(() => initialDraft?.safety?.conditions.map((item) => item.code) ?? []);
   const [safetyFlags, setSafetyFlags] = useState({
-    dangerous_food_reaction_history: false,
-    pregnant: false,
-    breastfeeding: false,
-    eating_disorder_diagnosed: false,
-    eating_disorder_active_symptoms: false,
-    emergency_or_danger_symptoms: false,
-    complex_medication_food_interaction: false,
+    dangerous_food_reaction_history: initialDraft?.safety?.dangerous_food_reaction_history ?? false,
+    pregnant: initialDraft?.safety?.pregnant ?? false,
+    breastfeeding: initialDraft?.safety?.breastfeeding ?? false,
+    eating_disorder_diagnosed: initialDraft?.safety?.eating_disorder_diagnosed ?? false,
+    eating_disorder_active_symptoms: initialDraft?.safety?.eating_disorder_active_symptoms ?? false,
+    emergency_or_danger_symptoms: initialDraft?.safety?.emergency_or_danger_symptoms ?? false,
+    complex_medication_food_interaction: initialDraft?.safety?.complex_medication_food_interaction ?? false,
   });
-  const [medications, setMedications] = useState("");
-  const [physicianRestrictions, setPhysicianRestrictions] = useState("");
-  const [otherCondition, setOtherCondition] = useState("");
+  const [medications, setMedications] = useState(() => initialDraft?.safety?.medications.map((item) => item.name).join(", ") ?? "");
+  const [physicianRestrictions, setPhysicianRestrictions] = useState(() => initialDraft?.safety?.physician_dietary_restrictions ?? "");
+  const [otherCondition, setOtherCondition] = useState(() => initialDraft?.safety?.other_relevant_condition ?? "");
   const [dailyActivityLevel, setDailyActivityLevel] = useState<NutritionProfileInput["daily_activity_level"]>(() => initialNutritionBasics?.daily_activity_level ?? "moderate");
   const [structuredExercise, setStructuredExercise] = useState<StructuredExerciseInput | undefined>(() => initialDraft?.structuredExercise);
   const [budget, setBudget] = useState(() => initialNutritionBasics === undefined ? "" : irrToToman(initialNutritionBasics.individual_monthly_food_budget_irr));
@@ -304,7 +305,7 @@ export function NutritionOnboardingFlow({
       if (draftMode) onDraftChange?.({ safety: input });
       setDecision(result);
       if (!result.can_continue_onboarding) setStep("blocked");
-      else setStep(productMode === "nutrition" || !trainingProfileExists ? "training" : "budget");
+      else setStep((productMode === "nutrition" && structuredExercise === undefined) || !trainingProfileExists ? "training" : "budget");
     }).catch(() => setRequestError(true)).finally(() => setBusy(false));
   }
 
@@ -501,11 +502,12 @@ export function NutritionOnboardingFlow({
           onOtherCondition={setOtherCondition}
           onComplete={saveSafety}
           onBack={() => setStep("personal")}
+          startAfterMedical={!draftMode && initialDraft?.safety !== undefined}
         />
       )}
       {step === "pre_account" && <PreAccountNutritionQuestions
-          busy={busy} conditions={conditions} flags={safetyFlags} foods={foods} budget={budget} dailyActivityLevel={dailyActivityLevel}
-        onConditions={setConditions} onFlags={setSafetyFlags} onFoods={setFoods} onBudget={(value) => setBudget(formatTomanInput(value))}
+          busy={busy} conditions={conditions} foods={foods} budget={budget} dailyActivityLevel={dailyActivityLevel}
+        onConditions={setConditions} onFoods={setFoods} onBudget={(value) => setBudget(formatTomanInput(value))}
         onDailyActivityLevel={setDailyActivityLevel}
         onBack={() => setStep("training")}
         onComplete={() => onDraftComplete?.({ safety: safetyInput(), structuredExercise, nutritionBasics: {
@@ -697,9 +699,11 @@ function SafetyForm(props: {
   onConditions: (value: MedicalConditionCode[]) => void; onFlags: (value: Flags) => void;
   onMedications: (value: string) => void; onPhysicianRestrictions: (value: string) => void;
   onOtherCondition: (value: string) => void; onFoods: (value: FoodsState) => void; onComplete: () => void; onBack: () => void;
+  startAfterMedical?: boolean;
 }) {
   const l = useLocalizer();
-  const [question, setQuestion] = useState(0);
+  const firstQuestion = props.startAfterMedical ? 1 : 0;
+  const [question, setQuestion] = useState(firstQuestion);
   const titles = [
     l("آیا شرایط پزشکی مشخصی داری؟", "Do you have any medical conditions?"),
     l("کدام موارد ایمنی دربارهٔ تو صدق می‌کند؟", "Do any of these safety considerations apply?"),
@@ -709,19 +713,19 @@ function SafetyForm(props: {
     l("حساسیت یا عدم‌تحمل غذایی داری؟", "Do you have food allergies or intolerances?"),
   ];
   const advance = () => question === titles.length - 1 ? props.onComplete() : setQuestion((current) => current + 1);
-  const back = () => question === 0 ? props.onBack() : setQuestion((current) => current - 1);
+  const back = () => question === firstQuestion ? props.onBack() : setQuestion((current) => current - 1);
   return (
     <NutritionQuestionFrame busy={props.busy} current={question} total={titles.length} title={titles[question]} stage={0}
       optional={question >= 2} nextLabel={question === titles.length - 1 ? l("ثبت ارزیابی ایمنی", "Save safety assessment") : undefined}
       onBack={back} onSubmit={advance}>
-        {question === 0 && <div className="profile-checkboxes">
+        {question === 0 && <div className="profile-checkboxes nutrition-option-grid">
           {conditionOptions.map(([code, fa, en]) => (
-            <label key={code}><input type="checkbox" checked={props.conditions.includes(code)}
+            <label className="nutrition-option" key={code}><input type="checkbox" checked={props.conditions.includes(code)}
               onChange={() => props.onConditions(props.conditions.includes(code)
                 ? props.conditions.filter((item) => item !== code) : [...props.conditions, code])} />{l(fa, en)}</label>
           ))}
         </div>}
-        {question === 1 && <div className="profile-checkboxes">{([
+        {question === 1 && <div className="profile-checkboxes nutrition-option-grid">{([
           ["dangerous_food_reaction_history", "سابقه واکنش خطرناک غذایی", "History of dangerous food reaction"],
           ["pregnant", "بارداری", "Pregnant"], ["breastfeeding", "شیردهی", "Breastfeeding"],
           ["eating_disorder_diagnosed", "تشخیص اختلال خوردن", "Diagnosed eating disorder"],
@@ -729,21 +733,21 @@ function SafetyForm(props: {
           ["complex_medication_food_interaction", "تداخل پیچیده دارو و غذا", "Complex medication-food interaction"],
           ["emergency_or_danger_symptoms", "علائم خطر یا وضعیت اورژانسی", "Emergency or danger symptoms"],
         ] as const).map(([field, fa, en]) => (
-          <label className="nutrition-check" key={field}><input type="checkbox" checked={props.flags[field]}
+          <label className="nutrition-check nutrition-option" key={field}><input type="checkbox" checked={props.flags[field]}
             onChange={(event) => props.onFlags({ ...props.flags, [field]: event.target.checked })} />{l(fa, en)}</label>
         ))}</div>}
         {question === 2 && <TextArea label={l("داروهای فعلی (اختیاری، هر دارو یک خط)", "Current medications (optional, one per line)")} value={props.medications} onChange={props.onMedications} />}
         {question === 3 && <TextArea label={l("محدودیت غذایی تجویزشده توسط پزشک (اختیاری)", "Physician-prescribed dietary restrictions (optional)")} value={props.physicianRestrictions} onChange={props.onPhysicianRestrictions} />}
         {question === 4 && <TextArea label={l("شرایط مرتبط دیگر (اختیاری)", "Other relevant conditions (optional)")} value={props.otherCondition} onChange={props.onOtherCondition} />}
-        {question === 5 && <><TextArea label={l("حساسیت‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food allergies (optional, comma separated)")} value={props.foods.allergies} onChange={(allergies) => props.onFoods({ ...props.foods, allergies })} /><TextArea label={l("عدم‌تحمل‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food intolerances (optional, comma separated)")} value={props.foods.intolerances} onChange={(intolerances) => props.onFoods({ ...props.foods, intolerances })} /></>}
+        {question === 5 && <div className="nutrition-allergy-fields"><TextArea label={l("حساسیت‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food allergies (optional, comma separated)")} value={props.foods.allergies} onChange={(allergies) => props.onFoods({ ...props.foods, allergies })} /><TextArea label={l("عدم‌تحمل‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food intolerances (optional, comma separated)")} value={props.foods.intolerances} onChange={(intolerances) => props.onFoods({ ...props.foods, intolerances })} /></div>}
     </NutritionQuestionFrame>
   );
 }
 
 function PreAccountNutritionQuestions(props: {
-  busy: boolean; conditions: MedicalConditionCode[]; flags: Flags; foods: FoodsState; budget: string;
+  busy: boolean; conditions: MedicalConditionCode[]; foods: FoodsState; budget: string;
   dailyActivityLevel: NutritionProfileInput["daily_activity_level"];
-  onConditions: (value: MedicalConditionCode[]) => void; onFlags: (value: Flags) => void;
+  onConditions: (value: MedicalConditionCode[]) => void;
   onFoods: (value: FoodsState) => void; onBudget: (value: string) => void;
   onDailyActivityLevel: (value: NutritionProfileInput["daily_activity_level"]) => void; onBack: () => void; onComplete: () => void;
 }) {
@@ -751,23 +755,17 @@ function PreAccountNutritionQuestions(props: {
   const [question, setQuestion] = useState(0);
   const titles = [
     l("آیا شرایط پزشکی مشخصی داری؟", "Do you have any medical conditions?"),
-    l("کدام موارد ایمنی دربارهٔ تو صدق می‌کند؟", "Do any of these safety considerations apply?"),
-    l("حساسیت یا عدم‌تحمل غذایی داری؟", "Do you have food allergies or intolerances?"),
     l("میزان فعالیت روزانه‌ات چقدر است؟", "How active are you on a typical day?"),
     l("بودجه ماهانه غذای تو چقدر است؟", "What is your monthly food budget?"),
     l("چه سبک غذایی را ترجیح می‌دهی؟", "Which food style do you prefer?"),
   ];
   const advance = () => question === titles.length - 1 ? props.onComplete() : setQuestion((current) => current + 1);
   const back = () => question === 0 ? props.onBack() : setQuestion((current) => current - 1);
-  return <NutritionQuestionFrame busy={props.busy} current={question} total={titles.length} title={titles[question]} stage={question < 2 ? 0 : question < 5 ? 1 : 2} optional={question === 2} nextLabel={question === titles.length - 1 ? l("ادامه و ساخت حساب", "Continue to account setup") : undefined} onBack={back} onSubmit={advance}>
-    {question === 0 && <div className="profile-checkboxes">{conditionOptions.map(([code, fa, en]) => <label key={code}><input type="checkbox" checked={props.conditions.includes(code)} onChange={() => props.onConditions(props.conditions.includes(code) ? props.conditions.filter((item) => item !== code) : [...props.conditions, code])} />{l(fa, en)}</label>)}</div>}
-    {question === 1 && <div className="profile-checkboxes">{([
-      ["dangerous_food_reaction_history", "سابقه واکنش خطرناک غذایی", "History of dangerous food reaction"], ["pregnant", "بارداری", "Pregnant"], ["breastfeeding", "شیردهی", "Breastfeeding"], ["eating_disorder_diagnosed", "تشخیص اختلال خوردن", "Diagnosed eating disorder"], ["eating_disorder_active_symptoms", "علائم فعال اختلال خوردن", "Active eating-disorder symptoms"], ["complex_medication_food_interaction", "تداخل پیچیده دارو و غذا", "Complex medication-food interaction"], ["emergency_or_danger_symptoms", "علائم خطر یا وضعیت اورژانسی", "Emergency or danger symptoms"],
-    ] as const).map(([field, fa, en]) => <label className="nutrition-check" key={field}><input type="checkbox" checked={props.flags[field]} onChange={(event) => props.onFlags({ ...props.flags, [field]: event.target.checked })} />{l(fa, en)}</label>)}</div>}
-    {question === 2 && <><TextArea label={l("حساسیت‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food allergies (optional, comma separated)")} value={props.foods.allergies} onChange={(allergies) => props.onFoods({ ...props.foods, allergies })} /><TextArea label={l("عدم‌تحمل‌های غذایی (اختیاری، با ویرگول جدا کن)", "Food intolerances (optional, comma separated)")} value={props.foods.intolerances} onChange={(intolerances) => props.onFoods({ ...props.foods, intolerances })} /></>}
-    {question === 3 && <SelectField label={l("فعالیت روزانه", "Daily activity")} value={props.dailyActivityLevel} onChange={(value) => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"])} options={[["sedentary", l("کم‌تحرک", "Mostly sedentary")], ["light", l("کمی فعال", "Lightly active")], ["moderate", l("فعالیت متوسط", "Moderately active")], ["very_active", l("بسیار فعال", "Very active")]]} />}
-    {question === 4 && <LabeledInput label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")} inputMode="numeric" required value={props.budget} onChange={props.onBudget} />}
-    {question === 5 && <SelectField label={l("سبک غذا", "Food style")} value={props.foods.dietaryPattern} onChange={(dietaryPattern) => props.onFoods({ ...props.foods, dietaryPattern: dietaryPattern as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />}
+  return <NutritionQuestionFrame busy={props.busy} current={question} total={titles.length} title={titles[question]} stage={question === 0 ? 0 : question < 3 ? 1 : 2} nextLabel={question === titles.length - 1 ? l("ادامه و ساخت حساب", "Continue to account setup") : undefined} onBack={back} onSubmit={advance}>
+    {question === 0 && <div className="profile-checkboxes nutrition-option-grid">{conditionOptions.map(([code, fa, en]) => <label className="nutrition-option" key={code}><input type="checkbox" checked={props.conditions.includes(code)} onChange={() => props.onConditions(props.conditions.includes(code) ? props.conditions.filter((item) => item !== code) : [...props.conditions, code])} />{l(fa, en)}</label>)}</div>}
+    {question === 1 && <SelectField label={l("فعالیت روزانه", "Daily activity")} value={props.dailyActivityLevel} onChange={(value) => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"])} options={[["sedentary", l("کم‌تحرک", "Mostly sedentary")], ["light", l("کمی فعال", "Lightly active")], ["moderate", l("فعالیت متوسط", "Moderately active")], ["very_active", l("بسیار فعال", "Very active")]]} />}
+    {question === 2 && <LabeledInput label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")} inputMode="numeric" required value={props.budget} onChange={props.onBudget} />}
+    {question === 3 && <SelectField label={l("سبک غذا", "Food style")} value={props.foods.dietaryPattern} onChange={(dietaryPattern) => props.onFoods({ ...props.foods, dietaryPattern: dietaryPattern as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />}
   </NutritionQuestionFrame>;
 }
 
@@ -814,7 +812,7 @@ function LabeledInput(props: { label: string; value: string; onChange: (value: s
 }
 
 function TextArea(props: { label: string; value: string; onChange: (value: string) => void }) {
-  return <div className="profile-field"><label>{props.label}<textarea value={props.value} onChange={(event) => props.onChange(event.target.value)} /></label></div>;
+  return <div className="profile-field nutrition-question__field"><label>{props.label}<textarea className="nutrition-question__textarea" dir="auto" value={props.value} onChange={(event) => props.onChange(event.target.value)} /></label></div>;
 }
 
 function SelectField(props: { label: string; value: string; options: Array<[string, string]>; onChange: (value: string) => void }) {

@@ -194,6 +194,50 @@ it("lets nutrition-only members opt out of training before medical questions", a
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   expect(await screen.findByRole("heading", { name: "آیا شرایط پزشکی مشخصی داری؟" })).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "چند روز در هفته تمرین می‌کنی؟" })).not.toBeInTheDocument();
+
+  expect(screen.queryByText("کدام موارد ایمنی دربارهٔ تو صدق می‌کند؟")).not.toBeInTheDocument();
+  expect(screen.queryByText("حساسیت یا عدم‌تحمل غذایی داری؟")).not.toBeInTheDocument();
+  await user.click(screen.getByLabelText("بیماری کلیه"));
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  expect(await screen.findByRole("heading", { name: "میزان فعالیت روزانه‌ات چقدر است؟" })).toBeInTheDocument();
+});
+
+it("resumes moved safety and allergy questions after registration", async () => {
+  vi.mocked(profileApi.getSharedProfile).mockResolvedValue({
+    user_id: "user-1", product_mode: "nutrition", display_name: "سارا",
+    birth_date: "2000-05-14", sex: "female", height_cm: 165,
+    current_weight_kg: 62.5, fitness_goal: "fat_loss",
+    weight_measured_at: "2026-08-05T12:00:00Z",
+  });
+  const user = userEvent.setup();
+  render(
+    <NutritionOnboardingFlow
+      productMode="nutrition"
+      initialDraft={{
+        mode: "nutrition",
+        safety: {
+          conditions: [{ code: "kidney_disease", details: null }], medications: [],
+          dangerous_food_reaction_history: false, pregnant: false, breastfeeding: false,
+          eating_disorder_diagnosed: false, eating_disorder_active_symptoms: false,
+          emergency_or_danger_symptoms: false, complex_medication_food_interaction: false,
+          physician_dietary_restrictions: null, other_relevant_condition: null,
+        },
+      }}
+      onCreateTrainingProfile={vi.fn()}
+      onComplete={vi.fn()}
+    />,
+  );
+
+  expect(await screen.findByRole("heading", { name: "کدام موارد ایمنی دربارهٔ تو صدق می‌کند؟" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "آیا شرایط پزشکی مشخصی داری؟" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.click(screen.getByRole("button", { name: "رد کردن این سؤال" }));
+  await user.click(screen.getByRole("button", { name: "رد کردن این سؤال" }));
+  await user.click(screen.getByRole("button", { name: "رد کردن این سؤال" }));
+
+  expect(await screen.findByRole("heading", { name: "حساسیت یا عدم‌تحمل غذایی داری؟" })).toBeInTheDocument();
+  expect(screen.getByLabelText(/حساسیت‌های غذایی/)).toHaveClass("nutrition-question__textarea");
+  expect(screen.getByLabelText(/عدم‌تحمل‌های غذایی/)).toHaveClass("nutrition-question__textarea");
 });
 
 it("shows essential and remaining nutrition details together after account creation", async () => {

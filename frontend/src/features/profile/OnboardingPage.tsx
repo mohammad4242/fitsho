@@ -6,6 +6,10 @@ import { AuthShell } from "../../shared/AuthShell";
 import { useAuth } from "../auth/AuthContext";
 import { NutritionOnboardingFlow } from "../nutrition/NutritionOnboardingFlow";
 import {
+  clearPendingNutritionBasics,
+  loadPendingNutritionSetup,
+} from "../publicOnboarding/onboardingDraft";
+import {
   BodyGoalFields,
   ExperienceFields,
   PersonalFields,
@@ -135,6 +139,7 @@ export function OnboardingPage() {
 
   const locale = i18n.resolvedLanguage === "en" ? "en" : "fa-IR";
   const numberFormat = new Intl.NumberFormat(locale);
+  const pendingNutritionSetup = loadPendingNutritionSetup();
 
   if (status === "missing") {
     return (
@@ -169,8 +174,15 @@ export function OnboardingPage() {
           <NutritionOnboardingFlow
             productMode={productMode}
             trainingProfileExists={profile !== null}
+            initialDraft={pendingNutritionSetup === null ? undefined : {
+              mode: productMode,
+              safety: pendingNutritionSetup.safety,
+              structuredExercise: pendingNutritionSetup.structuredExercise,
+            }}
+            initialNutritionBasics={pendingNutritionSetup?.nutritionBasics}
             onCreateTrainingProfile={createProfile}
             onComplete={retryProfile}
+            onNutritionComplete={clearPendingNutritionBasics}
             editExisting
           />
         </main>

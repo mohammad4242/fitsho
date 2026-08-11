@@ -1,5 +1,4 @@
-import * as nutritionApi from "../nutrition/api";
-import type { NutritionProfileInput, SafetyProfileInput } from "../nutrition/types";
+import type { NutritionProfileInput, SafetyProfileInput, StructuredExerciseInput } from "../nutrition/types";
 import * as profileApi from "../profile/api";
 import type { ProductMode, ProfileInput, SharedProfileInput } from "../profile/types";
 
@@ -13,6 +12,12 @@ export type PreAccountNutritionBasics = Pick<
   "daily_activity_level" | "individual_monthly_food_budget_irr" | "budget_style" | "plan_style" | "allergies" | "intolerances" | "dietary_pattern"
 >;
 
+export type PendingNutritionSetup = {
+  safety: SafetyProfileInput;
+  nutritionBasics: PreAccountNutritionBasics;
+  structuredExercise?: StructuredExerciseInput;
+};
+
 export type OnboardingDraft = {
   mode: ProductMode;
   shared?: SharedProfileInput;
@@ -20,6 +25,7 @@ export type OnboardingDraft = {
   training?: ProfileInput;
   nutrition?: NutritionProfileInput;
   nutritionBasics?: PreAccountNutritionBasics;
+  structuredExercise?: StructuredExerciseInput;
   readyForAuth?: boolean;
 };
 
@@ -48,9 +54,13 @@ export function clearOnboardingDraft(): void {
 }
 
 export function loadPendingNutritionBasics(): PreAccountNutritionBasics | null {
+  return loadPendingNutritionSetup()?.nutritionBasics ?? null;
+}
+
+export function loadPendingNutritionSetup(): PendingNutritionSetup | null {
   const stored = sessionStorage.getItem(PENDING_NUTRITION_BASICS_KEY);
   if (stored === null) return null;
-  try { return JSON.parse(stored) as PreAccountNutritionBasics; } catch { sessionStorage.removeItem(PENDING_NUTRITION_BASICS_KEY); return null; }
+  try { return JSON.parse(stored) as PendingNutritionSetup; } catch { sessionStorage.removeItem(PENDING_NUTRITION_BASICS_KEY); return null; }
 }
 
 export function clearPendingNutritionBasics(): void {
@@ -85,8 +95,15 @@ export async function hydrateOnboardingDraft(draft: OnboardingDraft): Promise<vo
   if (draft.training !== undefined) {
     await profileApi.createProfile(draft.training);
   }
-  await nutritionApi.saveSafetyProfile(draft.safety);
-  await nutritionApi.saveNutritionProfile(starterNutritionProfile(draft.nutritionBasics));
+  if (draft.mode === "nutrition" && draft.structuredExercise === undefined) {
+    throw new Error("Structured exercise draft is incomplete");
+  }
+  const pending: PendingNutritionSetup = {
+    safety: draft.safety,
+    nutritionBasics: draft.nutritionBasics,
+    ...(draft.structuredExercise === undefined ? {} : { structuredExercise: draft.structuredExercise }),
+  };
+  sessionStorage.setItem(PENDING_NUTRITION_BASICS_KEY, JSON.stringify(pending));
   markAccountHydrated();
   clearOnboardingDraft();
 }
@@ -94,41 +111,4 @@ export async function hydrateOnboardingDraft(draft: OnboardingDraft): Promise<vo
 function markAccountHydrated(): void {
   sessionStorage.setItem(HYDRATED_ACCOUNT_KEY, "true");
   window.dispatchEvent(new Event(HYDRATED_ACCOUNT_EVENT));
-}
-
-function starterNutritionProfile(basics: PreAccountNutritionBasics): NutritionProfileInput {
-  return {
-    daily_activity_level: basics.daily_activity_level,
-    individual_monthly_food_budget_irr: basics.individual_monthly_food_budget_irr,
-    budget_style: basics.budget_style,
-    meals_per_day: 3,
-    snacks_per_day: 1,
-    preferred_plan_start_day: "saturday",
-    plan_style: basics.plan_style,
-    cooking_skill: "basic",
-    maximum_cooking_time_minutes: 45,
-    cooking_frequency_per_week: 4,
-    meal_preparation_preference: "mixed",
-    refrigerator_access: true,
-    freezer_access: true,
-    cooking_equipment: ["stove", "refrigerator"],
-    supplied_meals_per_week: 0,
-    supplied_meal_source: null,
-    foods_available_at_home: [],
-    favourite_foods: [],
-    disliked_foods: [],
-    never_suggest_foods: [],
-    refused_foods: [],
-    allergies: basics.allergies,
-    intolerances: basics.intolerances,
-    dietary_pattern: basics.dietary_pattern,
-    religious_cultural_exclusions: [],
-    preferred_variety: "medium",
-    maximum_meal_repetition_per_week: 2,
-    accepts_leftovers: true,
-    accepts_batch_cooking: true,
-    work_shift_context: null,
-    daily_check_in_enabled: false,
-    preferred_check_in_time: null,
-  };
 }

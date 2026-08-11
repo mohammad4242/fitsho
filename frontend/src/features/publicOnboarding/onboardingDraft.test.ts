@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 import * as nutritionApi from "../nutrition/api";
 import * as profileApi from "../profile/api";
-import { clearOnboardingDraft, HYDRATED_ACCOUNT_KEY, hydrateOnboardingDraft, loadOnboardingDraft, saveOnboardingDraft } from "./onboardingDraft";
+import { clearOnboardingDraft, HYDRATED_ACCOUNT_KEY, hydrateOnboardingDraft, loadOnboardingDraft, loadPendingNutritionSetup, saveOnboardingDraft } from "./onboardingDraft";
 
 vi.mock("../nutrition/api");
 vi.mock("../profile/api");
@@ -73,7 +73,7 @@ it("preserves the draft when server hydration fails", async () => {
   expect(loadOnboardingDraft()).toEqual(draft);
 });
 
-it("creates the starter nutrition profile during account hydration", async () => {
+it("keeps nutrition safety and basics pending for post-registration completion", async () => {
   const draft = {
     mode: "nutrition" as const,
     shared: {
@@ -91,15 +91,18 @@ it("creates the starter nutrition profile during account hydration", async () =>
       individual_monthly_food_budget_irr: 13_000_000, budget_style: "strict" as const,
       plan_style: "balanced" as const, allergies: [], intolerances: [], dietary_pattern: "omnivore" as const,
     },
+    structuredExercise: { trains: false as const },
   };
 
   await hydrateOnboardingDraft(draft);
 
-  expect(nutritionApi.saveNutritionProfile).toHaveBeenCalledWith(expect.objectContaining({
-    daily_activity_level: "moderate",
-    individual_monthly_food_budget_irr: 13_000_000,
-    dietary_pattern: "omnivore",
-    allergies: [],
-    intolerances: [],
-  }));
+  expect(nutritionApi.saveSafetyProfile).not.toHaveBeenCalled();
+  expect(nutritionApi.saveNutritionProfile).not.toHaveBeenCalled();
+  expect(nutritionApi.saveStructuredExercise).not.toHaveBeenCalled();
+  expect(nutritionApi.createNutritionEstimate).not.toHaveBeenCalled();
+  expect(loadPendingNutritionSetup()).toEqual({
+    safety: draft.safety,
+    nutritionBasics: draft.nutritionBasics,
+    structuredExercise: draft.structuredExercise,
+  });
 });
