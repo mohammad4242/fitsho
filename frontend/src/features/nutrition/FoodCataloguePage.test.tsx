@@ -45,6 +45,15 @@ const response: api.FoodCatalogueResponse = {
       },
       nutrients: [
         {
+          nutrient_code: "fibre_g",
+          value_per_100g: 0,
+          unit: "g",
+          unit_form: "nutrient_mass",
+          source_name: "USDA FoodData Central",
+          source_reference: "https://fdc.nal.usda.gov/",
+          confidence: "high",
+        },
+        {
           nutrient_code: "iron_mg",
           value_per_100g: 0.37,
           unit: "mg",
@@ -106,7 +115,11 @@ it("shows nutrient data and never shows catalogue price information to a member"
     "src",
     "/media/food-catalogue/chicken.png",
   );
-  expect(screen.getByText("فیبر")).toBeVisible();
+  expect(screen.queryByText("فیبر")).not.toBeInTheDocument();
+  expect(screen.getByText("کالری")).toBeVisible();
+  expect(screen.getByText("پروتئین")).toBeVisible();
+  expect(screen.getByText("کربوهیدرات")).toBeVisible();
+  expect(screen.getByText("چربی")).toBeVisible();
   expect(screen.queryByText("یافت نشد")).not.toBeInTheDocument();
   expect(screen.getByText("۱۱٫۳ گرم")).toBeVisible();
   expect(screen.queryByRole("button", { name: "افزودن ماده غذایی" })).not.toBeInTheDocument();
@@ -114,6 +127,7 @@ it("shows nutrient data and never shows catalogue price information to a member"
 
   await user.click(screen.getByRole("button", { name: "جزئیات بیشتر" }));
   expect(screen.getByRole("dialog", { name: "جزئیات سینه مرغ" })).toBeVisible();
+  expect(screen.getByText("فیبر")).toBeVisible();
   expect(screen.getByText("آهن")).toBeVisible();
   expect(screen.getByText("ویتامین C")).toBeVisible();
   expect(screen.getByText(/USDA FoodData Central/)).toBeVisible();
@@ -122,6 +136,28 @@ it("shows nutrient data and never shows catalogue price information to a member"
   expect(screen.getByText("۰٫۲ mg")).toBeVisible();
   await user.click(screen.getByRole("button", { name: "۱۰۰ گرم" }));
   expect(screen.getByText("۰٫۴ mg")).toBeVisible();
+});
+
+it("filters with horizontal category chips while preserving the search query", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  const allChip = await screen.findByRole("button", { name: "همه گروه‌ها" });
+  expect(allChip).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "مرغ و ماکیان" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await user.type(screen.getByLabelText("جست‌وجوی ماده غذایی"), "مرغ");
+  await user.click(screen.getByRole("button", { name: "جست‌وجو" }));
+  await user.click(screen.getByRole("button", { name: "مرغ و ماکیان" }));
+
+  await waitFor(() => expect(api.getFoodCatalogue).toHaveBeenLastCalledWith({
+    query: "مرغ",
+    category: "poultry",
+    page: 1,
+    pageSize: 24,
+  }));
 });
 
 it("shows price and price controls only to an admin", async () => {

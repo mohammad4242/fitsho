@@ -9,13 +9,15 @@ import "./foodCatalogue.css";
 
 type LoadState = "loading" | "ready" | "error";
 
-const macroDefinitions = [
+const primaryNutrientDefinitions = [
   ["energy_kcal", "کالری", "Calories", "kcal"],
   ["protein_g", "پروتئین", "Protein", "g"],
   ["carbohydrate_g", "کربوهیدرات", "Carbs", "g"],
   ["total_fat_g", "چربی", "Fat", "g"],
   ["fibre_g", "فیبر", "Fibre", "g"],
 ] as const;
+
+const cardMacroDefinitions = primaryNutrientDefinitions.slice(1, 4);
 
 export function FoodCataloguePage() {
   const { i18n } = useTranslation();
@@ -76,20 +78,17 @@ export function FoodCataloguePage() {
 
       <section className="food-catalogue-toolbar" aria-label={l("جست‌وجو و فیلتر", "Search and filter")}>
         <form onSubmit={search} role="search">
-          <label htmlFor="food-search">{l("جست‌وجوی ماده غذایی", "Search foods")}</label>
+          <label className="food-search-label" htmlFor="food-search">{l("جست‌وجوی ماده غذایی", "Search foods")}</label>
           <div>
             <input id="food-search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder={l("مثلاً عدس یا سینه مرغ", "Try lentils or chicken breast")} />
             <button type="submit">{l("جست‌وجو", "Search")}</button>
           </div>
         </form>
-        <label>
-          {l("گروه غذایی", "Category")}
-          <select value={category} onChange={(event) => { setCategory(event.target.value); setPage(1); }}>
-            <option value="">{l("همه گروه‌ها", "All categories")}</option>
-            {data?.categories.map((value) => <option key={value} value={value}>{categoryLabel(value, language)}</option>)}
-          </select>
-        </label>
         {user?.is_admin && <button aria-label={l("افزودن ماده غذایی", "Add food")} className="food-catalogue-add" type="button" onClick={() => setAddingFood(true)}>＋ {l("افزودن ماده غذایی", "Add food")}</button>}
+        <nav className="food-category-chips" aria-label={l("گروه‌های غذایی", "Food categories")}>
+          <button aria-pressed={category === ""} className={category === "" ? "is-active" : ""} onClick={() => { setCategory(""); setPage(1); }} type="button">{l("همه گروه‌ها", "All categories")}</button>
+          {data?.categories.map((value) => <button aria-pressed={category === value} className={category === value ? "is-active" : ""} key={value} onClick={() => { setCategory(value); setPage(1); }} type="button">{categoryLabel(value, language)}</button>)}
+        </nav>
       </section>
 
       {state === "loading" && <p className="food-catalogue-state" role="status">{l("در حال چیدن قفسه…", "Stocking the shelf…")}</p>}
@@ -117,10 +116,13 @@ function FoodCard({ food, language, onDetails, onImage, onPrice }: { food: FoodC
   const portion = defaultPortion(food);
   return <article className="food-shelf-card" role="listitem">
     <FoodImage food={food} language={language} />
-    <header><div><span>{categoryLabel(food.category, language)}</span><h2>{fa ? food.name_fa : food.name_en}</h2><small>{fa ? food.name_en : food.name_fa}</small></div><span className="food-shelf-card__basis">{basisLabel(portion, language)}</span></header>
-    {isAdminFood(food) && <PriceTicket food={food} language={language} />}
-    <div className="food-macro-strip">{macroDefinitions.map(([code, faLabel, enLabel, unit]) => <div key={code}><span>{fa ? faLabel : enLabel}</span><strong>{macroValue(scale(food.macros[code], portion), unit, language)}</strong></div>)}</div>
-    <footer><button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>{onImage && <button type="button" onClick={onImage} aria-label={l(`${food.image_url ? "جایگزینی" : "بارگذاری"} تصویر ${food.name_fa}`, `${food.image_url ? "Replace" : "Upload"} image for ${food.name_en}`)}>{l(food.image_url ? "جایگزینی تصویر" : "بارگذاری تصویر", food.image_url ? "Replace image" : "Upload image")}</button>}{onPrice && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}</footer>
+    <div className="food-shelf-card__content">
+      <header><div className="food-shelf-card__identity"><span>{categoryLabel(food.category, language)}</span><h2>{fa ? food.name_fa : food.name_en}</h2><small>{fa ? food.name_en : food.name_fa}</small></div><div className="food-shelf-card__calories"><strong>{macroValue(scale(food.macros.energy_kcal, portion), "kcal", language)}</strong><span>{l("کالری", "Calories")}</span></div></header>
+      <span className="food-shelf-card__basis">{basisLabel(portion, language)}</span>
+      {isAdminFood(food) && <PriceTicket food={food} language={language} />}
+      <div className="food-macro-strip">{cardMacroDefinitions.map(([code, faLabel, enLabel, unit]) => <div key={code}><strong>{macroValue(scale(food.macros[code], portion), unit, language)}</strong><span>{fa ? faLabel : enLabel}</span></div>)}</div>
+      <footer><button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>{onImage && <button type="button" onClick={onImage} aria-label={l(`${food.image_url ? "جایگزینی" : "بارگذاری"} تصویر ${food.name_fa}`, `${food.image_url ? "Replace" : "Upload"} image for ${food.name_en}`)}>{l(food.image_url ? "جایگزینی تصویر" : "بارگذاری تصویر", food.image_url ? "Replace image" : "Upload image")}</button>}{onPrice && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}</footer>
+    </div>
   </article>;
 }
 
@@ -180,7 +182,7 @@ function AddFoodDialog({ language, onClose, onSaved }: { language: "fa" | "en"; 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
   function submit(event: FormEvent) { event.preventDefault(); setSaving(true); setError(false); const nutrientUnits: Record<string, string> = { energy_kcal: "kcal", protein_g: "g", carbohydrate_g: "g", total_fat_g: "g", fibre_g: "g" }; void api.saveCatalogueFood({ ...identity, verification_status: "verified", measurement_basis: "as_purchased", canonical_quantity: 100, canonical_unit: "g", edible_portion: 1, data_version: "admin-verified-v1", source_food_id: null, source_access_date: new Date().toISOString().slice(0, 10), aliases: [], dietary_patterns: ["omnivore", "vegetarian", "vegan"], roles: ["flexible"], nutrients: Object.entries(macros).map(([nutrient_code, value_per_100g]) => ({ nutrient_code, value_per_100g: Number(value_per_100g), unit: nutrientUnits[nutrient_code], unit_form: "nutrient_mass", source_name: identity.source_name, source_reference: identity.source_reference, confidence: "high" })) }).then(onSaved).catch(() => setError(true)).finally(() => setSaving(false)); }
-  return <DialogFrame label={l("افزودن ماده غذایی", "Add food")} onClose={onClose}><h2>{l("ماده غذایی تأییدشده", "Verified food")}</h2><p>{l("برای انتشار، مشخصات و پنج مقدار اصلی باید کامل باشند.", "Identity, provenance, and all five primary values are required.")}</p><form className="food-admin-form food-admin-form--wide" onSubmit={submit}>{(["slug", "name_fa", "name_en", "category", "source_name", "source_reference"] as const).map((field) => <label key={field}>{fieldLabel(field, language)}<input required type={field === "source_reference" ? "url" : "text"} value={identity[field]} onChange={(event) => setIdentity((value) => ({ ...value, [field]: event.target.value }))} /></label>)}{macroDefinitions.map(([code, faLabel, enLabel, unit]) => <label key={code}>{fa ? faLabel : enLabel} ({unit})<input inputMode="decimal" min="0" required value={macros[code]} onChange={(event) => setMacros((value) => ({ ...value, [code]: event.target.value }))} /></label>)}{error && <p role="alert">{l("ماده غذایی ذخیره نشد.", "Food was not saved.")}</p>}<button disabled={saving} type="submit">{saving ? l("در حال ذخیره…", "Saving…") : l("افزودن به کاتالوگ", "Add to catalogue")}</button></form></DialogFrame>;
+  return <DialogFrame label={l("افزودن ماده غذایی", "Add food")} onClose={onClose}><h2>{l("ماده غذایی تأییدشده", "Verified food")}</h2><p>{l("برای انتشار، مشخصات و پنج مقدار اصلی باید کامل باشند.", "Identity, provenance, and all five primary values are required.")}</p><form className="food-admin-form food-admin-form--wide" onSubmit={submit}>{(["slug", "name_fa", "name_en", "category", "source_name", "source_reference"] as const).map((field) => <label key={field}>{fieldLabel(field, language)}<input required type={field === "source_reference" ? "url" : "text"} value={identity[field]} onChange={(event) => setIdentity((value) => ({ ...value, [field]: event.target.value }))} /></label>)}{primaryNutrientDefinitions.map(([code, faLabel, enLabel, unit]) => <label key={code}>{fa ? faLabel : enLabel} ({unit})<input inputMode="decimal" min="0" required value={macros[code]} onChange={(event) => setMacros((value) => ({ ...value, [code]: event.target.value }))} /></label>)}{error && <p role="alert">{l("ماده غذایی ذخیره نشد.", "Food was not saved.")}</p>}<button disabled={saving} type="submit">{saving ? l("در حال ذخیره…", "Saving…") : l("افزودن به کاتالوگ", "Add to catalogue")}</button></form></DialogFrame>;
 }
 
 function DialogFrame({ children, label, onClose }: { children: ReactNode; label: string; onClose: () => void }) { return <div className="food-dialog-backdrop"><section aria-label={label} aria-modal="true" className="food-dialog" role="dialog"><button className="food-dialog__close" type="button" onClick={onClose} aria-label="Close">×</button>{children}</section></div>; }
