@@ -106,7 +106,10 @@ it("keeps the initial version visible while coach approval is pending", async ()
 
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
-  expect(await screen.findByText("در انتظار تأیید مربی")).toBeInTheDocument();
+  const pendingStatus = await screen.findByText("در انتظار تایید مربی");
+  expect(pendingStatus.closest("aside")).toHaveClass("workout-review-banner--pending");
+  expect(pendingStatus.closest("aside")?.querySelector(".workout-review-indicator")).toBeInTheDocument();
+  expect(screen.queryByText(/نسخه اولیه فعال است/)).not.toBeInTheDocument();
   expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
 });
 
@@ -148,7 +151,9 @@ it("lets the member inspect old and coach-approved immutable versions", async ()
 
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
-  expect(await screen.findByText("تأییدشده توسط مربی سارا")).toBeInTheDocument();
+  const approvedStatus = await screen.findByText("تأییدشده توسط مربی سارا");
+  expect(approvedStatus.closest("aside")).toHaveClass("workout-review-banner--approved");
+  expect(approvedStatus.closest("aside")?.querySelector(".workout-review-indicator")).toHaveTextContent("✓");
   expect(screen.getByText("فشار جلسه دوم کمتر شد.")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: /نسخه اولیه/ }));
 
@@ -220,9 +225,11 @@ it("renders the selected duration, exercise media, and exercise detail link", as
     "href",
     "/exercises/dumbbell-bench-press",
   );
+  const quickActions = screen.getByRole("group", { name: "ابزارهای برنامه" });
+  expect(quickActions).toHaveClass("workout-quick-actions");
   expect(screen.getByRole("button", { name: "دانلود PDF" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "بازخورد پایان دوره" })).toBeDisabled();
-  expect(screen.getByRole("link", { name: "مشاهده پیشرفت بدنی" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "پیشرفت بدنی" })).toHaveAttribute(
     "href",
     "/body-progress",
   );

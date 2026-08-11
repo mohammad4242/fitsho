@@ -12,7 +12,7 @@ type AppShellProps = {
 
 const navigation = [
   { to: "/dashboard", label: "header.today", icon: "home" },
-  { to: "/workout-plan", label: "header.plan", icon: "dumbbell", capability: "training" },
+  { to: "/workout-plan", label: "header.workoutPlan", icon: "dumbbell", capability: "training" },
   { to: "/nutrition-estimate", label: "header.nutritionTargets", icon: "nutrition", capability: "nutrition" },
   { to: "/body-progress", label: "header.bodyProgress", icon: "progress", capability: "training" },
   { to: "/more", label: "header.more", icon: "more" },
@@ -44,7 +44,7 @@ export function AppShell({ children }: AppShellProps) {
               key={item.to}
               to={item.to}
             >
-              <AppIcon className="app-shell__nav-icon" name={item.icon} />
+              <AppIcon className={`app-shell__nav-icon${item.to === "/workout-plan" ? " app-shell__nav-icon--workout" : ""}`} name={item.icon} />
               <span>{t(item.label)}</span>
             </Link>
           );

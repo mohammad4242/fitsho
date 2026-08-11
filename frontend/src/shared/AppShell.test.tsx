@@ -26,10 +26,12 @@ it("shows the five primary combined-mode destinations", () => {
     "href",
     "/dashboard",
   );
-  expect(screen.getByRole("link", { name: "برنامه" })).toHaveAttribute(
+  const workoutLink = screen.getByRole("link", { name: "تمرین" });
+  expect(workoutLink).toHaveAttribute(
     "href",
     "/workout-plan",
   );
+  expect(workoutLink.querySelector("svg")).toHaveClass("app-shell__nav-icon--workout");
   expect(screen.getByRole("link", { name: "تغذیه" })).toHaveAttribute(
     "href",
     "/nutrition-estimate",
@@ -42,8 +44,8 @@ it("shows the five primary combined-mode destinations", () => {
 });
 
 it.each([
-  ["nutrition", ["امروز", "تغذیه", "بیشتر"], ["برنامه", "پیشرفت بدن"]],
-  ["training", ["امروز", "برنامه", "پیشرفت بدن", "بیشتر"], ["تغذیه"]],
+  ["nutrition", ["امروز", "تغذیه", "بیشتر"], ["تمرین", "پیشرفت بدن"]],
+  ["training", ["امروز", "تمرین", "پیشرفت بدن", "بیشتر"], ["تغذیه"]],
 ] as const)("shows capability-aware links for %s mode", (productMode, visibleLabels, hiddenLabels) => {
   vi.spyOn(profileContextModule, "useOptionalProfile").mockReturnValue({
     profile: null,
@@ -72,7 +74,7 @@ it.each([
 });
 
 it.each([
-  ["/exercises", "برنامه"],
+  ["/exercises", "تمرین"],
   ["/nutrition-tracking", "تغذیه"],
   ["/food-catalogue", "تغذیه"],
   ["/profile", "بیشتر"],

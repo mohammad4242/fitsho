@@ -1261,7 +1261,10 @@ html[dir="ltr"] .primary-button span:last-child {
   width: 1.35rem;
   height: 1.35rem;
   display: block;
+  border: 0;
 }
+
+.app-shell__nav-icon--workout { width: 1.55rem; height: 1.55rem; stroke-width: 1.9; }
 
 @media (max-width: 760px) {
   .app-shell {

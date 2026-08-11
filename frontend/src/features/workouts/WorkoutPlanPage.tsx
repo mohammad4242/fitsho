@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { ApiError } from "../../shared/apiClient";
+import { AppIcon } from "../../shared/AppIcon";
 import { getProfile, updateProfile } from "../profile/api";
 import type { WorkoutGenerationMethod } from "../profile/types";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
@@ -170,6 +171,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         )}
         {state === "ready" && plan !== null && (
           <>
+            <CoachReviewBanner plan={plan} isEnglish={isEnglish} historical={isViewingHistorical} />
             <section className="workout-schedule" aria-labelledby="workout-schedule-title">
               <div className="workout-schedule__heading">
                 <div>
@@ -250,7 +252,6 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
               </div>
             </section>
             <div className="workout-plan-statuses">
-              <CoachReviewBanner plan={plan} isEnglish={isEnglish} historical={isViewingHistorical} />
               {reused && <p className="workout-reused" role="status">{t("workoutPlan.reused")}</p>}
               {plan.is_stale && <p className="workout-stale" role="status">{t("workoutPlan.stale")}</p>}
               {plan.body_analysis_provenance?.provisional === true && <p className="workout-body-analysis-warning" role="alert">{t("workoutPlan.provisionalBodyAnalysisWarning")}</p>}
@@ -258,6 +259,26 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
             </div>
           </>
         )}
+
+        <section className="workout-tools" aria-labelledby="workout-future-title">
+          <h2 id="workout-future-title">{t("workoutPlan.futureTitle")}</h2>
+          <div className="workout-quick-actions" role="group" aria-labelledby="workout-future-title">
+            <button className="workout-quick-action" type="button" disabled aria-label={t("workoutPlan.pdf.title")}>
+              <AppIcon name="document" />
+              <strong>{t("workoutPlan.pdf.title")}</strong>
+              <small>{t("workoutPlan.comingSoon")}</small>
+            </button>
+            <button className="workout-quick-action" type="button" disabled aria-label={t("workoutPlan.feedback.title")}>
+              <AppIcon name="feedback" />
+              <strong>{t("workoutPlan.feedback.title")}</strong>
+              <small>{t("workoutPlan.comingSoon")}</small>
+            </button>
+            <Link className="workout-quick-action" aria-label={t("workoutPlan.body.title")} to="/body-progress">
+              <AppIcon name="progress" />
+              <strong>{t("workoutPlan.body.title")}</strong>
+            </Link>
+          </div>
+        </section>
 
         <details className="workout-secondary">
           <summary>{l("جزئیات و تنظیمات برنامه", "Plan details and settings")}</summary>
@@ -294,28 +315,6 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
           </div>
         </details>
 
-        <section className="workout-future" aria-labelledby="workout-future-title">
-          <h2 id="workout-future-title">{t("workoutPlan.futureTitle")}</h2>
-          <div>
-            {[
-              ["pdf", "workoutPlan.pdf"],
-              ["feedback", "workoutPlan.feedback"],
-            ].map(([key, translationKey]) => (
-              <article key={key}>
-                <h3>{t(`${translationKey}.title`)}</h3>
-                <p>{t(`${translationKey}.body`)}</p>
-                <button type="button" disabled aria-label={t(`${translationKey}.title`)}>{t("workoutPlan.comingSoon")}</button>
-              </article>
-            ))}
-            <article>
-              <h3>{t("workoutPlan.body.title")}</h3>
-              <p>{t("workoutPlan.body.body")}</p>
-              <Link className="workout-future__link" to="/body-progress">
-                {t("workoutPlan.body.action")}
-              </Link>
-            </article>
-          </div>
-        </section>
       </main>
     </div>
   );
@@ -330,8 +329,8 @@ function CoachReviewBanner({ plan, isEnglish, historical }: { plan: WorkoutPlan;
   if (review?.state === "pending_coach_review") {
     return (
       <aside className="workout-review-banner workout-review-banner--pending" role="status">
-        <strong>{l("در انتظار تأیید مربی", "Waiting for coach approval")}</strong>
-        <span>{l("نسخه اولیه فعال است و بعد از تأیید، نسخه جدید جایگزین آن می‌شود.", "The initial version stays active until the approved version is ready.")}</span>
+        <span className="workout-review-indicator" aria-hidden="true" />
+        <strong>{l("در انتظار تایید مربی", "Waiting for coach approval")}</strong>
       </aside>
     );
   }
@@ -339,9 +338,12 @@ function CoachReviewBanner({ plan, isEnglish, historical }: { plan: WorkoutPlan;
     const coach = review.coach_display_name ?? l("مربی فیتشو", "Fitsho coach");
     return (
       <aside className="workout-review-banner workout-review-banner--approved" role="status">
-        <strong>{l(`تأییدشده توسط ${coach}`, `Approved by ${coach}`)}</strong>
-        {review.approved_at && <time dateTime={review.approved_at}>{new Intl.DateTimeFormat(isEnglish ? "en" : "fa-IR", { dateStyle: "long" }).format(new Date(review.approved_at))}</time>}
-        {review.coach_note && <p>{review.coach_note}</p>}
+        <span className="workout-review-indicator" aria-hidden="true">✓</span>
+        <div>
+          <strong>{l(`تأییدشده توسط ${coach}`, `Approved by ${coach}`)}</strong>
+          {review.approved_at && <time dateTime={review.approved_at}>{new Intl.DateTimeFormat(isEnglish ? "en" : "fa-IR", { dateStyle: "long" }).format(new Date(review.approved_at))}</time>}
+          {review.coach_note && <p>{review.coach_note}</p>}
+        </div>
       </aside>
     );
   }
