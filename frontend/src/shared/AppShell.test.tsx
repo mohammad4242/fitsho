@@ -1,5 +1,4 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -7,11 +6,13 @@ import "../i18n";
 import * as profileContextModule from "../features/profile/ProfileContext";
 import { AppShell } from "./AppShell";
 
+vi.mock("./AuthenticatedHeader", () => ({
+  AuthenticatedHeader: () => <header>member header</header>,
+}));
+
 afterEach(() => vi.restoreAllMocks());
 
-it("moves secondary combined-mode destinations behind More", async () => {
-  const user = userEvent.setup();
-
+it("shows the five primary combined-mode destinations", () => {
   render(
     <MemoryRouter initialEntries={["/dashboard"]}>
       <AppShell>
@@ -20,6 +21,7 @@ it("moves secondary combined-mode destinations behind More", async () => {
     </MemoryRouter>,
   );
 
+  expect(screen.getByRole("banner")).toHaveTextContent("member header");
   expect(screen.getByRole("link", { name: "امروز" })).toHaveAttribute(
     "href",
     "/dashboard",
@@ -28,35 +30,21 @@ it("moves secondary combined-mode destinations behind More", async () => {
     "href",
     "/workout-plan",
   );
-  expect(screen.getByRole("link", { name: "حرکات" })).toHaveAttribute(
-    "href",
-    "/exercises",
-  );
   expect(screen.getByRole("link", { name: "تغذیه" })).toHaveAttribute(
     "href",
     "/nutrition-estimate",
   );
-  expect(screen.queryByRole("link", { name: "کاتالوگ مواد غذایی" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("link", { name: "پروفایل" })).not.toBeInTheDocument();
-
-  const moreButton = screen.getByRole("button", { name: "بیشتر" });
-  expect(moreButton).toHaveAttribute("aria-expanded", "false");
-  await user.click(moreButton);
-
-  expect(moreButton).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getByRole("link", { name: "کاتالوگ مواد غذایی" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "پیشرفت بدن" })).toHaveAttribute(
     "href",
-    "/food-catalogue",
+    "/body-progress",
   );
-  expect(screen.getByRole("link", { name: "پروفایل" })).toHaveAttribute(
-    "href",
-    "/profile",
-  );
+  expect(screen.getByRole("link", { name: "بیشتر" })).toHaveAttribute("href", "/more");
 });
 
 it.each([
-  ["nutrition", ["امروز", "تغذیه", "کاتالوگ مواد غذایی", "پروفایل"], "برنامه"],
-] as const)("shows direct links without More for %s mode", (productMode, visibleLabels, hiddenLabel) => {
+  ["nutrition", ["امروز", "تغذیه", "بیشتر"], ["برنامه", "پیشرفت بدن"]],
+  ["training", ["امروز", "برنامه", "پیشرفت بدن", "بیشتر"], ["تغذیه"]],
+] as const)("shows capability-aware links for %s mode", (productMode, visibleLabels, hiddenLabels) => {
   vi.spyOn(profileContextModule, "useOptionalProfile").mockReturnValue({
     profile: null,
     status: "ready",
@@ -78,25 +66,7 @@ it.each([
   for (const label of visibleLabels) {
     expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
   }
-  expect(screen.queryByRole("link", { name: hiddenLabel })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "بیشتر" })).not.toBeInTheDocument();
-});
-
-it("keeps body progress in the compact More menu for training members", async () => {
-  const user = userEvent.setup();
-  vi.spyOn(profileContextModule, "useOptionalProfile").mockReturnValue({
-    profile: null,
-    status: "ready",
-    productMode: "training",
-    retryProfile: vi.fn(),
-    createProfile: vi.fn(async () => { throw new Error("not used"); }),
-    selectProductMode: vi.fn(async () => { throw new Error("not used"); }),
-    updateProfile: vi.fn(async () => { throw new Error("not used"); }),
-  });
-
-  render(<MemoryRouter initialEntries={["/dashboard"]}><AppShell><p>محتوا</p></AppShell></MemoryRouter>);
-
-  await user.click(screen.getByRole("button", { name: "بیشتر" }));
-  expect(screen.getByRole("link", { name: "پیشرفت بدن" })).toHaveAttribute("href", "/body-progress");
-  expect(screen.getByRole("link", { name: "پروفایل" })).toHaveAttribute("href", "/profile");
+  for (const label of hiddenLabels) {
+    expect(screen.queryByRole("link", { name: label })).not.toBeInTheDocument();
+  }
 });

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { ApiError } from "../../shared/apiClient";
 import { getProfile, updateProfile } from "../profile/api";
 import type { WorkoutGenerationMethod } from "../profile/types";
@@ -108,7 +107,6 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
 
   return (
     <div className="workout-plan-shell fitsho-page">
-      <AuthenticatedHeader />
       <main className="workout-plan-main">
         <header className="workout-plan-hero">
           <div className="workout-plan-hero__content">

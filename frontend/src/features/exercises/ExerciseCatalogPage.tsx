@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 
 import heroStrengthFallback from "../../assets/landing/hero-strength-fallback.jpg";
-import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getExerciseCategories, getExercises } from "./api";
 import { ExerciseMedia } from "./ExerciseMedia";
@@ -164,7 +163,6 @@ export function ExerciseCatalogPage() {
   return (
     <div className="exercise-catalog-shell">
       <MemberHeaderMedia imageSrc={heroStrengthFallback} className="member-page-background" />
-      <AuthenticatedHeader />
       <main className="exercise-catalog-main">
         <header className="exercise-catalog-hero">
           <div>

@@ -2,7 +2,6 @@ import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { useAuth } from "../auth/AuthContext";
 import * as api from "./api";
 import type { AdminFoodCatalogueItem, AdminFoodCatalogueResponse, FoodCatalogueItem, FoodCatalogueResponse } from "./api";
@@ -66,7 +65,6 @@ export function FoodCataloguePage() {
   const pageCount = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
   return (
     <main className="food-catalogue-page fitsho-page" dir={fa ? "rtl" : "ltr"}>
-      <AuthenticatedHeader />
       <section className="food-catalogue-hero">
         <div>
           <Link className="food-catalogue-back" to="/nutrition-estimate">

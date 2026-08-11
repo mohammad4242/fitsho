@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import * as nutritionApi from "./api";
 import type {
   NutritionEstimate,
@@ -78,7 +77,6 @@ export function NutritionEstimatePage() {
 
   return (
     <main className="nutrition-estimate-page fitsho-page" dir={language === "fa" ? "rtl" : "ltr"}>
-      <AuthenticatedHeader />
       <section className="nutrition-estimate-hero">
         <nav className="nutrition-estimate-tools" aria-label={l("ابزارهای تغذیه", "Nutrition tools")}>
           <Link className="nutrition-estimate-back" to="/dashboard">{l("بازگشت به امروز", "Back to Today")}</Link>

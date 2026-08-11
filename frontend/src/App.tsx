@@ -34,6 +34,7 @@ const ExerciseCatalogPage = lazy(() => import("./features/exercises/ExerciseCata
 const ExerciseDetailPage = lazy(() => import("./features/exercises/ExerciseDetailPage").then(({ ExerciseDetailPage }) => ({ default: ExerciseDetailPage })));
 const FoodCataloguePage = lazy(() => import("./features/nutrition/FoodCataloguePage").then(({ FoodCataloguePage }) => ({ default: FoodCataloguePage })));
 const LoginPage = lazy(() => import("./features/auth/LoginPage").then(({ LoginPage }) => ({ default: LoginPage })));
+const MorePage = lazy(() => import("./pages/MorePage").then(({ MorePage }) => ({ default: MorePage })));
 const NutritionEstimatePage = lazy(() => import("./features/nutrition/NutritionEstimatePage").then(({ NutritionEstimatePage }) => ({ default: NutritionEstimatePage })));
 const NutritionLabsPage = lazy(() => import("./features/nutrition/NutritionLabsPage").then(({ NutritionLabsPage }) => ({ default: NutritionLabsPage })));
 const NutritionSupplementsPage = lazy(() => import("./features/nutrition/NutritionSupplementsPage").then(({ NutritionSupplementsPage }) => ({ default: NutritionSupplementsPage })));
@@ -77,6 +78,7 @@ export function AppRoutes() {
         <Route element={<CompletedProfileRoute />}>
           <Route element={<CompletedAppShellRoute />}>
             <Route path="/dashboard" element={deferred(<DashboardPage />)} />
+            <Route path="/more" element={deferred(<MorePage />)} />
             <Route path="/profile" element={deferred(<ProfilePage />)} />
             <Route path="/nutrition-profile" element={<NutritionProfileRoute />} />
             <Route element={<NutritionCapabilityRoute />}>

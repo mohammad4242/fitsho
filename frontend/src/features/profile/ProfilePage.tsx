@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
 import authTrainingAccent from "../../assets/landing/auth-training-accent.jpg";
-import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { NutritionOnboardingFlow } from "../nutrition/NutritionOnboardingFlow";
 import * as profileApi from "./api";
@@ -116,7 +115,6 @@ function ProfileLoadingShell({ message, error = false }: { message: string; erro
   return (
     <div className="profile-page-shell">
       <MemberHeaderMedia imageSrc={authTrainingAccent} className="member-page-background" />
-      <AuthenticatedHeader />
       <main className="profile-page-main">
         <p className={error ? "form-error" : undefined} role={error ? "alert" : "status"}>{message}</p>
       </main>
@@ -270,7 +268,6 @@ function ReadyProfilePage({
   return (
     <div className="profile-page-shell" dir={language === "fa" ? "rtl" : "ltr"}>
       <MemberHeaderMedia imageSrc={authTrainingAccent} className="member-page-background" />
-      <AuthenticatedHeader />
       <main className="profile-page-main">
         <section className="profile-page-heading">
           <p className="eyebrow eyebrow--accent">{t("profile.eyebrow")}</p>

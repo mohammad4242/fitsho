@@ -1,0 +1,82 @@
+.more-page {
+  padding-block-end: var(--fitsho-space-8);
+}
+
+.more-page__container {
+  width: min(100% - 2rem, 68rem);
+  margin-inline: auto;
+  padding-block: clamp(1.75rem, 4vw, 3.5rem);
+}
+
+.more-page__heading {
+  max-width: 42rem;
+  margin-block-end: 1.5rem;
+}
+
+.more-page__heading h1 {
+  margin: 0.3rem 0 0.65rem;
+  font-size: clamp(2.25rem, 5vw, 3.75rem);
+  letter-spacing: -0.04em;
+}
+
+html[dir="rtl"] .more-page__heading h1 { letter-spacing: 0; }
+.more-page__heading > p:last-child { margin: 0; color: var(--fitsho-muted); line-height: 1.8; }
+
+.more-profile-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: clamp(1rem, 3vw, 1.4rem);
+  border: 1px solid var(--fitsho-line-strong);
+  border-radius: var(--fitsho-radius-xl);
+  background: linear-gradient(135deg, rgb(80 223 206 / 11%), var(--fitsho-surface));
+  box-shadow: var(--fitsho-shadow-focus);
+}
+
+.more-profile-card__avatar {
+  width: 3.3rem;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 1.05rem;
+  color: var(--fitsho-canvas);
+  background: var(--fitsho-aqua);
+  font-family: "Sora Variable", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.more-profile-card div { min-width: 0; display: grid; gap: 0.2rem; }
+.more-profile-card div span { overflow: hidden; color: var(--fitsho-muted); font-size: 0.8rem; text-overflow: ellipsis; }
+.more-profile-card > a { color: var(--fitsho-aqua); font-weight: 800; text-decoration: none; }
+
+.more-page__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-block-start: 1rem; }
+.more-group { min-width: 0; padding: 0.45rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); }
+.more-group h2 { margin: 0; padding: 0.8rem 0.85rem 0.65rem; color: var(--fitsho-muted); font-size: 0.76rem; letter-spacing: 0.04em; }
+.more-group > div { display: grid; }
+.more-row, .more-language-row { min-width: 0; min-height: 4.5rem; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.8rem; padding: 0.75rem 0.8rem; border-radius: var(--fitsho-radius-md); text-decoration: none; }
+.more-row + .more-row, .more-row + .more-language-row { border-block-start: 1px solid var(--fitsho-line); }
+.more-row:hover { background: var(--fitsho-surface-interactive); }
+.more-row > span:nth-child(2), .more-language-row > div { min-width: 0; display: grid; gap: 0.18rem; }
+.more-row small, .more-language-row span { color: var(--fitsho-muted); font-size: 0.75rem; line-height: 1.5; }
+.more-row b { color: var(--fitsho-aqua); }
+html[dir="ltr"] .more-row b { transform: rotate(180deg); }
+.more-row__icon { width: 2.2rem; aspect-ratio: 1; display: grid; place-items: center; border: 1px solid var(--fitsho-line-strong); border-radius: 0.75rem; color: var(--fitsho-aqua); background: rgb(80 223 206 / 8%); }
+.more-row__icon::after { font-size: 1rem; content: "•"; }
+.more-row__icon--exercise::after { content: "＋"; }
+.more-row__icon--progress::after { content: "↗"; }
+.more-row__icon--nutrition::after { content: "◒"; }
+.more-row__icon--tracking::after { content: "✓"; }
+.more-row__icon--profile::after { content: "○"; }
+.more-row__icon--coach::after, .more-row__icon--physician::after { content: "✦"; }
+.more-row__icon--admin::after { content: "◇"; }
+.more-language-row .language-switcher { min-height: 2.75rem; border-color: var(--fitsho-line); color: var(--fitsho-ink); background: var(--fitsho-surface-raised); }
+.more-page__logout { width: 100%; min-height: 3.5rem; margin-block-start: 1rem; border: 1px solid rgb(246 120 89 / 25%); border-radius: var(--fitsho-radius-lg); color: #ffad98; background: rgb(246 120 89 / 7%); font: inherit; font-weight: 800; cursor: pointer; }
+
+@media (max-width: 700px) {
+  .more-page__container { width: min(100% - 1.5rem, 68rem); padding-block-start: 1.25rem; }
+  .more-page__grid { grid-template-columns: 1fr; }
+  .more-profile-card { grid-template-columns: auto minmax(0, 1fr); }
+  .more-profile-card > a { grid-column: 1 / -1; min-height: 2.75rem; display: grid; place-items: center; border-radius: var(--fitsho-radius-md); background: rgb(80 223 206 / 9%); }
+}

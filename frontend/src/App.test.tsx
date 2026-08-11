@@ -386,7 +386,7 @@ it("renders the catalog route for a ready member", async () => {
     await screen.findByRole("heading", { name: "کتابخانه حرکات" }),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole("navigation", { name: "ناوبری اصلی" }).querySelector('[href="/exercises"]'),
+    screen.getByRole("navigation", { name: "ناوبری اصلی" }).querySelector('[href="/more"]'),
   ).toHaveAttribute(
     "aria-current",
     "page",
@@ -401,7 +401,7 @@ it("renders detail with active exercise navigation for a ready member", async ()
     await screen.findByRole("heading", { name: "پرس سینه دمبل" }),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole("navigation", { name: "ناوبری اصلی" }).querySelector('[href="/exercises"]'),
+    screen.getByRole("navigation", { name: "ناوبری اصلی" }).querySelector('[href="/more"]'),
   ).toHaveAttribute(
     "aria-current",
     "page",
@@ -464,6 +464,14 @@ it("redirects a non-admin away from the admin route", async () => {
 
   expect(await screen.findByRole("heading", { name: "سلام، Mohammad" })).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "مدیریت حرکات" })).not.toBeInTheDocument();
+});
+
+it("opens the authenticated More hub", async () => {
+  setReadyMember();
+  renderRoute("/more");
+
+  expect(await screen.findByRole("heading", { name: "بیشتر" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "پروفایل" })).toHaveAttribute("href", "/profile");
 });
 
 it("lets an admin without a fitness profile open the admin route", async () => {

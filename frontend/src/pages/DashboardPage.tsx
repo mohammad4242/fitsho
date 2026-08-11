@@ -6,7 +6,6 @@ import { useAuth } from "../features/auth/AuthContext";
 import { getLatestWeeklyNutritionPlan } from "../features/nutrition/api";
 import { useProfile } from "../features/profile/ProfileContext";
 import { generateWorkoutPlan, getActiveWorkoutPlan } from "../features/workouts/api";
-import { AuthenticatedHeader } from "../shared/AuthenticatedHeader";
 import "./dashboard.css";
 
 type PlanState = "loading" | "empty" | "ready" | "error";
@@ -63,7 +62,6 @@ export function DashboardPage() {
 
   return (
     <main className="command-center fitsho-page">
-      <AuthenticatedHeader />
       <div className="command-center__container">
         <header className="command-center__welcome">
           <p className="fitsho-section-heading__eyebrow">{t("dashboard.kicker")}</p>
