@@ -1028,3 +1028,231 @@ html[dir="rtl"] .catalog-dashboard-card__copy h2 {
 .exercise-detail-media video { border-radius: 1rem; }
 .exercise-instructions,
 .exercise-safety { border-radius: 1.25rem; }
+
+/* Authenticated library: compact, task-first dark treatment */
+.exercise-catalog-shell {
+  min-height: 100%;
+  padding: clamp(1rem, 2.5vw, 2rem) clamp(0.85rem, 3vw, 2rem) 7rem;
+  color: var(--fitsho-ink);
+  background:
+    radial-gradient(circle at 82% 0%, rgb(80 223 206 / 7%), transparent 24rem),
+    var(--fitsho-canvas);
+}
+
+.exercise-catalog-shell .member-page-background {
+  opacity: 0.12;
+  filter: saturate(0.7) contrast(1.1);
+}
+
+.exercise-catalog-main,
+.exercise-detail-main {
+  width: min(100%, var(--fitsho-content));
+  margin-block-start: 0;
+}
+
+.exercise-catalog-hero {
+  min-height: 13rem;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.55fr);
+  gap: clamp(1.5rem, 5vw, 5rem);
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border: 1px solid var(--fitsho-line-strong);
+  background:
+    linear-gradient(125deg, rgb(80 223 206 / 10%), transparent 52%),
+    rgb(7 23 22 / 88%);
+  box-shadow: var(--fitsho-shadow-soft);
+  backdrop-filter: blur(14px);
+}
+
+.exercise-catalog-hero h1 {
+  max-width: 14ch;
+  color: var(--fitsho-ink);
+  font-size: clamp(2.25rem, 5vw, 4rem);
+  line-height: 1.05;
+}
+
+.catalog-breadcrumb,
+.catalog-stage__heading p,
+.exercise-card__title p,
+.exercise-card dt,
+.catalog-pagination span,
+.exercise-detail-heading__secondary,
+.exercise-detail-facts dt,
+.exercise-detail-message p {
+  color: var(--fitsho-muted);
+}
+
+.catalog-breadcrumb a,
+.catalog-breadcrumb button {
+  color: var(--fitsho-ink);
+}
+
+.catalog-breadcrumb a:hover,
+.catalog-breadcrumb button:hover {
+  background: var(--fitsho-surface-interactive);
+}
+
+.catalog-special-filters,
+.catalog-stage,
+.catalog-results,
+.exercise-detail-heading,
+.exercise-instructions,
+.exercise-detail-message {
+  border: 1px solid var(--fitsho-line);
+  color: var(--fitsho-ink);
+  background: rgb(11 32 31 / 91%);
+  box-shadow: var(--fitsho-shadow-soft);
+}
+
+.catalog-special-filters {
+  border-inline-start-color: var(--fitsho-aqua);
+  border-radius: var(--fitsho-radius-md);
+}
+
+.catalog-special-filters p,
+.catalog-stage__heading h2,
+.exercise-card__title h3,
+.exercise-card dd,
+.exercise-detail-heading h1,
+.exercise-detail-section-heading h2,
+.exercise-detail-facts dd,
+.exercise-detail-message h1 {
+  color: var(--fitsho-ink);
+}
+
+.catalog-special-filters button,
+.region-button,
+.muscle-button,
+.exercise-filters select,
+.exercise-filters input,
+.catalog-pagination button {
+  border-color: var(--fitsho-line);
+  color: var(--fitsho-ink);
+  background: var(--fitsho-surface-raised);
+}
+
+.catalog-special-filters button.is-active,
+.region-button.is-active,
+.muscle-button.is-active,
+.region-button[aria-pressed="true"],
+.muscle-button[aria-pressed="true"] {
+  border-color: var(--fitsho-aqua);
+  color: var(--fitsho-petrol);
+  background: var(--fitsho-aqua);
+}
+
+.region-button small,
+.muscle-button small {
+  color: var(--fitsho-muted);
+}
+
+.exercise-filters {
+  background: var(--fitsho-surface-subtle);
+}
+
+.exercise-filters label {
+  color: var(--fitsho-ink);
+}
+
+.exercise-card {
+  border: 1px solid var(--fitsho-line);
+  color: var(--fitsho-ink);
+  background: var(--fitsho-surface);
+  box-shadow: var(--fitsho-shadow-soft);
+}
+
+.exercise-card:hover {
+  border-color: var(--fitsho-line-strong);
+  box-shadow: var(--fitsho-shadow-focus);
+}
+
+.exercise-card dl > div {
+  border-bottom-color: var(--fitsho-line);
+}
+
+.exercise-card__link,
+.exercise-detail-back {
+  color: var(--fitsho-petrol);
+  background: var(--fitsho-aqua);
+}
+
+.catalog-status {
+  border-color: var(--fitsho-line);
+  color: var(--fitsho-muted);
+  background: var(--fitsho-surface-subtle);
+}
+
+.exercise-detail-sheet {
+  border: 0;
+  box-shadow: none;
+}
+
+.exercise-detail-media,
+.exercise-safety {
+  border-color: var(--fitsho-line);
+  background: var(--fitsho-surface);
+  box-shadow: var(--fitsho-shadow-soft);
+}
+
+.exercise-detail-heading {
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.exercise-detail-heading h1 {
+  font-size: clamp(2.15rem, 4vw, 3.75rem);
+  line-height: 1.08;
+}
+
+.exercise-detail-facts > div {
+  border-inline-start-color: var(--fitsho-aqua);
+  background: var(--fitsho-surface-raised);
+}
+
+.exercise-instructions li,
+.exercise-safety li {
+  color: var(--fitsho-ink);
+}
+
+@media (max-width: 760px) {
+  .exercise-catalog-hero {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .exercise-catalog-hero h1 {
+    font-size: clamp(2rem, 11vw, 3rem);
+  }
+
+  .exercise-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 430px) {
+  .exercise-catalog-shell {
+    padding-inline: 0.75rem;
+  }
+
+  .catalog-special-filters,
+  .catalog-special-filters > div,
+  .catalog-pagination {
+    width: 100%;
+  }
+
+  .catalog-special-filters button {
+    flex: 1 1 auto;
+  }
+
+  .muscle-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-pagination {
+    justify-content: space-between;
+  }
+
+  .catalog-pagination button {
+    min-width: 0;
+    padding-inline: 0.75rem;
+  }
+}
