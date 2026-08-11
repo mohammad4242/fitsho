@@ -23,21 +23,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it("leads with the approved Persian body-led product promise", () => {
+it("leads with the cinematic Fitsho film and a focused Persian promise", () => {
   render(<MemoryRouter><PublicLandingPage /></MemoryRouter>);
 
   const hero = screen.getByRole("region", { name: "هر بدن، برنامه خودش را می‌خواهد." });
   expect(within(hero).getByRole("heading", { name: "هر بدن، برنامه خودش را می‌خواهد." })).toBeInTheDocument();
   expect(screen.getAllByRole("link", { name: "برنامه من را بساز" })[0]).toHaveAttribute("href", "/get-started");
-  expect(screen.getByTestId("fitsho-body-hero")).toHaveAttribute(
-    "src",
-    expect.stringContaining("fitsho-body-hero-3d"),
-  );
-  expect(within(hero).getByText("در حال ساخت برنامه فیتشو")).toBeInTheDocument();
-  expect(within(hero).getByText("اطمینان")).toBeInTheDocument();
-  expect(screen.queryByTestId("landing-film")).not.toBeInTheDocument();
-  expect(screen.getAllByText("سرشانه").length).toBeGreaterThanOrEqual(2);
-  expect(screen.getAllByText("۲۳۴۰ کیلوکالری").length).toBeGreaterThanOrEqual(2);
+  expect(screen.getByTestId("landing-film")).toHaveAttribute("autoplay");
+  expect(screen.getByTestId("landing-film")).toHaveProperty("muted", true);
+  expect(screen.getByTestId("landing-film")).toHaveAttribute("playsinline");
+  expect(screen.getByTestId("landing-film")).toHaveAttribute("loop");
 });
 
 it("switches the complete landing direction and primary copy to English", async () => {
@@ -52,32 +47,48 @@ it("switches the complete landing direction and primary copy to English", async 
   expect(screen.getAllByText("Shoulders").length).toBeGreaterThanOrEqual(1);
 });
 
-it("explains the real Fitsho inputs and ordered product progression", () => {
+it("presents coach and physician supervision with schematic documents", () => {
   render(<MemoryRouter><PublicLandingPage /></MemoryRouter>);
 
-  const inputs = screen.getByLabelText("نمونه ورودی‌های واقعی فیتشو");
-  const transformation = inputs.closest(".landing-transformation");
-  expect(transformation).not.toBeNull();
-  expect(within(transformation as HTMLElement).getByLabelText("وضعیت ساخت برنامه فیتشو")).toBeInTheDocument();
-  expect(screen.getByText("هدف")).toBeInTheDocument();
-  expect(screen.getByText("سطح تجربه")).toBeInTheDocument();
-  expect(screen.getAllByText("۴ روز در هفته").length).toBeGreaterThanOrEqual(2);
-  expect(screen.getAllByText("۶۰ دقیقه").length).toBeGreaterThanOrEqual(1);
-  expect(screen.getByText("ملاحظات تمرینی")).toBeInTheDocument();
-  expect(screen.getByText("درک")).toBeInTheDocument();
-  expect(screen.getByText("برنامه")).toBeInTheDocument();
-  expect(screen.getAllByText("تمرین").length).toBeGreaterThanOrEqual(2);
-  expect(screen.getByText("تطبیق")).toBeInTheDocument();
+  const training = screen.getByRole("region", { name: "برنامه تمرینی، تحت نظر مربی" });
+  const nutrition = screen.getByRole("region", { name: "برنامه تغذیه، تحت نظر پزشک" });
+  expect(within(training).getByText("TRAINING")).toBeInTheDocument();
+  expect(within(training).getByText("Coach supervised")).toBeInTheDocument();
+  expect(within(nutrition).getByText("NUTRITION")).toBeInTheDocument();
+  expect(within(nutrition).getByText("Physician supervised")).toBeInTheDocument();
+  expect(screen.getAllByTestId("verification-seal")).toHaveLength(2);
+  expect(screen.queryByText("Bench Press")).not.toBeInTheDocument();
 });
 
-it("uses the 3D body identity for the body-intelligence moment", () => {
+it("reveals the four-stage process in its required order without percentages", () => {
+  render(<MemoryRouter><PublicLandingPage /></MemoryRouter>);
+
+  const process = screen.getByRole("region", { name: "فیتشو چگونه برنامه تو را می‌سازد" });
+  expect(within(process).getAllByRole("listitem").map((item) => item.dataset.stage)).toEqual([
+    "understand", "plan", "train", "adapt",
+  ]);
+  expect(within(process).queryByText(/%|٪/)).not.toBeInTheDocument();
+  expect(within(process).getByText("تو را می‌شناسیم")).toBeInTheDocument();
+  expect(within(process).getByText("برنامه‌ات را می‌سازیم")).toBeInTheDocument();
+});
+
+it("uses the supplied body asset and updates interactive muscle callouts", async () => {
+  const user = userEvent.setup();
   render(<MemoryRouter><PublicLandingPage /></MemoryRouter>);
 
   expect(screen.getByTestId("fitsho-body-intelligence")).toHaveAttribute(
     "src",
-    expect.stringContaining("fitsho-body-hero-3d"),
+    expect.stringContaining("body"),
   );
-  expect(screen.getByTestId("fitsho-body-highlight")).toBeInTheDocument();
+  const shoulders = screen.getByRole("button", { name: "سرشانه" });
+  const back = screen.getByRole("button", { name: "پشت" });
+  expect(shoulders).toHaveAttribute("aria-pressed", "true");
+
+  await user.click(back);
+
+  expect(back).toHaveAttribute("aria-pressed", "true");
+  expect(shoulders).toHaveAttribute("aria-pressed", "false");
+  expect(screen.getByRole("status")).toHaveTextContent("پشت");
 });
 
 it("previews real product areas and repeats the onboarding CTA", () => {

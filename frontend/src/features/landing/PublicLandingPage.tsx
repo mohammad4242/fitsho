@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-import bodyHeroFallback from "../../assets/landing/fitsho-body-hero-3d.jpg";
-import bodyHero from "../../assets/landing/fitsho-body-hero-3d.webp";
 import { LanguageSwitcher } from "../../shared/LanguageSwitcher";
+import { BodyIntelligence } from "./BodyIntelligence";
+import { CinematicStory } from "./CinematicStory";
+import { ProcessStory } from "./ProcessStory";
 import "./publicLanding.css";
+import "./landingStory.css";
 
 function useReducedMotion() {
   const [reducedMotion, setReducedMotion] = useState(
@@ -30,8 +32,6 @@ export function PublicLandingPage() {
   const reducedMotion = useReducedMotion();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const inputs = ["goal", "experience", "days", "duration", "considerations"] as const;
-  const progression = ["understand", "plan", "train", "adapt"] as const;
   const previews = ["dashboard", "workout", "nutrition", "body", "catalogue"] as const;
 
   return (
@@ -81,112 +81,9 @@ export function PublicLandingPage() {
         </aside>
       )}
 
-      <section className="landing-hero" aria-labelledby="landing-hero-title">
-        <div className="landing-hero__copy">
-          <p className="landing-kicker">{t("landing.hero.eyebrow")}</p>
-          <h1 id="landing-hero-title" className="fitsho-display">{t("landing.hero.title")}</h1>
-          <p>{t("landing.hero.body")}</p>
-          <Link className="landing-primary-cta" to="/get-started">
-            {t("landing.cta")}<span aria-hidden="true">←</span>
-          </Link>
-        </div>
-
-        <div className="landing-hero__visual" aria-label={t("landing.hero.visualLabel")}>
-          <picture>
-            <source srcSet={bodyHero} type="image/webp" />
-            <img
-              data-testid="fitsho-body-hero"
-              src={bodyHeroFallback}
-              alt=""
-              aria-hidden="true"
-              width="1672"
-              height="941"
-              fetchPriority="high"
-            />
-          </picture>
-          <div className="landing-callout landing-callout--shoulders">
-            <span>{t("landing.callouts.shoulders")}</span>
-            <strong>{t("landing.callouts.priority")}</strong>
-          </div>
-          <div className="landing-callout landing-callout--back">
-            <span>{t("landing.callouts.back")}</span>
-            <strong>{t("landing.callouts.balanced")}</strong>
-          </div>
-          <div className="landing-callout landing-callout--confidence">
-            <span>{t("landing.intelligence.confidence")}</span>
-            <strong>{t("landing.intelligence.confidenceValue")}</strong>
-          </div>
-        </div>
-        <PlanBuilder compact />
-        <p className="landing-hero__note">{t("landing.hero.note")}</p>
-      </section>
-
-      <section className="landing-system" id="how-it-works" aria-labelledby="landing-system-title">
-        <div className="landing-section-heading">
-          <p className="landing-kicker">{t("landing.system.eyebrow")}</p>
-          <h2 id="landing-system-title" className="fitsho-display">{t("landing.system.title")}</h2>
-          <p>{t("landing.system.body")}</p>
-        </div>
-
-        <ol className="landing-progression" aria-label={t("landing.progression.label")}>
-          {progression.map((step, index) => (
-            <li key={step}>
-              <span>{new Intl.NumberFormat(language === "fa" ? "fa-IR" : "en").format(index + 1)}</span>
-              <strong>{t(`landing.progression.${step}.title`)}</strong>
-              <small>{t(`landing.progression.${step}.body`)}</small>
-            </li>
-          ))}
-        </ol>
-
-        <div className="landing-transformation">
-          <div className="landing-inputs" aria-label={t("landing.inputs.label")}>
-            <header>{t("landing.inputs.label")}</header>
-            {inputs.map((input) => (
-              <article key={input}>
-                <span>{t(`landing.inputs.${input}.label`)}</span>
-                <strong>{t(`landing.inputs.${input}.value`)}</strong>
-              </article>
-            ))}
-          </div>
-          <span className="landing-transformation__flow" aria-hidden="true">←</span>
-          <PlanBuilder />
-        </div>
-      </section>
-
-      <section className="landing-intelligence" aria-labelledby="landing-intelligence-title">
-        <div className="landing-body-interface" aria-hidden="true">
-          <picture>
-            <source srcSet={bodyHero} type="image/webp" />
-            <img
-              data-testid="fitsho-body-intelligence"
-              src={bodyHeroFallback}
-              alt=""
-              width="1672"
-              height="941"
-              loading="lazy"
-            />
-          </picture>
-          <span className="landing-body-interface__highlight" data-testid="fitsho-body-highlight" />
-          <span className="landing-body-interface__line" />
-          <div className="landing-callout landing-callout--intelligence">
-            <span>{t("landing.callouts.shoulders")}</span>
-            <strong>{t("landing.callouts.priority")}</strong>
-          </div>
-        </div>
-        <div className="landing-section-heading">
-          <p className="landing-kicker">{t("landing.intelligence.eyebrow")}</p>
-          <h2 id="landing-intelligence-title" className="fitsho-display">{t("landing.intelligence.title")}</h2>
-          <p>{t("landing.intelligence.body")}</p>
-          <div className="landing-analysis-sample">
-            <small>{t("landing.intelligence.sample")}</small>
-            <dl>
-              <div><dt>{t("landing.callouts.shoulders")}</dt><dd data-tone="priority">{t("landing.callouts.priority")}</dd></div>
-              <div><dt>{t("landing.callouts.back")}</dt><dd>{t("landing.callouts.balanced")}</dd></div>
-              <div><dt>{t("landing.intelligence.confidence")}</dt><dd>{t("landing.intelligence.medium")}</dd></div>
-            </dl>
-          </div>
-        </div>
-      </section>
+      <CinematicStory reducedMotion={reducedMotion} />
+      <ProcessStory reducedMotion={reducedMotion} />
+      <BodyIntelligence reducedMotion={reducedMotion} />
 
       <section className="landing-product" id="product" aria-labelledby="landing-product-title">
         <div className="landing-section-heading">
@@ -218,32 +115,6 @@ export function PublicLandingPage() {
         <span>© 2026 Fitsho</span>
       </footer>
     </main>
-  );
-}
-
-function PlanBuilder({ compact = false }: { compact?: boolean }) {
-  const { t } = useTranslation();
-
-  return (
-    <div
-      className={`landing-builder${compact ? " landing-builder--compact" : ""}`}
-      aria-label={t("landing.builder.label")}
-    >
-      <div className="landing-builder__heading">
-        <span className="landing-builder__pulse" aria-hidden="true" />
-        <div><strong>{t("landing.builder.title")}</strong><small>{t("landing.builder.body")}</small></div>
-      </div>
-      <ul>
-        {(["structure", "exercise", "targets", "revision"] as const).map((item) => (
-          <li key={item}><span aria-hidden="true">✓</span>{t(`landing.builder.items.${item}`)}</li>
-        ))}
-      </ul>
-      <div className="landing-builder__summary">
-        <span><small>{t("landing.callouts.training")}</small><strong>{t("landing.callouts.fourDays")}</strong></span>
-        <span><small>{t("landing.callouts.nutrition")}</small><strong>{t("landing.callouts.calories")}</strong></span>
-      </div>
-      <span className="landing-builder__progress" aria-hidden="true"><i /></span>
-    </div>
   );
 }
 

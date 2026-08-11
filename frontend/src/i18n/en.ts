@@ -23,9 +23,26 @@ const en = {
       hero: {
         eyebrow: "Your body is where the plan begins",
         title: "Every body needs its own plan.",
-        body: "Fitsho uses your body, goal, and real-life conditions to build training and nutrition that can adapt as you progress.",
+        body: "Training and nutrition shaped around your body, goal, and path.",
         visualLabel: "Fitsho body identity with sample plan data",
         note: "Displayed data is illustrative and is not a personal user result.",
+      },
+      story: {
+        label: "The story of a personal Fitsho plan",
+      },
+      supervision: {
+        training: {
+          title: "Training plan, supervised by a coach",
+          seal: "Coach supervised",
+        },
+        nutrition: {
+          title: "Nutrition plan, supervised by a physician",
+          seal: "Physician supervised",
+        },
+      },
+      process: {
+        eyebrow: "THE FITSHO PROCESS",
+        title: "How Fitsho builds your plan",
       },
       callouts: {
         shoulders: "Shoulders",
@@ -52,10 +69,10 @@ const en = {
       },
       progression: {
         label: "How Fitsho progresses",
-        understand: { title: "Understand", body: "Your body, goal, and real constraints" },
-        plan: { title: "Plan", body: "Clear training and nutrition structure" },
-        train: { title: "Train", body: "Actionable sessions with complete detail" },
-        adapt: { title: "Adapt", body: "A new revision when conditions change" },
+        understand: { title: "Understand", body: "We learn about you" },
+        plan: { title: "Plan", body: "We build your program" },
+        train: { title: "Train", body: "You execute with guidance" },
+        adapt: { title: "Adapt", body: "We adjust as you progress" },
       },
       builder: {
         label: "Fitsho plan-building status",
@@ -69,9 +86,14 @@ const en = {
         },
       },
       intelligence: {
-        eyebrow: "The body as an interface",
-        title: "See which areas need more attention.",
-        body: "Fitsho Body Analysis presents strengths, lag, and uncertainty in clear language, without medical claims or hiding data limitations.",
+        eyebrow: "BODY INTELLIGENCE",
+        title: "Your body informs the plan.",
+        body: "Select a point on the body to explore each area's priority.",
+        imageAlt: "Athlete's back for Fitsho interactive body analysis",
+        muscles: {
+          shoulders: "Priority",
+          back: "Balanced",
+        },
         sample: "Illustrative Fitsho analysis",
         confidence: "Confidence",
         confidenceValue: "87%",
