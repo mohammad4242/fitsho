@@ -43,7 +43,9 @@ it("switches the complete landing direction and primary copy to English", async 
 
   await waitFor(() => expect(screen.getByRole("heading", { name: "Every body needs its own plan." })).toBeInTheDocument());
   expect(screen.getByRole("main")).toHaveAttribute("dir", "ltr");
-  expect(screen.getAllByRole("link", { name: "Build my plan" }).length).toBeGreaterThanOrEqual(2);
+  expect(screen.getByRole("heading", { name: "Get Started" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Get Started" })).toHaveAttribute("href", "/get-started");
+  expect(screen.getByText("Estimate from your meal photo")).toBeInTheDocument();
   expect(screen.getAllByText("Shoulders").length).toBeGreaterThanOrEqual(1);
 });
 
@@ -64,6 +66,22 @@ it("presents coach and physician supervision with schematic documents", () => {
   expect(screen.queryByText("Bench Press")).not.toBeInTheDocument();
 });
 
+it("continues nutrition into an estimated meal-photo analysis", () => {
+  render(<MemoryRouter><PublicLandingPage /></MemoryRouter>);
+
+  const meal = screen.getByRole("region", { name: "تحلیل عکس غذا" });
+  expect(within(meal).getByTestId("meal-photo")).toHaveAttribute(
+    "src",
+    expect.stringContaining("food"),
+  );
+  expect(within(meal).getByTestId("meal-scan-line")).toBeInTheDocument();
+  expect(within(meal).getByText("≈ ۶۴۰ kcal")).toBeInTheDocument();
+  expect(within(meal).getByText("تخمین از روی عکس غذا")).toBeInTheDocument();
+  expect(within(meal).getByText("پروتئین")).toBeInTheDocument();
+  expect(within(meal).getByText("کربوهیدرات")).toBeInTheDocument();
+  expect(within(meal).getByText("چربی")).toBeInTheDocument();
+});
+
 it("reveals the four-stage process in its required order without percentages", () => {
   render(<MemoryRouter><PublicLandingPage /></MemoryRouter>);
 
@@ -76,10 +94,16 @@ it("reveals the four-stage process in its required order without percentages", (
   expect(within(process).getByText("برنامه‌ات را می‌سازیم")).toBeInTheDocument();
 });
 
-it("uses the supplied body asset and updates interactive muscle callouts", async () => {
+it("scans the supplied analysis photo before the interactive body result", async () => {
   const user = userEvent.setup();
   render(<MemoryRouter><PublicLandingPage /></MemoryRouter>);
 
+  expect(screen.getByRole("heading", { name: "یک عکس. یک نگاه دقیق‌تر به بدنت." })).toBeInTheDocument();
+  expect(screen.getByTestId("body-analysis-photo")).toHaveAttribute(
+    "src",
+    expect.stringContaining("analyze"),
+  );
+  expect(screen.getByTestId("body-analysis-scan-line")).toBeInTheDocument();
   expect(screen.getByTestId("fitsho-body-intelligence")).toHaveAttribute(
     "src",
     expect.stringContaining("body"),
@@ -107,20 +131,23 @@ it("uses the supplied body asset and updates interactive muscle callouts", async
   expect(back).toHaveAttribute("aria-pressed", "false");
 });
 
-it("presents three large product previews and repeats the onboarding CTA", () => {
-  render(<MemoryRouter><PublicLandingPage /></MemoryRouter>);
+it("removes generic late sections and ends body intelligence with a minimal start action", () => {
+  const { container } = render(<MemoryRouter><PublicLandingPage /></MemoryRouter>);
 
-  const product = screen.getByRole("region", { name: "همان تجربه‌ای که بعد از ورود ادامه پیدا می‌کند." });
-  expect(within(product).getAllByRole("article")).toHaveLength(3);
-  expect(within(product).getByText("امروز")).toBeInTheDocument();
-  expect(within(product).getByText("برنامه تمرینی")).toBeInTheDocument();
-  expect(within(product).getByText("هدف تغذیه")).toBeInTheDocument();
-  expect(within(product).queryByText("تحلیل بدن")).not.toBeInTheDocument();
-  expect(within(product).queryByText("کاتالوگ غذا")).not.toBeInTheDocument();
-  expect(screen.getByText("تمرین امروز")).toBeInTheDocument();
-  expect(screen.getByText("۱۶۵ گرم پروتئین")).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "بدنت تغییر می‌کند. برنامه‌ات هم باید تغییر کند." })).toBeInTheDocument();
-  expect(screen.getAllByRole("link", { name: "برنامه من را بساز" }).length).toBeGreaterThanOrEqual(2);
+  expect(screen.queryByText("یک محصول، یک زبان")).not.toBeInTheDocument();
+  expect(screen.queryByText("همان تجربه‌ای که بعد از ورود ادامه پیدا می‌کند.")).not.toBeInTheDocument();
+  expect(screen.queryByText("برنامه‌ای که ثابت نمی‌ماند")).not.toBeInTheDocument();
+  expect(screen.queryByText("بدنت تغییر می‌کند. برنامه‌ات هم باید تغییر کند.")).not.toBeInTheDocument();
+
+  const sections = [...container.querySelectorAll("main > section")];
+  expect(sections.map((section) => section.className)).toEqual([
+    "cinematic-story",
+    "process-story",
+    "body-intelligence",
+    "landing-final",
+  ]);
+  expect(screen.getByRole("heading", { name: "شروع کن" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "شروع کن" })).toHaveAttribute("href", "/get-started");
 });
 
 it("keeps all content visible when reduced motion is requested", () => {
@@ -130,7 +157,8 @@ it("keeps all content visible when reduced motion is requested", () => {
 
   expect(screen.getByRole("main")).toHaveAttribute("data-reduced-motion", "true");
   expect(screen.getByRole("heading", { name: "هر بدن، برنامه خودش را می‌خواهد." })).toBeVisible();
-  expect(screen.getByRole("heading", { name: "بدنت تغییر می‌کند. برنامه‌ات هم باید تغییر کند." })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "شروع کن" })).toBeVisible();
+  expect(screen.getByText("≈ ۶۴۰ kcal")).toBeVisible();
 });
 
 it("opens a compact menu with onboarding and sign-in routes", async () => {

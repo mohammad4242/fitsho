@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import foodPhoto from "../../assets/landing/food.webp";
 import landingFilm from "../../assets/landing/landfilm.mp4";
 import landingPoster from "../../assets/landing/landfilm-poster.webp";
 import { useScrollProgress } from "./useScrollProgress";
@@ -39,6 +40,52 @@ export function CinematicStory({ reducedMotion }: { reducedMotion: boolean }) {
 
         <SupervisionMoment type="training" />
         <SupervisionMoment type="nutrition" />
+        <MealPhotoAnalysis />
+      </div>
+    </section>
+  );
+}
+
+function MealPhotoAnalysis() {
+  const { t } = useTranslation();
+
+  return (
+    <section
+      className="meal-analysis"
+      aria-labelledby="landing-meal-title"
+    >
+      <div className="meal-analysis__copy">
+        <p>MEAL PHOTO ANALYSIS</p>
+        <h2 id="landing-meal-title" className="fitsho-display">{t("landing.meal.title")}</h2>
+        <small>{t("landing.meal.estimate")}</small>
+      </div>
+      <div className="meal-analysis__visual">
+        <div className="scan-frame scan-frame--meal">
+          <img
+            data-testid="meal-photo"
+            src={foodPhoto}
+            alt={t("landing.meal.imageAlt")}
+            width="560"
+            height="540"
+            loading="lazy"
+          />
+          <span className="scan-frame__corner scan-frame__corner--one" aria-hidden="true" />
+          <span className="scan-frame__corner scan-frame__corner--two" aria-hidden="true" />
+          <span className="scan-frame__corner scan-frame__corner--three" aria-hidden="true" />
+          <span className="scan-frame__corner scan-frame__corner--four" aria-hidden="true" />
+          <i className="scan-frame__line" data-testid="meal-scan-line" aria-hidden="true" />
+        </div>
+        <div className="meal-result" aria-label={t("landing.meal.resultLabel")}>
+          <strong>{t("landing.meal.calories")}</strong>
+          <div>
+            {(["protein", "carbs", "fat"] as const).map((macro) => (
+              <span key={macro}>
+                <small>{t(`landing.meal.macros.${macro}.label`)}</small>
+                <b>{t(`landing.meal.macros.${macro}.value`)}</b>
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );

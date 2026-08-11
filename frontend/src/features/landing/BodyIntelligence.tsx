@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import analysisPhoto from "../../assets/landing/analyze.webp";
 import bodyFallback from "../../assets/landing/body.png";
 import bodyImage from "../../assets/landing/body.webp";
 import { useScrollProgress } from "./useScrollProgress";
@@ -16,20 +17,44 @@ export function BodyIntelligence({ reducedMotion }: { reducedMotion: boolean }) 
   return (
     <section
       className="body-intelligence"
+      id="body-analysis"
       ref={bodyRef}
       aria-labelledby="landing-intelligence-title"
     >
-      <header className="body-intelligence__heading">
-        <p className="landing-kicker">{t("landing.intelligence.eyebrow")}</p>
-        <h2 id="landing-intelligence-title" className="fitsho-display">{t("landing.intelligence.title")}</h2>
-        <p>{t("landing.intelligence.body")}</p>
-      </header>
+      <div className="body-intelligence__stage">
+        <header className="body-intelligence__heading">
+          <p className="landing-kicker">{t("landing.intelligence.eyebrow")}</p>
+          <h2 id="landing-intelligence-title" className="fitsho-display">{t("landing.intelligence.title")}</h2>
+          <p>{t("landing.intelligence.body")}</p>
+        </header>
 
-      <div
-        className="body-interface"
-        data-testid="body-interface"
-        data-active-muscle={activeMuscle}
-      >
+        <div className="body-analysis-capture">
+          <div className="scan-frame scan-frame--body">
+            <img
+              data-testid="body-analysis-photo"
+              src={analysisPhoto}
+              alt={t("landing.intelligence.analysisImageAlt")}
+              width="480"
+              height="930"
+              loading="lazy"
+            />
+            <span className="scan-frame__corner scan-frame__corner--one" aria-hidden="true" />
+            <span className="scan-frame__corner scan-frame__corner--two" aria-hidden="true" />
+            <span className="scan-frame__corner scan-frame__corner--three" aria-hidden="true" />
+            <span className="scan-frame__corner scan-frame__corner--four" aria-hidden="true" />
+            <i className="scan-frame__line" data-testid="body-analysis-scan-line" aria-hidden="true" />
+            <div className="body-analysis-capture__mapping" aria-hidden="true">
+              <i /><i /><i />
+            </div>
+          </div>
+          <small>{t("landing.intelligence.scanning")}</small>
+        </div>
+
+        <div
+          className="body-interface"
+          data-testid="body-interface"
+          data-active-muscle={activeMuscle}
+        >
         <picture className="body-interface__image">
           <source srcSet={bodyImage} type="image/webp" />
           <img
@@ -93,9 +118,10 @@ export function BodyIntelligence({ reducedMotion }: { reducedMotion: boolean }) 
           ))}
         </div>
 
-        <div className="body-interface__callout" role="status" aria-live="polite">
-          <small>{t(`landing.callouts.${activeMuscle}`)}</small>
-          <strong>{t(`landing.intelligence.muscles.${activeMuscle}`)}</strong>
+          <div className="body-interface__callout" role="status" aria-live="polite">
+            <small>{t(`landing.callouts.${activeMuscle}`)}</small>
+            <strong>{t(`landing.intelligence.muscles.${activeMuscle}`)}</strong>
+          </div>
         </div>
       </div>
     </section>

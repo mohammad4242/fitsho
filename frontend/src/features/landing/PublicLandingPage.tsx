@@ -32,8 +32,6 @@ export function PublicLandingPage() {
   const reducedMotion = useReducedMotion();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const previews = ["dashboard", "workout", "nutrition"] as const;
-
   return (
     <main
       className="public-landing fitsho-page"
@@ -48,7 +46,7 @@ export function PublicLandingPage() {
         </Link>
         <nav className="landing-header__nav" aria-label={t("landing.menu.label")}>
           <a href="#how-it-works">{t("landing.menu.how")}</a>
-          <a href="#product">{t("landing.menu.product")}</a>
+          <a href="#body-analysis">{t("landing.menu.analysis")}</a>
           <Link to="/login">{t("landing.menu.signIn")}</Link>
         </nav>
         <div className="landing-header__actions">
@@ -74,7 +72,7 @@ export function PublicLandingPage() {
           >×</button>
           <nav>
             <a href="#how-it-works" onClick={() => setMenuOpen(false)}>{t("landing.menu.how")}</a>
-            <a href="#product" onClick={() => setMenuOpen(false)}>{t("landing.menu.product")}</a>
+            <a href="#body-analysis" onClick={() => setMenuOpen(false)}>{t("landing.menu.analysis")}</a>
             <Link to="/get-started">{t("landing.menu.build")}</Link>
             <Link to="/login">{t("landing.menu.signIn")}</Link>
           </nav>
@@ -85,68 +83,12 @@ export function PublicLandingPage() {
       <ProcessStory reducedMotion={reducedMotion} />
       <BodyIntelligence reducedMotion={reducedMotion} />
 
-      <section className="landing-product" id="product" aria-labelledby="landing-product-title">
-        <div className="landing-section-heading">
-          <p className="landing-kicker">{t("landing.product.eyebrow")}</p>
-          <h2 id="landing-product-title" className="fitsho-display">{t("landing.product.title")}</h2>
-          <p>{t("landing.product.body")}</p>
-        </div>
-        <div className="landing-product-rail">
-          {previews.map((preview, index) => (
-            <article className={`landing-product-card landing-product-card--${preview}`} key={preview}>
-              <header><span>{String(index + 1).padStart(2, "0")}</span><h3>{t(`landing.product.previews.${preview}`)}</h3></header>
-              <ProductPreview type={preview} />
-            </article>
-          ))}
-        </div>
-      </section>
-
       <section className="landing-final" aria-labelledby="landing-final-title">
-        <p className="landing-kicker">{t("landing.final.eyebrow")}</p>
         <h2 id="landing-final-title" className="fitsho-display">{t("landing.final.title")}</h2>
-        <p>{t("landing.final.body")}</p>
         <Link className="landing-primary-cta" to="/get-started">
-          {t("landing.cta")}<span aria-hidden="true">←</span>
+          {t("landing.final.action")}<span aria-hidden="true">←</span>
         </Link>
       </section>
-
-      <footer className="landing-footer">
-        <Link className="brand-mark" to="/"><span className="brand-mark__pulse" aria-hidden="true" />{t("common.brand")}</Link>
-        <span>© 2026 Fitsho</span>
-      </footer>
     </main>
-  );
-}
-
-function ProductPreview({ type }: { type: "dashboard" | "workout" | "nutrition" }) {
-  const { t } = useTranslation();
-
-  if (type === "workout") {
-    return (
-      <div className="landing-preview landing-preview--workout">
-        {(["pushDay", "pullDay", "legDay"] as const).map((day, index) => (
-          <span key={day} data-active={index === 0 ? "true" : undefined}>
-            <b>{t(`landing.product.sample.${day}`)}</b><small>{t("landing.product.sample.session")}</small>
-          </span>
-        ))}
-      </div>
-    );
-  }
-  if (type === "nutrition") {
-    return (
-      <div className="landing-preview landing-preview--nutrition">
-        <strong>2,340 <small>kcal</small></strong>
-        <span>{t("landing.product.sample.protein")}</span>
-        <span>{t("landing.product.sample.carbs")}</span>
-        <span>{t("landing.product.sample.fat")}</span>
-      </div>
-    );
-  }
-  return (
-    <div className="landing-preview landing-preview--dashboard">
-      <span><small>{t("landing.product.sample.todayWorkout")}</small><strong>{t("landing.product.sample.pushDay")}</strong></span>
-      <span><small>{t("landing.callouts.nutrition")}</small><strong>{t("landing.callouts.calories")}</strong></span>
-      <span><small>{t("landing.intelligence.confidence")}</small><strong>{t("landing.intelligence.confidenceValue")}</strong></span>
-    </div>
   );
 }

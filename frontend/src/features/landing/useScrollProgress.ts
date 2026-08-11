@@ -30,13 +30,16 @@ export function useScrollProgress<T extends HTMLElement>(
       const progress = reducedMotion ? 1 : clamp(-rect.top / distance);
 
       if (target === "cinematic") {
-        set("--hero-progress", 1 - range(progress, 0.04, 0.2));
-        set("--cinema-progress", range(progress, 0.08, 0.54));
-        set("--training-progress", windowed(progress, 0.18, 0.29, 0.45, 0.56));
-        set("--training-seal", range(progress, 0.27, 0.41));
-        set("--nutrition-progress", windowed(progress, 0.5, 0.62, 0.77, 0.87));
-        set("--nutrition-seal", range(progress, 0.6, 0.74));
-        set("--video-progress", 1 - range(progress, 0.82, 1));
+        set("--hero-progress", 1 - range(progress, 0.04, 0.16));
+        set("--cinema-progress", range(progress, 0.06, 0.58));
+        set("--training-progress", windowed(progress, 0.14, 0.21, 0.33, 0.44));
+        set("--training-seal", range(progress, 0.23, 0.31));
+        set("--nutrition-progress", windowed(progress, 0.38, 0.46, 0.61, 0.72));
+        set("--nutrition-seal", range(progress, 0.49, 0.57));
+        set("--meal-progress", range(progress, 0.64, 0.72));
+        set("--meal-scan", range(progress, 0.73, 0.87));
+        set("--meal-result", range(progress, 0.86, 0.94));
+        set("--video-progress", 1 - range(progress, 0.76, 1));
       } else if (target === "process") {
         const starts = [0, 0.25, 0.5, 0.75];
         starts.forEach((start, index) => {
@@ -45,7 +48,10 @@ export function useScrollProgress<T extends HTMLElement>(
           if (index < 3) set(`--line-${index}`, range(progress, start + 0.18, start + 0.25));
         });
       } else {
-        set("--body-depth", range(progress, 0, 1));
+        set("--analysis-progress", range(progress, 0.08, 0.46));
+        set("--analysis-exit", range(progress, 0.48, 0.66));
+        set("--body-result", range(progress, 0.58, 0.72));
+        set("--body-depth", range(progress, 0.58, 1));
       }
     };
 
