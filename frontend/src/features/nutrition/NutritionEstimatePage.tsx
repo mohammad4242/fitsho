@@ -78,16 +78,13 @@ export function NutritionEstimatePage() {
   return (
     <main className="nutrition-estimate-page fitsho-page" dir={language === "fa" ? "rtl" : "ltr"}>
       <section className="nutrition-estimate-hero">
+        <div><p className="eyebrow eyebrow--accent">{l("امروز", "Today")}</p><h1 className="fitsho-display">{l("هدف روزانه تغذیه", "Daily nutrition targets")}</h1></div>
         <nav className="nutrition-estimate-tools" aria-label={l("ابزارهای تغذیه", "Nutrition tools")}>
-          <Link className="nutrition-estimate-back" to="/dashboard">{l("بازگشت به امروز", "Back to Today")}</Link>
-          <Link className="secondary-button" to="/nutrition-tracking">{l("ثبت تغذیه امروز", "Track today's food")}</Link>
-          <Link className="secondary-button" to="/nutrition-labs">{l("آزمایش‌های من", "My lab documents")}</Link>
-          <Link className="secondary-button" to="/nutrition-supplements">{l("مکمل‌های من", "My supplements")}</Link>
-          <Link className="nutrition-catalogue-entry" to="/food-catalogue"><span aria-hidden="true">⌁</span><strong>{l("کاتالوگ مواد غذایی", "Food catalogue")}</strong><small>{l("مرجع ترکیب و ارزش غذایی", "Composition and nutrition reference")}</small></Link>
+          <Link className="nutrition-tool-link nutrition-tool-link--primary" to="/nutrition-tracking"><strong>{l("ثبت تغذیه", "Track food")}</strong><small>{l("دستی یا با عکس", "Manual or photo")}</small></Link>
+          <Link className="nutrition-tool-link" to="/food-catalogue"><strong>{l("کاتالوگ", "Catalogue")}</strong><small>{l("مرجع مواد غذایی", "Food reference")}</small></Link>
+          <Link className="nutrition-tool-link" to="/nutrition-labs"><strong>{l("آزمایش‌ها", "Labs")}</strong></Link>
+          <Link className="nutrition-tool-link" to="/nutrition-supplements"><strong>{l("مکمل‌ها", "Supplements")}</strong></Link>
         </nav>
-        <p className="eyebrow eyebrow--accent">{l("موتور علمی فیتشو", "Fitsho scientific engine")}</p>
-        <h1 className="fitsho-display">{l("هدف روزانه تغذیه", "Daily nutrition targets")}</h1>
-        <p>{l("انرژی و مواد مغذی براساس مشخصات فعلی، فعالیت روزانه و تمرینت محاسبه شده‌اند.", "Energy and nutrients are calculated from your current body data, daily activity, and structured exercise.")}</p>
       </section>
 
       {state === "loading" && <p className="nutrition-estimate-state" role="status">{calculating ? l("در حال محاسبه…", "Calculating…") : l("در حال دریافت برآورد…", "Loading estimate…")}</p>}
@@ -185,7 +182,7 @@ function EstimateContent({ estimate, language, onRefresh }: { estimate: Nutritio
       </div>
     </section>
 
-    <section className="nutrition-target-grid nutrition-target-grid--primary" aria-label={l("درشت‌مغذی‌های اصلی", "Primary macronutrient targets")}>
+    <section className="nutrition-target-grid nutrition-target-grid--primary fitsho-metric-strip" aria-label={l("درشت‌مغذی‌های اصلی", "Primary macronutrient targets")}>
       <TargetCard title={l("پروتئین", "Protein")} value={preferred("protein")} note={l(`حداقل ${formatValue(target("protein")?.minimum, target("protein")?.unit, number, language)}`, `Minimum ${formatValue(target("protein")?.minimum, target("protein")?.unit, number, language)}`)} />
       <TargetCard title={l("کربوهیدرات", "Carbohydrate")} value={range("carbohydrate")} note={l("بازه علمی روزانه", "Scientific daily range")} />
       <TargetCard title={l("چربی کل", "Total fat")} value={range("total_fat")} note={l("بازه علمی روزانه", "Scientific daily range")} />

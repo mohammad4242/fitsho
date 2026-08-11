@@ -115,6 +115,7 @@ it("shows planned versus actual tracking and saves photo corrections before conf
   expect(await screen.findByText("Logged calories")).toBeInTheDocument();
   expect(screen.getByText("Planned calories")).toBeInTheDocument();
   expect(await screen.findByRole("button", { name: "Chicken breast · 120 g" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /Food photo/i }));
   await user.click(screen.getByRole("checkbox", { name: /third-party image processing/i }));
   await user.upload(screen.getByLabelText("Choose food photo"), new File(["image"], "meal.jpg", { type: "image/jpeg" }));
   const amount = await screen.findByRole("spinbutton", { name: "Chicken amount" });

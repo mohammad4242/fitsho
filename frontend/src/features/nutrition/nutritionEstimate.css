@@ -180,3 +180,71 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .physician-review-section { display: grid; gap: 1rem; }.physician-review-section label { display: grid; gap: 0.4rem; color: #9ac2bc; }.physician-review-section input, .physician-review-section select, .physician-review-section textarea { width: 100%; min-height: 2.8rem; padding: 0.7rem; border: 1px solid rgb(154 225 214 / 17%); border-radius: 0.7rem; color: #f0fcf9; background: #0c302e; }.physician-review-section textarea { min-height: 7rem; resize: vertical; }
 
 @media (max-width: 850px) { .physician-review-hero { grid-template-columns: 1fr; }.physician-review-summary { width: fit-content; }.physician-review-workspace { grid-template-columns: 1fr; }.physician-clinical-tabs { grid-template-columns: repeat(2, 1fr); } }
+
+/* Compact authenticated nutrition composition */
+.nutrition-estimate-page { padding-bottom: 6rem; background: var(--fitsho-canvas); }
+.nutrition-estimate-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; padding: 1rem 0 .8rem; }
+.nutrition-estimate-hero h1 { max-width: none; margin: .15rem 0 0; font-size: clamp(1.45rem, 4vw, 2.2rem); line-height: 1.2; letter-spacing: 0; }
+.nutrition-estimate-hero > p:last-child { display: none; }
+.nutrition-estimate-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; margin: 0; }
+.nutrition-tool-link { min-height: 2.7rem; display: grid; align-content: center; padding: .45rem .7rem; border: 1px solid var(--fitsho-line); border-radius: .75rem; color: var(--fitsho-ink); background: var(--fitsho-surface-subtle); font-size: .72rem; text-decoration: none; }
+.nutrition-tool-link small { color: var(--fitsho-muted); font-size: .6rem; }
+.nutrition-tool-link--primary { border-color: var(--fitsho-line-strong); color: var(--fitsho-aqua); }
+.nutrition-estimate-summary { grid-template-columns: minmax(0, 1.4fr) minmax(15rem, .6fr); }
+.nutrition-calorie-card { min-height: 8.5rem; padding: 1rem; border-radius: var(--fitsho-radius-lg); }
+.nutrition-calorie-card strong { font-size: clamp(2rem, 6vw, 3.25rem); }
+.nutrition-confidence-card { min-height: 0; padding: 1rem; border-radius: var(--fitsho-radius-lg); }
+.nutrition-confidence-card p { margin: .5rem 0 0; font-size: .72rem; line-height: 1.55; }
+.nutrition-target-grid--primary.fitsho-metric-strip { gap: 0; padding-block: .65rem; }
+.nutrition-target-grid--primary.fitsho-metric-strip .nutrition-target-card { min-height: 0; padding: .75rem; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.nutrition-target-grid--primary.fitsho-metric-strip .nutrition-target-card + .nutrition-target-card { border-inline-start: 1px solid var(--fitsho-line); }
+.nutrition-target-grid--primary.fitsho-metric-strip .nutrition-target-card strong { font-size: 1rem; }
+.nutrition-target-grid--primary.fitsho-metric-strip .nutrition-target-card small { display: none; }
+.nutrition-science-details { margin-top: .2rem; border-radius: var(--fitsho-radius-md); }
+.nutrition-science-details > summary { min-height: 3rem; padding: .75rem 1rem; font-size: .78rem; }
+.weekly-plan-empty, .weekly-plan { margin-top: .75rem; }
+
+.nutrition-tracking-header { align-items: center; }
+.nutrition-tracking-header .nutrition-page-back { order: 2; min-height: 2.5rem; padding: .45rem .7rem; }
+.nutrition-daily-panel, .nutrition-photo-entry, .nutrition-checkin, .nutrition-manual-entry, .nutrition-recent-foods { width: min(100% - 2rem, 72rem); margin-inline: auto; }
+.nutrition-daily-panel { display: grid; grid-template-columns: minmax(12rem, .65fr) minmax(18rem, 1fr); align-items: center; gap: 1rem; padding: 1rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); }
+.nutrition-daily-panel__calories { display: grid; }
+.nutrition-daily-panel__calories > span { color: var(--fitsho-muted); font-size: .7rem; }
+.nutrition-daily-panel__calories > strong { font: 850 clamp(2rem, 6vw, 3rem)/1 "Sora Variable", sans-serif; }
+.nutrition-daily-panel__calories > small { margin-top: .3rem; color: var(--fitsho-muted); }
+.nutrition-daily-panel__calories b { color: var(--fitsho-ink); }
+.nutrition-photo-entry { margin-top: .65rem; }
+.nutrition-photo-entry button { width: 100%; display: flex; align-items: center; gap: .75rem; padding: .75rem; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-md); color: var(--fitsho-ink); background: rgb(80 223 206 / 6%); font: inherit; text-align: start; cursor: pointer; }
+.nutrition-photo-entry button > span:nth-child(2) { display: grid; }
+.nutrition-photo-entry button small { color: var(--fitsho-muted); font-size: .68rem; }
+.nutrition-photo-entry button b { margin-inline-start: auto; color: var(--fitsho-aqua); font-size: 1.2rem; }
+.nutrition-photo-entry__icon { width: 2.35rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; color: var(--fitsho-canvas); background: var(--fitsho-aqua); }
+.nutrition-photo-panel { margin-block: .5rem !important; padding: 1rem !important; }
+.nutrition-photo-panel h2 { margin-top: 0; font-size: 1rem; }
+.nutrition-photo-result li { display: flex; align-items: center; gap: .5rem; padding: .5rem 0; }
+.nutrition-photo-result input { width: 5rem; }
+.nutrition-checkin { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem; margin-top: .65rem; }
+.nutrition-checkin button { min-height: 2.65rem; padding: .45rem; border: 1px solid var(--fitsho-line); border-radius: .65rem; color: var(--fitsho-muted); background: var(--fitsho-surface-subtle); font: inherit; font-size: .68rem; cursor: pointer; }
+.nutrition-checkin button.is-active { border-color: var(--fitsho-aqua); color: var(--fitsho-aqua); background: rgb(80 223 206 / 7%); }
+.nutrition-recent-foods { margin-top: .65rem; }
+.nutrition-manual-entry { margin-top: .65rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-md); background: var(--fitsho-surface-subtle); }
+.nutrition-manual-entry > summary { padding: .75rem 1rem; color: var(--fitsho-muted); font-size: .75rem; font-weight: 850; cursor: pointer; }
+.nutrition-manual-entry .nutrition-estimate-notes { width: auto; margin: 0; padding: .85rem; border: 0; border-top: 1px solid var(--fitsho-line); border-radius: 0; box-shadow: none; }
+.nutrition-tracking-page > .nutrition-estimate-notes { margin-block: .65rem; padding: 1rem; }
+.nutrition-tracking-page > .nutrition-estimate-notes h2 { margin-top: 0; font-size: 1rem; }
+.nutrition-tracking-page .nutrition-adherence-chart article { grid-template-columns: 4rem 1fr 1fr; padding: .6rem; }
+
+@media (max-width: 600px) {
+  .nutrition-estimate-hero { align-items: flex-start; flex-direction: column; padding-top: .75rem; }
+  .nutrition-estimate-tools { width: 100%; display: grid; grid-template-columns: repeat(2, 1fr); }
+  .nutrition-estimate-summary { grid-template-columns: 1fr; }
+  .nutrition-confidence-card { display: flex; align-items: center; justify-content: space-between; }
+  .nutrition-confidence-card p { display: none; }
+  .nutrition-target-grid--primary.fitsho-metric-strip { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .nutrition-calorie-card { min-height: 7.5rem; }
+  .nutrition-tracking-header { flex-direction: row; }
+  .nutrition-daily-panel, .nutrition-photo-entry, .nutrition-checkin, .nutrition-manual-entry, .nutrition-recent-foods { width: min(100% - 1.5rem, 72rem); }
+  .nutrition-daily-panel { grid-template-columns: 1fr; gap: .75rem; }
+  .nutrition-checkin { grid-template-columns: repeat(2, 1fr); }
+  .nutrition-tracking-page .nutrition-adherence-chart article { grid-template-columns: 1fr; }
+}
