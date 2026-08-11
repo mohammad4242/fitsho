@@ -235,10 +235,30 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-photo-entry button small { color: var(--fitsho-muted); font-size: .68rem; }
 .nutrition-photo-entry button b { margin-inline-start: auto; color: var(--fitsho-aqua); font-size: 1.2rem; }
 .nutrition-photo-entry__icon { width: 2.35rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; color: var(--fitsho-canvas); background: var(--fitsho-aqua); }
-.nutrition-photo-panel { margin-block: .5rem !important; padding: 1rem !important; }
-.nutrition-photo-panel h2 { margin-top: 0; font-size: 1rem; }
-.nutrition-photo-result li { display: flex; align-items: center; gap: .5rem; padding: .5rem 0; }
-.nutrition-photo-result input { width: 5rem; }
+.nutrition-photo-panel { width: min(100% - 2rem, 72rem); margin: .5rem auto; padding: .85rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); }
+.nutrition-photo-panel > header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .65rem; }
+.nutrition-photo-panel h2 { margin: .1rem 0 0; font-size: 1.05rem; }
+.nutrition-photo-estimate-badge { padding: .4rem .55rem; border-radius: 2rem; color: var(--fitsho-aqua); background: rgb(80 223 206 / 10%); font-size: .65rem; }
+.nutrition-photo-stage { position: relative; overflow: hidden; min-height: 14rem; display: grid; place-items: center; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-md); background: linear-gradient(145deg, rgb(80 223 206 / 7%), transparent), var(--fitsho-canvas); }
+.nutrition-photo-stage > div { display: grid; justify-items: center; gap: .4rem; color: var(--fitsho-muted); font-size: .75rem; }
+.nutrition-photo-stage > div span { color: var(--fitsho-aqua); font-size: 2.25rem; }
+.nutrition-photo-stage img { width: 100%; height: 100%; min-height: 14rem; max-height: 24rem; object-fit: cover; }
+.nutrition-photo-stage__busy { position: absolute; inset: 0; display: grid; place-items: center; color: var(--fitsho-ink); background: rgb(2 10 10 / 72%); font-size: .8rem; font-weight: 850; }
+.nutrition-photo-disclosure { margin: .65rem 0; color: var(--fitsho-muted); font-size: .68rem; line-height: 1.6; }
+.nutrition-photo-consent { display: flex; align-items: flex-start; gap: .45rem; color: var(--fitsho-muted); font-size: .7rem; }
+.nutrition-photo-picker { width: fit-content; min-height: 2.5rem; display: grid; place-items: center; margin-top: .65rem; padding: .5rem .8rem; border: 1px solid var(--fitsho-line); border-radius: .65rem; color: var(--fitsho-muted); font-size: .72rem; font-weight: 850; }
+.nutrition-photo-picker.is-enabled { border-color: var(--fitsho-line-strong); color: var(--fitsho-aqua); cursor: pointer; }
+.nutrition-photo-picker input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.nutrition-photo-result { margin-top: .75rem; border-top: 1px solid var(--fitsho-line); }
+.nutrition-photo-result > p { margin: .7rem 0 .3rem; color: var(--fitsho-muted); font-size: .7rem; }
+.nutrition-photo-result ul { margin: 0 0 .65rem; padding: 0; list-style: none; }
+.nutrition-photo-result li { min-height: 3.2rem; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .55rem; padding: .55rem 0; }
+.nutrition-photo-result li + li { border-top: 1px solid var(--fitsho-line); }
+.nutrition-photo-result li > span { display: grid; }
+.nutrition-photo-result li small { color: var(--fitsho-muted); font-size: .6rem; }
+.nutrition-photo-result li label { color: var(--fitsho-muted); font-size: .62rem; }
+.nutrition-photo-result input { width: 4.5rem; min-height: 2.2rem; padding: .35rem; border: 1px solid var(--fitsho-line); border-radius: .5rem; color: var(--fitsho-ink); background: var(--fitsho-canvas); }
+.nutrition-photo-result li button { border: 0; color: var(--fitsho-coral); background: transparent; font: inherit; font-size: .68rem; cursor: pointer; }
 .nutrition-checkin { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem; margin-top: .65rem; }
 .nutrition-checkin button { min-height: 2.65rem; padding: .45rem; border: 1px solid var(--fitsho-line); border-radius: .65rem; color: var(--fitsho-muted); background: var(--fitsho-surface-subtle); font: inherit; font-size: .68rem; cursor: pointer; }
 .nutrition-checkin button.is-active { border-color: var(--fitsho-aqua); color: var(--fitsho-aqua); background: rgb(80 223 206 / 7%); }
@@ -261,6 +281,7 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
   .nutrition-target-grid--primary.fitsho-metric-strip { display: grid; grid-template-columns: repeat(3, 1fr); }
   .nutrition-calorie-card { min-height: 7.5rem; }
   .nutrition-today-panel, .nutrition-meal-summary { width: min(100% - 1.5rem, 72rem); }
+  .nutrition-photo-panel { width: min(100% - 1.5rem, 72rem); }
   .nutrition-today-panel__top { min-height: 7.6rem; grid-template-columns: minmax(0, 1fr) auto; gap: .65rem; padding: .8rem; }
   .nutrition-today-panel .nutrition-confidence-card { grid-column: 1 / -1; min-width: 0; min-height: 2rem; display: flex; align-items: center; justify-content: space-between; padding: .45rem 0 0; border: 0; border-top: 1px solid var(--fitsho-line); }
   .nutrition-today-panel .fitsho-progress-ring { width: 4.4rem; }

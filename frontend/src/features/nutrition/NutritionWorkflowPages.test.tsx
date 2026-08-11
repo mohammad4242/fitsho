@@ -118,6 +118,8 @@ it("shows planned versus actual tracking and saves photo corrections before conf
   await user.click(screen.getByRole("button", { name: /Food photo/i }));
   await user.click(screen.getByRole("checkbox", { name: /third-party image processing/i }));
   await user.upload(screen.getByLabelText("Choose food photo"), new File(["image"], "meal.jpg", { type: "image/jpeg" }));
+  expect(await screen.findByRole("img", { name: "Meal photo preview" })).toBeInTheDocument();
+  expect(screen.getByText("Estimated result · 80%")).toBeInTheDocument();
   const amount = await screen.findByRole("spinbutton", { name: "Chicken amount" });
   await user.clear(amount);
   await user.type(amount, "150");

@@ -29,6 +29,7 @@ export function NutritionTrackingPage() {
   const [recentFoods, setRecentFoods] = useState<Awaited<ReturnType<typeof api.listRecentFoods>>>([]);
   const [history, setHistory] = useState<DailyTrackingSummary[]>([]);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   const load = () => api.getDailyTracking(today).then(setSummary).catch(() => setError(l("دریافت اطلاعات ممکن نشد.", "Could not load tracking."))).finally(() => setLoading(false));
   useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -56,6 +57,9 @@ export function NutritionTrackingPage() {
 
   async function analyzePhoto(file: File | undefined) {
     if (!file || !photoConsent) return;
+    const reader = new FileReader();
+    reader.addEventListener("load", () => setPhotoPreview(typeof reader.result === "string" ? reader.result : null), { once: true });
+    reader.readAsDataURL(file);
     setBusy(true); setError(null);
     try { setPhotoEstimate(await api.estimateFoodPhoto(file)); }
     catch { setError(l("برآورد عکس فعلاً در دسترس نیست؛ ثبت دستی همچنان کار می‌کند.", "Photo estimation is unavailable; manual tracking still works.")); }
@@ -134,12 +138,16 @@ export function NutritionTrackingPage() {
       </div>
     </section>
     <section className="nutrition-photo-entry"><button type="button" onClick={() => setPhotoOpen((open) => !open)} aria-expanded={photoOpen}><span className="nutrition-photo-entry__icon" aria-hidden="true">⌾</span><span><strong>{l("عکس وعده", "Food photo")}</strong><small>{l("تخمین از روی عکس غذا", "Estimate from a meal photo")}</small></span><b aria-hidden="true">+</b></button></section>
-    {photoOpen && <section className="nutrition-estimate-notes nutrition-photo-panel">
-      <h2>{l("برآورد از عکس غذا", "Estimate from a food photo")}</h2>
-      <p>{l("عکس برای شناسایی تقریبی غذا به OpenRouter فرستاده می‌شود؛ اطلاعات حساب یا پزشکی ارسال نمی‌شود.", "The image is sent to OpenRouter only for approximate food identification; account and medical data are not sent.")}</p>
-      <label><input type="checkbox" checked={photoConsent} onChange={(event) => setPhotoConsent(event.target.checked)} /> {l("با پردازش عکس توسط سرویس ثالث موافقم", "I consent to third-party image processing")}</label>
-      <input aria-label={l("انتخاب عکس غذا", "Choose food photo")} type="file" accept="image/jpeg,image/png,image/webp" disabled={!photoConsent || busy} onChange={(event) => void analyzePhoto(event.target.files?.[0])} />
-      {photoEstimate && <div className="nutrition-photo-result"><p>{l("این نتیجه تقریبی است و فقط بعد از تأیید تو ثبت می‌شود.", "This is approximate and is saved only after your confirmation.")}</p><ul>{photoEstimate.items.map((item) => <li key={item.item_id}><span>{item.name_guess} ({item.mapping_status})</span><input aria-label={l(`مقدار ${item.name_guess}`, `${item.name_guess} amount`)} type="number" min="1" max="10000" defaultValue={item.estimated_amount} onBlur={(event) => void correctPhotoAmount(item.item_id, Number(event.target.value))} /> {item.unit}<button type="button" onClick={() => void removePhotoItem(item.item_id)}>{l("حذف", "Remove")}</button></li>)}</ul><button className="primary-button" disabled={busy} onClick={() => void confirmPhoto()}>{l("تأیید و ثبت", "Confirm and log")}</button></div>}
+    {photoOpen && <section className="nutrition-photo-panel">
+      <header><div><p className="eyebrow eyebrow--accent">{l("تخمین تصویری", "Photo estimate")}</p><h2>{l("عکس وعده", "Meal photo")}</h2></div>{photoEstimate && <strong className="nutrition-photo-estimate-badge">{l("نتیجه تخمینی", "Estimated result")} · {Math.round(photoEstimate.overall_confidence * 100).toLocaleString(fa ? "fa-IR" : "en-US")}{fa ? "٪" : "%"}</strong>}</header>
+      <div className="nutrition-photo-stage">
+        {photoPreview ? <img alt={l("پیش‌نمایش عکس وعده", "Meal photo preview")} src={photoPreview} /> : <div><span aria-hidden="true">⌾</span><strong>{l("عکس غذا را انتخاب کن", "Choose a meal photo")}</strong></div>}
+        {busy && <span className="nutrition-photo-stage__busy" role="status">{l("در حال تحلیل…", "Analyzing…")}</span>}
+      </div>
+      <p className="nutrition-photo-disclosure">{l("عکس فقط برای شناسایی تقریبی غذا به OpenRouter فرستاده می‌شود؛ اطلاعات حساب یا پزشکی ارسال نمی‌شود.", "The image is sent to OpenRouter only for approximate food identification; account and medical data are not sent.")}</p>
+      <label className="nutrition-photo-consent"><input type="checkbox" checked={photoConsent} onChange={(event) => setPhotoConsent(event.target.checked)} /> {l("با پردازش عکس توسط سرویس ثالث موافقم", "I consent to third-party image processing")}</label>
+      <label className={`nutrition-photo-picker${photoConsent ? " is-enabled" : ""}`}><span>{photoPreview ? l("تغییر عکس", "Change photo") : l("انتخاب عکس", "Choose photo")}</span><input aria-label={l("انتخاب عکس غذا", "Choose food photo")} type="file" accept="image/jpeg,image/png,image/webp" disabled={!photoConsent || busy} onChange={(event) => void analyzePhoto(event.target.files?.[0])} /></label>
+      {photoEstimate && <div className="nutrition-photo-result"><p>{l("این نتیجه تقریبی است و فقط بعد از تأیید تو ثبت می‌شود.", "This is approximate and is saved only after your confirmation.")}</p><ul>{photoEstimate.items.map((item) => <li key={item.item_id}><span><strong>{item.name_guess}</strong><small>{item.mapping_status}</small></span><label>{l("مقدار", "Amount")} <input aria-label={l(`مقدار ${item.name_guess}`, `${item.name_guess} amount`)} type="number" min="1" max="10000" defaultValue={item.estimated_amount} onBlur={(event) => void correctPhotoAmount(item.item_id, Number(event.target.value))} /> {item.unit}</label><button type="button" onClick={() => void removePhotoItem(item.item_id)}>{l("حذف", "Remove")}</button></li>)}</ul><button className="primary-button" disabled={busy} onClick={() => void confirmPhoto()}>{l("تأیید و ثبت", "Confirm and log")}</button></div>}
     </section>}
     <section className="nutrition-checkin" aria-label={l("ثبت وضعیت امروز", "Today's check-in")}>
       {([ ["on_plan", "طبق برنامه", "On plan"], ["mostly_on_plan", "تقریباً طبق برنامه", "Mostly on plan"], ["off_plan", "خارج از برنامه", "Off plan"], ["not_recorded", "ثبت نمی‌کنم", "Skip"] ] as const).map(([value, persian, english]) => <button className={summary?.check_in_status === value ? "is-active" : undefined} disabled={busy} key={value} onClick={() => void checkIn(value)}>{l(persian, english)}</button>)}
