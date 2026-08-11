@@ -740,6 +740,9 @@ html[dir="rtl"] .profile-page-heading h1 { letter-spacing: 0; }
 .profile-wizard__page > h2 { color: var(--fitsho-ink); font-family: inherit; font-size: clamp(1.55rem, 3vw, 2.25rem); font-weight: 850; }
 .profile-fieldset { border-color: var(--fitsho-line); background: var(--fitsho-surface-subtle); box-shadow: none; }
 .profile-fieldset legend { color: var(--fitsho-aqua); }
+.profile-form .profile-field label { color: var(--fitsho-ink); }
+.profile-form .profile-field__hint { color: var(--fitsho-muted); }
+.profile-form .profile-fieldset legend { color: var(--fitsho-aqua); }
 .profile-field :is(input, select, textarea) { border-color: var(--fitsho-line); color: var(--fitsho-ink); background: var(--fitsho-canvas); }
 .profile-field__hint { color: var(--fitsho-muted); }
 .profile-wizard__actions { background: linear-gradient(transparent, rgb(11 32 31 / 98%) 30%); }
