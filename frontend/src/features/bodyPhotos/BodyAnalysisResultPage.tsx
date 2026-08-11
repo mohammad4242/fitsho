@@ -122,7 +122,6 @@ export function BodyAnalysisResultPage() {
   return (
     <main className="body-analysis-page fitsho-page">
       <header className="body-analysis-page__header">
-        <Link className="body-photo-link-button" to="/body-progress">{t("bodyPhotos.results.back")}</Link>
         <p className="eyebrow eyebrow--accent">{t("bodyPhotos.eyebrow")}</p>
         <h1 className="fitsho-display">{t("bodyPhotos.results.title")}</h1>
         <p>{t("bodyPhotos.results.sessionDate", { date: sessionDate })}</p>

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
 
 import * as api from "./api";
 import type { DailyTrackingSummary } from "./types";
@@ -14,7 +13,6 @@ export function NutritionTrackingPage() {
   const { i18n } = useTranslation();
   const fa = i18n.language === "fa";
   const l = (persian: string, english: string) => (fa ? persian : english);
-  const navigate = useNavigate();
   const [summary, setSummary] = useState<DailyTrackingSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +122,6 @@ export function NutritionTrackingPage() {
 
   return <main className="nutrition-estimate-page nutrition-tracking-page" dir={fa ? "rtl" : "ltr"}>
     <section className="nutrition-estimate-hero nutrition-tracking-header">
-      <button className="secondary-button nutrition-page-back" type="button" onClick={() => navigate(-1)}>{l("بازگشت", "Back")}</button>
       <div><p className="nutrition-eyebrow">{l("امروز", "Today")}</p><h1 className="fitsho-display">{l("ثبت تغذیه", "Nutrition tracking")}</h1></div>
     </section>
     {loading && <p role="status" className="nutrition-estimate-state">{l("در حال دریافت ثبت‌های امروز…", "Loading today's entries…")}</p>}

@@ -743,3 +743,17 @@ html[dir="rtl"] .profile-page-heading h1 { letter-spacing: 0; }
   .profile-wizard__page { max-height: none; overflow: visible; padding: .9rem; }
   .profile-edit-form { grid-template-columns: 1fr; }
 }
+
+/* Final density overrides: account pages use app-scale surfaces, not landing heroes. */
+.profile-page-heading { padding: .8rem 1rem; border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); box-shadow: none; backdrop-filter: none; }
+.profile-page-heading h1 { margin: 0; font-size: clamp(1.45rem, 4vw, 2.2rem); letter-spacing: 0; }
+.measurement-card { min-height: 4.5rem; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .2rem .75rem; justify-content: initial; padding: .7rem .85rem; border-radius: var(--fitsho-radius-md); box-shadow: none; }
+.measurement-card p, .measurement-card strong { grid-column: 1; margin: 0; }
+.measurement-card strong { font-size: 1.25rem; }
+.measurement-card span { grid-column: 2; grid-row: 1 / span 2; font-size: .66rem; }
+.measurement-card--body-progress strong { max-width: none; overflow: hidden; font-size: .72rem; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.measurement-card--body-progress .secondary-button { grid-column: 2; grid-row: 1 / span 2; min-height: 2.4rem; margin: 0; padding-inline: .7rem; font-size: .7rem; }
+
+@media (max-width: 900px) {
+  .measurement-card { min-height: 4.25rem; }
+}

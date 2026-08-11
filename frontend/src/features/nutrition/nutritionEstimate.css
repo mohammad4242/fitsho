@@ -205,7 +205,6 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .weekly-plan-empty, .weekly-plan { margin-top: .75rem; }
 
 .nutrition-tracking-header { align-items: center; }
-.nutrition-tracking-header .nutrition-page-back { order: 2; min-height: 2.5rem; padding: .45rem .7rem; }
 .nutrition-daily-panel, .nutrition-photo-entry, .nutrition-checkin, .nutrition-manual-entry, .nutrition-recent-foods { width: min(100% - 2rem, 72rem); margin-inline: auto; }
 .nutrition-daily-panel { display: grid; grid-template-columns: minmax(12rem, .65fr) minmax(18rem, 1fr); align-items: center; gap: 1rem; padding: 1rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); }
 .nutrition-daily-panel__calories { display: grid; }
@@ -233,6 +232,8 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-tracking-page > .nutrition-estimate-notes { margin-block: .65rem; padding: 1rem; }
 .nutrition-tracking-page > .nutrition-estimate-notes h2 { margin-top: 0; font-size: 1rem; }
 .nutrition-tracking-page .nutrition-adherence-chart article { grid-template-columns: 4rem 1fr 1fr; padding: .6rem; }
+.nutrition-tracking-page input[type="date"] { min-height: 2.5rem; padding: .4rem .55rem; border: 1px solid var(--fitsho-line); border-radius: .6rem; color: var(--fitsho-ink); background: var(--fitsho-canvas); color-scheme: dark; }
+.nutrition-confidence-card .text-button { width: fit-content; margin-top: .45rem; padding: .35rem 0; border: 0; color: var(--fitsho-aqua); background: transparent; font: inherit; font-size: .72rem; font-weight: 850; cursor: pointer; }
 
 @media (max-width: 600px) {
   .nutrition-estimate-hero { align-items: flex-start; flex-direction: column; padding-top: .75rem; }
