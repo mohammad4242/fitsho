@@ -11,6 +11,7 @@ import type {
   WeeklyPlan,
   WeeklyPlanGeneration,
 } from "./types";
+import { useSynchronizedProgress } from "./useSynchronizedProgress";
 import { WeeklyNutritionPlan } from "./WeeklyNutritionPlan";
 import "./nutritionEstimate.css";
 
@@ -96,6 +97,7 @@ export function NutritionEstimatePage() {
       {state === "ready" && estimate !== null && (
         <>
           <EstimateContent estimate={estimate} language={language} onRefresh={calculate} plan={plan} tracking={tracking} />
+          <DoctorSupervision language={language} plan={plan} />
           <PlanArea
             generating={generatingPlan}
             language={language}
@@ -126,15 +128,8 @@ function PlanArea({
   if (plan !== null) return <WeeklyNutritionPlan language={language} plan={plan} />;
   const message = outcome === null ? null : generationMessage(outcome.outcome, language);
   return (
-    <section className="weekly-plan-empty" aria-labelledby="weekly-plan-empty-title">
-      <p className="eyebrow eyebrow--accent">{l("گام بعد", "Next step")}</p>
-      <h2 id="weekly-plan-empty-title">{l("برنامه هفتگی شخصی‌ات را بساز", "Build your personal weekly plan")}</h2>
-      <p>
-        {message ?? l(
-          "فیتشو هدف‌های علمی، محدودیت‌های غذایی و بودجه هفتگی را در یک پیش‌نویس هفت‌روزه ترکیب می‌کند.",
-          "Fitsho combines your scientific targets, food constraints, and weekly budget into a seven-day draft.",
-        )}
-      </p>
+    <section className="weekly-plan-empty" aria-label={l("ساخت برنامه تغذیه هفتگی", "Build weekly nutrition plan")}>
+      {message && <p className="weekly-plan-empty__message" role="status">{message}</p>}
       {outcome?.reason_codes.includes("INSUFFICIENT_PRICE_COVERAGE") && (
         <small>
           {l(
@@ -144,8 +139,67 @@ function PlanArea({
         </small>
       )}
       <button className="primary-button" disabled={generating} onClick={onGenerate} type="button">
-        {generating ? l("در حال ساخت برنامه…", "Building plan…") : l("ساخت برنامه هفتگی", "Build weekly plan")}
+        {generating ? l("در حال ساخت برنامه…", "Building plan…") : l("ساخت برنامه تغذیه هفتگی", "Build weekly nutrition plan")}
       </button>
+    </section>
+  );
+}
+
+function DoctorSupervision({ language, plan }: { language: "fa" | "en"; plan: WeeklyPlan | null }) {
+  const l = (fa: string, en: string) => language === "en" ? en : fa;
+  const pendingStatuses = new Set(["pending", "pending_physician_review", "physician_review_in_progress", "awaiting_lab_information"]);
+  const isPending = plan !== null
+    && !plan.physician_approved
+    && (pendingStatuses.has(plan.review_status) || pendingStatuses.has(plan.lifecycle_status));
+  const isApproved = plan?.physician_approved === true || ["physician_approved", "active"].includes(plan?.lifecycle_status ?? "");
+  const approvalCopy = plan === null
+    ? l("پس از ساخت برنامه", "After plan creation")
+    : isPending
+      ? l("در انتظار تأیید پزشک", "Pending physician approval")
+      : isApproved
+        ? l("تأییدشده توسط پزشک", "Physician approved")
+        : l("نیازمند بررسی", "Review required");
+  const guidanceCopy = plan?.physician_user_visible_notes
+    ?? (isPending
+      ? l("پس از بررسی پزشک", "After physician review")
+      : l("راهنمایی ثبت نشده", "No guidance recorded"));
+
+  return (
+    <section className="nutrition-doctor-supervision" aria-labelledby="nutrition-doctor-title">
+      <header>
+        <span className="nutrition-doctor-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="7" r="3" />
+            <path d="M7 21v-3a5 5 0 0 1 10 0v3M4 13v3a3 3 0 0 0 6 0v-3M4 13V9M10 13V9M18 13v3" />
+            <circle cx="18" cy="18" r="2" />
+          </svg>
+        </span>
+        <div>
+          <h2 id="nutrition-doctor-title">{l("تحت نظر پزشک", "Doctor supervision")}</h2>
+          <p>{l("خدمات و وضعیت بررسی پزشکی در یک نگاه", "Medical services and review status at a glance")}</p>
+        </div>
+        {isPending && <span className="nutrition-doctor-header-status"><i />{l("در انتظار پزشک", "Pending physician")}</span>}
+      </header>
+      <div className="nutrition-doctor-grid">
+        <Link className="nutrition-doctor-item nutrition-doctor-item--link" to="/nutrition-supplements">
+          <span className="nutrition-doctor-item__symbol" aria-hidden="true">✦</span>
+          <span><strong>{l("مکمل‌های من", "My supplements")}</strong><small>{l("دستورها و پیگیری مکمل‌ها", "Supplement orders and tracking")}</small></span>
+          <b aria-hidden="true">‹</b>
+        </Link>
+        <Link className="nutrition-doctor-item nutrition-doctor-item--link" to="/nutrition-labs">
+          <span className="nutrition-doctor-item__symbol" aria-hidden="true">⌁</span>
+          <span><strong>{l("آزمایشات من", "My lab tests")}</strong><small>{l("نتایج و سابقه بررسی", "Results and review history")}</small></span>
+          <b aria-hidden="true">‹</b>
+        </Link>
+        <article className="nutrition-doctor-item">
+          <span className="nutrition-doctor-item__symbol" aria-hidden="true">✓</span>
+          <span><strong>{l("تأیید برنامه غذایی", "Nutrition plan approval")}</strong><small className={isPending ? "nutrition-doctor-status--pending" : undefined}>{isPending && <i />}{approvalCopy}</small></span>
+        </article>
+        <article className="nutrition-doctor-item">
+          <span className="nutrition-doctor-item__symbol" aria-hidden="true">•••</span>
+          <span><strong>{l("راهنمایی‌های پزشک", "Physician guidance")}</strong><small>{guidanceCopy}</small></span>
+        </article>
+      </div>
     </section>
   );
 }
@@ -173,13 +227,14 @@ function EstimateContent({ estimate, language, onRefresh, plan, tracking }: { es
   const currentDate = new Date().toISOString().slice(0, 10);
   const todayPlan = plan?.days.find((day) => day.plan_date === currentDate) ?? plan?.days[0];
   const energyTarget = todayPlan?.nutrient_totals.energy_kcal ?? target("goal_calories")?.preferred ?? null;
+  const animationProgress = useSynchronizedProgress();
+  const animatedEnergyTarget = energyTarget === null ? null : energyTarget * animationProgress;
   const tracked = tracking?.actual_totals;
   const hasTrackedData = tracked !== undefined && (
     tracking?.data_status === "sufficient"
     || (tracking?.entries.length ?? 0) > 0
     || Object.values(tracked).some((value) => value > 0)
   );
-  const energyNow = hasTrackedData ? tracked.energy_kcal ?? 0 : energyTarget;
   const macro = (key: string, estimateMetric: string) => hasTrackedData && tracked[key] !== undefined
     ? formatValue(tracked[key], "g/day", number, language)
     : preferred(estimateMetric) !== (language === "en" ? "Not set" : "تعیین نشده")
@@ -189,12 +244,12 @@ function EstimateContent({ estimate, language, onRefresh, plan, tracking }: { es
   return <>
     <section className="nutrition-today-panel" aria-label={l("خلاصه هدف‌ها", "Target summary")}>
       <div className="nutrition-today-panel__top">
-        <article className="nutrition-calorie-card" aria-label={l("هدف انرژی روزانه", "Daily energy target")} role="region">
-          <span>{hasTrackedData ? l("دریافت امروز", "Consumed today") : l("هدف انرژی", "Energy target")}</span>
-          <strong>{energyNow === null ? l("تعیین نشده", "Not set") : number.format(energyNow)}</strong>
-          <small>{hasTrackedData && energyTarget !== null ? l(`از ${number.format(energyTarget)} کیلوکالری`, `of ${number.format(energyTarget)} kcal`) : l("کیلوکالری روزانه", "daily kcal")}</small>
+        <article className="nutrition-calorie-card" aria-label={l("کالری هدف روزانه", "Daily calorie goal")} role="region">
+          <span>{l("کالری هدف", "Calorie goal")}</span>
+          <strong>{animatedEnergyTarget === null ? l("تعیین نشده", "Not set") : number.format(animatedEnergyTarget)}</strong>
+          <small>{hasTrackedData ? l(`دریافت امروز ${number.format(tracked?.energy_kcal ?? 0)} کیلوکالری`, `Consumed today ${number.format(tracked?.energy_kcal ?? 0)} kcal`) : l("کیلوکالری روزانه", "daily kcal")}</small>
         </article>
-        {energyTarget !== null && <ProgressRing value={hasTrackedData ? tracked?.energy_kcal ?? 0 : 0} max={energyTarget} label={l("پیشرفت کالری امروز", "Today's calorie progress")} />}
+        {energyTarget !== null && <ProgressRing value={animatedEnergyTarget ?? 0} max={energyTarget} label={l("پیشرفت کالری هدف", "Calorie goal progress")} />}
         <div className="nutrition-confidence-card">
           <span className={`nutrition-confidence nutrition-confidence--${estimate.confidence}`}>{confidence}</span>
           {estimate.is_stale && <button className="text-button" type="button" onClick={onRefresh}>{l("به‌روزرسانی", "Refresh")}</button>}

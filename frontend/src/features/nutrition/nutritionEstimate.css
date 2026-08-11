@@ -193,9 +193,10 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-estimate-summary { grid-template-columns: minmax(0, 1.4fr) minmax(15rem, .6fr); }
 .nutrition-today-panel, .nutrition-meal-summary { width: min(100% - 2rem, 72rem); margin-inline: auto; }
 .nutrition-today-panel { overflow: hidden; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
-.nutrition-today-panel__top { min-height: 9rem; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 1rem; padding: 1rem; }
+.nutrition-today-panel__top { min-height: 8rem; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .85rem; padding: .85rem; }
 .nutrition-today-panel .nutrition-calorie-card { min-height: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
-.nutrition-today-panel .nutrition-calorie-card strong { display: block; margin-block: .25rem; font: 850 clamp(2.2rem, 6vw, 3.4rem)/1 "Sora Variable", sans-serif; }
+.nutrition-today-panel .nutrition-calorie-card strong { display: block; margin-block: .2rem; font: 850 clamp(2rem, 5.5vw, 3rem)/1 "Sora Variable", sans-serif; }
+.nutrition-today-panel .fitsho-progress-ring { width: 4.75rem; }
 .nutrition-today-panel .nutrition-confidence-card { min-width: 8rem; align-self: stretch; display: grid; align-content: center; justify-items: start; padding: .75rem; border: 0; border-inline-start: 1px solid var(--fitsho-line); border-radius: 0; background: transparent; box-shadow: none; }
 .nutrition-today-panel .nutrition-target-grid--primary { width: auto; margin: 0; border: 0; border-top: 1px solid var(--fitsho-line); border-radius: 0; background: rgb(255 255 255 / 2%); box-shadow: none; }
 .nutrition-meal-summary { margin-top: .65rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-md); background: var(--fitsho-surface-subtle); }
@@ -219,7 +220,30 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-target-grid--primary.fitsho-metric-strip .nutrition-target-card small { display: none; }
 .nutrition-science-details { margin-top: .2rem; border-radius: var(--fitsho-radius-md); }
 .nutrition-science-details > summary { min-height: 3rem; padding: .75rem 1rem; font-size: .78rem; }
+.nutrition-doctor-supervision { width: min(100% - 2rem, 72rem); margin: .65rem auto 0; padding: .85rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
+.nutrition-doctor-supervision > header { display: flex; align-items: center; gap: .65rem; padding: .1rem .1rem .7rem; }
+.nutrition-doctor-supervision h2 { margin: 0; font-size: .98rem; }
+.nutrition-doctor-supervision header p { margin: .2rem 0 0; color: var(--fitsho-muted); font-size: .65rem; }
+.nutrition-doctor-icon { width: 2.65rem; aspect-ratio: 1; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--fitsho-line-strong); border-radius: .8rem; color: var(--fitsho-aqua); background: rgb(80 223 206 / 6%); }
+.nutrition-doctor-icon svg { width: 1.55rem; }
+.nutrition-doctor-header-status { display: flex; align-items: center; gap: .35rem; margin-inline-start: auto; color: var(--fitsho-coral); font-size: .65rem; font-weight: 800; }
+.nutrition-doctor-header-status i, .nutrition-doctor-status--pending i { width: .42rem; aspect-ratio: 1; display: inline-block; flex: 0 0 auto; border-radius: 50%; background: var(--fitsho-coral); box-shadow: 0 0 .7rem rgb(255 128 111 / 55%); }
+.nutrition-doctor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; }
+.nutrition-doctor-item { min-height: 4.35rem; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .65rem; padding: .65rem .7rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-md); color: var(--fitsho-ink); background: var(--fitsho-surface-subtle); text-decoration: none; }
+.nutrition-doctor-item > span:nth-child(2) { min-width: 0; display: grid; gap: .18rem; }
+.nutrition-doctor-item strong { font-size: .78rem; }
+.nutrition-doctor-item small { overflow: hidden; color: var(--fitsho-muted); font-size: .62rem; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.nutrition-doctor-item__symbol { width: 2.15rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; color: var(--fitsho-aqua); background: rgb(80 223 206 / 7%); font: 800 .78rem "Sora Variable", sans-serif; }
+.nutrition-doctor-item b { color: var(--fitsho-muted); font-size: 1.25rem; font-weight: 500; }
+.nutrition-doctor-status--pending { display: flex; align-items: center; gap: .3rem; color: var(--fitsho-coral) !important; }
+.nutrition-doctor-item--link { transition: border-color var(--fitsho-duration-fast) var(--fitsho-ease), background var(--fitsho-duration-fast) var(--fitsho-ease); }
+.nutrition-doctor-item--link:hover, .nutrition-doctor-item--link:focus-visible { border-color: var(--fitsho-line-strong); background: rgb(80 223 206 / 6%); outline: none; }
+[dir="ltr"] .nutrition-doctor-item b { transform: rotate(180deg); }
 .weekly-plan-empty, .weekly-plan { margin-top: .75rem; }
+.weekly-plan-empty { width: min(100% - 2rem, 72rem); margin-block: .75rem 6rem; padding: 0; border-color: var(--fitsho-line-strong); border-radius: var(--fitsho-radius-lg); background: linear-gradient(115deg, rgb(80 223 206 / 9%), rgb(255 255 255 / 2%)), var(--fitsho-surface); }
+.weekly-plan-empty .primary-button { width: 100%; min-height: 4.25rem; display: flex; align-items: center; justify-content: center; margin: 0; border-radius: inherit; font-size: 1rem; }
+.weekly-plan-empty__message { margin: 0; padding: .7rem .85rem 0; color: var(--fitsho-muted); font-size: .7rem; text-align: center; }
+.weekly-plan-empty > small { margin: 0; padding: .65rem .85rem 0; text-align: center; }
 
 .nutrition-tracking-header { align-items: center; }
 .nutrition-daily-panel, .nutrition-photo-entry, .nutrition-checkin, .nutrition-manual-entry, .nutrition-recent-foods { width: min(100% - 2rem, 72rem); margin-inline: auto; }
@@ -281,6 +305,10 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
   .nutrition-target-grid--primary.fitsho-metric-strip { display: grid; grid-template-columns: repeat(3, 1fr); }
   .nutrition-calorie-card { min-height: 7.5rem; }
   .nutrition-today-panel, .nutrition-meal-summary { width: min(100% - 1.5rem, 72rem); }
+  .nutrition-doctor-supervision, .weekly-plan-empty { width: min(100% - 1.5rem, 72rem); }
+  .nutrition-doctor-grid { grid-template-columns: 1fr; }
+  .nutrition-doctor-supervision > header { align-items: flex-start; flex-wrap: wrap; }
+  .nutrition-doctor-header-status { width: 100%; margin-inline-start: 3.3rem; }
   .nutrition-photo-panel { width: min(100% - 1.5rem, 72rem); }
   .nutrition-today-panel__top { min-height: 7.6rem; grid-template-columns: minmax(0, 1fr) auto; gap: .65rem; padding: .8rem; }
   .nutrition-today-panel .nutrition-confidence-card { grid-column: 1 / -1; min-width: 0; min-height: 2rem; display: flex; align-items: center; justify-content: space-between; padding: .45rem 0 0; border: 0; border-top: 1px solid var(--fitsho-line); }

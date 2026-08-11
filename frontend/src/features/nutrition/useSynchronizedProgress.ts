@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-const reducedMotionRequested = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const reducedMotionRequested = () => typeof window.matchMedia === "function"
+  && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export function useSynchronizedProgress(durationMs = 900) {
   const [progress, setProgress] = useState(() => reducedMotionRequested() ? 1 : 0);
