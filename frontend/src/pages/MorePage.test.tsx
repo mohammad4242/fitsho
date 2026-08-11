@@ -6,10 +6,11 @@ import { expect, it, vi } from "vitest";
 import "../i18n";
 
 const logout = vi.fn(async () => undefined);
+const auth = vi.hoisted(() => ({ isAdmin: false }));
 
 vi.mock("../features/auth/AuthContext", () => ({
   useAuth: () => ({
-    user: { id: "1", email: "member@example.com", created_at: "2026-08-11", is_admin: false },
+    user: { id: "1", email: "member@example.com", created_at: "2026-08-11", is_admin: auth.isAdmin },
     logout,
   }),
 }));
@@ -28,10 +29,22 @@ vi.mock("../features/workoutReviews/api", () => ({ verifyCoachAccess: vi.fn(asyn
 import { MorePage } from "./MorePage";
 
 it("signs out from the separated account action", async () => {
+  auth.isAdmin = false;
   const user = userEvent.setup();
   render(<MemoryRouter><MorePage /></MemoryRouter>);
 
   await user.click(screen.getByRole("button", { name: "خروج از حساب" }));
 
   expect(logout).toHaveBeenCalledOnce();
+});
+
+it("shows the training program library in the mobile admin workspace", () => {
+  auth.isAdmin = true;
+
+  render(<MemoryRouter><MorePage /></MemoryRouter>);
+
+  expect(screen.getByRole("link", { name: /کتابخانه برنامه‌های تمرینی/ })).toHaveAttribute(
+    "href",
+    "/admin/training-program-templates",
+  );
 });

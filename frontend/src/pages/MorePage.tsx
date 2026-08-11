@@ -85,6 +85,7 @@ export function MorePage() {
               {isCoach && <MoreLink to="/coach/workouts" icon="profile" title={l("فضای مربی", "Coach workspace")} />}
               {isPhysician && <MoreLink to="/physician/nutrition" icon="profile" title={l("فضای پزشک", "Physician workspace")} />}
               {user.is_admin && <MoreLink to="/admin/exercises" icon="settings" title={l("مدیریت حرکات", "Exercise administration")} />}
+              {user.is_admin && <MoreLink to="/admin/training-program-templates" icon="dumbbell" title={l("کتابخانه برنامه‌های تمرینی", "Training program library")} />}
               {user.is_admin && <MoreLink to="/admin/nutrition-monitoring" icon="settings" title={l("پایش تغذیه", "Nutrition monitoring")} />}
             </MoreGroup>
           )}
