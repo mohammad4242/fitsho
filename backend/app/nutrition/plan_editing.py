@@ -195,6 +195,8 @@ def _copy_meal(
     meal: NutritionWeeklyPlanMeal, *, slot_index: int | None = None
 ) -> NutritionWeeklyPlanMeal:
     return NutritionWeeklyPlanMeal(
+        catalogue_meal_id=meal.catalogue_meal_id,
+        catalogue_meal_category=meal.catalogue_meal_category,
         slot_role=meal.slot_role,
         slot_index=meal.slot_index if slot_index is None else slot_index,
         target_distribution=dict(meal.target_distribution),
@@ -261,10 +263,7 @@ def _create_revision(
         price_snapshot=dict(plan.price_snapshot),
         repair_snapshot=list(plan.repair_snapshot),
         warning_codes=list(
-            set(
-                plan.warning_codes
-                + ["PHYSICIAN_PLAN_EDIT" if physician_id else "USER_PLAN_EDIT"]
-            )
+            set(plan.warning_codes + ["PHYSICIAN_PLAN_EDIT" if physician_id else "USER_PLAN_EDIT"])
         ),
         explanation_codes=list(plan.explanation_codes),
         weekly_cost_irr=sum(day.cost_irr for day in days),
@@ -556,6 +555,8 @@ def confirm_replace_food(
             for food in meal.foods
         ]
         return NutritionWeeklyPlanMeal(
+            catalogue_meal_id=meal.catalogue_meal_id,
+            catalogue_meal_category=meal.catalogue_meal_category,
             slot_role=meal.slot_role,
             slot_index=meal.slot_index,
             target_distribution=dict(meal.target_distribution),
@@ -669,9 +670,7 @@ def physician_remove_meal(
     if plan is None:
         raise PlanEditError("NUTRITION_PLAN_NOT_FOUND")
     review = db.scalar(
-        select(NutritionPlanPhysicianReview).where(
-            NutritionPlanPhysicianReview.plan_id == plan_id
-        )
+        select(NutritionPlanPhysicianReview).where(NutritionPlanPhysicianReview.plan_id == plan_id)
     )
     if review is None or review.physician_user_id != physician_id:
         raise PlanEditError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
@@ -729,6 +728,8 @@ def physician_adjust_food_quantity(
             for food in meal.foods
         ]
         return NutritionWeeklyPlanMeal(
+            catalogue_meal_id=meal.catalogue_meal_id,
+            catalogue_meal_category=meal.catalogue_meal_category,
             slot_role=meal.slot_role,
             slot_index=meal.slot_index,
             target_distribution=dict(meal.target_distribution),
@@ -838,10 +839,13 @@ def physician_action(
     elif action == "approve":
         if plan.review.status != NutritionPlanReviewStatus.IN_REVIEW:
             raise PlanEditError("REVIEW_NOT_IN_PROGRESS")
-        if any(
-            nutrient.status in {"below_minimum", "above_applicable_limit"}
-            for nutrient in plan.nutrients
-        ) or plan.budget_status == NutritionPlanBudgetStatus.OVER_BUDGET:
+        if (
+            any(
+                nutrient.status in {"below_minimum", "above_applicable_limit"}
+                for nutrient in plan.nutrients
+            )
+            or plan.budget_status == NutritionPlanBudgetStatus.OVER_BUDGET
+        ):
             raise PlanEditError("PLAN_HARD_INVARIANTS_FAILED")
         plan.review.status = NutritionPlanReviewStatus.APPROVED
         plan.review.reviewed_at = now

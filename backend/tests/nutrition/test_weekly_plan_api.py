@@ -9,11 +9,15 @@ from app.nutrition.enums import (
     EstimateConfidence,
     FoodRole,
     FoodVerificationStatus,
+    MealCategory,
+    MealIngredientRole,
     PriceReferenceStatus,
 )
 from app.nutrition.models import (
     NutritionCatalogueFood,
     NutritionCatalogueFoodRole,
+    NutritionCatalogueMeal,
+    NutritionCatalogueMealItem,
     NutritionFoodComposition,
     NutritionFoodPriceReference,
     NutritionPlanGeneration,
@@ -148,6 +152,7 @@ def _seed_foods_and_prices(db: Session) -> None:
         ("task6-oil", "روغن زیتون", (FoodRole.FLEXIBLE,), "884", "0", "0", "100", "1"),
     )
     now = datetime.now(UTC)
+    foods: dict[str, NutritionCatalogueFood] = {}
     for index, (slug, name, roles, kcal, protein, carbs, fat, calcium) in enumerate(rows):
         food = NutritionCatalogueFood(
             slug=slug,
@@ -181,6 +186,7 @@ def _seed_foods_and_prices(db: Session) -> None:
         )
         db.add(food)
         db.flush()
+        foods[slug] = food
         db.add(
             NutritionFoodPriceReference(
                 food_id=food.id,
@@ -193,7 +199,59 @@ def _seed_foods_and_prices(db: Session) -> None:
                 accepted_at=now,
             )
         )
+    db.add_all(
+        [
+            NutritionCatalogueMeal(
+                name_fa="مرغ و برنج تست",
+                name_en="Test chicken and rice",
+                category=MealCategory.LUNCH,
+                verification_status=FoodVerificationStatus.VERIFIED,
+                items=[
+                    _meal_item(foods["task6-chicken"], "150", "80", "220", "protein"),
+                    _meal_item(foods["task6-rice"], "80", "50", "140", "carbohydrate"),
+                    _meal_item(foods["task6-oil"], "5", "2", "10", "fat", required=False),
+                ],
+            ),
+            NutritionCatalogueMeal(
+                name_fa="عدس و سیب‌زمینی تست",
+                name_en="Test lentils and potato",
+                category=MealCategory.DINNER,
+                verification_status=FoodVerificationStatus.VERIFIED,
+                items=[
+                    _meal_item(foods["task6-lentils"], "180", "100", "300", "protein"),
+                    _meal_item(foods["task6-potato"], "250", "150", "400", "carbohydrate"),
+                    _meal_item(foods["task6-oil"], "20", "10", "30", "fat"),
+                ],
+            ),
+            NutritionCatalogueMeal(
+                name_fa="میان‌وعده ماست تست",
+                name_en="Test yogurt snack",
+                category=MealCategory.SNACK,
+                verification_status=FoodVerificationStatus.VERIFIED,
+                items=[_meal_item(foods["task6-yogurt"], "200", "100", "350", "protein")],
+            ),
+        ]
+    )
     db.commit()
+
+
+def _meal_item(
+    food: NutritionCatalogueFood,
+    reference: str,
+    minimum: str,
+    maximum: str,
+    role: str,
+    *,
+    required: bool = True,
+) -> NutritionCatalogueMealItem:
+    return NutritionCatalogueMealItem(
+        food_id=food.id,
+        reference_grams=Decimal(reference),
+        min_grams=Decimal(minimum),
+        max_grams=Decimal(maximum),
+        is_required=required,
+        functional_role=MealIngredientRole(role),
+    )
 
 
 def test_generation_returns_visible_seven_day_draft_and_creates_review(
@@ -206,7 +264,7 @@ def test_generation_returns_visible_seven_day_draft_and_creates_review(
 
     assert response.status_code == 201
     body = response.json()
-    assert body["outcome"] == "success"
+    assert body["outcome"] == "success", body
     assert body["plan"]["lifecycle_status"] == "pending_physician_review"
     assert body["plan"]["is_user_visible"] is True
     assert body["plan"]["review_status"] == "pending"
@@ -223,6 +281,11 @@ def test_generation_returns_visible_seven_day_draft_and_creates_review(
     assert body["plan"]["weekly_cost_irr"] > 0
     assert body["plan"]["input_snapshot"]["main_meals_per_day"] == 2
     assert body["plan"]["price_snapshot"]["currency"] == "IRR"
+    assert all(
+        meal["catalogue_meal_id"] is not None and meal["catalogue_meal_category"]
+        for day in body["plan"]["days"]
+        for meal in day["meals"]
+    )
     revision = client.get(f"/api/v1/nutrition/plans/{body['plan']['id']}")
     assert revision.status_code == 200
     assert revision.json()["id"] == body["plan"]["id"]

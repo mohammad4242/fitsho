@@ -518,6 +518,8 @@ class WeeklyPlanFoodResponse(BaseModel):
 
 class WeeklyPlanMealResponse(BaseModel):
     id: UUID
+    catalogue_meal_id: UUID | None
+    catalogue_meal_category: str | None
     slot_role: str
     slot_index: int
     target_distribution: dict[str, float]

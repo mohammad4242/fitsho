@@ -46,6 +46,31 @@ class PlannerFood:
 
 
 @dataclass(frozen=True)
+class PlannerMealIngredient:
+    food_id: str
+    reference_grams: Decimal
+    min_grams: Decimal
+    max_grams: Decimal
+    is_required: bool
+    functional_role: str | None
+
+
+@dataclass(frozen=True)
+class PlannerMealTemplate:
+    meal_id: str
+    name_fa: str
+    name_en: str
+    category: str
+    items: tuple[PlannerMealIngredient, ...]
+
+
+@dataclass(frozen=True)
+class EligibleMealTemplate:
+    template: PlannerMealTemplate
+    items: tuple[tuple[PlannerMealIngredient, PlannerFood], ...]
+
+
+@dataclass(frozen=True)
 class PlannerInput:
     daily_targets: dict[str, Decimal]
     micronutrient_targets: dict[str, Decimal]
@@ -74,12 +99,17 @@ class PlannedFood:
     cost_irr: Decimal
     nutrients: tuple[tuple[str, Decimal], ...]
     price_reference_id: str
+    min_grams: Decimal
+    max_grams: Decimal
+    functional_role: str | None
 
 
 @dataclass(frozen=True)
 class PlannedMeal:
     role: str
     slot_index: int
+    template_id: str
+    template_category: str
     foods: tuple[PlannedFood, ...]
     cost_irr: Decimal
     nutrients: tuple[tuple[str, Decimal], ...]
@@ -133,6 +163,7 @@ class PlannerResult:
 def plan_week(
     inputs: PlannerInput,
     foods: tuple[PlannerFood, ...],
+    meal_templates: tuple[PlannerMealTemplate, ...],
     policy: PlannerPolicy = DEFAULT_POLICY,
 ) -> PlannerResult:
     _validate_inputs(inputs)
@@ -149,35 +180,23 @@ def plan_week(
             key=lambda item: item.slug,
         )
     )
-    proteins = _rank_candidates(
-        inputs, tuple(food for food in eligible if "main_protein" in food.roles), policy
-    )
-    staples = _rank_candidates(
-        inputs, tuple(food for food in eligible if "main_staple" in food.roles), policy
-    )
-    snacks = _rank_candidates(
+    eligible_templates = _eligible_templates(inputs, eligible, meal_templates)
+    main_templates = _rank_templates(
         inputs,
-        tuple(
-            food
-            for food in eligible
-            if "snack" in food.roles
-            and "main_protein" not in food.roles
-            and "main_staple" not in food.roles
-        ),
+        tuple(item for item in eligible_templates if item.template.category != "snack"),
         policy,
     )
-    flexible = _rank_candidates(
-        inputs, tuple(food for food in eligible if "flexible" in food.roles), policy
+    snack_templates = _rank_templates(
+        inputs,
+        tuple(item for item in eligible_templates if item.template.category == "snack"),
+        policy,
     )
-    if (
-        len(proteins) < policy.minimum_main_protein_candidates
-        or len(staples) < policy.minimum_main_staple_candidates
-        or (inputs.snacks_per_day and len(snacks) < policy.minimum_snack_candidates)
-    ):
+    if not main_templates or (inputs.snacks_per_day and not snack_templates):
         return _failure(GenerationOutcome.LIVE_PRICE_UNAVAILABLE, "INSUFFICIENT_PRICE_COVERAGE")
 
-    days = _build_days(inputs, proteins, staples, snacks, flexible, policy)
-    days, repairs = _repair_micronutrients(days, inputs, flexible, policy)
+    days = _build_days(inputs, main_templates, snack_templates, policy)
+    foods_by_id = {food.food_id: food for food in eligible}
+    days, repairs = _repair_micronutrients(days, inputs, foods_by_id, policy)
     weekly_totals = _sum_nutrients(day.nutrients for day in days)
     daily_average = {code: value / Decimal("7") for code, value in weekly_totals.items()}
     data_completeness = _nutrient_data_completeness(days, inputs)
@@ -284,9 +303,9 @@ def _rank_candidates(
             ),
             ZERO,
         )
-        preference = (
-            Decimal("1") if food.food_id in inputs.liked_food_ids else ZERO
-        ) - (Decimal("1") if food.food_id in inputs.disliked_food_ids else ZERO)
+        preference = (Decimal("1") if food.food_id in inputs.liked_food_ids else ZERO) - (
+            Decimal("1") if food.food_id in inputs.disliked_food_ids else ZERO
+        )
         cost_per_kcal = food.price_irr_per_gram * HUNDRED / energy
         value = (
             micronutrient_adequacy * policy.micronutrient_score_weight
@@ -298,12 +317,68 @@ def _rank_candidates(
     return tuple(sorted(foods, key=score))
 
 
+def _eligible_templates(
+    inputs: PlannerInput,
+    foods: tuple[PlannerFood, ...],
+    templates: tuple[PlannerMealTemplate, ...],
+) -> tuple[EligibleMealTemplate, ...]:
+    foods_by_id = {food.food_id: food for food in foods}
+    eligible: list[EligibleMealTemplate] = []
+    for template in sorted(templates, key=lambda item: (item.category, item.meal_id)):
+        items: list[tuple[PlannerMealIngredient, PlannerFood]] = []
+        missing_required = False
+        for item in template.items:
+            food = foods_by_id.get(item.food_id)
+            if food is None:
+                if item.is_required:
+                    missing_required = True
+                    break
+                continue
+            items.append((item, food))
+        if not missing_required and items:
+            eligible.append(EligibleMealTemplate(template=template, items=tuple(items)))
+    return tuple(eligible)
+
+
+def _rank_templates(
+    inputs: PlannerInput,
+    templates: tuple[EligibleMealTemplate, ...],
+    policy: PlannerPolicy,
+) -> tuple[EligibleMealTemplate, ...]:
+    def score(candidate: EligibleMealTemplate) -> tuple[Decimal, str]:
+        nutrients: dict[str, Decimal] = {}
+        cost = ZERO
+        preference = ZERO
+        for item, food in candidate.items:
+            for code, value in food.nutrients_per_100g.items():
+                nutrients[code] = nutrients.get(code, ZERO) + value * item.reference_grams / HUNDRED
+            cost += food.price_irr_per_gram * item.reference_grams
+            preference += (Decimal("1") if food.food_id in inputs.liked_food_ids else ZERO) - (
+                Decimal("1") if food.food_id in inputs.disliked_food_ids else ZERO
+            )
+        micronutrient_adequacy = sum(
+            (
+                min(nutrients.get(code, ZERO) / target, Decimal("1"))
+                for code, target in inputs.micronutrient_targets.items()
+                if target > ZERO
+            ),
+            ZERO,
+        )
+        energy = max(nutrients.get("energy_kcal", ZERO), Decimal("1"))
+        value = (
+            micronutrient_adequacy * policy.micronutrient_score_weight
+            + preference * policy.preference_score_weight
+            - (cost / energy) * policy.cost_score_weight / Decimal("10000")
+        )
+        return -value, candidate.template.meal_id
+
+    return tuple(sorted(templates, key=score))
+
+
 def _build_days(
     inputs: PlannerInput,
-    proteins: tuple[PlannerFood, ...],
-    staples: tuple[PlannerFood, ...],
-    snacks: tuple[PlannerFood, ...],
-    flexible: tuple[PlannerFood, ...],
+    main_templates: tuple[EligibleMealTemplate, ...],
+    snack_templates: tuple[EligibleMealTemplate, ...],
     policy: PlannerPolicy,
 ) -> tuple[PlannedDay, ...]:
     daily_kcal = inputs.daily_targets["goal_calories"]
@@ -316,48 +391,55 @@ def _build_days(
         if inputs.snacks_per_day
         else ZERO
     )
-    fat_candidates = tuple(
-        food for food in flexible if food.nutrients_per_100g.get("total_fat_g", ZERO) > 20
-    )
     days: list[PlannedDay] = []
     for day_index in range(7):
         meals: list[PlannedMeal] = []
         for slot_index in range(inputs.main_meals_per_day):
             sequence = day_index * inputs.main_meals_per_day + slot_index
-            protein = proteins[sequence % len(proteins)]
-            staple = staples[sequence % len(staples)]
-            fat = fat_candidates[sequence % len(fat_candidates)] if fat_candidates else None
-            protein_share = policy.protein_energy_share
-            fat_share = Decimal("0.15") if fat else ZERO
-            staple_share = Decimal("1") - protein_share - fat_share
-            items = [
-                _portion(
-                    protein, main_slot_kcal * protein_share, policy.maximum_main_food_portion_g
-                ),
-                _portion(staple, main_slot_kcal * staple_share, policy.maximum_main_food_portion_g),
-            ]
-            if fat is not None:
-                items.append(
-                    _portion(fat, main_slot_kcal * fat_share, policy.maximum_main_food_portion_g)
-                )
-            meals.append(_meal("main_meal", slot_index, tuple(items)))
+            template = main_templates[sequence % len(main_templates)]
+            meals.append(_meal_from_template("main_meal", slot_index, template, main_slot_kcal))
         for slot_index in range(inputs.snacks_per_day):
-            snack = snacks[(day_index * max(inputs.snacks_per_day, 1) + slot_index) % len(snacks)]
-            meals.append(
-                _meal(
-                    "snack",
-                    slot_index,
-                    (_portion(snack, snack_slot_kcal, policy.maximum_snack_portion_g),),
-                )
-            )
+            sequence = day_index * max(inputs.snacks_per_day, 1) + slot_index
+            template = snack_templates[sequence % len(snack_templates)]
+            meals.append(_meal_from_template("snack", slot_index, template, snack_slot_kcal))
         days.append(_day(day_index, tuple(meals)))
     return tuple(days)
 
 
-def _portion(food: PlannerFood, target_kcal: Decimal, maximum_g: Decimal) -> PlannedFood:
-    energy = food.nutrients_per_100g["energy_kcal"]
-    grams = (target_kcal * HUNDRED / energy).quantize(Decimal("0.1"), ROUND_HALF_UP)
-    grams = max(DEFAULT_POLICY.minimum_portion_g, min(grams, maximum_g))
+def _meal_from_template(
+    role: str,
+    slot_index: int,
+    candidate: EligibleMealTemplate,
+    target_kcal: Decimal,
+) -> PlannedMeal:
+    reference_kcal = sum(
+        (
+            food.nutrients_per_100g["energy_kcal"] * item.reference_grams / HUNDRED
+            for item, food in candidate.items
+        ),
+        ZERO,
+    )
+    scale = target_kcal / reference_kcal if reference_kcal > ZERO else Decimal("1")
+    foods = tuple(
+        _portion_for_template_item(food, item, item.reference_grams * scale)
+        for item, food in candidate.items
+    )
+    return _meal(
+        role,
+        slot_index,
+        foods,
+        template_id=candidate.template.meal_id,
+        template_category=candidate.template.category,
+    )
+
+
+def _portion_for_template_item(
+    food: PlannerFood,
+    item: PlannerMealIngredient,
+    requested_grams: Decimal,
+) -> PlannedFood:
+    grams = requested_grams.quantize(Decimal("0.1"), ROUND_HALF_UP)
+    grams = max(item.min_grams, min(grams, item.max_grams))
     nutrients = tuple(
         sorted(
             (code, (value * grams / HUNDRED).quantize(Decimal("0.0001")))
@@ -374,14 +456,26 @@ def _portion(food: PlannerFood, target_kcal: Decimal, maximum_g: Decimal) -> Pla
         cost_irr=(food.price_irr_per_gram * grams).quantize(Decimal("1")),
         nutrients=nutrients,
         price_reference_id=food.price_reference_id,
+        min_grams=item.min_grams,
+        max_grams=item.max_grams,
+        functional_role=item.functional_role,
     )
 
 
-def _meal(role: str, slot_index: int, foods: tuple[PlannedFood, ...]) -> PlannedMeal:
+def _meal(
+    role: str,
+    slot_index: int,
+    foods: tuple[PlannedFood, ...],
+    *,
+    template_id: str,
+    template_category: str,
+) -> PlannedMeal:
     nutrients = _sum_nutrients(food.nutrients for food in foods)
     return PlannedMeal(
         role=role,
         slot_index=slot_index,
+        template_id=template_id,
+        template_category=template_category,
         foods=foods,
         cost_irr=sum((food.cost_irr for food in foods), ZERO),
         nutrients=tuple(sorted(nutrients.items())),
@@ -401,7 +495,7 @@ def _day(day_index: int, meals: tuple[PlannedMeal, ...]) -> PlannedDay:
 def _repair_micronutrients(
     days: tuple[PlannedDay, ...],
     inputs: PlannerInput,
-    flexible: tuple[PlannerFood, ...],
+    foods_by_id: dict[str, PlannerFood],
     policy: PlannerPolicy,
 ) -> tuple[tuple[PlannedDay, ...], tuple[RepairAction, ...]]:
     mutable_days = list(days)
@@ -411,25 +505,41 @@ def _repair_micronutrients(
         if weekly >= target * Decimal("7"):
             continue
         candidates = [
-            food for food in flexible if food.nutrients_per_100g.get(nutrient_code, ZERO) > ZERO
+            (day_index, meal_index, food)
+            for day_index, day in enumerate(mutable_days)
+            for meal_index, meal in enumerate(day.meals)
+            for food in meal.foods
+            if food.grams < food.max_grams
+            and foods_by_id[food.food_id].nutrients_per_100g.get(nutrient_code, ZERO) > ZERO
         ]
         if not candidates:
             continue
         candidates.sort(
-            key=lambda food: (
-                -(food.nutrients_per_100g[nutrient_code] / food.nutrients_per_100g["energy_kcal"]),
-                food.slug,
+            key=lambda candidate: (
+                -(
+                    foods_by_id[candidate[2].food_id].nutrients_per_100g[nutrient_code]
+                    / foods_by_id[candidate[2].food_id].nutrients_per_100g["energy_kcal"]
+                ),
+                candidate[2].slug,
+                candidate[0],
+                candidate[1],
             )
         )
-        selected = candidates[0]
-        for day_index in range(min(policy.maximum_repair_iterations, len(mutable_days))):
+        for day_index, target_meal_index, selected in candidates[
+            : policy.maximum_repair_iterations
+        ]:
             day = mutable_days[day_index]
-            target_meal_index = next(
-                index for index, meal in enumerate(day.meals) if meal.role == "main_meal"
-            )
             meal = day.meals[target_meal_index]
-            addition = _portion_for_grams(selected, policy.repair_portion_g)
-            repaired_meal = _meal(meal.role, meal.slot_index, (*meal.foods, addition))
+            source = foods_by_id[selected.food_id]
+            added_grams = min(policy.repair_portion_g, selected.max_grams - selected.grams)
+            resized = _resize_planned_food(selected, source, selected.grams + added_grams)
+            repaired_meal = _meal(
+                meal.role,
+                meal.slot_index,
+                tuple(resized if food.food_id == selected.food_id else food for food in meal.foods),
+                template_id=meal.template_id,
+                template_category=meal.template_category,
+            )
             repaired_meals = list(day.meals)
             repaired_meals[target_meal_index] = repaired_meal
             candidate_days = list(mutable_days)
@@ -451,10 +561,8 @@ def _repair_micronutrients(
             ):
                 continue
             mutable_days = candidate_days
-            actions.append(
-                RepairAction(nutrient_code, selected.slug, policy.repair_portion_g, day_index)
-            )
-            weekly += selected.nutrients_per_100g[nutrient_code] * policy.repair_portion_g / HUNDRED
+            actions.append(RepairAction(nutrient_code, selected.slug, added_grams, day_index))
+            weekly += source.nutrients_per_100g[nutrient_code] * added_grams / HUNDRED
             if weekly >= target * Decimal("7"):
                 break
         if len(actions) >= policy.maximum_repair_iterations:
@@ -462,9 +570,16 @@ def _repair_micronutrients(
     return tuple(mutable_days), tuple(actions)
 
 
-def _portion_for_grams(food: PlannerFood, grams: Decimal) -> PlannedFood:
-    energy = food.nutrients_per_100g["energy_kcal"]
-    return _portion(food, energy * grams / HUNDRED, grams)
+def _resize_planned_food(planned: PlannedFood, source: PlannerFood, grams: Decimal) -> PlannedFood:
+    item = PlannerMealIngredient(
+        food_id=planned.food_id,
+        reference_grams=planned.grams,
+        min_grams=planned.min_grams,
+        max_grams=planned.max_grams,
+        is_required=True,
+        functional_role=planned.functional_role,
+    )
+    return _portion_for_template_item(source, item, grams)
 
 
 def _sum_nutrients(

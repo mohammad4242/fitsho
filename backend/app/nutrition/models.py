@@ -1215,6 +1215,12 @@ class NutritionWeeklyPlanMeal(Base):
         nullable=False,
         index=True,
     )
+    catalogue_meal_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_catalogue_meals.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    catalogue_meal_category: Mapped[str | None] = mapped_column(String(32))
     slot_role: Mapped[MealSlotRole] = mapped_column(
         enum_column(MealSlotRole, "ck_nutrition_weekly_plan_meal_role_values"), nullable=False
     )
@@ -1332,9 +1338,7 @@ class NutritionMealFeedback(Base):
 
 class NutritionLabDocument(Base):
     __tablename__ = "nutrition_lab_documents"
-    __table_args__ = (
-        UniqueConstraint("user_id", "sha256", name="uq_nutrition_lab_user_sha256"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "sha256", name="uq_nutrition_lab_user_sha256"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(

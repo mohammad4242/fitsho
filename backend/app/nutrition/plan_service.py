@@ -30,6 +30,7 @@ from app.nutrition.exceptions import (
 )
 from app.nutrition.models import (
     NutritionCatalogueFood,
+    NutritionCatalogueMeal,
     NutritionEstimate,
     NutritionEstimateMicronutrientTarget,
     NutritionEstimateTarget,
@@ -48,6 +49,8 @@ from app.nutrition.planner_engine import (
     GenerationOutcome,
     PlannerFood,
     PlannerInput,
+    PlannerMealIngredient,
+    PlannerMealTemplate,
     PlannerResult,
     plan_week,
 )
@@ -203,6 +206,8 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         if item.kind is FoodItemKind.DISLIKED and item.catalogue_food_id is not None
     )
     foods, price_snapshot, food_manifest = _planner_foods(db)
+    meal_templates, meal_manifest = _planner_meal_templates(db)
+    food_manifest["meals"] = meal_manifest
     minimums, maximums = _daily_limits(estimate.targets)
     weekly_budget = profile.individual_monthly_food_budget_irr * 12 // 52
     input_snapshot: dict[str, object] = {
@@ -231,6 +236,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         "maximum_meal_repetition_per_week": profile.maximum_meal_repetition_per_week,
         "meal_distribution_policy_version": "meal-distribution-v1",
         "budget_formula_version": "annualized-monthly-times-12-divided-52-v1",
+        "meal_catalogue_template_ids": [item.meal_id for item in meal_templates],
     }
     result = plan_week(
         PlannerInput(
@@ -250,6 +256,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
             maximum_meal_repetition_per_week=profile.maximum_meal_repetition_per_week,
         ),
         foods,
+        meal_templates,
     )
     outcome = NutritionPlanGenerationOutcome(result.outcome.value)
     generation = _persist_generation(
@@ -263,6 +270,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         input_snapshot=input_snapshot,
         diagnostics={
             "candidate_count": len(foods),
+            "meal_template_count": len(meal_templates),
             "weekly_cost_irr": str(result.weekly_cost_irr),
             "budget_status": result.budget_status,
         },
@@ -485,6 +493,8 @@ def _persist_successful_plan(
                 nutrient_totals=_json_nutrient_pairs(day.nutrients),
                 meals=[
                     NutritionWeeklyPlanMeal(
+                        catalogue_meal_id=UUID(meal.template_id),
+                        catalogue_meal_category=meal.template_category,
                         slot_role=meal.role,
                         slot_index=meal.slot_index,
                         target_distribution=_meal_target_distribution(
@@ -615,6 +625,57 @@ def _planner_foods(
         {"currency": "IRR", "references": snapshots},
         {"foods": manifest},
     )
+
+
+def _planner_meal_templates(
+    db: Session,
+) -> tuple[tuple[PlannerMealTemplate, ...], list[dict[str, object]]]:
+    meals = db.scalars(
+        select(NutritionCatalogueMeal)
+        .where(NutritionCatalogueMeal.verification_status == FoodVerificationStatus.VERIFIED)
+        .options(selectinload(NutritionCatalogueMeal.items))
+        .order_by(NutritionCatalogueMeal.category, NutritionCatalogueMeal.id)
+    ).all()
+    templates = tuple(
+        PlannerMealTemplate(
+            meal_id=str(meal.id),
+            name_fa=meal.name_fa,
+            name_en=meal.name_en,
+            category=meal.category.value,
+            items=tuple(
+                PlannerMealIngredient(
+                    food_id=str(item.food_id),
+                    reference_grams=item.reference_grams,
+                    min_grams=item.min_grams,
+                    max_grams=item.max_grams,
+                    is_required=item.is_required,
+                    functional_role=(
+                        item.functional_role.value if item.functional_role is not None else None
+                    ),
+                )
+                for item in meal.items
+            ),
+        )
+        for meal in meals
+    )
+    return templates, [
+        {
+            "meal_id": template.meal_id,
+            "category": template.category,
+            "ingredient_bounds": [
+                {
+                    "food_id": item.food_id,
+                    "reference_grams": str(item.reference_grams),
+                    "min_grams": str(item.min_grams),
+                    "max_grams": str(item.max_grams),
+                    "is_required": item.is_required,
+                    "functional_role": item.functional_role,
+                }
+                for item in template.items
+            ],
+        }
+        for template in templates
+    ]
 
 
 def _daily_targets(rows: list[NutritionEstimateTarget]) -> dict[str, Decimal]:
@@ -796,6 +857,8 @@ def weekly_plan_response(plan: NutritionWeeklyPlan) -> WeeklyPlanResponse:
                 meals=[
                     WeeklyPlanMealResponse(
                         id=meal.id,
+                        catalogue_meal_id=meal.catalogue_meal_id,
+                        catalogue_meal_category=meal.catalogue_meal_category,
                         slot_role=meal.slot_role.value,
                         slot_index=meal.slot_index,
                         target_distribution=_float_map(meal.target_distribution),
