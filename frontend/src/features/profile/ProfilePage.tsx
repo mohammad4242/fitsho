@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import authTrainingAccent from "../../assets/landing/auth-training-accent.jpg";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { NutritionOnboardingFlow } from "../nutrition/NutritionOnboardingFlow";
+import { useAuth } from "../auth/AuthContext";
 import * as profileApi from "./api";
 import {
   BodyGoalFields,
@@ -140,6 +141,7 @@ function ReadyProfilePage({
   onNutritionComplete: () => void;
 }) {
   const { i18n, t } = useTranslation();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const language = i18n.resolvedLanguage === "en" ? "en" : "fa";
   const l = (fa: string, en: string) => language === "en" ? en : fa;
@@ -275,6 +277,21 @@ function ReadyProfilePage({
           <p>{t("profile.intro")}</p>
         </section>
 
+        <section className="profile-account-summary" aria-label={l("خلاصه پروفایل", "Profile summary")}>
+          <header>
+            <span aria-hidden="true">{baselineShared.display_name.slice(0, 1).toLocaleUpperCase()}</span>
+            <div><h2>{baselineShared.display_name}</h2>{user?.email && <p>{user.email}</p>}</div>
+            <a href="#profile-editor">{l("ویرایش پروفایل", "Edit profile")}</a>
+          </header>
+          <dl>
+            <div><dt>{l("قد", "Height")}</dt><dd>{new Intl.NumberFormat(locale).format(baselineShared.height_cm)} {l("سانتی‌متر", "cm")}</dd></div>
+            <div><dt>{l("وزن", "Weight")}</dt><dd>{measuredWeight} {l("کیلوگرم", "kg")}</dd></div>
+            <div><dt>{l("سن", "Age")}</dt><dd>{new Intl.NumberFormat(locale).format(ageFromBirthDate(baselineShared.birth_date))}</dd></div>
+            {baselineProfile?.training_days_per_week && <div><dt>{l("فعالیت", "Activity")}</dt><dd>{l(`${new Intl.NumberFormat(locale).format(baselineProfile.training_days_per_week)} روز در هفته`, `${baselineProfile.training_days_per_week} days/week`)}</dd></div>}
+            <div><dt>{l("هدف", "Goal")}</dt><dd>{profileValueLabel(baselineShared.fitness_goal, language)}</dd></div>
+          </dl>
+        </section>
+
         {section === "personal" && <>
           <aside className="measurement-card" aria-label={t("profile.measurementTitle")}>
             <p>{t("profile.measurementTitle")}</p>
@@ -288,7 +305,7 @@ function ReadyProfilePage({
           </aside>
         </>}
 
-        <section className="profile-wizard">
+        <section className="profile-wizard" id="profile-editor">
           <ProfileProgress section={section} language={language} />
 
           {section !== "nutrition" && (
@@ -370,6 +387,21 @@ function ReadyProfilePage({
       </main>
     </div>
   );
+}
+
+function ageFromBirthDate(value: string) {
+  const birth = new Date(`${value}T00:00:00Z`);
+  const now = new Date();
+  let age = now.getUTCFullYear() - birth.getUTCFullYear();
+  if (now.getUTCMonth() < birth.getUTCMonth() || (now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() < birth.getUTCDate())) age -= 1;
+  return age;
+}
+
+function profileValueLabel(value: string, language: "fa" | "en") {
+  const labels: Record<string, [string, string]> = {
+    fat_loss: ["کاهش چربی", "Fat loss"], maintain_weight: ["حفظ وزن", "Maintain weight"], build_muscle: ["عضله‌سازی", "Build muscle"], improve_fitness: ["بهبود آمادگی", "Improve fitness"],
+  };
+  return labels[value]?.[language === "fa" ? 0 : 1] ?? value.replaceAll("_", " ");
 }
 
 function ProfileProgress({ section, language }: { section: ProfileSection; language: "fa" | "en" }) {

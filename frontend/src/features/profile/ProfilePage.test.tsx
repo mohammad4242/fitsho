@@ -23,6 +23,7 @@ const profileApi = vi.hoisted(() => ({
 }));
 
 vi.mock("./api", () => profileApi);
+vi.mock("../auth/AuthContext", () => ({ useAuth: () => ({ user: { email: "member@example.com" } }) }));
 
 vi.mock("../nutrition/NutritionOnboardingFlow", () => ({
   NutritionOnboardingFlow: ({ onBack }: { onBack?: () => void }) => (
@@ -138,6 +139,16 @@ it("shows signed-in profile information as three ordered full pages", async () =
   expect(screen.getByRole("heading", { name: "اطلاعات تمرینی" })).toBeInTheDocument();
 });
 
+it("leads with a compact real-data account summary and edit action", () => {
+  renderProfilePage();
+
+  const summary = screen.getByRole("region", { name: "خلاصه پروفایل" });
+  expect(summary).toHaveTextContent("Mohammad");
+  expect(summary).toHaveTextContent("۱۷۸");
+  expect(summary).toHaveTextContent("۷۶٫۵");
+  expect(screen.getByRole("link", { name: "ویرایش پروفایل" })).toHaveAttribute("href", "#profile-editor");
+});
+
 it("returns from the first profile page to the dashboard", async () => {
   const user = userEvent.setup();
   renderProfilePage();
@@ -225,7 +236,7 @@ it("shows the latest measured weight and localized measurement time", () => {
     timeStyle: "short",
   }).format(new Date(savedProfile.weight_measured_at));
 
-  expect(screen.getByText(`${expectedWeight} کیلوگرم`)).toBeInTheDocument();
+  expect(screen.getAllByText(`${expectedWeight} کیلوگرم`)).toHaveLength(2);
   expect(screen.getByText(`ثبت‌شده در ${expectedDate}`)).toBeInTheDocument();
 });
 

@@ -604,6 +604,19 @@ html[dir="rtl"] .profile-page-heading h1 {
 .profile-page-heading { grid-column: 1 / -1; padding: .8rem 1rem; border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); box-shadow: none; }
 .profile-page-heading .eyebrow, .profile-page-heading > p:last-child { display: none; }
 .profile-page-heading h1 { margin: 0; font-size: clamp(1.45rem, 4vw, 2.2rem); letter-spacing: 0; }
+.profile-account-summary { grid-column: 1 / -1; overflow: hidden; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); }
+.profile-account-summary > header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .8rem; border-bottom: 1px solid var(--fitsho-line); }
+.profile-account-summary > header > span { width: 3rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; color: var(--fitsho-canvas); background: var(--fitsho-aqua); font: 850 1.1rem "Sora Variable", sans-serif; }
+.profile-account-summary header div { min-width: 0; }
+.profile-account-summary h2, .profile-account-summary p { margin: 0; }
+.profile-account-summary h2 { font-size: 1rem; }
+.profile-account-summary p { overflow: hidden; color: var(--fitsho-muted); font-size: .72rem; text-overflow: ellipsis; }
+.profile-account-summary header a { color: var(--fitsho-aqua); font-size: .72rem; font-weight: 850; text-decoration: none; }
+.profile-account-summary dl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0; }
+.profile-account-summary dl div { min-width: 0; display: grid; gap: .2rem; padding: .7rem .8rem; }
+.profile-account-summary dl div + div { border-inline-start: 1px solid var(--fitsho-line); }
+.profile-account-summary dt { color: var(--fitsho-muted); font-size: .64rem; }
+.profile-account-summary dd { margin: 0; overflow-wrap: anywhere; font-size: .78rem; font-weight: 850; }
 .measurement-card { min-height: 4.5rem; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .2rem .75rem; justify-content: initial; padding: .7rem .85rem; border-radius: var(--fitsho-radius-md); box-shadow: none; }
 .measurement-card p { grid-column: 1; }
 .measurement-card strong { grid-column: 1; margin: 0; font-size: 1.25rem; }
@@ -735,6 +748,12 @@ html[dir="rtl"] .profile-page-heading h1 { letter-spacing: 0; }
 @media (max-width: 900px) {
   .profile-page-main { grid-template-columns: 1fr; }
   .measurement-card { min-height: 8rem; }
+}
+
+@media (max-width: 620px) {
+  .profile-account-summary dl { grid-template-columns: repeat(3, 1fr); }
+  .profile-account-summary dl div:nth-child(n+4) { border-top: 1px solid var(--fitsho-line); }
+  .profile-account-summary dl div:nth-child(4) { border-inline-start: 0; }
 }
 
 @media (max-width: 620px) {
