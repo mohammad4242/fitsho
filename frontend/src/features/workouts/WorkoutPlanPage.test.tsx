@@ -283,7 +283,7 @@ it("renders the selected duration, exercise media, and exercise detail link", as
   expect(quickActions).toHaveClass("workout-quick-actions");
   expect(screen.getByRole("button", { name: "دانلود PDF" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "بازخورد پایان دوره" })).toBeDisabled();
-  expect(screen.getByRole("link", { name: "پیشرفت بدنی" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "Body Analysis" })).toHaveAttribute(
     "href",
     "/body-progress",
   );

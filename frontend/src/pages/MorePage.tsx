@@ -70,7 +70,7 @@ export function MorePage() {
         <div className="more-page__grid">
           <MoreGroup title={l("محصول", "Product")}>
             {hasTraining && <MoreLink to="/exercises" icon="dumbbell" title={l("کتابخانه حرکات", "Exercise library")} subtitle={l("حرکت‌ها، اجرا و نکات ایمنی", "Exercises, execution, and safety notes")} />}
-            {hasTraining && <MoreLink to="/body-progress" icon="body" title={l("پیشرفت بدن", "Body progress")} subtitle={l("جلسه‌ها و تحلیل‌های ثبت‌شده", "Saved sessions and analyses")} />}
+            {hasTraining && <MoreLink to="/body-progress" icon="body" title="Body Analysis" subtitle={l("جلسه‌ها و تحلیل‌های ثبت‌شده", "Saved sessions and analyses")} />}
             {hasNutrition && <MoreLink to="/food-catalogue" icon="nutrition" title={l("کاتالوگ مواد غذایی", "Food catalogue")} subtitle={l("مرجع سریع ارزش غذایی", "Fast nutrition reference")} />}
             {hasNutrition && <MoreLink to="/nutrition-tracking" icon="target" title={l("ثبت تغذیه", "Nutrition tracking")} subtitle={l("پیگیری ساده وضعیت روز", "Simple daily check-in")} />}
           </MoreGroup>

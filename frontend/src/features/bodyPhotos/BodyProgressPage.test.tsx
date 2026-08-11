@@ -39,7 +39,24 @@ it("links each photo session to its result and keeps the workflow optional", asy
     "href",
     "/body-progress/session-1",
   );
-  expect(screen.getByRole("list", { name: "Body progress" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Body Analysis" })).toBeInTheDocument();
+  expect(screen.getByRole("list", { name: "Body Analysis" })).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Latest progress photo" })).toHaveAttribute("src", "/api/v1/body-photos/photos/photo-1/content");
   expect(screen.getByText(/Optional — add standardized/i)).toBeInTheDocument();
+});
+
+it("uses the Bod scanner visual and shows an actionable empty state", async () => {
+  api.getBodyPhotoSessions.mockResolvedValue({ items: [] });
+  render(<MemoryRouter><BodyProgressPage /></MemoryRouter>);
+
+  expect(await screen.findByRole("heading", { name: "No photo registered" })).toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "Body analysis scanner preview" })).toHaveAttribute(
+    "src",
+    "/body-analysis/Bod.png",
+  );
+  expect(screen.getByRole("link", { name: "Register new photos" })).toHaveAttribute(
+    "href",
+    "/body-progress/new",
+  );
+  expect(screen.queryByText("پیشرفت بدنی")).not.toBeInTheDocument();
 });
