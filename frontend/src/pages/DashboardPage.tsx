@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
+import bodyAnalysisImage from "../assets/landing/body.webp";
+import foodAnalysisImage from "../assets/landing/food.webp";
 import { useAuth } from "../features/auth/AuthContext";
 import { ExerciseMedia } from "../features/exercises/ExerciseMedia";
 import { getCurrentNutritionEstimate, getDailyTracking, getLatestWeeklyNutritionPlan } from "../features/nutrition/api";
@@ -104,13 +106,21 @@ export function DashboardPage() {
   const actual = hasActual ? trackedTotals : null;
   const hasNutritionTarget = nutritionTarget.energy_kcal !== null;
   const format = (value: number) => Math.round(value).toLocaleString(locale);
+  const displayName = profile?.display_name ?? (english ? "there" : "دوست");
+  const avatarInitial = displayName.trim().charAt(0).toLocaleUpperCase(locale);
 
   return (
     <main className="command-center fitsho-page">
       <div className="command-center__container">
         <header className="command-center__welcome">
-          <h1 className="fitsho-display">{t("dashboard.greeting", { name: profile?.display_name ?? (english ? "there" : "دوست") })}</h1>
-          <p>{english ? "Ready for today?" : "برای امروز آماده‌ای؟"}</p>
+          <Link className="command-center__avatar" to="/profile" aria-label={t("header.profile")}>
+            {avatarInitial}
+          </Link>
+          <div>
+            <h1 className="fitsho-display">{t("dashboard.greeting", { name: displayName })}</h1>
+            <p>{english ? "Ready for today?" : "برای امروز آماده‌ای؟"}</p>
+          </div>
+          <span className="command-center__live" aria-hidden="true" />
         </header>
 
         {profile === null && (
@@ -148,11 +158,11 @@ export function DashboardPage() {
               to="/nutrition-estimate"
               aria-label={t("dashboard.nutritionAria")}
             >
-              <div className="command-card__head"><div><p>{t("dashboard.nutritionEyebrow")}</p><h2>{t("dashboard.nutritionTitle")}</h2></div></div>
+              <div className="command-card__head"><div><p>{t("dashboard.nutritionEyebrow")}</p><h2>{t("dashboard.nutritionTitle")}</h2></div><span className="command-card__arrow" aria-hidden="true">←</span></div>
               {hasNutritionTarget ? <>
                 <div className="command-card__calories">
                   <div><strong>{format(actual?.energy_kcal ?? nutritionTarget.energy_kcal ?? 0)}</strong><span>{actual ? `${english ? "of" : "از"} ${format(nutritionTarget.energy_kcal ?? 0)} kcal` : english ? "daily target" : "هدف روزانه"}</span></div>
-                  {actual && <ProgressRing value={actual.energy_kcal ?? 0} max={nutritionTarget.energy_kcal ?? 0} label={english ? "Today's calorie progress" : "پیشرفت کالری امروز"} />}
+                  <ProgressRing value={actual?.energy_kcal ?? 0} max={nutritionTarget.energy_kcal ?? 0} label={english ? "Today's calorie progress" : "پیشرفت کالری امروز"} />
                 </div>
                 <div className="fitsho-metric-strip">
                   <span><strong>{formatMetric(actual?.protein_g ?? nutritionTarget.protein_g, format)}</strong><small>{english ? "Protein" : "پروتئین"}</small></span>
@@ -163,24 +173,34 @@ export function DashboardPage() {
             </Link>
           )}
 
-          <Link
-            className="command-card command-card--progress"
-            to="/body-progress"
-            aria-label={t("workoutPlan.body.action")}
-          >
-            <div className="command-card__head"><div><p>{t("dashboard.progressEyebrow")}</p><h2>{t("dashboard.progressTitle")}</h2></div><span className="command-card__arrow" aria-hidden="true">←</span></div>
-            {profile?.current_weight_kg !== undefined && <div className="command-card__progress-metric"><strong>{profile.current_weight_kg.toLocaleString(locale)}</strong><span>kg · {english ? "current weight" : "وزن فعلی"}</span></div>}
-          </Link>
         </section>
 
         <nav className="command-center__quick" aria-label={t("dashboard.quickActions") }>
-          {hasTraining && <Link to="/workout-plan">{t("header.workoutPlan")}</Link>}
-          {hasTraining && <Link to="/exercises">{t("header.exercises")}</Link>}
-          {hasNutrition && <Link to="/food-catalogue">{t("header.foodCatalogue")}</Link>}
-          <Link to="/profile">{t("header.profile")}</Link>
+          <DashboardQuickAction
+            image={bodyAnalysisImage}
+            title="body analys"
+            to="/body-progress"
+          />
+          {hasNutrition && (
+            <DashboardQuickAction
+              image={foodAnalysisImage}
+              title="food analys"
+              to="/nutrition-tracking"
+            />
+          )}
         </nav>
       </div>
     </main>
+  );
+}
+
+function DashboardQuickAction({ image, title, to }: { image: string; title: string; to: string }) {
+  return (
+    <Link className="command-quick-card" to={to} aria-label={title}>
+      <img src={image} alt="" />
+      <i className="command-quick-card__scan" aria-hidden="true" />
+      <span dir="ltr">{title}</span>
+    </Link>
   );
 }
 

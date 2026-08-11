@@ -188,7 +188,7 @@ it("presents a focused command center without cinematic media", async () => {
   expect(screen.getByRole("region", { name: "وضعیت امروز" })).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "تمرین امروز" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "تمرین امروز" })).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "مشاهده پیشرفت بدنی" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "body analys" })).toHaveAttribute(
     "href",
     "/body-progress",
   );
@@ -206,4 +206,68 @@ it("shows real profile context in the workout status", async () => {
 
   await screen.findByRole("heading", { name: "سلام، محمد" });
   expect(screen.getByText("دوره ۴ هفته‌ای")).toBeInTheDocument();
+});
+
+it("keeps workout, nutrition, and quick actions in the required priority", async () => {
+  profile.productMode = "both";
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue({
+    id: "plan-1",
+    days: [{ day_number: 1, title_fa: "فشار بالاتنه", title_en: "Upper push", estimated_duration_minutes: 52, exercises: [] }],
+  });
+  nutritionApi.getCurrentNutritionEstimate.mockResolvedValue({
+    confidence: "high",
+    targets: {
+      goal_calories: { preferred: 2200 },
+      protein: { preferred: 130 },
+      carbohydrate: { preferred: 280 },
+      total_fat: { preferred: 68 },
+    },
+  });
+
+  render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+
+  const workout = await screen.findByRole("region", { name: "تمرین امروز" });
+  const nutrition = await screen.findByRole("link", { name: "هدف روزانه تغذیه" });
+  const quickActions = screen.getByRole("navigation", { name: "دسترسی سریع" });
+
+  expect(workout.compareDocumentPosition(nutrition) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(nutrition.compareDocumentPosition(quickActions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it("shows calorie progress against the real target before food is tracked", async () => {
+  profile.productMode = "both";
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
+  nutritionApi.getCurrentNutritionEstimate.mockResolvedValue({
+    confidence: "high",
+    targets: {
+      goal_calories: { preferred: 2200 },
+      protein: { preferred: 130 },
+      carbohydrate: { preferred: 280 },
+      total_fat: { preferred: 68 },
+    },
+  });
+
+  render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+
+  expect(await screen.findByRole("progressbar", { name: "پیشرفت کالری امروز" })).toHaveAttribute(
+    "aria-valuenow",
+    "0",
+  );
+});
+
+it("routes the minimal body and food analysis shortcuts to their real flows", async () => {
+  profile.productMode = "both";
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
+
+  render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+
+  const body = await screen.findByRole("link", { name: "body analys" });
+  const food = screen.getByRole("link", { name: "food analys" });
+
+  expect(body).toHaveAttribute("href", "/body-progress");
+  expect(food).toHaveAttribute("href", "/nutrition-tracking");
+  expect(body.textContent).toBe("body analys");
+  expect(food.textContent).toBe("food analys");
+  expect(body.querySelector("img")).not.toBeNull();
+  expect(food.querySelector("img")).not.toBeNull();
 });

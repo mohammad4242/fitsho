@@ -408,13 +408,13 @@ it("renders detail with active exercise navigation for a ready member", async ()
   );
 });
 
-it("links the dashboard quick action to the exercise catalog", async () => {
+it("links the dashboard body analysis shortcut to the existing flow", async () => {
   setReadyMember();
   renderRoute("/dashboard");
 
   expect(
-    screen.getByRole("navigation", { name: "دسترسی سریع" }).querySelector('[href="/exercises"]'),
-  ).toHaveAttribute("href", "/exercises");
+    screen.getByRole("navigation", { name: "دسترسی سریع" }).querySelector('[href="/body-progress"]'),
+  ).toHaveAttribute("href", "/body-progress");
 });
 
 it("hides admin navigation from regular members", async () => {
