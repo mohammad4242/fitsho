@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -81,9 +82,11 @@ def test_training_template_library_has_no_public_endpoint(client: TestClient) ->
     assert response.status_code == 404
 
 
+@pytest.mark.parametrize("training_level", ["intermediate", "first_month"])
 def test_admin_creates_a_complete_program_template_with_catalog_exercise(
     client: TestClient,
     db: Session,
+    training_level: str,
 ) -> None:
     _seed_library(db)
     _make_current_user_admin(client, db)
@@ -98,7 +101,7 @@ def test_admin_creates_a_complete_program_template_with_catalog_exercise(
             "description_en": "A configurable four-day reference program.",
             "description_fa": "برنامه مرجع چهارروزه قابل تنظیم.",
             "days_per_week": 4,
-            "training_level": "intermediate",
+            "training_level": training_level,
             "fitness_goal": "build_muscle",
             "focus_tags": ["classic"],
             "intensity_methods": ["standard"],
@@ -112,6 +115,7 @@ def test_admin_creates_a_complete_program_template_with_catalog_exercise(
     assert response.status_code == 201
     created = response.json()
     assert created["slug"] == "admin-four-day-program"
+    assert created["training_level"] == training_level
     assert len(created["days"]) == 4
     assert len(created["days"][0]["slots"]) == 5
     assert created["days"][0]["slots"][0]["exercise"]["id"] == exercise_id

@@ -122,6 +122,7 @@ it("filters the library by day count and training level", async () => {
 
   expect(await screen.findByText("تفکیک کلاسیک چهار روزه")).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "متوسط" })).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: "First Month" })).toBeInTheDocument();
   expect(screen.getAllByText("سینه + پشت بازو")).toHaveLength(3);
   expect(screen.getAllByText("پرس سینه دمبل")).toHaveLength(3);
   expect(screen.getAllByText("پلاور کابل")).toHaveLength(3);
@@ -141,4 +142,11 @@ it("filters the library by day count and training level", async () => {
 
   expect(await screen.findByText("تخصصی سینه چهارروزه پیشرفته")).toBeInTheDocument();
   expect(screen.queryByText("تفکیک کلاسیک چهار روزه")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("tab", { name: "First Month" }));
+
+  expect(screen.getByRole("link", { name: "افزودن برنامه جدید" })).toHaveAttribute(
+    "href",
+    "/admin/training-program-templates/new?days=4&level=first_month",
+  );
 });

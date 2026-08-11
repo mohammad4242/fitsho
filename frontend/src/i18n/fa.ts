@@ -201,6 +201,7 @@ const fa = {
           maintain_weight: "حفظ وزن",
         },
         experience: {
+          first_month: "ماه اولمه",
           beginner: "مبتدی",
           intermediate: "متوسط",
           advanced: "پیشرفته",
@@ -435,6 +436,7 @@ const fa = {
         days_other: "{{count}} روزه",
         levelFilter: "سطح برنامه",
         allLevels: "همهٔ سطح‌ها",
+        firstMonth: "First Month",
         loading: "در حال دریافت الگوها…",
         loadError: "کتابخانه برنامه‌ها دریافت نشد.",
         empty: "برای این تعداد روز، الگویی ثبت نشده است.",

@@ -64,6 +64,25 @@ def test_create_profile_atomically_stores_profile_and_initial_weight(
     assert len(measurements) == 1
 
 
+def test_create_profile_persists_first_month_experience(
+    client: TestClient, db: Session
+) -> None:
+    user_id = register(client, "first-month-profile@example.com")
+
+    response = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={**VALID_PROFILE, "experience_level": "first_month"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["experience_level"] == "first_month"
+    profile = db.get(UserProfile, user_id)
+    assert profile is not None
+    assert profile.experience_level is not None
+    assert profile.experience_level.value == "first_month"
+
+
 @pytest.mark.parametrize(
     "home_training_setup",
     ["bodyweight_only", "dumbbells_available"],

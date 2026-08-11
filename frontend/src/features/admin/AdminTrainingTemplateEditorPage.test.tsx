@@ -48,6 +48,19 @@ it("creates a new program with the selected day and level defaults", async () =>
   expect(screen.getAllByRole("button", { name: "افزودن حرکت" })).toHaveLength(4);
 });
 
+it("supports an independent first-month program level", async () => {
+  render(
+    <MemoryRouter initialEntries={["/admin/training-program-templates/new?days=2&level=first_month"]}>
+      <Routes>
+        <Route path="/admin/training-program-templates/new" element={<AdminTrainingTemplateEditorPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByLabelText("سطح تمرین")).toHaveValue("first_month");
+  expect(screen.getByRole("option", { name: "First Month" })).toBeInTheDocument();
+});
+
 it("searches the exercise library, links a movement, and removes a slot", async () => {
   const user = userEvent.setup();
   render(

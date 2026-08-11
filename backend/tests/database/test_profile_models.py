@@ -61,6 +61,20 @@ def test_user_can_have_only_one_profile(db: Session) -> None:
         db.flush()
 
 
+def test_first_month_experience_is_stored_in_profile(db: Session) -> None:
+    user = make_user(db, "first-month@example.com")
+    profile = make_profile(user)
+    profile.experience_level = ExperienceLevel.FIRST_MONTH
+    db.add(profile)
+    db.flush()
+    db.expire(profile)
+
+    stored = db.scalar(select(UserProfile).where(UserProfile.user_id == user.id))
+
+    assert stored is not None
+    assert stored.experience_level is ExperienceLevel.FIRST_MONTH
+
+
 def test_weight_is_decimal_and_history_is_many_to_one(db: Session) -> None:
     user = make_user(db, "weights@example.com")
     db.add(make_profile(user))

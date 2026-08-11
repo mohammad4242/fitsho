@@ -10,7 +10,7 @@ import type { AdminTrainingProgramTemplatesResponse } from "./types";
 import "./admin.css";
 
 const trainingDays = [2, 3, 4, 5, 6] as const;
-const trainingLevels = ["all", "beginner", "intermediate", "advanced"] as const;
+const trainingLevels = ["all", "first_month", "beginner", "intermediate", "advanced"] as const;
 
 export function AdminTrainingTemplatesPage() {
   const { i18n, t } = useTranslation();
@@ -88,7 +88,9 @@ export function AdminTrainingTemplatesPage() {
                 >
                   {level === "all"
                     ? t("admin.templates.allLevels")
-                    : t(`catalog.difficulty.${level}`)}
+                    : level === "first_month"
+                      ? <><span aria-hidden="true">◇</span> {t("admin.templates.firstMonth")}</>
+                      : t(`catalog.difficulty.${level}`)}
                 </button>
               ))}
             </div>
@@ -116,7 +118,9 @@ export function AdminTrainingTemplatesPage() {
                     <p>{english ? template.description_en : template.description_fa}</p>
                   </div>
                   <span className="admin-template-level">
-                    {t(`catalog.difficulty.${template.training_level}`)}
+                    {template.training_level === "first_month"
+                      ? t("admin.templates.firstMonth")
+                      : t(`catalog.difficulty.${template.training_level}`)}
                   </span>
                 </header>
                 <div className="admin-template-tags" aria-label={t("admin.templates.labels")}>

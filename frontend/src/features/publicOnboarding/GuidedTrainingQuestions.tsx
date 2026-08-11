@@ -63,6 +63,7 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete, 
     <h1 className="fitsho-display" id="guided-training-title">{title}</h1>
     <form className="guided-question__form" onSubmit={submit}>
       {question === "experience" && <div className="guided-choice-grid">{([
+        ["first_month", language === "en" ? "It is my first month" : "ماه اولمه"],
         ["beginner", language === "en" ? "Beginner (under 6 months)" : "مبتدی (زیر ۶ ماه)"],
         ["intermediate", language === "en" ? "Intermediate (6 months to 2 years)" : "متوسط (۶ ماه تا ۲ سال)"],
         ["advanced", language === "en" ? "Advanced (over 2 years)" : "پیشرفته (بیش از ۲ سال)"],

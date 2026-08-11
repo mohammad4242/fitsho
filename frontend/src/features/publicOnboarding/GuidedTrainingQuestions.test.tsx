@@ -38,6 +38,7 @@ it("uses fixed experience, weekly-day, and workout-time choices", async () => {
   render(<TrainingHarness />);
 
   expect(screen.getByRole("heading", { name: "چقدر سابقه تمرین مداوم داری؟" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "ماه اولمه" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "مبتدی (زیر ۶ ماه)" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "مبتدی (زیر ۶ ماه)" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));

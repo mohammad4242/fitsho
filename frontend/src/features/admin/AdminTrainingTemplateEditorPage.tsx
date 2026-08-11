@@ -26,7 +26,7 @@ import "./admin.css";
 
 type EditorState = "loading" | "ready" | "missing" | "error";
 
-const levels: ExperienceLevel[] = ["beginner", "intermediate", "advanced"];
+const levels: ExperienceLevel[] = ["first_month", "beginner", "intermediate", "advanced"];
 const methods: TrainingTemplateMethod[] = ["standard", "superset", "drop_set"];
 const priorities: TrainingTemplateSlotPriority[] = ["core", "accessory", "optional"];
 
@@ -220,7 +220,7 @@ export function AdminTrainingTemplateEditorPage() {
                 </label>
                 <label>{t("admin.templateEditor.trainingLevel")}
                   <select aria-label={t("admin.templateEditor.trainingLevel")} value={form.training_level} onChange={(event) => updateField("training_level", event.target.value as ExperienceLevel)}>
-                    {levels.map((level) => <option key={level} value={level}>{t(`catalog.difficulty.${level}`)}</option>)}
+                    {levels.map((level) => <option key={level} value={level}>{level === "first_month" ? t("admin.templates.firstMonth") : t(`catalog.difficulty.${level}`)}</option>)}
                   </select>
                 </label>
                 <label>{t("admin.templateEditor.goal")}

@@ -131,6 +131,27 @@ def test_selector_excludes_inactive_nonprogrammable_unsafe_and_too_hard_exercise
     assert result.ids == (allowed.id,)
 
 
+def test_first_month_uses_only_beginner_exercises(db: Session) -> None:
+    beginner = exercise(db, "first-month-row", equipment=(Equipment.BODYWEIGHT,))
+    intermediate = exercise(
+        db,
+        "intermediate-row",
+        equipment=(Equipment.BODYWEIGHT,),
+        difficulty=Difficulty.INTERMEDIATE,
+    )
+
+    result = WorkoutCandidateSelector(db).select(
+        profile(
+            location=TrainingLocation.HOME,
+            setup=HomeTrainingSetup.BODYWEIGHT_ONLY,
+            experience=ExperienceLevel.FIRST_MONTH,
+        )
+    )
+
+    assert beginner.id in result.ids
+    assert intermediate.id not in result.ids
+
+
 def test_gym_allows_supported_gym_equipment_and_keeps_soft_other_caution(db: Session) -> None:
     cable_row = exercise(db, "cable-row", equipment=(Equipment.CABLE,))
 

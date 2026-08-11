@@ -201,6 +201,7 @@ const en = {
           maintain_weight: "Maintain weight",
         },
         experience: {
+          first_month: "It is my first month",
           beginner: "Beginner",
           intermediate: "Intermediate",
           advanced: "Advanced",
@@ -435,6 +436,7 @@ const en = {
         days_other: "{{count}} days",
         levelFilter: "Program level",
         allLevels: "All levels",
+        firstMonth: "First Month",
         loading: "Loading templates…",
         loadError: "The program library could not be loaded.",
         empty: "No template has been recorded for this day count.",

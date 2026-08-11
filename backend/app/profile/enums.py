@@ -39,6 +39,7 @@ class FitnessGoal(StrEnum):
 
 
 class ExperienceLevel(StrEnum):
+    FIRST_MONTH = "first_month"
     BEGINNER = "beginner"
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"

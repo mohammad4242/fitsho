@@ -674,6 +674,7 @@ class WorkoutGenerationService:
         sanitized = self._sanitize_limitations(profile.physical_limitations)
         limitations = (Limitation(name=sanitized, stable=False),) if sanitized is not None else ()
         training_age = {
+            ExperienceLevel.FIRST_MONTH: 0,
             ExperienceLevel.BEGINNER: 0,
             ExperienceLevel.INTERMEDIATE: 12,
             ExperienceLevel.ADVANCED: 48,
@@ -685,7 +686,11 @@ class WorkoutGenerationService:
             "height_cm": profile.height_cm,
             "weight_kg": float(source.measurement.weight_kg),
             "primary_goal": profile.fitness_goal.value,
-            "training_experience": TrainingExperience(profile.experience_level.value),
+            "training_experience": (
+                TrainingExperience.BEGINNER
+                if profile.experience_level is ExperienceLevel.FIRST_MONTH
+                else TrainingExperience(profile.experience_level.value)
+            ),
             "training_age_months": training_age,
             "available_training_days": profile.training_days_per_week,
             "session_duration_minutes": profile.session_duration_minutes,

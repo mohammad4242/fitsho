@@ -42,6 +42,7 @@ CAUTION_EXCLUSIONS: dict[TrainingCaution, frozenset[ExerciseCautionTag]] = {
 SOFT_CAUTIONS = frozenset({TrainingCaution.OTHER})
 
 _ALLOWED_DIFFICULTIES: dict[ExperienceLevel, frozenset[Difficulty]] = {
+    ExperienceLevel.FIRST_MONTH: frozenset({Difficulty.BEGINNER}),
     ExperienceLevel.BEGINNER: frozenset({Difficulty.BEGINNER}),
     ExperienceLevel.INTERMEDIATE: frozenset({Difficulty.BEGINNER, Difficulty.INTERMEDIATE}),
     ExperienceLevel.ADVANCED: frozenset(Difficulty),
@@ -154,6 +155,7 @@ class WorkoutCandidateSelector:
             ExerciseType.OTHER: 4,
         }
         target_difficulty = {
+            ExperienceLevel.FIRST_MONTH: difficulty_rank[Difficulty.BEGINNER],
             ExperienceLevel.BEGINNER: difficulty_rank[Difficulty.BEGINNER],
             ExperienceLevel.INTERMEDIATE: difficulty_rank[Difficulty.INTERMEDIATE],
             ExperienceLevel.ADVANCED: difficulty_rank[Difficulty.ADVANCED],

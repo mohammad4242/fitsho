@@ -14,7 +14,7 @@ const legacyFitnessGoals = [
 ] as const;
 export type FitnessGoal = (typeof fitnessGoals)[number] | (typeof legacyFitnessGoals)[number];
 
-export const experienceLevels = ["beginner", "intermediate", "advanced"] as const;
+export const experienceLevels = ["first_month", "beginner", "intermediate", "advanced"] as const;
 export type ExperienceLevel = (typeof experienceLevels)[number];
 
 export const trainingLocations = ["home", "gym"] as const;
