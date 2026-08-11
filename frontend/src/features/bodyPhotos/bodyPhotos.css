@@ -130,6 +130,36 @@
   .body-goal-suggestion, .body-checklist > header, .body-checklist__area dl { grid-template-columns: 1fr; }
 }
 
+/* Compact progress and visual-first analysis */
+.body-progress-page.fitsho-page, .body-analysis-page.fitsho-page { padding-top: .8rem; }
+.body-progress-page > header { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .5rem 1rem; padding-block: .5rem .8rem; }
+.body-progress-page > header h1, .body-analysis-page__header h1 { font-size: clamp(1.45rem, 4vw, 2.2rem); letter-spacing: 0; }
+.body-progress-page > header > p { grid-column: 1 / -1; color: var(--fitsho-muted); font-size: .75rem; }
+.body-progress-page > header .primary-button { min-height: 2.65rem; padding: .55rem .85rem; }
+.body-progress-page > .primary-button { display: none; }
+.body-progress-list { gap: .45rem; }
+.body-progress-list > li { min-height: 3.8rem; padding: .65rem .75rem; border-radius: var(--fitsho-radius-md); background: var(--fitsho-surface); box-shadow: none; }
+.body-progress-list > li.body-progress-list__latest { min-height: 7.5rem; border-color: var(--fitsho-line-strong); background: linear-gradient(135deg, rgb(80 223 206 / 7%), var(--fitsho-surface)); }
+.body-progress-list__latest small { color: var(--fitsho-aqua); font-size: .65rem; font-weight: 850; }
+.body-progress-list > li > a { min-height: 2.35rem; }
+.body-analysis-page__header { padding-block: .5rem .8rem; }
+.body-analysis-page__header > p:last-child { color: var(--fitsho-muted); font-size: .72rem; }
+.body-analysis-stage { position: relative; }
+.body-analysis-stage .body-analysis-overview { position: absolute; z-index: 2; inset-block-start: .8rem; inset-inline-end: .8rem; width: min(12rem, 42%); display: grid; grid-template-columns: 1fr; gap: .2rem; padding: .7rem; border-radius: var(--fitsho-radius-md); background: rgb(8 18 17 / 88%); backdrop-filter: blur(12px); }
+.body-analysis-stage .body-analysis-overview h2 { font-size: 1.8rem; }
+.body-analysis-stage .body-analysis-overview > p { color: var(--fitsho-muted); font-size: .65rem; }
+.body-analysis-photo-details { border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-md); background: var(--fitsho-surface-subtle); }
+.body-analysis-photo-details > summary { padding: .75rem 1rem; color: var(--fitsho-muted); font-size: .75rem; font-weight: 850; cursor: pointer; }
+.body-analysis-photo-details .body-analysis-photos { padding: 0 .75rem .75rem; }
+
+@media (max-width: 640px) {
+  .body-progress-page > header { grid-template-columns: 1fr auto; }
+  .body-progress-list > li.body-progress-list__latest { grid-template-columns: 1fr auto; }
+  .body-analysis-stage .body-area-map { padding-top: 4.2rem; }
+  .body-analysis-stage .body-analysis-overview { width: calc(100% - 1.6rem); grid-template-columns: auto 1fr; }
+  .body-analysis-stage .body-analysis-overview > p { align-self: center; }
+}
+
 /* Body intelligence visual layer */
 .body-progress-page.fitsho-page,
 .body-analysis-page.fitsho-page {

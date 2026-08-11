@@ -7,6 +7,7 @@ import { verifyPhysicianAccess } from "../features/nutrition/api";
 import { useProfile } from "../features/profile/ProfileContext";
 import { verifyCoachAccess } from "../features/workoutReviews/api";
 import { LanguageSwitcher } from "../shared/LanguageSwitcher";
+import { AppIcon, type IconName } from "../shared/AppIcon";
 import "./more.css";
 
 export function MorePage() {
@@ -50,9 +51,7 @@ export function MorePage() {
     <main className="more-page fitsho-page">
       <div className="more-page__container">
         <header className="more-page__heading">
-          <p className="eyebrow eyebrow--accent">{l("حساب و ابزارها", "Account & tools")}</p>
           <h1>{l("بیشتر", "More")}</h1>
-          <p>{l("پروفایل، ابزارهای تکمیلی و دسترسی‌های حسابت را یک‌جا مدیریت کن.", "Manage your profile, supporting tools, and account access in one place.")}</p>
         </header>
 
         <section className="more-profile-card" aria-label={l("خلاصه پروفایل", "Profile summary")}>
@@ -70,10 +69,10 @@ export function MorePage() {
 
         <div className="more-page__grid">
           <MoreGroup title={l("محصول", "Product")}>
-            {hasTraining && <MoreLink to="/exercises" icon="exercise" title={l("کتابخانه حرکات", "Exercise library")} subtitle={l("حرکت‌ها، اجرا و نکات ایمنی", "Exercises, execution, and safety notes")} />}
-            {hasTraining && <MoreLink to="/body-progress" icon="progress" title={l("پیشرفت بدن", "Body progress")} subtitle={l("جلسه‌ها و تحلیل‌های ثبت‌شده", "Saved sessions and analyses")} />}
+            {hasTraining && <MoreLink to="/exercises" icon="dumbbell" title={l("کتابخانه حرکات", "Exercise library")} subtitle={l("حرکت‌ها، اجرا و نکات ایمنی", "Exercises, execution, and safety notes")} />}
+            {hasTraining && <MoreLink to="/body-progress" icon="body" title={l("پیشرفت بدن", "Body progress")} subtitle={l("جلسه‌ها و تحلیل‌های ثبت‌شده", "Saved sessions and analyses")} />}
             {hasNutrition && <MoreLink to="/food-catalogue" icon="nutrition" title={l("کاتالوگ مواد غذایی", "Food catalogue")} subtitle={l("مرجع سریع ارزش غذایی", "Fast nutrition reference")} />}
-            {hasNutrition && <MoreLink to="/nutrition-tracking" icon="tracking" title={l("ثبت تغذیه", "Nutrition tracking")} subtitle={l("پیگیری ساده وضعیت روز", "Simple daily check-in")} />}
+            {hasNutrition && <MoreLink to="/nutrition-tracking" icon="target" title={l("ثبت تغذیه", "Nutrition tracking")} subtitle={l("پیگیری ساده وضعیت روز", "Simple daily check-in")} />}
           </MoreGroup>
 
           <MoreGroup title={l("حساب", "Account")}>
@@ -83,10 +82,10 @@ export function MorePage() {
 
           {(isCoach || isPhysician || user.is_admin) && (
             <MoreGroup title={l("فضاهای تخصصی", "Workspaces")}>
-              {isCoach && <MoreLink to="/coach/workouts" icon="coach" title={l("فضای مربی", "Coach workspace")} />}
-              {isPhysician && <MoreLink to="/physician/nutrition" icon="physician" title={l("فضای پزشک", "Physician workspace")} />}
-              {user.is_admin && <MoreLink to="/admin/exercises" icon="admin" title={l("مدیریت حرکات", "Exercise administration")} />}
-              {user.is_admin && <MoreLink to="/admin/nutrition-monitoring" icon="admin" title={l("پایش تغذیه", "Nutrition monitoring")} />}
+              {isCoach && <MoreLink to="/coach/workouts" icon="profile" title={l("فضای مربی", "Coach workspace")} />}
+              {isPhysician && <MoreLink to="/physician/nutrition" icon="profile" title={l("فضای پزشک", "Physician workspace")} />}
+              {user.is_admin && <MoreLink to="/admin/exercises" icon="settings" title={l("مدیریت حرکات", "Exercise administration")} />}
+              {user.is_admin && <MoreLink to="/admin/nutrition-monitoring" icon="settings" title={l("پایش تغذیه", "Nutrition monitoring")} />}
             </MoreGroup>
           )}
         </div>
@@ -104,6 +103,6 @@ function MoreGroup({ title, children }: { title: string; children: ReactNode }) 
   return <section className="more-group" aria-label={title}><h2>{title}</h2><div>{children}</div></section>;
 }
 
-function MoreLink({ to, icon, title, subtitle }: { to: string; icon: string; title: string; subtitle?: string }) {
-  return <Link className="more-row" to={to}><span className={`more-row__icon more-row__icon--${icon}`} aria-hidden="true" /><span><strong>{title}</strong>{subtitle && <small>{subtitle}</small>}</span><b aria-hidden="true">←</b></Link>;
+function MoreLink({ to, icon, title, subtitle }: { to: string; icon: IconName; title: string; subtitle?: string }) {
+  return <Link className="more-row" to={to}><span className="more-row__icon"><AppIcon name={icon} /></span><span><strong>{title}</strong>{subtitle && <small>{subtitle}</small>}</span><AppIcon className="more-row__chevron" name="chevron" /></Link>;
 }

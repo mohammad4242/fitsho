@@ -128,18 +128,6 @@ export function BodyAnalysisResultPage() {
         <p>{t("bodyPhotos.results.sessionDate", { date: sessionDate })}</p>
       </header>
 
-      <section className="body-analysis-photos" aria-label={t("bodyPhotos.results.photosLabel")}>
-        {session.photos.map((photo) => (
-          <figure key={photo.id}>
-            <img
-              src={photo.content_url}
-              alt={t("bodyPhotos.results.photoAlt", { view: t(`bodyPhotos.views.${photo.view}`) })}
-            />
-            <figcaption>{t(`bodyPhotos.views.${photo.view}`)}</figcaption>
-          </figure>
-        ))}
-      </section>
-
       {analysis === null && !analysisActionFailed && (
         <p role="status">{t("bodyPhotos.results.notStarted")}</p>
       )}
@@ -192,6 +180,12 @@ export function BodyAnalysisResultPage() {
       )}
 
       {analysis !== null && <BodyAnalysisResult analysis={analysis} />}
+      <details className="body-analysis-photo-details">
+        <summary>{t("bodyPhotos.results.photosLabel")}</summary>
+        <section className="body-analysis-photos" aria-label={t("bodyPhotos.results.photosLabel")}>
+          {session.photos.map((photo) => <figure key={photo.id}><img src={photo.content_url} alt={t("bodyPhotos.results.photoAlt", { view: t(`bodyPhotos.views.${photo.view}`) })} /><figcaption>{t(`bodyPhotos.views.${photo.view}`)}</figcaption></figure>)}
+        </section>
+      </details>
       {analysis?.normalized_result !== null
         && analysis?.normalized_result !== undefined
         && previousAnalysis?.normalized_result !== null

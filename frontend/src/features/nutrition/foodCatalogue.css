@@ -61,3 +61,30 @@ html[dir="rtl"] .food-catalogue-hero h1 { letter-spacing: 0; }
 @media (prefers-reduced-motion: reduce) { .food-shelf-card { transition: none; } }
 @media (max-width: 520px) { .food-macro-strip { grid-template-columns: repeat(2, 1fr); } .food-macro-strip div + div { border-inline-start: 0; } .food-detail-grid, .food-admin-form { grid-template-columns: 1fr; } .food-admin-form label { grid-column: 1; } }
 @media (prefers-reduced-motion: reduce) { .food-shelf-card { transition: none; } .food-shelf-card:hover { transform: none; } }
+
+.food-catalogue-hero { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 0 .75rem; }
+.food-catalogue-hero h1 { margin: 0; font-size: clamp(1.45rem, 4vw, 2.2rem); letter-spacing: 0; }
+.food-catalogue-back { padding: .45rem .7rem; border: 1px solid var(--fitsho-line); border-radius: 99rem; color: var(--fitsho-muted); font-size: .72rem; }
+.food-catalogue-toolbar { inset-block-start: .5rem; padding: .6rem; border-radius: var(--fitsho-radius-lg); background: rgb(8 18 17 / 96%); }
+.food-catalogue-toolbar label, .food-catalogue-toolbar form { gap: .3rem; font-size: .68rem; }
+.food-catalogue-toolbar input, .food-catalogue-toolbar select { min-height: 2.65rem; }
+.food-catalogue-toolbar button { min-height: 2.65rem; }
+.food-catalogue-grid { gap: .55rem; padding-top: .75rem; }
+.food-shelf-card { border-radius: var(--fitsho-radius-md); box-shadow: none; }
+.food-shelf-card > header { align-items: center; padding: .7rem .8rem .55rem; }
+.food-shelf-card h2 { margin: .1rem 0; font-size: 1rem; }
+.food-shelf-card__basis { font-size: .62rem !important; }
+.food-macro-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: .35rem; }
+.food-macro-strip div { padding: .55rem .25rem; }
+.food-macro-strip span { min-height: auto; font-size: .6rem; }
+.food-macro-strip strong { margin-top: .15rem; font-size: .7rem; }
+.food-shelf-card > footer { padding: .55rem .8rem .7rem; }
+.food-shelf-card > footer button { min-height: 2.2rem; padding: .4rem .65rem; font-size: .7rem; }
+.food-dialog { background: var(--fitsho-surface-raised); }
+
+@media (max-width: 760px) {
+  .food-catalogue-hero { flex-direction: row; padding-top: .75rem; }
+  .food-catalogue-toolbar { position: sticky; inset-block-start: 3.9rem; grid-template-columns: 1fr auto; }
+  .food-catalogue-toolbar form { grid-column: 1 / -1; }
+  .food-catalogue-toolbar > label { min-width: 8rem; }
+}

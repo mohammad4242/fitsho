@@ -67,14 +67,9 @@ export function FoodCataloguePage() {
     <main className="food-catalogue-page fitsho-page" dir={fa ? "rtl" : "ltr"}>
       <section className="food-catalogue-hero">
         <div>
-          <Link className="food-catalogue-back" to="/nutrition-estimate">
-            <span aria-hidden="true">←</span> {l("بازگشت به تغذیه", "Back to Nutrition")}
-          </Link>
-          <p className="eyebrow eyebrow--accent">{l("ترکیب علمیِ تأییدشده", "Verified nutrition reference")}</p>
           <h1 className="fitsho-display">{l("کاتالوگ مواد غذایی", "Food catalogue")}</h1>
-          <p>{l("ترکیب غذایی و ریزمغذی‌های موجود را با مبنای روشن ببین.", "Explore verified composition and available micronutrients with a clear basis.")}</p>
         </div>
-        <CatalogueIcon />
+        <Link className="food-catalogue-back" to="/nutrition-estimate">{l("تغذیه", "Nutrition")}</Link>
       </section>
 
       <section className="food-catalogue-toolbar" aria-label={l("جست‌وجو و فیلتر", "Search and filter")}>
@@ -120,7 +115,7 @@ function FoodCard({ food, language, onDetails, onPrice }: { food: FoodCatalogueI
   return <article className="food-shelf-card" role="listitem">
     <header><div><span>{categoryLabel(food.category, language)}</span><h2>{fa ? food.name_fa : food.name_en}</h2><small>{fa ? food.name_en : food.name_fa}</small></div><span className="food-shelf-card__basis">{basisLabel(portion, language)}</span></header>
     {isAdminFood(food) && <PriceTicket food={food} language={language} />}
-    <div className="food-macro-strip">{macroDefinitions.map(([code, faLabel, enLabel, unit]) => <div key={code}><span>{fa ? faLabel : enLabel}</span><strong>{macroValue(scale(food.macros[code], portion), unit, language)}</strong></div>)}</div>
+    <div className="food-macro-strip">{macroDefinitions.slice(0, 4).map(([code, faLabel, enLabel, unit]) => <div key={code}><span>{fa ? faLabel : enLabel}</span><strong>{macroValue(scale(food.macros[code], portion), unit, language)}</strong></div>)}</div>
     <footer><button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>{onPrice && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}</footer>
   </article>;
 }
@@ -159,7 +154,6 @@ function AddFoodDialog({ language, onClose, onSaved }: { language: "fa" | "en"; 
 }
 
 function DialogFrame({ children, label, onClose }: { children: ReactNode; label: string; onClose: () => void }) { return <div className="food-dialog-backdrop"><section aria-label={label} aria-modal="true" className="food-dialog" role="dialog"><button className="food-dialog__close" type="button" onClick={onClose} aria-label="Close">×</button>{children}</section></div>; }
-function CatalogueIcon() { return <svg aria-hidden="true" className="food-catalogue-icon" viewBox="0 0 180 180"><path d="M30 70h120l-13 70H43L30 70Z"/><path d="M58 70c0-24 13-40 32-40s32 16 32 40M67 94v24m23-24v24m23-24v24"/><circle cx="48" cy="53" r="10"/><path d="M45 43c6-12 16-14 25-7"/></svg>; }
 function formatNumber(value: number, language: "fa" | "en") { return new Intl.NumberFormat(language === "fa" ? "fa-IR" : "en-US", { maximumFractionDigits: 1 }).format(value); }
 function macroValue(value: string | number | null, unit: string, language: "fa" | "en") { return value === null ? "—" : `${formatNumber(Number(value), language)} ${language === "fa" && unit === "g" ? "گرم" : unit}`; }
 function isAdminFood(food: FoodCatalogueItem): food is AdminFoodCatalogueItem { return "price" in food; }

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type IconName =
+export type IconName =
   | "home" | "dumbbell" | "nutrition" | "progress" | "more"
   | "arrow" | "profile" | "camera" | "catalogue" | "settings"
   | "body" | "target" | "language" | "logout" | "chevron";
