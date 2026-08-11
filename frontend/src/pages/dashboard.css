@@ -7,6 +7,7 @@
 .command-card { min-width: 0; padding: 1rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); color: var(--fitsho-ink); background: var(--fitsho-surface); text-decoration: none; box-shadow: var(--fitsho-shadow-soft); }
 .command-card--primary { position: relative; isolation: isolate; overflow: hidden; grid-row: span 2; min-height: 17rem; display: flex; flex-direction: column; background: linear-gradient(145deg, rgb(80 223 206 / 7%), transparent 48%), var(--fitsho-surface); }
 .command-card--primary::after { position: absolute; z-index: 1; inset: 0; background: linear-gradient(90deg, var(--fitsho-surface) 0 48%, transparent 78%); content: ""; pointer-events: none; }
+html[dir="rtl"] .command-card--primary::after { background: linear-gradient(270deg, var(--fitsho-surface) 0 48%, transparent 78%); }
 .command-card--primary > :not(.command-card__media) { position: relative; z-index: 2; }
 .command-card__head { min-width: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
 .command-card__head p { margin: 0 0 .25rem; color: var(--fitsho-muted); font-size: .68rem; font-weight: 850; }
@@ -49,6 +50,7 @@
   .command-card { padding: .85rem; }
   .command-card--primary { min-height: 10.75rem; }
   .command-card--primary::after { background: linear-gradient(90deg, var(--fitsho-surface) 0 44%, rgb(8 18 17 / 72%) 70%, transparent); }
+  html[dir="rtl"] .command-card--primary::after { background: linear-gradient(270deg, var(--fitsho-surface) 0 44%, rgb(8 18 17 / 72%) 70%, transparent); }
   .command-card__media { width: 45%; }
   .command-card__workout { margin-block: .8rem; }
   .command-card__workout h3 { font-size: 1.25rem; }

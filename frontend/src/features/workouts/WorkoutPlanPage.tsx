@@ -170,28 +170,6 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         )}
         {state === "ready" && plan !== null && (
           <>
-            <CoachReviewBanner plan={plan} isEnglish={isEnglish} historical={isViewingHistorical} />
-            {reused && <p className="workout-reused" role="status">{t("workoutPlan.reused")}</p>}
-            {plan.is_stale && (
-              <p className="workout-stale" role="status">{t("workoutPlan.stale")}</p>
-            )}
-            {plan.body_analysis_provenance?.provisional === true && (
-              <p className="workout-body-analysis-warning" role="alert">
-                {t("workoutPlan.provisionalBodyAnalysisWarning")}
-              </p>
-            )}
-            {generationError && (
-              <StatusPanel
-                role="alert"
-                message={t(
-                  generationError === "cooldown"
-                    ? "workoutPlan.generateCooldown"
-                    : "workoutPlan.generateError",
-                )}
-                action={generationError === "failed" ? t("common.retry") : undefined}
-                onAction={generationError === "failed" ? generate : undefined}
-              />
-            )}
             <section className="workout-schedule" aria-labelledby="workout-schedule-title">
               <div className="workout-schedule__heading">
                 <div>
@@ -210,13 +188,14 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
               {generating && <p className="workout-generating" role="status">{t("workoutPlan.generating")}</p>}
               <div className="workout-days" role="list" aria-labelledby="workout-schedule-title">
                 {plan.days.map((day, dayIndex) => (
-                  <details className={`workout-day${dayIndex === 0 ? " workout-day--focus" : ""}`} key={day.day_number} role="listitem" open={dayIndex === 0}>
+                  <details className={`workout-day${dayIndex === 0 ? " workout-day--focus" : ""}`} key={day.day_number} role="listitem">
                     <summary>
+                      {dayIndex === 0 && day.exercises[0]?.exercise.media_path && <span className="workout-day__media"><ExerciseMedia ambient path={day.exercises[0].exercise.media_path} name={isEnglish ? day.exercises[0].exercise.name_en : day.exercises[0].exercise.name_fa} mediaType={day.exercises[0].exercise.media_type} /></span>}
                       <span>{String(day.day_number).padStart(2, "0")}</span>
                       <div>
                         {dayIndex === 0 && <small>{l("جلسه بعد", "Next session")}</small>}
                         <h3>{isEnglish ? day.title_en : day.title_fa}</h3>
-                        <p>{t("workoutPlan.sessionMinutes", { count: day.estimated_duration_minutes })}</p>
+                        <p>{dayIndex === 0 && day.exercises[0] ? `${isEnglish ? day.exercises[0].exercise.name_en : day.exercises[0].exercise.name_fa} · ` : ""}{t("workoutPlan.sessionMinutes", { count: day.estimated_duration_minutes })}</p>
                       </div>
                     </summary>
                     {day.ai_coach_explanation_fa && (
@@ -270,6 +249,13 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 ))}
               </div>
             </section>
+            <div className="workout-plan-statuses">
+              <CoachReviewBanner plan={plan} isEnglish={isEnglish} historical={isViewingHistorical} />
+              {reused && <p className="workout-reused" role="status">{t("workoutPlan.reused")}</p>}
+              {plan.is_stale && <p className="workout-stale" role="status">{t("workoutPlan.stale")}</p>}
+              {plan.body_analysis_provenance?.provisional === true && <p className="workout-body-analysis-warning" role="alert">{t("workoutPlan.provisionalBodyAnalysisWarning")}</p>}
+              {generationError && <StatusPanel role="alert" message={t(generationError === "cooldown" ? "workoutPlan.generateCooldown" : "workoutPlan.generateError")} action={generationError === "failed" ? t("common.retry") : undefined} onAction={generationError === "failed" ? generate : undefined} />}
+            </div>
           </>
         )}
 

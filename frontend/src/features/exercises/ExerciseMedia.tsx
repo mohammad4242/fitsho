@@ -5,12 +5,13 @@ import type { MediaType } from "./types";
 const placeholderPath = "/exercises/exercise-placeholder.svg";
 
 type ExerciseMediaProps = {
+  ambient?: boolean;
   path: string;
   name: string;
   mediaType: MediaType;
 };
 
-export function ExerciseMedia({ path, name, mediaType }: ExerciseMediaProps) {
+export function ExerciseMedia({ ambient = false, path, name, mediaType }: ExerciseMediaProps) {
   const [failed, setFailed] = useState(false);
   const alt = localizedAlt(name);
 
@@ -23,7 +24,9 @@ export function ExerciseMedia({ path, name, mediaType }: ExerciseMediaProps) {
       <video
         src={path}
         aria-label={alt}
-        controls
+        autoPlay={ambient}
+        controls={!ambient}
+        loop={ambient}
         muted
         playsInline
         preload="metadata"

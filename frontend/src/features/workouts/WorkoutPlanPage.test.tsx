@@ -203,14 +203,19 @@ it("explains the generation cooldown instead of showing a generic failure", asyn
 
 it("renders the selected duration, exercise media, and exercise detail link", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  const user = userEvent.setup();
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={6} /></MemoryRouter>);
 
   expect(await screen.findByLabelText("دوره 6 هفته‌ای")).toBeInTheDocument();
   expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
-  expect(screen.getByRole("img", { name: "نمایش حرکت پرس سینه دمبل" })).toHaveAttribute(
+  expect(screen.getAllByRole("img", { name: "نمایش حرکت پرس سینه دمبل" })[0]).toHaveAttribute(
     "src",
     "/media/bench.gif",
   );
+  const workoutDay = screen.getByText("تمام بدن").closest("details")!;
+  expect(workoutDay).not.toHaveAttribute("open");
+  await user.click(screen.getByText("تمام بدن").closest("summary")!);
+  expect(workoutDay).toHaveAttribute("open");
   expect(screen.getByRole("link", { name: "مشاهده جزئیات حرکت" })).toHaveAttribute(
     "href",
     "/exercises/dumbbell-bench-press",

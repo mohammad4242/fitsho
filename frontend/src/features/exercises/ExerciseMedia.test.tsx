@@ -68,4 +68,13 @@ describe("ExerciseMedia", () => {
       screen.getByRole("img", { name: "Romanian Deadlift demonstration" }),
     ).toHaveAttribute("src", placeholderPath);
   });
+
+  it("supports a silent looping preview without controls in summary cards", () => {
+    render(<ExerciseMedia ambient path="/exercises/demo.mp4" name="Squat" mediaType="video" />);
+
+    const video = screen.getByLabelText("Squat demonstration");
+    expect(video).toHaveAttribute("autoplay");
+    expect(video).toHaveAttribute("loop");
+    expect(video).not.toHaveAttribute("controls");
+  });
 });

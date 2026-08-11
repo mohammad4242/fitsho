@@ -135,7 +135,7 @@ export function DashboardPage() {
                     <span>{String(nextDay.day_number).padStart(2, "0")}</span>
                     <div><h3>{english ? nextDay.title_en : nextDay.title_fa}</h3><p>{format(nextDay.estimated_duration_minutes)} {english ? "min" : "دقیقه"}</p></div>
                   </div>
-                  {nextDay.exercises[0]?.exercise.media_path && <div className="command-card__media"><ExerciseMedia path={nextDay.exercises[0].exercise.media_path} name={english ? nextDay.exercises[0].exercise.name_en : nextDay.exercises[0].exercise.name_fa} mediaType={nextDay.exercises[0].exercise.media_type} /></div>}
+                  {nextDay.exercises[0]?.exercise.media_path && <div className="command-card__media"><ExerciseMedia ambient path={nextDay.exercises[0].exercise.media_path} name={english ? nextDay.exercises[0].exercise.name_en : nextDay.exercises[0].exercise.name_fa} mediaType={nextDay.exercises[0].exercise.media_type} /></div>}
                 </>
               ) : planDuration !== undefined ? <p className="command-card__context">{t("dashboard.planDuration", { count: planDuration.toLocaleString(locale) })}</p> : null}
               <PrimaryAction state={planState} generating={generating} onStart={startWorkout} />
