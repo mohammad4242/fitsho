@@ -40,6 +40,8 @@ from app.nutrition.enums import (
     FoodRole,
     FoodVerificationStatus,
     MainMealCountBucket,
+    MealCategory,
+    MealIngredientRole,
     MealPreparationPreference,
     MealSlotRole,
     MedicalConditionCode,
@@ -753,8 +755,8 @@ class NutritionCatalogueMeal(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
     name_en: Mapped[str] = mapped_column(String(160), nullable=False)
-    slot_role: Mapped[MealSlotRole] = mapped_column(
-        enum_column(MealSlotRole, "ck_nutrition_catalogue_meal_slot_values"), nullable=False
+    category: Mapped[MealCategory] = mapped_column(
+        enum_column(MealCategory, "ck_nutrition_catalogue_meal_category_values"), nullable=False
     )
     verification_status: Mapped[FoodVerificationStatus] = mapped_column(
         enum_column(FoodVerificationStatus, "ck_nutrition_catalogue_meal_status_values"),
@@ -768,7 +770,11 @@ class NutritionCatalogueMeal(Base):
 class NutritionCatalogueMealItem(Base):
     __tablename__ = "nutrition_catalogue_meal_items"
     __table_args__ = (
-        CheckConstraint("grams > 0", name="ck_nutrition_catalogue_meal_item_grams_positive"),
+        UniqueConstraint("meal_id", "food_id", name="uq_nutrition_catalogue_meal_item_food"),
+        CheckConstraint(
+            "min_grams > 0 AND min_grams <= reference_grams AND reference_grams <= max_grams",
+            name="ck_nutrition_catalogue_meal_item_bounds",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -778,7 +784,17 @@ class NutritionCatalogueMealItem(Base):
     food_id: Mapped[UUID] = mapped_column(
         ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), nullable=False
     )
-    grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    reference_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    min_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    max_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    functional_role: Mapped[MealIngredientRole | None] = mapped_column(
+        enum_column(
+            MealIngredientRole,
+            "ck_nutrition_catalogue_meal_item_functional_role_values",
+        )
+    )
+    food: Mapped["NutritionCatalogueFood"] = relationship()
 
 
 class NutritionPriceProvider(Base):

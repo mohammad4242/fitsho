@@ -97,6 +97,22 @@ class MealSlotRole(StrEnum):
     SNACK = "snack"
 
 
+class MealCategory(StrEnum):
+    BREAKFAST = "breakfast"
+    LUNCH = "lunch"
+    POST_WORKOUT = "post_workout"
+    SNACK = "snack"
+    DINNER = "dinner"
+
+
+class MealIngredientRole(StrEnum):
+    PROTEIN = "protein"
+    CARBOHYDRATE = "carbohydrate"
+    FAT = "fat"
+    FIBRE = "fibre"
+    MICRONUTRIENT_SOURCE = "micronutrient_source"
+
+
 class PriceProviderKind(StrEnum):
     DATABASE = "database"
     IMPORT = "import"

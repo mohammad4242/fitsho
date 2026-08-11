@@ -19,23 +19,18 @@ from app.nutrition.enums import (
     EstimateConfidence,
     FoodMeasurementBasis,
     FoodVerificationStatus,
-    MealSlotRole,
 )
 from app.nutrition.enums import FoodRole as FoodRoleEnum
 from app.nutrition.models import (
     NutritionCatalogueFood,
     NutritionCatalogueFoodAlias,
     NutritionCatalogueFoodRole,
-    NutritionCatalogueMeal,
-    NutritionCatalogueMealItem,
     NutritionFoodComposition,
     NutritionFoodPortion,
 )
 from app.nutrition.schemas import (
     CatalogueFoodResponse,
     CatalogueFoodWrite,
-    CatalogueMealResponse,
-    CatalogueMealWrite,
 )
 
 REQUIRED_PRIMARY_NUTRIENTS = frozenset(
@@ -110,20 +105,6 @@ def calculate_meal_totals(
 
 def scale_nutrient_value_for_grams(value_per_100g: Decimal, grams: Decimal) -> Decimal:
     return value_per_100g * grams / Decimal("100")
-
-
-def validate_meal_roles(slot_role: str, food_roles: list[str]) -> None:
-    if not food_roles:
-        raise ValueError("Meal requires at least one food")
-    if slot_role == "main_meal" and not {
-        FoodRole.MAIN_PROTEIN,
-        FoodRole.MAIN_STAPLE,
-    }.intersection(food_roles):
-        raise ValueError("Main meal requires a main eligible food")
-    if slot_role == "snack" and any(
-        role in {FoodRole.MAIN_PROTEIN, FoodRole.MAIN_STAPLE} for role in food_roles
-    ):
-        raise ValueError("Snack can only contain snack or flexible foods")
 
 
 def list_verified_foods(db: Session) -> list[CatalogueFoodResponse]:
@@ -230,56 +211,6 @@ def save_catalogue_food(db: Session, payload: CatalogueFoodWrite) -> CatalogueFo
     db.commit()
     db.refresh(food)
     return _food_response(food)
-
-
-def save_catalogue_meal(db: Session, payload: CatalogueMealWrite) -> CatalogueMealResponse:
-    foods = {
-        food.id: food
-        for food in db.scalars(
-            select(NutritionCatalogueFood)
-            .where(NutritionCatalogueFood.id.in_([item.food_id for item in payload.items]))
-            .options(
-                selectinload(NutritionCatalogueFood.roles),
-                selectinload(NutritionCatalogueFood.compositions),
-            )
-        ).all()
-    }
-    if len(foods) != len(payload.items):
-        raise ValueError("Every meal food must exist")
-    role_values = [role.role.value for item in payload.items for role in foods[item.food_id].roles]
-    validate_meal_roles(payload.slot_role, role_values)
-    meal = NutritionCatalogueMeal(
-        name_fa=payload.name_fa,
-        name_en=payload.name_en,
-        slot_role=MealSlotRole(payload.slot_role),
-        verification_status=FoodVerificationStatus(payload.verification_status),
-        items=[
-            NutritionCatalogueMealItem(food_id=item.food_id, grams=Decimal(str(item.grams)))
-            for item in payload.items
-        ],
-    )
-    db.add(meal)
-    db.commit()
-    db.refresh(meal)
-    totals = calculate_meal_totals(
-        [
-            (
-                Decimal(str(item.grams)),
-                [
-                    FoodCompositionValue(value.nutrient_code, value.value_per_100g, value.unit)
-                    for value in foods[item.food_id].compositions
-                ],
-            )
-            for item in payload.items
-        ]
-    )
-    return CatalogueMealResponse(
-        id=meal.id,
-        **payload.model_dump(),
-        totals={
-            code: float(value) if value is not None else None for code, value in totals.items()
-        },
-    )
 
 
 def retire_catalogue_food(db: Session, slug: str) -> None:

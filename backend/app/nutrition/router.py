@@ -56,6 +56,7 @@ from app.nutrition.clinical_service import (
 )
 from app.nutrition.enums import (
     FoodVerificationStatus,
+    MealCategory,
     NutritionLabRequestStatus,
     NutritionSupplementOrderStatus,
     PriceUpdateTriggerKind,
@@ -83,7 +84,6 @@ from app.nutrition.food_catalogue import (
     list_verified_foods,
     retire_catalogue_food,
     save_catalogue_food,
-    save_catalogue_meal,
 )
 from app.nutrition.food_photo_service import (
     FoodPhotoError,
@@ -94,6 +94,16 @@ from app.nutrition.food_photo_service import (
     estimate_photo,
     open_photo,
     replay_idempotent_photo,
+)
+from app.nutrition.meal_catalogue import (
+    CATEGORY_ORDER,
+    get_catalogue_meal,
+    list_catalogue_meals,
+    meal_response,
+    update_catalogue_meal,
+)
+from app.nutrition.meal_catalogue import (
+    create_catalogue_meal as create_meal,
 )
 from app.nutrition.models import (
     NutritionCatalogueFood,
@@ -141,6 +151,7 @@ from app.nutrition.schemas import (
     CatalogueConsumptionInput,
     CatalogueFoodResponse,
     CatalogueFoodWrite,
+    CatalogueMealPageResponse,
     CatalogueMealResponse,
     CatalogueMealWrite,
     ConsumptionEntryEditInput,
@@ -376,9 +387,42 @@ def create_food_price_override(
     )
 
 
+@router.get(
+    "/admin/meals",
+    response_model=CatalogueMealPageResponse,
+)
+def read_catalogue_meals(
+    db: DatabaseSession,
+    admin: AdminUser,
+    category: MealCategory | None = None,
+) -> CatalogueMealPageResponse:
+    del admin
+    return CatalogueMealPageResponse(
+        items=[meal_response(meal) for meal in list_catalogue_meals(db, category)],
+        categories=list(CATEGORY_ORDER),
+    )
+
+
+@router.get(
+    "/admin/meals/{meal_id}",
+    response_model=CatalogueMealResponse,
+)
+def read_catalogue_meal(
+    meal_id: UUID,
+    db: DatabaseSession,
+    admin: AdminUser,
+) -> CatalogueMealResponse:
+    del admin
+    meal = get_catalogue_meal(db, meal_id)
+    if meal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meal not found")
+    return meal_response(meal)
+
+
 @router.post(
     "/admin/meals",
     response_model=CatalogueMealResponse,
+    status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_trusted_origin)],
 )
 def create_catalogue_meal(
@@ -388,11 +432,34 @@ def create_catalogue_meal(
 ) -> CatalogueMealResponse:
     del admin
     try:
-        return save_catalogue_meal(db, payload)
+        return meal_response(create_meal(db, payload))
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
         ) from None
+
+
+@router.put(
+    "/admin/meals/{meal_id}",
+    response_model=CatalogueMealResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def replace_catalogue_meal(
+    meal_id: UUID,
+    payload: CatalogueMealWrite,
+    db: DatabaseSession,
+    admin: AdminUser,
+) -> CatalogueMealResponse:
+    del admin
+    try:
+        meal = update_catalogue_meal(db, meal_id, payload)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from None
+    if meal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meal not found")
+    return meal_response(meal)
 
 
 @router.delete(

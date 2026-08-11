@@ -15,6 +15,8 @@ from app.nutrition.enums import (
     FoodMeasurementBasis,
     FoodPortionUnit,
     MainMealCountBucket,
+    MealCategory,
+    MealIngredientRole,
     MealPreparationPreference,
     MedicalConditionCode,
     MetabolicBasis,
@@ -428,20 +430,59 @@ class FoodPriceOverrideResponse(BaseModel):
 
 class CatalogueMealItemInput(BaseModel):
     food_id: UUID
-    grams: float = Field(gt=0)
+    reference_grams: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
+    min_grams: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
+    max_grams: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
+    is_required: bool = True
+    functional_role: MealIngredientRole | None = None
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> "CatalogueMealItemInput":
+        if not self.min_grams <= self.reference_grams <= self.max_grams:
+            raise ValueError("Ingredient grams must satisfy min <= reference <= max")
+        return self
 
 
 class CatalogueMealWrite(BaseModel):
     name_fa: str = Field(min_length=1, max_length=160)
     name_en: str = Field(min_length=1, max_length=160)
-    slot_role: str
-    verification_status: str
+    category: MealCategory
+    verification_status: Literal["draft", "verified", "retired"]
     items: list[CatalogueMealItemInput] = Field(min_length=1, max_length=20)
 
+    @field_validator("items")
+    @classmethod
+    def unique_foods(cls, values: list[CatalogueMealItemInput]) -> list[CatalogueMealItemInput]:
+        if len({item.food_id for item in values}) != len(values):
+            raise ValueError("Meal foods must be unique")
+        return values
 
-class CatalogueMealResponse(CatalogueMealWrite):
+
+class CatalogueMealItemResponse(BaseModel):
+    food_id: UUID
+    food_slug: str
+    food_name_fa: str
+    food_name_en: str
+    reference_grams: float
+    min_grams: float
+    max_grams: float
+    is_required: bool
+    functional_role: MealIngredientRole | None
+
+
+class CatalogueMealResponse(BaseModel):
     id: UUID
+    name_fa: str
+    name_en: str
+    category: MealCategory
+    verification_status: Literal["draft", "verified", "retired"]
+    items: list[CatalogueMealItemResponse]
     totals: dict[str, float | None]
+
+
+class CatalogueMealPageResponse(BaseModel):
+    items: list[CatalogueMealResponse]
+    categories: list[MealCategory]
 
 
 class NutritionEstimateResponse(BaseModel):
