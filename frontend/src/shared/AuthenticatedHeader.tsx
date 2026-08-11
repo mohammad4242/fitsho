@@ -106,6 +106,7 @@ export function AuthenticatedHeader() {
     { to: "/physician/nutrition", label: t("header.physicianWorkspace"), active: location.pathname.startsWith("/physician/nutrition"), visible: isPhysician },
     { to: "/admin/exercises", label: t("header.adminExercises"), active: location.pathname.startsWith("/admin/exercises"), visible: user.is_admin },
     { to: "/admin/nutrition-monitoring", label: t("header.nutritionMonitoring"), active: location.pathname.startsWith("/admin/nutrition-monitoring"), visible: user.is_admin },
+    { to: "/admin/nutrition-meals", label: t("header.adminMealCatalogue"), active: location.pathname.startsWith("/admin/nutrition-meals"), visible: user.is_admin },
     { to: "/admin/ai-settings", label: t("header.adminAiSettings"), active: location.pathname.startsWith("/admin/ai-settings"), visible: user.is_admin },
     { to: "/admin/training-program-templates", label: t("header.adminTrainingTemplates"), active: location.pathname.startsWith("/admin/training-program-templates"), visible: user.is_admin },
   ].find((item) => item.visible && item.active);
@@ -180,6 +181,7 @@ export function AuthenticatedHeader() {
                     <span className="member-menu__section-label">{t("header.adminLinks")}</span>
                     <Link to="/admin/exercises" onClick={() => setMenuOpen(false)}>{t("header.adminExercises")}</Link>
                     <Link to="/admin/nutrition-monitoring" onClick={() => setMenuOpen(false)}>{t("header.nutritionMonitoring")}</Link>
+                    <Link to="/admin/nutrition-meals" onClick={() => setMenuOpen(false)}>{t("header.adminMealCatalogue")}</Link>
                     <Link to="/admin/ai-settings" onClick={() => setMenuOpen(false)}>{t("header.adminAiSettings")}</Link>
                     <Link to="/admin/training-program-templates" onClick={() => setMenuOpen(false)}>{t("header.adminTrainingTemplates")}</Link>
                   </div>
@@ -217,6 +219,7 @@ export function AuthenticatedHeader() {
 
 function getMobileContext(pathname: string, t: (key: string) => string, isFa: boolean): { title: string; backTo?: string } {
   const contexts: Array<{ prefix: string; title: string; backTo?: string }> = [
+    { prefix: "/admin/nutrition-meals", title: t("header.adminMealCatalogue"), backTo: "/more" },
     { prefix: "/nutrition-tracking", title: isFa ? "ثبت تغذیه" : "Nutrition tracking", backTo: "/nutrition-estimate" },
     { prefix: "/food-catalogue", title: t("header.foodCatalogue"), backTo: "/nutrition-estimate" },
     { prefix: "/nutrition-labs", title: isFa ? "آزمایش‌ها" : "Lab results", backTo: "/nutrition-estimate" },

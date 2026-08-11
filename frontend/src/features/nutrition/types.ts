@@ -165,6 +165,8 @@ export type WeeklyPlan = {
     cost_irr: number;
     meals: Array<{
       id: string;
+      catalogue_meal_id?: string | null;
+      catalogue_meal_category?: string | null;
       slot_role: "main_meal" | "snack";
       slot_index: number;
       target_distribution: Record<string, number>;

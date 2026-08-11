@@ -373,3 +373,57 @@ export type AdminTrainingProgramTemplateWrite = {
   source_url: string;
   days: AdminTrainingTemplateDayWrite[];
 };
+
+export type MealCategory = "breakfast" | "lunch" | "post_workout" | "snack" | "dinner";
+export type MealVerificationStatus = "draft" | "verified" | "retired";
+export type MealIngredientRole =
+  | "protein"
+  | "carbohydrate"
+  | "fat"
+  | "fibre"
+  | "micronutrient_source";
+
+export type AdminMealIngredient = {
+  food_id: string;
+  food_slug: string;
+  food_name_fa: string;
+  food_name_en: string;
+  reference_grams: number;
+  min_grams: number;
+  max_grams: number;
+  is_required: boolean;
+  functional_role: MealIngredientRole | null;
+};
+
+export type AdminMealCatalogueItem = {
+  id: string;
+  name_fa: string;
+  name_en: string;
+  category: MealCategory;
+  verification_status: MealVerificationStatus;
+  items: AdminMealIngredient[];
+  totals: Record<string, number | null>;
+};
+
+export type AdminMealCatalogueResponse = {
+  items: AdminMealCatalogueItem[];
+  categories: MealCategory[];
+};
+
+export type AdminMealIngredientWrite = Pick<
+  AdminMealIngredient,
+  | "food_id"
+  | "reference_grams"
+  | "min_grams"
+  | "max_grams"
+  | "is_required"
+  | "functional_role"
+>;
+
+export type AdminMealWrite = {
+  name_fa: string;
+  name_en: string;
+  category: MealCategory;
+  verification_status: MealVerificationStatus;
+  items: AdminMealIngredientWrite[];
+};

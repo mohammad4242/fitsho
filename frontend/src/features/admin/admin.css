@@ -95,6 +95,27 @@
 .admin-template-card footer { align-items: center; color: var(--muted); font-size: .8rem; }.admin-template-card footer a { color: var(--turquoise-dark); font-weight: 800; }
 @media (max-width: 760px) { .admin-ai-model-row { grid-template-columns: 1fr; }.admin-ai-model-row dl { flex-wrap: wrap; }.admin-ai-row-actions { justify-content: start; }.admin-ai-priority-row { grid-template-columns: 2.25rem minmax(0, 1fr); }.admin-ai-priority-row .admin-ai-row-actions { grid-column: 1 / -1; } }
 
+.admin-main--meal-catalogue, .admin-main--meal-editor { --meal-accent: #d8902f; }
+.admin-meal-category-tabs button[aria-selected="true"] { background: linear-gradient(135deg, var(--petrol-800), #80561f); }
+.admin-meal-card { border-top: .35rem solid var(--meal-accent); }
+.admin-meal-status { padding: .35rem .7rem; border-radius: 999px; font-size: .78rem; font-weight: 850; }
+.admin-meal-status--verified { color: #146349; background: #dff6eb; }
+.admin-meal-status--draft { color: #80561f; background: #fff0d6; }
+.admin-meal-status--retired { color: var(--muted); background: #edf0ef; }
+.admin-meal-ingredients { display: grid; gap: .55rem; margin: 0; padding: 0; list-style: none; }
+.admin-meal-ingredients li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .8rem; padding: .75rem .85rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--mist-50); }
+.admin-meal-ingredients strong, .admin-meal-ingredients small { display: block; }
+.admin-meal-ingredients small { margin-top: .15rem; color: var(--muted); }
+.admin-meal-ingredients li > span { color: var(--petrol-900); font-size: .8rem; font-weight: 800; }
+.admin-meal-editor-items { display: grid; gap: .8rem; }
+.admin-meal-editor-item { padding: .85rem; border: 1px solid rgb(22 91 84 / 14%); border-radius: .85rem; background: white; }
+.admin-meal-editor-item > header { display: flex; align-items: center; justify-content: space-between; gap: .7rem; margin-bottom: .75rem; }
+.admin-meal-editor-item > header strong { color: var(--petrol-900); }
+.admin-meal-editor-item > header button { padding: .45rem .65rem; border: 0; border-radius: .55rem; color: var(--danger); background: rgb(161 63 50 / 10%); cursor: pointer; font-weight: 800; }
+.admin-meal-required { display: flex !important; align-items: center; align-self: end; min-height: 2.7rem; }
+.admin-meal-required input { width: auto; }
+@media (max-width: 760px) { .admin-meal-ingredients li { grid-template-columns: 1fr; }.admin-meal-ingredients li > span { justify-self: start; } }
+
 .admin-main--ai-settings { display: grid; gap: 1rem; }
 .admin-main--ai-settings .admin-page-heading { align-items: center; padding: 1.25rem; border-radius: 1.25rem; color: var(--paper); background: linear-gradient(135deg, var(--petrol-950), var(--petrol-800)); box-shadow: var(--fitsho-shadow); }.admin-main--ai-settings .admin-page-heading h1 { margin: .15rem 0 0; }.admin-main--ai-settings .admin-page-heading .admin-kicker { margin: 0; color: var(--turquoise); }.admin-ai-back { display: inline-flex; align-items: center; gap: .5rem; padding: .65rem .85rem; border: 1px solid rgb(255 255 255 / 28%); border-radius: 999px; color: white; text-decoration: none; font-weight: 800; }.admin-ai-back:hover { background: rgb(255 255 255 / 12%); }.admin-ai-back svg { width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
 .admin-ai-task-tabs, .admin-ai-settings-actions { display: flex; flex-wrap: wrap; gap: .65rem; }

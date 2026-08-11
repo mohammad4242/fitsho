@@ -1,11 +1,13 @@
 import { afterEach, expect, it, vi } from "vitest";
 
 import {
+  createAdminMeal,
   createAdminExercise,
   getAdminAiGenerationFailures,
   getAdminAiModelTestRuns,
   getAdminAiModels,
   getAdminExercises,
+  getAdminMealCatalogue,
   updateAdminAiRouting,
 } from "./api";
 import type {
@@ -134,6 +136,34 @@ it("lists admin exercises with inactive filter support", async () => {
   expect(fetch).toHaveBeenCalledWith(
     "/api/v1/admin/exercises?is_active=false&search=push+up",
     expect.objectContaining({ credentials: "include" }),
+  );
+});
+
+it("lists and creates nutrition meal catalogue templates", async () => {
+  const page = { items: [], categories: ["breakfast", "lunch", "post_workout", "snack", "dinner"] };
+  const input = {
+    name_fa: "میان‌وعده",
+    name_en: "Snack",
+    category: "snack" as const,
+    verification_status: "draft" as const,
+    items: [{ food_id: "food-1", reference_grams: 50, min_grams: 20, max_grams: 80, is_required: true, functional_role: "fat" as const }],
+  };
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(jsonResponse(page))
+    .mockResolvedValueOnce(jsonResponse({ id: "meal-1", ...input, totals: {} }));
+
+  await expect(getAdminMealCatalogue("snack")).resolves.toEqual(page);
+  await createAdminMeal(input);
+
+  expect(fetch).toHaveBeenNthCalledWith(
+    1,
+    "/api/v1/nutrition/admin/meals?category=snack",
+    expect.objectContaining({ credentials: "include" }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    "/api/v1/nutrition/admin/meals",
+    expect.objectContaining({ method: "POST", body: JSON.stringify(input) }),
   );
 });
 

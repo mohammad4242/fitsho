@@ -1,4 +1,9 @@
 import { request } from "../../shared/apiClient";
+import {
+  getAdminFoodCatalogue as readAdminFoodCatalogue,
+  type AdminFoodCatalogueResponse,
+  type FoodCatalogueQuery,
+} from "../nutrition/api";
 import type {
   AdminAiModel,
   AdminAiModelCheck,
@@ -20,6 +25,10 @@ import type {
   AdminExerciseCreate,
   AdminExerciseFilters,
   AdminExerciseMediaFiles,
+  AdminMealCatalogueItem,
+  AdminMealCatalogueResponse,
+  AdminMealWrite,
+  MealCategory,
   AdminTrainingProgramTemplatesResponse,
   AdminTrainingProgramTemplate,
   AdminTrainingProgramTemplateWrite,
@@ -29,6 +38,40 @@ import type {
 const adminExercisesPath = "/api/v1/admin/exercises";
 const adminAiModelsPath = "/api/v1/admin/ai-models";
 const adminTrainingProgramTemplatesPath = "/api/v1/admin/training-program-templates";
+const adminMealCataloguePath = "/api/v1/nutrition/admin/meals";
+
+export function getAdminMealCatalogue(
+  category: MealCategory,
+): Promise<AdminMealCatalogueResponse> {
+  return request<AdminMealCatalogueResponse>(`${adminMealCataloguePath}?category=${category}`);
+}
+
+export function getAdminMeal(mealId: string): Promise<AdminMealCatalogueItem> {
+  return request<AdminMealCatalogueItem>(`${adminMealCataloguePath}/${mealId}`);
+}
+
+export function createAdminMeal(input: AdminMealWrite): Promise<AdminMealCatalogueItem> {
+  return request<AdminMealCatalogueItem>(adminMealCataloguePath, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateAdminMeal(
+  mealId: string,
+  input: AdminMealWrite,
+): Promise<AdminMealCatalogueItem> {
+  return request<AdminMealCatalogueItem>(`${adminMealCataloguePath}/${mealId}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function getAdminFoodCatalogue(
+  input: FoodCatalogueQuery = {},
+): Promise<AdminFoodCatalogueResponse> {
+  return readAdminFoodCatalogue(input);
+}
 
 export function getAdminAiModels(): Promise<AdminAiModelsResponse> {
   return request<AdminAiModelsResponse>(adminAiModelsPath);
