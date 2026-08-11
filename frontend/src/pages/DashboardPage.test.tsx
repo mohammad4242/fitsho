@@ -22,6 +22,7 @@ const workoutApi = vi.hoisted(() => ({
 const nutritionApi = vi.hoisted(() => ({
   getLatestWeeklyNutritionPlan: vi.fn(),
   getDailyTracking: vi.fn(),
+  getCurrentNutritionEstimate: vi.fn(),
 }));
 
 vi.mock("../features/auth/AuthContext", () => ({ useAuth: () => auth }));
@@ -38,8 +39,10 @@ beforeEach(() => {
   workoutApi.generateWorkoutPlan.mockReset();
   nutritionApi.getLatestWeeklyNutritionPlan.mockReset();
   nutritionApi.getDailyTracking.mockReset();
+  nutritionApi.getCurrentNutritionEstimate.mockReset();
   nutritionApi.getLatestWeeklyNutritionPlan.mockResolvedValue(null);
   nutritionApi.getDailyTracking.mockRejectedValue(new Error("not tracked"));
+  nutritionApi.getCurrentNutritionEstimate.mockResolvedValue(null);
   profile.productMode = "training";
 });
 
@@ -53,6 +56,64 @@ it("surfaces the real next session instead of generic workout copy", async () =>
 
   expect(await screen.findByRole("heading", { name: "فشار بالاتنه" })).toBeInTheDocument();
   expect(screen.getByText("۵۲ دقیقه")).toBeInTheDocument();
+});
+
+it("uses the next workout's first real exercise media in the hero", async () => {
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue({
+    id: "plan-1",
+    days: [{
+      day_number: 1,
+      title_fa: "فشار بالاتنه",
+      title_en: "Upper push",
+      estimated_duration_minutes: 52,
+      exercises: [{
+        order_index: 1,
+        exercise: {
+          id: "exercise-1",
+          slug: "bench-press",
+          name_fa: "پرس سینه",
+          name_en: "Bench press",
+          media_path: "/media/bench.webp",
+          media_type: "image",
+        },
+      }],
+    }],
+  });
+
+  render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+
+  expect(await screen.findByRole("img", { name: "نمایش حرکت پرس سینه" })).toHaveAttribute(
+    "src",
+    "/media/bench.webp",
+  );
+});
+
+it("uses the current scientific estimate when no weekly plan exists", async () => {
+  profile.productMode = "both";
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
+  nutritionApi.getCurrentNutritionEstimate.mockResolvedValue({
+    confidence: "high",
+    targets: {
+      goal_calories: { preferred: 2200 },
+      protein: { preferred: 130 },
+      carbohydrate: { preferred: 280 },
+      total_fat: { preferred: 68 },
+    },
+  });
+  nutritionApi.getDailyTracking.mockResolvedValue({
+    data_status: "sufficient",
+    actual_totals: { energy_kcal: 1100, protein_g: 65, carbohydrate_g: 140, total_fat_g: 34 },
+    entries: [{}],
+  });
+
+  render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+
+  expect(await screen.findByText("۱٬۱۰۰")).toBeInTheDocument();
+  expect(screen.getByText("از ۲٬۲۰۰ kcal")).toBeInTheDocument();
+  expect(screen.getByRole("progressbar", { name: "پیشرفت کالری امروز" })).toHaveAttribute(
+    "aria-valuemax",
+    "2200",
+  );
 });
 
 it("shows connected real nutrition totals for combined members", async () => {

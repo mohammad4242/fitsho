@@ -5,7 +5,9 @@
 .command-center__welcome p { margin: 0; color: var(--fitsho-muted); font-size: .86rem; }
 .command-center__grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(18rem, .8fr); gap: .75rem; }
 .command-card { min-width: 0; padding: 1rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); color: var(--fitsho-ink); background: var(--fitsho-surface); text-decoration: none; box-shadow: var(--fitsho-shadow-soft); }
-.command-card--primary { grid-row: span 2; min-height: 17rem; display: flex; flex-direction: column; background: linear-gradient(145deg, rgb(80 223 206 / 7%), transparent 48%), var(--fitsho-surface); }
+.command-card--primary { position: relative; isolation: isolate; overflow: hidden; grid-row: span 2; min-height: 17rem; display: flex; flex-direction: column; background: linear-gradient(145deg, rgb(80 223 206 / 7%), transparent 48%), var(--fitsho-surface); }
+.command-card--primary::after { position: absolute; z-index: 1; inset: 0; background: linear-gradient(90deg, var(--fitsho-surface) 0 48%, transparent 78%); content: ""; pointer-events: none; }
+.command-card--primary > :not(.command-card__media) { position: relative; z-index: 2; }
 .command-card__head { min-width: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
 .command-card__head p { margin: 0 0 .25rem; color: var(--fitsho-muted); font-size: .68rem; font-weight: 850; }
 .command-card__head h2 { margin: 0; font-size: 1rem; }
@@ -14,6 +16,8 @@
 .command-card__workout > span { width: 3.25rem; aspect-ratio: 1; display: grid; place-items: center; border: 1px solid var(--fitsho-line-strong); border-radius: .9rem; color: var(--fitsho-aqua); background: rgb(80 223 206 / 7%); font: 900 1.15rem "Sora Variable", sans-serif; }
 .command-card__workout h3 { margin: 0; font-size: clamp(1.35rem, 3vw, 2rem); }
 .command-card__workout p { margin: .25rem 0 0; color: var(--fitsho-muted); font-size: .78rem; }
+.command-card__media { position: absolute; z-index: 0; inset-block: 2.6rem 0; inset-inline-end: 0; width: 46%; overflow: hidden; opacity: .66; pointer-events: none; }
+.command-card__media :is(img, video) { width: 100%; height: 100%; object-fit: cover; object-position: center top; filter: saturate(.55) contrast(1.08); }
 .command-card__context { margin-block: auto 1rem; color: var(--fitsho-aqua); font-weight: 850; }
 .command-card__action { align-self: flex-start; min-height: 2.75rem; margin-top: auto; padding: .6rem 1.1rem; }
 .command-card__calories { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: .85rem 0; }
@@ -44,6 +48,8 @@
   .command-center__welcome h1 { font-size: 1.35rem; }
   .command-card { padding: .85rem; }
   .command-card--primary { min-height: 10.75rem; }
+  .command-card--primary::after { background: linear-gradient(90deg, var(--fitsho-surface) 0 44%, rgb(8 18 17 / 72%) 70%, transparent); }
+  .command-card__media { width: 45%; }
   .command-card__workout { margin-block: .8rem; }
   .command-card__workout h3 { font-size: 1.25rem; }
   .fitsho-progress-ring { width: 3.8rem; }

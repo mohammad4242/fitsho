@@ -3,8 +3,9 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../features/auth/AuthContext";
-import { getDailyTracking, getLatestWeeklyNutritionPlan } from "../features/nutrition/api";
-import type { DailyTrackingSummary, WeeklyPlan } from "../features/nutrition/types";
+import { ExerciseMedia } from "../features/exercises/ExerciseMedia";
+import { getCurrentNutritionEstimate, getDailyTracking, getLatestWeeklyNutritionPlan } from "../features/nutrition/api";
+import type { DailyTrackingSummary, NutritionEstimate, WeeklyPlan } from "../features/nutrition/types";
 import { useProfile } from "../features/profile/ProfileContext";
 import { generateWorkoutPlan, getActiveWorkoutPlan } from "../features/workouts/api";
 import type { WorkoutPlan } from "../features/workouts/types";
@@ -26,6 +27,7 @@ export function DashboardPage() {
   const [generating, setGenerating] = useState(false);
   const [nutritionState, setNutritionState] = useState<NutritionState>("loading");
   const [nutritionPlan, setNutritionPlan] = useState<WeeklyPlan | null>(null);
+  const [nutritionEstimate, setNutritionEstimate] = useState<NutritionEstimate | null>(null);
   const [dailyTracking, setDailyTracking] = useState<DailyTrackingSummary | null>(null);
 
   useEffect(() => {
@@ -51,12 +53,19 @@ export function DashboardPage() {
     }
     let active = true;
     const today = new Date().toISOString().slice(0, 10);
-    void Promise.all([getLatestWeeklyNutritionPlan(), getDailyTracking(today).catch(() => null)])
-      .then(([latestPlan, tracking]) => {
+    void Promise.all([
+      getLatestWeeklyNutritionPlan(),
+      getCurrentNutritionEstimate(),
+      getDailyTracking(today).catch(() => null),
+    ])
+      .then(([latestPlan, estimate, tracking]) => {
         if (active) {
           setNutritionPlan(latestPlan);
+          setNutritionEstimate(estimate);
           setDailyTracking(tracking);
-          setNutritionState(latestPlan === null ? "empty" : latestPlan.physician_approved ? "ready" : "pending");
+          setNutritionState(latestPlan !== null
+            ? latestPlan.physician_approved ? "ready" : "pending"
+            : estimate !== null ? "ready" : "empty");
         }
       })
       .catch(() => { if (active) setNutritionState("empty"); });
@@ -79,7 +88,21 @@ export function DashboardPage() {
   const currentDate = new Date().toISOString().slice(0, 10);
   const todayPlan = nutritionPlan?.days?.find((day) => day.plan_date === currentDate) ?? nutritionPlan?.days?.[0];
   const planned = todayPlan?.nutrient_totals;
-  const actual = dailyTracking?.actual_totals;
+  const estimated = nutritionEstimate?.targets;
+  const nutritionTarget = {
+    energy_kcal: planned?.energy_kcal ?? estimated?.goal_calories?.preferred ?? null,
+    protein_g: planned?.protein_g ?? estimated?.protein?.preferred ?? null,
+    carbohydrate_g: planned?.carbohydrate_g ?? estimated?.carbohydrate?.preferred ?? null,
+    total_fat_g: planned?.total_fat_g ?? estimated?.total_fat?.preferred ?? null,
+  };
+  const trackedTotals = dailyTracking?.actual_totals;
+  const hasActual = trackedTotals !== undefined && (
+    dailyTracking?.data_status === "sufficient"
+    || (dailyTracking?.entries?.length ?? 0) > 0
+    || Object.values(trackedTotals).some((value) => value > 0)
+  );
+  const actual = hasActual ? trackedTotals : null;
+  const hasNutritionTarget = nutritionTarget.energy_kcal !== null;
   const format = (value: number) => Math.round(value).toLocaleString(locale);
 
   return (
@@ -107,10 +130,13 @@ export function DashboardPage() {
                 </span>
               </div>
               {nextDay ? (
-                <div className="command-card__workout">
-                  <span>{String(nextDay.day_number).padStart(2, "0")}</span>
-                  <div><h3>{english ? nextDay.title_en : nextDay.title_fa}</h3><p>{format(nextDay.estimated_duration_minutes)} {english ? "min" : "دقیقه"}</p></div>
-                </div>
+                <>
+                  <div className="command-card__workout">
+                    <span>{String(nextDay.day_number).padStart(2, "0")}</span>
+                    <div><h3>{english ? nextDay.title_en : nextDay.title_fa}</h3><p>{format(nextDay.estimated_duration_minutes)} {english ? "min" : "دقیقه"}</p></div>
+                  </div>
+                  {nextDay.exercises[0]?.exercise.media_path && <div className="command-card__media"><ExerciseMedia path={nextDay.exercises[0].exercise.media_path} name={english ? nextDay.exercises[0].exercise.name_en : nextDay.exercises[0].exercise.name_fa} mediaType={nextDay.exercises[0].exercise.media_type} /></div>}
+                </>
               ) : planDuration !== undefined ? <p className="command-card__context">{t("dashboard.planDuration", { count: planDuration.toLocaleString(locale) })}</p> : null}
               <PrimaryAction state={planState} generating={generating} onStart={startWorkout} />
             </article>
@@ -123,15 +149,15 @@ export function DashboardPage() {
               aria-label={t("dashboard.nutritionAria")}
             >
               <div className="command-card__head"><div><p>{t("dashboard.nutritionEyebrow")}</p><h2>{t("dashboard.nutritionTitle")}</h2></div></div>
-              {planned ? <>
+              {hasNutritionTarget ? <>
                 <div className="command-card__calories">
-                  <div><strong>{format(actual?.energy_kcal ?? planned.energy_kcal ?? 0)}</strong><span>{actual ? `${english ? "of" : "از"} ${format(planned.energy_kcal ?? 0)} kcal` : english ? "daily target" : "هدف روزانه"}</span></div>
-                  {actual && <ProgressRing value={actual.energy_kcal ?? 0} max={planned.energy_kcal ?? 0} />}
+                  <div><strong>{format(actual?.energy_kcal ?? nutritionTarget.energy_kcal ?? 0)}</strong><span>{actual ? `${english ? "of" : "از"} ${format(nutritionTarget.energy_kcal ?? 0)} kcal` : english ? "daily target" : "هدف روزانه"}</span></div>
+                  {actual && <ProgressRing value={actual.energy_kcal ?? 0} max={nutritionTarget.energy_kcal ?? 0} label={english ? "Today's calorie progress" : "پیشرفت کالری امروز"} />}
                 </div>
                 <div className="fitsho-metric-strip">
-                  <span><strong>{format(actual?.protein_g ?? planned.protein_g ?? 0)}g</strong><small>{english ? "Protein" : "پروتئین"}</small></span>
-                  <span><strong>{format(actual?.carbohydrate_g ?? planned.carbohydrate_g ?? 0)}g</strong><small>{english ? "Carbs" : "کربوهیدرات"}</small></span>
-                  <span><strong>{format(actual?.total_fat_g ?? planned.total_fat_g ?? 0)}g</strong><small>{english ? "Fat" : "چربی"}</small></span>
+                  <span><strong>{formatMetric(actual?.protein_g ?? nutritionTarget.protein_g, format)}</strong><small>{english ? "Protein" : "پروتئین"}</small></span>
+                  <span><strong>{formatMetric(actual?.carbohydrate_g ?? nutritionTarget.carbohydrate_g, format)}</strong><small>{english ? "Carbs" : "کربوهیدرات"}</small></span>
+                  <span><strong>{formatMetric(actual?.total_fat_g ?? nutritionTarget.total_fat_g, format)}</strong><small>{english ? "Fat" : "چربی"}</small></span>
                 </div>
               </> : <span className="command-card__empty">{t(`dashboard.nutritionState.${nutritionState}`)}</span>}
             </Link>
@@ -156,6 +182,10 @@ export function DashboardPage() {
       </div>
     </main>
   );
+}
+
+function formatMetric(value: number | null | undefined, format: (value: number) => string) {
+  return value === null || value === undefined ? "—" : `${format(value)}g`;
 }
 
 function PrimaryAction({ state, generating, onStart }: { state: PlanState; generating: boolean; onStart: () => void }) {
