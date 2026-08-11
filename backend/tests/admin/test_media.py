@@ -6,14 +6,17 @@ import pytest
 from fastapi import UploadFile
 from starlette.datastructures import Headers
 
+from app.admin import media
 from app.admin.media import MediaValidationError, discard_media, store_upload
 from app.config import Settings
 from app.exercises.enums import MediaType
 
 GIF_BYTES = b"GIF89a" + b"\x00" * 32
 JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 32
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 MP4_BYTES = b"\x00\x00\x00\x18ftypisom" + b"\x00" * 32
 WEBM_BYTES = b"\x1a\x45\xdf\xa3" + b"\x00" * 32
+WEBP_BYTES = b"RIFF\x20\x00\x00\x00WEBP" + b"\x00" * 32
 
 
 def upload(filename: str, content: bytes, content_type: str) -> UploadFile:
@@ -55,6 +58,55 @@ def test_valid_jpeg_thumbnail_is_stored_with_image_type(tmp_path: Path) -> None:
     assert stored.media_type is MediaType.IMAGE
     assert stored.absolute_path.suffix == ".jpg"
     assert stored.absolute_path.read_bytes() == JPEG_BYTES
+
+
+@pytest.mark.parametrize(
+    ("filename", "content", "content_type", "suffix"),
+    [
+        ("food.png", PNG_BYTES, "image/png", ".png"),
+        ("food.webp", WEBP_BYTES, "image/webp", ".webp"),
+        ("food.jpg", JPEG_BYTES, "image/jpeg", ".jpg"),
+    ],
+)
+def test_food_image_is_stored_in_scoped_public_directory(
+    tmp_path: Path,
+    filename: str,
+    content: bytes,
+    content_type: str,
+    suffix: str,
+) -> None:
+    stored = media.store_image_upload(
+        upload(filename, content, content_type),
+        settings(tmp_path),
+        "food-catalogue",
+    )
+
+    assert stored.media_type is MediaType.IMAGE
+    assert stored.public_path.startswith("/media/food-catalogue/")
+    assert stored.absolute_path.parent == tmp_path / "food-catalogue"
+    assert stored.absolute_path.suffix == suffix
+    assert stored.absolute_path.read_bytes() == content
+
+
+def test_food_image_upload_rejects_non_image_media(tmp_path: Path) -> None:
+    with pytest.raises(MediaValidationError, match="image"):
+        media.store_image_upload(
+            upload("food.mp4", MP4_BYTES, "video/mp4"),
+            settings(tmp_path),
+            "food-catalogue",
+        )
+
+
+@pytest.mark.parametrize("subdirectory", ["../food-catalogue", "nested/food", "food\\image"])
+def test_food_image_upload_rejects_unsafe_subdirectory(
+    tmp_path: Path, subdirectory: str
+) -> None:
+    with pytest.raises(MediaValidationError, match="directory"):
+        media.store_image_upload(
+            upload("food.png", PNG_BYTES, "image/png"),
+            settings(tmp_path),
+            subdirectory,
+        )
 
 
 @pytest.mark.parametrize(

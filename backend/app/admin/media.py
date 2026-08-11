@@ -20,6 +20,14 @@ ALLOWED_MEDIA: dict[str, tuple[str, MediaType]] = {
     ".webm": ("video/webm", MediaType.VIDEO),
 }
 
+ALLOWED_IMAGE_MEDIA: dict[str, str] = {
+    ".gif": "image/gif",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
+
 
 class MediaValidationError(ValueError):
     pass
@@ -48,6 +56,10 @@ def _signature_extension(header: bytes) -> str | None:
         return ".gif"
     if header.startswith(b"\xff\xd8\xff"):
         return ".jpg"
+    if header.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if len(header) >= 12 and header.startswith(b"RIFF") and header[8:12] == b"WEBP":
+        return ".webp"
     if len(header) >= 12 and header[4:8] == b"ftyp":
         return ".mp4"
     if header.startswith(b"\x1a\x45\xdf\xa3"):
@@ -86,13 +98,18 @@ def _probe_video_duration(path: Path, settings: Settings) -> float:
     return duration
 
 
-def _write_temporary(upload: UploadFile, settings: Settings) -> Path:
-    settings.media_root.mkdir(parents=True, exist_ok=True)
+def _write_temporary(
+    upload: UploadFile,
+    settings: Settings,
+    storage_root: Path | None = None,
+) -> Path:
+    target_root = storage_root or settings.media_root
+    target_root.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
             mode="wb",
-            dir=settings.media_root,
+            dir=target_root,
             prefix=".upload-",
             delete=False,
         ) as temporary:
@@ -118,10 +135,10 @@ def _write_temporary(upload: UploadFile, settings: Settings) -> Path:
 def _publish_temporary(
     temporary_path: Path,
     extension: str,
-    settings: Settings,
+    storage_root: Path,
 ) -> Path:
     for _ in range(10):
-        final_path = settings.media_root / f"{uuid4().hex}{extension}"
+        final_path = storage_root / f"{uuid4().hex}{extension}"
         try:
             os.link(temporary_path, final_path)
         except FileExistsError:
@@ -149,7 +166,7 @@ def store_upload(upload: UploadFile, settings: Settings) -> StoredMedia:
             if duration > settings.media_max_video_duration_seconds:
                 limit = settings.media_max_video_duration_seconds
                 raise MediaValidationError(f"Video duration exceeds the {limit:g} seconds limit")
-        final_path = _publish_temporary(temporary_path, extension, settings)
+        final_path = _publish_temporary(temporary_path, extension, settings.media_root)
     except Exception:
         temporary_path.unlink(missing_ok=True)
         raise
@@ -164,3 +181,67 @@ def store_upload(upload: UploadFile, settings: Settings) -> StoredMedia:
 
 def discard_media(media: StoredMedia) -> None:
     media.absolute_path.unlink(missing_ok=True)
+
+
+def store_image_upload(
+    upload: UploadFile,
+    settings: Settings,
+    subdirectory: str,
+) -> StoredMedia:
+    if not subdirectory or any(
+        character not in "abcdefghijklmnopqrstuvwxyz0123456789-" for character in subdirectory
+    ):
+        raise MediaValidationError("Invalid media directory")
+    if (
+        not upload.filename
+        or "\x00" in upload.filename
+        or "/" in upload.filename
+        or "\\" in upload.filename
+    ):
+        raise MediaValidationError("Invalid media filename")
+    extension = Path(upload.filename).suffix.lower()
+    expected_content_type = ALLOWED_IMAGE_MEDIA.get(extension)
+    if expected_content_type is None:
+        raise MediaValidationError("Only GIF, JPEG, PNG, and WebP image files are supported")
+    if upload.content_type != expected_content_type:
+        raise MediaValidationError("Image MIME type does not match its extension")
+
+    storage_root = settings.media_root / subdirectory
+    temporary_path = _write_temporary(upload, settings, storage_root)
+    try:
+        with temporary_path.open("rb") as file_handle:
+            detected_extension = _signature_extension(file_handle.read(64))
+        if detected_extension != extension and not (
+            detected_extension == ".jpg" and extension == ".jpeg"
+        ):
+            raise MediaValidationError("Image signature does not match its extension")
+        final_path = _publish_temporary(temporary_path, extension, storage_root)
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
+
+    public_root = settings.media_public_path.rstrip("/")
+    return StoredMedia(
+        public_path=f"{public_root}/{subdirectory}/{final_path.name}",
+        media_type=MediaType.IMAGE,
+        absolute_path=final_path,
+    )
+
+
+def discard_managed_media_path(
+    public_path: str | None,
+    settings: Settings,
+    subdirectory: str,
+) -> None:
+    if public_path is None:
+        return
+    expected_prefix = f"{settings.media_public_path.rstrip('/')}/{subdirectory}/"
+    if not public_path.startswith(expected_prefix):
+        return
+    filename = public_path.removeprefix(expected_prefix)
+    if not filename or Path(filename).name != filename:
+        return
+    managed_root = (settings.media_root / subdirectory).resolve()
+    target = (managed_root / filename).resolve()
+    if target.parent == managed_root:
+        target.unlink(missing_ok=True)

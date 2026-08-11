@@ -368,6 +368,7 @@ class FoodCatalogueItemResponse(BaseModel):
     slug: str
     name_fa: str
     name_en: str
+    image_url: str | None
     category: str
     measurement_basis: FoodMeasurementBasis
     nutrient_basis: FoodCatalogueNutrientBasis
@@ -379,6 +380,10 @@ class FoodCatalogueItemResponse(BaseModel):
 
 class AdminFoodCatalogueItemResponse(FoodCatalogueItemResponse):
     price: FoodCataloguePriceResponse
+
+
+class FoodCatalogueImageResponse(BaseModel):
+    image_url: str
 
 
 class FoodCataloguePageResponse(BaseModel):

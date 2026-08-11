@@ -20,6 +20,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.admin.dependencies import AdminUser
+from app.admin.media import (
+    MediaValidationError,
+    discard_managed_media_path,
+    discard_media,
+    store_image_upload,
+)
 from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
@@ -49,6 +55,7 @@ from app.nutrition.clinical_service import (
     upload_lab,
 )
 from app.nutrition.enums import (
+    FoodVerificationStatus,
     NutritionLabRequestStatus,
     NutritionSupplementOrderStatus,
     PriceUpdateTriggerKind,
@@ -138,6 +145,7 @@ from app.nutrition.schemas import (
     CatalogueMealWrite,
     ConsumptionEntryEditInput,
     DailyCheckInInput,
+    FoodCatalogueImageResponse,
     FoodCataloguePageResponse,
     FoodPhotoConfirmInput,
     FoodPhotoItemCorrectionInput,
@@ -241,7 +249,6 @@ def read_verified_foods(db: DatabaseSession, user: CurrentUser) -> list[Catalogu
 @router.get(
     "/food-catalogue",
     response_model=FoodCataloguePageResponse,
-    response_model_exclude_none=True,
 )
 def read_member_food_catalogue(
     db: DatabaseSession,
@@ -266,7 +273,6 @@ def read_member_food_catalogue(
 @router.get(
     "/admin/food-catalogue",
     response_model=AdminFoodCataloguePageResponse,
-    response_model_exclude_none=True,
 )
 def read_admin_food_catalogue(
     db: DatabaseSession,
@@ -297,6 +303,41 @@ def create_or_update_catalogue_food(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
         ) from None
+
+
+@router.post(
+    "/admin/foods/{slug}/image",
+    response_model=FoodCatalogueImageResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def upload_catalogue_food_image(
+    slug: str,
+    db: DatabaseSession,
+    admin: AdminUser,
+    settings: AppSettings,
+    file: Annotated[UploadFile, File()],
+) -> FoodCatalogueImageResponse:
+    del admin
+    food = db.scalar(select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == slug))
+    if food is None or food.verification_status == FoodVerificationStatus.RETIRED:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food not found")
+    try:
+        stored = store_image_upload(file, settings, "food-catalogue")
+    except MediaValidationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from None
+    previous_path = food.image_path
+    try:
+        food.image_path = stored.public_path
+        db.commit()
+    except Exception:
+        db.rollback()
+        discard_media(stored)
+        raise
+    discard_managed_media_path(previous_path, settings, "food-catalogue")
+    return FoodCatalogueImageResponse(image_url=stored.public_path)
 
 
 @router.post(

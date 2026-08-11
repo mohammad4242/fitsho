@@ -625,6 +625,7 @@ class NutritionCatalogueFood(Base):
     source_name: Mapped[str] = mapped_column(String(160), nullable=False)
     source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
     source_food_id: Mapped[str | None] = mapped_column(String(120))
+    image_path: Mapped[str | None] = mapped_column(String(500))
     category: Mapped[str] = mapped_column(String(64), nullable=False, default="uncategorized")
     measurement_basis: Mapped[FoodMeasurementBasis] = mapped_column(
         enum_column(FoodMeasurementBasis, "ck_nutrition_catalogue_food_basis_values"),

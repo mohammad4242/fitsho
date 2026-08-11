@@ -113,6 +113,7 @@ def _member_item(food: NutritionCatalogueFood) -> FoodCatalogueItemResponse:
         slug=food.slug,
         name_fa=food.name_fa,
         name_en=food.name_en,
+        image_url=food.image_path,
         category=food.category,
         measurement_basis=food.measurement_basis,
         nutrient_basis=FoodCatalogueNutrientBasis(

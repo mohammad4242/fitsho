@@ -6,10 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
+from app.config import Settings
 from app.profile.enums import ProductMode
 from app.profile.models import UserProfile
 
 ORIGIN = {"Origin": "http://localhost:5173"}
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 
 
 def _register_with_mode(
@@ -78,6 +80,7 @@ def test_nutrition_member_sees_macros_search_and_no_price_data(
         "fibre_g",
     }
     assert item["nutrient_basis"] == {"quantity": "100.0000", "unit": "g"}
+    assert item["image_url"] is None
     assert "price" not in item
     assert any(nutrient["nutrient_code"] == "iron_mg" for nutrient in item["nutrients"])
 
@@ -159,6 +162,96 @@ def test_admin_reads_catalogue_with_price_data(client: TestClient, db: Session) 
     assert response.status_code == 200
     item = next(row for row in response.json()["items"] if row["slug"] == "basmati-rice")
     assert item["price"]["status"] == "accepted"
+    assert item["image_url"] is None
+
+
+def test_admin_uploads_and_replaces_food_image_without_exposing_price_to_member(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    _register_with_mode(
+        client,
+        db,
+        email="admin-catalogue-image@example.com",
+        mode=ProductMode.NUTRITION,
+        admin=True,
+    )
+
+    first = client.post(
+        "/api/v1/nutrition/admin/foods/chicken-breast/image",
+        headers=ORIGIN,
+        files={"file": ("chicken.png", PNG_BYTES, "image/png")},
+    )
+
+    assert first.status_code == 200
+    first_url = first.json()["image_url"]
+    assert first_url.startswith("/media/food-catalogue/")
+    first_path = test_settings.media_root / first_url.removeprefix("/media/")
+    assert first_path.read_bytes() == PNG_BYTES
+
+    second = client.post(
+        "/api/v1/nutrition/admin/foods/chicken-breast/image",
+        headers=ORIGIN,
+        files={"file": ("replacement.png", PNG_BYTES + b"replacement", "image/png")},
+    )
+
+    assert second.status_code == 200
+    assert second.json()["image_url"] != first_url
+    assert not first_path.exists()
+    member_items = client.get("/api/v1/nutrition/food-catalogue?q=chicken").json()["items"]
+    member = next(item for item in member_items if item["slug"] == "chicken-breast")
+    assert member["image_url"] == second.json()["image_url"]
+    assert "price" not in member
+
+
+def test_food_image_upload_requires_admin_and_trusted_origin(
+    client: TestClient, db: Session
+) -> None:
+    _register_with_mode(
+        client,
+        db,
+        email="member-catalogue-image@example.com",
+        mode=ProductMode.NUTRITION,
+    )
+
+    forbidden = client.post(
+        "/api/v1/nutrition/admin/foods/chicken-breast/image",
+        headers=ORIGIN,
+        files={"file": ("chicken.png", PNG_BYTES, "image/png")},
+    )
+    assert forbidden.status_code == 403
+
+
+def test_food_image_upload_rejects_invalid_image_and_missing_food(
+    client: TestClient, db: Session
+) -> None:
+    _register_with_mode(
+        client,
+        db,
+        email="admin-invalid-catalogue-image@example.com",
+        mode=ProductMode.NUTRITION,
+        admin=True,
+    )
+
+    invalid = client.post(
+        "/api/v1/nutrition/admin/foods/chicken-breast/image",
+        headers=ORIGIN,
+        files={"file": ("chicken.png", b"not-an-image", "image/png")},
+    )
+    missing = client.post(
+        "/api/v1/nutrition/admin/foods/not-a-food/image",
+        headers=ORIGIN,
+        files={"file": ("chicken.png", PNG_BYTES, "image/png")},
+    )
+    no_origin = client.post(
+        "/api/v1/nutrition/admin/foods/chicken-breast/image",
+        files={"file": ("chicken.png", PNG_BYTES, "image/png")},
+    )
+
+    assert invalid.status_code == 422
+    assert missing.status_code == 404
+    assert no_origin.status_code == 403
 
 
 def test_only_admin_can_create_audited_price_override(client: TestClient, db: Session) -> None:
