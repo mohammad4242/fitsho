@@ -3,7 +3,9 @@
   --fitsho-petrol: #0a211f;
   --fitsho-teal: #102b28;
   --fitsho-surface: #0b201f;
+  --fitsho-surface-subtle: #071716;
   --fitsho-surface-raised: #163431;
+  --fitsho-surface-interactive: rgb(80 223 206 / 7%);
   --fitsho-aqua: #50dfce;
   --fitsho-coral: #f67859;
   --fitsho-amber: #f2b85b;
@@ -25,15 +27,18 @@
   --fitsho-radius-sm: 0.625rem;
   --fitsho-radius-md: 0.875rem;
   --fitsho-radius-lg: 1.125rem;
+  --fitsho-radius-xl: 1.5rem;
   --fitsho-radius-card: 1.125rem;
   --fitsho-radius-pill: 999px;
   --fitsho-shadow: 0 1.25rem 3.5rem rgb(0 0 0 / 20%);
   --fitsho-shadow-soft: 0 0.75rem 2.5rem rgb(0 0 0 / 13%);
+  --fitsho-shadow-focus: 0 1.25rem 3.75rem rgb(0 0 0 / 24%), 0 0 0 1px rgb(80 223 206 / 5%);
   --fitsho-duration-fast: 160ms;
   --fitsho-duration-medium: 280ms;
   --fitsho-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --fitsho-content: 82rem;
   --fitsho-content-max: 82rem;
+  --fitsho-reading: 68rem;
 }
 
 .fitsho-app {

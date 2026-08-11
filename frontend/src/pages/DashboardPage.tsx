@@ -75,11 +75,11 @@ export function DashboardPage() {
 
         <section className="command-center__grid" aria-label={t("dashboard.statusLabel")}>
           {hasTraining && (
-            <article className="command-card command-card--primary">
+            <article className="command-card command-card--primary" role="region" aria-labelledby="dashboard-today-workout">
               <div className="command-card__head">
                 <div>
                   <p>{t("dashboard.trainingEyebrow")}</p>
-                  <h2>{t("dashboard.todayWorkout")}</h2>
+                  <h2 id="dashboard-today-workout">{t("dashboard.todayWorkout")}</h2>
                 </div>
                 <span className={`fitsho-status fitsho-status--${planState === "ready" ? "success" : "neutral"}`}>
                   {t(`dashboard.planState.${planState}`)}

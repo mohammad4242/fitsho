@@ -17,6 +17,19 @@
   box-shadow: var(--fitsho-shadow-soft);
 }
 
+.fitsho-card--interactive {
+  transition:
+    border-color var(--fitsho-duration-fast) var(--fitsho-ease),
+    background var(--fitsho-duration-fast) var(--fitsho-ease),
+    transform var(--fitsho-duration-fast) var(--fitsho-ease);
+}
+
+.fitsho-card--interactive:hover {
+  border-color: var(--fitsho-line-strong);
+  background: var(--fitsho-surface-interactive);
+  transform: translateY(-1px);
+}
+
 .fitsho-section-heading {
   display: grid;
   gap: var(--fitsho-space-2);
@@ -30,6 +43,14 @@
   max-width: 44rem;
   color: var(--fitsho-muted);
   line-height: 1.85;
+}
+
+.fitsho-section-heading__eyebrow {
+  margin: 0;
+  color: var(--fitsho-aqua);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.07em;
 }
 
 .fitsho-button,
@@ -129,6 +150,43 @@
 .fitsho-status--danger { border-inline-start-color: var(--fitsho-coral); }
 .fitsho-status--success { border-inline-start-color: var(--fitsho-success); }
 
+.fitsho-metric {
+  min-width: 0;
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px solid var(--fitsho-line);
+  border-radius: var(--fitsho-radius-md);
+  background: var(--fitsho-surface-subtle);
+}
+
+.fitsho-metric > span,
+.fitsho-metric > small { color: var(--fitsho-muted); }
+.fitsho-metric > strong { font-family: "Sora Variable", sans-serif; font-size: clamp(1.25rem, 3vw, 2rem); }
+
+.fitsho-list-row {
+  min-width: 0;
+  min-height: 4.25rem;
+  display: flex;
+  align-items: center;
+  gap: var(--fitsho-space-3);
+  padding: 0.85rem 1rem;
+  border-block-end: 1px solid var(--fitsho-line);
+}
+
+.fitsho-progress {
+  width: 100%;
+  height: 0.45rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--fitsho-radius-pill);
+  background: rgb(255 255 255 / 7%);
+  accent-color: var(--fitsho-aqua);
+}
+
+.fitsho-progress::-webkit-progress-bar { background: rgb(255 255 255 / 7%); }
+.fitsho-progress::-webkit-progress-value { border-radius: inherit; background: var(--fitsho-aqua); }
+
 .route-loading {
   min-height: 50vh;
   display: grid;
@@ -160,7 +218,8 @@
   .route-loading__indicator { animation: none; }
 
   .fitsho-button,
-  .fitsho-button-secondary {
+  .fitsho-button-secondary,
+  .fitsho-card--interactive {
     transition: none;
   }
 
@@ -168,4 +227,6 @@
   .fitsho-button-secondary:hover:not(:disabled) {
     transform: none;
   }
+
+  .fitsho-card--interactive:hover { transform: none; }
 }

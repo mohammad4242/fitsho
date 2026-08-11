@@ -88,6 +88,7 @@ it("presents a focused command center without cinematic media", async () => {
 
   await screen.findByRole("heading", { name: "سلام، محمد" });
   expect(screen.getByRole("region", { name: "وضعیت امروز" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "تمرین امروز" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "تمرین امروز" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "مشاهده پیشرفت بدنی" })).toHaveAttribute(
     "href",
