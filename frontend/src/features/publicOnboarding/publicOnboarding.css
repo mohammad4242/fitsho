@@ -20,12 +20,60 @@
 .public-mode-selection > h1,
 .public-question-card > h1 { margin: 0.35rem 0 1rem; color: #f4f1e9; font-size: clamp(2.6rem, 7vw, 5.5rem); line-height: 0.95; }
 .public-question-card > p:not(.eyebrow) { color: rgb(255 255 255 / 65%); line-height: 1.9; }
-.public-onboarding .product-mode-cards { margin-top: 2rem; }
-.public-onboarding .product-mode-card { min-height: 6.6rem; justify-content: center; color: #f4f1e9; background: rgb(255 255 255 / 5%); border-color: rgb(255 255 255 / 12%); }
+.public-onboarding .product-mode-cards { width: min(100%, 48rem); grid-template-columns: minmax(0, 1fr); justify-items: stretch; gap: 1rem; margin: 2rem auto 0; }
+.public-onboarding .product-mode-card {
+  width: 100%;
+  min-height: 7.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  justify-content: initial;
+  overflow: hidden;
+  padding: 1.15rem 1.3rem;
+  border-color: rgb(255 255 255 / 12%);
+  border-radius: 1.25rem;
+  color: #f4f1e9;
+  background: rgb(255 255 255 / 5%);
+}
 .public-onboarding .product-mode-card strong { color: #f4f1e9; font-size: clamp(1.45rem, 3vw, 2rem); line-height: 1.2; text-shadow: 0 0.2rem 1.2rem rgb(0 0 0 / 36%); }
+.public-onboarding .product-mode-card .product-mode-card__icon {
+  flex: 0 0 3.75rem;
+  width: 3.75rem;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  justify-self: stretch;
+  padding: 0;
+  border: 1px solid rgb(80 223 206 / 24%);
+  border-radius: 1rem;
+  color: var(--fitsho-aqua);
+  background: rgb(80 223 206 / 8%);
+}
+.public-onboarding .product-mode-card__icon svg { width: 1.75rem; height: 1.75rem; }
+.public-onboarding .product-mode-card .product-mode-card__content {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+}
+.public-onboarding .product-mode-card .product-mode-card__badge {
+  width: fit-content;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  color: #071313;
+  background: var(--fitsho-aqua);
+  font-size: 0.7rem;
+  font-weight: 850;
+}
 .public-onboarding .product-mode-card.mode-training,
 .public-onboarding .product-mode-card.mode-nutrition { background: var(--fitsho-surface); }
 .public-onboarding .product-mode-card.mode-both { border-color: rgb(80 223 206 / 60%); background: rgb(80 223 206 / 10%); }
+.public-onboarding .product-mode-card.mode-both .product-mode-card__icon { color: #071313; background: var(--fitsho-aqua); }
 .public-onboarding .product-mode-card:hover, .public-onboarding .product-mode-card:focus-visible { border-color: #f4f1e9; background: rgb(255 255 255 / 13%); }
 .public-question-card { width: min(100%, 48rem); margin: 0 auto; }
 .public-question-card--fullscreen {
@@ -79,6 +127,8 @@
 .guided-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
 .guided-choice-grid button { min-height: 5rem; padding: 1rem; border: 1px solid rgb(255 255 255 / 14%); border-radius: 1rem; color: #f4f1e9; background: rgb(255 255 255 / 5%); font-weight: 850; cursor: pointer; }
 .guided-choice-grid button.is-selected { border-color: var(--turquoise); background: rgb(27 185 164 / 20%); box-shadow: inset 0 0 0 1px rgb(27 185 164 / 28%); }
+.guided-choice-grid--sex { width: min(100%, 34rem); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.guided-choice-grid--sex button { min-height: 6.5rem; font-size: 1.1rem; }
 .public-onboarding .profile-fieldset { border-color: rgb(255 255 255 / 11%); background: rgb(255 255 255 / 3%); }
 .public-onboarding .profile-field input,
 .public-onboarding .profile-field select,
@@ -95,9 +145,17 @@
 .account-divider::after { height: 1px; flex: 1; content: ""; background: rgb(255 255 255 / 12%); }
 
 @media (max-width: 650px) {
+  .public-onboarding__stage { width: min(100% - 1.25rem, 68rem); }
   .public-onboarding__header > span { display: none; }
+  .public-onboarding .product-mode-cards { gap: 0.75rem; margin-top: 1.5rem; }
+  .public-onboarding .product-mode-card { min-height: 6.25rem; gap: 0.85rem; padding: 0.9rem; border-radius: 1.1rem; }
+  .public-onboarding .product-mode-card strong { font-size: clamp(1.15rem, 6vw, 1.45rem); }
+  .public-onboarding .product-mode-card .product-mode-card__icon { width: 3.25rem; flex-basis: 3.25rem; border-radius: 0.9rem; }
+  .public-onboarding .product-mode-card__icon svg { width: 1.5rem; height: 1.5rem; }
   .account-providers { grid-template-columns: 1fr; }
   .birth-date-picker { grid-template-columns: 1fr; }
   .guided-body-fields { grid-template-columns: 1fr; }
   .guided-choice-grid { grid-template-columns: 1fr; }
+  .guided-choice-grid--sex { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; }
+  .guided-choice-grid--sex button { min-height: 6rem; padding-inline: 0.65rem; }
 }

@@ -85,11 +85,33 @@ it("starts with product mode and marks the combined path as recommended", () => 
 it("shows only the three prominent product paths without explanatory copy", () => {
   render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
 
-  expect(screen.getByRole("button", { name: "برنامه تمرینی" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "برنامه تغذیه" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "تمرین و تغذیه" })).toBeInTheDocument();
+  for (const name of ["برنامه تمرینی", "برنامه تغذیه", "تمرین و تغذیه"]) {
+    const option = screen.getByRole("button", { name });
+    expect(option.querySelector(".product-mode-card__icon")).toBeInTheDocument();
+    expect(option.querySelector(".product-mode-card__content")).toBeInTheDocument();
+  }
   expect(screen.queryByText("یکی را انتخاب کن؛ فقط سؤال‌های مرتبط با همان مسیر را از تو می‌پرسیم.")).not.toBeInTheDocument();
   expect(screen.queryByText("برنامه ورزشی براساس بدن، هدف، زمان و تجهیزات")).not.toBeInTheDocument();
+});
+
+it("offers only balanced female and male choices on the gender step", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
+
+  await user.click(screen.getByRole("button", { name: "برنامه تمرینی" }));
+  await user.type(screen.getByLabelText("نام نمایشی"), "سارا");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.selectOptions(screen.getByLabelText("روز"), "14");
+  await user.selectOptions(screen.getByLabelText("ماه"), "5");
+  await user.selectOptions(screen.getByLabelText("سال"), "2000");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+
+  const female = screen.getByRole("button", { name: "زن" });
+  const male = screen.getByRole("button", { name: "مرد" });
+  expect(female.parentElement).toHaveClass("guided-choice-grid--sex");
+  expect(male.parentElement).toBe(female.parentElement);
+  expect(screen.queryByRole("button", { name: "سایر" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ترجیح می‌دهم نگویم" })).not.toBeInTheDocument();
 });
 
 it("lets the user go back from the first question to mode selection", async () => {

@@ -10,7 +10,7 @@ type Props = {
   onComplete: () => void;
 };
 
-const sexes = ["female", "male", "other", "prefer_not_to_say"] as const;
+const sexes = ["female", "male"] as const;
 const goals = [
   ["lose_weight", "🔻⬆️"],
   ["gain_weight", "🔺️⬇️"],
@@ -92,7 +92,7 @@ export function GuidedSharedProfileQuestions({ values, onChange, onBack, onCompl
           <label>{language === "en" ? "Month" : "ماه"}<select className="birth-date-picker__select" required value={birthParts.month} onChange={(event) => setBirthParts((current) => ({ ...current, month: event.target.value }))}><option value="" />{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select></label>
           <label>{language === "en" ? "Year" : "سال"}<select className="birth-date-picker__select" required value={birthParts.year} onChange={(event) => setBirthParts((current) => ({ ...current, year: event.target.value }))}><option value="" />{years.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
         </fieldset>}
-        {question === 2 && <div className="guided-choice-grid">{sexes.map((sex) => <button className={values.sex === sex ? "is-selected" : ""} key={sex} type="button" onClick={() => onChange("sex", sex)}>{t(`onboarding.options.sex.${sex}`)}</button>)}</div>}
+        {question === 2 && <div className="guided-choice-grid guided-choice-grid--sex">{sexes.map((sex) => <button className={values.sex === sex ? "is-selected" : ""} key={sex} type="button" onClick={() => onChange("sex", sex)}>{t(`onboarding.options.sex.${sex}`)}</button>)}</div>}
         {question === 3 && <div className="guided-body-fields">
           <label>{t("onboarding.fields.height")}<input aria-label={t("onboarding.fields.height")} name="height_cm" type="number" inputMode="numeric" required min={120} max={230} value={values.height_cm} onChange={(event) => updateBodyValue("height_cm", event.target.value)} /><small>{language === "en" ? "120–230 cm" : "۱۲۰ تا ۲۳۰ سانتی‌متر"}</small></label>
           <label>{t("onboarding.fields.weight")}<input aria-label={t("onboarding.fields.weight")} name="current_weight_kg" type="number" inputMode="decimal" required min={35} max={300} step="0.01" value={values.current_weight_kg} onChange={(event) => updateBodyValue("current_weight_kg", event.target.value)} /><small>{language === "en" ? "35–300 kg" : "۳۵ تا ۳۰۰ کیلوگرم"}</small></label>

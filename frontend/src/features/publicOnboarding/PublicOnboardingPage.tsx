@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
+import { AppIcon } from "../../shared/AppIcon";
 import { authErrorMessage } from "../auth/authError";
 import { useAuth } from "../auth/AuthContext";
 import { NutritionOnboardingFlow } from "../nutrition/NutritionOnboardingFlow";
@@ -83,16 +84,16 @@ export function PublicOnboardingPage() {
 function ModeSelection({ language, onChoose }: { language: Language; onChoose: (mode: ProductMode) => void }) {
   const text = publicCopy[language].mode;
   const modes = [
-    ["training", text.training],
-    ["nutrition", text.nutrition],
-    ["both", text.both],
+    ["training", text.training, "dumbbell"],
+    ["nutrition", text.nutrition, "nutrition"],
+    ["both", text.both, "target"],
   ] as const;
   return (
     <section className="public-mode-selection">
       <p className="eyebrow eyebrow--accent">{text.eyebrow}</p>
       <h1 className="fitsho-display">{text.title}</h1>
       <div className="product-mode-cards">
-        {modes.map(([mode, title]) => (
+        {modes.map(([mode, title, icon]) => (
           <button
             key={mode}
             className={`product-mode-card mode-${mode} ${mode === "both" ? "is-recommended" : ""}`}
@@ -100,8 +101,11 @@ function ModeSelection({ language, onChoose }: { language: Language; onChoose: (
             aria-label={title}
             onClick={() => onChoose(mode)}
           >
-            {mode === "both" && <span>{text.recommended}</span>}
-            <strong>{title}</strong>
+            <span className="product-mode-card__icon" aria-hidden="true"><AppIcon name={icon} /></span>
+            <span className="product-mode-card__content">
+              <strong>{title}</strong>
+              {mode === "both" && <span className="product-mode-card__badge">{text.recommended}</span>}
+            </span>
           </button>
         ))}
       </div>
