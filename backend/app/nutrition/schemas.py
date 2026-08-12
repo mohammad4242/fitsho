@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.nutrition.enums import (
     BudgetStyle,
@@ -21,6 +21,7 @@ from app.nutrition.enums import (
     MedicalConditionCode,
     MetabolicBasis,
     NutritionDailyCheckInStatus,
+    NutritionDietStyle,
     NutritionEstimateStatus,
     NutritionLabRequestStatus,
     NutritionMealFeedbackType,
@@ -483,6 +484,100 @@ class CatalogueMealResponse(BaseModel):
 class CatalogueMealPageResponse(BaseModel):
     items: list[CatalogueMealResponse]
     categories: list[MealCategory]
+
+
+class NutritionProgramSlotWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category: MealCategory
+    meal_id: UUID
+
+
+class NutritionProgramDayWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    day_number: int = Field(ge=1, le=7)
+    post_workout_enabled: bool = False
+    slots: list[NutritionProgramSlotWrite] = Field(min_length=4, max_length=5)
+
+    @model_validator(mode="after")
+    def validate_slots(self) -> "NutritionProgramDayWrite":
+        categories = [slot.category for slot in self.slots]
+        if len(categories) != len(set(categories)):
+            raise ValueError("Program day meal slots must be unique")
+        required = {
+            MealCategory.BREAKFAST,
+            MealCategory.LUNCH,
+            MealCategory.SNACK,
+            MealCategory.DINNER,
+        }
+        if not required.issubset(categories):
+            raise ValueError("Every program day requires breakfast, lunch, snack, and dinner")
+        has_post_workout = MealCategory.POST_WORKOUT in categories
+        if has_post_workout != self.post_workout_enabled:
+            raise ValueError("Post-workout slot must match the day post-workout setting")
+        return self
+
+
+class NutritionProgramWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name_fa: str = Field(min_length=1, max_length=160)
+    name_en: str = Field(min_length=1, max_length=160)
+    description_fa: str = Field(min_length=1, max_length=1000)
+    description_en: str = Field(min_length=1, max_length=1000)
+    diet_style: NutritionDietStyle
+    post_workout_enabled: bool = False
+    days: list[NutritionProgramDayWrite] = Field(min_length=7, max_length=7)
+
+    @model_validator(mode="after")
+    def validate_week(self) -> "NutritionProgramWrite":
+        if {day.day_number for day in self.days} != set(range(1, 8)):
+            raise ValueError("Program must contain days 1 through 7 exactly once")
+        if not self.post_workout_enabled and any(day.post_workout_enabled for day in self.days):
+            raise ValueError("Daily post-workout cannot be enabled when globally disabled")
+        return self
+
+
+class NutritionProgramMealReference(BaseModel):
+    id: UUID
+    name_fa: str
+    name_en: str
+    category: MealCategory
+
+
+class NutritionProgramSlotResponse(BaseModel):
+    id: UUID
+    category: MealCategory
+    meal: NutritionProgramMealReference
+
+
+class NutritionProgramDayResponse(BaseModel):
+    id: UUID
+    day_number: int
+    post_workout_enabled: bool
+    slots: list[NutritionProgramSlotResponse]
+
+
+class NutritionProgramResponse(BaseModel):
+    id: UUID
+    slug: str
+    name_fa: str
+    name_en: str
+    description_fa: str
+    description_en: str
+    diet_style: NutritionDietStyle
+    post_workout_enabled: bool
+    is_active: bool
+    archived_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    days: list[NutritionProgramDayResponse]
+
+
+class NutritionProgramPageResponse(BaseModel):
+    items: list[NutritionProgramResponse]
+    diet_styles: list[NutritionDietStyle]
 
 
 class NutritionEstimateResponse(BaseModel):

@@ -105,6 +105,14 @@ class MealCategory(StrEnum):
     DINNER = "dinner"
 
 
+class NutritionDietStyle(StrEnum):
+    ECONOMY = "economy"
+    BALANCED_IRANIAN = "balanced_iranian"
+    HIGH_PROTEIN_GYM = "high_protein_gym"
+    QUICK_EASY = "quick_easy"
+    PREMIUM_VARIED = "premium_varied"
+
+
 class MealIngredientRole(StrEnum):
     PROTEIN = "protein"
     CARBOHYDRATE = "carbohydrate"
