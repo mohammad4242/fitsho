@@ -559,6 +559,7 @@ class NutritionProgramWrite(BaseModel):
 
 class NutritionProgramMealReference(BaseModel):
     id: UUID
+    code: str
     name_fa: str
     name_en: str
     category: MealCategory

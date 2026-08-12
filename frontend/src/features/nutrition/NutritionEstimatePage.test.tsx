@@ -119,6 +119,10 @@ beforeEach(() => {
   });
   vi.mocked(nutritionApi.getShoppingList).mockResolvedValue({ plan_id: "plan-1", plan_revision: 1, approval_status: "pending", warning_codes: ["PLAN_NOT_ACTIVE"], total_cost_irr: 1_400_000, items: [{ food_id: "food-1", slug: "chicken-breast", name_fa: "سینه مرغ", name_en: "Chicken breast", required_quantity: 1050, canonical_unit: "g", cost_irr: 1_400_000 }] });
   vi.mocked(nutritionApi.listWeeklyNutritionPlans).mockResolvedValue([]);
+  vi.mocked(nutritionApi.saveFreeMeal).mockResolvedValue({
+    entry_date: "2026-08-08", check_in_status: "not_recorded", plan_revision_id: "plan-1",
+    data_status: "sufficient", actual_totals: { energy_kcal: 700 }, entries: [],
+  });
 });
 
 afterEach(() => {
@@ -244,6 +248,38 @@ it("generates and displays a seven-day draft without claiming physician approval
   expect(screen.queryByText("تأییدشده توسط پزشک")).not.toBeInTheDocument();
   expect(screen.getAllByRole("tab")).toHaveLength(7);
   expect(screen.getAllByText("سینه مرغ")).toHaveLength(2);
+});
+
+it("shows four Free Meal macro inputs and adds the saved intake to the actual day total", async () => {
+  await i18n.changeLanguage("fa");
+  const freePlan: WeeklyPlan = {
+    ...weeklyPlan,
+    days: weeklyPlan.days.map((day, index) => index === 0 ? {
+      ...day,
+      meals: [{
+        id: "free-meal-1", catalogue_meal_id: null, catalogue_meal_category: "lunch",
+        slot_role: "free_meal", slot_index: 0, target_distribution: {}, nutrient_totals: {},
+        cost_irr: 0, is_locked: false, foods: [],
+      }],
+    } : day),
+  };
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(freePlan);
+  const user = userEvent.setup();
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  expect(await screen.findByText("وعده آزاد")).toBeInTheDocument();
+  expect(screen.getByText(/لطفاً جهت محاسبه کالری روزانه/)).toBeInTheDocument();
+  await user.type(screen.getByRole("spinbutton", { name: "کالری" }), "700");
+  await user.type(screen.getByRole("spinbutton", { name: "پروتئین" }), "35");
+  await user.type(screen.getByRole("spinbutton", { name: "کربو" }), "80");
+  await user.type(screen.getByRole("spinbutton", { name: "چربی" }), "22");
+  await user.click(screen.getByRole("button", { name: "ثبت وعده آزاد" }));
+
+  expect(nutritionApi.saveFreeMeal).toHaveBeenCalledWith("free-meal-1", {
+    entry_date: "2026-08-08", calories: 700, protein_g: 35, carbohydrate_g: 80, fat_g: 22,
+  });
+  expect(await screen.findByText(/جمع مصرف واقعی این روز/)).toHaveTextContent("۷۰۰ kcal");
+  expect(screen.getByRole("link", { name: "محاسبه با عکس اختیاری" })).toHaveAttribute("href", expect.stringContaining("/nutrition-tracking?freeMealId=free-meal-1"));
 });
 
 it("shows the scientific calorie and nutrient estimate with its limits in Persian", async () => {

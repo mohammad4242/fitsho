@@ -20,6 +20,7 @@ import { AdminNutritionProgramsPage } from "./AdminNutritionProgramsPage";
 
 const program = {
   id: "program-1",
+  code: "IRN01",
   slug: "iranian-week",
   name_fa: "هفته ایرانی متعادل",
   name_en: "Balanced Iranian week",
@@ -35,10 +36,11 @@ const program = {
     id: `day-${index + 1}`,
     day_number: index + 1,
     post_workout_enabled: index === 0,
-    slots: [{
+    slots: index === 6 ? [{ id: "free-slot", kind: "free_meal", category: "lunch", meal: null }] : [{
       id: `slot-${index + 1}`,
+      kind: "catalogue_meal",
       category: "breakfast",
-      meal: { id: "meal-1", name_fa: "املت", name_en: "Omelette", category: "breakfast" },
+      meal: { id: "meal-1", code: "BF01", name_fa: "املت", name_en: "Omelette", category: "breakfast" },
     }],
   })),
 };
@@ -60,6 +62,8 @@ it("filters weekly programs by diet style and archives them", async () => {
   expect(await screen.findByRole("heading", { name: "کاتالوگ برنامه‌های غذایی" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "کاتالوگ برنامه‌های غذایی" })).toHaveAttribute("href", "/admin/nutrition-programs");
   expect(screen.getByText("هفته ایرانی متعادل")).toBeInTheDocument();
+  expect(screen.getAllByText(/BF01 — املت/)).toHaveLength(6);
+  expect(screen.getByText("وعده آزاد")).toBeInTheDocument();
   expect(screen.getAllByText(/روز /)).toHaveLength(7);
   expect(screen.getByRole("link", { name: "ویرایش هفته ایرانی متعادل" })).toHaveAttribute(
     "href", "/admin/nutrition-programs/program-1/edit",

@@ -294,7 +294,9 @@ function EstimateContent({ estimate, language, onRefresh, plan, tracking }: { es
   </>;
 }
 
-function mealLabel(role: "main_meal" | "snack", index: number, language: "fa" | "en") {
+function mealLabel(role: "main_meal" | "snack" | "free_meal" | "post_workout", index: number, language: "fa" | "en") {
+  if (role === "free_meal") return language === "en" ? "Free Meal" : "وعده آزاد";
+  if (role === "post_workout") return language === "en" ? "Post-workout" : "پس از تمرین";
   if (role === "snack") return language === "en" ? `Snack ${index + 1}` : `میان‌وعده ${new Intl.NumberFormat("fa-IR").format(index + 1)}`;
   const labels = language === "en" ? ["Breakfast", "Lunch", "Dinner"] : ["صبحانه", "ناهار", "شام"];
   return labels[index] ?? (language === "en" ? `Meal ${index + 1}` : `وعده ${new Intl.NumberFormat("fa-IR").format(index + 1)}`);

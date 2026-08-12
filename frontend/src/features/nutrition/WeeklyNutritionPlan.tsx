@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import * as api from "./api";
 import type { ShoppingList, WeeklyPlan, WeeklyPlanHistoryItem } from "./types";
@@ -151,7 +152,7 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
       {day && (
         <><div className="weekly-plan__daily-summary"><strong>{l("جمع روز", "Daily total")}: {number.format(day.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</strong><span>{number.format(Math.floor(day.cost_irr / 10))} {l("تومان", "Toman")}</span><span>{l("پروتئین", "Protein")}: {number.format(day.nutrient_totals.protein_g ?? 0)} g</span><span>{l("کربوهیدرات", "Carbohydrate")}: {number.format(day.nutrient_totals.carbohydrate_g ?? 0)} g</span></div><div className="weekly-plan__day-actions"><button disabled={busyMeal === "regenerate" || day.meals.every((meal) => meal.is_locked)} type="button" onClick={() => void regenerateDay()}>{l("بازسازی وعده‌های باز این روز", "Regenerate unlocked meals for this day")}</button></div><div className="weekly-plan__meals" role="tabpanel">
           {day.meals.map((meal) => (
-            <article className="weekly-plan__meal" key={meal.id}>
+            meal.slot_role === "free_meal" ? <FreeMealCard key={meal.id} meal={meal} entryDate={day.plan_date} language={language} /> : <article className="weekly-plan__meal" key={meal.id}>
               <header>
                 <div>
                   <span>{meal.slot_role === "snack" ? l("میان‌وعده", "Snack") : l("وعده اصلی", "Main meal")}</span>
@@ -214,7 +215,49 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
   );
 }
 
-function findMealAlternative(plan: WeeklyPlan, mealId: string, role: "main_meal" | "snack") {
+function FreeMealCard({ meal, entryDate, language }: { meal: WeeklyPlan["days"][number]["meals"][number]; entryDate: string; language: "fa" | "en" }) {
+  const l = (fa: string, en: string) => language === "en" ? en : fa;
+  const stored = sessionStorage.getItem(`fitsho-free-meal:${meal.id}`);
+  const initial = stored ? JSON.parse(stored) as api.FreeMealMacros : null;
+  const [values, setValues] = useState({
+    calories: initial?.calories?.toString() ?? "",
+    protein_g: initial?.protein_g?.toString() ?? "",
+    carbohydrate_g: initial?.carbohydrate_g?.toString() ?? "",
+    fat_g: initial?.fat_g?.toString() ?? "",
+  });
+  const [actualTotal, setActualTotal] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const fields = [
+    ["calories", l("کالری", "Calories"), "kcal"],
+    ["protein_g", l("پروتئین", "Protein"), "g"],
+    ["carbohydrate_g", l("کربو", "Carbs"), "g"],
+    ["fat_g", l("چربی", "Fat"), "g"],
+  ] as const;
+  async function save() {
+    if (Object.values(values).some((value) => value === "" || Number(value) < 0)) return;
+    setSaving(true);
+    try {
+      const summary = await api.saveFreeMeal(meal.id, {
+        entry_date: entryDate,
+        calories: Number(values.calories),
+        protein_g: Number(values.protein_g),
+        carbohydrate_g: Number(values.carbohydrate_g),
+        fat_g: Number(values.fat_g),
+      });
+      sessionStorage.removeItem(`fitsho-free-meal:${meal.id}`);
+      setActualTotal(summary.actual_totals.energy_kcal ?? 0);
+    } finally { setSaving(false); }
+  }
+  return <article className="weekly-plan__meal weekly-plan__free-meal">
+    <header><div><span>{l("ناهار جمعه", "Friday lunch")}</span><strong>{l("وعده آزاد", "Free Meal")}</strong></div></header>
+    <p>{l("لطفاً جهت محاسبه کالری روزانه از وعده آزاد عکس بگیرید و اطلاعات مهم وعده آزاد را اینجا وارد کنید.", "Optionally take a photo, then enter the Free Meal nutrition details here.")}</p>
+    <div className="weekly-plan__free-fields">{fields.map(([key, label, unit]) => <label key={key}><i aria-hidden="true" /><span>{label}</span><input aria-label={label} min="0" type="number" value={values[key]} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} /><b>{unit}</b></label>)}</div>
+    <div className="weekly-plan__meal-actions"><Link to={`/nutrition-tracking?freeMealId=${meal.id}&entryDate=${entryDate}&return=${encodeURIComponent("/nutrition-estimate")}`}>{l("محاسبه با عکس اختیاری", "Optional photo estimate")}</Link><button disabled={saving} type="button" onClick={() => void save()}>{saving ? l("در حال ثبت…", "Saving…") : l("ثبت وعده آزاد", "Save Free Meal")}</button></div>
+    {actualTotal !== null && <strong role="status">{l("جمع مصرف واقعی این روز", "Actual daily total")}: {actualTotal.toLocaleString(language === "fa" ? "fa-IR" : "en-US")} kcal</strong>}
+  </article>;
+}
+
+function findMealAlternative(plan: WeeklyPlan, mealId: string, role: "main_meal" | "snack" | "free_meal" | "post_workout") {
   return plan.days.flatMap((day) => day.meals).find((meal) => meal.id !== mealId && meal.slot_role === role);
 }
 

@@ -161,7 +161,7 @@ export type AdminAiModelSync = {
 };
 
 export type AdminAiValidationProblem = {
-  code: string;
+  code?: string;
   message: string;
   day_number?: number;
   exercise_id?: string;
@@ -441,6 +441,7 @@ export type NutritionProgramLifecycle = "active" | "archived" | "all";
 
 export type AdminNutritionProgramMeal = {
   id: string;
+  code: string;
   name_fa: string;
   name_en: string;
   category: MealCategory;
@@ -448,8 +449,9 @@ export type AdminNutritionProgramMeal = {
 
 export type AdminNutritionProgramSlot = {
   id: string;
+  kind?: "catalogue_meal" | "free_meal";
   category: MealCategory;
-  meal: AdminNutritionProgramMeal;
+  meal: AdminNutritionProgramMeal | null;
 };
 
 export type AdminNutritionProgramDay = {
@@ -461,6 +463,7 @@ export type AdminNutritionProgramDay = {
 
 export type AdminNutritionProgram = {
   id: string;
+  code?: string;
   slug: string;
   name_fa: string;
   name_en: string;
@@ -482,7 +485,8 @@ export type AdminNutritionProgramPage = {
 
 export type AdminNutritionProgramSlotWrite = {
   category: MealCategory;
-  meal_id: string;
+  kind?: "catalogue_meal" | "free_meal";
+  meal_id: string | null;
 };
 
 export type AdminNutritionProgramDayWrite = {
@@ -492,6 +496,7 @@ export type AdminNutritionProgramDayWrite = {
 };
 
 export type AdminNutritionProgramWrite = {
+  code?: string | null;
   name_fa: string;
   name_en: string;
   description_fa: string;

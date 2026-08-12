@@ -107,7 +107,7 @@ export function AdminNutritionProgramsPage() {
                   <header>
                     <div>
                       <p className="eyebrow">{t(`admin.nutritionPrograms.dietStyles.${program.diet_style}`)}</p>
-                      <h2>{name}</h2>
+                      <h2>{program.code ? <>{program.code} — </> : null}<span>{name}</span></h2>
                       <p>{english ? program.description_en : program.description_fa}</p>
                     </div>
                     <span className="admin-template-level">{t(`admin.nutritionPrograms.lifecycle.${program.is_active ? "active" : "archived"}`)}</span>
@@ -116,7 +116,7 @@ export function AdminNutritionProgramsPage() {
                     {program.days.map((day) => (
                       <section className="admin-program-day" key={day.id}>
                         <strong>{t("admin.nutritionPrograms.day", { number: day.day_number })}</strong>
-                        <ul>{day.slots.map((slot) => <li key={slot.id}><span>{t(`admin.meals.categories.${slot.category}`)}</span><b>{english ? slot.meal.name_en : slot.meal.name_fa}</b></li>)}</ul>
+                        <ul>{day.slots.map((slot) => <li key={slot.id}><span>{t(`admin.meals.categories.${slot.category}`)}</span>{slot.kind === "free_meal" || slot.meal === null ? <b>وعده آزاد</b> : <b>{slot.meal.code ? <>{slot.meal.code} — </> : null}{slot.meal.name_fa}<small>{slot.meal.name_en}</small></b>}</li>)}</ul>
                       </section>
                     ))}
                   </div>

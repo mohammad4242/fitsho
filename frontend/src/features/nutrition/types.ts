@@ -167,7 +167,7 @@ export type WeeklyPlan = {
       id: string;
       catalogue_meal_id?: string | null;
       catalogue_meal_category?: string | null;
-      slot_role: "main_meal" | "snack";
+      slot_role: "main_meal" | "snack" | "free_meal" | "post_workout";
       slot_index: number;
       target_distribution: Record<string, number>;
       nutrient_totals: Record<string, number>;
