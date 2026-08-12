@@ -1,0 +1,303 @@
+"""Canonical Meal UUID registry and the 25 approved weekly program matrices."""
+
+from dataclasses import dataclass
+from uuid import UUID
+
+from app.nutrition.enums import MealCategory, NutritionDietStyle
+
+
+@dataclass(frozen=True)
+class CanonicalMeal:
+    id: UUID
+    category: MealCategory
+    name_fa: str
+
+
+def meal(meal_id: str, category: MealCategory, name_fa: str) -> CanonicalMeal:
+    return CanonicalMeal(UUID(meal_id), category, name_fa)
+
+
+B = MealCategory.BREAKFAST
+L = MealCategory.LUNCH
+D = MealCategory.DINNER
+S = MealCategory.SNACK
+P = MealCategory.POST_WORKOUT
+
+CANONICAL_MEAL_REGISTRY = {
+    "BF01": meal("ddab9f0c-687e-5326-acf1-ffb9a4baf35e", B, "املت گوجه + نان"),
+    "BF02": meal("8f7e1676-4fb5-5ee1-a6a5-82555fe4cb36", B, "نیمرو + نان + گوجه"),
+    "BF03": meal("d5a6f9e5-74a7-582c-8f75-ef4e73efb710", B, "پنیر + گردو + نان + خیار و گوجه"),
+    "BF04": meal("b95b388c-fc79-5d89-96c7-ffc84a4d5855", B, "پنیر + کره + نان + خیار و گوجه"),
+    "BF05": meal("4adbde0e-9d49-5141-8126-a45ab6ed525c", B, "تخم‌مرغ آب‌پز + نان + خیار و گوجه"),
+    "BF06": meal("8a2e64c2-c1c0-565f-9f7b-ad5509dbd6cb", B, "عدسی + نان"),
+    "BF07": meal("94773b38-d195-5280-baaa-5528fad4c8e0", B, "کره بادام‌زمینی + نان + موز"),
+    "BF08": meal("839ac69a-a0bb-5088-9091-c68c57367f06", B, "جو دوسر + شیر + موز + مغزها"),
+    "LU01": meal("4f3327de-c00f-5771-85a4-f0a163370217", L, "جوجه کباب + برنج + گوجه کبابی"),
+    "LU02": meal("58825fdc-3b71-5cbf-94f6-1a53b5106b6f", L, "سینه مرغ آب‌پز + برنج + سالاد"),
+    "LU03": meal("5038ab18-1ada-5045-a883-e5592815206f", L, "زرشک‌پلو با مرغ + سالاد"),
+    "LU04": meal("922e93bf-f875-581e-9fb3-f6b76785cb0c", L, "ماهی کبابی/تنوری + برنج + سبزیجات"),
+    "LU05": meal("c8dc97d6-3892-5beb-8aac-00e6b47db8ec", L, "ماکارونی + گوشت چرخ‌کرده + سبزیجات"),
+    "LU06": meal("40791576-3f80-5887-be94-e3014099f593", L, "ماکارونی + مرغ چرخ‌کرده + سبزیجات"),
+    "LU07": meal("0204ec63-8b96-5248-84e5-6b0d3a0b7ace", L, "قورمه‌سبزی + برنج"),
+    "LU08": meal("194842bd-548d-5f2b-a1c5-d568bbc2217c", L, "قیمه + برنج"),
+    "LU09": meal("2b2e7608-f205-52a6-908c-7148aa7e74be", L, "عدس‌پلو + گوشت/مرغ چرخ‌کرده + ماست"),
+    "LU10": meal("72bdde25-1d1a-506a-9196-09438f0d6738", L, "لوبیاپلو + گوشت/مرغ چرخ‌کرده + سالاد"),
+    "LU11": meal("f9f2dfa7-cdaa-59c4-97c1-d88de2d87aaf", L, "آبگوشت + نان سنگک + سبزی"),
+    "LU12": meal("c8f75f67-d8a2-5976-8cba-a128611d5468", L, "کباب تابه‌ای گوشت + برنج + سالاد"),
+    "LU13": meal(
+        "289643f8-d4ba-5a7e-8ff3-d5c60fc26646", L, "کباب تابه‌ای 50٪ مرغ + 50٪ گوشت + برنج + سالاد"
+    ),
+    "DN01": meal("999702b0-d97d-5b76-9f67-d9c67578d056", D, "سینه مرغ کبابی + برنج + سبزیجات"),
+    "DN02": meal("096a27fc-b7c7-5b72-9d2a-c653e64d75ce", D, "سینه مرغ آب‌پز + نان + خیار و گوجه"),
+    "DN03": meal("4d7c9b3c-2c24-50ef-840f-2f3b007ff022", D, "ماهی + سیب‌زمینی آب‌پز/تنوری + سبزیجات"),
+    "DN04": meal("d743cb14-3a9e-56db-b2ae-05ea77ff924b", D, "تخم‌مرغ + سیب‌زمینی + سالاد"),
+    "DN05": meal("f91d5430-a32e-5f2d-9739-58d0674e2945", D, "عدسی + نان + ماست"),
+    "DN06": meal("b3c826fd-7452-543b-845c-ae4a18cf9e25", D, "خوراک لوبیا + نان + سبزیجات"),
+    "DN07": meal("46cdfccf-4615-5ff8-aac7-d57b8396656a", D, "ساندویچ خانگی مرغ + سبزیجات"),
+    "DN08": meal("5f0f120a-3b9c-5def-b393-ec04a66529eb", D, "پیتزای خانگی مرغ"),
+    "SN01": meal("83fbd6b4-b5f3-520f-8a54-c153fef27064", S, "بادام‌زمینی"),
+    "SN02": meal("faef4a5a-d177-5a1c-ad9f-15d81a490a25", S, "کره بادام‌زمینی + نان"),
+    "SN03": meal("2d32e429-3637-5e95-81b4-239293dfb12a", S, "شیر + موز"),
+    "SN04": meal("c452568c-bbfb-5a5f-a301-4f32ca1681ab", S, "ماست + میوه"),
+    "SN05": meal("c3ce0527-d197-52af-b7b1-2f8ba2702257", S, "ماست + گردو"),
+    "SN06": meal("b266f58d-6925-5784-8476-8f0b437009f6", S, "میوه + بادام‌زمینی"),
+    "SN07": meal("36fa150b-8a58-5417-b796-3b2c26bc87fb", S, "پنیر + نان"),
+    "SN08": meal("c990a04d-27cc-5a93-a3a4-ee15408ef641", S, "تخم‌مرغ آب‌پز"),
+    "PW01": meal("582c6c58-941e-5d73-8129-930734c16b0f", P, "تخم‌مرغ آب‌پز + سیب‌زمینی آب‌پز/تنوری"),
+}
+
+PROGRAM_WEEKS: dict[str, tuple[str, ...]] = {
+    "ECO01": (
+        "BF01 LU02 SN01 DN06",
+        "BF06 LU06 SN03 DN04",
+        "BF05 LU01 SN04 DN05",
+        "BF02 LU02 SN06 DN06",
+        "BF06 LU06 SN08 DN02",
+        "BF01 LU01 SN03 DN04",
+        "BF06 FREE_MEAL SN04 DN05",
+    ),
+    "ECO02": (
+        "BF06 LU02 SN03 DN05",
+        "BF01 LU06 SN01 DN04",
+        "BF05 LU01 SN04 DN06",
+        "BF02 LU02 SN06 DN05",
+        "BF06 LU06 SN08 DN04",
+        "BF01 LU01 SN03 DN02",
+        "BF05 FREE_MEAL SN03 DN06",
+    ),
+    "ECO03": (
+        "BF05 LU06 SN01 DN06",
+        "BF01 LU02 SN03 DN04",
+        "BF06 LU01 SN04 DN05",
+        "BF02 LU06 SN06 DN06",
+        "BF05 LU02 SN08 DN04",
+        "BF01 LU01 SN03 DN05",
+        "BF01 FREE_MEAL SN06 DN04",
+    ),
+    "ECO04": (
+        "BF01 LU01 SN04 DN05",
+        "BF06 LU06 SN01 DN04",
+        "BF02 LU02 SN03 DN06",
+        "BF05 LU01 SN06 DN05",
+        "BF06 LU02 SN08 DN04",
+        "BF01 LU06 SN03 DN02",
+        "BF06 FREE_MEAL SN03 DN02",
+    ),
+    "ECO05": (
+        "BF06 LU06 SN03 DN04",
+        "BF02 LU02 SN01 DN05",
+        "BF01 LU01 SN04 DN06",
+        "BF05 LU06 SN06 DN04",
+        "BF06 LU02 SN08 DN05",
+        "BF01 LU01 SN03 DN02",
+        "BF05 FREE_MEAL SN04 DN06",
+    ),
+    "IRN01": (
+        "BF01 LU07 SN04 DN02",
+        "BF03 LU03 SN03 DN05",
+        "BF05 LU08 SN06 DN01",
+        "BF06 LU01 SN05 DN04",
+        "BF02 LU10 SN04 DN06",
+        "BF03 LU11 SN03 DN01",
+        "BF03 FREE_MEAL SN04 DN01",
+    ),
+    "IRN02": (
+        "BF03 LU03 SN04 DN06",
+        "BF01 LU08 SN03 DN01",
+        "BF06 LU09 SN05 DN04",
+        "BF02 LU07 SN06 DN02",
+        "BF05 LU01 SN04 DN05",
+        "BF03 LU10 SN03 DN01",
+        "BF01 FREE_MEAL SN03 DN05",
+    ),
+    "IRN03": (
+        "BF02 LU01 SN04 DN05",
+        "BF03 LU07 SN05 DN01",
+        "BF06 LU10 SN03 DN04",
+        "BF01 LU03 SN06 DN06",
+        "BF05 LU08 SN04 DN02",
+        "BF03 LU11 SN03 DN01",
+        "BF05 FREE_MEAL SN05 DN06",
+    ),
+    "IRN04": (
+        "BF06 LU09 SN04 DN01",
+        "BF01 LU07 SN03 DN05",
+        "BF03 LU01 SN05 DN04",
+        "BF02 LU08 SN06 DN02",
+        "BF05 LU03 SN04 DN06",
+        "BF01 LU10 SN03 DN01",
+        "BF02 FREE_MEAL SN04 DN01",
+    ),
+    "IRN05": (
+        "BF03 LU03 SN05 DN04",
+        "BF02 LU07 SN04 DN01",
+        "BF06 LU10 SN03 DN05",
+        "BF01 LU08 SN06 DN02",
+        "BF05 LU01 SN04 DN06",
+        "BF03 LU11 SN03 DN01",
+        "BF03 FREE_MEAL SN06 DN05",
+    ),
+    "GYM01": (
+        "BF05 LU02 SN03 DN01",
+        "BF02 LU06 SN05 DN03",
+        "BF01 LU12 SN08 DN04",
+        "BF05 LU04 SN06 DN01",
+        "BF02 LU13 SN03 DN03",
+        "BF01 LU01 SN05 DN04",
+        "BF05 FREE_MEAL SN03 DN01",
+    ),
+    "GYM02": (
+        "BF02 LU01 SN03 DN01",
+        "BF05 LU05 SN06 DN03",
+        "BF01 LU13 SN08 DN04",
+        "BF02 LU02 SN05 DN01",
+        "BF05 LU12 SN03 DN03",
+        "BF01 LU04 SN06 DN04",
+        "BF02 FREE_MEAL SN05 DN03",
+    ),
+    "GYM03": (
+        "BF01 LU06 SN05 DN01",
+        "BF05 LU02 SN03 DN04",
+        "BF02 LU12 SN08 DN03",
+        "BF01 LU01 SN06 DN01",
+        "BF05 LU04 SN03 DN04",
+        "BF02 LU13 SN05 DN03",
+        "BF01 FREE_MEAL SN08 DN01",
+    ),
+    "GYM04": (
+        "BF05 LU04 SN03 DN01",
+        "BF01 LU13 SN05 DN04",
+        "BF02 LU06 SN08 DN03",
+        "BF05 LU12 SN06 DN01",
+        "BF01 LU02 SN03 DN04",
+        "BF02 LU01 SN05 DN03",
+        "BF05 FREE_MEAL SN06 DN03",
+    ),
+    "GYM05": (
+        "BF02 LU01 SN06 DN03",
+        "BF05 LU12 SN03 DN01",
+        "BF01 LU04 SN05 DN04",
+        "BF02 LU06 SN08 DN01",
+        "BF05 LU13 SN03 DN03",
+        "BF01 LU02 SN06 DN04",
+        "BF02 FREE_MEAL SN03 DN04",
+    ),
+    "FAST01": (
+        "BF05 LU02 SN03 DN07",
+        "BF07 LU06 SN04 DN04",
+        "BF08 LU01 SN08 DN02",
+        "BF03 LU02 SN06 DN07",
+        "BF05 LU06 SN03 DN04",
+        "BF07 LU01 SN04 DN02",
+        "BF05 FREE_MEAL SN03 DN07",
+    ),
+    "FAST02": (
+        "BF08 LU02 SN03 DN04",
+        "BF05 LU06 SN06 DN07",
+        "BF07 LU01 SN04 DN02",
+        "BF03 LU02 SN08 DN04",
+        "BF05 LU06 SN03 DN07",
+        "BF08 LU01 SN04 DN02",
+        "BF07 FREE_MEAL SN04 DN04",
+    ),
+    "FAST03": (
+        "BF03 LU01 SN06 DN07",
+        "BF05 LU02 SN03 DN04",
+        "BF08 LU06 SN04 DN02",
+        "BF07 LU01 SN08 DN07",
+        "BF05 LU02 SN03 DN04",
+        "BF03 LU06 SN06 DN02",
+        "BF08 FREE_MEAL SN03 DN02",
+    ),
+    "FAST04": (
+        "BF05 LU06 SN03 DN07",
+        "BF08 LU02 SN04 DN04",
+        "BF03 LU01 SN08 DN02",
+        "BF07 LU06 SN06 DN07",
+        "BF05 LU02 SN03 DN04",
+        "BF08 LU01 SN04 DN02",
+        "BF03 FREE_MEAL SN04 DN07",
+    ),
+    "FAST05": (
+        "BF07 LU02 SN03 DN04",
+        "BF05 LU01 SN06 DN07",
+        "BF08 LU06 SN04 DN02",
+        "BF03 LU02 SN08 DN04",
+        "BF05 LU01 SN03 DN07",
+        "BF07 LU06 SN04 DN02",
+        "BF05 FREE_MEAL SN06 DN04",
+    ),
+    "PREM01": (
+        "BF08 LU04 SN05 DN08",
+        "BF03 LU13 SN06 DN03",
+        "BF07 LU03 SN05 DN01",
+        "BF01 LU12 SN04 DN03",
+        "BF08 LU05 SN06 DN08",
+        "BF03 LU04 SN05 DN01",
+        "BF08 FREE_MEAL SN05 DN03",
+    ),
+    "PREM02": (
+        "BF03 LU03 SN05 DN03",
+        "BF08 LU12 SN06 DN08",
+        "BF01 LU04 SN04 DN01",
+        "BF07 LU13 SN05 DN03",
+        "BF03 LU05 SN06 DN08",
+        "BF08 LU03 SN04 DN01",
+        "BF03 FREE_MEAL SN06 DN08",
+    ),
+    "PREM03": (
+        "BF08 LU13 SN05 DN03",
+        "BF03 LU04 SN06 DN01",
+        "BF07 LU12 SN04 DN08",
+        "BF01 LU03 SN05 DN03",
+        "BF08 LU05 SN06 DN01",
+        "BF03 LU04 SN05 DN08",
+        "BF07 FREE_MEAL SN04 DN01",
+    ),
+    "PREM04": (
+        "BF03 LU12 SN06 DN03",
+        "BF08 LU03 SN05 DN08",
+        "BF01 LU04 SN04 DN01",
+        "BF07 LU13 SN06 DN03",
+        "BF03 LU05 SN05 DN08",
+        "BF08 LU04 SN04 DN01",
+        "BF08 FREE_MEAL SN05 DN03",
+    ),
+    "PREM05": (
+        "BF08 LU04 SN05 DN01",
+        "BF03 LU03 SN06 DN08",
+        "BF07 LU13 SN04 DN03",
+        "BF01 LU12 SN05 DN01",
+        "BF08 LU05 SN06 DN08",
+        "BF03 LU04 SN05 DN03",
+        "BF03 FREE_MEAL SN06 DN08",
+    ),
+}
+
+STYLE_BY_PREFIX = {
+    "ECO": NutritionDietStyle.ECONOMY,
+    "IRN": NutritionDietStyle.BALANCED_IRANIAN,
+    "GYM": NutritionDietStyle.HIGH_PROTEIN_GYM,
+    "FAST": NutritionDietStyle.QUICK_EASY,
+    "PREM": NutritionDietStyle.PREMIUM_VARIED,
+}
