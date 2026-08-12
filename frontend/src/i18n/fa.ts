@@ -174,6 +174,7 @@ const fa = {
         trainingLocation: "کجا تمرین می‌کنی؟",
         homeTrainingSetup: "برای تمرین در خانه چه امکاناتی داری؟",
         sessionDuration: "معمولاً برای هر جلسه چقدر زمان داری؟",
+        trainingIntensity: "شدت معمول تمرین",
         trainingCautions: "موارد احتیاط تمرین",
         planDuration: "مدت این برنامه چقدر باشد؟",
         limitations: "محدودیت‌های جسمی (اختیاری)",
@@ -221,6 +222,11 @@ const fa = {
           75: "۷۵ دقیقه",
           90: "۹۰ دقیقه",
           120: "بیش از ۹۰ دقیقه",
+        },
+        trainingIntensity: {
+          light: "سبک",
+          moderate: "متوسط",
+          vigorous: "شدید",
         },
         trainingCaution: {
           none: "ندارم",
