@@ -59,7 +59,8 @@ def get_program(db: Session, program_id: UUID) -> NutritionProgram | None:
 
 def create_program(db: Session, payload: NutritionProgramWrite) -> NutritionProgram:
     meals = _validate_meals(db, payload)
-    program = NutritionProgram(slug=_unique_slug(db, payload.name_en))
+    slug = _unique_slug(db, payload.name_en)
+    program = NutritionProgram(slug=slug, code=payload.code or slug.upper()[:20])
     db.add(program)
     _replace_program_content(program, payload, meals)
     db.commit()
@@ -105,6 +106,7 @@ def restore_program(db: Session, program_id: UUID) -> NutritionProgram | None:
 def program_response(program: NutritionProgram) -> NutritionProgramResponse:
     return NutritionProgramResponse(
         id=program.id,
+        code=program.code,
         slug=program.slug,
         name_fa=program.name_fa,
         name_en=program.name_en,
@@ -124,15 +126,18 @@ def program_response(program: NutritionProgram) -> NutritionProgramResponse:
                 slots=[
                     NutritionProgramSlotResponse(
                         id=slot.id,
+                        kind=slot.kind,
                         category=slot.category,
                         meal=NutritionProgramMealReference(
                             id=slot.meal.id,
-                            meal_code=slot.meal.code,
+                            code=slot.meal.code,
                             name_fa=slot.meal.name_fa,
                             name_en=slot.meal.name_en,
                             image_url=slot.meal.image_path,
                             category=slot.meal.category,
-                        ),
+                        )
+                        if slot.meal is not None
+                        else None,
                     )
                     for slot in sorted(day.slots, key=lambda item: SLOT_ORDER[item.category])
                 ],
@@ -154,7 +159,9 @@ def _validate_meals(
     db: Session,
     payload: NutritionProgramWrite,
 ) -> dict[UUID, NutritionCatalogueMeal]:
-    meal_ids = {slot.meal_id for day in payload.days for slot in day.slots}
+    meal_ids = {
+        slot.meal_id for day in payload.days for slot in day.slots if slot.meal_id is not None
+    }
     meals = {
         meal.id: meal
         for meal in db.scalars(
@@ -175,7 +182,7 @@ def _validate_meals(
         )
     for day in payload.days:
         for slot in day.slots:
-            if meals[slot.meal_id].category is not slot.category:
+            if slot.meal_id is not None and meals[slot.meal_id].category is not slot.category:
                 raise ProgramWriteError("Selected meal category must match its program slot")
     return meals
 
@@ -186,6 +193,8 @@ def _replace_program_content(
     meals: dict[UUID, NutritionCatalogueMeal],
 ) -> None:
     program.name_fa = payload.name_fa
+    if payload.code is not None:
+        program.code = payload.code
     program.name_en = payload.name_en
     program.description_fa = payload.description_fa
     program.description_en = payload.description_en
@@ -200,9 +209,12 @@ def _replace_program_content(
         for slot_payload in sorted(day_payload.slots, key=lambda item: SLOT_ORDER[item.category]):
             day.slots.append(
                 NutritionProgramSlot(
+                    kind=slot_payload.kind,
                     category=slot_payload.category,
                     meal_id=slot_payload.meal_id,
-                    meal=meals[slot_payload.meal_id],
+                    meal=(
+                        meals[slot_payload.meal_id] if slot_payload.meal_id is not None else None
+                    ),
                 )
             )
 

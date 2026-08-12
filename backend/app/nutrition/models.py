@@ -62,6 +62,7 @@ from app.nutrition.enums import (
     NutritionPlanLifecycleStatus,
     NutritionPlanReviewStatus,
     NutritionPlanStyle,
+    NutritionProgramSlotKind,
     NutritionSupplementOrderStatus,
     NutritionTargetMetric,
     PhysicianReviewMode,
@@ -805,6 +806,7 @@ class NutritionProgram(Base):
     __tablename__ = "nutrition_programs"
     __table_args__ = (
         UniqueConstraint("slug", name="uq_nutrition_programs_slug"),
+        UniqueConstraint("code", name="uq_nutrition_programs_code"),
         CheckConstraint(
             "slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'",
             name="ck_nutrition_programs_slug_format",
@@ -812,6 +814,7 @@ class NutritionProgram(Base):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    code: Mapped[str] = mapped_column(String(20), nullable=False)
     slug: Mapped[str] = mapped_column(String(120), nullable=False)
     name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
     name_en: Mapped[str] = mapped_column(String(160), nullable=False)
@@ -878,12 +881,17 @@ class NutritionProgramSlot(Base):
     category: Mapped[MealCategory] = mapped_column(
         enum_column(MealCategory, "ck_nutrition_program_slots_category_values"), nullable=False
     )
-    meal_id: Mapped[UUID] = mapped_column(
-        ForeignKey("nutrition_catalogue_meals.id", ondelete="RESTRICT"), nullable=False, index=True
+    kind: Mapped[NutritionProgramSlotKind] = mapped_column(
+        enum_column(NutritionProgramSlotKind, "ck_nutrition_program_slots_kind_values"),
+        nullable=False,
+        default=NutritionProgramSlotKind.CATALOGUE_MEAL,
+    )
+    meal_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_catalogue_meals.id", ondelete="RESTRICT"), nullable=True, index=True
     )
 
     day: Mapped["NutritionProgramDay"] = relationship(back_populates="slots")
-    meal: Mapped["NutritionCatalogueMeal"] = relationship()
+    meal: Mapped["NutritionCatalogueMeal | None"] = relationship()
 
 
 class NutritionPriceProvider(Base):
@@ -1204,6 +1212,9 @@ class NutritionWeeklyPlan(Base):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    program_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_programs.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("nutrition_profiles.user_id", ondelete="CASCADE"), nullable=False
     )

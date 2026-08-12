@@ -95,6 +95,8 @@ class FoodRole(StrEnum):
 class MealSlotRole(StrEnum):
     MAIN_MEAL = "main_meal"
     SNACK = "snack"
+    FREE_MEAL = "free_meal"
+    POST_WORKOUT = "post_workout"
 
 
 class MealCategory(StrEnum):
@@ -103,6 +105,11 @@ class MealCategory(StrEnum):
     POST_WORKOUT = "post_workout"
     SNACK = "snack"
     DINNER = "dinner"
+
+
+class NutritionProgramSlotKind(StrEnum):
+    CATALOGUE_MEAL = "catalogue_meal"
+    FREE_MEAL = "free_meal"
 
 
 class NutritionDietStyle(StrEnum):
@@ -234,6 +241,7 @@ class NutritionConsumptionSource(StrEnum):
     PHOTO_ESTIMATED_EDITED = "photo_estimated_edited"
     QUICK_APPROXIMATION = "quick_approximation"
     PROFESSIONAL_ENTRY = "professional_entry"
+    FREE_MEAL = "free_meal"
 
 
 class NutritionPlanBudgetStatus(StrEnum):

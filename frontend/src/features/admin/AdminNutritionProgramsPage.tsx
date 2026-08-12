@@ -108,7 +108,7 @@ export function AdminNutritionProgramsPage() {
                   <header>
                     <div>
                       <p className="eyebrow">{t(`admin.nutritionPrograms.dietStyles.${program.diet_style}`)}</p>
-                      <h2>{name}</h2>
+                      <h2>{program.code ? <>{program.code} — </> : null}<span>{name}</span></h2>
                       <p>{english ? program.description_en : program.description_fa}</p>
                     </div>
                     <span className="admin-template-level">{t(`admin.nutritionPrograms.lifecycle.${program.is_active ? "active" : "archived"}`)}</span>
@@ -118,8 +118,11 @@ export function AdminNutritionProgramsPage() {
                       <section className="admin-program-day" key={day.id}>
                         <strong>{t("admin.nutritionPrograms.day", { number: day.day_number })}</strong>
                         <ul>{day.slots.map((slot) => {
+                          if (slot.kind === "free_meal" || slot.meal === null) {
+                            return <li key={slot.id}><span>{t(`admin.meals.categories.${slot.category}`)}</span><b>وعده آزاد</b></li>;
+                          }
                           const mealName = english ? slot.meal.name_en : slot.meal.name_fa;
-                          return <li key={slot.id}><span>{t(`admin.meals.categories.${slot.category}`)}</span><div className="admin-program-meal"><MealThumbnail alt={mealName} className="admin-program-meal__image" fallbackLabel={t("admin.meals.imageFallback", { name: mealName })} imageUrl={slot.meal.image_url} /><b>{slot.meal.meal_code} — {mealName}</b></div></li>;
+                          return <li key={slot.id}><span>{t(`admin.meals.categories.${slot.category}`)}</span><div className="admin-program-meal"><MealThumbnail alt={mealName} className="admin-program-meal__image" fallbackLabel={t("admin.meals.imageFallback", { name: mealName })} imageUrl={slot.meal.image_url} /><b>{slot.meal.code} — {mealName}</b></div></li>;
                         })}</ul>
                       </section>
                     ))}

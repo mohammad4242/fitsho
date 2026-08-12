@@ -38,7 +38,9 @@ from app.nutrition.models import (
     NutritionPlanGeneration,
     NutritionPlanPhysicianReview,
     NutritionProfile,
+    NutritionProgram,
     NutritionSafetyDecision,
+    NutritionStructuredExercise,
     NutritionWeeklyPlan,
     NutritionWeeklyPlanDay,
     NutritionWeeklyPlanFood,
@@ -60,6 +62,9 @@ from app.nutrition.planner_policy import (
     PLANNER_VERSION,
 )
 from app.nutrition.price_overrides import effective_prices
+from app.nutrition.program_adaptation import adapt_program
+from app.nutrition.program_catalogue import list_programs
+from app.nutrition.program_selection import ProgramSelectionContext, select_program
 from app.nutrition.schemas import (
     WeeklyPlanDayResponse,
     WeeklyPlanFoodResponse,
@@ -70,6 +75,7 @@ from app.nutrition.schemas import (
     WeeklyPlanResponse,
 )
 from app.nutrition.service import current_safety_decision
+from app.profile.models import UserProfile
 
 _HARD_EXCLUSION_KINDS = {
     FoodItemKind.NEVER_SUGGEST,
@@ -207,6 +213,53 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
     )
     foods, price_snapshot, food_manifest = _planner_foods(db)
     meal_templates, meal_manifest = _planner_meal_templates(db)
+    selected_program: NutritionProgram | None = None
+    template_schedule: tuple[tuple[tuple[str, str | None, str], ...], ...] | None = None
+    programs = list_programs(db)
+    user_profile = db.get(UserProfile, user_id)
+    structured_exercise = db.get(NutritionStructuredExercise, user_id)
+    if programs and user_profile is not None and user_profile.fitness_goal is not None:
+        selected_program = select_program(
+            programs,
+            ProgramSelectionContext(
+                fitness_goal=user_profile.fitness_goal.value,
+                trains=structured_exercise.trains if structured_exercise else False,
+                exercise_type=(
+                    structured_exercise.exercise_type.value
+                    if structured_exercise and structured_exercise.exercise_type
+                    else None
+                ),
+                plan_style=profile.plan_style.value,
+                budget_style=profile.budget_style.value,
+                cooking_skill=profile.cooking_skill.value,
+                maximum_cooking_time_minutes=profile.maximum_cooking_time_minutes,
+                meal_preparation_preference=profile.meal_preparation_preference.value,
+                preferred_variety=profile.preferred_variety.value,
+            ),
+            user_id,
+        )
+        adapted = adapt_program(
+            selected_program,
+            profile.main_meal_count_bucket,
+            profile.snack_count_bucket,
+        )
+        template_schedule = tuple(
+            tuple(
+                (
+                    "snack"
+                    if slot.role == "snack"
+                    else "free_meal"
+                    if slot.role == "free_meal"
+                    else "post_workout"
+                    if slot.role == "post_workout"
+                    else "main_meal",
+                    str(slot.meal_id) if slot.meal_id is not None else None,
+                    slot.category.value,
+                )
+                for slot in day.slots
+            )
+            for day in adapted.days
+        )
     food_manifest["meals"] = meal_manifest
     minimums, maximums = _daily_limits(estimate.targets)
     weekly_budget = profile.individual_monthly_food_budget_irr * 12 // 52
@@ -237,6 +290,8 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         "meal_distribution_policy_version": "meal-distribution-v1",
         "budget_formula_version": "annualized-monthly-times-12-divided-52-v1",
         "meal_catalogue_template_ids": [item.meal_id for item in meal_templates],
+        "nutrition_program_id": str(selected_program.id) if selected_program else None,
+        "nutrition_program_code": selected_program.code if selected_program else None,
     }
     result = plan_week(
         PlannerInput(
@@ -254,6 +309,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
             disliked_food_ids=disliked_food_ids,
             dietary_pattern=profile.dietary_pattern.value,
             maximum_meal_repetition_per_week=profile.maximum_meal_repetition_per_week,
+            template_schedule=template_schedule,
         ),
         foods,
         meal_templates,
@@ -292,6 +348,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         price_snapshot=price_snapshot,
         food_manifest=food_manifest,
         micro_metadata=micro_metadata,
+        program_id=selected_program.id if selected_program else None,
     )
     try:
         db.commit()
@@ -445,6 +502,7 @@ def _persist_successful_plan(
     price_snapshot: dict[str, object],
     food_manifest: dict[str, object],
     micro_metadata: dict[str, dict[str, object]],
+    program_id: UUID | None,
 ) -> NutritionWeeklyPlan:
     latest_revision = db.scalar(
         select(NutritionWeeklyPlan.revision)
@@ -455,6 +513,7 @@ def _persist_successful_plan(
     start_date = _next_weekday(date.today(), profile.preferred_plan_start_day)
     plan_revision = (latest_revision or 0) + 1
     plan = NutritionWeeklyPlan(
+        program_id=program_id,
         user_id=profile.user_id,
         generation_id=generation.id,
         estimate_id=estimate.id,
@@ -493,7 +552,9 @@ def _persist_successful_plan(
                 nutrient_totals=_json_nutrient_pairs(day.nutrients),
                 meals=[
                     NutritionWeeklyPlanMeal(
-                        catalogue_meal_id=UUID(meal.template_id),
+                        catalogue_meal_id=(
+                            UUID(meal.template_id) if meal.template_id is not None else None
+                        ),
                         catalogue_meal_category=meal.template_category,
                         slot_role=meal.role,
                         slot_index=meal.slot_index,

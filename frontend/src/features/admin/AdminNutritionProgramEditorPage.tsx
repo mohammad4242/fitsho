@@ -23,11 +23,11 @@ import "./admin.css";
 const requiredCategories: MealCategory[] = ["breakfast", "lunch", "snack", "dinner"];
 const allCategories: MealCategory[] = [...requiredCategories, "post_workout"];
 const dietStyles: NutritionDietStyle[] = ["economy", "balanced_iranian", "high_protein_gym", "quick_easy", "premium_varied"];
-type DayForm = { day_number: number; post_workout_enabled: boolean; meals: Record<MealCategory, string> };
+type DayForm = { day_number: number; post_workout_enabled: boolean; free_meal: boolean; meals: Record<MealCategory, string> };
 type ProgramForm = Omit<AdminNutritionProgramWrite, "days"> & { days: DayForm[] };
 
 export function AdminNutritionProgramEditorPage() {
-  const { i18n, t } = useTranslation();
+  const { t } = useTranslation();
   const { programId } = useParams();
   const navigate = useNavigate();
   const [form, setForm] = useState<ProgramForm>(emptyProgram());
@@ -35,7 +35,6 @@ export function AdminNutritionProgramEditorPage() {
   const [state, setState] = useState<"loading" | "ready" | "missing">("loading");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const english = i18n.resolvedLanguage === "en";
 
   useEffect(() => {
     let active = true;
@@ -72,9 +71,10 @@ export function AdminNutritionProgramEditorPage() {
   }
 
   async function save() {
-    const missingRequired = form.days.some((day) => requiredCategories.some((category) => !day.meals[category]) || (day.post_workout_enabled && !day.meals.post_workout));
+    const missingRequired = form.days.some((day) => requiredCategories.some((category) => category !== "lunch" || !day.free_meal ? !day.meals[category] : false) || (day.post_workout_enabled && !day.meals.post_workout));
     if (missingRequired) { setError(t("admin.nutritionProgramEditor.mealRequired")); return; }
     const payload: AdminNutritionProgramWrite = {
+      code: form.code,
       name_fa: form.name_fa,
       name_en: form.name_en,
       description_fa: form.description_fa,
@@ -85,7 +85,7 @@ export function AdminNutritionProgramEditorPage() {
         day_number: day.day_number,
         post_workout_enabled: day.post_workout_enabled,
         slots: [
-          ...requiredCategories.map((category) => ({ category, meal_id: day.meals[category] })),
+          ...requiredCategories.map((category) => category === "lunch" && day.free_meal ? ({ kind: "free_meal" as const, category, meal_id: null }) : ({ category, meal_id: day.meals[category] })),
           ...(day.post_workout_enabled ? [{ category: "post_workout" as const, meal_id: day.meals.post_workout }] : []),
         ],
       })),
@@ -133,9 +133,10 @@ export function AdminNutritionProgramEditorPage() {
                 {form.days.map((day) => (
                   <fieldset className="admin-program-editor-day" aria-label={t("admin.nutritionPrograms.day", { number: day.day_number })} key={day.day_number}>
                     <legend>{t("admin.nutritionPrograms.day", { number: day.day_number })}</legend>
-                    {requiredCategories.map((category) => <MealSelect key={category} category={category} dayNumber={day.day_number} meals={mealOptions[category]} value={day.meals[category]} english={english} onChange={(mealId) => setMeal(day.day_number, category, mealId)} />)}
+                    {requiredCategories.map((category) => category === "lunch" && day.free_meal ? <p key={category}><strong>وعده آزاد</strong></p> : <MealSelect key={category} category={category} dayNumber={day.day_number} meals={mealOptions[category]} value={day.meals[category]} onChange={(mealId) => setMeal(day.day_number, category, mealId)} />)}
+                    {day.day_number === 7 && <label className="admin-program-toggle"><input type="checkbox" checked={day.free_meal} onChange={(event) => patchDay(day.day_number, { free_meal: event.target.checked })} />وعده آزاد</label>}
                     {form.post_workout_enabled && <label className="admin-program-toggle"><input aria-label={t("admin.nutritionProgramEditor.dailyPostWorkoutAria", { number: day.day_number })} checked={day.post_workout_enabled} type="checkbox" onChange={(event) => patchDay(day.day_number, { post_workout_enabled: event.target.checked, meals: event.target.checked ? day.meals : { ...day.meals, post_workout: "" } })} />{t("admin.nutritionProgramEditor.dailyPostWorkout")}</label>}
-                    {form.post_workout_enabled && day.post_workout_enabled && <MealSelect category="post_workout" dayNumber={day.day_number} meals={mealOptions.post_workout} value={day.meals.post_workout} english={english} onChange={(mealId) => setMeal(day.day_number, "post_workout", mealId)} />}
+                    {form.post_workout_enabled && day.post_workout_enabled && <MealSelect category="post_workout" dayNumber={day.day_number} meals={mealOptions.post_workout} value={day.meals.post_workout} onChange={(mealId) => setMeal(day.day_number, "post_workout", mealId)} />}
                   </fieldset>
                 ))}
               </div>
@@ -148,16 +149,16 @@ export function AdminNutritionProgramEditorPage() {
   );
 }
 
-function MealSelect({ category, dayNumber, meals, value, english, onChange }: { category: MealCategory; dayNumber: number; meals: AdminMealCatalogueItem[]; value: string; english: boolean; onChange: (value: string) => void }) {
+function MealSelect({ category, dayNumber, meals, value, onChange }: { category: MealCategory; dayNumber: number; meals: AdminMealCatalogueItem[]; value: string; onChange: (value: string) => void }) {
   const { t } = useTranslation();
   const label = t("admin.nutritionProgramEditor.mealAria", { category: t(`admin.meals.categories.${category}`), number: dayNumber });
-  return <label>{t(`admin.meals.categories.${category}`)}<select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}><option value="">{t("admin.nutritionProgramEditor.chooseMeal")}</option>{meals.map((meal) => <option key={meal.id} value={meal.id}>{english ? meal.name_en : meal.name_fa}</option>)}</select></label>;
+  return <label>{t(`admin.meals.categories.${category}`)}<select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}><option value="">{t("admin.nutritionProgramEditor.chooseMeal")}</option>{meals.map((meal) => <option key={meal.id} value={meal.id}>{meal.code} — {meal.name_fa} · {meal.name_en}</option>)}</select></label>;
 }
 
 function emptyProgram(): ProgramForm {
   return {
-    name_fa: "", name_en: "", description_fa: "", description_en: "", diet_style: "balanced_iranian", post_workout_enabled: false,
-    days: Array.from({ length: 7 }, (_, index) => ({ day_number: index + 1, post_workout_enabled: false, meals: { breakfast: "", lunch: "", snack: "", dinner: "", post_workout: "" } })),
+    code: null, name_fa: "", name_en: "", description_fa: "", description_en: "", diet_style: "balanced_iranian", post_workout_enabled: false,
+    days: Array.from({ length: 7 }, (_, index) => ({ day_number: index + 1, post_workout_enabled: false, free_meal: false, meals: { breakfast: "", lunch: "", snack: "", dinner: "", post_workout: "" } })),
   };
 }
 
@@ -167,12 +168,13 @@ function emptyMealOptions(): Record<MealCategory, AdminMealCatalogueItem[]> {
 
 function formFromProgram(program: AdminNutritionProgram): ProgramForm {
   return {
-    name_fa: program.name_fa, name_en: program.name_en, description_fa: program.description_fa, description_en: program.description_en,
+    code: program.code, name_fa: program.name_fa, name_en: program.name_en, description_fa: program.description_fa, description_en: program.description_en,
     diet_style: program.diet_style, post_workout_enabled: program.post_workout_enabled,
     days: program.days.map((day) => ({
       day_number: day.day_number,
       post_workout_enabled: day.post_workout_enabled,
-      meals: { breakfast: "", lunch: "", snack: "", dinner: "", post_workout: "", ...Object.fromEntries(day.slots.map((slot) => [slot.category, slot.meal.id])) },
+      free_meal: day.slots.some((slot) => slot.kind === "free_meal"),
+      meals: { breakfast: "", lunch: "", snack: "", dinner: "", post_workout: "", ...Object.fromEntries(day.slots.filter((slot) => slot.meal !== null).map((slot) => [slot.category, slot.meal!.id])) },
     })),
   };
 }

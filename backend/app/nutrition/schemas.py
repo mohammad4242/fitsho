@@ -27,6 +27,7 @@ from app.nutrition.enums import (
     NutritionMealFeedbackType,
     NutritionOnboardingStatus,
     NutritionPlanStyle,
+    NutritionProgramSlotKind,
     PhysicianReviewMode,
     PhysicianReviewStatus,
     PreferredVariety,
@@ -497,7 +498,21 @@ class NutritionProgramSlotWrite(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     category: MealCategory
-    meal_id: UUID
+    kind: NutritionProgramSlotKind = NutritionProgramSlotKind.CATALOGUE_MEAL
+    meal_id: UUID | None
+
+    @model_validator(mode="after")
+    def validate_relationship(self) -> "NutritionProgramSlotWrite":
+        if self.kind is NutritionProgramSlotKind.CATALOGUE_MEAL and self.meal_id is None:
+            raise ValueError("Catalogue meal slots require a Meal Catalogue relationship")
+        if self.kind is NutritionProgramSlotKind.FREE_MEAL and self.meal_id is not None:
+            raise ValueError("Free Meal slots cannot reference the Meal Catalogue")
+        if (
+            self.kind is NutritionProgramSlotKind.FREE_MEAL
+            and self.category is not MealCategory.LUNCH
+        ):
+            raise ValueError("Free Meal replaces lunch")
+        return self
 
 
 class NutritionProgramDayWrite(BaseModel):
@@ -529,6 +544,7 @@ class NutritionProgramDayWrite(BaseModel):
 class NutritionProgramWrite(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    code: str | None = Field(default=None, min_length=1, max_length=20, pattern=r"^[A-Z0-9-]+$")
     name_fa: str = Field(min_length=1, max_length=160)
     name_en: str = Field(min_length=1, max_length=160)
     description_fa: str = Field(min_length=1, max_length=1000)
@@ -548,7 +564,7 @@ class NutritionProgramWrite(BaseModel):
 
 class NutritionProgramMealReference(BaseModel):
     id: UUID
-    meal_code: str
+    code: str
     name_fa: str
     name_en: str
     image_url: str | None
@@ -557,8 +573,9 @@ class NutritionProgramMealReference(BaseModel):
 
 class NutritionProgramSlotResponse(BaseModel):
     id: UUID
+    kind: NutritionProgramSlotKind
     category: MealCategory
-    meal: NutritionProgramMealReference
+    meal: NutritionProgramMealReference | None
 
 
 class NutritionProgramDayResponse(BaseModel):
@@ -570,6 +587,7 @@ class NutritionProgramDayResponse(BaseModel):
 
 class NutritionProgramResponse(BaseModel):
     id: UUID
+    code: str
     slug: str
     name_fa: str
     name_en: str
@@ -791,6 +809,14 @@ class QuickApproximationInput(BaseModel):
     display_name: str = Field(min_length=1, max_length=160)
     calories: float = Field(gt=0, le=10000)
     protein_g: float | None = Field(default=None, ge=0, le=1000)
+
+
+class FreeMealTrackingInput(BaseModel):
+    entry_date: date
+    calories: float = Field(gt=0, le=10000)
+    protein_g: float = Field(ge=0, le=1000)
+    carbohydrate_g: float = Field(ge=0, le=2000)
+    fat_g: float = Field(ge=0, le=1000)
 
 
 class ConsumptionEntryEditInput(BaseModel):
