@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
@@ -22,25 +22,120 @@ def _register_admin(client: TestClient, db: Session) -> None:
     db.commit()
 
 
-def test_seed_creates_one_existing_food_linked_meal_for_every_category(db: Session) -> None:
+def _add_required_imported_foods(db: Session) -> None:
+    from app.nutrition.enums import FoodMeasurementBasis, FoodVerificationStatus
+    from app.nutrition.models import NutritionCatalogueFood
+
+    for slug, name_fa, name_en, category in (
+        ("creamy-peanut-butter", "کره بادام‌زمینی", "Creamy peanut butter", "nuts_seeds"),
+        ("wheat-flour", "آرد گندم", "Wheat flour", "grains"),
+        ("green-beans", "لوبیا سبز", "Green beans", "vegetable"),
+        ("tomato-paste", "رب گوجه‌فرنگی", "Tomato paste", "vegetable"),
+    ):
+        if db.scalar(select(NutritionCatalogueFood.id).where(NutritionCatalogueFood.slug == slug)):
+            continue
+        db.add(
+            NutritionCatalogueFood(
+                slug=slug,
+                name_fa=name_fa,
+                name_en=name_en,
+                verification_status=FoodVerificationStatus.VERIFIED,
+                source_name="USDA FoodData Central Foundation Foods",
+                source_reference="https://fdc.nal.usda.gov/",
+                category=category,
+                measurement_basis=FoodMeasurementBasis.AS_PURCHASED,
+                canonical_quantity=Decimal("100"),
+                canonical_unit="g",
+                edible_portion=Decimal("1"),
+                data_version="foundation-test-fixture",
+                dietary_patterns=["omnivore", "vegetarian", "vegan"],
+            )
+        )
+    db.commit()
+
+
+def test_seed_creates_exact_complete_bounded_meal_catalogue_idempotently(db: Session) -> None:
+    from app.nutrition.enums import FoodVerificationStatus, MealCategory
     from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
     from app.nutrition.meal_catalogue import seed_meal_catalogue
+    from app.nutrition.models import NutritionCatalogueMeal
 
     seed_base_iranian_food_catalogue(db)
-    meals = seed_meal_catalogue(db)
+    _add_required_imported_foods(db)
+    custom = NutritionCatalogueMeal(
+        code="CUSTOM01",
+        name_fa="وعده سفارشی حفظ‌شونده",
+        name_en="Preserved custom meal",
+        category=MealCategory.SNACK,
+        verification_status=FoodVerificationStatus.DRAFT,
+    )
+    db.add(custom)
+    db.commit()
+    first = seed_meal_catalogue(db)
+    second = seed_meal_catalogue(db)
 
-    assert {meal.category.value for meal in meals} == {
-        "breakfast",
-        "lunch",
-        "post_workout",
-        "snack",
-        "dinner",
+    expected_codes = {
+        *(f"BF{number:02}" for number in range(1, 9)),
+        *(f"LU{number:02}" for number in range(1, 14)),
+        *(f"DN{number:02}" for number in range(1, 9)),
+        *(f"SN{number:02}" for number in range(1, 9)),
+        "PW01",
     }
-    assert all(meal.items for meal in meals)
-    assert all(item.food_id is not None for meal in meals for item in meal.items)
-    peanuts = next(meal for meal in meals if meal.category.value == "snack")
+    seeded = [meal for meal in second if meal.code in expected_codes]
+
+    assert len(first) == 39
+    assert len(second) == 39
+    assert len(seeded) == 38
+    assert {meal.code for meal in seeded} == expected_codes
+    assert db.scalar(select(func.count()).select_from(NutritionCatalogueMeal)) == 39
+    assert {
+        category: sum(meal.category.value == category for meal in seeded)
+        for category in ("breakfast", "lunch", "dinner", "snack", "post_workout")
+    } == {
+        "breakfast": 8,
+        "lunch": 13,
+        "dinner": 8,
+        "snack": 8,
+        "post_workout": 1,
+    }
+    assert all(meal.verification_status.value == "verified" for meal in seeded)
+    assert all(meal.items for meal in seeded)
+    assert all(item.food_id is not None for meal in seeded for item in meal.items)
+    assert all(item.functional_role is not None for meal in seeded for item in meal.items)
+    assert all(
+        item.min_grams <= item.reference_grams <= item.max_grams
+        for meal in seeded
+        for item in meal.items
+    )
+    peanuts = next(meal for meal in seeded if meal.code == "SN01")
     assert peanuts.items[0].reference_grams == Decimal("50")
     assert peanuts.items[0].min_grams <= Decimal("50") <= peanuts.items[0].max_grams
+    post_workout = next(meal for meal in seeded if meal.code == "PW01")
+    assert {item.food.slug for item in post_workout.items} == {"egg", "potato"}
+    assert all(
+        item.food.slug == "sangak-bread"
+        for meal in seeded
+        for item in meal.items
+        if item.food.category == "bread"
+    )
+    assert {
+        meal.code for meal in seeded if any(item.food.category == "bread" for item in meal.items)
+    } == {
+        "BF01",
+        "BF02",
+        "BF03",
+        "BF04",
+        "BF05",
+        "BF06",
+        "BF07",
+        "LU11",
+        "DN02",
+        "DN05",
+        "DN06",
+        "DN07",
+        "SN02",
+        "SN07",
+    }
 
 
 def test_admin_lists_and_updates_meals_with_bounded_ingredients(
@@ -52,6 +147,7 @@ def test_admin_lists_and_updates_meals_with_bounded_ingredients(
     from app.nutrition.models import NutritionCatalogueFood
 
     seed_base_iranian_food_catalogue(db)
+    _add_required_imported_foods(db)
     seed_meal_catalogue(db)
     _register_admin(client, db)
     egg = db.scalar(select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "egg"))
@@ -70,9 +166,9 @@ def test_admin_lists_and_updates_meals_with_bounded_ingredients(
         "snack",
         "dinner",
     ]
-    assert len(listed.json()["items"]) == 1
-    assert listed.json()["items"][0]["code"] == "BF02"
-    meal_id = listed.json()["items"][0]["id"]
+    assert len(listed.json()["items"]) == 8
+    breakfast = next(item for item in listed.json()["items"] if item["code"] == "BF02")
+    meal_id = breakfast["id"]
 
     updated = client.put(
         f"/api/v1/nutrition/admin/meals/{meal_id}",
@@ -160,6 +256,7 @@ def test_admin_rejects_duplicate_or_changed_meal_codes(
     from app.nutrition.models import NutritionCatalogueFood
 
     seed_base_iranian_food_catalogue(db)
+    _add_required_imported_foods(db)
     seed_meal_catalogue(db)
     _register_admin(client, db)
     egg = db.scalar(select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "egg"))

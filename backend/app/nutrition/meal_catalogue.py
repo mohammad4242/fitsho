@@ -6,8 +6,9 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.nutrition.enums import FoodVerificationStatus, MealCategory, MealIngredientRole
+from app.nutrition.enums import FoodVerificationStatus, MealCategory
 from app.nutrition.food_catalogue import FoodCompositionValue, calculate_meal_totals
+from app.nutrition.meal_catalogue_seed_data import SEED_MEALS
 from app.nutrition.models import (
     NutritionCatalogueFood,
     NutritionCatalogueMeal,
@@ -20,63 +21,6 @@ from app.nutrition.schemas import (
 )
 
 CATEGORY_ORDER = tuple(MealCategory)
-
-SEED_MEALS: tuple[dict[str, object], ...] = (
-    {
-        "code": "BF02",
-        "category": MealCategory.BREAKFAST,
-        "name_fa": "تخم‌مرغ نیمرو با نان و گوجه خردشده",
-        "name_en": "Fried eggs with bread and chopped tomato",
-        "items": (
-            ("egg", "100", "50", "200", True, MealIngredientRole.PROTEIN),
-            ("sangak-bread", "60", "30", "120", True, MealIngredientRole.CARBOHYDRATE),
-            ("tomato", "80", "30", "150", False, MealIngredientRole.MICRONUTRIENT_SOURCE),
-            ("vegetable-oil", "5", "2", "10", False, MealIngredientRole.FAT),
-        ),
-    },
-    {
-        "code": "LU01",
-        "category": MealCategory.LUNCH,
-        "name_fa": "گوشت گوسفند و برنج با سالاد شیرازی",
-        "name_en": "Lamb and rice with Shirazi salad",
-        "items": (
-            ("lamb", "150", "80", "220", True, MealIngredientRole.PROTEIN),
-            ("basmati-rice", "80", "50", "130", True, MealIngredientRole.CARBOHYDRATE),
-            ("tomato", "60", "30", "120", True, MealIngredientRole.MICRONUTRIENT_SOURCE),
-            ("cucumber", "60", "30", "120", True, MealIngredientRole.FIBRE),
-            ("onion", "20", "10", "40", False, MealIngredientRole.MICRONUTRIENT_SOURCE),
-        ),
-    },
-    {
-        "code": "PW01",
-        "category": MealCategory.POST_WORKOUT,
-        "name_fa": "تخم‌مرغ آب‌پز و سیب‌زمینی تنوری",
-        "name_en": "Boiled eggs with baked potato",
-        "items": (
-            ("egg", "100", "50", "200", True, MealIngredientRole.PROTEIN),
-            ("potato", "250", "150", "400", True, MealIngredientRole.CARBOHYDRATE),
-        ),
-    },
-    {
-        "code": "SN01",
-        "category": MealCategory.SNACK,
-        "name_fa": "۵۰ گرم بادام‌زمینی",
-        "name_en": "50 g peanuts",
-        "items": (("peanuts", "50", "20", "80", True, MealIngredientRole.FAT),),
-    },
-    {
-        "code": "DN01",
-        "category": MealCategory.DINNER,
-        "name_fa": "سینه مرغ و برنج با سبزیجات",
-        "name_en": "Chicken breast and rice with vegetables",
-        "items": (
-            ("chicken-breast", "160", "100", "250", True, MealIngredientRole.PROTEIN),
-            ("basmati-rice", "80", "50", "130", True, MealIngredientRole.CARBOHYDRATE),
-            ("broccoli", "75", "30", "150", False, MealIngredientRole.FIBRE),
-            ("carrot", "75", "30", "150", False, MealIngredientRole.MICRONUTRIENT_SOURCE),
-        ),
-    },
-)
 
 
 def list_catalogue_meals(
@@ -210,15 +154,23 @@ def meal_response(meal: NutritionCatalogueMeal) -> CatalogueMealResponse:
 
 def seed_meal_catalogue(db: Session, *, commit: bool = True) -> list[NutritionCatalogueMeal]:
     foods = {food.slug: food for food in db.scalars(select(NutritionCatalogueFood))}
+    seed_codes = [str(seed["code"]) for seed in SEED_MEALS]
+    existing_by_code = {
+        meal.code: meal
+        for meal in db.scalars(
+            select(NutritionCatalogueMeal).where(NutritionCatalogueMeal.code.in_(seed_codes))
+        )
+    }
     seeded: list[NutritionCatalogueMeal] = []
     for seed in SEED_MEALS:
         category = seed["category"]
         assert isinstance(category, MealCategory)
         code = str(seed["code"])
-        meal_id = uuid5(NAMESPACE_URL, f"fitsho:nutrition:meal:{category.value}:initial")
-        meal = db.get(NutritionCatalogueMeal, meal_id)
+        meal = existing_by_code.get(code)
         if meal is None:
-            meal = NutritionCatalogueMeal(id=meal_id)
+            meal = NutritionCatalogueMeal(
+                id=uuid5(NAMESPACE_URL, f"fitsho:nutrition:meal:{code}"), code=code
+            )
             db.add(meal)
         else:
             meal.items.clear()
@@ -242,7 +194,7 @@ def seed_meal_catalogue(db: Session, *, commit: bool = True) -> list[NutritionCa
         )
         meal.items = [
             NutritionCatalogueMealItem(
-                id=uuid5(NAMESPACE_URL, f"fitsho:nutrition:meal:{category.value}:{slug}"),
+                id=uuid5(NAMESPACE_URL, f"fitsho:nutrition:meal:{code}:{slug}"),
                 food_id=foods[slug].id,
                 reference_grams=Decimal(reference),
                 min_grams=Decimal(minimum),
