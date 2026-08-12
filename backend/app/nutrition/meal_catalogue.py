@@ -23,6 +23,7 @@ CATEGORY_ORDER = tuple(MealCategory)
 
 SEED_MEALS: tuple[dict[str, object], ...] = (
     {
+        "code": "BF02",
         "category": MealCategory.BREAKFAST,
         "name_fa": "تخم‌مرغ نیمرو با نان و گوجه خردشده",
         "name_en": "Fried eggs with bread and chopped tomato",
@@ -34,6 +35,7 @@ SEED_MEALS: tuple[dict[str, object], ...] = (
         ),
     },
     {
+        "code": "LU01",
         "category": MealCategory.LUNCH,
         "name_fa": "گوشت گوسفند و برنج با سالاد شیرازی",
         "name_en": "Lamb and rice with Shirazi salad",
@@ -46,6 +48,7 @@ SEED_MEALS: tuple[dict[str, object], ...] = (
         ),
     },
     {
+        "code": "PW01",
         "category": MealCategory.POST_WORKOUT,
         "name_fa": "تخم‌مرغ آب‌پز و سیب‌زمینی تنوری",
         "name_en": "Boiled eggs with baked potato",
@@ -55,12 +58,14 @@ SEED_MEALS: tuple[dict[str, object], ...] = (
         ),
     },
     {
+        "code": "SN01",
         "category": MealCategory.SNACK,
         "name_fa": "۵۰ گرم بادام‌زمینی",
         "name_en": "50 g peanuts",
         "items": (("peanuts", "50", "20", "80", True, MealIngredientRole.FAT),),
     },
     {
+        "code": "DN01",
         "category": MealCategory.DINNER,
         "name_fa": "سینه مرغ و برنج با سبزیجات",
         "name_en": "Chicken breast and rice with vegetables",
@@ -84,7 +89,7 @@ def list_catalogue_meals(
             .selectinload(NutritionCatalogueMealItem.food)
             .selectinload(NutritionCatalogueFood.compositions)
         )
-        .order_by(NutritionCatalogueMeal.category, NutritionCatalogueMeal.name_en)
+        .order_by(NutritionCatalogueMeal.category, NutritionCatalogueMeal.code)
     )
     if category is not None:
         query = query.where(NutritionCatalogueMeal.category == category)
@@ -104,8 +109,11 @@ def get_catalogue_meal(db: Session, meal_id: UUID) -> NutritionCatalogueMeal | N
 
 
 def create_catalogue_meal(db: Session, payload: CatalogueMealWrite) -> NutritionCatalogueMeal:
-    meal = NutritionCatalogueMeal()
-    db.add(meal)
+    if db.scalar(
+        select(NutritionCatalogueMeal.id).where(NutritionCatalogueMeal.code == payload.code)
+    ):
+        raise ValueError("Meal code already exists")
+    meal = NutritionCatalogueMeal(code=payload.code)
     return _save_catalogue_meal(db, meal, payload)
 
 
@@ -115,6 +123,8 @@ def update_catalogue_meal(
     meal = db.get(NutritionCatalogueMeal, meal_id)
     if meal is None:
         return None
+    if meal.code != payload.code:
+        raise ValueError("Meal code cannot be changed")
     meal.items.clear()
     db.flush()
     return _save_catalogue_meal(db, meal, payload)
@@ -152,6 +162,7 @@ def _save_catalogue_meal(
         )
         for item in payload.items
     ]
+    db.add(meal)
     db.commit()
     saved = get_catalogue_meal(db, meal.id)
     if saved is None:
@@ -174,6 +185,7 @@ def meal_response(meal: NutritionCatalogueMeal) -> CatalogueMealResponse:
     )
     return CatalogueMealResponse(
         id=meal.id,
+        code=meal.code,
         name_fa=meal.name_fa,
         name_en=meal.name_en,
         category=meal.category,
@@ -202,6 +214,7 @@ def seed_meal_catalogue(db: Session, *, commit: bool = True) -> list[NutritionCa
     for seed in SEED_MEALS:
         category = seed["category"]
         assert isinstance(category, MealCategory)
+        code = str(seed["code"])
         meal_id = uuid5(NAMESPACE_URL, f"fitsho:nutrition:meal:{category.value}:initial")
         meal = db.get(NutritionCatalogueMeal, meal_id)
         if meal is None:
@@ -217,6 +230,7 @@ def seed_meal_catalogue(db: Session, *, commit: bool = True) -> list[NutritionCa
             raise ValueError(f"Meal seed foods are missing: {', '.join(missing)}")
         meal.name_fa = str(seed["name_fa"])
         meal.name_en = str(seed["name_en"])
+        meal.code = code
         meal.category = category
         meal.verification_status = (
             FoodVerificationStatus.VERIFIED

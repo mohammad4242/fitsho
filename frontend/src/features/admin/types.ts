@@ -397,6 +397,7 @@ export type AdminMealIngredient = {
 
 export type AdminMealCatalogueItem = {
   id: string;
+  code: string;
   name_fa: string;
   name_en: string;
   category: MealCategory;
@@ -421,6 +422,7 @@ export type AdminMealIngredientWrite = Pick<
 >;
 
 export type AdminMealWrite = {
+  code: string;
   name_fa: string;
   name_en: string;
   category: MealCategory;

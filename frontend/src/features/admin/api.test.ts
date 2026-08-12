@@ -146,6 +146,7 @@ it("lists admin exercises with inactive filter support", async () => {
 it("lists and creates nutrition meal catalogue templates", async () => {
   const page = { items: [], categories: ["breakfast", "lunch", "post_workout", "snack", "dinner"] };
   const input = {
+    code: "SN99",
     name_fa: "میان‌وعده",
     name_en: "Snack",
     category: "snack" as const,

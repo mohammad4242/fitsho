@@ -43,6 +43,7 @@ it("adds a food-catalogue ingredient and captures bounded planner inputs", async
   );
 
   expect(await screen.findByRole("heading", { name: "افزودن وعده غذایی" })).toBeInTheDocument();
+  expect(screen.getByLabelText("کد وعده")).toBeEnabled();
   expect(screen.getByLabelText("دسته وعده")).toHaveValue("post_workout");
   await user.click(screen.getByRole("button", { name: "افزودن ماده غذایی" }));
   await user.type(screen.getByPlaceholderText("جست‌وجو در کاتالوگ مواد غذایی"), "تخم");
@@ -54,4 +55,31 @@ it("adds a food-catalogue ingredient and captures bounded planner inputs", async
   expect(screen.getByLabelText("حداکثر گرم تخم‌مرغ")).toHaveValue(200);
   expect(screen.getByLabelText("نقش تخم‌مرغ")).toHaveValue("protein");
   expect(screen.getByLabelText("تخم‌مرغ الزامی است")).toBeChecked();
+});
+
+it("shows an existing meal code as immutable while editing", async () => {
+  adminApi.getAdminMeal.mockResolvedValue({
+    id: "meal-1",
+    code: "BF02",
+    name_fa: "نیمرو با نان",
+    name_en: "Fried eggs with bread",
+    category: "breakfast",
+    verification_status: "verified",
+    totals: {},
+    items: [],
+  });
+  render(
+    <MemoryRouter initialEntries={["/admin/nutrition-meals/meal-1/edit"]}>
+      <Routes>
+        <Route
+          path="/admin/nutrition-meals/:mealId/edit"
+          element={<AdminMealCatalogueEditorPage />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  const code = await screen.findByLabelText("کد وعده");
+  expect(code).toHaveValue("BF02");
+  expect(code).toBeDisabled();
 });

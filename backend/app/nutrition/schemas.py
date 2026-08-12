@@ -445,6 +445,7 @@ class CatalogueMealItemInput(BaseModel):
 
 
 class CatalogueMealWrite(BaseModel):
+    code: str = Field(min_length=2, max_length=20, pattern=r"^[A-Z][A-Z0-9-]*$")
     name_fa: str = Field(min_length=1, max_length=160)
     name_en: str = Field(min_length=1, max_length=160)
     category: MealCategory
@@ -473,6 +474,7 @@ class CatalogueMealItemResponse(BaseModel):
 
 class CatalogueMealResponse(BaseModel):
     id: UUID
+    code: str
     name_fa: str
     name_en: str
     category: MealCategory

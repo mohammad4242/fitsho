@@ -74,7 +74,7 @@ export function AdminMealCataloguePage() {
               <article className="admin-template-card admin-meal-card" key={meal.id}>
                 <header>
                   <div>
-                    <p className="eyebrow">{t(`admin.meals.categories.${meal.category}`)}</p>
+                    <p className="eyebrow">{meal.code} · {t(`admin.meals.categories.${meal.category}`)}</p>
                     <h2>{english ? meal.name_en : meal.name_fa}</h2>
                   </div>
                   <span className={`admin-meal-status admin-meal-status--${meal.verification_status}`}>

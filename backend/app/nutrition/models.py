@@ -752,8 +752,10 @@ class NutritionFoodComposition(Base):
 
 class NutritionCatalogueMeal(Base):
     __tablename__ = "nutrition_catalogue_meals"
+    __table_args__ = (UniqueConstraint("code", name="uq_nutrition_catalogue_meals_code"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    code: Mapped[str] = mapped_column(String(20), nullable=False)
     name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
     name_en: Mapped[str] = mapped_column(String(160), nullable=False)
     category: Mapped[MealCategory] = mapped_column(
@@ -843,9 +845,7 @@ class NutritionProgramDay(Base):
     __tablename__ = "nutrition_program_days"
     __table_args__ = (
         UniqueConstraint("program_id", "day_number", name="uq_nutrition_program_days_number"),
-        CheckConstraint(
-            "day_number BETWEEN 1 AND 7", name="ck_nutrition_program_days_number"
-        ),
+        CheckConstraint("day_number BETWEEN 1 AND 7", name="ck_nutrition_program_days_number"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)

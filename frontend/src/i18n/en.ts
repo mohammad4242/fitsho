@@ -381,6 +381,7 @@ const en = {
         loading: "Loading meal…",
         missing: "This meal was not found.",
         identity: "Meal details",
+        code: "Meal code",
         nameFa: "Persian meal name",
         nameEn: "English meal name",
         category: "Meal category",

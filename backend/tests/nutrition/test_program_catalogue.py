@@ -29,6 +29,7 @@ def _register(client: TestClient, db: Session, email: str, *, admin: bool = Fals
 def _meal_library(db: Session) -> dict[str, UUID]:
     meals = {
         category.value: NutritionCatalogueMeal(
+            code=f"TST-{category.value.upper()}",
             name_fa=f"وعده {category.value}",
             name_en=f"Verified {category.value}",
             category=category,

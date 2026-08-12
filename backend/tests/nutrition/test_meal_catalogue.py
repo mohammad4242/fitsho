@@ -71,12 +71,14 @@ def test_admin_lists_and_updates_meals_with_bounded_ingredients(
         "dinner",
     ]
     assert len(listed.json()["items"]) == 1
+    assert listed.json()["items"][0]["code"] == "BF02"
     meal_id = listed.json()["items"][0]["id"]
 
     updated = client.put(
         f"/api/v1/nutrition/admin/meals/{meal_id}",
         headers=ORIGIN,
         json={
+            "code": "BF02",
             "name_fa": "املت تخم‌مرغ و گوجه",
             "name_en": "Egg and tomato breakfast",
             "category": "breakfast",
@@ -128,6 +130,7 @@ def test_admin_rejects_verified_meal_with_draft_food_or_invalid_bounds(
         "/api/v1/nutrition/admin/meals",
         headers=ORIGIN,
         json={
+            "code": "BF99",
             "name_fa": "صبحانه نامعتبر",
             "name_en": "Invalid breakfast",
             "category": "breakfast",
@@ -146,6 +149,51 @@ def test_admin_rejects_verified_meal_with_draft_food_or_invalid_bounds(
     )
 
     assert response.status_code == 422
+
+
+def test_admin_rejects_duplicate_or_changed_meal_codes(
+    client: TestClient,
+    db: Session,
+) -> None:
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.meal_catalogue import seed_meal_catalogue
+    from app.nutrition.models import NutritionCatalogueFood
+
+    seed_base_iranian_food_catalogue(db)
+    seed_meal_catalogue(db)
+    _register_admin(client, db)
+    egg = db.scalar(select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "egg"))
+    assert egg is not None
+    payload = {
+        "code": "CUS01",
+        "name_fa": "وعده سفارشی",
+        "name_en": "Custom meal",
+        "category": "snack",
+        "verification_status": "verified",
+        "items": [
+            {
+                "food_id": str(egg.id),
+                "reference_grams": 50,
+                "min_grams": 50,
+                "max_grams": 100,
+                "is_required": True,
+                "functional_role": "protein",
+            }
+        ],
+    }
+
+    created = client.post("/api/v1/nutrition/admin/meals", headers=ORIGIN, json=payload)
+
+    assert created.status_code == 201, created.json()
+    assert created.json()["code"] == "CUS01"
+    duplicate = client.post("/api/v1/nutrition/admin/meals", headers=ORIGIN, json=payload)
+    assert duplicate.status_code == 422
+    changed = client.put(
+        f"/api/v1/nutrition/admin/meals/{created.json()['id']}",
+        headers=ORIGIN,
+        json={**payload, "code": "CUS02"},
+    )
+    assert changed.status_code == 422
 
 
 def test_meal_catalogue_requires_admin_access(client: TestClient) -> None:
