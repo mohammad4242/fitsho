@@ -105,6 +105,11 @@ class MealCategory(StrEnum):
     DINNER = "dinner"
 
 
+class NutritionProgramSlotKind(StrEnum):
+    CATALOGUE_MEAL = "catalogue_meal"
+    FREE_MEAL = "free_meal"
+
+
 class NutritionDietStyle(StrEnum):
     ECONOMY = "economy"
     BALANCED_IRANIAN = "balanced_iranian"

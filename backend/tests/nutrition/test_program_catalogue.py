@@ -56,9 +56,7 @@ def _program_payload(
             for category in ("breakfast", "lunch", "snack", "dinner")
         ]
         if daily_post_workout:
-            slots.append(
-                {"category": "post_workout", "meal_id": str(meals["post_workout"])}
-            )
+            slots.append({"category": "post_workout", "meal_id": str(meals["post_workout"])})
         days.append(
             {
                 "day_number": day_number,
@@ -67,6 +65,7 @@ def _program_payload(
             }
         )
     return {
+        "code": f"{diet_style.upper().replace('_', '-')[:8]}-TST",
         "name_fa": "برنامه هفتگی ایرانی",
         "name_en": "Iranian weekly structure",
         "description_fa": "ساختار هفت‌روزه بدون تعیین مقدار.",
@@ -75,6 +74,55 @@ def _program_payload(
         "post_workout_enabled": post_workout_enabled,
         "days": days,
     }
+
+
+def test_admin_stores_friday_free_meal_without_catalogue_uuid(
+    client: TestClient,
+    db: Session,
+) -> None:
+    meals = _meal_library(db)
+    _register(client, db, "nutrition-program-free-meal@example.com", admin=True)
+    payload = _program_payload(meals, post_workout_enabled=False)
+    friday = payload["days"][6]  # type: ignore[index]
+    friday["slots"][1] = {"kind": "free_meal", "category": "lunch", "meal_id": None}  # type: ignore[index]
+
+    response = client.post(PROGRAMS_PATH, headers=ORIGIN, json=payload)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["code"] == "BALANCED-TST"
+    free_slot = body["days"][6]["slots"][1]
+    assert free_slot == {
+        "id": free_slot["id"],
+        "kind": "free_meal",
+        "category": "lunch",
+        "meal": None,
+    }
+    assert (
+        db.scalar(select(NutritionCatalogueMeal).where(NutritionCatalogueMeal.code == "FREE_MEAL"))
+        is None
+    )
+
+
+def test_admin_rejects_invalid_free_meal_relationships(client: TestClient, db: Session) -> None:
+    meals = _meal_library(db)
+    _register(client, db, "nutrition-program-free-validation@example.com", admin=True)
+    payload = _program_payload(meals, post_workout_enabled=False)
+    payload["days"][6]["slots"][1] = {  # type: ignore[index]
+        "kind": "free_meal",
+        "category": "lunch",
+        "meal_id": str(meals["lunch"]),
+    }
+
+    assert client.post(PROGRAMS_PATH, headers=ORIGIN, json=payload).status_code == 422
+
+    payload = _program_payload(meals, post_workout_enabled=False)
+    payload["days"][0]["slots"][1] = {  # type: ignore[index]
+        "kind": "catalogue_meal",
+        "category": "lunch",
+        "meal_id": None,
+    }
+    assert client.post(PROGRAMS_PATH, headers=ORIGIN, json=payload).status_code == 422
 
 
 def test_program_catalogue_requires_admin(client: TestClient, db: Session) -> None:
