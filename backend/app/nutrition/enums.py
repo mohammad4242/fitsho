@@ -241,6 +241,7 @@ class NutritionConsumptionSource(StrEnum):
     PHOTO_ESTIMATED_EDITED = "photo_estimated_edited"
     QUICK_APPROXIMATION = "quick_approximation"
     PROFESSIONAL_ENTRY = "professional_entry"
+    FREE_MEAL = "free_meal"
 
 
 class NutritionPlanBudgetStatus(StrEnum):

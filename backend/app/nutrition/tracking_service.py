@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.nutrition.enums import (
     EstimateConfidence,
     FoodItemKind,
+    MealSlotRole,
     NutritionConsumptionSource,
     NutritionDailyCheckInStatus,
     NutritionPlanLifecycleStatus,
@@ -222,6 +223,58 @@ def save_quick_approximation(
     return _entry_response(entry)
 
 
+def save_free_meal(
+    db: Session,
+    user_id: UUID,
+    meal_id: UUID,
+    entry_date: date,
+    calories: Decimal,
+    protein: Decimal,
+    carbohydrate: Decimal,
+    fat: Decimal,
+) -> dict[str, object]:
+    plan = _active_plan_for_date(db, user_id, entry_date)
+    if plan is None:
+        raise TrackingError("ACTIVE_PLAN_REQUIRED")
+    day = next((candidate for candidate in plan.days if candidate.plan_date == entry_date), None)
+    meal = (
+        next((candidate for candidate in day.meals if candidate.id == meal_id), None)
+        if day is not None
+        else None
+    )
+    if meal is None or meal.slot_role is not MealSlotRole.FREE_MEAL:
+        raise TrackingError("ACTIVE_FREE_MEAL_NOT_FOUND")
+    entry = db.scalar(
+        select(NutritionConsumptionEntry).where(
+            NutritionConsumptionEntry.user_id == user_id,
+            NutritionConsumptionEntry.entry_date == entry_date,
+            NutritionConsumptionEntry.planned_meal_id == meal_id,
+            NutritionConsumptionEntry.source == NutritionConsumptionSource.FREE_MEAL,
+        )
+    )
+    if entry is None:
+        entry = NutritionConsumptionEntry(
+            user_id=user_id,
+            entry_date=entry_date,
+            plan_revision_id=plan.id,
+            planned_meal_id=meal.id,
+            display_name="وعده آزاد",
+            source=NutritionConsumptionSource.FREE_MEAL,
+            confidence=EstimateConfidence.LOW,
+            user_confirmed=True,
+            warning_codes=["USER_REPORTED_FREE_MEAL"],
+        )
+        db.add(entry)
+    entry.nutrients = {
+        "energy_kcal": str(calories),
+        "protein_g": str(protein),
+        "carbohydrate_g": str(carbohydrate),
+        "total_fat_g": str(fat),
+    }
+    db.commit()
+    return daily_summary(db, user_id, entry_date)
+
+
 def daily_summary(db: Session, user_id: UUID, entry_date: date) -> dict[str, object]:
     check_in = db.scalar(
         select(NutritionDailyCheckIn).where(
@@ -295,8 +348,7 @@ def edit_entry(
             factor = grams / Decimal("100")
             entry.quantity_grams = grams
             entry.nutrients = {
-                row.nutrient_code: str(row.value_per_100g * factor)
-                for row in food.compositions
+                row.nutrient_code: str(row.value_per_100g * factor) for row in food.compositions
             }
             entry.warning_codes = actual_intake_warnings(db, user_id, food)
     elif entry.source is NutritionConsumptionSource.QUICK_APPROXIMATION:
@@ -364,10 +416,14 @@ def adjust_planned_meal(
         raise TrackingError("ACTIVE_PLAN_REQUIRED")
     day_index = (entry_date - plan.start_date).days % 7
     day = next((candidate for candidate in plan.days if candidate.day_index == day_index), None)
-    meal = next(
-        (candidate for candidate in day.meals if candidate.id == meal_id),
-        None,
-    ) if day is not None else None
+    meal = (
+        next(
+            (candidate for candidate in day.meals if candidate.id == meal_id),
+            None,
+        )
+        if day is not None
+        else None
+    )
     if meal is None:
         raise TrackingError("ACTIVE_PLAN_MEAL_NOT_FOUND")
     existing = db.scalar(
@@ -398,8 +454,7 @@ def adjust_planned_meal(
         "confidence": EstimateConfidence.HIGH,
         "user_confirmed": True,
         "nutrients": {
-            code: str(Decimal(str(value)) * ratio)
-            for code, value in meal.nutrient_totals.items()
+            code: str(Decimal(str(value)) * ratio) for code, value in meal.nutrient_totals.items()
         },
         "warning_codes": [],
     }

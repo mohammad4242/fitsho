@@ -90,6 +90,7 @@ from app.nutrition.food_photo_service import (
     FoodPhotoError,
     authorize_photo_access,
     confirm_photo,
+    confirm_photo_macro_preview,
     correct_photo_item,
     delete_photo,
     estimate_photo,
@@ -174,6 +175,7 @@ from app.nutrition.schemas import (
     FoodPhotoItemCorrectionInput,
     FoodPriceOverrideInput,
     FoodPriceOverrideResponse,
+    FreeMealTrackingInput,
     MealFeedbackInput,
     MealLockInput,
     NutritionEstimateResponse,
@@ -247,6 +249,7 @@ from app.nutrition.tracking_service import (
     edit_entry,
     history,
     recent_foods,
+    save_free_meal,
     save_quick_approximation,
     submit_check_in,
 )
@@ -1331,6 +1334,31 @@ def create_quick_consumption(
     )
 
 
+@router.put(
+    "/tracking/free-meals/{meal_id}",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_free_meal_consumption(
+    meal_id: UUID,
+    payload: FreeMealTrackingInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, object]:
+    try:
+        return save_free_meal(
+            db,
+            user.id,
+            meal_id,
+            payload.entry_date,
+            Decimal(str(payload.calories)),
+            Decimal(str(payload.protein_g)),
+            Decimal(str(payload.carbohydrate_g)),
+            Decimal(str(payload.fat_g)),
+        )
+    except TrackingError as error:
+        raise _tracking_error(error) from None
+
+
 @router.get("/tracking/days/{entry_date}")
 def read_daily_tracking(
     entry_date: date, db: DatabaseSession, user: CurrentUser
@@ -1515,6 +1543,21 @@ def confirm_food_photo_estimate(
 ) -> list[dict[str, object]]:
     try:
         return confirm_photo(db, user.id, estimate_id, payload.entry_date)
+    except FoodPhotoError as error:
+        raise _food_photo_error(error) from None
+
+
+@router.post(
+    "/tracking/photo-estimates/{estimate_id}/free-meal-preview",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def confirm_free_meal_photo_preview(
+    estimate_id: UUID,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, float]:
+    try:
+        return confirm_photo_macro_preview(db, user.id, estimate_id)
     except FoodPhotoError as error:
         raise _food_photo_error(error) from None
 

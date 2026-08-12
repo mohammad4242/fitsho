@@ -800,6 +800,14 @@ class QuickApproximationInput(BaseModel):
     protein_g: float | None = Field(default=None, ge=0, le=1000)
 
 
+class FreeMealTrackingInput(BaseModel):
+    entry_date: date
+    calories: float = Field(gt=0, le=10000)
+    protein_g: float = Field(ge=0, le=1000)
+    carbohydrate_g: float = Field(ge=0, le=2000)
+    fat_g: float = Field(ge=0, le=1000)
+
+
 class ConsumptionEntryEditInput(BaseModel):
     grams: float | None = Field(default=None, gt=0, le=5000)
     display_name: str | None = Field(default=None, min_length=1, max_length=160)
