@@ -95,6 +95,8 @@ class FoodRole(StrEnum):
 class MealSlotRole(StrEnum):
     MAIN_MEAL = "main_meal"
     SNACK = "snack"
+    FREE_MEAL = "free_meal"
+    POST_WORKOUT = "post_workout"
 
 
 class MealCategory(StrEnum):

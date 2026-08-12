@@ -1211,6 +1211,9 @@ class NutritionWeeklyPlan(Base):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    program_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_programs.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("nutrition_profiles.user_id", ondelete="CASCADE"), nullable=False
     )

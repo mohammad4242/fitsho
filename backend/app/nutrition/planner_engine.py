@@ -86,6 +86,7 @@ class PlannerInput:
     disliked_food_ids: tuple[str, ...]
     dietary_pattern: str
     maximum_meal_repetition_per_week: int
+    template_schedule: tuple[tuple[tuple[str, str | None, str], ...], ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -108,7 +109,7 @@ class PlannedFood:
 class PlannedMeal:
     role: str
     slot_index: int
-    template_id: str
+    template_id: str | None
     template_category: str
     foods: tuple[PlannedFood, ...]
     cost_irr: Decimal
@@ -381,6 +382,8 @@ def _build_days(
     snack_templates: tuple[EligibleMealTemplate, ...],
     policy: PlannerPolicy,
 ) -> tuple[PlannedDay, ...]:
+    if inputs.template_schedule is not None:
+        return _build_scheduled_days(inputs, (*main_templates, *snack_templates), policy)
     daily_kcal = inputs.daily_targets["goal_calories"]
     snack_total_share = policy.snack_energy_share if inputs.snacks_per_day else ZERO
     main_slot_kcal = (
@@ -402,6 +405,55 @@ def _build_days(
             sequence = day_index * max(inputs.snacks_per_day, 1) + slot_index
             template = snack_templates[sequence % len(snack_templates)]
             meals.append(_meal_from_template("snack", slot_index, template, snack_slot_kcal))
+        days.append(_day(day_index, tuple(meals)))
+    return tuple(days)
+
+
+def _build_scheduled_days(
+    inputs: PlannerInput,
+    templates: tuple[EligibleMealTemplate, ...],
+    policy: PlannerPolicy,
+) -> tuple[PlannedDay, ...]:
+    if len(inputs.template_schedule or ()) != 7:
+        raise ValueError("Template schedule must contain exactly seven days")
+    by_id = {candidate.template.meal_id: candidate for candidate in templates}
+    days: list[PlannedDay] = []
+    for day_index, schedule in enumerate(inputs.template_schedule or ()):
+        real_slots = [slot for slot in schedule if slot[1] is not None]
+        snack_count = sum(role == "snack" for role, _, _ in real_slots)
+        main_count = len(real_slots) - snack_count
+        snack_share = policy.snack_energy_share if snack_count else ZERO
+        main_kcal = (
+            inputs.daily_targets["goal_calories"] * (Decimal("1") - snack_share) / main_count
+        )
+        snack_kcal = (
+            inputs.daily_targets["goal_calories"] * snack_share / snack_count
+            if snack_count
+            else ZERO
+        )
+        meals: list[PlannedMeal] = []
+        role_indexes: dict[str, int] = {}
+        for role, template_id, category in schedule:
+            slot_index = role_indexes.get(role, 0)
+            role_indexes[role] = slot_index + 1
+            if template_id is None:
+                meals.append(
+                    PlannedMeal(
+                        role=role,
+                        slot_index=slot_index,
+                        template_id=None,
+                        template_category=category,
+                        foods=(),
+                        cost_irr=ZERO,
+                        nutrients=(),
+                    )
+                )
+                continue
+            candidate = by_id.get(template_id)
+            if candidate is None:
+                raise ValueError(f"Scheduled Meal Catalogue template is unavailable: {template_id}")
+            target = snack_kcal if role == "snack" else main_kcal
+            meals.append(_meal_from_template(role, slot_index, candidate, target))
         days.append(_day(day_index, tuple(meals)))
     return tuple(days)
 
@@ -467,7 +519,7 @@ def _meal(
     slot_index: int,
     foods: tuple[PlannedFood, ...],
     *,
-    template_id: str,
+    template_id: str | None,
     template_category: str,
 ) -> PlannedMeal:
     nutrients = _sum_nutrients(food.nutrients for food in foods)
