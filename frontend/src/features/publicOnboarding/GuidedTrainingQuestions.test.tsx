@@ -12,6 +12,7 @@ const values = {
   waist_circumference_cm: "", hip_circumference_cm: "", fitness_goal: "fat_loss" as const,
   experience_level: "" as const, training_days_per_week: "", training_location: "" as const,
   home_training_setup: "" as const, session_duration_minutes: "", physical_limitations: "",
+  training_intensity: "" as const,
   training_cautions: null, plan_duration_weeks: "4",
 };
 
@@ -51,6 +52,9 @@ it("uses fixed experience, weekly-day, and workout-time choices", async () => {
   expect(screen.getByRole("button", { name: "بیش از ۹۰ دقیقه" })).toBeInTheDocument();
   expect(screen.queryByText("مربی دربارهٔ محدودیت جسمی دیگری بداند؟")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "۴۵ تا ۶۰ دقیقه" }));
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  expect(screen.getByRole("heading", { name: "شدت معمول تمرینت چقدر است؟" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "متوسط" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   expect(screen.getByText("cautions-set")).toBeInTheDocument();

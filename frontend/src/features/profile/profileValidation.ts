@@ -185,6 +185,10 @@ function validateStepThree(values: ProfileFormValues): ProfileValidationErrors {
     errors.training_cautions = "required";
   }
 
+  if (values.training_intensity === "") {
+    errors.training_intensity = "required";
+  }
+
   const planDuration = values.plan_duration_weeks.trim();
   if (planDuration === "") {
     errors.plan_duration_weeks = "required";
@@ -250,6 +254,7 @@ export function toProfileInput(values: ProfileFormValues): ProfileInput {
     session_duration_minutes: Number(
       values.session_duration_minutes,
     ) as SessionDurationMinutes,
+    training_intensity: values.training_intensity as ProfileInput["training_intensity"],
     physical_limitations: values.physical_limitations.trim() || null,
     training_cautions: values.training_cautions as TrainingCaution[],
     plan_duration_weeks: Number(values.plan_duration_weeks) as PlanDurationWeeks,
@@ -272,6 +277,7 @@ export function profileToFormValues(profile: Profile): ProfileFormValues {
     training_location: profile.training_location,
     home_training_setup: profile.home_training_setup ?? "",
     session_duration_minutes: String(profile.session_duration_minutes),
+    training_intensity: profile.training_intensity ?? "",
     physical_limitations: profile.physical_limitations ?? "",
     training_cautions: profile.training_cautions,
     plan_duration_weeks: String(profile.plan_duration_weeks),
@@ -326,6 +332,9 @@ export function toProfilePatch(
   }
   if (input.session_duration_minutes !== currentProfile.session_duration_minutes) {
     patch.session_duration_minutes = input.session_duration_minutes;
+  }
+  if (input.training_intensity !== currentProfile.training_intensity) {
+    patch.training_intensity = input.training_intensity;
   }
   if (input.physical_limitations !== currentProfile.physical_limitations) {
     patch.physical_limitations = input.physical_limitations;

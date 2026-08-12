@@ -15,7 +15,7 @@ type Props = {
 export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete, allowNoTraining = false, onNoTraining }: Props) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage === "en" ? "en" : "fa";
-  const questions = useMemo(() => ["experience", "days", "location", ...(values.training_location === "home" ? ["home"] : []), "duration", "cautions", "weeks"] as const, [values.training_location]);
+  const questions = useMemo(() => ["experience", "days", "location", ...(values.training_location === "home" ? ["home"] : []), "duration", "intensity", "cautions", "weeks"] as const, [values.training_location]);
   const [index, setIndex] = useState(0);
   const [noTrainingSelected, setNoTrainingSelected] = useState(false);
   const question = questions[Math.min(index, questions.length - 1)];
@@ -25,6 +25,7 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete, 
     location: language === "en" ? "Where will you train?" : "کجا تمرین می‌کنی؟",
     home: language === "en" ? "What do you have at home?" : "در خانه چه امکاناتی داری؟",
     duration: language === "en" ? "How long is each workout?" : "برای هر جلسه چقدر زمان داری؟",
+    intensity: language === "en" ? "What is your usual training intensity?" : "شدت معمول تمرینت چقدر است؟",
     cautions: language === "en" ? "Any training considerations?" : "برای تمرین مورد احتیاطی داری؟",
     weeks: language === "en" ? "How long should this plan run?" : "این برنامه چند هفته باشد؟",
   })[question];
@@ -51,10 +52,11 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete, 
     location: values.training_location !== "",
     home: values.home_training_setup !== "",
     duration: values.session_duration_minutes !== "",
+    intensity: values.training_intensity !== "",
     cautions: true,
     weeks: values.plan_duration_weeks !== "",
   })[question];
-  const activeStage = question === "experience" ? 0 : ["days", "location", "home", "duration"].includes(question) ? 1 : 2;
+  const activeStage = question === "experience" ? 0 : ["days", "location", "home", "duration", "intensity"].includes(question) ? 1 : 2;
   const stages = language === "en" ? ["Experience", "Routine", "Safety"] : ["تجربه", "برنامه", "ایمنی"];
 
   return <section className="guided-question" aria-labelledby="guided-training-title">
@@ -79,6 +81,11 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete, 
         [90, language === "en" ? "75–90 minutes" : "۷۵ تا ۹۰ دقیقه"],
         [120, language === "en" ? "More than 90 minutes" : "بیش از ۹۰ دقیقه"],
       ] as const).map(([value, label]) => choice("session_duration_minutes", String(value), label))}</div>}
+      {question === "intensity" && <div className="guided-choice-grid">{([
+        ["light", language === "en" ? "Light" : "سبک"],
+        ["moderate", language === "en" ? "Moderate" : "متوسط"],
+        ["vigorous", language === "en" ? "Vigorous" : "شدید"],
+      ] as const).map(([value, label]) => choice("training_intensity", value, label))}</div>}
       {question === "cautions" && <div className="guided-choice-grid">{(["lower_back", "knee", "shoulder", "neck", "wrist", "other"] as TrainingCaution[]).map((value) => <button className={cautions.includes(value) ? "is-selected" : ""} key={value} type="button" onClick={() => toggle(value)}>{t(`onboarding.options.trainingCaution.${value}`)}</button>)}</div>}
       {question === "weeks" && <div className="guided-choice-grid">{[4, 6, 8].map((value) => choice("plan_duration_weeks", String(value), t(`onboarding.options.planDuration.${value}`)))}</div>}
       {question === "cautions" && <button className="text-button" type="submit">{language === "en" ? "Skip this question" : "رد کردن این سؤال"}</button>}

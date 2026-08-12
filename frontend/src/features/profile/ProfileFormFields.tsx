@@ -12,6 +12,7 @@ import {
   sessionDurations,
   sexes,
   trainingCautions,
+  trainingIntensities,
   type TrainingCaution,
   trainingLocations,
   type ProfileFormValues,
@@ -415,6 +416,25 @@ export function ExperienceFields({
           field="session_duration_minutes"
           error={errors.session_duration_minutes}
         />
+      </div>
+
+      <div className="profile-field">
+        <label htmlFor="profile-training-intensity">{t("onboarding.fields.trainingIntensity")}</label>
+        <select
+          id="profile-training-intensity"
+          name="training_intensity"
+          required
+          value={values.training_intensity}
+          aria-invalid={errors.training_intensity !== undefined}
+          aria-describedby={describedBy("training_intensity", errors.training_intensity)}
+          onChange={(event) => onChange("training_intensity", event.target.value)}
+        >
+          <option value="" disabled>{t("onboarding.options.select")}</option>
+          {trainingIntensities.map((intensity) => (
+            <option key={intensity} value={intensity}>{t(`onboarding.options.trainingIntensity.${intensity}`)}</option>
+          ))}
+        </select>
+        <FieldError field="training_intensity" error={errors.training_intensity} />
       </div>
 
       <fieldset

@@ -17,6 +17,9 @@ export type FitnessGoal = (typeof fitnessGoals)[number] | (typeof legacyFitnessG
 export const experienceLevels = ["first_month", "beginner", "intermediate", "advanced"] as const;
 export type ExperienceLevel = (typeof experienceLevels)[number];
 
+export const trainingIntensities = ["light", "moderate", "vigorous"] as const;
+export type TrainingIntensity = (typeof trainingIntensities)[number];
+
 export const trainingLocations = ["home", "gym"] as const;
 export type TrainingLocation = (typeof trainingLocations)[number];
 
@@ -79,6 +82,7 @@ export type ProfileInput = {
   training_location: TrainingLocation;
   home_training_setup: HomeTrainingSetup | null;
   session_duration_minutes: SessionDurationMinutes;
+  training_intensity?: TrainingIntensity | null;
   physical_limitations: string | null;
   training_cautions: TrainingCaution[];
   plan_duration_weeks: PlanDurationWeeks;
@@ -110,6 +114,7 @@ export type ProfileFormValues = {
   training_location: TrainingLocation | "";
   home_training_setup: HomeTrainingSetup | "";
   session_duration_minutes: string;
+  training_intensity: TrainingIntensity | "";
   physical_limitations: string;
   training_cautions: TrainingCaution[] | null;
   plan_duration_weeks: string;

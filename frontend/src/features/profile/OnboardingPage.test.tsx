@@ -72,6 +72,7 @@ const createdProfile: Profile = {
   training_location: "gym",
   home_training_setup: null,
   session_duration_minutes: 60,
+  training_intensity: "moderate",
   physical_limitations: null,
   training_cautions: [],
   plan_duration_weeks: 4,
@@ -128,6 +129,7 @@ async function completeExperienceFields(user: UserEvent) {
   await user.type(screen.getByLabelText("روزهای تمرین در هفته"), "3");
   await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "gym");
   await user.selectOptions(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"), "60");
+  await user.selectOptions(screen.getByLabelText("شدت معمول تمرین"), "moderate");
   await user.click(screen.getByLabelText("ندارم"));
 }
 
@@ -300,6 +302,7 @@ it("shows home setup only for home training and clears it after switching to gym
     "dumbbells_available",
   );
   await user.selectOptions(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"), "60");
+  await user.selectOptions(screen.getByLabelText("شدت معمول تمرین"), "moderate");
   await user.click(screen.getByLabelText("ندارم"));
   await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "gym");
 
@@ -373,6 +376,7 @@ it("submits one normalized typed profile payload", async () => {
     training_location: "gym",
     home_training_setup: null,
     session_duration_minutes: 60,
+    training_intensity: "moderate",
     physical_limitations: "knee pain",
     training_cautions: ["knee"],
     plan_duration_weeks: 6,
@@ -456,6 +460,7 @@ it("requires a deliberate training-caution choice", async () => {
     screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"),
     "60",
   );
+  await user.selectOptions(screen.getByLabelText("شدت معمول تمرین"), "moderate");
 
   await user.click(screen.getByRole("button", { name: "ساخت پروفایل" }));
 
