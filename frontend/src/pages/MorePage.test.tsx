@@ -48,3 +48,14 @@ it("shows the training program library in the mobile admin workspace", () => {
     "/admin/training-program-templates",
   );
 });
+
+it("shows the nutrition program catalogue in the mobile admin workspace", () => {
+  auth.isAdmin = true;
+
+  render(<MemoryRouter><MorePage /></MemoryRouter>);
+
+  expect(screen.getByRole("link", { name: /کاتالوگ برنامه‌های غذایی/ })).toHaveAttribute(
+    "href",
+    "/admin/nutrition-programs",
+  );
+});

@@ -488,6 +488,24 @@ it("lets an admin without a fitness profile open the admin route", async () => {
   );
 });
 
+it("lets an admin open the nutrition program catalogue route", async () => {
+  auth.value.user = { ...member, is_admin: true };
+  profile.value.status = "missing";
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({
+      items: [],
+      diet_styles: ["economy", "balanced_iranian", "high_protein_gym", "quick_easy", "premium_varied"],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }),
+  );
+
+  renderRoute("/admin/nutrition-programs");
+
+  expect(
+    await screen.findByRole("heading", { name: "کاتالوگ برنامه‌های غذایی" }),
+  ).toBeInTheDocument();
+  fetchMock.mockRestore();
+});
+
 const member = {
   id: "1",
   email: "member@example.com",

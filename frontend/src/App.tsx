@@ -24,6 +24,8 @@ const AdminExercisesPage = lazy(() => import("./features/admin/AdminExercisesPag
 const AdminNutritionMonitoringPage = lazy(() => import("./features/admin/AdminNutritionMonitoringPage").then(({ AdminNutritionMonitoringPage }) => ({ default: AdminNutritionMonitoringPage })));
 const AdminMealCataloguePage = lazy(() => import("./features/admin/AdminMealCataloguePage").then(({ AdminMealCataloguePage }) => ({ default: AdminMealCataloguePage })));
 const AdminMealCatalogueEditorPage = lazy(() => import("./features/admin/AdminMealCatalogueEditorPage").then(({ AdminMealCatalogueEditorPage }) => ({ default: AdminMealCatalogueEditorPage })));
+const AdminNutritionProgramEditorPage = lazy(() => import("./features/admin/AdminNutritionProgramEditorPage").then(({ AdminNutritionProgramEditorPage }) => ({ default: AdminNutritionProgramEditorPage })));
+const AdminNutritionProgramsPage = lazy(() => import("./features/admin/AdminNutritionProgramsPage").then(({ AdminNutritionProgramsPage }) => ({ default: AdminNutritionProgramsPage })));
 const AdminSupplementsPage = lazy(() => import("./features/admin/AdminSupplementsPage").then(({ AdminSupplementsPage }) => ({ default: AdminSupplementsPage })));
 const AdminTrainingTemplateEditorPage = lazy(() => import("./features/admin/AdminTrainingTemplateEditorPage").then(({ AdminTrainingTemplateEditorPage }) => ({ default: AdminTrainingTemplateEditorPage })));
 const AdminTrainingTemplatesPage = lazy(() => import("./features/admin/AdminTrainingTemplatesPage").then(({ AdminTrainingTemplatesPage }) => ({ default: AdminTrainingTemplatesPage })));
@@ -76,6 +78,9 @@ export function AppRoutes() {
           <Route path="/admin/nutrition-meals" element={deferred(<AdminMealCataloguePage />)} />
           <Route path="/admin/nutrition-meals/new" element={deferred(<AdminMealCatalogueEditorPage />)} />
           <Route path="/admin/nutrition-meals/:mealId/edit" element={deferred(<AdminMealCatalogueEditorPage />)} />
+          <Route path="/admin/nutrition-programs" element={deferred(<AdminNutritionProgramsPage />)} />
+          <Route path="/admin/nutrition-programs/new" element={deferred(<AdminNutritionProgramEditorPage />)} />
+          <Route path="/admin/nutrition-programs/:programId/edit" element={deferred(<AdminNutritionProgramEditorPage />)} />
         </Route>
         <Route element={<OnboardingRoute />}>
           <Route path="/onboarding" element={deferred(<OnboardingPage />)} />

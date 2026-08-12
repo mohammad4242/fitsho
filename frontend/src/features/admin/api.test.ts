@@ -2,12 +2,16 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import {
   createAdminMeal,
+  createAdminNutritionProgram,
   createAdminExercise,
   getAdminAiGenerationFailures,
   getAdminAiModelTestRuns,
   getAdminAiModels,
   getAdminExercises,
   getAdminMealCatalogue,
+  getAdminNutritionPrograms,
+  archiveAdminNutritionProgram,
+  restoreAdminNutritionProgram,
   updateAdminAiRouting,
 } from "./api";
 import type {
@@ -164,6 +168,50 @@ it("lists and creates nutrition meal catalogue templates", async () => {
     2,
     "/api/v1/nutrition/admin/meals",
     expect.objectContaining({ method: "POST", body: JSON.stringify(input) }),
+  );
+});
+
+it("filters, creates, archives, and restores nutrition programs", async () => {
+  const page = { items: [], diet_styles: ["economy"] };
+  const input = {
+    name_fa: "برنامه اقتصادی",
+    name_en: "Economy program",
+    description_fa: "ساختار هفت روزه",
+    description_en: "Seven-day structure",
+    diet_style: "economy" as const,
+    post_workout_enabled: false,
+    days: [],
+  };
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(jsonResponse(page))
+    .mockResolvedValueOnce(jsonResponse({ id: "program-1", ...input }))
+    .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    .mockResolvedValueOnce(jsonResponse({ id: "program-1", ...input, is_active: true }));
+
+  await expect(getAdminNutritionPrograms({ dietStyle: "economy", lifecycle: "archived" })).resolves.toEqual(page);
+  await createAdminNutritionProgram(input);
+  await archiveAdminNutritionProgram("program-1");
+  await restoreAdminNutritionProgram("program-1");
+
+  expect(fetch).toHaveBeenNthCalledWith(
+    1,
+    "/api/v1/nutrition/admin/programs?diet_style=economy&lifecycle=archived",
+    expect.objectContaining({ credentials: "include" }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    "/api/v1/nutrition/admin/programs",
+    expect.objectContaining({ method: "POST", body: JSON.stringify(input) }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    3,
+    "/api/v1/nutrition/admin/programs/program-1",
+    expect.objectContaining({ method: "DELETE" }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    4,
+    "/api/v1/nutrition/admin/programs/program-1/restore",
+    expect.objectContaining({ method: "POST" }),
   );
 });
 

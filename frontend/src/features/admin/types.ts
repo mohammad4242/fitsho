@@ -427,3 +427,74 @@ export type AdminMealWrite = {
   verification_status: MealVerificationStatus;
   items: AdminMealIngredientWrite[];
 };
+
+export type NutritionDietStyle =
+  | "economy"
+  | "balanced_iranian"
+  | "high_protein_gym"
+  | "quick_easy"
+  | "premium_varied";
+
+export type NutritionProgramLifecycle = "active" | "archived" | "all";
+
+export type AdminNutritionProgramMeal = {
+  id: string;
+  name_fa: string;
+  name_en: string;
+  category: MealCategory;
+};
+
+export type AdminNutritionProgramSlot = {
+  id: string;
+  category: MealCategory;
+  meal: AdminNutritionProgramMeal;
+};
+
+export type AdminNutritionProgramDay = {
+  id: string;
+  day_number: number;
+  post_workout_enabled: boolean;
+  slots: AdminNutritionProgramSlot[];
+};
+
+export type AdminNutritionProgram = {
+  id: string;
+  slug: string;
+  name_fa: string;
+  name_en: string;
+  description_fa: string;
+  description_en: string;
+  diet_style: NutritionDietStyle;
+  post_workout_enabled: boolean;
+  is_active: boolean;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+  days: AdminNutritionProgramDay[];
+};
+
+export type AdminNutritionProgramPage = {
+  items: AdminNutritionProgram[];
+  diet_styles: NutritionDietStyle[];
+};
+
+export type AdminNutritionProgramSlotWrite = {
+  category: MealCategory;
+  meal_id: string;
+};
+
+export type AdminNutritionProgramDayWrite = {
+  day_number: number;
+  post_workout_enabled: boolean;
+  slots: AdminNutritionProgramSlotWrite[];
+};
+
+export type AdminNutritionProgramWrite = {
+  name_fa: string;
+  name_en: string;
+  description_fa: string;
+  description_en: string;
+  diet_style: NutritionDietStyle;
+  post_workout_enabled: boolean;
+  days: AdminNutritionProgramDayWrite[];
+};
