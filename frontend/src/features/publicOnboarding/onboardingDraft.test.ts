@@ -40,6 +40,8 @@ beforeEach(() => {
   });
   vi.mocked(nutritionApi.saveSafetyProfile).mockResolvedValue({} as never);
   vi.mocked(nutritionApi.saveNutritionProfile).mockResolvedValue({} as never);
+  vi.mocked(nutritionApi.saveStructuredExercise).mockResolvedValue({} as never);
+  vi.mocked(nutritionApi.createNutritionEstimate).mockResolvedValue({} as never);
 });
 
 it("keeps a pre-auth draft only in the current browser session", () => {

@@ -174,6 +174,7 @@ const en = {
         trainingLocation: "Where do you train?",
         homeTrainingSetup: "What equipment do you have for training at home?",
         sessionDuration: "How much time do you usually have for each workout?",
+        trainingIntensity: "Usual training intensity",
         trainingCautions: "Training considerations",
         planDuration: "How long should this plan run?",
         limitations: "Physical limitations (optional)",
@@ -221,6 +222,11 @@ const en = {
           75: "75 minutes",
           90: "90 minutes",
           120: "More than 90 minutes",
+        },
+        trainingIntensity: {
+          light: "Light",
+          moderate: "Moderate",
+          vigorous: "Vigorous",
         },
         trainingCaution: {
           none: "None",

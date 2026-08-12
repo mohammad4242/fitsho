@@ -69,6 +69,7 @@ const savedProfile: Profile = {
   training_location: "home",
   home_training_setup: "dumbbells_available",
   session_duration_minutes: 75,
+  training_intensity: "moderate",
   physical_limitations: "Knee pain",
   training_cautions: ["knee"],
   plan_duration_weeks: 6,
@@ -209,6 +210,7 @@ it("renders every saved profile value in its editable profile page", async () =>
   expect(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟")).toHaveValue(
     "75",
   );
+  expect(screen.getByLabelText("شدت معمول تمرین")).toHaveValue("moderate");
   expect(screen.getByLabelText("محدودیت‌های جسمی (اختیاری)")).toHaveValue(
     "Knee pain",
   );

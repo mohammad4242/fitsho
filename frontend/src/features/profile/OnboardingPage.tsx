@@ -41,6 +41,7 @@ const emptyValues: ProfileFormValues = {
   training_location: "",
   home_training_setup: "",
   session_duration_minutes: "",
+  training_intensity: "",
   physical_limitations: "",
   training_cautions: null,
   plan_duration_weeks: "4",
