@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -60,6 +60,15 @@ const response: api.FoodCatalogueResponse = {
           unit_form: "nutrient_mass",
           source_name: "USDA FoodData Central",
           source_reference: "https://fdc.nal.usda.gov/",
+          confidence: "high",
+        },
+        {
+          nutrient_code: "copper_mg",
+          value_per_100g: 0.3,
+          unit: "mg",
+          unit_form: "nutrient_mass",
+          source_name: "Iranian bread nutrient review",
+          source_reference: "https://doi.org/10.1186/s41043-022-00327-9",
           confidence: "high",
         },
         {
@@ -129,11 +138,14 @@ it("shows nutrient data and never shows catalogue price information to a member"
   expect(screen.getByRole("dialog", { name: "جزئیات سینه مرغ" })).toBeVisible();
   expect(screen.getByText("فیبر")).toBeVisible();
   expect(screen.getByText("آهن")).toBeVisible();
+  expect(screen.getByText("مس")).toBeVisible();
   expect(screen.getByText("ویتامین C")).toBeVisible();
   expect(screen.getByText(/USDA FoodData Central/)).toBeVisible();
   expect(screen.getByText("در ۱ عدد")).toBeVisible();
   expect(screen.getByText(/۱ عدد ≈ ۵۰ گرم/)).toBeVisible();
-  expect(screen.getByText("۰٫۲ mg")).toBeVisible();
+  const ironCard = screen.getByText("آهن").closest("article");
+  expect(ironCard).not.toBeNull();
+  expect(within(ironCard!).getByText("۰٫۲ mg")).toBeVisible();
   await user.click(screen.getByRole("button", { name: "۱۰۰ گرم" }));
   expect(screen.getByText("۰٫۴ mg")).toBeVisible();
 });

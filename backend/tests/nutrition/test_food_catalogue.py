@@ -130,7 +130,7 @@ def test_approved_catalogue_keeps_identity_aliases_and_composition_separate(db: 
     assert "added_sugars_g" not in values
 
 
-def test_approved_catalogue_has_all_65_identities_and_only_sourced_rows_are_verified(
+def test_approved_catalogue_has_all_65_identities_and_source_backed_breads_are_verified(
     db: Session,
 ) -> None:
     from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
@@ -142,11 +142,88 @@ def test_approved_catalogue_has_all_65_identities_and_only_sourced_rows_are_veri
     current = [food for food in foods if food.verification_status.value != "retired"]
     assert len(current) == 65
     statuses = {food.slug: food.verification_status.value for food in current}
-    assert statuses["sangak-bread"] == "draft"
-    assert statuses["barbari-bread"] == "draft"
-    assert statuses["lavash-bread"] == "draft"
-    assert statuses["taftoon-bread"] == "draft"
+    assert statuses["sangak-bread"] == "verified"
+    assert statuses["barbari-bread"] == "verified"
+    assert statuses["lavash-bread"] == "verified"
+    assert statuses["taftoon-bread"] == "verified"
     assert statuses["chicken-breast"] == "verified"
+
+
+def test_iranian_breads_have_literal_source_backed_nutrients_and_palm_portions(
+    db: Session,
+) -> None:
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.models import NutritionCatalogueFood
+
+    seed_base_iranian_food_catalogue(db)
+
+    expected = {
+        "sangak-bread": {
+            "energy_kcal": Decimal("258"),
+            "protein_g": Decimal("7.7"),
+            "carbohydrate_g": Decimal("57.4"),
+            "total_fat_g": Decimal("0.7"),
+            "fibre_g": Decimal("4.1"),
+            "total_sugars_g": Decimal("1.5"),
+            "potassium_mg": Decimal("110"),
+            "zinc_mg": Decimal("1.66"),
+            "copper_mg": Decimal("0.3445"),
+            "calcium_mg": Decimal("80.05"),
+        },
+        "barbari-bread": {
+            "energy_kcal": Decimal("272"),
+            "protein_g": Decimal("8.4"),
+            "carbohydrate_g": Decimal("59.5"),
+            "total_fat_g": Decimal("0.6"),
+            "fibre_g": Decimal("2.2"),
+            "total_sugars_g": Decimal("0.8"),
+            "potassium_mg": Decimal("112"),
+            "zinc_mg": Decimal("0.884"),
+            "copper_mg": Decimal("0.218"),
+        },
+        "taftoon-bread": {
+            "energy_kcal": Decimal("279"),
+            "protein_g": Decimal("8.1"),
+            "carbohydrate_g": Decimal("61.1"),
+            "total_fat_g": Decimal("0.7"),
+            "fibre_g": Decimal("2.2"),
+            "total_sugars_g": Decimal("0.8"),
+            "potassium_mg": Decimal("106"),
+            "zinc_mg": Decimal("1.35"),
+            "copper_mg": Decimal("0.289"),
+        },
+        "lavash-bread": {
+            "energy_kcal": Decimal("291"),
+            "protein_g": Decimal("8.8"),
+            "carbohydrate_g": Decimal("63.4"),
+            "total_fat_g": Decimal("0.8"),
+            "fibre_g": Decimal("2.4"),
+            "total_sugars_g": Decimal("0.8"),
+            "potassium_mg": Decimal("103"),
+            "zinc_mg": Decimal("0.561"),
+            "copper_mg": Decimal("0.2805"),
+        },
+    }
+    palm_grams = {
+        "sangak-bread": Decimal("30"),
+        "barbari-bread": Decimal("30"),
+        "taftoon-bread": Decimal("30"),
+        "lavash-bread": Decimal("7.5"),
+    }
+
+    foods = db.scalars(
+        select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug.in_(expected))
+    ).all()
+    assert len(foods) == 4
+    for food in foods:
+        values = {row.nutrient_code: row.value_per_100g for row in food.compositions}
+        assert values == expected[food.slug]
+        assert all(row.source_reference.startswith("https://doi.org/") for row in food.compositions)
+        assert "iron_mg" not in values
+        assert len(food.portions) == 1
+        assert food.portions[0].code == "palm"
+        assert food.portions[0].grams == palm_grams[food.slug]
+        assert food.portions[0].is_default is True
 
 
 def test_prepared_meals_remain_a_distinct_table() -> None:

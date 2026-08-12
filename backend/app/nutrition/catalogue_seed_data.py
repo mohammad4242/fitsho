@@ -12,6 +12,17 @@ USDA_SOURCE_NAME = "USDA FoodData Central SR Legacy"
 USDA_SOURCE_REFERENCE = "https://fdc.nal.usda.gov/download-datasets/"
 USDA_DATA_VERSION = "sr-legacy-2018-04"
 USDA_ACCESS_DATE = "2026-08-09"
+IRANIAN_BREAD_MACRO_SOURCE_NAME = "Glycemic Index Values for Major Carbohydrates in Iran"
+IRANIAN_BREAD_MACRO_SOURCE_REFERENCE = "https://doi.org/10.5812/ijem.99793"
+IRANIAN_BREAD_MACRO_DATA_VERSION = "ijem-2020-e99793"
+IRANIAN_BREAD_MICRO_SOURCE_NAME = "Evaluation of nutrients in bread: a systematic review"
+IRANIAN_BREAD_MICRO_SOURCE_REFERENCE = "https://doi.org/10.1186/s41043-022-00327-9"
+IRANIAN_BREAD_MICRO_DATA_VERSION = "jhpn-2022-41-50"
+IRANIAN_BREAD_ACCESS_DATE = "2026-08-12"
+IRANIAN_BREAD_PORTION_SOURCE_NAME = "Iran Ministry of Health nutrition training package"
+IRANIAN_BREAD_PORTION_SOURCE_REFERENCE = (
+    "https://sedayesalmand.ir/cms/content/contentfile/download/580"
+)
 
 NUTRIENT_COLUMNS = (
     "energy_kcal",
@@ -47,6 +58,7 @@ NUTRIENT_UNITS = {
     "magnesium_mg": "mg",
     "iron_mg": "mg",
     "zinc_mg": "mg",
+    "copper_mg": "mg",
     "vitamin_c_mg": "mg",
     "vitamin_d_mcg": "mcg",
     "vitamin_b12_mcg": "mcg",
@@ -78,6 +90,16 @@ class FoodPortionSeed:
     sort_order: int
     source_name: str
     source_reference: str
+
+
+@dataclass(frozen=True)
+class FoodCompositionSeed:
+    nutrient_code: str
+    value_per_100g: Decimal
+    source_name: str
+    source_reference: str
+    data_version: str
+    source_access_date: str
 
 
 def _food(
@@ -149,8 +171,27 @@ APPROVED_FOODS = (
         "کنسرو تن ماهی",
     ),
     _food(
-        "egg", "تخم‌مرغ", "Egg", "eggs", "main_protein", "raw", "171287", "تخم مرغ",
-        portions=(FoodPortionSeed("piece", Decimal("1"), "۱ عدد", "1 piece", Decimal("50"), True, 0, USDA_SOURCE_NAME, USDA_SOURCE_REFERENCE),),
+        "egg",
+        "تخم‌مرغ",
+        "Egg",
+        "eggs",
+        "main_protein",
+        "raw",
+        "171287",
+        "تخم مرغ",
+        portions=(
+            FoodPortionSeed(
+                "piece",
+                Decimal("1"),
+                "۱ عدد",
+                "1 piece",
+                Decimal("50"),
+                True,
+                0,
+                USDA_SOURCE_NAME,
+                USDA_SOURCE_REFERENCE,
+            ),
+        ),
     ),
     _food("lentils", "عدس", "Lentils", "legumes", "main_protein", "dry", "172420", "عدس خشک"),
     _food("chickpeas", "نخود", "Chickpeas", "legumes", "main_protein", "dry", "173756", "نخود خشک"),
@@ -189,13 +230,93 @@ APPROVED_FOODS = (
         "برنج خشک",
         "برنج باسماتی",
     ),
-    _food("sangak-bread", "نان سنگک", "Sangak bread", "bread", "main_staple", "as_purchased", None),
     _food(
-        "barbari-bread", "نان بربری", "Barbari bread", "bread", "main_staple", "as_purchased", None
+        "sangak-bread",
+        "نان سنگک",
+        "Sangak bread",
+        "bread",
+        "main_staple",
+        "as_purchased",
+        None,
+        portions=(
+            FoodPortionSeed(
+                "palm",
+                Decimal("1"),
+                "۱ کف دست بدون انگشت",
+                "1 palm without fingers",
+                Decimal("30"),
+                True,
+                0,
+                IRANIAN_BREAD_PORTION_SOURCE_NAME,
+                IRANIAN_BREAD_PORTION_SOURCE_REFERENCE,
+            ),
+        ),
     ),
-    _food("lavash-bread", "نان لواش", "Lavash bread", "bread", "main_staple", "as_purchased", None),
     _food(
-        "taftoon-bread", "نان تافتون", "Taftoon bread", "bread", "main_staple", "as_purchased", None
+        "barbari-bread",
+        "نان بربری",
+        "Barbari bread",
+        "bread",
+        "main_staple",
+        "as_purchased",
+        None,
+        portions=(
+            FoodPortionSeed(
+                "palm",
+                Decimal("1"),
+                "۱ کف دست بدون انگشت",
+                "1 palm without fingers",
+                Decimal("30"),
+                True,
+                0,
+                IRANIAN_BREAD_PORTION_SOURCE_NAME,
+                IRANIAN_BREAD_PORTION_SOURCE_REFERENCE,
+            ),
+        ),
+    ),
+    _food(
+        "lavash-bread",
+        "نان لواش",
+        "Lavash bread",
+        "bread",
+        "main_staple",
+        "as_purchased",
+        None,
+        portions=(
+            FoodPortionSeed(
+                "palm",
+                Decimal("1"),
+                "۱ کف دست",
+                "1 palm",
+                Decimal("7.5"),
+                True,
+                0,
+                IRANIAN_BREAD_PORTION_SOURCE_NAME,
+                IRANIAN_BREAD_PORTION_SOURCE_REFERENCE,
+            ),
+        ),
+    ),
+    _food(
+        "taftoon-bread",
+        "نان تافتون",
+        "Taftoon bread",
+        "bread",
+        "main_staple",
+        "as_purchased",
+        None,
+        portions=(
+            FoodPortionSeed(
+                "palm",
+                Decimal("1"),
+                "۱ کف دست بدون انگشت",
+                "1 palm without fingers",
+                Decimal("30"),
+                True,
+                0,
+                IRANIAN_BREAD_PORTION_SOURCE_NAME,
+                IRANIAN_BREAD_PORTION_SOURCE_REFERENCE,
+            ),
+        ),
     ),
     _food("oats", "جو دوسر", "Oats", "grains", "main_staple", "dry", "173904", "اوتمیل"),
     _food("barley", "جو", "Barley", "grains", "main_staple", "dry", "170284", "جو پوست کنده"),
@@ -380,3 +501,80 @@ def composition_for(slug: str) -> dict[str, Decimal]:
                 if value
             }
     return {}
+
+
+_BREAD_COMPOSITIONS = {
+    "sangak-bread": {
+        "macro": ("258", "7.7", "57.4", "0.7", "4.1", "1.5"),
+        "micro": {
+            "potassium_mg": "110",
+            "zinc_mg": "1.66",
+            "copper_mg": "0.3445",
+            "calcium_mg": "80.05",
+        },
+    },
+    "barbari-bread": {
+        "macro": ("272", "8.4", "59.5", "0.6", "2.2", "0.8"),
+        "micro": {"potassium_mg": "112", "zinc_mg": "0.884", "copper_mg": "0.218"},
+    },
+    "taftoon-bread": {
+        "macro": ("279", "8.1", "61.1", "0.7", "2.2", "0.8"),
+        "micro": {"potassium_mg": "106", "zinc_mg": "1.35", "copper_mg": "0.289"},
+    },
+    "lavash-bread": {
+        "macro": ("291", "8.8", "63.4", "0.8", "2.4", "0.8"),
+        "micro": {"potassium_mg": "103", "zinc_mg": "0.561", "copper_mg": "0.2805"},
+    },
+}
+
+
+def composition_seeds_for(slug: str) -> tuple[FoodCompositionSeed, ...]:
+    bread = _BREAD_COMPOSITIONS.get(slug)
+    if bread is None:
+        return tuple(
+            FoodCompositionSeed(
+                nutrient_code=code,
+                value_per_100g=value,
+                source_name=USDA_SOURCE_NAME,
+                source_reference=USDA_SOURCE_REFERENCE,
+                data_version=USDA_DATA_VERSION,
+                source_access_date=USDA_ACCESS_DATE,
+            )
+            for code, value in composition_for(slug).items()
+        )
+    macro_codes = (
+        "energy_kcal",
+        "protein_g",
+        "carbohydrate_g",
+        "total_fat_g",
+        "fibre_g",
+        "total_sugars_g",
+    )
+    macro_values = bread["macro"]
+    assert isinstance(macro_values, tuple)
+    micro_values = bread["micro"]
+    assert isinstance(micro_values, dict)
+    return (
+        *(
+            FoodCompositionSeed(
+                nutrient_code=code,
+                value_per_100g=Decimal(value),
+                source_name=IRANIAN_BREAD_MACRO_SOURCE_NAME,
+                source_reference=IRANIAN_BREAD_MACRO_SOURCE_REFERENCE,
+                data_version=IRANIAN_BREAD_MACRO_DATA_VERSION,
+                source_access_date=IRANIAN_BREAD_ACCESS_DATE,
+            )
+            for code, value in zip(macro_codes, macro_values, strict=True)
+        ),
+        *(
+            FoodCompositionSeed(
+                nutrient_code=code,
+                value_per_100g=Decimal(value),
+                source_name=IRANIAN_BREAD_MICRO_SOURCE_NAME,
+                source_reference=IRANIAN_BREAD_MICRO_SOURCE_REFERENCE,
+                data_version=IRANIAN_BREAD_MICRO_DATA_VERSION,
+                source_access_date=IRANIAN_BREAD_ACCESS_DATE,
+            )
+            for code, value in micro_values.items()
+        ),
+    )
