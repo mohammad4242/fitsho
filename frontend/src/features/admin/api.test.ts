@@ -12,6 +12,7 @@ import {
   getAdminNutritionPrograms,
   archiveAdminNutritionProgram,
   restoreAdminNutritionProgram,
+  uploadAdminMealImage,
   updateAdminAiRouting,
 } from "./api";
 import type {
@@ -170,6 +171,24 @@ it("lists and creates nutrition meal catalogue templates", async () => {
     "/api/v1/nutrition/admin/meals",
     expect.objectContaining({ method: "POST", body: JSON.stringify(input) }),
   );
+});
+
+it("uploads a meal catalogue image as multipart data", async () => {
+  const file = new File(["image"], "meal.png", { type: "image/png" });
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    jsonResponse({ image_url: "/media/meal-catalogue/meal.png" }),
+  );
+
+  await expect(uploadAdminMealImage("meal-1", file)).resolves.toEqual({
+    image_url: "/media/meal-catalogue/meal.png",
+  });
+
+  const [path, init] = vi.mocked(fetch).mock.calls[0];
+  expect(path).toBe("/api/v1/nutrition/admin/meals/meal-1/image");
+  expect(init).toEqual(expect.objectContaining({ method: "POST" }));
+  const body = init?.body;
+  expect(body).toBeInstanceOf(FormData);
+  expect((body as FormData).get("file")).toBe(file);
 });
 
 it("filters, creates, archives, and restores nutrition programs", async () => {

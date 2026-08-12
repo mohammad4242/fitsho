@@ -74,6 +74,10 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .weekly-plan__meal header { display: flex; justify-content: space-between; gap: 1rem; align-items: center; padding: 1rem 1.1rem; border-bottom: 1px solid rgb(234 244 241 / 8%); }
 .weekly-plan__meal header div { display: flex; flex-direction: column; gap: .25rem; }
 .weekly-plan__meal header span, .weekly-plan__meal header small { color: rgb(234 244 241 / 58%); font-size: .78rem; }
+.weekly-plan__meal-heading { flex-direction: row !important; align-items: center; min-width: 0; }
+.weekly-plan__meal-heading > div { min-width: 0; }
+.weekly-plan__meal-image { width: 3.6rem; height: 3.6rem; border: 1px solid rgb(234 244 241 / 12%); }
+.weekly-plan__meal-title { overflow: hidden; max-width: 24rem; text-overflow: ellipsis; white-space: nowrap; }
 .weekly-plan__meal ul { margin: 0; padding: .5rem 1.1rem 1rem; list-style: none; }
 .weekly-plan__meal li { display: flex; justify-content: space-between; gap: 1rem; padding-block: .7rem; }
 .weekly-plan__meal li + li { border-top: 1px dashed rgb(234 244 241 / 10%); }

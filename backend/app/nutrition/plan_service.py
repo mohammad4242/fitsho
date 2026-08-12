@@ -778,6 +778,9 @@ def _plan_query() -> Select[tuple[NutritionWeeklyPlan]]:
         selectinload(NutritionWeeklyPlan.days)
         .selectinload(NutritionWeeklyPlanDay.meals)
         .selectinload(NutritionWeeklyPlanMeal.foods),
+        selectinload(NutritionWeeklyPlan.days)
+        .selectinload(NutritionWeeklyPlanDay.meals)
+        .selectinload(NutritionWeeklyPlanMeal.catalogue_meal),
     )
 
 
@@ -859,6 +862,10 @@ def weekly_plan_response(plan: NutritionWeeklyPlan) -> WeeklyPlanResponse:
                         id=meal.id,
                         catalogue_meal_id=meal.catalogue_meal_id,
                         catalogue_meal_category=meal.catalogue_meal_category,
+                        name_fa=(meal.catalogue_meal.name_fa if meal.catalogue_meal else None),
+                        name_en=(meal.catalogue_meal.name_en if meal.catalogue_meal else None),
+                        meal_code=(meal.catalogue_meal.code if meal.catalogue_meal else None),
+                        image_url=(meal.catalogue_meal.image_path if meal.catalogue_meal else None),
                         slot_role=meal.slot_role.value,
                         slot_index=meal.slot_index,
                         target_distribution=_float_map(meal.target_distribution),

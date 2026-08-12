@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import foodAccent from "../../assets/landing/food.webp";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
-import { getAdminMealCatalogue } from "./api";
-import type { AdminMealCatalogueResponse, MealCategory } from "./types";
+import { MealThumbnail } from "../../shared/MealThumbnail";
+import { getAdminMealCatalogue, uploadAdminMealImage } from "./api";
+import type { AdminMealCatalogueItem, AdminMealCatalogueResponse, MealCategory } from "./types";
 import "./admin.css";
 
 const categories: MealCategory[] = ["breakfast", "lunch", "post_workout", "snack", "dinner"];
@@ -17,6 +18,7 @@ export function AdminMealCataloguePage() {
   const [page, setPage] = useState<AdminMealCatalogueResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [retry, setRetry] = useState(0);
+  const [imageMeal, setImageMeal] = useState<AdminMealCatalogueItem | null>(null);
   const english = i18n.resolvedLanguage === "en";
   const number = new Intl.NumberFormat(english ? "en" : "fa-IR", { maximumFractionDigits: 1 });
 
@@ -73,9 +75,17 @@ export function AdminMealCataloguePage() {
             {page.items.map((meal) => (
               <article className="admin-template-card admin-meal-card" key={meal.id}>
                 <header>
-                  <div>
+                  <div className="admin-meal-card__identity">
+                    <MealThumbnail
+                      alt={english ? meal.name_en : meal.name_fa}
+                      className="admin-meal-card__image"
+                      fallbackLabel={t("admin.meals.imageFallback", { name: english ? meal.name_en : meal.name_fa })}
+                      imageUrl={meal.image_url}
+                    />
+                    <div>
                     <p className="eyebrow">{meal.code} · {t(`admin.meals.categories.${meal.category}`)}</p>
                     <h2>{english ? meal.name_en : meal.name_fa}</h2>
+                    </div>
                   </div>
                   <span className={`admin-meal-status admin-meal-status--${meal.verification_status}`}>
                     {t(`admin.meals.status.${meal.verification_status}`)}
@@ -92,6 +102,7 @@ export function AdminMealCataloguePage() {
                 </ul>
                 <footer>
                   <Link aria-label={t("admin.meals.editAria", { name: english ? meal.name_en : meal.name_fa })} to={`/admin/nutrition-meals/${meal.id}/edit`}>{t("admin.meals.edit")}</Link>
+                  <button aria-label={t("admin.meals.imageActionAria", { action: t(meal.image_url ? "admin.meals.replaceImage" : "admin.meals.uploadImage"), name: english ? meal.name_en : meal.name_fa })} type="button" onClick={() => setImageMeal(meal)}>{t(meal.image_url ? "admin.meals.replaceImage" : "admin.meals.uploadImage")}</button>
                   <span>{t("admin.meals.referenceNote")}</span>
                 </footer>
               </article>
@@ -100,6 +111,60 @@ export function AdminMealCataloguePage() {
         )}
         {state === "ready" && <div className="admin-template-add-program"><Link className="admin-primary-link" to={`/admin/nutrition-meals/new?category=${category}`}>{t("admin.meals.add")}</Link></div>}
       </main>
+      {imageMeal && (
+        <MealImageDialog
+          meal={imageMeal}
+          onClose={() => setImageMeal(null)}
+          onSaved={(imageUrl) => {
+            setPage((current) => current === null ? current : {
+              ...current,
+              items: current.items.map((meal) => meal.id === imageMeal.id ? { ...meal, image_url: imageUrl } : meal),
+            });
+            setImageMeal(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function MealImageDialog({ meal, onClose, onSaved }: {
+  meal: AdminMealCatalogueItem;
+  onClose: () => void;
+  onSaved: (imageUrl: string) => void;
+}) {
+  const { i18n, t } = useTranslation();
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
+  const name = i18n.resolvedLanguage === "en" ? meal.name_en : meal.name_fa;
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!file) return;
+    setSaving(true);
+    setError(false);
+    try {
+      const saved = await uploadAdminMealImage(meal.id, file);
+      onSaved(saved.image_url);
+    } catch {
+      setError(true);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="admin-meal-image-dialog" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section aria-label={t("admin.meals.imageDialog", { name })} role="dialog" aria-modal="true">
+        <header><h2>{t(meal.image_url ? "admin.meals.replaceImage" : "admin.meals.uploadImage")}</h2><button aria-label={t("admin.meals.closeImage")} type="button" onClick={onClose}>×</button></header>
+        <p>{t("admin.meals.imageHint")}</p>
+        <form onSubmit={(event) => void submit(event)}>
+          <label>{t("admin.meals.imageInput")}<input accept="image/gif,image/jpeg,image/png,image/webp" type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>
+          {file && <small>{file.name}</small>}
+          {error && <p role="alert">{t("admin.meals.imageError")}</p>}
+          <button disabled={saving || !file} type="submit">{saving ? t("admin.meals.savingImage") : t("admin.meals.saveImage")}</button>
+        </form>
+      </section>
     </div>
   );
 }

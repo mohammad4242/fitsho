@@ -167,6 +167,10 @@ export type WeeklyPlan = {
       id: string;
       catalogue_meal_id?: string | null;
       catalogue_meal_category?: string | null;
+      name_fa: string | null;
+      name_en: string | null;
+      meal_code: string | null;
+      image_url: string | null;
       slot_role: "main_meal" | "snack";
       slot_index: number;
       target_distribution: Record<string, number>;

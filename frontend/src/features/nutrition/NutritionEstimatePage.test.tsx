@@ -84,6 +84,12 @@ const weeklyPlan: WeeklyPlan = {
     cost_irr: 1_000_000,
     meals: [{
       id: `meal-${index}`,
+      catalogue_meal_id: "catalogue-meal-1",
+      catalogue_meal_category: "lunch",
+      name_fa: "جوجه کباب + برنج + گوجه کبابی",
+      name_en: "Chicken kebab, rice, and grilled tomato",
+      meal_code: "LU01",
+      image_url: "/media/meal-catalogue/lu01.png",
       slot_role: "main_meal" as const,
       slot_index: 0,
       target_distribution: { goal_calories: 700 },
@@ -176,6 +182,19 @@ it("keeps the red pending status for a plan awaiting physician approval", async 
 
   const supervision = (await screen.findByRole("heading", { name: "تحت نظر پزشک" })).closest("section");
   expect(within(supervision!).getByText("در انتظار تأیید پزشک")).toHaveClass("nutrition-doctor-status--pending");
+});
+
+it("shows the catalogue meal title and thumbnail in the weekly plan", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  expect(await screen.findByText("LU01 — جوجه کباب + برنج + گوجه کبابی")).toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "جوجه کباب + برنج + گوجه کبابی" })).toHaveAttribute(
+    "src", "/media/meal-catalogue/lu01.png",
+  );
+  expect(screen.queryByText("catalogue-meal-1")).not.toBeInTheDocument();
 });
 
 it("uses one compact weekly nutrition plan action", async () => {

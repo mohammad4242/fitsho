@@ -5,8 +5,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
+from app.config import Settings
 
 ORIGIN = {"Origin": "http://localhost:5173"}
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 
 
 def _register_admin(client: TestClient, db: Session) -> None:
@@ -168,6 +170,7 @@ def test_admin_lists_and_updates_meals_with_bounded_ingredients(
     ]
     assert len(listed.json()["items"]) == 8
     breakfast = next(item for item in listed.json()["items"] if item["code"] == "BF02")
+    assert breakfast["image_url"] is None
     meal_id = breakfast["id"]
 
     updated = client.put(
@@ -206,6 +209,48 @@ def test_admin_lists_and_updates_meals_with_bounded_ingredients(
     assert body["category"] == "breakfast"
     assert body["items"][1]["is_required"] is False
     assert body["items"][1]["max_grams"] == 120
+
+
+def test_admin_uploads_and_replaces_meal_catalogue_image(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.meal_catalogue import seed_meal_catalogue
+    from app.nutrition.models import NutritionCatalogueMeal
+
+    seed_base_iranian_food_catalogue(db)
+    _add_required_imported_foods(db)
+    seed_meal_catalogue(db)
+    _register_admin(client, db)
+    meal = db.scalar(select(NutritionCatalogueMeal).where(NutritionCatalogueMeal.code == "LU01"))
+    assert meal is not None
+
+    first = client.post(
+        f"/api/v1/nutrition/admin/meals/{meal.id}/image",
+        headers=ORIGIN,
+        files={"file": ("meal.png", PNG_BYTES, "image/png")},
+    )
+
+    assert first.status_code == 200
+    first_url = first.json()["image_url"]
+    assert first_url.startswith("/media/meal-catalogue/")
+    first_path = test_settings.media_root / first_url.removeprefix("/media/")
+    assert first_path.read_bytes() == PNG_BYTES
+
+    second = client.post(
+        f"/api/v1/nutrition/admin/meals/{meal.id}/image",
+        headers=ORIGIN,
+        files={"file": ("replacement.png", PNG_BYTES + b"replacement", "image/png")},
+    )
+
+    assert second.status_code == 200
+    assert second.json()["image_url"] != first_url
+    assert not first_path.exists()
+    listed = client.get("/api/v1/nutrition/admin/meals?category=lunch").json()["items"]
+    saved_meal = next(item for item in listed if item["id"] == str(meal.id))
+    assert saved_meal["image_url"] == second.json()["image_url"]
 
 
 def test_admin_rejects_verified_meal_with_draft_food_or_invalid_bounds(

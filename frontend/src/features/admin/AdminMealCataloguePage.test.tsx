@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const adminApi = vi.hoisted(() => ({ getAdminMealCatalogue: vi.fn() }));
+const adminApi = vi.hoisted(() => ({
+  getAdminMealCatalogue: vi.fn(),
+  uploadAdminMealImage: vi.fn(),
+}));
 vi.mock("./api", () => adminApi);
 vi.mock("../auth/AuthContext", () => ({
   useAuth: () => ({
@@ -23,6 +26,7 @@ beforeEach(() => {
       code: "BF02",
       name_fa: "تخم‌مرغ نیمرو با نان و گوجه خردشده",
       name_en: "Fried eggs with bread and chopped tomato",
+      image_url: null,
       category: "breakfast",
       verification_status: "draft",
       totals: { energy_kcal: 420 },
@@ -45,6 +49,7 @@ it("shows all five categories and meals linked for editing", async () => {
   expect(screen.getByRole("tab", { name: "صبحانه" })).toHaveAttribute("aria-selected", "true");
   expect(screen.getByText("۵۰ تا ۲۰۰ گرم")).toBeInTheDocument();
   expect(screen.getByText("الزامی")).toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "تصویر پیش‌فرض تخم‌مرغ نیمرو با نان و گوجه خردشده" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "ویرایش وعده: تخم‌مرغ نیمرو با نان و گوجه خردشده" })).toHaveAttribute(
     "href", "/admin/nutrition-meals/meal-1/edit",
   );
@@ -54,4 +59,33 @@ it("shows all five categories and meals linked for editing", async () => {
 
   await user.click(screen.getByRole("tab", { name: "ناهار" }));
   expect(adminApi.getAdminMealCatalogue).toHaveBeenLastCalledWith("lunch");
+});
+
+it("shows meal thumbnails and replaces an uploaded image", async () => {
+  const user = userEvent.setup();
+  adminApi.getAdminMealCatalogue.mockResolvedValue({
+    categories: ["breakfast", "lunch", "post_workout", "snack", "dinner"],
+    items: [{
+      id: "meal-1", code: "BF02", name_fa: "املت", name_en: "Omelette",
+      image_url: "/media/meal-catalogue/omelette.png", category: "breakfast",
+      verification_status: "verified", totals: {}, items: [],
+    }],
+  });
+  adminApi.uploadAdminMealImage.mockResolvedValue({
+    image_url: "/media/meal-catalogue/replacement.png",
+  });
+  render(<MemoryRouter><AdminMealCataloguePage /></MemoryRouter>);
+
+  expect(await screen.findByRole("img", { name: "املت" })).toHaveAttribute(
+    "src", "/media/meal-catalogue/omelette.png",
+  );
+  await user.click(screen.getByRole("button", { name: "جایگزینی تصویر املت" }));
+  const file = new File(["image"], "replacement.png", { type: "image/png" });
+  await user.upload(screen.getByLabelText("تصویر وعده"), file);
+  await user.click(screen.getByRole("button", { name: "ذخیره تصویر" }));
+
+  expect(adminApi.uploadAdminMealImage).toHaveBeenCalledWith("meal-1", file);
+  expect(await screen.findByRole("img", { name: "املت" })).toHaveAttribute(
+    "src", "/media/meal-catalogue/replacement.png",
+  );
 });

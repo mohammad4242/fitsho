@@ -127,8 +127,10 @@ def program_response(program: NutritionProgram) -> NutritionProgramResponse:
                         category=slot.category,
                         meal=NutritionProgramMealReference(
                             id=slot.meal.id,
+                            meal_code=slot.meal.code,
                             name_fa=slot.meal.name_fa,
                             name_en=slot.meal.name_en,
+                            image_url=slot.meal.image_path,
                             category=slot.meal.category,
                         ),
                     )

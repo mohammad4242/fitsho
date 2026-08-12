@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import foodAccent from "../../assets/landing/food.webp";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
+import { MealThumbnail } from "../../shared/MealThumbnail";
 import {
   archiveAdminNutritionProgram,
   getAdminNutritionPrograms,
@@ -116,7 +117,10 @@ export function AdminNutritionProgramsPage() {
                     {program.days.map((day) => (
                       <section className="admin-program-day" key={day.id}>
                         <strong>{t("admin.nutritionPrograms.day", { number: day.day_number })}</strong>
-                        <ul>{day.slots.map((slot) => <li key={slot.id}><span>{t(`admin.meals.categories.${slot.category}`)}</span><b>{english ? slot.meal.name_en : slot.meal.name_fa}</b></li>)}</ul>
+                        <ul>{day.slots.map((slot) => {
+                          const mealName = english ? slot.meal.name_en : slot.meal.name_fa;
+                          return <li key={slot.id}><span>{t(`admin.meals.categories.${slot.category}`)}</span><div className="admin-program-meal"><MealThumbnail alt={mealName} className="admin-program-meal__image" fallbackLabel={t("admin.meals.imageFallback", { name: mealName })} imageUrl={slot.meal.image_url} /><b>{slot.meal.meal_code} — {mealName}</b></div></li>;
+                        })}</ul>
                       </section>
                     ))}
                   </div>

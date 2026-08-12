@@ -1,0 +1,25 @@
+.meal-thumbnail {
+  display: block;
+  flex: 0 0 auto;
+  object-fit: cover;
+  overflow: hidden;
+  border-radius: .7rem;
+  background: #e8efea;
+}
+
+.meal-thumbnail--fallback {
+  display: grid;
+  place-items: center;
+  color: #60766d;
+  background: linear-gradient(145deg, #edf3ef, #dbe7e0);
+}
+
+.meal-thumbnail--fallback svg {
+  width: 62%;
+  height: 62%;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}

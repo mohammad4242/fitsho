@@ -477,6 +477,7 @@ class CatalogueMealResponse(BaseModel):
     code: str
     name_fa: str
     name_en: str
+    image_url: str | None
     category: MealCategory
     verification_status: Literal["draft", "verified", "retired"]
     items: list[CatalogueMealItemResponse]
@@ -486,6 +487,10 @@ class CatalogueMealResponse(BaseModel):
 class CatalogueMealPageResponse(BaseModel):
     items: list[CatalogueMealResponse]
     categories: list[MealCategory]
+
+
+class CatalogueMealImageResponse(BaseModel):
+    image_url: str
 
 
 class NutritionProgramSlotWrite(BaseModel):
@@ -543,8 +548,10 @@ class NutritionProgramWrite(BaseModel):
 
 class NutritionProgramMealReference(BaseModel):
     id: UUID
+    meal_code: str
     name_fa: str
     name_en: str
+    image_url: str | None
     category: MealCategory
 
 
@@ -617,6 +624,10 @@ class WeeklyPlanMealResponse(BaseModel):
     id: UUID
     catalogue_meal_id: UUID | None
     catalogue_meal_category: str | None
+    name_fa: str | None
+    name_en: str | None
+    meal_code: str | None
+    image_url: str | None
     slot_role: str
     slot_index: int
     target_distribution: dict[str, float]
