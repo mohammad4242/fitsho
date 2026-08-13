@@ -33,8 +33,12 @@ beforeEach(() => {
   });
   adminApi.previewAdminPreparedRecipe.mockResolvedValue({
     final_cooked_yield_grams: 250,
-    nutrients_per_100g: { energy_kcal: 150, protein_g: 12, iron_mg: 2.5 },
-    estimated_cost_irr_per_100g: 40000,
+    nutrients_per_100g: {
+      energy_kcal: 150.12345678,
+      protein_g: 12.3456789,
+      iron_mg: 2.5,
+    },
+    estimated_cost_irr_per_100g: 40000.987654,
     price_reference_ids: ["price-1"],
   });
 });
@@ -66,8 +70,11 @@ it("switches to Prepared Recipe and recalculates a bounded recipe preview", asyn
   await user.clear(screen.getByLabelText("وزن نهایی غذای پخته (گرم)"));
   await user.type(screen.getByLabelText("وزن نهایی غذای پخته (گرم)"), "250");
 
-  expect(await screen.findByText("150 kcal / 100 g")).toBeInTheDocument();
+  expect(await screen.findByText("150.123 kcal / 100 g")).toBeInTheDocument();
+  expect(screen.getByText("protein_g: 12.346")).toBeInTheDocument();
   expect(screen.getByText("iron_mg: 2.5")).toBeInTheDocument();
+  expect(screen.getByText("40000.988 IRR / 100 g")).toBeInTheDocument();
+  expect(screen.queryByText(/150\.1234/)).not.toBeInTheDocument();
   expect(adminApi.previewAdminPreparedRecipe).toHaveBeenCalled();
 });
 
