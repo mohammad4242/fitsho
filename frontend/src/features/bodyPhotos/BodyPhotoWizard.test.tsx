@@ -101,6 +101,23 @@ it("requires operational consent before the confirm upload action is enabled", a
   expect(screen.getByRole("button", { name: /confirm and upload front/i })).toBeEnabled();
 });
 
+it("explains how to recover when the phone origin is not trusted", async () => {
+  const user = userEvent.setup();
+  const processor: BodyPhotoProcessor = { process: vi.fn().mockResolvedValue(processed("front")) };
+  api.createBodyPhotoSession.mockRejectedValueOnce(
+    new ApiError(403, "Untrusted request origin"),
+  );
+  renderWizard(processor);
+
+  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
+  await user.click(screen.getByRole("button", { name: /confirm and upload front/i }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    /current phone address is not trusted by fitsho/i,
+  );
+});
+
 it("replaces only the rejected view in an existing photo session", async () => {
   const user = userEvent.setup();
   const processor: BodyPhotoProcessor = { process: vi.fn().mockResolvedValue(processed("side")) };

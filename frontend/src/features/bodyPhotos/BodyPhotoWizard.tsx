@@ -399,6 +399,13 @@ function processingErrorMessage(error: unknown, t: ReturnType<typeof useTranslat
 }
 
 function uploadErrorMessage(error: unknown, t: ReturnType<typeof useTranslation>["t"]): string {
+  if (
+    error instanceof ApiError
+    && error.status === 403
+    && error.message === "Untrusted request origin"
+  ) {
+    return t("bodyPhotos.errors.untrustedOrigin");
+  }
   if (error instanceof ApiError && error.code !== null) {
     return t(`bodyPhotos.errors.${error.code}`, { defaultValue: t("bodyPhotos.errors.upload") });
   }

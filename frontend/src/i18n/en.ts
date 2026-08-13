@@ -882,6 +882,7 @@ const en = {
         insufficient_lighting: "The image lighting is not sufficient for analysis.",
         image_too_blurry: "The image is too blurry. Hold the camera steady and retake it.",
         segmentation_unavailable: "The body could not be separated from the background. Try again in a supported browser.",
+        untrustedOrigin: "The current phone address is not trusted by Fitsho. Reopen the current Fitsho link and try again.",
         upload: "The standardized photo could not be uploaded. Try again.",
         submit: "The photo session could not be submitted. Try again.",
         analysisNotStarted: "Photos were submitted successfully, but body analysis has not started. Check the Body photo analysis task in Admin settings.",

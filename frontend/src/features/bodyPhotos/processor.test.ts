@@ -113,7 +113,7 @@ describe("BrowserBodyPhotoProcessor", () => {
     expect(runtime.normalizeBackground).toHaveBeenCalledWith(
       decoded,
       expect.objectContaining({ confidence: expect.any(Float32Array) }),
-      expect.objectContaining({ background: [183, 186, 184] }),
+      expect.objectContaining({ background: [160, 163, 161] }),
     );
   });
 

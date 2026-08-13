@@ -142,7 +142,7 @@ const limits = {
   frameMargin: 0.005,
   targetWidth: 1200,
   outputQuality: 0.9,
-  neutralGray: [183, 186, 184] as const,
+  neutralGray: [160, 163, 161] as const,
 } as const;
 
 const landmarkGroups = {
