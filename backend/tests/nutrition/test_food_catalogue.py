@@ -96,6 +96,49 @@ def test_base_catalogue_seed_contains_user_approved_iranian_ingredients(db: Sess
     assert all(food.verification_status.value == "verified" for food in approved)
 
 
+def test_base_seed_supplies_source_backed_foundation_foods_for_complete_meal_seed(
+    db: Session,
+) -> None:
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.meal_catalogue import seed_meal_catalogue
+    from app.nutrition.models import NutritionCatalogueFood
+
+    seed_base_iranian_food_catalogue(db, commit=False)
+    meals = seed_meal_catalogue(db, commit=False)
+
+    foundation_foods = {
+        food.slug: food
+        for food in db.scalars(
+            select(NutritionCatalogueFood).where(
+                NutritionCatalogueFood.slug.in_(
+                    {"creamy-peanut-butter", "wheat-flour", "green-beans", "tomato-paste"}
+                )
+            )
+        )
+    }
+    assert len(meals) == 38
+    assert set(foundation_foods) == {
+        "creamy-peanut-butter",
+        "wheat-flour",
+        "green-beans",
+        "tomato-paste",
+    }
+    assert all(food.verification_status.value == "verified" for food in foundation_foods.values())
+    assert {food.source_food_id for food in foundation_foods.values()} == {
+        "2262072",
+        "790018",
+        "2346400",
+        "2685580",
+    }
+    peanut_butter = foundation_foods["creamy-peanut-butter"]
+    assert peanut_butter.source_food_id == "2262072"
+    assert peanut_butter.verification_status.value == "verified"
+    assert peanut_butter.source_reference.endswith("/2262072/nutrients")
+    values = {row.nutrient_code: row.value_per_100g for row in peanut_butter.compositions}
+    assert values["energy_kcal"] == Decimal("631.65")
+    assert values["protein_g"] == Decimal("23.99124")
+
+
 def test_approved_catalogue_keeps_identity_aliases_and_composition_separate(db: Session) -> None:
     from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
     from app.nutrition.models import (
@@ -130,7 +173,7 @@ def test_approved_catalogue_keeps_identity_aliases_and_composition_separate(db: 
     assert "added_sugars_g" not in values
 
 
-def test_approved_catalogue_has_all_65_identities_and_source_backed_breads_are_verified(
+def test_approved_catalogue_has_all_69_identities_and_source_backed_breads_are_verified(
     db: Session,
 ) -> None:
     from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
@@ -140,7 +183,7 @@ def test_approved_catalogue_has_all_65_identities_and_source_backed_breads_are_v
 
     foods = db.scalars(select(NutritionCatalogueFood)).all()
     current = [food for food in foods if food.verification_status.value != "retired"]
-    assert len(current) == 65
+    assert len(current) == 69
     statuses = {food.slug: food.verification_status.value for food in current}
     assert statuses["sangak-bread"] == "verified"
     assert statuses["barbari-bread"] == "verified"

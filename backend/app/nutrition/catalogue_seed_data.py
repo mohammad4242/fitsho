@@ -12,6 +12,8 @@ USDA_SOURCE_NAME = "USDA FoodData Central SR Legacy"
 USDA_SOURCE_REFERENCE = "https://fdc.nal.usda.gov/download-datasets/"
 USDA_DATA_VERSION = "sr-legacy-2018-04"
 USDA_ACCESS_DATE = "2026-08-09"
+USDA_FOUNDATION_SOURCE_NAME = "USDA FoodData Central Foundation Foods"
+USDA_FOUNDATION_ACCESS_DATE = "2026-08-13"
 IRANIAN_BREAD_MACRO_SOURCE_NAME = "Glycemic Index Values for Major Carbohydrates in Iran"
 IRANIAN_BREAD_MACRO_SOURCE_REFERENCE = "https://doi.org/10.5812/ijem.99793"
 IRANIAN_BREAD_MACRO_DATA_VERSION = "ijem-2020-e99793"
@@ -319,6 +321,16 @@ APPROVED_FOODS = (
         ),
     ),
     _food("oats", "جو دوسر", "Oats", "grains", "main_staple", "dry", "173904", "اوتمیل"),
+    _food(
+        "wheat-flour",
+        "آرد گندم سفید",
+        "Wheat flour",
+        "grains",
+        "main_staple",
+        "dry",
+        "790018",
+        "آرد سفید",
+    ),
     _food("barley", "جو", "Barley", "grains", "main_staple", "dry", "170284", "جو پوست کنده"),
     _food(
         "potato",
@@ -354,6 +366,16 @@ APPROVED_FOODS = (
         "پنیر کم چرب",
     ),
     _food("tomato", "گوجه‌فرنگی", "Tomato", "vegetables", "flexible", "raw", "170457", "گوجه فرنگی"),
+    _food(
+        "tomato-paste",
+        "رب گوجه‌فرنگی",
+        "Tomato paste",
+        "vegetables",
+        "flexible",
+        "as_purchased",
+        "2685580",
+        "رب گوجه فرنگی",
+    ),
     _food("cucumber", "خیار", "Cucumber", "vegetables", "flexible", "raw", "168409"),
     _food("onion", "پیاز", "Onion", "vegetables", "flexible", "raw", "170000"),
     _food("carrot", "هویج", "Carrot", "vegetables", "flexible", "raw", "170393"),
@@ -375,6 +397,15 @@ APPROVED_FOODS = (
     _food("mushroom", "قارچ", "Mushroom", "vegetables", "flexible", "raw", "169251"),
     _food("celery", "کرفس", "Celery", "vegetables", "flexible", "raw", "169988"),
     _food("broccoli", "بروکلی", "Broccoli", "vegetables", "flexible", "raw", "170379"),
+    _food(
+        "green-beans",
+        "لوبیا سبز",
+        "Green beans",
+        "vegetables",
+        "flexible",
+        "raw",
+        "2346400",
+    ),
     _food(
         "cauliflower", "گل‌کلم", "Cauliflower", "vegetables", "flexible", "raw", "169986", "گل کلم"
     ),
@@ -404,6 +435,16 @@ APPROVED_FOODS = (
     _food("almonds", "بادام", "Almonds", "nuts_seeds", "flexible", "raw", "170567"),
     _food(
         "peanuts", "بادام‌زمینی", "Peanuts", "nuts_seeds", "flexible", "raw", "172430", "بادام زمینی"
+    ),
+    _food(
+        "creamy-peanut-butter",
+        "کره بادام‌زمینی",
+        "Creamy peanut butter",
+        "nuts_seeds",
+        "flexible",
+        "as_purchased",
+        "2262072",
+        "کره بادام زمینی",
     ),
     _food("sesame", "کنجد", "Sesame", "nuts_seeds", "flexible", "raw", "170150"),
     _food("tahini", "ارده", "Tahini", "nuts_seeds", "flexible", "as_purchased", "170189"),
@@ -527,8 +568,96 @@ _BREAD_COMPOSITIONS = {
     },
 }
 
+_FOUNDATION_COMPOSITIONS: dict[str, tuple[str, str, dict[str, str]]] = {
+    "creamy-peanut-butter": (
+        "2262072",
+        "2022-04-28",
+        {
+            "energy_kcal": "631.65",
+            "protein_g": "23.99124",
+            "carbohydrate_g": "22.70376",
+            "total_fat_g": "49.43",
+            "fibre_g": "6.323",
+            "saturated_fat_g": "8.415",
+            "sodium_mg": "220.7",
+            "calcium_mg": "49.85",
+            "potassium_mg": "654",
+            "magnesium_mg": "192.6",
+            "iron_mg": "1.853",
+            "zinc_mg": "3.062",
+            "copper_mg": "0.5405",
+        },
+    ),
+    "wheat-flour": (
+        "790018",
+        "2020-04-01",
+        {
+            "energy_kcal": "362",
+            "protein_g": "12",
+            "carbohydrate_g": "74.6",
+            "total_fat_g": "1.7",
+            "fibre_g": "3",
+            "sodium_mg": "2",
+            "calcium_mg": "22",
+            "potassium_mg": "150",
+            "magnesium_mg": "36.1",
+            "iron_mg": "1.18",
+            "zinc_mg": "1.15",
+        },
+    ),
+    "green-beans": (
+        "2346400",
+        "2022-10-28",
+        {
+            "energy_kcal": "39.9998",
+            "protein_g": "1.96875",
+            "carbohydrate_g": "7.41245",
+            "total_fat_g": "0.275",
+            "fibre_g": "3.011",
+            "sodium_mg": "0",
+            "calcium_mg": "40.05",
+            "potassium_mg": "290.4",
+            "magnesium_mg": "28.21",
+            "iron_mg": "0.6516",
+            "zinc_mg": "0.3498",
+        },
+    ),
+    "tomato-paste": (
+        "2685580",
+        "2024-04-18",
+        {
+            "energy_kcal": "104.2825",
+            "protein_g": "4.234375",
+            "carbohydrate_g": "20.188125",
+            "total_fat_g": "0.7325",
+            "fibre_g": "4.704",
+            "sodium_mg": "61.15",
+            "calcium_mg": "36.85",
+            "potassium_mg": "971.6",
+            "magnesium_mg": "49.61",
+            "iron_mg": "3.185",
+            "zinc_mg": "0.5113",
+            "vitamin_c_mg": "18.4",
+        },
+    ),
+}
+
 
 def composition_seeds_for(slug: str) -> tuple[FoodCompositionSeed, ...]:
+    foundation = _FOUNDATION_COMPOSITIONS.get(slug)
+    if foundation is not None:
+        fdc_id, published_date, values = foundation
+        return tuple(
+            FoodCompositionSeed(
+                nutrient_code=code,
+                value_per_100g=Decimal(value),
+                source_name=USDA_FOUNDATION_SOURCE_NAME,
+                source_reference=f"https://fdc.nal.usda.gov/food-details/{fdc_id}/nutrients",
+                data_version=f"fdc-{fdc_id}-published-{published_date}",
+                source_access_date=USDA_FOUNDATION_ACCESS_DATE,
+            )
+            for code, value in values.items()
+        )
     bread = _BREAD_COMPOSITIONS.get(slug)
     if bread is None:
         return tuple(
