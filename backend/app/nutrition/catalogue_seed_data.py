@@ -149,7 +149,19 @@ APPROVED_FOODS = (
         "173627",
         "ران مرغ",
     ),
-    _food("beef", "گوشت گوساله", "Beef", "red_meat", "main_protein", "raw", "174030", "گوشت گاو"),
+    _food(
+        "ground-beef",
+        "گوشت چرخ‌کرده گوساله (۱۰٪ چربی)",
+        "Ground beef, 90% lean / 10% fat",
+        "red_meat",
+        "main_protein",
+        "raw",
+        "174030",
+        "گوشت چرخ‌کرده گوساله",
+        "گوشت چرخ کرده گوساله",
+        "گوشت گاو چرخ‌کرده",
+        "Beef",
+    ),
     _food("lamb", "گوشت گوسفند", "Lamb", "red_meat", "main_protein", "raw", "174370"),
     _food("white-fish", "ماهی سفید", "White fish", "fish", "main_protein", "raw", "173711"),
     _food(
@@ -365,6 +377,17 @@ APPROVED_FOODS = (
         "172182",
         "پنیر کم چرب",
     ),
+    _food(
+        "mozzarella",
+        "پنیر موزارلا",
+        "Low-moisture whole-milk mozzarella",
+        "dairy",
+        "flexible",
+        "as_purchased",
+        "170846",
+        "پنیر پیتزا",
+        "موزارلا",
+    ),
     _food("tomato", "گوجه‌فرنگی", "Tomato", "vegetables", "flexible", "raw", "170457", "گوجه فرنگی"),
     _food(
         "tomato-paste",
@@ -458,6 +481,17 @@ APPROVED_FOODS = (
     _food("dates", "خرما", "Dates", "fruit", "snack", "raw", "171726"),
     _food("raisins", "کشمش", "Raisins", "fruit", "snack", "raw", "168165"),
     _food(
+        "barberries",
+        "زرشک",
+        "Dried barberries",
+        "fruit",
+        "flexible",
+        "dry",
+        "0945",
+        "زرشک خشک",
+        "زرشک پلویی",
+    ),
+    _food(
         "strawberries", "توت‌فرنگی", "Strawberries", "fruit", "snack", "raw", "167762", "توت فرنگی"
     ),
     _food("watermelon", "هندوانه", "Watermelon", "fruit", "snack", "raw", "167765"),
@@ -468,7 +502,7 @@ APPROVED_FOODS = (
 _COMPOSITION_CSV = """slug|energy_kcal|protein_g|carbohydrate_g|total_fat_g|fibre_g|total_sugars_g|saturated_fat_g|sodium_mg|calcium_mg|potassium_mg|magnesium_mg|iron_mg|zinc_mg|vitamin_c_mg|vitamin_d_mcg|vitamin_b12_mcg|folate_dfe_mcg
 chicken-breast|120|22.5|0|2.62|0|0|0.563|45|5|334|28|0.37|0.68|0|0|0.21|9
 chicken-thigh-skinless|121|19.66|0|4.12|0|0|1.097|95|7|242|23|0.81|1.58|0|0|0.61|4
-beef|176|20|0|10|0|0|3.927|66|12|321|20|2.24|4.79|0|0.1|2.21|6
+ground-beef|176|20|0|10|0|0|3.927|66|12|321|20|2.24|4.79|0|0.1|2.21|6
 lamb|282|16.56|0|23.41|0|0|10.19|59|16|222|21|1.55|3.41|0|0.1|2.31|18
 white-fish|134|19.09|0|5.86|0|0|0.906|51|26|317|33|0.37|0.99|0|12|1|15
 rainbow-trout|141|19.94|0|6.18|0|0|1.383|51|25|377|25|0.31|0.45|2.9|15.9|4.3|11
@@ -637,13 +671,99 @@ _FOUNDATION_COMPOSITIONS: dict[str, tuple[str, str, dict[str, str]]] = {
             "magnesium_mg": "49.61",
             "iron_mg": "3.185",
             "zinc_mg": "0.5113",
+            "copper_mg": "0.295",
             "vitamin_c_mg": "18.4",
+        },
+    ),
+}
+
+_OTHER_SOURCE_COMPOSITIONS: dict[str, tuple[str, str, str, str, dict[str, str]]] = {
+    "barberries": (
+        "Czech Food Composition Database",
+        "https://www.nutridatabaze.cz/en/food/?id=945",
+        "version-10.25",
+        "2026-08-13",
+        {
+            "energy_kcal": "334",
+            "protein_g": "4.2",
+            "carbohydrate_g": "80.6",
+            "total_fat_g": "2",
+            "fibre_g": "11.5",
+            "total_sugars_g": "48.2",
+            "saturated_fat_g": "0.48",
+            "sodium_mg": "12",
+        },
+    ),
+    "mozzarella": (
+        USDA_SOURCE_NAME,
+        "https://fdc.nal.usda.gov/food-details/170846/nutrients",
+        USDA_DATA_VERSION,
+        "2026-08-13",
+        {
+            "energy_kcal": "318",
+            "protein_g": "21.6",
+            "carbohydrate_g": "2.47",
+            "total_fat_g": "24.64",
+            "fibre_g": "0",
+            "total_sugars_g": "1.01",
+            "saturated_fat_g": "15.561",
+            "sodium_mg": "710",
+            "calcium_mg": "575",
+            "potassium_mg": "75",
+            "magnesium_mg": "21",
+            "iron_mg": "0.2",
+            "zinc_mg": "2.46",
+            "copper_mg": "0.022",
+            "vitamin_c_mg": "0",
+            "vitamin_d_mcg": "0.5",
+            "vitamin_b12_mcg": "0.73",
+            "folate_dfe_mcg": "8",
+        },
+    ),
+    "ground-beef": (
+        USDA_SOURCE_NAME,
+        "https://fdc.nal.usda.gov/food-details/174030/nutrients",
+        USDA_DATA_VERSION,
+        "2026-08-13",
+        {
+            "energy_kcal": "176",
+            "protein_g": "20",
+            "carbohydrate_g": "0",
+            "total_fat_g": "10",
+            "fibre_g": "0",
+            "total_sugars_g": "0",
+            "saturated_fat_g": "3.927",
+            "sodium_mg": "66",
+            "calcium_mg": "12",
+            "potassium_mg": "321",
+            "magnesium_mg": "20",
+            "iron_mg": "2.24",
+            "zinc_mg": "4.79",
+            "copper_mg": "0.072",
+            "vitamin_c_mg": "0",
+            "vitamin_d_mcg": "0.1",
+            "vitamin_b12_mcg": "2.21",
+            "folate_dfe_mcg": "6",
         },
     ),
 }
 
 
 def composition_seeds_for(slug: str) -> tuple[FoodCompositionSeed, ...]:
+    other_source = _OTHER_SOURCE_COMPOSITIONS.get(slug)
+    if other_source is not None:
+        source_name, source_reference, data_version, source_access_date, values = other_source
+        return tuple(
+            FoodCompositionSeed(
+                nutrient_code=code,
+                value_per_100g=Decimal(value),
+                source_name=source_name,
+                source_reference=source_reference,
+                data_version=data_version,
+                source_access_date=source_access_date,
+            )
+            for code, value in values.items()
+        )
     foundation = _FOUNDATION_COMPOSITIONS.get(slug)
     if foundation is not None:
         fdc_id, published_date, values = foundation

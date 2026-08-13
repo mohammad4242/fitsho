@@ -349,6 +349,18 @@ def seed_base_iranian_food_catalogue(
     db: Session, *, commit: bool = True
 ) -> list[NutritionCatalogueFood]:
     """Upsert the approved identities and only verify source-backed compositions."""
+    legacy_beef = db.scalar(
+        select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "beef")
+    )
+    ground_beef = db.scalar(
+        select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "ground-beef")
+    )
+    if legacy_beef is not None and ground_beef is not None:
+        raise ValueError("Duplicate beef and ground-beef catalogue identities")
+    if legacy_beef is not None:
+        legacy_beef.slug = "ground-beef"
+        db.flush()
+
     for legacy_slug in ("cooked-basmati-rice", "grilled-chicken-breast"):
         legacy = db.scalar(
             select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == legacy_slug)
@@ -398,8 +410,11 @@ def seed_base_iranian_food_catalogue(
         food.source_access_date = (
             date.fromisoformat(compositions[0].source_access_date) if compositions else None
         )
+        composition_codes = {composition.nutrient_code for composition in compositions}
         food.verification_status = (
-            FoodVerificationStatus.VERIFIED if compositions else FoodVerificationStatus.DRAFT
+            FoodVerificationStatus.VERIFIED
+            if not REQUIRED_PRIMARY_NUTRIENTS - composition_codes
+            else FoodVerificationStatus.DRAFT
         )
         food.dietary_patterns = _dietary_patterns_for_slug(item.slug)
         food.roles = [NutritionCatalogueFoodRole(role=FoodRoleEnum(role)) for role in item.roles]
@@ -460,14 +475,21 @@ def _dietary_patterns_for_slug(slug: str) -> list[str]:
     omnivore_only = {
         "chicken-breast",
         "chicken-thigh-skinless",
-        "beef",
+        "ground-beef",
         "lamb",
         "white-fish",
         "rainbow-trout",
         "canned-tuna",
         "grilled-chicken-breast",
     }
-    vegetarian = {"egg", "milk", "plain-yogurt", "low-fat-cheese", "butter"}
+    vegetarian = {
+        "egg",
+        "milk",
+        "plain-yogurt",
+        "low-fat-cheese",
+        "mozzarella",
+        "butter",
+    }
     if slug in omnivore_only:
         return ["omnivore"]
     if slug in vegetarian:

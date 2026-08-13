@@ -85,58 +85,186 @@ def test_base_catalogue_seed_contains_user_approved_iranian_ingredients(db: Sess
     foods = db.scalars(select(NutritionCatalogueFood)).all()
     assert {food.slug for food in foods} >= {
         "chicken-breast",
-        "beef",
+        "ground-beef",
         "lentils",
         "basmati-rice",
         "tomato",
         "apple",
         "olive-oil",
     }
-    approved = [food for food in foods if food.slug in {"chicken-breast", "beef", "lentils"}]
+    approved = [food for food in foods if food.slug in {"chicken-breast", "ground-beef", "lentils"}]
     assert all(food.verification_status.value == "verified" for food in approved)
 
 
-def test_base_seed_supplies_source_backed_foundation_foods_for_complete_meal_seed(
-    db: Session,
-) -> None:
+def test_base_seed_contains_exact_requested_source_backed_foods(db: Session) -> None:
     from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
-    from app.nutrition.meal_catalogue import seed_meal_catalogue
     from app.nutrition.models import NutritionCatalogueFood
 
-    seed_base_iranian_food_catalogue(db, commit=False)
-    meals = seed_meal_catalogue(db, commit=False)
+    first = seed_base_iranian_food_catalogue(db, commit=False)
+    second = seed_base_iranian_food_catalogue(db, commit=False)
 
-    foundation_foods = {
+    requested = {
         food.slug: food
         for food in db.scalars(
             select(NutritionCatalogueFood).where(
                 NutritionCatalogueFood.slug.in_(
-                    {"creamy-peanut-butter", "wheat-flour", "green-beans", "tomato-paste"}
+                    {
+                        "creamy-peanut-butter",
+                        "tomato-paste",
+                        "green-beans",
+                        "barberries",
+                        "wheat-flour",
+                        "mozzarella",
+                        "ground-beef",
+                    }
                 )
             )
         )
     }
-    assert len(meals) == 38
-    assert set(foundation_foods) == {
+    assert len(first) == len(second) == 71
+    assert set(requested) == {
         "creamy-peanut-butter",
-        "wheat-flour",
-        "green-beans",
         "tomato-paste",
+        "green-beans",
+        "barberries",
+        "wheat-flour",
+        "mozzarella",
+        "ground-beef",
     }
-    assert all(food.verification_status.value == "verified" for food in foundation_foods.values())
-    assert {food.source_food_id for food in foundation_foods.values()} == {
+    assert all(food.verification_status.value == "verified" for food in requested.values())
+    assert {food.source_food_id for food in requested.values()} == {
         "2262072",
-        "790018",
-        "2346400",
         "2685580",
+        "2346400",
+        "0945",
+        "790018",
+        "170846",
+        "174030",
     }
-    peanut_butter = foundation_foods["creamy-peanut-butter"]
-    assert peanut_butter.source_food_id == "2262072"
-    assert peanut_butter.verification_status.value == "verified"
-    assert peanut_butter.source_reference.endswith("/2262072/nutrients")
-    values = {row.nutrient_code: row.value_per_100g for row in peanut_butter.compositions}
-    assert values["energy_kcal"] == Decimal("631.65")
-    assert values["protein_g"] == Decimal("23.99124")
+    assert {food.slug: food.measurement_basis.value for food in requested.values()} == {
+        "creamy-peanut-butter": "as_purchased",
+        "tomato-paste": "as_purchased",
+        "green-beans": "raw",
+        "barberries": "dry",
+        "wheat-flour": "dry",
+        "mozzarella": "as_purchased",
+        "ground-beef": "raw",
+    }
+    assert requested["ground-beef"].name_fa == "گوشت چرخ‌کرده گوساله (۱۰٪ چربی)"
+    assert requested["ground-beef"].name_en == "Ground beef, 90% lean / 10% fat"
+    assert requested["ground-beef"].dietary_patterns == ["omnivore"]
+    assert requested["mozzarella"].dietary_patterns == ["omnivore", "vegetarian"]
+    assert requested["mozzarella"].aliases
+    assert {alias.alias for alias in requested["mozzarella"].aliases} >= {
+        "پنیر موزارلا",
+        "پنیر پیتزا",
+    }
+    assert (
+        db.scalar(select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "beef"))
+        is None
+    )
+
+
+def test_requested_foods_have_complete_primaries_and_composition_provenance(
+    db: Session,
+) -> None:
+    from app.nutrition.food_catalogue import (
+        REQUIRED_PRIMARY_NUTRIENTS,
+        seed_base_iranian_food_catalogue,
+    )
+    from app.nutrition.models import NutritionCatalogueFood
+
+    seed_base_iranian_food_catalogue(db)
+    slugs = {
+        "creamy-peanut-butter",
+        "tomato-paste",
+        "green-beans",
+        "barberries",
+        "wheat-flour",
+        "mozzarella",
+        "ground-beef",
+    }
+    foods = db.scalars(
+        select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug.in_(slugs))
+    ).all()
+
+    assert len(foods) == 7
+    for food in foods:
+        codes = {composition.nutrient_code for composition in food.compositions}
+        assert codes >= REQUIRED_PRIMARY_NUTRIENTS
+        assert food.verification_status.value == "verified"
+        assert food.source_name
+        assert food.source_reference.startswith("https://")
+        assert food.data_version
+        assert food.source_access_date is not None
+        assert all(composition.source_name for composition in food.compositions)
+        assert all(
+            composition.source_reference.startswith("https://") for composition in food.compositions
+        )
+        assert all(
+            composition.source_food_id == food.source_food_id for composition in food.compositions
+        )
+        assert all(composition.data_version for composition in food.compositions)
+        assert all(composition.source_access_date is not None for composition in food.compositions)
+        assert all(composition.confidence.value == "high" for composition in food.compositions)
+
+
+def test_requested_foods_keep_unavailable_micronutrients_absent(db: Session) -> None:
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.models import NutritionCatalogueFood
+
+    seed_base_iranian_food_catalogue(db)
+    barberries = db.scalar(
+        select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "barberries")
+    )
+    peanut_butter = db.scalar(
+        select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "creamy-peanut-butter")
+    )
+
+    assert barberries is not None
+    assert peanut_butter is not None
+    barberry_values = {
+        composition.nutrient_code: composition.value_per_100g
+        for composition in barberries.compositions
+    }
+    peanut_values = {
+        composition.nutrient_code: composition.value_per_100g
+        for composition in peanut_butter.compositions
+    }
+    assert barberry_values == {
+        "energy_kcal": Decimal("334"),
+        "protein_g": Decimal("4.2"),
+        "carbohydrate_g": Decimal("80.6"),
+        "total_fat_g": Decimal("2"),
+        "fibre_g": Decimal("11.5"),
+        "total_sugars_g": Decimal("48.2"),
+        "saturated_fat_g": Decimal("0.48"),
+        "sodium_mg": Decimal("12"),
+    }
+    assert "total_sugars_g" not in peanut_values
+
+
+def test_seed_keeps_food_draft_when_a_required_primary_is_unavailable(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.nutrition import food_catalogue
+    from app.nutrition.catalogue_seed_data import FoodCompositionSeed, composition_seeds_for
+    from app.nutrition.models import NutritionCatalogueFood
+
+    def without_fibre(slug: str) -> tuple[FoodCompositionSeed, ...]:
+        compositions = composition_seeds_for(slug)
+        if slug == "barberries":
+            return tuple(row for row in compositions if row.nutrient_code != "fibre_g")
+        return compositions
+
+    monkeypatch.setattr(food_catalogue, "composition_seeds_for", without_fibre)
+    food_catalogue.seed_base_iranian_food_catalogue(db)
+
+    barberries = db.scalar(
+        select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "barberries")
+    )
+    assert barberries is not None
+    assert barberries.verification_status.value == "draft"
 
 
 def test_approved_catalogue_keeps_identity_aliases_and_composition_separate(db: Session) -> None:
@@ -173,7 +301,7 @@ def test_approved_catalogue_keeps_identity_aliases_and_composition_separate(db: 
     assert "added_sugars_g" not in values
 
 
-def test_approved_catalogue_has_all_69_identities_and_source_backed_breads_are_verified(
+def test_approved_catalogue_has_all_71_identities_and_source_backed_breads_are_verified(
     db: Session,
 ) -> None:
     from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
@@ -183,7 +311,7 @@ def test_approved_catalogue_has_all_69_identities_and_source_backed_breads_are_v
 
     foods = db.scalars(select(NutritionCatalogueFood)).all()
     current = [food for food in foods if food.verification_status.value != "retired"]
-    assert len(current) == 69
+    assert len(current) == 71
     statuses = {food.slug: food.verification_status.value for food in current}
     assert statuses["sangak-bread"] == "verified"
     assert statuses["barbari-bread"] == "verified"

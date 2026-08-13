@@ -176,7 +176,7 @@ SEED_MEALS: tuple[dict[str, object], ...] = (
         "name_en": "Pasta with ground beef and vegetables",
         "items": (
             item("pasta", 90, 60, 140, C),
-            item("beef", 140, 90, 220, P),
+            item("ground-beef", 140, 90, 220, P),
             item("carrot", 70, 35, 140, M),
             item("bell-pepper", 70, 35, 140, FB),
             item("tomato-paste", 30, 15, 60, M, required=False),
@@ -201,7 +201,7 @@ SEED_MEALS: tuple[dict[str, object], ...] = (
         "name_fa": "قورمه‌سبزی + برنج",
         "name_en": "Ghormeh sabzi with rice",
         "items": (
-            item("beef", 120, 80, 200, P),
+            item("ground-beef", 120, 80, 200, P),
             item("red-kidney-beans", 40, 25, 70, FB),
             item("mixed-herbs", 120, 70, 200, M),
             item("basmati-rice", 80, 50, 130, C),
@@ -215,7 +215,7 @@ SEED_MEALS: tuple[dict[str, object], ...] = (
         "name_fa": "قیمه + برنج",
         "name_en": "Gheimeh with rice",
         "items": (
-            item("beef", 120, 80, 200, P),
+            item("ground-beef", 120, 80, 200, P),
             item("split-peas", 45, 25, 75, FB),
             item("basmati-rice", 80, 50, 130, C),
             item("tomato-paste", 35, 15, 65, M),
@@ -231,7 +231,7 @@ SEED_MEALS: tuple[dict[str, object], ...] = (
         "items": (
             item("basmati-rice", 75, 45, 125, C),
             item("lentils", 45, 25, 75, FB),
-            item("beef", 100, 60, 170, P),
+            item("ground-beef", 100, 60, 170, P),
             item("plain-yogurt", 180, 100, 300, P),
             item("raisins", 15, 5, 30, M, required=False),
         ),
@@ -244,7 +244,7 @@ SEED_MEALS: tuple[dict[str, object], ...] = (
         "items": (
             item("basmati-rice", 75, 45, 125, C),
             item("green-beans", 100, 50, 180, FB),
-            item("beef", 100, 60, 170, P),
+            item("ground-beef", 100, 60, 170, P),
             item("tomato-paste", 30, 15, 60, M),
             item("lettuce", 60, 30, 120, FB),
             item("cucumber", 60, 30, 120, M),
@@ -272,7 +272,7 @@ SEED_MEALS: tuple[dict[str, object], ...] = (
         "name_fa": "کباب تابه‌ای گوشت چرخ‌کرده + برنج + سالاد",
         "name_en": "Pan kebab with rice and salad",
         "items": (
-            item("beef", 170, 110, 250, P),
+            item("ground-beef", 170, 110, 250, P),
             item("basmati-rice", 80, 50, 130, C),
             item("onion", 30, 15, 60, M, required=False),
             item("lettuce", 60, 30, 120, FB),
@@ -287,7 +287,7 @@ SEED_MEALS: tuple[dict[str, object], ...] = (
         "name_en": "Half chicken, half beef pan kebab with rice and salad",
         "items": (
             item("chicken-breast", 85, 55, 125, P),
-            item("beef", 85, 55, 125, P),
+            item("ground-beef", 85, 55, 125, P),
             item("basmati-rice", 80, 50, 130, C),
             item("onion", 30, 15, 60, M, required=False),
             item("lettuce", 60, 30, 120, FB),
