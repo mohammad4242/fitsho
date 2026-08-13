@@ -51,7 +51,7 @@ _RECIPES: dict[str, dict[str, object]] = {
     "LU07": {
         "name_fa": "قورمه‌سبزی",
         "name_en": "Ghormeh sabzi",
-        "final_cooked_yield_grams": "400",
+        "final_cooked_yield_grams": "456.75",
         "ingredients": (
             ("beef-chuck-stew-meat", "120", "80", "200", True),
             ("red-kidney-beans", "40", "25", "70", True),
@@ -69,7 +69,7 @@ _RECIPES: dict[str, dict[str, object]] = {
     "LU08": {
         "name_fa": "قیمه",
         "name_en": "Gheimeh",
-        "final_cooked_yield_grams": "425",
+        "final_cooked_yield_grams": "485.75",
         "ingredients": (
             ("beef-chuck-stew-meat", "120", "80", "200", True),
             ("split-peas", "45", "25", "75", True),
@@ -85,7 +85,7 @@ _RECIPES: dict[str, dict[str, object]] = {
     "LU11": {
         "name_fa": "آبگوشت",
         "name_en": "Abgoosht",
-        "final_cooked_yield_grams": "520",
+        "final_cooked_yield_grams": "740",
         "ingredients": (
             ("lamb", "120", "80", "200", True),
             ("chickpeas", "35", "20", "60", True),

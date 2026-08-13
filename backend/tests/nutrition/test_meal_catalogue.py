@@ -109,12 +109,21 @@ def test_seed_creates_exact_complete_bounded_meal_catalogue_idempotently(db: Ses
         for meal in seeded
         if meal.code not in {"LU07", "LU08", "LU11"}
     )
-    for code in ("LU07", "LU08", "LU11"):
+    expected_prepared_recipe_yields = {
+        "LU07": (Decimal("315"), Decimal("456.75"), Decimal("1.45")),
+        "LU08": (Decimal("335"), Decimal("485.75"), Decimal("1.45")),
+        "LU11": (Decimal("370"), Decimal("740"), Decimal("2.00")),
+    }
+    for code, (reference_input, cooked_yield, yield_factor) in (
+        expected_prepared_recipe_yields.items()
+    ):
         meal = next(item for item in seeded if item.code == code)
         assert meal.prepared_recipe is not None
         revision = meal.prepared_recipe.revisions[-1]
         assert revision.verification_status is FoodVerificationStatus.DRAFT
-        assert revision.final_cooked_yield_grams > revision.reference_input_grams
+        assert revision.reference_input_grams == reference_input
+        assert revision.final_cooked_yield_grams == cooked_yield
+        assert revision.final_cooked_yield_grams / revision.reference_input_grams == yield_factor
         assert revision.ratios
         assert revision.data_gaps
     assert all(meal.items for meal in seeded)
