@@ -104,14 +104,6 @@ def _session_with_result(
                 byte_size=2048,
                 width=600,
                 height=1200,
-                client_crop_confidence=0.92,
-                client_crop_confirmed=True,
-                server_geometry_checked=True,
-                crop_original_height=1400,
-                crop_top=200,
-                crop_bottom=1400,
-                processed_sha256="a" * 64,
-                crop_evidence_sha256="b" * 64,
             )
         )
     payload = _payload(findings)

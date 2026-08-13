@@ -1,70 +1,55 @@
-import type { BodyPhotoView } from "./types";
+import { MediaPipeBodySegmenter } from "./mediaPipeBodySegmenter";
 import { MediaPipePoseLandmarkDetector } from "./mediaPipePoseDetector";
+import type { BodyPhotoView } from "./types";
+
+export type NormalizedBodyLandmark = {
+  x: number;
+  y: number;
+  z: number;
+  visibility: number;
+};
+
+export type BodyLandmarkDetection = {
+  personCount: number;
+  landmarks: NormalizedBodyLandmark[];
+};
+
+export interface BodyLandmarkDetector {
+  detect(image: DecodedBodyPhoto): Promise<BodyLandmarkDetection>;
+}
+
+export type BodySegmentationMask = {
+  width: number;
+  height: number;
+  confidence: Float32Array;
+};
+
+export interface BodyPhotoSegmenter {
+  segment(image: DecodedBodyPhoto): Promise<BodySegmentationMask>;
+}
 
 export type BodyPhotoQuality = {
-  overallScore: number;
   brightnessScore: number;
   sharpnessScore: number;
-  poseScore: number;
-  bodyCompletenessScore: number;
-  clothingVisibilityScore: number;
-  backgroundReliabilityScore: number;
+  minimumLandmarkVisibility: number;
 };
 
 export type BodyPhotoValidation = {
   isValid: true;
   expectedView: BodyPhotoView;
-  detectedView: BodyPhotoView;
+  viewAssessment: "matched" | "ambiguous";
   quality: BodyPhotoQuality;
-  warnings: string[];
-  crop: {
-    headRemoved: true;
-    confidence: number;
-  };
+  visibleLandmarks: Array<"shoulders" | "arms" | "hips" | "knees" | "ankles" | "feet">;
 };
 
 export type ProcessedBodyPhoto = {
   file: File;
   previewUrl: string;
-  originalHeight: number;
-  cropTop: number;
-  cropBottom: number;
-  cropConfidence: number;
-  processedSha256: string;
-  cropEvidenceSha256: string;
   validation: BodyPhotoValidation;
 };
 
 export interface BodyPhotoProcessor {
   process(file: File, view: BodyPhotoView): Promise<ProcessedBodyPhoto>;
-}
-
-export type BodyLandmarkDetection = {
-  personCount: number;
-  detectedView: BodyPhotoView | "unknown";
-  detectionConfidence: number;
-  poseScore: number;
-  bodyCompletenessScore: number;
-  clothingVisibilityScore: number;
-  backgroundReliabilityScore: number;
-  isSafeAndRelevant: boolean;
-  clothingValidation: "accepted" | "rejected" | "unavailable";
-  contentSafetyValidation: "accepted" | "rejected" | "unavailable";
-  backgroundValidation: "accepted" | "rejected" | "unavailable";
-  /** Lowest confidently observed face/head landmark in normalized image coordinates. */
-  faceBottomY: number | null;
-  /** Normalized Y coordinate below the complete head and above both shoulders. */
-  safeHeadCropY: number | null;
-  /** Normalized Y coordinate of the highest shoulder landmark. */
-  shoulderLineY: number | null;
-  headFullyExcluded: boolean;
-  shouldersPreserved: boolean;
-  headCropConfidence: number;
-  warnings: string[];
-};
-
-export interface BodyLandmarkDetector {
-  detect(image: DecodedBodyPhoto, expectedView: BodyPhotoView): Promise<BodyLandmarkDetection>;
 }
 
 export type DecodedBodyPhoto = {
@@ -81,14 +66,13 @@ export type MeasuredImageQuality = {
   sharpnessScore: number;
 };
 
-export type CropRequest = {
-  top: number;
-  bottom: number;
+export type BackgroundNormalizationOptions = {
   targetWidth: number;
   quality: number;
+  background: readonly [number, number, number];
 };
 
-export type EncodedCrop = {
+export type EncodedBodyPhoto = {
   blob: Blob;
   width: number;
   height: number;
@@ -97,9 +81,12 @@ export type EncodedCrop = {
 export interface BodyPhotoRuntime {
   decode(file: File): Promise<DecodedBodyPhoto>;
   measureQuality(image: DecodedBodyPhoto): MeasuredImageQuality;
-  cropAndEncode(image: DecodedBodyPhoto, crop: CropRequest): Promise<EncodedCrop>;
+  normalizeBackground(
+    image: DecodedBodyPhoto,
+    mask: BodySegmentationMask,
+    options: BackgroundNormalizationOptions,
+  ): Promise<EncodedBodyPhoto>;
   createObjectUrl(blob: Blob): string;
-  sha256(value: ArrayBuffer): Promise<string>;
 }
 
 type AcceptedImageMimeType = "image/jpeg" | "image/png" | "image/webp";
@@ -113,19 +100,17 @@ export type BodyPhotoProcessingErrorCode =
   | "image_too_large"
   | "orientation_normalization_failed"
   | "pose_detection_unavailable"
-  | "exactly_one_person_required"
+  | "body_not_detected"
+  | "multiple_people_detected"
   | "unexpected_body_view"
-  | "low_pose_confidence"
-  | "body_not_fully_visible"
-  | "clothing_hides_body_contours"
-  | "clothing_validation_unavailable"
-  | "content_validation_unavailable"
-  | "background_validation_unavailable"
-  | "unsafe_or_irrelevant_image"
-  | "image_too_dark"
-  | "image_too_bright"
+  | "shoulders_not_visible"
+  | "arms_not_visible"
+  | "torso_not_visible"
+  | "legs_or_feet_not_visible"
+  | "body_out_of_frame"
+  | "insufficient_lighting"
   | "image_too_blurry"
-  | "safe_head_crop_unavailable"
+  | "segmentation_unavailable"
   | "canvas_unavailable"
   | "processing_failed";
 
@@ -145,33 +130,43 @@ const acceptedMimeTypes = new Set<AcceptedImageMimeType>([
   "image/webp",
 ]);
 
-const defaultLimits = {
+const limits = {
   maximumFileBytes: 8 * 1024 * 1024,
   minimumWidth: 256,
   minimumHeight: 512,
   maximumPixelCount: 40_000_000,
-  minimumDetectionConfidence: 0.7,
-  minimumPoseScore: 0.7,
-  minimumBodyCompletenessScore: 0.82,
-  minimumClothingVisibilityScore: 0.65,
-  minimumCropConfidence: 0.8,
   minimumBrightnessScore: 0.12,
   maximumBrightnessScore: 0.94,
   minimumSharpnessScore: 0.025,
+  minimumLandmarkVisibility: 0.55,
+  frameMargin: 0.005,
   targetWidth: 1200,
   outputQuality: 0.9,
-  minimumFaceCropSafetyMargin: 0.04,
+  neutralGray: [183, 186, 184] as const,
+} as const;
+
+const landmarkGroups = {
+  shoulders: [11, 12],
+  elbows: [13, 14],
+  wrists: [15, 16],
+  hips: [23, 24],
+  knees: [25, 26],
+  ankles: [27, 28],
+  feet: [31, 32],
 } as const;
 
 export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
   private readonly detector: BodyLandmarkDetector;
+  private readonly segmenter: BodyPhotoSegmenter;
   private readonly runtime: BodyPhotoRuntime;
 
   constructor(options: {
     detector?: BodyLandmarkDetector;
+    segmenter?: BodyPhotoSegmenter;
     runtime?: BodyPhotoRuntime;
   } = {}) {
     this.detector = options.detector ?? new MediaPipePoseLandmarkDetector();
+    this.segmenter = options.segmenter ?? new MediaPipeBodySegmenter();
     this.runtime = options.runtime ?? browserBodyPhotoRuntime;
   }
 
@@ -179,76 +174,44 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
     if (!acceptedMimeTypes.has(file.type as AcceptedImageMimeType)) {
       throw new BodyPhotoProcessingError("unsupported_format");
     }
-    if (file.size === 0 || file.size > defaultLimits.maximumFileBytes) {
+    if (file.size === 0 || file.size > limits.maximumFileBytes) {
       throw new BodyPhotoProcessingError("invalid_file_size");
     }
 
     const image = await this.runtime.decode(file);
     try {
-      this.validateDecodedImage(image, file.type as AcceptedImageMimeType);
-      const detection = await this.detectBody(image, view);
-      this.validateDetection(detection, view);
-      const measuredQuality = this.runtime.measureQuality(image);
-      this.validateMeasuredQuality(measuredQuality);
-
-      const safeCropY = detection.safeHeadCropY;
-      if (safeCropY === null) {
-        throw new BodyPhotoProcessingError("safe_head_crop_unavailable");
-      }
-      const cropTop = Math.ceil(image.height * safeCropY);
-      const cropBottom = image.height;
-      const encodedCrop = await this.runtime.cropAndEncode(image, {
-        top: cropTop,
-        bottom: cropBottom,
-        targetWidth: Math.min(defaultLimits.targetWidth, image.width),
-        quality: defaultLimits.outputQuality,
+      validateDecodedImage(image, file.type as AcceptedImageMimeType);
+      const quality = this.runtime.measureQuality(image);
+      validateQuality(quality);
+      const detection = await this.detect(image);
+      const pose = validateLandmarks(detection, view);
+      const mask = await this.segment(image);
+      const encoded = await this.runtime.normalizeBackground(image, mask, {
+        targetWidth: Math.min(limits.targetWidth, image.width),
+        quality: limits.outputQuality,
+        background: limits.neutralGray,
       });
-      if (encodedCrop.blob.size === 0 || encodedCrop.blob.type !== "image/jpeg") {
+      if (encoded.blob.size === 0 || encoded.blob.type !== "image/jpeg") {
         throw new BodyPhotoProcessingError("processing_failed");
       }
-
-      const processedBytes = await encodedCrop.blob.arrayBuffer();
-      const processedSha256 = await this.runtime.sha256(processedBytes);
-      // The backend verifies crop geometry against the resized output. Preserve the
-      // source crop ratio in a scaled coordinate system whose crop height exactly
-      // matches the encoded image height.
-      const scaledCropTop = Math.max(
-        1,
-        Math.round((cropTop / (cropBottom - cropTop)) * encodedCrop.height),
-      );
-      const evidenceOriginalHeight = scaledCropTop + encodedCrop.height;
-      const evidenceCropBottom = evidenceOriginalHeight;
-      const cropEvidenceSha256 = await this.runtime.sha256(
-        new TextEncoder().encode(
-          `v1:${processedSha256}:${evidenceOriginalHeight}:${scaledCropTop}:${evidenceCropBottom}`,
-        ).buffer,
-      );
       const processedFile = new File(
-        [encodedCrop.blob],
+        [encoded.blob],
         `body-photo-${createFileNonce()}.jpg`,
         { type: "image/jpeg", lastModified: Date.now() },
       );
-      const quality = buildQuality(measuredQuality, detection);
-
       return {
         file: processedFile,
         previewUrl: this.runtime.createObjectUrl(processedFile),
-        originalHeight: evidenceOriginalHeight,
-        cropTop: scaledCropTop,
-        cropBottom: evidenceCropBottom,
-        cropConfidence: detection.headCropConfidence,
-        processedSha256,
-        cropEvidenceSha256,
         validation: {
           isValid: true,
           expectedView: view,
-          detectedView: detection.detectedView as BodyPhotoView,
-          quality,
-          warnings: detection.warnings,
-          crop: {
-            headRemoved: true,
-            confidence: detection.headCropConfidence,
+          viewAssessment: pose.viewAssessment,
+          quality: {
+            brightnessScore: quality.brightnessScore,
+            sharpnessScore: quality.sharpnessScore,
+            minimumLandmarkVisibility: pose.minimumVisibility,
           },
+          visibleLandmarks: ["shoulders", "arms", "hips", "knees", "ankles", "feet"],
         },
       };
     } finally {
@@ -256,91 +219,134 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
     }
   }
 
-  private async detectBody(image: DecodedBodyPhoto, view: BodyPhotoView) {
+  private async detect(image: DecodedBodyPhoto): Promise<BodyLandmarkDetection> {
     try {
-      return await this.detector.detect(image, view);
+      return await this.detector.detect(image);
     } catch (error) {
       if (error instanceof BodyPhotoProcessingError) throw error;
       throw new BodyPhotoProcessingError("pose_detection_unavailable");
     }
   }
 
-  private validateDecodedImage(image: DecodedBodyPhoto, declaredMimeType: AcceptedImageMimeType) {
-    if (image.decodedMimeType !== declaredMimeType) {
-      throw new BodyPhotoProcessingError("image_signature_mismatch");
-    }
-    if (!image.orientationNormalized) {
-      throw new BodyPhotoProcessingError("orientation_normalization_failed");
-    }
-    if (image.width < defaultLimits.minimumWidth || image.height < defaultLimits.minimumHeight) {
-      throw new BodyPhotoProcessingError("invalid_resolution");
-    }
-    if (image.width * image.height > defaultLimits.maximumPixelCount) {
-      throw new BodyPhotoProcessingError("image_too_large");
-    }
-  }
-
-  private validateDetection(detection: BodyLandmarkDetection, expectedView: BodyPhotoView) {
-    if (detection.personCount !== 1) {
-      throw new BodyPhotoProcessingError("exactly_one_person_required");
-    }
-    if (detection.clothingValidation === "rejected") {
-      throw new BodyPhotoProcessingError("clothing_hides_body_contours");
-    }
-    if (detection.contentSafetyValidation === "rejected" || (
-      detection.contentSafetyValidation === "accepted" && !detection.isSafeAndRelevant
-    )) {
-      throw new BodyPhotoProcessingError("unsafe_or_irrelevant_image");
-    }
-    if (detection.detectedView !== expectedView) {
-      throw new BodyPhotoProcessingError("unexpected_body_view");
-    }
-    if (
-      detection.detectionConfidence < defaultLimits.minimumDetectionConfidence
-      || detection.poseScore < defaultLimits.minimumPoseScore
-    ) {
-      throw new BodyPhotoProcessingError("low_pose_confidence");
-    }
-    if (detection.bodyCompletenessScore < defaultLimits.minimumBodyCompletenessScore) {
-      throw new BodyPhotoProcessingError("body_not_fully_visible");
-    }
-    if (
-      detection.clothingValidation === "accepted"
-      && detection.clothingVisibilityScore < defaultLimits.minimumClothingVisibilityScore
-    ) {
-      throw new BodyPhotoProcessingError("clothing_hides_body_contours");
-    }
-    if (detection.backgroundValidation === "accepted" && detection.backgroundReliabilityScore < 0.5) {
-      throw new BodyPhotoProcessingError("body_not_fully_visible");
-    }
-    if (
-      detection.safeHeadCropY === null
-      || detection.shoulderLineY === null
-      || detection.faceBottomY === null
-      || !detection.headFullyExcluded
-      || !detection.shouldersPreserved
-      || detection.headCropConfidence < defaultLimits.minimumCropConfidence
-      || detection.safeHeadCropY <= 0
-      || detection.safeHeadCropY >= detection.shoulderLineY
-      || detection.safeHeadCropY
-        < detection.faceBottomY + defaultLimits.minimumFaceCropSafetyMargin
-      || detection.shoulderLineY - detection.safeHeadCropY > 0.18
-      || detection.shoulderLineY >= 0.5
-    ) {
-      throw new BodyPhotoProcessingError("safe_head_crop_unavailable");
+  private async segment(image: DecodedBodyPhoto): Promise<BodySegmentationMask> {
+    try {
+      const mask = await this.segmenter.segment(image);
+      if (
+        mask.width <= 0
+        || mask.height <= 0
+        || mask.confidence.length !== mask.width * mask.height
+      ) {
+        throw new Error("invalid segmentation mask");
+      }
+      return mask;
+    } catch (error) {
+      if (error instanceof BodyPhotoProcessingError) throw error;
+      throw new BodyPhotoProcessingError("segmentation_unavailable");
     }
   }
+}
 
-  private validateMeasuredQuality(quality: MeasuredImageQuality) {
-    if (quality.brightnessScore < defaultLimits.minimumBrightnessScore) {
-      throw new BodyPhotoProcessingError("image_too_dark");
-    }
-    if (quality.brightnessScore > defaultLimits.maximumBrightnessScore) {
-      throw new BodyPhotoProcessingError("image_too_bright");
-    }
-    if (quality.sharpnessScore < defaultLimits.minimumSharpnessScore) {
-      throw new BodyPhotoProcessingError("image_too_blurry");
-    }
+type ValidatedPose = {
+  viewAssessment: "matched" | "ambiguous";
+  minimumVisibility: number;
+};
+
+function validateLandmarks(
+  detection: BodyLandmarkDetection,
+  expectedView: BodyPhotoView,
+): ValidatedPose {
+  if (detection.personCount === 0) throw new BodyPhotoProcessingError("body_not_detected");
+  if (detection.personCount > 1) {
+    throw new BodyPhotoProcessingError("multiple_people_detected");
+  }
+  if (detection.landmarks.length < 33) {
+    throw new BodyPhotoProcessingError("body_not_detected");
+  }
+  requireVisible(detection.landmarks, landmarkGroups.shoulders, "shoulders_not_visible");
+  requireVisible(detection.landmarks, landmarkGroups.elbows, "arms_not_visible");
+  if (expectedView !== "side") {
+    requireVisible(detection.landmarks, landmarkGroups.wrists, "arms_not_visible");
+  }
+  requireVisible(detection.landmarks, landmarkGroups.hips, "torso_not_visible");
+  requireVisible(detection.landmarks, landmarkGroups.knees, "legs_or_feet_not_visible");
+  requireVisible(detection.landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible");
+  requireVisible(detection.landmarks, landmarkGroups.feet, "legs_or_feet_not_visible");
+
+  const requiredIndices = Object.values(landmarkGroups).flat();
+  const required = requiredIndices.map((index) => detection.landmarks[index]!);
+  if (required.some((landmark) => !insideFrame(landmark))) {
+    throw new BodyPhotoProcessingError("body_out_of_frame");
+  }
+
+  const projection = projectedView(detection.landmarks);
+  if (
+    (expectedView === "side" && projection === "non_side")
+    || (expectedView !== "side" && projection === "side")
+  ) {
+    throw new BodyPhotoProcessingError("unexpected_body_view");
+  }
+  return {
+    viewAssessment: (
+      expectedView === "side" && projection === "side" ? "matched" : "ambiguous"
+    ),
+    minimumVisibility: clampScore(Math.min(...required.map((landmark) => landmark.visibility))),
+  };
+}
+
+function requireVisible(
+  landmarks: NormalizedBodyLandmark[],
+  indices: readonly number[],
+  code: BodyPhotoProcessingErrorCode,
+) {
+  if (indices.some((index) => (landmarks[index]?.visibility ?? 0) < limits.minimumLandmarkVisibility)) {
+    throw new BodyPhotoProcessingError(code);
+  }
+}
+
+function insideFrame(landmark: NormalizedBodyLandmark): boolean {
+  return landmark.x >= limits.frameMargin
+    && landmark.x <= 1 - limits.frameMargin
+    && landmark.y >= limits.frameMargin
+    && landmark.y <= 1 - limits.frameMargin;
+}
+
+function projectedView(landmarks: NormalizedBodyLandmark[]): "side" | "non_side" | "ambiguous" {
+  const shoulderSpan = Math.abs(landmarks[11]!.x - landmarks[12]!.x);
+  const hipSpan = Math.abs(landmarks[23]!.x - landmarks[24]!.x);
+  if (shoulderSpan <= 0.08 && hipSpan <= 0.08) return "side";
+  if (shoulderSpan >= 0.16 && hipSpan >= 0.12) return "non_side";
+  return "ambiguous";
+}
+
+function validateDecodedImage(image: DecodedBodyPhoto, declaredMimeType: AcceptedImageMimeType) {
+  if (image.decodedMimeType !== declaredMimeType) {
+    throw new BodyPhotoProcessingError("image_signature_mismatch");
+  }
+  if (!image.orientationNormalized) {
+    throw new BodyPhotoProcessingError("orientation_normalization_failed");
+  }
+  if (
+    image.width < limits.minimumWidth
+    || image.height < limits.minimumHeight
+    || image.height < image.width
+    || image.height > image.width * 3
+  ) {
+    throw new BodyPhotoProcessingError("invalid_resolution");
+  }
+  if (image.width * image.height > limits.maximumPixelCount) {
+    throw new BodyPhotoProcessingError("image_too_large");
+  }
+}
+
+function validateQuality(quality: MeasuredImageQuality) {
+  if (
+    quality.brightnessScore < limits.minimumBrightnessScore
+    || quality.brightnessScore > limits.maximumBrightnessScore
+  ) {
+    throw new BodyPhotoProcessingError("insufficient_lighting");
+  }
+  if (quality.sharpnessScore < limits.minimumSharpnessScore) {
+    throw new BodyPhotoProcessingError("image_too_blurry");
   }
 }
 
@@ -352,7 +358,6 @@ export class BrowserBodyPhotoRuntime implements BodyPhotoRuntime {
     if (decodedMimeType === null || decodedMimeType !== declaredMimeType) {
       throw new BodyPhotoProcessingError("image_signature_mismatch");
     }
-
     if (typeof createImageBitmap === "function") {
       try {
         const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
@@ -380,16 +385,16 @@ export class BrowserBodyPhotoRuntime implements BodyPhotoRuntime {
     const context = requireContext(canvas);
     context.drawImage(image.source, 0, 0, width, height);
     const pixels = context.getImageData(0, 0, width, height).data;
-    if (pixels.length === 0) {
-      throw new BodyPhotoProcessingError("invalid_image");
-    }
+    if (pixels.length === 0) throw new BodyPhotoProcessingError("invalid_image");
 
     let brightnessTotal = 0;
     let edgeTotal = 0;
     let edgeSamples = 0;
     let previousLuma: number | null = null;
     for (let index = 0; index < pixels.length; index += 4) {
-      const luma = (pixels[index] * 0.2126) + (pixels[index + 1] * 0.7152) + (pixels[index + 2] * 0.0722);
+      const luma = (pixels[index]! * 0.2126)
+        + (pixels[index + 1]! * 0.7152)
+        + (pixels[index + 2]! * 0.0722);
       brightnessTotal += luma;
       if (previousLuma !== null && (index / 4) % width !== 0) {
         edgeTotal += Math.abs(luma - previousLuma);
@@ -404,28 +409,27 @@ export class BrowserBodyPhotoRuntime implements BodyPhotoRuntime {
     };
   }
 
-  async cropAndEncode(image: DecodedBodyPhoto, crop: CropRequest): Promise<EncodedCrop> {
-    const cropHeight = crop.bottom - crop.top;
-    if (crop.top < 0 || cropHeight <= 0 || crop.bottom > image.height) {
-      throw new BodyPhotoProcessingError("safe_head_crop_unavailable");
-    }
-    const outputWidth = Math.min(crop.targetWidth, image.width);
-    const outputHeight = Math.max(1, Math.round((cropHeight / image.width) * outputWidth));
+  async normalizeBackground(
+    image: DecodedBodyPhoto,
+    mask: BodySegmentationMask,
+    options: BackgroundNormalizationOptions,
+  ): Promise<EncodedBodyPhoto> {
+    const outputWidth = Math.min(options.targetWidth, image.width);
+    const outputHeight = Math.max(1, Math.round((image.height / image.width) * outputWidth));
     const canvas = createCanvas(outputWidth, outputHeight);
     const context = requireContext(canvas);
-    context.drawImage(
-      image.source,
-      0,
-      crop.top,
-      image.width,
-      cropHeight,
-      0,
-      0,
+    context.drawImage(image.source, 0, 0, outputWidth, outputHeight);
+    const imageData = context.getImageData(0, 0, outputWidth, outputHeight);
+    imageData.data.set(compositeBodyOnNeutralBackground(
+      imageData.data,
       outputWidth,
       outputHeight,
-    );
+      mask,
+      options.background,
+    ));
+    context.putImageData(imageData, 0, 0);
     return {
-      blob: await canvasToBlob(canvas, crop.quality),
+      blob: await canvasToBlob(canvas, options.quality),
       width: outputWidth,
       height: outputHeight,
     };
@@ -434,22 +438,35 @@ export class BrowserBodyPhotoRuntime implements BodyPhotoRuntime {
   createObjectUrl(blob: Blob): string {
     return URL.createObjectURL(blob);
   }
+}
 
-  async sha256(value: ArrayBuffer): Promise<string> {
-    const digest = await crypto.subtle.digest("SHA-256", value);
-    return Array.from(
-      new Uint8Array(digest),
-      (byte) => byte.toString(16).padStart(2, "0"),
-    ).join("");
+export function compositeBodyOnNeutralBackground(
+  source: Uint8ClampedArray,
+  width: number,
+  height: number,
+  mask: BodySegmentationMask,
+  background: readonly [number, number, number],
+): Uint8ClampedArray {
+  if (source.length !== width * height * 4 || mask.confidence.length !== mask.width * mask.height) {
+    throw new BodyPhotoProcessingError("segmentation_unavailable");
   }
+  const output = new Uint8ClampedArray(source.length);
+  for (let y = 0; y < height; y += 1) {
+    const maskY = Math.min(mask.height - 1, Math.floor((y / height) * mask.height));
+    for (let x = 0; x < width; x += 1) {
+      const maskX = Math.min(mask.width - 1, Math.floor((x / width) * mask.width));
+      const confidence = Math.min(1, Math.max(0, mask.confidence[maskY * mask.width + maskX]!));
+      const index = (y * width + x) * 4;
+      output[index] = Math.round(source[index]! * confidence + background[0] * (1 - confidence));
+      output[index + 1] = Math.round(source[index + 1]! * confidence + background[1] * (1 - confidence));
+      output[index + 2] = Math.round(source[index + 2]! * confidence + background[2] * (1 - confidence));
+      output[index + 3] = 255;
+    }
+  }
+  return output;
 }
 
 const browserBodyPhotoRuntime = new BrowserBodyPhotoRuntime();
-
-/**
- * The default processor uses an on-device MediaPipe landmarker. If its model or
- * runtime cannot load, processing fails closed and no selected image is uploaded.
- */
 export const browserBodyPhotoProcessor = new BrowserBodyPhotoProcessor();
 
 function decodeWithImageElement(
@@ -459,11 +476,10 @@ function decodeWithImageElement(
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
     const image = new Image();
-    const releaseObjectUrl = () => URL.revokeObjectURL(objectUrl);
+    const release = () => URL.revokeObjectURL(objectUrl);
     image.onload = () => {
-      releaseObjectUrl();
+      release();
       if (image.naturalWidth === 0 || image.naturalHeight === 0) {
-        image.src = "";
         reject(new BodyPhotoProcessingError("invalid_image"));
         return;
       }
@@ -473,16 +489,11 @@ function decodeWithImageElement(
         height: image.naturalHeight,
         decodedMimeType,
         orientationNormalized: true,
-        dispose: () => {
-          image.onload = null;
-          image.onerror = null;
-          image.src = "";
-        },
+        dispose: () => { image.src = ""; },
       });
     };
     image.onerror = () => {
-      releaseObjectUrl();
-      image.src = "";
+      release();
       reject(new BodyPhotoProcessingError("invalid_image"));
     };
     image.src = objectUrl;
@@ -503,16 +514,12 @@ function sniffMimeType(bytes: Uint8Array): AcceptedImageMimeType | null {
     && bytes[5] === 0x0a
     && bytes[6] === 0x1a
     && bytes[7] === 0x0a
-  ) {
-    return "image/png";
-  }
+  ) return "image/png";
   if (
     bytes.length >= 12
     && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF"
     && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP"
-  ) {
-    return "image/webp";
-  }
+  ) return "image/webp";
   return null;
 }
 
@@ -525,45 +532,17 @@ function createCanvas(width: number, height: number): HTMLCanvasElement {
 
 function requireContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (context === null) {
-    throw new BodyPhotoProcessingError("canvas_unavailable");
-  }
+  if (context === null) throw new BodyPhotoProcessingError("canvas_unavailable");
   return context;
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
-      if (blob === null) {
-        reject(new BodyPhotoProcessingError("processing_failed"));
-        return;
-      }
-      resolve(blob);
+      if (blob === null) reject(new BodyPhotoProcessingError("processing_failed"));
+      else resolve(blob);
     }, "image/jpeg", quality);
   });
-}
-
-function buildQuality(
-  measured: MeasuredImageQuality,
-  detection: BodyLandmarkDetection,
-): BodyPhotoQuality {
-  const scores = [
-    measured.brightnessScore,
-    measured.sharpnessScore,
-    detection.poseScore,
-    detection.bodyCompletenessScore,
-    detection.clothingVisibilityScore,
-    detection.backgroundReliabilityScore,
-  ];
-  return {
-    overallScore: clampScore(scores.reduce((total, score) => total + score, 0) / scores.length),
-    brightnessScore: measured.brightnessScore,
-    sharpnessScore: measured.sharpnessScore,
-    poseScore: detection.poseScore,
-    bodyCompletenessScore: detection.bodyCompletenessScore,
-    clothingVisibilityScore: detection.clothingVisibilityScore,
-    backgroundReliabilityScore: detection.backgroundReliabilityScore,
-  };
 }
 
 function clampScore(value: number): number {

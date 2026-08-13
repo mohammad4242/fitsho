@@ -23,33 +23,22 @@ vi.mock("./api", () => api);
 
 import { BodyPhotoWizard } from "./BodyPhotoWizard";
 
-const file = new File(["original-face-containing-bytes"], "front.jpg", { type: "image/jpeg" });
+const file = new File(["user-cropped-headless-bytes"], "front.jpg", { type: "image/jpeg" });
 
 function processed(view: "front" | "side" | "back"): ProcessedBodyPhoto {
   return {
-    file: new File([`cropped-${view}`], `${view}.jpg`, { type: "image/jpeg" }),
+    file: new File([`standardized-${view}`], `${view}.jpg`, { type: "image/jpeg" }),
     previewUrl: `blob:preview-${view}`,
-    originalHeight: 1200,
-    cropTop: 240,
-    cropBottom: 1080,
-    cropConfidence: 0.95,
-    processedSha256: "a".repeat(64),
-    cropEvidenceSha256: "b".repeat(64),
     validation: {
       isValid: true,
       expectedView: view,
-      detectedView: view,
+      viewAssessment: view === "side" ? "matched" : "ambiguous",
       quality: {
-        overallScore: 0.9,
         brightnessScore: 0.9,
         sharpnessScore: 0.9,
-        poseScore: 0.9,
-        bodyCompletenessScore: 0.9,
-        clothingVisibilityScore: 0.9,
-        backgroundReliabilityScore: 0.9,
+        minimumLandmarkVisibility: 0.9,
       },
-      warnings: [],
-      crop: { headRemoved: true, confidence: 0.95 },
+      visibleLandmarks: ["shoulders", "arms", "hips", "knees", "ankles", "feet"],
     },
   };
 }
@@ -103,7 +92,7 @@ it("requires operational consent before the confirm upload action is enabled", a
   renderWizard(processor);
 
   await user.upload(screen.getByLabelText(/front photo upload/i), file);
-  expect(await screen.findByAltText(/anonymized front preview/i)).toBeInTheDocument();
+  expect(await screen.findByAltText(/standardized front preview/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /confirm and upload front/i })).toBeDisabled();
   expect(api.createBodyPhotoSession).not.toHaveBeenCalled();
   expect(api.uploadBodyPhoto).not.toHaveBeenCalled();
@@ -142,7 +131,7 @@ it("returns to the result after a successful replacement cannot start analysis",
   await user.click(screen.getByRole("button", { name: /confirm and upload side/i }));
 
   await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/body-progress/session-2"));
-  expect(screen.queryByText(/anonymized photo could not be uploaded/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/standardized photo could not be uploaded/i)).not.toBeInTheDocument();
 });
 
 it("shows the selected photo immediately while anonymization is processing", async () => {
@@ -182,21 +171,26 @@ it("shows fitted-clothing guidance on every capture step", async () => {
   expect(screen.getByText(/athletic shorts and fitted, minimal athletic clothing/i)).toBeInTheDocument();
 });
 
-it("offers separate actions for taking a photo and uploading an existing photo", () => {
+it("requires a phone-cropped headless photo and lists every retained body region", async () => {
+  await i18n.changeLanguage("fa");
   renderWizard();
 
-  expect(screen.getByRole("button", { name: /take front photo/i })).toBeInTheDocument();
-  expect(screen.getByLabelText(/upload an existing front photo/i)).toBeInTheDocument();
+  expect(screen.getByText("لطفاً حتماً قبل از ارسال عکس، عکس را کراپ کرده و چهره را حذف کنید")).toBeVisible();
+  expect(screen.getByLabelText(/راهنمای کادر عکس بدون چهره/)).toHaveTextContent(
+    /شانه‌ها.*بازوها.*کمر و باسن.*زانوها.*مچ پا و کف پا/,
+  );
+  expect(screen.queryByRole("button", { name: /گرفتن عکس/ })).not.toBeInTheDocument();
+  expect(screen.getByLabelText(/بارگذاری عکس روبه‌رو/)).toBeInTheDocument();
 });
 
-it("processes three views, allows retake, and never passes the original file to upload", async () => {
+it("processes three views, allows retake, and uploads only standardized files", async () => {
   const user = userEvent.setup();
   const processor: BodyPhotoProcessor = { process: vi.fn().mockImplementation((_, view) => processed(view)) };
   renderWizard(processor);
 
   await user.upload(screen.getByLabelText(/front photo upload/i), file);
   await user.click(screen.getByRole("button", { name: /retake front/i }));
-  expect(screen.queryByAltText(/anonymized front preview/i)).not.toBeInTheDocument();
+  expect(screen.queryByAltText(/standardized front preview/i)).not.toBeInTheDocument();
   await user.upload(screen.getByLabelText(/front photo upload/i), file);
   await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
   await user.click(screen.getByRole("button", { name: /confirm and upload front/i }));
@@ -251,7 +245,7 @@ it("explains that photos were submitted when body analysis cannot start", async 
   expect(api.submitBodyPhotoSession).toHaveBeenCalledWith("session-1", true, false);
 });
 
-it("revokes anonymized preview URLs when a photo is replaced and on unmount", async () => {
+it("revokes standardized preview URLs when a photo is replaced and on unmount", async () => {
   const user = userEvent.setup();
   const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
   const processor: BodyPhotoProcessor = {
@@ -269,26 +263,30 @@ it("revokes anonymized preview URLs when a photo is replaced and on unmount", as
   expect(revoke).toHaveBeenCalledWith("blob:replacement");
 });
 
-it("shows structured quality feedback for an anonymized preview", async () => {
+it("shows only measured quality feedback for a standardized preview", async () => {
   const user = userEvent.setup();
   renderWizard({ process: vi.fn().mockResolvedValue(processed("front")) });
 
   await user.upload(screen.getByLabelText(/front photo upload/i), file);
 
-  expect(screen.getByLabelText(/photo check/i)).toHaveTextContent(/overall quality/i);
-  expect(screen.getByLabelText(/photo check/i)).toHaveTextContent(/pose and framing/i);
+  expect(screen.getByLabelText(/photo check/i)).toHaveTextContent(/lighting/i);
+  expect(screen.getByLabelText(/photo check/i)).toHaveTextContent(/landmark visibility/i);
+  expect(screen.getByLabelText(/photo check/i)).not.toHaveTextContent(/overall quality/i);
 });
 
-it("shows a distinct clothing rejection and keeps the repeated clothing guidance visible", async () => {
+it.each([
+  ["shoulders_not_visible", /shoulders are not fully visible/i],
+  ["legs_or_feet_not_visible", /legs, ankles, and feet must remain fully inside/i],
+  ["body_out_of_frame", /part of the body is outside the frame/i],
+  ["image_too_blurry", /image is too blurry/i],
+  ["insufficient_lighting", /lighting is not sufficient/i],
+  ["unexpected_body_view", /does not match the required view/i],
+  ["multiple_people_detected", /more than one person was detected/i],
+] as const)("shows the actionable %s error", async (code, message) => {
   const user = userEvent.setup();
-  renderWizard({
-    process: vi.fn().mockRejectedValue(new BodyPhotoProcessingError("clothing_hides_body_contours")),
-  });
-
+  renderWizard({ process: vi.fn().mockRejectedValue(new BodyPhotoProcessingError(code)) });
   await user.upload(screen.getByLabelText(/front photo upload/i), file);
-
-  expect(await screen.findByRole("alert")).toHaveTextContent(/clothing hides body contours/i);
-  expect(screen.getByLabelText(/clothing and coverage/i)).toBeInTheDocument();
+  expect(await screen.findByRole("alert")).toHaveTextContent(message);
 });
 
 it("releases a late preview when processing resolves after the wizard unmounts", async () => {

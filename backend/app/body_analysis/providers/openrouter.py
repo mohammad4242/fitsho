@@ -333,7 +333,7 @@ class OpenRouterProvider:
                 [
                     {
                         "type": "text",
-                        "text": f"Processed anonymized {image.label} view:",
+                        "text": f"Standardized headless {image.label} view:",
                     },
                     {
                         "type": "image_url",

@@ -3,15 +3,11 @@ from __future__ import annotations
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
-from hashlib import sha256
-from hmac import compare_digest
 from io import BytesIO
 
 from fastapi import UploadFile
-from PIL import Image, ImageChops, ImageOps, ImageStat, UnidentifiedImageError
-from pydantic import ValidationError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
-from app.body_photos.schemas import BodyPhotoCropEvidenceInput
 from app.config import Settings
 
 FORMAT_DETAILS = {
@@ -27,7 +23,9 @@ SIGNATURES: dict[str, Callable[[bytes], bool]] = {
 
 
 class BodyPhotoValidationError(ValueError):
-    pass
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -37,25 +35,6 @@ class NormalizedBodyPhoto:
     extension: str
     width: int
     height: int
-    client_crop_confidence: float
-    client_crop_confirmed: bool
-    server_geometry_checked: bool
-    crop_original_height: int
-    crop_top: int
-    crop_bottom: int
-    processed_sha256: str
-    crop_evidence_sha256: str
-
-
-@dataclass(frozen=True)
-class CropEvidence:
-    client_crop_confirmed: bool
-    confidence: float
-    original_height: int
-    crop_top: int
-    crop_bottom: int
-    processed_sha256: str
-    evidence_sha256: str
 
 
 def _read_limited(upload: UploadFile, settings: Settings) -> bytes:
@@ -65,120 +44,21 @@ def _read_limited(upload: UploadFile, settings: Settings) -> bytes:
     while chunk := upload.file.read(settings.body_photo_read_chunk_bytes):
         total += len(chunk)
         if total > settings.body_photo_max_bytes:
-            raise BodyPhotoValidationError
+            raise BodyPhotoValidationError("invalid_file_size")
         chunks.append(chunk)
     if total == 0:
-        raise BodyPhotoValidationError
+        raise BodyPhotoValidationError("invalid_image")
     return b"".join(chunks)
 
 
-def _parse_crop_evidence(
-    *,
-    client_crop_confirmed: str | None,
-    client_crop_confidence: str | None,
-    original_height: str | None,
-    crop_top: str | None,
-    crop_bottom: str | None,
-    processed_sha256: str | None,
-    crop_evidence_sha256: str | None,
-) -> CropEvidence:
-    if (
-        client_crop_confirmed != "true"
-        or client_crop_confidence is None
-        or original_height is None
-        or crop_top is None
-        or crop_bottom is None
-        or processed_sha256 is None
-        or crop_evidence_sha256 is None
-    ):
-        raise BodyPhotoValidationError
-    try:
-        parsed = BodyPhotoCropEvidenceInput.model_validate(
-            {
-                "confidence": client_crop_confidence,
-                "original_height": original_height,
-                "crop_top": crop_top,
-                "crop_bottom": crop_bottom,
-                "processed_sha256": processed_sha256,
-                "crop_evidence_sha256": crop_evidence_sha256,
-            }
-        )
-    except ValidationError as error:
-        raise BodyPhotoValidationError from error
-    return CropEvidence(
-        client_crop_confirmed=True,
-        confidence=parsed.confidence,
-        original_height=parsed.original_height,
-        crop_top=parsed.crop_top,
-        crop_bottom=parsed.crop_bottom,
-        processed_sha256=parsed.processed_sha256.casefold(),
-        evidence_sha256=parsed.crop_evidence_sha256.casefold(),
-    )
-
-
-def _validate_output_geometry(width: int, height: int, settings: Settings) -> None:
+def _validate_geometry(width: int, height: int, settings: Settings) -> None:
     if (
         width < settings.body_photo_min_width
         or height < settings.body_photo_min_height
         or height < width
         or height > width * 3
     ):
-        raise BodyPhotoValidationError
-
-
-def _validate_server_geometry(image: Image.Image, settings: Settings) -> None:
-    """Reject output that lacks image structure at the claimed crop boundary.
-
-    This is deliberately a conservative image-geometry heuristic, not anatomical proof.
-    """
-    grayscale = image.convert("L")
-    grayscale.thumbnail((128, 256))
-    if ImageStat.Stat(grayscale).stddev[0] < settings.body_photo_min_luma_stddev:
-        raise BodyPhotoValidationError
-
-    band_height = max(8, round(grayscale.height * settings.body_photo_top_band_ratio))
-    top_band = grayscale.crop((0, 0, grayscale.width, band_height))
-    minimum, maximum = ImageStat.Stat(top_band).extrema[0]
-    if maximum - minimum < settings.body_photo_min_top_band_luma_range:
-        raise BodyPhotoValidationError
-
-    horizontal = ImageChops.difference(
-        top_band.crop((1, 0, top_band.width, top_band.height)),
-        top_band.crop((0, 0, top_band.width - 1, top_band.height)),
-    )
-    vertical = ImageChops.difference(
-        top_band.crop((0, 1, top_band.width, top_band.height)),
-        top_band.crop((0, 0, top_band.width, top_band.height - 1)),
-    )
-    edge_mean = (ImageStat.Stat(horizontal).mean[0] + ImageStat.Stat(vertical).mean[0]) / 2
-    if edge_mean < settings.body_photo_min_top_band_edge_mean:
-        raise BodyPhotoValidationError
-
-
-def _verify_crop_evidence(
-    content: bytes,
-    output_height: int,
-    evidence: CropEvidence,
-    settings: Settings,
-) -> None:
-    actual_digest = sha256(content).hexdigest()
-    if not compare_digest(actual_digest, evidence.processed_sha256):
-        raise BodyPhotoValidationError
-    if (
-        evidence.original_height <= 0
-        or evidence.crop_top < 0
-        or evidence.crop_bottom > evidence.original_height
-        or evidence.crop_bottom <= evidence.crop_top
-        or evidence.crop_bottom - evidence.crop_top != output_height
-        or evidence.crop_top / evidence.original_height < settings.body_photo_min_crop_top_ratio
-    ):
-        raise BodyPhotoValidationError
-    canonical = (
-        f"v1:{actual_digest}:{evidence.original_height}:{evidence.crop_top}:{evidence.crop_bottom}"
-    )
-    actual_evidence_digest = sha256(canonical.encode()).hexdigest()
-    if not compare_digest(actual_evidence_digest, evidence.evidence_sha256):
-        raise BodyPhotoValidationError
+        raise BodyPhotoValidationError("invalid_geometry")
 
 
 def _normalized_mode(image: Image.Image, image_format: str) -> Image.Image:
@@ -189,29 +69,9 @@ def _normalized_mode(image: Image.Image, image_format: str) -> Image.Image:
     return image.convert("RGBA" if "transparency" in image.info else "RGB")
 
 
-def validate_and_normalize(
-    upload: UploadFile,
-    settings: Settings,
-    *,
-    client_crop_confirmed: str | None,
-    client_crop_confidence: str | None,
-    original_height: str | None,
-    crop_top: str | None,
-    crop_bottom: str | None,
-    processed_sha256: str | None,
-    crop_evidence_sha256: str | None,
-) -> NormalizedBodyPhoto:
-    evidence = _parse_crop_evidence(
-        client_crop_confirmed=client_crop_confirmed,
-        client_crop_confidence=client_crop_confidence,
-        original_height=original_height,
-        crop_top=crop_top,
-        crop_bottom=crop_bottom,
-        processed_sha256=processed_sha256,
-        crop_evidence_sha256=crop_evidence_sha256,
-    )
+def validate_and_normalize(upload: UploadFile, settings: Settings) -> NormalizedBodyPhoto:
     if upload.content_type not in {"image/jpeg", "image/png", "image/webp"}:
-        raise BodyPhotoValidationError
+        raise BodyPhotoValidationError("unsupported_format")
     content = _read_limited(upload, settings)
 
     try:
@@ -220,21 +80,19 @@ def validate_and_normalize(
             with Image.open(BytesIO(content)) as probe:
                 image_format = probe.format
                 if image_format not in FORMAT_DETAILS:
-                    raise BodyPhotoValidationError
+                    raise BodyPhotoValidationError("unsupported_format")
                 mime_type, extension = FORMAT_DETAILS[image_format]
                 if upload.content_type != mime_type or not SIGNATURES[image_format](content):
-                    raise BodyPhotoValidationError
+                    raise BodyPhotoValidationError("invalid_image")
                 width, height = probe.size
                 if width * height > settings.body_photo_max_pixels:
-                    raise BodyPhotoValidationError
+                    raise BodyPhotoValidationError("image_too_large")
                 probe.verify()
 
             with Image.open(BytesIO(content)) as decoded:
                 decoded.load()
                 oriented = ImageOps.exif_transpose(decoded)
-                _validate_output_geometry(*oriented.size, settings)
-                _validate_server_geometry(oriented, settings)
-                _verify_crop_evidence(content, oriented.height, evidence, settings)
+                _validate_geometry(*oriented.size, settings)
                 normalized = _normalized_mode(oriented, image_format)
                 output = BytesIO()
                 if image_format == "JPEG":
@@ -243,30 +101,22 @@ def validate_and_normalize(
                     normalized.save(output, format="PNG", optimize=True)
                 else:
                     normalized.save(output, format="WEBP", quality=90, method=6)
-    except (
-        BodyPhotoValidationError,
-        Image.DecompressionBombError,
-        Image.DecompressionBombWarning,
-    ) as error:
-        raise BodyPhotoValidationError from error
+    except BodyPhotoValidationError:
+        raise
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning) as error:
+        raise BodyPhotoValidationError("image_too_large") from error
     except (OSError, UnidentifiedImageError, ValueError) as error:
-        raise BodyPhotoValidationError from error
+        raise BodyPhotoValidationError("invalid_image") from error
 
     normalized_content = output.getvalue()
-    if not normalized_content or len(normalized_content) > settings.body_photo_max_bytes:
-        raise BodyPhotoValidationError
+    if not normalized_content:
+        raise BodyPhotoValidationError("invalid_image")
+    if len(normalized_content) > settings.body_photo_max_bytes:
+        raise BodyPhotoValidationError("invalid_file_size")
     return NormalizedBodyPhoto(
         content=normalized_content,
         mime_type=mime_type,
         extension=extension,
         width=normalized.width,
         height=normalized.height,
-        client_crop_confidence=evidence.confidence,
-        client_crop_confirmed=evidence.client_crop_confirmed,
-        server_geometry_checked=True,
-        crop_original_height=evidence.original_height,
-        crop_top=evidence.crop_top,
-        crop_bottom=evidence.crop_bottom,
-        processed_sha256=evidence.processed_sha256,
-        crop_evidence_sha256=evidence.evidence_sha256,
     )

@@ -7,16 +7,19 @@ export type ApiValidationDetail = {
 export class ApiError extends Error {
   readonly status: number;
   readonly details: ApiValidationDetail[] | null;
+  readonly code: string | null;
 
   constructor(
     status: number,
     message: string,
     details: ApiValidationDetail[] | null = null,
+    code: string | null = null,
   ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.details = details;
+    this.code = code;
   }
 }
 
@@ -39,7 +42,11 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const details = Array.isArray(body?.detail)
       ? (body.detail as ApiValidationDetail[])
       : null;
-    throw new ApiError(response.status, message, details);
+    const code = typeof body?.detail === "object" && body.detail !== null
+      && "code" in body.detail && typeof body.detail.code === "string"
+      ? body.detail.code
+      : null;
+    throw new ApiError(response.status, message, details, code);
   }
   if (response.status === 204) {
     return undefined as T;

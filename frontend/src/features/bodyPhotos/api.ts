@@ -36,15 +36,6 @@ export function uploadBodyPhoto(
   return request<BodyPhotoSession>(`${basePath}/${sessionId}/photos/${view}`, {
     method: "PUT",
     body: data,
-    headers: {
-      "X-Fitsho-Client-Crop-Confirmed": "true",
-      "X-Fitsho-Client-Crop-Confidence": String(processed.cropConfidence),
-      "X-Fitsho-Original-Height": String(processed.originalHeight),
-      "X-Fitsho-Crop-Top": String(processed.cropTop),
-      "X-Fitsho-Crop-Bottom": String(processed.cropBottom),
-      "X-Fitsho-Processed-SHA256": processed.processedSha256,
-      "X-Fitsho-Crop-Evidence-SHA256": processed.cropEvidenceSha256,
-    },
   });
 }
 

@@ -2,6 +2,8 @@ import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
+import { ApiError } from "../../shared/apiClient";
+
 import {
   createBodyPhotoSession,
   getBodyPhotoSession,
@@ -54,9 +56,6 @@ export function BodyPhotoWizard({
   const selectedPreviewRef = useRef<SelectedPhotoPreview | null>(null);
   const mountedRef = useRef(false);
   const selectionTokenRef = useRef(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const cameraStreamRef = useRef<MediaStream | null>(null);
-  const [cameraOpen, setCameraOpen] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(editingExistingPhoto);
 
   const view = views[currentIndex];
@@ -72,7 +71,6 @@ export function BodyPhotoWizard({
     return () => {
       mountedRef.current = false;
       selectionTokenRef.current += 1;
-      releaseCamera();
       Object.values(processedRef.current).forEach(disposeProcessedPhoto);
       disposeSelectedPreview(selectedPreviewRef.current);
       processedRef.current = {};
@@ -102,12 +100,6 @@ export function BodyPhotoWizard({
     side: t("bodyPhotos.pose.side"),
     back: t("bodyPhotos.pose.back"),
   }), [t]);
-
-  useEffect(() => {
-    if (cameraOpen && videoRef.current && cameraStreamRef.current) {
-      videoRef.current.srcObject = cameraStreamRef.current;
-    }
-  }, [cameraOpen]);
 
   async function processFile(file: File) {
     if (busy) return;
@@ -142,68 +134,6 @@ export function BodyPhotoWizard({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (file !== undefined) void processFile(file);
-  }
-
-  async function openCamera() {
-    if (busy || cameraOpen) return;
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setError(t("bodyPhotos.errors.cameraUnavailable"));
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false,
-      });
-      if (!mountedRef.current) {
-        stream.getTracks().forEach((track) => track.stop());
-        return;
-      }
-      cameraStreamRef.current = stream;
-      setCameraOpen(true);
-    } catch {
-      setError(t("bodyPhotos.errors.cameraUnavailable"));
-    } finally {
-      if (mountedRef.current) setBusy(false);
-    }
-  }
-
-  function closeCamera() {
-    releaseCamera();
-    setCameraOpen(false);
-  }
-
-  function releaseCamera() {
-    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
-    cameraStreamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
-  }
-
-  function captureCameraPhoto() {
-    const video = videoRef.current;
-    if (video === null || video.videoWidth === 0 || video.videoHeight === 0) {
-      setError(t("bodyPhotos.errors.cameraNotReady"));
-      return;
-    }
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const context = canvas.getContext("2d");
-    if (context === null) {
-      setError(t("bodyPhotos.errors.processing"));
-      return;
-    }
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (blob === null) {
-        setError(t("bodyPhotos.errors.processing"));
-        return;
-      }
-      closeCamera();
-      void processFile(new File([blob], `camera-${view}.jpg`, { type: "image/jpeg" }));
-    }, "image/jpeg", 0.92);
   }
 
   function retake() {
@@ -252,12 +182,16 @@ export function BodyPhotoWizard({
       } else {
         setCurrentIndex((index) => index + 1);
       }
-    } catch {
+    } catch (uploadError) {
       if (uploadedPhoto && editingExistingPhoto && uploadedSessionId !== null) {
         navigate(`/body-progress/${uploadedSessionId}`);
         return;
       }
-      setError(t(uploadedPhoto ? "bodyPhotos.errors.analysisNotStarted" : "bodyPhotos.errors.upload"));
+      setError(
+        uploadedPhoto
+          ? t("bodyPhotos.errors.analysisNotStarted")
+          : uploadErrorMessage(uploadError, t),
+      );
     } finally {
       setBusy(false);
     }
@@ -373,10 +307,8 @@ export function BodyPhotoWizard({
         <h2 id={`body-photo-${view}`}>{t("bodyPhotos.captureTitle", { view: t(`bodyPhotos.views.${view}`) })}</h2>
         <p>{instructions[view]}</p>
         <p className="body-photo-muted">{t("bodyPhotos.cameraGuidance")}</p>
+        <HeadlessPhotoGuide />
         <div className="body-photo-source-actions">
-          <button className="secondary-button" type="button" onClick={() => void openCamera()} disabled={busy || cameraOpen || sessionLoading}>
-            {t("bodyPhotos.takePhoto", { view: t(`bodyPhotos.views.${view}`) })}
-          </button>
           <label className="body-photo-upload-control">
             <span>{t("bodyPhotos.uploadExistingPhoto", { view: t(`bodyPhotos.views.${view}`) })}</span>
             <input
@@ -388,15 +320,6 @@ export function BodyPhotoWizard({
             />
           </label>
         </div>
-        {cameraOpen && (
-          <section className="body-photo-camera" aria-label={t("bodyPhotos.cameraTitle")}>
-            <video ref={videoRef} autoPlay muted playsInline />
-            <div>
-              <button className="primary-button" type="button" onClick={captureCameraPhoto} disabled={busy}>{t("bodyPhotos.capturePhoto")}</button>
-              <button className="secondary-button" type="button" onClick={closeCamera} disabled={busy}>{t("bodyPhotos.closeCamera")}</button>
-            </div>
-          </section>
-        )}
         {selectedPreview?.view === view && (
           <div className="body-photo-source-preview">
             <img
@@ -439,19 +362,31 @@ function PhotoClothingGuide() {
   return <aside className="body-photo-clothing-guide" aria-label={t("bodyPhotos.clothingTitle")}><strong>{t("bodyPhotos.clothingTitle")}</strong><p>{t("bodyPhotos.clothingBody")}</p><p>{t("bodyPhotos.coverage")}</p></aside>;
 }
 
+function HeadlessPhotoGuide() {
+  const { t } = useTranslation();
+  const retained = ["shouldersArms", "waistHips", "legsKnees", "anklesFeet"] as const;
+  return (
+    <aside className="body-photo-headless-guide" aria-label={t("bodyPhotos.headlessGuideLabel")}>
+      <strong>{t("bodyPhotos.headlessInstruction")}</strong>
+      <p>{t("bodyPhotos.headlessGuideIntro")}</p>
+      <ul>
+        {retained.map((item) => <li key={item}>{t(`bodyPhotos.retained.${item}`)}</li>)}
+      </ul>
+    </aside>
+  );
+}
+
 function PhotoQualityFeedback({ photo }: { photo: ProcessedBodyPhoto }) {
   const { t } = useTranslation();
-  const { quality, warnings } = photo.validation;
+  const { quality } = photo.validation;
   return (
     <section className="body-photo-quality" aria-label={t("bodyPhotos.quality.title")}>
       <strong>{t("bodyPhotos.quality.title")}</strong>
       <dl>
-        <div><dt>{t("bodyPhotos.quality.overall")}</dt><dd>{formatScore(quality.overallScore)}</dd></div>
         <div><dt>{t("bodyPhotos.quality.lighting")}</dt><dd>{formatScore(quality.brightnessScore)}</dd></div>
         <div><dt>{t("bodyPhotos.quality.sharpness")}</dt><dd>{formatScore(quality.sharpnessScore)}</dd></div>
-        <div><dt>{t("bodyPhotos.quality.pose")}</dt><dd>{formatScore(quality.poseScore)}</dd></div>
+        <div><dt>{t("bodyPhotos.quality.landmarks")}</dt><dd>{formatScore(quality.minimumLandmarkVisibility)}</dd></div>
       </dl>
-      {warnings.length > 0 && <p className="body-photo-muted">{t("bodyPhotos.quality.warning")}</p>}
     </section>
   );
 }
@@ -461,6 +396,13 @@ function processingErrorMessage(error: unknown, t: ReturnType<typeof useTranslat
     return t(`bodyPhotos.errors.${error.code}`, { defaultValue: t("bodyPhotos.errors.processing") });
   }
   return t("bodyPhotos.errors.processing");
+}
+
+function uploadErrorMessage(error: unknown, t: ReturnType<typeof useTranslation>["t"]): string {
+  if (error instanceof ApiError && error.code !== null) {
+    return t(`bodyPhotos.errors.${error.code}`, { defaultValue: t("bodyPhotos.errors.upload") });
+  }
+  return t("bodyPhotos.errors.upload");
 }
 
 function formatScore(score: number): string {

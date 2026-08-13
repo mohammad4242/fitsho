@@ -143,7 +143,7 @@ def test_openrouter_connection_test_validates_key_before_loading_catalog() -> No
     assert paths == ["/api/v1/auth/key", "/api/v1/models"]
 
 
-def test_openrouter_image_request_sends_three_processed_images_with_json_schema() -> None:
+def test_openrouter_image_request_sends_three_standardized_images_with_json_schema() -> None:
     seen: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -187,9 +187,9 @@ def test_openrouter_image_request_sends_three_processed_images_with_json_schema(
     assert user_content[0]["type"] == "text"
     assert json.loads(user_content[0]["text"]) == {"session_id": "session-1"}
     assert [item["text"] for item in user_content[1::2]] == [
-        "Processed anonymized front view:",
-        "Processed anonymized side view:",
-        "Processed anonymized back view:",
+        "Standardized headless front view:",
+        "Standardized headless side view:",
+        "Standardized headless back view:",
     ]
     assert [item["image_url"]["url"] for item in user_content[2::2]] == [
         "data:image/jpeg;base64,ZnJvbnQ=",

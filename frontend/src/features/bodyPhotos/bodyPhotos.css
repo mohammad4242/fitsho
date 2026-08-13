@@ -22,10 +22,14 @@
 .body-photo-steps li { padding: .55rem; border: 1px solid var(--line); border-radius: .55rem; color: var(--muted); text-align: center; font-weight: 750; }
 .body-photo-steps li[aria-current="step"] { border-color: var(--turquoise-dark); color: var(--petrol-950); background: #edf9f6; }
 .body-photo-capture { display: grid; gap: .9rem; }
-.body-photo-source-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .65rem; align-items: stretch; }.body-photo-source-actions > button { width: 100%; }
+.body-photo-source-actions { display: grid; gap: .65rem; align-items: stretch; }
 .body-photo-upload-control { display: grid; gap: .55rem; padding: 1rem; border: 1px dashed var(--turquoise-dark); border-radius: .8rem; cursor: pointer; font-weight: 800; }
 .body-photo-upload-control input { max-width: 100%; }
-.body-photo-camera { display: grid; gap: .65rem; padding: .75rem; border: 1px solid var(--turquoise-dark); border-radius: .85rem; background: #eef9f6; }.body-photo-camera video { width: 100%; max-height: 28rem; border-radius: .65rem; background: var(--petrol-950); object-fit: cover; }.body-photo-camera > div { display: flex; flex-wrap: wrap; gap: .6rem; }
+.body-photo-headless-guide { display: grid; gap: .65rem; padding: clamp(1rem, 3vw, 1.35rem); border: 1px solid rgb(80 223 206 / 35%); border-inline-start: .35rem solid var(--fitsho-aqua); border-radius: var(--fitsho-radius-lg); background: linear-gradient(135deg, rgb(80 223 206 / 10%), var(--fitsho-surface-subtle)); }
+.body-photo-headless-guide > strong { color: var(--fitsho-ink); font-size: clamp(1.15rem, 3vw, 1.45rem); font-weight: 900; line-height: 1.55; }
+.body-photo-headless-guide > p { color: var(--fitsho-muted); }
+.body-photo-headless-guide ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; margin: 0; padding: 0; list-style: none; }
+.body-photo-headless-guide li { padding: .55rem .7rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-sm); background: var(--fitsho-surface); font-weight: 750; }
 .body-photo-preview, .body-photo-source-preview { display: grid; gap: .65rem; }
 .body-photo-preview img, .body-photo-source-preview img { max-height: 28rem; width: min(100%, 22rem); border-radius: .75rem; object-fit: contain; background: var(--petrol-950); }
 .body-photo-source-preview { padding: .75rem; border: 1px solid var(--turquoise-dark); border-radius: .85rem; background: #eef9f6; }
@@ -260,7 +264,7 @@
 
 html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress-page h1, .body-analysis-page__header h1) { letter-spacing: 0; }
 .body-photo-clothing-guide, .body-analysis-warning { border-color: rgb(242 184 91 / 26%); color: var(--fitsho-ink); background: rgb(242 184 91 / 8%); }
-.body-photo-steps li, .body-photo-quality, .body-analysis-status, .body-photo-source-preview, .body-photo-camera { border-color: var(--fitsho-line); color: var(--fitsho-ink); background: var(--fitsho-surface-subtle); }
+.body-photo-steps li, .body-photo-quality, .body-analysis-status, .body-photo-source-preview { border-color: var(--fitsho-line); color: var(--fitsho-ink); background: var(--fitsho-surface-subtle); }
 .body-photo-steps li[aria-current="step"] { border-color: var(--fitsho-aqua); color: var(--fitsho-aqua); background: var(--fitsho-surface-interactive); }
 .body-photo-upload-control { border-color: var(--fitsho-line-strong); }
 .body-photo-modal { color: var(--fitsho-ink); background: var(--fitsho-surface); }
@@ -307,6 +311,7 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
   .body-progress-list > li > a { grid-column: 1 / -1; }
   .body-area-map { padding: .85rem; }
   .body-area-map__figure { min-height: 18rem; }
+  .body-photo-headless-guide ul { grid-template-columns: 1fr; }
 }
 
 /* Body Analysis home */

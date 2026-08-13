@@ -10,12 +10,10 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     Enum,
-    Float,
     ForeignKey,
     Integer,
     String,
     UniqueConstraint,
-    false,
     func,
     text,
 )
@@ -104,31 +102,6 @@ class BodyPhoto(Base):
         UniqueConstraint("session_id", "view", name="uq_body_photos_session_view"),
         CheckConstraint("byte_size > 0", name="ck_body_photos_byte_size_positive"),
         CheckConstraint("width > 0 AND height > 0", name="ck_body_photos_dimensions_positive"),
-        CheckConstraint(
-            "crop_confidence >= 0 AND crop_confidence <= 1",
-            name="ck_body_photos_crop_confidence_range",
-        ),
-        CheckConstraint(
-            "crop_original_height IS NULL OR crop_original_height > 0",
-            name="ck_body_photos_crop_original_height_positive",
-        ),
-        CheckConstraint(
-            "crop_top IS NULL OR crop_top >= 0",
-            name="ck_body_photos_crop_top_nonnegative",
-        ),
-        CheckConstraint(
-            "crop_bottom IS NULL OR crop_bottom > crop_top",
-            name="ck_body_photos_crop_bottom_after_top",
-        ),
-        CheckConstraint(
-            "NOT server_geometry_checked OR "
-            "(client_crop_confirmed AND crop_original_height IS NOT NULL AND "
-            "crop_top IS NOT NULL AND "
-            "crop_bottom IS NOT NULL AND crop_bottom <= crop_original_height AND "
-            "crop_bottom - crop_top = height AND char_length(processed_sha256) = 64 AND "
-            "char_length(crop_evidence_sha256) = 64)",
-            name="ck_body_photos_checked_crop_evidence_complete",
-        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -151,22 +124,6 @@ class BodyPhoto(Base):
     byte_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
     width: Mapped[int] = mapped_column(Integer, nullable=False)
     height: Mapped[int] = mapped_column(Integer, nullable=False)
-    # This is browser-reported evidence about the crop operation.  It is not a
-    # server-side anatomical determination that a head was removed.
-    client_crop_confidence: Mapped[float] = mapped_column(
-        "crop_confidence", Float, nullable=False
-    )
-    client_crop_confirmed: Mapped[bool] = mapped_column(
-        Boolean, default=False, server_default=false(), nullable=False
-    )
-    server_geometry_checked: Mapped[bool] = mapped_column(
-        Boolean, default=False, server_default=false(), nullable=False
-    )
-    crop_original_height: Mapped[int | None] = mapped_column(Integer)
-    crop_top: Mapped[int | None] = mapped_column(Integer)
-    crop_bottom: Mapped[int | None] = mapped_column(Integer)
-    processed_sha256: Mapped[str | None] = mapped_column(String(64))
-    crop_evidence_sha256: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

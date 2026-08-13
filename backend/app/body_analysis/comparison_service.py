@@ -244,13 +244,9 @@ class BodyProgressComparisonService:
 
     def _quality(self, session_id: UUID, analysis_confidence: float) -> ComparisonInputQuality:
         photos = self._db.scalars(select(BodyPhoto).where(BodyPhoto.session_id == session_id)).all()
-        crop_confidences = [photo.client_crop_confidence for photo in photos]
         return ComparisonInputQuality(
             analysis_confidence=analysis_confidence,
-            minimum_client_crop_confidence=(min(crop_confidences) if crop_confidences else None),
-            all_server_geometry_checked=(
-                len(photos) == 3 and all(photo.server_geometry_checked for photo in photos)
-            ),
+            all_standardized_views_present=len(photos) == 3,
         )
 
     def _compare(
@@ -313,10 +309,10 @@ class BodyProgressComparisonService:
         if current is None:
             limitations.add("missing_current_finding")
         if (
-            not previous_quality.all_server_geometry_checked
-            or not current_quality.all_server_geometry_checked
+            not previous_quality.all_standardized_views_present
+            or not current_quality.all_standardized_views_present
         ):
-            limitations.add("unverified_input_geometry")
+            limitations.add("incomplete_standardized_views")
 
         supporting_views = tuple(
             sorted(
@@ -383,11 +379,11 @@ class BodyProgressComparisonService:
             previous_quality.analysis_confidence,
             current_quality.analysis_confidence,
         ]
-        for quality in (previous_quality, current_quality):
-            if not quality.all_server_geometry_checked:
-                return 0.0
-            if quality.minimum_client_crop_confidence is not None:
-                confidence_values.append(quality.minimum_client_crop_confidence)
+        if not (
+            previous_quality.all_standardized_views_present
+            and current_quality.all_standardized_views_present
+        ):
+            return 0.0
         return round(min(confidence_values), 4)
 
     @staticmethod
