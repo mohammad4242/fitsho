@@ -71,12 +71,32 @@ it("loads structured programming metadata and saves an edited exercise", async (
   expect(screen.getByLabelText("فشار داخلی شانه")).toBeChecked();
   expect(screen.getByLabelText("قابل استفاده برای تولید برنامه")).toBeChecked();
 
+  await user.clear(screen.getByLabelText("نام انگلیسی"));
+  await user.type(screen.getByLabelText("نام انگلیسی"), "Advanced Incline Push Up");
+  await user.clear(screen.getByLabelText("نام فارسی"));
+  await user.type(screen.getByLabelText("نام فارسی"), "شنا شیب‌دار پیشرفته");
+  await user.click(screen.getByLabelText("دمبل"));
+  await user.selectOptions(screen.getByLabelText("سطح سختی"), "advanced");
+  await user.clear(screen.getByLabelText("مرحله انگلیسی ۱"));
+  await user.type(screen.getByLabelText("مرحله انگلیسی ۱"), "Set the bench securely");
+  await user.clear(screen.getByLabelText("نکته فارسی ۱"));
+  await user.type(screen.getByLabelText("نکته فارسی ۱"), "شانه‌ها را ثابت نگه دارید");
+
   await user.selectOptions(screen.getByLabelText("الگوی حرکت"), "vertical_push");
   await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
 
   expect(adminApi.updateAdminExercise).toHaveBeenCalledWith(
     "exercise-id",
-    expect.objectContaining({ movement_pattern: "vertical_push", is_programmable: true }),
+    expect.objectContaining({
+      name_en: "Advanced Incline Push Up",
+      name_fa: "شنا شیب‌دار پیشرفته",
+      equipment: ["bodyweight", "bench", "dumbbell"],
+      difficulty: "advanced",
+      instructions_en: ["Set the bench securely", "Lower", "Press"],
+      safety_notes_fa: ["شانه‌ها را ثابت نگه دارید"],
+      movement_pattern: "vertical_push",
+      is_programmable: true,
+    }),
     null,
     [],
   );

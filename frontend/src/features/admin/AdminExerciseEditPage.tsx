@@ -7,15 +7,19 @@ import { ApiError } from "../../shared/apiClient";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getAdminExercise, updateAdminExercise } from "./api";
-import { AdminExerciseForm, type ProgrammingMetadata } from "./AdminExerciseForm";
-import { ExerciseMediaAssetsFields } from "./ExerciseMediaAssetsFields";
+import { AdminExerciseFields } from "./AdminExerciseFields";
 import { exerciseLibraryReturnPath, readExerciseLibraryReturn } from "./exerciseLibraryNavigation";
 import type {
   AdminExercise,
-  AdminExerciseForm as AdminExerciseFormState,
+  AdminExerciseForm,
   AdminExerciseMediaFiles,
 } from "./types";
-import { adminExerciseToForm, toAdminExerciseCreate } from "./validation";
+import {
+  adminExerciseToForm,
+  toAdminExerciseCreate,
+  validateAdminExercise,
+  type AdminValidationErrors,
+} from "./validation";
 import "./admin.css";
 
 export function AdminExerciseEditPage() {
@@ -25,12 +29,15 @@ export function AdminExerciseEditPage() {
   const [searchParams] = useSearchParams();
   const returnTo = readExerciseLibraryReturn(searchParams);
   const [exercise, setExercise] = useState<AdminExercise | null>(null);
-  const [form, setForm] = useState<AdminExerciseFormState | null>(null);
+  const [form, setForm] = useState<AdminExerciseForm | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [busy, setBusy] = useState(false);
-  const [saveError, setSaveError] = useState(false);
+  const [errors, setErrors] = useState<AdminValidationErrors>({});
+  const [requestError, setRequestError] = useState<"duplicate" | "api" | null>(null);
   const [reload, setReload] = useState(0);
+  const [media, setMedia] = useState<File | null>(null);
   const [mediaAssets, setMediaAssets] = useState<AdminExerciseMediaFiles>([]);
+  const [preview, setPreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (!exerciseId) {
@@ -44,6 +51,8 @@ export function AdminExerciseEditPage() {
         if (!active) return;
         setExercise(result);
         setForm(adminExerciseToForm(result));
+        setErrors({});
+        setRequestError(null);
         setState("ready");
       })
       .catch((error: unknown) => {
@@ -53,26 +62,33 @@ export function AdminExerciseEditPage() {
     return () => { active = false; };
   }, [exerciseId, reload]);
 
-  function setField<K extends keyof AdminExerciseFormState>(
-    key: K,
-    value: AdminExerciseFormState[K],
-  ) {
-    setForm((current) => current === null ? current : { ...current, [key]: value });
-  }
+  useEffect(() => {
+    if (media === null) {
+      setPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(media);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [media]);
 
-  function setProgrammingField<K extends keyof ProgrammingMetadata>(key: K, value: ProgrammingMetadata[K]) {
-    setField(key, value as AdminExerciseFormState[K]);
+  function setField<K extends keyof AdminExerciseForm>(key: K, value: AdminExerciseForm[K]) {
+    setForm((current) => current === null ? current : { ...current, [key]: value });
+    setErrors((current) => ({ ...current, [key]: undefined }));
   }
 
   async function save() {
     if (!exerciseId || form === null) return;
+    const nextErrors = validateAdminExercise(form);
+    setErrors(nextErrors);
+    setRequestError(null);
+    if (Object.keys(nextErrors).length > 0) return;
     setBusy(true);
-    setSaveError(false);
     try {
       const updated = await updateAdminExercise(
         exerciseId,
         toAdminExerciseCreate(form),
-        null,
+        media,
         mediaAssets,
       );
       navigate(
@@ -83,14 +99,31 @@ export function AdminExerciseEditPage() {
           updated.is_active,
           updated.needs_review,
         ),
-        { replace: true },
+        { replace: true, state: { editedId: updated.id } },
       );
-    } catch {
-      setSaveError(true);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setRequestError("duplicate");
+        setErrors((current) => ({ ...current, slug: "required" }));
+      } else {
+        setRequestError("api");
+        if (error instanceof ApiError && error.details) {
+          const field = error.details[0]?.loc?.at(-1);
+          if (typeof field === "string" && field in form) {
+            setErrors((current) => ({ ...current, [field]: "required" }));
+          }
+        }
+      }
     } finally {
       setBusy(false);
     }
   }
+
+  const previewType = media?.type.startsWith("video/")
+    ? "video"
+    : media
+      ? "gif"
+      : exercise?.media_type ?? "placeholder";
 
   return (
     <div className="admin-page">
@@ -98,24 +131,60 @@ export function AdminExerciseEditPage() {
       <AuthenticatedHeader />
       <main className="admin-main admin-main--form">
         <header className="admin-form-header">
-          <div><p className="eyebrow eyebrow--accent">{t("admin.edit.eyebrow")}</p><h1>{t("admin.edit.title")}</h1><p>{t("admin.edit.intro")}</p></div>
+          <div>
+            <p className="eyebrow eyebrow--accent">{t("admin.edit.eyebrow")}</p>
+            <h1>{t("admin.edit.title")}</h1>
+            <p>{t("admin.edit.intro")}</p>
+          </div>
           <Link to={returnTo}>{t("admin.edit.back")}</Link>
         </header>
         {state === "loading" && <p className="admin-status" role="status">{t("admin.edit.loading")}</p>}
         {state === "missing" && <p className="admin-status" role="alert">{t("admin.edit.missing")}</p>}
-        {state === "error" && <div className="admin-status" role="alert"><p>{t("admin.edit.loadError")}</p><button type="button" onClick={() => setReload((value) => value + 1)}>{t("common.retry")}</button></div>}
+        {state === "error" && (
+          <div className="admin-status" role="alert">
+            <p>{t("admin.edit.loadError")}</p>
+            <button type="button" onClick={() => setReload((value) => value + 1)}>
+              {t("common.retry")}
+            </button>
+          </div>
+        )}
         {state === "ready" && form !== null && exercise !== null && (
-          <form className="admin-form" noValidate onSubmit={(event) => { event.preventDefault(); void save(); }}>
-            {saveError && <div className="admin-form-alert" role="alert">{t("admin.errors.api")}</div>}
-            <p className="admin-status" dir="ltr">{exercise.slug}</p>
-            <AdminExerciseForm value={form} onChange={setProgrammingField} />
-            <ExerciseMediaAssetsFields
-              assets={form.media_assets}
-              files={mediaAssets}
-              onAssetsChange={(mediaAssetsInput) => setField("media_assets", mediaAssetsInput)}
-              onFilesChange={setMediaAssets}
+          <form
+            className="admin-form"
+            noValidate
+            onSubmit={(event) => {
+              event.preventDefault();
+              void save();
+            }}
+          >
+            {(Object.keys(errors).length > 0 || requestError) && (
+              <div className="admin-form-alert" role="alert">
+                {requestError === "duplicate"
+                  ? t("admin.errors.duplicate")
+                  : requestError === "api"
+                    ? t("admin.errors.api")
+                    : t("admin.errors.validation")}
+                {requestError === "api" && (
+                  <button type="button" onClick={() => void save()}>{t("common.retry")}</button>
+                )}
+              </div>
+            )}
+            <AdminExerciseFields
+              value={form}
+              errors={errors}
+              duplicateSlug={requestError === "duplicate"}
+              primaryMediaPath={preview ?? exercise.media_path}
+              primaryMediaType={previewType}
+              mediaFiles={mediaAssets}
+              onChange={setField}
+              onPrimaryMediaChange={setMedia}
+              onMediaFilesChange={setMediaAssets}
             />
-            <div className="admin-form-actions"><button className="admin-primary-link" type="submit" disabled={busy}>{busy ? t("admin.actions.savingChanges") : t("admin.actions.saveChanges")}</button></div>
+            <div className="admin-form-actions">
+              <button className="admin-primary-link" type="submit" disabled={busy}>
+                {busy ? t("admin.actions.savingChanges") : t("admin.actions.saveChanges")}
+              </button>
+            </div>
           </form>
         )}
       </main>

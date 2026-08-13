@@ -511,6 +511,7 @@ html[dir="rtl"] .exercise-catalog-hero h1 {
 
 .exercise-card__edit {
   margin-block-start: 0.55rem;
+  color: var(--paper);
   background: transparent;
 }
 

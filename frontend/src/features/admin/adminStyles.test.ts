@@ -10,6 +10,9 @@ const nodeProcess = (globalThis as typeof globalThis & {
 const adminCss = nodeProcess
   .getBuiltinModule("fs")
   .readFileSync("src/features/admin/admin.css", "utf8");
+const exerciseCss = nodeProcess
+  .getBuiltinModule("fs")
+  .readFileSync("src/features/exercises/exercises.css", "utf8");
 
 it("keeps the meal image dialog fixed above the mobile header", () => {
   expect(adminCss).toMatch(
@@ -20,5 +23,11 @@ it("keeps the meal image dialog fixed above the mobile header", () => {
 it("keeps an open account menu above admin page content", () => {
   expect(adminCss).toMatch(
     /\.admin-page\s*>\s*\.dashboard-header--menu-open\s*\{[^}]*z-index:\s*50;/,
+  );
+});
+
+it("renders the exercise-card Edit action with white text", () => {
+  expect(exerciseCss).toMatch(
+    /\.exercise-card__edit\s*\{[^}]*color:\s*(?:#fff(?:fff)?|white|var\(--paper\));/,
   );
 });
