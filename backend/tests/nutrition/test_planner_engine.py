@@ -215,6 +215,37 @@ def test_planner_creates_exact_user_selected_slots_for_seven_days() -> None:
     assert all(sum(meal.role == "snack" for meal in day.meals) == 2 for day in result.days)
 
 
+def test_planner_uses_exact_program_schedule_and_redistributes_around_free_meal() -> None:
+    from app.nutrition.planner_engine import GenerationOutcome, plan_week
+
+    normal = (
+        ("main_meal", "lunch-template", "lunch"),
+        ("main_meal", "dinner-template", "dinner"),
+        ("snack", "snack-template", "snack"),
+    )
+    friday = (
+        ("free_meal", None, "lunch"),
+        ("main_meal", "dinner-template", "dinner"),
+        ("snack", "snack-template", "snack"),
+    )
+    schedule = (normal, normal, normal, normal, normal, normal, friday)
+    inputs = _input(main_meals_per_day=2, template_schedule=schedule)
+
+    result = plan_week(inputs, _catalogue(), _meal_templates())
+
+    assert result.outcome is GenerationOutcome.SUCCESS
+    assert [[meal.template_id for meal in day.meals] for day in result.days[:6]] == [
+        ["lunch-template", "dinner-template", "snack-template"]
+    ] * 6
+    assert [meal.template_id for meal in result.days[6].meals] == [
+        None,
+        "dinner-template",
+        "snack-template",
+    ]
+    assert result.days[6].meals[0].foods == ()
+    assert inputs.daily_targets["goal_calories"] == Decimal("2000")
+
+
 def test_planner_is_deterministic_and_controls_repetition() -> None:
     from app.nutrition.planner_engine import plan_week
 

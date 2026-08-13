@@ -202,6 +202,7 @@ def _seed_foods_and_prices(db: Session) -> None:
     db.add_all(
         [
             NutritionCatalogueMeal(
+                code="TST-LU01",
                 name_fa="مرغ و برنج تست",
                 name_en="Test chicken and rice",
                 category=MealCategory.LUNCH,
@@ -213,6 +214,7 @@ def _seed_foods_and_prices(db: Session) -> None:
                 ],
             ),
             NutritionCatalogueMeal(
+                code="TST-DN01",
                 name_fa="عدس و سیب‌زمینی تست",
                 name_en="Test lentils and potato",
                 category=MealCategory.DINNER,
@@ -224,6 +226,7 @@ def _seed_foods_and_prices(db: Session) -> None:
                 ],
             ),
             NutritionCatalogueMeal(
+                code="TST-SN01",
                 name_fa="میان‌وعده ماست تست",
                 name_en="Test yogurt snack",
                 category=MealCategory.SNACK,

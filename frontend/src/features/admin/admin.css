@@ -116,6 +116,30 @@
 .admin-meal-required input { width: auto; }
 @media (max-width: 760px) { .admin-meal-ingredients li { grid-template-columns: 1fr; }.admin-meal-ingredients li > span { justify-self: start; } }
 
+.admin-main--nutrition-programs, .admin-main--nutrition-program-editor { --program-accent: #7c9b3a; }
+.admin-program-diet-tabs button[aria-selected="true"] { background: linear-gradient(135deg, var(--petrol-800), #556d27); }
+.admin-program-card { border-top: .35rem solid var(--program-accent); }
+.admin-program-card.is-archived { opacity: .72; }
+.admin-program-card footer button { padding: .5rem .8rem; border: 1px solid var(--line); border-radius: 999px; color: var(--danger); background: white; cursor: pointer; font-weight: 800; }
+.admin-program-week { display: grid; grid-template-columns: repeat(7, minmax(9rem, 1fr)); gap: .55rem; overflow-x: auto; padding-bottom: .35rem; }
+.admin-program-day { min-width: 9rem; padding: .8rem; border: 1px solid rgb(85 109 39 / 22%); border-radius: .85rem; background: linear-gradient(180deg, rgb(238 245 221 / 78%), white); }
+.admin-program-day > strong { color: #455d1e; font-size: .82rem; }
+.admin-program-day ul { display: grid; gap: .45rem; margin: .65rem 0 0; padding: 0; list-style: none; }
+.admin-program-day li { padding-top: .45rem; border-top: 1px solid rgb(85 109 39 / 16%); }
+.admin-program-day li span, .admin-program-day li b { display: block; }
+.admin-program-day li span { color: var(--muted); font-size: .68rem; }
+.admin-program-day li b { margin-top: .12rem; color: var(--petrol-900); font-size: .78rem; }
+.admin-program-editor-week { display: grid; grid-template-columns: repeat(7, minmax(12rem, 1fr)); gap: .7rem; overflow-x: auto; padding: .2rem .1rem .6rem; }
+.admin-program-editor-day { display: grid; min-width: 12rem; gap: .65rem; margin: 0; padding: .85rem; border: 1px solid rgb(85 109 39 / 24%); border-radius: .9rem; background: linear-gradient(160deg, rgb(238 245 221 / 76%), white 48%); }
+.admin-program-editor-day legend { padding-inline: .35rem; color: #455d1e; font-weight: 900; }
+.admin-program-editor-day label { display: grid; gap: .3rem; color: var(--petrol-900); font-size: .76rem; font-weight: 800; }
+.admin-program-toggle { display: flex !important; align-items: center; align-self: end; gap: .5rem !important; min-height: 2.7rem; }
+.admin-program-toggle input { width: auto; }
+@media (max-width: 760px) {
+  .admin-program-week, .admin-program-editor-week { grid-template-columns: 1fr; overflow: visible; }
+  .admin-program-day, .admin-program-editor-day { min-width: 0; }
+}
+
 .admin-main--ai-settings { display: grid; gap: 1rem; }
 .admin-main--ai-settings .admin-page-heading { align-items: center; padding: 1.25rem; border-radius: 1.25rem; color: var(--paper); background: linear-gradient(135deg, var(--petrol-950), var(--petrol-800)); box-shadow: var(--fitsho-shadow); }.admin-main--ai-settings .admin-page-heading h1 { margin: .15rem 0 0; }.admin-main--ai-settings .admin-page-heading .admin-kicker { margin: 0; color: var(--turquoise); }.admin-ai-back { display: inline-flex; align-items: center; gap: .5rem; padding: .65rem .85rem; border: 1px solid rgb(255 255 255 / 28%); border-radius: 999px; color: white; text-decoration: none; font-weight: 800; }.admin-ai-back:hover { background: rgb(255 255 255 / 12%); }.admin-ai-back svg { width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
 .admin-ai-task-tabs, .admin-ai-settings-actions { display: flex; flex-wrap: wrap; gap: .65rem; }

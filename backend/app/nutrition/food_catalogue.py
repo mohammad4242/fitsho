@@ -9,11 +9,8 @@ from sqlalchemy.orm import Session, selectinload
 from app.nutrition.catalogue_seed_data import (
     APPROVED_FOODS,
     NUTRIENT_UNITS,
-    USDA_ACCESS_DATE,
-    USDA_DATA_VERSION,
-    USDA_SOURCE_NAME,
     USDA_SOURCE_REFERENCE,
-    composition_for,
+    composition_seeds_for,
 )
 from app.nutrition.enums import (
     EstimateConfidence,
@@ -361,7 +358,7 @@ def seed_base_iranian_food_catalogue(
 
     seeded: list[NutritionCatalogueFood] = []
     for item in APPROVED_FOODS:
-        nutrients = composition_for(item.slug)
+        compositions = composition_seeds_for(item.slug)
         food = db.scalar(
             select(NutritionCatalogueFood)
             .where(NutritionCatalogueFood.slug == item.slug)
@@ -388,13 +385,21 @@ def seed_base_iranian_food_catalogue(
         food.canonical_quantity = Decimal("100")
         food.canonical_unit = "g"
         food.edible_portion = Decimal("1")
-        food.source_name = USDA_SOURCE_NAME if nutrients else "Fitsho approved vocabulary"
-        food.source_reference = USDA_SOURCE_REFERENCE
+        food.source_name = (
+            compositions[0].source_name if compositions else "Fitsho approved vocabulary"
+        )
+        food.source_reference = (
+            compositions[0].source_reference if compositions else USDA_SOURCE_REFERENCE
+        )
         food.source_food_id = item.source_food_id
-        food.data_version = USDA_DATA_VERSION if nutrients else "awaiting-regional-source"
-        food.source_access_date = date.fromisoformat(USDA_ACCESS_DATE) if nutrients else None
+        food.data_version = (
+            compositions[0].data_version if compositions else "awaiting-regional-source"
+        )
+        food.source_access_date = (
+            date.fromisoformat(compositions[0].source_access_date) if compositions else None
+        )
         food.verification_status = (
-            FoodVerificationStatus.VERIFIED if nutrients else FoodVerificationStatus.DRAFT
+            FoodVerificationStatus.VERIFIED if compositions else FoodVerificationStatus.DRAFT
         )
         food.dietary_patterns = _dietary_patterns_for_slug(item.slug)
         food.roles = [NutritionCatalogueFoodRole(role=FoodRoleEnum(role)) for role in item.roles]
@@ -408,20 +413,22 @@ def seed_base_iranian_food_catalogue(
         ]
         food.compositions = [
             NutritionFoodComposition(
-                nutrient_code=code,
-                value_per_100g=value,
-                unit=NUTRIENT_UNITS[code],
+                nutrient_code=composition.nutrient_code,
+                value_per_100g=composition.value_per_100g,
+                unit=NUTRIENT_UNITS[composition.nutrient_code],
                 unit_form=(
-                    "dietary_folate_equivalents" if code == "folate_dfe_mcg" else "nutrient_mass"
+                    "dietary_folate_equivalents"
+                    if composition.nutrient_code == "folate_dfe_mcg"
+                    else "nutrient_mass"
                 ),
-                source_name=USDA_SOURCE_NAME,
-                source_reference=USDA_SOURCE_REFERENCE,
+                source_name=composition.source_name,
+                source_reference=composition.source_reference,
                 source_food_id=item.source_food_id,
-                data_version=USDA_DATA_VERSION,
-                source_access_date=date.fromisoformat(USDA_ACCESS_DATE),
+                data_version=composition.data_version,
+                source_access_date=date.fromisoformat(composition.source_access_date),
                 confidence=EstimateConfidence.HIGH,
             )
-            for code, value in nutrients.items()
+            for composition in compositions
         ]
         food.portions = [
             NutritionFoodPortion(

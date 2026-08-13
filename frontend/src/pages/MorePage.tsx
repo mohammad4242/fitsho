@@ -87,6 +87,7 @@ export function MorePage() {
               {user.is_admin && <MoreLink to="/admin/exercises" icon="settings" title={l("مدیریت حرکات", "Exercise administration")} />}
               {user.is_admin && <MoreLink to="/admin/training-program-templates" icon="dumbbell" title={l("کتابخانه برنامه‌های تمرینی", "Training program library")} />}
               {user.is_admin && <MoreLink to="/admin/nutrition-meals" icon="nutrition" title={l("کاتالوگ وعده‌های غذایی", "Nutrition meal catalogue")} />}
+              {user.is_admin && <MoreLink to="/admin/nutrition-programs" icon="nutrition" title={l("کاتالوگ برنامه‌های غذایی", "Nutrition program catalogue")} />}
               {user.is_admin && <MoreLink to="/admin/nutrition-monitoring" icon="settings" title={l("پایش تغذیه", "Nutrition monitoring")} />}
             </MoreGroup>
           )}

@@ -347,8 +347,7 @@ def correct_photo_item(
             food = db.scalar(
                 select(NutritionCatalogueFood).where(
                     NutritionCatalogueFood.id == food_id,
-                    NutritionCatalogueFood.verification_status
-                    == FoodVerificationStatus.VERIFIED,
+                    NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED,
                 )
             )
             if food is None:
@@ -397,8 +396,7 @@ def confirm_photo(
             select(NutritionCatalogueFood)
             .where(
                 NutritionCatalogueFood.id == UUID(str(food_id)),
-                NutritionCatalogueFood.verification_status
-                == FoodVerificationStatus.VERIFIED,
+                NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED,
             )
             .options(selectinload(NutritionCatalogueFood.compositions))
         )
@@ -435,6 +433,57 @@ def confirm_photo(
     row.confirmed_at = datetime.now(UTC)
     db.commit()
     return [{"id": item.id, "display_name": item.display_name} for item in created]
+
+
+def confirm_photo_macro_preview(db: Session, user_id: UUID, estimate_id: UUID) -> dict[str, float]:
+    row = db.scalar(
+        select(NutritionFoodPhotoEstimate).where(
+            NutritionFoodPhotoEstimate.id == estimate_id,
+            NutritionFoodPhotoEstimate.user_id == user_id,
+            NutritionFoodPhotoEstimate.status == "estimated",
+        )
+    )
+    if row is None:
+        raise FoodPhotoError("FOOD_PHOTO_ESTIMATE_NOT_FOUND")
+    totals = {
+        "calories": Decimal(),
+        "protein_g": Decimal(),
+        "carbohydrate_g": Decimal(),
+        "fat_g": Decimal(),
+    }
+    nutrient_keys = {
+        "energy_kcal": "calories",
+        "protein_g": "protein_g",
+        "carbohydrate_g": "carbohydrate_g",
+        "total_fat_g": "fat_g",
+    }
+    resolved = False
+    for item in row.mapped_items:
+        food_id = item.get("food_id")
+        if not food_id or item.get("unit") != "g":
+            continue
+        food = db.scalar(
+            select(NutritionCatalogueFood)
+            .where(
+                NutritionCatalogueFood.id == UUID(str(food_id)),
+                NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED,
+            )
+            .options(selectinload(NutritionCatalogueFood.compositions))
+        )
+        if food is None:
+            continue
+        resolved = True
+        factor = Decimal(str(item["estimated_amount"])) / Decimal("100")
+        for composition in food.compositions:
+            output_key = nutrient_keys.get(composition.nutrient_code)
+            if output_key is not None:
+                totals[output_key] += composition.value_per_100g * factor
+    if not resolved:
+        raise FoodPhotoError("UNRESOLVED_ITEMS_REQUIRE_EDIT")
+    row.status = "confirmed"
+    row.confirmed_at = datetime.now(UTC)
+    db.commit()
+    return {key: float(value) for key, value in totals.items()}
 
 
 def delete_photo(db: Session, user_id: UUID, estimate_id: UUID, settings: Settings) -> None:

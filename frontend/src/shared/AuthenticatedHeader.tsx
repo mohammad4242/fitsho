@@ -107,6 +107,7 @@ export function AuthenticatedHeader() {
     { to: "/admin/exercises", label: t("header.adminExercises"), active: location.pathname.startsWith("/admin/exercises"), visible: user.is_admin },
     { to: "/admin/nutrition-monitoring", label: t("header.nutritionMonitoring"), active: location.pathname.startsWith("/admin/nutrition-monitoring"), visible: user.is_admin },
     { to: "/admin/nutrition-meals", label: t("header.adminMealCatalogue"), active: location.pathname.startsWith("/admin/nutrition-meals"), visible: user.is_admin },
+    { to: "/admin/nutrition-programs", label: t("header.adminNutritionPrograms"), active: location.pathname.startsWith("/admin/nutrition-programs"), visible: user.is_admin },
     { to: "/admin/ai-settings", label: t("header.adminAiSettings"), active: location.pathname.startsWith("/admin/ai-settings"), visible: user.is_admin },
     { to: "/admin/training-program-templates", label: t("header.adminTrainingTemplates"), active: location.pathname.startsWith("/admin/training-program-templates"), visible: user.is_admin },
   ].find((item) => item.visible && item.active);
@@ -219,6 +220,7 @@ export function AuthenticatedHeader() {
 
 function getMobileContext(pathname: string, t: (key: string) => string, isFa: boolean): { title: string; backTo?: string } {
   const contexts: Array<{ prefix: string; title: string; backTo?: string }> = [
+    { prefix: "/admin/nutrition-programs", title: t("header.adminNutritionPrograms"), backTo: "/more" },
     { prefix: "/admin/nutrition-meals", title: t("header.adminMealCatalogue"), backTo: "/more" },
     { prefix: "/nutrition-tracking", title: isFa ? "ثبت تغذیه" : "Nutrition tracking", backTo: "/nutrition-estimate" },
     { prefix: "/food-catalogue", title: t("header.foodCatalogue"), backTo: "/nutrition-estimate" },

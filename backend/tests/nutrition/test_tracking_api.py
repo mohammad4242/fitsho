@@ -4,8 +4,16 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.nutrition.enums import NutritionPlanLifecycleStatus, NutritionPlanReviewStatus
-from app.nutrition.models import NutritionCatalogueFood, NutritionWeeklyPlan
+from app.nutrition.enums import (
+    MealSlotRole,
+    NutritionPlanLifecycleStatus,
+    NutritionPlanReviewStatus,
+)
+from app.nutrition.models import (
+    NutritionCatalogueFood,
+    NutritionWeeklyPlan,
+    NutritionWeeklyPlanMeal,
+)
 from tests.nutrition.test_weekly_plan_api import (
     ORIGIN,
     _register_and_estimate,
@@ -22,9 +30,7 @@ def _setup(client: TestClient, db: Session) -> tuple[dict[str, object], Nutritio
     return plan, food
 
 
-def test_pending_plan_is_not_a_quick_check_in_baseline(
-    client: TestClient, db: Session
-) -> None:
+def test_pending_plan_is_not_a_quick_check_in_baseline(client: TestClient, db: Session) -> None:
     plan, food = _setup(client, db)
     entry_date = plan["start_date"]
 
@@ -98,6 +104,62 @@ def test_quick_approximation_is_explicitly_low_confidence_and_deletable(
     assert summary.json()["data_status"] == "insufficient_data"
 
 
+def test_free_meal_macros_update_actual_totals_without_changing_plan_targets(
+    client: TestClient,
+    db: Session,
+) -> None:
+    plan_json, _food = _setup(client, db)
+    plan = db.get(NutritionWeeklyPlan, plan_json["id"])
+    assert plan is not None and plan.review is not None
+    plan.lifecycle_status = NutritionPlanLifecycleStatus.ACTIVE
+    plan.review.status = NutritionPlanReviewStatus.APPROVED
+    day = plan.days[0]
+    planned_targets = dict(day.nutrient_totals)
+    free_meal = NutritionWeeklyPlanMeal(
+        day_id=day.id,
+        catalogue_meal_id=None,
+        catalogue_meal_category="lunch",
+        slot_role=MealSlotRole.FREE_MEAL,
+        slot_index=0,
+        target_distribution={},
+        nutrient_totals={},
+        cost_irr=0,
+    )
+    db.add(free_meal)
+    db.commit()
+
+    payload = {
+        "entry_date": day.plan_date.isoformat(),
+        "calories": 720,
+        "protein_g": 38,
+        "carbohydrate_g": 82,
+        "fat_g": 24,
+    }
+    first = client.put(
+        f"/api/v1/nutrition/tracking/free-meals/{free_meal.id}",
+        headers=ORIGIN,
+        json=payload,
+    )
+    second = client.put(
+        f"/api/v1/nutrition/tracking/free-meals/{free_meal.id}",
+        headers=ORIGIN,
+        json={**payload, "calories": 700},
+    )
+
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200
+    assert second.json()["actual_totals"] == {
+        "energy_kcal": 700,
+        "protein_g": 38,
+        "carbohydrate_g": 82,
+        "total_fat_g": 24,
+    }
+    assert len(second.json()["entries"]) == 1
+    assert second.json()["entries"][0]["source"] == "free_meal"
+    db.refresh(day)
+    assert day.nutrient_totals == planned_targets
+
+
 def test_member_can_edit_own_catalogue_entry_and_read_recent_foods(
     client: TestClient,
     db: Session,
@@ -164,8 +226,7 @@ def test_member_can_adjust_and_skip_planned_meal_on_active_revision(
     )
     assert adjusted_entry["source"] == "planned_adjusted"
     assert (
-        adjusted_entry["nutrients"]["energy_kcal"]
-        == meal["nutrient_totals"]["energy_kcal"] * 0.5
+        adjusted_entry["nutrients"]["energy_kcal"] == meal["nutrient_totals"]["energy_kcal"] * 0.5
     )
     assert skipped.status_code == 200
     assert all(item["planned_meal_id"] != meal["id"] for item in skipped.json()["entries"])

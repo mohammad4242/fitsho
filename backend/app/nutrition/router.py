@@ -57,6 +57,7 @@ from app.nutrition.clinical_service import (
 from app.nutrition.enums import (
     FoodVerificationStatus,
     MealCategory,
+    NutritionDietStyle,
     NutritionLabRequestStatus,
     NutritionSupplementOrderStatus,
     PriceUpdateTriggerKind,
@@ -89,6 +90,7 @@ from app.nutrition.food_photo_service import (
     FoodPhotoError,
     authorize_photo_access,
     confirm_photo,
+    confirm_photo_macro_preview,
     correct_photo_item,
     delete_photo,
     estimate_photo,
@@ -146,6 +148,17 @@ from app.nutrition.plan_service import (
 from app.nutrition.price_overrides import create_price_override
 from app.nutrition.price_providers import configured_providers
 from app.nutrition.price_update_service import run_price_update_async
+from app.nutrition.program_catalogue import (
+    ProgramLifecycle,
+    ProgramWriteError,
+    archive_program,
+    create_program,
+    get_program,
+    list_programs,
+    program_response,
+    restore_program,
+    update_program,
+)
 from app.nutrition.schemas import (
     AdminFoodCataloguePageResponse,
     CatalogueConsumptionInput,
@@ -162,11 +175,15 @@ from app.nutrition.schemas import (
     FoodPhotoItemCorrectionInput,
     FoodPriceOverrideInput,
     FoodPriceOverrideResponse,
+    FreeMealTrackingInput,
     MealFeedbackInput,
     MealLockInput,
     NutritionEstimateResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
+    NutritionProgramPageResponse,
+    NutritionProgramResponse,
+    NutritionProgramWrite,
     PartialRegenerationInput,
     PhysicianFoodQuantityInput,
     PhysicianLabRequestInput,
@@ -232,6 +249,7 @@ from app.nutrition.tracking_service import (
     edit_entry,
     history,
     recent_foods,
+    save_free_meal,
     save_quick_approximation,
     submit_check_in,
 )
@@ -460,6 +478,117 @@ def replace_catalogue_meal(
     if meal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meal not found")
     return meal_response(meal)
+
+
+@router.get(
+    "/admin/programs",
+    response_model=NutritionProgramPageResponse,
+)
+def read_nutrition_programs(
+    db: DatabaseSession,
+    admin: AdminUser,
+    diet_style: NutritionDietStyle | None = None,
+    lifecycle: ProgramLifecycle = "active",
+) -> NutritionProgramPageResponse:
+    del admin
+    return NutritionProgramPageResponse(
+        items=[
+            program_response(program)
+            for program in list_programs(db, diet_style=diet_style, lifecycle=lifecycle)
+        ],
+        diet_styles=list(NutritionDietStyle),
+    )
+
+
+@router.get(
+    "/admin/programs/{program_id}",
+    response_model=NutritionProgramResponse,
+)
+def read_nutrition_program(
+    program_id: UUID,
+    db: DatabaseSession,
+    admin: AdminUser,
+) -> NutritionProgramResponse:
+    del admin
+    program = get_program(db, program_id)
+    if program is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
+    return program_response(program)
+
+
+@router.post(
+    "/admin/programs",
+    response_model=NutritionProgramResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def create_nutrition_program(
+    payload: NutritionProgramWrite,
+    db: DatabaseSession,
+    admin: AdminUser,
+) -> NutritionProgramResponse:
+    del admin
+    try:
+        return program_response(create_program(db, payload))
+    except ProgramWriteError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from None
+
+
+@router.put(
+    "/admin/programs/{program_id}",
+    response_model=NutritionProgramResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def replace_nutrition_program(
+    program_id: UUID,
+    payload: NutritionProgramWrite,
+    db: DatabaseSession,
+    admin: AdminUser,
+) -> NutritionProgramResponse:
+    del admin
+    try:
+        program = update_program(db, program_id, payload)
+    except ProgramWriteError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from None
+    if program is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
+    return program_response(program)
+
+
+@router.delete(
+    "/admin/programs/{program_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def archive_nutrition_program(
+    program_id: UUID,
+    db: DatabaseSession,
+    admin: AdminUser,
+) -> None:
+    del admin
+    if not archive_program(db, program_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
+
+
+@router.post(
+    "/admin/programs/{program_id}/restore",
+    response_model=NutritionProgramResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def restore_nutrition_program(
+    program_id: UUID,
+    db: DatabaseSession,
+    admin: AdminUser,
+) -> NutritionProgramResponse:
+    del admin
+    program = restore_program(db, program_id)
+    if program is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
+    return program_response(program)
 
 
 @router.delete(
@@ -1205,6 +1334,31 @@ def create_quick_consumption(
     )
 
 
+@router.put(
+    "/tracking/free-meals/{meal_id}",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_free_meal_consumption(
+    meal_id: UUID,
+    payload: FreeMealTrackingInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, object]:
+    try:
+        return save_free_meal(
+            db,
+            user.id,
+            meal_id,
+            payload.entry_date,
+            Decimal(str(payload.calories)),
+            Decimal(str(payload.protein_g)),
+            Decimal(str(payload.carbohydrate_g)),
+            Decimal(str(payload.fat_g)),
+        )
+    except TrackingError as error:
+        raise _tracking_error(error) from None
+
+
 @router.get("/tracking/days/{entry_date}")
 def read_daily_tracking(
     entry_date: date, db: DatabaseSession, user: CurrentUser
@@ -1389,6 +1543,21 @@ def confirm_food_photo_estimate(
 ) -> list[dict[str, object]]:
     try:
         return confirm_photo(db, user.id, estimate_id, payload.entry_date)
+    except FoodPhotoError as error:
+        raise _food_photo_error(error) from None
+
+
+@router.post(
+    "/tracking/photo-estimates/{estimate_id}/free-meal-preview",
+    dependencies=[Depends(require_trusted_origin)],
+)
+def confirm_free_meal_photo_preview(
+    estimate_id: UUID,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> dict[str, float]:
+    try:
+        return confirm_photo_macro_preview(db, user.id, estimate_id)
     except FoodPhotoError as error:
         raise _food_photo_error(error) from None
 

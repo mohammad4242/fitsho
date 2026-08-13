@@ -52,6 +52,7 @@ from app.nutrition.enums import (
     MicronutrientUpperLimitScope,
     NutritionConsumptionSource,
     NutritionDailyCheckInStatus,
+    NutritionDietStyle,
     NutritionEstimateStatus,
     NutritionLabRequestStatus,
     NutritionMealFeedbackType,
@@ -61,6 +62,7 @@ from app.nutrition.enums import (
     NutritionPlanLifecycleStatus,
     NutritionPlanReviewStatus,
     NutritionPlanStyle,
+    NutritionProgramSlotKind,
     NutritionSupplementOrderStatus,
     NutritionTargetMetric,
     PhysicianReviewMode,
@@ -751,8 +753,10 @@ class NutritionFoodComposition(Base):
 
 class NutritionCatalogueMeal(Base):
     __tablename__ = "nutrition_catalogue_meals"
+    __table_args__ = (UniqueConstraint("code", name="uq_nutrition_catalogue_meals_code"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    code: Mapped[str] = mapped_column(String(20), nullable=False)
     name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
     name_en: Mapped[str] = mapped_column(String(160), nullable=False)
     category: Mapped[MealCategory] = mapped_column(
@@ -795,6 +799,98 @@ class NutritionCatalogueMealItem(Base):
         )
     )
     food: Mapped["NutritionCatalogueFood"] = relationship()
+
+
+class NutritionProgram(Base):
+    __tablename__ = "nutrition_programs"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_nutrition_programs_slug"),
+        UniqueConstraint("code", name="uq_nutrition_programs_code"),
+        CheckConstraint(
+            "slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'",
+            name="ck_nutrition_programs_slug_format",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    code: Mapped[str] = mapped_column(String(20), nullable=False)
+    slug: Mapped[str] = mapped_column(String(120), nullable=False)
+    name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
+    name_en: Mapped[str] = mapped_column(String(160), nullable=False)
+    description_fa: Mapped[str] = mapped_column(String(1000), nullable=False)
+    description_en: Mapped[str] = mapped_column(String(1000), nullable=False)
+    diet_style: Mapped[NutritionDietStyle] = mapped_column(
+        enum_column(NutritionDietStyle, "ck_nutrition_programs_diet_style_values"),
+        nullable=False,
+        index=True,
+    )
+    post_workout_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=sql_text("true")
+    )
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    days: Mapped[list["NutritionProgramDay"]] = relationship(
+        back_populates="program",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by=lambda: NutritionProgramDay.day_number,
+    )
+
+
+class NutritionProgramDay(Base):
+    __tablename__ = "nutrition_program_days"
+    __table_args__ = (
+        UniqueConstraint("program_id", "day_number", name="uq_nutrition_program_days_number"),
+        CheckConstraint("day_number BETWEEN 1 AND 7", name="ck_nutrition_program_days_number"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    program_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_programs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    day_number: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    post_workout_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    program: Mapped["NutritionProgram"] = relationship(back_populates="days")
+    slots: Mapped[list["NutritionProgramSlot"]] = relationship(
+        back_populates="day",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by=lambda: NutritionProgramSlot.category,
+    )
+
+
+class NutritionProgramSlot(Base):
+    __tablename__ = "nutrition_program_slots"
+    __table_args__ = (
+        UniqueConstraint("program_day_id", "category", name="uq_nutrition_program_slots_category"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    program_day_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_program_days.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    category: Mapped[MealCategory] = mapped_column(
+        enum_column(MealCategory, "ck_nutrition_program_slots_category_values"), nullable=False
+    )
+    kind: Mapped[NutritionProgramSlotKind] = mapped_column(
+        enum_column(NutritionProgramSlotKind, "ck_nutrition_program_slots_kind_values"),
+        nullable=False,
+        default=NutritionProgramSlotKind.CATALOGUE_MEAL,
+    )
+    meal_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_catalogue_meals.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+
+    day: Mapped["NutritionProgramDay"] = relationship(back_populates="slots")
+    meal: Mapped["NutritionCatalogueMeal | None"] = relationship()
 
 
 class NutritionPriceProvider(Base):
@@ -1115,6 +1211,9 @@ class NutritionWeeklyPlan(Base):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    program_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_programs.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("nutrition_profiles.user_id", ondelete="CASCADE"), nullable=False
     )

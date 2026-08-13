@@ -161,7 +161,7 @@ export type AdminAiModelSync = {
 };
 
 export type AdminAiValidationProblem = {
-  code: string;
+  code?: string;
   message: string;
   day_number?: number;
   exercise_id?: string;
@@ -397,6 +397,7 @@ export type AdminMealIngredient = {
 
 export type AdminMealCatalogueItem = {
   id: string;
+  code: string;
   name_fa: string;
   name_en: string;
   category: MealCategory;
@@ -421,9 +422,86 @@ export type AdminMealIngredientWrite = Pick<
 >;
 
 export type AdminMealWrite = {
+  code: string;
   name_fa: string;
   name_en: string;
   category: MealCategory;
   verification_status: MealVerificationStatus;
   items: AdminMealIngredientWrite[];
+};
+
+export type NutritionDietStyle =
+  | "economy"
+  | "balanced_iranian"
+  | "high_protein_gym"
+  | "quick_easy"
+  | "premium_varied";
+
+export type NutritionProgramLifecycle = "active" | "archived" | "all";
+
+export type AdminNutritionProgramMeal = {
+  id: string;
+  code: string;
+  name_fa: string;
+  name_en: string;
+  category: MealCategory;
+};
+
+export type AdminNutritionProgramSlot = {
+  id: string;
+  kind?: "catalogue_meal" | "free_meal";
+  category: MealCategory;
+  meal: AdminNutritionProgramMeal | null;
+};
+
+export type AdminNutritionProgramDay = {
+  id: string;
+  day_number: number;
+  post_workout_enabled: boolean;
+  slots: AdminNutritionProgramSlot[];
+};
+
+export type AdminNutritionProgram = {
+  id: string;
+  code?: string;
+  slug: string;
+  name_fa: string;
+  name_en: string;
+  description_fa: string;
+  description_en: string;
+  diet_style: NutritionDietStyle;
+  post_workout_enabled: boolean;
+  is_active: boolean;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+  days: AdminNutritionProgramDay[];
+};
+
+export type AdminNutritionProgramPage = {
+  items: AdminNutritionProgram[];
+  diet_styles: NutritionDietStyle[];
+};
+
+export type AdminNutritionProgramSlotWrite = {
+  category: MealCategory;
+  kind?: "catalogue_meal" | "free_meal";
+  meal_id: string | null;
+};
+
+export type AdminNutritionProgramDayWrite = {
+  day_number: number;
+  post_workout_enabled: boolean;
+  slots: AdminNutritionProgramSlotWrite[];
+};
+
+export type AdminNutritionProgramWrite = {
+  code?: string | null;
+  name_fa: string;
+  name_en: string;
+  description_fa: string;
+  description_en: string;
+  diet_style: NutritionDietStyle;
+  post_workout_enabled: boolean;
+  days: AdminNutritionProgramDayWrite[];
 };

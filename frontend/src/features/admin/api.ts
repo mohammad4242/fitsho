@@ -28,7 +28,12 @@ import type {
   AdminMealCatalogueItem,
   AdminMealCatalogueResponse,
   AdminMealWrite,
+  AdminNutritionProgram,
+  AdminNutritionProgramPage,
+  AdminNutritionProgramWrite,
   MealCategory,
+  NutritionDietStyle,
+  NutritionProgramLifecycle,
   AdminTrainingProgramTemplatesResponse,
   AdminTrainingProgramTemplate,
   AdminTrainingProgramTemplateWrite,
@@ -39,6 +44,51 @@ const adminExercisesPath = "/api/v1/admin/exercises";
 const adminAiModelsPath = "/api/v1/admin/ai-models";
 const adminTrainingProgramTemplatesPath = "/api/v1/admin/training-program-templates";
 const adminMealCataloguePath = "/api/v1/nutrition/admin/meals";
+const adminNutritionProgramsPath = "/api/v1/nutrition/admin/programs";
+
+export function getAdminNutritionPrograms(input: {
+  dietStyle?: NutritionDietStyle | "all";
+  lifecycle?: NutritionProgramLifecycle;
+} = {}): Promise<AdminNutritionProgramPage> {
+  const query = new URLSearchParams();
+  if (input.dietStyle && input.dietStyle !== "all") query.set("diet_style", input.dietStyle);
+  if (input.lifecycle) query.set("lifecycle", input.lifecycle);
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return request<AdminNutritionProgramPage>(`${adminNutritionProgramsPath}${suffix}`);
+}
+
+export function getAdminNutritionProgram(programId: string): Promise<AdminNutritionProgram> {
+  return request<AdminNutritionProgram>(`${adminNutritionProgramsPath}/${programId}`);
+}
+
+export function createAdminNutritionProgram(
+  input: AdminNutritionProgramWrite,
+): Promise<AdminNutritionProgram> {
+  return request<AdminNutritionProgram>(adminNutritionProgramsPath, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateAdminNutritionProgram(
+  programId: string,
+  input: AdminNutritionProgramWrite,
+): Promise<AdminNutritionProgram> {
+  return request<AdminNutritionProgram>(`${adminNutritionProgramsPath}/${programId}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function archiveAdminNutritionProgram(programId: string): Promise<void> {
+  return request<void>(`${adminNutritionProgramsPath}/${programId}`, { method: "DELETE" });
+}
+
+export function restoreAdminNutritionProgram(programId: string): Promise<AdminNutritionProgram> {
+  return request<AdminNutritionProgram>(`${adminNutritionProgramsPath}/${programId}/restore`, {
+    method: "POST",
+  });
+}
 
 export function getAdminMealCatalogue(
   category: MealCategory,

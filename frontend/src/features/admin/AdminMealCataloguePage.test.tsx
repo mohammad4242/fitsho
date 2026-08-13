@@ -20,6 +20,7 @@ beforeEach(() => {
     categories: ["breakfast", "lunch", "post_workout", "snack", "dinner"],
     items: category === "breakfast" ? [{
       id: "meal-1",
+      code: "BF02",
       name_fa: "تخم‌مرغ نیمرو با نان و گوجه خردشده",
       name_en: "Fried eggs with bread and chopped tomato",
       category: "breakfast",
@@ -39,6 +40,7 @@ it("shows all five categories and meals linked for editing", async () => {
   render(<MemoryRouter><AdminMealCataloguePage /></MemoryRouter>);
 
   expect(await screen.findByText("تخم‌مرغ نیمرو با نان و گوجه خردشده")).toBeInTheDocument();
+  expect(screen.getByText(/BF02/)).toBeInTheDocument();
   expect(screen.getAllByRole("tab")).toHaveLength(5);
   expect(screen.getByRole("tab", { name: "صبحانه" })).toHaveAttribute("aria-selected", "true");
   expect(screen.getByText("۵۰ تا ۲۰۰ گرم")).toBeInTheDocument();

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import * as api from "./api";
 import type { DailyTrackingSummary } from "./types";
@@ -13,6 +14,11 @@ export function NutritionTrackingPage() {
   const { i18n } = useTranslation();
   const fa = i18n.language === "fa";
   const l = (persian: string, english: string) => (fa ? persian : english);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const freeMealId = searchParams.get("freeMealId");
+  const entryDate = searchParams.get("entryDate") ?? today;
+  const returnPath = searchParams.get("return") ?? "/nutrition-estimate";
   const [summary, setSummary] = useState<DailyTrackingSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,11 +34,11 @@ export function NutritionTrackingPage() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [recentFoods, setRecentFoods] = useState<Awaited<ReturnType<typeof api.listRecentFoods>>>([]);
   const [history, setHistory] = useState<DailyTrackingSummary[]>([]);
-  const [photoOpen, setPhotoOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(freeMealId !== null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [adherenceOpen, setAdherenceOpen] = useState(false);
 
-  const load = () => api.getDailyTracking(today).then(setSummary).catch(() => setError(l("دریافت اطلاعات ممکن نشد.", "Could not load tracking."))).finally(() => setLoading(false));
+  const load = () => api.getDailyTracking(entryDate).then(setSummary).catch(() => setError(l("دریافت اطلاعات ممکن نشد.", "Could not load tracking."))).finally(() => setLoading(false));
   useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void api.getNutritionAdherence(rangeStart, today).then(setAdherence); }, [rangeStart]);
   useEffect(() => { void api.listCatalogueFoods().then((items) => { setFoods(items); setFoodId(items[0]?.id ?? ""); }); }, []);
@@ -85,7 +91,15 @@ export function NutritionTrackingPage() {
   async function confirmPhoto() {
     if (!photoEstimate) return;
     setBusy(true);
-    try { await api.confirmFoodPhoto(photoEstimate.id, today); setPhotoEstimate(null); await load(); }
+    try {
+      if (freeMealId) {
+        const macros = await api.confirmFreeMealPhotoPreview(photoEstimate.id);
+        sessionStorage.setItem(`fitsho-free-meal:${freeMealId}`, JSON.stringify(macros));
+        navigate(`${returnPath}?freeMealId=${freeMealId}`);
+      } else {
+        await api.confirmFoodPhoto(photoEstimate.id, entryDate); setPhotoEstimate(null); await load();
+      }
+    }
     catch { setError(l("موارد نامشخص را اول ویرایش کن.", "Resolve uncertain items before confirming.")); }
     finally { setBusy(false); }
   }
@@ -148,7 +162,7 @@ export function NutritionTrackingPage() {
       <p className="nutrition-photo-disclosure">{l("عکس فقط برای شناسایی تقریبی غذا به OpenRouter فرستاده می‌شود؛ اطلاعات حساب یا پزشکی ارسال نمی‌شود.", "The image is sent to OpenRouter only for approximate food identification; account and medical data are not sent.")}</p>
       <label className="nutrition-photo-consent"><input type="checkbox" checked={photoConsent} onChange={(event) => setPhotoConsent(event.target.checked)} /> {l("با پردازش عکس توسط سرویس ثالث موافقم", "I consent to third-party image processing")}</label>
       <label className={`nutrition-photo-picker${photoConsent ? " is-enabled" : ""}`}><span>{photoPreview ? l("تغییر عکس", "Change photo") : l("انتخاب عکس", "Choose photo")}</span><input aria-label={l("انتخاب عکس غذا", "Choose food photo")} type="file" accept="image/jpeg,image/png,image/webp" disabled={!photoConsent || busy} onChange={(event) => void analyzePhoto(event.target.files?.[0])} /></label>
-      {photoEstimate && <div className="nutrition-photo-result"><p>{l("این نتیجه تقریبی است و فقط بعد از تأیید تو ثبت می‌شود.", "This is approximate and is saved only after your confirmation.")}</p><ul>{photoEstimate.items.map((item) => <li key={item.item_id}><span><strong>{item.name_guess}</strong><small>{item.mapping_status}</small></span><label>{l("مقدار", "Amount")} <input aria-label={l(`مقدار ${item.name_guess}`, `${item.name_guess} amount`)} type="number" min="1" max="10000" defaultValue={item.estimated_amount} onBlur={(event) => void correctPhotoAmount(item.item_id, Number(event.target.value))} /> {item.unit}</label><button type="button" onClick={() => void removePhotoItem(item.item_id)}>{l("حذف", "Remove")}</button></li>)}</ul><button className="primary-button" disabled={busy} onClick={() => void confirmPhoto()}>{l("تأیید و ثبت", "Confirm and log")}</button></div>}
+      {photoEstimate && <div className="nutrition-photo-result"><p>{l("این نتیجه تقریبی است و فقط بعد از تأیید تو ثبت می‌شود.", "This is approximate and is saved only after your confirmation.")}</p><ul>{photoEstimate.items.map((item) => <li key={item.item_id}><span><strong>{item.name_guess}</strong><small>{item.mapping_status}</small></span><label>{l("مقدار", "Amount")} <input aria-label={l(`مقدار ${item.name_guess}`, `${item.name_guess} amount`)} type="number" min="1" max="10000" defaultValue={item.estimated_amount} onBlur={(event) => void correctPhotoAmount(item.item_id, Number(event.target.value))} /> {item.unit}</label><button type="button" onClick={() => void removePhotoItem(item.item_id)}>{l("حذف", "Remove")}</button></li>)}</ul><button className="primary-button" disabled={busy} onClick={() => void confirmPhoto()}>{freeMealId ? l("تأیید و بازگشت به وعده آزاد", "Confirm and return to Free Meal") : l("تأیید و ثبت", "Confirm and log")}</button></div>}
     </section>}
     <section className="nutrition-checkin" aria-label={l("ثبت وضعیت امروز", "Today's check-in")}>
       {([ ["on_plan", "طبق برنامه", "On plan"], ["mostly_on_plan", "تقریباً طبق برنامه", "Mostly on plan"], ["off_plan", "خارج از برنامه", "Off plan"], ["not_recorded", "ثبت نمی‌کنم", "Skip"] ] as const).map(([value, persian, english]) => <button className={summary?.check_in_status === value ? "is-active" : undefined} disabled={busy} key={value} onClick={() => void checkIn(value)}>{l(persian, english)}</button>)}

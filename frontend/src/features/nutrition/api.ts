@@ -330,6 +330,14 @@ export function confirmFoodPhoto(estimateId: string, entryDate: string): Promise
   });
 }
 
+export type FreeMealMacros = { calories: number; protein_g: number; carbohydrate_g: number; fat_g: number };
+export function confirmFreeMealPhotoPreview(estimateId: string): Promise<FreeMealMacros> {
+  return request(`${nutritionPath}/tracking/photo-estimates/${estimateId}/free-meal-preview`, { method: "POST" });
+}
+export function saveFreeMeal(mealId: string, input: FreeMealMacros & { entry_date: string }): Promise<DailyTrackingSummary> {
+  return request(`${nutritionPath}/tracking/free-meals/${mealId}`, { method: "PUT", body: JSON.stringify(input) });
+}
+
 export function getNutritionAdherence(start: string, end: string): Promise<NutritionAdherence> {
   const query = new URLSearchParams({ start, end });
   return request<NutritionAdherence>(`${nutritionPath}/adherence?${query}`);

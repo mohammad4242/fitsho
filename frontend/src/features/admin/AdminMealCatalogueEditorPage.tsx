@@ -121,6 +121,7 @@ export function AdminMealCatalogueEditorPage() {
             <section>
               <h2>{t("admin.mealEditor.identity")}</h2>
               <div className="admin-template-editor-grid">
+                <TextInput disabled={Boolean(mealId)} label={t("admin.mealEditor.code")} value={form.code} onChange={(code) => setForm((current) => ({ ...current, code: code.toUpperCase() }))} />
                 <TextInput label={t("admin.mealEditor.nameFa")} value={form.name_fa} onChange={(name_fa) => setForm((current) => ({ ...current, name_fa }))} />
                 <TextInput label={t("admin.mealEditor.nameEn")} value={form.name_en} onChange={(name_en) => setForm((current) => ({ ...current, name_en }))} />
                 <label>{t("admin.mealEditor.category")}<select aria-label={t("admin.mealEditor.category")} value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value as MealCategory }))}>{categories.map((category) => <option key={category} value={category}>{t(`admin.meals.categories.${category}`)}</option>)}</select></label>
@@ -146,11 +147,11 @@ export function AdminMealCatalogueEditorPage() {
 
 function emptyMeal(rawCategory: string | null): MealForm {
   const category = categories.includes(rawCategory as MealCategory) ? rawCategory as MealCategory : "breakfast";
-  return { name_fa: "", name_en: "", category, verification_status: "draft", items: [] };
+  return { code: "", name_fa: "", name_en: "", category, verification_status: "draft", items: [] };
 }
 
-function TextInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label>{label}<input aria-label={label} required value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+function TextInput({ disabled = false, label, value, onChange }: { disabled?: boolean; label: string; value: string; onChange: (value: string) => void }) {
+  return <label>{label}<input aria-label={label} disabled={disabled} required value={value} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function NumberInput({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
