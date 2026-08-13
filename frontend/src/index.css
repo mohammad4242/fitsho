@@ -405,6 +405,60 @@ html[dir="rtl"] .next-step-card h2 {
   margin-block: 2.2rem 1.5rem;
 }
 
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  margin-block-start: 1.5rem;
+  padding: 0.3rem;
+  border: 1px solid var(--fitsho-line);
+  border-radius: 0.95rem;
+  background: rgb(255 255 255 / 4%);
+}
+
+.auth-tabs button {
+  min-height: 2.8rem;
+  border: 0;
+  border-radius: 0.7rem;
+  color: var(--fitsho-muted);
+  background: transparent;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.auth-tabs button[aria-selected="true"] {
+  color: var(--fitsho-canvas);
+  background: var(--fitsho-aqua);
+}
+
+.auth-field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.auth-field-heading a,
+.auth-resend {
+  color: var(--fitsho-aqua);
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-underline-offset: 0.25rem;
+}
+
+.auth-resend {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.auth-resend:disabled {
+  color: var(--fitsho-muted);
+  cursor: default;
+}
+
 .auth-form label,
 .label-row {
   color: var(--ink);
@@ -498,6 +552,16 @@ html[dir="ltr"] .primary-button span:last-child {
   color: var(--danger);
   background: #fff0ec;
   line-height: 1.6;
+}
+
+.form-success {
+  margin: 2rem 0 1.5rem;
+  padding: 1rem;
+  border-inline-start: 4px solid var(--fitsho-aqua);
+  border-radius: 0.6rem;
+  color: var(--fitsho-ink);
+  background: rgb(80 223 206 / 10%);
+  line-height: 1.8;
 }
 
 .form-alternative {

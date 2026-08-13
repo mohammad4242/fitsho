@@ -195,6 +195,18 @@ it("redirects a guest away from the protected dashboard", async () => {
   ).toBeInTheDocument();
 });
 
+it("keeps password recovery routes in the guest auth shell", async () => {
+  renderRoute("/forgot-password");
+  expect(
+    await screen.findByRole("heading", { name: "بازیابی رمز عبور" }),
+  ).toBeInTheDocument();
+
+  renderRoute("/reset-password?token=raw-token");
+  expect(
+    await screen.findByRole("heading", { name: "انتخاب رمز عبور جدید" }),
+  ).toBeInTheDocument();
+});
+
 it("shows an accessible loading state while a route chunk loads", async () => {
   renderRoute("/");
 

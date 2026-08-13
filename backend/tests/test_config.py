@@ -3,6 +3,15 @@ from pydantic import ValidationError
 
 from app.config import Settings
 
+PRODUCTION_AUTH_DELIVERY = {
+    "email_provider": "smtp",
+    "smtp_host": "smtp.example.com",
+    "smtp_from_address": "no-reply@fitsho.example",
+    "sms_provider": "kavenegar",
+    "kavenegar_api_key": "test-kavenegar-key",
+    "phone_otp_hmac_secret": "production-phone-otp-hmac-secret-for-tests",
+}
+
 
 def test_settings_accept_explicit_environment_values() -> None:
     settings = Settings(
@@ -15,6 +24,36 @@ def test_settings_accept_explicit_environment_values() -> None:
 
     assert settings.session_ttl_seconds == 604800
     assert settings.frontend_origin == "http://localhost:5173"
+    assert settings.email_provider == "fake"
+    assert settings.sms_provider == "fake"
+    assert settings.password_reset_ttl_seconds == 900
+    assert settings.phone_otp_ttl_seconds == 300
+    assert settings.phone_otp_resend_cooldown_seconds == 60
+    assert settings.phone_otp_max_attempts == 5
+
+
+def test_delivery_credentials_are_redacted() -> None:
+    settings = Settings(
+        smtp_password="smtp-secret",
+        kavenegar_api_key="sms-secret",
+        phone_otp_hmac_secret="otp-secret-with-at-least-thirty-two-characters",
+    )
+
+    rendered = repr(settings)
+    assert "smtp-secret" not in rendered
+    assert "sms-secret" not in rendered
+    assert "otp-secret" not in rendered
+
+
+def test_production_rejects_fake_auth_delivery_providers() -> None:
+    with pytest.raises(ValidationError, match="SMTP email provider"):
+        Settings(
+            app_env="production",
+            frontend_origin="https://fitsho.example",
+            cookie_secure=True,
+            session_cookie_name="__Host-fitsho_session",
+            private_file_signing_key="production-private-file-signing-key-for-tests",
+        )
 
 
 def test_local_settings_accept_multiple_explicit_frontend_origins() -> None:
@@ -39,6 +78,7 @@ def test_production_settings_accept_secure_cookie_contract() -> None:
         cookie_secure=True,
         session_cookie_name="__Host-fitsho_session",
         private_file_signing_key="production-private-file-signing-key-for-tests",
+        **PRODUCTION_AUTH_DELIVERY,  # type: ignore[arg-type]
     )
 
     assert settings.app_env == "production"
@@ -51,6 +91,7 @@ def test_production_settings_normalize_a_trailing_origin_slash() -> None:
         cookie_secure=True,
         session_cookie_name="__Host-fitsho_session",
         private_file_signing_key="production-private-file-signing-key-for-tests",
+        **PRODUCTION_AUTH_DELIVERY,  # type: ignore[arg-type]
     )
 
     assert settings.frontend_origin == "https://fitsho.example"
@@ -87,6 +128,7 @@ def test_production_settings_reject_insecure_cookie_contract(
         "cookie_secure": True,
         "session_cookie_name": "__Host-fitsho_session",
         "private_file_signing_key": "production-private-file-signing-key-for-tests",
+        **PRODUCTION_AUTH_DELIVERY,
     }
     values.update(override)
 
@@ -101,6 +143,7 @@ def test_production_settings_reject_default_private_file_signing_key() -> None:
             frontend_origin="https://fitsho.example",
             cookie_secure=True,
             session_cookie_name="__Host-fitsho_session",
+            **PRODUCTION_AUTH_DELIVERY,  # type: ignore[arg-type]
         )
 
 

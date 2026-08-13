@@ -8,17 +8,24 @@ import { AuthProvider, useAuth } from "./AuthContext";
 afterEach(() => vi.restoreAllMocks());
 
 function Probe() {
-  const { user, loading, startupError, login } = useAuth();
+  const { user, loading, startupError, login, loginWithPhone } = useAuth();
   return (
     <div>
       <span>
-        {loading ? "loading" : startupError ? "startup-error" : (user?.email ?? "guest")}
+        {loading
+          ? "loading"
+          : startupError
+            ? "startup-error"
+            : (user?.email ?? user?.phone_number ?? "guest")}
       </span>
       <button
         type="button"
         onClick={() => login({ email: "member@example.com", password: "password" })}
       >
         login
+      </button>
+      <button type="button" onClick={() => loginWithPhone("09123456789", "123456")}>
+        phone login
       </button>
     </div>
   );
@@ -28,6 +35,7 @@ it("loads the current user on startup", async () => {
   vi.spyOn(api, "getCurrentUser").mockResolvedValue({
     id: "1",
     email: "user@example.com",
+    phone_number: null,
     created_at: "2026-07-24T00:00:00Z",
     is_admin: false,
   });
@@ -68,6 +76,7 @@ it("ignores a stale startup response after a successful login", async () => {
   vi.spyOn(api, "login").mockResolvedValue({
     id: "2",
     email: "member@example.com",
+    phone_number: null,
     created_at: "2026-07-24T00:00:00Z",
     is_admin: false,
   });
@@ -84,4 +93,27 @@ it("ignores a stale startup response after a successful login", async () => {
   await act(async () => resolveCurrentUser(null));
 
   expect(screen.getByText("member@example.com")).toBeInTheDocument();
+});
+
+it("stores the authenticated user after phone OTP verification", async () => {
+  vi.spyOn(api, "getCurrentUser").mockResolvedValue(null);
+  vi.spyOn(api, "verifyPhoneOtp").mockResolvedValue({
+    id: "3",
+    email: null,
+    phone_number: "+989123456789",
+    created_at: "2026-08-13T00:00:00Z",
+    is_admin: false,
+  });
+  const user = userEvent.setup();
+
+  render(
+    <AuthProvider>
+      <Probe />
+    </AuthProvider>,
+  );
+  await waitFor(() => expect(screen.getByText("guest")).toBeInTheDocument());
+  await user.click(screen.getByRole("button", { name: "phone login" }));
+
+  expect(api.verifyPhoneOtp).toHaveBeenCalledWith("09123456789", "123456");
+  expect(await screen.findByText("+989123456789")).toBeInTheDocument();
 });

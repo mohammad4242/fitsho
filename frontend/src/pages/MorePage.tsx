@@ -37,6 +37,8 @@ export function MorePage() {
   }, []);
 
   if (user === null) return null;
+  const accountLabel = profile?.display_name ?? user.email ?? user.phone_number ?? l("کاربر فیتشو", "Fitsho member");
+  const accountContact = user.email ?? user.phone_number ?? "";
 
   function handleLogout() {
     setBusy(true);
@@ -56,11 +58,11 @@ export function MorePage() {
 
         <section className="more-profile-card" aria-label={l("خلاصه پروفایل", "Profile summary")}>
           <span className="more-profile-card__avatar" aria-hidden="true">
-            {(profile?.display_name ?? user.email).slice(0, 1).toLocaleUpperCase()}
+            {accountLabel.slice(0, 1).toLocaleUpperCase()}
           </span>
           <div>
-            <strong>{profile?.display_name ?? user.email}</strong>
-            <span>{user.email}</span>
+            <strong>{accountLabel}</strong>
+            <span>{accountContact}</span>
           </div>
           <Link to={status === "ready" ? "/profile" : "/onboarding"}>
             {status === "ready" ? l("پروفایل", "Profile") : l("تکمیل پروفایل", "Complete profile")}

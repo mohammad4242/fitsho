@@ -19,6 +19,7 @@ type AuthContextValue = {
   retryStartup: () => void;
   register: (credentials: Credentials) => Promise<void>;
   login: (credentials: Credentials) => Promise<void>;
+  loginWithPhone: (phoneNumber: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -77,6 +78,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login: async (credentials) => {
         cancelStartupRequest();
         setUser(await api.login(credentials));
+      },
+      loginWithPhone: async (phoneNumber, code) => {
+        cancelStartupRequest();
+        setUser(await api.verifyPhoneOtp(phoneNumber, code));
       },
       logout: async () => {
         cancelStartupRequest();

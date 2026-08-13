@@ -15,6 +15,25 @@ class Settings(BaseSettings):
     cookie_secure: bool = True
     session_cookie_name: str = "__Host-fitsho_session"
     session_ttl_seconds: int = 60 * 60 * 24 * 7
+    email_provider: Literal["fake", "smtp"] = "fake"
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = Field(default=None, repr=False)
+    smtp_from_address: str | None = None
+    smtp_use_tls: bool = True
+    password_reset_ttl_seconds: int = Field(default=900, ge=60, le=3600)
+    sms_provider: Literal["fake", "kavenegar"] = "fake"
+    kavenegar_api_key: SecretStr | None = Field(default=None, repr=False)
+    kavenegar_base_url: str = "https://api.kavenegar.com/v1"
+    kavenegar_sender: str | None = None
+    sms_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    phone_otp_hmac_secret: SecretStr = Field(
+        default=SecretStr("fitsho-local-phone-otp-secret-change-me"), repr=False
+    )
+    phone_otp_ttl_seconds: int = Field(default=300, ge=60, le=900)
+    phone_otp_resend_cooldown_seconds: int = Field(default=60, ge=10, le=600)
+    phone_otp_max_attempts: int = Field(default=5, ge=1, le=10)
     media_root: Path = Path("var/media")
     media_public_path: str = "/media"
     media_max_bytes: int = 20 * 1024 * 1024
@@ -137,6 +156,13 @@ class Settings(BaseSettings):
             raise ValueError("Production requires secure cookies")
         if self.session_cookie_name != "__Host-fitsho_session":
             raise ValueError("Production requires the __Host-fitsho_session cookie name")
+        if self.email_provider != "smtp" or not self.smtp_host or not self.smtp_from_address:
+            raise ValueError("Production requires a configured SMTP email provider")
+        if self.sms_provider != "kavenegar" or self.kavenegar_api_key is None:
+            raise ValueError("Production requires a configured Kavenegar SMS provider")
+        otp_secret = self.phone_otp_hmac_secret.get_secret_value()
+        if otp_secret == "fitsho-local-phone-otp-secret-change-me" or len(otp_secret) < 32:
+            raise ValueError("Production requires a strong phone OTP HMAC secret")
         signing_key = self.private_file_signing_key.get_secret_value()
         if (
             signing_key == "fitsho-local-private-file-signing-key-change-me"

@@ -37,6 +37,7 @@ const DashboardPage = lazy(() => import("./pages/DashboardPage").then(({ Dashboa
 const ExerciseCatalogPage = lazy(() => import("./features/exercises/ExerciseCatalogPage").then(({ ExerciseCatalogPage }) => ({ default: ExerciseCatalogPage })));
 const ExerciseDetailPage = lazy(() => import("./features/exercises/ExerciseDetailPage").then(({ ExerciseDetailPage }) => ({ default: ExerciseDetailPage })));
 const FoodCataloguePage = lazy(() => import("./features/nutrition/FoodCataloguePage").then(({ FoodCataloguePage }) => ({ default: FoodCataloguePage })));
+const ForgotPasswordPage = lazy(() => import("./features/auth/ForgotPasswordPage").then(({ ForgotPasswordPage }) => ({ default: ForgotPasswordPage })));
 const LoginPage = lazy(() => import("./features/auth/LoginPage").then(({ LoginPage }) => ({ default: LoginPage })));
 const MorePage = lazy(() => import("./pages/MorePage").then(({ MorePage }) => ({ default: MorePage })));
 const NutritionEstimatePage = lazy(() => import("./features/nutrition/NutritionEstimatePage").then(({ NutritionEstimatePage }) => ({ default: NutritionEstimatePage })));
@@ -49,6 +50,7 @@ const ProfilePage = lazy(() => import("./features/profile/ProfilePage").then(({ 
 const PublicLandingRoute = lazy(() => import("./features/landing/PublicLandingRoute").then(({ PublicLandingRoute }) => ({ default: PublicLandingRoute })));
 const PublicOnboardingPage = lazy(() => import("./features/publicOnboarding/PublicOnboardingPage").then(({ PublicOnboardingPage }) => ({ default: PublicOnboardingPage })));
 const RegisterPage = lazy(() => import("./features/auth/RegisterPage").then(({ RegisterPage }) => ({ default: RegisterPage })));
+const ResetPasswordPage = lazy(() => import("./features/auth/ResetPasswordPage").then(({ ResetPasswordPage }) => ({ default: ResetPasswordPage })));
 const WorkoutPlanPage = lazy(() => import("./features/workouts/WorkoutPlanPage").then(({ WorkoutPlanPage }) => ({ default: WorkoutPlanPage })));
 
 export function AppRoutes() {
@@ -57,6 +59,8 @@ export function AppRoutes() {
       <Route element={<GuestRoute />}>
         <Route path="/login" element={deferred(<LoginPage />)} />
         <Route path="/register" element={deferred(<RegisterPage />)} />
+        <Route path="/forgot-password" element={deferred(<ForgotPasswordPage />)} />
+        <Route path="/reset-password" element={deferred(<ResetPasswordPage />)} />
       </Route>
       <Route element={<ProtectedRoute />}>
         <Route element={<CoachRoute />}>
