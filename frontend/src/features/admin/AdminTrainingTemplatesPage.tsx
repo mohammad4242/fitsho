@@ -19,6 +19,8 @@ export function AdminTrainingTemplatesPage() {
   const [page, setPage] = useState<AdminTrainingProgramTemplatesResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [retry, setRetry] = useState(0);
+  const [expandedPrograms, setExpandedPrograms] = useState<Set<string>>(() => new Set());
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(() => new Set());
   const english = i18n.resolvedLanguage === "en";
   const visibleTemplates = page?.items.filter(
     (template) => trainingLevel === "all" || template.training_level === trainingLevel,
@@ -109,88 +111,142 @@ export function AdminTrainingTemplatesPage() {
         )}
         {state === "ready" && page !== null && visibleTemplates.length > 0 && (
           <section className="admin-template-list" role="tabpanel" aria-labelledby={`template-tab-${daysPerWeek}`}>
-            {visibleTemplates.map((template) => (
-              <article className="admin-template-card" key={template.id}>
-                <header>
-                  <div>
-                    <p className="eyebrow">{t("admin.templates.days", { count: template.days_per_week })}</p>
-                    <h2>{english ? template.name_en : template.name_fa}</h2>
-                    <p>{english ? template.description_en : template.description_fa}</p>
+            {visibleTemplates.map((template) => {
+              const name = english ? template.name_en : template.name_fa;
+              const programExpanded = expandedPrograms.has(template.id);
+              const programPanelId = `training-program-${template.id}`;
+              return (
+                <article className="admin-template-card" data-expanded={programExpanded} key={template.id}>
+                  <header className="admin-accordion-header">
+                    <button
+                      aria-controls={programPanelId}
+                      aria-expanded={programExpanded}
+                      aria-label={t(`admin.templates.${programExpanded ? "collapseProgramAria" : "expandProgramAria"}`, { name })}
+                      className="admin-program-accordion-trigger"
+                      onClick={() => {
+                        setExpandedPrograms((current) => {
+                          const next = new Set(current);
+                          if (programExpanded) next.delete(template.id);
+                          else next.add(template.id);
+                          return next;
+                        });
+                        if (programExpanded) {
+                          const dayIds = new Set(template.days.map((day) => day.id));
+                          setExpandedDays((current) => new Set([...current].filter((id) => !dayIds.has(id))));
+                        }
+                      }}
+                      type="button"
+                    >
+                      <span className="admin-program-accordion-copy">
+                        <span className="eyebrow">{t("admin.templates.days", { count: template.days_per_week })}</span>
+                        <span className="admin-program-accordion-title">{name}</span>
+                        <span className="admin-program-accordion-description">{english ? template.description_en : template.description_fa}</span>
+                      </span>
+                      <span className="admin-program-accordion-meta">
+                        <span className="admin-template-level">
+                          {template.training_level === "first_month"
+                            ? t("admin.templates.firstMonth")
+                            : t(`catalog.difficulty.${template.training_level}`)}
+                        </span>
+                        <span aria-hidden="true" className="admin-accordion-chevron">⌄</span>
+                      </span>
+                    </button>
+                  </header>
+                  <div className="admin-template-tags" aria-label={t("admin.templates.labels")}>
+                    {template.focus_tags.map((tag) => <span key={tag}>{t(`admin.templates.tags.${tag}`)}</span>)}
+                    {template.intensity_methods.filter((method) => method !== "standard").map((method) => (
+                      <span key={method}>{t(`admin.templates.methods.${method}`)}</span>
+                    ))}
                   </div>
-                  <span className="admin-template-level">
-                    {template.training_level === "first_month"
-                      ? t("admin.templates.firstMonth")
-                      : t(`catalog.difficulty.${template.training_level}`)}
-                  </span>
-                </header>
-                <div className="admin-template-tags" aria-label={t("admin.templates.labels")}>
-                  {template.focus_tags.map((tag) => <span key={tag}>{t(`admin.templates.tags.${tag}`)}</span>)}
-                  {template.intensity_methods.filter((method) => method !== "standard").map((method) => (
-                    <span key={method}>{t(`admin.templates.methods.${method}`)}</span>
-                  ))}
-                </div>
-                <div className="admin-template-days">
-                  {template.days.map((day) => (
-                    <section className="admin-template-day" key={day.id}>
-                      <header>
-                        <span>{t("admin.templates.dayNumber", { number: day.day_number })}</span>
-                        <h3>{english ? day.title_en : day.title_fa}</h3>
-                      </header>
-                      <ol>
-                        {day.slots.map((slot) => {
-                          const name = slot.exercise === null
-                            ? (english ? slot.placeholder_name_en : slot.placeholder_name_fa)
-                            : (english ? slot.exercise.name_en : slot.exercise.name_fa);
+                  {programExpanded && (
+                    <div className="admin-program-accordion-panel" id={programPanelId}>
+                      <div className="admin-template-days">
+                        {template.days.map((day) => {
+                          const dayName = english ? day.title_en : day.title_fa;
+                          const dayExpanded = expandedDays.has(day.id);
+                          const dayPanelId = `training-day-${day.id}`;
                           return (
-                            <li className={slot.exercise === null || slot.exercise.needs_review ? "is-placeholder" : ""} key={slot.id}>
-                              <div>
-                                <strong>{name ?? slot.exercise_slug_hint}</strong>
-                                {slot.exercise === null && <small>{t("admin.templates.placeholder")}</small>}
-                                {slot.exercise !== null && (
-                                  <Link
-                                    aria-label={t("admin.templates.exerciseDetailAria", { name })}
-                                    className="admin-template-exercise-detail"
-                                    to={`/exercises/${slot.exercise.slug}`}
-                                  >
-                                    <span aria-hidden="true">↗</span>
-                                    {t("admin.templates.exerciseDetail")}
-                                  </Link>
-                                )}
-                                {slot.exercise?.needs_review && <small>{t("admin.templates.reviewMedia")}</small>}
-                              </div>
-                              <span dir="ltr">
-                                {slot.sets} × {slot.rep_min}–{slot.rep_max} · RIR {slot.target_rir}
-                              </span>
-                            </li>
+                            <section className="admin-template-day" data-expanded={dayExpanded} key={day.id}>
+                              <header>
+                                <button
+                                  aria-controls={dayPanelId}
+                                  aria-expanded={dayExpanded}
+                                  aria-label={t(`admin.templates.${dayExpanded ? "collapseDayAria" : "expandDayAria"}`, { name: dayName, number: day.day_number })}
+                                  className="admin-day-accordion-trigger"
+                                  onClick={() => setExpandedDays((current) => {
+                                    const next = new Set(current);
+                                    if (dayExpanded) next.delete(day.id);
+                                    else next.add(day.id);
+                                    return next;
+                                  })}
+                                  type="button"
+                                >
+                                  <span>{t("admin.templates.dayNumber", { number: day.day_number })}</span>
+                                  <strong>{dayName}</strong>
+                                  <span aria-hidden="true" className="admin-accordion-chevron">⌄</span>
+                                </button>
+                              </header>
+                              {dayExpanded && (
+                                <ol className="admin-day-accordion-panel" id={dayPanelId}>
+                                  {day.slots.map((slot) => {
+                                    const exerciseName = slot.exercise === null
+                                      ? (english ? slot.placeholder_name_en : slot.placeholder_name_fa)
+                                      : (english ? slot.exercise.name_en : slot.exercise.name_fa);
+                                    return (
+                                      <li className={slot.exercise === null || slot.exercise.needs_review ? "is-placeholder" : ""} key={slot.id}>
+                                        <div>
+                                          <strong>{exerciseName ?? slot.exercise_slug_hint}</strong>
+                                          {slot.exercise === null && <small>{t("admin.templates.placeholder")}</small>}
+                                          {slot.exercise !== null && (
+                                            <Link
+                                              aria-label={t("admin.templates.exerciseDetailAria", { name: exerciseName })}
+                                              className="admin-template-exercise-detail"
+                                              to={`/exercises/${slot.exercise.slug}`}
+                                            >
+                                              <span aria-hidden="true">↗</span>
+                                              {t("admin.templates.exerciseDetail")}
+                                            </Link>
+                                          )}
+                                          {slot.exercise?.needs_review && <small>{t("admin.templates.reviewMedia")}</small>}
+                                        </div>
+                                        <span dir="ltr">
+                                          {slot.sets} × {slot.rep_min}–{slot.rep_max} · RIR {slot.target_rir}
+                                        </span>
+                                      </li>
+                                    );
+                                  })}
+                                </ol>
+                              )}
+                            </section>
                           );
                         })}
-                      </ol>
-                    </section>
-                  ))}
-                </div>
-                <section className="admin-template-rationale" aria-label={t("admin.templates.rationaleTitle")}>
-                  <h3>{t("admin.templates.rationaleTitle")}</h3>
-                  <ol>
-                    {template.programming_rationale.map((rationale) => (
-                      <li key={rationale.title_en}>
-                        <strong>{english ? rationale.title_en : rationale.title_fa}</strong>
-                        <p>{english ? rationale.detail_en : rationale.detail_fa}</p>
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-                <footer>
-                  <Link
-                    aria-label={t("admin.templates.editProgramAria", { name: english ? template.name_en : template.name_fa })}
-                    to={`/admin/training-program-templates/${template.id}/edit`}
-                  >
-                    {t("admin.templates.editProgram")}
-                  </Link>
-                  <span>{t("admin.templates.source")}: {template.source_name}</span>
-                  <a href={template.source_url} rel="noreferrer" target="_blank">{t("admin.templates.reference")}</a>
-                </footer>
-              </article>
-            ))}
+                      </div>
+                      <section className="admin-template-rationale" aria-label={t("admin.templates.rationaleTitle")}>
+                        <h3>{t("admin.templates.rationaleTitle")}</h3>
+                        <ol>
+                          {template.programming_rationale.map((rationale) => (
+                            <li key={rationale.title_en}>
+                              <strong>{english ? rationale.title_en : rationale.title_fa}</strong>
+                              <p>{english ? rationale.detail_en : rationale.detail_fa}</p>
+                            </li>
+                          ))}
+                        </ol>
+                      </section>
+                    </div>
+                  )}
+                  <footer>
+                    <Link
+                      aria-label={t("admin.templates.editProgramAria", { name })}
+                      to={`/admin/training-program-templates/${template.id}/edit`}
+                    >
+                      {t("admin.templates.editProgram")}
+                    </Link>
+                    <span>{t("admin.templates.source")}: {template.source_name}</span>
+                    <a href={template.source_url} rel="noreferrer" target="_blank">{t("admin.templates.reference")}</a>
+                  </footer>
+                </article>
+              );
+            })}
           </section>
         )}
         {state === "ready" && (

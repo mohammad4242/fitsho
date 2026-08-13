@@ -64,16 +64,33 @@ it("filters weekly programs by diet style and archives them", async () => {
 
   expect(await screen.findByRole("heading", { name: "کاتالوگ برنامه‌های غذایی" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "کاتالوگ برنامه‌های غذایی" })).toHaveAttribute("href", "/admin/nutrition-programs");
-  expect(screen.getByText("هفته ایرانی متعادل")).toBeInTheDocument();
-  expect(screen.getAllByRole("img", { name: "املت" })[0]).toHaveAttribute(
-    "src", "/media/meal-catalogue/omelette.png",
+  expect(screen.queryByRole("img", { name: "املت" })).not.toBeInTheDocument();
+  expect(screen.queryByText("وعده آزاد")).not.toBeInTheDocument();
+  expect(screen.queryByText(/روز /)).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "باز کردن برنامه: هفته ایرانی متعادل" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
   );
-  expect(screen.getAllByText(/BF01 — املت/)).toHaveLength(6);
-  expect(screen.getByText("وعده آزاد")).toBeInTheDocument();
-  expect(screen.getAllByText(/روز /)).toHaveLength(7);
   expect(screen.getByRole("link", { name: "ویرایش هفته ایرانی متعادل" })).toHaveAttribute(
     "href", "/admin/nutrition-programs/program-1/edit",
   );
+
+  await user.click(screen.getByRole("button", { name: "باز کردن برنامه: هفته ایرانی متعادل" }));
+
+  expect(screen.getAllByText(/روز /)).toHaveLength(7);
+  expect(screen.queryByRole("img", { name: "املت" })).not.toBeInTheDocument();
+  expect(screen.queryByText("وعده آزاد")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "باز کردن روز 1" })).toHaveAttribute("aria-expanded", "false");
+
+  await user.click(screen.getByRole("button", { name: "باز کردن روز 1" }));
+
+  expect(screen.getByRole("img", { name: "املت" })).toHaveAttribute(
+    "src", "/media/meal-catalogue/omelette.png",
+  );
+  expect(screen.getByText(/BF01 — املت/)).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "باز کردن روز 7" }));
+  expect(screen.getByText("وعده آزاد")).toBeInTheDocument();
 
   await user.click(screen.getByRole("tab", { name: "اقتصادی" }));
   expect(adminApi.getAdminNutritionPrograms).toHaveBeenLastCalledWith({

@@ -123,20 +123,37 @@ it("filters the library by day count and training level", async () => {
   expect(await screen.findByText("تفکیک کلاسیک چهار روزه")).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "متوسط" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "First Month" })).toBeInTheDocument();
-  expect(screen.getAllByText("سینه + پشت بازو")).toHaveLength(3);
-  expect(screen.getAllByText("پرس سینه دمبل")).toHaveLength(3);
-  expect(screen.getAllByText("پلاور کابل")).toHaveLength(3);
-  expect(screen.getAllByText("نیازمند ویدیو و بازبینی")).toHaveLength(3);
-  expect(screen.getAllByRole("link", { name: "جزئیات حرکت: پرس سینه دمبل" })).toHaveLength(3);
-  expect(screen.getAllByRole("link", { name: "جزئیات حرکت: پلاور کابل" })).toHaveLength(3);
+  expect(screen.queryByText("سینه + پشت بازو")).not.toBeInTheDocument();
+  expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "باز کردن برنامه: تفکیک کلاسیک چهار روزه" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
   expect(screen.getAllByRole("link", { name: "ویرایش برنامه: تفکیک کلاسیک چهار روزه" })).toHaveLength(1);
   expect(screen.getByRole("link", { name: "افزودن برنامه جدید" })).toHaveAttribute(
     "href",
     "/admin/training-program-templates/new?days=4&level=beginner",
   );
-  expect(screen.getAllByText("منطق برنامه")).toHaveLength(3);
-  expect(screen.getAllByText("ترتیب حرکات")).toHaveLength(3);
   expect(adminApi.getAdminTrainingProgramTemplates).toHaveBeenCalledWith(4);
+
+  await user.click(screen.getByRole("button", { name: "باز کردن برنامه: تفکیک کلاسیک چهار روزه" }));
+
+  expect(screen.getByText("سینه + پشت بازو")).toBeInTheDocument();
+  expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "باز کردن روز 1: سینه + پشت بازو" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  expect(screen.getByText("منطق برنامه")).toBeInTheDocument();
+  expect(screen.getByText("ترتیب حرکات")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "باز کردن روز 1: سینه + پشت بازو" }));
+
+  expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
+  expect(screen.getByText("پلاور کابل")).toBeInTheDocument();
+  expect(screen.getByText("نیازمند ویدیو و بازبینی")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "جزئیات حرکت: پرس سینه دمبل" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "جزئیات حرکت: پلاور کابل" })).toBeInTheDocument();
 
   await user.click(screen.getByRole("tab", { name: "پیشرفته" }));
 

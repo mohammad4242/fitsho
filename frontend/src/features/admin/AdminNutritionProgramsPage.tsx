@@ -35,6 +35,8 @@ export function AdminNutritionProgramsPage() {
   const [page, setPage] = useState<AdminNutritionProgramPage | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [retry, setRetry] = useState(0);
+  const [expandedPrograms, setExpandedPrograms] = useState<Set<string>>(() => new Set());
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(() => new Set());
   const english = i18n.resolvedLanguage === "en";
 
   useEffect(() => {
@@ -103,30 +105,78 @@ export function AdminNutritionProgramsPage() {
           <section className="admin-template-list">
             {page.items.map((program) => {
               const name = english ? program.name_en : program.name_fa;
+              const programExpanded = expandedPrograms.has(program.id);
+              const programPanelId = `nutrition-program-${program.id}`;
               return (
-                <article className={`admin-template-card admin-program-card${program.is_active ? "" : " is-archived"}`} key={program.id}>
-                  <header>
-                    <div>
-                      <p className="eyebrow">{t(`admin.nutritionPrograms.dietStyles.${program.diet_style}`)}</p>
-                      <h2>{program.code ? <>{program.code} — </> : null}<span>{name}</span></h2>
-                      <p>{english ? program.description_en : program.description_fa}</p>
-                    </div>
-                    <span className="admin-template-level">{t(`admin.nutritionPrograms.lifecycle.${program.is_active ? "active" : "archived"}`)}</span>
+                <article className={`admin-template-card admin-program-card${program.is_active ? "" : " is-archived"}`} data-expanded={programExpanded} key={program.id}>
+                  <header className="admin-accordion-header">
+                    <button
+                      aria-controls={programPanelId}
+                      aria-expanded={programExpanded}
+                      aria-label={t(`admin.nutritionPrograms.${programExpanded ? "collapseProgramAria" : "expandProgramAria"}`, { name })}
+                      className="admin-program-accordion-trigger"
+                      onClick={() => {
+                        setExpandedPrograms((current) => {
+                          const next = new Set(current);
+                          if (programExpanded) next.delete(program.id);
+                          else next.add(program.id);
+                          return next;
+                        });
+                        if (programExpanded) {
+                          const dayIds = new Set(program.days.map((day) => day.id));
+                          setExpandedDays((current) => new Set([...current].filter((id) => !dayIds.has(id))));
+                        }
+                      }}
+                      type="button"
+                    >
+                      <span className="admin-program-accordion-copy">
+                        <span className="eyebrow">{t(`admin.nutritionPrograms.dietStyles.${program.diet_style}`)}</span>
+                        <span className="admin-program-accordion-title">{program.code ? <>{program.code} — </> : null}{name}</span>
+                        <span className="admin-program-accordion-description">{english ? program.description_en : program.description_fa}</span>
+                      </span>
+                      <span className="admin-program-accordion-meta">
+                        <span className="admin-template-level">{t(`admin.nutritionPrograms.lifecycle.${program.is_active ? "active" : "archived"}`)}</span>
+                        <span aria-hidden="true" className="admin-accordion-chevron">⌄</span>
+                      </span>
+                    </button>
                   </header>
-                  <div className="admin-program-week">
-                    {program.days.map((day) => (
-                      <section className="admin-program-day" key={day.id}>
-                        <strong>{t("admin.nutritionPrograms.day", { number: day.day_number })}</strong>
-                        <ul>{day.slots.map((slot) => {
-                          if (slot.kind === "free_meal" || slot.meal === null) {
-                            return <li key={slot.id}><span>{t(`admin.meals.categories.${slot.category}`)}</span><b>وعده آزاد</b></li>;
-                          }
-                          const mealName = english ? slot.meal.name_en : slot.meal.name_fa;
-                          return <li key={slot.id}><span>{t(`admin.meals.categories.${slot.category}`)}</span><div className="admin-program-meal"><MealThumbnail alt={mealName} className="admin-program-meal__image" fallbackLabel={t("admin.meals.imageFallback", { name: mealName })} imageUrl={slot.meal.image_url} /><b>{slot.meal.code} — {mealName}</b></div></li>;
-                        })}</ul>
-                      </section>
-                    ))}
-                  </div>
+                  {programExpanded && (
+                    <div className="admin-program-accordion-panel admin-program-week" id={programPanelId}>
+                      {program.days.map((day) => {
+                        const dayExpanded = expandedDays.has(day.id);
+                        const dayPanelId = `nutrition-day-${day.id}`;
+                        return (
+                          <section className="admin-program-day" data-expanded={dayExpanded} key={day.id}>
+                            <button
+                              aria-controls={dayPanelId}
+                              aria-expanded={dayExpanded}
+                              aria-label={t(`admin.nutritionPrograms.${dayExpanded ? "collapseDayAria" : "expandDayAria"}`, { number: day.day_number })}
+                              className="admin-day-accordion-trigger"
+                              onClick={() => setExpandedDays((current) => {
+                                const next = new Set(current);
+                                if (dayExpanded) next.delete(day.id);
+                                else next.add(day.id);
+                                return next;
+                              })}
+                              type="button"
+                            >
+                              <strong>{t("admin.nutritionPrograms.day", { number: day.day_number })}</strong>
+                              <span aria-hidden="true" className="admin-accordion-chevron">⌄</span>
+                            </button>
+                            {dayExpanded && (
+                              <ul className="admin-day-accordion-panel" id={dayPanelId}>{day.slots.map((slot) => {
+                                if (slot.kind === "free_meal" || slot.meal === null) {
+                                  return <li key={slot.id}><span>{t(`admin.meals.categories.${slot.category}`)}</span><b>وعده آزاد</b></li>;
+                                }
+                                const mealName = english ? slot.meal.name_en : slot.meal.name_fa;
+                                return <li key={slot.id}><span>{t(`admin.meals.categories.${slot.category}`)}</span><div className="admin-program-meal"><MealThumbnail alt={mealName} className="admin-program-meal__image" fallbackLabel={t("admin.meals.imageFallback", { name: mealName })} imageUrl={slot.meal.image_url} /><b>{slot.meal.code} — {mealName}</b></div></li>;
+                              })}</ul>
+                            )}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  )}
                   <footer>
                     <Link aria-label={t("admin.nutritionPrograms.editAria", { name })} to={`/admin/nutrition-programs/${program.id}/edit`}>{t("admin.nutritionPrograms.edit")}</Link>
                     <button type="button" aria-label={t(`admin.nutritionPrograms.${program.is_active ? "archiveAria" : "restoreAria"}`, { name })} onClick={() => void changeLifecycle(program.id, program.is_active)}>
