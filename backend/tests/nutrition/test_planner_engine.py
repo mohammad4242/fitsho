@@ -89,6 +89,9 @@ def test_prepared_recipe_optimizer_changes_raw_inputs_but_returns_cooked_dish() 
         revision_id=str(UUID(int=201)),
         name_fa="قیمه",
         name_en="Gheimeh",
+        verification_status="draft",
+        provenance={"source_name": "Internal recipe source"},
+        data_gaps=({"message_fa": "شکاف داخلی", "message_en": "Internal gap"},),
         definition=PreparedRecipeDefinition(
             calculation_version="prepared-recipe-v1",
             ingredients=(
@@ -156,6 +159,13 @@ def test_prepared_recipe_optimizer_changes_raw_inputs_but_returns_cooked_dish() 
     assert Decimal("1.5") <= economical_ratio <= Decimal("3")
     assert Decimal(high_protein_inputs[beef_id]) / Decimal(high_protein_inputs[peas_id]) <= 3
     assert high_protein.recipe_snapshot["calculation_version"] == "prepared-recipe-v1"
+    assert high_protein.recipe_snapshot["verification_status"] == "draft"
+    assert high_protein.recipe_snapshot["provenance"] == {
+        "source_name": "Internal recipe source"
+    }
+    assert high_protein.recipe_snapshot["data_gaps"] == [
+        {"message_fa": "شکاف داخلی", "message_en": "Internal gap"}
+    ]
 
 
 def test_prepared_recipe_optimizer_rejects_an_infinite_budget() -> None:

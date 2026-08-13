@@ -760,6 +760,12 @@ class PhysicianReviewRequirementResponse(BaseModel):
     safety_decision_id: UUID
 
 
+class WeeklyPlanPreparedRecipeSummary(BaseModel):
+    status: Literal["estimated", "verified"]
+    nutrients_per_100g: dict[str, float]
+    cost_irr_per_100g: float
+
+
 class WeeklyPlanFoodResponse(BaseModel):
     food_id: UUID | None
     item_kind: Literal["food", "prepared_recipe"] = "food"
@@ -769,7 +775,7 @@ class WeeklyPlanFoodResponse(BaseModel):
     grams: float
     cost_irr: int
     nutrients: dict[str, float]
-    recipe_snapshot: dict[str, object] | None = None
+    prepared_recipe: WeeklyPlanPreparedRecipeSummary | None = None
 
 
 class WeeklyPlanMealResponse(BaseModel):

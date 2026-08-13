@@ -77,6 +77,9 @@ class PlannerPreparedRecipe:
     name_fa: str
     name_en: str
     definition: PreparedRecipeDefinition
+    verification_status: str = "draft"
+    provenance: dict[str, object] | None = None
+    data_gaps: tuple[dict[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -734,6 +737,9 @@ def optimize_prepared_recipe(
         recipe_snapshot={
             "revision_id": recipe.revision_id,
             "calculation_version": calculation.calculation_version,
+            "verification_status": recipe.verification_status,
+            "provenance": recipe.provenance,
+            "data_gaps": list(recipe.data_gaps),
             "selected_ingredient_grams": selected_grams,
             "ingredients": [
                 {

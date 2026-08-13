@@ -82,6 +82,7 @@ from app.nutrition.schemas import (
     WeeklyPlanHistoryItemResponse,
     WeeklyPlanMealResponse,
     WeeklyPlanNutrientResponse,
+    WeeklyPlanPreparedRecipeSummary,
     WeeklyPlanResponse,
 )
 from app.nutrition.service import current_safety_decision
@@ -775,6 +776,9 @@ def _planner_meal_templates(
             "prepared_recipe": (
                 {
                     "revision_id": template.prepared_recipe.revision_id,
+                    "verification_status": template.prepared_recipe.verification_status,
+                    "provenance": template.prepared_recipe.provenance,
+                    "data_gaps": list(template.prepared_recipe.data_gaps),
                     "calculation_version": (
                         template.prepared_recipe.definition.calculation_version
                     ),
@@ -827,6 +831,24 @@ def _planner_prepared_recipe(meal: NutritionCatalogueMeal) -> PlannerPreparedRec
         revision_id=str(revision.id),
         name_fa=meal.name_fa.split(" + ", 1)[0],
         name_en=meal.name_en.split(" with ", 1)[0],
+        verification_status=revision.verification_status.value,
+        provenance={
+            "source_name": revision.source_name,
+            "source_reference": revision.source_reference,
+            "notes": revision.notes,
+            "yield_source_name": revision.yield_source_name,
+            "yield_source_reference": revision.yield_source_reference,
+            "yield_notes": revision.yield_notes,
+        },
+        data_gaps=tuple(
+            {
+                "ingredient_name_fa": gap.ingredient_name_fa,
+                "ingredient_name_en": gap.ingredient_name_en,
+                "message_fa": gap.message_fa,
+                "message_en": gap.message_en,
+            }
+            for gap in revision.data_gaps
+        ),
         definition=PreparedRecipeDefinition(
             calculation_version=revision.calculation_version,
             ingredients=tuple(
@@ -1061,7 +1083,9 @@ def weekly_plan_response(plan: NutritionWeeklyPlan) -> WeeklyPlanResponse:
                                 grams=float(food.grams),
                                 cost_irr=food.cost_irr,
                                 nutrients=_float_map(food.nutrient_snapshot),
-                                recipe_snapshot=food.recipe_snapshot,
+                                prepared_recipe=_public_prepared_recipe_summary(
+                                    food.recipe_snapshot
+                                ),
                             )
                             for food in meal.foods
                         ],
@@ -1072,6 +1096,35 @@ def weekly_plan_response(plan: NutritionWeeklyPlan) -> WeeklyPlanResponse:
             for day in plan.days
         ],
         created_at=plan.created_at,
+    )
+
+
+def _public_prepared_recipe_summary(
+    snapshot: dict[str, object] | None,
+) -> WeeklyPlanPreparedRecipeSummary | None:
+    if snapshot is None:
+        return None
+    raw_nutrients = snapshot.get("nutrients_per_100g")
+    raw_cost = snapshot.get("cost_irr_per_100g")
+    if not isinstance(raw_nutrients, dict) or not isinstance(raw_cost, (int, float, str)):
+        return None
+    public_codes = {
+        "energy_kcal",
+        "protein_g",
+        "carbohydrate_g",
+        "total_fat_g",
+        "fibre_g",
+    }
+    nutrients = {
+        str(code): float(value)
+        for code, value in raw_nutrients.items()
+        if code in public_codes and isinstance(value, (int, float, str))
+    }
+    status = "verified" if snapshot.get("verification_status") == "verified" else "estimated"
+    return WeeklyPlanPreparedRecipeSummary(
+        status=status,
+        nutrients_per_100g=nutrients,
+        cost_irr_per_100g=float(raw_cost),
     )
 
 
