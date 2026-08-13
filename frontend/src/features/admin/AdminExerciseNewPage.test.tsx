@@ -48,6 +48,24 @@ it("suggests an editable slug and filters muscles by region", async () => {
   expect(screen.getByLabelText("عضله اصلی")).not.toContainHTML("quadriceps");
 });
 
+it("prefills the selected library category and keeps it editable", async () => {
+  const user = userEvent.setup();
+  renderPage(
+    "/admin/exercises/new?body_region=lower_body&primary_muscle=quadriceps&return_to=%2Fexercises%3Fbody_region%3Dlower_body%26primary_muscle%3Dquadriceps%26search%3Dsquat",
+  );
+
+  expect(screen.getByLabelText("ناحیه بدن")).toHaveValue("lower_body");
+  expect(screen.getByLabelText("عضله اصلی")).toHaveValue("quadriceps");
+  expect(screen.getByRole("link", { name: /بازگشت/ })).toHaveAttribute(
+    "href",
+    "/exercises?body_region=lower_body&primary_muscle=quadriceps&search=squat",
+  );
+
+  await user.selectOptions(screen.getByLabelText("ناحیه بدن"), "core");
+  await user.selectOptions(screen.getByLabelText("عضله اصلی"), "abs");
+  expect(screen.getByLabelText("عضله اصلی")).toHaveValue("abs");
+});
+
 it("allows a review record to leave anatomy unassigned and add a cardio label", async () => {
   const user = userEvent.setup();
   renderPage();
@@ -181,12 +199,12 @@ async function fillMinimumForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("نکته فارسی ۱"), "بدن هم‌راستا باشد");
 }
 
-function renderPage() {
+function renderPage(path = "/admin/exercises/new") {
   return render(
-    <MemoryRouter initialEntries={["/admin/exercises/new"]}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/admin/exercises/new" element={<AdminExerciseNewPage />} />
-        <Route path="/admin/exercises" element={<p>LIST PAGE</p>} />
+        <Route path="/exercises" element={<p>LIST PAGE</p>} />
       </Routes>
     </MemoryRouter>,
   );

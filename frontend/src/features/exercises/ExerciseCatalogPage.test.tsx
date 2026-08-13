@@ -14,8 +14,16 @@ const api = vi.hoisted(() => ({
   getExerciseCategories: vi.fn(),
   getExercises: vi.fn(),
 }));
+const adminApi = vi.hoisted(() => ({
+  getAdminExercises: vi.fn(),
+}));
+const auth = vi.hoisted(() => ({ isAdmin: false }));
 
 vi.mock("./api", () => api);
+vi.mock("../admin/api", () => adminApi);
+vi.mock("../auth/AuthContext", () => ({
+  useAuth: () => ({ user: { is_admin: auth.isAdmin } }),
+}));
 vi.mock("../../shared/AuthenticatedHeader", () => ({
   AuthenticatedHeader: () => null,
 }));
@@ -84,8 +92,14 @@ const emptyPage: PaginatedExercises = {
 beforeEach(async () => {
   api.getExerciseCategories.mockReset();
   api.getExercises.mockReset();
+  adminApi.getAdminExercises.mockReset();
+  auth.isAdmin = false;
   api.getExerciseCategories.mockResolvedValue(categories);
   api.getExercises.mockResolvedValue(populatedPage);
+  adminApi.getAdminExercises.mockResolvedValue({
+    ...populatedPage,
+    items: [{ ...benchPress, is_active: false, needs_review: true }],
+  });
   await i18n.changeLanguage("fa");
 });
 
@@ -281,6 +295,68 @@ describe("catalog filters and states", () => {
     );
 
     expect(await screen.findByText("حرکتی با این فیلترها پیدا نشد.")).toBeVisible();
+  });
+});
+
+describe("administrator controls", () => {
+  it("keeps all administration controls hidden from members", async () => {
+    renderCatalog("/exercises?body_region=upper_body&primary_muscle=chest");
+
+    const card = await screen.findByRole("article", { name: "پرس سینه دمبل" });
+    expect(screen.queryByRole("link", { name: "افزودن حرکت" })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("link", { name: "ویرایش" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "وضعیت مدیریتی" })).not.toBeInTheDocument();
+  });
+
+  it("links add and edit actions back to the current library context", async () => {
+    auth.isAdmin = true;
+    renderCatalog(
+      "/exercises?body_region=upper_body&primary_muscle=chest&equipment=dumbbell&search=press",
+    );
+
+    const card = await screen.findByRole("article", { name: "پرس سینه دمبل" });
+    const returnTo = encodeURIComponent(
+      "/exercises?body_region=upper_body&primary_muscle=chest&equipment=dumbbell&search=press",
+    );
+    expect(screen.getByRole("link", { name: "افزودن حرکت" })).toHaveAttribute(
+      "href",
+      `/admin/exercises/new?body_region=upper_body&primary_muscle=chest&return_to=${returnTo}`,
+    );
+    expect(within(card).getByRole("link", { name: "ویرایش" })).toHaveAttribute(
+      "href",
+      `/admin/exercises/${benchPress.id}/edit?return_to=${returnTo}`,
+    );
+  });
+
+  it("uses the protected admin list only for explicit admin status filters", async () => {
+    auth.isAdmin = true;
+    const user = userEvent.setup();
+    renderCatalog(
+      "/exercises?body_region=upper_body&primary_muscle=chest&equipment=dumbbell&difficulty=intermediate&search=press",
+    );
+
+    await screen.findByRole("article", { name: "پرس سینه دمبل" });
+    expect(api.getExercises).toHaveBeenCalled();
+    expect(adminApi.getAdminExercises).not.toHaveBeenCalled();
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "وضعیت مدیریتی" }),
+      "inactive",
+    );
+
+    expect(
+      within(await screen.findByRole("article", { name: "پرس سینه دمبل" })).getByText("غیرفعال"),
+    ).toBeVisible();
+    expect(adminApi.getAdminExercises).toHaveBeenLastCalledWith({
+      body_region: "upper_body",
+      primary_muscle: "chest",
+      equipment: "dumbbell",
+      difficulty: "intermediate",
+      search: "press",
+      is_active: false,
+      page: 1,
+    });
+    expect(locationValue()).toContain("admin_status=inactive");
   });
 });
 

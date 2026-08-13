@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { ApiError } from "../../shared/apiClient";
@@ -9,6 +9,7 @@ import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getAdminExercise, updateAdminExercise } from "./api";
 import { AdminExerciseForm, type ProgrammingMetadata } from "./AdminExerciseForm";
 import { ExerciseMediaAssetsFields } from "./ExerciseMediaAssetsFields";
+import { exerciseLibraryReturnPath, readExerciseLibraryReturn } from "./exerciseLibraryNavigation";
 import type {
   AdminExercise,
   AdminExerciseForm as AdminExerciseFormState,
@@ -21,6 +22,8 @@ export function AdminExerciseEditPage() {
   const { t } = useTranslation();
   const { exerciseId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = readExerciseLibraryReturn(searchParams);
   const [exercise, setExercise] = useState<AdminExercise | null>(null);
   const [form, setForm] = useState<AdminExerciseFormState | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
@@ -66,8 +69,22 @@ export function AdminExerciseEditPage() {
     setBusy(true);
     setSaveError(false);
     try {
-      await updateAdminExercise(exerciseId, toAdminExerciseCreate(form), null, mediaAssets);
-      navigate("/admin/exercises", { replace: true });
+      const updated = await updateAdminExercise(
+        exerciseId,
+        toAdminExerciseCreate(form),
+        null,
+        mediaAssets,
+      );
+      navigate(
+        exerciseLibraryReturnPath(
+          returnTo,
+          updated.body_region,
+          updated.primary_muscle,
+          updated.is_active,
+          updated.needs_review,
+        ),
+        { replace: true },
+      );
     } catch {
       setSaveError(true);
     } finally {
@@ -82,7 +99,7 @@ export function AdminExerciseEditPage() {
       <main className="admin-main admin-main--form">
         <header className="admin-form-header">
           <div><p className="eyebrow eyebrow--accent">{t("admin.edit.eyebrow")}</p><h1>{t("admin.edit.title")}</h1><p>{t("admin.edit.intro")}</p></div>
-          <Link to="/admin/exercises">{t("admin.edit.back")}</Link>
+          <Link to={returnTo}>{t("admin.edit.back")}</Link>
         </header>
         {state === "loading" && <p className="admin-status" role="status">{t("admin.edit.loading")}</p>}
         {state === "missing" && <p className="admin-status" role="alert">{t("admin.edit.missing")}</p>}

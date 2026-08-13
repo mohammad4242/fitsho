@@ -46,11 +46,18 @@ SourceUrl = Annotated[
 
 
 class AdminExerciseFilters(BaseModel):
+    body_region: BodyRegion | None = None
+    primary_muscle: MuscleGroup | None = None
+    equipment: Equipment | None = None
+    difficulty: Difficulty | None = None
+    exercise_type: ExerciseType | None = None
+    labels: list[ExerciseLabel] | None = None
     search: Annotated[
         str | None,
         StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
     ] = None
     is_active: bool | None = None
+    needs_review: bool | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 

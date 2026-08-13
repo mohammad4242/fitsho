@@ -74,7 +74,14 @@ export type AdminExerciseForm = Omit<
 };
 
 export type AdminExerciseFilters = {
+  body_region?: BodyRegion | "";
+  primary_muscle?: MuscleGroup | "";
+  equipment?: Equipment | "";
+  difficulty?: Difficulty | "";
+  exercise_type?: ExerciseType | "";
+  labels?: ExerciseLabel[];
   is_active?: boolean | "";
+  needs_review?: boolean | "";
   search?: string;
   page?: number;
   page_size?: number;

@@ -219,7 +219,7 @@ export function AdminAiSettingsPage() {
       <main className="admin-main admin-main--ai-settings">
       <header className="admin-page-heading">
         <div><p className="admin-kicker">{t("admin.aiSettings.eyebrow")}</p><h1>{t("admin.aiSettings.title")}</h1></div>
-        <Link className="admin-ai-back" to="/admin/exercises" aria-label={backLabel}>
+        <Link className="admin-ai-back" to="/more" aria-label={backLabel}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7M8 12h9" /></svg>
           <span>{backLabel}</span>
         </Link>

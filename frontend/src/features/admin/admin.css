@@ -10,7 +10,6 @@
 .admin-status--success { border-color: rgb(56 183 165 / 40%); color: var(--petrol-900); background: rgb(56 183 165 / 9%); }.admin-status--success p { margin-top: 0; }.admin-status--success a { color: var(--turquoise-dark); font-weight: 800; }
 .admin-status--error { border-color: rgb(161 63 50 / 35%); color: var(--danger); background: rgb(161 63 50 / 9%); }
 .admin-status button, .admin-form-alert button, .admin-repeater > button { padding: .55rem .9rem; border: 1px solid var(--turquoise-dark); border-radius: 999px; color: var(--petrol-900); background: transparent; cursor: pointer; }
-.admin-exercise-list { display: grid; gap: .9rem; margin-top: 1.5rem; }
 .admin-exercise-row { display: grid; grid-template-columns: auto minmax(12rem, 1fr) minmax(18rem, .7fr); align-items: center; gap: 1.25rem; padding: 1.25rem 1.4rem; border: 1px solid var(--line); border-radius: 1.25rem; background: var(--paper); }
 .admin-exercise-row.is-created { border-color: var(--turquoise); box-shadow: 0 0 0 3px rgb(56 183 165 / 15%); }
 .admin-exercise-row h2, .admin-exercise-row p, .admin-exercise-row dl, .admin-exercise-row dd { margin: 0; }

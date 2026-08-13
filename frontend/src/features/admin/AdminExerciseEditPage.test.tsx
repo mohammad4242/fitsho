@@ -61,7 +61,7 @@ it("loads structured programming metadata and saves an edited exercise", async (
     <MemoryRouter initialEntries={["/admin/exercises/exercise-id/edit"]}>
       <Routes>
         <Route path="/admin/exercises/:exerciseId/edit" element={<AdminExerciseEditPage />} />
-        <Route path="/admin/exercises" element={<p>LIST PAGE</p>} />
+        <Route path="/exercises" element={<p>LIST PAGE</p>} />
       </Routes>
     </MemoryRouter>,
   );

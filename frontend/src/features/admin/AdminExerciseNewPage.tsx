@@ -1,6 +1,6 @@
 import { cloneElement, type FormEvent, type ReactElement, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { ApiError } from "../../shared/apiClient";
@@ -10,6 +10,11 @@ import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import { bodyRegions, difficulties, equipment, type MuscleGroup } from "../exercises/types";
 import { createAdminExercise } from "./api";
 import { ExerciseMediaAssetsFields } from "./ExerciseMediaAssetsFields";
+import {
+  exerciseLibraryReturnPath,
+  readExerciseCreateContext,
+  readExerciseLibraryReturn,
+} from "./exerciseLibraryNavigation";
 import type { AdminExerciseForm, AdminExerciseMediaFiles } from "./types";
 import { AdminExerciseForm as ProgrammingMetadataForm, type ProgrammingMetadata } from "./AdminExerciseForm";
 import {
@@ -33,7 +38,12 @@ export type AdminExerciseFormProps = {
 export function AdminExerciseNewPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [form, setForm] = useState<AdminExerciseForm>(emptyAdminExerciseForm);
+  const [searchParams] = useSearchParams();
+  const returnTo = readExerciseLibraryReturn(searchParams);
+  const [form, setForm] = useState<AdminExerciseForm>(() => ({
+    ...emptyAdminExerciseForm(),
+    ...readExerciseCreateContext(searchParams),
+  }));
   const [slugEdited, setSlugEdited] = useState(false);
   const [errors, setErrors] = useState<AdminValidationErrors>({});
   const [media, setMedia] = useState<File | null>(null);
@@ -80,7 +90,16 @@ export function AdminExerciseNewPage() {
     setBusy(true);
     try {
       const created = await createAdminExercise(toAdminExerciseCreate(form), media, mediaAssets);
-      navigate("/admin/exercises", { replace: true, state: { createdId: created.id } });
+      navigate(
+        exerciseLibraryReturnPath(
+          returnTo,
+          created.body_region,
+          created.primary_muscle,
+          created.is_active,
+          created.needs_review,
+        ),
+        { replace: true, state: { createdId: created.id } },
+      );
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         setRequestError("duplicate");
@@ -115,7 +134,7 @@ export function AdminExerciseNewPage() {
       <main className="admin-main admin-main--form">
         <header className="admin-form-header">
           <div><p className="eyebrow eyebrow--accent">{t("admin.new.eyebrow")}</p><h1>{t("admin.new.title")}</h1><p>{t("admin.new.intro")}</p></div>
-          <Link to="/admin/exercises">{t("admin.new.back")}</Link>
+          <Link to={returnTo}>{t("admin.new.back")}</Link>
         </header>
         <form className="admin-form" noValidate onSubmit={handleSubmit}>
           {(Object.keys(errors).length > 0 || requestError) && (

@@ -104,7 +104,6 @@ export function AuthenticatedHeader() {
   const contextualNavigation = [
     { to: "/coach/workouts", label: t("header.coachWorkspace"), active: location.pathname.startsWith("/coach/workouts"), visible: isCoach },
     { to: "/physician/nutrition", label: t("header.physicianWorkspace"), active: location.pathname.startsWith("/physician/nutrition"), visible: isPhysician },
-    { to: "/admin/exercises", label: t("header.adminExercises"), active: location.pathname.startsWith("/admin/exercises"), visible: user.is_admin },
     { to: "/admin/nutrition-monitoring", label: t("header.nutritionMonitoring"), active: location.pathname.startsWith("/admin/nutrition-monitoring"), visible: user.is_admin },
     { to: "/admin/nutrition-meals", label: t("header.adminMealCatalogue"), active: location.pathname.startsWith("/admin/nutrition-meals"), visible: user.is_admin },
     { to: "/admin/nutrition-programs", label: t("header.adminNutritionPrograms"), active: location.pathname.startsWith("/admin/nutrition-programs"), visible: user.is_admin },
@@ -180,7 +179,6 @@ export function AuthenticatedHeader() {
                 {user.is_admin && (
                   <div className="member-menu__group" role="group" aria-label={t("header.adminLinks")}>
                     <span className="member-menu__section-label">{t("header.adminLinks")}</span>
-                    <Link to="/admin/exercises" onClick={() => setMenuOpen(false)}>{t("header.adminExercises")}</Link>
                     <Link to="/admin/nutrition-monitoring" onClick={() => setMenuOpen(false)}>{t("header.nutritionMonitoring")}</Link>
                     <Link to="/admin/nutrition-meals" onClick={() => setMenuOpen(false)}>{t("header.adminMealCatalogue")}</Link>
                     <Link to="/admin/nutrition-programs" onClick={() => setMenuOpen(false)}>{t("header.adminNutritionPrograms")}</Link>

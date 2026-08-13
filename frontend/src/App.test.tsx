@@ -501,18 +501,15 @@ it("opens the authenticated More hub", async () => {
   expect(screen.getByRole("link", { name: "پروفایل" })).toHaveAttribute("href", "/profile");
 });
 
-it("lets an admin without a fitness profile open the admin route", async () => {
+it("redirects the obsolete admin exercise browser to the shared library", async () => {
   auth.value.user = { ...member, is_admin: true };
   profile.value.status = "missing";
   renderRoute("/admin/exercises");
 
   expect(
-    await screen.findByRole("heading", { name: "مدیریت حرکات" }),
+    await screen.findByRole("heading", { name: "کتابخانه حرکات" }),
   ).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "مدیریت حرکات" })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  expect(screen.queryByRole("link", { name: "مدیریت حرکات" })).not.toBeInTheDocument();
 });
 
 it("lets an admin open the nutrition program catalogue route", async () => {

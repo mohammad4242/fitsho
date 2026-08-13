@@ -125,8 +125,26 @@ def list_admin_exercises(
     filters: AdminExerciseFilters,
 ) -> tuple[list[Exercise], int]:
     conditions: list[ColumnElement[bool]] = []
+    if filters.body_region is not None:
+        conditions.append(Exercise.body_region == filters.body_region)
+    if filters.primary_muscle is not None:
+        conditions.append(Exercise.primary_muscle == filters.primary_muscle)
+    if filters.equipment is not None:
+        conditions.append(
+            Exercise.equipment_items.any(ExerciseEquipment.equipment == filters.equipment)
+        )
+    if filters.difficulty is not None:
+        conditions.append(Exercise.difficulty == filters.difficulty)
+    if filters.exercise_type is not None:
+        conditions.append(Exercise.exercise_type == filters.exercise_type)
+    if filters.labels:
+        conditions.extend(
+            Exercise.labels.any(ExerciseLabelItem.label == label) for label in filters.labels
+        )
     if filters.is_active is not None:
         conditions.append(Exercise.is_active.is_(filters.is_active))
+    if filters.needs_review is not None:
+        conditions.append(Exercise.needs_review.is_(filters.needs_review))
     if filters.search is not None:
         pattern = f"%{_escape_like(filters.search)}%"
         conditions.append(

@@ -160,6 +160,61 @@ def test_admin_list_includes_inactive_exercises(
     assert item["updated_at"]
 
 
+def test_admin_list_filters_library_category_and_status(
+    client: TestClient,
+    db: Session,
+) -> None:
+    make_current_user_admin(client, db)
+    seed_exercises(db)
+    exercise = db.scalar(select(Exercise).where(Exercise.slug == "dumbbell-bench-press"))
+    other = db.scalar(select(Exercise).where(Exercise.slug == "dumbbell-lateral-raise"))
+    assert exercise is not None
+    assert other is not None
+    exercise.is_active = False
+    exercise.needs_review = True
+    other.is_active = False
+    other.needs_review = True
+    db.commit()
+
+    response = client.get(
+        "/api/v1/admin/exercises",
+        params={
+            "body_region": "upper_body",
+            "primary_muscle": "chest",
+            "equipment": "dumbbell",
+            "difficulty": "intermediate",
+            "exercise_type": "compound",
+            "is_active": "false",
+            "needs_review": "true",
+        },
+    )
+
+    assert response.status_code == 200
+    assert [item["slug"] for item in response.json()["items"]] == ["dumbbell-bench-press"]
+
+
+def test_admin_list_filters_labels(client: TestClient, db: Session) -> None:
+    make_current_user_admin(client, db)
+
+    created = post_exercise(
+        client,
+        exercise_payload(slug="cardio-step-up", labels=["cardio"]),
+    )
+    assert created.status_code == 201
+    assert (
+        post_exercise(
+            client,
+            exercise_payload(slug="plain-step-up", labels=[]),
+        ).status_code
+        == 201
+    )
+
+    response = client.get("/api/v1/admin/exercises", params={"labels": "cardio"})
+
+    assert response.status_code == 200
+    assert [item["slug"] for item in response.json()["items"]] == ["cardio-step-up"]
+
+
 def test_admin_creates_exercise_and_normalized_associations(
     client: TestClient,
     db: Session,

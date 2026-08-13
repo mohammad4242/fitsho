@@ -59,3 +59,12 @@ it("shows the nutrition program catalogue in the mobile admin workspace", () => 
     "/admin/nutrition-programs",
   );
 });
+
+it("does not show a separate exercise administration workspace", () => {
+  auth.isAdmin = true;
+
+  render(<MemoryRouter><MorePage /></MemoryRouter>);
+
+  expect(screen.queryByRole("link", { name: /مدیریت حرکات/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /کتابخانه حرکات/ })).toHaveAttribute("href", "/exercises");
+});

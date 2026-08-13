@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 import { AdminRoute } from "./features/admin/AdminRoute";
-import { AuthProvider } from "./features/auth/AuthContext";
+import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { ProtectedRoute } from "./features/auth/ProtectedRoute";
 import { ProfileProvider } from "./features/profile/ProfileContext";
 import { useProfile } from "./features/profile/ProfileContext";
@@ -20,7 +20,6 @@ import { AppShell } from "./shared/AppShell";
 const AdminAiSettingsPage = lazy(() => import("./features/admin/AdminAiSettingsPage").then(({ AdminAiSettingsPage }) => ({ default: AdminAiSettingsPage })));
 const AdminExerciseEditPage = lazy(() => import("./features/admin/AdminExerciseEditPage").then(({ AdminExerciseEditPage }) => ({ default: AdminExerciseEditPage })));
 const AdminExerciseNewPage = lazy(() => import("./features/admin/AdminExerciseNewPage").then(({ AdminExerciseNewPage }) => ({ default: AdminExerciseNewPage })));
-const AdminExercisesPage = lazy(() => import("./features/admin/AdminExercisesPage").then(({ AdminExercisesPage }) => ({ default: AdminExercisesPage })));
 const AdminNutritionMonitoringPage = lazy(() => import("./features/admin/AdminNutritionMonitoringPage").then(({ AdminNutritionMonitoringPage }) => ({ default: AdminNutritionMonitoringPage })));
 const AdminMealCataloguePage = lazy(() => import("./features/admin/AdminMealCataloguePage").then(({ AdminMealCataloguePage }) => ({ default: AdminMealCataloguePage })));
 const AdminMealCatalogueEditorPage = lazy(() => import("./features/admin/AdminMealCatalogueEditorPage").then(({ AdminMealCatalogueEditorPage }) => ({ default: AdminMealCatalogueEditorPage })));
@@ -74,7 +73,7 @@ export function AppRoutes() {
           <Route path="/admin/training-program-templates" element={deferred(<AdminTrainingTemplatesPage />)} />
           <Route path="/admin/training-program-templates/new" element={deferred(<AdminTrainingTemplateEditorPage />)} />
           <Route path="/admin/training-program-templates/:templateId/edit" element={deferred(<AdminTrainingTemplateEditorPage />)} />
-          <Route path="/admin/exercises" element={deferred(<AdminExercisesPage />)} />
+          <Route path="/admin/exercises" element={<Navigate to="/exercises" replace />} />
           <Route path="/admin/exercises/new" element={deferred(<AdminExerciseNewPage />)} />
           <Route path="/admin/exercises/:exerciseId/edit" element={deferred(<AdminExerciseEditPage />)} />
           <Route path="/admin/nutrition-supplements" element={deferred(<AdminSupplementsPage />)} />
@@ -88,6 +87,12 @@ export function AppRoutes() {
         </Route>
         <Route element={<OnboardingRoute />}>
           <Route path="/onboarding" element={deferred(<OnboardingPage />)} />
+        </Route>
+        <Route element={<ExerciseLibraryRoute />}>
+          <Route element={<CompletedAppShellRoute />}>
+            <Route path="/exercises" element={deferred(<ExerciseCatalogPage />)} />
+            <Route path="/exercises/:slug" element={deferred(<ExerciseDetailPage />)} />
+          </Route>
         </Route>
         <Route element={<CompletedProfileRoute />}>
           <Route element={<CompletedAppShellRoute />}>
@@ -106,8 +111,6 @@ export function AppRoutes() {
             <Route path="/body-progress/new" element={deferred(<BodyPhotoWizard />)} />
             <Route path="/body-progress/:sessionId" element={deferred(<BodyAnalysisResultPage />)} />
             <Route path="/workout-plan" element={deferred(<WorkoutPlanRoute />)} />
-            <Route path="/exercises" element={deferred(<ExerciseCatalogPage />)} />
-            <Route path="/exercises/:slug" element={deferred(<ExerciseDetailPage />)} />
           </Route>
         </Route>
       </Route>
@@ -124,6 +127,11 @@ function CompletedAppShellRoute() {
       <Outlet />
     </AppShell>
   );
+}
+
+function ExerciseLibraryRoute() {
+  const { user } = useAuth();
+  return user?.is_admin === true ? <Outlet /> : <CompletedProfileRoute />;
 }
 
 function WorkoutPlanRoute() {

@@ -4,6 +4,8 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import heroStrengthFallback from "../../assets/landing/hero-strength-fallback.jpg";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
+import { getAdminExercises } from "../admin/api";
+import { useAuth } from "../auth/AuthContext";
 import { getExerciseCategories, getExercises } from "./api";
 import { ExerciseMedia } from "./ExerciseMedia";
 import {
@@ -35,11 +37,16 @@ type CatalogQuery = {
   exercise_type?: ExerciseType;
   labels?: ExerciseLabel[];
   search?: string;
+  admin_status?: AdminStatus;
   page: number;
 };
 
+type AdminStatus = "all" | "inactive" | "needs_review";
+type CatalogExercise = ExerciseSummary & { is_active?: boolean; needs_review?: boolean };
+
 export function ExerciseCatalogPage() {
   const { i18n, t } = useTranslation();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [categories, setCategories] = useState<ExerciseCategories | null>(null);
   const [categoryState, setCategoryState] = useState<LoadState>("loading");
@@ -63,7 +70,9 @@ export function ExerciseCatalogPage() {
   const selectedMuscle = muscleCategory?.value;
   const selectedLabel = query.labels?.[0];
   const hasSpecialFilter = selectedLabel !== undefined || query.exercise_type === "mobility";
-  const canLoadExercises = hasSpecialFilter || (regionCategory !== undefined && selectedMuscle !== undefined);
+  const isAdmin = user?.is_admin === true;
+  const adminStatus = isAdmin ? query.admin_status : undefined;
+  const canLoadExercises = adminStatus !== undefined || hasSpecialFilter || (regionCategory !== undefined && selectedMuscle !== undefined);
 
   useEffect(() => {
     let active = true;
@@ -102,7 +111,14 @@ export function ExerciseCatalogPage() {
       search: query.search?.trim() || undefined,
       page: query.page,
     };
-    void getExercises(filters)
+    const request = adminStatus === undefined
+      ? getExercises(filters)
+      : getAdminExercises({
+          ...filters,
+          is_active: adminStatus === "inactive" ? false : undefined,
+          needs_review: adminStatus === "needs_review" ? true : undefined,
+        });
+    void request
       .then((response) => {
         if (!active) return;
         setExercisePage(response);
@@ -117,6 +133,7 @@ export function ExerciseCatalogPage() {
     };
   }, [
     exerciseRetry,
+    adminStatus,
     canLoadExercises,
     query.body_region,
     query.difficulty,
@@ -159,6 +176,11 @@ export function ExerciseCatalogPage() {
 
   const hasResultFilters = Boolean(query.equipment || query.difficulty || query.search?.trim());
   const currentSearch = searchParams.toString();
+  const returnTo = `/exercises${currentSearch ? `?${currentSearch}` : ""}`;
+  const createParams = new URLSearchParams();
+  if (query.body_region !== undefined) createParams.set("body_region", query.body_region);
+  if (query.primary_muscle !== undefined) createParams.set("primary_muscle", query.primary_muscle);
+  createParams.set("return_to", returnTo);
 
   return (
     <div className="exercise-catalog-shell">
@@ -179,6 +201,28 @@ export function ExerciseCatalogPage() {
           onLibrary={resetLibrary}
           onRegion={resetToRegion}
         />
+
+        {isAdmin && (
+          <section className="catalog-admin-toolbar" aria-label={t("catalog.adminTools")}>
+            <Link className="catalog-admin-add" to={`/admin/exercises/new?${createParams.toString()}`}>
+              {t("catalog.addExercise")}
+            </Link>
+            <label>
+              <span>{t("catalog.adminStatusLabel")}</span>
+              <select
+                value={adminStatus ?? "published"}
+                onChange={(event) => writeQuery({
+                  admin_status: optionalValue(event.currentTarget.value, ["all", "inactive", "needs_review"] as const),
+                })}
+              >
+                <option value="published">{t("catalog.adminStatus.published")}</option>
+                <option value="all">{t("catalog.adminStatus.all")}</option>
+                <option value="inactive">{t("catalog.adminStatus.inactive")}</option>
+                <option value="needs_review">{t("catalog.adminStatus.needs_review")}</option>
+              </select>
+            </label>
+          </section>
+        )}
 
         <section className="catalog-special-filters" aria-label={t("catalog.specialFiltersTitle")}>
           <p>{t("catalog.specialFiltersTitle")}</p>
@@ -363,6 +407,8 @@ export function ExerciseCatalogPage() {
                       categories={categories}
                       isEnglish={isEnglish}
                       catalogSearch={currentSearch}
+                      isAdmin={isAdmin}
+                      returnTo={returnTo}
                     />
                   ))}
                 </div>
@@ -469,11 +515,15 @@ function ExerciseCard({
   categories,
   isEnglish,
   catalogSearch,
+  isAdmin,
+  returnTo,
 }: {
-  exercise: ExerciseSummary;
+  exercise: CatalogExercise;
   categories: ExerciseCategories;
   isEnglish: boolean;
   catalogSearch: string;
+  isAdmin: boolean;
+  returnTo: string;
 }) {
   const { t } = useTranslation();
   const name = isEnglish ? exercise.name_en : exercise.name_fa;
@@ -513,6 +563,20 @@ function ExerciseCard({
           {t("catalog.viewExercise")}
           <span aria-hidden="true">←</span>
         </Link>
+        {isAdmin && (
+          <Link
+            className="exercise-card__edit"
+            to={`/admin/exercises/${exercise.id}/edit?${new URLSearchParams({ return_to: returnTo }).toString()}`}
+          >
+            {t("catalog.editExercise")}
+          </Link>
+        )}
+        {isAdmin && exercise.is_active === false && (
+          <span className="exercise-card__admin-state">{t("catalog.adminStatus.inactive")}</span>
+        )}
+        {isAdmin && exercise.needs_review === true && (
+          <span className="exercise-card__admin-state">{t("catalog.needsReview")}</span>
+        )}
       </div>
     </article>
   );
@@ -554,6 +618,7 @@ function parseCatalogQuery(searchParams: URLSearchParams): CatalogQuery {
     exercise_type: optionalValue(searchParams.get("exercise_type"), ["mobility"] as const),
     labels: parseLabels(searchParams),
     search: searchParams.get("search") || undefined,
+    admin_status: optionalValue(searchParams.get("admin_status"), ["all", "inactive", "needs_review"] as const),
     page: Number.isInteger(rawPage) && rawPage >= 1 ? rawPage : 1,
   };
 }
@@ -569,6 +634,7 @@ function serializeCatalogQuery(query: CatalogQuery): URLSearchParams {
   if (query.exercise_type !== undefined) searchParams.set("exercise_type", query.exercise_type);
   query.labels?.forEach((label) => searchParams.append("labels", label));
   if (query.search?.trim()) searchParams.set("search", query.search);
+  if (query.admin_status !== undefined) searchParams.set("admin_status", query.admin_status);
   if (query.page > 1) searchParams.set("page", String(query.page));
   return searchParams;
 }
