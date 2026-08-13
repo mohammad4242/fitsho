@@ -145,9 +145,168 @@ def test_prepared_recipe_optimizer_changes_raw_inputs_but_returns_cooked_dish() 
     assert economical.slug == "prepared-gheimeh"
     assert economical.name_fa == "قیمه"
     assert economical.grams > 0
+    assert economical.cost_irr <= Decimal("100000")
+    assert economical.cost_irr < high_protein.cost_irr
     assert Decimal(high_protein_inputs[beef_id]) >= Decimal(economical_inputs[beef_id])
+    assert Decimal("80") <= Decimal(economical_inputs[beef_id]) <= Decimal("140")
+    assert Decimal("40") <= Decimal(economical_inputs[peas_id]) <= Decimal("70")
+    economical_ratio = Decimal(economical_inputs[beef_id]) / Decimal(
+        economical_inputs[peas_id]
+    )
+    assert Decimal("1.5") <= economical_ratio <= Decimal("3")
     assert Decimal(high_protein_inputs[beef_id]) / Decimal(high_protein_inputs[peas_id]) <= 3
     assert high_protein.recipe_snapshot["calculation_version"] == "prepared-recipe-v1"
+
+
+def test_prepared_recipe_optimizer_rejects_an_infinite_budget() -> None:
+    import pytest
+
+    from app.nutrition.planner_engine import PlannerPreparedRecipe, optimize_prepared_recipe
+    from app.nutrition.prepared_recipe import (
+        PreparedRecipeDefinition,
+        PreparedRecipeIngredient,
+        PreparedRecipeYield,
+    )
+
+    food = _food("recipe-food", ("main_protein",), kcal="200", protein="30", price="100")
+    recipe = PlannerPreparedRecipe(
+        revision_id=str(UUID(int=301)),
+        name_fa="غذای تست",
+        name_en="Test recipe",
+        definition=PreparedRecipeDefinition(
+            calculation_version="prepared-recipe-v1",
+            ingredients=(
+                PreparedRecipeIngredient(
+                    food_id=food.food_id,
+                    reference_grams=Decimal("100"),
+                    min_grams=Decimal("80"),
+                    max_grams=Decimal("120"),
+                    is_required=True,
+                ),
+            ),
+            ratios=(),
+            cooked_yield=PreparedRecipeYield(
+                method="proportional_reference_batch",
+                reference_input_grams=Decimal("100"),
+                final_cooked_yield_grams=Decimal("145"),
+            ),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="finite"):
+        optimize_prepared_recipe(
+            recipe,
+            {food.food_id: food},
+            target_kcal=Decimal("200"),
+            target_protein=Decimal("30"),
+            maximum_cost_irr=Decimal("Infinity"),
+        )
+
+
+def test_weekly_budget_repairs_prepared_recipes_to_cheaper_valid_variants() -> None:
+    from app.nutrition.planner_engine import (
+        GenerationOutcome,
+        PlannerMealTemplate,
+        PlannerPreparedRecipe,
+        plan_week,
+    )
+    from app.nutrition.prepared_recipe import (
+        PreparedRecipeDefinition,
+        PreparedRecipeIngredient,
+        PreparedRecipeRatio,
+        PreparedRecipeYield,
+    )
+
+    beef = _food("budget-beef", ("main_protein",), kcal="200", protein="30", price="1000")
+    peas = _food(
+        "budget-peas",
+        ("main_protein",),
+        kcal="360",
+        protein="20",
+        carbs="60",
+        price="100",
+    )
+    recipe = PlannerPreparedRecipe(
+        revision_id=str(UUID(int=401)),
+        name_fa="قیمه بودجه‌ای",
+        name_en="Budget Gheimeh",
+        definition=PreparedRecipeDefinition(
+            calculation_version="prepared-recipe-v1",
+            ingredients=(
+                PreparedRecipeIngredient(
+                    food_id=beef.food_id,
+                    reference_grams=Decimal("100"),
+                    min_grams=Decimal("80"),
+                    max_grams=Decimal("140"),
+                    is_required=True,
+                ),
+                PreparedRecipeIngredient(
+                    food_id=peas.food_id,
+                    reference_grams=Decimal("50"),
+                    min_grams=Decimal("40"),
+                    max_grams=Decimal("70"),
+                    is_required=True,
+                ),
+            ),
+            ratios=(
+                PreparedRecipeRatio(
+                    numerator_food_id=beef.food_id,
+                    denominator_food_id=peas.food_id,
+                    min_ratio=Decimal("1.5"),
+                    max_ratio=Decimal("3"),
+                ),
+            ),
+            cooked_yield=PreparedRecipeYield(
+                method="proportional_reference_batch",
+                reference_input_grams=Decimal("150"),
+                final_cooked_yield_grams=Decimal("300"),
+            ),
+        ),
+    )
+    template = PlannerMealTemplate(
+        meal_id="budget-recipe-template",
+        name_fa="قیمه",
+        name_en="Gheimeh",
+        category="lunch",
+        items=(),
+        prepared_recipe=recipe,
+    )
+    day = (
+        ("main_meal", template.meal_id, "lunch"),
+        ("free_meal", None, "dinner"),
+    )
+    inputs = _input(
+        daily_targets={"goal_calories": Decimal("500")},
+        micronutrient_targets={},
+        micronutrient_upper_limits={},
+        daily_minimums={},
+        daily_maximums={},
+        main_meals_per_day=2,
+        snacks_per_day=0,
+        weekly_budget_irr=800_000,
+        template_schedule=(day,) * 7,
+    )
+
+    result = plan_week(inputs, (beef, peas), (template,))
+
+    assert result.outcome is GenerationOutcome.SUCCESS
+    assert result.weekly_cost_irr <= Decimal(inputs.weekly_budget_irr)
+    recipes = [
+        meal.foods[0]
+        for day_result in result.days
+        for meal in day_result.meals
+        if meal.foods
+    ]
+    assert all(recipe_food.item_kind == "prepared_recipe" for recipe_food in recipes)
+    for recipe_food in recipes:
+        snapshot = recipe_food.recipe_snapshot
+        assert snapshot is not None
+        quantities = snapshot["selected_ingredient_grams"]
+        beef_grams = Decimal(quantities[beef.food_id])
+        peas_grams = Decimal(quantities[peas.food_id])
+        assert Decimal("80") <= beef_grams <= Decimal("140")
+        assert Decimal("40") <= peas_grams <= Decimal("70")
+        assert Decimal("1.5") <= beef_grams / peas_grams <= Decimal("3")
 
 
 def _catalogue():

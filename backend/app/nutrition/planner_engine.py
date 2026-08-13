@@ -213,7 +213,14 @@ def plan_week(
     if not main_templates or (inputs.snacks_per_day and not snack_templates):
         return _failure(GenerationOutcome.LIVE_PRICE_UNAVAILABLE, "INSUFFICIENT_PRICE_COVERAGE")
 
-    days = _build_days(inputs, main_templates, snack_templates, policy)
+    weekly_budget_cap = _weekly_budget_cap(inputs, policy)
+    days = _build_days(
+        inputs,
+        main_templates,
+        snack_templates,
+        policy,
+        maximum_recipe_cost_irr=weekly_budget_cap,
+    )
     foods_by_id = {food.food_id: food for food in eligible}
     days, repairs = _repair_micronutrients(days, inputs, foods_by_id, policy)
     weekly_totals = _sum_nutrients(day.nutrients for day in days)
@@ -237,6 +244,11 @@ def plan_week(
             repair_actions=repairs,
         )
 
+    days = _repair_prepared_recipe_budget(days, inputs, eligible_templates, policy)
+    weekly_totals = _sum_nutrients(day.nutrients for day in days)
+    daily_average = {code: value / Decimal("7") for code, value in weekly_totals.items()}
+    data_completeness = _nutrient_data_completeness(days, inputs)
+    comparisons = _comparisons(inputs, daily_average, data_completeness, policy)
     cost = sum((day.cost_irr for day in days), ZERO).quantize(Decimal("1"))
     allowance = Decimal(inputs.weekly_budget_irr)
     if inputs.budget_mode == "strict" and cost > allowance:
@@ -290,6 +302,13 @@ def _validate_inputs(inputs: PlannerInput) -> None:
         raise ValueError("Invalid dietary pattern")
     if inputs.maximum_meal_repetition_per_week < 1:
         raise ValueError("Maximum meal repetition must be positive")
+
+
+def _weekly_budget_cap(inputs: PlannerInput, policy: PlannerPolicy) -> Decimal:
+    allowance = Decimal(inputs.weekly_budget_irr)
+    if inputs.budget_mode == "strict":
+        return allowance
+    return allowance * (Decimal("1") + policy.flexible_budget_overage_cap)
 
 
 def _has_mandatory_nutrients(food: PlannerFood) -> bool:
@@ -429,9 +448,16 @@ def _build_days(
     main_templates: tuple[EligibleMealTemplate, ...],
     snack_templates: tuple[EligibleMealTemplate, ...],
     policy: PlannerPolicy,
+    *,
+    maximum_recipe_cost_irr: Decimal,
 ) -> tuple[PlannedDay, ...]:
     if inputs.template_schedule is not None:
-        return _build_scheduled_days(inputs, (*main_templates, *snack_templates), policy)
+        return _build_scheduled_days(
+            inputs,
+            (*main_templates, *snack_templates),
+            policy,
+            maximum_recipe_cost_irr=maximum_recipe_cost_irr,
+        )
     daily_kcal = inputs.daily_targets["goal_calories"]
     snack_total_share = policy.snack_energy_share if inputs.snacks_per_day else ZERO
     main_slot_kcal = (
@@ -448,11 +474,27 @@ def _build_days(
         for slot_index in range(inputs.main_meals_per_day):
             sequence = day_index * inputs.main_meals_per_day + slot_index
             template = main_templates[sequence % len(main_templates)]
-            meals.append(_meal_from_template("main_meal", slot_index, template, main_slot_kcal))
+            meals.append(
+                _meal_from_template(
+                    "main_meal",
+                    slot_index,
+                    template,
+                    main_slot_kcal,
+                    maximum_recipe_cost_irr=maximum_recipe_cost_irr,
+                )
+            )
         for slot_index in range(inputs.snacks_per_day):
             sequence = day_index * max(inputs.snacks_per_day, 1) + slot_index
             template = snack_templates[sequence % len(snack_templates)]
-            meals.append(_meal_from_template("snack", slot_index, template, snack_slot_kcal))
+            meals.append(
+                _meal_from_template(
+                    "snack",
+                    slot_index,
+                    template,
+                    snack_slot_kcal,
+                    maximum_recipe_cost_irr=maximum_recipe_cost_irr,
+                )
+            )
         days.append(_day(day_index, tuple(meals)))
     return tuple(days)
 
@@ -461,6 +503,8 @@ def _build_scheduled_days(
     inputs: PlannerInput,
     templates: tuple[EligibleMealTemplate, ...],
     policy: PlannerPolicy,
+    *,
+    maximum_recipe_cost_irr: Decimal,
 ) -> tuple[PlannedDay, ...]:
     if len(inputs.template_schedule or ()) != 7:
         raise ValueError("Template schedule must contain exactly seven days")
@@ -501,7 +545,15 @@ def _build_scheduled_days(
             if candidate is None:
                 raise ValueError(f"Scheduled Meal Catalogue template is unavailable: {template_id}")
             target = snack_kcal if role == "snack" else main_kcal
-            meals.append(_meal_from_template(role, slot_index, candidate, target))
+            meals.append(
+                _meal_from_template(
+                    role,
+                    slot_index,
+                    candidate,
+                    target,
+                    maximum_recipe_cost_irr=maximum_recipe_cost_irr,
+                )
+            )
         days.append(_day(day_index, tuple(meals)))
     return tuple(days)
 
@@ -511,6 +563,8 @@ def _meal_from_template(
     slot_index: int,
     candidate: EligibleMealTemplate,
     target_kcal: Decimal,
+    *,
+    maximum_recipe_cost_irr: Decimal,
 ) -> PlannedMeal:
     simple_reference_kcal = sum(
         (
@@ -550,7 +604,7 @@ def _meal_from_template(
                 dict(candidate.prepared_recipe_foods),
                 target_kcal=target_recipe_kcal,
                 target_protein=target_recipe_protein,
-                maximum_cost_irr=Decimal("Infinity"),
+                maximum_cost_irr=maximum_recipe_cost_irr,
             ),
         )
     foods = tuple(planned_foods)
@@ -601,6 +655,9 @@ def optimize_prepared_recipe(
     maximum_cost_irr: Decimal,
 ) -> PlannedFood:
     """Select a deterministic bounded recipe variant using the shared calculator."""
+
+    if not maximum_cost_irr.is_finite() or maximum_cost_irr < ZERO:
+        raise ValueError("Prepared Recipe maximum cost must be finite and non-negative")
 
     definition = recipe.definition
     calculation_foods = {
@@ -735,6 +792,75 @@ def _day(day_index: int, meals: tuple[PlannedMeal, ...]) -> PlannedDay:
         cost_irr=sum((meal.cost_irr for meal in meals), ZERO),
         nutrients=tuple(sorted(nutrients.items())),
     )
+
+
+def _repair_prepared_recipe_budget(
+    days: tuple[PlannedDay, ...],
+    inputs: PlannerInput,
+    templates: tuple[EligibleMealTemplate, ...],
+    policy: PlannerPolicy,
+) -> tuple[PlannedDay, ...]:
+    budget_cap = _weekly_budget_cap(inputs, policy)
+    mutable_days = list(days)
+    templates_by_id = {candidate.template.meal_id: candidate for candidate in templates}
+    locations = sorted(
+        (
+            (food.cost_irr, day_index, meal_index, food_index)
+            for day_index, day in enumerate(days)
+            for meal_index, meal in enumerate(day.meals)
+            for food_index, food in enumerate(meal.foods)
+            if food.item_kind == "prepared_recipe"
+        ),
+        reverse=True,
+    )
+    for _, day_index, meal_index, food_index in locations:
+        weekly_cost = sum((day.cost_irr for day in mutable_days), ZERO)
+        overage = weekly_cost - budget_cap
+        if overage <= ZERO:
+            break
+        day = mutable_days[day_index]
+        meal = day.meals[meal_index]
+        current = meal.foods[food_index]
+        candidate = templates_by_id.get(meal.template_id or "")
+        if candidate is None or candidate.template.prepared_recipe is None:
+            continue
+        nutrients = dict(current.nutrients)
+        for fraction in (Decimal("1"), Decimal("0.75"), Decimal("0.5"), Decimal("0.25")):
+            maximum_cost = max(current.cost_irr - overage * fraction, ZERO)
+            replacement = optimize_prepared_recipe(
+                candidate.template.prepared_recipe,
+                dict(candidate.prepared_recipe_foods),
+                target_kcal=nutrients.get("energy_kcal", ZERO),
+                target_protein=nutrients.get("protein_g", ZERO),
+                maximum_cost_irr=maximum_cost,
+            )
+            if replacement.cost_irr >= current.cost_irr:
+                continue
+            repaired_foods = list(meal.foods)
+            repaired_foods[food_index] = replacement
+            repaired_meal = _meal(
+                meal.role,
+                meal.slot_index,
+                tuple(repaired_foods),
+                template_id=meal.template_id,
+                template_category=meal.template_category,
+            )
+            repaired_meals = list(day.meals)
+            repaired_meals[meal_index] = repaired_meal
+            candidate_days = list(mutable_days)
+            candidate_days[day_index] = _day(day.day_index, tuple(repaired_meals))
+            candidate_totals = _sum_nutrients(item.nutrients for item in candidate_days)
+            candidate_average = {
+                code: value / Decimal("7") for code, value in candidate_totals.items()
+            }
+            invalid_nutrition = _validate_nutritional_feasibility(
+                inputs, candidate_average, policy
+            )
+            if _upper_limit_exceeded(inputs, candidate_average) or invalid_nutrition:
+                continue
+            mutable_days = candidate_days
+            break
+    return tuple(mutable_days)
 
 
 def _repair_micronutrients(
