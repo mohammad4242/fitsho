@@ -417,7 +417,7 @@ def read_catalogue_meals(
 ) -> CatalogueMealPageResponse:
     del admin
     return CatalogueMealPageResponse(
-        items=[meal_response(meal) for meal in list_catalogue_meals(db, category)],
+        items=[meal_response(meal, db) for meal in list_catalogue_meals(db, category)],
         categories=list(CATEGORY_ORDER),
     )
 
@@ -435,7 +435,7 @@ def read_catalogue_meal(
     meal = get_catalogue_meal(db, meal_id)
     if meal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meal not found")
-    return meal_response(meal)
+    return meal_response(meal, db)
 
 
 @router.post(
@@ -451,7 +451,7 @@ def create_catalogue_meal(
 ) -> CatalogueMealResponse:
     del admin
     try:
-        return meal_response(create_meal(db, payload))
+        return meal_response(create_meal(db, payload), db)
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
@@ -478,7 +478,7 @@ def replace_catalogue_meal(
         ) from None
     if meal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meal not found")
-    return meal_response(meal)
+    return meal_response(meal, db)
 
 
 @router.post(

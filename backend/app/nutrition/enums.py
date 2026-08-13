@@ -107,6 +107,11 @@ class MealCategory(StrEnum):
     DINNER = "dinner"
 
 
+class MealCalculationMode(StrEnum):
+    SIMPLE = "simple"
+    PREPARED_RECIPE = "prepared_recipe"
+
+
 class NutritionProgramSlotKind(StrEnum):
     CATALOGUE_MEAL = "catalogue_meal"
     FREE_MEAL = "free_meal"

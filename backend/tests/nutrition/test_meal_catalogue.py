@@ -340,3 +340,191 @@ def test_admin_rejects_duplicate_or_changed_meal_codes(
 
 def test_meal_catalogue_requires_admin_access(client: TestClient) -> None:
     assert client.get("/api/v1/nutrition/admin/meals").status_code == 401
+
+
+def _prepared_recipe_payload(*, egg_id: str, tomato_id: str, bread_id: str) -> dict[str, object]:
+    return {
+        "code": "CUS02",
+        "name_fa": "خوراک پخته آزمایشی با نان",
+        "name_en": "Test prepared dish with bread",
+        "category": "lunch",
+        "verification_status": "draft",
+        "calculation_mode": "prepared_recipe",
+        "items": [
+            {
+                "food_id": bread_id,
+                "reference_grams": 60,
+                "min_grams": 30,
+                "max_grams": 120,
+                "is_required": True,
+                "functional_role": "carbohydrate",
+            }
+        ],
+        "prepared_recipe": {
+            "verification_status": "draft",
+            "source_name": "Measured test kitchen batch",
+            "source_reference": "https://example.test/recipe-batch-1",
+            "notes": "Test-only measured batch",
+            "cooked_yield": {
+                "method": "proportional_reference_batch",
+                "final_cooked_yield_grams": 300,
+                "source_name": "Measured test kitchen batch",
+                "source_reference": "https://example.test/recipe-batch-1",
+                "notes": "Final mass measured after cooking",
+            },
+            "ingredients": [
+                {
+                    "food_id": egg_id,
+                    "reference_grams": 100,
+                    "min_grams": 80,
+                    "max_grams": 120,
+                    "is_required": True,
+                },
+                {
+                    "food_id": tomato_id,
+                    "reference_grams": 50,
+                    "min_grams": 40,
+                    "max_grams": 60,
+                    "is_required": True,
+                },
+            ],
+            "ratios": [
+                {
+                    "numerator_food_id": egg_id,
+                    "denominator_food_id": tomato_id,
+                    "min_ratio": 1.5,
+                    "max_ratio": 2.5,
+                }
+            ],
+            "data_gaps": [],
+        },
+    }
+
+
+def test_admin_switches_modes_and_creates_immutable_recipe_revisions(
+    client: TestClient,
+    db: Session,
+) -> None:
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.models import (
+        NutritionCatalogueFood,
+        NutritionPreparedRecipeRevision,
+    )
+
+    seed_base_iranian_food_catalogue(db)
+    _register_admin(client, db)
+    foods = {
+        food.slug: food
+        for food in db.scalars(
+            select(NutritionCatalogueFood).where(
+                NutritionCatalogueFood.slug.in_(("egg", "tomato", "sangak-bread"))
+            )
+        )
+    }
+    payload = _prepared_recipe_payload(
+        egg_id=str(foods["egg"].id),
+        tomato_id=str(foods["tomato"].id),
+        bread_id=str(foods["sangak-bread"].id),
+    )
+
+    created = client.post("/api/v1/nutrition/admin/meals", headers=ORIGIN, json=payload)
+
+    assert created.status_code == 201, created.json()
+    body = created.json()
+    assert body["calculation_mode"] == "prepared_recipe"
+    assert body["prepared_recipe"]["version"] == 1
+    assert body["prepared_recipe"]["calculation_version"] == "prepared-recipe-v1"
+    assert body["prepared_recipe"]["preview"]["nutrients_per_100g"]["energy_kcal"] > 0
+    assert body["prepared_recipe"]["preview"]["final_cooked_yield_grams"] == 300
+
+    changed_payload = {
+        **payload,
+        "prepared_recipe": {
+            **payload["prepared_recipe"],  # type: ignore[dict-item]
+            "ingredients": [
+                {
+                    **payload["prepared_recipe"]["ingredients"][0],  # type: ignore[index]
+                    "reference_grams": 110,
+                    "max_grams": 130,
+                },
+                payload["prepared_recipe"]["ingredients"][1],  # type: ignore[index]
+            ],
+        },
+    }
+    updated = client.put(
+        f"/api/v1/nutrition/admin/meals/{body['id']}", headers=ORIGIN, json=changed_payload
+    )
+
+    assert updated.status_code == 200, updated.json()
+    assert updated.json()["prepared_recipe"]["version"] == 2
+    assert db.scalar(select(func.count()).select_from(NutritionPreparedRecipeRevision)) == 2
+
+    simple_payload = {
+        key: value
+        for key, value in payload.items()
+        if key not in {"prepared_recipe", "calculation_mode"}
+    }
+    simple_payload["calculation_mode"] = "simple"
+    switched_back = client.put(
+        f"/api/v1/nutrition/admin/meals/{body['id']}", headers=ORIGIN, json=simple_payload
+    )
+
+    assert switched_back.status_code == 200, switched_back.json()
+    assert switched_back.json()["calculation_mode"] == "simple"
+    assert switched_back.json()["prepared_recipe"] is None
+    assert db.scalar(select(func.count()).select_from(NutritionPreparedRecipeRevision)) == 2
+
+
+def test_recipe_data_gap_is_visible_and_prevents_verification(
+    client: TestClient,
+    db: Session,
+) -> None:
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.models import NutritionCatalogueFood
+
+    seed_base_iranian_food_catalogue(db)
+    _register_admin(client, db)
+    foods = {
+        food.slug: food
+        for food in db.scalars(
+            select(NutritionCatalogueFood).where(
+                NutritionCatalogueFood.slug.in_(("egg", "tomato", "sangak-bread"))
+            )
+        )
+    }
+    payload = _prepared_recipe_payload(
+        egg_id=str(foods["egg"].id),
+        tomato_id=str(foods["tomato"].id),
+        bread_id=str(foods["sangak-bread"].id),
+    )
+    payload["prepared_recipe"]["data_gaps"] = [  # type: ignore[index]
+        {
+            "ingredient_name_fa": "پیاز",
+            "ingredient_name_en": "Onion",
+            "message_fa": "پیاز در کاتالوگ مواد غذایی وجود ندارد",
+            "message_en": "Onion does not exist in Food Catalogue",
+        }
+    ]
+
+    draft = client.post("/api/v1/nutrition/admin/meals", headers=ORIGIN, json=payload)
+
+    assert draft.status_code == 201, draft.json()
+    assert draft.json()["prepared_recipe"]["data_gaps"][0]["message_fa"] == (
+        "پیاز در کاتالوگ مواد غذایی وجود ندارد"
+    )
+    verified_payload = {
+        **payload,
+        "verification_status": "verified",
+        "prepared_recipe": {
+            **payload["prepared_recipe"],  # type: ignore[dict-item]
+            "verification_status": "verified",
+        },
+    }
+    rejected = client.put(
+        f"/api/v1/nutrition/admin/meals/{draft.json()['id']}",
+        headers=ORIGIN,
+        json=verified_payload,
+    )
+
+    assert rejected.status_code == 422
+    assert "data gaps" in rejected.json()["detail"]

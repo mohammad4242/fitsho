@@ -15,6 +15,7 @@ from app.nutrition.enums import (
     FoodMeasurementBasis,
     FoodPortionUnit,
     MainMealCountBucket,
+    MealCalculationMode,
     MealCategory,
     MealIngredientRole,
     MealPreparationPreference,
@@ -445,13 +446,82 @@ class CatalogueMealItemInput(BaseModel):
         return self
 
 
+class PreparedRecipeIngredientInput(BaseModel):
+    food_id: UUID
+    reference_grams: Decimal = Field(ge=0, max_digits=20, decimal_places=8)
+    min_grams: Decimal = Field(ge=0, max_digits=20, decimal_places=8)
+    max_grams: Decimal = Field(ge=0, max_digits=20, decimal_places=8)
+    is_required: bool = True
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> "PreparedRecipeIngredientInput":
+        if not self.min_grams <= self.reference_grams <= self.max_grams:
+            raise ValueError("Recipe ingredient grams must satisfy min <= reference <= max")
+        if self.is_required and min(self.min_grams, self.reference_grams, self.max_grams) <= 0:
+            raise ValueError("Required recipe ingredient quantities must be positive")
+        return self
+
+
+class PreparedRecipeRatioInput(BaseModel):
+    numerator_food_id: UUID
+    denominator_food_id: UUID
+    min_ratio: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
+    max_ratio: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
+
+    @model_validator(mode="after")
+    def validate_ratio(self) -> "PreparedRecipeRatioInput":
+        if self.numerator_food_id == self.denominator_food_id:
+            raise ValueError("Recipe ratio ingredients must be different")
+        if self.min_ratio > self.max_ratio:
+            raise ValueError("Recipe ratio must satisfy min <= max")
+        return self
+
+
+class PreparedRecipeYieldInput(BaseModel):
+    method: Literal["proportional_reference_batch"]
+    final_cooked_yield_grams: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
+    source_name: str = Field(min_length=1, max_length=160)
+    source_reference: str = Field(min_length=1, max_length=500)
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class PreparedRecipeDataGapInput(BaseModel):
+    ingredient_name_fa: str = Field(min_length=1, max_length=160)
+    ingredient_name_en: str = Field(min_length=1, max_length=160)
+    message_fa: str = Field(min_length=1, max_length=500)
+    message_en: str = Field(min_length=1, max_length=500)
+
+
+class PreparedRecipeWrite(BaseModel):
+    verification_status: Literal["draft", "verified", "retired"]
+    source_name: str = Field(min_length=1, max_length=160)
+    source_reference: str = Field(min_length=1, max_length=500)
+    notes: str | None = Field(default=None, max_length=1000)
+    cooked_yield: PreparedRecipeYieldInput
+    ingredients: list[PreparedRecipeIngredientInput] = Field(min_length=1, max_length=30)
+    ratios: list[PreparedRecipeRatioInput] = Field(default_factory=list, max_length=50)
+    data_gaps: list[PreparedRecipeDataGapInput] = Field(default_factory=list, max_length=30)
+
+    @model_validator(mode="after")
+    def validate_collections(self) -> "PreparedRecipeWrite":
+        food_ids = [item.food_id for item in self.ingredients]
+        if len(food_ids) != len(set(food_ids)):
+            raise ValueError("Recipe ingredients must be unique")
+        ratio_pairs = [(item.numerator_food_id, item.denominator_food_id) for item in self.ratios]
+        if len(ratio_pairs) != len(set(ratio_pairs)):
+            raise ValueError("Recipe ratio constraints must be unique")
+        return self
+
+
 class CatalogueMealWrite(BaseModel):
     code: str = Field(min_length=2, max_length=20, pattern=r"^[A-Z][A-Z0-9-]*$")
     name_fa: str = Field(min_length=1, max_length=160)
     name_en: str = Field(min_length=1, max_length=160)
     category: MealCategory
     verification_status: Literal["draft", "verified", "retired"]
-    items: list[CatalogueMealItemInput] = Field(min_length=1, max_length=20)
+    calculation_mode: MealCalculationMode = MealCalculationMode.SIMPLE
+    items: list[CatalogueMealItemInput] = Field(default_factory=list, max_length=20)
+    prepared_recipe: PreparedRecipeWrite | None = None
 
     @field_validator("items")
     @classmethod
@@ -459,6 +529,17 @@ class CatalogueMealWrite(BaseModel):
         if len({item.food_id for item in values}) != len(values):
             raise ValueError("Meal foods must be unique")
         return values
+
+    @model_validator(mode="after")
+    def validate_calculation_mode(self) -> "CatalogueMealWrite":
+        if self.calculation_mode is MealCalculationMode.SIMPLE:
+            if not self.items:
+                raise ValueError("Simple meals require at least one food")
+            if self.prepared_recipe is not None:
+                raise ValueError("Simple meals cannot include a Prepared Recipe")
+        elif self.prepared_recipe is None:
+            raise ValueError("Prepared Recipe meals require a valid recipe")
+        return self
 
 
 class CatalogueMealItemResponse(BaseModel):
@@ -473,6 +554,55 @@ class CatalogueMealItemResponse(BaseModel):
     functional_role: MealIngredientRole | None
 
 
+class PreparedRecipeIngredientResponse(BaseModel):
+    food_id: UUID
+    food_slug: str
+    food_name_fa: str
+    food_name_en: str
+    reference_grams: float
+    min_grams: float
+    max_grams: float
+    is_required: bool
+
+
+class PreparedRecipeRatioResponse(BaseModel):
+    numerator_food_id: UUID
+    denominator_food_id: UUID
+    min_ratio: float
+    max_ratio: float
+
+
+class PreparedRecipeYieldResponse(BaseModel):
+    method: str
+    reference_input_grams: float
+    final_cooked_yield_grams: float
+    source_name: str
+    source_reference: str
+    notes: str | None
+
+
+class PreparedRecipePreviewResponse(BaseModel):
+    final_cooked_yield_grams: float
+    nutrients_per_100g: dict[str, float]
+    estimated_cost_irr_per_100g: float | None
+    price_reference_ids: list[str]
+
+
+class PreparedRecipeResponse(BaseModel):
+    id: UUID
+    version: int
+    verification_status: Literal["draft", "verified", "retired"]
+    calculation_version: str
+    source_name: str
+    source_reference: str
+    notes: str | None
+    cooked_yield: PreparedRecipeYieldResponse
+    ingredients: list[PreparedRecipeIngredientResponse]
+    ratios: list[PreparedRecipeRatioResponse]
+    data_gaps: list[PreparedRecipeDataGapInput]
+    preview: PreparedRecipePreviewResponse
+
+
 class CatalogueMealResponse(BaseModel):
     id: UUID
     code: str
@@ -481,7 +611,9 @@ class CatalogueMealResponse(BaseModel):
     image_url: str | None
     category: MealCategory
     verification_status: Literal["draft", "verified", "retired"]
+    calculation_mode: MealCalculationMode
     items: list[CatalogueMealItemResponse]
+    prepared_recipe: PreparedRecipeResponse | None
     totals: dict[str, float | None]
 
 

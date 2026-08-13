@@ -40,6 +40,7 @@ from app.nutrition.enums import (
     FoodRole,
     FoodVerificationStatus,
     MainMealCountBucket,
+    MealCalculationMode,
     MealCategory,
     MealIngredientRole,
     MealPreparationPreference,
@@ -767,8 +768,17 @@ class NutritionCatalogueMeal(Base):
         enum_column(FoodVerificationStatus, "ck_nutrition_catalogue_meal_status_values"),
         nullable=False,
     )
+    calculation_mode: Mapped[MealCalculationMode] = mapped_column(
+        enum_column(MealCalculationMode, "ck_nutrition_catalogue_meal_calculation_mode_values"),
+        nullable=False,
+        default=MealCalculationMode.SIMPLE,
+        server_default=MealCalculationMode.SIMPLE.value,
+    )
     items: Mapped[list["NutritionCatalogueMealItem"]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
+    )
+    prepared_recipe: Mapped["NutritionPreparedRecipe | None"] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True, uselist=False
     )
 
 
@@ -800,6 +810,149 @@ class NutritionCatalogueMealItem(Base):
         )
     )
     food: Mapped["NutritionCatalogueFood"] = relationship()
+
+
+class NutritionPreparedRecipe(Base):
+    __tablename__ = "nutrition_prepared_recipes"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    meal_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_meals.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    revisions: Mapped[list["NutritionPreparedRecipeRevision"]] = relationship(
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="NutritionPreparedRecipeRevision.version",
+    )
+
+
+class NutritionPreparedRecipeRevision(Base):
+    __tablename__ = "nutrition_prepared_recipe_revisions"
+    __table_args__ = (
+        UniqueConstraint("recipe_id", "version", name="uq_nutrition_prepared_recipe_version"),
+        CheckConstraint("version > 0", name="ck_nutrition_prepared_recipe_version_positive"),
+        CheckConstraint(
+            "reference_input_grams > 0 AND final_cooked_yield_grams > 0",
+            name="ck_nutrition_prepared_recipe_yield_positive",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    recipe_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_prepared_recipes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    version: Mapped[int] = mapped_column(nullable=False)
+    verification_status: Mapped[FoodVerificationStatus] = mapped_column(
+        enum_column(FoodVerificationStatus, "ck_nutrition_prepared_recipe_status_values"),
+        nullable=False,
+    )
+    calculation_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    notes: Mapped[str | None] = mapped_column(String(1000))
+    yield_method: Mapped[str] = mapped_column(String(64), nullable=False)
+    reference_input_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    final_cooked_yield_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    yield_source_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    yield_source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    yield_notes: Mapped[str | None] = mapped_column(String(1000))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    ingredients: Mapped[list["NutritionPreparedRecipeIngredient"]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True
+    )
+    ratios: Mapped[list["NutritionPreparedRecipeRatio"]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True
+    )
+    data_gaps: Mapped[list["NutritionPreparedRecipeDataGap"]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class NutritionPreparedRecipeIngredient(Base):
+    __tablename__ = "nutrition_prepared_recipe_ingredients"
+    __table_args__ = (
+        UniqueConstraint("revision_id", "food_id", name="uq_nutrition_recipe_ingredient_food"),
+        CheckConstraint(
+            "min_grams >= 0 AND min_grams <= reference_grams AND reference_grams <= max_grams",
+            name="ck_nutrition_recipe_ingredient_bounds",
+        ),
+        CheckConstraint(
+            "NOT is_required OR (min_grams > 0 AND reference_grams > 0 AND max_grams > 0)",
+            name="ck_nutrition_recipe_required_positive",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_prepared_recipe_revisions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), nullable=False
+    )
+    reference_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    min_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    max_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    food: Mapped["NutritionCatalogueFood"] = relationship()
+
+
+class NutritionPreparedRecipeRatio(Base):
+    __tablename__ = "nutrition_prepared_recipe_ratios"
+    __table_args__ = (
+        UniqueConstraint(
+            "revision_id",
+            "numerator_food_id",
+            "denominator_food_id",
+            name="uq_nutrition_recipe_ratio_pair",
+        ),
+        CheckConstraint(
+            "numerator_food_id <> denominator_food_id",
+            name="ck_nutrition_recipe_ratio_distinct",
+        ),
+        CheckConstraint(
+            "min_ratio > 0 AND min_ratio <= max_ratio",
+            name="ck_nutrition_recipe_ratio_bounds",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_prepared_recipe_revisions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    numerator_food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), nullable=False
+    )
+    denominator_food_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), nullable=False
+    )
+    min_ratio: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    max_ratio: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+
+
+class NutritionPreparedRecipeDataGap(Base):
+    __tablename__ = "nutrition_prepared_recipe_data_gaps"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_prepared_recipe_revisions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    ingredient_name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
+    ingredient_name_en: Mapped[str] = mapped_column(String(160), nullable=False)
+    message_fa: Mapped[str] = mapped_column(String(500), nullable=False)
+    message_en: Mapped[str] = mapped_column(String(500), nullable=False)
 
 
 class NutritionProgram(Base):

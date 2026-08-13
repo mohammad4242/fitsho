@@ -3,21 +3,42 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.nutrition.enums import FoodVerificationStatus, MealCategory
+from app.nutrition.enums import FoodVerificationStatus, MealCalculationMode, MealCategory
 from app.nutrition.food_catalogue import FoodCompositionValue, calculate_meal_totals
 from app.nutrition.meal_catalogue_seed_data import SEED_MEALS
 from app.nutrition.models import (
     NutritionCatalogueFood,
     NutritionCatalogueMeal,
     NutritionCatalogueMealItem,
+    NutritionPreparedRecipe,
+    NutritionPreparedRecipeDataGap,
+    NutritionPreparedRecipeIngredient,
+    NutritionPreparedRecipeRatio,
+    NutritionPreparedRecipeRevision,
 )
+from app.nutrition.prepared_recipe import (
+    CALCULATION_VERSION,
+    PreparedRecipeDefinition,
+    PreparedRecipeFood,
+    PreparedRecipeIngredient,
+    PreparedRecipeRatio,
+    PreparedRecipeYield,
+    calculate_prepared_recipe,
+    validate_prepared_recipe,
+)
+from app.nutrition.price_overrides import effective_prices
 from app.nutrition.schemas import (
     CatalogueMealItemResponse,
     CatalogueMealResponse,
     CatalogueMealWrite,
+    PreparedRecipeIngredientResponse,
+    PreparedRecipePreviewResponse,
+    PreparedRecipeRatioResponse,
+    PreparedRecipeResponse,
+    PreparedRecipeYieldResponse,
 )
 
 CATEGORY_ORDER = tuple(MealCategory)
@@ -31,7 +52,18 @@ def list_catalogue_meals(
         .options(
             selectinload(NutritionCatalogueMeal.items)
             .selectinload(NutritionCatalogueMealItem.food)
-            .selectinload(NutritionCatalogueFood.compositions)
+            .selectinload(NutritionCatalogueFood.compositions),
+            selectinload(NutritionCatalogueMeal.prepared_recipe)
+            .selectinload(NutritionPreparedRecipe.revisions)
+            .selectinload(NutritionPreparedRecipeRevision.ingredients)
+            .selectinload(NutritionPreparedRecipeIngredient.food)
+            .selectinload(NutritionCatalogueFood.compositions),
+            selectinload(NutritionCatalogueMeal.prepared_recipe)
+            .selectinload(NutritionPreparedRecipe.revisions)
+            .selectinload(NutritionPreparedRecipeRevision.ratios),
+            selectinload(NutritionCatalogueMeal.prepared_recipe)
+            .selectinload(NutritionPreparedRecipe.revisions)
+            .selectinload(NutritionPreparedRecipeRevision.data_gaps),
         )
         .order_by(NutritionCatalogueMeal.category, NutritionCatalogueMeal.code)
     )
@@ -47,7 +79,18 @@ def get_catalogue_meal(db: Session, meal_id: UUID) -> NutritionCatalogueMeal | N
         .options(
             selectinload(NutritionCatalogueMeal.items)
             .selectinload(NutritionCatalogueMealItem.food)
-            .selectinload(NutritionCatalogueFood.compositions)
+            .selectinload(NutritionCatalogueFood.compositions),
+            selectinload(NutritionCatalogueMeal.prepared_recipe)
+            .selectinload(NutritionPreparedRecipe.revisions)
+            .selectinload(NutritionPreparedRecipeRevision.ingredients)
+            .selectinload(NutritionPreparedRecipeIngredient.food)
+            .selectinload(NutritionCatalogueFood.compositions),
+            selectinload(NutritionCatalogueMeal.prepared_recipe)
+            .selectinload(NutritionPreparedRecipe.revisions)
+            .selectinload(NutritionPreparedRecipeRevision.ratios),
+            selectinload(NutritionCatalogueMeal.prepared_recipe)
+            .selectinload(NutritionPreparedRecipe.revisions)
+            .selectinload(NutritionPreparedRecipeRevision.data_gaps),
         )
     )
 
@@ -77,24 +120,47 @@ def update_catalogue_meal(
 def _save_catalogue_meal(
     db: Session, meal: NutritionCatalogueMeal, payload: CatalogueMealWrite
 ) -> NutritionCatalogueMeal:
+    recipe_payload = payload.prepared_recipe
+    requested_food_ids = {item.food_id for item in payload.items}
+    if recipe_payload is not None:
+        requested_food_ids.update(item.food_id for item in recipe_payload.ingredients)
     foods = {
         food.id: food
         for food in db.scalars(
-            select(NutritionCatalogueFood).where(
-                NutritionCatalogueFood.id.in_(item.food_id for item in payload.items)
-            )
+            select(NutritionCatalogueFood).where(NutritionCatalogueFood.id.in_(requested_food_ids))
         )
     }
-    if len(foods) != len(payload.items):
+    if len(foods) != len(requested_food_ids):
         raise ValueError("Every meal food must exist")
     if payload.verification_status == FoodVerificationStatus.VERIFIED.value and any(
-        food.verification_status is not FoodVerificationStatus.VERIFIED for food in foods.values()
+        foods[item.food_id].verification_status is not FoodVerificationStatus.VERIFIED
+        for item in payload.items
     ):
         raise ValueError("Verified meals may only use verified foods")
+    if payload.calculation_mode is MealCalculationMode.PREPARED_RECIPE:
+        if recipe_payload is None:
+            raise ValueError("Prepared Recipe meals require a valid recipe")
+        definition = _definition_from_payload(recipe_payload)
+        validate_prepared_recipe(definition, set(foods))
+        if recipe_payload.verification_status == FoodVerificationStatus.VERIFIED.value:
+            if recipe_payload.data_gaps:
+                raise ValueError("Verified Prepared Recipes cannot contain data gaps")
+            if any(
+                item.is_required
+                and foods[item.food_id].verification_status is not FoodVerificationStatus.VERIFIED
+                for item in recipe_payload.ingredients
+            ):
+                raise ValueError("Verified Prepared Recipes require verified required foods")
+        if (
+            payload.verification_status == FoodVerificationStatus.VERIFIED.value
+            and recipe_payload.verification_status != FoodVerificationStatus.VERIFIED.value
+        ):
+            raise ValueError("Verified Prepared Recipe meals require a verified recipe revision")
     meal.name_fa = payload.name_fa
     meal.name_en = payload.name_en
     meal.category = payload.category
     meal.verification_status = FoodVerificationStatus(payload.verification_status)
+    meal.calculation_mode = payload.calculation_mode
     meal.items = [
         NutritionCatalogueMealItem(
             food_id=item.food_id,
@@ -107,6 +173,9 @@ def _save_catalogue_meal(
         for item in payload.items
     ]
     db.add(meal)
+    db.flush()
+    if recipe_payload is not None:
+        _append_recipe_revision(db, meal, recipe_payload)
     db.commit()
     saved = get_catalogue_meal(db, meal.id)
     if saved is None:
@@ -114,19 +183,124 @@ def _save_catalogue_meal(
     return saved
 
 
-def meal_response(meal: NutritionCatalogueMeal) -> CatalogueMealResponse:
-    totals = calculate_meal_totals(
-        [
+def _definition_from_payload(payload: object) -> PreparedRecipeDefinition:
+    from app.nutrition.schemas import PreparedRecipeWrite
+
+    if not isinstance(payload, PreparedRecipeWrite):
+        raise ValueError("Invalid Prepared Recipe payload")
+    return PreparedRecipeDefinition(
+        calculation_version=CALCULATION_VERSION,
+        ingredients=tuple(
+            PreparedRecipeIngredient(
+                food_id=item.food_id,
+                reference_grams=item.reference_grams,
+                min_grams=item.min_grams,
+                max_grams=item.max_grams,
+                is_required=item.is_required,
+            )
+            for item in payload.ingredients
+        ),
+        ratios=tuple(
+            PreparedRecipeRatio(
+                numerator_food_id=item.numerator_food_id,
+                denominator_food_id=item.denominator_food_id,
+                min_ratio=item.min_ratio,
+                max_ratio=item.max_ratio,
+            )
+            for item in payload.ratios
+        ),
+        cooked_yield=PreparedRecipeYield(
+            method=payload.cooked_yield.method,
+            reference_input_grams=sum(
+                (item.reference_grams for item in payload.ingredients), Decimal("0")
+            ),
+            final_cooked_yield_grams=payload.cooked_yield.final_cooked_yield_grams,
+        ),
+    )
+
+
+def _append_recipe_revision(db: Session, meal: NutritionCatalogueMeal, payload: object) -> None:
+    from app.nutrition.schemas import PreparedRecipeWrite
+
+    if not isinstance(payload, PreparedRecipeWrite):
+        raise ValueError("Invalid Prepared Recipe payload")
+    recipe = db.scalar(
+        select(NutritionPreparedRecipe).where(NutritionPreparedRecipe.meal_id == meal.id)
+    )
+    if recipe is None:
+        recipe = NutritionPreparedRecipe(meal_id=meal.id)
+        db.add(recipe)
+        db.flush()
+    latest_version = db.scalar(
+        select(func.max(NutritionPreparedRecipeRevision.version)).where(
+            NutritionPreparedRecipeRevision.recipe_id == recipe.id
+        )
+    )
+    definition = _definition_from_payload(payload)
+    revision = NutritionPreparedRecipeRevision(
+        recipe_id=recipe.id,
+        version=(latest_version or 0) + 1,
+        verification_status=FoodVerificationStatus(payload.verification_status),
+        calculation_version=CALCULATION_VERSION,
+        source_name=payload.source_name,
+        source_reference=payload.source_reference,
+        notes=payload.notes,
+        yield_method=payload.cooked_yield.method,
+        reference_input_grams=definition.cooked_yield.reference_input_grams,
+        final_cooked_yield_grams=payload.cooked_yield.final_cooked_yield_grams,
+        yield_source_name=payload.cooked_yield.source_name,
+        yield_source_reference=payload.cooked_yield.source_reference,
+        yield_notes=payload.cooked_yield.notes,
+        ingredients=[
+            NutritionPreparedRecipeIngredient(
+                food_id=item.food_id,
+                reference_grams=item.reference_grams,
+                min_grams=item.min_grams,
+                max_grams=item.max_grams,
+                is_required=item.is_required,
+            )
+            for item in payload.ingredients
+        ],
+        ratios=[
+            NutritionPreparedRecipeRatio(
+                numerator_food_id=item.numerator_food_id,
+                denominator_food_id=item.denominator_food_id,
+                min_ratio=item.min_ratio,
+                max_ratio=item.max_ratio,
+            )
+            for item in payload.ratios
+        ],
+        data_gaps=[
+            NutritionPreparedRecipeDataGap(**item.model_dump()) for item in payload.data_gaps
+        ],
+    )
+    db.add(revision)
+    db.flush()
+
+
+def meal_response(meal: NutritionCatalogueMeal, db: Session | None = None) -> CatalogueMealResponse:
+    total_items = [
+        (
+            item.reference_grams,
+            [
+                FoodCompositionValue(row.nutrient_code, row.value_per_100g, row.unit)
+                for row in item.food.compositions
+            ],
+        )
+        for item in meal.items
+    ]
+    prepared_response = _prepared_recipe_response(meal, db)
+    if prepared_response is not None:
+        total_items.append(
             (
-                item.reference_grams,
+                Decimal(str(prepared_response.preview.final_cooked_yield_grams)),
                 [
-                    FoodCompositionValue(row.nutrient_code, row.value_per_100g, row.unit)
-                    for row in item.food.compositions
+                    FoodCompositionValue(code, Decimal(str(value)), "")
+                    for code, value in prepared_response.preview.nutrients_per_100g.items()
                 ],
             )
-            for item in meal.items
-        ]
-    )
+        )
+    totals = calculate_meal_totals(total_items)
     return CatalogueMealResponse(
         id=meal.id,
         code=meal.code,
@@ -135,6 +309,7 @@ def meal_response(meal: NutritionCatalogueMeal) -> CatalogueMealResponse:
         image_url=meal.image_path,
         category=meal.category,
         verification_status=meal.verification_status.value,
+        calculation_mode=meal.calculation_mode,
         items=[
             CatalogueMealItemResponse(
                 food_id=item.food_id,
@@ -149,7 +324,128 @@ def meal_response(meal: NutritionCatalogueMeal) -> CatalogueMealResponse:
             )
             for item in meal.items
         ],
+        prepared_recipe=prepared_response,
         totals={key: float(value) if value is not None else None for key, value in totals.items()},
+    )
+
+
+def _prepared_recipe_response(
+    meal: NutritionCatalogueMeal, db: Session | None
+) -> PreparedRecipeResponse | None:
+    if meal.calculation_mode is not MealCalculationMode.PREPARED_RECIPE:
+        return None
+    recipe = meal.prepared_recipe
+    if recipe is None or not recipe.revisions:
+        raise ValueError("Prepared Recipe meal has no valid recipe revision")
+    revision = recipe.revisions[-1]
+    definition = PreparedRecipeDefinition(
+        calculation_version=revision.calculation_version,
+        ingredients=tuple(
+            PreparedRecipeIngredient(
+                food_id=item.food_id,
+                reference_grams=item.reference_grams,
+                min_grams=item.min_grams,
+                max_grams=item.max_grams,
+                is_required=item.is_required,
+            )
+            for item in revision.ingredients
+        ),
+        ratios=tuple(
+            PreparedRecipeRatio(
+                numerator_food_id=item.numerator_food_id,
+                denominator_food_id=item.denominator_food_id,
+                min_ratio=item.min_ratio,
+                max_ratio=item.max_ratio,
+            )
+            for item in revision.ratios
+        ),
+        cooked_yield=PreparedRecipeYield(
+            method=revision.yield_method,
+            reference_input_grams=revision.reference_input_grams,
+            final_cooked_yield_grams=revision.final_cooked_yield_grams,
+        ),
+    )
+    prices = effective_prices(db, [item.food_id for item in revision.ingredients]) if db else {}
+    all_prices_available = len(prices) == len(revision.ingredients)
+    calculation_foods: dict[UUID, PreparedRecipeFood] = {}
+    for item in revision.ingredients:
+        price = prices.get(item.food_id)
+        price_per_gram = Decimal("0")
+        reference_id = "unavailable"
+        if price is not None and price.canonical_unit == "TOMAN_PER_KG":
+            price_per_gram = price.reference_price_toman * Decimal("10") / Decimal("1000")
+            reference_id = price.reference_id
+        else:
+            all_prices_available = False
+        calculation_foods[item.food_id] = PreparedRecipeFood(
+            food_id=item.food_id,
+            nutrients_per_100g={
+                composition.nutrient_code: composition.value_per_100g
+                for composition in item.food.compositions
+            },
+            price_irr_per_gram=price_per_gram,
+            price_reference_id=reference_id,
+        )
+    calculation = calculate_prepared_recipe(definition, calculation_foods)
+    return PreparedRecipeResponse(
+        id=revision.id,
+        version=revision.version,
+        verification_status=revision.verification_status.value,
+        calculation_version=revision.calculation_version,
+        source_name=revision.source_name,
+        source_reference=revision.source_reference,
+        notes=revision.notes,
+        cooked_yield=PreparedRecipeYieldResponse(
+            method=revision.yield_method,
+            reference_input_grams=float(revision.reference_input_grams),
+            final_cooked_yield_grams=float(revision.final_cooked_yield_grams),
+            source_name=revision.yield_source_name,
+            source_reference=revision.yield_source_reference,
+            notes=revision.yield_notes,
+        ),
+        ingredients=[
+            PreparedRecipeIngredientResponse(
+                food_id=item.food_id,
+                food_slug=item.food.slug,
+                food_name_fa=item.food.name_fa,
+                food_name_en=item.food.name_en,
+                reference_grams=float(item.reference_grams),
+                min_grams=float(item.min_grams),
+                max_grams=float(item.max_grams),
+                is_required=item.is_required,
+            )
+            for item in revision.ingredients
+        ],
+        ratios=[
+            PreparedRecipeRatioResponse(
+                numerator_food_id=item.numerator_food_id,
+                denominator_food_id=item.denominator_food_id,
+                min_ratio=float(item.min_ratio),
+                max_ratio=float(item.max_ratio),
+            )
+            for item in revision.ratios
+        ],
+        data_gaps=[
+            {
+                "ingredient_name_fa": item.ingredient_name_fa,
+                "ingredient_name_en": item.ingredient_name_en,
+                "message_fa": item.message_fa,
+                "message_en": item.message_en,
+            }
+            for item in revision.data_gaps
+        ],
+        preview=PreparedRecipePreviewResponse(
+            final_cooked_yield_grams=float(calculation.final_cooked_yield_grams),
+            nutrients_per_100g={
+                code: float(value) for code, value in calculation.nutrients_per_100g.items()
+            },
+            estimated_cost_irr_per_100g=(
+                float(calculation.cost_irr_per_100g) if all_prices_available else None
+            ),
+            price_reference_ids=(
+                list(calculation.price_reference_ids) if all_prices_available else []
+            ),
+        ),
     )
 
 
