@@ -436,6 +436,21 @@ it("hides admin navigation from regular members", async () => {
   expect(screen.queryByRole("link", { name: "مدیریت حرکات" })).not.toBeInTheDocument();
 });
 
+it("shows the nutrition program catalogue in the administrator account menu", async () => {
+  auth.value.user = { ...member, is_admin: true };
+  profile.value.status = "ready";
+  const user = userEvent.setup();
+  renderRoute("/dashboard");
+
+  await user.click(screen.getByRole("button", { name: "باز کردن منوی حساب" }));
+
+  const accountMenu = screen.getByRole("navigation", { name: "منوی حساب" });
+  const adminGroup = within(accountMenu).getByRole("group", { name: "مدیریت" });
+  expect(
+    within(adminGroup).getByRole("link", { name: "کاتالوگ برنامه‌های غذایی" }),
+  ).toHaveAttribute("href", "/admin/nutrition-programs");
+});
+
 it("shows the workout review workspace in the account menu for coaches", async () => {
   workoutReviewApi.verifyCoachAccess.mockResolvedValue({ authorized: true });
   setReadyMember();

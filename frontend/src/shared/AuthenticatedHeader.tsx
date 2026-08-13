@@ -183,6 +183,7 @@ export function AuthenticatedHeader() {
                     <Link to="/admin/exercises" onClick={() => setMenuOpen(false)}>{t("header.adminExercises")}</Link>
                     <Link to="/admin/nutrition-monitoring" onClick={() => setMenuOpen(false)}>{t("header.nutritionMonitoring")}</Link>
                     <Link to="/admin/nutrition-meals" onClick={() => setMenuOpen(false)}>{t("header.adminMealCatalogue")}</Link>
+                    <Link to="/admin/nutrition-programs" onClick={() => setMenuOpen(false)}>{t("header.adminNutritionPrograms")}</Link>
                     <Link to="/admin/ai-settings" onClick={() => setMenuOpen(false)}>{t("header.adminAiSettings")}</Link>
                     <Link to="/admin/training-program-templates" onClick={() => setMenuOpen(false)}>{t("header.adminTrainingTemplates")}</Link>
                   </div>
