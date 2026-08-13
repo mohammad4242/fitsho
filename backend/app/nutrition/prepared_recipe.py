@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Set
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 HUNDRED = Decimal("100")
 ZERO = Decimal("0")
 CALCULATION_VERSION = "prepared-recipe-v1"
 YIELD_METHOD = "proportional_reference_batch"
+type FoodId = UUID | str
 
 
 @dataclass(frozen=True)
 class PreparedRecipeIngredient:
-    food_id: UUID
+    food_id: FoodId
     reference_grams: Decimal
     min_grams: Decimal
     max_grams: Decimal
@@ -23,8 +26,8 @@ class PreparedRecipeIngredient:
 
 @dataclass(frozen=True)
 class PreparedRecipeRatio:
-    numerator_food_id: UUID
-    denominator_food_id: UUID
+    numerator_food_id: FoodId
+    denominator_food_id: FoodId
     min_ratio: Decimal
     max_ratio: Decimal
 
@@ -46,7 +49,7 @@ class PreparedRecipeDefinition:
 
 @dataclass(frozen=True)
 class PreparedRecipeFood:
-    food_id: UUID
+    food_id: FoodId
     nutrients_per_100g: dict[str, Decimal]
     price_irr_per_gram: Decimal
     price_reference_id: str
@@ -55,7 +58,7 @@ class PreparedRecipeFood:
 @dataclass(frozen=True)
 class PreparedRecipeCalculation:
     calculation_version: str
-    selected_ingredient_grams: tuple[tuple[UUID, Decimal], ...]
+    selected_ingredient_grams: tuple[tuple[FoodId, Decimal], ...]
     final_cooked_yield_grams: Decimal
     total_nutrients: tuple[tuple[str, Decimal], ...]
     nutrients_per_100g: dict[str, Decimal]
@@ -66,7 +69,7 @@ class PreparedRecipeCalculation:
 
 def validate_prepared_recipe(
     definition: PreparedRecipeDefinition,
-    available_food_ids: set[UUID],
+    available_food_ids: Set[Any],
 ) -> None:
     if definition.calculation_version != CALCULATION_VERSION:
         raise ValueError("Unsupported Prepared Recipe calculation version")
@@ -105,7 +108,7 @@ def validate_prepared_recipe(
     if reference_total != cooked_yield.reference_input_grams:
         raise ValueError("Cooked yield reference input must equal ingredient reference grams")
 
-    seen_ratios: set[tuple[UUID, UUID]] = set()
+    seen_ratios: set[tuple[FoodId, FoodId]] = set()
     for ratio in definition.ratios:
         pair = (ratio.numerator_food_id, ratio.denominator_food_id)
         if pair in seen_ratios:
@@ -138,9 +141,9 @@ def validate_prepared_recipe(
 
 def calculate_prepared_recipe(
     definition: PreparedRecipeDefinition,
-    foods: dict[UUID, PreparedRecipeFood],
+    foods: Mapping[Any, PreparedRecipeFood],
     *,
-    quantities: dict[UUID, Decimal] | None = None,
+    quantities: Mapping[Any, Decimal] | None = None,
 ) -> PreparedRecipeCalculation:
     validate_prepared_recipe(definition, set(foods))
     requested = quantities or {

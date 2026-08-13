@@ -122,13 +122,15 @@ export type WeeklyPlanNutrient = {
 };
 
 export type WeeklyPlanFood = {
-  food_id: string;
+  food_id: string | null;
+  item_kind?: "food" | "prepared_recipe";
   slug: string;
   name_fa: string;
   name_en: string;
   grams: number;
   cost_irr: number;
   nutrients: Record<string, number>;
+  recipe_snapshot?: Record<string, unknown> | null;
 };
 
 export type WeeklyPlan = {

@@ -6,6 +6,12 @@ from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
 
 from app.nutrition.planner_policy import DEFAULT_POLICY, PlannerPolicy
+from app.nutrition.prepared_recipe import (
+    PreparedRecipeCalculation,
+    PreparedRecipeDefinition,
+    PreparedRecipeFood,
+    calculate_prepared_recipe,
+)
 
 ZERO = Decimal("0")
 HUNDRED = Decimal("100")
@@ -62,12 +68,22 @@ class PlannerMealTemplate:
     name_en: str
     category: str
     items: tuple[PlannerMealIngredient, ...]
+    prepared_recipe: PlannerPreparedRecipe | None = None
+
+
+@dataclass(frozen=True)
+class PlannerPreparedRecipe:
+    revision_id: str
+    name_fa: str
+    name_en: str
+    definition: PreparedRecipeDefinition
 
 
 @dataclass(frozen=True)
 class EligibleMealTemplate:
     template: PlannerMealTemplate
     items: tuple[tuple[PlannerMealIngredient, PlannerFood], ...]
+    prepared_recipe_foods: tuple[tuple[str, PlannerFood], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -91,7 +107,7 @@ class PlannerInput:
 
 @dataclass(frozen=True)
 class PlannedFood:
-    food_id: str
+    food_id: str | None
     slug: str
     name_fa: str
     name_en: str
@@ -103,6 +119,8 @@ class PlannedFood:
     min_grams: Decimal
     max_grams: Decimal
     functional_role: str | None
+    item_kind: str = "food"
+    recipe_snapshot: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -336,8 +354,22 @@ def _eligible_templates(
                     break
                 continue
             items.append((item, food))
-        if not missing_required and items:
-            eligible.append(EligibleMealTemplate(template=template, items=tuple(items)))
+        recipe_foods: list[tuple[str, PlannerFood]] = []
+        if template.prepared_recipe is not None:
+            for ingredient in template.prepared_recipe.definition.ingredients:
+                food = foods_by_id.get(str(ingredient.food_id))
+                if food is None:
+                    missing_required = True
+                    break
+                recipe_foods.append((str(ingredient.food_id), food))
+        if not missing_required and (items or recipe_foods):
+            eligible.append(
+                EligibleMealTemplate(
+                    template=template,
+                    items=tuple(items),
+                    prepared_recipe_foods=tuple(recipe_foods),
+                )
+            )
     return tuple(eligible)
 
 
@@ -357,6 +389,22 @@ def _rank_templates(
             preference += (Decimal("1") if food.food_id in inputs.liked_food_ids else ZERO) - (
                 Decimal("1") if food.food_id in inputs.disliked_food_ids else ZERO
             )
+        if candidate.template.prepared_recipe is not None:
+            calculation = calculate_prepared_recipe(
+                candidate.template.prepared_recipe.definition,
+                {
+                    food_id: PreparedRecipeFood(
+                        food_id=food_id,
+                        nutrients_per_100g=food.nutrients_per_100g,
+                        price_irr_per_gram=food.price_irr_per_gram,
+                        price_reference_id=food.price_reference_id,
+                    )
+                    for food_id, food in candidate.prepared_recipe_foods
+                },
+            )
+            for code, value in calculation.total_nutrients:
+                nutrients[code] = nutrients.get(code, ZERO) + value
+            cost += calculation.total_cost_irr
         micronutrient_adequacy = sum(
             (
                 min(nutrients.get(code, ZERO) / target, Decimal("1"))
@@ -464,18 +512,48 @@ def _meal_from_template(
     candidate: EligibleMealTemplate,
     target_kcal: Decimal,
 ) -> PlannedMeal:
-    reference_kcal = sum(
+    simple_reference_kcal = sum(
         (
             food.nutrients_per_100g["energy_kcal"] * item.reference_grams / HUNDRED
             for item, food in candidate.items
         ),
         ZERO,
     )
+    recipe_reference_kcal = ZERO
+    if candidate.template.prepared_recipe is not None:
+        recipe_reference = calculate_prepared_recipe(
+            candidate.template.prepared_recipe.definition,
+            {
+                food_id: PreparedRecipeFood(
+                    food_id=food_id,
+                    nutrients_per_100g=food.nutrients_per_100g,
+                    price_irr_per_gram=food.price_irr_per_gram,
+                    price_reference_id=food.price_reference_id,
+                )
+                for food_id, food in candidate.prepared_recipe_foods
+            },
+        )
+        recipe_reference_kcal = dict(recipe_reference.total_nutrients).get("energy_kcal", ZERO)
+    reference_kcal = simple_reference_kcal + recipe_reference_kcal
     scale = target_kcal / reference_kcal if reference_kcal > ZERO else Decimal("1")
-    foods = tuple(
+    planned_foods = list(
         _portion_for_template_item(food, item, item.reference_grams * scale)
         for item, food in candidate.items
     )
+    if candidate.template.prepared_recipe is not None:
+        target_recipe_kcal = max(target_kcal - simple_reference_kcal * scale, ZERO)
+        target_recipe_protein = target_recipe_kcal * Decimal("0.20") / Decimal("4")
+        planned_foods.insert(
+            0,
+            optimize_prepared_recipe(
+                candidate.template.prepared_recipe,
+                dict(candidate.prepared_recipe_foods),
+                target_kcal=target_recipe_kcal,
+                target_protein=target_recipe_protein,
+                maximum_cost_irr=Decimal("Infinity"),
+            ),
+        )
+    foods = tuple(planned_foods)
     return _meal(
         role,
         slot_index,
@@ -511,6 +589,121 @@ def _portion_for_template_item(
         min_grams=item.min_grams,
         max_grams=item.max_grams,
         functional_role=item.functional_role,
+    )
+
+
+def optimize_prepared_recipe(
+    recipe: PlannerPreparedRecipe,
+    foods: dict[str, PlannerFood],
+    *,
+    target_kcal: Decimal,
+    target_protein: Decimal,
+    maximum_cost_irr: Decimal,
+) -> PlannedFood:
+    """Select a deterministic bounded recipe variant using the shared calculator."""
+
+    definition = recipe.definition
+    calculation_foods = {
+        food_id: PreparedRecipeFood(
+            food_id=food_id,
+            nutrients_per_100g=food.nutrients_per_100g,
+            price_irr_per_gram=food.price_irr_per_gram,
+            price_reference_id=food.price_reference_id,
+        )
+        for food_id, food in foods.items()
+    }
+    quantities = {
+        ingredient.food_id: ingredient.reference_grams for ingredient in definition.ingredients
+    }
+    candidates: list[tuple[Decimal, Decimal, tuple[Decimal, ...], PreparedRecipeCalculation]] = []
+    levels = (Decimal("0"), Decimal("0.25"), Decimal("0.5"), Decimal("0.75"), Decimal("1"))
+
+    def search(index: int) -> None:
+        if index == len(definition.ingredients):
+            try:
+                calculation = calculate_prepared_recipe(
+                    definition, calculation_foods, quantities=quantities
+                )
+            except ValueError:
+                return
+            protein = dict(calculation.total_nutrients).get("protein_g", ZERO)
+            energy = dict(calculation.total_nutrients).get("energy_kcal", ZERO)
+            protein_gap = max(target_protein - protein, ZERO)
+            kcal_gap = abs(target_kcal - energy)
+            budget_penalty = max(calculation.total_cost_irr - maximum_cost_irr, ZERO)
+            selected = tuple(
+                quantities[ingredient.food_id] for ingredient in definition.ingredients
+            )
+            candidates.append(
+                (
+                    budget_penalty * Decimal("1000") + protein_gap * Decimal("100") + kcal_gap,
+                    calculation.total_cost_irr,
+                    selected,
+                    calculation,
+                )
+            )
+            return
+        ingredient = definition.ingredients[index]
+        span = ingredient.max_grams - ingredient.min_grams
+        values = {ingredient.min_grams + span * level for level in levels}
+        values.add(ingredient.reference_grams)
+        for grams in sorted(values):
+            quantities[ingredient.food_id] = grams
+            search(index + 1)
+
+    search(0)
+    if not candidates:
+        raise ValueError("Prepared Recipe constraints are infeasible")
+    _, _, _, selected_calculation = min(candidates, key=lambda item: item[:3])
+    calculation = selected_calculation
+    selected_grams = {
+        str(food_id): str(grams) for food_id, grams in calculation.selected_ingredient_grams
+    }
+    nutrients = tuple(sorted(calculation.total_nutrients))
+    return PlannedFood(
+        food_id=None,
+        slug=f"prepared-{recipe.name_en.casefold().replace(' ', '-')}",
+        name_fa=recipe.name_fa,
+        name_en=recipe.name_en,
+        roles=("prepared_recipe",),
+        grams=calculation.final_cooked_yield_grams.quantize(Decimal("0.1"), ROUND_HALF_UP),
+        cost_irr=calculation.total_cost_irr.quantize(Decimal("1")),
+        nutrients=nutrients,
+        price_reference_id="prepared-recipe",
+        min_grams=ZERO,
+        max_grams=calculation.final_cooked_yield_grams,
+        functional_role=None,
+        item_kind="prepared_recipe",
+        recipe_snapshot={
+            "revision_id": recipe.revision_id,
+            "calculation_version": calculation.calculation_version,
+            "selected_ingredient_grams": selected_grams,
+            "ingredients": [
+                {
+                    "food_id": food_id,
+                    "slug": foods[food_id].slug,
+                    "name_fa": foods[food_id].name_fa,
+                    "name_en": foods[food_id].name_en,
+                    "grams": selected_grams[food_id],
+                    "cost_irr": str(
+                        foods[food_id].price_irr_per_gram * Decimal(selected_grams[food_id])
+                    ),
+                    "nutrients": {
+                        code: str(value * Decimal(selected_grams[food_id]) / HUNDRED)
+                        for code, value in foods[food_id].nutrients_per_100g.items()
+                    },
+                    "price_reference_id": foods[food_id].price_reference_id,
+                }
+                for food_id in sorted(foods)
+            ],
+            "final_cooked_yield_grams": str(calculation.final_cooked_yield_grams),
+            "nutrients_per_100g": {
+                code: str(value) for code, value in calculation.nutrients_per_100g.items()
+            },
+            "total_cost_irr": str(calculation.total_cost_irr),
+            "cost_irr_per_100g": str(calculation.cost_irr_per_100g),
+            "price_reference_ids": list(calculation.price_reference_ids),
+        },
     )
 
 
@@ -557,11 +750,12 @@ def _repair_micronutrients(
         if weekly >= target * Decimal("7"):
             continue
         candidates = [
-            (day_index, meal_index, food)
+            (day_index, meal_index, food.food_id, food)
             for day_index, day in enumerate(mutable_days)
             for meal_index, meal in enumerate(day.meals)
             for food in meal.foods
-            if food.grams < food.max_grams
+            if food.food_id is not None
+            and food.grams < food.max_grams
             and foods_by_id[food.food_id].nutrients_per_100g.get(nutrient_code, ZERO) > ZERO
         ]
         if not candidates:
@@ -569,20 +763,20 @@ def _repair_micronutrients(
         candidates.sort(
             key=lambda candidate: (
                 -(
-                    foods_by_id[candidate[2].food_id].nutrients_per_100g[nutrient_code]
-                    / foods_by_id[candidate[2].food_id].nutrients_per_100g["energy_kcal"]
+                    foods_by_id[candidate[2]].nutrients_per_100g[nutrient_code]
+                    / foods_by_id[candidate[2]].nutrients_per_100g["energy_kcal"]
                 ),
-                candidate[2].slug,
+                candidate[3].slug,
                 candidate[0],
                 candidate[1],
             )
         )
-        for day_index, target_meal_index, selected in candidates[
+        for day_index, target_meal_index, selected_food_id, selected in candidates[
             : policy.maximum_repair_iterations
         ]:
             day = mutable_days[day_index]
             meal = day.meals[target_meal_index]
-            source = foods_by_id[selected.food_id]
+            source = foods_by_id[selected_food_id]
             added_grams = min(policy.repair_portion_g, selected.max_grams - selected.grams)
             resized = _resize_planned_food(selected, source, selected.grams + added_grams)
             repaired_meal = _meal(
@@ -623,6 +817,8 @@ def _repair_micronutrients(
 
 
 def _resize_planned_food(planned: PlannedFood, source: PlannerFood, grams: Decimal) -> PlannedFood:
+    if planned.food_id is None:
+        raise ValueError("Prepared Recipe outputs cannot be resized as Food Catalogue items")
     item = PlannerMealIngredient(
         food_id=planned.food_id,
         reference_grams=planned.grams,

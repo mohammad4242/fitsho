@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import UUID
 
 
 def _food(
@@ -69,6 +70,84 @@ def _input(**changes: object):
     }
     values.update(changes)
     return PlannerInput(**values)  # type: ignore[arg-type]
+
+
+def test_prepared_recipe_optimizer_changes_raw_inputs_but_returns_cooked_dish() -> None:
+    from app.nutrition.planner_engine import PlannerPreparedRecipe, optimize_prepared_recipe
+    from app.nutrition.prepared_recipe import (
+        PreparedRecipeDefinition,
+        PreparedRecipeIngredient,
+        PreparedRecipeRatio,
+        PreparedRecipeYield,
+    )
+
+    beef_id = str(UUID(int=101))
+    peas_id = str(UUID(int=102))
+    beef = _food(beef_id, ("main_protein",), kcal="200", protein="30", price="1000")
+    peas = _food(peas_id, ("main_protein",), kcal="360", protein="20", carbs="60", price="100")
+    recipe = PlannerPreparedRecipe(
+        revision_id=str(UUID(int=201)),
+        name_fa="قیمه",
+        name_en="Gheimeh",
+        definition=PreparedRecipeDefinition(
+            calculation_version="prepared-recipe-v1",
+            ingredients=(
+                PreparedRecipeIngredient(
+                    food_id=beef_id,
+                    reference_grams=Decimal("100"),
+                    min_grams=Decimal("80"),
+                    max_grams=Decimal("140"),
+                    is_required=True,
+                ),
+                PreparedRecipeIngredient(
+                    food_id=peas_id,
+                    reference_grams=Decimal("50"),
+                    min_grams=Decimal("40"),
+                    max_grams=Decimal("70"),
+                    is_required=True,
+                ),
+            ),
+            ratios=(
+                PreparedRecipeRatio(
+                    numerator_food_id=beef_id,
+                    denominator_food_id=peas_id,
+                    min_ratio=Decimal("1.5"),
+                    max_ratio=Decimal("3"),
+                ),
+            ),
+            cooked_yield=PreparedRecipeYield(
+                method="proportional_reference_batch",
+                reference_input_grams=Decimal("150"),
+                final_cooked_yield_grams=Decimal("300"),
+            ),
+        ),
+    )
+
+    economical = optimize_prepared_recipe(
+        recipe,
+        {beef_id: beef, peas_id: peas},
+        target_kcal=Decimal("280"),
+        target_protein=Decimal("20"),
+        maximum_cost_irr=Decimal("100000"),
+    )
+    high_protein = optimize_prepared_recipe(
+        recipe,
+        {beef_id: beef, peas_id: peas},
+        target_kcal=Decimal("280"),
+        target_protein=Decimal("40"),
+        maximum_cost_irr=Decimal("200000"),
+    )
+
+    economical_inputs = economical.recipe_snapshot["selected_ingredient_grams"]
+    high_protein_inputs = high_protein.recipe_snapshot["selected_ingredient_grams"]
+    assert economical.item_kind == "prepared_recipe"
+    assert economical.food_id is None
+    assert economical.slug == "prepared-gheimeh"
+    assert economical.name_fa == "قیمه"
+    assert economical.grams > 0
+    assert Decimal(high_protein_inputs[beef_id]) >= Decimal(economical_inputs[beef_id])
+    assert Decimal(high_protein_inputs[beef_id]) / Decimal(high_protein_inputs[peas_id]) <= 3
+    assert high_protein.recipe_snapshot["calculation_version"] == "prepared-recipe-v1"
 
 
 def _catalogue():

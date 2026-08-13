@@ -38,6 +38,7 @@ from app.nutrition.schemas import (
     PreparedRecipePreviewResponse,
     PreparedRecipeRatioResponse,
     PreparedRecipeResponse,
+    PreparedRecipeWrite,
     PreparedRecipeYieldResponse,
 )
 
@@ -184,8 +185,6 @@ def _save_catalogue_meal(
 
 
 def _definition_from_payload(payload: object) -> PreparedRecipeDefinition:
-    from app.nutrition.schemas import PreparedRecipeWrite
-
     if not isinstance(payload, PreparedRecipeWrite):
         raise ValueError("Invalid Prepared Recipe payload")
     return PreparedRecipeDefinition(
@@ -220,8 +219,6 @@ def _definition_from_payload(payload: object) -> PreparedRecipeDefinition:
 
 
 def _append_recipe_revision(db: Session, meal: NutritionCatalogueMeal, payload: object) -> None:
-    from app.nutrition.schemas import PreparedRecipeWrite
-
     if not isinstance(payload, PreparedRecipeWrite):
         raise ValueError("Invalid Prepared Recipe payload")
     recipe = db.scalar(
@@ -276,6 +273,52 @@ def _append_recipe_revision(db: Session, meal: NutritionCatalogueMeal, payload: 
     )
     db.add(revision)
     db.flush()
+
+
+def preview_prepared_recipe(
+    db: Session, payload: PreparedRecipeWrite
+) -> PreparedRecipePreviewResponse:
+    definition = _definition_from_payload(payload)
+    food_ids = [item.food_id for item in payload.ingredients]
+    foods = db.scalars(
+        select(NutritionCatalogueFood)
+        .where(NutritionCatalogueFood.id.in_(food_ids))
+        .options(selectinload(NutritionCatalogueFood.compositions))
+    ).all()
+    if len(foods) != len(food_ids):
+        raise ValueError("Prepared Recipe ingredient does not exist in Food Catalogue")
+    prices = effective_prices(db, food_ids)
+    all_prices_available = len(prices) == len(food_ids)
+    calculation_foods: dict[UUID, PreparedRecipeFood] = {}
+    for food in foods:
+        price = prices.get(food.id)
+        price_per_gram = Decimal("0")
+        reference_id = "unavailable"
+        if price is not None and price.canonical_unit == "TOMAN_PER_KG":
+            price_per_gram = price.reference_price_toman * Decimal("10") / Decimal("1000")
+            reference_id = price.reference_id
+        else:
+            all_prices_available = False
+        calculation_foods[food.id] = PreparedRecipeFood(
+            food_id=food.id,
+            nutrients_per_100g={
+                composition.nutrient_code: composition.value_per_100g
+                for composition in food.compositions
+            },
+            price_irr_per_gram=price_per_gram,
+            price_reference_id=reference_id,
+        )
+    calculation = calculate_prepared_recipe(definition, calculation_foods)
+    return PreparedRecipePreviewResponse(
+        final_cooked_yield_grams=float(calculation.final_cooked_yield_grams),
+        nutrients_per_100g={
+            code: float(value) for code, value in calculation.nutrients_per_100g.items()
+        },
+        estimated_cost_irr_per_100g=(
+            float(calculation.cost_irr_per_100g) if all_prices_available else None
+        ),
+        price_reference_ids=(list(calculation.price_reference_ids) if all_prices_available else []),
+    )
 
 
 def meal_response(meal: NutritionCatalogueMeal, db: Session | None = None) -> CatalogueMealResponse:

@@ -102,6 +102,7 @@ from app.nutrition.meal_catalogue import (
     get_catalogue_meal,
     list_catalogue_meals,
     meal_response,
+    preview_prepared_recipe,
     update_catalogue_meal,
 )
 from app.nutrition.meal_catalogue import (
@@ -196,6 +197,8 @@ from app.nutrition.schemas import (
     PhysicianReviewRequirementResponse,
     PhysicianSupplementOrderInput,
     PlannedMealTrackingInput,
+    PreparedRecipePreviewResponse,
+    PreparedRecipeWrite,
     QuickApproximationInput,
     RemoveMealConfirmationInput,
     ReplaceFoodInput,
@@ -420,6 +423,25 @@ def read_catalogue_meals(
         items=[meal_response(meal, db) for meal in list_catalogue_meals(db, category)],
         categories=list(CATEGORY_ORDER),
     )
+
+
+@router.post(
+    "/admin/meals/prepared-recipe/preview",
+    response_model=PreparedRecipePreviewResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def preview_catalogue_prepared_recipe(
+    payload: PreparedRecipeWrite,
+    db: DatabaseSession,
+    admin: AdminUser,
+) -> PreparedRecipePreviewResponse:
+    del admin
+    try:
+        return preview_prepared_recipe(db, payload)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from None
 
 
 @router.get(

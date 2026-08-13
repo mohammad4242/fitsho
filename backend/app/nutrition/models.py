@@ -1501,9 +1501,10 @@ class NutritionWeeklyPlanFood(Base):
         nullable=False,
         index=True,
     )
-    food_id: Mapped[UUID] = mapped_column(
-        ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), nullable=False
+    food_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), nullable=True
     )
+    item_kind: Mapped[str] = mapped_column(String(32), nullable=False, default="food")
     food_slug: Mapped[str] = mapped_column(String(120), nullable=False)
     food_name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
     food_name_en: Mapped[str] = mapped_column(String(160), nullable=False)
@@ -1511,6 +1512,7 @@ class NutritionWeeklyPlanFood(Base):
     cost_irr: Mapped[int] = mapped_column(BigInteger, nullable=False)
     nutrient_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
     price_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    recipe_snapshot: Mapped[dict[str, object] | None] = mapped_column(JSON)
 
 
 class NutritionWeeklyPlanNutrient(Base):

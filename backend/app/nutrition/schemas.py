@@ -761,13 +761,15 @@ class PhysicianReviewRequirementResponse(BaseModel):
 
 
 class WeeklyPlanFoodResponse(BaseModel):
-    food_id: UUID
+    food_id: UUID | None
+    item_kind: Literal["food", "prepared_recipe"] = "food"
     slug: str
     name_fa: str
     name_en: str
     grams: float
     cost_irr: int
     nutrients: dict[str, float]
+    recipe_snapshot: dict[str, object] | None = None
 
 
 class WeeklyPlanMealResponse(BaseModel):

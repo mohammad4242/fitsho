@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.nutrition.enums import (
     FoodItemKind,
     FoodVerificationStatus,
+    MealCalculationMode,
     NutritionPlanBudgetStatus,
     NutritionPlanGenerationOutcome,
     NutritionPlanLifecycleStatus,
@@ -37,6 +38,8 @@ from app.nutrition.models import (
     NutritionFoodItem,
     NutritionPlanGeneration,
     NutritionPlanPhysicianReview,
+    NutritionPreparedRecipe,
+    NutritionPreparedRecipeRevision,
     NutritionProfile,
     NutritionProgram,
     NutritionSafetyDecision,
@@ -53,6 +56,7 @@ from app.nutrition.planner_engine import (
     PlannerInput,
     PlannerMealIngredient,
     PlannerMealTemplate,
+    PlannerPreparedRecipe,
     PlannerResult,
     plan_week,
 )
@@ -60,6 +64,12 @@ from app.nutrition.planner_policy import (
     DEFAULT_POLICY,
     PLANNER_POLICY_VERSION,
     PLANNER_VERSION,
+)
+from app.nutrition.prepared_recipe import (
+    PreparedRecipeDefinition,
+    PreparedRecipeIngredient,
+    PreparedRecipeRatio,
+    PreparedRecipeYield,
 )
 from app.nutrition.price_overrides import effective_prices
 from app.nutrition.program_adaptation import adapt_program
@@ -565,14 +575,25 @@ def _persist_successful_plan(
                         cost_irr=int(meal.cost_irr),
                         foods=[
                             NutritionWeeklyPlanFood(
-                                food_id=UUID(food.food_id),
+                                food_id=(UUID(food.food_id) if food.food_id is not None else None),
+                                item_kind=food.item_kind,
                                 food_slug=food.slug,
                                 food_name_fa=food.name_fa,
                                 food_name_en=food.name_en,
                                 grams=food.grams,
                                 cost_irr=int(food.cost_irr),
                                 nutrient_snapshot=_json_nutrient_pairs(food.nutrients),
-                                price_snapshot=_food_price_snapshot(price_snapshot, food.food_id),
+                                price_snapshot=(
+                                    _food_price_snapshot(price_snapshot, food.food_id)
+                                    if food.food_id is not None
+                                    else {
+                                        "kind": "prepared_recipe",
+                                        "price_reference_ids": (food.recipe_snapshot or {}).get(
+                                            "price_reference_ids", []
+                                        ),
+                                    }
+                                ),
+                                recipe_snapshot=food.recipe_snapshot,
                             )
                             for food in meal.foods
                         ],
@@ -694,7 +715,18 @@ def _planner_meal_templates(
     meals = db.scalars(
         select(NutritionCatalogueMeal)
         .where(NutritionCatalogueMeal.verification_status == FoodVerificationStatus.VERIFIED)
-        .options(selectinload(NutritionCatalogueMeal.items))
+        .options(
+            selectinload(NutritionCatalogueMeal.items),
+            selectinload(NutritionCatalogueMeal.prepared_recipe)
+            .selectinload(NutritionPreparedRecipe.revisions)
+            .selectinload(NutritionPreparedRecipeRevision.ingredients),
+            selectinload(NutritionCatalogueMeal.prepared_recipe)
+            .selectinload(NutritionPreparedRecipe.revisions)
+            .selectinload(NutritionPreparedRecipeRevision.ratios),
+            selectinload(NutritionCatalogueMeal.prepared_recipe)
+            .selectinload(NutritionPreparedRecipe.revisions)
+            .selectinload(NutritionPreparedRecipeRevision.data_gaps),
+        )
         .order_by(NutritionCatalogueMeal.category, NutritionCatalogueMeal.id)
     ).all()
     templates = tuple(
@@ -716,6 +748,7 @@ def _planner_meal_templates(
                 )
                 for item in meal.items
             ),
+            prepared_recipe=_planner_prepared_recipe(meal),
         )
         for meal in meals
     )
@@ -734,9 +767,89 @@ def _planner_meal_templates(
                 }
                 for item in template.items
             ],
+            "prepared_recipe": (
+                {
+                    "revision_id": template.prepared_recipe.revision_id,
+                    "calculation_version": (
+                        template.prepared_recipe.definition.calculation_version
+                    ),
+                    "ingredient_bounds": [
+                        {
+                            "food_id": str(item.food_id),
+                            "reference_grams": str(item.reference_grams),
+                            "min_grams": str(item.min_grams),
+                            "max_grams": str(item.max_grams),
+                            "is_required": item.is_required,
+                        }
+                        for item in template.prepared_recipe.definition.ingredients
+                    ],
+                    "ratio_constraints": [
+                        {
+                            "numerator_food_id": str(item.numerator_food_id),
+                            "denominator_food_id": str(item.denominator_food_id),
+                            "min_ratio": str(item.min_ratio),
+                            "max_ratio": str(item.max_ratio),
+                        }
+                        for item in template.prepared_recipe.definition.ratios
+                    ],
+                    "yield": {
+                        "method": template.prepared_recipe.definition.cooked_yield.method,
+                        "reference_input_grams": str(
+                            template.prepared_recipe.definition.cooked_yield.reference_input_grams
+                        ),
+                        "final_cooked_yield_grams": str(
+                            template.prepared_recipe.definition.cooked_yield.final_cooked_yield_grams
+                        ),
+                    },
+                }
+                if template.prepared_recipe is not None
+                else None
+            ),
         }
         for template in templates
     ]
+
+
+def _planner_prepared_recipe(meal: NutritionCatalogueMeal) -> PlannerPreparedRecipe | None:
+    if meal.calculation_mode is not MealCalculationMode.PREPARED_RECIPE:
+        return None
+    if meal.prepared_recipe is None or not meal.prepared_recipe.revisions:
+        return None
+    revision = meal.prepared_recipe.revisions[-1]
+    if revision.verification_status is not FoodVerificationStatus.VERIFIED or revision.data_gaps:
+        return None
+    return PlannerPreparedRecipe(
+        revision_id=str(revision.id),
+        name_fa=meal.name_fa.split(" + ", 1)[0],
+        name_en=meal.name_en.split(" with ", 1)[0],
+        definition=PreparedRecipeDefinition(
+            calculation_version=revision.calculation_version,
+            ingredients=tuple(
+                PreparedRecipeIngredient(
+                    food_id=str(item.food_id),
+                    reference_grams=item.reference_grams,
+                    min_grams=item.min_grams,
+                    max_grams=item.max_grams,
+                    is_required=item.is_required,
+                )
+                for item in revision.ingredients
+            ),
+            ratios=tuple(
+                PreparedRecipeRatio(
+                    numerator_food_id=str(item.numerator_food_id),
+                    denominator_food_id=str(item.denominator_food_id),
+                    min_ratio=item.min_ratio,
+                    max_ratio=item.max_ratio,
+                )
+                for item in revision.ratios
+            ),
+            cooked_yield=PreparedRecipeYield(
+                method=revision.yield_method,
+                reference_input_grams=revision.reference_input_grams,
+                final_cooked_yield_grams=revision.final_cooked_yield_grams,
+            ),
+        ),
+    )
 
 
 def _daily_targets(rows: list[NutritionEstimateTarget]) -> dict[str, Decimal]:
@@ -936,12 +1049,14 @@ def weekly_plan_response(plan: NutritionWeeklyPlan) -> WeeklyPlanResponse:
                         foods=[
                             WeeklyPlanFoodResponse(
                                 food_id=food.food_id,
+                                item_kind=food.item_kind,
                                 slug=food.food_slug,
                                 name_fa=food.food_name_fa,
                                 name_en=food.food_name_en,
                                 grams=float(food.grams),
                                 cost_irr=food.cost_irr,
                                 nutrients=_float_map(food.nutrient_snapshot),
+                                recipe_snapshot=food.recipe_snapshot,
                             )
                             for food in meal.foods
                         ],

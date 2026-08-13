@@ -395,6 +395,64 @@ export type AdminMealIngredient = {
   functional_role: MealIngredientRole | null;
 };
 
+export type PreparedRecipeIngredient = {
+  food_id: string;
+  food_slug: string;
+  food_name_fa: string;
+  food_name_en: string;
+  reference_grams: number;
+  min_grams: number;
+  max_grams: number;
+  is_required: boolean;
+};
+
+export type PreparedRecipeRatio = {
+  numerator_food_id: string;
+  denominator_food_id: string;
+  min_ratio: number;
+  max_ratio: number;
+};
+
+export type PreparedRecipeDataGap = {
+  ingredient_name_fa: string;
+  ingredient_name_en: string;
+  message_fa: string;
+  message_en: string;
+};
+
+export type PreparedRecipePreview = {
+  final_cooked_yield_grams: number;
+  nutrients_per_100g: Record<string, number>;
+  estimated_cost_irr_per_100g: number | null;
+  price_reference_ids: string[];
+};
+
+export type AdminPreparedRecipe = {
+  id?: string;
+  version?: number;
+  verification_status: MealVerificationStatus;
+  calculation_version?: string;
+  source_name: string;
+  source_reference: string;
+  notes: string | null;
+  cooked_yield: {
+    method: "proportional_reference_batch";
+    reference_input_grams?: number;
+    final_cooked_yield_grams: number;
+    source_name: string;
+    source_reference: string;
+    notes: string | null;
+  };
+  ingredients: PreparedRecipeIngredient[];
+  ratios: PreparedRecipeRatio[];
+  data_gaps: PreparedRecipeDataGap[];
+  preview?: PreparedRecipePreview;
+};
+
+export type AdminPreparedRecipeWrite = Omit<AdminPreparedRecipe, "id" | "version" | "calculation_version" | "preview" | "ingredients"> & {
+  ingredients: Array<Pick<PreparedRecipeIngredient, "food_id" | "reference_grams" | "min_grams" | "max_grams" | "is_required">>;
+};
+
 export type AdminMealCatalogueItem = {
   id: string;
   code: string;
@@ -403,7 +461,9 @@ export type AdminMealCatalogueItem = {
   image_url: string | null;
   category: MealCategory;
   verification_status: MealVerificationStatus;
+  calculation_mode?: "simple" | "prepared_recipe";
   items: AdminMealIngredient[];
+  prepared_recipe: AdminPreparedRecipe | null;
   totals: Record<string, number | null>;
 };
 
@@ -428,7 +488,9 @@ export type AdminMealWrite = {
   name_en: string;
   category: MealCategory;
   verification_status: MealVerificationStatus;
+  calculation_mode?: "simple" | "prepared_recipe";
   items: AdminMealIngredientWrite[];
+  prepared_recipe?: AdminPreparedRecipeWrite | null;
 };
 
 export type NutritionDietStyle =

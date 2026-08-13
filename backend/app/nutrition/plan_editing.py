@@ -67,6 +67,15 @@ def shopping_list(db: Session, user_id: UUID, plan_id: UUID) -> dict[str, object
     for day in plan.days:
         for meal in day.meals:
             for food in meal.foods:
+                if food.item_kind == "prepared_recipe" and food.recipe_snapshot is not None:
+                    raw_ingredients = food.recipe_snapshot.get("ingredients", [])
+                    if isinstance(raw_ingredients, list):
+                        for ingredient in raw_ingredients:
+                            if isinstance(ingredient, dict):
+                                _add_shopping_snapshot_item(items, ingredient)
+                    continue
+                if food.food_id is None:
+                    continue
                 item = items.setdefault(
                     food.food_id,
                     {
@@ -101,6 +110,37 @@ def shopping_list(db: Session, user_id: UUID, plan_id: UUID) -> dict[str, object
         "items": serialized,
         "total_cost_irr": sum(int(item["cost_irr"]) for item in serialized),
     }
+
+
+def _add_shopping_snapshot_item(
+    items: dict[UUID, dict[str, Any]], ingredient: dict[str, object]
+) -> None:
+    try:
+        food_id = UUID(str(ingredient["food_id"]))
+        grams = Decimal(str(ingredient["grams"]))
+        cost = int(Decimal(str(ingredient["cost_irr"])))
+    except (KeyError, TypeError, ValueError):
+        return
+    item = items.setdefault(
+        food_id,
+        {
+            "food_id": food_id,
+            "slug": str(ingredient.get("slug", "")),
+            "name_fa": str(ingredient.get("name_fa", "")),
+            "name_en": str(ingredient.get("name_en", "")),
+            "required_quantity": Decimal(),
+            "canonical_unit": "g",
+            "cost_irr": 0,
+            "nutrients": defaultdict(Decimal),
+            "price_snapshot": {"reference_id": ingredient.get("price_reference_id")},
+        },
+    )
+    item["required_quantity"] += grams
+    item["cost_irr"] += cost
+    nutrients = ingredient.get("nutrients", {})
+    if isinstance(nutrients, dict):
+        for code, value in nutrients.items():
+            item["nutrients"][str(code)] += Decimal(str(value))
 
 
 def set_meal_lock(

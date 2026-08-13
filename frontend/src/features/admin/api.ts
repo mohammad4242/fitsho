@@ -38,6 +38,8 @@ import type {
   AdminTrainingProgramTemplate,
   AdminTrainingProgramTemplateWrite,
   PaginatedAdminExercises,
+  AdminPreparedRecipeWrite,
+  PreparedRecipePreview,
 } from "./types";
 
 const adminExercisesPath = "/api/v1/admin/exercises";
@@ -113,6 +115,15 @@ export function updateAdminMeal(
 ): Promise<AdminMealCatalogueItem> {
   return request<AdminMealCatalogueItem>(`${adminMealCataloguePath}/${mealId}`, {
     method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function previewAdminPreparedRecipe(
+  input: AdminPreparedRecipeWrite,
+): Promise<PreparedRecipePreview> {
+  return request(`${adminMealCataloguePath}/prepared-recipe/preview`, {
+    method: "POST",
     body: JSON.stringify(input),
   });
 }

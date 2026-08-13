@@ -172,7 +172,7 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
               </header>
               <ul>
                 {meal.foods.map((food) => (
-                  <li key={`${meal.id}-${food.food_id}`}>
+                  <li key={`${meal.id}-${food.food_id ?? food.slug}`}>
                     <span>{language === "en" ? food.name_en : food.name_fa}</span>
                     <strong>{number.format(food.grams)} {l("گرم", "g")}</strong>
                   </li>
@@ -187,7 +187,7 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
                 <button type="button" onClick={() => void api.saveMealFeedback(currentPlan.id, meal.id, "disliked")}>{l("کمتر پیشنهاد بده", "Suggest less often")}</button>
                 <button disabled={meal.is_locked || busyMeal === meal.id} type="button" onClick={() => void beginRemoval(meal.id)}>{l("پیش‌نمایش حذف", "Preview removal")}</button>
                 {findMealAlternative(currentPlan, meal.id, meal.slot_role) && <button disabled={meal.is_locked || busyMeal === meal.id} type="button" onClick={() => void beginMealReplacement(meal.id, findMealAlternative(currentPlan, meal.id, meal.slot_role)!.id)}>{l("پیش‌نمایش تعویض وعده", "Preview meal replacement")}</button>}
-                {meal.foods[0] && findFoodAlternative(currentPlan, meal.foods[0].food_id) && <button disabled={meal.is_locked || busyMeal === meal.id} type="button" onClick={() => void beginFoodReplacement(meal.id, meal.foods[0].food_id, findFoodAlternative(currentPlan, meal.foods[0].food_id)!.food_id)}>{l("پیش‌نمایش تعویض ماده", "Preview food replacement")}</button>}
+                {meal.foods[0]?.food_id && findFoodAlternative(currentPlan, meal.foods[0].food_id) && <button disabled={meal.is_locked || busyMeal === meal.id} type="button" onClick={() => void beginFoodReplacement(meal.id, meal.foods[0]!.food_id!, findFoodAlternative(currentPlan, meal.foods[0]!.food_id!)!.food_id!)}>{l("پیش‌نمایش تعویض ماده", "Preview food replacement")}</button>}
               </div>
             </article>
           ))}
@@ -282,7 +282,7 @@ function findMealAlternative(plan: WeeklyPlan, mealId: string, role: "main_meal"
 }
 
 function findFoodAlternative(plan: WeeklyPlan, foodId: string) {
-  return plan.days.flatMap((day) => day.meals).flatMap((meal) => meal.foods).find((food) => food.food_id !== foodId);
+  return plan.days.flatMap((day) => day.meals).flatMap((meal) => meal.foods).find((food) => food.food_id !== null && food.food_id !== foodId);
 }
 
 function editPreviewCost(data: api.PlanEditPreview | Awaited<ReturnType<typeof api.previewMealRemoval>>) {

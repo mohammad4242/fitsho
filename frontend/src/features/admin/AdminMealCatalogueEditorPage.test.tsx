@@ -8,6 +8,7 @@ const adminApi = vi.hoisted(() => ({
   getAdminFoodCatalogue: vi.fn(),
   getAdminMeal: vi.fn(),
   updateAdminMeal: vi.fn(),
+  previewAdminPreparedRecipe: vi.fn(),
 }));
 vi.mock("./api", () => adminApi);
 vi.mock("../auth/AuthContext", () => ({
@@ -30,6 +31,62 @@ beforeEach(() => {
       price: { status: "accepted", reference_price_irr: "1000", reference_unit: "IRR_PER_KG" },
     }], page: 1, page_size: 20, total: 1, categories: ["eggs"],
   });
+  adminApi.previewAdminPreparedRecipe.mockResolvedValue({
+    final_cooked_yield_grams: 250,
+    nutrients_per_100g: { energy_kcal: 150, protein_g: 12, iron_mg: 2.5 },
+    estimated_cost_irr_per_100g: 40000,
+    price_reference_ids: ["price-1"],
+  });
+});
+
+it("switches to Prepared Recipe and recalculates a bounded recipe preview", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={["/admin/nutrition-meals/new?category=lunch"]}>
+      <Routes>
+        <Route path="/admin/nutrition-meals/new" element={<AdminMealCatalogueEditorPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await user.click(screen.getByLabelText("محاسبه به‌صورت غذای پخته"));
+
+  expect(screen.getByRole("heading", { name: "دستور پخت آماده" })).toBeInTheDocument();
+  expect(screen.getByLabelText("وزن نهایی غذای پخته (گرم)")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "افزودن ماده اولیه دستور پخت" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "افزودن محدودیت نسبت" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "ثبت شکاف داده" })).toBeInTheDocument();
+
+  await user.type(screen.getByLabelText("نام منبع دستور پخت"), "Test kitchen");
+  await user.type(screen.getByLabelText("پیوند منبع دستور پخت"), "https://example.test/recipe");
+
+  await user.click(screen.getByRole("button", { name: "افزودن ماده اولیه دستور پخت" }));
+  await user.type(screen.getByPlaceholderText("جست‌وجو در کاتالوگ مواد غذایی"), "تخم");
+  await user.click(await screen.findByRole("button", { name: "انتخاب تخم‌مرغ" }));
+  await user.clear(screen.getByLabelText("وزن نهایی غذای پخته (گرم)"));
+  await user.type(screen.getByLabelText("وزن نهایی غذای پخته (گرم)"), "250");
+
+  expect(await screen.findByText("150 kcal / 100 g")).toBeInTheDocument();
+  expect(screen.getByText("iron_mg: 2.5")).toBeInTheDocument();
+  expect(adminApi.previewAdminPreparedRecipe).toHaveBeenCalled();
+});
+
+it("shows a missing Food Catalogue ingredient as a visible data gap", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={["/admin/nutrition-meals/new?category=lunch"]}>
+      <Routes>
+        <Route path="/admin/nutrition-meals/new" element={<AdminMealCatalogueEditorPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await user.click(screen.getByLabelText("محاسبه به‌صورت غذای پخته"));
+  await user.click(screen.getByRole("button", { name: "ثبت شکاف داده" }));
+  await user.type(screen.getByLabelText("نام فارسی ماده موجودنیست"), "پیاز مخصوص");
+  await user.type(screen.getByLabelText("نام انگلیسی ماده موجودنیست"), "Special onion");
+
+  expect(screen.getByText("پیاز مخصوص در کاتالوگ مواد غذایی وجود ندارد")).toBeInTheDocument();
 });
 
 it("adds a food-catalogue ingredient and captures bounded planner inputs", async () => {
