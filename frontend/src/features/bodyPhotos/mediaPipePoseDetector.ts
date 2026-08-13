@@ -2,202 +2,92 @@ import type {
   BodyLandmarkDetection,
   BodyLandmarkDetector,
   DecodedBodyPhoto,
+  NormalizedBodyLandmark,
 } from "./processor";
-import type { BodyPhotoView } from "./types";
 
-type FaceDetectorLike = {
-  detect(image: CanvasImageSource): { detections: Array<{ boundingBox?: FaceBoundingBox }> };
+type PoseLandmarkerLike = {
+  detect(image: CanvasImageSource): { landmarks: NormalizedBodyLandmark[][]; close?: () => void };
 };
 
-type FaceBoundingBox = {
-  originX?: number;
-  width?: number;
-  originY: number;
-  height: number;
-};
-
-type FaceDetectorLoader = () => Promise<FaceDetectorLike>;
+type PoseLandmarkerLoader = () => Promise<PoseLandmarkerLike>;
 
 type MediaPipeVisionModule = {
   FilesetResolver: { forVisionTasks(basePath: string): Promise<unknown> };
-  FaceDetector: {
-    createFromOptions(fileset: unknown, options: Record<string, unknown>): Promise<FaceDetectorLike>;
+  PoseLandmarker: {
+    createFromOptions(
+      fileset: unknown,
+      options: Record<string, unknown>,
+    ): Promise<PoseLandmarkerLike>;
   };
 };
 
-export const mediaPipeFaceAssets = {
-  modelAssetPath: "/mediapipe/models/blaze_face_short_range.tflite",
+export const mediaPipePoseAssets = {
+  modelAssetPath: "/mediapipe/models/pose_landmarker_lite.task",
   wasmBasePath: "/mediapipe/wasm",
 } as const;
 
-/**
- * Lightweight on-device adapter used only to remove the face before upload. Full
- * body eligibility is validated later by the configured AI preflight, so a heavy
- * pose landmarker does not block the browser's main thread.
- */
 export class MediaPipePoseLandmarkDetector implements BodyLandmarkDetector {
-  private faceLoader: FaceDetectorLoader;
-  private faceDetectorPromise: Promise<FaceDetectorLike | null> | null = null;
+  private readonly loader: PoseLandmarkerLoader;
+  private detectorPromise: Promise<PoseLandmarkerLike> | null = null;
 
-  constructor(faceLoader: FaceDetectorLoader = loadMediaPipeFaceDetector) {
-    this.faceLoader = faceLoader;
+  constructor(loader: PoseLandmarkerLoader = loadMediaPipePoseLandmarker) {
+    this.loader = loader;
   }
 
-  async detect(image: DecodedBodyPhoto, expectedView: BodyPhotoView): Promise<BodyLandmarkDetection> {
-    const detector = await this.getFaceDetector();
-    if (detector === null) throw new Error("face detector unavailable");
-    const detections = detector.detect(image.source).detections;
-    const primaryFace = selectPrimaryFace(detections, image.width);
-    if (primaryFace === undefined) return fullBodyCropFallback(image, expectedView);
-    const faceBottomY = faceBottom(primaryFace.boundingBox, image.height);
-    if (faceBottomY === null) return fullBodyCropFallback(image, expectedView);
-
-    const safeHeadCropY = faceBottomY + 0.05;
-    if (safeHeadCropY >= 0.5) return fullBodyCropFallback(image, expectedView);
-    return faceDetected(expectedView, faceBottomY, safeHeadCropY);
-  }
-
-  private getFaceDetector(): Promise<FaceDetectorLike | null> {
-    if (this.faceDetectorPromise === null) {
-      this.faceDetectorPromise = this.faceLoader().catch(() => null);
+  async detect(image: DecodedBodyPhoto): Promise<BodyLandmarkDetection> {
+    const detector = await this.getDetector();
+    const result = detector.detect(image.source);
+    try {
+      return {
+        personCount: result.landmarks.length,
+        landmarks: result.landmarks.length === 1 ? result.landmarks[0] : [],
+      };
+    } finally {
+      result.close?.();
     }
-    return this.faceDetectorPromise;
   }
 
+  private getDetector(): Promise<PoseLandmarkerLike> {
+    this.detectorPromise ??= this.loader();
+    return this.detectorPromise;
+  }
 }
 
-export function createMediaPipeFaceDetectorLoader(
-  assets = mediaPipeFaceAssets,
+export function createMediaPipePoseLandmarkerLoader(
+  assets = mediaPipePoseAssets,
   loadVision: () => Promise<MediaPipeVisionModule> = loadMediaPipeVision,
-): FaceDetectorLoader {
+): PoseLandmarkerLoader {
   return async () => {
-    const { FilesetResolver, FaceDetector } = await loadVision();
+    const { FilesetResolver, PoseLandmarker } = await loadVision();
     const fileset = await FilesetResolver.forVisionTasks(assets.wasmBasePath);
-    return FaceDetector.createFromOptions(fileset, {
+    return PoseLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: assets.modelAssetPath },
       runningMode: "IMAGE",
-      minDetectionConfidence: 0.7,
+      numPoses: 2,
+      minPoseDetectionConfidence: 0.55,
+      minPosePresenceConfidence: 0.55,
     });
   };
 }
 
-async function loadMediaPipeFaceDetector(): Promise<FaceDetectorLike> {
-  return createMediaPipeFaceDetectorLoader()();
+async function loadMediaPipePoseLandmarker(): Promise<PoseLandmarkerLike> {
+  return createMediaPipePoseLandmarkerLoader()();
 }
 
 async function loadMediaPipeVision(): Promise<MediaPipeVisionModule> {
   const vision = await import("@mediapipe/tasks-vision");
   return {
     FilesetResolver: vision.FilesetResolver,
-    FaceDetector: {
+    PoseLandmarker: {
       createFromOptions: async (fileset, options) => {
-        const faceDetector = await vision.FaceDetector.createFromOptions(fileset as never, options as never);
+        const landmarker = await vision.PoseLandmarker.createFromOptions(
+          fileset as never,
+          options as never,
+        );
         return {
-          detect: (image) => faceDetector.detect(image as never) as { detections: Array<{ boundingBox?: FaceBoundingBox }> },
+          detect: (image) => landmarker.detect(image as never),
         };
       },
     },
-  };
-}
-
-function incompleteDetection(view: BodyPhotoView): BodyLandmarkDetection {
-  return {
-    personCount: 1,
-    detectedView: view,
-    detectionConfidence: 0,
-    poseScore: 0,
-    bodyCompletenessScore: 0,
-    clothingVisibilityScore: 0,
-    backgroundReliabilityScore: 0,
-    isSafeAndRelevant: false,
-    clothingValidation: "unavailable",
-    contentSafetyValidation: "unavailable",
-    backgroundValidation: "unavailable",
-    faceBottomY: null,
-    safeHeadCropY: null,
-    shoulderLineY: null,
-    headFullyExcluded: false,
-    shouldersPreserved: false,
-    headCropConfidence: 0,
-    warnings: ["required_landmarks_missing"],
-  };
-}
-
-function fullBodyCropFallback(
-  image: DecodedBodyPhoto,
-  view: BodyPhotoView,
-): BodyLandmarkDetection {
-  if (image.height / image.width < 1.25) return incompleteDetection(view);
-  return {
-    personCount: 1,
-    detectedView: view,
-    detectionConfidence: 0.8,
-    poseScore: 0.8,
-    bodyCompletenessScore: 0.9,
-    clothingVisibilityScore: 0,
-    backgroundReliabilityScore: 0,
-    isSafeAndRelevant: false,
-    clothingValidation: "unavailable",
-    contentSafetyValidation: "unavailable",
-    backgroundValidation: "unavailable",
-    // A standard full-body frame leaves the head in the top portion. The UI shows
-    // the resulting crop before the user can explicitly confirm the upload.
-    faceBottomY: 0.18,
-    safeHeadCropY: 0.24,
-    shoulderLineY: 0.3,
-    headFullyExcluded: true,
-    shouldersPreserved: true,
-    headCropConfidence: 0.8,
-    warnings: ["face_crop_fallback"],
-  };
-}
-
-function faceBottom(
-  box: FaceBoundingBox | undefined,
-  imageHeight: number,
-): number | null {
-  if (box === undefined || box.height <= 0 || imageHeight <= 0) return null;
-  const bottom = (box.originY + box.height) / imageHeight;
-  return Number.isFinite(bottom) && bottom > 0 && bottom < 0.45 ? bottom : null;
-}
-
-function selectPrimaryFace(
-  detections: Array<{ boundingBox?: FaceBoundingBox }>,
-  imageWidth: number,
-): { boundingBox?: FaceBoundingBox } | undefined {
-  return detections
-    .filter((detection) => detection.boundingBox !== undefined)
-    .sort((left, right) => faceCenterDistance(left.boundingBox, imageWidth) - faceCenterDistance(right.boundingBox, imageWidth))[0];
-}
-
-function faceCenterDistance(box: FaceBoundingBox | undefined, imageWidth: number): number {
-  if (box?.originX === undefined || box.width === undefined || imageWidth <= 0) return Infinity;
-  return Math.abs(((box.originX + (box.width / 2)) / imageWidth) - 0.5);
-}
-
-function faceDetected(
-  view: BodyPhotoView,
-  faceBottomY: number,
-  safeHeadCropY: number,
-): BodyLandmarkDetection {
-  return {
-    personCount: 1,
-    detectedView: view,
-    detectionConfidence: 0.95,
-    poseScore: 0.95,
-    bodyCompletenessScore: 1,
-    clothingVisibilityScore: 0,
-    backgroundReliabilityScore: 0,
-    isSafeAndRelevant: false,
-    clothingValidation: "unavailable",
-    contentSafetyValidation: "unavailable",
-    backgroundValidation: "unavailable",
-    faceBottomY,
-    safeHeadCropY,
-    shoulderLineY: safeHeadCropY + 0.06,
-    headFullyExcluded: true,
-    shouldersPreserved: true,
-    headCropConfidence: 0.95,
-    warnings: [],
   };
 }

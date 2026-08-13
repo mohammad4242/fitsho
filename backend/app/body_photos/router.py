@@ -8,7 +8,6 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
-    Header,
     HTTPException,
     UploadFile,
     status,
@@ -80,9 +79,6 @@ def _session_response(session: BodyPhotoSession) -> BodyPhotoSessionResponse:
                 byte_size=photo.byte_size,
                 width=photo.width,
                 height=photo.height,
-                client_crop_confidence=photo.client_crop_confidence,
-                client_crop_confirmed=photo.client_crop_confirmed,
-                server_geometry_checked=photo.server_geometry_checked,
                 content_url=(
                     f"/api/v1/body-photo-sessions/{session.id}/photos/{photo.view.value}/content"
                 ),
@@ -161,44 +157,21 @@ def upload_photo(
     user: CurrentUser,
     settings: AppSettings,
     file: Annotated[UploadFile, File()],
-    client_crop_confirmed: Annotated[
-        str | None,
-        Header(alias="X-Fitsho-Client-Crop-Confirmed"),
-    ] = None,
-    client_crop_confidence: Annotated[
-        str | None,
-        Header(alias="X-Fitsho-Client-Crop-Confidence"),
-    ] = None,
-    original_height: Annotated[str | None, Header(alias="X-Fitsho-Original-Height")] = None,
-    crop_top: Annotated[str | None, Header(alias="X-Fitsho-Crop-Top")] = None,
-    crop_bottom: Annotated[str | None, Header(alias="X-Fitsho-Crop-Bottom")] = None,
-    processed_sha256: Annotated[str | None, Header(alias="X-Fitsho-Processed-SHA256")] = None,
-    crop_evidence_sha256: Annotated[
-        str | None,
-        Header(alias="X-Fitsho-Crop-Evidence-SHA256"),
-    ] = None,
 ) -> BodyPhotoSessionResponse:
     try:
-        session = BodyPhotoService(db, settings).upload_processed_photo(
+        session = BodyPhotoService(db, settings).upload_standardized_photo(
             session_id,
             user.id,
             view,
             file,
-            client_crop_confirmed=client_crop_confirmed,
-            client_crop_confidence=client_crop_confidence,
-            original_height=original_height,
-            crop_top=crop_top,
-            crop_bottom=crop_bottom,
-            processed_sha256=processed_sha256,
-            crop_evidence_sha256=crop_evidence_sha256,
         )
         return _session_response(session)
     except BodyPhotoSessionNotFoundError:
         raise _not_found() from None
-    except BodyPhotoValidationError:
+    except BodyPhotoValidationError as error:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Body photo could not be accepted",
+            detail={"code": error.code},
         ) from None
     except BodyPhotoSessionStateError:
         raise HTTPException(

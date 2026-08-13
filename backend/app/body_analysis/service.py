@@ -126,8 +126,9 @@ class EffectiveBodyAnalysisResult:
 
 _ANALYSIS_PROMPT = """You are Fitsho's conservative visual physique-development assessor.
 Reproduce the structured visual review process of an experienced in-person physique coach while
-remaining strictly limited to what is visibly supported by the three processed, head-cropped body
-photos labelled front, side, and back. Review all views internally before producing JSON. Do not
+remaining strictly limited to what is visibly supported by the three user-selected headless body
+photos standardized onto a neutral-gray background and labelled front, side, and back. Review all
+views internally before producing JSON. Do not
 reveal intermediate reasoning.
 
 Provide a non-medical visual coaching assessment of visible muscular development, proportional
@@ -200,8 +201,9 @@ For symmetry use left_right_balance only when appropriate. For visible_alignment
 suggested_training_emphasis empty. Never provide exercises or programming instructions. The result
 is provisional and requires human coach and doctor review."""
 
-_PHOTO_PREFLIGHT_PROMPT = """You validate three processed, head-cropped body photos before
-any body-development analysis. Head removal is an intentional privacy transformation: absence of
+_PHOTO_PREFLIGHT_PROMPT = """You validate three user-selected headless body photos standardized
+onto a neutral-gray background before any body-development analysis. Head removal was performed by
+the user before upload as an intentional privacy measure: absence of
 the head is expected and must never trigger full_body_not_visible. For this task, full body means
 the visible body from the neck or shoulder line through the feet; do not require a face, head, or
 hair. Use full_body_not_visible only when a material region such as torso, hips, thighs, knees,
@@ -373,7 +375,6 @@ class BodyAnalysisService:
                 images=image_inputs,
             )
             preflight = BodyPhotoPreflight.model_validate(preflight_response.payload)
-            preflight = self._discard_head_crop_false_positives(preflight)
             if preflight.accepted and preflight.confidence < execution_config.minimum_confidence:
                 preflight = BodyPhotoPreflight(
                     accepted=False,
@@ -662,10 +663,8 @@ class BodyAnalysisService:
                 .order_by(BodyPhoto.view)
             ).all()
         )
-        if {photo.view for photo in photos} != set(BodyPhotoView) or any(
-            not photo.client_crop_confirmed or not photo.server_geometry_checked for photo in photos
-        ):
-            raise BodyAnalysisInputError("three validated processed views are required")
+        if {photo.view for photo in photos} != set(BodyPhotoView):
+            raise BodyAnalysisInputError("three standardized headless views are required")
         return photos
 
     @staticmethod
@@ -714,22 +713,6 @@ class BodyAnalysisService:
             and response.cost > config.max_cost_per_request
         ):
             raise BodyAnalysisInputError("analysis cost exceeds the configured limit")
-
-    @staticmethod
-    def _discard_head_crop_false_positives(
-        preflight: BodyPhotoPreflight,
-    ) -> BodyPhotoPreflight:
-        """Trust verified privacy crops when the model's only objection is the absent head."""
-
-        issues = tuple(
-            issue for issue in preflight.issues if issue.reasons != ("full_body_not_visible",)
-        )
-        usable_views = len(BodyPhotoView) - len(issues)
-        return BodyPhotoPreflight(
-            accepted=usable_views >= 2,
-            confidence=preflight.confidence,
-            issues=issues,
-        )
 
     @staticmethod
     def _sum_optional_int(left: int | None, right: int | None) -> int | None:

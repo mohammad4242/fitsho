@@ -131,20 +131,12 @@ class BodyPhotoService:
     def get_session(self, session_id: UUID, user_id: UUID) -> BodyPhotoSession:
         return self._owner_session(session_id, user_id)
 
-    def upload_processed_photo(
+    def upload_standardized_photo(
         self,
         session_id: UUID,
         user_id: UUID,
         view: BodyPhotoView,
         upload: UploadFile,
-        *,
-        client_crop_confirmed: str | None,
-        client_crop_confidence: str | None,
-        original_height: str | None,
-        crop_top: str | None,
-        crop_bottom: str | None,
-        processed_sha256: str | None,
-        crop_evidence_sha256: str | None,
     ) -> BodyPhotoSession:
         session = self._owner_session(session_id, user_id)
         if session.state not in EDITABLE_STATES and not self._queued_session_has_failed_analysis(
@@ -152,17 +144,7 @@ class BodyPhotoService:
         ):
             raise BodyPhotoSessionStateError
         self._drain_pending_cleanup(session)
-        normalized = validate_and_normalize(
-            upload,
-            self._settings,
-            client_crop_confirmed=client_crop_confirmed,
-            client_crop_confidence=client_crop_confidence,
-            original_height=original_height,
-            crop_top=crop_top,
-            crop_bottom=crop_bottom,
-            processed_sha256=processed_sha256,
-            crop_evidence_sha256=crop_evidence_sha256,
-        )
+        normalized = validate_and_normalize(upload, self._settings)
         return self._store_photo(session, view, normalized)
 
     def _queued_session_has_failed_analysis(self, session_id: UUID) -> bool:
@@ -194,14 +176,6 @@ class BodyPhotoService:
         existing.byte_size = len(normalized.content)
         existing.width = normalized.width
         existing.height = normalized.height
-        existing.client_crop_confidence = normalized.client_crop_confidence
-        existing.client_crop_confirmed = normalized.client_crop_confirmed
-        existing.server_geometry_checked = normalized.server_geometry_checked
-        existing.crop_original_height = normalized.crop_original_height
-        existing.crop_top = normalized.crop_top
-        existing.crop_bottom = normalized.crop_bottom
-        existing.processed_sha256 = normalized.processed_sha256
-        existing.crop_evidence_sha256 = normalized.crop_evidence_sha256
         if old_key is not None:
             self._queue_cleanup(session, old_key, BodyPhotoCleanupReason.REPLACEMENT)
         session.state = BodyPhotoSessionState.UPLOADING
@@ -292,10 +266,7 @@ class BodyPhotoService:
             return session
         if session.state not in EDITABLE_STATES:
             raise BodyPhotoSessionStateError
-        if {photo.view for photo in session.photos} != set(BodyPhotoView) or any(
-            not photo.client_crop_confirmed or not photo.server_geometry_checked
-            for photo in session.photos
-        ):
+        if {photo.view for photo in session.photos} != set(BodyPhotoView):
             raise BodyPhotoSessionValidationError
         if not payload.operational_processing.granted:
             raise BodyPhotoSessionValidationError

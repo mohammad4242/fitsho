@@ -1,97 +1,69 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createMediaPipeFaceDetectorLoader,
+  createMediaPipePoseLandmarkerLoader,
+  mediaPipePoseAssets,
   MediaPipePoseLandmarkDetector,
-  mediaPipeFaceAssets,
 } from "./mediaPipePoseDetector";
 import type { DecodedBodyPhoto } from "./processor";
 
-function decodedImage(): DecodedBodyPhoto {
-  return {
-    source: {} as CanvasImageSource,
-    width: 1200,
-    height: 1800,
-    decodedMimeType: "image/jpeg",
-    orientationNormalized: true,
-    dispose: vi.fn(),
-  };
+const image: DecodedBodyPhoto = {
+  source: {} as CanvasImageSource,
+  width: 1200,
+  height: 2400,
+  decodedMimeType: "image/jpeg",
+  orientationNormalized: true,
+  dispose: vi.fn(),
+};
+
+function pose(visibility = 0.98) {
+  return Array.from({ length: 33 }, (_, index) => ({
+    x: index % 2 === 0 ? 0.58 : 0.42,
+    y: 0.12 + (index / 40),
+    z: 0,
+    visibility,
+  }));
 }
 
 describe("MediaPipePoseLandmarkDetector", () => {
-  it("uses the lightweight face detector without loading the pose landmarker", async () => {
-    const faceLoader = vi.fn().mockResolvedValue({
-      detect: vi.fn().mockReturnValue({
-        detections: [{ boundingBox: { originY: 12, height: 240 } }],
-      }),
-    });
-    const detector = new MediaPipePoseLandmarkDetector(faceLoader);
+  it("returns only real pose landmarks reported by MediaPipe", async () => {
+    const landmarks = pose();
+    const detector = new MediaPipePoseLandmarkDetector(async () => ({
+      detect: vi.fn().mockReturnValue({ landmarks: [landmarks] }),
+    }));
 
-    await expect(detector.detect(decodedImage(), "front")).resolves.toMatchObject({
-      personCount: 1,
-      detectedView: "front",
-      faceBottomY: 0.14,
-      headFullyExcluded: true,
-      shouldersPreserved: true,
-      clothingValidation: "unavailable",
-    });
-    await detector.detect(decodedImage(), "front");
+    const result = await detector.detect(image);
 
-    expect(faceLoader).toHaveBeenCalledOnce();
+    expect(result.personCount).toBe(1);
+    expect(result.landmarks).toEqual(landmarks);
+    expect(result.landmarks[11]?.visibility).toBe(0.98);
   });
 
-  it("uses the centered face and does not treat background artwork as another person", async () => {
-    const detector = new MediaPipePoseLandmarkDetector(
-      vi.fn().mockResolvedValue({
-        detect: vi.fn().mockReturnValue({
-          detections: [
-            { boundingBox: { originX: 24, width: 220, originY: 10, height: 190 } },
-            { boundingBox: { originX: 480, width: 220, originY: 12, height: 240 } },
-          ],
-        }),
-      }),
-    );
+  it("reports multiple real poses without selecting a primary person", async () => {
+    const detector = new MediaPipePoseLandmarkDetector(async () => ({
+      detect: vi.fn().mockReturnValue({ landmarks: [pose(), pose(0.87)] }),
+    }));
 
-    await expect(detector.detect(decodedImage(), "front")).resolves.toMatchObject({
-      personCount: 1,
-      faceBottomY: 252 / 1800,
-      safeHeadCropY: expect.any(Number),
-    });
+    await expect(detector.detect(image)).resolves.toMatchObject({ personCount: 2 });
   });
 
-  it("uses a conservative head crop for a tall full-body photo when face detection misses", async () => {
-    const detector = new MediaPipePoseLandmarkDetector(
-      vi.fn().mockResolvedValue({ detect: vi.fn().mockReturnValue({ detections: [] }) }),
-    );
-
-    await expect(detector.detect(decodedImage(), "front")).resolves.toMatchObject({
-      personCount: 1,
-      detectedView: "front",
-      detectionConfidence: 0.8,
-      safeHeadCropY: 0.24,
-      headFullyExcluded: true,
-      warnings: ["face_crop_fallback"],
-    });
-  });
-
-  it("uses bundled local WASM and model configuration", async () => {
-    const forVisionTasks = vi.fn().mockResolvedValue("fileset");
-    const createFaceDetector = vi.fn().mockResolvedValue({ detect: vi.fn() });
-    const loader = createMediaPipeFaceDetectorLoader(
-      mediaPipeFaceAssets,
+  it("loads Pose Landmarker and contains no face detector asset", async () => {
+    const createFromOptions = vi.fn().mockResolvedValue({ detect: vi.fn() });
+    const loader = createMediaPipePoseLandmarkerLoader(
+      mediaPipePoseAssets,
       async () => ({
-        FilesetResolver: { forVisionTasks },
-        FaceDetector: { createFromOptions: createFaceDetector },
+        FilesetResolver: { forVisionTasks: vi.fn().mockResolvedValue("fileset") },
+        PoseLandmarker: { createFromOptions },
       }),
     );
 
     await loader();
 
-    expect(mediaPipeFaceAssets.wasmBasePath).toBe("/mediapipe/wasm");
-    expect(mediaPipeFaceAssets.modelAssetPath).toBe("/mediapipe/models/blaze_face_short_range.tflite");
-    expect(forVisionTasks).toHaveBeenCalledWith(mediaPipeFaceAssets.wasmBasePath);
-    expect(createFaceDetector).toHaveBeenCalledWith("fileset", expect.objectContaining({
-      baseOptions: { modelAssetPath: mediaPipeFaceAssets.modelAssetPath },
+    expect(mediaPipePoseAssets.modelAssetPath).toBe("/mediapipe/models/pose_landmarker_lite.task");
+    expect(JSON.stringify(mediaPipePoseAssets)).not.toMatch(/face|blaze/i);
+    expect(createFromOptions).toHaveBeenCalledWith("fileset", expect.objectContaining({
+      numPoses: 2,
+      runningMode: "IMAGE",
     }));
   });
 });

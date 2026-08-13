@@ -57,8 +57,7 @@ class ComparisonInputQuality(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     analysis_confidence: float = Field(ge=0, le=1)
-    minimum_client_crop_confidence: float | None = Field(default=None, ge=0, le=1)
-    all_server_geometry_checked: bool
+    all_standardized_views_present: bool
 
 
 class UserReportedMeasurementChange(BaseModel):

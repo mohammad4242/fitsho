@@ -1,4 +1,3 @@
-import hashlib
 import struct
 import zlib
 from pathlib import Path
@@ -46,29 +45,6 @@ def _png(
     )
 
 
-def _crop_headers(
-    content: bytes,
-    *,
-    output_height: int = 640,
-    original_height: int = 800,
-    crop_top: int = 160,
-    crop_bottom: int | None = None,
-) -> dict[str, str]:
-    bottom = crop_bottom if crop_bottom is not None else crop_top + output_height
-    processed_sha256 = hashlib.sha256(content).hexdigest()
-    evidence = f"v1:{processed_sha256}:{original_height}:{crop_top}:{bottom}"
-    return {
-        **ORIGIN,
-        "X-Fitsho-Client-Crop-Confirmed": "true",
-        "X-Fitsho-Client-Crop-Confidence": "0.97",
-        "X-Fitsho-Original-Height": str(original_height),
-        "X-Fitsho-Crop-Top": str(crop_top),
-        "X-Fitsho-Crop-Bottom": str(bottom),
-        "X-Fitsho-Processed-SHA256": processed_sha256,
-        "X-Fitsho-Crop-Evidence-SHA256": hashlib.sha256(evidence.encode()).hexdigest(),
-    }
-
-
 def _register(client: TestClient, email: str) -> None:
     response = client.post(
         "/api/v1/auth/register",
@@ -113,7 +89,7 @@ def _upload(
     payload = content or _png()
     return client.put(
         f"/api/v1/body-photo-sessions/{session_id}/photos/{view}",
-        headers=headers or _crop_headers(payload),
+        headers=headers or ORIGIN,
         files={"file": (f"{view}.png", payload, content_type)},
     )
 
@@ -205,15 +181,6 @@ def test_every_session_mutation_rejects_missing_trusted_origin(client: TestClien
 
     upload = client.put(
         f"/api/v1/body-photo-sessions/{session_id}/photos/front",
-        headers={
-            "X-Fitsho-Client-Crop-Confirmed": "true",
-            "X-Fitsho-Client-Crop-Confidence": "0.97",
-            "X-Fitsho-Original-Height": "800",
-            "X-Fitsho-Crop-Top": "160",
-            "X-Fitsho-Crop-Bottom": "800",
-            "X-Fitsho-Processed-SHA256": hashlib.sha256(_png()).hexdigest(),
-            "X-Fitsho-Crop-Evidence-SHA256": "unused-without-trusted-origin",
-        },
         files={"file": ("front.png", _png(), "image/png")},
     )
     submit = client.post(
@@ -234,50 +201,33 @@ def test_every_session_mutation_rejects_missing_trusted_origin(client: TestClien
     ]
 
 
-def test_upload_cors_preflight_allows_private_photo_headers(client: TestClient) -> None:
+def test_upload_cors_preflight_allows_multipart_content(client: TestClient) -> None:
     response = client.options(
         "/api/v1/body-photo-sessions/00000000-0000-0000-0000-000000000000/photos/front",
         headers={
             "Origin": "http://localhost:5173",
             "Access-Control-Request-Method": "PUT",
-            "Access-Control-Request-Headers": (
-                "content-type,x-fitsho-client-crop-confirmed,x-fitsho-client-crop-confidence,"
-                "x-fitsho-original-height,x-fitsho-crop-top,x-fitsho-crop-bottom,"
-                "x-fitsho-processed-sha256,x-fitsho-crop-evidence-sha256"
-            ),
+            "Access-Control-Request-Headers": "content-type",
         },
     )
 
     assert response.status_code == 200
     assert "PUT" in response.headers["access-control-allow-methods"]
-    assert (
-        "x-fitsho-client-crop-confirmed" in response.headers["access-control-allow-headers"].lower()
-    )
-    assert "x-fitsho-processed-sha256" in response.headers["access-control-allow-headers"].lower()
-    assert (
-        "x-fitsho-crop-evidence-sha256" in response.headers["access-control-allow-headers"].lower()
-    )
+    assert "content-type" in response.headers["access-control-allow-headers"].lower()
 
 
-def test_upload_requires_client_named_crop_confidence_and_returns_client_metadata(
+def test_upload_accepts_standardized_photo_without_obsolete_crop_evidence(
     client: TestClient,
 ) -> None:
     _register(client, "photo-client-crop-name@example.com")
     created = _create_session(client)
-    content = _png()
-    legacy_headers = _crop_headers(content)
-    legacy_headers["X-Fitsho-Crop-Confidence"] = legacy_headers.pop(
-        "X-Fitsho-Client-Crop-Confidence"
-    )
+    accepted = _upload(client, created["id"], "front")
 
-    rejected = _upload(client, created["id"], "front", content, headers=legacy_headers)
-    accepted = _upload(client, created["id"], "front", content)
-
-    assert rejected.status_code == 422
     assert accepted.status_code == 200
     photo = accepted.json()["photos"][0]
-    assert photo["client_crop_confidence"] == 0.97
-    assert "crop_confidence" not in photo
+    assert "client_crop_confidence" not in photo
+    assert "client_crop_confirmed" not in photo
+    assert "server_geometry_checked" not in photo
 
 
 def test_owner_can_create_list_and_read_safe_session_dtos(client: TestClient) -> None:
@@ -346,34 +296,6 @@ def test_submit_requires_operational_consent_but_not_training_consent(
     assert submitted.json()["model_training_consent"]["granted"] is False
     assert submitted.json()["operational_processing_consent"]["recorded_at"]
     assert submitted.json()["model_training_consent"]["recorded_at"]
-
-
-def test_submit_rejects_any_photo_without_client_and_server_crop_checks(
-    client: TestClient,
-    db: Session,
-    test_settings: Settings,
-) -> None:
-    test_settings.body_photo_storage_root = Path(test_settings.media_root).parent / "body-private"
-    _register(client, "photo-unchecked@example.com")
-    created = _create_session(client)
-    for view in ("front", "side", "back"):
-        assert _upload(client, created["id"], view).status_code == 200
-    db.execute(
-        text(
-            "UPDATE body_photos SET server_geometry_checked = false "
-            "WHERE session_id = :session_id AND view = 'back'"
-        ),
-        {"session_id": UUID(str(created["id"]))},
-    )
-    db.commit()
-
-    submitted = client.post(
-        f"/api/v1/body-photo-sessions/{created['id']}/submit",
-        headers=ORIGIN,
-        json=_consents(),
-    )
-
-    assert submitted.status_code == 422
 
 
 def test_training_consent_revocation_is_a_separate_immutable_event(

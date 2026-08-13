@@ -1,4 +1,3 @@
-import hashlib
 import struct
 import zlib
 from io import BytesIO
@@ -49,29 +48,6 @@ def _png(
         + chunk(b"IDAT", zlib.compress(b"".join(rows)))
         + chunk(b"IEND", b"")
     )
-
-
-def _crop_headers(
-    content: bytes,
-    *,
-    output_height: int = 640,
-    original_height: int = 800,
-    crop_top: int = 160,
-    crop_bottom: int | None = None,
-) -> dict[str, str]:
-    bottom = crop_bottom if crop_bottom is not None else crop_top + output_height
-    processed_sha256 = hashlib.sha256(content).hexdigest()
-    evidence = f"v1:{processed_sha256}:{original_height}:{crop_top}:{bottom}"
-    return {
-        **ORIGIN,
-        "X-Fitsho-Client-Crop-Confirmed": "true",
-        "X-Fitsho-Client-Crop-Confidence": "0.95",
-        "X-Fitsho-Original-Height": str(original_height),
-        "X-Fitsho-Crop-Top": str(crop_top),
-        "X-Fitsho-Crop-Bottom": str(bottom),
-        "X-Fitsho-Processed-SHA256": processed_sha256,
-        "X-Fitsho-Crop-Evidence-SHA256": hashlib.sha256(evidence.encode()).hexdigest(),
-    }
 
 
 def _png_with_declared_dimensions(width: int, height: int) -> bytes:
@@ -127,7 +103,7 @@ def _upload(
 ) -> object:
     return client.put(
         f"/api/v1/body-photo-sessions/{session_id}/photos/front",
-        headers=headers or _crop_headers(content),
+        headers=headers or ORIGIN,
         files={"file": ("front.png", content, content_type)},
     )
 
@@ -160,7 +136,7 @@ def test_mime_mismatch_and_corruption_leave_no_stored_file(
     response = _upload(client, session_id, content, content_type)
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "Body photo could not be accepted"}
+    assert response.json() == {"detail": {"code": "invalid_image"}}
     assert _stored_files(private_root) == []
 
 
@@ -179,13 +155,7 @@ def test_excessive_bytes_and_pixels_leave_no_stored_file(
     test_settings.body_photo_min_width = 1
     test_settings.body_photo_min_height = 1
     tiny_pixels = _png(5, 5)
-    too_many_pixels = _upload(
-        client,
-        session_id,
-        tiny_pixels,
-        "image/png",
-        _crop_headers(tiny_pixels, output_height=5, original_height=10, crop_top=5),
-    )
+    too_many_pixels = _upload(client, session_id, tiny_pixels, "image/png")
 
     assert too_many_bytes.status_code == 422
     assert too_many_pixels.status_code == 422
@@ -201,45 +171,10 @@ def test_pillow_decompression_bomb_warning_is_sanitized_and_stores_nothing(
     session_id = _register_and_create(client, "photo-bomb@example.com")
 
     bomb = _png_with_declared_dimensions(10_000, 10_000)
-    response = _upload(
-        client,
-        session_id,
-        bomb,
-        "image/png",
-        _crop_headers(
-            bomb,
-            output_height=10_000,
-            original_height=12_000,
-            crop_top=2_000,
-        ),
-    )
+    response = _upload(client, session_id, bomb, "image/png")
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "Body photo could not be accepted"}
-    assert _stored_files(private_root) == []
-
-
-@pytest.mark.parametrize(
-    "headers",
-    [
-        ORIGIN,
-        {**_crop_headers(_png()), "X-Fitsho-Client-Crop-Confirmed": "false"},
-        {key: value for key, value in _crop_headers(_png()).items() if key != "X-Fitsho-Crop-Top"},
-        {**_crop_headers(_png()), "X-Fitsho-Client-Crop-Confidence": "0.2"},
-    ],
-)
-def test_missing_or_unreliable_crop_attestation_is_rejected_without_storage(
-    client: TestClient,
-    test_settings: Settings,
-    headers: dict[str, str],
-) -> None:
-    private_root = Path(test_settings.media_root).parent / "body-private"
-    test_settings.body_photo_storage_root = private_root
-    session_id = _register_and_create(client, f"crop-{len(headers)}@example.com")
-
-    response = _upload(client, session_id, _png(), "image/png", headers)
-
-    assert response.status_code == 422
+    assert response.json() == {"detail": {"code": "image_too_large"}}
     assert _stored_files(private_root) == []
 
 
@@ -252,75 +187,7 @@ def test_landscape_geometry_is_rejected_without_storage(
     session_id = _register_and_create(client, "crop-geometry@example.com")
 
     landscape = _png(800, 400)
-    response = _upload(
-        client,
-        session_id,
-        landscape,
-        "image/png",
-        _crop_headers(landscape, output_height=400, original_height=560, crop_top=160),
-    )
-
-    assert response.status_code == 422
-    assert _stored_files(private_root) == []
-
-
-def test_flat_or_empty_top_boundary_is_rejected_without_storage(
-    client: TestClient,
-    test_settings: Settings,
-) -> None:
-    private_root = Path(test_settings.media_root).parent / "body-private"
-    test_settings.body_photo_storage_root = private_root
-    session_id = _register_and_create(client, "photo-boundary-content@example.com")
-    solid = Image.new("RGB", (320, 640), color=(30, 60, 90))
-    solid_output = BytesIO()
-    solid.save(solid_output, format="PNG")
-    blank_top = Image.new("RGB", (320, 640), color=(30, 60, 90))
-    draw = ImageDraw.Draw(blank_top)
-    for y in range(160, 640, 24):
-        draw.rectangle((0, y, 319, min(y + 11, 639)), fill=(110, 140, 170))
-    blank_top_output = BytesIO()
-    blank_top.save(blank_top_output, format="PNG")
-
-    for content in (solid_output.getvalue(), blank_top_output.getvalue()):
-        response = _upload(
-            client,
-            session_id,
-            content,
-            "image/png",
-            _crop_headers(content),
-        )
-        assert response.status_code == 422
-
-    assert _stored_files(private_root) == []
-
-
-@pytest.mark.parametrize(
-    "header_overrides",
-    [
-        {"X-Fitsho-Processed-SHA256": "0" * 64},
-        {"X-Fitsho-Crop-Evidence-SHA256": "0" * 64},
-        {"X-Fitsho-Crop-Top": "20", "X-Fitsho-Crop-Bottom": "660"},
-        {"X-Fitsho-Crop-Bottom": "799"},
-        {"X-Fitsho-Original-Height": "not-an-integer"},
-    ],
-)
-def test_unbound_or_unsafe_crop_geometry_is_rejected(
-    client: TestClient,
-    test_settings: Settings,
-    header_overrides: dict[str, str],
-) -> None:
-    private_root = Path(test_settings.media_root).parent / "body-private"
-    test_settings.body_photo_storage_root = private_root
-    session_id = _register_and_create(client, f"crop-evidence-{len(header_overrides)}@example.com")
-    content = _png()
-
-    response = _upload(
-        client,
-        session_id,
-        content,
-        "image/png",
-        {**_crop_headers(content), **header_overrides},
-    )
+    response = _upload(client, session_id, landscape, "image/png")
 
     assert response.status_code == 422
     assert _stored_files(private_root) == []
@@ -341,18 +208,7 @@ def test_minimum_width_and_height_are_enforced_independently(
     session_id = _register_and_create(client, f"photo-tiny-{width}-{height}@example.com")
     tiny = _png(width, height)
 
-    response = _upload(
-        client,
-        session_id,
-        tiny,
-        "image/png",
-        _crop_headers(
-            tiny,
-            output_height=height,
-            original_height=height + 160,
-            crop_top=160,
-        ),
-    )
+    response = _upload(client, session_id, tiny, "image/png")
 
     assert response.status_code == 422
     assert _stored_files(private_root) == []
@@ -380,59 +236,6 @@ def test_dimension_minimums_are_configurable(
     assert _stored_files(private_root) == []
 
 
-def test_crop_top_safety_threshold_is_configurable(
-    client: TestClient,
-    test_settings: Settings,
-) -> None:
-    private_root = Path(test_settings.media_root).parent / "body-private"
-    test_settings.body_photo_storage_root = private_root
-    test_settings.body_photo_min_crop_top_ratio = 0.25
-    session_id = _register_and_create(client, "photo-crop-threshold@example.com")
-    content = _png()
-
-    response = _upload(client, session_id, content, "image/png")
-
-    assert response.status_code == 422
-    assert _stored_files(private_root) == []
-
-
-def test_client_confirmation_and_server_geometry_check_are_recorded(
-    client: TestClient,
-    db: Session,
-    test_settings: Settings,
-) -> None:
-    private_root = Path(test_settings.media_root).parent / "body-private"
-    test_settings.body_photo_storage_root = private_root
-    session_id = _register_and_create(client, "photo-crop-record@example.com")
-    content = _png()
-    headers = _crop_headers(content)
-
-    response = _upload(client, session_id, content, "image/png", headers)
-
-    assert response.status_code == 200
-    photo = response.json()["photos"][0]
-    assert photo["client_crop_confirmed"] is True
-    assert photo["server_geometry_checked"] is True
-    assert "crop_geometry_verified" not in photo
-    assert "processed_sha256" not in response.text
-    stored = db.execute(
-        text(
-            "SELECT client_crop_confirmed, server_geometry_checked, "
-            "crop_original_height, crop_top, crop_bottom, processed_sha256, "
-            "crop_evidence_sha256 FROM body_photos"
-        )
-    ).one()
-    assert stored == (
-        True,
-        True,
-        800,
-        160,
-        800,
-        headers["X-Fitsho-Processed-SHA256"],
-        headers["X-Fitsho-Crop-Evidence-SHA256"],
-    )
-
-
 def test_accepted_jpeg_is_reencoded_without_exif(
     client: TestClient,
     test_settings: Settings,
@@ -444,7 +247,7 @@ def test_accepted_jpeg_is_reencoded_without_exif(
     jpeg = _jpeg_with_exif()
     uploaded = client.put(
         f"/api/v1/body-photo-sessions/{session_id}/photos/front",
-        headers=_crop_headers(jpeg),
+        headers=ORIGIN,
         files={"file": ("front.jpg", jpeg, "image/jpeg")},
     )
     content = client.get(f"/api/v1/body-photo-sessions/{session_id}/photos/front/content")
@@ -512,25 +315,17 @@ def test_service_accepts_storage_interface_injection(
     service = BodyPhotoService(db, test_settings, storage=storage)
     session = service.create_session(user.id, BodyPhotoPurpose.INITIAL_PLAN)
     content = _png()
-    headers = _crop_headers(content)
     upload = StarletteUploadFile(
         BytesIO(content),
         filename="front.png",
         headers=Headers({"content-type": "image/png"}),
     )
 
-    updated = service.upload_processed_photo(
+    updated = service.upload_standardized_photo(
         session.id,
         user.id,
         BodyPhotoView.FRONT,
         upload,
-        client_crop_confirmed=headers["X-Fitsho-Client-Crop-Confirmed"],
-        client_crop_confidence=headers["X-Fitsho-Client-Crop-Confidence"],
-        original_height=headers["X-Fitsho-Original-Height"],
-        crop_top=headers["X-Fitsho-Crop-Top"],
-        crop_bottom=headers["X-Fitsho-Crop-Bottom"],
-        processed_sha256=headers["X-Fitsho-Processed-SHA256"],
-        crop_evidence_sha256=headers["X-Fitsho-Crop-Evidence-SHA256"],
     )
 
     assert len(updated.photos) == 1
@@ -596,7 +391,6 @@ def test_failed_db_commit_and_failed_delete_persist_cleanup_in_separate_session(
 
     monkeypatch.setattr(db, "commit", fail_photo_commit)
     content = _png()
-    headers = _crop_headers(content)
     upload = StarletteUploadFile(
         BytesIO(content),
         filename="front.png",
@@ -604,18 +398,11 @@ def test_failed_db_commit_and_failed_delete_persist_cleanup_in_separate_session(
     )
 
     with pytest.raises(SQLAlchemyError, match="forced photo commit failure"):
-        service.upload_processed_photo(
+        service.upload_standardized_photo(
             session.id,
             user.id,
             BodyPhotoView.FRONT,
             upload,
-            client_crop_confirmed=headers["X-Fitsho-Client-Crop-Confirmed"],
-            client_crop_confidence=headers["X-Fitsho-Client-Crop-Confidence"],
-            original_height=headers["X-Fitsho-Original-Height"],
-            crop_top=headers["X-Fitsho-Crop-Top"],
-            crop_bottom=headers["X-Fitsho-Crop-Bottom"],
-            processed_sha256=headers["X-Fitsho-Processed-SHA256"],
-            crop_evidence_sha256=headers["X-Fitsho-Crop-Evidence-SHA256"],
         )
 
     cleanup = db.scalar(select(BodyPhotoStorageCleanup))

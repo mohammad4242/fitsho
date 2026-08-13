@@ -71,6 +71,20 @@ it("uses the generic message for structured validation details", async () => {
   });
 });
 
+it("preserves a stable API error code", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ detail: { code: "invalid_geometry" } }), {
+      status: 422,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+
+  await expect(request("/api/photo-error")).rejects.toMatchObject({
+    status: 422,
+    code: "invalid_geometry",
+  });
+});
+
 it("lets the browser set the multipart boundary for FormData", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
     new Response(JSON.stringify({ ok: true }), {

@@ -20,9 +20,6 @@ export type BodyPhoto = {
   byte_size: number;
   width: number;
   height: number;
-  client_crop_confidence: number;
-  client_crop_confirmed: boolean;
-  server_geometry_checked: boolean;
   content_url: string;
   created_at: string;
   updated_at: string;
