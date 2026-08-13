@@ -11,5 +11,8 @@ htmlcov/
 node_modules/
 dist/
 *.egg-info/
-backend/var/media/
+backend/var/media/*
+!backend/var/media/meal-catalogue/
+backend/var/media/meal-catalogue/*
+!backend/var/media/meal-catalogue/.gitkeep
 *.py[cod]

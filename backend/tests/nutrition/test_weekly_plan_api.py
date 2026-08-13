@@ -205,6 +205,7 @@ def _seed_foods_and_prices(db: Session) -> None:
                 code="TST-LU01",
                 name_fa="مرغ و برنج تست",
                 name_en="Test chicken and rice",
+                image_path="/media/meal-catalogue/test-lunch.png",
                 category=MealCategory.LUNCH,
                 verification_status=FoodVerificationStatus.VERIFIED,
                 items=[
@@ -289,6 +290,16 @@ def test_generation_returns_visible_seven_day_draft_and_creates_review(
         for day in body["plan"]["days"]
         for meal in day["meals"]
     )
+    catalogue_meals = {
+        str(meal.id): meal for meal in db.scalars(select(NutritionCatalogueMeal)).all()
+    }
+    for day in body["plan"]["days"]:
+        for meal in day["meals"]:
+            catalogue = catalogue_meals[meal["catalogue_meal_id"]]
+            assert meal["name_fa"] == catalogue.name_fa
+            assert meal["name_en"] == catalogue.name_en
+            assert meal["meal_code"] == catalogue.code
+            assert meal["image_url"] == catalogue.image_path
     revision = client.get(f"/api/v1/nutrition/plans/{body['plan']['id']}")
     assert revision.status_code == 200
     assert revision.json()["id"] == body["plan"]["id"]

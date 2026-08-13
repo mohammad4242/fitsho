@@ -24,6 +24,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://fitsho:fitsho@db:5432/fitsho
       FRONTEND_ORIGIN: http://localhost:5173
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://10.120.36.22:5173,http://100.97.78.5:5173}
       APP_ENV: local
       COOKIE_SECURE: "false"
       SESSION_COOKIE_NAME: fitsho_session
@@ -35,6 +36,7 @@ services:
       - "8000:8000"
     volumes:
       - fitsho_exercise_media:/var/lib/fitsho/media
+      - ./backend/var/media/meal-catalogue:/var/lib/fitsho/media/meal-catalogue
     depends_on:
       db:
         condition: service_healthy

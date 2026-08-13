@@ -133,6 +133,7 @@ def program_response(program: NutritionProgram) -> NutritionProgramResponse:
                             code=slot.meal.code,
                             name_fa=slot.meal.name_fa,
                             name_en=slot.meal.name_en,
+                            image_url=slot.meal.image_path,
                             category=slot.meal.category,
                         )
                         if slot.meal is not None

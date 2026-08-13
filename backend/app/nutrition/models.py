@@ -759,6 +759,7 @@ class NutritionCatalogueMeal(Base):
     code: Mapped[str] = mapped_column(String(20), nullable=False)
     name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
     name_en: Mapped[str] = mapped_column(String(160), nullable=False)
+    image_path: Mapped[str | None] = mapped_column(String(500))
     category: Mapped[MealCategory] = mapped_column(
         enum_column(MealCategory, "ck_nutrition_catalogue_meal_category_values"), nullable=False
     )
@@ -1320,6 +1321,7 @@ class NutritionWeeklyPlanMeal(Base):
         index=True,
     )
     catalogue_meal_category: Mapped[str | None] = mapped_column(String(32))
+    catalogue_meal: Mapped["NutritionCatalogueMeal | None"] = relationship()
     slot_role: Mapped[MealSlotRole] = mapped_column(
         enum_column(MealSlotRole, "ck_nutrition_weekly_plan_meal_role_values"), nullable=False
     )

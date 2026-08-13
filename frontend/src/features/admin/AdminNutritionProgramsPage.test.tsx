@@ -40,7 +40,10 @@ const program = {
       id: `slot-${index + 1}`,
       kind: "catalogue_meal",
       category: "breakfast",
-      meal: { id: "meal-1", code: "BF01", name_fa: "املت", name_en: "Omelette", category: "breakfast" },
+      meal: {
+        id: "meal-1", code: "BF01", name_fa: "املت", name_en: "Omelette",
+        image_url: "/media/meal-catalogue/omelette.png", category: "breakfast",
+      },
     }],
   })),
 };
@@ -62,6 +65,9 @@ it("filters weekly programs by diet style and archives them", async () => {
   expect(await screen.findByRole("heading", { name: "کاتالوگ برنامه‌های غذایی" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "کاتالوگ برنامه‌های غذایی" })).toHaveAttribute("href", "/admin/nutrition-programs");
   expect(screen.getByText("هفته ایرانی متعادل")).toBeInTheDocument();
+  expect(screen.getAllByRole("img", { name: "املت" })[0]).toHaveAttribute(
+    "src", "/media/meal-catalogue/omelette.png",
+  );
   expect(screen.getAllByText(/BF01 — املت/)).toHaveLength(6);
   expect(screen.getByText("وعده آزاد")).toBeInTheDocument();
   expect(screen.getAllByText(/روز /)).toHaveLength(7);

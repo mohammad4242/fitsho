@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { MealThumbnail } from "../../shared/MealThumbnail";
 import * as api from "./api";
 import type { ShoppingList, WeeklyPlan, WeeklyPlanHistoryItem } from "./types";
 
@@ -154,9 +155,18 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
           {day.meals.map((meal) => (
             meal.slot_role === "free_meal" ? <FreeMealCard key={meal.id} meal={meal} entryDate={day.plan_date} language={language} /> : <article className="weekly-plan__meal" key={meal.id}>
               <header>
-                <div>
-                  <span>{meal.slot_role === "snack" ? l("میان‌وعده", "Snack") : l("وعده اصلی", "Main meal")}</span>
-                  <strong>{number.format(meal.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</strong>
+                <div className="weekly-plan__meal-heading">
+                  <MealThumbnail
+                    alt={meal.name_fa && meal.name_en ? (language === "en" ? meal.name_en : meal.name_fa) : mealTitle(meal, language)}
+                    className="weekly-plan__meal-image"
+                    fallbackLabel={l(`تصویر پیش‌فرض ${mealTitle(meal, language)}`, `Placeholder for ${mealTitle(meal, language)}`)}
+                    imageUrl={meal.image_url}
+                  />
+                  <div>
+                    <span>{meal.slot_role === "snack" ? l("میان‌وعده", "Snack") : l("وعده اصلی", "Main meal")}</span>
+                    <strong className="weekly-plan__meal-title">{mealTitle(meal, language)}</strong>
+                    <small>{number.format(meal.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</small>
+                  </div>
                 </div>
                 <small>{number.format(Math.floor(meal.cost_irr / 10))} {l("تومان", "Toman")}</small>
               </header>
@@ -213,6 +223,16 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
       </section>
     </section>
   );
+}
+
+function mealTitle(
+  meal: WeeklyPlan["days"][number]["meals"][number],
+  language: "fa" | "en",
+): string {
+  const catalogueName = language === "en" ? meal.name_en : meal.name_fa;
+  if (catalogueName) return meal.meal_code ? `${meal.meal_code} — ${catalogueName}` : catalogueName;
+  const foodNames = meal.foods.map((food) => language === "en" ? food.name_en : food.name_fa);
+  return foodNames.join(" + ") || (language === "en" ? "Meal" : "وعده غذایی");
 }
 
 function FreeMealCard({ meal, entryDate, language }: { meal: WeeklyPlan["days"][number]["meals"][number]; entryDate: string; language: "fa" | "en" }) {

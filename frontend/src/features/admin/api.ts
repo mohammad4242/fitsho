@@ -117,6 +117,18 @@ export function updateAdminMeal(
   });
 }
 
+export function uploadAdminMealImage(
+  mealId: string,
+  file: File,
+): Promise<{ image_url: string }> {
+  const body = new FormData();
+  body.append("file", file);
+  return request(`${adminMealCataloguePath}/${mealId}/image`, {
+    method: "POST",
+    body,
+  });
+}
+
 export function getAdminFoodCatalogue(
   input: FoodCatalogueQuery = {},
 ): Promise<AdminFoodCatalogueResponse> {

@@ -400,6 +400,7 @@ export type AdminMealCatalogueItem = {
   code: string;
   name_fa: string;
   name_en: string;
+  image_url: string | null;
   category: MealCategory;
   verification_status: MealVerificationStatus;
   items: AdminMealIngredient[];
@@ -444,6 +445,7 @@ export type AdminNutritionProgramMeal = {
   code: string;
   name_fa: string;
   name_en: string;
+  image_url: string | null;
   category: MealCategory;
 };
 

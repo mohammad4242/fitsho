@@ -164,6 +164,7 @@ from app.nutrition.schemas import (
     CatalogueConsumptionInput,
     CatalogueFoodResponse,
     CatalogueFoodWrite,
+    CatalogueMealImageResponse,
     CatalogueMealPageResponse,
     CatalogueMealResponse,
     CatalogueMealWrite,
@@ -478,6 +479,41 @@ def replace_catalogue_meal(
     if meal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meal not found")
     return meal_response(meal)
+
+
+@router.post(
+    "/admin/meals/{meal_id}/image",
+    response_model=CatalogueMealImageResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def upload_catalogue_meal_image(
+    meal_id: UUID,
+    db: DatabaseSession,
+    admin: AdminUser,
+    settings: AppSettings,
+    file: Annotated[UploadFile, File()],
+) -> CatalogueMealImageResponse:
+    del admin
+    meal = db.get(NutritionCatalogueMeal, meal_id)
+    if meal is None or meal.verification_status == FoodVerificationStatus.RETIRED:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meal not found")
+    try:
+        stored = store_image_upload(file, settings, "meal-catalogue")
+    except MediaValidationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from None
+    previous_path = meal.image_path
+    try:
+        meal.image_path = stored.public_path
+        db.commit()
+    except Exception:
+        db.rollback()
+        discard_media(stored)
+        raise
+    discard_managed_media_path(previous_path, settings, "meal-catalogue")
+    return CatalogueMealImageResponse(image_url=stored.public_path)
 
 
 @router.get(

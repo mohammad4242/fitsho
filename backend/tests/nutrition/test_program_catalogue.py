@@ -32,6 +32,11 @@ def _meal_library(db: Session) -> dict[str, UUID]:
             code=f"TST-{category.value.upper()}",
             name_fa=f"وعده {category.value}",
             name_en=f"Verified {category.value}",
+            image_path=(
+                "/media/meal-catalogue/breakfast.png"
+                if category is MealCategory.BREAKFAST
+                else None
+            ),
             category=category,
             verification_status=FoodVerificationStatus.VERIFIED,
         )
@@ -165,6 +170,10 @@ def test_admin_creates_seven_day_program_from_verified_category_matched_meals(
     ]
     assert "fitness_goal" not in body
     assert "calories" not in body
+    breakfast = body["days"][0]["slots"][0]["meal"]
+    assert breakfast["code"] == "TST-BREAKFAST"
+    assert breakfast["image_url"] == "/media/meal-catalogue/breakfast.png"
+    assert body["days"][0]["slots"][1]["meal"]["image_url"] is None
     program = db.scalar(select(NutritionProgram).where(NutritionProgram.id == UUID(body["id"])))
     assert program is not None
     assert program.diet_style is NutritionDietStyle.BALANCED_IRANIAN

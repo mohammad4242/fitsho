@@ -132,6 +132,7 @@ def meal_response(meal: NutritionCatalogueMeal) -> CatalogueMealResponse:
         code=meal.code,
         name_fa=meal.name_fa,
         name_en=meal.name_en,
+        image_url=meal.image_path,
         category=meal.category,
         verification_status=meal.verification_status.value,
         items=[
