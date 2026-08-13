@@ -16,3 +16,9 @@ it("keeps the meal image dialog fixed above the mobile header", () => {
     /\.admin-page\s*>\s*\.admin-meal-image-dialog\s*\{[^}]*position:\s*fixed;[^}]*z-index:\s*70;/,
   );
 });
+
+it("keeps an open account menu above admin page content", () => {
+  expect(adminCss).toMatch(
+    /\.admin-page\s*>\s*\.dashboard-header--menu-open\s*\{[^}]*z-index:\s*50;/,
+  );
+});

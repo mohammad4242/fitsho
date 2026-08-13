@@ -46,6 +46,10 @@
   z-index: 1;
 }
 
+.admin-page > .dashboard-header--menu-open {
+  z-index: 50;
+}
+
 .admin-hero, .admin-form-header {
   background: rgb(10 31 30 / 52%);
   backdrop-filter: blur(8px);
