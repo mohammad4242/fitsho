@@ -26,10 +26,11 @@ function renderPage() {
   );
 }
 
-it("keeps registration controls usable beside the decorative training photo", () => {
+it("keeps registration controls usable without promotional media", () => {
   renderPage();
 
-  expect(screen.getByTestId("auth-training-accent")).toHaveAttribute("aria-hidden", "true");
+  expect(screen.queryByTestId("auth-training-accent")).not.toBeInTheDocument();
+  expect(document.querySelector(".brand-panel")).not.toBeInTheDocument();
   expect(screen.getByLabelText("ایمیل")).toBeVisible();
   expect(screen.getByRole("button", { name: "ساخت حساب" })).toBeEnabled();
 });

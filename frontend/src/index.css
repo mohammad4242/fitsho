@@ -89,8 +89,7 @@ a:focus-visible {
 
 .auth-shell {
   min-height: 100svh;
-  display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(26rem, 0.92fr);
+  display: block;
   background: var(--mist-50);
 }
 
@@ -336,8 +335,8 @@ html[dir="rtl"] .welcome-card h1 {
 .form-panel {
   min-height: 100svh;
   display: grid;
-  place-items: center;
-  padding: clamp(2rem, 6vw, 5rem);
+  grid-template-rows: auto 1fr;
+  padding: 1.2rem clamp(1rem, 6vw, 5rem) 3rem;
   background:
     linear-gradient(rgb(255 255 255 / 72%), rgb(255 255 255 / 72%)),
     repeating-linear-gradient(
@@ -348,12 +347,21 @@ html[dir="rtl"] .welcome-card h1 {
 }
 
 .form-panel__mobile-nav {
-  display: none;
+  display: flex;
+  width: 100%;
 }
 
 .form-wrap {
   width: min(100%, 27rem);
+  align-self: center;
+  justify-self: center;
   animation: rise-in 520ms 80ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.form-panel__mobile-nav .language-switcher {
+  border-color: var(--fitsho-line);
+  color: var(--fitsho-ink);
+  background: var(--fitsho-surface);
 }
 
 .auth-shell {
@@ -833,32 +841,12 @@ html[dir="ltr"] .primary-button span:last-child {
 }
 
 @media (max-width: 900px) {
-  .auth-shell {
-    display: block;
-  }
-
-  .brand-panel {
-    display: none;
-  }
-
   .form-panel {
-    display: block;
     padding: 1.2rem clamp(1rem, 6vw, 3rem) 3rem;
   }
 
   .form-panel__mobile-nav {
-    display: flex;
     margin-block-end: clamp(3rem, 10vh, 6rem);
-  }
-
-  .form-panel__mobile-nav .language-switcher {
-    border-color: var(--line);
-    color: var(--ink);
-    background: var(--paper);
-  }
-
-  .form-wrap {
-    margin-inline: auto;
   }
 
   .welcome-card,

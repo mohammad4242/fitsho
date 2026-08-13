@@ -24,13 +24,11 @@ function renderPage() {
   );
 }
 
-it("keeps the login form usable beside the decorative training photo", () => {
+it("keeps the login form usable without promotional media", () => {
   renderPage();
 
-  expect(screen.getByTestId("auth-training-accent")).toHaveAttribute(
-    "src",
-    expect.stringContaining("fitsho-body-hero"),
-  );
+  expect(screen.queryByTestId("auth-training-accent")).not.toBeInTheDocument();
+  expect(document.querySelector(".brand-panel")).not.toBeInTheDocument();
   expect(document.querySelector(".auth-shell")).toHaveClass("fitsho-page");
   expect(screen.getByLabelText("ایمیل")).toBeVisible();
   expect(screen.getByRole("button", { name: "ورود به فیتشو" })).toBeEnabled();
