@@ -130,7 +130,11 @@ export type WeeklyPlanFood = {
   grams: number;
   cost_irr: number;
   nutrients: Record<string, number>;
-  recipe_snapshot?: Record<string, unknown> | null;
+  prepared_recipe?: {
+    status: "estimated" | "verified";
+    nutrients_per_100g: Record<string, number>;
+    cost_irr_per_100g: number;
+  } | null;
 };
 
 export type WeeklyPlan = {

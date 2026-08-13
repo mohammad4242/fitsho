@@ -178,6 +178,20 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
                   </li>
                 ))}
               </ul>
+              {meal.foods.map((food) => food.item_kind === "prepared_recipe" && food.prepared_recipe ? (
+                <aside className="weekly-plan__prepared-recipe" key={`${meal.id}-${food.slug}-summary`}>
+                  <div>
+                    <strong>{number.format(food.prepared_recipe.nutrients_per_100g.energy_kcal ?? 0)} {l("کیلوکالری در ۱۰۰ گرم", "kcal per 100 g")}</strong>
+                    {food.prepared_recipe.status === "estimated" && <span>تخمینی</span>}
+                  </div>
+                  <dl>
+                    {preparedRecipeMacroEntries(food.prepared_recipe.nutrients_per_100g).map(([code, value]) => (
+                      <div key={code}><dt>{nutrientLabel(code, language)}</dt><dd>{number.format(value)}</dd></div>
+                    ))}
+                  </dl>
+                  <small>{number.format(Math.floor(food.prepared_recipe.cost_irr_per_100g / 10))} {l("تومان در ۱۰۰ گرم", "Toman per 100 g")}</small>
+                </aside>
+              ) : null)}
               <dl className="weekly-plan__meal-totals">
                 {mealMetricEntries(meal.nutrient_totals).map(([code, value]) => <div key={code}><dt>{nutrientLabel(code, language)}</dt><dd>{number.format(value)}</dd></div>)}
               </dl>
@@ -295,6 +309,11 @@ function mealMetricEntries(values: Record<string, number>): Array<[string, numbe
   return ordered.flatMap((code) => typeof values[code] === "number" ? [[code, values[code]] as [string, number]] : []);
 }
 
+function preparedRecipeMacroEntries(values: Record<string, number>): Array<[string, number]> {
+  return ["protein_g", "carbohydrate_g", "total_fat_g", "fibre_g"]
+    .flatMap((code) => typeof values[code] === "number" ? [[code, values[code]] as [string, number]] : []);
+}
+
 function lifecycleLabel(status: string, language: "fa" | "en") {
   const values: Record<string, [string, string]> = {
     pending_physician_review: ["در انتظار بررسی", "Pending review"], physician_review_in_progress: ["در حال بررسی پزشک", "Physician review in progress"], awaiting_lab_information: ["در انتظار اطلاعات آزمایش", "Awaiting lab information"], physician_approved: ["تأییدشده", "Approved"], active: ["فعال", "Active"], archived: ["بایگانی‌شده", "Archived"], changes_requested: ["نیازمند تغییر", "Changes requested"], rejected: ["ردشده", "Rejected"],
@@ -323,6 +342,7 @@ function nutrientLabel(code: string, language: "fa" | "en") {
     energy_kcal: ["انرژی", "Energy"],
     protein_g: ["پروتئین", "Protein"],
     carbohydrate_g: ["کربوهیدرات", "Carbohydrate"],
+    total_fat_g: ["چربی کل", "Total fat"],
     fat_g: ["چربی", "Fat"],
     fibre_g: ["فیبر", "Fibre"],
     free_sugar_g: ["قند آزاد", "Free sugar"],

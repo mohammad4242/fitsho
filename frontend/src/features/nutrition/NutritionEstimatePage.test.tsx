@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import i18n from "../../i18n";
 import * as nutritionApi from "./api";
 import { NutritionEstimatePage } from "./NutritionEstimatePage";
+import { WeeklyNutritionPlan } from "./WeeklyNutritionPlan";
 import type { NutritionEstimate, WeeklyPlan } from "./types";
 
 vi.mock("./api");
@@ -133,6 +134,71 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+function preparedRecipePlan(status: "estimated" | "verified"): WeeklyPlan {
+  return {
+    ...weeklyPlan,
+    days: weeklyPlan.days.map((day, index) => index === 0 ? {
+      ...day,
+      meals: day.meals.map((meal) => ({
+        ...meal,
+        foods: [{
+          food_id: null,
+          item_kind: "prepared_recipe",
+          slug: "prepared-gheimeh",
+          name_fa: "قیمه",
+          name_en: "Gheimeh",
+          grams: 290,
+          cost_irr: 141_375,
+          nutrients: { energy_kcal: 500, protein_g: 41.2 },
+          prepared_recipe: {
+            status,
+            nutrients_per_100g: {
+              energy_kcal: 172.4,
+              protein_g: 14.2,
+              carbohydrate_g: 11.3,
+              total_fat_g: 7.1,
+              fibre_g: 2.4,
+            },
+            cost_irr_per_100g: 48_750,
+          },
+        }],
+      })),
+    } : day),
+  };
+}
+
+it("shows the safe per-100g summary and only تخمینی for an estimated recipe", async () => {
+  await i18n.changeLanguage("fa");
+
+  render(<MemoryRouter><WeeklyNutritionPlan language="fa" plan={preparedRecipePlan("estimated")} /></MemoryRouter>);
+
+  const estimatedLabel = await screen.findByText("تخمینی");
+  const recipeSummary = estimatedLabel.closest("aside");
+  expect(recipeSummary).not.toBeNull();
+  expect(screen.getByText(/۱۷۲٫۴.*کیلوکالری.*۱۰۰ گرم/)).toBeInTheDocument();
+  expect(within(recipeSummary!).getByText("پروتئین")).toBeInTheDocument();
+  expect(within(recipeSummary!).getByText("۱۴٫۲")).toBeInTheDocument();
+  expect(within(recipeSummary!).getByText("کربوهیدرات")).toBeInTheDocument();
+  expect(within(recipeSummary!).getByText("۱۱٫۳")).toBeInTheDocument();
+  expect(within(recipeSummary!).getByText("چربی کل")).toBeInTheDocument();
+  expect(within(recipeSummary!).getByText("۷٫۱")).toBeInTheDocument();
+  expect(within(recipeSummary!).getByText("فیبر")).toBeInTheDocument();
+  expect(within(recipeSummary!).getByText("۲٫۴")).toBeInTheDocument();
+  expect(screen.getByText(/۴٬۸۷۵.*تومان.*۱۰۰ گرم/)).toBeInTheDocument();
+  expect(screen.queryByText(/draft|verified|بررسی‌نشده/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/قیمت ماده|مقدار ماده/)).not.toBeInTheDocument();
+});
+
+it("does not show the estimated label for a verified recipe", async () => {
+  await i18n.changeLanguage("fa");
+
+  render(<MemoryRouter><WeeklyNutritionPlan language="fa" plan={preparedRecipePlan("verified")} /></MemoryRouter>);
+
+  await waitFor(() => expect(nutritionApi.getShoppingList).toHaveBeenCalled());
+  expect(screen.queryByText("تخمینی")).not.toBeInTheDocument();
+  expect(screen.getByText(/۱۷۲٫۴.*کیلوکالری.*۱۰۰ گرم/)).toBeInTheDocument();
 });
 
 it("animates the real calorie target and full ring on the same timeline", async () => {
