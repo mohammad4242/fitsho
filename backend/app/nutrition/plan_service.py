@@ -6,7 +6,7 @@ from decimal import Decimal
 from hashlib import sha256
 from uuid import UUID
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
@@ -714,7 +714,12 @@ def _planner_meal_templates(
 ) -> tuple[tuple[PlannerMealTemplate, ...], list[dict[str, object]]]:
     meals = db.scalars(
         select(NutritionCatalogueMeal)
-        .where(NutritionCatalogueMeal.verification_status == FoodVerificationStatus.VERIFIED)
+        .where(
+            or_(
+                NutritionCatalogueMeal.verification_status == FoodVerificationStatus.VERIFIED,
+                NutritionCatalogueMeal.calculation_mode == MealCalculationMode.PREPARED_RECIPE,
+            )
+        )
         .options(
             selectinload(NutritionCatalogueMeal.items),
             selectinload(NutritionCatalogueMeal.prepared_recipe)
@@ -816,7 +821,7 @@ def _planner_prepared_recipe(meal: NutritionCatalogueMeal) -> PlannerPreparedRec
     if meal.prepared_recipe is None or not meal.prepared_recipe.revisions:
         return None
     revision = meal.prepared_recipe.revisions[-1]
-    if revision.verification_status is not FoodVerificationStatus.VERIFIED or revision.data_gaps:
+    if revision.verification_status is FoodVerificationStatus.RETIRED:
         return None
     return PlannerPreparedRecipe(
         revision_id=str(revision.id),

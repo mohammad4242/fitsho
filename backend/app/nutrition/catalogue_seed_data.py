@@ -162,6 +162,18 @@ APPROVED_FOODS = (
         "گوشت گاو چرخ‌کرده",
         "Beef",
     ),
+    _food(
+        "beef-chuck-stew-meat",
+        "گوشت خورشتی گوساله (سردست)",
+        "Beef chuck stew meat",
+        "red_meat",
+        "main_protein",
+        "raw",
+        "2646174",
+        "گوشت خورشتی گوساله",
+        "گوشت تکه‌ای گوساله",
+        "Beef chuck roast",
+    ),
     _food("lamb", "گوشت گوسفند", "Lamb", "red_meat", "main_protein", "raw", "174370"),
     _food("white-fish", "ماهی سفید", "White fish", "fish", "main_protein", "raw", "173711"),
     _food(
@@ -603,6 +615,25 @@ _BREAD_COMPOSITIONS = {
 }
 
 _FOUNDATION_COMPOSITIONS: dict[str, tuple[str, str, dict[str, str]]] = {
+    "beef-chuck-stew-meat": (
+        "2646174",
+        "2023-10-12",
+        {
+            "energy_kcal": "231.71",
+            "protein_g": "18.40",
+            "carbohydrate_g": "0",
+            "total_fat_g": "17.80",
+            "fibre_g": "0",
+            "saturated_fat_g": "6.34",
+            "sodium_mg": "48.4",
+            "calcium_mg": "4.58",
+            "potassium_mg": "281",
+            "magnesium_mg": "17",
+            "iron_mg": "2.06",
+            "zinc_mg": "5.39",
+            "copper_mg": "0.054",
+        },
+    ),
     "creamy-peanut-butter": (
         "2262072",
         "2022-04-28",

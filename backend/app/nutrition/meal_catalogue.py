@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.nutrition.enums import FoodVerificationStatus, MealCalculationMode, MealCategory
 from app.nutrition.food_catalogue import FoodCompositionValue, calculate_meal_totals
-from app.nutrition.meal_catalogue_seed_data import SEED_MEALS
+from app.nutrition.meal_catalogue_seed_data import PREPARED_RECIPE_SEEDS, SEED_MEALS
 from app.nutrition.models import (
     NutritionCatalogueFood,
     NutritionCatalogueMeal,
@@ -152,11 +152,6 @@ def _save_catalogue_meal(
                 for item in recipe_payload.ingredients
             ):
                 raise ValueError("Verified Prepared Recipes require verified required foods")
-        if (
-            payload.verification_status == FoodVerificationStatus.VERIFIED.value
-            and recipe_payload.verification_status != FoodVerificationStatus.VERIFIED.value
-        ):
-            raise ValueError("Verified Prepared Recipe meals require a verified recipe revision")
     meal.name_fa = payload.name_fa
     meal.name_en = payload.name_en
     meal.category = payload.category
@@ -532,6 +527,12 @@ def seed_meal_catalogue(db: Session, *, commit: bool = True) -> list[NutritionCa
             )
             else FoodVerificationStatus.DRAFT
         )
+        recipe_seed = PREPARED_RECIPE_SEEDS.get(code)
+        meal.calculation_mode = (
+            MealCalculationMode.PREPARED_RECIPE
+            if recipe_seed is not None
+            else MealCalculationMode.SIMPLE
+        )
         meal.items = [
             NutritionCatalogueMealItem(
                 id=uuid5(NAMESPACE_URL, f"fitsho:nutrition:meal:{code}:{slug}"),
@@ -544,9 +545,85 @@ def seed_meal_catalogue(db: Session, *, commit: bool = True) -> list[NutritionCa
             )
             for slug, reference, minimum, maximum, required, role in item_seeds
         ]
+        if recipe_seed is not None:
+            _seed_initial_prepared_recipe(db, meal, recipe_seed, foods)
         seeded.append(meal)
     if commit:
         db.commit()
     else:
         db.flush()
     return list_catalogue_meals(db)
+
+
+def _seed_initial_prepared_recipe(
+    db: Session,
+    meal: NutritionCatalogueMeal,
+    seed: dict[str, object],
+    foods: dict[str, NutritionCatalogueFood],
+) -> None:
+    existing_recipe_id = db.scalar(
+        select(NutritionPreparedRecipe.id).where(NutritionPreparedRecipe.meal_id == meal.id)
+    )
+    if existing_recipe_id:
+        return
+    ingredient_seeds = seed["ingredients"]
+    ratio_seeds = seed["ratios"]
+    assert isinstance(ingredient_seeds, tuple)
+    assert isinstance(ratio_seeds, tuple)
+    missing = [slug for slug, *_ in ingredient_seeds if slug not in foods]
+    if missing:
+        raise ValueError(f"Prepared Recipe seed foods are missing: {', '.join(missing)}")
+    recipe = NutritionPreparedRecipe(
+        id=uuid5(NAMESPACE_URL, f"fitsho:nutrition:prepared-recipe:{meal.code}"),
+        meal_id=meal.id,
+    )
+    db.add(recipe)
+    db.flush()
+    reference_input = sum(
+        (Decimal(reference) for _, reference, *_ in ingredient_seeds), Decimal("0")
+    )
+    revision = NutritionPreparedRecipeRevision(
+        id=uuid5(NAMESPACE_URL, f"fitsho:nutrition:prepared-recipe:{meal.code}:v1"),
+        recipe_id=recipe.id,
+        version=1,
+        verification_status=FoodVerificationStatus.DRAFT,
+        calculation_version=CALCULATION_VERSION,
+        source_name="Fitsho initial recipe estimate",
+        source_reference="admin://nutrition/prepared-recipes/initial-estimate",
+        notes="Ingredient bounds are editable; seasonings are intentionally excluded.",
+        yield_method="proportional_reference_batch",
+        reference_input_grams=reference_input,
+        final_cooked_yield_grams=Decimal(str(seed["final_cooked_yield_grams"])),
+        yield_source_name="Fitsho approximate retained-water model",
+        yield_source_reference="admin://nutrition/prepared-recipes/estimated-yield",
+        yield_notes="Approximate cooked mass; replace with a measured kitchen batch.",
+        ingredients=[
+            NutritionPreparedRecipeIngredient(
+                food_id=foods[slug].id,
+                reference_grams=Decimal(reference),
+                min_grams=Decimal(minimum),
+                max_grams=Decimal(maximum),
+                is_required=required,
+            )
+            for slug, reference, minimum, maximum, required in ingredient_seeds
+        ],
+        ratios=[
+            NutritionPreparedRecipeRatio(
+                numerator_food_id=foods[numerator].id,
+                denominator_food_id=foods[denominator].id,
+                min_ratio=Decimal(minimum),
+                max_ratio=Decimal(maximum),
+            )
+            for numerator, denominator, minimum, maximum in ratio_seeds
+        ],
+        data_gaps=[
+            NutritionPreparedRecipeDataGap(
+                ingredient_name_fa=str(seed["name_fa"]),
+                ingredient_name_en=str(seed["name_en"]),
+                message_fa=str(seed["gap_fa"]),
+                message_en=str(seed["gap_en"]),
+            )
+        ],
+    )
+    db.add(revision)
+    db.flush()

@@ -21,6 +21,75 @@ def item(
     return slug, str(reference), str(minimum), str(maximum), required, role
 
 
+def recipe_item(
+    slug: str, reference: int, minimum: int, maximum: int, *, required: bool = True
+) -> tuple[str, str, str, str, bool]:
+    return slug, str(reference), str(minimum), str(maximum), required
+
+
+def ratio(
+    numerator_slug: str, denominator_slug: str, minimum: str, maximum: str
+) -> tuple[str, str, str, str]:
+    return numerator_slug, denominator_slug, minimum, maximum
+
+
+PREPARED_RECIPE_SEEDS: dict[str, dict[str, object]] = {
+    "LU07": {
+        "name_fa": "قورمه‌سبزی",
+        "name_en": "Ghormeh sabzi",
+        "final_cooked_yield_grams": "400",
+        "ingredients": (
+            recipe_item("beef-chuck-stew-meat", 120, 80, 200),
+            recipe_item("red-kidney-beans", 40, 25, 70),
+            recipe_item("mixed-herbs", 120, 70, 200),
+            recipe_item("onion", 30, 15, 60),
+            recipe_item("vegetable-oil", 5, 2, 10, required=False),
+        ),
+        "ratios": (ratio("beef-chuck-stew-meat", "red-kidney-beans", "1.5", "5"),),
+        "gap_fa": "وزن نهایی پخته و ترکیب دقیق سبزی قورمه تخمینی است و منبع اندازه‌گیری‌شده ندارد",
+        "gap_en": (
+            "Final cooked yield and the exact Ghormeh herb blend are estimates "
+            "without a measured source"
+        ),
+    },
+    "LU08": {
+        "name_fa": "قیمه",
+        "name_en": "Gheimeh",
+        "final_cooked_yield_grams": "425",
+        "ingredients": (
+            recipe_item("beef-chuck-stew-meat", 120, 80, 200),
+            recipe_item("split-peas", 45, 25, 75),
+            recipe_item("tomato-paste", 35, 15, 65),
+            recipe_item("potato", 100, 50, 180, required=False),
+            recipe_item("onion", 30, 15, 60),
+            recipe_item("vegetable-oil", 5, 2, 10, required=False),
+        ),
+        "ratios": (ratio("beef-chuck-stew-meat", "split-peas", "1.5", "4"),),
+        "gap_fa": "وزن نهایی پخته تخمینی است و منبع اندازه‌گیری‌شده ندارد",
+        "gap_en": "Final cooked yield is an estimate without a measured source",
+    },
+    "LU11": {
+        "name_fa": "آبگوشت",
+        "name_en": "Abgoosht",
+        "final_cooked_yield_grams": "520",
+        "ingredients": (
+            recipe_item("lamb", 120, 80, 200),
+            recipe_item("chickpeas", 35, 20, 60),
+            recipe_item("white-beans", 35, 20, 60),
+            recipe_item("potato", 120, 70, 220),
+            recipe_item("tomato-paste", 30, 15, 60),
+            recipe_item("onion", 30, 15, 60),
+        ),
+        "ratios": (
+            ratio("lamb", "chickpeas", "2", "6"),
+            ratio("chickpeas", "white-beans", "0.5", "2"),
+        ),
+        "gap_fa": "وزن نهایی پخته و مقدار آب باقی‌مانده تخمینی است و منبع اندازه‌گیری‌شده ندارد",
+        "gap_en": "Final cooked yield and retained broth are estimates without a measured source",
+    },
+}
+
+
 SEED_MEALS: tuple[dict[str, object], ...] = (
     {
         "code": "BF01",
@@ -200,28 +269,14 @@ SEED_MEALS: tuple[dict[str, object], ...] = (
         "category": MealCategory.LUNCH,
         "name_fa": "قورمه‌سبزی + برنج",
         "name_en": "Ghormeh sabzi with rice",
-        "items": (
-            item("ground-beef", 120, 80, 200, P),
-            item("red-kidney-beans", 40, 25, 70, FB),
-            item("mixed-herbs", 120, 70, 200, M),
-            item("basmati-rice", 80, 50, 130, C),
-            item("onion", 30, 15, 60, M, required=False),
-            item("vegetable-oil", 5, 2, 10, F, required=False),
-        ),
+        "items": (item("basmati-rice", 80, 50, 130, C),),
     },
     {
         "code": "LU08",
         "category": MealCategory.LUNCH,
         "name_fa": "قیمه + برنج",
         "name_en": "Gheimeh with rice",
-        "items": (
-            item("ground-beef", 120, 80, 200, P),
-            item("split-peas", 45, 25, 75, FB),
-            item("basmati-rice", 80, 50, 130, C),
-            item("tomato-paste", 35, 15, 65, M),
-            item("potato", 100, 50, 180, C, required=False),
-            item("onion", 30, 15, 60, M, required=False),
-        ),
+        "items": (item("basmati-rice", 80, 50, 130, C),),
     },
     {
         "code": "LU09",
@@ -257,11 +312,6 @@ SEED_MEALS: tuple[dict[str, object], ...] = (
         "name_fa": "آبگوشت + نان سنگک + سبزی",
         "name_en": "Abgoosht with Sangak and herbs",
         "items": (
-            item("lamb", 120, 80, 200, P),
-            item("chickpeas", 35, 20, 60, FB),
-            item("white-beans", 35, 20, 60, FB),
-            item("potato", 120, 70, 220, C),
-            item("tomato-paste", 30, 15, 60, M),
             item("sangak-bread", 60, 30, 120, C),
             item("mixed-herbs", 60, 30, 120, M),
         ),

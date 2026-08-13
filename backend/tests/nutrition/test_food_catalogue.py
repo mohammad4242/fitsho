@@ -86,6 +86,7 @@ def test_base_catalogue_seed_contains_user_approved_iranian_ingredients(db: Sess
     assert {food.slug for food in foods} >= {
         "chicken-breast",
         "ground-beef",
+        "beef-chuck-stew-meat",
         "lentils",
         "basmati-rice",
         "tomato",
@@ -109,6 +110,7 @@ def test_base_seed_contains_exact_requested_source_backed_foods(db: Session) -> 
             select(NutritionCatalogueFood).where(
                 NutritionCatalogueFood.slug.in_(
                     {
+                        "beef-chuck-stew-meat",
                         "creamy-peanut-butter",
                         "tomato-paste",
                         "green-beans",
@@ -121,7 +123,7 @@ def test_base_seed_contains_exact_requested_source_backed_foods(db: Session) -> 
             )
         )
     }
-    assert len(first) == len(second) == 71
+    assert len(first) == len(second) == 72
     assert set(requested) == {
         "creamy-peanut-butter",
         "tomato-paste",
@@ -130,6 +132,7 @@ def test_base_seed_contains_exact_requested_source_backed_foods(db: Session) -> 
         "wheat-flour",
         "mozzarella",
         "ground-beef",
+        "beef-chuck-stew-meat",
     }
     assert all(food.verification_status.value == "verified" for food in requested.values())
     assert {food.source_food_id for food in requested.values()} == {
@@ -140,6 +143,7 @@ def test_base_seed_contains_exact_requested_source_backed_foods(db: Session) -> 
         "790018",
         "170846",
         "174030",
+        "2646174",
     }
     assert {food.slug: food.measurement_basis.value for food in requested.values()} == {
         "creamy-peanut-butter": "as_purchased",
@@ -149,10 +153,14 @@ def test_base_seed_contains_exact_requested_source_backed_foods(db: Session) -> 
         "wheat-flour": "dry",
         "mozzarella": "as_purchased",
         "ground-beef": "raw",
+        "beef-chuck-stew-meat": "raw",
     }
     assert requested["ground-beef"].name_fa == "گوشت چرخ‌کرده گوساله (۱۰٪ چربی)"
     assert requested["ground-beef"].name_en == "Ground beef, 90% lean / 10% fat"
     assert requested["ground-beef"].dietary_patterns == ["omnivore"]
+    assert requested["beef-chuck-stew-meat"].name_en == "Beef chuck stew meat"
+    assert requested["beef-chuck-stew-meat"].source_food_id == "2646174"
+    assert requested["beef-chuck-stew-meat"].dietary_patterns == ["omnivore"]
     assert requested["mozzarella"].dietary_patterns == ["omnivore", "vegetarian"]
     assert requested["mozzarella"].aliases
     assert {alias.alias for alias in requested["mozzarella"].aliases} >= {
@@ -301,7 +309,7 @@ def test_approved_catalogue_keeps_identity_aliases_and_composition_separate(db: 
     assert "added_sugars_g" not in values
 
 
-def test_approved_catalogue_has_all_71_identities_and_source_backed_breads_are_verified(
+def test_approved_catalogue_has_all_72_identities_and_source_backed_breads_are_verified(
     db: Session,
 ) -> None:
     from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
@@ -311,7 +319,7 @@ def test_approved_catalogue_has_all_71_identities_and_source_backed_breads_are_v
 
     foods = db.scalars(select(NutritionCatalogueFood)).all()
     current = [food for food in foods if food.verification_status.value != "retired"]
-    assert len(current) == 71
+    assert len(current) == 72
     statuses = {food.slug: food.verification_status.value for food in current}
     assert statuses["sangak-bread"] == "verified"
     assert statuses["barbari-bread"] == "verified"

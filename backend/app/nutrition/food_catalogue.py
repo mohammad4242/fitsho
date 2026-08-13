@@ -476,6 +476,7 @@ def _dietary_patterns_for_slug(slug: str) -> list[str]:
         "chicken-breast",
         "chicken-thigh-skinless",
         "ground-beef",
+        "beef-chuck-stew-meat",
         "lamb",
         "white-fish",
         "rainbow-trout",

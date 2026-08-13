@@ -57,7 +57,7 @@ def _add_required_imported_foods(db: Session) -> None:
 
 
 def test_seed_creates_exact_complete_bounded_meal_catalogue_idempotently(db: Session) -> None:
-    from app.nutrition.enums import FoodVerificationStatus, MealCategory
+    from app.nutrition.enums import FoodVerificationStatus, MealCalculationMode, MealCategory
     from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
     from app.nutrition.meal_catalogue import seed_meal_catalogue
     from app.nutrition.models import NutritionCatalogueMeal
@@ -101,6 +101,22 @@ def test_seed_creates_exact_complete_bounded_meal_catalogue_idempotently(db: Ses
         "post_workout": 1,
     }
     assert all(meal.verification_status.value == "verified" for meal in seeded)
+    assert {
+        meal.code for meal in seeded if meal.calculation_mode is MealCalculationMode.PREPARED_RECIPE
+    } == {"LU07", "LU08", "LU11"}
+    assert all(
+        meal.calculation_mode is MealCalculationMode.SIMPLE
+        for meal in seeded
+        if meal.code not in {"LU07", "LU08", "LU11"}
+    )
+    for code in ("LU07", "LU08", "LU11"):
+        meal = next(item for item in seeded if item.code == code)
+        assert meal.prepared_recipe is not None
+        revision = meal.prepared_recipe.revisions[-1]
+        assert revision.verification_status is FoodVerificationStatus.DRAFT
+        assert revision.final_cooked_yield_grams > revision.reference_input_grams
+        assert revision.ratios
+        assert revision.data_gaps
     assert all(meal.items for meal in seeded)
     assert all(item.food_id is not None for meal in seeded for item in meal.items)
     assert all(item.functional_role is not None for meal in seeded for item in meal.items)
@@ -137,6 +153,11 @@ def test_seed_creates_exact_complete_bounded_meal_catalogue_idempotently(db: Ses
         "DN07",
         "SN02",
         "SN07",
+    }
+    ghormeh = next(meal for meal in seeded if meal.code == "LU07")
+    assert {item.food.slug for item in ghormeh.items} == {"basmati-rice"}
+    assert "ground-beef" not in {
+        ingredient.food.slug for ingredient in ghormeh.prepared_recipe.revisions[-1].ingredients
     }
 
 
