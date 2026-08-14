@@ -50,6 +50,7 @@ def test_seed_manifest_covers_every_catalog_category() -> None:
 
 def test_seed_manifest_has_complete_bilingual_safe_content() -> None:
     from app.exercises.seed_data import ALTERNATIVE_SEEDS, EXERCISE_SEEDS
+    from app.exercises.taxonomy import is_compatible_muscle_focus
 
     slugs = {seed.slug for seed in EXERCISE_SEEDS}
     for seed in EXERCISE_SEEDS:
@@ -64,6 +65,7 @@ def test_seed_manifest_has_complete_bilingual_safe_content() -> None:
         assert seed.equipment
         assert len(set(seed.equipment)) == len(seed.equipment)
         assert seed.primary_muscle not in seed.secondary_muscles
+        assert is_compatible_muscle_focus(seed.primary_muscle, seed.muscle_focus)
         assert len(set(seed.secondary_muscles)) == len(seed.secondary_muscles)
         assert seed.is_programmable is True
         assert seed.movement_pattern.value
@@ -111,6 +113,7 @@ def test_seed_is_idempotent_and_restores_seed_owned_fields(db: Session) -> None:
         Difficulty,
         Equipment,
         MediaType,
+        MuscleFocus,
         MuscleGroup,
     )
     from app.exercises.models import Exercise, ExerciseAlternative, ExerciseEquipment
@@ -132,6 +135,7 @@ def test_seed_is_idempotent_and_restores_seed_owned_fields(db: Session) -> None:
         name_fa="حرکت سفارشی مالک پروژه",
         body_region=BodyRegion.CORE,
         primary_muscle=MuscleGroup.LOWER_BACK,
+        muscle_focus=MuscleFocus.LUMBAR_ERECTORS,
         difficulty=Difficulty.BEGINNER,
         instructions_en=["Set a stable stance.", "Move with control.", "Return to start."],
         instructions_fa=[

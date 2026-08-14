@@ -124,8 +124,8 @@ def classify_muscle_focus(
             return _classification(MuscleFocus.UPPER_BACK, source_basis)
         if target == "lats":
             return _classification(MuscleFocus.LATS, source_basis)
-        if "pullover" in name:
-            return _classification(MuscleFocus.LATS, "mechanics:shoulder_extension")
+        if "pullover" in name or movement_pattern is MovementPattern.VERTICAL_PULL:
+            return _classification(MuscleFocus.LATS, "mechanics:vertical_pull_or_extension")
         if movement_pattern is MovementPattern.HORIZONTAL_PULL:
             return _classification(MuscleFocus.GENERAL_BACK, "mechanics:broad_row")
         return None

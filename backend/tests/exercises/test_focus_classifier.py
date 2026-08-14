@@ -76,6 +76,18 @@ def test_shoulder_raise_and_press_mechanics_are_specific() -> None:
         assert result.focus is expected
 
 
+def test_vertical_back_pull_classifies_as_lats() -> None:
+    result = classify(
+        MuscleGroup.BACK,
+        target="back",
+        name="Lat Pulldown",
+        movement=MovementPattern.VERTICAL_PULL,
+    )
+
+    assert result is not None
+    assert result.focus is MuscleFocus.LATS
+
+
 def test_core_rotation_records_move_from_abs_to_obliques() -> None:
     cases = (
         ("Cable Standing Lift", MovementPattern.OTHER),

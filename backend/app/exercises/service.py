@@ -102,6 +102,7 @@ def _apply_seed_fields(exercise: Exercise, seed: ExerciseSeed) -> None:
     exercise.name_fa = seed.name_fa
     exercise.body_region = seed.body_region
     exercise.primary_muscle = seed.primary_muscle
+    exercise.muscle_focus = seed.muscle_focus
     exercise.difficulty = seed.difficulty
     exercise.movement_pattern = seed.movement_pattern
     exercise.exercise_type = seed.exercise_type

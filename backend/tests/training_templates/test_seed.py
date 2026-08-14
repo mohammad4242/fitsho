@@ -3,7 +3,7 @@ from collections import Counter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.exercises.enums import MediaType, MovementPattern, MuscleGroup
+from app.exercises.enums import MediaType, MovementPattern, MuscleFocus, MuscleGroup
 from app.exercises.models import Exercise
 from app.exercises.service import seed_exercises
 from app.profile.enums import ExperienceLevel
@@ -214,6 +214,7 @@ def test_seed_creates_missing_template_exercise_as_safe_catalog_placeholder(db: 
     assert slot.exercise is not None
     assert slot.exercise.slug == "cable-pullover"
     assert slot.exercise.primary_muscle is MuscleGroup.BACK
+    assert slot.exercise.muscle_focus is MuscleFocus.LATS
     assert slot.exercise.needs_review is True
     assert slot.exercise.is_programmable is False
     assert slot.exercise.media_type is MediaType.PLACEHOLDER
