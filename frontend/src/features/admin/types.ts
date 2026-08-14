@@ -9,6 +9,7 @@ import type {
   MediaPresentation,
   MediaRole,
   MovementPattern,
+  MuscleFocus,
   MuscleGroup,
 } from "../exercises/types";
 import type { ExperienceLevel, FitnessGoal } from "../profile/types";
@@ -44,6 +45,7 @@ export type AdminExerciseCreate = {
   name_fa: string;
   body_region: BodyRegion | null;
   primary_muscle: MuscleGroup | null;
+  muscle_focus: MuscleFocus | null;
   secondary_muscles: MuscleGroup[];
   equipment: Equipment[];
   difficulty: Difficulty;
@@ -66,16 +68,18 @@ export type AdminExerciseCreate = {
 
 export type AdminExerciseForm = Omit<
   AdminExerciseCreate,
-  "body_region" | "primary_muscle" | "media_assets"
+  "body_region" | "primary_muscle" | "muscle_focus" | "media_assets"
 > & {
   body_region: BodyRegion | "";
   primary_muscle: MuscleGroup | "";
+  muscle_focus: MuscleFocus | "";
   media_assets: AdminExerciseMediaAssetInput[];
 };
 
 export type AdminExerciseFilters = {
   body_region?: BodyRegion | "";
   primary_muscle?: MuscleGroup | "";
+  muscle_focus?: MuscleFocus | "";
   equipment?: Equipment | "";
   difficulty?: Difficulty | "";
   exercise_type?: ExerciseType | "";

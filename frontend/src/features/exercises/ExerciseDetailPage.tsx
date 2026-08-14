@@ -136,6 +136,12 @@ function ReadyExerciseDetail({
             <span>{t(`catalog.muscle.${exercise.primary_muscle}`)}</span>
           </>
         )}
+        {exercise.muscle_focus !== null && (
+          <>
+            <span aria-hidden="true">←</span>
+            <span>{t(`catalog.muscleFocus.${exercise.muscle_focus}`)}</span>
+          </>
+        )}
         <span aria-hidden="true">←</span>
         <span aria-current="page">{name}</span>
       </nav>
@@ -186,6 +192,12 @@ function ReadyExerciseDetail({
               <dt>{t("catalog.primaryMuscleLabel")}</dt>
               <dd>{exercise.primary_muscle === null ? t("catalog.needsReview") : t(`catalog.muscle.${exercise.primary_muscle}`)}</dd>
             </div>
+            {exercise.muscle_focus !== null && (
+              <div>
+                <dt>{t("catalog.muscleFocusLabel")}</dt>
+                <dd>{t(`catalog.muscleFocus.${exercise.muscle_focus}`)}</dd>
+              </div>
+            )}
             {labels.length > 0 && (
               <div>
                 <dt>{t("exerciseDetail.labels")}</dt>

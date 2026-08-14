@@ -7,6 +7,7 @@ import type {
   ExerciseDetail,
   PaginatedExercises,
 } from "./types";
+import { muscleGroups } from "./types";
 
 const categories: ExerciseCategories = {
   body_regions: [
@@ -19,6 +20,9 @@ const categories: ExerciseCategories = {
     { value: "quadriceps", name_en: "Quadriceps", name_fa: "جلو پا" },
   ],
   core: [{ value: "lower_back", name_en: "Lower Back", name_fa: "فیله" }],
+  muscle_focuses: Object.fromEntries(
+    muscleGroups.map((muscle) => [muscle, []]),
+  ) as unknown as ExerciseCategories["muscle_focuses"],
 };
 
 const page: PaginatedExercises = {
@@ -36,6 +40,7 @@ const detail: ExerciseDetail = {
   name_fa: "پرس سینه دمبل",
   body_region: "upper_body",
   primary_muscle: "chest",
+  muscle_focus: "mid_chest",
   labels: [],
   secondary_muscles: ["triceps", "shoulders"],
   equipment: ["dumbbell", "bench"],
@@ -72,6 +77,7 @@ describe("exercise api", () => {
       getExercises({
         body_region: "upper_body",
         primary_muscle: "chest",
+        muscle_focus: "upper_chest",
         equipment: "",
         difficulty: undefined,
         search: "incline press",
@@ -80,7 +86,7 @@ describe("exercise api", () => {
     ).resolves.toEqual(page);
 
     expect(fetch).toHaveBeenCalledWith(
-      "/api/v1/exercises?body_region=upper_body&primary_muscle=chest&search=incline+press&page=2",
+      "/api/v1/exercises?body_region=upper_body&primary_muscle=chest&muscle_focus=upper_chest&search=incline+press&page=2",
       expect.objectContaining({ credentials: "include" }),
     );
   });

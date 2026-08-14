@@ -2,7 +2,14 @@ import { cloneElement, type ReactElement, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
-import { bodyRegions, difficulties, equipment, type MuscleGroup } from "../exercises/types";
+import {
+  bodyRegions,
+  difficulties,
+  equipment,
+  muscleFocusesByMuscle,
+  type MuscleFocus,
+  type MuscleGroup,
+} from "../exercises/types";
 import { AdminExerciseForm as ProgrammingMetadataForm, type ProgrammingMetadata } from "./AdminExerciseForm";
 import { ExerciseMediaAssetsFields } from "./ExerciseMediaAssetsFields";
 import type { AdminExerciseForm, AdminExerciseMediaFiles } from "./types";
@@ -42,6 +49,9 @@ export function AdminExerciseFields({
   const { t } = useTranslation();
   const [slugEdited, setSlugEdited] = useState(false);
   const availableMuscles = value.body_region ? musclesByRegion[value.body_region] : [];
+  const availableFocuses = value.primary_muscle
+    ? muscleFocusesByMuscle[value.primary_muscle]
+    : [];
   const errorText = (key: keyof AdminExerciseForm) =>
     errors[key] ? t(`admin.validation.${errors[key]}`) : null;
 
@@ -140,6 +150,7 @@ export function AdminExerciseFields({
               onChange={(event) => {
                 onChange("body_region", event.target.value as AdminExerciseForm["body_region"]);
                 onChange("primary_muscle", "");
+                onChange("muscle_focus", "");
                 onChange("secondary_muscles", []);
               }}
             >
@@ -153,11 +164,26 @@ export function AdminExerciseFields({
             <select
               value={value.primary_muscle}
               disabled={!value.body_region || value.needs_review}
-              onChange={(event) => onChange("primary_muscle", event.target.value as MuscleGroup)}
+              onChange={(event) => {
+                onChange("primary_muscle", event.target.value as MuscleGroup);
+                onChange("muscle_focus", "");
+              }}
             >
               <option value="">{t("admin.fields.select")}</option>
               {availableMuscles.map((muscle) => (
                 <option key={muscle} value={muscle}>{t(`catalog.muscle.${muscle}`)}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t("admin.fields.muscleFocus")} error={errorText("muscle_focus")}>
+            <select
+              value={value.muscle_focus}
+              disabled={!value.primary_muscle || value.needs_review}
+              onChange={(event) => onChange("muscle_focus", event.target.value as MuscleFocus)}
+            >
+              <option value="">{t("admin.fields.select")}</option>
+              {availableFocuses.map((focus) => (
+                <option key={focus} value={focus}>{t(`catalog.muscleFocus.${focus}`)}</option>
               ))}
             </select>
           </Field>

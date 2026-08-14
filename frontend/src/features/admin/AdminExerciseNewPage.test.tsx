@@ -51,19 +51,21 @@ it("suggests an editable slug and filters muscles by region", async () => {
 it("prefills the selected library category and keeps it editable", async () => {
   const user = userEvent.setup();
   renderPage(
-    "/admin/exercises/new?body_region=lower_body&primary_muscle=quadriceps&return_to=%2Fexercises%3Fbody_region%3Dlower_body%26primary_muscle%3Dquadriceps%26search%3Dsquat",
+    "/admin/exercises/new?body_region=lower_body&primary_muscle=quadriceps&muscle_focus=vasti&return_to=%2Fexercises%3Fbody_region%3Dlower_body%26primary_muscle%3Dquadriceps%26muscle_focus%3Dvasti%26search%3Dsquat",
   );
 
   expect(screen.getByLabelText("ناحیه بدن")).toHaveValue("lower_body");
   expect(screen.getByLabelText("عضله اصلی")).toHaveValue("quadriceps");
+  expect(screen.getByLabelText("بخش هدف عضله")).toHaveValue("vasti");
   expect(screen.getByRole("link", { name: /بازگشت/ })).toHaveAttribute(
     "href",
-    "/exercises?body_region=lower_body&primary_muscle=quadriceps&search=squat",
+    "/exercises?body_region=lower_body&primary_muscle=quadriceps&muscle_focus=vasti&search=squat",
   );
 
   await user.selectOptions(screen.getByLabelText("ناحیه بدن"), "core");
   await user.selectOptions(screen.getByLabelText("عضله اصلی"), "abs");
   expect(screen.getByLabelText("عضله اصلی")).toHaveValue("abs");
+  expect(screen.getByLabelText("بخش هدف عضله")).toHaveValue("");
 });
 
 it("allows a review record to leave anatomy unassigned and add a cardio label", async () => {
@@ -189,6 +191,7 @@ async function fillMinimumForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("نام فارسی"), "شنا شیب‌دار");
   await user.selectOptions(screen.getByLabelText("ناحیه بدن"), "upper_body");
   await user.selectOptions(screen.getByLabelText("عضله اصلی"), "chest");
+  await user.selectOptions(screen.getByLabelText("بخش هدف عضله"), "mid_chest");
   await user.click(screen.getByLabelText("وزن بدن"));
   const digits = ["۱", "۲", "۳"];
   for (const [index, value] of ["Brace", "Lower", "Press"].entries()) {

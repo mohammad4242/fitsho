@@ -1,4 +1,8 @@
-import type { BodyRegion, MuscleGroup } from "../exercises/types";
+import {
+  muscleFocusesByMuscle,
+  type BodyRegion,
+  type MuscleGroup,
+} from "../exercises/types";
 import type { AdminExerciseCreate, AdminExerciseForm } from "./types";
 
 export type AdminValidationCode =
@@ -8,6 +12,7 @@ export type AdminValidationCode =
   | "instructionCount"
   | "safetyRequired"
   | "muscleRegion"
+  | "muscleFocus"
   | "primaryRepeated"
   | "invalidUrl";
 
@@ -28,6 +33,7 @@ export function emptyAdminExerciseForm(): AdminExerciseForm {
     name_fa: "",
     body_region: "",
     primary_muscle: "",
+    muscle_focus: "",
     secondary_muscles: [],
     equipment: [],
     difficulty: "beginner",
@@ -80,6 +86,7 @@ export function validateAdminExercise(form: AdminExerciseForm): AdminValidationE
   if (!form.name_fa.trim()) errors.name_fa = "required";
   if (!form.needs_review && !form.body_region) errors.body_region = "required";
   if (!form.needs_review && !form.primary_muscle) errors.primary_muscle = "required";
+  if (!form.needs_review && !form.muscle_focus) errors.muscle_focus = "required";
   if (form.needs_review && Boolean(form.body_region) !== Boolean(form.primary_muscle)) {
     errors.primary_muscle = "required";
   }
@@ -104,6 +111,13 @@ export function validateAdminExercise(form: AdminExerciseForm): AdminValidationE
   if (form.primary_muscle && form.secondary_muscles.includes(form.primary_muscle)) {
     errors.secondary_muscles = "primaryRepeated";
   }
+  if (
+    form.primary_muscle
+    && form.muscle_focus
+    && !muscleFocusesByMuscle[form.primary_muscle].includes(form.muscle_focus)
+  ) {
+    errors.muscle_focus = "muscleFocus";
+  }
   if (form.media_source_url && !isHttpUrl(form.media_source_url)) {
     errors.media_source_url = "invalidUrl";
   }
@@ -112,7 +126,7 @@ export function validateAdminExercise(form: AdminExerciseForm): AdminValidationE
 
 export function toAdminExerciseCreate(form: AdminExerciseForm): AdminExerciseCreate {
   if (
-    (!form.needs_review && (!form.body_region || !form.primary_muscle))
+    (!form.needs_review && (!form.body_region || !form.primary_muscle || !form.muscle_focus))
     || Boolean(form.body_region) !== Boolean(form.primary_muscle)
   ) {
     throw new Error("Cannot serialize an invalid admin exercise form");
@@ -126,6 +140,7 @@ export function toAdminExerciseCreate(form: AdminExerciseForm): AdminExerciseCre
     name_fa: form.name_fa.trim(),
     body_region: form.body_region || null,
     primary_muscle: form.primary_muscle || null,
+    muscle_focus: form.muscle_focus || null,
     instructions_en: trimList(form.instructions_en),
     instructions_fa: trimList(form.instructions_fa),
     safety_notes_en: trimList(form.safety_notes_en),
@@ -149,6 +164,7 @@ export function adminExerciseToForm(exercise: import("./types").AdminExercise): 
     name_fa: exercise.name_fa,
     body_region: exercise.body_region ?? "",
     primary_muscle: exercise.primary_muscle ?? "",
+    muscle_focus: exercise.muscle_focus ?? "",
     secondary_muscles: exercise.secondary_muscles,
     equipment: exercise.equipment,
     difficulty: exercise.difficulty,

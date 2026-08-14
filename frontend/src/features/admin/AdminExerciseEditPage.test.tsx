@@ -25,6 +25,7 @@ const exercise = {
   name_fa: "شنا سوئدی شیب‌دار",
   body_region: "upper_body",
   primary_muscle: "chest",
+  muscle_focus: "mid_chest",
   secondary_muscles: ["triceps"],
   equipment: ["bodyweight", "bench"],
   difficulty: "beginner",
@@ -68,6 +69,7 @@ it("loads structured programming metadata and saves an edited exercise", async (
 
   expect(await screen.findByLabelText("الگوی حرکت")).toHaveValue("horizontal_push");
   expect(screen.getByLabelText("نوع حرکت")).toHaveValue("compound");
+  expect(screen.getByLabelText("بخش هدف عضله")).toHaveValue("mid_chest");
   expect(screen.getByLabelText("فشار داخلی شانه")).toBeChecked();
   expect(screen.getByLabelText("قابل استفاده برای تولید برنامه")).toBeChecked();
 

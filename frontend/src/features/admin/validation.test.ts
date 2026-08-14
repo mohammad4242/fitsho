@@ -18,6 +18,7 @@ it("requires bilingual steps, safety notes, and equipment", () => {
     slug: "required",
     name_en: "required",
     name_fa: "required",
+    muscle_focus: "required",
     equipment: "equipmentRequired",
     instructions_en: "instructionCount",
     instructions_fa: "instructionCount",
@@ -55,6 +56,7 @@ it("accepts a complete valid bilingual exercise", () => {
     name_fa: "شنا سوئدی شیب‌دار",
     body_region: "upper_body",
     primary_muscle: "chest",
+    muscle_focus: "mid_chest",
     secondary_muscles: ["shoulders", "triceps"],
     equipment: ["bodyweight", "bench"],
     instructions_en: ["Brace", "Lower", "Press"],
@@ -64,6 +66,25 @@ it("accepts a complete valid bilingual exercise", () => {
   });
 
   expect(validateAdminExercise(form)).toEqual({});
+});
+
+it("requires a focus compatible with the primary muscle", () => {
+  const form = emptyAdminExerciseForm();
+  Object.assign(form, {
+    slug: "incline-push-up",
+    name_en: "Incline Push Up",
+    name_fa: "شنا سوئدی شیب‌دار",
+    body_region: "upper_body",
+    primary_muscle: "chest",
+    muscle_focus: "front_delt",
+    equipment: ["bodyweight"],
+    instructions_en: ["Brace", "Lower", "Press"],
+    instructions_fa: ["منقبض", "پایین", "بالا"],
+    safety_notes_en: ["Keep aligned"],
+    safety_notes_fa: ["هم‌راستا بمانید"],
+  });
+
+  expect(validateAdminExercise(form)).toMatchObject({ muscle_focus: "muscleFocus" });
 });
 
 it("allows a review record with labels and no anatomy", () => {
@@ -85,6 +106,7 @@ it("allows a review record with labels and no anatomy", () => {
   expect(toAdminExerciseCreate(form)).toMatchObject({
     body_region: null,
     primary_muscle: null,
+    muscle_focus: null,
     labels: ["cardio"],
     needs_review: true,
   });

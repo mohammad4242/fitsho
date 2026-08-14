@@ -66,6 +66,7 @@ export function AdminExerciseNewPage() {
           returnTo,
           created.body_region,
           created.primary_muscle,
+          created.muscle_focus,
           created.is_active,
           created.needs_review,
         ),
