@@ -134,7 +134,7 @@ def test_admin_saves_encrypted_masked_credential_and_audits_without_secret(
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["credential"] == {"configured": True, "masked": "••••cret"}
+    assert body["credential"] == {"configured": True, "masked": "********cret"}
     assert "sk-openrouter-secret" not in response.text
     credential = db.scalar(select(AIProviderCredential))
     assert credential is not None

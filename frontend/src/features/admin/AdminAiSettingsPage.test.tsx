@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import i18n from "../../i18n";
+import { ApiError } from "../../shared/apiClient";
 
 const api = vi.hoisted(() => ({
   getAdminAiTaskConfigs: vi.fn(),
@@ -87,7 +88,7 @@ it("requires explicit credential replacement and saves task settings", async () 
   api.saveAdminAiTaskConfig.mockResolvedValue({
     ...bodyConfig,
     primary_model_id: "vendor/vision-model",
-    credential: { configured: true, masked: "••••cret" },
+    credential: { configured: true, masked: "********cret" },
   });
   const user = userEvent.setup();
   renderPage();
@@ -105,12 +106,15 @@ it("requires explicit credential replacement and saves task settings", async () 
       primary_model_id: "vendor/vision-model",
     }),
   );
-  expect(await screen.findByText("••••cret")).toBeInTheDocument();
+  expect(await screen.findByLabelText("API key")).toHaveAttribute(
+    "placeholder",
+    "********cret",
+  );
 });
 
 it("tests connection and refreshes the dynamic model catalog", async () => {
   api.getAdminAiTaskConfigs.mockResolvedValue([
-    { ...bodyConfig, credential: { configured: true, masked: "••••cret" } },
+    { ...bodyConfig, credential: { configured: true, masked: "********cret" } },
   ]);
   api.testAdminAiProvider.mockResolvedValue({
     ok: true,
@@ -128,10 +132,32 @@ it("tests connection and refreshes the dynamic model catalog", async () => {
   renderPage();
 
   await user.click(await screen.findByRole("button", { name: "Test connection" }));
-  expect(await screen.findByText("Connection successful")).toBeInTheDocument();
+  const connectionMessage = await screen.findByText("Connection successful");
+  expect(connectionMessage.closest(".admin-panel")).toContainElement(
+    screen.getByRole("button", { name: "Test connection" }),
+  );
   await user.click(screen.getByRole("button", { name: "Refresh models" }));
   expect(api.refreshAdminAiModels).toHaveBeenCalledTimes(1);
   expect(api.getAdminAiTaskModels).toHaveBeenCalledTimes(2);
+});
+
+it("shows the provider refresh error beside the provider controls", async () => {
+  api.getAdminAiTaskConfigs.mockResolvedValue([
+    { ...bodyConfig, credential: { configured: true, masked: "********cret" } },
+  ]);
+  api.refreshAdminAiModels.mockRejectedValue(
+    new ApiError(502, "The AI provider is temporarily unreachable."),
+  );
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByRole("button", { name: "Refresh models" }));
+
+  const providerError = await screen.findByRole("alert");
+  expect(providerError).toHaveTextContent("The AI provider is temporarily unreachable.");
+  expect(providerError.closest(".admin-panel")).toContainElement(
+    screen.getByRole("button", { name: "Refresh models" }),
+  );
 });
 
 it("persists disable immediately", async () => {
@@ -227,7 +253,7 @@ it("ignores a stale catalog response after switching AI tasks", async () => {
 it("does not refresh task A's catalog after switching to task B", async () => {
   let resolveRefresh: (() => void) | undefined;
   api.getAdminAiTaskConfigs.mockResolvedValue([
-    { ...bodyConfig, credential: { configured: true, masked: "••••cret" } },
+    { ...bodyConfig, credential: { configured: true, masked: "********cret" } },
     progressConfig,
   ]);
   api.refreshAdminAiModels.mockReturnValue(new Promise((resolve) => { resolveRefresh = () => resolve({
@@ -278,7 +304,7 @@ it("ignores delayed task A refresh, test, and save results after an A-to-B-to-A 
   let resolveConnection: ((value: { ok: boolean; checked_at: string; model_count: number; error_code: null; safe_error_message: null }) => void) | undefined;
   let resolveSave: ((value: AdminAiTaskConfig) => void) | undefined;
   api.getAdminAiTaskConfigs.mockResolvedValue([
-    { ...bodyConfig, credential: { configured: true, masked: "••••cret" } },
+    { ...bodyConfig, credential: { configured: true, masked: "********cret" } },
     progressConfig,
   ]);
   api.refreshAdminAiModels.mockReturnValue(new Promise((resolve) => { resolveRefresh = () => resolve({

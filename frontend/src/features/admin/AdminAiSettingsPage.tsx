@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
+import { ApiError } from "../../shared/apiClient";
 import {
   getAdminAiTaskConfigs,
   getAdminAiTaskModels,
@@ -21,6 +22,8 @@ import type {
 } from "./types";
 import "./admin.css";
 
+type AiSettingsOperation = "save" | "test" | "refresh";
+
 export function AdminAiSettingsPage() {
   const { i18n, t } = useTranslation();
   const [configs, setConfigs] = useState<AdminAiTaskConfig[]>([]);
@@ -31,6 +34,7 @@ export function AdminAiSettingsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [feedbackOperation, setFeedbackOperation] = useState<AiSettingsOperation | null>(null);
   const modelRequestVersion = useRef(0);
   const operationVersion = useRef(0);
   const activeTask = useRef<AdminAiTaskType>(selectedTask);
@@ -161,6 +165,7 @@ export function AdminAiSettingsPage() {
     const taskAtStart = selectedTask;
     const epochAtStart = taskEpoch.current;
     const operation = beginOperation("refresh");
+    setMessage(null);
     setError(null);
     void refreshAdminAiModels()
       .then(() => {
@@ -172,9 +177,13 @@ export function AdminAiSettingsPage() {
           setMessage(t("admin.aiSettings.refreshed"));
         }
       })
-      .catch(() => {
+      .catch((requestError: unknown) => {
         if (isActiveOperation(taskAtStart, epochAtStart, operation)) {
-          setError(t("admin.aiSettings.refreshError"));
+          setError(
+            requestError instanceof ApiError
+              ? requestError.message
+              : t("admin.aiSettings.refreshError"),
+          );
         }
       })
       .finally(() => finishOperation(taskAtStart, epochAtStart, operation));
@@ -189,10 +198,11 @@ export function AdminAiSettingsPage() {
     setSelectedTask(task);
   }
 
-  function beginOperation(kind: string) {
+  function beginOperation(kind: AiSettingsOperation) {
     const operation = operationVersion.current + 1;
     operationVersion.current = operation;
     setBusy(kind);
+    setFeedbackOperation(kind);
     return operation;
   }
 
@@ -251,7 +261,6 @@ export function AdminAiSettingsPage() {
               onChange={(event) => setApiKey(event.target.value)}
             />
           </label>
-          {config.credential.masked && <p className="admin-ai-secret-status">{config.credential.masked}</p>}
           <dl className="admin-ai-observability">
             <div><dt>{t("admin.aiSettings.lastConnection")}</dt><dd>{config.last_successful_connection_test_at ?? "—"}</dd></div>
             <div><dt>{t("admin.aiSettings.lastCatalogRefresh")}</dt><dd>{config.last_model_catalog_refresh_at ?? "—"}</dd></div>
@@ -261,6 +270,8 @@ export function AdminAiSettingsPage() {
             <button type="button" disabled={busy !== null} onClick={handleConnectionTest}>{t("admin.aiSettings.test")}</button>
             <button type="button" disabled={busy !== null || !config.credential.configured} onClick={handleRefresh}>{t("admin.aiSettings.refresh")}</button>
           </div>
+          {feedbackOperation !== "save" && message && <p className="admin-ai-provider-feedback admin-ai-settings-message" role="status">{message}</p>}
+          {feedbackOperation !== "save" && error && <p className="admin-ai-provider-feedback form-error" role="alert">{error}</p>}
         </section>
 
         <section className="admin-panel">
@@ -285,8 +296,8 @@ export function AdminAiSettingsPage() {
           <div className="admin-ai-setting-field"><SettingLabel htmlFor="ai-restrictions" label={t("admin.aiSettings.restrictions")} guide={t("admin.aiSettings.guides.restrictions")} /><input id="ai-restrictions" value={config.routing_restrictions.join(", ")} onChange={(event) => patchConfig({ routing_restrictions: event.target.value.split(",").map((value) => value.trim()).filter(Boolean) })} /></div>
         </section>
 
-        {message && <p className="admin-ai-settings-message" role="status">{message}</p>}
-        {error && <p className="form-error" role="alert">{error}</p>}
+        {(feedbackOperation === "save" || feedbackOperation === null) && message && <p className="admin-ai-settings-message" role="status">{message}</p>}
+        {(feedbackOperation === "save" || feedbackOperation === null) && error && <p className="form-error" role="alert">{error}</p>}
         <div className="admin-ai-settings-actions"><button type="submit" disabled={busy !== null}>{t("admin.aiSettings.save")}</button><button type="button" disabled={busy !== null} onClick={handleDisable}>{t("admin.aiSettings.disable")}</button></div>
       </form>
       </main>

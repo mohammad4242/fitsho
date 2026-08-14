@@ -35,7 +35,7 @@ class AIConfigError(ValueError):
 def credential_status(credential: AIProviderCredential | None) -> CredentialStatus:
     return CredentialStatus(
         configured=credential is not None,
-        masked=f"••••{credential.key_last_four}" if credential is not None else None,
+        masked=f"********{credential.key_last_four}" if credential is not None else None,
     )
 
 
