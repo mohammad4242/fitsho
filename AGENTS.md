@@ -49,6 +49,8 @@ database used by the test suite.
 | Autogenerate migration | `alembic revision --autogenerate -m "msg"` |
 | Seed exercises | `python -m app.exercises.seed` |
 | Import exercise dataset | `python -m app.exercises.free_exercise_db_import --source-root <path>` |
+| Dry-run 5 owner videos | `python -m app.exercises.owner_video_import --dry-run --source-root ../exercise-import/raw --limit 5 --report var/imports/owner-video/dry-run-5.json` |
+| Import all owner videos | `python -m app.exercises.owner_video_import --apply --source-root ../exercise-import/raw --report var/imports/owner-video/full-import.json` |
 | Grant admin | `python -m app.admin.grant_admin <email>` |
 
 ### Frontend

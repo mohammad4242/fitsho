@@ -1,7 +1,9 @@
 import hashlib
+import json
 from pathlib import Path
 from uuid import UUID
 
+import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -368,3 +370,91 @@ def test_failed_video_does_not_stop_the_next_video(
             Exercise.source_id == second_id,
         )
     ) is not None
+
+
+def test_dry_run_limit_reports_all_files_without_database_or_media_writes(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    source_root = tmp_path / "raw"
+    _, first_id = write_video(source_root, "01-first.mp4", b"first")
+    _, second_id = write_video(source_root, "02-second.mp4", b"second")
+    write_video(source_root, "03-third.mp4", b"third")
+    analyzer = FakeAnalyzer(
+        {
+            first_id: analysis_for(first_id),
+            second_id: analysis_for(second_id),
+        }
+    )
+    settings = importer_settings(test_settings, tmp_path)
+
+    report = build_importer(db, settings, source_root, analyzer).run(limit=2, apply=False)
+
+    assert report.total == 3
+    assert report.processed == 2
+    assert report.created_new == 2
+    assert report.failed == 0
+    assert db.scalar(select(func.count()).select_from(Exercise)) == 0
+    assert not settings.media_root.exists()
+    assert settings.owner_video_import_work_root.is_dir()
+
+
+def test_owner_video_cli_requires_one_mode_positive_limit_and_report() -> None:
+    from app.exercises.owner_video_import import _parser
+
+    parser = _parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args([])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--dry-run"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--dry-run", "--apply", "--report", "report.json"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--dry-run", "--limit", "0", "--report", "report.json"])
+
+    args = parser.parse_args(
+        [
+            "--dry-run",
+            "--source-root",
+            "../exercise-import/raw",
+            "--limit",
+            "5",
+            "--report",
+            "var/imports/owner-video/dry-run-5.json",
+        ]
+    )
+    assert args.dry_run is True
+    assert args.apply is False
+    assert args.limit == 5
+
+
+def test_write_report_atomically_renders_required_counters(tmp_path: Path) -> None:
+    from app.exercises.owner_video_import import OwnerVideoImportReport, write_report
+
+    report = OwnerVideoImportReport(
+        total=3,
+        processed=2,
+        matched_existing=1,
+        created_new=1,
+        duplicate_videos=0,
+        needs_review=1,
+        failed=0,
+    )
+    destination = tmp_path / "reports" / "owner.json"
+
+    write_report(destination, report)
+
+    payload = json.loads(destination.read_text(encoding="utf-8"))
+    assert set(payload) == {
+        "total",
+        "processed",
+        "matched_existing",
+        "created_new",
+        "duplicate_videos",
+        "needs_review",
+        "failed",
+        "items",
+    }
+    assert payload["total"] == 3
+    assert list(destination.parent.glob(".owner.json-*.tmp")) == []

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import argparse
+import json
+import os
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.config import Settings
+from app.config import Settings, get_settings
+from app.database.session import get_engine
 from app.exercises.enums import MediaRole, MediaType
 from app.exercises.models import (
     Exercise,
@@ -22,6 +26,7 @@ from app.exercises.models import (
 )
 from app.exercises.owner_video_analysis import (
     CatalogueExercise,
+    CodexCliExerciseAnalyzer,
     OwnerVideoAnalysis,
     build_catalogue_snapshot,
     resolve_existing_match,
@@ -410,3 +415,61 @@ class OwnerVideoImporter:
     def _failure_reason(error: Exception) -> str:
         message = str(error).splitlines()[0].strip()
         return f"{type(error).__name__}: {message}" if message else type(error).__name__
+
+
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("limit must be at least 1")
+    return parsed
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Import owner-provided exercise MP4 files with Codex analysis"
+    )
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--dry-run", action="store_true")
+    mode.add_argument("--apply", action="store_true")
+    parser.add_argument(
+        "--source-root",
+        type=Path,
+        default=Path("../exercise-import/raw"),
+    )
+    parser.add_argument("--limit", type=positive_int)
+    parser.add_argument("--report", type=Path, required=True)
+    return parser
+
+
+def write_report(path: Path, report: OwnerVideoImportReport) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staged = path.parent / f".{path.name}-{uuid4().hex}.tmp"
+    try:
+        with staged.open("w", encoding="utf-8") as file_handle:
+            json.dump(report.as_dict(), file_handle, ensure_ascii=False, indent=2)
+            file_handle.write("\n")
+            file_handle.flush()
+            os.fsync(file_handle.fileno())
+        os.replace(staged, path)
+    finally:
+        staged.unlink(missing_ok=True)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    settings = get_settings()
+    analyzer = CodexCliExerciseAnalyzer(settings)
+    with Session(get_engine(settings.database_url)) as db:
+        report = OwnerVideoImporter(
+            db,
+            settings=settings,
+            source_root=args.source_root.resolve(),
+            analyzer=analyzer,
+        ).run(limit=args.limit, apply=args.apply)
+    write_report(args.report.resolve(), report)
+    print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
+    return 1 if report.failed else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
