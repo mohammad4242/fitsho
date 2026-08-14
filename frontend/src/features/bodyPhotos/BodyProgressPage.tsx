@@ -82,6 +82,9 @@ export function BodyProgressPage() {
               <p>{t("bodyPhotos.incomplete.eyebrow")}</p>
               <h2 id="body-analysis-incomplete-title">{t("bodyPhotos.incomplete.title")}</h2>
             </div>
+            {analysisSessions.length === 0 && (
+              <Link className="primary-button" to="/body-progress/new">{t("bodyPhotos.start")}</Link>
+            )}
           </header>
           <ul aria-label={t("bodyPhotos.incomplete.title")}>
             {incompleteSessions.map((session) => (

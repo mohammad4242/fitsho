@@ -125,6 +125,10 @@ it("deletes an incomplete session after confirmation", async () => {
   });
   render(<MemoryRouter><BodyProgressPage /></MemoryRouter>);
 
+  expect(await screen.findByRole("link", { name: "Start photo session" })).toHaveAttribute(
+    "href",
+    "/body-progress/new",
+  );
   await user.click(await screen.findByRole("button", { name: "Delete upload" }));
 
   await waitFor(() => expect(api.deleteBodyPhotoSession).toHaveBeenCalledWith("incomplete-1"));
