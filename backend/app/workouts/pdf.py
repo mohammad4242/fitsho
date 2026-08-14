@@ -43,9 +43,10 @@ h1 { color: #087d6c; font-size: 24pt; margin-bottom: 2mm; }
   direction: ltr;
   display: inline-block;
   font-weight: bold;
-  margin-left: 2mm;
+  margin-left: 1mm;
   unicode-bidi: isolate;
 }
+.exercise-arrow { color: #087d6c; display: inline-block; margin-left: 2mm; }
 .exercise h3 { font-size: 12pt; margin-bottom: 1mm; }
 .prescription { color: #087d6c; font-weight: bold; margin-bottom: 1mm; }
 .instruction { color: #354b46; margin-bottom: 1mm; }
@@ -116,7 +117,8 @@ def _render_exercise(
     note = _paragraph("یادداشت", notes, class_name="instruction")
     return (
         '<article class="exercise">'
-        f'<h3><span class="exercise-number" dir="ltr">{_fa_number(position)})</span> '
+        f'<h3><span class="exercise-number" dir="ltr">{_fa_number(position)}</span> '
+        '<span class="exercise-arrow">←</span> '
         f"{escape(name)}</h3>"
         f'<p class="prescription">{prescription}</p>{note}'
         "</article>"
