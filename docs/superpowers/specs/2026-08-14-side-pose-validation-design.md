@@ -1,14 +1,18 @@
-# Side Pose Validation Design
+# View-Aware Pose Validation Design
 
 ## Goal
 
-Reduce false client-side rejections for valid headless side photos while retaining real,
-deterministic full-body and multiple-person checks.
+Reduce false client-side rejections for valid headless side and back photos while retaining
+real, deterministic full-body and multiple-person checks.
 
 ## Landmark Rules
 
-- Front and back views continue to require both visible shoulders, elbows, wrists, hips,
-  knees, ankles, and feet.
+- Front views continue to require both visible shoulders, elbows, wrists, hips, knees,
+  ankles, and feet.
+- Back views require both shoulders and both arms. Each arm is valid when either its elbow
+  or its wrist is visible at the existing confidence threshold. A hidden endpoint is excluded
+  from frame and minimum-confidence checks when the other endpoint on that arm is valid.
+- Back views continue to require both hips, knees, ankles, and feet.
 - Side views require at least one visible shoulder, elbow, hip, knee, ankle, and foot.
 - The most visible landmark in each required side-view group is used for visibility,
   frame-boundary, and minimum-confidence checks.
@@ -42,6 +46,8 @@ No face detector, head crop, generative editing, or fabricated confidence is int
 - Accept a side photo when only one shoulder, elbow, hip, knee, ankle, and foot are visible.
 - Ignore hidden far-side landmarks outside the frame.
 - Reject a side photo when neither landmark in a required group is visible.
+- Accept a back photo when each arm has a visible elbow or wrist.
+- Reject a back photo when one arm has neither a visible elbow nor wrist.
 - Treat overlapping duplicate pose candidates as one person.
 - Ignore a weak secondary pose candidate.
 - Reject two credible, spatially distinct full-body pose candidates.
