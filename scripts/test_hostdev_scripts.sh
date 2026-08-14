@@ -13,6 +13,8 @@ grep -Fq -- '--port 8002' "$launcher"
 grep -Fq 'COOKIE_SECURE="false"' "$launcher"
 grep -Fq 'SESSION_COOKIE_NAME="fitsho_session"' "$launcher"
 grep -Fq ':5174' "$launcher"
+grep -Fq 'FITSHO_HOSTDEV_LAN_IPS' "$launcher"
+grep -Fq 'for hostdev_lan_ip in $hostdev_lan_ips' "$launcher"
 
 grep -Fq 'destination_project="fitsho-hostdev"' "$clone_script"
 grep -Fq 'destination_service="hostdev-db"' "$clone_script"
