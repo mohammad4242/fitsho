@@ -57,6 +57,8 @@ Before applying the data migration, generate and review a full-catalogue audit. 
 
 The 23 cardio, full-body, hip-flexor, abductor, or peroneal records whose existing `primary_muscle` is null remain intentionally outside the muscle hierarchy with a null focus. They remain accessible through existing special categories and admin filters.
 
+Seven records previously assigned to `abs` are corrected to `obliques` because their primary mechanics are rotation, anti-rotation, or lateral flexion: `0230`, `0862`, `0407`, `0562`, `pallof-press`, `side-plank`, and `0777`. This user-approved data correction takes precedence over preserving those seven records in the old Abs `All` result; all other primary-muscle memberships remain unchanged.
+
 ## API and admin contracts
 
 - Add optional `muscle_focus` filtering to public and protected admin exercise-list endpoints.

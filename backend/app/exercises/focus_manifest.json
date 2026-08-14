@@ -1,0 +1,3071 @@
+[
+  {
+    "key": "fitsho_training_template:barbell-hip-thrust",
+    "slug": "barbell-hip-thrust",
+    "name_en": "Barbell Hip Thrust",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "fitsho_training_template:barbell-shrug",
+    "slug": "barbell-shrug",
+    "name_en": "Barbell Shrug",
+    "previous_primary_muscle": "traps",
+    "primary_muscle": "traps",
+    "muscle_focus": "upper_traps",
+    "basis": "mechanics:scapular_elevation"
+  },
+  {
+    "key": "fitsho_training_template:bulgarian-split-squat",
+    "slug": "bulgarian-split-squat",
+    "name_en": "Bulgarian Split Squat",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "general_quadriceps",
+    "basis": "mechanics:multi_joint_knee_extension"
+  },
+  {
+    "key": "fitsho_training_template:cable-curl",
+    "slug": "cable-curl",
+    "name_en": "Cable Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "fitsho_training_template:cable-lateral-raise",
+    "slug": "cable-lateral-raise",
+    "name_en": "Cable Lateral Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "lateral_delt",
+    "basis": "mechanics:shoulder_abduction"
+  },
+  {
+    "key": "fitsho_training_template:cable-pullover",
+    "slug": "cable-pullover",
+    "name_en": "Cable Pullover",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "mechanics:shoulder_extension"
+  },
+  {
+    "key": "fitsho_training_template:chest-supported-row",
+    "slug": "chest-supported-row",
+    "name_en": "Chest-Supported Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "general_back",
+    "basis": "mechanics:broad_row"
+  },
+  {
+    "key": "fitsho_training_template:dead-bug",
+    "slug": "dead-bug",
+    "name_en": "Dead Bug",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "anti_extension",
+    "basis": "mechanics:anti_extension"
+  },
+  {
+    "key": "fitsho_training_template:dumbbell-shrug",
+    "slug": "dumbbell-shrug",
+    "name_en": "Dumbbell Shrug",
+    "previous_primary_muscle": "traps",
+    "primary_muscle": "traps",
+    "muscle_focus": "upper_traps",
+    "basis": "mechanics:scapular_elevation"
+  },
+  {
+    "key": "fitsho_training_template:face-pull",
+    "slug": "face-pull",
+    "name_en": "Face Pull",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "rear_delt",
+    "basis": "mechanics:horizontal_abduction"
+  },
+  {
+    "key": "free-exercise-db:0002",
+    "slug": "fedb-0002-band-side-bend",
+    "name_en": "Band Side Bend",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "lateral_flexion",
+    "basis": "mechanics:lateral_flexion"
+  },
+  {
+    "key": "free-exercise-db:0025",
+    "slug": "fedb-0025-barbell-bench-press",
+    "name_en": "Barbell Bench Press",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "free-exercise-db:0027",
+    "slug": "fedb-0027-barbell-underhand-bent-over-row",
+    "name_en": "Barbell Underhand Bent-Over Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0028",
+    "slug": "fedb-0028-barbell-clean-and-press",
+    "name_en": "Barbell Clean And Press",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "general_quadriceps",
+    "basis": "reviewed_movement_mechanics"
+  },
+  {
+    "key": "free-exercise-db:0030",
+    "slug": "fedb-0030-barbell-close-grip-bench-press",
+    "name_en": "Barbell Close Grip Bench Press",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "general_triceps",
+    "basis": "mechanics:compound_press"
+  },
+  {
+    "key": "free-exercise-db:0031",
+    "slug": "fedb-0031-barbell-curl",
+    "name_en": "Barbell Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0033",
+    "slug": "fedb-0033-barbell-decline-bench-press",
+    "name_en": "Barbell Decline Bench Press",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "lower_chest",
+    "basis": "mechanics:decline_or_dip"
+  },
+  {
+    "key": "free-exercise-db:0038",
+    "slug": "fedb-0038-barbell-drag-curl",
+    "name_en": "Barbell Drag Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0041",
+    "slug": "fedb-0041-barbell-front-raise",
+    "name_en": "Barbell Front Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "front_delt",
+    "basis": "mechanics:shoulder_flexion"
+  },
+  {
+    "key": "free-exercise-db:0042",
+    "slug": "fedb-0042-barbell-front-squat",
+    "name_en": "Barbell Front Squat",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "general_quadriceps",
+    "basis": "mechanics:multi_joint_knee_extension"
+  },
+  {
+    "key": "free-exercise-db:0047",
+    "slug": "fedb-0047-barbell-incline-bench-press",
+    "name_en": "Barbell Incline Bench Press",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "upper_chest",
+    "basis": "mechanics:incline"
+  },
+  {
+    "key": "free-exercise-db:0054",
+    "slug": "fedb-0054-barbell-lunge",
+    "name_en": "Barbell Lunge",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:0061",
+    "slug": "fedb-0061-ez-bar-lying-triceps-extension",
+    "name_en": "EZ Bar Lying Triceps Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "mechanics:shoulder_flexed"
+  },
+  {
+    "key": "free-exercise-db:0072",
+    "slug": "fedb-0072-barbell-prone-incline-curl",
+    "name_en": "Barbell Prone Incline Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0075",
+    "slug": "fedb-0075-barbell-rear-delt-raise",
+    "name_en": "Barbell Rear Delt Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "rear_delt",
+    "basis": "mechanics:horizontal_abduction"
+  },
+  {
+    "key": "free-exercise-db:0082",
+    "slug": "fedb-0082-barbell-reverse-wrist-curl",
+    "name_en": "Barbell Reverse Wrist Curl",
+    "previous_primary_muscle": "forearms",
+    "primary_muscle": "forearms",
+    "muscle_focus": "forearm_extensors",
+    "basis": "source_target:forearm extensors"
+  },
+  {
+    "key": "free-exercise-db:0095",
+    "slug": "fedb-0095-barbell-shrug",
+    "name_en": "Barbell Shrug",
+    "previous_primary_muscle": "traps",
+    "primary_muscle": "traps",
+    "muscle_focus": "upper_traps",
+    "basis": "mechanics:scapular_elevation"
+  },
+  {
+    "key": "free-exercise-db:0104",
+    "slug": "fedb-0104-barbell-standing-back-wrist-curl",
+    "name_en": "Barbell Standing Back Wrist Curl",
+    "previous_primary_muscle": "forearms",
+    "primary_muscle": "forearms",
+    "muscle_focus": "forearm_flexors",
+    "basis": "mechanics:wrist_flexion"
+  },
+  {
+    "key": "free-exercise-db:0116",
+    "slug": "fedb-0116-barbell-straight-leg-deadlift",
+    "name_en": "Barbell Straight Leg Deadlift",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_hip_extension",
+    "basis": "mechanics:hip_hinge_or_stretch"
+  },
+  {
+    "key": "free-exercise-db:0123",
+    "slug": "fedb-0123-barbell-wide-grip-upright-row",
+    "name_en": "Barbell Wide-Grip Upright Row",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "lateral_delt",
+    "basis": "mechanics:shoulder_abduction"
+  },
+  {
+    "key": "free-exercise-db:0128",
+    "slug": "fedb-0128-battling-ropes",
+    "name_en": "Battling Ropes",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "general_shoulders",
+    "basis": "mechanics:broad_shoulders"
+  },
+  {
+    "key": "free-exercise-db:0154",
+    "slug": "fedb-0154-cable-crossover-reverse-fly",
+    "name_en": "Cable Crossover Reverse Fly",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "rear_delt",
+    "basis": "mechanics:horizontal_abduction"
+  },
+  {
+    "key": "free-exercise-db:0162",
+    "slug": "fedb-0162-cable-one-arm-front-raise",
+    "name_en": "Cable One Arm Front Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "front_delt",
+    "basis": "source_target:anterior deltoid"
+  },
+  {
+    "key": "free-exercise-db:0175",
+    "slug": "fedb-0175-cable-kneeling-crunch",
+    "name_en": "Cable Kneeling Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:0178",
+    "slug": "fedb-0178-cable-lateral-raise",
+    "name_en": "Cable Lateral Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "lateral_delt",
+    "basis": "mechanics:shoulder_abduction"
+  },
+  {
+    "key": "free-exercise-db:0186",
+    "slug": "fedb-0186-cable-lying-triceps-extension",
+    "name_en": "Cable Lying Triceps Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "mechanics:shoulder_flexed"
+  },
+  {
+    "key": "free-exercise-db:0190",
+    "slug": "fedb-0190-cable-one-arm-curl",
+    "name_en": "Cable One Arm Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0192",
+    "slug": "fedb-0192-cable-one-arm-lateral-raise",
+    "name_en": "Cable One Arm Lateral Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "lateral_delt",
+    "basis": "mechanics:shoulder_abduction"
+  },
+  {
+    "key": "free-exercise-db:0194",
+    "slug": "fedb-0194-cable-rope-overhead-triceps-extension",
+    "name_en": "Cable Rope Overhead Triceps Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "mechanics:shoulder_flexed"
+  },
+  {
+    "key": "free-exercise-db:0198",
+    "slug": "fedb-0198-cable-pulldown",
+    "name_en": "Cable Pulldown",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0200",
+    "slug": "fedb-0200-cable-rope-triceps-pushdown",
+    "name_en": "Cable Rope Triceps Pushdown",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_lateral_medial_heads",
+    "basis": "mechanics:arm_at_side"
+  },
+  {
+    "key": "free-exercise-db:0203",
+    "slug": "fedb-0203-cable-rear-delt-row-with-rope",
+    "name_en": "Cable Rear Delt Row (with rope)",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "rear_delt",
+    "basis": "mechanics:horizontal_abduction"
+  },
+  {
+    "key": "free-exercise-db:0207",
+    "slug": "fedb-0207-reverse-grip-cable-lat-pulldown",
+    "name_en": "Reverse-Grip Cable Lat Pulldown",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0208",
+    "slug": "fedb-0208-seated-cable-row-v-grip",
+    "name_en": "Seated Cable Row (V-Grip)",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0211",
+    "slug": "fedb-0211-russian-twist-on-stability-ball-arms-straight",
+    "name_en": "Russian Twist on Stability Ball (Arms Straight)",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:0213",
+    "slug": "fedb-0213-cable-seated-high-row-v-bar",
+    "name_en": "Cable Seated High Row (V-bar)",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0218",
+    "slug": "fedb-0218-seated-cable-row-wide-grip",
+    "name_en": "Seated Cable Row (Wide-Grip)",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "upper_back",
+    "basis": "source_target:upper back"
+  },
+  {
+    "key": "free-exercise-db:0226",
+    "slug": "fedb-0226-cable-standing-crunch",
+    "name_en": "Cable Standing Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:0229",
+    "slug": "fedb-0229-cable-standing-inner-curl",
+    "name_en": "Cable Standing Inner Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0230",
+    "slug": "fedb-0230-cable-standing-lift",
+    "name_en": "Cable Standing Lift",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:0231",
+    "slug": "fedb-0231-cable-standing-one-arm-triceps-extension",
+    "name_en": "Cable Standing One Arm Triceps Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "reviewed_movement_mechanics"
+  },
+  {
+    "key": "free-exercise-db:0238",
+    "slug": "fedb-0238-cable-straight-arm-pulldown",
+    "name_en": "Cable Straight Arm Pulldown",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0248",
+    "slug": "fedb-0248-cambered-bar-lying-row",
+    "name_en": "Cambered Bar Lying Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "upper_back",
+    "basis": "source_target:upper back"
+  },
+  {
+    "key": "free-exercise-db:0253",
+    "slug": "fedb-0253-chin-ups-narrow-parallel-grip",
+    "name_en": "Chin-ups (narrow parallel grip)",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "upper_back",
+    "basis": "source_target:upper back"
+  },
+  {
+    "key": "free-exercise-db:0257",
+    "slug": "fedb-0257-hip-circles-stretch",
+    "name_en": "Hip Circles Stretch",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:0259",
+    "slug": "fedb-0259-close-grip-push-up",
+    "name_en": "Close-Grip Push-Up",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "general_triceps",
+    "basis": "mechanics:compound_press"
+  },
+  {
+    "key": "free-exercise-db:0271",
+    "slug": "fedb-0271-stability-ball-leg-elevated-crunch",
+    "name_en": "Stability Ball Leg Elevated Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:0274",
+    "slug": "fedb-0274-floor-crunch",
+    "name_en": "Floor Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:0284",
+    "slug": "fedb-0284-donkey-calf-raise",
+    "name_en": "Donkey Calf Raise",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "gastrocnemius",
+    "basis": "mechanics:straight_knee_raise"
+  },
+  {
+    "key": "free-exercise-db:0285",
+    "slug": "fedb-0285-seated-alternating-dumbbell-curl",
+    "name_en": "Seated Alternating Dumbbell Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0289",
+    "slug": "fedb-0289-seated-dumbbell-shoulder-press",
+    "name_en": "Seated Dumbbell Shoulder Press",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "front_delt",
+    "basis": "mechanics:shoulder_flexion"
+  },
+  {
+    "key": "free-exercise-db:0293",
+    "slug": "fedb-0293-dumbbell-bent-over-row",
+    "name_en": "Dumbbell Bent-Over Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0294",
+    "slug": "fedb-0294-dumbbell-biceps-curl",
+    "name_en": "Dumbbell Biceps Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0296",
+    "slug": "fedb-0296-dumbbell-close-grip-press",
+    "name_en": "Dumbbell Close-Grip Press",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "general_triceps",
+    "basis": "reviewed_movement_mechanics"
+  },
+  {
+    "key": "free-exercise-db:0297",
+    "slug": "fedb-0297-dumbbell-concentration-curl",
+    "name_en": "Dumbbell Concentration Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0298",
+    "slug": "fedb-0298-dumbbell-cross-body-hammer-curl",
+    "name_en": "Dumbbell Cross Body Hammer Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "brachialis_brachioradialis",
+    "basis": "mechanics:neutral_or_pronated_grip"
+  },
+  {
+    "key": "free-exercise-db:0300",
+    "slug": "fedb-0300-dumbbell-deadlift",
+    "name_en": "Dumbbell Deadlift",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:0301",
+    "slug": "fedb-0301-decline-dumbbell-bench-press",
+    "name_en": "Decline Dumbbell Bench Press",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "lower_chest",
+    "basis": "mechanics:decline_or_dip"
+  },
+  {
+    "key": "free-exercise-db:0302",
+    "slug": "fedb-0302-decline-dumbbell-fly",
+    "name_en": "Decline Dumbbell Fly",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "lower_chest",
+    "basis": "mechanics:decline_or_dip"
+  },
+  {
+    "key": "free-exercise-db:0306",
+    "slug": "fedb-0306-dumbbell-one-arm-triceps-extension",
+    "name_en": "Dumbbell One-Arm Triceps Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "instructions:shoulder_flexed"
+  },
+  {
+    "key": "free-exercise-db:0308",
+    "slug": "fedb-0308-dumbbell-fly",
+    "name_en": "Dumbbell Fly",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "free-exercise-db:0310",
+    "slug": "fedb-0310-dumbbell-front-raise",
+    "name_en": "Dumbbell Front Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "front_delt",
+    "basis": "mechanics:shoulder_flexion"
+  },
+  {
+    "key": "free-exercise-db:0314",
+    "slug": "fedb-0314-dumbbell-incline-bench-press",
+    "name_en": "Dumbbell Incline Bench Press",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "upper_chest",
+    "basis": "mechanics:incline"
+  },
+  {
+    "key": "free-exercise-db:0318",
+    "slug": "fedb-0318-dumbbell-incline-curl",
+    "name_en": "Dumbbell Incline Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0319",
+    "slug": "fedb-0319-dumbbell-incline-fly",
+    "name_en": "Dumbbell Incline Fly",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "upper_chest",
+    "basis": "mechanics:incline"
+  },
+  {
+    "key": "free-exercise-db:0320",
+    "slug": "fedb-0320-dumbbell-incline-hammer-curl",
+    "name_en": "Dumbbell Incline Hammer Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "brachialis_brachioradialis",
+    "basis": "mechanics:neutral_or_pronated_grip"
+  },
+  {
+    "key": "free-exercise-db:0321",
+    "slug": "fedb-0321-dumbbell-incline-hammer-press",
+    "name_en": "Dumbbell Incline Hammer Press",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "upper_chest",
+    "basis": "mechanics:incline"
+  },
+  {
+    "key": "free-exercise-db:0322",
+    "slug": "fedb-0322-dumbbell-incline-biceps-curl",
+    "name_en": "Dumbbell Incline Biceps Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0325",
+    "slug": "fedb-0325-incline-leg-hip-raise",
+    "name_en": "Incline Leg Hip Raise",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "hip_flexion_posterior_tilt",
+    "basis": "mechanics:hip_flexion_or_posterior_tilt"
+  },
+  {
+    "key": "free-exercise-db:0326",
+    "slug": "fedb-0326-dumbbell-incline-rear-lateral-raise",
+    "name_en": "Dumbbell Incline Rear Lateral Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "rear_delt",
+    "basis": "mechanics:horizontal_abduction"
+  },
+  {
+    "key": "free-exercise-db:0327",
+    "slug": "fedb-0327-dumbbell-incline-row",
+    "name_en": "Dumbbell Incline Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "upper_back",
+    "basis": "source_target:upper back"
+  },
+  {
+    "key": "free-exercise-db:0329",
+    "slug": "fedb-0329-dumbbell-incline-shrug",
+    "name_en": "Dumbbell Incline Shrug",
+    "previous_primary_muscle": "traps",
+    "primary_muscle": "traps",
+    "muscle_focus": "mid_lower_traps",
+    "basis": "mechanics:scapular_retraction_depression"
+  },
+  {
+    "key": "free-exercise-db:0330",
+    "slug": "fedb-0330-dumbbell-incline-triceps-extension",
+    "name_en": "Dumbbell Incline Triceps Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "mechanics:shoulder_flexed"
+  },
+  {
+    "key": "free-exercise-db:0332",
+    "slug": "fedb-0332-dumbbell-iron-cross",
+    "name_en": "Dumbbell Iron Cross",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "lateral_delt",
+    "basis": "mechanics:shoulder_abduction"
+  },
+  {
+    "key": "free-exercise-db:0333",
+    "slug": "fedb-0333-dumbbell-kickback",
+    "name_en": "Dumbbell Kickback",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_lateral_medial_heads",
+    "basis": "mechanics:arm_at_side"
+  },
+  {
+    "key": "free-exercise-db:0334",
+    "slug": "fedb-0334-dumbbell-lateral-raise",
+    "name_en": "Dumbbell Lateral Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "lateral_delt",
+    "basis": "mechanics:shoulder_abduction"
+  },
+  {
+    "key": "free-exercise-db:0336",
+    "slug": "fedb-0336-dumbbell-lunge",
+    "name_en": "Dumbbell Lunge",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:0340",
+    "slug": "fedb-0340-dumbbell-lying-hammer-press",
+    "name_en": "Dumbbell Lying Hammer Press",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "free-exercise-db:0343",
+    "slug": "fedb-0343-dumbbell-lying-leg-curl",
+    "name_en": "Dumbbell Lying Leg Curl",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_knee_flexion",
+    "basis": "mechanics:knee_flexion"
+  },
+  {
+    "key": "free-exercise-db:0350",
+    "slug": "fedb-0350-supine-dumbbell-biceps-curl",
+    "name_en": "Supine Dumbbell Biceps Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0351",
+    "slug": "fedb-0351-dumbbell-lying-triceps-extension",
+    "name_en": "Dumbbell Lying Triceps Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "mechanics:shoulder_flexed"
+  },
+  {
+    "key": "free-exercise-db:0353",
+    "slug": "fedb-0353-stability-ball-leg-curl",
+    "name_en": "Stability Ball Leg Curl",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_knee_flexion",
+    "basis": "mechanics:knee_flexion"
+  },
+  {
+    "key": "free-exercise-db:0355",
+    "slug": "fedb-0355-dumbbell-one-arm-lateral-raise",
+    "name_en": "Dumbbell One Arm Lateral Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "lateral_delt",
+    "basis": "mechanics:shoulder_abduction"
+  },
+  {
+    "key": "free-exercise-db:0361",
+    "slug": "fedb-0361-dumbbell-alternating-shoulder-press",
+    "name_en": "Dumbbell Alternating Shoulder Press",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "front_delt",
+    "basis": "mechanics:shoulder_flexion"
+  },
+  {
+    "key": "free-exercise-db:0364",
+    "slug": "fedb-0364-dumbbell-behind-the-back-wrist-curl",
+    "name_en": "Dumbbell Behind-the-Back Wrist Curl",
+    "previous_primary_muscle": "forearms",
+    "primary_muscle": "forearms",
+    "muscle_focus": "forearm_flexors",
+    "basis": "source_muscle_group:flexors"
+  },
+  {
+    "key": "free-exercise-db:0369",
+    "slug": "fedb-0369-dumbbell-over-bench-wrist-curl",
+    "name_en": "Dumbbell Over Bench Wrist Curl",
+    "previous_primary_muscle": "forearms",
+    "primary_muscle": "forearms",
+    "muscle_focus": "forearm_flexors",
+    "basis": "mechanics:wrist_flexion"
+  },
+  {
+    "key": "free-exercise-db:0373",
+    "slug": "fedb-0373-dumbbell-pronate-grip-triceps-extension",
+    "name_en": "Dumbbell Pronate-grip Triceps Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_lateral_medial_heads",
+    "basis": "mechanics:arm_at_side"
+  },
+  {
+    "key": "free-exercise-db:0374",
+    "slug": "fedb-0374-dumbbell-prone-incline-curl",
+    "name_en": "Dumbbell Prone Incline Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0377",
+    "slug": "fedb-0377-dumbbell-rear-delt-row",
+    "name_en": "Dumbbell Rear Delt Row",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "rear_delt",
+    "basis": "mechanics:horizontal_abduction"
+  },
+  {
+    "key": "free-exercise-db:0392",
+    "slug": "fedb-0392-dumbbell-seated-front-raise",
+    "name_en": "Dumbbell Seated Front Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "front_delt",
+    "basis": "mechanics:shoulder_flexion"
+  },
+  {
+    "key": "free-exercise-db:0394",
+    "slug": "fedb-0394-dumbbell-seated-kickback",
+    "name_en": "Dumbbell Seated Kickback",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_lateral_medial_heads",
+    "basis": "mechanics:arm_at_side"
+  },
+  {
+    "key": "free-exercise-db:0396",
+    "slug": "fedb-0396-dumbbell-seated-lateral-raise",
+    "name_en": "Dumbbell Seated Lateral Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "lateral_delt",
+    "basis": "mechanics:shoulder_abduction"
+  },
+  {
+    "key": "free-exercise-db:0397",
+    "slug": "fedb-0397-dumbbell-seated-neutral-wrist-curl",
+    "name_en": "Dumbbell Seated Neutral Wrist Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "brachialis_brachioradialis",
+    "basis": "mechanics:neutral_or_pronated_grip"
+  },
+  {
+    "key": "free-exercise-db:0402",
+    "slug": "fedb-0402-dumbbell-seated-preacher-curl",
+    "name_en": "Dumbbell Seated Preacher Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0406",
+    "slug": "fedb-0406-dumbbell-shrug",
+    "name_en": "Dumbbell Shrug",
+    "previous_primary_muscle": "traps",
+    "primary_muscle": "traps",
+    "muscle_focus": "upper_traps",
+    "basis": "mechanics:scapular_elevation"
+  },
+  {
+    "key": "free-exercise-db:0407",
+    "slug": "fedb-0407-dumbbell-side-bend",
+    "name_en": "Dumbbell Side Bend",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "obliques",
+    "muscle_focus": "lateral_flexion",
+    "basis": "mechanics:lateral_flexion"
+  },
+  {
+    "key": "free-exercise-db:0409",
+    "slug": "fedb-0409-dumbbell-single-leg-calf-raise",
+    "name_en": "Dumbbell Single Leg Calf Raise",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "gastrocnemius",
+    "basis": "mechanics:straight_knee_raise"
+  },
+  {
+    "key": "free-exercise-db:0411",
+    "slug": "fedb-0411-dumbbell-single-leg-squat",
+    "name_en": "Dumbbell Single Leg Squat",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:0413",
+    "slug": "fedb-0413-dumbbell-squat",
+    "name_en": "Dumbbell Squat",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:0417",
+    "slug": "fedb-0417-dumbbell-standing-calf-raise",
+    "name_en": "Dumbbell Standing Calf Raise",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "gastrocnemius",
+    "basis": "mechanics:straight_knee_raise"
+  },
+  {
+    "key": "free-exercise-db:0432",
+    "slug": "fedb-0432-dumbbell-stiff-leg-deadlift",
+    "name_en": "Dumbbell Stiff Leg Deadlift",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:0437",
+    "slug": "fedb-0437-dumbbell-upright-row",
+    "name_en": "Dumbbell Upright Row",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "lateral_delt",
+    "basis": "mechanics:shoulder_abduction"
+  },
+  {
+    "key": "free-exercise-db:0445",
+    "slug": "fedb-0445-ez-barbell-anti-gravity-press",
+    "name_en": "EZ Barbell Anti Gravity Press",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "front_delt",
+    "basis": "reviewed_movement_mechanics"
+  },
+  {
+    "key": "free-exercise-db:0464",
+    "slug": "fedb-0464-front-plank",
+    "name_en": "Front Plank",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "anti_extension",
+    "basis": "mechanics:anti_extension"
+  },
+  {
+    "key": "free-exercise-db:0474",
+    "slug": "fedb-0474-hanging-straight-leg-raise",
+    "name_en": "Hanging Straight Leg Raise",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "hip_flexion_posterior_tilt",
+    "basis": "mechanics:hip_flexion_or_posterior_tilt"
+  },
+  {
+    "key": "free-exercise-db:0484",
+    "slug": "fedb-0484-standing-knee-raise-stretch",
+    "name_en": "Standing Knee Raise Stretch",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:0489",
+    "slug": "fedb-0489-45-degree-hyperextension",
+    "name_en": "45 Degree Hyperextension",
+    "previous_primary_muscle": "lower_back",
+    "primary_muscle": "lower_back",
+    "muscle_focus": "lumbar_erectors",
+    "basis": "source_target:erector spinae"
+  },
+  {
+    "key": "free-exercise-db:0493",
+    "slug": "fedb-0493-incline-push-up",
+    "name_en": "Incline Push-Up",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "free-exercise-db:0498",
+    "slug": "fedb-0498-inverted-row-with-straps",
+    "name_en": "Inverted Row With Straps",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "upper_back",
+    "basis": "source_target:upper back"
+  },
+  {
+    "key": "free-exercise-db:0499",
+    "slug": "fedb-0499-inverted-row-between-chairs",
+    "name_en": "Inverted Row Between Chairs",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0553",
+    "slug": "fedb-0553-military-press",
+    "name_en": "Military Press",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "front_delt",
+    "basis": "mechanics:shoulder_flexion"
+  },
+  {
+    "key": "free-exercise-db:0562",
+    "slug": "fedb-0562-landmine-180",
+    "name_en": "Landmine 180",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:0570",
+    "slug": "fedb-0570-bench-pull-up",
+    "name_en": "Bench Pull-Up",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0573",
+    "slug": "fedb-0573-lever-back-extension",
+    "name_en": "Lever Back Extension",
+    "previous_primary_muscle": "lower_back",
+    "primary_muscle": "lower_back",
+    "muscle_focus": "lumbar_erectors",
+    "basis": "source_target:spine"
+  },
+  {
+    "key": "free-exercise-db:0577",
+    "slug": "fedb-0577-lever-lying-chest-press",
+    "name_en": "Lever Lying Chest Press",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "free-exercise-db:0581",
+    "slug": "fedb-0581-lever-high-row",
+    "name_en": "Lever High Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "upper_back",
+    "basis": "source_target:upper back"
+  },
+  {
+    "key": "free-exercise-db:0582",
+    "slug": "fedb-0582-lever-kneeling-leg-curl",
+    "name_en": "Lever Kneeling Leg Curl",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_knee_flexion",
+    "basis": "mechanics:knee_flexion"
+  },
+  {
+    "key": "free-exercise-db:0584",
+    "slug": "fedb-0584-lever-lateral-raise",
+    "name_en": "Lever Lateral Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "lateral_delt",
+    "basis": "mechanics:shoulder_abduction"
+  },
+  {
+    "key": "free-exercise-db:0585",
+    "slug": "fedb-0585-lever-leg-extension",
+    "name_en": "Lever Leg Extension",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "vasti",
+    "basis": "mechanics:hip_flexed_knee_extension"
+  },
+  {
+    "key": "free-exercise-db:0586",
+    "slug": "fedb-0586-lever-lying-leg-curl",
+    "name_en": "Lever Lying Leg Curl",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_knee_flexion",
+    "basis": "mechanics:knee_flexion"
+  },
+  {
+    "key": "free-exercise-db:0592",
+    "slug": "fedb-0592-lever-preacher-curl",
+    "name_en": "Lever Preacher Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0593",
+    "slug": "fedb-0593-lever-reverse-hyperextension",
+    "name_en": "Lever Reverse Hyperextension",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:0594",
+    "slug": "fedb-0594-lever-seated-calf-raise",
+    "name_en": "Lever Seated Calf Raise",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "soleus",
+    "basis": "mechanics:flexed_knee"
+  },
+  {
+    "key": "free-exercise-db:0597",
+    "slug": "fedb-0597-lever-seated-hip-abduction",
+    "name_en": "Lever Seated Hip Abduction",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:0598",
+    "slug": "fedb-0598-lever-seated-hip-adduction",
+    "name_en": "Lever Seated Hip Adduction",
+    "previous_primary_muscle": "adductors",
+    "primary_muscle": "adductors",
+    "muscle_focus": "hip_adduction",
+    "basis": "mechanics:hip_adduction"
+  },
+  {
+    "key": "free-exercise-db:0599",
+    "slug": "fedb-0599-lever-seated-leg-curl",
+    "name_en": "Lever Seated Leg Curl",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_knee_flexion",
+    "basis": "mechanics:knee_flexion"
+  },
+  {
+    "key": "free-exercise-db:0600",
+    "slug": "fedb-0600-leg-raise-crunch",
+    "name_en": "Leg Raise Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "hip_flexion_posterior_tilt",
+    "basis": "mechanics:hip_flexion_or_posterior_tilt"
+  },
+  {
+    "key": "free-exercise-db:0602",
+    "slug": "fedb-0602-lever-seated-reverse-fly",
+    "name_en": "Lever Seated Reverse Fly",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "rear_delt",
+    "basis": "mechanics:horizontal_abduction"
+  },
+  {
+    "key": "free-exercise-db:0604",
+    "slug": "fedb-0604-lever-shrug",
+    "name_en": "Lever Shrug",
+    "previous_primary_muscle": "traps",
+    "primary_muscle": "traps",
+    "muscle_focus": "upper_traps",
+    "basis": "mechanics:scapular_elevation"
+  },
+  {
+    "key": "free-exercise-db:0605",
+    "slug": "fedb-0605-lever-standing-calf-raise",
+    "name_en": "Lever Standing Calf Raise",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "gastrocnemius",
+    "basis": "mechanics:straight_knee_raise"
+  },
+  {
+    "key": "free-exercise-db:0607",
+    "slug": "fedb-0607-lever-triceps-extension",
+    "name_en": "Lever Triceps Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "reviewed_movement_mechanics"
+  },
+  {
+    "key": "free-exercise-db:0620",
+    "slug": "fedb-0620-flat-bench-cable-fly",
+    "name_en": "Flat Bench Cable Fly",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "free-exercise-db:0640",
+    "slug": "fedb-0640-medicine-ball-wall-sit-up",
+    "name_en": "Medicine Ball Wall Sit-Up",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:0651",
+    "slug": "fedb-0651-shoulder-width-pull-up",
+    "name_en": "Shoulder-Width Pull-Up",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0668",
+    "slug": "fedb-0668-rear-decline-bridge",
+    "name_en": "Rear Decline Bridge",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:0669",
+    "slug": "fedb-0669-rear-deltoid-stretch",
+    "name_en": "Rear Deltoid Stretch",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "rear_delt",
+    "basis": "source_target:posterior deltoid"
+  },
+  {
+    "key": "free-exercise-db:0672",
+    "slug": "fedb-0672-reverse-dip-stretch",
+    "name_en": "Reverse Dip Stretch",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "general_triceps",
+    "basis": "mechanics:compound_press"
+  },
+  {
+    "key": "free-exercise-db:0673",
+    "slug": "fedb-0673-reverse-grip-machine-lat-pulldown",
+    "name_en": "Reverse Grip Machine Lat Pulldown",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0690",
+    "slug": "fedb-0690-seated-lower-back-stretch",
+    "name_en": "Seated Lower Back Stretch",
+    "previous_primary_muscle": "lower_back",
+    "primary_muscle": "lower_back",
+    "muscle_focus": "lumbar_erectors",
+    "basis": "source_target:erector spinae"
+  },
+  {
+    "key": "free-exercise-db:0705",
+    "slug": "fedb-0705-side-plank",
+    "name_en": "Side Plank",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "lateral_flexion",
+    "basis": "mechanics:anti_lateral_flexion"
+  },
+  {
+    "key": "free-exercise-db:0721",
+    "slug": "fedb-0721-side-wrist-pull-stretch",
+    "name_en": "Side Wrist Pull Stretch",
+    "previous_primary_muscle": "forearms",
+    "primary_muscle": "forearms",
+    "muscle_focus": "general_forearms",
+    "basis": "mechanics:broad_forearm"
+  },
+  {
+    "key": "free-exercise-db:0738",
+    "slug": "fedb-0738-sled-45-degree-calf-press",
+    "name_en": "Sled 45 Degree Calf Press",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "gastrocnemius",
+    "basis": "mechanics:straight_knee_raise"
+  },
+  {
+    "key": "free-exercise-db:0740",
+    "slug": "fedb-0740-sled-45-degree-wide-leg-press",
+    "name_en": "Sled 45 Degree Wide Leg Press",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "vasti",
+    "basis": "mechanics:hip_flexed_knee_extension"
+  },
+  {
+    "key": "free-exercise-db:0743",
+    "slug": "fedb-0743-sled-hack-squat",
+    "name_en": "Sled Hack Squat",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:0748",
+    "slug": "fedb-0748-smith-machine-leg-press",
+    "name_en": "Smith Machine Leg Press",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "vasti",
+    "basis": "mechanics:hip_flexed_knee_extension"
+  },
+  {
+    "key": "free-exercise-db:0750",
+    "slug": "fedb-0750-smith-chair-squat",
+    "name_en": "Smith Chair Squat",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "general_quadriceps",
+    "basis": "mechanics:multi_joint_knee_extension"
+  },
+  {
+    "key": "free-exercise-db:0752",
+    "slug": "fedb-0752-smith-machine-deadlift",
+    "name_en": "Smith Machine Deadlift",
+    "previous_primary_muscle": "lower_back",
+    "primary_muscle": "lower_back",
+    "muscle_focus": "lumbar_erectors",
+    "basis": "source_target:erectors"
+  },
+  {
+    "key": "free-exercise-db:0765",
+    "slug": "fedb-0765-smith-seated-shoulder-press",
+    "name_en": "Smith Seated Shoulder Press",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "front_delt",
+    "basis": "mechanics:shoulder_flexion"
+  },
+  {
+    "key": "free-exercise-db:0777",
+    "slug": "fedb-0777-spell-caster",
+    "name_en": "Spell Caster",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:0794",
+    "slug": "fedb-0794-standing-lateral-stretch",
+    "name_en": "Standing Lateral Stretch",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "lateral_flexion",
+    "basis": "mechanics:lateral_flexion"
+  },
+  {
+    "key": "free-exercise-db:0796",
+    "slug": "fedb-0796-standing-wheel-rollout",
+    "name_en": "Standing Wheel Rollout",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "anti_extension",
+    "basis": "mechanics:anti_extension"
+  },
+  {
+    "key": "free-exercise-db:0826",
+    "slug": "fedb-0826-vertical-leg-raise-on-parallel-bars",
+    "name_en": "Vertical Leg Raise (on parallel bars)",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "hip_flexion_posterior_tilt",
+    "basis": "mechanics:hip_flexion_or_posterior_tilt"
+  },
+  {
+    "key": "free-exercise-db:0832",
+    "slug": "fedb-0832-weighted-leg-extension-crunch",
+    "name_en": "Weighted Leg Extension Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:0846",
+    "slug": "fedb-0846-weighted-lying-twist",
+    "name_en": "Weighted Lying Twist",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:0849",
+    "slug": "fedb-0849-seated-twist-on-stability-ball",
+    "name_en": "Seated Twist on Stability Ball",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:0850",
+    "slug": "fedb-0850-side-bend-on-stability-ball",
+    "name_en": "Side Bend on Stability Ball",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "lateral_flexion",
+    "basis": "mechanics:lateral_flexion"
+  },
+  {
+    "key": "free-exercise-db:0851",
+    "slug": "fedb-0851-weighted-sissy-squat",
+    "name_en": "Weighted Sissy Squat",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "rectus_femoris",
+    "basis": "mechanics:rectus_femoris_lengthened"
+  },
+  {
+    "key": "free-exercise-db:0853",
+    "slug": "fedb-0853-weighted-standing-curl",
+    "name_en": "Weighted Standing Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:0861",
+    "slug": "fedb-0861-cable-one-arm-twisting-seated-row",
+    "name_en": "Cable One-Arm Twisting Seated Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0862",
+    "slug": "fedb-0862-cable-twist-up-down",
+    "name_en": "Cable Twist (up-down)",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:0865",
+    "slug": "fedb-0865-lying-leg-raise",
+    "name_en": "Lying Leg Raise",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "hip_flexion_posterior_tilt",
+    "basis": "mechanics:hip_flexion_or_posterior_tilt"
+  },
+  {
+    "key": "free-exercise-db:0872",
+    "slug": "fedb-0872-reverse-crunch",
+    "name_en": "Reverse Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:0970",
+    "slug": "fedb-0970-band-assisted-pull-up",
+    "name_en": "Band Assisted Pull-up",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0974",
+    "slug": "fedb-0974-cable-close-grip-lat-pulldown",
+    "name_en": "Cable Close Grip Lat Pulldown",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0976",
+    "slug": "fedb-0976-band-prone-leg-curl",
+    "name_en": "Band Prone Leg Curl",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_knee_flexion",
+    "basis": "mechanics:knee_flexion"
+  },
+  {
+    "key": "free-exercise-db:0980",
+    "slug": "fedb-0980-band-seated-leg-extension",
+    "name_en": "Band Seated Leg Extension",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "vasti",
+    "basis": "mechanics:hip_flexed_knee_extension"
+  },
+  {
+    "key": "free-exercise-db:0981",
+    "slug": "fedb-0981-jackknife-floor",
+    "name_en": "Jackknife Floor",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "hip_flexion_posterior_tilt",
+    "basis": "mechanics:hip_flexion_or_posterior_tilt"
+  },
+  {
+    "key": "free-exercise-db:0983",
+    "slug": "fedb-0983-band-kneeling-one-arm-pulldown",
+    "name_en": "Band Kneeling One Arm Pulldown",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0985",
+    "slug": "fedb-0985-twisting-crunch",
+    "name_en": "Twisting Crunch",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:0988",
+    "slug": "fedb-0988-band-standing-leg-curl",
+    "name_en": "Band Standing Leg Curl",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_knee_flexion",
+    "basis": "mechanics:knee_flexion"
+  },
+  {
+    "key": "free-exercise-db:0990",
+    "slug": "fedb-0990-band-seated-row",
+    "name_en": "Band Seated Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:0991",
+    "slug": "fedb-0991-band-pull-through",
+    "name_en": "Band Pull Through",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:0999",
+    "slug": "fedb-0999-band-standing-calf-raise",
+    "name_en": "Band Standing Calf Raise",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "gastrocnemius",
+    "basis": "mechanics:straight_knee_raise"
+  },
+  {
+    "key": "free-exercise-db:1002",
+    "slug": "fedb-1002-lying-straight-leg-raise",
+    "name_en": "Lying Straight Leg Raise",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:1005",
+    "slug": "fedb-1005-band-standing-crunch",
+    "name_en": "Band Standing Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:1011",
+    "slug": "fedb-1011-seated-straight-arm-twist",
+    "name_en": "Seated Straight Arm Twist",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:1017",
+    "slug": "fedb-1017-band-one-arm-front-raise",
+    "name_en": "Band One Arm Front Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "front_delt",
+    "basis": "source_target:anterior deltoid"
+  },
+  {
+    "key": "free-exercise-db:1022",
+    "slug": "fedb-1022-band-standing-rear-delt-row",
+    "name_en": "Band Standing Rear Delt Row",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "rear_delt",
+    "basis": "mechanics:horizontal_abduction"
+  },
+  {
+    "key": "free-exercise-db:1160",
+    "slug": "fedb-1160-burpee",
+    "name_en": "Burpee",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:1167",
+    "slug": "fedb-1167-dynamic-chest-stretch",
+    "name_en": "Dynamic Chest Stretch",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "general_chest",
+    "basis": "mechanics:mobility"
+  },
+  {
+    "key": "free-exercise-db:1259",
+    "slug": "fedb-1259-overhead-chest-stretch",
+    "name_en": "Overhead Chest Stretch",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "general_chest",
+    "basis": "mechanics:mobility"
+  },
+  {
+    "key": "free-exercise-db:1269",
+    "slug": "fedb-1269-cable-standing-fly",
+    "name_en": "Cable Standing Fly",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "free-exercise-db:1274",
+    "slug": "fedb-1274-deep-push-up",
+    "name_en": "Deep Push-Up",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "free-exercise-db:1277",
+    "slug": "fedb-1277-dumbbell-fly-on-exercise-ball",
+    "name_en": "Dumbbell Fly On Exercise Ball",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "free-exercise-db:1278",
+    "slug": "fedb-1278-dumbbell-incline-fly-on-exercise-ball",
+    "name_en": "Dumbbell Incline Fly On Exercise Ball",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "upper_chest",
+    "basis": "mechanics:incline"
+  },
+  {
+    "key": "free-exercise-db:1299",
+    "slug": "fedb-1299-lever-incline-hammer-chest-press",
+    "name_en": "Lever Incline Hammer Chest Press",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "upper_chest",
+    "basis": "source_target:upper pectorals"
+  },
+  {
+    "key": "free-exercise-db:1328",
+    "slug": "fedb-1328-dumbbell-lying-rear-delt-row",
+    "name_en": "Dumbbell Lying Rear Delt Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "upper_back",
+    "basis": "source_target:upper back"
+  },
+  {
+    "key": "free-exercise-db:1329",
+    "slug": "fedb-1329-dumbbell-palm-rotational-bent-over-row",
+    "name_en": "Dumbbell Palm Rotational Bent Over Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "upper_back",
+    "basis": "source_target:upper back"
+  },
+  {
+    "key": "free-exercise-db:1330",
+    "slug": "fedb-1330-dumbbell-hammer-grip-incline-bench-row",
+    "name_en": "Dumbbell Hammer Grip Incline Bench Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:1338",
+    "slug": "fedb-1338-exercise-ball-sit-up",
+    "name_en": "Exercise Ball Sit-Up",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:1339",
+    "slug": "fedb-1339-exercise-ball-spinal-stretch",
+    "name_en": "Exercise Ball Spinal Stretch",
+    "previous_primary_muscle": "lower_back",
+    "primary_muscle": "lower_back",
+    "muscle_focus": "thoracic_mobility",
+    "basis": "mechanics:spinal_mobility"
+  },
+  {
+    "key": "free-exercise-db:1346",
+    "slug": "fedb-1346-kneeling-lat-stretch",
+    "name_en": "Kneeling Lat Stretch",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:1349",
+    "slug": "fedb-1349-lever-reverse-t-bar-row",
+    "name_en": "Lever Reverse T-Bar Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "upper_back",
+    "basis": "source_target:upper back"
+  },
+  {
+    "key": "free-exercise-db:1363",
+    "slug": "fedb-1363-spine-stretch",
+    "name_en": "Spine Stretch",
+    "previous_primary_muscle": "lower_back",
+    "primary_muscle": "lower_back",
+    "muscle_focus": "lumbar_erectors",
+    "basis": "source_target:spinal erectors"
+  },
+  {
+    "key": "free-exercise-db:1378",
+    "slug": "fedb-1378-calf-stretch-with-rope",
+    "name_en": "Calf Stretch with Rope",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "general_calves",
+    "basis": "source_muscle_group:mixed_calf"
+  },
+  {
+    "key": "free-exercise-db:1379",
+    "slug": "fedb-1379-dumbbell-seated-calf-raise",
+    "name_en": "Dumbbell Seated Calf Raise",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "soleus",
+    "basis": "mechanics:flexed_knee"
+  },
+  {
+    "key": "free-exercise-db:1388",
+    "slug": "fedb-1388-peroneals-stretch",
+    "name_en": "Peroneals Stretch",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:1390",
+    "slug": "fedb-1390-seated-calf-stretch",
+    "name_en": "Seated Calf Stretch",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "soleus",
+    "basis": "mechanics:flexed_knee"
+  },
+  {
+    "key": "free-exercise-db:1393",
+    "slug": "fedb-1393-smith-machine-calf-raise",
+    "name_en": "Smith Machine Calf Raise",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "gastrocnemius",
+    "basis": "mechanics:straight_knee_raise"
+  },
+  {
+    "key": "free-exercise-db:1403",
+    "slug": "fedb-1403-neck-side-stretch",
+    "name_en": "Neck Side Stretch",
+    "previous_primary_muscle": "neck",
+    "primary_muscle": "neck",
+    "muscle_focus": "neck_lateral_extension",
+    "basis": "mechanics:lateral_or_extension"
+  },
+  {
+    "key": "free-exercise-db:1405",
+    "slug": "fedb-1405-middle-back-stretch",
+    "name_en": "Middle Back Stretch",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "mid_back_rhomboids",
+    "basis": "source_target:middle back"
+  },
+  {
+    "key": "free-exercise-db:1408",
+    "slug": "fedb-1408-band-standing-lift",
+    "name_en": "Band Standing Lift",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:1419",
+    "slug": "fedb-1419-iron-cross-stretch",
+    "name_en": "Iron Cross Stretch",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "lateral_flexion",
+    "basis": "mechanics:lateral_flexion"
+  },
+  {
+    "key": "free-exercise-db:1428",
+    "slug": "fedb-1428-wrist-circles",
+    "name_en": "Wrist Circles",
+    "previous_primary_muscle": "forearms",
+    "primary_muscle": "forearms",
+    "muscle_focus": "general_forearms",
+    "basis": "mechanics:broad_forearm"
+  },
+  {
+    "key": "free-exercise-db:1429",
+    "slug": "fedb-1429-pull-up-wide-grip",
+    "name_en": "Pull-Up (Wide Grip)",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:1435",
+    "slug": "fedb-1435-barbell-back-squat",
+    "name_en": "Barbell Back Squat",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "general_quadriceps",
+    "basis": "mechanics:multi_joint_knee_extension"
+  },
+  {
+    "key": "free-exercise-db:1451",
+    "slug": "fedb-1451-lever-seated-dip",
+    "name_en": "Lever Seated Dip",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "general_triceps",
+    "basis": "mechanics:compound_press"
+  },
+  {
+    "key": "free-exercise-db:1452",
+    "slug": "fedb-1452-lever-seated-crunch",
+    "name_en": "Lever Seated Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:1494",
+    "slug": "fedb-1494-butterfly-yoga-pose",
+    "name_en": "Butterfly Yoga Pose",
+    "previous_primary_muscle": "adductors",
+    "primary_muscle": "adductors",
+    "muscle_focus": "hip_adduction",
+    "basis": "mechanics:hip_adduction"
+  },
+  {
+    "key": "free-exercise-db:1511",
+    "slug": "fedb-1511-standing-hamstring-stretch",
+    "name_en": "Standing Hamstring Stretch",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_hip_extension",
+    "basis": "mechanics:hip_hinge_or_stretch"
+  },
+  {
+    "key": "free-exercise-db:1564",
+    "slug": "fedb-1564-hip-flexor-and-quadriceps-stretch",
+    "name_en": "Hip Flexor and Quadriceps Stretch",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "rectus_femoris",
+    "basis": "mechanics:rectus_femoris_lengthened"
+  },
+  {
+    "key": "free-exercise-db:1585",
+    "slug": "fedb-1585-runner-s-stretch",
+    "name_en": "Runner's Stretch",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:1587",
+    "slug": "fedb-1587-seated-wide-angle-pose-sequence",
+    "name_en": "Seated Wide Angle Pose Sequence",
+    "previous_primary_muscle": "adductors",
+    "primary_muscle": "adductors",
+    "muscle_focus": "hip_adduction",
+    "basis": "mechanics:hip_adduction"
+  },
+  {
+    "key": "free-exercise-db:1599",
+    "slug": "fedb-1599-calf-stretch-with-strap",
+    "name_en": "Calf Stretch with Strap",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "gastrocnemius",
+    "basis": "mechanics:straight_knee_stretch"
+  },
+  {
+    "key": "free-exercise-db:1672",
+    "slug": "fedb-1672-dumbbell-one-arm-zottman-preacher-curl",
+    "name_en": "Dumbbell One Arm Zottman Preacher Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "brachialis_brachioradialis",
+    "basis": "mechanics:neutral_or_pronated_grip"
+  },
+  {
+    "key": "free-exercise-db:1673",
+    "slug": "fedb-1673-dumbbell-preacher-curl-over-exercise-ball",
+    "name_en": "Dumbbell Preacher Curl Over Exercise Ball",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:1723",
+    "slug": "fedb-1723-cable-triceps-pushdown",
+    "name_en": "Cable Triceps Pushdown",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_lateral_medial_heads",
+    "basis": "mechanics:arm_at_side"
+  },
+  {
+    "key": "free-exercise-db:1729",
+    "slug": "fedb-1729-dumbbell-lying-alternate-extension",
+    "name_en": "Dumbbell Lying Alternate Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "mechanics:shoulder_flexed"
+  },
+  {
+    "key": "free-exercise-db:1757",
+    "slug": "fedb-1757-single-dumbbell-stiff-leg-deadlift",
+    "name_en": "Single Dumbbell Stiff-Leg Deadlift",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_hip_extension",
+    "basis": "mechanics:hip_hinge_or_stretch"
+  },
+  {
+    "key": "free-exercise-db:1760",
+    "slug": "fedb-1760-dumbbell-goblet-squat",
+    "name_en": "Dumbbell Goblet Squat",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "general_quadriceps",
+    "basis": "mechanics:multi_joint_knee_extension"
+  },
+  {
+    "key": "free-exercise-db:1764",
+    "slug": "fedb-1764-hanging-leg-hip-raise",
+    "name_en": "Hanging Leg Hip Raise",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "hip_flexion_posterior_tilt",
+    "basis": "mechanics:hip_flexion_or_posterior_tilt"
+  },
+  {
+    "key": "free-exercise-db:1771",
+    "slug": "fedb-1771-kneeling-triceps-stretch",
+    "name_en": "Kneeling Triceps Stretch",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "mechanics:shoulder_flexed"
+  },
+  {
+    "key": "free-exercise-db:2137",
+    "slug": "fedb-2137-dumbbell-arnold-press",
+    "name_en": "Dumbbell Arnold Press",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "front_delt",
+    "basis": "reviewed_movement_mechanics"
+  },
+  {
+    "key": "free-exercise-db:2138",
+    "slug": "fedb-2138-stationary-bike",
+    "name_en": "Stationary Bike",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:2141",
+    "slug": "fedb-2141-elliptical-trainer",
+    "name_en": "Elliptical Trainer",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:2188",
+    "slug": "fedb-2188-dumbbell-seated-triceps-extension",
+    "name_en": "Dumbbell Seated Triceps Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "instructions:shoulder_flexed"
+  },
+  {
+    "key": "free-exercise-db:2203",
+    "slug": "fedb-2203-seated-shoulder-flexor-depressor-retractor-stretch",
+    "name_en": "Seated Shoulder Flexor, Depressor, Retractor Stretch",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "general_shoulders",
+    "basis": "mechanics:broad_shoulders"
+  },
+  {
+    "key": "free-exercise-db:2286",
+    "slug": "fedb-2286-lever-standing-hip-extension",
+    "name_en": "Lever Standing Hip Extension",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:2327",
+    "slug": "fedb-2327-reverse-grip-pull-up",
+    "name_en": "Reverse Grip Pull-Up",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:2407",
+    "slug": "fedb-2407-ez-bar-biceps-curl",
+    "name_en": "EZ Bar Biceps Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "free-exercise-db:2611",
+    "slug": "fedb-2611-lever-horizontal-leg-press",
+    "name_en": "Lever Horizontal Leg Press",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "vasti",
+    "basis": "mechanics:hip_flexed_knee_extension"
+  },
+  {
+    "key": "free-exercise-db:2612",
+    "slug": "fedb-2612-jump-rope",
+    "name_en": "Jump Rope",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:2616",
+    "slug": "fedb-2616-cable-one-arm-lateral-pulldown",
+    "name_en": "Cable One Arm Lateral Pulldown",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:2987",
+    "slug": "fedb-2987-close-grip-chin-up",
+    "name_en": "Close Grip Chin-Up",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:3006",
+    "slug": "fedb-3006-band-hip-abduction",
+    "name_en": "Band Hip Abduction",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_medius_minimus",
+    "basis": "source_target:gluteus medius"
+  },
+  {
+    "key": "free-exercise-db:3012",
+    "slug": "fedb-3012-scapula-dips",
+    "name_en": "Scapula Dips",
+    "previous_primary_muscle": "traps",
+    "primary_muscle": "traps",
+    "muscle_focus": "mid_lower_traps",
+    "basis": "mechanics:scapular_retraction_depression"
+  },
+  {
+    "key": "free-exercise-db:3144",
+    "slug": "fedb-3144-band-straight-back-seated-row",
+    "name_en": "Band Straight-Back Seated Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:3639",
+    "slug": "fedb-3639-bent-knee-lying-twist-on-stability-ball",
+    "name_en": "Bent Knee Lying Twist on Stability Ball",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:drv-45-degree-bycicle-twisting-crunch-1",
+    "slug": "fedb-drv-45-degree-bycicle-twisting-crunch-1-45-degree-bicycle-twisting-crunch",
+    "name_en": "45-Degree Bicycle Twisting Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:drv-45-degree-bycicle-twisting-crunch",
+    "slug": "fedb-drv-45-degree-bycicle-twisting-crunch-45-degree-bicycle-twisting-crunch",
+    "name_en": "45-Degree Bicycle Twisting Crunch",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:drv-band-bent-over-rear-lateral-raise",
+    "slug": "fedb-drv-band-bent-over-rear-lateral-raise-band-bent-over-rear-lateral-raise",
+    "name_en": "Band Bent-Over Rear Lateral Raise",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "rear_delt",
+    "basis": "source_target:rear deltoids"
+  },
+  {
+    "key": "free-exercise-db:drv-band-decline-sit-ups",
+    "slug": "fedb-drv-band-decline-sit-ups-band-resisted-decline-sit-up",
+    "name_en": "Band Resisted Decline Sit-Up",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:drv-band-high-fly",
+    "slug": "fedb-drv-band-high-fly-resistance-band-high-fly",
+    "name_en": "Resistance Band High Fly",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "lower_chest",
+    "basis": "reviewed_movement_mechanics"
+  },
+  {
+    "key": "free-exercise-db:drv-band-hip-adduction",
+    "slug": "fedb-drv-band-hip-adduction-band-hip-adduction",
+    "name_en": "Band Hip Adduction",
+    "previous_primary_muscle": "adductors",
+    "primary_muscle": "adductors",
+    "muscle_focus": "hip_adduction",
+    "basis": "mechanics:hip_adduction"
+  },
+  {
+    "key": "free-exercise-db:drv-band-one-leg-kickback-bent-position",
+    "slug": "fedb-drv-band-one-leg-kickback-bent-position-band-one-leg-kickback-bent-position",
+    "name_en": "Band One-Leg Kickback (Bent Position)",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:drv-barbell-seated-behind-head-military-press",
+    "slug": "fedb-drv-barbell-seated-behind-head-military-press-barbell-seated-behind-the-neck-press",
+    "name_en": "Barbell Seated Behind-The-Neck Press",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "general_shoulders",
+    "basis": "reviewed_movement_mechanics"
+  },
+  {
+    "key": "free-exercise-db:drv-bench-dips",
+    "slug": "fedb-drv-bench-dips-bench-dips",
+    "name_en": "Bench Dips",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "general_triceps",
+    "basis": "mechanics:compound_press"
+  },
+  {
+    "key": "free-exercise-db:drv-cable-bar-lateral-pulldown-wide-shoulder-grip",
+    "slug": "fedb-drv-cable-bar-lateral-pulldown-wide-shoulder-grip-wide-grip-cable-lat-pulldown",
+    "name_en": "Wide Grip Cable Lat Pulldown",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:drv-cardio-exercises",
+    "slug": "fedb-drv-cardio-exercises-cardio-exercise",
+    "name_en": "Cardio Exercise",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:drv-cardio-exercises-machine",
+    "slug": "fedb-drv-cardio-exercises-machine-cardio-machine-exercise",
+    "name_en": "Cardio Machine Exercise",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:drv-cardio-exercises-machines",
+    "slug": "fedb-drv-cardio-exercises-machines-cardio-machine-workouts",
+    "name_en": "Cardio Machine Workouts",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:drv-chest-dips",
+    "slug": "fedb-drv-chest-dips-chest-dips",
+    "name_en": "Chest Dips",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "lower_chest",
+    "basis": "mechanics:decline_or_dip"
+  },
+  {
+    "key": "free-exercise-db:drv-chest-lift-with-rotation",
+    "slug": "fedb-drv-chest-lift-with-rotation-chest-lift-with-rotation",
+    "name_en": "Chest Lift with Rotation",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:drv-chin-ups-pull-ups",
+    "slug": "fedb-drv-chin-ups-pull-ups-pull-up-chin-up",
+    "name_en": "Pull-Up / Chin-Up",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:drv-close-feet-leg-press",
+    "slug": "fedb-drv-close-feet-leg-press-close-feet-leg-press",
+    "name_en": "Close Feet Leg Press",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "vasti",
+    "basis": "mechanics:hip_flexed_knee_extension"
+  },
+  {
+    "key": "free-exercise-db:drv-commando-pull-up",
+    "slug": "fedb-drv-commando-pull-up-commando-pull-up",
+    "name_en": "Commando Pull-Up",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:drv-corkscrew-pilates",
+    "slug": "fedb-drv-corkscrew-pilates-pilates-corkscrew",
+    "name_en": "Pilates Corkscrew",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "hip_flexion_posterior_tilt",
+    "basis": "mechanics:hip_flexion_or_posterior_tilt"
+  },
+  {
+    "key": "free-exercise-db:drv-crunch-on-bench",
+    "slug": "fedb-drv-crunch-on-bench-bench-crunch",
+    "name_en": "Bench Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:drv-crunch-straight-leg-up",
+    "slug": "fedb-drv-crunch-straight-leg-up-straight-leg-up-crunch",
+    "name_en": "Straight-Leg Up Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:drv-hip-raise-bridge",
+    "slug": "fedb-drv-hip-raise-bridge-glute-bridge",
+    "name_en": "Glute Bridge",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:drv-hundred-pilates",
+    "slug": "fedb-drv-hundred-pilates-pilates-hundred",
+    "name_en": "Pilates Hundred",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "anti_extension",
+    "basis": "mechanics:anti_extension"
+  },
+  {
+    "key": "free-exercise-db:drv-jack-split-crunches",
+    "slug": "fedb-drv-jack-split-crunches-jackknife-split-crunch",
+    "name_en": "Jackknife Split Crunch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "hip_flexion_posterior_tilt",
+    "basis": "mechanics:hip_flexion_or_posterior_tilt"
+  },
+  {
+    "key": "free-exercise-db:drv-jackknife-pilates",
+    "slug": "fedb-drv-jackknife-pilates-jackknife",
+    "name_en": "Jackknife",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "hip_flexion_posterior_tilt",
+    "basis": "mechanics:hip_flexion_or_posterior_tilt"
+  },
+  {
+    "key": "free-exercise-db:drv-jump-step-up",
+    "slug": "fedb-drv-jump-step-up-jump-step-up",
+    "name_en": "Jump Step-Up",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "general_quadriceps",
+    "basis": "mechanics:multi_joint_knee_extension"
+  },
+  {
+    "key": "free-exercise-db:drv-kettlebell-deadlift",
+    "slug": "fedb-drv-kettlebell-deadlift-kettlebell-deadlift",
+    "name_en": "Kettlebell Deadlift",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:drv-leg-raise-hip-lift",
+    "slug": "fedb-drv-leg-raise-hip-lift-leg-raise-with-hip-lift",
+    "name_en": "Leg Raise with Hip Lift",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "hip_flexion_posterior_tilt",
+    "basis": "mechanics:hip_flexion_or_posterior_tilt"
+  },
+  {
+    "key": "free-exercise-db:drv-lever-pec-deck-fly",
+    "slug": "fedb-drv-lever-pec-deck-fly-pec-deck-fly",
+    "name_en": "Pec Deck Fly",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "free-exercise-db:drv-lever-standing-rear-kick",
+    "slug": "fedb-drv-lever-standing-rear-kick-lever-standing-rear-kick",
+    "name_en": "Lever Standing Rear Kick",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:drv-lever-t-bar-row",
+    "slug": "fedb-drv-lever-t-bar-row-lever-t-bar-row",
+    "name_en": "Lever T-Bar Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "lats",
+    "basis": "source_target:lats"
+  },
+  {
+    "key": "free-exercise-db:drv-lying-hip-lift-on-stability-ball",
+    "slug": "fedb-drv-lying-hip-lift-on-stability-ball-lying-hip-lift-on-stability-ball",
+    "name_en": "Lying Hip Lift on Stability Ball",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:drv-lying-scissor-kick-female",
+    "slug": "fedb-drv-lying-scissor-kick-female-lying-scissor-kick",
+    "name_en": "Lying Scissor Kick",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:drv-old-school-reverse-extensions",
+    "slug": "fedb-drv-old-school-reverse-extensions-old-school-reverse-extensions",
+    "name_en": "Old School Reverse Extensions",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_lateral_medial_heads",
+    "basis": "mechanics:arm_at_side"
+  },
+  {
+    "key": "free-exercise-db:drv-otis-ups",
+    "slug": "fedb-drv-otis-ups-otis-up",
+    "name_en": "Otis-Up",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:drv-push-ups",
+    "slug": "fedb-drv-push-ups-push-up",
+    "name_en": "Push-Up",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "free-exercise-db:drv-ring-high-row",
+    "slug": "fedb-drv-ring-high-row-ring-high-row",
+    "name_en": "Ring High Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "mid_back_rhomboids",
+    "basis": "source_target:rhomboids"
+  },
+  {
+    "key": "free-exercise-db:drv-rotate-push-up-female",
+    "slug": "fedb-drv-rotate-push-up-female-rotational-push-up",
+    "name_en": "Rotational Push-Up",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "free-exercise-db:drv-running",
+    "slug": "fedb-drv-running-running",
+    "name_en": "Running",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:drv-sit-up",
+    "slug": "fedb-drv-sit-up-sit-up",
+    "name_en": "Sit-Up",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:drv-sit-ups",
+    "slug": "fedb-drv-sit-ups-sit-up",
+    "name_en": "Sit-Up",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:drv-squat",
+    "slug": "fedb-drv-squat-squat",
+    "name_en": "Squat",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "general_quadriceps",
+    "basis": "mechanics:multi_joint_knee_extension"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-adductor-stretch",
+    "slug": "fedb-drv-stretching-adductor-stretch-standing-adductor-stretch",
+    "name_en": "Standing Adductor Stretch",
+    "previous_primary_muscle": "adductors",
+    "primary_muscle": "adductors",
+    "muscle_focus": "adductor_mobility",
+    "basis": "mechanics:mobility"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-all-fours-squad-stretch",
+    "slug": "fedb-drv-stretching-all-fours-squad-stretch-all-fours-groin-stretch",
+    "name_en": "All Fours Groin Stretch",
+    "previous_primary_muscle": "adductors",
+    "primary_muscle": "adductors",
+    "muscle_focus": "adductor_mobility",
+    "basis": "mechanics:mobility"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-band-warm-up-shoulder-stretch",
+    "slug": "fedb-drv-stretching-band-warm-up-shoulder-stretch-band-shoulder-warm-up-stretch",
+    "name_en": "Band Shoulder Warm-Up Stretch",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "general_shoulders",
+    "basis": "mechanics:broad_shoulders"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-boat-stretch",
+    "slug": "fedb-drv-stretching-boat-stretch-seated-boat-stretch",
+    "name_en": "Seated Boat Stretch",
+    "previous_primary_muscle": "adductors",
+    "primary_muscle": "adductors",
+    "muscle_focus": "adductor_mobility",
+    "basis": "mechanics:mobility"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-bridge-pose-setu-bandhasana-1",
+    "slug": "fedb-drv-stretching-bridge-pose-setu-bandhasana-1-bridge-pose-setu-bandhasana",
+    "name_en": "Bridge Pose (Setu Bandhasana)",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-bridge-pose-setu-bandhasana",
+    "slug": "fedb-drv-stretching-bridge-pose-setu-bandhasana-bridge-pose-setu-bandhasana",
+    "name_en": "Bridge Pose (Setu Bandhasana)",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-ceiling-look-stretch",
+    "slug": "fedb-drv-stretching-ceiling-look-stretch-standing-hip-flexor-and-abdominal-stretch",
+    "name_en": "Standing Hip Flexor and Abdominal Stretch",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-chin-to-chest-stretch",
+    "slug": "fedb-drv-stretching-chin-to-chest-stretch-chin-to-chest-stretch",
+    "name_en": "Chin-to-Chest Stretch",
+    "previous_primary_muscle": "neck",
+    "primary_muscle": "neck",
+    "muscle_focus": "neck_flexion",
+    "basis": "source_target:neck flexors"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-crossover-kneeling-hip-flexor-stretch",
+    "slug": "fedb-drv-stretching-crossover-kneeling-hip-flexor-stretch-crossover-kneeling-hip-flexor-stretch",
+    "name_en": "Crossover Kneeling Hip Flexor Stretch",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-feet-and-ankles-rotation-stretch",
+    "slug": "fedb-drv-stretching-feet-and-ankles-rotation-stretch-feet-and-ankles-rotation-stretch",
+    "name_en": "Feet and Ankles Rotation Stretch",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "gastrocnemius",
+    "basis": "mechanics:straight_knee_stretch"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-feet-and-ankles-stretch",
+    "slug": "fedb-drv-stretching-feet-and-ankles-stretch-feet-and-ankles-stretch",
+    "name_en": "Feet and Ankles Stretch",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "general_calves",
+    "basis": "source_muscle_group:mixed_calf"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-flexion-leg-sit-up",
+    "slug": "fedb-drv-stretching-flexion-leg-sit-up-flexion-leg-sit-up-stretch",
+    "name_en": "Flexion Leg Sit-Up Stretch",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "trunk_flexion",
+    "basis": "mechanics:trunk_flexion"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-front-toe-touch",
+    "slug": "fedb-drv-stretching-front-toe-touch-front-toe-touch-stretch",
+    "name_en": "Front Toe Touch Stretch",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_hip_extension",
+    "basis": "mechanics:hip_hinge_or_stretch"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-hip-extension-stretch",
+    "slug": "fedb-drv-stretching-hip-extension-stretch-hip-extension-stretch",
+    "name_en": "Hip Extension Stretch",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-hip-flexor-stretch-rear-foot-elevated",
+    "slug": "fedb-drv-stretching-hip-flexor-stretch-rear-foot-elevated-rear-foot-elevated-hip-flexor-stretch",
+    "name_en": "Rear Foot Elevated Hip Flexor Stretch",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-kneeling-back-rotation-stretch",
+    "slug": "fedb-drv-stretching-kneeling-back-rotation-stretch-kneeling-back-rotation-stretch",
+    "name_en": "Kneeling Back Rotation Stretch",
+    "previous_primary_muscle": "lower_back",
+    "primary_muscle": "lower_back",
+    "muscle_focus": "thoracic_mobility",
+    "basis": "source_target:thoracic spine"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-plyo-side-lunge-stretch",
+    "slug": "fedb-drv-stretching-plyo-side-lunge-stretch-plyometric-side-lunge-stretch",
+    "name_en": "Plyometric Side Lunge Stretch",
+    "previous_primary_muscle": "adductors",
+    "primary_muscle": "adductors",
+    "muscle_focus": "adductor_mobility",
+    "basis": "mechanics:mobility"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-quadriceps-lying-stretch",
+    "slug": "fedb-drv-stretching-quadriceps-lying-stretch-lying-quadriceps-stretch",
+    "name_en": "Lying Quadriceps Stretch",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "rectus_femoris",
+    "basis": "mechanics:rectus_femoris_lengthened"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-quadriceps-stretch",
+    "slug": "fedb-drv-stretching-quadriceps-stretch-standing-quadriceps-stretch",
+    "name_en": "Standing Quadriceps Stretch",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "rectus_femoris",
+    "basis": "mechanics:rectus_femoris_lengthened"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-seated-twist-straight-arm",
+    "slug": "fedb-drv-stretching-seated-twist-straight-arm-seated-twist-stretch-straight-arm",
+    "name_en": "Seated Twist Stretch (Straight Arm)",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-single-leg-stretch-bent-knee",
+    "slug": "fedb-drv-stretching-single-leg-stretch-bent-knee-single-leg-stretch-bent-knee",
+    "name_en": "Single Leg Stretch (Bent Knee)",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-single-straight-leg-stretch",
+    "slug": "fedb-drv-stretching-single-straight-leg-stretch-single-straight-leg-stretch",
+    "name_en": "Single Straight Leg Stretch",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_hip_extension",
+    "basis": "mechanics:hip_hinge_or_stretch"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-sitting-bent-over-back-stretch",
+    "slug": "fedb-drv-stretching-sitting-bent-over-back-stretch-seated-bent-over-back-stretch",
+    "name_en": "Seated Bent Over Back Stretch",
+    "previous_primary_muscle": "lower_back",
+    "primary_muscle": "lower_back",
+    "muscle_focus": "lumbar_erectors",
+    "basis": "source_target:erectors"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-slopes-towards-stretch",
+    "slug": "fedb-drv-stretching-slopes-towards-stretch-side-bend-stretch",
+    "name_en": "Side Bend Stretch",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "lateral_flexion",
+    "basis": "mechanics:lateral_flexion"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-stairs-calf-stretch",
+    "slug": "fedb-drv-stretching-stairs-calf-stretch-stairs-calf-stretch",
+    "name_en": "Stairs Calf Stretch",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "general_calves",
+    "basis": "source_muscle_group:mixed_calf"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-standing-back-rotation-stretch",
+    "slug": "fedb-drv-stretching-standing-back-rotation-stretch-standing-back-rotation-stretch",
+    "name_en": "Standing Back Rotation Stretch",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "trunk_rotation",
+    "basis": "mechanics:trunk_rotation"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-standing-bench-calf-stretch",
+    "slug": "fedb-drv-stretching-standing-bench-calf-stretch-standing-bench-calf-stretch",
+    "name_en": "Standing Bench Calf Stretch",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "gastrocnemius",
+    "basis": "mechanics:straight_knee_stretch"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-standing-reach-up-back-rotation-stretch",
+    "slug": "fedb-drv-stretching-standing-reach-up-back-rotation-stretch-standing-reach-up-back-rotation-stretch",
+    "name_en": "Standing Reach Up Back Rotation Stretch",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "general_chest",
+    "basis": "mechanics:mobility"
+  },
+  {
+    "key": "free-exercise-db:drv-stretching-standing-side-bend-bent-arm",
+    "slug": "fedb-drv-stretching-standing-side-bend-bent-arm-standing-side-bend-stretch-bent-arm",
+    "name_en": "Standing Side Bend Stretch (Bent Arm)",
+    "previous_primary_muscle": "obliques",
+    "primary_muscle": "obliques",
+    "muscle_focus": "lateral_flexion",
+    "basis": "mechanics:lateral_flexion"
+  },
+  {
+    "key": "free-exercise-db:drv-treadmill-running",
+    "slug": "fedb-drv-treadmill-running-treadmill-running",
+    "name_en": "Treadmill Running",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:drv-triceps-dips",
+    "slug": "fedb-drv-triceps-dips-triceps-dips",
+    "name_en": "Triceps Dips",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "general_triceps",
+    "basis": "mechanics:compound_press"
+  },
+  {
+    "key": "free-exercise-db:drv-v-up",
+    "slug": "fedb-drv-v-up-v-up",
+    "name_en": "V-Up",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "abs",
+    "muscle_focus": "hip_flexion_posterior_tilt",
+    "basis": "mechanics:hip_flexion_or_posterior_tilt"
+  },
+  {
+    "key": "free-exercise-db:drv-walk-wave-machine",
+    "slug": "fedb-drv-walk-wave-machine-walk-wave-machine",
+    "name_en": "Walk Wave Machine",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "free-exercise-db:new-band-overhead-triceps-extension",
+    "slug": "fedb-new-band-overhead-triceps-extension-band-overhead-triceps-extension",
+    "name_en": "Band Overhead Triceps Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "mechanics:shoulder_flexed"
+  },
+  {
+    "key": "free-exercise-db:new-band-triceps-pushdown",
+    "slug": "fedb-new-band-triceps-pushdown-band-triceps-pushdown",
+    "name_en": "Band Triceps Pushdown",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_lateral_medial_heads",
+    "basis": "mechanics:arm_at_side"
+  },
+  {
+    "key": "free-exercise-db:new-dumbbell-sumo-squat",
+    "slug": "fedb-new-dumbbell-sumo-squat-dumbbell-sumo-squat",
+    "name_en": "Dumbbell Sumo Squat",
+    "previous_primary_muscle": "glutes",
+    "primary_muscle": "glutes",
+    "muscle_focus": "glute_max",
+    "basis": "mechanics:hip_extension"
+  },
+  {
+    "key": "free-exercise-db:new-low-impact-jumping-jack",
+    "slug": "fedb-new-low-impact-jumping-jack-jumping-jack",
+    "name_en": "Jumping Jack",
+    "previous_primary_muscle": null,
+    "primary_muscle": null,
+    "muscle_focus": null,
+    "basis": "primary_muscle:null"
+  },
+  {
+    "key": "fitsho_training_template:hack-squat",
+    "slug": "hack-squat",
+    "name_en": "Hack Squat",
+    "previous_primary_muscle": "quadriceps",
+    "primary_muscle": "quadriceps",
+    "muscle_focus": "general_quadriceps",
+    "basis": "mechanics:multi_joint_knee_extension"
+  },
+  {
+    "key": "fitsho_training_template:lying-leg-curl",
+    "slug": "lying-leg-curl",
+    "name_en": "Lying Leg Curl",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_knee_flexion",
+    "basis": "mechanics:knee_flexion"
+  },
+  {
+    "key": "fitsho_training_template:machine-chest-press",
+    "slug": "machine-chest-press",
+    "name_en": "Machine Chest Press",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "fitsho_training_template:overhead-dumbbell-extension",
+    "slug": "overhead-dumbbell-extension",
+    "name_en": "Overhead Dumbbell Triceps Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "mechanics:shoulder_flexed"
+  },
+  {
+    "key": "fitsho_training_template:pallof-press",
+    "slug": "pallof-press",
+    "name_en": "Pallof Press",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "obliques",
+    "muscle_focus": "anti_rotation",
+    "basis": "mechanics:anti_rotation"
+  },
+  {
+    "key": "fitsho_training_template:pec-deck-fly",
+    "slug": "pec-deck-fly",
+    "name_en": "Pec Deck Fly",
+    "previous_primary_muscle": "chest",
+    "primary_muscle": "chest",
+    "muscle_focus": "mid_chest",
+    "basis": "mechanics:horizontal_or_flat"
+  },
+  {
+    "key": "fitsho_training_template:preacher-curl",
+    "slug": "preacher-curl",
+    "name_en": "Preacher Curl",
+    "previous_primary_muscle": "biceps",
+    "primary_muscle": "biceps",
+    "muscle_focus": "biceps_brachii",
+    "basis": "mechanics:supinated_curl"
+  },
+  {
+    "key": "fitsho_training_template:rear-delt-fly",
+    "slug": "rear-delt-fly",
+    "name_en": "Rear Delt Fly",
+    "previous_primary_muscle": "shoulders",
+    "primary_muscle": "shoulders",
+    "muscle_focus": "rear_delt",
+    "basis": "mechanics:horizontal_abduction"
+  },
+  {
+    "key": "fitsho_training_template:romanian-deadlift",
+    "slug": "romanian-deadlift",
+    "name_en": "Romanian Deadlift",
+    "previous_primary_muscle": "hamstrings",
+    "primary_muscle": "hamstrings",
+    "muscle_focus": "hamstrings_hip_extension",
+    "basis": "mechanics:hip_hinge_or_stretch"
+  },
+  {
+    "key": "fitsho_training_template:rope-overhead-extension",
+    "slug": "rope-overhead-extension",
+    "name_en": "Rope Overhead Extension",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "mechanics:shoulder_flexed"
+  },
+  {
+    "key": "fitsho_training_template:seated-calf-raise",
+    "slug": "seated-calf-raise",
+    "name_en": "Seated Calf Raise",
+    "previous_primary_muscle": "calves",
+    "primary_muscle": "calves",
+    "muscle_focus": "soleus",
+    "basis": "mechanics:flexed_knee"
+  },
+  {
+    "key": "fitsho_training_template:side-plank",
+    "slug": "side-plank",
+    "name_en": "Side Plank",
+    "previous_primary_muscle": "abs",
+    "primary_muscle": "obliques",
+    "muscle_focus": "lateral_flexion",
+    "basis": "mechanics:anti_lateral_flexion"
+  },
+  {
+    "key": "fitsho_training_template:single-arm-cable-row",
+    "slug": "single-arm-cable-row",
+    "name_en": "Single-Arm Cable Row",
+    "previous_primary_muscle": "back",
+    "primary_muscle": "back",
+    "muscle_focus": "general_back",
+    "basis": "mechanics:broad_row"
+  },
+  {
+    "key": "fitsho_training_template:skull-crusher",
+    "slug": "skull-crusher",
+    "name_en": "Skull Crusher",
+    "previous_primary_muscle": "triceps",
+    "primary_muscle": "triceps",
+    "muscle_focus": "triceps_long_head",
+    "basis": "mechanics:shoulder_flexed"
+  }
+]
