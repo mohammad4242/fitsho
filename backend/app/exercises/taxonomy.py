@@ -70,11 +70,7 @@ FOCUSES_BY_MUSCLE: dict[MuscleGroup, tuple[MuscleFocus, ...]] = {
     ),
     MuscleGroup.NECK: (MuscleFocus.NECK_FLEXION, MuscleFocus.NECK_LATERAL_EXTENSION),
     MuscleGroup.GLUTES: (MuscleFocus.GLUTE_MAX, MuscleFocus.GLUTE_MEDIUS_MINIMUS),
-    MuscleGroup.QUADRICEPS: (
-        MuscleFocus.GENERAL_QUADRICEPS,
-        MuscleFocus.RECTUS_FEMORIS,
-        MuscleFocus.VASTI,
-    ),
+    MuscleGroup.QUADRICEPS: (),
     MuscleGroup.HAMSTRINGS: (
         MuscleFocus.HAMSTRINGS_HIP_EXTENSION,
         MuscleFocus.HAMSTRINGS_KNEE_FLEXION,
@@ -175,6 +171,11 @@ def is_compatible_muscle_focus(
     primary_muscle: MuscleGroup | None,
     muscle_focus: MuscleFocus | None,
 ) -> bool:
-    if primary_muscle is None or muscle_focus is None:
-        return primary_muscle is None and muscle_focus is None
-    return muscle_focus in FOCUSES_BY_MUSCLE[primary_muscle]
+    if primary_muscle is None:
+        return muscle_focus is None
+    focuses = FOCUSES_BY_MUSCLE[primary_muscle]
+    if not focuses:
+        return muscle_focus is None
+    if muscle_focus is None:
+        return False
+    return muscle_focus in focuses

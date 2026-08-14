@@ -163,13 +163,6 @@ def test_reviewed_press_and_extension_variants_have_specific_focuses() -> None:
             ExerciseType.ISOLATION,
             MuscleFocus.LOWER_CHEST,
         ),
-        (
-            MuscleGroup.QUADRICEPS,
-            "Barbell Clean And Press",
-            MovementPattern.KNEE_EXTENSION,
-            ExerciseType.ISOLATION,
-            MuscleFocus.GENERAL_QUADRICEPS,
-        ),
     )
     for muscle, name, movement, exercise_type, expected in cases:
         result = classify(
@@ -181,3 +174,13 @@ def test_reviewed_press_and_extension_variants_have_specific_focuses() -> None:
         )
         assert result is not None
         assert result.focus is expected
+
+
+def test_quadriceps_does_not_receive_a_focus_subcategory() -> None:
+    assert classify(
+        MuscleGroup.QUADRICEPS,
+        target="quadriceps",
+        name="Leg Extension",
+        movement=MovementPattern.KNEE_EXTENSION,
+        exercise_type=ExerciseType.ISOLATION,
+    ) is None

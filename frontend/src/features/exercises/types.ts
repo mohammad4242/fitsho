@@ -51,7 +51,7 @@ export const muscleFocusesByMuscle: Record<MuscleGroup, readonly MuscleFocus[]> 
   forearms: ["general_forearms", "forearm_flexors", "forearm_extensors"],
   neck: ["neck_flexion", "neck_lateral_extension"],
   glutes: ["glute_max", "glute_medius_minimus"],
-  quadriceps: ["general_quadriceps", "rectus_femoris", "vasti"],
+  quadriceps: [],
   hamstrings: ["hamstrings_hip_extension", "hamstrings_knee_flexion"],
   adductors: ["hip_adduction", "adductor_mobility"],
   calves: ["general_calves", "gastrocnemius", "soleus"],

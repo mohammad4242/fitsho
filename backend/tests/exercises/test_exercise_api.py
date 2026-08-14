@@ -144,6 +144,7 @@ def test_categories_return_ordered_bilingual_taxonomy_even_when_core_is_empty(
         ("mid_chest", "Mid Chest", "میان‌سینه"),
         ("lower_chest", "Lower Chest", "زیرسینه"),
     ]
+    assert response.json()["muscle_focuses"]["quadriceps"] == []
     assert set(response.json()["muscle_focuses"]) == {
         item["value"]
         for region in ("upper_body", "lower_body", "core")

@@ -43,7 +43,6 @@ REVIEWED_MECHANICS: dict[tuple[MuscleGroup, str], MuscleFocus] = {
     (MuscleGroup.TRICEPS, "dumbbell close grip press"): MuscleFocus.GENERAL_TRICEPS,
     (MuscleGroup.TRICEPS, "lever triceps extension"): MuscleFocus.TRICEPS_LONG_HEAD,
     (MuscleGroup.CHEST, "resistance band high fly"): MuscleFocus.LOWER_CHEST,
-    (MuscleGroup.QUADRICEPS, "barbell clean and press"): MuscleFocus.GENERAL_QUADRICEPS,
 }
 
 
@@ -217,18 +216,6 @@ def classify_muscle_focus(
         return None
 
     if primary_muscle is MuscleGroup.QUADRICEPS:
-        if exercise_type is ExerciseType.MOBILITY or "sissy squat" in name:
-            return _classification(
-                MuscleFocus.RECTUS_FEMORIS,
-                "mechanics:rectus_femoris_lengthened",
-            )
-        if movement_pattern is MovementPattern.KNEE_EXTENSION:
-            return _classification(MuscleFocus.VASTI, "mechanics:hip_flexed_knee_extension")
-        if movement_pattern in {MovementPattern.SQUAT, MovementPattern.LUNGE}:
-            return _classification(
-                MuscleFocus.GENERAL_QUADRICEPS,
-                "mechanics:multi_joint_knee_extension",
-            )
         return None
 
     if primary_muscle is MuscleGroup.HAMSTRINGS:

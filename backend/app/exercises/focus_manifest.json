@@ -23,8 +23,8 @@
     "name_en": "Bulgarian Split Squat",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "general_quadriceps",
-    "basis": "mechanics:multi_joint_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "fitsho_training_template:cable-curl",
@@ -122,8 +122,8 @@
     "name_en": "Barbell Clean And Press",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "general_quadriceps",
-    "basis": "reviewed_movement_mechanics"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:0030",
@@ -176,8 +176,8 @@
     "name_en": "Barbell Front Squat",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "general_quadriceps",
-    "basis": "mechanics:multi_joint_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:0047",
@@ -1157,8 +1157,8 @@
     "name_en": "Lever Leg Extension",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "vasti",
-    "basis": "mechanics:hip_flexed_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:0586",
@@ -1373,8 +1373,8 @@
     "name_en": "Sled 45 Degree Wide Leg Press",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "vasti",
-    "basis": "mechanics:hip_flexed_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:0743",
@@ -1391,8 +1391,8 @@
     "name_en": "Smith Machine Leg Press",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "vasti",
-    "basis": "mechanics:hip_flexed_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:0750",
@@ -1400,8 +1400,8 @@
     "name_en": "Smith Chair Squat",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "general_quadriceps",
-    "basis": "mechanics:multi_joint_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:0752",
@@ -1499,8 +1499,8 @@
     "name_en": "Weighted Sissy Squat",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "rectus_femoris",
-    "basis": "mechanics:rectus_femoris_lengthened"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:0853",
@@ -1580,8 +1580,8 @@
     "name_en": "Band Seated Leg Extension",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "vasti",
-    "basis": "mechanics:hip_flexed_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:0981",
@@ -1940,8 +1940,8 @@
     "name_en": "Barbell Back Squat",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "general_quadriceps",
-    "basis": "mechanics:multi_joint_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:1451",
@@ -1985,8 +1985,8 @@
     "name_en": "Hip Flexor and Quadriceps Stretch",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "rectus_femoris",
-    "basis": "mechanics:rectus_femoris_lengthened"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:1585",
@@ -2066,8 +2066,8 @@
     "name_en": "Dumbbell Goblet Squat",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "general_quadriceps",
-    "basis": "mechanics:multi_joint_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:1764",
@@ -2165,8 +2165,8 @@
     "name_en": "Lever Horizontal Leg Press",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "vasti",
-    "basis": "mechanics:hip_flexed_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:2612",
@@ -2381,8 +2381,8 @@
     "name_en": "Close Feet Leg Press",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "vasti",
-    "basis": "mechanics:hip_flexed_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:drv-commando-pull-up",
@@ -2462,8 +2462,8 @@
     "name_en": "Jump Step-Up",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "general_quadriceps",
-    "basis": "mechanics:multi_joint_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:drv-kettlebell-deadlift",
@@ -2606,8 +2606,8 @@
     "name_en": "Squat",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "general_quadriceps",
-    "basis": "mechanics:multi_joint_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:drv-stretching-adductor-stretch",
@@ -2768,8 +2768,8 @@
     "name_en": "Lying Quadriceps Stretch",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "rectus_femoris",
-    "basis": "mechanics:rectus_femoris_lengthened"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:drv-stretching-quadriceps-stretch",
@@ -2777,8 +2777,8 @@
     "name_en": "Standing Quadriceps Stretch",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "rectus_femoris",
-    "basis": "mechanics:rectus_femoris_lengthened"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:drv-stretching-seated-twist-straight-arm",
@@ -2948,8 +2948,8 @@
     "name_en": "Hack Squat",
     "previous_primary_muscle": "quadriceps",
     "primary_muscle": "quadriceps",
-    "muscle_focus": "general_quadriceps",
-    "basis": "mechanics:multi_joint_knee_extension"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "fitsho_training_template:lying-leg-curl",

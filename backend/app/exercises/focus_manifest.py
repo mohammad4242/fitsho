@@ -8,6 +8,7 @@ from typing import Any
 from app.exercises.enums import MuscleFocus, MuscleGroup
 from app.exercises.focus_classifier import classify_muscle_focus, refine_primary_muscle
 from app.exercises.models import Exercise
+from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 
 MANIFEST_PATH = Path(__file__).with_name("focus_manifest.json")
 
@@ -69,7 +70,11 @@ def manifest_entry_for_exercise(exercise: Exercise) -> FocusManifestEntry:
         exercise_type=exercise.exercise_type,
         instructions_en=exercise.instructions_en,
     )
-    if primary_muscle is not None and classification is None:
+    if (
+        primary_muscle is not None
+        and FOCUSES_BY_MUSCLE[primary_muscle]
+        and classification is None
+    ):
         raise UnresolvedMuscleFocusError(
             f"{stable_exercise_key(exercise)}: unresolved focus for {exercise.name_en}"
         )
@@ -80,7 +85,11 @@ def manifest_entry_for_exercise(exercise: Exercise) -> FocusManifestEntry:
         previous_primary_muscle=exercise.primary_muscle,
         primary_muscle=primary_muscle,
         muscle_focus=classification.focus if classification is not None else None,
-        basis=classification.basis if classification is not None else "primary_muscle:null",
+        basis=(
+            classification.basis
+            if classification is not None
+            else "primary_muscle:null" if primary_muscle is None else "focus:not_applicable"
+        ),
     )
 
 

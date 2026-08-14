@@ -68,8 +68,13 @@ def test_manifest_entry_records_approved_core_primary_correction() -> None:
 
 def test_checked_in_manifest_covers_the_reviewed_live_catalogue() -> None:
     assert len(FOCUS_MANIFEST) == 341
-    assert sum(item.muscle_focus is not None for item in FOCUS_MANIFEST.values()) == 318
-    assert sum(item.muscle_focus is None for item in FOCUS_MANIFEST.values()) == 23
+    assert sum(item.muscle_focus is not None for item in FOCUS_MANIFEST.values()) == 299
+    assert sum(item.muscle_focus is None for item in FOCUS_MANIFEST.values()) == 42
+    assert all(
+        item.muscle_focus is None
+        for item in FOCUS_MANIFEST.values()
+        if item.primary_muscle is MuscleGroup.QUADRICEPS
+    )
     assert all(
         item.primary_muscle is not None
         for item in FOCUS_MANIFEST.values()

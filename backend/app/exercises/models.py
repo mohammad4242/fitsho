@@ -45,14 +45,20 @@ def enum_values(members: type[StrEnum]) -> list[str]:
 def muscle_focus_compatibility_sql() -> str:
     compatible_pairs = []
     for muscle, focuses in FOCUSES_BY_MUSCLE.items():
+        if not focuses:
+            continue
         focus_values = ", ".join(f"'{focus.value}'" for focus in focuses)
         compatible_pairs.append(
             f"(primary_muscle = '{muscle.value}' AND muscle_focus IN ({focus_values}))"
         )
     muscle_values = ", ".join(f"'{muscle.value}'" for muscle in MuscleGroup)
+    focusless_muscle_values = ", ".join(
+        f"'{muscle.value}'" for muscle, focuses in FOCUSES_BY_MUSCLE.items() if not focuses
+    )
     focus_values = ", ".join(f"'{focus.value}'" for focus in MuscleFocus)
     return (
         "(primary_muscle IS NULL AND muscle_focus IS NULL) OR "
+        f"(primary_muscle IN ({focusless_muscle_values}) AND muscle_focus IS NULL) OR "
         "(primary_muscle IS NOT NULL AND muscle_focus IS NOT NULL AND ("
         f"primary_muscle NOT IN ({muscle_values}) OR "
         f"muscle_focus NOT IN ({focus_values}) OR "

@@ -21,6 +21,7 @@ from app.exercises.models import (
     ExerciseEquipment,
     ExerciseSecondaryMuscle,
 )
+from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.training_templates.seed_data import TemplateSlotSeed
 
 TEMPLATE_PLACEHOLDER_SOURCE = "fitsho_training_template"
@@ -185,7 +186,7 @@ def _placeholder_focus(
     name_en: str,
     movement_pattern: MovementPattern,
     exercise_type: ExerciseType,
-) -> MuscleFocus:
+) -> MuscleFocus | None:
     classification = classify_muscle_focus(
         primary_muscle=primary_muscle,
         source_target=None,
@@ -197,6 +198,8 @@ def _placeholder_focus(
         instructions_en=(),
     )
     if classification is None:
+        if not FOCUSES_BY_MUSCLE[primary_muscle]:
+            return None
         raise ValueError(f"Template placeholder {name_en} has unresolved muscle focus")
     return classification.focus
 

@@ -21,7 +21,7 @@ it("returns to the saved category and clears filters that could hide the exercis
     "vasti",
     false,
     false,
-  )).toBe("/exercises?body_region=lower_body&primary_muscle=quadriceps&muscle_focus=vasti&admin_status=inactive");
+  )).toBe("/exercises?body_region=lower_body&primary_muscle=quadriceps&admin_status=inactive");
 });
 
 it("returns review records without a category through the protected review filter", () => {

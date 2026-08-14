@@ -30,14 +30,25 @@ def test_chest_focuses_are_ordered_for_catalogue() -> None:
     )
 
 
-def test_every_muscle_focus_has_a_bilingual_category() -> None:
+def test_every_active_muscle_focus_has_a_bilingual_category() -> None:
     categories = {
         category.value: (category.name_en, category.name_fa)
         for values in MUSCLE_FOCUS_CATEGORIES.values()
         for category in values
     }
-    assert set(categories) == set(MuscleFocus)
+    assert set(categories) == {
+        focus for focuses in FOCUSES_BY_MUSCLE.values() for focus in focuses
+    }
     assert all(name_en and name_fa for name_en, name_fa in categories.values())
+
+
+def test_quadriceps_has_no_focus_subcategories() -> None:
+    assert FOCUSES_BY_MUSCLE[MuscleGroup.QUADRICEPS] == ()
+    assert is_compatible_muscle_focus(MuscleGroup.QUADRICEPS, None)
+    assert not is_compatible_muscle_focus(
+        MuscleGroup.QUADRICEPS,
+        MuscleFocus.GENERAL_QUADRICEPS,
+    )
 
 
 def test_focus_compatibility_is_bound_to_primary_muscle() -> None:

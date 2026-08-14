@@ -82,7 +82,7 @@ def _exercise(
         name_fa=slug,
         body_region=body_region,
         primary_muscle=muscle,
-        muscle_focus=FOCUSES_BY_MUSCLE[muscle][0],
+        muscle_focus=next(iter(FOCUSES_BY_MUSCLE[muscle]), None),
         difficulty=Difficulty.BEGINNER,
         movement_pattern=pattern,
         exercise_type=exercise_type,

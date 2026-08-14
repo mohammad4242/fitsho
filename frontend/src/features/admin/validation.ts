@@ -86,7 +86,14 @@ export function validateAdminExercise(form: AdminExerciseForm): AdminValidationE
   if (!form.name_fa.trim()) errors.name_fa = "required";
   if (!form.needs_review && !form.body_region) errors.body_region = "required";
   if (!form.needs_review && !form.primary_muscle) errors.primary_muscle = "required";
-  if (!form.needs_review && !form.muscle_focus) errors.muscle_focus = "required";
+  if (
+    !form.needs_review
+    && (
+      !form.primary_muscle
+      || muscleFocusesByMuscle[form.primary_muscle].length > 0
+    )
+    && !form.muscle_focus
+  ) errors.muscle_focus = "required";
   if (form.needs_review && Boolean(form.body_region) !== Boolean(form.primary_muscle)) {
     errors.primary_muscle = "required";
   }
@@ -126,7 +133,17 @@ export function validateAdminExercise(form: AdminExerciseForm): AdminValidationE
 
 export function toAdminExerciseCreate(form: AdminExerciseForm): AdminExerciseCreate {
   if (
-    (!form.needs_review && (!form.body_region || !form.primary_muscle || !form.muscle_focus))
+    (
+      !form.needs_review
+      && (
+        !form.body_region
+        || !form.primary_muscle
+        || (
+          muscleFocusesByMuscle[form.primary_muscle].length > 0
+          && !form.muscle_focus
+        )
+      )
+    )
     || Boolean(form.body_region) !== Boolean(form.primary_muscle)
   ) {
     throw new Error("Cannot serialize an invalid admin exercise form");

@@ -56,7 +56,7 @@ it("prefills the selected library category and keeps it editable", async () => {
 
   expect(screen.getByLabelText("ناحیه بدن")).toHaveValue("lower_body");
   expect(screen.getByLabelText("عضله اصلی")).toHaveValue("quadriceps");
-  expect(screen.getByLabelText("بخش هدف عضله")).toHaveValue("vasti");
+  expect(screen.queryByLabelText("بخش هدف عضله")).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: /بازگشت/ })).toHaveAttribute(
     "href",
     "/exercises?body_region=lower_body&primary_muscle=quadriceps&muscle_focus=vasti&search=squat",

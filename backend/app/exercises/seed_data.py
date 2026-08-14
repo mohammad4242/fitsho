@@ -21,7 +21,7 @@ class ExerciseSeed:
     name_fa: str
     body_region: BodyRegion
     primary_muscle: MuscleGroup
-    muscle_focus: MuscleFocus
+    muscle_focus: MuscleFocus | None
     secondary_muscles: tuple[MuscleGroup, ...]
     equipment: tuple[Equipment, ...]
     difficulty: Difficulty
@@ -171,7 +171,7 @@ T = ExerciseType
 C = ExerciseCautionTag
 F = MuscleFocus
 
-SEED_MUSCLE_FOCUS: dict[str, MuscleFocus] = {
+SEED_MUSCLE_FOCUS: dict[str, MuscleFocus | None] = {
     "dumbbell-bench-press": F.MID_CHEST,
     "barbell-bent-over-row": F.GENERAL_BACK,
     "dumbbell-lateral-raise": F.LATERAL_DELT,
@@ -183,10 +183,10 @@ SEED_MUSCLE_FOCUS: dict[str, MuscleFocus] = {
     "barbell-curl": F.BICEPS_BRACHII,
     "overhead-dumbbell-extension": F.TRICEPS_LONG_HEAD,
     "glute-bridge": F.GLUTE_MAX,
-    "goblet-squat": F.GENERAL_QUADRICEPS,
-    "leg-press": F.GENERAL_QUADRICEPS,
-    "leg-extension": F.VASTI,
-    "dumbbell-lunge": F.GENERAL_QUADRICEPS,
+    "goblet-squat": None,
+    "leg-press": None,
+    "leg-extension": None,
+    "dumbbell-lunge": None,
     "romanian-deadlift": F.HAMSTRINGS_HIP_EXTENSION,
     "standing-calf-raise": F.GASTROCNEMIUS,
 }

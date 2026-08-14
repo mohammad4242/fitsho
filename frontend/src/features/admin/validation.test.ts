@@ -87,6 +87,26 @@ it("requires a focus compatible with the primary muscle", () => {
   expect(validateAdminExercise(form)).toMatchObject({ muscle_focus: "muscleFocus" });
 });
 
+it("accepts a quadriceps exercise without a focus subcategory", () => {
+  const form = emptyAdminExerciseForm();
+  Object.assign(form, {
+    slug: "leg-extension",
+    name_en: "Leg Extension",
+    name_fa: "جلو پا دستگاه",
+    body_region: "lower_body",
+    primary_muscle: "quadriceps",
+    muscle_focus: "",
+    equipment: ["machine"],
+    instructions_en: ["Set up", "Extend", "Lower"],
+    instructions_fa: ["تنظیم", "باز کن", "پایین بیاور"],
+    safety_notes_en: ["Keep control"],
+    safety_notes_fa: ["کنترل را حفظ کن"],
+  });
+
+  expect(validateAdminExercise(form)).toEqual({});
+  expect(toAdminExerciseCreate(form).muscle_focus).toBeNull();
+});
+
 it("allows a review record with labels and no anatomy", () => {
   const form = emptyAdminExerciseForm();
   Object.assign(form, {

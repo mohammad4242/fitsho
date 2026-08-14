@@ -80,7 +80,7 @@ def _exercise(
         name_fa=f"حرکت {unique_slug}",
         body_region=BodyRegion.UPPER_BODY,
         primary_muscle=muscle,
-        muscle_focus=FOCUSES_BY_MUSCLE[muscle][0],
+        muscle_focus=next(iter(FOCUSES_BY_MUSCLE[muscle]), None),
         difficulty=Difficulty.BEGINNER,
         instructions_en=["Set up.", "Perform the movement.", "Finish safely."],
         instructions_fa=["شروع کن.", "حرکت را انجام بده.", "ایمن تمام کن."],

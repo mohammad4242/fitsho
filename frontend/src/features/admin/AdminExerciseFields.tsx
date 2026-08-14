@@ -175,18 +175,20 @@ export function AdminExerciseFields({
               ))}
             </select>
           </Field>
-          <Field label={t("admin.fields.muscleFocus")} error={errorText("muscle_focus")}>
-            <select
-              value={value.muscle_focus}
-              disabled={!value.primary_muscle || value.needs_review}
-              onChange={(event) => onChange("muscle_focus", event.target.value as MuscleFocus)}
-            >
-              <option value="">{t("admin.fields.select")}</option>
-              {availableFocuses.map((focus) => (
-                <option key={focus} value={focus}>{t(`catalog.muscleFocus.${focus}`)}</option>
-              ))}
-            </select>
-          </Field>
+          {availableFocuses.length > 0 && (
+            <Field label={t("admin.fields.muscleFocus")} error={errorText("muscle_focus")}>
+              <select
+                value={value.muscle_focus}
+                disabled={!value.primary_muscle || value.needs_review}
+                onChange={(event) => onChange("muscle_focus", event.target.value as MuscleFocus)}
+              >
+                <option value="">{t("admin.fields.select")}</option>
+                {availableFocuses.map((focus) => (
+                  <option key={focus} value={focus}>{t(`catalog.muscleFocus.${focus}`)}</option>
+                ))}
+              </select>
+            </Field>
+          )}
         </div>
         <ChoiceGroup
           legend={t("admin.fields.secondaryMuscles")}
