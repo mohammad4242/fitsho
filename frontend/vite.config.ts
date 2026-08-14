@@ -1,6 +1,12 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
+export function resolveApiProxyTarget(value: string | undefined): string {
+  return value?.trim() || "http://localhost:8001";
+}
+
+const apiProxyTarget = resolveApiProxyTarget(process.env.VITE_API_PROXY_TARGET);
+
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -8,11 +14,11 @@ export default defineConfig({
 
     proxy: {
       "/api": {
-        target: "http://localhost:8001",
+        target: apiProxyTarget,
         changeOrigin: false,
       },
       "^/media(?:/|$)": {
-        target: "http://localhost:8001",
+        target: apiProxyTarget,
         changeOrigin: false,
       },
     },
