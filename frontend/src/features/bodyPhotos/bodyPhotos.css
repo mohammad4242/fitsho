@@ -512,6 +512,13 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 .body-analysis-session > div span,
 .body-analysis-session > span { color: var(--fitsho-muted); font-size: .8rem; }
 .body-analysis-session > a { min-height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; padding-inline: .8rem; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-pill); color: var(--fitsho-aqua); font-weight: 800; text-decoration: none; }
+.body-analysis-session > .body-analysis-session__actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.body-analysis-session__actions a,
+.body-analysis-session__actions button { min-height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; padding-inline: .8rem; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-pill); font: inherit; font-weight: 800; cursor: pointer; }
+.body-analysis-session__actions a { color: var(--fitsho-aqua); text-decoration: none; }
+.body-analysis-session__actions button { color: var(--fitsho-danger); background: transparent; }
+.body-analysis-session__actions button:disabled { cursor: wait; opacity: .65; }
+.body-analysis-session > .body-analysis-session__error { grid-column: 1 / -1; margin: 0; }
 
 @keyframes body-analysis-scan {
   0%, 100% { transform: translateY(0); opacity: .25; }

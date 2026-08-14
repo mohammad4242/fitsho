@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { AppIcon } from "../../shared/AppIcon";
-import { getBodyPhotoSessions } from "./api";
+import { deleteBodyPhotoSession, getBodyPhotoSessions } from "./api";
 import type { BodyPhotoSession } from "./types";
 import "./bodyPhotos.css";
 
@@ -12,12 +12,32 @@ export function BodyProgressPage() {
   const l = (fa: string, en: string) => i18n.resolvedLanguage === "en" ? en : fa;
   const [sessions, setSessions] = useState<BodyPhotoSession[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const [deleteErrorSessionId, setDeleteErrorSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     void getBodyPhotoSessions()
       .then((response) => setSessions(response.items))
       .catch(() => setFailed(true));
   }, []);
+
+  const incompleteSessions = sessions?.filter((session) => session.submitted_at === null) ?? [];
+  const analysisSessions = sessions?.filter((session) => session.submitted_at !== null) ?? [];
+  const locale = i18n.resolvedLanguage === "en" ? "en" : "fa-IR";
+
+  async function removeSession(sessionId: string) {
+    if (!window.confirm(t("bodyPhotos.incomplete.confirmDelete"))) return;
+    setDeletingSessionId(sessionId);
+    setDeleteErrorSessionId(null);
+    try {
+      await deleteBodyPhotoSession(sessionId);
+      setSessions((current) => current?.filter((session) => session.id !== sessionId) ?? current);
+    } catch {
+      setDeleteErrorSessionId(sessionId);
+    } finally {
+      setDeletingSessionId(null);
+    }
+  }
 
   return (
     <main className="body-analysis-home fitsho-page">
@@ -55,7 +75,46 @@ export function BodyProgressPage() {
         </section>
       )}
 
-      {sessions && sessions.length > 0 && (
+      {incompleteSessions.length > 0 && (
+        <section className="body-analysis-history body-analysis-incomplete" aria-labelledby="body-analysis-incomplete-title">
+          <header>
+            <div>
+              <p>{t("bodyPhotos.incomplete.eyebrow")}</p>
+              <h2 id="body-analysis-incomplete-title">{t("bodyPhotos.incomplete.title")}</h2>
+            </div>
+          </header>
+          <ul aria-label={t("bodyPhotos.incomplete.title")}>
+            {incompleteSessions.map((session) => (
+              <li className="body-analysis-session body-analysis-session--incomplete" key={session.id}>
+                <div className="body-analysis-session__details">
+                  <strong>{new Intl.DateTimeFormat(locale).format(new Date(session.created_at))}</strong>
+                  <span>{t(`bodyPhotos.status.${session.state}`)}</span>
+                </div>
+                <span>{session.photos.length}/3</span>
+                <div className="body-analysis-session__actions">
+                  <Link to={`/body-progress/new?sessionId=${session.id}`}>{t("bodyPhotos.incomplete.continue")}</Link>
+                  <button
+                    type="button"
+                    disabled={deletingSessionId === session.id}
+                    onClick={() => void removeSession(session.id)}
+                  >
+                    {deletingSessionId === session.id
+                      ? t("bodyPhotos.incomplete.deleting")
+                      : t("bodyPhotos.incomplete.delete")}
+                  </button>
+                </div>
+                {deleteErrorSessionId === session.id && (
+                  <p className="form-error body-analysis-session__error" role="alert">
+                    {t("bodyPhotos.incomplete.deleteError")}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {analysisSessions.length > 0 && (
         <section className="body-analysis-history" aria-labelledby="body-analysis-history-title">
           <header>
             <div>
@@ -65,14 +124,14 @@ export function BodyProgressPage() {
             <Link className="primary-button" to="/body-progress/new">{t("bodyPhotos.start")}</Link>
           </header>
           <ul aria-label={t("bodyPhotos.progressTitle")}>
-            {sessions.map((session, index) => (
+            {analysisSessions.map((session, index) => (
               <li className={index === 0 ? "body-analysis-session body-analysis-session--latest" : "body-analysis-session"} key={session.id}>
                 {index === 0 && session.photos[0] && (
                   <figure><img src={session.photos[0].content_url} alt={l("آخرین عکس تحلیل بدن", "Latest progress photo")} /></figure>
                 )}
                 <div>
                   {index === 0 && <small>{l("آخرین تحلیل", "Latest analysis")}</small>}
-                  <strong>{new Intl.DateTimeFormat(i18n.resolvedLanguage === "en" ? "en" : "fa-IR").format(new Date(session.created_at))}</strong>
+                  <strong>{new Intl.DateTimeFormat(locale).format(new Date(session.created_at))}</strong>
                   <span>{t(`bodyPhotos.status.${session.state}`)}</span>
                 </div>
                 <span>{session.photos.length}/3</span>
