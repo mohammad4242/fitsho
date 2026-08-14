@@ -32,12 +32,32 @@ from app.exercises.enums import (
     MediaRole,
     MediaType,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
 )
+from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 
 
 def enum_values(members: type[StrEnum]) -> list[str]:
     return [member.value for member in members]
+
+
+def muscle_focus_compatibility_sql() -> str:
+    compatible_pairs = []
+    for muscle, focuses in FOCUSES_BY_MUSCLE.items():
+        focus_values = ", ".join(f"'{focus.value}'" for focus in focuses)
+        compatible_pairs.append(
+            f"(primary_muscle = '{muscle.value}' AND muscle_focus IN ({focus_values}))"
+        )
+    muscle_values = ", ".join(f"'{muscle.value}'" for muscle in MuscleGroup)
+    focus_values = ", ".join(f"'{focus.value}'" for focus in MuscleFocus)
+    return (
+        "(primary_muscle IS NULL AND muscle_focus IS NULL) OR "
+        "(primary_muscle IS NOT NULL AND muscle_focus IS NOT NULL AND ("
+        f"primary_muscle NOT IN ({muscle_values}) OR "
+        f"muscle_focus NOT IN ({focus_values}) OR "
+        f"{' OR '.join(compatible_pairs)}))"
+    )
 
 
 class Exercise(Base):
@@ -75,8 +95,17 @@ class Exercise(Base):
             name="ck_exercises_safety_notes_fa_items",
         ),
         UniqueConstraint("source", "source_id", name="uq_exercises_source_source_id"),
+        CheckConstraint(
+            muscle_focus_compatibility_sql(),
+            name="ck_exercises_primary_muscle_focus_compatible",
+        ),
         Index("ix_exercises_body_region", "body_region"),
         Index("ix_exercises_primary_muscle", "primary_muscle"),
+        Index(
+            "ix_exercises_primary_muscle_muscle_focus",
+            "primary_muscle",
+            "muscle_focus",
+        ),
         Index("ix_exercises_difficulty", "difficulty"),
         Index("ix_exercises_is_active", "is_active"),
         Index("ix_exercises_is_programmable", "is_programmable"),
@@ -105,6 +134,18 @@ class Exercise(Base):
             validate_strings=True,
             values_callable=enum_values,
             name="ck_exercises_primary_muscle_values",
+        ),
+        nullable=True,
+    )
+    muscle_focus: Mapped[MuscleFocus | None] = mapped_column(
+        Enum(
+            MuscleFocus,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercises_muscle_focus_values",
+            length=40,
         ),
         nullable=True,
     )
