@@ -133,6 +133,55 @@ def test_workout_plan_is_scoped_to_its_owner(client: TestClient, db: Session) ->
     assert client.get(f"/api/v1/workout-plans/{plan.id}").status_code == 404
 
 
+def test_workout_plan_pdf_requires_authentication(client: TestClient) -> None:
+    assert client.get(f"/api/v1/workout-plans/{uuid4()}/pdf").status_code == 401
+
+
+def test_workout_plan_pdf_is_scoped_to_its_owner(client: TestClient, db: Session) -> None:
+    owner_id = _register_and_complete_profile(client, "pdf-owner@example.com")
+    plan = _plan(db, owner_id)
+    exercise = _exercise("pdf-bench-press")
+    day = WorkoutDay(
+        workout_plan=plan,
+        day_number=1,
+        title_en="Upper body",
+        title_fa="بالاتنه",
+        estimated_duration_minutes=30,
+        ai_coach_explanation_fa="حرکت‌ها را کنترل‌شده اجرا کن.",
+    )
+    db.add_all(
+        [
+            exercise,
+            day,
+            WorkoutPlanExercise(
+                workout_day=day,
+                exercise=exercise,
+                order_index=1,
+                sets=3,
+                reps_min=8,
+                reps_max=12,
+                rest_seconds=90,
+                rir=2,
+                estimated_minutes=8,
+                notes_fa="فرم صحیح را حفظ کن.",
+            ),
+        ]
+    )
+    db.commit()
+
+    response = client.get(f"/api/v1/workout-plans/{plan.id}/pdf")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["content-disposition"].startswith("attachment;")
+    assert response.content.startswith(b"%PDF-")
+
+    assert client.post("/api/v1/auth/logout", headers=ORIGIN).status_code == 204
+    _register_and_complete_profile(client, "pdf-other@example.com")
+
+    assert client.get(f"/api/v1/workout-plans/{plan.id}/pdf").status_code == 404
+
+
 def test_workout_plan_returns_active_curated_alternatives_read_only(
     client: TestClient, db: Session
 ) -> None:

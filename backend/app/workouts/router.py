@@ -2,6 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -16,6 +17,7 @@ from app.profile.models import UserProfile
 from app.workout_reviews.enums import WorkoutReviewStatus
 from app.workouts.dependencies import WorkoutGenerationServiceDependency
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
+from app.workouts.pdf import render_workout_plan_pdf
 from app.workouts.program_engine.session_targets import (
     english_session_title_for_targets,
     persian_session_title_for_targets,
@@ -126,6 +128,29 @@ def read_plan_history(
         )
         for plan in list_plans_for_user(db, user.id)
     ]
+
+
+@router.get(
+    "/{plan_id}/pdf",
+    response_class=Response,
+    responses={status.HTTP_200_OK: {"content": {"application/pdf": {}}}},
+)
+def download_plan_pdf(
+    plan_id: UUID,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> Response:
+    plan = get_plan_for_user(db, plan_id=plan_id, user_id=user.id)
+    if plan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workout plan not found")
+    content = render_workout_plan_pdf(to_plan_response(plan, db=db))
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="fitsho-workout-plan-{plan.id}.pdf"'
+        },
+    )
 
 
 @router.get("/{plan_id}", response_model=WorkoutPlanResponse)
