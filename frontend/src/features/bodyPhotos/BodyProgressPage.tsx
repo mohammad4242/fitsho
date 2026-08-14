@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -12,8 +12,10 @@ export function BodyProgressPage() {
   const l = (fa: string, en: string) => i18n.resolvedLanguage === "en" ? en : fa;
   const [sessions, setSessions] = useState<BodyPhotoSession[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<BodyPhotoSession | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
-  const [deleteErrorSessionId, setDeleteErrorSessionId] = useState<string | null>(null);
+  const [deleteFailed, setDeleteFailed] = useState(false);
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     void getBodyPhotoSessions()
@@ -21,19 +23,52 @@ export function BodyProgressPage() {
       .catch(() => setFailed(true));
   }, []);
 
+  useEffect(() => {
+    if (deleteTarget === null) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape" || deletingSessionId !== null) return;
+      event.preventDefault();
+      setDeleteTarget(null);
+      setDeleteFailed(false);
+      deleteTriggerRef.current?.focus();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [deleteTarget, deletingSessionId]);
+
   const incompleteSessions = sessions?.filter((session) => session.submitted_at === null) ?? [];
   const analysisSessions = sessions?.filter((session) => session.submitted_at !== null) ?? [];
   const locale = i18n.resolvedLanguage === "en" ? "en" : "fa-IR";
 
-  async function removeSession(sessionId: string) {
-    if (!window.confirm(t("bodyPhotos.incomplete.confirmDelete"))) return;
+  function openDeleteDialog(session: BodyPhotoSession, trigger: HTMLButtonElement) {
+    deleteTriggerRef.current = trigger;
+    setDeleteFailed(false);
+    setDeleteTarget(session);
+  }
+
+  function closeDeleteDialog() {
+    if (deletingSessionId !== null) return;
+    setDeleteTarget(null);
+    setDeleteFailed(false);
+    deleteTriggerRef.current?.focus();
+  }
+
+  async function removeSession() {
+    if (deleteTarget === null) return;
+    const sessionId = deleteTarget.id;
     setDeletingSessionId(sessionId);
-    setDeleteErrorSessionId(null);
+    setDeleteFailed(false);
     try {
       await deleteBodyPhotoSession(sessionId);
       setSessions((current) => current?.filter((session) => session.id !== sessionId) ?? current);
+      setDeleteTarget(null);
     } catch {
-      setDeleteErrorSessionId(sessionId);
+      setDeleteFailed(true);
     } finally {
       setDeletingSessionId(null);
     }
@@ -98,19 +133,11 @@ export function BodyProgressPage() {
                   <Link to={`/body-progress/new?sessionId=${session.id}`}>{t("bodyPhotos.incomplete.continue")}</Link>
                   <button
                     type="button"
-                    disabled={deletingSessionId === session.id}
-                    onClick={() => void removeSession(session.id)}
+                    onClick={(event) => openDeleteDialog(session, event.currentTarget)}
                   >
-                    {deletingSessionId === session.id
-                      ? t("bodyPhotos.incomplete.deleting")
-                      : t("bodyPhotos.incomplete.delete")}
+                    {t("bodyPhotos.deleteDialog.deleteUpload")}
                   </button>
                 </div>
-                {deleteErrorSessionId === session.id && (
-                  <p className="form-error body-analysis-session__error" role="alert">
-                    {t("bodyPhotos.incomplete.deleteError")}
-                  </p>
-                )}
               </li>
             ))}
           </ul>
@@ -138,12 +165,96 @@ export function BodyProgressPage() {
                   <span>{t(`bodyPhotos.status.${session.state}`)}</span>
                 </div>
                 <span>{session.photos.length}/3</span>
-                <Link to={`/body-progress/${session.id}`}>{t("bodyPhotos.results.viewAnalysis")}</Link>
+                <div className="body-analysis-session__actions">
+                  <Link to={`/body-progress/${session.id}`}>{t("bodyPhotos.results.viewAnalysis")}</Link>
+                  <button type="button" onClick={(event) => openDeleteDialog(session, event.currentTarget)}>
+                    {t("bodyPhotos.deleteDialog.deleteAnalysis")}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         </section>
       )}
+
+      {deleteTarget !== null && (
+        <div
+          className="body-analysis-delete-overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeDeleteDialog();
+          }}
+        >
+          <section
+            aria-describedby="body-analysis-delete-description"
+            aria-labelledby="body-analysis-delete-title"
+            aria-modal="true"
+            className="body-analysis-delete-dialog"
+            role="dialog"
+          >
+            <span className="body-analysis-delete-dialog__rail" aria-hidden="true" />
+            <header>
+              <span className="body-analysis-delete-dialog__icon" aria-hidden="true"><TrashIcon /></span>
+              <div>
+                <p>{t("bodyPhotos.deleteDialog.eyebrow")}</p>
+                <h2 id="body-analysis-delete-title">
+                  {t(deleteTarget.submitted_at === null
+                    ? "bodyPhotos.deleteDialog.uploadTitle"
+                    : "bodyPhotos.deleteDialog.analysisTitle")}
+                </h2>
+              </div>
+            </header>
+            <p id="body-analysis-delete-description" className="body-analysis-delete-dialog__description">
+              {t(deleteTarget.submitted_at === null
+                ? "bodyPhotos.deleteDialog.uploadBody"
+                : "bodyPhotos.deleteDialog.analysisBody")}
+            </p>
+            <dl>
+              <div>
+                <dt>{t("bodyPhotos.deleteDialog.dateLabel")}</dt>
+                <dd>{new Intl.DateTimeFormat(locale).format(new Date(deleteTarget.created_at))}</dd>
+              </div>
+              <div>
+                <dt>{t("bodyPhotos.deleteDialog.statusLabel")}</dt>
+                <dd>{t(`bodyPhotos.status.${deleteTarget.state}`)}</dd>
+              </div>
+            </dl>
+            {deleteFailed && (
+              <p className="form-error body-analysis-delete-dialog__error" role="alert">
+                {t("bodyPhotos.deleteDialog.error")}
+              </p>
+            )}
+            <footer>
+              <button
+                autoFocus
+                className="body-analysis-delete-dialog__cancel"
+                type="button"
+                disabled={deletingSessionId !== null}
+                onClick={closeDeleteDialog}
+              >
+                {t("bodyPhotos.deleteDialog.cancel")}
+              </button>
+              <button
+                className="body-analysis-delete-dialog__confirm"
+                type="button"
+                disabled={deletingSessionId !== null}
+                onClick={() => void removeSession()}
+              >
+                {deletingSessionId !== null
+                  ? t("bodyPhotos.deleteDialog.deleting")
+                  : t("bodyPhotos.deleteDialog.confirm")}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
     </main>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
+    </svg>
   );
 }
