@@ -15,4 +15,5 @@ backend/var/media/*
 !backend/var/media/meal-catalogue/
 backend/var/media/meal-catalogue/*
 !backend/var/media/meal-catalogue/.gitkeep
+backend/var/imports/owner-video/
 *.py[cod]
