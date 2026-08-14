@@ -83,12 +83,38 @@ def test_html_contains_persian_plan_details_and_rtl_layout() -> None:
     assert "۹۰ ثانیه استراحت" in html
 
 
-def test_html_includes_available_notes_and_instructions() -> None:
+def test_html_uses_vazirmatn_and_numbers_exercises_per_day() -> None:
+    plan = _plan_response()
+    second_exercise = plan.days[0].exercises[0].model_copy(
+        deep=True,
+        update={"order_index": 2},
+    )
+    second_exercise.exercise.name_fa = "قایقی سیم‌کش"
+    plan.days[0].exercises.append(second_exercise)
+    second_day = plan.days[0].model_copy(
+        deep=True,
+        update={"day_number": 2, "title_fa": "پایین‌تنه"},
+    )
+    second_day.exercises = [second_day.exercises[0]]
+    plan.days.append(second_day)
+
+    html = build_workout_plan_html(plan)
+
+    assert 'font-family: "Vazirmatn", "DejaVu Sans", sans-serif' in html
+    assert html.count('<span class="exercise-number">۱)</span>') == 2
+    assert html.count('<span class="exercise-number">۲)</span>') == 1
+    assert html.index("۱)</span>") < html.index("۲)</span>")
+
+
+def test_html_keeps_notes_but_omits_duration_and_progression_details() -> None:
     html = build_workout_plan_html(_plan_response())
 
+    assert "۴۵ دقیقه" not in html
+    assert "راهنمای وزنه" not in html
+    assert "وزنه را تدریجی افزایش بده." not in html
+    assert "روش پیشرفت" not in html
+    assert "double_progression" not in html
     assert "کنترل‌شده حرکت کن." in html
-    assert "وزنه را تدریجی افزایش بده." in html
-    assert "double_progression" in html
     assert "توضیح روز" in html
     assert "توضیح برنامه" in html
     assert "یادداشت مربی" in html

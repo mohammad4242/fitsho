@@ -11,7 +11,7 @@ PDF_CSS = """
 * { box-sizing: border-box; }
 body {
   color: #102622;
-  font-family: "DejaVu Sans", sans-serif;
+  font-family: "Vazirmatn", "DejaVu Sans", sans-serif;
   font-size: 11pt;
   line-height: 1.75;
   direction: rtl;
@@ -35,9 +35,12 @@ h1 { color: #087d6c; font-size: 24pt; margin-bottom: 2mm; }
   border: 1px solid #d6e2df;
   border-radius: 3mm;
   break-inside: avoid;
+  display: grid;
+  grid-template-columns: 8mm 1fr;
   margin: 0 0 3mm;
   padding: 3mm 4mm;
 }
+.exercise-number { color: #087d6c; font-weight: bold; grid-row: 1 / 3; }
 .exercise h3 { font-size: 12pt; margin-bottom: 1mm; }
 .prescription { color: #087d6c; font-weight: bold; margin-bottom: 1mm; }
 .instruction { color: #354b46; margin-bottom: 1mm; }
@@ -61,23 +64,21 @@ def _paragraph(label: str, value: str | None, *, class_name: str = "note") -> st
 def _render_day(day: WorkoutDayResponse) -> str:
     exercises = "".join(
         _render_exercise(
+            position=position,
             name=item.exercise.name_fa,
             sets=item.sets,
             reps_min=item.reps_min,
             reps_max=item.reps_max,
             rest_seconds=item.rest_seconds,
             notes=item.notes_fa or item.notes_en,
-            load_guidance=item.load_guidance,
-            progression_rule=item.progression_rule,
         )
-        for item in day.exercises
+        for position, item in enumerate(day.exercises, start=1)
     )
     explanation = _paragraph("توضیحات جلسه", day.ai_coach_explanation_fa)
     return (
         '<section class="day">'
         '<div class="day-heading">'
         f"<h2>روز {_fa_number(day.day_number)}: {escape(day.title_fa)}</h2>"
-        f"<span>{_fa_number(day.estimated_duration_minutes)} دقیقه</span>"
         "</div>"
         f"{explanation}{exercises}</section>"
     )
@@ -85,31 +86,25 @@ def _render_day(day: WorkoutDayResponse) -> str:
 
 def _render_exercise(
     *,
+    position: int,
     name: str,
     sets: int,
     reps_min: int,
     reps_max: int,
     rest_seconds: int,
     notes: str | None,
-    load_guidance: str,
-    progression_rule: str,
 ) -> str:
     prescription = (
         f"{_fa_number(sets)} ست · {_fa_number(reps_min)} تا {_fa_number(reps_max)} تکرار · "
         f"{_fa_number(rest_seconds)} ثانیه استراحت"
     )
-    instructions = "".join(
-        (
-            _paragraph("یادداشت", notes, class_name="instruction"),
-            _paragraph("راهنمای وزنه", load_guidance, class_name="instruction"),
-            _paragraph("روش پیشرفت", progression_rule, class_name="instruction"),
-        )
-    )
+    note = _paragraph("یادداشت", notes, class_name="instruction")
     return (
         '<article class="exercise">'
-        f"<h3>{escape(name)}</h3>"
-        f'<p class="prescription">{prescription}</p>'
-        f"{instructions}</article>"
+        f'<span class="exercise-number">{_fa_number(position)})</span>'
+        f"<div><h3>{escape(name)}</h3>"
+        f'<p class="prescription">{prescription}</p>{note}</div>'
+        "</article>"
     )
 
 

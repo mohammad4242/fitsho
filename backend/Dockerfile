@@ -7,6 +7,7 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y \
         ffmpeg \
         fonts-dejavu-core \
+        fonts-vazirmatn \
         libharfbuzz-subset0 \
         libpango-1.0-0 \
         libpangoft2-1.0-0 \
