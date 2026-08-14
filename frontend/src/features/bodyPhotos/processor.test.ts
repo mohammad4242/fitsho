@@ -120,6 +120,36 @@ describe("BrowserBodyPhotoProcessor", () => {
     );
   });
 
+  it("accepts a side view with hidden far-side landmarks outside the frame", async () => {
+    const hiddenFarSide = [12, 14, 16, 24, 26, 28, 32];
+    const { processor } = setup({
+      viewShape: "side",
+      mutate: (value) => {
+        for (const index of hiddenFarSide) {
+          value[index] = { ...value[index]!, x: 1.1, visibility: 0.1 };
+        }
+      },
+    });
+
+    await expect(processor.process(inputFile(), "side")).resolves.toMatchObject({
+      validation: { expectedView: "side" },
+    });
+  });
+
+  it("rejects a side view when neither elbow is visible", async () => {
+    const { processor } = setup({
+      viewShape: "side",
+      mutate: (value) => {
+        value[13]!.visibility = 0.1;
+        value[14]!.visibility = 0.1;
+      },
+    });
+
+    await expect(processor.process(inputFile(), "side")).rejects.toMatchObject({
+      code: "arms_not_visible",
+    });
+  });
+
   it("rejects missing shoulders with a specific code", async () => {
     const { processor } = setup({ mutate: (value) => {
       value[11]!.visibility = 0.1;

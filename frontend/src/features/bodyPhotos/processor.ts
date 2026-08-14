@@ -255,18 +255,7 @@ function validateLandmarks(
   expectedView: BodyPhotoView,
 ): ValidatedPose {
   const landmarks = selectPrimaryPose(detection.poses);
-  requireVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible");
-  requireVisible(landmarks, landmarkGroups.elbows, "arms_not_visible");
-  if (expectedView !== "side") {
-    requireVisible(landmarks, landmarkGroups.wrists, "arms_not_visible");
-  }
-  requireVisible(landmarks, landmarkGroups.hips, "torso_not_visible");
-  requireVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible");
-  requireVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible");
-  requireVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible");
-
-  const requiredIndices = Object.values(landmarkGroups).flat();
-  const required = requiredIndices.map((index) => landmarks[index]!);
+  const required = requiredLandmarksForView(landmarks, expectedView);
   if (required.some((landmark) => !insideFrame(landmark))) {
     throw new BodyPhotoProcessingError("body_out_of_frame");
   }
@@ -284,6 +273,48 @@ function validateLandmarks(
     ),
     minimumVisibility: clampScore(Math.min(...required.map((landmark) => landmark.visibility))),
   };
+}
+
+function requiredLandmarksForView(
+  landmarks: NormalizedBodyLandmark[],
+  view: BodyPhotoView,
+): NormalizedBodyLandmark[] {
+  if (view === "side") {
+    return [
+      mostVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible"),
+      mostVisible(landmarks, landmarkGroups.elbows, "arms_not_visible"),
+      mostVisible(landmarks, landmarkGroups.hips, "torso_not_visible"),
+      mostVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible"),
+      mostVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible"),
+      mostVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible"),
+    ];
+  }
+
+  requireVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible");
+  requireVisible(landmarks, landmarkGroups.elbows, "arms_not_visible");
+  requireVisible(landmarks, landmarkGroups.wrists, "arms_not_visible");
+  requireVisible(landmarks, landmarkGroups.hips, "torso_not_visible");
+  requireVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible");
+  requireVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible");
+  requireVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible");
+  return Object.values(landmarkGroups)
+    .flat()
+    .map((index) => landmarks[index]!);
+}
+
+function mostVisible(
+  landmarks: NormalizedBodyLandmark[],
+  indices: readonly number[],
+  code: BodyPhotoProcessingErrorCode,
+): NormalizedBodyLandmark {
+  const selected = indices
+    .map((index) => landmarks[index])
+    .filter((landmark): landmark is NormalizedBodyLandmark => landmark !== undefined)
+    .sort((left, right) => right.visibility - left.visibility)[0];
+  if (selected === undefined || selected.visibility < limits.minimumLandmarkVisibility) {
+    throw new BodyPhotoProcessingError(code);
+  }
+  return selected;
 }
 
 type PoseBox = {
@@ -408,6 +439,12 @@ function insideFrame(landmark: NormalizedBodyLandmark): boolean {
 }
 
 function projectedView(landmarks: NormalizedBodyLandmark[]): "side" | "non_side" | "ambiguous" {
+  if (
+    [...landmarkGroups.shoulders, ...landmarkGroups.hips]
+      .some((index) => (landmarks[index]?.visibility ?? 0) < limits.minimumLandmarkVisibility)
+  ) {
+    return "ambiguous";
+  }
   const shoulderSpan = Math.abs(landmarks[11]!.x - landmarks[12]!.x);
   const hipSpan = Math.abs(landmarks[23]!.x - landmarks[24]!.x);
   if (shoulderSpan <= 0.08 && hipSpan <= 0.08) return "side";
