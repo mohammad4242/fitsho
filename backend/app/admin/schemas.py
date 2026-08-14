@@ -14,9 +14,11 @@ from app.exercises.enums import (
     MediaPresentation,
     MediaRole,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
 )
 from app.exercises.schemas import ExerciseDetail
+from app.exercises.taxonomy import is_compatible_muscle_focus
 from app.profile.enums import ExperienceLevel, FitnessGoal
 from app.training_templates.models import TrainingTemplateMethod, TrainingTemplateSlotPriority
 
@@ -48,6 +50,7 @@ SourceUrl = Annotated[
 class AdminExerciseFilters(BaseModel):
     body_region: BodyRegion | None = None
     primary_muscle: MuscleGroup | None = None
+    muscle_focus: MuscleFocus | None = None
     equipment: Equipment | None = None
     difficulty: Difficulty | None = None
     exercise_type: ExerciseType | None = None
@@ -60,6 +63,15 @@ class AdminExerciseFilters(BaseModel):
     needs_review: bool | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
+
+    @model_validator(mode="after")
+    def validate_muscle_focus(self) -> "AdminExerciseFilters":
+        if self.muscle_focus is not None and not is_compatible_muscle_focus(
+            self.primary_muscle,
+            self.muscle_focus,
+        ):
+            raise ValueError("Muscle focus requires a compatible primary muscle")
+        return self
 
 
 class AdminExerciseMediaAssetInput(BaseModel):
@@ -84,6 +96,7 @@ class AdminExerciseCreate(BaseModel):
     name_fa: Name
     body_region: BodyRegion | None
     primary_muscle: MuscleGroup | None
+    muscle_focus: MuscleFocus | None
     secondary_muscles: list[MuscleGroup] = Field(default_factory=list)
     equipment: list[Equipment] = Field(min_length=1)
     difficulty: Difficulty

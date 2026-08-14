@@ -96,6 +96,7 @@ export function AdminExerciseEditPage() {
           returnTo,
           updated.body_region,
           updated.primary_muscle,
+          updated.muscle_focus,
           updated.is_active,
           updated.needs_review,
         ),

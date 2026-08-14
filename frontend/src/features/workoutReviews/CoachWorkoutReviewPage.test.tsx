@@ -93,6 +93,7 @@ const detail: WorkoutReviewDetail = {
               name_fa: "پرس سینه",
               body_region: "upper_body",
               primary_muscle: "chest",
+              muscle_focus: "mid_chest",
               labels: [],
               secondary_muscles: [],
               equipment: [],

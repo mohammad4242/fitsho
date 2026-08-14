@@ -11,8 +11,10 @@ from app.exercises.enums import (
     ExerciseType,
     MediaType,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
 )
+from app.exercises.focus_classifier import classify_muscle_focus, refine_primary_muscle
 from app.exercises.models import (
     Exercise,
     ExerciseCautionTagItem,
@@ -106,16 +108,30 @@ def ensure_template_catalog_placeholders(
 
 def _placeholder_exercise(slot: TemplateSlotSeed) -> Exercise:
     name_en, name_fa = _placeholder_names(slot)
-    primary_muscle = slot.target_muscles[0]
+    primary_muscle = refine_primary_muscle(
+        slot.target_muscles[0],
+        name_en,
+        slot.movement_pattern,
+    )
+    if primary_muscle is None:
+        raise ValueError(f"Template placeholder {slot.exercise_slug_hint} has no primary muscle")
+    exercise_type = _exercise_type(slot)
+    muscle_focus = _placeholder_focus(
+        primary_muscle,
+        name_en,
+        slot.movement_pattern,
+        exercise_type,
+    )
     return Exercise(
         slug=slot.exercise_slug_hint,
         name_en=name_en,
         name_fa=name_fa,
         body_region=_body_region(primary_muscle),
         primary_muscle=primary_muscle,
+        muscle_focus=muscle_focus,
         difficulty=Difficulty.INTERMEDIATE,
         movement_pattern=slot.movement_pattern,
-        exercise_type=_exercise_type(slot),
+        exercise_type=exercise_type,
         instructions_en=[
             "Set up the equipment securely and choose a controlled load.",
             "Move through the prescribed range while controlling the target muscle.",
@@ -153,13 +169,36 @@ def _placeholder_exercise(slot: TemplateSlotSeed) -> Exercise:
         is_active=True,
         is_programmable=False,
         secondary_muscles=[
-            ExerciseSecondaryMuscle(muscle=muscle) for muscle in slot.target_muscles[1:]
+            ExerciseSecondaryMuscle(muscle=muscle)
+            for muscle in slot.target_muscles[1:]
+            if muscle is not primary_muscle
         ],
         equipment_items=[ExerciseEquipment(equipment=_equipment(slot.exercise_slug_hint))],
         caution_tag_items=[
             ExerciseCautionTagItem(caution_tag=tag) for tag in _caution_tags(slot.movement_pattern)
         ],
     )
+
+
+def _placeholder_focus(
+    primary_muscle: MuscleGroup,
+    name_en: str,
+    movement_pattern: MovementPattern,
+    exercise_type: ExerciseType,
+) -> MuscleFocus:
+    classification = classify_muscle_focus(
+        primary_muscle=primary_muscle,
+        source_target=None,
+        source_muscle_group=None,
+        secondary_targets=(),
+        name_en=name_en,
+        movement_pattern=movement_pattern,
+        exercise_type=exercise_type,
+        instructions_en=(),
+    )
+    if classification is None:
+        raise ValueError(f"Template placeholder {name_en} has unresolved muscle focus")
+    return classification.focus
 
 
 def _placeholder_names(slot: TemplateSlotSeed) -> tuple[str, str]:

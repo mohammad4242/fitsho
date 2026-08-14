@@ -20,6 +20,7 @@ from app.exercises.enums import (
     MuscleGroup,
 )
 from app.exercises.models import Exercise, ExerciseEquipment
+from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.models import BodyMeasurement, UserProfile
 from app.workouts.body_analysis_resolver import BodyAnalysisInfluenceResolver
@@ -81,6 +82,7 @@ def _exercise(
         name_fa=slug,
         body_region=body_region,
         primary_muscle=muscle,
+        muscle_focus=FOCUSES_BY_MUSCLE[muscle][0],
         difficulty=Difficulty.BEGINNER,
         movement_pattern=pattern,
         exercise_type=exercise_type,

@@ -40,6 +40,7 @@ def exercise_payload(**overrides: object) -> dict[str, object]:
         "name_fa": "شنا سوئدی شیب‌دار",
         "body_region": "upper_body",
         "primary_muscle": "chest",
+        "muscle_focus": "mid_chest",
         "secondary_muscles": ["shoulders", "triceps"],
         "equipment": ["bodyweight", "bench"],
         "difficulty": "beginner",
@@ -181,6 +182,7 @@ def test_admin_list_filters_library_category_and_status(
         params={
             "body_region": "upper_body",
             "primary_muscle": "chest",
+            "muscle_focus": "mid_chest",
             "equipment": "dumbbell",
             "difficulty": "intermediate",
             "exercise_type": "compound",
@@ -191,6 +193,23 @@ def test_admin_list_filters_library_category_and_status(
 
     assert response.status_code == 200
     assert [item["slug"] for item in response.json()["items"]] == ["dumbbell-bench-press"]
+    assert response.json()["items"][0]["muscle_focus"] == "mid_chest"
+
+
+def test_admin_list_filters_by_muscle_focus(client: TestClient, db: Session) -> None:
+    make_current_user_admin(client, db)
+    seed_exercises(db)
+
+    response = client.get(
+        "/api/v1/admin/exercises",
+        params={
+            "primary_muscle": "biceps",
+            "muscle_focus": "brachialis_brachioradialis",
+        },
+    )
+
+    assert response.status_code == 200
+    assert [item["slug"] for item in response.json()["items"]] == ["hammer-curl"]
 
 
 def test_admin_list_filters_labels(client: TestClient, db: Session) -> None:
@@ -225,6 +244,7 @@ def test_admin_creates_exercise_and_normalized_associations(
 
     assert response.status_code == 201
     assert response.json()["slug"] == "incline-push-up"
+    assert response.json()["muscle_focus"] == "mid_chest"
     assert response.json()["secondary_muscles"] == ["shoulders", "triceps"]
     assert response.json()["equipment"] == ["bench", "bodyweight"]
     assert response.json()["media_type"] == "placeholder"
@@ -562,6 +582,21 @@ def test_create_rejects_primary_muscle_as_secondary(
     assert response.json()["detail"][0]["loc"][-1] == "secondary_muscles"
 
 
+def test_create_rejects_focus_outside_primary_muscle(
+    client: TestClient,
+    db: Session,
+) -> None:
+    make_current_user_admin(client, db)
+
+    response = post_exercise(
+        client,
+        exercise_payload(muscle_focus="front_delt"),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"][-1] == "muscle_focus"
+
+
 def test_create_allows_cross_region_secondary_muscles(
     client: TestClient,
     db: Session,
@@ -577,6 +612,7 @@ def test_create_allows_cross_region_secondary_muscles(
             "payload": json.dumps(
                 exercise_payload(
                     primary_muscle="back",
+                    muscle_focus="general_back",
                     secondary_muscles=["biceps", "lower_back", "traps"],
                 )
             )
@@ -691,6 +727,7 @@ def test_admin_creates_review_exercise_with_labels_and_no_anatomy(
         exercise_payload(
             body_region=None,
             primary_muscle=None,
+            muscle_focus=None,
             secondary_muscles=[],
             labels=["cardio"],
             needs_review=True,

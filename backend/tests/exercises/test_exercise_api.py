@@ -92,7 +92,13 @@ def test_categories_return_ordered_bilingual_taxonomy_even_when_core_is_empty(
     response = client.get("/api/v1/exercise-categories")
 
     assert response.status_code == 200
-    assert list(response.json()) == ["body_regions", "upper_body", "lower_body", "core"]
+    assert list(response.json()) == [
+        "body_regions",
+        "upper_body",
+        "lower_body",
+        "core",
+        "muscle_focuses",
+    ]
     assert [
         (item["value"], item["name_en"], item["name_fa"])
         for item in response.json()["body_regions"]
@@ -129,6 +135,20 @@ def test_categories_return_ordered_bilingual_taxonomy_even_when_core_is_empty(
         ("obliques", "Obliques", "پهلو"),
         ("lower_back", "Lower Back", "فیله"),
     ]
+    assert [
+        (item["value"], item["name_en"], item["name_fa"])
+        for item in response.json()["muscle_focuses"]["chest"]
+    ] == [
+        ("general_chest", "General Chest", "کل سینه"),
+        ("upper_chest", "Upper Chest", "بالاسینه"),
+        ("mid_chest", "Mid Chest", "میان‌سینه"),
+        ("lower_chest", "Lower Chest", "زیرسینه"),
+    ]
+    assert set(response.json()["muscle_focuses"]) == {
+        item["value"]
+        for region in ("upper_body", "lower_body", "core")
+        for item in response.json()[region]
+    }
 
 
 def test_list_returns_active_exercises_with_pagination_metadata(
@@ -156,6 +176,7 @@ def test_list_returns_active_exercises_with_pagination_metadata(
         "name_fa",
         "body_region",
         "primary_muscle",
+        "muscle_focus",
         "secondary_muscles",
         "equipment",
             "difficulty",
@@ -205,6 +226,7 @@ def test_detail_returns_complete_bilingual_exercise(
     assert payload["name_en"] == "Dumbbell Bench Press"
     assert payload["name_fa"] == "پرس سینه دمبل"
     assert payload["primary_muscle"] == "chest"
+    assert payload["muscle_focus"] == "mid_chest"
     assert payload["secondary_muscles"] == ["shoulders", "triceps"]
     assert payload["equipment"] == ["bench", "dumbbell"]
     assert len(payload["instructions_en"]) == 3
@@ -299,6 +321,44 @@ def test_combined_filters_use_and_semantics(client: TestClient, db: Session) -> 
         "dumbbell-curl",
         "hammer-curl",
     }
+
+
+def test_list_filters_by_focus_inside_selected_muscle(
+    client: TestClient,
+    db: Session,
+) -> None:
+    prepare_catalog(client, db)
+
+    response = client.get(
+        "/api/v1/exercises",
+        params={
+            "primary_muscle": "biceps",
+            "muscle_focus": "brachialis_brachioradialis",
+            "page_size": 50,
+        },
+    )
+
+    assert response.status_code == 200
+    assert [item["slug"] for item in response.json()["items"]] == ["hammer-curl"]
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"muscle_focus": "mid_chest"},
+        {"primary_muscle": "shoulders", "muscle_focus": "mid_chest"},
+    ],
+)
+def test_list_rejects_focus_without_compatible_muscle(
+    client: TestClient,
+    db: Session,
+    params: dict[str, str],
+) -> None:
+    prepare_catalog(client, db)
+
+    response = client.get("/api/v1/exercises", params=params)
+
+    assert response.status_code == 422
 
 
 @pytest.mark.parametrize(

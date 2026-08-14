@@ -29,6 +29,7 @@ const created: AdminExercise = {
   name_fa: "شنا سوئدی شیب‌دار",
   body_region: "upper_body",
   primary_muscle: "chest",
+  muscle_focus: "mid_chest",
   secondary_muscles: ["shoulders"],
   equipment: ["bench", "bodyweight"],
   difficulty: "beginner",
@@ -58,6 +59,7 @@ const input: AdminExerciseCreate = {
   name_fa: created.name_fa,
   body_region: created.body_region,
   primary_muscle: created.primary_muscle,
+  muscle_focus: created.muscle_focus,
   secondary_muscles: created.secondary_muscles,
   equipment: created.equipment,
   difficulty: created.difficulty,
@@ -125,7 +127,7 @@ it("reads recent AI model test runs", async () => {
   );
 });
 
-it("lists admin exercises with inactive filter support", async () => {
+it("lists admin exercises with focus and inactive filter support", async () => {
   const page: PaginatedAdminExercises = {
     items: [created],
     page: 1,
@@ -135,11 +137,14 @@ it("lists admin exercises with inactive filter support", async () => {
   };
   vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(page));
 
-  await expect(getAdminExercises({ is_active: false, search: "push up" })).resolves.toEqual(
-    page,
-  );
+  await expect(getAdminExercises({
+    primary_muscle: "chest",
+    muscle_focus: "mid_chest",
+    is_active: false,
+    search: "push up",
+  })).resolves.toEqual(page);
   expect(fetch).toHaveBeenCalledWith(
-    "/api/v1/admin/exercises?is_active=false&search=push+up",
+    "/api/v1/admin/exercises?primary_muscle=chest&muscle_focus=mid_chest&is_active=false&search=push+up",
     expect.objectContaining({ credentials: "include" }),
   );
 });

@@ -12,6 +12,7 @@ import {
   bodyRegions,
   difficulties,
   equipment,
+  muscleFocuses,
   muscleGroups,
   type BodyRegion,
   type Difficulty,
@@ -20,6 +21,8 @@ import {
   type ExerciseCategory,
   type ExerciseFilters,
   type ExerciseLabel,
+  type MuscleFocus,
+  type MuscleFocusCategory,
   type ExerciseSummary,
   type ExerciseType,
   type MuscleGroup,
@@ -32,6 +35,7 @@ type LoadState = "idle" | "loading" | "ready" | "error";
 type CatalogQuery = {
   body_region?: BodyRegion;
   primary_muscle?: MuscleGroup;
+  muscle_focus?: MuscleFocus;
   equipment?: Equipment;
   difficulty?: Difficulty;
   exercise_type?: ExerciseType;
@@ -68,6 +72,13 @@ export function ExerciseCatalogPage() {
     (category) => category.value === query.primary_muscle,
   );
   const selectedMuscle = muscleCategory?.value;
+  const availableFocuses = selectedMuscle === undefined || categories === null
+    ? []
+    : categories.muscle_focuses[selectedMuscle];
+  const focusCategory = availableFocuses.find(
+    (category) => category.value === query.muscle_focus,
+  );
+  const selectedFocus = focusCategory?.value;
   const selectedLabel = query.labels?.[0];
   const hasSpecialFilter = selectedLabel !== undefined || query.exercise_type === "mobility";
   const isAdmin = user?.is_admin === true;
@@ -104,6 +115,7 @@ export function ExerciseCatalogPage() {
     const filters: ExerciseFilters = {
       body_region: query.body_region,
       primary_muscle: selectedMuscle,
+      muscle_focus: selectedFocus,
       equipment: query.equipment,
       difficulty: query.difficulty,
       exercise_type: query.exercise_type,
@@ -142,6 +154,7 @@ export function ExerciseCatalogPage() {
     query.labels,
     query.page,
     query.search,
+    selectedFocus,
     selectedMuscle,
   ]);
 
@@ -155,15 +168,19 @@ export function ExerciseCatalogPage() {
   }
 
   function chooseRegion(value: BodyRegion) {
-    writeQuery({ body_region: value, primary_muscle: undefined, labels: undefined, exercise_type: undefined });
+    writeQuery({ body_region: value, primary_muscle: undefined, muscle_focus: undefined, labels: undefined, exercise_type: undefined });
   }
 
   function chooseMuscle(value: MuscleGroup) {
-    writeQuery({ primary_muscle: value, labels: undefined, exercise_type: undefined });
+    writeQuery({ primary_muscle: value, muscle_focus: undefined, labels: undefined, exercise_type: undefined });
+  }
+
+  function chooseFocus(value: MuscleFocus | undefined) {
+    writeQuery({ muscle_focus: value });
   }
 
   function chooseSpecialFilter(changes: Pick<CatalogQuery, "labels" | "exercise_type">) {
-    writeQuery({ ...changes, body_region: undefined, primary_muscle: undefined });
+    writeQuery({ ...changes, body_region: undefined, primary_muscle: undefined, muscle_focus: undefined });
   }
 
   function resetLibrary() {
@@ -171,15 +188,16 @@ export function ExerciseCatalogPage() {
   }
 
   function resetToRegion() {
-    writeQuery({ primary_muscle: undefined });
+    writeQuery({ primary_muscle: undefined, muscle_focus: undefined });
   }
 
-  const hasResultFilters = Boolean(query.equipment || query.difficulty || query.search?.trim());
+  const hasResultFilters = Boolean(selectedFocus || query.equipment || query.difficulty || query.search?.trim());
   const currentSearch = searchParams.toString();
   const returnTo = `/exercises${currentSearch ? `?${currentSearch}` : ""}`;
   const createParams = new URLSearchParams();
   if (query.body_region !== undefined) createParams.set("body_region", query.body_region);
   if (query.primary_muscle !== undefined) createParams.set("primary_muscle", query.primary_muscle);
+  if (selectedFocus !== undefined) createParams.set("muscle_focus", selectedFocus);
   createParams.set("return_to", returnTo);
 
   return (
@@ -197,9 +215,11 @@ export function ExerciseCatalogPage() {
         <CatalogBreadcrumb
           region={regionCategory}
           muscle={muscleCategory}
+          focus={focusCategory}
           isEnglish={isEnglish}
           onLibrary={resetLibrary}
           onRegion={resetToRegion}
+          onMuscle={() => chooseFocus(undefined)}
         />
 
         {isAdmin && (
@@ -314,16 +334,48 @@ export function ExerciseCatalogPage() {
                 </div>
               </section>
             )}
+
+            {muscleCategory !== undefined && (
+              <section className="catalog-stage catalog-stage--focus" aria-labelledby="focus-heading">
+                <div className="catalog-stage__heading">
+                  <span>03</span>
+                  <div>
+                    <h2 id="focus-heading" className="fitsho-display">{t("catalog.focusTitle")}</h2>
+                    <p>{t("catalog.focusIntro", { muscle: activeName(muscleCategory, isEnglish) })}</p>
+                  </div>
+                </div>
+                <div className="focus-selector" role="group" aria-label={t("catalog.focusTitle")}>
+                  <button
+                    className={`focus-button${selectedFocus === undefined ? " is-active" : ""}`}
+                    type="button"
+                    aria-pressed={selectedFocus === undefined}
+                    onClick={() => chooseFocus(undefined)}
+                  >
+                    {t("catalog.allMuscleFocuses", { muscle: activeName(muscleCategory, isEnglish) })}
+                  </button>
+                  {availableFocuses.map((category) => (
+                    <CategoryButton
+                      key={category.value}
+                      category={category}
+                      active={category.value === selectedFocus}
+                      isEnglish={isEnglish}
+                      onClick={() => chooseFocus(category.value)}
+                      kind="focus"
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
           </>
         )}
 
         {canLoadExercises && (
           <section className="catalog-results" aria-labelledby="results-heading">
             <div className="catalog-stage__heading catalog-stage__heading--results">
-              <span>03</span>
+              <span>04</span>
               <div>
                 <h2 id="results-heading" className="fitsho-display">
-                  {resultHeading(query, muscleCategory, isEnglish, t)}
+                  {resultHeading(query, muscleCategory, focusCategory, isEnglish, t)}
                 </h2>
                 <p>{t("catalog.resultsIntro")}</p>
               </div>
@@ -448,15 +500,19 @@ export function ExerciseCatalogPage() {
 function CatalogBreadcrumb({
   region,
   muscle,
+  focus,
   isEnglish,
   onLibrary,
   onRegion,
+  onMuscle,
 }: {
   region?: { name_en: string; name_fa: string };
   muscle?: ExerciseCategory;
+  focus?: MuscleFocusCategory;
   isEnglish: boolean;
   onLibrary: () => void;
   onRegion: () => void;
+  onMuscle: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -475,7 +531,17 @@ function CatalogBreadcrumb({
       {muscle !== undefined && (
         <>
           <span aria-hidden="true">←</span>
-          <span aria-current="page">{activeName(muscle, isEnglish)}</span>
+          {focus === undefined ? (
+            <span aria-current="page">{activeName(muscle, isEnglish)}</span>
+          ) : (
+            <button type="button" onClick={onMuscle}>{activeName(muscle, isEnglish)}</button>
+          )}
+        </>
+      )}
+      {focus !== undefined && (
+        <>
+          <span aria-hidden="true">←</span>
+          <span aria-current="page">{activeName(focus, isEnglish)}</span>
         </>
       )}
     </nav>
@@ -494,7 +560,7 @@ function CategoryButton({
   active: boolean;
   isEnglish: boolean;
   onClick: () => void;
-  kind: "region" | "muscle";
+  kind: "region" | "muscle" | "focus";
   compact?: boolean;
 }) {
   return (
@@ -529,6 +595,11 @@ function ExerciseCard({
   const name = isEnglish ? exercise.name_en : exercise.name_fa;
   const secondary = isEnglish ? exercise.name_fa : exercise.name_en;
   const muscle = findMuscleCategory(categories, exercise.primary_muscle);
+  const focus = exercise.primary_muscle === null || exercise.muscle_focus === null
+    ? undefined
+    : categories.muscle_focuses[exercise.primary_muscle].find(
+        (category) => category.value === exercise.muscle_focus,
+      );
   const equipmentNames = exercise.equipment.map((value) => t(`catalog.equipment.${value}`));
   const detailPath = `/exercises/${exercise.slug}${catalogSearch ? `?${catalogSearch}` : ""}`;
 
@@ -558,6 +629,12 @@ function ExerciseCard({
             <dt>{t("catalog.equipmentLabel")}</dt>
             <dd>{equipmentNames.join(t("catalog.listSeparator"))}</dd>
           </div>
+          {focus !== undefined && (
+            <div>
+              <dt>{t("catalog.muscleFocusLabel")}</dt>
+              <dd>{activeName(focus, isEnglish)}</dd>
+            </div>
+          )}
         </dl>
         <Link className="exercise-card__link" to={detailPath}>
           {t("catalog.viewExercise")}
@@ -613,6 +690,7 @@ function parseCatalogQuery(searchParams: URLSearchParams): CatalogQuery {
   return {
     body_region: optionalValue(searchParams.get("body_region"), bodyRegions),
     primary_muscle: optionalValue(searchParams.get("primary_muscle"), muscleGroups),
+    muscle_focus: optionalValue(searchParams.get("muscle_focus"), muscleFocuses),
     equipment: optionalValue(searchParams.get("equipment"), equipment),
     difficulty: optionalValue(searchParams.get("difficulty"), difficulties),
     exercise_type: optionalValue(searchParams.get("exercise_type"), ["mobility"] as const),
@@ -629,6 +707,7 @@ function serializeCatalogQuery(query: CatalogQuery): URLSearchParams {
   if (query.primary_muscle !== undefined) {
     searchParams.set("primary_muscle", query.primary_muscle);
   }
+  if (query.muscle_focus !== undefined) searchParams.set("muscle_focus", query.muscle_focus);
   if (query.equipment !== undefined) searchParams.set("equipment", query.equipment);
   if (query.difficulty !== undefined) searchParams.set("difficulty", query.difficulty);
   if (query.exercise_type !== undefined) searchParams.set("exercise_type", query.exercise_type);
@@ -649,11 +728,13 @@ function parseLabels(searchParams: URLSearchParams): ExerciseLabel[] | undefined
 function resultHeading(
   query: CatalogQuery,
   muscle: ExerciseCategory | undefined,
+  focus: MuscleFocusCategory | undefined,
   isEnglish: boolean,
   t: (key: string) => string,
 ): string {
   if (query.labels?.[0] !== undefined) return t(`catalog.label.${query.labels[0]}`);
   if (query.exercise_type === "mobility") return t("catalog.mobility");
+  if (focus !== undefined) return activeName(focus, isEnglish);
   return muscle === undefined ? t("catalog.title") : activeName(muscle, isEnglish);
 }
 

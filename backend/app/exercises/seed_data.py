@@ -8,6 +8,7 @@ from app.exercises.enums import (
     ExerciseType,
     MediaType,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
 )
 from app.exercises.media_metadata import OWNER_ATTRIBUTION, OWNER_LICENSE
@@ -20,6 +21,7 @@ class ExerciseSeed:
     name_fa: str
     body_region: BodyRegion
     primary_muscle: MuscleGroup
+    muscle_focus: MuscleFocus
     secondary_muscles: tuple[MuscleGroup, ...]
     equipment: tuple[Equipment, ...]
     difficulty: Difficulty
@@ -140,6 +142,7 @@ def _exercise(
         name_fa=name_fa,
         body_region=body_region,
         primary_muscle=primary_muscle,
+        muscle_focus=SEED_MUSCLE_FOCUS[slug],
         secondary_muscles=secondary_muscles,
         equipment=equipment,
         movement_pattern=movement_pattern,
@@ -166,6 +169,27 @@ M = MuscleGroup
 P = MovementPattern
 T = ExerciseType
 C = ExerciseCautionTag
+F = MuscleFocus
+
+SEED_MUSCLE_FOCUS: dict[str, MuscleFocus] = {
+    "dumbbell-bench-press": F.MID_CHEST,
+    "barbell-bent-over-row": F.GENERAL_BACK,
+    "dumbbell-lateral-raise": F.LATERAL_DELT,
+    "smith-machine-shoulder-press": F.FRONT_DELT,
+    "rear-delt-fly": F.REAR_DELT,
+    "dumbbell-curl": F.BICEPS_BRACHII,
+    "hammer-curl": F.BRACHIALIS_BRACHIORADIALIS,
+    "cable-curl": F.BICEPS_BRACHII,
+    "barbell-curl": F.BICEPS_BRACHII,
+    "overhead-dumbbell-extension": F.TRICEPS_LONG_HEAD,
+    "glute-bridge": F.GLUTE_MAX,
+    "goblet-squat": F.GENERAL_QUADRICEPS,
+    "leg-press": F.GENERAL_QUADRICEPS,
+    "leg-extension": F.VASTI,
+    "dumbbell-lunge": F.GENERAL_QUADRICEPS,
+    "romanian-deadlift": F.HAMSTRINGS_HIP_EXTENSION,
+    "standing-calf-raise": F.GASTROCNEMIUS,
+}
 
 PROGRAMMING_METADATA: dict[
     str, tuple[MovementPattern, ExerciseType, tuple[ExerciseCautionTag, ...]]

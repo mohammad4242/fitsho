@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 
 import type { ExerciseCategories, ExerciseDetail, PaginatedExercises } from "./features/exercises/types";
+import { muscleGroups } from "./features/exercises/types";
 import { HYDRATED_ACCOUNT_KEY } from "./features/publicOnboarding/onboardingDraft";
 
 const auth = vi.hoisted(() => ({
@@ -100,6 +101,9 @@ const exerciseCategories: ExerciseCategories = {
   upper_body: [{ value: "chest", name_en: "Chest", name_fa: "سینه" }],
   lower_body: [],
   core: [],
+  muscle_focuses: Object.fromEntries(
+    muscleGroups.map((muscle) => [muscle, []]),
+  ) as unknown as ExerciseCategories["muscle_focuses"],
 };
 
 const emptyExercisePage: PaginatedExercises = {
@@ -117,6 +121,7 @@ const exerciseDetail: ExerciseDetail = {
   name_fa: "پرس سینه دمبل",
   body_region: "upper_body",
   primary_muscle: "chest",
+  muscle_focus: "mid_chest",
   labels: [],
   secondary_muscles: ["triceps"],
   equipment: ["dumbbell", "bench"],

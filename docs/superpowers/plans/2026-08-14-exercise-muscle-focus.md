@@ -17,6 +17,7 @@
 - Classification must use source targets and secondary muscles before names, must not silently guess, and must report unresolved stable IDs.
 - Public endpoints remain read-only; admin writes remain under the protected admin router and existing permission/origin checks.
 - Workout generation continues using existing primary-muscle programming behavior.
+- Correct `0230`, `0862`, `0407`, `0562`, `pallof-press`, `side-plank`, and `0777` from `abs` to `obliques`; preserve every other primary-muscle membership.
 - Preserve unrelated work, including the existing local `compose.yaml` change.
 
 ---

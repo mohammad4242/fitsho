@@ -9,6 +9,7 @@ import type {
   ExerciseSummary,
   PaginatedExercises,
 } from "./types";
+import { muscleGroups } from "./types";
 
 const api = vi.hoisted(() => ({
   getExerciseCategories: vi.fn(),
@@ -56,6 +57,17 @@ const categories: ExerciseCategories = {
     { value: "obliques", name_en: "Obliques", name_fa: "پهلو" },
     { value: "lower_back", name_en: "Lower Back", name_fa: "فیله" },
   ],
+  muscle_focuses: Object.fromEntries(muscleGroups.map((muscle) => [
+    muscle,
+    muscle === "chest"
+      ? [
+          { value: "general_chest", name_en: "General Chest", name_fa: "کل سینه" },
+          { value: "upper_chest", name_en: "Upper Chest", name_fa: "بالاسینه" },
+          { value: "mid_chest", name_en: "Mid Chest", name_fa: "میان‌سینه" },
+          { value: "lower_chest", name_en: "Lower Chest", name_fa: "زیرسینه" },
+        ]
+      : [],
+  ])) as unknown as ExerciseCategories["muscle_focuses"],
 };
 
 const benchPress: ExerciseSummary = {
@@ -65,6 +77,7 @@ const benchPress: ExerciseSummary = {
   name_fa: "پرس سینه دمبل",
   body_region: "upper_body",
   primary_muscle: "chest",
+  muscle_focus: "mid_chest",
   labels: [],
   secondary_muscles: ["triceps", "shoulders"],
   equipment: ["dumbbell", "bench"],
@@ -165,6 +178,28 @@ describe("catalog selection flow", () => {
 
     await user.click(within(breadcrumb).getByRole("button", { name: "کتابخانه حرکات" }));
     expect(locationValue()).toBe("/exercises");
+  });
+
+  it("keeps All backward-compatible and filters by a selected muscle focus", async () => {
+    const user = userEvent.setup();
+    renderCatalog("/exercises?body_region=upper_body&primary_muscle=chest");
+
+    expect(await screen.findByRole("button", { name: "همه حرکات سینه" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(api.getExercises).toHaveBeenLastCalledWith(
+      expect.objectContaining({ primary_muscle: "chest", muscle_focus: undefined }),
+    );
+
+    await user.click(screen.getByRole("button", { name: /بالاسینه.*Upper Chest/ }));
+
+    expect(locationValue()).toBe(
+      "/exercises?body_region=upper_body&primary_muscle=chest&muscle_focus=upper_chest",
+    );
+    expect(api.getExercises).toHaveBeenLastCalledWith(
+      expect.objectContaining({ primary_muscle: "chest", muscle_focus: "upper_chest" }),
+    );
   });
 
   it("supports keyboard selection for regions and muscles", async () => {
@@ -311,16 +346,16 @@ describe("administrator controls", () => {
   it("links add and edit actions back to the current library context", async () => {
     auth.isAdmin = true;
     renderCatalog(
-      "/exercises?body_region=upper_body&primary_muscle=chest&equipment=dumbbell&search=press",
+      "/exercises?body_region=upper_body&primary_muscle=chest&muscle_focus=mid_chest&equipment=dumbbell&search=press",
     );
 
     const card = await screen.findByRole("article", { name: "پرس سینه دمبل" });
     const returnTo = encodeURIComponent(
-      "/exercises?body_region=upper_body&primary_muscle=chest&equipment=dumbbell&search=press",
+      "/exercises?body_region=upper_body&primary_muscle=chest&muscle_focus=mid_chest&equipment=dumbbell&search=press",
     );
     expect(screen.getByRole("link", { name: "افزودن حرکت" })).toHaveAttribute(
       "href",
-      `/admin/exercises/new?body_region=upper_body&primary_muscle=chest&return_to=${returnTo}`,
+      `/admin/exercises/new?body_region=upper_body&primary_muscle=chest&muscle_focus=mid_chest&return_to=${returnTo}`,
     );
     expect(within(card).getByRole("link", { name: "ویرایش" })).toHaveAttribute(
       "href",

@@ -13,6 +13,7 @@ from app.exercises.enums import (
     ExerciseType,
     MediaType,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
 )
 from app.exercises.models import Exercise
@@ -59,6 +60,7 @@ def _plan(db: Session, user_id: UUID) -> WorkoutPlan:
         name_fa="پرس سینه",
         body_region=BodyRegion.UPPER_BODY,
         primary_muscle=MuscleGroup.CHEST,
+        muscle_focus=MuscleFocus.MID_CHEST,
         difficulty=Difficulty.BEGINNER,
         movement_pattern=MovementPattern.HORIZONTAL_PUSH,
         exercise_type=ExerciseType.COMPOUND,

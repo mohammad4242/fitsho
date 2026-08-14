@@ -8,8 +8,23 @@ from sqlalchemy.orm import Session
 from app.exercises.models import Exercise
 
 
+def test_exercise_has_nullable_muscle_focus_column_and_composite_index() -> None:
+    column = Exercise.__table__.c.muscle_focus
+    assert column.nullable is True
+    assert column.type.length == 40
+    assert "ix_exercises_primary_muscle_muscle_focus" in {
+        index.name for index in Exercise.__table__.indexes
+    }
+
+
 def make_exercise(slug: str = "push-up") -> Exercise:
-    from app.exercises.enums import BodyRegion, Difficulty, MediaType, MuscleGroup
+    from app.exercises.enums import (
+        BodyRegion,
+        Difficulty,
+        MediaType,
+        MuscleFocus,
+        MuscleGroup,
+    )
 
     return Exercise(
         slug=slug,
@@ -17,6 +32,7 @@ def make_exercise(slug: str = "push-up") -> Exercise:
         name_fa="شنا سوئدی",
         body_region=BodyRegion.UPPER_BODY,
         primary_muscle=MuscleGroup.CHEST,
+        muscle_focus=MuscleFocus.MID_CHEST,
         difficulty=Difficulty.BEGINNER,
         instructions_en=[
             "Brace your trunk.",
@@ -70,12 +86,13 @@ def test_exercise_stores_controlled_catalog_data(db: Session) -> None:
 
 
 def test_exercise_stores_lower_back_as_a_core_muscle(db: Session) -> None:
-    from app.exercises.enums import BodyRegion, MuscleGroup
+    from app.exercises.enums import BodyRegion, MuscleFocus, MuscleGroup
     from app.exercises.models import Exercise
 
     exercise = make_exercise("back-extension")
     exercise.body_region = BodyRegion.CORE
     exercise.primary_muscle = MuscleGroup.LOWER_BACK
+    exercise.muscle_focus = MuscleFocus.LUMBAR_ERECTORS
     db.add(exercise)
     db.flush()
 
@@ -126,12 +143,37 @@ def test_exercise_slug_is_unique(db: Session) -> None:
     assert "uq_exercises_slug" in str(error.value)
 
 
+def test_exercise_database_rejects_incompatible_primary_muscle_focus(db: Session) -> None:
+    from app.exercises.enums import MuscleFocus
+
+    exercise = make_exercise("invalid-focus")
+    exercise.muscle_focus = MuscleFocus.REAR_DELT
+    db.add(exercise)
+
+    with pytest.raises(IntegrityError) as error:
+        db.flush()
+
+    assert "ck_exercises_primary_muscle_focus_compatible" in str(error.value)
+
+
+def test_exercise_database_requires_focus_for_known_primary_muscle(db: Session) -> None:
+    exercise = make_exercise("missing-focus")
+    exercise.muscle_focus = None
+    db.add(exercise)
+
+    with pytest.raises(IntegrityError) as error:
+        db.flush()
+
+    assert "ck_exercises_primary_muscle_focus_compatible" in str(error.value)
+
+
 @pytest.mark.parametrize(
     ("column", "invalid_value", "constraint_name"),
     [
         ("body_region", "arms", "ck_exercises_body_region_values"),
         ("primary_muscle", "pelvic_floor", "ck_exercises_primary_muscle_values"),
         ("primary_muscle", "core_stability", "ck_exercises_primary_muscle_values"),
+        ("muscle_focus", "inner_chest", "ck_exercises_muscle_focus_values"),
         ("difficulty", "expert", "ck_exercises_difficulty_values"),
         ("media_type", "youtube", "ck_exercises_media_type_values"),
     ],
@@ -147,6 +189,7 @@ def test_exercise_database_rejects_invalid_controlled_values(
         "slug": f"invalid-{column}",
         "body_region": "upper_body",
         "primary_muscle": "chest",
+        "muscle_focus": "mid_chest",
         "difficulty": "beginner",
         "media_type": "placeholder",
     }
@@ -157,12 +200,13 @@ def test_exercise_database_rejects_invalid_controlled_values(
             text(
                 """
                 INSERT INTO exercises (
-                    id, slug, name_en, name_fa, body_region, primary_muscle,
+                    id, slug, name_en, name_fa, body_region, primary_muscle, muscle_focus,
                     difficulty, instructions_en, instructions_fa,
                     safety_notes_en, safety_notes_fa, media_path, media_type
                 ) VALUES (
                     :id, :slug, 'Push-Up', 'شنا سوئدی', :body_region,
-                    :primary_muscle, :difficulty, '["Step one", "Step two", "Step three"]',
+                    :primary_muscle, :muscle_focus, :difficulty,
+                    '["Step one", "Step two", "Step three"]',
                     '["گام یک", "گام دو", "گام سه"]', '["Use control"]',
                     '["حرکت را کنترل کن"]', '/exercises/exercise-placeholder.svg',
                     :media_type

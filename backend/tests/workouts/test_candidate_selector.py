@@ -11,6 +11,7 @@ from app.exercises.enums import (
     ExerciseType,
     MediaType,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
 )
 from app.exercises.models import (
@@ -64,6 +65,7 @@ def exercise(
         name_fa=unique_slug,
         body_region=BodyRegion.UPPER_BODY,
         primary_muscle=MuscleGroup.BICEPS,
+        muscle_focus=MuscleFocus.BICEPS_BRACHII,
         difficulty=difficulty,
         movement_pattern=movement_pattern,
         exercise_type=ExerciseType.COMPOUND,
@@ -218,6 +220,7 @@ def test_multiday_selector_requires_candidate_count_and_pattern_coverage(db: Ses
 def test_candidate_preserves_cardio_label_and_null_primary_muscle(db: Session) -> None:
     cardio = exercise(db, "cardio-step", equipment=(Equipment.BODYWEIGHT,))
     cardio.primary_muscle = None
+    cardio.muscle_focus = None
     cardio.labels.append(ExerciseLabelItem(label=ExerciseLabel.CARDIO))
     db.commit()
 

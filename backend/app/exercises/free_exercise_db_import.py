@@ -30,8 +30,10 @@ from app.exercises.enums import (
     MediaRole,
     MediaType,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
 )
+from app.exercises.focus_classifier import classify_muscle_focus, refine_primary_muscle
 from app.exercises.free_exercise_db_translations import CURATED_TRANSLATIONS
 from app.exercises.models import (
     Exercise,
@@ -462,6 +464,7 @@ class ImportCandidate:
     name_en: str
     body_region: BodyRegion | None
     primary_muscle: MuscleGroup | None
+    muscle_focus: MuscleFocus | None
     labels: tuple[ExerciseLabel, ...]
     secondary_muscles: list[MuscleGroup]
     equipment: list[Equipment]
@@ -639,6 +642,28 @@ class FreeExerciseDbImporter:
             form_cues_en=form_cues,
             common_mistakes_en=common_mistakes,
         )
+        primary_muscle = refine_primary_muscle(
+            primary_muscle,
+            name_en,
+            programming_metadata.movement_pattern,
+        )
+        classification = classify_muscle_focus(
+            primary_muscle=primary_muscle,
+            source_target=target,
+            source_muscle_group=self._optional_text(raw_record, "muscleGroup"),
+            secondary_targets=secondary_names,
+            name_en=name_en,
+            movement_pattern=programming_metadata.movement_pattern,
+            exercise_type=programming_metadata.exercise_type,
+            instructions_en=[instructions, *steps],
+        )
+        if primary_muscle is not None and classification is None:
+            report.validation_failures.append(f"{source_id}: muscle focus is unresolved")
+            return None
+        muscle_focus = classification.focus if classification is not None else None
+        secondary_muscles = [
+            muscle for muscle in secondary_muscles if muscle is not primary_muscle
+        ]
         labels = classify_exercise_labels(
             body_part=body_part,
             target=target,
@@ -657,6 +682,7 @@ class FreeExerciseDbImporter:
             name_en=name_en,
             body_region=body_region,
             primary_muscle=primary_muscle,
+            muscle_focus=muscle_focus,
             labels=labels,
             secondary_muscles=secondary_muscles,
             equipment=[equipment],
@@ -758,6 +784,8 @@ class FreeExerciseDbImporter:
             and actual_assets == expected_assets
             and all(self._stored_media_exists(asset.media_path) for asset in exercise.media_assets)
             and exercise.movement_pattern is candidate.programming_metadata.movement_pattern
+            and exercise.primary_muscle is candidate.primary_muscle
+            and exercise.muscle_focus is candidate.muscle_focus
             and exercise.exercise_type is candidate.programming_metadata.exercise_type
             and exercise.is_programmable is True
             and {item.label for item in exercise.labels} == set(candidate.labels)
@@ -849,6 +877,7 @@ class FreeExerciseDbImporter:
         exercise.name_fa = translation.name_fa.strip()
         exercise.body_region = candidate.body_region
         exercise.primary_muscle = candidate.primary_muscle
+        exercise.muscle_focus = candidate.muscle_focus
         exercise.difficulty = candidate.difficulty
         exercise.movement_pattern = candidate.programming_metadata.movement_pattern
         exercise.exercise_type = candidate.programming_metadata.exercise_type

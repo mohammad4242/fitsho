@@ -39,6 +39,8 @@ def list_exercises(
         conditions.append(Exercise.body_region == filters.body_region)
     if filters.primary_muscle is not None:
         conditions.append(Exercise.primary_muscle == filters.primary_muscle)
+    if filters.muscle_focus is not None:
+        conditions.append(Exercise.muscle_focus == filters.muscle_focus)
     if filters.equipment is not None:
         conditions.append(
             Exercise.equipment_items.any(ExerciseEquipment.equipment == filters.equipment)
@@ -102,6 +104,7 @@ def _apply_seed_fields(exercise: Exercise, seed: ExerciseSeed) -> None:
     exercise.name_fa = seed.name_fa
     exercise.body_region = seed.body_region
     exercise.primary_muscle = seed.primary_muscle
+    exercise.muscle_focus = seed.muscle_focus
     exercise.difficulty = seed.difficulty
     exercise.movement_pattern = seed.movement_pattern
     exercise.exercise_type = seed.exercise_type

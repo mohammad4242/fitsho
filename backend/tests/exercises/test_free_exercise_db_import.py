@@ -13,6 +13,7 @@ from app.exercises.enums import (
     ExerciseLabel,
     ExerciseType,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
 )
 from app.exercises.models import Exercise
@@ -120,7 +121,13 @@ def test_importer_maps_forearms_and_preserves_unmapped_anatomy_for_review(
 
     source_root = tmp_path / "source"
     record = source_record()
-    record["target"] = "forearms"
+    record.update(
+        {
+            "name": "Dumbbell Wrist Curl",
+            "target": "forearms",
+            "muscleGroup": "forearm flexors",
+        }
+    )
     write_source(source_root, record)
     report = FreeExerciseDbImporter(
         db,
@@ -133,6 +140,68 @@ def test_importer_maps_forearms_and_preserves_unmapped_anatomy_for_review(
     assert report.imported_records == ["0001"]
     assert exercise is not None
     assert exercise.primary_muscle is MuscleGroup.FOREARMS
+    assert exercise.muscle_focus is MuscleFocus.FOREARM_FLEXORS
+
+
+def test_importer_assigns_source_backed_upper_chest_focus(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    record = source_record()
+    record.update(
+        {
+            "name": "Incline Bench Press",
+            "target": "upper pectorals",
+            "muscleGroup": "pectoralis major, clavicular head",
+        }
+    )
+    write_source(source_root, record)
+
+    report = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=FakeTranslator(),
+    ).run()
+    exercise = db.scalar(select(Exercise).where(Exercise.source_id == "0001"))
+
+    assert report.validation_failures == []
+    assert exercise is not None
+    assert exercise.muscle_focus is MuscleFocus.UPPER_CHEST
+
+
+def test_importer_rejects_known_muscle_when_focus_is_unresolved(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    record = source_record()
+    record.update(
+        {
+            "name": "Unknown Chest Movement",
+            "target": "pectorals",
+            "muscleGroup": "pectorals",
+        }
+    )
+    write_source(source_root, record)
+
+    report = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=FakeTranslator(),
+    ).run()
+
+    assert report.validation_failures == ["0001: muscle focus is unresolved"]
+    assert report.skipped_records == ["0001"]
+    assert db.scalar(select(Exercise).where(Exercise.source_id == "0001")) is None
 
 
 def test_importer_imports_unmapped_anatomy_with_review_flag_and_cardio_label(
@@ -449,6 +518,7 @@ def test_curated_translator_returns_only_local_persian_content() -> None:
         name_en="Push-Up",
         body_region=BodyRegion.UPPER_BODY,
         primary_muscle=MuscleGroup.CHEST,
+        muscle_focus=MuscleFocus.MID_CHEST,
         labels=(),
         secondary_muscles=[],
         equipment=[Equipment.BODYWEIGHT],
