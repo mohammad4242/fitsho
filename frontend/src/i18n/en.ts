@@ -1098,7 +1098,7 @@ const en = {
       generate: "Generate plan", generating: "Generating plan…", update: "Refresh plan", reused: "Your current plan still matches your current conditions.", stale: "This plan no longer matches your current conditions or selected duration. Generate the next plan when you are ready.", generateError: "Generation did not finish. Your current plan is still available; try again.", generateCooldown: "Please try again in a few minutes.",
       weekly: "Weekly schedule", scheduleTitle: "Your training days", sessionMinutes: "{{count}} minutes", sets: "Sets", reps: "Reps", rest: "Rest", seconds: "s", rir: "RIR", detail: "View exercise details", alternatives: "View alternatives",
       futureTitle: "Plan tools", comingSoon: "Coming soon",
-      pdf: { title: "Download PDF", body: "A concise Persian workout PDF will be available here." },
+      pdf: { title: "Download PDF", body: "Get the Persian plan", loading: "Preparing PDF…", error: "The PDF could not be downloaded. Try again." },
       feedback: { title: "End-of-cycle feedback", body: "Share changes after completing this full plan to shape the next one." },
       body: { title: "Body Analysis", body: "Review optional photo sessions and visible-development analyses.", action: "View Body Analysis" },
       provisionalBodyAnalysisWarning: "This plan used provisional body-analysis findings that have not yet been approved by both specialists.",

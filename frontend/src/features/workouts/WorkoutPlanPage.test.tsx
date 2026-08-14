@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
 import { ApiError } from "../../shared/apiClient";
@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   getWorkoutPlanHistory: vi.fn(),
   getWorkoutPlan: vi.fn(),
   generateWorkoutPlan: vi.fn(),
+  downloadWorkoutPlanPdf: vi.fn(),
 }));
 const profileApi = vi.hoisted(() => ({
   getProfile: vi.fn(),
@@ -97,13 +98,26 @@ beforeEach(() => {
   api.getWorkoutPlanHistory.mockReset();
   api.getWorkoutPlan.mockReset();
   api.generateWorkoutPlan.mockReset();
+  api.downloadWorkoutPlanPdf.mockReset();
   profileApi.getProfile.mockReset();
   profileApi.updateProfile.mockReset();
   api.getWorkoutPlanHistory.mockResolvedValue([]);
   api.generateWorkoutPlan.mockResolvedValue({ plan, reused: false });
+  api.downloadWorkoutPlanPdf.mockResolvedValue(
+    new Blob(["%PDF-test"], { type: "application/pdf" }),
+  );
   profileApi.getProfile.mockResolvedValue({ workout_generation_method: "fitsho_coach" });
   profileApi.updateProfile.mockResolvedValue({ workout_generation_method: "ai" });
 });
+
+afterEach(() => vi.restoreAllMocks());
+
+function mockBrowserDownload() {
+  const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:plan");
+  const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+  return { click, createObjectURL, revokeObjectURL };
+}
 
 it("places the compact generation selector between coach status and workout days and persists both choices", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue({
@@ -283,7 +297,7 @@ it("renders the selected duration, exercise media, and exercise detail link", as
   );
   const quickActions = screen.getByRole("group", { name: "ابزارهای برنامه" });
   expect(quickActions).toHaveClass("workout-quick-actions");
-  expect(screen.getByRole("button", { name: "دانلود PDF" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "دانلود PDF" })).toBeEnabled();
   expect(screen.getByRole("button", { name: "بازخورد پایان دوره" })).toBeDisabled();
   expect(screen.getByRole("link", { name: "Body Analysis" })).toHaveAttribute(
     "href",
@@ -294,6 +308,88 @@ it("renders the selected duration, exercise media, and exercise detail link", as
     "href",
     "/exercises/push-up",
   );
+});
+
+it("downloads the displayed workout plan from the existing PDF button", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  const browserDownload = mockBrowserDownload();
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: "دانلود PDF" }));
+
+  expect(api.downloadWorkoutPlanPdf).toHaveBeenCalledWith(plan.id);
+  expect(browserDownload.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+  expect(browserDownload.click).toHaveBeenCalledOnce();
+  expect(browserDownload.revokeObjectURL).toHaveBeenCalledWith("blob:plan");
+});
+
+it("disables the existing PDF button while the file is loading", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  mockBrowserDownload();
+  let resolveDownload: ((value: Blob) => void) | undefined;
+  api.downloadWorkoutPlanPdf.mockReturnValue(
+    new Promise((resolve) => {
+      resolveDownload = resolve;
+    }),
+  );
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  const button = await screen.findByRole("button", { name: "دانلود PDF" });
+  await user.click(button);
+
+  expect(button).toBeDisabled();
+  expect(screen.getByText("در حال آماده‌سازی PDF…")).toBeInTheDocument();
+
+  resolveDownload?.(new Blob(["pdf"], { type: "application/pdf" }));
+  await waitFor(() => expect(button).toBeEnabled());
+});
+
+it("shows a retryable error when the PDF request fails", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  api.downloadWorkoutPlanPdf.mockRejectedValue(new Error("PDF unavailable"));
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  const button = await screen.findByRole("button", { name: "دانلود PDF" });
+  await user.click(button);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "دانلود PDF انجام نشد. دوباره تلاش کن.",
+  );
+  expect(button).toBeEnabled();
+});
+
+it("downloads the historical plan currently displayed", async () => {
+  const historicalPlan = { ...plan, id: "018f0000-0000-7000-8000-000000000099" };
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  api.getWorkoutPlanHistory.mockResolvedValue([
+    {
+      id: plan.id,
+      created_at: plan.created_at,
+      activated_at: plan.activated_at,
+      is_active: true,
+      coach_review: { state: "none", coach_display_name: null, coach_note: null, approved_at: null },
+    },
+    {
+      id: historicalPlan.id,
+      created_at: "2026-07-01T10:00:00Z",
+      activated_at: "2026-07-01T10:00:00Z",
+      is_active: false,
+      coach_review: { state: "none", coach_display_name: null, coach_note: null, approved_at: null },
+    },
+  ]);
+  api.getWorkoutPlan.mockResolvedValue(historicalPlan);
+  mockBrowserDownload();
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: /نسخه اولیه.*۱۰ تیر ۱۴۰۵/ }));
+  await screen.findByText("در حال مشاهده نسخه قبلی");
+  await user.click(screen.getByRole("button", { name: "دانلود PDF" }));
+
+  expect(api.downloadWorkoutPlanPdf).toHaveBeenCalledWith(historicalPlan.id);
 });
 
 it("warns when the plan used provisional body-analysis findings", async () => {

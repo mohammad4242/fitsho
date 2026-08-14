@@ -8,6 +8,7 @@ import { getProfile, updateProfile } from "../profile/api";
 import type { WorkoutGenerationMethod } from "../profile/types";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import {
+  downloadWorkoutPlanPdf,
   generateWorkoutPlan,
   getActiveWorkoutPlan,
   getWorkoutPlan,
@@ -31,6 +32,8 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [generationMethod, setGenerationMethod] = useState<WorkoutGenerationMethod>("fitsho_coach");
   const [savingGenerationMethod, setSavingGenerationMethod] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState(false);
   const isEnglish = i18n.resolvedLanguage === "en";
   const l = (fa: string, en: string) => isEnglish ? en : fa;
   const displayedPlanDuration = plan?.plan_duration_weeks ?? planDurationWeeks;
@@ -104,6 +107,29 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
       .then(setPlan)
       .catch(() => undefined)
       .finally(() => setSelectingVersionId(null));
+  }
+
+  function downloadPdf() {
+    if (plan === null || downloadingPdf) return;
+    const planId = plan.id;
+    setDownloadingPdf(true);
+    setPdfError(false);
+    void downloadWorkoutPlanPdf(planId)
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        try {
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = `fitsho-workout-plan-${planId}.pdf`;
+          document.body.append(anchor);
+          anchor.click();
+          anchor.remove();
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      })
+      .catch(() => setPdfError(true))
+      .finally(() => setDownloadingPdf(false));
   }
 
   return (
@@ -278,10 +304,17 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         <section className="workout-tools" aria-labelledby="workout-future-title">
           <h2 id="workout-future-title">{t("workoutPlan.futureTitle")}</h2>
           <div className="workout-quick-actions" role="group" aria-labelledby="workout-future-title">
-            <button className="workout-quick-action" type="button" disabled aria-label={t("workoutPlan.pdf.title")}>
+            <button
+              className="workout-quick-action"
+              type="button"
+              disabled={plan === null || downloadingPdf}
+              aria-busy={downloadingPdf}
+              aria-label={t("workoutPlan.pdf.title")}
+              onClick={downloadPdf}
+            >
               <AppIcon name="document" />
               <strong>{t("workoutPlan.pdf.title")}</strong>
-              <small>{t("workoutPlan.comingSoon")}</small>
+              <small>{t(downloadingPdf ? "workoutPlan.pdf.loading" : "workoutPlan.pdf.body")}</small>
             </button>
             <button className="workout-quick-action" type="button" disabled aria-label={t("workoutPlan.feedback.title")}>
               <AppIcon name="feedback" />
@@ -293,6 +326,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
               <strong>{t("workoutPlan.body.title")}</strong>
             </Link>
           </div>
+          {pdfError && <StatusPanel role="alert" message={t("workoutPlan.pdf.error")} />}
         </section>
 
         <details className="workout-secondary">
