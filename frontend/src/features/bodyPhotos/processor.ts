@@ -10,8 +10,7 @@ export type NormalizedBodyLandmark = {
 };
 
 export type BodyLandmarkDetection = {
-  personCount: number;
-  landmarks: NormalizedBodyLandmark[];
+  poses: NormalizedBodyLandmark[][];
 };
 
 export interface BodyLandmarkDetector {
@@ -255,30 +254,13 @@ function validateLandmarks(
   detection: BodyLandmarkDetection,
   expectedView: BodyPhotoView,
 ): ValidatedPose {
-  if (detection.personCount === 0) throw new BodyPhotoProcessingError("body_not_detected");
-  if (detection.personCount > 1) {
-    throw new BodyPhotoProcessingError("multiple_people_detected");
-  }
-  if (detection.landmarks.length < 33) {
-    throw new BodyPhotoProcessingError("body_not_detected");
-  }
-  requireVisible(detection.landmarks, landmarkGroups.shoulders, "shoulders_not_visible");
-  requireVisible(detection.landmarks, landmarkGroups.elbows, "arms_not_visible");
-  if (expectedView !== "side") {
-    requireVisible(detection.landmarks, landmarkGroups.wrists, "arms_not_visible");
-  }
-  requireVisible(detection.landmarks, landmarkGroups.hips, "torso_not_visible");
-  requireVisible(detection.landmarks, landmarkGroups.knees, "legs_or_feet_not_visible");
-  requireVisible(detection.landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible");
-  requireVisible(detection.landmarks, landmarkGroups.feet, "legs_or_feet_not_visible");
-
-  const requiredIndices = Object.values(landmarkGroups).flat();
-  const required = requiredIndices.map((index) => detection.landmarks[index]!);
+  const landmarks = selectPrimaryPose(detection.poses);
+  const required = requiredLandmarksForView(landmarks, expectedView);
   if (required.some((landmark) => !insideFrame(landmark))) {
     throw new BodyPhotoProcessingError("body_out_of_frame");
   }
 
-  const projection = projectedView(detection.landmarks);
+  const projection = projectedView(landmarks);
   if (
     (expectedView === "side" && projection === "non_side")
     || (expectedView !== "side" && projection === "side")
@@ -291,6 +273,169 @@ function validateLandmarks(
     ),
     minimumVisibility: clampScore(Math.min(...required.map((landmark) => landmark.visibility))),
   };
+}
+
+function requiredLandmarksForView(
+  landmarks: NormalizedBodyLandmark[],
+  view: BodyPhotoView,
+): NormalizedBodyLandmark[] {
+  if (view === "side") {
+    return [
+      mostVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible"),
+      mostVisible(landmarks, landmarkGroups.elbows, "arms_not_visible"),
+      mostVisible(landmarks, landmarkGroups.hips, "torso_not_visible"),
+      mostVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible"),
+      mostVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible"),
+      mostVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible"),
+    ];
+  }
+
+  if (view === "back") {
+    requireVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible");
+    requireVisible(landmarks, landmarkGroups.hips, "torso_not_visible");
+    requireVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible");
+    requireVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible");
+    requireVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible");
+    return [
+      ...landmarkGroups.shoulders.map((index) => landmarks[index]!),
+      mostVisible(landmarks, [13, 15], "arms_not_visible"),
+      mostVisible(landmarks, [14, 16], "arms_not_visible"),
+      ...landmarkGroups.hips.map((index) => landmarks[index]!),
+      ...landmarkGroups.knees.map((index) => landmarks[index]!),
+      ...landmarkGroups.ankles.map((index) => landmarks[index]!),
+      ...landmarkGroups.feet.map((index) => landmarks[index]!),
+    ];
+  }
+
+  requireVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible");
+  requireVisible(landmarks, landmarkGroups.elbows, "arms_not_visible");
+  requireVisible(landmarks, landmarkGroups.wrists, "arms_not_visible");
+  requireVisible(landmarks, landmarkGroups.hips, "torso_not_visible");
+  requireVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible");
+  requireVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible");
+  requireVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible");
+  return Object.values(landmarkGroups)
+    .flat()
+    .map((index) => landmarks[index]!);
+}
+
+function mostVisible(
+  landmarks: NormalizedBodyLandmark[],
+  indices: readonly number[],
+  code: BodyPhotoProcessingErrorCode,
+): NormalizedBodyLandmark {
+  const selected = indices
+    .map((index) => landmarks[index])
+    .filter((landmark): landmark is NormalizedBodyLandmark => landmark !== undefined)
+    .sort((left, right) => right.visibility - left.visibility)[0];
+  if (selected === undefined || selected.visibility < limits.minimumLandmarkVisibility) {
+    throw new BodyPhotoProcessingError(code);
+  }
+  return selected;
+}
+
+type PoseBox = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+
+type PoseCandidate = {
+  landmarks: NormalizedBodyLandmark[];
+  box: PoseBox;
+  area: number;
+  reliability: number;
+};
+
+const poseBoxIndices = [
+  ...landmarkGroups.shoulders,
+  ...landmarkGroups.elbows,
+  ...landmarkGroups.hips,
+  ...landmarkGroups.knees,
+  ...landmarkGroups.ankles,
+  ...landmarkGroups.feet,
+] as const;
+
+function selectPrimaryPose(poses: NormalizedBodyLandmark[][]): NormalizedBodyLandmark[] {
+  const candidates = poses
+    .filter((pose) => pose.length >= 33)
+    .map(toPoseCandidate)
+    .sort((left, right) => (
+      right.reliability - left.reliability || right.area - left.area
+    ));
+  const primary = candidates[0];
+  if (primary === undefined) throw new BodyPhotoProcessingError("body_not_detected");
+
+  const hasDistinctSecondary = candidates.slice(1).some((candidate) => (
+    isCrediblePose(candidate.landmarks)
+    && candidate.area >= primary.area * 0.25
+    && intersectionOverUnion(primary.box, candidate.box) < 0.6
+  ));
+  if (hasDistinctSecondary) {
+    throw new BodyPhotoProcessingError("multiple_people_detected");
+  }
+  return primary.landmarks;
+}
+
+function toPoseCandidate(landmarks: NormalizedBodyLandmark[]): PoseCandidate {
+  const box = poseBox(landmarks);
+  return {
+    landmarks,
+    box,
+    area: boxArea(box),
+    reliability: Object.values(landmarkGroups)
+      .reduce((score, indices) => score + maximumVisibility(landmarks, indices), 0),
+  };
+}
+
+function isCrediblePose(landmarks: NormalizedBodyLandmark[]): boolean {
+  const visible = (indices: readonly number[]) => (
+    maximumVisibility(landmarks, indices) >= limits.minimumLandmarkVisibility
+  );
+  const visibleLowerGroups = [landmarkGroups.knees, landmarkGroups.ankles, landmarkGroups.feet]
+    .filter(visible).length;
+  return visible(landmarkGroups.shoulders)
+    && visible(landmarkGroups.elbows)
+    && visible(landmarkGroups.hips)
+    && visibleLowerGroups >= 2;
+}
+
+function maximumVisibility(
+  landmarks: NormalizedBodyLandmark[],
+  indices: readonly number[],
+): number {
+  return Math.max(...indices.map((index) => landmarks[index]?.visibility ?? 0));
+}
+
+function poseBox(landmarks: NormalizedBodyLandmark[]): PoseBox {
+  const visible = poseBoxIndices
+    .map((index) => landmarks[index])
+    .filter((landmark): landmark is NormalizedBodyLandmark => (
+      landmark !== undefined && landmark.visibility >= 0.2
+    ));
+  if (visible.length === 0) return { left: 0, top: 0, right: 0, bottom: 0 };
+  return {
+    left: Math.min(...visible.map((landmark) => landmark.x)),
+    top: Math.min(...visible.map((landmark) => landmark.y)),
+    right: Math.max(...visible.map((landmark) => landmark.x)),
+    bottom: Math.max(...visible.map((landmark) => landmark.y)),
+  };
+}
+
+function boxArea(box: PoseBox): number {
+  return Math.max(0, box.right - box.left) * Math.max(0, box.bottom - box.top);
+}
+
+function intersectionOverUnion(left: PoseBox, right: PoseBox): number {
+  const intersection = boxArea({
+    left: Math.max(left.left, right.left),
+    top: Math.max(left.top, right.top),
+    right: Math.min(left.right, right.right),
+    bottom: Math.min(left.bottom, right.bottom),
+  });
+  const union = boxArea(left) + boxArea(right) - intersection;
+  return union <= 0 ? 0 : intersection / union;
 }
 
 function requireVisible(
@@ -311,6 +456,12 @@ function insideFrame(landmark: NormalizedBodyLandmark): boolean {
 }
 
 function projectedView(landmarks: NormalizedBodyLandmark[]): "side" | "non_side" | "ambiguous" {
+  if (
+    [...landmarkGroups.shoulders, ...landmarkGroups.hips]
+      .some((index) => (landmarks[index]?.visibility ?? 0) < limits.minimumLandmarkVisibility)
+  ) {
+    return "ambiguous";
+  }
   const shoulderSpan = Math.abs(landmarks[11]!.x - landmarks[12]!.x);
   const hipSpan = Math.abs(landmarks[23]!.x - landmarks[24]!.x);
   if (shoulderSpan <= 0.08 && hipSpan <= 0.08) return "side";

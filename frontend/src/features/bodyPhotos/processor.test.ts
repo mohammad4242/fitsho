@@ -36,9 +36,13 @@ function inputFile() {
   });
 }
 
+function translatedPose(pose: NormalizedBodyLandmark[], deltaX: number) {
+  return pose.map((point) => ({ ...point, x: point.x + deltaX }));
+}
+
 function setup(options: {
   viewShape?: "front" | "side";
-  personCount?: number;
+  poses?: NormalizedBodyLandmark[][];
   mutate?: (value: NormalizedBodyLandmark[]) => void;
   width?: number;
   height?: number;
@@ -49,8 +53,7 @@ function setup(options: {
   const detected = landmarks(options.viewShape);
   options.mutate?.(detected);
   const detection: BodyLandmarkDetection = {
-    personCount: options.personCount ?? 1,
-    landmarks: detected,
+    poses: options.poses ?? [detected],
   };
   const detector: BodyLandmarkDetector = { detect: vi.fn().mockResolvedValue(detection) };
   const segmenter: BodyPhotoSegmenter = {
@@ -117,6 +120,62 @@ describe("BrowserBodyPhotoProcessor", () => {
     );
   });
 
+  it("accepts a side view with hidden far-side landmarks outside the frame", async () => {
+    const hiddenFarSide = [12, 14, 16, 24, 26, 28, 32];
+    const { processor } = setup({
+      viewShape: "side",
+      mutate: (value) => {
+        for (const index of hiddenFarSide) {
+          value[index] = { ...value[index]!, x: 1.1, visibility: 0.1 };
+        }
+      },
+    });
+
+    await expect(processor.process(inputFile(), "side")).resolves.toMatchObject({
+      validation: { expectedView: "side" },
+    });
+  });
+
+  it("rejects a side view when neither elbow is visible", async () => {
+    const { processor } = setup({
+      viewShape: "side",
+      mutate: (value) => {
+        value[13]!.visibility = 0.1;
+        value[14]!.visibility = 0.1;
+      },
+    });
+
+    await expect(processor.process(inputFile(), "side")).rejects.toMatchObject({
+      code: "arms_not_visible",
+    });
+  });
+
+  it("accepts a back view when each arm has a visible elbow or wrist", async () => {
+    const { processor } = setup({
+      mutate: (value) => {
+        value[15] = { ...value[15]!, x: -0.1, visibility: 0.1 };
+        value[14] = { ...value[14]!, x: 1.1, visibility: 0.1 };
+      },
+    });
+
+    await expect(processor.process(inputFile(), "back")).resolves.toMatchObject({
+      validation: { expectedView: "back" },
+    });
+  });
+
+  it("rejects a back view when one arm has neither a visible elbow nor wrist", async () => {
+    const { processor } = setup({
+      mutate: (value) => {
+        value[13]!.visibility = 0.1;
+        value[15]!.visibility = 0.1;
+      },
+    });
+
+    await expect(processor.process(inputFile(), "back")).rejects.toMatchObject({
+      code: "arms_not_visible",
+    });
+  });
+
   it("rejects missing shoulders with a specific code", async () => {
     const { processor } = setup({ mutate: (value) => {
       value[11]!.visibility = 0.1;
@@ -147,12 +206,32 @@ describe("BrowserBodyPhotoProcessor", () => {
     });
   });
 
-  it("reports multiple people from the detector", async () => {
-    const { processor } = setup({ personCount: 2 });
+  it("rejects two credible spatially distinct people", async () => {
+    const primary = landmarks();
+    const secondary = translatedPose(landmarks(), 0.3);
+    const { processor } = setup({ poses: [primary, secondary] });
 
     await expect(processor.process(inputFile(), "front")).rejects.toMatchObject({
       code: "multiple_people_detected",
     });
+  });
+
+  it("accepts overlapping duplicate detections as one person", async () => {
+    const primary = landmarks();
+    const duplicate = primary.map((point) => ({ ...point, x: point.x + 0.005 }));
+    const { processor } = setup({ poses: [primary, duplicate] });
+
+    await expect(processor.process(inputFile(), "front")).resolves.toBeDefined();
+  });
+
+  it("ignores a weak secondary pose candidate", async () => {
+    const weak = translatedPose(landmarks(), 0.3).map((point) => ({
+      ...point,
+      visibility: 0.1,
+    }));
+    const { processor } = setup({ poses: [landmarks(), weak] });
+
+    await expect(processor.process(inputFile(), "front")).resolves.toBeDefined();
   });
 
   it.each([
@@ -191,7 +270,7 @@ describe("BrowserBodyPhotoProcessor", () => {
   });
 
   it("disposes decoded data even when validation fails", async () => {
-    const { processor, decoded } = setup({ personCount: 0 });
+    const { processor, decoded } = setup({ poses: [] });
     await expect(processor.process(inputFile(), "front")).rejects.toBeInstanceOf(
       BodyPhotoProcessingError,
     );
