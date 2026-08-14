@@ -60,6 +60,25 @@ it("shows the nutrition program catalogue in the mobile admin workspace", () => 
   );
 });
 
+it("shows AI settings in the mobile admin workspace", () => {
+  auth.isAdmin = true;
+
+  render(<MemoryRouter><MorePage /></MemoryRouter>);
+
+  expect(screen.getByRole("link", { name: /تنظیمات هوش مصنوعی/ })).toHaveAttribute(
+    "href",
+    "/admin/ai-settings",
+  );
+});
+
+it("hides AI settings from non-admin members", () => {
+  auth.isAdmin = false;
+
+  render(<MemoryRouter><MorePage /></MemoryRouter>);
+
+  expect(screen.queryByRole("link", { name: /تنظیمات هوش مصنوعی/ })).not.toBeInTheDocument();
+});
+
 it("does not show a separate exercise administration workspace", () => {
   auth.isAdmin = true;
 

@@ -90,6 +90,7 @@ export function MorePage() {
               {user.is_admin && <MoreLink to="/admin/nutrition-meals" icon="nutrition" title={l("کاتالوگ وعده‌های غذایی", "Nutrition meal catalogue")} />}
               {user.is_admin && <MoreLink to="/admin/nutrition-programs" icon="nutrition" title={l("کاتالوگ برنامه‌های غذایی", "Nutrition program catalogue")} />}
               {user.is_admin && <MoreLink to="/admin/nutrition-monitoring" icon="settings" title={l("پایش تغذیه", "Nutrition monitoring")} />}
+              {user.is_admin && <MoreLink to="/admin/ai-settings" icon="settings" title={l("تنظیمات هوش مصنوعی", "AI settings")} />}
             </MoreGroup>
           )}
         </div>
