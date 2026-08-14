@@ -189,6 +189,35 @@ describe("exercise detail content", () => {
     expect(video).toHaveAttribute("src", "/media/male.mp4");
     expect(screen.getByText("Male creator")).toBeVisible();
   });
+
+  it("lets the member select an unspecified owner video", async () => {
+    const user = userEvent.setup();
+    api.getExercise.mockResolvedValue({
+      ...detail,
+      media_assets: [
+        {
+          presentation: "unspecified",
+          role: "video",
+          sort_order: 0,
+          media_path: "/media/owner-video.mp4",
+          media_type: "video",
+          media_source_url: null,
+          media_license: null,
+          media_attribution: "Fitsho owner-provided",
+        },
+      ],
+    });
+    renderDetail();
+
+    const selector = await screen.findByLabelText("رسانهٔ نمایش");
+    await user.selectOptions(selector, "unspecified-video");
+
+    expect(screen.getByRole("option", { name: "ویدئوی مالک" })).toBeVisible();
+    expect(screen.getByLabelText("نمایش حرکت پرس سینه دمبل")).toHaveAttribute(
+      "src",
+      "/media/owner-video.mp4",
+    );
+  });
 });
 
 function renderDetail(

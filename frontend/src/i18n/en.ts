@@ -821,8 +821,10 @@ const en = {
       legacyMedia: "Default media",
       maleVideo: "Male video",
       femaleVideo: "Female video",
+      unspecifiedVideo: "Owner video",
       maleThumbnail: "Male thumbnail",
       femaleThumbnail: "Female thumbnail",
+      unspecifiedThumbnail: "Owner thumbnail",
     },
     bodyPhotos: {
       eyebrow: "Optional body analysis",

@@ -821,8 +821,10 @@ const fa = {
       legacyMedia: "رسانهٔ پیش‌فرض",
       maleVideo: "ویدئوی مرد",
       femaleVideo: "ویدئوی زن",
+      unspecifiedVideo: "ویدئوی مالک",
       maleThumbnail: "تصویر بندانگشتی مرد",
       femaleThumbnail: "تصویر بندانگشتی زن",
+      unspecifiedThumbnail: "تصویر بندانگشتی مالک",
     },
     bodyPhotos: {
       eyebrow: "تحلیل اختیاری بدن",

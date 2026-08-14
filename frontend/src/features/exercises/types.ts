@@ -132,7 +132,7 @@ export const mediaTypes = [
 ] as const;
 export type MediaType = (typeof mediaTypes)[number];
 
-export const mediaPresentations = ["male", "female"] as const;
+export const mediaPresentations = ["male", "female", "unspecified"] as const;
 export type MediaPresentation = (typeof mediaPresentations)[number];
 
 export const mediaRoles = ["video", "thumbnail"] as const;

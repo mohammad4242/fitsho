@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { MediaPresentation } from "../exercises/types";
 import type { AdminExerciseMediaAssetInput, AdminExerciseMediaFiles } from "./types";
 
 type Props = {
@@ -12,7 +13,7 @@ type Props = {
 
 function nextSortOrder(
   assets: AdminExerciseMediaAssetInput[],
-  presentation: "male" | "female",
+  presentation: MediaPresentation,
   role: "video" | "thumbnail",
 ): number {
   return Math.max(

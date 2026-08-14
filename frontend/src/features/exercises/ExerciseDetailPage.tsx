@@ -6,7 +6,7 @@ import heroStrengthFallback from "../../assets/landing/hero-strength-fallback.jp
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getExercise } from "./api";
 import { ExerciseMedia } from "./ExerciseMedia";
-import type { ExerciseDetail } from "./types";
+import type { ExerciseDetail, MediaPresentation, MediaRole } from "./types";
 import "./exercises.css";
 
 type DetailState = "loading" | "ready" | "not-found" | "error";
@@ -118,7 +118,7 @@ function ReadyExerciseDetail({
     media_attribution: exercise.media_attribution,
   };
 
-  function mediaAssetLabel(presentation: "male" | "female", role: "video" | "thumbnail") {
+  function mediaAssetLabel(presentation: MediaPresentation, role: MediaRole) {
     return t(
       `exerciseDetail.${presentation}${role === "video" ? "Video" : "Thumbnail"}`,
     );
