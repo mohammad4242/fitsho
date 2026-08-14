@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from app.exercises.enums import (
     BodyRegion,
@@ -12,8 +12,10 @@ from app.exercises.enums import (
     MediaPresentation,
     MediaRole,
     MediaType,
+    MuscleFocus,
     MuscleGroup,
 )
+from app.exercises.taxonomy import is_compatible_muscle_focus
 
 SearchText = Annotated[
     str,
@@ -24,6 +26,7 @@ SearchText = Annotated[
 class ExerciseFilters(BaseModel):
     body_region: BodyRegion | None = None
     primary_muscle: MuscleGroup | None = None
+    muscle_focus: MuscleFocus | None = None
     equipment: Equipment | None = None
     difficulty: Difficulty | None = None
     exercise_type: ExerciseType | None = None
@@ -31,6 +34,15 @@ class ExerciseFilters(BaseModel):
     search: SearchText | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=12, ge=1, le=50)
+
+    @model_validator(mode="after")
+    def validate_muscle_focus(self) -> "ExerciseFilters":
+        if self.muscle_focus is not None and not is_compatible_muscle_focus(
+            self.primary_muscle,
+            self.muscle_focus,
+        ):
+            raise ValueError("Muscle focus requires a compatible primary muscle")
+        return self
 
 
 class ExerciseCategory(BaseModel):
@@ -45,11 +57,18 @@ class BodyRegionCategory(BaseModel):
     name_fa: str
 
 
+class ExerciseFocusCategory(BaseModel):
+    value: MuscleFocus
+    name_en: str
+    name_fa: str
+
+
 class ExerciseCategories(BaseModel):
     body_regions: list[BodyRegionCategory]
     upper_body: list[ExerciseCategory]
     lower_body: list[ExerciseCategory]
     core: list[ExerciseCategory]
+    muscle_focuses: dict[MuscleGroup, list[ExerciseFocusCategory]]
 
 
 class ExerciseSummary(BaseModel):
@@ -59,6 +78,7 @@ class ExerciseSummary(BaseModel):
     name_fa: str
     body_region: BodyRegion | None
     primary_muscle: MuscleGroup | None
+    muscle_focus: MuscleFocus | None = None
     labels: list[ExerciseLabel] = Field(default_factory=list)
     secondary_muscles: list[MuscleGroup]
     equipment: list[Equipment]

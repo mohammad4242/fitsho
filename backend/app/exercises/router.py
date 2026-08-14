@@ -12,11 +12,13 @@ from app.exercises.schemas import (
     ExerciseCategory,
     ExerciseDetail,
     ExerciseFilters,
+    ExerciseFocusCategory,
     ExerciseMediaAssetDetail,
     ExerciseSummary,
     PaginatedExercises,
 )
 from app.exercises.service import get_active_exercise_by_slug, list_exercises
+from app.exercises.taxonomy import MUSCLE_FOCUS_CATEGORIES
 
 router = APIRouter(
     prefix="/api/v1",
@@ -77,6 +79,7 @@ def _summary(exercise: Exercise) -> ExerciseSummary:
         name_fa=exercise.name_fa,
         body_region=exercise.body_region,
         primary_muscle=exercise.primary_muscle,
+        muscle_focus=exercise.muscle_focus,
         secondary_muscles=sorted(
             (item.muscle for item in exercise.secondary_muscles),
             key=lambda value: value.value,
@@ -135,6 +138,17 @@ def categories() -> ExerciseCategories:
         upper_body=_category_items(UPPER_BODY_CATEGORIES),
         lower_body=_category_items(LOWER_BODY_CATEGORIES),
         core=_category_items(CORE_CATEGORIES),
+        muscle_focuses={
+            muscle: [
+                ExerciseFocusCategory(
+                    value=category.value,
+                    name_en=category.name_en,
+                    name_fa=category.name_fa,
+                )
+                for category in categories
+            ]
+            for muscle, categories in MUSCLE_FOCUS_CATEGORIES.items()
+        },
     )
 
 

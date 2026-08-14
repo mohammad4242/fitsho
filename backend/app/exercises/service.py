@@ -39,6 +39,8 @@ def list_exercises(
         conditions.append(Exercise.body_region == filters.body_region)
     if filters.primary_muscle is not None:
         conditions.append(Exercise.primary_muscle == filters.primary_muscle)
+    if filters.muscle_focus is not None:
+        conditions.append(Exercise.muscle_focus == filters.muscle_focus)
     if filters.equipment is not None:
         conditions.append(
             Exercise.equipment_items.any(ExerciseEquipment.equipment == filters.equipment)

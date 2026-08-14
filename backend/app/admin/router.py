@@ -40,7 +40,7 @@ from app.auth.dependencies import AppSettings, DatabaseSession
 from app.exercises.enums import MediaPresentation, MediaRole, MediaType
 from app.exercises.models import Exercise
 from app.exercises.schemas import ExerciseMediaAssetDetail
-from app.exercises.taxonomy import MUSCLES_BY_REGION
+from app.exercises.taxonomy import MUSCLES_BY_REGION, is_compatible_muscle_focus
 from app.training_templates.admin_service import (
     TemplateWriteError,
     create_training_program_template,
@@ -194,6 +194,7 @@ def _detail(exercise: Exercise) -> AdminExerciseDetail:
         name_fa=exercise.name_fa,
         body_region=exercise.body_region,
         primary_muscle=exercise.primary_muscle,
+        muscle_focus=exercise.muscle_focus,
         secondary_muscles=sorted(
             (item.muscle for item in exercise.secondary_muscles),
             key=lambda value: value.value,
@@ -285,6 +286,8 @@ def _parse_payload(raw_payload: str) -> AdminExerciseCreate:
             )
         if not payload.needs_review:
             raise _validation_error("anatomy", "Unknown anatomy requires review")
+        if payload.muscle_focus is not None:
+            raise _validation_error("muscle_focus", "Unknown anatomy cannot have muscle focus")
         return payload
     allowed_muscles = MUSCLES_BY_REGION[payload.body_region]
     if payload.primary_muscle not in allowed_muscles:
@@ -296,6 +299,11 @@ def _parse_payload(raw_payload: str) -> AdminExerciseCreate:
         raise _validation_error(
             "secondary_muscles",
             "Primary muscle cannot also be a secondary muscle",
+        )
+    if not is_compatible_muscle_focus(payload.primary_muscle, payload.muscle_focus):
+        raise _validation_error(
+            "muscle_focus",
+            "Muscle focus must belong to the selected primary muscle",
         )
     return payload
 
