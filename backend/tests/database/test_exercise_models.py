@@ -387,3 +387,41 @@ def test_exercise_database_allows_multiple_media_assets_in_display_order(db: Ses
 
     assert stored is not None
     assert [item.sort_order for item in stored.media_assets] == [0, 1]
+
+
+def test_exercise_media_asset_stores_unique_owner_provenance(db: Session) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.models import ExerciseMediaAsset
+
+    first = make_exercise("owner-video-first")
+    second = make_exercise("owner-video-second")
+    first.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            sort_order=0,
+            media_path="/media/owner-video/aa/first.mp4",
+            media_type=MediaType.VIDEO,
+            source="owner-video",
+            source_id="a" * 64,
+        )
+    )
+    second.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            sort_order=0,
+            media_path="/media/owner-video/aa/second.mp4",
+            media_type=MediaType.VIDEO,
+            source="owner-video",
+            source_id="a" * 64,
+        )
+    )
+    db.add(first)
+    db.flush()
+    db.add(second)
+
+    with pytest.raises(IntegrityError) as error:
+        db.flush()
+
+    assert "uq_exercise_media_assets_source_source_id" in str(error.value)

@@ -297,6 +297,11 @@ class ExerciseMediaAsset(Base):
     __tablename__ = "exercise_media_assets"
     __table_args__ = (
         UniqueConstraint(
+            "source",
+            "source_id",
+            name="uq_exercise_media_assets_source_source_id",
+        ),
+        UniqueConstraint(
             "exercise_id",
             "presentation",
             "role",
@@ -359,6 +364,8 @@ class ExerciseMediaAsset(Base):
     media_source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     media_license: Mapped[str | None] = mapped_column(String(120), nullable=True)
     media_attribution: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    source_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
 
     exercise: Mapped[Exercise] = relationship(back_populates="media_assets")
 

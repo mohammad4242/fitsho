@@ -103,6 +103,7 @@ class MediaType(StrEnum):
 class MediaPresentation(StrEnum):
     MALE = "male"
     FEMALE = "female"
+    UNSPECIFIED = "unspecified"
 
 
 class MediaRole(StrEnum):
