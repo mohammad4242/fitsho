@@ -43,6 +43,14 @@ function processed(view: "front" | "side" | "back"): ProcessedBodyPhoto {
   };
 }
 
+function serverPhoto(view: "front" | "side" | "back") {
+  return {
+    id: `${view}-photo`,
+    view,
+    content_url: `/api/v1/body-photo-sessions/session-2/photos/${view}/content`,
+  };
+}
+
 function renderWizard(processor?: BodyPhotoProcessor, entry = "/body-progress/new") {
   return render(
     <MemoryRouter initialEntries={[entry]}>
@@ -149,6 +157,72 @@ it("returns to the result after a successful replacement cannot start analysis",
 
   await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/body-progress/session-2"));
   expect(screen.queryByText(/standardized photo could not be uploaded/i)).not.toBeInTheDocument();
+});
+
+it("resumes an incomplete session at its first missing view and submits the same session", async () => {
+  const user = userEvent.setup();
+  const processor: BodyPhotoProcessor = { process: vi.fn().mockImplementation((_, view) => processed(view)) };
+  api.getBodyPhotoSession.mockResolvedValue({
+    id: "session-2",
+    state: "uploading",
+    photos: [serverPhoto("front")],
+    operational_processing_consent: null,
+    model_training_consent: null,
+    submitted_at: null,
+  });
+  api.uploadBodyPhoto
+    .mockResolvedValueOnce({
+      id: "session-2",
+      state: "uploading",
+      photos: [serverPhoto("front"), serverPhoto("side")],
+    })
+    .mockResolvedValueOnce({
+      id: "session-2",
+      state: "uploaded",
+      photos: [serverPhoto("front"), serverPhoto("side"), serverPhoto("back")],
+    });
+  api.submitBodyPhotoSession.mockResolvedValue({
+    id: "session-2",
+    state: "queued",
+    photos: [serverPhoto("front"), serverPhoto("side"), serverPhoto("back")],
+  });
+
+  renderWizard(processor, "/body-progress/new?sessionId=session-2");
+
+  await user.upload(await screen.findByLabelText(/side photo upload/i), file);
+  await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
+  await user.click(screen.getByRole("button", { name: /confirm and upload side/i }));
+  await user.upload(await screen.findByLabelText(/back photo upload/i), file);
+  await user.click(screen.getByRole("button", { name: /confirm and upload back/i }));
+
+  expect(await screen.findByRole("heading", { name: /review standardized photos/i })).toBeVisible();
+  expect(screen.getByAltText(/standardized front preview/i)).toHaveAttribute(
+    "src",
+    "/api/v1/body-photo-sessions/session-2/photos/front/content",
+  );
+  await user.click(screen.getByRole("button", { name: /submit photos/i }));
+
+  await waitFor(() => expect(api.submitBodyPhotoSession).toHaveBeenCalledWith("session-2", true, false));
+  expect(api.startBodyPhotoAnalysis).toHaveBeenCalledWith("session-2");
+  expect(api.createBodyPhotoSession).not.toHaveBeenCalled();
+  expect(api.uploadBodyPhoto.mock.calls.map((call) => call[1])).toEqual(["side", "back"]);
+});
+
+it("opens review directly when an incomplete session already contains three photos", async () => {
+  api.getBodyPhotoSession.mockResolvedValue({
+    id: "session-2",
+    state: "uploaded",
+    photos: [serverPhoto("front"), serverPhoto("side"), serverPhoto("back")],
+    operational_processing_consent: null,
+    model_training_consent: null,
+    submitted_at: null,
+  });
+
+  renderWizard(undefined, "/body-progress/new?sessionId=session-2");
+
+  expect(await screen.findByRole("heading", { name: /review standardized photos/i })).toBeVisible();
+  expect(screen.getAllByRole("img")).toHaveLength(3);
+  expect(api.createBodyPhotoSession).not.toHaveBeenCalled();
 });
 
 it("shows the selected photo immediately while anonymization is processing", async () => {

@@ -41,6 +41,7 @@ export function BodyPhotoWizard({
   const [searchParams] = useSearchParams();
   const editSessionId = searchParams.get("sessionId");
   const editView = views.find((item) => item === searchParams.get("view")) ?? null;
+  const loadingExistingSession = editSessionId !== null;
   const editingExistingPhoto = editSessionId !== null && editView !== null;
   const [currentIndex, setCurrentIndex] = useState(() => editView === null ? 0 : views.indexOf(editView));
   const [processed, setProcessed] = useState<Partial<Record<BodyPhotoView, ProcessedBodyPhoto>>>({});
@@ -56,11 +57,13 @@ export function BodyPhotoWizard({
   const selectedPreviewRef = useRef<SelectedPhotoPreview | null>(null);
   const mountedRef = useRef(false);
   const selectionTokenRef = useRef(0);
-  const [sessionLoading, setSessionLoading] = useState(editingExistingPhoto);
+  const [sessionLoading, setSessionLoading] = useState(loadingExistingSession);
 
   const view = views[currentIndex];
   const current = processed[view] ?? null;
-  const complete = views.every((item) => processed[item] !== undefined);
+  const complete = views.every((item) => (
+    processed[item] !== undefined || session?.photos.some((photo) => photo.view === item) === true
+  ));
 
   useEffect(() => {
     processedRef.current = processed;
@@ -79,13 +82,23 @@ export function BodyPhotoWizard({
   }, []);
 
   useEffect(() => {
-    if (!editingExistingPhoto || editSessionId === null) return;
+    if (editSessionId === null) return;
     void getBodyPhotoSession(editSessionId)
       .then((loaded) => {
         if (!mountedRef.current) return;
         setSession(loaded);
         setOperationalConsent(loaded.operational_processing_consent?.granted ?? false);
         setModelTrainingConsent(loaded.model_training_consent?.granted ?? false);
+        if (editView === null) {
+          const missingIndex = views.findIndex((item) => (
+            !loaded.photos.some((photo) => photo.view === item)
+          ));
+          if (missingIndex === -1) {
+            setState("confirm");
+          } else {
+            setCurrentIndex(missingIndex);
+          }
+        }
       })
       .catch(() => {
         if (mountedRef.current) setError(t("bodyPhotos.errors.load"));
@@ -93,7 +106,7 @@ export function BodyPhotoWizard({
       .finally(() => {
         if (mountedRef.current) setSessionLoading(false);
       });
-  }, [editSessionId, editingExistingPhoto, t]);
+  }, [editSessionId, editView, t]);
 
   const instructions = useMemo(() => ({
     front: t("bodyPhotos.pose.front"),
@@ -151,7 +164,7 @@ export function BodyPhotoWizard({
 
   async function confirmUpload() {
     if (current === null || !operationalConsent || busy || sessionLoading) return;
-    if (editingExistingPhoto && session === null) {
+    if (loadingExistingSession && session === null) {
       setError(t("bodyPhotos.errors.load"));
       return;
     }
@@ -177,10 +190,13 @@ export function BodyPhotoWizard({
         navigate(`/body-progress/${activeSession.id}`);
         return;
       }
-      if (currentIndex === views.length - 1) {
+      const availableViews = new Set(uploaded.photos.map((photo) => photo.view));
+      Object.keys(processed).forEach((item) => availableViews.add(item as BodyPhotoView));
+      const missingIndex = views.findIndex((item) => !availableViews.has(item));
+      if (missingIndex === -1) {
         setState("confirm");
       } else {
-        setCurrentIndex((index) => index + 1);
+        setCurrentIndex(missingIndex);
       }
     } catch (uploadError) {
       if (uploadedPhoto && editingExistingPhoto && uploadedSessionId !== null) {
@@ -267,11 +283,19 @@ export function BodyPhotoWizard({
               setCurrentIndex(index);
               setState("capture");
             }}>
-              <img src={processed[item]?.previewUrl} alt={t("bodyPhotos.previewAlt", { view: t(`bodyPhotos.views.${item}`) })} />
+              <img src={photoPreviewUrl(item, processed, session)} alt={t("bodyPhotos.previewAlt", { view: t(`bodyPhotos.views.${item}`) })} />
               <span>{t("bodyPhotos.retake", { view: t(`bodyPhotos.views.${item}`) })}</span>
             </button>
           ))}
         </div>
+        <label className="body-photo-consent">
+          <input
+            type="checkbox"
+            checked={operationalConsent}
+            onChange={(event) => setOperationalConsent(event.target.checked)}
+          />
+          <span>{t("bodyPhotos.processingConsentBefore")} <button type="button" className="body-photo-link-button" onClick={() => setTermsOpen(true)}>{t("bodyPhotos.processingTerms")}</button></span>
+        </label>
         <label className="body-photo-consent">
           <input
             type="checkbox"
@@ -282,9 +306,10 @@ export function BodyPhotoWizard({
         </label>
         <p className="body-photo-muted">{t("bodyPhotos.modelTrainingHint")}</p>
         {error !== null && <p className="form-error" role="alert">{error}</p>}
-        <button className="primary-button" type="button" onClick={() => void submit()} disabled={busy}>
+        <button className="primary-button" type="button" onClick={() => void submit()} disabled={busy || !operationalConsent}>
           {busy ? t("bodyPhotos.submitting") : t("bodyPhotos.submit")}
         </button>
+        {termsOpen && <ConsentModal onClose={() => setTermsOpen(false)} />}
       </section>
     );
   }
@@ -414,6 +439,16 @@ function uploadErrorMessage(error: unknown, t: ReturnType<typeof useTranslation>
 
 function formatScore(score: number): string {
   return `${Math.round(score * 100)}%`;
+}
+
+function photoPreviewUrl(
+  view: BodyPhotoView,
+  processed: Partial<Record<BodyPhotoView, ProcessedBodyPhoto>>,
+  session: BodyPhotoSession | null,
+): string {
+  return processed[view]?.previewUrl
+    ?? session?.photos.find((photo) => photo.view === view)?.content_url
+    ?? "";
 }
 
 function disposeProcessedPhoto(photo: ProcessedBodyPhoto | undefined) {
