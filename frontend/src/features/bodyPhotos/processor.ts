@@ -290,6 +290,23 @@ function requiredLandmarksForView(
     ];
   }
 
+  if (view === "back") {
+    requireVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible");
+    requireVisible(landmarks, landmarkGroups.hips, "torso_not_visible");
+    requireVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible");
+    requireVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible");
+    requireVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible");
+    return [
+      ...landmarkGroups.shoulders.map((index) => landmarks[index]!),
+      mostVisible(landmarks, [13, 15], "arms_not_visible"),
+      mostVisible(landmarks, [14, 16], "arms_not_visible"),
+      ...landmarkGroups.hips.map((index) => landmarks[index]!),
+      ...landmarkGroups.knees.map((index) => landmarks[index]!),
+      ...landmarkGroups.ankles.map((index) => landmarks[index]!),
+      ...landmarkGroups.feet.map((index) => landmarks[index]!),
+    ];
+  }
+
   requireVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible");
   requireVisible(landmarks, landmarkGroups.elbows, "arms_not_visible");
   requireVisible(landmarks, landmarkGroups.wrists, "arms_not_visible");

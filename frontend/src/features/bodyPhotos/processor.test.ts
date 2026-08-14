@@ -150,6 +150,32 @@ describe("BrowserBodyPhotoProcessor", () => {
     });
   });
 
+  it("accepts a back view when each arm has a visible elbow or wrist", async () => {
+    const { processor } = setup({
+      mutate: (value) => {
+        value[15] = { ...value[15]!, x: -0.1, visibility: 0.1 };
+        value[14] = { ...value[14]!, x: 1.1, visibility: 0.1 };
+      },
+    });
+
+    await expect(processor.process(inputFile(), "back")).resolves.toMatchObject({
+      validation: { expectedView: "back" },
+    });
+  });
+
+  it("rejects a back view when one arm has neither a visible elbow nor wrist", async () => {
+    const { processor } = setup({
+      mutate: (value) => {
+        value[13]!.visibility = 0.1;
+        value[15]!.visibility = 0.1;
+      },
+    });
+
+    await expect(processor.process(inputFile(), "back")).rejects.toMatchObject({
+      code: "arms_not_visible",
+    });
+  });
+
   it("rejects missing shoulders with a specific code", async () => {
     const { processor } = setup({ mutate: (value) => {
       value[11]!.visibility = 0.1;
