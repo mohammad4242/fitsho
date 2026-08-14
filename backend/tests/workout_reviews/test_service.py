@@ -15,6 +15,7 @@ from app.exercises.enums import (
     ExerciseType,
     MediaType,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
 )
 from app.exercises.models import Exercise
@@ -53,6 +54,7 @@ def _exercise(db: Session, slug: str, *, programmable: bool = True) -> Exercise:
         name_fa=f"حرکت {slug}",
         body_region=BodyRegion.UPPER_BODY,
         primary_muscle=MuscleGroup.CHEST,
+        muscle_focus=MuscleFocus.MID_CHEST,
         difficulty=Difficulty.BEGINNER,
         movement_pattern=MovementPattern.HORIZONTAL_PUSH,
         exercise_type=ExerciseType.COMPOUND,

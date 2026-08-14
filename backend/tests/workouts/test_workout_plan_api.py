@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.ai.schemas import ProviderErrorCode
 from app.exercises.enums import BodyRegion, Difficulty, MediaType, MuscleGroup
 from app.exercises.models import Exercise, ExerciseAlternative
+from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
 from app.workouts.schemas import ProgramGenerationOverrides
@@ -79,6 +80,7 @@ def _exercise(
         name_fa=f"حرکت {unique_slug}",
         body_region=BodyRegion.UPPER_BODY,
         primary_muscle=muscle,
+        muscle_focus=FOCUSES_BY_MUSCLE[muscle][0],
         difficulty=Difficulty.BEGINNER,
         instructions_en=["Set up.", "Perform the movement.", "Finish safely."],
         instructions_fa=["شروع کن.", "حرکت را انجام بده.", "ایمن تمام کن."],
@@ -193,7 +195,8 @@ def test_workout_plan_returns_active_curated_alternatives_read_only(
                 "name_en": active_alternative.name_en,
                 "name_fa": active_alternative.name_fa,
                 "body_region": "upper_body",
-                "primary_muscle": "chest",
+                    "primary_muscle": "chest",
+                    "muscle_focus": "general_chest",
                 "labels": [],
                 "secondary_muscles": [],
                 "equipment": [],
