@@ -143,10 +143,12 @@ def test_presentation_uses_unspecified_below_confidence_threshold(
 def test_codex_cli_receives_five_frames_schema_prompt_and_uses_cache(
     test_settings: Settings,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from app.exercises.owner_video_analysis import CodexCliExerciseAnalyzer
 
-    prepared = prepared_video(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    prepared = prepared_video(Path("relative-work"))
     commands: list[list[str]] = []
     prompts: list[str] = []
 
@@ -176,6 +178,9 @@ def test_codex_cli_receives_five_frames_schema_prompt_and_uses_cache(
     assert "--output-last-message" in command
     assert "--ephemeral" in command
     assert command[command.index("--sandbox") + 1] == "read-only"
+    assert command[-2:] == ["--", "-"]
+    assert Path(command[command.index("-C") + 1]).is_absolute()
+    assert Path(commands[0][commands[0].index("--image") + 1]).is_absolute()
     assert SOURCE_ID in prompts[0]
     assert "horizontal_push" in prompts[0]
     assert "Push-Up" in prompts[0]

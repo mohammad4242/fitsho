@@ -253,7 +253,7 @@ class CodexCliExerciseAnalyzer:
         prepared: PreparedOwnerVideo,
         catalogue: Sequence[CatalogueExercise],
     ) -> OwnerVideoAnalysis:
-        work_directory = prepared.muted_path.parent
+        work_directory = prepared.muted_path.parent.resolve()
         cache_path = work_directory / "analysis-cache.json"
         cached = self._load_cache(cache_path, prepared, catalogue)
         if cached is not None:
@@ -280,8 +280,8 @@ class CodexCliExerciseAnalyzer:
         if self._settings.owner_video_codex_model:
             command.extend(["--model", self._settings.owner_video_codex_model])
         for frame_path in prepared.frame_paths:
-            command.extend(["--image", str(frame_path)])
-        command.append("-")
+            command.extend(["--image", str(frame_path.resolve())])
+        command.extend(["--", "-"])
         try:
             result = self._runner(
                 command,
