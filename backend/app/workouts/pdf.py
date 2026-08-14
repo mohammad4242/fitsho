@@ -27,7 +27,7 @@ h1 { color: #087d6c; font-size: 24pt; margin-bottom: 2mm; }
   margin: 0 0 4mm;
   padding: 3mm 4mm;
 }
-.day { break-inside: avoid; margin: 0 0 8mm; }
+.day { margin: 0 0 8mm; }
 .day-heading { border-bottom: 1px solid #b8cbc6; margin-bottom: 3mm; padding-bottom: 2mm; }
 .day-heading h2 { display: inline; font-size: 16pt; }
 .day-heading span { color: #5f716d; margin-right: 3mm; }
@@ -35,12 +35,17 @@ h1 { color: #087d6c; font-size: 24pt; margin-bottom: 2mm; }
   border: 1px solid #d6e2df;
   border-radius: 3mm;
   break-inside: avoid;
-  display: grid;
-  grid-template-columns: 8mm 1fr;
   margin: 0 0 3mm;
   padding: 3mm 4mm;
 }
-.exercise-number { color: #087d6c; font-weight: bold; grid-row: 1 / 3; }
+.exercise-number {
+  color: #087d6c;
+  direction: ltr;
+  display: inline-block;
+  font-weight: bold;
+  margin-left: 2mm;
+  unicode-bidi: isolate;
+}
 .exercise h3 { font-size: 12pt; margin-bottom: 1mm; }
 .prescription { color: #087d6c; font-weight: bold; margin-bottom: 1mm; }
 .instruction { color: #354b46; margin-bottom: 1mm; }
@@ -78,10 +83,20 @@ def _render_day(day: WorkoutDayResponse) -> str:
     return (
         '<section class="day">'
         '<div class="day-heading">'
-        f"<h2>روز {_fa_number(day.day_number)}: {escape(day.title_fa)}</h2>"
+        f"<h2>{escape(_day_title(day))}</h2>"
         "</div>"
         f"{explanation}{exercises}</section>"
     )
+
+
+def _day_title(day: WorkoutDayResponse) -> str:
+    title = day.title_fa.strip()
+    label = f"روز {_fa_number(day.day_number)}:"
+    for prefix in (f"روز {day.day_number}:", label):
+        if title.startswith(prefix):
+            title = title[len(prefix) :].lstrip()
+            break
+    return f"{label} {title}"
 
 
 def _render_exercise(
@@ -101,9 +116,9 @@ def _render_exercise(
     note = _paragraph("یادداشت", notes, class_name="instruction")
     return (
         '<article class="exercise">'
-        f'<span class="exercise-number">{_fa_number(position)})</span>'
-        f"<div><h3>{escape(name)}</h3>"
-        f'<p class="prescription">{prescription}</p>{note}</div>'
+        f'<h3><span class="exercise-number" dir="ltr">{_fa_number(position)})</span> '
+        f"{escape(name)}</h3>"
+        f'<p class="prescription">{prescription}</p>{note}'
         "</article>"
     )
 

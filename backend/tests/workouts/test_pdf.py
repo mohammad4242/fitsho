@@ -101,9 +101,27 @@ def test_html_uses_vazirmatn_and_numbers_exercises_per_day() -> None:
     html = build_workout_plan_html(plan)
 
     assert 'font-family: "Vazirmatn", "DejaVu Sans", sans-serif' in html
-    assert html.count('<span class="exercise-number">۱)</span>') == 2
-    assert html.count('<span class="exercise-number">۲)</span>') == 1
+    assert html.count('<span class="exercise-number" dir="ltr">۱)</span>') == 2
+    assert html.count('<span class="exercise-number" dir="ltr">۲)</span>') == 1
     assert html.index("۱)</span>") < html.index("۲)</span>")
+
+
+def test_html_keeps_exercise_number_beside_name_in_rtl_layout() -> None:
+    html = build_workout_plan_html(_plan_response())
+
+    assert 'class="exercise-number" dir="ltr">۱)</span> پرس سینه دمبل</h3>' in html
+    assert "display: grid" not in html
+    assert ".day { break-inside: avoid" not in html
+
+
+def test_html_does_not_repeat_day_label_from_generated_title() -> None:
+    plan = _plan_response()
+    plan.days[0].title_fa = "روز 1: سینه + پشت بازو"
+
+    html = build_workout_plan_html(plan)
+
+    assert "روز ۱: روز ۱:" not in html
+    assert "<h2>روز ۱: سینه + پشت بازو</h2>" in html
 
 
 def test_html_keeps_notes_but_omits_duration_and_progression_details() -> None:
