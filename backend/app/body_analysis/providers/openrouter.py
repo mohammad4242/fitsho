@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from copy import deepcopy
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -314,13 +315,31 @@ class OpenRouterProvider:
                 "json_schema": {
                     "name": request.schema_name,
                     "strict": True,
-                    "schema": request.response_schema,
+                    "schema": self._strict_response_schema(request.response_schema),
                 },
             },
             "temperature": request.temperature,
             "max_tokens": request.max_output_tokens,
             "provider": request.provider_preferences.model_dump(exclude_none=True),
         }
+
+    @classmethod
+    def _strict_response_schema(cls, schema: dict[str, Any]) -> dict[str, Any]:
+        strict_schema = deepcopy(schema)
+
+        def require_all_properties(node: object) -> None:
+            if isinstance(node, dict):
+                properties = node.get("properties")
+                if isinstance(properties, dict):
+                    node["required"] = list(properties)
+                for value in node.values():
+                    require_all_properties(value)
+            elif isinstance(node, list):
+                for value in node:
+                    require_all_properties(value)
+
+        require_all_properties(strict_schema)
+        return strict_schema
 
     @staticmethod
     def _image_content(

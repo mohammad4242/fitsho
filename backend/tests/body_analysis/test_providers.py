@@ -199,6 +199,41 @@ def test_openrouter_image_request_sends_three_standardized_images_with_json_sche
     assert "test-openrouter-secret" not in json.dumps(body)
 
 
+def test_openrouter_strict_schema_requires_every_declared_property() -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return _completion('{"status":"ok","issues":[]}')
+
+    request = _request().model_copy(
+        update={
+            "response_schema": {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "enum": ["ok"]},
+                    "issues": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["status"],
+                "additionalProperties": False,
+            }
+        }
+    )
+
+    _run(
+        _provider(httpx.MockTransport(handler)).analyze_images(
+            request,
+            images=(ImageInput(label="front", mime_type="image/jpeg", base64_data="ZnJvbnQ="),),
+        )
+    )
+
+    body = seen["body"]
+    assert isinstance(body, dict)
+    strict_schema = body["response_format"]["json_schema"]["schema"]
+    assert strict_schema["required"] == ["status", "issues"]
+    assert request.response_schema["required"] == ["status"]
+
+
 def test_openrouter_maps_typed_privacy_routing_preferences_to_request() -> None:
     seen: dict[str, object] = {}
 
