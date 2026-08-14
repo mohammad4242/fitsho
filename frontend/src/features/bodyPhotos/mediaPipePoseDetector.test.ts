@@ -34,17 +34,18 @@ describe("MediaPipePoseLandmarkDetector", () => {
 
     const result = await detector.detect(image);
 
-    expect(result.personCount).toBe(1);
-    expect(result.landmarks).toEqual(landmarks);
-    expect(result.landmarks[11]?.visibility).toBe(0.98);
+    expect(result.poses).toEqual([landmarks]);
+    expect(result.poses[0]?.[11]?.visibility).toBe(0.98);
   });
 
-  it("reports multiple real poses without selecting a primary person", async () => {
+  it("returns every real pose candidate without inventing a primary person", async () => {
+    const primary = pose();
+    const secondary = pose(0.87);
     const detector = new MediaPipePoseLandmarkDetector(async () => ({
-      detect: vi.fn().mockReturnValue({ landmarks: [pose(), pose(0.87)] }),
+      detect: vi.fn().mockReturnValue({ landmarks: [primary, secondary] }),
     }));
 
-    await expect(detector.detect(image)).resolves.toMatchObject({ personCount: 2 });
+    await expect(detector.detect(image)).resolves.toEqual({ poses: [primary, secondary] });
   });
 
   it("loads Pose Landmarker and contains no face detector asset", async () => {

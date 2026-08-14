@@ -38,10 +38,7 @@ export class MediaPipePoseLandmarkDetector implements BodyLandmarkDetector {
     const detector = await this.getDetector();
     const result = detector.detect(image.source);
     try {
-      return {
-        personCount: result.landmarks.length,
-        landmarks: result.landmarks.length === 1 ? result.landmarks[0] : [],
-      };
+      return { poses: result.landmarks };
     } finally {
       result.close?.();
     }
