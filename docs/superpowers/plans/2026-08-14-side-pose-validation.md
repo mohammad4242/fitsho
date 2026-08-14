@@ -163,3 +163,59 @@ Check the Vite-served `processor.ts` for the new side-view selector and confirm 
 
 Confirm local `main` equals `origin/main`, the login page returns `200`, and unrelated workspace
 files remain untouched.
+
+### Task 4: Back-View Arm Endpoint Validation
+
+**Files:**
+- Modify: `frontend/src/features/bodyPhotos/processor.ts`
+- Test: `frontend/src/features/bodyPhotos/processor.test.ts`
+
+**Interfaces:**
+- Consumes: MediaPipe elbow indices `13/14` and wrist indices `15/16`.
+- Produces: one selected, visible endpoint for each left/right arm in back views.
+
+- [ ] **Step 1: Write failing back-view tests**
+
+Add a valid back case where the left elbow is visible while the left wrist is hidden and outside
+the frame, and the right wrist is visible while the right elbow is hidden and outside the frame.
+Add an invalid case where both the elbow and wrist of one arm are below `0.55`; expect
+`arms_not_visible`.
+
+- [ ] **Step 2: Run tests and verify RED**
+
+```bash
+npm run test -- --run src/features/bodyPhotos/processor.test.ts
+```
+
+Expected: the valid back case fails with `arms_not_visible` under the old all-endpoints rule.
+
+- [ ] **Step 3: Implement per-arm endpoint selection**
+
+For `back`, retain both shoulders and all existing paired lower-body requirements. Select the
+higher-visibility point from `[left elbow, left wrist]` and independently from
+`[right elbow, right wrist]`. Require each selected point to meet `0.55`, and use only the selected
+endpoints for frame and minimum-confidence checks. Leave front and side behavior unchanged.
+
+- [ ] **Step 4: Run focused and complete verification**
+
+```bash
+npm run test -- --run src/features/bodyPhotos/processor.test.ts
+npm run test -- --run
+npm run lint
+npm run build
+git diff --check
+```
+
+Expected: all tests, lint, build, and whitespace checks pass.
+
+- [ ] **Step 5: Commit, push, and verify runtime**
+
+```bash
+git add frontend/src/features/bodyPhotos/processor.ts \
+  frontend/src/features/bodyPhotos/processor.test.ts
+git commit -m "fix(body-analysis): accept visible back arm endpoints"
+git push origin main
+```
+
+Confirm the Vite-served processor contains the back-view branch and both frontend `5173` and
+backend `8001` return `200`.
