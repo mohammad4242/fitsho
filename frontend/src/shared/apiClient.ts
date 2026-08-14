@@ -23,7 +23,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function requestResponse(path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
   const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
   if (!isFormData && !headers.has("Content-Type")) {
@@ -48,8 +48,18 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
       : null;
     throw new ApiError(response.status, message, details, code);
   }
+  return response;
+}
+
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await requestResponse(path, init);
   if (response.status === 204) {
     return undefined as T;
   }
   return (await response.json()) as T;
+}
+
+export async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
+  const response = await requestResponse(path, init);
+  return response.blob();
 }

@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 
 import {
+  downloadWorkoutPlanPdf,
   generateWorkoutPlan,
   getActiveWorkoutPlan,
   getWorkoutPlan,
@@ -71,6 +72,20 @@ it("reads member plan history and a selected immutable version", async () => {
   expect(fetch).toHaveBeenNthCalledWith(
     2,
     `/api/v1/workout-plans/${plan.id}`,
+    expect.objectContaining({ credentials: "include" }),
+  );
+});
+
+it("downloads a workout plan PDF through Fitsho", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response("%PDF-test", { headers: { "Content-Type": "application/pdf" } }),
+  );
+
+  const response = await downloadWorkoutPlanPdf(plan.id);
+
+  expect(await response.text()).toBe("%PDF-test");
+  expect(fetch).toHaveBeenCalledWith(
+    `/api/v1/workout-plans/${plan.id}/pdf`,
     expect.objectContaining({ credentials: "include" }),
   );
 });

@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 
-import { ApiError, request } from "./apiClient";
+import { ApiError, request, requestBlob } from "./apiClient";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -99,4 +99,32 @@ it("lets the browser set the multipart boundary for FormData", async () => {
 
   const [, init] = vi.mocked(fetch).mock.calls[0];
   expect(new Headers(init?.headers).has("Content-Type")).toBe(false);
+});
+
+it("downloads binary responses with cookies", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response("%PDF-test", { headers: { "Content-Type": "application/pdf" } }),
+  );
+
+  const response = await requestBlob("/api/pdf");
+
+  expect(response.type).toBe("application/pdf");
+  expect(await response.text()).toBe("%PDF-test");
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/pdf",
+    expect.objectContaining({ credentials: "include" }),
+  );
+});
+
+it("maps binary request failures to the existing API error", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ detail: "PDF unavailable" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+
+  await expect(requestBlob("/api/pdf")).rejects.toEqual(
+    new ApiError(503, "PDF unavailable"),
+  );
 });

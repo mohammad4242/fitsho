@@ -1,4 +1,4 @@
-import { ApiError, request } from "../../shared/apiClient";
+import { ApiError, request, requestBlob } from "../../shared/apiClient";
 
 import type { WorkoutPlan, WorkoutPlanGeneration, WorkoutPlanVersionSummary } from "./types";
 
@@ -25,4 +25,8 @@ export function getWorkoutPlanHistory(): Promise<WorkoutPlanVersionSummary[]> {
 
 export function getWorkoutPlan(planId: string): Promise<WorkoutPlan> {
   return request<WorkoutPlan>(`${workoutPlansPath}/${planId}`);
+}
+
+export function downloadWorkoutPlanPdf(planId: string): Promise<Blob> {
+  return requestBlob(`${workoutPlansPath}/${planId}/pdf`);
 }
