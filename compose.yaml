@@ -37,6 +37,7 @@ services:
     volumes:
       - fitsho_exercise_media:/var/lib/fitsho/media
       - ./backend/var/media/meal-catalogue:/var/lib/fitsho/media/meal-catalogue
+      - ./backend/var/media/owner-video:/var/lib/fitsho/media/owner-video
     depends_on:
       db:
         condition: service_healthy
