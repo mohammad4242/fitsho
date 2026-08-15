@@ -71,6 +71,20 @@ def test_prepare_owner_video_removes_audio_and_preserves_original(
     assert muted_probe.audio_streams == 0
 
 
+def test_owner_video_source_limit_allows_25_megabyte_mp4(
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.owner_video_media import _validate_source
+
+    source = tmp_path / "large-source.mp4"
+    with source.open("wb") as file_handle:
+        file_handle.write(b"\x00\x00\x00\x18ftypisom")
+        file_handle.truncate(25 * 1024 * 1024)
+
+    _validate_source(source, test_settings)
+
+
 def test_publish_owner_video_uses_stable_media_path_and_reuses_valid_file(
     test_settings: Settings,
     tmp_path: Path,

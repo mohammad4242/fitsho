@@ -65,6 +65,11 @@ class Settings(BaseSettings):
     ffprobe_timeout_seconds: float = 5.0
     ffmpeg_path: str = "ffmpeg"
     ffmpeg_timeout_seconds: float = Field(default=60.0, gt=0, le=300)
+    owner_video_import_max_bytes: int = Field(
+        default=64 * 1024 * 1024,
+        ge=1024,
+        le=256 * 1024 * 1024,
+    )
     owner_video_import_work_root: Path = Path("var/imports/owner-video")
     owner_video_codex_path: str = "codex"
     owner_video_codex_model: str | None = None

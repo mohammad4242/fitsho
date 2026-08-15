@@ -125,9 +125,9 @@ def _validate_source(path: Path, settings: Settings) -> None:
     size = path.stat().st_size
     if size == 0:
         raise OwnerVideoMediaError("Source video cannot be empty")
-    if size > settings.import_media_max_bytes:
+    if size > settings.owner_video_import_max_bytes:
         raise OwnerVideoMediaError(
-            f"Source video exceeds the {settings.import_media_max_bytes} bytes limit"
+            f"Source video exceeds the {settings.owner_video_import_max_bytes} bytes limit"
         )
     with path.open("rb") as file_handle:
         if _signature_extension(file_handle.read(64)) != ".mp4":

@@ -175,7 +175,10 @@ class OwnerVideoImporter:
             if prepared.source_id != source_id:
                 raise ValueError("Prepared video digest does not match the original")
             catalogue = build_catalogue_snapshot(self._db)
-            analysis = self._analyzer.analyze(prepared, catalogue)
+            try:
+                analysis = self._analyzer.analyze(prepared, catalogue)
+            except Exception as error:
+                analysis = self._fallback_analysis(source_path, source_id, error)
             match_id = resolve_existing_match(analysis, catalogue, self._settings)
             review_reasons = self._review_reasons(analysis, match_id)
             needs_review = bool(review_reasons)
@@ -288,6 +291,61 @@ class OwnerVideoImporter:
         if analysis.decision == "match_existing" and match_id is None:
             reasons.append("existing_match_not_corroborated")
         return list(dict.fromkeys(reasons))
+
+    @staticmethod
+    def _fallback_analysis(
+        source_path: Path,
+        source_id: str,
+        error: Exception,
+    ) -> OwnerVideoAnalysis:
+        stem = source_path.stem[:100]
+        failure_reason = OwnerVideoImporter._failure_reason(error)
+        return OwnerVideoAnalysis.model_validate(
+            {
+                "source_id": source_id,
+                "name_en": f"Owner Video Review {stem}",
+                "name_fa": f"بازبینی ویدیوی مالک {stem}",
+                "visible_text": [],
+                "aliases_en": [],
+                "body_region": "upper_body",
+                "primary_muscle": "forearms",
+                "muscle_focus": "general_forearms",
+                "secondary_muscles": [],
+                "equipment": ["other"],
+                "difficulty": "beginner",
+                "movement_pattern": "other",
+                "exercise_type": "other",
+                "labels": [],
+                "caution_tags": ["other"],
+                "instructions_en": [
+                    "Review the attached owner video before programming this exercise.",
+                    "Confirm the exercise identity and equipment.",
+                    "Replace this placeholder metadata after review.",
+                ],
+                "instructions_fa": [
+                    "پیش از برنامه‌ریزی، ویدیوی مالک پیوست‌شده را بازبینی کنید.",
+                    "هویت حرکت و تجهیزات آن را تأیید کنید.",
+                    "پس از بازبینی، این اطلاعات موقت را اصلاح کنید.",
+                ],
+                "safety_notes_en": ["Do not program until an administrator reviews this video."],
+                "safety_notes_fa": ["تا زمان بازبینی ادمین، این حرکت را برنامه‌ریزی نکنید."],
+                "short_description_en": "Owner video awaiting administrator review.",
+                "short_description_fa": "ویدیوی مالک در انتظار بازبینی ادمین است.",
+                "form_cues_en": [],
+                "form_cues_fa": [],
+                "common_mistakes_en": [],
+                "common_mistakes_fa": [],
+                "breathing_en": "Use controlled breathing after the exercise is identified.",
+                "breathing_fa": "پس از شناسایی حرکت، تنفس کنترل‌شده داشته باشید.",
+                "presentation": "unspecified",
+                "presentation_confidence": 0.0,
+                "identification_confidence": 0.0,
+                "decision": "needs_review",
+                "match_confidence": 0.0,
+                "existing_exercise_id": None,
+                "review_reasons": ["codex_analysis_failed", failure_reason],
+            }
+        )
 
     def _attach_to_existing(
         self,

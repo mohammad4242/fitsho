@@ -362,8 +362,24 @@ def test_failed_video_does_not_stop_the_next_video(
 
     assert report.total == 2
     assert report.processed == 2
-    assert report.failed == 1
-    assert report.created_new == 1
+    assert report.failed == 0
+    assert report.created_new == 2
+    assert report.needs_review == 1
+    first = db.scalar(
+        select(Exercise).where(
+            Exercise.source == "owner-video",
+            Exercise.source_id == first_id,
+        )
+    )
+    assert first is not None
+    assert first.needs_review is True
+    assert first.is_programmable is False
+    assert db.scalar(
+        select(ExerciseMediaAsset).where(
+            ExerciseMediaAsset.source == "owner-video",
+            ExerciseMediaAsset.source_id == first_id,
+        )
+    ) is not None
     assert db.scalar(
         select(Exercise).where(
             Exercise.source == "owner-video",
