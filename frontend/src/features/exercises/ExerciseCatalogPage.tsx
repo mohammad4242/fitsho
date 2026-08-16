@@ -4,7 +4,6 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import heroStrengthFallback from "../../assets/landing/hero-strength-fallback.jpg";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
-import { ApiError } from "../../shared/apiClient";
 import { deleteAdminExercise, getAdminExercises } from "../admin/api";
 import { useAuth } from "../auth/AuthContext";
 import { getExerciseCategories, getExercises } from "./api";
@@ -242,12 +241,8 @@ export function ExerciseCatalogPage() {
             total: Math.max(0, current.total - 1),
           });
       setDeleteTarget(null);
-    } catch (error) {
-      setDeleteError(
-        error instanceof ApiError && error.status === 409
-          ? t("catalog.deleteExerciseInUse")
-          : t("catalog.deleteExerciseError"),
-      );
+    } catch {
+      setDeleteError(t("catalog.deleteExerciseError"));
     } finally {
       setDeletingExerciseId(null);
     }

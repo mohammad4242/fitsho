@@ -739,7 +739,6 @@ const en = {
       deleteCancel: "Cancel",
       deleteConfirm: "Delete permanently",
       deleteBusy: "Deleting…",
-      deleteExerciseInUse: "This exercise is used in a workout plan and cannot be deleted.",
       deleteExerciseError: "The exercise could not be deleted. Try again.",
       adminStatusLabel: "Administration status",
       adminStatus: {

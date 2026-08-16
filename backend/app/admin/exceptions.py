@@ -4,7 +4,3 @@ class AdminUserNotFoundError(Exception):
 
 class DuplicateExerciseSlugError(Exception):
     pass
-
-
-class ExerciseInUseError(Exception):
-    pass

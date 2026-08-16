@@ -194,7 +194,7 @@ def test_delete_requires_trusted_origin(
     assert response.json() == {"detail": "Untrusted request origin"}
 
 
-def test_admin_cannot_delete_an_exercise_used_in_a_workout_plan(
+def test_admin_deletes_an_exercise_used_in_a_workout_plan(
     client: TestClient, db: Session
 ) -> None:
     admin = make_current_user_admin(client, db)
@@ -238,9 +238,12 @@ def test_admin_cannot_delete_an_exercise_used_in_a_workout_plan(
 
     response = client.delete(f"/api/v1/admin/exercises/{exercise.id}", headers=ORIGIN)
 
-    assert response.status_code == 409
-    assert response.json() == {"detail": "Exercise is used in a workout plan"}
-    assert db.get(Exercise, exercise.id) is not None
+    assert response.status_code == 204
+    assert db.get(Exercise, exercise.id) is None
+    assert db.get(WorkoutPlan, plan.id) is not None
+    assert db.scalar(
+        select(WorkoutPlanExercise).where(WorkoutPlanExercise.exercise_id == exercise.id)
+    ) is None
 
 
 def test_admin_list_includes_inactive_exercises(

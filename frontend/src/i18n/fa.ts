@@ -739,7 +739,6 @@ const fa = {
       deleteCancel: "انصراف",
       deleteConfirm: "حذف قطعی",
       deleteBusy: "در حال حذف…",
-      deleteExerciseInUse: "این حرکت در یک برنامه تمرینی استفاده شده و قابل حذف نیست.",
       deleteExerciseError: "حرکت حذف نشد. دوباره تلاش کنید.",
       adminStatusLabel: "وضعیت مدیریتی",
       adminStatus: {

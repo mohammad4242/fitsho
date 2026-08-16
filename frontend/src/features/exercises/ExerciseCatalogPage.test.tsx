@@ -4,7 +4,6 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
-import { ApiError } from "../../shared/apiClient";
 import type {
   ExerciseCategories,
   ExerciseSummary,
@@ -387,9 +386,7 @@ describe("administrator controls", () => {
   it("shows a safe error when the exercise cannot be deleted", async () => {
     auth.isAdmin = true;
     const user = userEvent.setup();
-    adminApi.deleteAdminExercise.mockRejectedValue(
-      new ApiError(409, "Exercise is used in a workout plan"),
-    );
+    adminApi.deleteAdminExercise.mockRejectedValue(new Error("Request failed"));
     renderCatalog("/exercises?body_region=upper_body&primary_muscle=chest");
 
     const card = await screen.findByRole("article", { name: "پرس سینه دمبل" });
@@ -401,7 +398,7 @@ describe("administrator controls", () => {
     );
 
     expect(await within(screen.getByRole("dialog", { name: "حذف حرکت" })).findByRole("alert")).toHaveTextContent(
-      "این حرکت در یک برنامه تمرینی استفاده شده و قابل حذف نیست.",
+      "حرکت حذف نشد. دوباره تلاش کنید.",
     );
     expect(screen.getByRole("article", { name: "پرس سینه دمبل" })).toBeInTheDocument();
   });

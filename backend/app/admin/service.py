@@ -1,15 +1,11 @@
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.admin.exceptions import (
-    AdminUserNotFoundError,
-    DuplicateExerciseSlugError,
-    ExerciseInUseError,
-)
+from app.admin.exceptions import AdminUserNotFoundError, DuplicateExerciseSlugError
 from app.admin.media import StoredMedia
 from app.admin.schemas import (
     AdminExerciseCreate,
@@ -28,6 +24,7 @@ from app.exercises.models import (
     ExerciseMediaAsset,
     ExerciseSecondaryMuscle,
 )
+from app.workouts.models import WorkoutPlanExercise
 
 PLACEHOLDER_MEDIA_PATH = "/exercises/exercise-placeholder.svg"
 MediaAssetKey = tuple[MediaPresentation, MediaRole, int]
@@ -342,12 +339,15 @@ def delete_admin_exercise(db: Session, exercise_id: UUID) -> list[str] | None:
         return None
 
     media_paths = [exercise.media_path, *(asset.media_path for asset in exercise.media_assets)]
+    db.execute(
+        delete(WorkoutPlanExercise).where(WorkoutPlanExercise.exercise_id == exercise_id)
+    )
     db.delete(exercise)
     try:
         db.commit()
-    except IntegrityError as error:
+    except IntegrityError:
         db.rollback()
-        raise ExerciseInUseError from error
+        raise
     except SQLAlchemyError:
         db.rollback()
         raise

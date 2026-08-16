@@ -14,7 +14,7 @@ from fastapi import (
 from pydantic import ValidationError
 
 from app.admin.dependencies import require_admin
-from app.admin.exceptions import DuplicateExerciseSlugError, ExerciseInUseError
+from app.admin.exceptions import DuplicateExerciseSlugError
 from app.admin.media import (
     MediaValidationError,
     StoredMedia,
@@ -478,13 +478,7 @@ def delete_exercise(
     db: DatabaseSession,
     settings: AppSettings,
 ) -> None:
-    try:
-        media_paths = delete_admin_exercise(db, exercise_id)
-    except ExerciseInUseError:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Exercise is used in a workout plan",
-        ) from None
+    media_paths = delete_admin_exercise(db, exercise_id)
     if media_paths is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercise not found")
     for media_path in media_paths:
