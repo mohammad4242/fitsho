@@ -276,7 +276,7 @@ CURATED_TRANSLATIONS: dict[str, ExerciseTranslationData] = {
             "دسته ها را به آرامی به حالت اول برگردانید بدون اینکه شانه های خود "
             "را بالا بیاورید یا وضعیت تنه خود را تغییر دهید.",
         ],
-        "name_fa": "Cable Crossover Reverse Fly",
+        "name_fa": "فلای معکوس کراس‌اور",
     },
     "0162": {
         "instructions_fa": [
@@ -729,7 +729,7 @@ CURATED_TRANSLATIONS: dict[str, ExerciseTranslationData] = {
             "در پایین برای کشش مکث کنید.",
             "دمبل ها را به حالت اولیه برگردانید، سینه را فشار دهید.",
         ],
-        "name_fa": "دمبل فلای را رد کنید",
+        "name_fa": "قفسه زیر سینه دمبل",
     },
     "0306": {
         "instructions_fa": [
@@ -751,7 +751,7 @@ CURATED_TRANSLATIONS: dict[str, ExerciseTranslationData] = {
             "در حالی که همان خم شدن آرنج را حفظ کرده اید، در قسمت پایین مکث کوتاهی کنید.",
             "قفسه سینه خود را فشار دهید و دمبل ها را در امتداد همان قوس روی سینه به هم برگردانید.",
         ],
-        "name_fa": "دمبل فلای",
+        "name_fa": "قفسه سینه دمبل",
     },
     "0310": {
         "instructions_fa": [
@@ -1581,7 +1581,7 @@ CURATED_TRANSLATIONS: dict[str, ExerciseTranslationData] = {
             "شانه های عقب و قسمت بالایی پشت خود را در پایان حرکت فشار دهید.",
             "دسته ها را به آرامی به حالت اول برگردانید بدون اینکه وزنه پایین بیاید.",
         ],
-        "name_fa": "پرواز معکوس اهرمی نشسته",
+        "name_fa": "فلای معکوس دستگاه",
     },
     "0604": {
         "instructions_fa": [
@@ -1631,7 +1631,7 @@ CURATED_TRANSLATIONS: dict[str, ExerciseTranslationData] = {
             "قفسه سینه خود را در بالا فشار دهید.",
             "با کنترل به آرامی به موقعیت شروع بازگردید.",
         ],
-        "name_fa": "کابل فلای نیمکت تخت",
+        "name_fa": "قفسه سینه سیم‌کش روی نیمکت تخت",
     },
     "0640": {
         "instructions_fa": [
@@ -2231,7 +2231,7 @@ CURATED_TRANSLATIONS: dict[str, ExerciseTranslationData] = {
             "دمبل ها را روی سینه خود در امتداد همان قوس به هم برگردانید و قفسه "
             "سینه خود را در بالا فشار دهید.",
         ],
-        "name_fa": "پرواز دمبل روی توپ ورزشی",
+        "name_fa": "قفسه سینه دمبل روی توپ بدنسازی",
     },
     "1278": {
         "instructions_fa": [
@@ -2886,7 +2886,7 @@ CURATED_TRANSLATIONS: dict[str, ExerciseTranslationData] = {
             "بازوها را به سمت پایین بکشید و در یک قوس پهن کنار هم قرار دهید.",
             "سینه را فشار دهید، سپس برای شروع به آرامی برگردید.",
         ],
-        "name_fa": "باند مقاومت بالا پرواز",
+        "name_fa": "قفسه سینه سیم‌کش از بالا",
     },
     "drv-band-hip-adduction": {
         "instructions_fa": [
@@ -3135,7 +3135,7 @@ CURATED_TRANSLATIONS: dict[str, ExerciseTranslationData] = {
             "سینه را در پایان حرکت فشار دهید.",
             "به آرامی به موقعیت شروع بازگردید.",
         ],
-        "name_fa": "Pec Deck Fly",
+        "name_fa": "قفسه سینه دستگاه (پک دک)",
     },
     "drv-lever-standing-rear-kick": {
         "instructions_fa": [
