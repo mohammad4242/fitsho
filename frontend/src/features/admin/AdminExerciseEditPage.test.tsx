@@ -270,3 +270,32 @@ it("allows editing muscle focus on a review exercise", async () => {
     [],
   );
 });
+
+it("allows editing the primary muscle on a review exercise", async () => {
+  const user = userEvent.setup();
+  adminApi.getAdminExercise.mockResolvedValue({
+    ...exercise,
+    needs_review: true,
+  });
+  render(
+    <MemoryRouter initialEntries={["/admin/exercises/exercise-id/edit"]}>
+      <Routes>
+        <Route path="/admin/exercises/:exerciseId/edit" element={<AdminExerciseEditPage />} />
+        <Route path="/exercises" element={<p>LIST PAGE</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await openSection(user, "هدف و تجهیزات");
+  const primaryMuscle = await screen.findByLabelText("عضله اصلی");
+  expect(primaryMuscle).not.toBeDisabled();
+  await user.selectOptions(primaryMuscle, "back");
+  await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
+
+  expect(adminApi.updateAdminExercise).toHaveBeenCalledWith(
+    "exercise-id",
+    expect.objectContaining({ primary_muscle: "back", muscle_focus: null }),
+    null,
+    [],
+  );
+});
