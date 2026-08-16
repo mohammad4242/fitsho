@@ -37,9 +37,10 @@ _UPPER_BODY_MUSCLES = frozenset(
         MuscleGroup.TRAPS,
         MuscleGroup.FOREARMS,
         MuscleGroup.NECK,
+        MuscleGroup.LOWER_BACK,
     }
 )
-_CORE_MUSCLES = frozenset({MuscleGroup.ABS, MuscleGroup.OBLIQUES, MuscleGroup.LOWER_BACK})
+_CORE_MUSCLES = frozenset({MuscleGroup.ABS, MuscleGroup.OBLIQUES})
 _COMPOUND_PATTERNS = frozenset(
     {
         MovementPattern.HORIZONTAL_PUSH,

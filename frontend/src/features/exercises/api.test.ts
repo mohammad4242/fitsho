@@ -15,11 +15,14 @@ const categories: ExerciseCategories = {
     { value: "lower_body", name_en: "Lower Body", name_fa: "پایین‌تنه" },
     { value: "core", name_en: "Core", name_fa: "میان‌تنه" },
   ],
-  upper_body: [{ value: "chest", name_en: "Chest", name_fa: "سینه" }],
+  upper_body: [
+    { value: "chest", name_en: "Chest", name_fa: "سینه" },
+    { value: "lower_back", name_en: "Lower Back", name_fa: "پایین پشت" },
+  ],
   lower_body: [
     { value: "quadriceps", name_en: "Quadriceps", name_fa: "جلو پا" },
   ],
-  core: [{ value: "lower_back", name_en: "Lower Back", name_fa: "فیله" }],
+  core: [],
   muscle_focuses: Object.fromEntries(
     muscleGroups.map((muscle) => [muscle, []]),
   ) as unknown as ExerciseCategories["muscle_focuses"],

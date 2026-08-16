@@ -112,12 +112,12 @@ def test_exercise_stores_controlled_catalog_data(db: Session) -> None:
     assert stored.is_active is True
 
 
-def test_exercise_stores_lower_back_as_a_core_muscle(db: Session) -> None:
+def test_exercise_stores_lower_back_as_an_upper_body_muscle(db: Session) -> None:
     from app.exercises.enums import BodyRegion, MuscleFocus, MuscleGroup
     from app.exercises.models import Exercise
 
     exercise = make_exercise("back-extension")
-    exercise.body_region = BodyRegion.CORE
+    exercise.body_region = BodyRegion.UPPER_BODY
     exercise.primary_muscle = MuscleGroup.LOWER_BACK
     exercise.muscle_focus = MuscleFocus.LUMBAR_ERECTORS
     db.add(exercise)
@@ -126,7 +126,7 @@ def test_exercise_stores_lower_back_as_a_core_muscle(db: Session) -> None:
     stored = db.scalar(select(Exercise).where(Exercise.slug == "back-extension"))
 
     assert stored is not None
-    assert stored.body_region is BodyRegion.CORE
+    assert stored.body_region is BodyRegion.UPPER_BODY
     assert stored.primary_muscle is MuscleGroup.LOWER_BACK
 
 

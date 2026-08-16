@@ -112,6 +112,7 @@ def test_categories_return_ordered_bilingual_taxonomy_even_when_core_is_empty(
     ] == [
         ("chest", "Chest", "سینه"),
         ("back", "Back", "پشت و زیر بغل"),
+        ("lower_back", "Lower Back", "پایین پشت"),
         ("shoulders", "Shoulders", "سرشانه"),
         ("biceps", "Biceps", "جلو بازو"),
         ("triceps", "Triceps", "پشت بازو"),
@@ -132,11 +133,7 @@ def test_categories_return_ordered_bilingual_taxonomy_even_when_core_is_empty(
     ]
     assert [
         (item["value"], item["name_en"], item["name_fa"]) for item in response.json()["core"]
-    ] == [
-        ("abs", "Abs", "شکم"),
-        ("obliques", "Obliques", "پهلو"),
-        ("lower_back", "Lower Back", "فیله"),
-    ]
+    ] == [("abs", "Abs", "شکم"), ("obliques", "Obliques", "پهلو")]
     assert [
         (item["value"], item["name_en"], item["name_fa"])
         for item in response.json()["muscle_focuses"]["chest"]

@@ -15,6 +15,15 @@ def test_upper_body_has_small_forearm_and_neck_groups() -> None:
     assert MuscleGroup.NECK in MUSCLES_BY_REGION[BodyRegion.UPPER_BODY]
 
 
+def test_lower_back_belongs_to_the_upper_body_back_section() -> None:
+    assert MuscleGroup.LOWER_BACK in MUSCLES_BY_REGION[BodyRegion.UPPER_BODY]
+    assert MuscleGroup.LOWER_BACK not in MUSCLES_BY_REGION[BodyRegion.CORE]
+    assert FOCUSES_BY_MUSCLE[MuscleGroup.LOWER_BACK] == (
+        MuscleFocus.LUMBAR_ERECTORS,
+        MuscleFocus.THORACIC_MOBILITY,
+    )
+
+
 def test_exercise_schema_supports_reviewable_unknown_anatomy_and_labels() -> None:
     assert Exercise.__table__.c.body_region.nullable is True
     assert Exercise.__table__.c.primary_muscle.nullable is True

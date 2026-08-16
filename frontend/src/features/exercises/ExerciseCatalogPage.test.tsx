@@ -45,6 +45,7 @@ const categories: ExerciseCategories = {
     { value: "biceps", name_en: "Biceps", name_fa: "جلو بازو" },
     { value: "triceps", name_en: "Triceps", name_fa: "پشت بازو" },
     { value: "traps", name_en: "Traps", name_fa: "کول" },
+    { value: "lower_back", name_en: "Lower Back", name_fa: "پایین پشت" },
   ],
   lower_body: [
     { value: "glutes", name_en: "Glutes", name_fa: "باسن" },
@@ -58,7 +59,6 @@ const categories: ExerciseCategories = {
   core: [
     { value: "abs", name_en: "Abs", name_fa: "شکم" },
     { value: "obliques", name_en: "Obliques", name_fa: "پهلو" },
-    { value: "lower_back", name_en: "Lower Back", name_fa: "فیله" },
   ],
   muscle_focuses: Object.fromEntries(muscleGroups.map((muscle) => [
     muscle,
@@ -359,7 +359,7 @@ describe("catalog filters and states", () => {
   it("distinguishes an empty muscle group from filters with no matches", async () => {
     const user = userEvent.setup();
     api.getExercises.mockResolvedValue(emptyPage);
-    renderCatalog("/exercises?body_region=core&primary_muscle=lower_back");
+    renderCatalog("/exercises?body_region=upper_body&primary_muscle=lower_back");
 
     expect(
       await screen.findByText("هنوز حرکتی برای این گروه عضلانی اضافه نشده است."),

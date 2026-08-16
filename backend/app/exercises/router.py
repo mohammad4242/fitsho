@@ -34,6 +34,7 @@ BODY_REGION_CATEGORIES = (
 UPPER_BODY_CATEGORIES = (
     (MuscleGroup.CHEST, "Chest", "سینه"),
     (MuscleGroup.BACK, "Back", "پشت و زیر بغل"),
+    (MuscleGroup.LOWER_BACK, "Lower Back", "پایین پشت"),
     (MuscleGroup.SHOULDERS, "Shoulders", "سرشانه"),
     (MuscleGroup.BICEPS, "Biceps", "جلو بازو"),
     (MuscleGroup.TRICEPS, "Triceps", "پشت بازو"),
@@ -53,7 +54,6 @@ LOWER_BODY_CATEGORIES = (
 CORE_CATEGORIES = (
     (MuscleGroup.ABS, "Abs", "شکم"),
     (MuscleGroup.OBLIQUES, "Obliques", "پهلو"),
-    (MuscleGroup.LOWER_BACK, "Lower Back", "فیله"),
 )
 
 
