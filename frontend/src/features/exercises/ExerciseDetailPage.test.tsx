@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -220,7 +220,93 @@ describe("exercise detail content", () => {
       "/media/owner-video.mp4",
     );
   });
+
+  it("swipes left to next media and right to previous media", async () => {
+    api.getExercise.mockResolvedValue({
+      ...detail,
+      media_assets: [
+        mediaAsset("/media/male.mp4", "male", 0),
+        mediaAsset("/media/female.mp4", "female", 0),
+      ],
+    });
+    renderDetail();
+
+    await screen.findByTestId("exercise-media-carousel");
+    const carousel = screen.getByTestId("exercise-media-surface");
+    expect(screen.getByText("۱ / ۳")).toBeVisible();
+
+    fireEvent.pointerDown(carousel, { clientX: 240, clientY: 140 });
+    fireEvent.pointerUp(carousel, { clientX: 160, clientY: 140 });
+    expect(screen.getByLabelText("نمایش حرکت پرس سینه دمبل")).toHaveAttribute(
+      "src",
+      "/media/male.mp4",
+    );
+    expect(screen.getByText("۲ / ۳")).toBeVisible();
+
+    fireEvent.pointerDown(carousel, { clientX: 160, clientY: 140 });
+    fireEvent.pointerUp(carousel, { clientX: 240, clientY: 140 });
+    expect(screen.getByRole("img", { name: "نمایش حرکت پرس سینه دمبل" })).toHaveAttribute(
+      "src",
+      detail.media_path,
+    );
+    expect(screen.getByText("۱ / ۳")).toBeVisible();
+  });
+
+  it("deduplicates an asset matching legacy media and keeps unique legacy media", async () => {
+    api.getExercise.mockResolvedValue({
+      ...detail,
+      media_assets: [
+        mediaAsset(detail.media_path, "male", 0),
+        mediaAsset("/media/owner.mp4", "unspecified", 1),
+      ],
+    });
+    renderDetail();
+
+    await screen.findByTestId("exercise-media-carousel");
+    const carousel = screen.getByTestId("exercise-media-surface");
+    expect(screen.getByText("۱ / ۲")).toBeVisible();
+    expect(screen.getByRole("img", { name: "نمایش حرکت پرس سینه دمبل" })).toHaveAttribute(
+      "src",
+      detail.media_path,
+    );
+
+    fireEvent.pointerDown(carousel, { clientX: 240, clientY: 140 });
+    fireEvent.pointerUp(carousel, { clientX: 160, clientY: 140 });
+    expect(screen.getByLabelText("نمایش حرکت پرس سینه دمبل")).toHaveAttribute(
+      "src",
+      "/media/owner.mp4",
+    );
+  });
+
+  it("does not show carousel navigation for a single deduplicated media item", async () => {
+    api.getExercise.mockResolvedValue({
+      ...detail,
+      media_assets: [mediaAsset(detail.media_path, "male", 0)],
+    });
+    renderDetail();
+
+    expect(await screen.findByTestId("exercise-media-carousel")).toBeVisible();
+    expect(screen.queryByText(/۱ \/ \d/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "رسانهٔ نمایش" })).not.toBeInTheDocument();
+  });
 });
+
+function mediaAsset(
+  mediaPath: string,
+  presentation: "male" | "female" | "unspecified",
+  sortOrder: number,
+) {
+  return {
+    presentation,
+    role: "video" as const,
+    sort_order: sortOrder,
+    media_path: mediaPath,
+    media_type: "video" as const,
+    media_source_url: null,
+    media_license: null,
+    media_attribution: `${presentation} creator`,
+  };
+}
 
 function renderDetail(
   path = "/exercises/dumbbell-bench-press?body_region=upper_body&primary_muscle=chest",

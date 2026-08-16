@@ -5,7 +5,8 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import heroStrengthFallback from "../../assets/landing/hero-strength-fallback.jpg";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getExercise } from "./api";
-import { ExerciseMedia } from "./ExerciseMedia";
+import { ExerciseMediaCarousel } from "./ExerciseMediaCarousel";
+import { buildExerciseMediaItems } from "./exerciseMediaItems";
 import type { ExerciseDetail } from "./types";
 import "./exercises.css";
 
@@ -107,16 +108,7 @@ function ReadyExerciseDetail({
   const equipmentNames = exercise.equipment.map((value) =>
     t(`catalog.equipment.${value}`),
   );
-  const mediaAssets = exercise.media_assets ?? [];
-  const [selectedMediaKey, setSelectedMediaKey] = useState("legacy");
-  const selectedAsset = mediaAssets.find(
-    (asset) => `${asset.presentation}-video-${asset.sort_order}` === selectedMediaKey,
-  );
-  const displayedMedia = selectedAsset ?? {
-    media_path: exercise.media_path,
-    media_type: exercise.media_type,
-    media_attribution: exercise.media_attribution,
-  };
+  const mediaItems = buildExerciseMediaItems(exercise);
 
   return (
     <>
@@ -142,34 +134,10 @@ function ReadyExerciseDetail({
 
       <article className="exercise-detail-sheet">
         <div className="exercise-detail-media">
-          <ExerciseMedia
-            path={displayedMedia.media_path}
+          <ExerciseMediaCarousel
+            items={mediaItems}
             name={name}
-            mediaType={displayedMedia.media_type}
           />
-          {mediaAssets.length > 0 && (
-            <label className="exercise-detail-media__selector">
-              {t("exerciseDetail.mediaSelector")}
-              <select
-                value={selectedMediaKey}
-                onChange={(event) => setSelectedMediaKey(event.target.value)}
-              >
-                <option value="legacy">{t("exerciseDetail.legacyMedia")}</option>
-                {mediaAssets.map((asset) => (
-                  <option
-                    key={`${asset.presentation}-video-${asset.sort_order}`}
-                    value={`${asset.presentation}-video-${asset.sort_order}`}
-                  >
-                    {t(`exerciseDetail.${asset.presentation}Video`)}
-                    {asset.sort_order > 0 ? ` ${asset.sort_order + 1}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {displayedMedia.media_attribution !== null && (
-            <small>{displayedMedia.media_attribution}</small>
-          )}
         </div>
 
         <header className="exercise-detail-heading">

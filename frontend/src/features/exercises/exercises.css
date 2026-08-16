@@ -836,6 +836,20 @@ html[dir="ltr"] .exercise-card__link span {
   object-fit: cover;
 }
 
+.exercise-media-carousel__surface {
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.exercise-media-carousel__indicator {
+  display: block;
+  padding: 0.45rem 1rem 0.2rem;
+  color: rgb(255 255 255 / 62%);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
 .exercise-detail-media small {
   display: block;
   padding: 0.75rem 1rem;
@@ -1119,6 +1133,10 @@ html[dir="rtl"] .catalog-dashboard-card__copy h2 {
   .exercise-detail-sheet,
   .catalog-dashboard-card {
     grid-template-columns: 1fr;
+  }
+
+  .exercise-detail-media__selector {
+    display: none;
   }
 
   .catalog-dashboard-card__visual {

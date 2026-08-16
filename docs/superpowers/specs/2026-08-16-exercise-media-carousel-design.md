@@ -23,7 +23,8 @@ the existing desktop selector.
 
 ## Components and tests
 
-`ExerciseMediaCarousel` owns the media list, selected index, and pointer
-gesture handling. `ExerciseMedia` remains responsible only for rendering one
-image or video. Tests cover list deduplication, legacy preservation, index
-changes in both directions, single-item UI, and the existing desktop selector.
+`exerciseMediaItems` builds the media list, while `ExerciseMediaCarousel` owns
+the selected index and pointer gesture handling. `ExerciseMedia` remains
+responsible only for rendering one image or video. Tests cover list
+deduplication, legacy preservation, index changes in both directions,
+single-item UI, and the existing desktop selector.
