@@ -1,5 +1,6 @@
 import json
 from typing import cast
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,6 +15,8 @@ from app.auth.models import User
 from app.config import Settings
 from app.exercises.models import Exercise
 from app.exercises.service import seed_exercises
+from app.workouts.enums import WorkoutPlanStatus
+from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 GIF_BYTES = b"GIF89a" + b"\x00" * 32
@@ -110,33 +113,35 @@ def test_admin_media_asset_input_rejects_thumbnail_role() -> None:
         )
 
 
-@pytest.mark.parametrize("method", ["get", "post"])
+@pytest.mark.parametrize("method", ["get", "post", "delete"])
 def test_admin_exercise_routes_require_authentication(
     client: TestClient,
     method: str,
 ) -> None:
-    response = (
-        client.get("/api/v1/admin/exercises")
-        if method == "get"
-        else post_exercise(client, exercise_payload())
-    )
+    if method == "get":
+        response = client.get("/api/v1/admin/exercises")
+    elif method == "post":
+        response = post_exercise(client, exercise_payload())
+    else:
+        response = client.delete(f"/api/v1/admin/exercises/{uuid4()}")
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication required"}
 
 
-@pytest.mark.parametrize("method", ["get", "post"])
+@pytest.mark.parametrize("method", ["get", "post", "delete"])
 def test_admin_exercise_routes_reject_non_admin(
     client: TestClient,
     method: str,
 ) -> None:
     register(client, "member@example.com")
 
-    response = (
-        client.get("/api/v1/admin/exercises")
-        if method == "get"
-        else post_exercise(client, exercise_payload())
-    )
+    if method == "get":
+        response = client.get("/api/v1/admin/exercises")
+    elif method == "post":
+        response = post_exercise(client, exercise_payload())
+    else:
+        response = client.delete(f"/api/v1/admin/exercises/{uuid4()}")
 
     assert response.status_code == 403
     assert response.json() == {"detail": "Administrator access required"}
@@ -151,6 +156,91 @@ def test_admin_access_does_not_require_completed_profile(
     response = client.get("/api/v1/admin/exercises")
 
     assert response.status_code == 200
+
+
+def test_admin_can_delete_an_exercise(client: TestClient, db: Session) -> None:
+    make_current_user_admin(client, db)
+    created = post_exercise(client, exercise_payload())
+    assert created.status_code == 201
+    exercise_id = created.json()["id"]
+
+    response = client.delete(f"/api/v1/admin/exercises/{exercise_id}", headers=ORIGIN)
+
+    assert response.status_code == 204
+    assert db.get(Exercise, exercise_id) is None
+
+
+def test_admin_delete_returns_not_found_for_missing_exercise(
+    client: TestClient, db: Session
+) -> None:
+    make_current_user_admin(client, db)
+
+    response = client.delete(f"/api/v1/admin/exercises/{uuid4()}", headers=ORIGIN)
+
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize("headers", [{}, {"Origin": "https://evil.example"}])
+def test_delete_requires_trusted_origin(
+    client: TestClient,
+    db: Session,
+    headers: dict[str, str],
+) -> None:
+    make_current_user_admin(client, db)
+
+    response = client.delete(f"/api/v1/admin/exercises/{uuid4()}", headers=headers)
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Untrusted request origin"}
+
+
+def test_admin_cannot_delete_an_exercise_used_in_a_workout_plan(
+    client: TestClient, db: Session
+) -> None:
+    admin = make_current_user_admin(client, db)
+    created = post_exercise(client, exercise_payload())
+    assert created.status_code == 201
+    exercise = db.get(Exercise, created.json()["id"])
+    assert exercise is not None
+    plan = WorkoutPlan(
+        user_id=admin.id,
+        status=WorkoutPlanStatus.ACTIVE,
+        generation_signature="a" * 64,
+        profile_snapshot={},
+        provider="fake",
+        model_id="fake-model",
+        prompt_version="v1",
+        generation_policy_version="v1",
+        candidate_set_hash="b" * 64,
+        generation_method="ai",
+    )
+    day = WorkoutDay(
+        workout_plan=plan,
+        day_number=1,
+        title_en="Upper body",
+        title_fa="بالاتنه",
+        estimated_duration_minutes=30,
+    )
+    db.add(
+        WorkoutPlanExercise(
+            workout_day=day,
+            exercise=exercise,
+            order_index=1,
+            sets=3,
+            reps_min=8,
+            reps_max=12,
+            rest_seconds=90,
+            rir=2,
+            estimated_minutes=8,
+        )
+    )
+    db.commit()
+
+    response = client.delete(f"/api/v1/admin/exercises/{exercise.id}", headers=ORIGIN)
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Exercise is used in a workout plan"}
+    assert db.get(Exercise, exercise.id) is not None
 
 
 def test_admin_list_includes_inactive_exercises(

@@ -5,7 +5,11 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.admin.exceptions import AdminUserNotFoundError, DuplicateExerciseSlugError
+from app.admin.exceptions import (
+    AdminUserNotFoundError,
+    DuplicateExerciseSlugError,
+    ExerciseInUseError,
+)
 from app.admin.media import StoredMedia
 from app.admin.schemas import (
     AdminExerciseCreate,
@@ -325,3 +329,26 @@ def update_admin_exercise(
         db.rollback()
         raise
     return exercise
+
+
+def delete_admin_exercise(db: Session, exercise_id: UUID) -> list[str] | None:
+    exercise = db.scalar(
+        select(Exercise)
+        .where(Exercise.id == exercise_id)
+        .options(selectinload(Exercise.media_assets))
+        .with_for_update()
+    )
+    if exercise is None:
+        return None
+
+    media_paths = [exercise.media_path, *(asset.media_path for asset in exercise.media_assets)]
+    db.delete(exercise)
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise ExerciseInUseError from error
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return media_paths

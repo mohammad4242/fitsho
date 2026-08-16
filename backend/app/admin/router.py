@@ -14,8 +14,14 @@ from fastapi import (
 from pydantic import ValidationError
 
 from app.admin.dependencies import require_admin
-from app.admin.exceptions import DuplicateExerciseSlugError
-from app.admin.media import MediaValidationError, StoredMedia, discard_media, store_upload
+from app.admin.exceptions import DuplicateExerciseSlugError, ExerciseInUseError
+from app.admin.media import (
+    MediaValidationError,
+    StoredMedia,
+    discard_managed_media_file,
+    discard_media,
+    store_upload,
+)
 from app.admin.schemas import (
     AdminExerciseCreate,
     AdminExerciseDetail,
@@ -31,6 +37,7 @@ from app.admin.schemas import (
 from app.admin.service import (
     MediaAssetKey,
     create_admin_exercise,
+    delete_admin_exercise,
     get_admin_exercise,
     list_admin_exercises,
     update_admin_exercise,
@@ -459,6 +466,29 @@ def update_exercise(
         _discard_media_assets(stored_media_assets)
         raise
     return _detail(exercise)
+
+
+@router.delete(
+    "/exercises/{exercise_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def delete_exercise(
+    exercise_id: UUID,
+    db: DatabaseSession,
+    settings: AppSettings,
+) -> None:
+    try:
+        media_paths = delete_admin_exercise(db, exercise_id)
+    except ExerciseInUseError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Exercise is used in a workout plan",
+        ) from None
+    if media_paths is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercise not found")
+    for media_path in media_paths:
+        discard_managed_media_file(media_path, settings)
 
 
 @router.post(

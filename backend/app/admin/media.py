@@ -183,6 +183,22 @@ def discard_media(media: StoredMedia) -> None:
     media.absolute_path.unlink(missing_ok=True)
 
 
+def discard_managed_media_file(public_path: str | None, settings: Settings) -> None:
+    if public_path is None:
+        return
+    expected_prefix = f"{settings.media_public_path.rstrip('/')}/"
+    if not public_path.startswith(expected_prefix):
+        return
+    relative_path = public_path.removeprefix(expected_prefix)
+    if not relative_path:
+        return
+    media_root = settings.media_root.resolve()
+    target = (media_root / relative_path).resolve()
+    if target == media_root or media_root not in target.parents:
+        return
+    target.unlink(missing_ok=True)
+
+
 def store_image_upload(
     upload: UploadFile,
     settings: Settings,
