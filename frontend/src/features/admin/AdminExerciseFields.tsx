@@ -321,7 +321,7 @@ export function AdminExerciseFields({
           values={value.safety_notes_en}
           error={errorText("safety_notes_en")}
           max={8}
-          min={1}
+          min={0}
           dir="ltr"
           onChange={(index, text) => changeList("safety_notes_en", index, text)}
           onAdd={() => onChange("safety_notes_en", [...value.safety_notes_en, ""])}
@@ -336,7 +336,7 @@ export function AdminExerciseFields({
           values={value.safety_notes_fa}
           error={errorText("safety_notes_fa")}
           max={8}
-          min={1}
+          min={0}
           dir="rtl"
           onChange={(index, text) => changeList("safety_notes_fa", index, text)}
           onAdd={() => onChange("safety_notes_fa", [...value.safety_notes_fa, ""])}

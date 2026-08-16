@@ -624,8 +624,6 @@ def test_create_rejects_browser_supplied_media_path(
         ("instructions_fa", ["یک", "دو"]),
         ("instructions_en", ["1", "2", "3", "4", "5", "6", "7"]),
         ("instructions_fa", ["۱", "۲", "۳", "۴", "۵", "۶", "۷"]),
-        ("safety_notes_en", []),
-        ("safety_notes_fa", []),
     ],
 )
 def test_create_rejects_invalid_fields(
@@ -777,6 +775,35 @@ def test_admin_can_update_programming_metadata(
     assert [item.caution_tag.value for item in stored.caution_tag_items] == [
         "shoulder_internal_rotation"
     ]
+
+
+def test_admin_can_update_name_without_safety_notes(
+    client: TestClient,
+    db: Session,
+) -> None:
+    make_current_user_admin(client, db)
+    created = post_exercise(client, exercise_payload())
+    assert created.status_code == 201
+
+    response = client.patch(
+        f"/api/v1/admin/exercises/{created.json()['id']}",
+        headers=ORIGIN,
+        data={
+            "payload": json.dumps(
+                exercise_payload(
+                    name_en="Renamed Incline Push Up",
+                    name_fa="شنا سوئدی شیب‌دار تغییرنام‌یافته",
+                    safety_notes_en=[],
+                    safety_notes_fa=[],
+                )
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["name_en"] == "Renamed Incline Push Up"
+    assert response.json()["safety_notes_en"] == []
+    assert response.json()["safety_notes_fa"] == []
 
 
 def test_admin_can_switch_existing_item_between_exercise_and_guide_without_media_loss(

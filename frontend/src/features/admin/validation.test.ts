@@ -11,7 +11,7 @@ it("suggests an editable lowercase kebab-case slug", () => {
   expect(slugifyExerciseName("  Dumbbell Fly (Incline)  ")).toBe("dumbbell-fly-incline");
 });
 
-it("requires bilingual steps, safety notes, and equipment", () => {
+it("requires bilingual steps and equipment", () => {
   const errors = validateAdminExercise(emptyAdminExerciseForm());
 
   expect(errors).toMatchObject({
@@ -22,8 +22,29 @@ it("requires bilingual steps, safety notes, and equipment", () => {
     equipment: "equipmentRequired",
     instructions_en: "instructionCount",
     instructions_fa: "instructionCount",
-    safety_notes_en: "safetyRequired",
-    safety_notes_fa: "safetyRequired",
+  });
+});
+
+it("allows an exercise without safety notes", () => {
+  const form = emptyAdminExerciseForm();
+  Object.assign(form, {
+    slug: "rename-only",
+    name_en: "Renamed Exercise",
+    name_fa: "حرکت تغییرنام‌یافته",
+    body_region: "upper_body",
+    primary_muscle: "chest",
+    muscle_focus: "mid_chest",
+    equipment: ["bodyweight"],
+    instructions_en: ["Brace", "Lower", "Press"],
+    instructions_fa: ["منقبض", "پایین", "بالا"],
+    safety_notes_en: [],
+    safety_notes_fa: [],
+  });
+
+  expect(validateAdminExercise(form)).toEqual({});
+  expect(toAdminExerciseCreate(form)).toMatchObject({
+    safety_notes_en: [],
+    safety_notes_fa: [],
   });
 });
 

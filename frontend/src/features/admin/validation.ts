@@ -10,7 +10,6 @@ export type AdminValidationCode =
   | "slugFormat"
   | "equipmentRequired"
   | "instructionCount"
-  | "safetyRequired"
   | "muscleRegion"
   | "muscleFocus"
   | "primaryRepeated"
@@ -104,8 +103,6 @@ export function validateAdminExercise(form: AdminExerciseForm): AdminValidationE
   const faSteps = nonEmptyCount(form.instructions_fa);
   if (enSteps < 3 || enSteps > 6) errors.instructions_en = "instructionCount";
   if (faSteps < 3 || faSteps > 6) errors.instructions_fa = "instructionCount";
-  if (nonEmptyCount(form.safety_notes_en) < 1) errors.safety_notes_en = "safetyRequired";
-  if (nonEmptyCount(form.safety_notes_fa) < 1) errors.safety_notes_fa = "safetyRequired";
 
   if (form.body_region) {
     const allowed = musclesByRegion[form.body_region];

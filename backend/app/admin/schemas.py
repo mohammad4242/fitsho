@@ -105,12 +105,12 @@ class AdminExerciseCreate(BaseModel):
     difficulty: Difficulty
     instructions_en: list[TextItem] = Field(min_length=3, max_length=6)
     instructions_fa: list[TextItem] = Field(min_length=3, max_length=6)
-    safety_notes_en: list[TextItem] = Field(min_length=1)
+    safety_notes_en: list[TextItem] = Field(default_factory=list)
     movement_pattern: MovementPattern = MovementPattern.OTHER
     exercise_type: ExerciseType = ExerciseType.OTHER
     caution_tags: list[ExerciseCautionTag] = Field(default_factory=list)
     is_programmable: bool = False
-    safety_notes_fa: list[TextItem] = Field(min_length=1)
+    safety_notes_fa: list[TextItem] = Field(default_factory=list)
     is_active: bool = True
     needs_review: bool = False
     labels: list[ExerciseLabel] = Field(default_factory=list)

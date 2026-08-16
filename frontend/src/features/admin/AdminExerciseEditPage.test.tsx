@@ -147,6 +147,40 @@ it("loads structured programming metadata and saves an edited exercise", async (
   expect(await screen.findByText("LIST PAGE")).toBeInTheDocument();
 });
 
+it("saves a name-only edit when safety notes are empty", async () => {
+  const user = userEvent.setup();
+  adminApi.getAdminExercise.mockResolvedValue({
+    ...exercise,
+    safety_notes_en: [],
+    safety_notes_fa: [],
+  });
+  render(
+    <MemoryRouter initialEntries={["/admin/exercises/exercise-id/edit"]}>
+      <Routes>
+        <Route path="/admin/exercises/:exerciseId/edit" element={<AdminExerciseEditPage />} />
+        <Route path="/exercises" element={<p>LIST PAGE</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await openSection(user, "هویت حرکت");
+  await user.clear(screen.getByLabelText("نام انگلیسی"));
+  await user.type(screen.getByLabelText("نام انگلیسی"), "Renamed Incline Push Up");
+  await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
+
+  expect(adminApi.updateAdminExercise).toHaveBeenCalledWith(
+    "exercise-id",
+    expect.objectContaining({
+      name_en: "Renamed Incline Push Up",
+      safety_notes_en: [],
+      safety_notes_fa: [],
+    }),
+    null,
+    [],
+  );
+  expect(await screen.findByText("LIST PAGE")).toBeInTheDocument();
+});
+
 it("switches an existing catalogue item to guide without uploading media", async () => {
   const user = userEvent.setup();
   render(
