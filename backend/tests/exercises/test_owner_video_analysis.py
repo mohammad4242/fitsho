@@ -126,6 +126,25 @@ def test_match_requires_catalogue_identity_name_taxonomy_and_equipment(
     assert resolve_existing_match(uncertain, catalogue, test_settings) is None
 
 
+def test_exact_bilingual_name_match_reuses_existing_catalogue_card() -> None:
+    from app.exercises.owner_video_analysis import OwnerVideoAnalysis, resolve_exact_name_match
+
+    catalogue = (catalogue_exercise(),)
+    same_name = OwnerVideoAnalysis.model_validate(
+        valid_analysis_payload(decision="create_new", existing_exercise_id=None)
+    )
+    different_persian_name = OwnerVideoAnalysis.model_validate(
+        valid_analysis_payload(
+            decision="create_new",
+            existing_exercise_id=None,
+            name_fa="پرس سینه هالتر اسمیت",
+        )
+    )
+
+    assert resolve_exact_name_match(same_name, catalogue) == EXERCISE_ID
+    assert resolve_exact_name_match(different_persian_name, catalogue) is None
+
+
 def test_presentation_uses_unspecified_below_confidence_threshold(
     test_settings: Settings,
 ) -> None:

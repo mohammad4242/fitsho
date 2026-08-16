@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import unicodedata
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Literal, Self
@@ -130,6 +131,28 @@ def build_catalogue_snapshot(db: Session) -> tuple[CatalogueExercise, ...]:
 
 def _normalized_name(value: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", value.casefold()))
+
+
+def _normalized_display_name(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value.casefold()).replace("\u200c", " ")
+    return " ".join(
+        "".join(character if character.isalnum() else " " for character in normalized).split()
+    )
+
+
+def resolve_exact_name_match(
+    analysis: OwnerVideoAnalysis,
+    catalogue: Sequence[CatalogueExercise],
+) -> UUID | None:
+    analysis_name_en = _normalized_name(analysis.name_en)
+    analysis_name_fa = _normalized_display_name(analysis.name_fa)
+    candidates = [
+        item
+        for item in catalogue
+        if _normalized_name(item.name_en) == analysis_name_en
+        and _normalized_display_name(item.name_fa) == analysis_name_fa
+    ]
+    return candidates[0].id if len(candidates) == 1 else None
 
 
 def resolve_existing_match(

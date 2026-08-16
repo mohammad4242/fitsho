@@ -29,6 +29,7 @@ from app.exercises.owner_video_analysis import (
     CodexCliExerciseAnalyzer,
     OwnerVideoAnalysis,
     build_catalogue_snapshot,
+    resolve_exact_name_match,
     resolve_existing_match,
     resolve_presentation,
 )
@@ -170,6 +171,14 @@ class OwnerVideoImporter:
                     )
                 )
                 return
+            duplicate_exercise = self._db.scalar(
+                select(Exercise).where(
+                    Exercise.source == OWNER_VIDEO_SOURCE,
+                    Exercise.source_id == source_id,
+                )
+            )
+            if duplicate_exercise is not None:
+                raise ValueError("Owner video source already exists without a media asset")
 
             prepared = self._prepare_video(source_path, settings=self._settings)
             if prepared.source_id != source_id:
@@ -179,7 +188,14 @@ class OwnerVideoImporter:
                 analysis = self._analyzer.analyze(prepared, catalogue)
             except Exception as error:
                 analysis = self._fallback_analysis(source_path, source_id, error)
-            match_id = resolve_existing_match(analysis, catalogue, self._settings)
+            exact_match_id = (
+                resolve_exact_name_match(analysis, catalogue)
+                if analysis.decision == "create_new"
+                else None
+            )
+            match_id = exact_match_id or resolve_existing_match(
+                analysis, catalogue, self._settings
+            )
             review_reasons = self._review_reasons(analysis, match_id)
             needs_review = bool(review_reasons)
 

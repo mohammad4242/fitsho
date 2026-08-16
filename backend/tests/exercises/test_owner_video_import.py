@@ -237,6 +237,28 @@ def test_importer_matches_existing_exercise_and_uses_next_media_sort_order(
     assert existing.media_path == "/media/original.mp4"
 
 
+def test_importer_attaches_exact_bilingual_name_even_when_analysis_requests_new(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    source_root = tmp_path / "raw"
+    _, source_id = write_video(source_root, "one.mp4", b"one")
+    existing = existing_push_up()
+    db.add(existing)
+    db.commit()
+    analyzer = FakeAnalyzer({source_id: analysis_for(source_id, decision="create_new")})
+    settings = importer_settings(test_settings, tmp_path)
+
+    report = build_importer(db, settings, source_root, analyzer).run(apply=True)
+
+    db.refresh(existing, ["media_assets"])
+    assert report.matched_existing == 1
+    assert report.created_new == 0
+    assert len(existing.media_assets) == 1
+    assert existing.media_assets[0].source == "owner-video"
+
+
 def test_importer_creates_complete_new_exercise_and_second_run_is_idempotent(
     db: Session,
     test_settings: Settings,
