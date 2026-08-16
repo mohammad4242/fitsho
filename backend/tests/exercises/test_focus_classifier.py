@@ -184,3 +184,13 @@ def test_quadriceps_does_not_receive_a_focus_subcategory() -> None:
         movement=MovementPattern.KNEE_EXTENSION,
         exercise_type=ExerciseType.ISOLATION,
     ) is None
+
+
+def test_adductors_do_not_receive_a_focus_subcategory() -> None:
+    assert classify(
+        MuscleGroup.ADDUCTORS,
+        target="adductors",
+        name="Seated Hip Adduction",
+        movement=MovementPattern.HIP_ADDUCTION,
+        exercise_type=ExerciseType.ISOLATION,
+    ) is None

@@ -53,7 +53,7 @@ export const muscleFocusesByMuscle: Record<MuscleGroup, readonly MuscleFocus[]> 
   glutes: ["glute_max", "glute_medius_minimus"],
   quadriceps: [],
   hamstrings: ["hamstrings_hip_extension", "hamstrings_knee_flexion"],
-  adductors: ["hip_adduction", "adductor_mobility"],
+  adductors: [],
   calves: ["general_calves", "gastrocnemius", "soleus"],
   abs: ["trunk_flexion", "hip_flexion_posterior_tilt", "anti_extension"],
   obliques: ["trunk_rotation", "lateral_flexion", "anti_rotation"],

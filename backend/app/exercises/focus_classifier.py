@@ -229,10 +229,6 @@ def classify_muscle_focus(
         return None
 
     if primary_muscle is MuscleGroup.ADDUCTORS:
-        if exercise_type is ExerciseType.MOBILITY:
-            return _classification(MuscleFocus.ADDUCTOR_MOBILITY, "mechanics:mobility")
-        if movement_pattern is MovementPattern.HIP_ADDUCTION:
-            return _classification(MuscleFocus.HIP_ADDUCTION, "mechanics:hip_adduction")
         return None
 
     if primary_muscle is MuscleGroup.CALVES:

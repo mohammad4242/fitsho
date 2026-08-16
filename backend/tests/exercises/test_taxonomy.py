@@ -51,6 +51,12 @@ def test_quadriceps_has_no_focus_subcategories() -> None:
     )
 
 
+def test_adductors_have_no_focus_subcategories() -> None:
+    assert FOCUSES_BY_MUSCLE[MuscleGroup.ADDUCTORS] == ()
+    assert is_compatible_muscle_focus(MuscleGroup.ADDUCTORS, None)
+    assert not is_compatible_muscle_focus(MuscleGroup.ADDUCTORS, MuscleFocus.HIP_ADDUCTION)
+
+
 def test_focus_compatibility_is_bound_to_primary_muscle() -> None:
     assert is_compatible_muscle_focus(MuscleGroup.CHEST, MuscleFocus.UPPER_CHEST)
     assert not is_compatible_muscle_focus(MuscleGroup.SHOULDERS, MuscleFocus.UPPER_CHEST)

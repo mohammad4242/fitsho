@@ -1211,8 +1211,8 @@
     "name_en": "Lever Seated Hip Adduction",
     "previous_primary_muscle": "adductors",
     "primary_muscle": "adductors",
-    "muscle_focus": "hip_adduction",
-    "basis": "mechanics:hip_adduction"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:0599",
@@ -1967,8 +1967,8 @@
     "name_en": "Butterfly Yoga Pose",
     "previous_primary_muscle": "adductors",
     "primary_muscle": "adductors",
-    "muscle_focus": "hip_adduction",
-    "basis": "mechanics:hip_adduction"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:1511",
@@ -2003,8 +2003,8 @@
     "name_en": "Seated Wide Angle Pose Sequence",
     "previous_primary_muscle": "adductors",
     "primary_muscle": "adductors",
-    "muscle_focus": "hip_adduction",
-    "basis": "mechanics:hip_adduction"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:1599",
@@ -2282,8 +2282,8 @@
     "name_en": "Band Hip Adduction",
     "previous_primary_muscle": "adductors",
     "primary_muscle": "adductors",
-    "muscle_focus": "hip_adduction",
-    "basis": "mechanics:hip_adduction"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:drv-band-one-leg-kickback-bent-position",
@@ -2615,8 +2615,8 @@
     "name_en": "Standing Adductor Stretch",
     "previous_primary_muscle": "adductors",
     "primary_muscle": "adductors",
-    "muscle_focus": "adductor_mobility",
-    "basis": "mechanics:mobility"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:drv-stretching-all-fours-squad-stretch",
@@ -2624,8 +2624,8 @@
     "name_en": "All Fours Groin Stretch",
     "previous_primary_muscle": "adductors",
     "primary_muscle": "adductors",
-    "muscle_focus": "adductor_mobility",
-    "basis": "mechanics:mobility"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:drv-stretching-band-warm-up-shoulder-stretch",
@@ -2642,8 +2642,8 @@
     "name_en": "Seated Boat Stretch",
     "previous_primary_muscle": "adductors",
     "primary_muscle": "adductors",
-    "muscle_focus": "adductor_mobility",
-    "basis": "mechanics:mobility"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:drv-stretching-bridge-pose-setu-bandhasana-1",
@@ -2759,8 +2759,8 @@
     "name_en": "Plyometric Side Lunge Stretch",
     "previous_primary_muscle": "adductors",
     "primary_muscle": "adductors",
-    "muscle_focus": "adductor_mobility",
-    "basis": "mechanics:mobility"
+    "muscle_focus": null,
+    "basis": "focus:not_applicable"
   },
   {
     "key": "free-exercise-db:drv-stretching-quadriceps-lying-stretch",

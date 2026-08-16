@@ -75,7 +75,7 @@ FOCUSES_BY_MUSCLE: dict[MuscleGroup, tuple[MuscleFocus, ...]] = {
         MuscleFocus.HAMSTRINGS_HIP_EXTENSION,
         MuscleFocus.HAMSTRINGS_KNEE_FLEXION,
     ),
-    MuscleGroup.ADDUCTORS: (MuscleFocus.HIP_ADDUCTION, MuscleFocus.ADDUCTOR_MOBILITY),
+    MuscleGroup.ADDUCTORS: (),
     MuscleGroup.CALVES: (
         MuscleFocus.GENERAL_CALVES,
         MuscleFocus.GASTROCNEMIUS,
