@@ -553,6 +553,59 @@ html[dir="rtl"] .exercise-catalog-hero h1 {
   cursor: pointer;
 }
 
+.exercise-delete-overlay {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgb(1 10 12 / 72%);
+  backdrop-filter: blur(10px) saturate(.8);
+}
+
+.exercise-delete-dialog {
+  position: relative;
+  width: min(100%, 31rem);
+  overflow: hidden;
+  padding: 1.35rem;
+  border: 1px solid color-mix(in srgb, var(--fitsho-danger) 30%, var(--fitsho-line));
+  border-radius: 1.35rem;
+  color: var(--fitsho-text);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--fitsho-danger) 7%, var(--fitsho-surface)), var(--fitsho-surface) 48%);
+  box-shadow: 0 2rem 6rem rgb(0 0 0 / 48%);
+  animation: exercise-delete-enter 180ms ease-out both;
+}
+
+.exercise-delete-dialog__rail { position: absolute; inset-block: 0; inset-inline-start: 0; width: .3rem; background: var(--fitsho-danger); box-shadow: 0 0 1.5rem color-mix(in srgb, var(--fitsho-danger) 55%, transparent); }
+.exercise-delete-dialog > header { display: flex; align-items: center; gap: .85rem; }
+.exercise-delete-dialog > header p { margin: 0 0 .2rem; color: var(--fitsho-danger); font-size: .72rem; font-weight: 850; letter-spacing: .04em; }
+.exercise-delete-dialog h2 { margin: 0; font-size: clamp(1.3rem, 4vw, 1.65rem); }
+.exercise-delete-dialog__icon { flex: 0 0 auto; width: 3rem; height: 3rem; display: grid; place-items: center; border: 1px solid color-mix(in srgb, var(--fitsho-danger) 38%, transparent); border-radius: 1rem; color: var(--fitsho-danger); background: color-mix(in srgb, var(--fitsho-danger) 12%, transparent); }
+.exercise-delete-dialog__icon svg { width: 1.4rem; height: 1.4rem; }
+.exercise-delete-dialog__description { margin: 1rem 0; color: var(--fitsho-muted); line-height: 1.85; }
+.exercise-delete-dialog__error { margin: .85rem 0 0; color: var(--fitsho-danger); font-weight: 750; line-height: 1.7; }
+.exercise-delete-dialog footer { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; margin-block-start: 1.15rem; }
+.exercise-delete-dialog footer button { min-height: 3rem; border-radius: .9rem; font: inherit; font-weight: 850; cursor: pointer; }
+.exercise-delete-dialog footer button:disabled { cursor: wait; opacity: .68; }
+.exercise-delete-dialog__cancel { border: 1px solid var(--fitsho-line-strong); color: var(--fitsho-text); background: transparent; }
+.exercise-delete-dialog__confirm { border: 1px solid var(--fitsho-danger); color: #190603; background: linear-gradient(135deg, #ff9b7f, var(--fitsho-danger)); box-shadow: 0 .65rem 1.6rem color-mix(in srgb, var(--fitsho-danger) 24%, transparent); }
+.exercise-delete-dialog footer button:focus-visible { outline: 3px solid color-mix(in srgb, var(--fitsho-aqua) 65%, transparent); outline-offset: 2px; }
+
+@keyframes exercise-delete-enter {
+  from { opacity: 0; transform: translateY(.65rem) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exercise-delete-dialog { animation: none; }
+}
+
+@media (max-width: 640px) {
+  .exercise-delete-overlay { align-items: end; padding: 0; }
+  .exercise-delete-dialog { width: 100%; padding: 1.2rem 1rem calc(1rem + env(safe-area-inset-bottom)); border-radius: 1.5rem 1.5rem 0 0; }
+}
+
 .exercise-card__admin-state {
   display: inline-flex;
   margin-block-start: 0.45rem;

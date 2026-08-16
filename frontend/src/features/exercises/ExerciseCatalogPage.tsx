@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -59,7 +59,10 @@ export function ExerciseCatalogPage() {
   const [exercisePage, setExercisePage] = useState<PaginatedExercises | null>(null);
   const [exerciseState, setExerciseState] = useState<LoadState>("idle");
   const [exerciseRetry, setExerciseRetry] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<CatalogExercise | null>(null);
+  const [deletingExerciseId, setDeletingExerciseId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const query = useMemo(() => parseCatalogQuery(searchParams), [searchParams]);
   const isEnglish = i18n.resolvedLanguage === "en";
@@ -160,6 +163,24 @@ export function ExerciseCatalogPage() {
     selectedMuscle,
   ]);
 
+  useEffect(() => {
+    if (deleteTarget === null) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape" || deletingExerciseId !== null) return;
+      event.preventDefault();
+      setDeleteTarget(null);
+      setDeleteError(null);
+      deleteTriggerRef.current?.focus();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [deleteTarget, deletingExerciseId]);
+
   function writeQuery(
     changes: Partial<Omit<CatalogQuery, "page">> & { page?: number },
     resetPage = true,
@@ -193,9 +214,23 @@ export function ExerciseCatalogPage() {
     writeQuery({ primary_muscle: undefined, muscle_focus: undefined });
   }
 
-  async function handleDelete(exercise: CatalogExercise) {
-    const name = isEnglish ? exercise.name_en : exercise.name_fa;
-    if (!window.confirm(t("catalog.confirmDeleteExercise", { name }))) return;
+  function openDeleteDialog(exercise: CatalogExercise, trigger: HTMLButtonElement) {
+    deleteTriggerRef.current = trigger;
+    setDeleteError(null);
+    setDeleteTarget(exercise);
+  }
+
+  function closeDeleteDialog() {
+    if (deletingExerciseId !== null) return;
+    setDeleteTarget(null);
+    setDeleteError(null);
+    deleteTriggerRef.current?.focus();
+  }
+
+  async function handleDelete() {
+    if (deleteTarget === null) return;
+    const exercise = deleteTarget;
+    setDeletingExerciseId(exercise.id);
     setDeleteError(null);
     try {
       await deleteAdminExercise(exercise.id);
@@ -206,12 +241,15 @@ export function ExerciseCatalogPage() {
             items: current.items.filter((item) => item.id !== exercise.id),
             total: Math.max(0, current.total - 1),
           });
+      setDeleteTarget(null);
     } catch (error) {
       setDeleteError(
         error instanceof ApiError && error.status === 409
           ? t("catalog.deleteExerciseInUse")
           : t("catalog.deleteExerciseError"),
       );
+    } finally {
+      setDeletingExerciseId(null);
     }
   }
 
@@ -451,10 +489,6 @@ export function ExerciseCatalogPage() {
               </label>
             </div>
 
-            {deleteError !== null && (
-              <StatusPanel role="alert" message={deleteError} compact />
-            )}
-
             {exerciseState === "loading" && (
               <StatusPanel role="status" message={t("catalog.loadingExercises")} compact />
             )}
@@ -489,7 +523,7 @@ export function ExerciseCatalogPage() {
                       catalogSearch={currentSearch}
                       isAdmin={isAdmin}
                       returnTo={returnTo}
-                      onDelete={handleDelete}
+                      onDelete={openDeleteDialog}
                     />
                   ))}
                 </div>
@@ -522,6 +556,60 @@ export function ExerciseCatalogPage() {
           </section>
         )}
       </main>
+      {deleteTarget !== null && (
+        <div
+          className="exercise-delete-overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeDeleteDialog();
+          }}
+        >
+          <section
+            aria-describedby="exercise-delete-description"
+            aria-label={t("catalog.deleteDialogLabel")}
+            aria-modal="true"
+            className="exercise-delete-dialog"
+            role="dialog"
+          >
+            <span className="exercise-delete-dialog__rail" aria-hidden="true" />
+            <header>
+              <span className="exercise-delete-dialog__icon" aria-hidden="true"><TrashIcon /></span>
+              <div>
+                <p>{t("catalog.deleteEyebrow")}</p>
+                <h2>{t("catalog.deleteDialogTitle")}</h2>
+              </div>
+            </header>
+            <p id="exercise-delete-description" className="exercise-delete-dialog__description">
+              {t("catalog.deleteDialogBody", {
+                name: isEnglish ? deleteTarget.name_en : deleteTarget.name_fa,
+              })}
+            </p>
+            {deleteError !== null && (
+              <p className="exercise-delete-dialog__error" role="alert">{deleteError}</p>
+            )}
+            <footer>
+              <button
+                autoFocus
+                className="exercise-delete-dialog__cancel"
+                type="button"
+                disabled={deletingExerciseId !== null}
+                onClick={closeDeleteDialog}
+              >
+                {t("catalog.deleteCancel")}
+              </button>
+              <button
+                className="exercise-delete-dialog__confirm"
+                type="button"
+                disabled={deletingExerciseId !== null}
+                onClick={() => void handleDelete()}
+              >
+                {deletingExerciseId !== null
+                  ? t("catalog.deleteBusy")
+                  : t("catalog.deleteConfirm")}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
@@ -620,7 +708,7 @@ function ExerciseCard({
   catalogSearch: string;
   isAdmin: boolean;
   returnTo: string;
-  onDelete: (exercise: CatalogExercise) => Promise<void>;
+  onDelete: (exercise: CatalogExercise, trigger: HTMLButtonElement) => void;
 }) {
   const { t } = useTranslation();
   const name = isEnglish ? exercise.name_en : exercise.name_fa;
@@ -683,7 +771,7 @@ function ExerciseCard({
           <button
             className="exercise-card__delete"
             type="button"
-            onClick={() => void onDelete(exercise)}
+            onClick={(event) => onDelete(exercise, event.currentTarget)}
           >
             {t("catalog.deleteExercise")}
           </button>
@@ -696,6 +784,14 @@ function ExerciseCard({
         )}
       </div>
     </article>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
+    </svg>
   );
 }
 

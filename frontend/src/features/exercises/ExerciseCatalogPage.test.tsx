@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -369,23 +369,24 @@ describe("administrator controls", () => {
   it("confirms and removes an exercise through the admin delete action", async () => {
     auth.isAdmin = true;
     const user = userEvent.setup();
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     adminApi.deleteAdminExercise.mockResolvedValue(undefined);
     renderCatalog("/exercises?body_region=upper_body&primary_muscle=chest");
 
     const card = await screen.findByRole("article", { name: "پرس سینه دمبل" });
     await user.click(within(card).getByRole("button", { name: "حذف" }));
 
-    expect(confirm).toHaveBeenCalled();
-    expect(adminApi.deleteAdminExercise).toHaveBeenCalledWith(benchPress.id);
+    const dialog = screen.getByRole("dialog", { name: "حذف حرکت" });
+    expect(dialog).toHaveTextContent("پرس سینه دمبل");
+    expect(adminApi.deleteAdminExercise).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "حذف قطعی" }));
+
+    await waitFor(() => expect(adminApi.deleteAdminExercise).toHaveBeenCalledWith(benchPress.id));
     expect(screen.queryByRole("article", { name: "پرس سینه دمبل" })).not.toBeInTheDocument();
-    confirm.mockRestore();
   });
 
   it("shows a safe error when the exercise cannot be deleted", async () => {
     auth.isAdmin = true;
     const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     adminApi.deleteAdminExercise.mockRejectedValue(
       new ApiError(409, "Exercise is used in a workout plan"),
     );
@@ -393,12 +394,16 @@ describe("administrator controls", () => {
 
     const card = await screen.findByRole("article", { name: "پرس سینه دمبل" });
     await user.click(within(card).getByRole("button", { name: "حذف" }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: "حذف حرکت" })).getByRole("button", {
+        name: "حذف قطعی",
+      }),
+    );
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expect(await within(screen.getByRole("dialog", { name: "حذف حرکت" })).findByRole("alert")).toHaveTextContent(
       "این حرکت در یک برنامه تمرینی استفاده شده و قابل حذف نیست.",
     );
     expect(screen.getByRole("article", { name: "پرس سینه دمبل" })).toBeInTheDocument();
-    vi.restoreAllMocks();
   });
 
   it("uses the protected admin list only for explicit admin status filters", async () => {
