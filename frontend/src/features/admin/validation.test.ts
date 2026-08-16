@@ -148,15 +148,15 @@ it("accepts a quadriceps exercise without a focus subcategory", () => {
   expect(toAdminExerciseCreate(form).muscle_focus).toBeNull();
 });
 
-it("accepts lower back as an upper-body muscle group", () => {
+it("accepts lower back as a back focus", () => {
   const form = emptyAdminExerciseForm();
   Object.assign(form, {
     slug: "back-extension",
     name_en: "Back Extension",
     name_fa: "باز کردن پشت",
     body_region: "upper_body",
-    primary_muscle: "lower_back",
-    muscle_focus: "lumbar_erectors",
+    primary_muscle: "back",
+    muscle_focus: "lower_back",
     equipment: ["bodyweight"],
     instructions_en: ["Set up", "Move", "Return"],
     instructions_fa: ["تنظیم", "حرکت", "برگشت"],

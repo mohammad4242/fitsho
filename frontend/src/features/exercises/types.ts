@@ -25,7 +25,7 @@ export type MuscleGroup = (typeof muscleGroups)[number];
 
 export const muscleFocuses = [
   "general_chest", "upper_chest", "mid_chest", "lower_chest",
-  "general_back", "lats", "mid_back_rhomboids", "upper_back",
+  "general_back", "lats", "lower_back", "mid_back_rhomboids", "upper_back",
   "general_shoulders", "front_delt", "lateral_delt", "rear_delt",
   "general_biceps", "biceps_brachii", "brachialis_brachioradialis",
   "general_triceps", "triceps_long_head", "triceps_lateral_medial_heads",
@@ -45,7 +45,7 @@ export type MuscleFocus = (typeof muscleFocuses)[number];
 
 export const muscleFocusesByMuscle: Record<MuscleGroup, readonly MuscleFocus[]> = {
   chest: ["general_chest", "upper_chest", "mid_chest", "lower_chest"],
-  back: ["general_back", "lats", "mid_back_rhomboids", "upper_back"],
+  back: ["general_back", "lats", "lower_back", "mid_back_rhomboids", "upper_back"],
   shoulders: ["general_shoulders", "front_delt", "lateral_delt", "rear_delt"],
   biceps: ["general_biceps", "biceps_brachii", "brachialis_brachioradialis"],
   triceps: ["general_triceps", "triceps_long_head", "triceps_lateral_medial_heads"],
@@ -168,7 +168,7 @@ export type ExerciseCategories = {
   upper_body: ExerciseCategory[];
   lower_body: ExerciseCategory[];
   core: ExerciseCategory[];
-  muscle_focuses: Record<MuscleGroup, MuscleFocusCategory[]>;
+  muscle_focuses: Partial<Record<MuscleGroup, MuscleFocusCategory[]>>;
 };
 
 export type ExerciseSummary = {

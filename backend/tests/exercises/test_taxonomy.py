@@ -15,13 +15,10 @@ def test_upper_body_has_small_forearm_and_neck_groups() -> None:
     assert MuscleGroup.NECK in MUSCLES_BY_REGION[BodyRegion.UPPER_BODY]
 
 
-def test_lower_back_belongs_to_the_upper_body_back_section() -> None:
-    assert MuscleGroup.LOWER_BACK in MUSCLES_BY_REGION[BodyRegion.UPPER_BODY]
+def test_lower_back_is_a_back_focus_not_a_standalone_muscle_group() -> None:
+    assert MuscleGroup.LOWER_BACK not in MUSCLES_BY_REGION[BodyRegion.UPPER_BODY]
     assert MuscleGroup.LOWER_BACK not in MUSCLES_BY_REGION[BodyRegion.CORE]
-    assert FOCUSES_BY_MUSCLE[MuscleGroup.LOWER_BACK] == (
-        MuscleFocus.LUMBAR_ERECTORS,
-        MuscleFocus.THORACIC_MOBILITY,
-    )
+    assert MuscleFocus.LOWER_BACK in FOCUSES_BY_MUSCLE[MuscleGroup.BACK]
 
 
 def test_exercise_schema_supports_reviewable_unknown_anatomy_and_labels() -> None:
@@ -46,7 +43,11 @@ def test_every_active_muscle_focus_has_a_bilingual_category() -> None:
         for category in values
     }
     assert set(categories) == {
-        focus for focuses in FOCUSES_BY_MUSCLE.values() for focus in focuses
+        focus
+        for muscle in MUSCLES_BY_REGION[BodyRegion.UPPER_BODY]
+        | MUSCLES_BY_REGION[BodyRegion.LOWER_BODY]
+        | MUSCLES_BY_REGION[BodyRegion.CORE]
+        for focus in FOCUSES_BY_MUSCLE[muscle]
     }
     assert all(name_en and name_fa for name_en, name_fa in categories.values())
 

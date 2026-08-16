@@ -14,3 +14,7 @@ it("does not expose adductors focus subcategories", () => {
 it("exposes abductors and legs as lower-body muscle groups", () => {
   expect(muscleGroups).toEqual(expect.arrayContaining(["abductors", "legs"]));
 });
+
+it("exposes lower back as a back focus", () => {
+  expect(muscleFocusesByMuscle.back).toContain("lower_back");
+});

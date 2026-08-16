@@ -20,7 +20,7 @@ export type AdminValidationErrors = Partial<
 >;
 
 export const musclesByRegion: Record<BodyRegion, readonly MuscleGroup[]> = {
-  upper_body: ["chest", "back", "lower_back", "shoulders", "biceps", "triceps", "traps", "forearms", "neck"],
+  upper_body: ["chest", "back", "shoulders", "biceps", "triceps", "traps", "forearms", "neck"],
   lower_body: ["glutes", "quadriceps", "hamstrings", "adductors", "abductors", "legs", "calves"],
   core: ["abs", "obliques"],
 };

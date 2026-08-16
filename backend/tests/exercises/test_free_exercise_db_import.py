@@ -105,7 +105,7 @@ def test_free_exercise_db_maps_known_values_and_reports_unknown_values() -> None
     assert map_body_region("waist") is BodyRegion.CORE
     assert map_muscle_group("rectus abdominis") is MuscleGroup.ABS
     assert map_muscle_group("adductors") is MuscleGroup.ADDUCTORS
-    assert map_muscle_group("lower back") is MuscleGroup.LOWER_BACK
+    assert map_muscle_group("lower back") is MuscleGroup.BACK
     assert map_equipment("smith machine") is Equipment.MACHINE
     assert map_difficulty("advanced") is Difficulty.ADVANCED
     assert map_body_region("cardio") is None

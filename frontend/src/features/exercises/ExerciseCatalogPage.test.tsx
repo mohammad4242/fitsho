@@ -45,7 +45,6 @@ const categories: ExerciseCategories = {
     { value: "biceps", name_en: "Biceps", name_fa: "جلو بازو" },
     { value: "triceps", name_en: "Triceps", name_fa: "پشت بازو" },
     { value: "traps", name_en: "Traps", name_fa: "کول" },
-    { value: "lower_back", name_en: "Lower Back", name_fa: "پایین پشت" },
   ],
   lower_body: [
     { value: "glutes", name_en: "Glutes", name_fa: "باسن" },
@@ -69,6 +68,14 @@ const categories: ExerciseCategories = {
           { value: "mid_chest", name_en: "Mid Chest", name_fa: "میان‌سینه" },
           { value: "lower_chest", name_en: "Lower Chest", name_fa: "زیرسینه" },
         ]
+      : muscle === "back"
+        ? [
+            { value: "general_back", name_en: "General Back", name_fa: "کل پشت" },
+            { value: "lats", name_en: "Lats", name_fa: "زیر بغل" },
+            { value: "lower_back", name_en: "Lower Back", name_fa: "پایین پشت" },
+            { value: "mid_back_rhomboids", name_en: "Mid Back / Rhomboids", name_fa: "میانه پشت / رومبوئید" },
+            { value: "upper_back", name_en: "Upper Back", name_fa: "بالای پشت" },
+          ]
       : [],
   ])) as unknown as ExerciseCategories["muscle_focuses"],
 };
@@ -359,11 +366,13 @@ describe("catalog filters and states", () => {
   it("distinguishes an empty muscle group from filters with no matches", async () => {
     const user = userEvent.setup();
     api.getExercises.mockResolvedValue(emptyPage);
-    renderCatalog("/exercises?body_region=upper_body&primary_muscle=lower_back");
+    renderCatalog("/exercises?body_region=upper_body&primary_muscle=back");
 
     expect(
       await screen.findByText("هنوز حرکتی برای این گروه عضلانی اضافه نشده است."),
     ).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: /پایین پشت/ }));
 
     await user.selectOptions(
       screen.getByRole("combobox", { name: "تجهیزات" }),

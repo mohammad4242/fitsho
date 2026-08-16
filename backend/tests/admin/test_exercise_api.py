@@ -602,7 +602,7 @@ def test_duplicate_slug_returns_conflict(client: TestClient, db: Session) -> Non
     [
         ("lower_body", "abductors", "Abductor Exercise", "حرکت بیرون پا", "abductor-exercise"),
         ("lower_body", "legs", "Whole Leg Exercise", "حرکت کل پا", "whole-leg-exercise"),
-        ("upper_body", "lower_back", "Back Extension", "باز کردن پشت", "back-extension"),
+        ("upper_body", "back", "Back Extension", "باز کردن پشت", "back-extension"),
     ],
 )
 def test_admin_can_create_new_taxonomy_muscle_groups(
@@ -624,7 +624,7 @@ def test_admin_can_create_new_taxonomy_muscle_groups(
             name_fa=name_fa,
             body_region=body_region,
             primary_muscle=primary_muscle,
-            muscle_focus=("lumbar_erectors" if primary_muscle == "lower_back" else None),
+            muscle_focus=("lower_back" if slug == "back-extension" else None),
             secondary_muscles=[],
         ),
     )
@@ -632,7 +632,7 @@ def test_admin_can_create_new_taxonomy_muscle_groups(
     assert response.status_code == 201
     assert response.json()["primary_muscle"] == primary_muscle
     assert response.json()["muscle_focus"] == (
-        "lumbar_erectors" if primary_muscle == "lower_back" else None
+        "lower_back" if slug == "back-extension" else None
     )
 
 

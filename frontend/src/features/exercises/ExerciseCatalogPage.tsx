@@ -80,7 +80,7 @@ export function ExerciseCatalogPage() {
   const selectedMuscle = muscleCategory?.value;
   const availableFocuses = selectedMuscle === undefined || categories === null
     ? []
-    : categories.muscle_focuses[selectedMuscle];
+    : categories.muscle_focuses[selectedMuscle] ?? [];
   const focusCategory = availableFocuses.find(
     (category) => category.value === query.muscle_focus,
   );
@@ -774,7 +774,7 @@ function ExerciseCard({
   const muscle = findMuscleCategory(categories, exercise.primary_muscle);
   const focus = exercise.primary_muscle === null || exercise.muscle_focus === null
     ? undefined
-    : categories.muscle_focuses[exercise.primary_muscle].find(
+    : categories.muscle_focuses[exercise.primary_muscle]?.find(
         (category) => category.value === exercise.muscle_focus,
       );
   const equipmentNames = exercise.equipment.map((value) => t(`catalog.equipment.${value}`));

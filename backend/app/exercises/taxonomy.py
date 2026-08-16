@@ -13,7 +13,6 @@ MUSCLES_BY_REGION: dict[BodyRegion, frozenset[MuscleGroup]] = {
             MuscleGroup.TRAPS,
             MuscleGroup.FOREARMS,
             MuscleGroup.NECK,
-            MuscleGroup.LOWER_BACK,
         }
     ),
     BodyRegion.LOWER_BODY: frozenset(
@@ -45,6 +44,7 @@ FOCUSES_BY_MUSCLE: dict[MuscleGroup, tuple[MuscleFocus, ...]] = {
     MuscleGroup.BACK: (
         MuscleFocus.GENERAL_BACK,
         MuscleFocus.LATS,
+        MuscleFocus.LOWER_BACK,
         MuscleFocus.MID_BACK_RHOMBOIDS,
         MuscleFocus.UPPER_BACK,
     ),
@@ -116,6 +116,7 @@ _FOCUS_LABELS: dict[MuscleFocus, tuple[str, str]] = {
     MuscleFocus.LOWER_CHEST: ("Lower Chest", "زیرسینه"),
     MuscleFocus.GENERAL_BACK: ("General Back", "کل پشت"),
     MuscleFocus.LATS: ("Lats", "زیر بغل"),
+    MuscleFocus.LOWER_BACK: ("Lower Back", "پایین پشت"),
     MuscleFocus.MID_BACK_RHOMBOIDS: ("Mid Back / Rhomboids", "میانه پشت / رومبوئید"),
     MuscleFocus.UPPER_BACK: ("Upper Back", "بالای پشت"),
     MuscleFocus.GENERAL_SHOULDERS: ("General Shoulders", "کل سرشانه"),
@@ -163,11 +164,11 @@ _FOCUS_LABELS: dict[MuscleFocus, tuple[str, str]] = {
     MuscleFocus.THORACIC_MOBILITY: ("Thoracic Mobility", "تحرک ستون پشتی"),
 }
 
+_CATALOG_MUSCLES = frozenset().union(*MUSCLES_BY_REGION.values())
 MUSCLE_FOCUS_CATEGORIES: dict[MuscleGroup, tuple[MuscleFocusCategory, ...]] = {
-    muscle: tuple(
-        MuscleFocusCategory(focus, *_FOCUS_LABELS[focus]) for focus in focuses
-    )
+    muscle: tuple(MuscleFocusCategory(focus, *_FOCUS_LABELS[focus]) for focus in focuses)
     for muscle, focuses in FOCUSES_BY_MUSCLE.items()
+    if muscle in _CATALOG_MUSCLES
 }
 
 

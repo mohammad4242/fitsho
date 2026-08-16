@@ -1048,8 +1048,8 @@
     "slug": "fedb-0489-45-degree-hyperextension",
     "name_en": "45 Degree Hyperextension",
     "previous_primary_muscle": "lower_back",
-    "primary_muscle": "lower_back",
-    "muscle_focus": "lumbar_erectors",
+    "primary_muscle": "back",
+    "muscle_focus": "lower_back",
     "basis": "source_target:erector spinae"
   },
   {
@@ -1111,8 +1111,8 @@
     "slug": "fedb-0573-lever-back-extension",
     "name_en": "Lever Back Extension",
     "previous_primary_muscle": "lower_back",
-    "primary_muscle": "lower_back",
-    "muscle_focus": "lumbar_erectors",
+    "primary_muscle": "back",
+    "muscle_focus": "lower_back",
     "basis": "source_target:spine"
   },
   {
@@ -1336,8 +1336,8 @@
     "slug": "fedb-0690-seated-lower-back-stretch",
     "name_en": "Seated Lower Back Stretch",
     "previous_primary_muscle": "lower_back",
-    "primary_muscle": "lower_back",
-    "muscle_focus": "lumbar_erectors",
+    "primary_muscle": "back",
+    "muscle_focus": "lower_back",
     "basis": "source_target:erector spinae"
   },
   {
@@ -1408,8 +1408,8 @@
     "slug": "fedb-0752-smith-machine-deadlift",
     "name_en": "Smith Machine Deadlift",
     "previous_primary_muscle": "lower_back",
-    "primary_muscle": "lower_back",
-    "muscle_focus": "lumbar_erectors",
+    "primary_muscle": "back",
+    "muscle_focus": "lower_back",
     "basis": "source_target:erectors"
   },
   {
@@ -1804,8 +1804,8 @@
     "slug": "fedb-1339-exercise-ball-spinal-stretch",
     "name_en": "Exercise Ball Spinal Stretch",
     "previous_primary_muscle": "lower_back",
-    "primary_muscle": "lower_back",
-    "muscle_focus": "thoracic_mobility",
+    "primary_muscle": "back",
+    "muscle_focus": "lower_back",
     "basis": "mechanics:spinal_mobility"
   },
   {
@@ -1831,8 +1831,8 @@
     "slug": "fedb-1363-spine-stretch",
     "name_en": "Spine Stretch",
     "previous_primary_muscle": "lower_back",
-    "primary_muscle": "lower_back",
-    "muscle_focus": "lumbar_erectors",
+    "primary_muscle": "back",
+    "muscle_focus": "lower_back",
     "basis": "source_target:spinal erectors"
   },
   {
@@ -2749,8 +2749,8 @@
     "slug": "fedb-drv-stretching-kneeling-back-rotation-stretch-kneeling-back-rotation-stretch",
     "name_en": "Kneeling Back Rotation Stretch",
     "previous_primary_muscle": "lower_back",
-    "primary_muscle": "lower_back",
-    "muscle_focus": "thoracic_mobility",
+    "primary_muscle": "back",
+    "muscle_focus": "lower_back",
     "basis": "source_target:thoracic spine"
   },
   {
@@ -2812,8 +2812,8 @@
     "slug": "fedb-drv-stretching-sitting-bent-over-back-stretch-seated-bent-over-back-stretch",
     "name_en": "Seated Bent Over Back Stretch",
     "previous_primary_muscle": "lower_back",
-    "primary_muscle": "lower_back",
-    "muscle_focus": "lumbar_erectors",
+    "primary_muscle": "back",
+    "muscle_focus": "lower_back",
     "basis": "source_target:erectors"
   },
   {

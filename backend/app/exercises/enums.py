@@ -40,6 +40,7 @@ class MuscleFocus(StrEnum):
     LOWER_CHEST = "lower_chest"
     GENERAL_BACK = "general_back"
     LATS = "lats"
+    LOWER_BACK = "lower_back"
     MID_BACK_RHOMBOIDS = "mid_back_rhomboids"
     UPPER_BACK = "upper_back"
     GENERAL_SHOULDERS = "general_shoulders"

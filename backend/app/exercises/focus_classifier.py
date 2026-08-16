@@ -117,6 +117,10 @@ def classify_muscle_focus(
         return None
 
     if primary_muscle is MuscleGroup.BACK:
+        if _contains(target, "lower back", "erector", "spine") or _contains(
+            source_group, "erector", "spine"
+        ):
+            return _classification(MuscleFocus.LOWER_BACK, source_basis)
         if target == "rhomboids" or target == "middle back":
             return _classification(MuscleFocus.MID_BACK_RHOMBOIDS, source_basis)
         if target == "upper back":
