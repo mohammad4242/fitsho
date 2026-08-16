@@ -792,6 +792,8 @@ const en = {
         quadriceps: "Quadriceps",
         hamstrings: "Hamstrings",
         adductors: "Adductors",
+        abductors: "Abductors",
+        legs: "Legs",
         calves: "Calves",
         abs: "Abs",
         obliques: "Obliques",

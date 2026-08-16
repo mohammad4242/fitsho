@@ -126,6 +126,8 @@ def test_categories_return_ordered_bilingual_taxonomy_even_when_core_is_empty(
         ("quadriceps", "Quadriceps", "جلو پا"),
         ("hamstrings", "Hamstrings", "پشت پا"),
         ("adductors", "Adductors", "داخل پا"),
+        ("abductors", "Abductors", "بیرون پا"),
+        ("legs", "Legs", "کل پا"),
         ("calves", "Calves", "ساق"),
     ]
     assert [

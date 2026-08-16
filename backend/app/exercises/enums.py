@@ -25,6 +25,8 @@ class MuscleGroup(StrEnum):
     QUADRICEPS = "quadriceps"
     HAMSTRINGS = "hamstrings"
     ADDUCTORS = "adductors"
+    ABDUCTORS = "abductors"
+    LEGS = "legs"
     CALVES = "calves"
     ABS = "abs"
     OBLIQUES = "obliques"

@@ -792,6 +792,8 @@ const fa = {
         quadriceps: "جلو پا",
         hamstrings: "پشت پا",
         adductors: "داخل پا",
+        abductors: "بیرون پا",
+        legs: "کل پا",
         calves: "ساق",
         abs: "شکم",
         obliques: "پهلو",

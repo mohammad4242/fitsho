@@ -57,6 +57,15 @@ def test_adductors_have_no_focus_subcategories() -> None:
     assert not is_compatible_muscle_focus(MuscleGroup.ADDUCTORS, MuscleFocus.HIP_ADDUCTION)
 
 
+def test_lower_body_has_abductors_and_legs_without_focus_subcategories() -> None:
+    assert MuscleGroup.ABDUCTORS in MUSCLES_BY_REGION[BodyRegion.LOWER_BODY]
+    assert MuscleGroup.LEGS in MUSCLES_BY_REGION[BodyRegion.LOWER_BODY]
+    assert FOCUSES_BY_MUSCLE[MuscleGroup.ABDUCTORS] == ()
+    assert FOCUSES_BY_MUSCLE[MuscleGroup.LEGS] == ()
+    assert is_compatible_muscle_focus(MuscleGroup.ABDUCTORS, None)
+    assert is_compatible_muscle_focus(MuscleGroup.LEGS, None)
+
+
 def test_focus_compatibility_is_bound_to_primary_muscle() -> None:
     assert is_compatible_muscle_focus(MuscleGroup.CHEST, MuscleFocus.UPPER_CHEST)
     assert not is_compatible_muscle_focus(MuscleGroup.SHOULDERS, MuscleFocus.UPPER_CHEST)

@@ -597,6 +597,41 @@ def test_duplicate_slug_returns_conflict(client: TestClient, db: Session) -> Non
     assert response.json() == {"detail": "Exercise slug already exists"}
 
 
+@pytest.mark.parametrize(
+    ("primary_muscle", "name_en", "name_fa", "slug"),
+    [
+        ("abductors", "Abductor Exercise", "حرکت بیرون پا", "abductor-exercise"),
+        ("legs", "Whole Leg Exercise", "حرکت کل پا", "whole-leg-exercise"),
+    ],
+)
+def test_admin_can_create_new_lower_body_muscle_groups(
+    client: TestClient,
+    db: Session,
+    primary_muscle: str,
+    name_en: str,
+    name_fa: str,
+    slug: str,
+) -> None:
+    make_current_user_admin(client, db)
+
+    response = post_exercise(
+        client,
+        exercise_payload(
+            slug=slug,
+            name_en=name_en,
+            name_fa=name_fa,
+            body_region="lower_body",
+            primary_muscle=primary_muscle,
+            muscle_focus=None,
+            secondary_muscles=[],
+        ),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["primary_muscle"] == primary_muscle
+    assert response.json()["muscle_focus"] is None
+
+
 def test_create_rejects_browser_supplied_media_path(
     client: TestClient,
     db: Session,

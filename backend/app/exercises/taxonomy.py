@@ -21,6 +21,8 @@ MUSCLES_BY_REGION: dict[BodyRegion, frozenset[MuscleGroup]] = {
             MuscleGroup.QUADRICEPS,
             MuscleGroup.HAMSTRINGS,
             MuscleGroup.ADDUCTORS,
+            MuscleGroup.ABDUCTORS,
+            MuscleGroup.LEGS,
             MuscleGroup.CALVES,
         }
     ),
@@ -76,6 +78,8 @@ FOCUSES_BY_MUSCLE: dict[MuscleGroup, tuple[MuscleFocus, ...]] = {
         MuscleFocus.HAMSTRINGS_KNEE_FLEXION,
     ),
     MuscleGroup.ADDUCTORS: (),
+    MuscleGroup.ABDUCTORS: (),
+    MuscleGroup.LEGS: (),
     MuscleGroup.CALVES: (
         MuscleFocus.GENERAL_CALVES,
         MuscleFocus.GASTROCNEMIUS,

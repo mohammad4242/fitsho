@@ -46,6 +46,8 @@ LOWER_BODY_CATEGORIES = (
     (MuscleGroup.QUADRICEPS, "Quadriceps", "جلو پا"),
     (MuscleGroup.HAMSTRINGS, "Hamstrings", "پشت پا"),
     (MuscleGroup.ADDUCTORS, "Adductors", "داخل پا"),
+    (MuscleGroup.ABDUCTORS, "Abductors", "بیرون پا"),
+    (MuscleGroup.LEGS, "Legs", "کل پا"),
     (MuscleGroup.CALVES, "Calves", "ساق"),
 )
 CORE_CATEGORIES = (

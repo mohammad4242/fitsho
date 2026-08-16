@@ -51,6 +51,8 @@ const categories: ExerciseCategories = {
     { value: "quadriceps", name_en: "Quadriceps", name_fa: "جلو پا" },
     { value: "hamstrings", name_en: "Hamstrings", name_fa: "پشت پا" },
     { value: "adductors", name_en: "Adductors", name_fa: "داخل پا" },
+    { value: "abductors", name_en: "Abductors", name_fa: "بیرون پا" },
+    { value: "legs", name_en: "Legs", name_fa: "کل پا" },
     { value: "calves", name_en: "Calves", name_fa: "ساق" },
   ],
   core: [
@@ -167,6 +169,16 @@ describe("catalog selection flow", () => {
       "href",
       "/exercises/dumbbell-bench-press?body_region=upper_body&primary_muscle=chest",
     );
+  });
+
+  it("shows abductors and legs as separate lower-body groups", async () => {
+    const user = userEvent.setup();
+    renderCatalog();
+
+    await user.click(await screen.findByRole("button", { name: /پایین‌تنه.*Lower Body/ }));
+
+    expect(screen.getByRole("button", { name: /بیرون پا.*Abductors/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /کل پا.*Legs/ })).toBeVisible();
   });
 
   it("uses breadcrumb actions to change the current catalog level", async () => {

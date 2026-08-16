@@ -148,6 +148,28 @@ it("accepts a quadriceps exercise without a focus subcategory", () => {
   expect(toAdminExerciseCreate(form).muscle_focus).toBeNull();
 });
 
+it.each([
+  ["abductors", "بیرون پا"],
+  ["legs", "کل پا"],
+])("accepts a %s exercise without a focus subcategory", (primary_muscle) => {
+  const form = emptyAdminExerciseForm();
+  Object.assign(form, {
+    slug: `${primary_muscle}-exercise`,
+    name_en: "Leg Exercise",
+    name_fa: "حرکت پا",
+    body_region: "lower_body",
+    primary_muscle,
+    muscle_focus: "",
+    equipment: ["bodyweight"],
+    instructions_en: ["Set up", "Move", "Return"],
+    instructions_fa: ["تنظیم", "حرکت", "برگشت"],
+    safety_notes_en: ["Keep control"],
+    safety_notes_fa: ["کنترل را حفظ کن"],
+  });
+
+  expect(validateAdminExercise(form)).toEqual({});
+});
+
 it("allows a review record with labels and no anatomy", () => {
   const form = emptyAdminExerciseForm();
   Object.assign(form, {

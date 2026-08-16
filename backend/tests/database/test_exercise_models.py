@@ -194,6 +194,31 @@ def test_exercise_database_requires_focus_for_known_primary_muscle(db: Session) 
     assert "ck_exercises_primary_muscle_focus_compatible" in str(error.value)
 
 
+@pytest.mark.parametrize("primary_muscle", ["abductors", "legs"])
+def test_exercise_database_accepts_new_lower_body_muscle_groups(
+    db: Session,
+    primary_muscle: str,
+) -> None:
+    db.execute(
+        text(
+            """
+            INSERT INTO exercises (
+                id, slug, name_en, name_fa, body_region, primary_muscle, muscle_focus,
+                difficulty, instructions_en, instructions_fa,
+                safety_notes_en, safety_notes_fa, media_path, media_type, content_type
+            ) VALUES (
+                :id, :slug, 'Leg Exercise', 'حرکت پا', 'lower_body', :primary_muscle, NULL,
+                'beginner', '[\"Step one\", \"Step two\", \"Step three\"]',
+                '[\"گام یک\", \"گام دو\", \"گام سه\"]', '[\"Use control\"]',
+                '[\"حرکت را کنترل کن\"]', '/exercises/exercise-placeholder.svg',
+                'placeholder', 'exercise'
+            )
+            """
+        ),
+        {"id": uuid4(), "slug": f"{primary_muscle}-exercise", "primary_muscle": primary_muscle},
+    )
+
+
 @pytest.mark.parametrize(
     ("column", "invalid_value", "constraint_name"),
     [
