@@ -27,7 +27,7 @@ it("requires bilingual steps, safety notes, and equipment", () => {
   });
 });
 
-it("validates slug format and body-region muscle membership", () => {
+it("validates body-region membership only for the primary muscle", () => {
   const form = emptyAdminExerciseForm();
   form.slug = "Bad Slug";
   form.name_en = "Test Exercise";
@@ -44,8 +44,28 @@ it("validates slug format and body-region muscle membership", () => {
   expect(validateAdminExercise(form)).toMatchObject({
     slug: "slugFormat",
     primary_muscle: "muscleRegion",
-    secondary_muscles: "muscleRegion",
   });
+  expect(validateAdminExercise(form).secondary_muscles).toBeUndefined();
+});
+
+it("accepts a cross-region secondary muscle", () => {
+  const form = emptyAdminExerciseForm();
+  Object.assign(form, {
+    slug: "back-row",
+    name_en: "Back Row",
+    name_fa: "پارویی پشت",
+    body_region: "upper_body",
+    primary_muscle: "back",
+    muscle_focus: "general_back",
+    secondary_muscles: ["biceps", "calves"],
+    equipment: ["cable"],
+    instructions_en: ["Brace", "Pull", "Return"],
+    instructions_fa: ["آماده شو", "بکش", "برگرد"],
+    safety_notes_en: ["Keep control"],
+    safety_notes_fa: ["کنترل را حفظ کن"],
+  });
+
+  expect(validateAdminExercise(form)).toEqual({});
 });
 
 it("accepts a complete valid bilingual exercise", () => {

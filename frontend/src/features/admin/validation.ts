@@ -112,9 +112,6 @@ export function validateAdminExercise(form: AdminExerciseForm): AdminValidationE
     if (form.primary_muscle && !allowed.includes(form.primary_muscle)) {
       errors.primary_muscle = "muscleRegion";
     }
-    if (form.secondary_muscles.some((muscle) => !allowed.includes(muscle))) {
-      errors.secondary_muscles = "muscleRegion";
-    }
   }
   if (form.primary_muscle && form.secondary_muscles.includes(form.primary_muscle)) {
     errors.secondary_muscles = "primaryRepeated";

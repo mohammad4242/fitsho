@@ -127,3 +127,39 @@ it("switches an existing catalogue item to guide without uploading media", async
     [],
   );
 });
+
+it("shows and allows editing a cross-region secondary muscle", async () => {
+  const user = userEvent.setup();
+  adminApi.getAdminExercise.mockResolvedValue({
+    ...exercise,
+    secondary_muscles: ["triceps", "calves"],
+  });
+  render(
+    <MemoryRouter initialEntries={["/admin/exercises/exercise-id/edit"]}>
+      <Routes>
+        <Route path="/admin/exercises/:exerciseId/edit" element={<AdminExerciseEditPage />} />
+        <Route path="/exercises" element={<p>LIST PAGE</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  const calves = await screen.findByLabelText("عضله فرعی: ساق");
+  expect(calves).toBeChecked();
+  await user.click(calves);
+  expect(calves).not.toBeChecked();
+  await user.click(calves);
+
+  await user.clear(screen.getByLabelText("نام انگلیسی"));
+  await user.type(screen.getByLabelText("نام انگلیسی"), "Renamed Legacy Exercise");
+  await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
+
+  expect(adminApi.updateAdminExercise).toHaveBeenCalledWith(
+    "exercise-id",
+    expect.objectContaining({
+      name_en: "Renamed Legacy Exercise",
+      secondary_muscles: ["triceps", "calves"],
+    }),
+    null,
+    [],
+  );
+});

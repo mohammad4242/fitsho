@@ -7,6 +7,7 @@ import {
   difficulties,
   equipment,
   muscleFocusesByMuscle,
+  muscleGroups,
   type MuscleFocus,
   type MuscleGroup,
 } from "../exercises/types";
@@ -180,7 +181,6 @@ export function AdminExerciseFields({
                 onChange("body_region", event.target.value as AdminExerciseForm["body_region"]);
                 onChange("primary_muscle", "");
                 onChange("muscle_focus", "");
-                onChange("secondary_muscles", []);
               }}
             >
               <option value="">{t("admin.fields.select")}</option>
@@ -222,7 +222,7 @@ export function AdminExerciseFields({
         <ChoiceGroup
           legend={t("admin.fields.secondaryMuscles")}
           error={errorText("secondary_muscles")}
-          values={availableMuscles}
+          values={muscleGroups}
           selected={value.secondary_muscles}
           label={(muscle) => `${t("admin.fields.secondaryPrefix")}: ${t(`catalog.muscle.${muscle}`)}`}
           onToggle={(muscle) => toggleChoice("secondary_muscles", muscle)}
