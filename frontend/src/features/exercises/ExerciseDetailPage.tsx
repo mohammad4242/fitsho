@@ -6,7 +6,7 @@ import heroStrengthFallback from "../../assets/landing/hero-strength-fallback.jp
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getExercise } from "./api";
 import { ExerciseMedia } from "./ExerciseMedia";
-import type { ExerciseDetail, MediaPresentation, MediaRole } from "./types";
+import type { ExerciseDetail } from "./types";
 import "./exercises.css";
 
 type DetailState = "loading" | "ready" | "not-found" | "error";
@@ -110,19 +110,13 @@ function ReadyExerciseDetail({
   const mediaAssets = exercise.media_assets ?? [];
   const [selectedMediaKey, setSelectedMediaKey] = useState("legacy");
   const selectedAsset = mediaAssets.find(
-    (asset) => `${asset.presentation}-${asset.role}` === selectedMediaKey,
+    (asset) => `${asset.presentation}-video-${asset.sort_order}` === selectedMediaKey,
   );
   const displayedMedia = selectedAsset ?? {
     media_path: exercise.media_path,
     media_type: exercise.media_type,
     media_attribution: exercise.media_attribution,
   };
-
-  function mediaAssetLabel(presentation: MediaPresentation, role: MediaRole) {
-    return t(
-      `exerciseDetail.${presentation}${role === "video" ? "Video" : "Thumbnail"}`,
-    );
-  }
 
   return (
     <>
@@ -163,10 +157,11 @@ function ReadyExerciseDetail({
                 <option value="legacy">{t("exerciseDetail.legacyMedia")}</option>
                 {mediaAssets.map((asset) => (
                   <option
-                    key={`${asset.presentation}-${asset.role}`}
-                    value={`${asset.presentation}-${asset.role}`}
+                    key={`${asset.presentation}-video-${asset.sort_order}`}
+                    value={`${asset.presentation}-video-${asset.sort_order}`}
                   >
-                    {mediaAssetLabel(asset.presentation, asset.role)}
+                    {t(`exerciseDetail.${asset.presentation}Video`)}
+                    {asset.sort_order > 0 ? ` ${asset.sort_order + 1}` : ""}
                   </option>
                 ))}
               </select>

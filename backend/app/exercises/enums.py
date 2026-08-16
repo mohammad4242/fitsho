@@ -108,7 +108,6 @@ class MediaPresentation(StrEnum):
 
 class MediaRole(StrEnum):
     VIDEO = "video"
-    THUMBNAIL = "thumbnail"
 
 
 class MovementPattern(StrEnum):

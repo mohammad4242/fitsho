@@ -171,6 +171,7 @@ describe("exercise detail content", () => {
         {
           presentation: "male",
           role: "video",
+          sort_order: 0,
           media_path: "/media/male.mp4",
           media_type: "video",
           media_source_url: null,
@@ -182,7 +183,7 @@ describe("exercise detail content", () => {
     renderDetail();
 
     const selector = await screen.findByLabelText("رسانهٔ نمایش");
-    await user.selectOptions(selector, "male-video");
+    await user.selectOptions(selector, "male-video-0");
 
     const video = screen.getByLabelText("نمایش حرکت پرس سینه دمبل");
     expect(video.tagName).toBe("VIDEO");
@@ -210,7 +211,7 @@ describe("exercise detail content", () => {
     renderDetail();
 
     const selector = await screen.findByLabelText("رسانهٔ نمایش");
-    await user.selectOptions(selector, "unspecified-video");
+    await user.selectOptions(selector, "unspecified-video-0");
 
     expect(screen.getByRole("option", { name: "ویدئوی مالک" })).toBeVisible();
     expect(screen.getByLabelText("نمایش حرکت پرس سینه دمبل")).toHaveAttribute(

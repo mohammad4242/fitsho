@@ -333,7 +333,7 @@ def test_importer_prevents_duplicates_on_a_second_run(
     assert exercise is not None
     assert exercise.name_fa == "شنا سوئدی"
     assert exercise.needs_review is True
-    assert len(exercise.media_assets) == 4
+    assert len(exercise.media_assets) == 2
     assert translator.calls == [["0001"]]
 
 
@@ -468,9 +468,10 @@ def test_importer_reports_missing_media_but_imports_available_variants(
     exercise = db.scalar(select(Exercise).where(Exercise.source_id == "0001"))
 
     assert report.imported_records == ["0001"]
-    assert report.missing_media == ["0001:female:thumbnail"]
+    assert report.missing_media == []
     assert exercise is not None
-    assert len(exercise.media_assets) == 3
+    assert len(exercise.media_assets) == 2
+    assert all(asset.role.value == "video" for asset in exercise.media_assets)
 
 
 def test_importer_reports_invalid_records_without_writing_them(

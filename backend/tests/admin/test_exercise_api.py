@@ -4,10 +4,12 @@ from typing import cast
 import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.admin.schemas import AdminExerciseMediaAssetInput
 from app.auth.models import User
 from app.config import Settings
 from app.exercises.models import Exercise
@@ -15,7 +17,6 @@ from app.exercises.service import seed_exercises
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 GIF_BYTES = b"GIF89a" + b"\x00" * 32
-JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 32
 MP4_BYTES = b"\x00\x00\x00\x18ftypisom" + b"\x00" * 32
 VALID_PROFILE = {
     "display_name": "Admin User",
@@ -96,6 +97,17 @@ def post_exercise(
             files=files or None,
         ),
     )
+
+
+def test_admin_media_asset_input_rejects_thumbnail_role() -> None:
+    with pytest.raises(ValidationError):
+        AdminExerciseMediaAssetInput.model_validate(
+            {
+                "presentation": "male",
+                "role": "thumbnail",
+                "sort_order": 0,
+            }
+        )
 
 
 @pytest.mark.parametrize("method", ["get", "post"])
@@ -352,8 +364,8 @@ def test_admin_creates_gendered_media_assets_and_public_detail_returns_them(
             },
             {
                 "presentation": "female",
-                "role": "thumbnail",
-                "media_source_url": "https://source.example/female.jpg",
+                "role": "video",
+                "media_source_url": "https://source.example/female.mp4",
                 "media_license": "MIT",
                 "media_attribution": "Female creator",
             },
@@ -365,7 +377,7 @@ def test_admin_creates_gendered_media_assets_and_public_detail_returns_them(
         payload,
         media_assets={
             "media_male_video": ("male.mp4", MP4_BYTES, "video/mp4"),
-            "media_female_thumbnail": ("female.jpg", JPEG_BYTES, "image/jpeg"),
+            "media_female_video": ("female.mp4", MP4_BYTES, "video/mp4"),
         },
     )
 
@@ -374,7 +386,7 @@ def test_admin_creates_gendered_media_assets_and_public_detail_returns_them(
         "female",
         "male",
     ]
-    assert response.json()["media_assets"][0]["media_type"] == "image"
+    assert response.json()["media_assets"][0]["media_type"] == "video"
     assert response.json()["media_assets"][0]["sort_order"] == 0
     assert client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE).status_code == 201
 
@@ -443,7 +455,7 @@ def test_invalid_variant_upload_removes_already_stored_legacy_media(
             media_assets=[
                 {
                     "presentation": "male",
-                    "role": "thumbnail",
+                    "role": "video",
                     "media_source_url": None,
                     "media_license": None,
                     "media_attribution": None,
@@ -451,7 +463,7 @@ def test_invalid_variant_upload_removes_already_stored_legacy_media(
             ]
         ),
         media=("legacy.gif", GIF_BYTES, "image/gif"),
-        media_assets={"media_male_thumbnail": ("wrong.gif", GIF_BYTES, "image/gif")},
+        media_assets={"media_male_video": ("wrong.gif", GIF_BYTES, "image/gif")},
     )
 
     assert response.status_code == 422

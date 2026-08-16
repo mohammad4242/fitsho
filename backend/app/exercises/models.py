@@ -310,8 +310,7 @@ class ExerciseMediaAsset(Base):
         ),
         CheckConstraint("sort_order >= 0", name="ck_exercise_media_assets_sort_order"),
         CheckConstraint(
-            "(role = 'video' AND media_type = 'video') "
-            "OR (role = 'thumbnail' AND media_type = 'image')",
+            "role = 'video' AND media_type = 'video'",
             name="ck_exercise_media_assets_role_media_type",
         ),
     )

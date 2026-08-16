@@ -135,7 +135,7 @@ export type MediaType = (typeof mediaTypes)[number];
 export const mediaPresentations = ["male", "female", "unspecified"] as const;
 export type MediaPresentation = (typeof mediaPresentations)[number];
 
-export const mediaRoles = ["video", "thumbnail"] as const;
+export const mediaRoles = ["video"] as const;
 export type MediaRole = (typeof mediaRoles)[number];
 
 export type BodyRegionCategory = {

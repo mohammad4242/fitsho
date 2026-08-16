@@ -17,6 +17,12 @@ def test_exercise_has_nullable_muscle_focus_column_and_composite_index() -> None
     }
 
 
+def test_exercise_media_role_has_no_thumbnail() -> None:
+    from app.exercises.enums import MediaRole
+
+    assert [role.value for role in MediaRole] == ["video"]
+
+
 def make_exercise(slug: str = "push-up") -> Exercise:
     from app.exercises.enums import (
         BodyRegion,
@@ -330,10 +336,10 @@ def test_exercise_stores_separate_male_and_female_media_metadata(db: Session) ->
             ),
             ExerciseMediaAsset(
                 presentation=MediaPresentation.FEMALE,
-                role=MediaRole.THUMBNAIL,
-                media_path="/media/push-up-female.jpg",
-                media_type=MediaType.IMAGE,
-                media_source_url="https://source.example/female.jpg",
+                role=MediaRole.VIDEO,
+                media_path="/media/push-up-female.mp4",
+                media_type=MediaType.VIDEO,
+                media_source_url="https://source.example/female.mp4",
                 media_license="MIT",
                 media_attribution="Female creator",
             ),

@@ -722,40 +722,33 @@ class FreeExerciseDbImporter:
         report: ImportReport,
     ) -> list[ImportMediaAsset]:
         assets: list[ImportMediaAsset] = []
-        configurations = (
-            ("videos", MediaRole.VIDEO, MediaType.VIDEO, "videos"),
-            ("thumbnails", MediaRole.THUMBNAIL, MediaType.IMAGE, "thumbnails"),
-        )
-        for source_field, role, media_type, directory in configurations:
-            urls = record.get(source_field)
-            url_map = urls if isinstance(urls, Mapping) else {}
-            for label, presentation in (
-                ("male", MediaPresentation.MALE),
-                ("female", MediaPresentation.FEMALE),
-            ):
-                value = url_map.get(label)
-                if not isinstance(value, str) or not value:
-                    report.missing_media.append(f"{source_id}:{label}:{role.value}")
-                    continue
-                filename = Path(urlsplit(value).path).name
-                if not filename or filename != Path(filename).name:
-                    report.validation_failures.append(
-                        f"{source_id}: invalid {label} {role.value} URL"
-                    )
-                    continue
-                source_path = self._source_root / directory / label / filename
-                if not source_path.is_file():
-                    report.missing_media.append(f"{source_id}:{label}:{role.value}")
-                    continue
-                assets.append(
-                    ImportMediaAsset(
-                        presentation=presentation,
-                        role=role,
-                        source_url=value,
-                        source_path=source_path,
-                        media_type=media_type,
-                    )
+        urls = record.get("videos")
+        url_map = urls if isinstance(urls, Mapping) else {}
+        for label, presentation in (
+            ("male", MediaPresentation.MALE),
+            ("female", MediaPresentation.FEMALE),
+        ):
+            value = url_map.get(label)
+            if not isinstance(value, str) or not value:
+                report.missing_media.append(f"{source_id}:{label}:video")
+                continue
+            filename = Path(urlsplit(value).path).name
+            if not filename or filename != Path(filename).name:
+                report.validation_failures.append(f"{source_id}: invalid {label} video URL")
+                continue
+            source_path = self._source_root / "videos" / label / filename
+            if not source_path.is_file():
+                report.missing_media.append(f"{source_id}:{label}:video")
+                continue
+            assets.append(
+                ImportMediaAsset(
+                    presentation=presentation,
+                    role=MediaRole.VIDEO,
+                    source_url=value,
+                    source_path=source_path,
+                    media_type=MediaType.VIDEO,
                 )
+            )
         return assets
 
     def _existing_exercise(self, source_id: str) -> Exercise | None:
