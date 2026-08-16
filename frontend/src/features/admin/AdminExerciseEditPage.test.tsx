@@ -163,3 +163,31 @@ it("shows and allows editing a cross-region secondary muscle", async () => {
     [],
   );
 });
+
+it("allows editing muscle focus on a review exercise", async () => {
+  const user = userEvent.setup();
+  adminApi.getAdminExercise.mockResolvedValue({
+    ...exercise,
+    needs_review: true,
+  });
+  render(
+    <MemoryRouter initialEntries={["/admin/exercises/exercise-id/edit"]}>
+      <Routes>
+        <Route path="/admin/exercises/:exerciseId/edit" element={<AdminExerciseEditPage />} />
+        <Route path="/exercises" element={<p>LIST PAGE</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  const focus = await screen.findByLabelText("بخش هدف عضله");
+  expect(focus).not.toBeDisabled();
+  await user.selectOptions(focus, "upper_chest");
+  await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
+
+  expect(adminApi.updateAdminExercise).toHaveBeenCalledWith(
+    "exercise-id",
+    expect.objectContaining({ muscle_focus: "upper_chest" }),
+    null,
+    [],
+  );
+});

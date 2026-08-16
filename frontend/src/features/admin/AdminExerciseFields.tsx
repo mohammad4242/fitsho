@@ -208,7 +208,7 @@ export function AdminExerciseFields({
             <Field label={t("admin.fields.muscleFocus")} error={errorText("muscle_focus")}>
               <select
                 value={value.muscle_focus}
-                disabled={!value.primary_muscle || value.needs_review}
+                disabled={!value.primary_muscle}
                 onChange={(event) => onChange("muscle_focus", event.target.value as MuscleFocus)}
               >
                 <option value="">{t("admin.fields.select")}</option>
