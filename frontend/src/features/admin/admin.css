@@ -34,6 +34,14 @@
 .admin-primary-link { color: var(--fitsho-petrol); background: var(--fitsho-aqua); }
 .admin-exercise-row, .admin-form-section { border: 0; border-radius: 1.25rem; box-shadow: 0 0.8rem 2rem rgb(10 31 30 / 7%); }
 
+.admin-content-type-field { margin-block-start: 1rem; }
+.admin-content-type-field__label { display: block; margin-block-end: .5rem; color: var(--muted); font-weight: 750; }
+.admin-content-type-switch { display: inline-flex; gap: .25rem; padding: .25rem; border: 1px solid var(--line); border-radius: 999px; background: var(--mist-100); }
+.admin-content-type-switch label { position: relative; cursor: pointer; }
+.admin-content-type-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.admin-content-type-switch span { display: block; padding: .6rem 1rem; border-radius: 999px; color: var(--muted); font-weight: 800; }
+.admin-content-type-switch input:checked + span { color: var(--paper); background: var(--petrol-900); }
+
 .admin-page {
   position: relative;
   isolation: isolate;

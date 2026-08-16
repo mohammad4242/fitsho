@@ -138,6 +138,35 @@ export function AdminExerciseFields({
             </select>
           </Field>
         </div>
+        <div className="admin-content-type-field">
+          <span className="admin-content-type-field__label">{t("admin.fields.contentType")}</span>
+          <div
+            className="admin-content-type-switch"
+            role="group"
+            aria-label={t("admin.fields.contentType")}
+          >
+            <label>
+              <input
+                type="radio"
+                name="content_type"
+                value="exercise"
+                checked={value.content_type === "exercise"}
+                onChange={() => onChange("content_type", "exercise")}
+              />
+              <span>{t("admin.contentType.exercise")}</span>
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="content_type"
+                value="guide"
+                checked={value.content_type === "guide"}
+                onChange={() => onChange("content_type", "guide")}
+              />
+              <span>{t("admin.contentType.guide")}</span>
+            </label>
+          </div>
+        </div>
       </fieldset>
 
       <fieldset className="admin-form-section">

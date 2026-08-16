@@ -9,6 +9,7 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseCautionTag,
+    ExerciseContentType,
     ExerciseLabel,
     ExerciseType,
     MediaPresentation,
@@ -48,6 +49,7 @@ SourceUrl = Annotated[
 
 
 class AdminExerciseFilters(BaseModel):
+    content_type: ExerciseContentType | None = None
     body_region: BodyRegion | None = None
     primary_muscle: MuscleGroup | None = None
     muscle_focus: MuscleFocus | None = None
@@ -94,6 +96,7 @@ class AdminExerciseCreate(BaseModel):
     slug: Slug
     name_en: Name
     name_fa: Name
+    content_type: ExerciseContentType = ExerciseContentType.EXERCISE
     body_region: BodyRegion | None
     primary_muscle: MuscleGroup | None
     muscle_focus: MuscleFocus | None

@@ -779,6 +779,78 @@ def test_admin_can_update_programming_metadata(
     ]
 
 
+def test_admin_can_switch_existing_item_between_exercise_and_guide_without_media_loss(
+    client: TestClient,
+    db: Session,
+) -> None:
+    from app.exercises.enums import ExerciseContentType
+    from app.exercises.models import ExerciseMediaAsset
+
+    make_current_user_admin(client, db)
+    created = post_exercise(client, exercise_payload())
+    assert created.status_code == 201
+    exercise = db.get(Exercise, created.json()["id"])
+    assert exercise is not None
+    exercise.media_path = "/media/existing-guide.mp4"
+    exercise.media_type = "video"
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation="male",
+            role="video",
+            media_path="/media/existing-guide-male.mp4",
+            media_type="video",
+        )
+    )
+    db.commit()
+    original_id = exercise.id
+    original_media_path = exercise.media_path
+    original_asset_count = len(exercise.media_assets)
+    media_metadata = [
+        {
+            "id": str(exercise.media_assets[0].id),
+            "presentation": "male",
+            "role": "video",
+            "sort_order": 0,
+            "media_source_url": None,
+            "media_license": None,
+            "media_attribution": None,
+        }
+    ]
+
+    guide_response = client.patch(
+        f"/api/v1/admin/exercises/{original_id}",
+        headers=ORIGIN,
+        data={
+            "payload": json.dumps(
+                exercise_payload(content_type="guide", media_assets=media_metadata)
+            )
+        },
+    )
+
+    assert guide_response.status_code == 200
+    assert guide_response.json()["content_type"] == "guide"
+    stored = db.get(Exercise, original_id)
+    assert stored is not None
+    assert stored.content_type is ExerciseContentType.GUIDE
+    assert stored.media_path == original_media_path
+    assert len(stored.media_assets) == original_asset_count
+    assert stored.equipment_items
+
+    exercise_response = client.patch(
+        f"/api/v1/admin/exercises/{original_id}",
+        headers=ORIGIN,
+        data={
+            "payload": json.dumps(
+                exercise_payload(content_type="exercise", media_assets=media_metadata)
+            )
+        },
+    )
+
+    assert exercise_response.status_code == 200
+    assert exercise_response.json()["content_type"] == "exercise"
+    assert db.get(Exercise, original_id) is not None
+
+
 def test_admin_updates_a_gendered_media_asset(
     client: TestClient,
     db: Session,

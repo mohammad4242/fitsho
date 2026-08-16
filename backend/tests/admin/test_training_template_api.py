@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
+from app.exercises.models import Exercise
 from app.exercises.service import seed_exercises
 from app.training_templates.service import seed_training_program_templates
 
@@ -197,6 +198,38 @@ def test_admin_rejects_template_slot_with_unknown_exercise(client: TestClient, d
         "/api/v1/admin/training-program-templates",
         headers=ORIGIN,
         json=payload,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "days"]
+
+
+def test_admin_rejects_guide_from_training_template_slots(client: TestClient, db: Session) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    guide = db.scalar(select(Exercise).where(Exercise.slug == "dumbbell-bench-press"))
+    assert guide is not None
+    guide.content_type = "guide"
+    db.commit()
+
+    response = client.post(
+        "/api/v1/admin/training-program-templates",
+        headers=ORIGIN,
+        json={
+            "name_en": "Guide Slot Program",
+            "name_fa": "برنامه راهنما",
+            "description_en": "Guide slot must be rejected.",
+            "description_fa": "جایگاه راهنما باید رد شود.",
+            "days_per_week": 2,
+            "training_level": "beginner",
+            "fitness_goal": "build_muscle",
+            "focus_tags": ["foundation"],
+            "intensity_methods": ["standard"],
+            "programming_rationale": _rationale_payload(),
+            "source_name": "Fitsho admin library",
+            "source_url": "https://fitsho.local/admin-library",
+            "days": [_day_payload(day, str(guide.id)) for day in range(1, 3)],
+        },
     )
 
     assert response.status_code == 422

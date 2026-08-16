@@ -23,6 +23,7 @@ const exercise = {
   slug: "incline-push-up",
   name_en: "Incline Push Up",
   name_fa: "شنا سوئدی شیب‌دار",
+  content_type: "exercise",
   body_region: "upper_body",
   primary_muscle: "chest",
   muscle_focus: "mid_chest",
@@ -103,4 +104,26 @@ it("loads structured programming metadata and saves an edited exercise", async (
     [],
   );
   expect(await screen.findByText("LIST PAGE")).toBeInTheDocument();
+});
+
+it("switches an existing catalogue item to guide without uploading media", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={["/admin/exercises/exercise-id/edit"]}>
+      <Routes>
+        <Route path="/admin/exercises/:exerciseId/edit" element={<AdminExerciseEditPage />} />
+        <Route path="/exercises" element={<p>LIST PAGE</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await user.click(await screen.findByLabelText("راهنما"));
+  await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
+
+  expect(adminApi.updateAdminExercise).toHaveBeenCalledWith(
+    "exercise-id",
+    expect.objectContaining({ content_type: "guide" }),
+    null,
+    [],
+  );
 });

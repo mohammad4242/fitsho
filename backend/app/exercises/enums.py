@@ -7,6 +7,11 @@ class BodyRegion(StrEnum):
     CORE = "core"
 
 
+class ExerciseContentType(StrEnum):
+    EXERCISE = "exercise"
+    GUIDE = "guide"
+
+
 class MuscleGroup(StrEnum):
     CHEST = "chest"
     BACK = "back"

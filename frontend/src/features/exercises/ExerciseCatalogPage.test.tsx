@@ -85,6 +85,7 @@ const benchPress: ExerciseSummary = {
   difficulty: "intermediate",
   media_path: "/exercises/upper-body/chest/dumbbell-bench-press.gif",
   media_type: "gif",
+  content_type: "exercise",
 };
 
 const populatedPage: PaginatedExercises = {
@@ -235,6 +236,32 @@ describe("catalog selection flow", () => {
 });
 
 describe("catalog filters and states", () => {
+  it("shows only guides in the simple guide view for the selected muscle", async () => {
+    const user = userEvent.setup();
+    const guide = { ...benchPress, slug: "bench-angle-guide", name_fa: "راهنمای زاویه پرس", content_type: "guide" as const };
+    api.getExercises.mockImplementation(async (filters) =>
+      filters.content_type === "guide"
+        ? { ...populatedPage, items: [guide] }
+        : populatedPage,
+    );
+    renderCatalog("/exercises?body_region=upper_body&primary_muscle=chest");
+
+    await screen.findByRole("button", { name: "همه حرکات سینه" });
+    expect(api.getExercises).toHaveBeenLastCalledWith(
+      expect.objectContaining({ content_type: "exercise" }),
+    );
+    await user.click(await screen.findByRole("button", { name: "راهنما" }));
+
+    expect(locationValue()).toBe(
+      "/exercises?body_region=upper_body&primary_muscle=chest&content_type=guide",
+    );
+    expect(api.getExercises).toHaveBeenLastCalledWith(
+      expect.objectContaining({ content_type: "guide", muscle_focus: undefined }),
+    );
+    expect(screen.queryByRole("button", { name: "همه حرکات سینه" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("article", { name: "راهنمای زاویه پرس" })).toBeVisible();
+  });
+
   it("opens the cardio catalog section", async () => {
     const user = userEvent.setup();
     renderCatalog();
@@ -422,7 +449,7 @@ describe("administrator controls", () => {
     expect(
       within(await screen.findByRole("article", { name: "پرس سینه دمبل" })).getByText("غیرفعال"),
     ).toBeVisible();
-    expect(adminApi.getAdminExercises).toHaveBeenLastCalledWith({
+    expect(adminApi.getAdminExercises).toHaveBeenLastCalledWith(expect.objectContaining({
       body_region: "upper_body",
       primary_muscle: "chest",
       equipment: "dumbbell",
@@ -430,7 +457,8 @@ describe("administrator controls", () => {
       search: "press",
       is_active: false,
       page: 1,
-    });
+      content_type: "exercise",
+    }));
     expect(locationValue()).toContain("admin_status=inactive");
   });
 });

@@ -3,6 +3,7 @@ import type {
   Difficulty,
   Equipment,
   ExerciseCautionTag,
+  ExerciseContentType,
   ExerciseDetail,
   ExerciseLabel,
   ExerciseType,
@@ -43,6 +44,7 @@ export type AdminExerciseCreate = {
   slug: string;
   name_en: string;
   name_fa: string;
+  content_type: ExerciseContentType;
   body_region: BodyRegion | null;
   primary_muscle: MuscleGroup | null;
   muscle_focus: MuscleFocus | null;
@@ -77,6 +79,7 @@ export type AdminExerciseForm = Omit<
 };
 
 export type AdminExerciseFilters = {
+  content_type?: ExerciseContentType;
   body_region?: BodyRegion | "";
   primary_muscle?: MuscleGroup | "";
   muscle_focus?: MuscleFocus | "";

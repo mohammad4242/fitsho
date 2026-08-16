@@ -91,6 +91,7 @@ const detail: WorkoutReviewDetail = {
               slug: "bench-press",
               name_en: "Bench Press",
               name_fa: "پرس سینه",
+              content_type: "exercise",
               body_region: "upper_body",
               primary_muscle: "chest",
               muscle_focus: "mid_chest",

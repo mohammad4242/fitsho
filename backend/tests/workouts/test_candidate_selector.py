@@ -7,6 +7,7 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseCautionTag,
+    ExerciseContentType,
     ExerciseLabel,
     ExerciseType,
     MediaType,
@@ -128,6 +129,18 @@ def test_selector_excludes_inactive_nonprogrammable_unsafe_and_too_hard_exercise
             setup=HomeTrainingSetup.BODYWEIGHT_ONLY,
             cautions=(TrainingCaution.LOWER_BACK,),
         )
+    )
+
+    assert result.ids == (allowed.id,)
+
+
+def test_selector_never_includes_guide_content(db: Session) -> None:
+    guide = exercise(db, "form-guide", equipment=(Equipment.BODYWEIGHT,))
+    guide.content_type = ExerciseContentType.GUIDE
+    allowed = exercise(db, "guided-exercise", equipment=(Equipment.BODYWEIGHT,))
+
+    result = WorkoutCandidateSelector(db).select(
+        profile(location=TrainingLocation.HOME, setup=HomeTrainingSetup.BODYWEIGHT_ONLY)
     )
 
     assert result.ids == (allowed.id,)

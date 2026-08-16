@@ -19,6 +19,7 @@ import {
   type Equipment,
   type ExerciseCategories,
   type ExerciseCategory,
+  type ExerciseContentType,
   type ExerciseFilters,
   type ExerciseLabel,
   type MuscleFocus,
@@ -33,6 +34,7 @@ import "./exercises.css";
 type LoadState = "idle" | "loading" | "ready" | "error";
 
 type CatalogQuery = {
+  content_type: ExerciseContentType;
   body_region?: BodyRegion;
   primary_muscle?: MuscleGroup;
   muscle_focus?: MuscleFocus;
@@ -118,6 +120,7 @@ export function ExerciseCatalogPage() {
     setExerciseState("loading");
     const filters: ExerciseFilters = {
       body_region: query.body_region,
+      content_type: query.content_type,
       primary_muscle: selectedMuscle,
       muscle_focus: selectedFocus,
       equipment: query.equipment,
@@ -152,6 +155,7 @@ export function ExerciseCatalogPage() {
     adminStatus,
     canLoadExercises,
     query.body_region,
+    query.content_type,
     query.difficulty,
     query.exercise_type,
     query.equipment,
@@ -190,11 +194,24 @@ export function ExerciseCatalogPage() {
   }
 
   function chooseRegion(value: BodyRegion) {
-    writeQuery({ body_region: value, primary_muscle: undefined, muscle_focus: undefined, labels: undefined, exercise_type: undefined });
+    writeQuery({
+      body_region: value,
+      primary_muscle: undefined,
+      muscle_focus: undefined,
+      content_type: "exercise",
+      labels: undefined,
+      exercise_type: undefined,
+    });
   }
 
   function chooseMuscle(value: MuscleGroup) {
-    writeQuery({ primary_muscle: value, muscle_focus: undefined, labels: undefined, exercise_type: undefined });
+    writeQuery({
+      primary_muscle: value,
+      muscle_focus: undefined,
+      content_type: "exercise",
+      labels: undefined,
+      exercise_type: undefined,
+    });
   }
 
   function chooseFocus(value: MuscleFocus | undefined) {
@@ -203,6 +220,16 @@ export function ExerciseCatalogPage() {
 
   function chooseSpecialFilter(changes: Pick<CatalogQuery, "labels" | "exercise_type">) {
     writeQuery({ ...changes, body_region: undefined, primary_muscle: undefined, muscle_focus: undefined });
+  }
+
+  function chooseContentType(contentType: ExerciseContentType) {
+    writeQuery({
+      content_type: contentType,
+      muscle_focus: undefined,
+      equipment: undefined,
+      difficulty: undefined,
+      search: undefined,
+    });
   }
 
   function resetLibrary() {
@@ -401,6 +428,11 @@ export function ExerciseCatalogPage() {
                     <p>{t("catalog.focusIntro", { muscle: activeName(muscleCategory, isEnglish) })}</p>
                   </div>
                 </div>
+                <ContentTypeSwitcher
+                  value={query.content_type}
+                  onChange={chooseContentType}
+                />
+                {query.content_type === "exercise" && (
                 <div className="focus-selector" role="group" aria-label={t("catalog.focusTitle")}>
                   <button
                     className={`focus-button${selectedFocus === undefined ? " is-active" : ""}`}
@@ -421,6 +453,7 @@ export function ExerciseCatalogPage() {
                     />
                   ))}
                 </div>
+                )}
               </section>
             )}
           </>
@@ -438,7 +471,7 @@ export function ExerciseCatalogPage() {
               </div>
             </div>
 
-            <div className="exercise-filters" aria-label={t("catalog.filtersTitle")}>
+            {query.content_type === "exercise" && <div className="exercise-filters" aria-label={t("catalog.filtersTitle")}>
               <label>
                 <span>{t("catalog.equipmentLabel")}</span>
                 <select
@@ -482,7 +515,7 @@ export function ExerciseCatalogPage() {
                   onChange={(event) => writeQuery({ search: event.currentTarget.value || undefined })}
                 />
               </label>
-            </div>
+            </div>}
 
             {exerciseState === "loading" && (
               <StatusPanel role="status" message={t("catalog.loadingExercises")} compact />
@@ -688,6 +721,36 @@ function CategoryButton({
   );
 }
 
+function ContentTypeSwitcher({
+  value,
+  onChange,
+}: {
+  value: ExerciseContentType;
+  onChange: (value: ExerciseContentType) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="catalog-content-switcher" role="group" aria-label={t("catalog.contentTypeLabel")}>
+      <button
+        type="button"
+        aria-pressed={value === "exercise"}
+        className={value === "exercise" ? "is-active" : ""}
+        onClick={() => onChange("exercise")}
+      >
+        {t("catalog.contentType.exercise")}
+      </button>
+      <button
+        type="button"
+        aria-pressed={value === "guide"}
+        className={value === "guide" ? "is-active" : ""}
+        onClick={() => onChange("guide")}
+      >
+        {t("catalog.contentType.guide")}
+      </button>
+    </div>
+  );
+}
+
 function ExerciseCard({
   exercise,
   categories,
@@ -751,7 +814,7 @@ function ExerciseCard({
           )}
         </dl>
         <Link className="exercise-card__link" to={detailPath}>
-          {t("catalog.viewExercise")}
+          {t(exercise.content_type === "guide" ? "catalog.viewGuide" : "catalog.viewExercise")}
           <span aria-hidden="true">←</span>
         </Link>
         {isAdmin && (
@@ -819,6 +882,7 @@ function StatusPanel({
 function parseCatalogQuery(searchParams: URLSearchParams): CatalogQuery {
   const rawPage = Number(searchParams.get("page"));
   return {
+    content_type: optionalValue(searchParams.get("content_type"), ["exercise", "guide"] as const) ?? "exercise",
     body_region: optionalValue(searchParams.get("body_region"), bodyRegions),
     primary_muscle: optionalValue(searchParams.get("primary_muscle"), muscleGroups),
     muscle_focus: optionalValue(searchParams.get("muscle_focus"), muscleFocuses),
@@ -838,6 +902,7 @@ function serializeCatalogQuery(query: CatalogQuery): URLSearchParams {
   if (query.primary_muscle !== undefined) {
     searchParams.set("primary_muscle", query.primary_muscle);
   }
+  if (query.content_type !== "exercise") searchParams.set("content_type", query.content_type);
   if (query.muscle_focus !== undefined) searchParams.set("muscle_focus", query.muscle_focus);
   if (query.equipment !== undefined) searchParams.set("equipment", query.equipment);
   if (query.difficulty !== undefined) searchParams.set("difficulty", query.difficulty);
@@ -865,6 +930,7 @@ function resultHeading(
 ): string {
   if (query.labels?.[0] !== undefined) return t(`catalog.label.${query.labels[0]}`);
   if (query.exercise_type === "mobility") return t("catalog.mobility");
+  if (query.content_type === "guide") return t("catalog.guides");
   if (focus !== undefined) return activeName(focus, isEnglish);
   return muscle === undefined ? t("catalog.title") : activeName(muscle, isEnglish);
 }

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.cookies import require_trusted_origin
+from app.exercises.enums import ExerciseContentType
 from app.profile.models import UserProfile
 from app.workout_reviews.dependencies import (
     CoachUser,
@@ -189,7 +190,12 @@ def _detail_response(db: Session, review: WorkoutPlanReview) -> WorkoutReviewDet
     options = [
         WorkoutReviewExerciseOption(id=item.id, name_en=item.name_en, name_fa=item.name_fa)
         for item in sorted(get_exercises(db, candidate_ids), key=lambda exercise: exercise.name_en)
-        if item.is_active and item.is_programmable and not item.needs_review
+        if (
+            item.is_active
+            and item.is_programmable
+            and not item.needs_review
+            and item.content_type is ExerciseContentType.EXERCISE
+        )
     ]
     return WorkoutReviewDetailResponse(
         **summary.model_dump(),

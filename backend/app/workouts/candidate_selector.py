@@ -9,6 +9,7 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseCautionTag,
+    ExerciseContentType,
     ExerciseLabel,
     ExerciseType,
     MovementPattern,
@@ -62,6 +63,7 @@ class WorkoutCandidateSelector:
                 Exercise.is_active.is_(True),
                 Exercise.is_programmable.is_(True),
                 Exercise.needs_review.is_(False),
+                Exercise.content_type == ExerciseContentType.EXERCISE,
             )
             .options(
                 selectinload(Exercise.secondary_muscles),

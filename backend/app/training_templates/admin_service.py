@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.admin.schemas import AdminTrainingProgramTemplateWrite
+from app.exercises.enums import ExerciseContentType
 from app.exercises.models import Exercise
 from app.training_templates.models import (
     TrainingProgramTemplate,
@@ -70,6 +71,7 @@ def _validate_exercise_links(
             select(Exercise).where(
                 Exercise.id.in_(exercise_ids),
                 Exercise.is_active.is_(True),
+                Exercise.content_type == ExerciseContentType.EXERCISE,
             )
         )
     )

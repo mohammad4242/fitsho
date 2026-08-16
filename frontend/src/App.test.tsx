@@ -119,6 +119,7 @@ const exerciseDetail: ExerciseDetail = {
   slug: "dumbbell-bench-press",
   name_en: "Dumbbell Bench Press",
   name_fa: "پرس سینه دمبل",
+  content_type: "exercise",
   body_region: "upper_body",
   primary_muscle: "chest",
   muscle_focus: "mid_chest",

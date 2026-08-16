@@ -38,6 +38,7 @@ const detail: ExerciseDetail = {
   slug: "dumbbell-bench-press",
   name_en: "Dumbbell Bench Press",
   name_fa: "پرس سینه دمبل",
+  content_type: "exercise",
   body_region: "upper_body",
   primary_muscle: "chest",
   muscle_focus: "mid_chest",
@@ -77,6 +78,7 @@ describe("exercise api", () => {
       getExercises({
         body_region: "upper_body",
         primary_muscle: "chest",
+        content_type: "guide",
         muscle_focus: "upper_chest",
         equipment: "",
         difficulty: undefined,
@@ -86,7 +88,7 @@ describe("exercise api", () => {
     ).resolves.toEqual(page);
 
     expect(fetch).toHaveBeenCalledWith(
-      "/api/v1/exercises?body_region=upper_body&primary_muscle=chest&muscle_focus=upper_chest&search=incline+press&page=2",
+      "/api/v1/exercises?body_region=upper_body&primary_muscle=chest&content_type=guide&muscle_focus=upper_chest&search=incline+press&page=2",
       expect.objectContaining({ credentials: "include" }),
     );
   });

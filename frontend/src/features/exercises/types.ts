@@ -106,6 +106,9 @@ export type MovementPattern = (typeof movementPatterns)[number];
 export const exerciseTypes = ["compound", "isolation", "core", "mobility", "other"] as const;
 export type ExerciseType = (typeof exerciseTypes)[number];
 
+export const exerciseContentTypes = ["exercise", "guide"] as const;
+export type ExerciseContentType = (typeof exerciseContentTypes)[number];
+
 export const exerciseLabels = ["full_body", "cardio"] as const;
 export type ExerciseLabel = (typeof exerciseLabels)[number];
 
@@ -169,6 +172,7 @@ export type ExerciseSummary = {
   slug: string;
   name_en: string;
   name_fa: string;
+  content_type: ExerciseContentType;
   body_region: BodyRegion | null;
   primary_muscle: MuscleGroup | null;
   muscle_focus: MuscleFocus | null;
@@ -211,6 +215,7 @@ export type PaginatedExercises = {
 };
 
 export type ExerciseFilters = {
+  content_type?: ExerciseContentType;
   body_region?: BodyRegion | "";
   primary_muscle?: MuscleGroup | "";
   muscle_focus?: MuscleFocus | "";

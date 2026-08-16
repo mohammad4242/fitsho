@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.exercises.enums import ExerciseLabel
+from app.exercises.enums import ExerciseContentType, ExerciseLabel
 from app.exercises.models import Exercise, ExerciseLabelItem
 from app.exercises.service import seed_exercises
 
@@ -183,9 +183,39 @@ def test_list_returns_active_exercises_with_pagination_metadata(
         "equipment",
             "difficulty",
             "labels",
-            "media_path",
+        "media_path",
         "media_type",
+        "content_type",
     }
+    assert {item["content_type"] for item in payload["items"]} == {"exercise"}
+
+
+def test_list_can_return_only_guides_for_a_selected_muscle(
+    client: TestClient,
+    db: Session,
+) -> None:
+    prepare_catalog(client, db)
+    guide = db.scalar(select(Exercise).where(Exercise.slug == "dumbbell-bench-press"))
+    assert guide is not None
+    guide.content_type = ExerciseContentType.GUIDE
+    db.commit()
+
+    default_response = client.get(
+        "/api/v1/exercises",
+        params={"primary_muscle": "chest"},
+    )
+    guide_response = client.get(
+        "/api/v1/exercises",
+        params={"primary_muscle": "chest", "content_type": "guide"},
+    )
+
+    assert default_response.status_code == 200
+    assert all(item["content_type"] == "exercise" for item in default_response.json()["items"])
+    assert guide_response.status_code == 200
+    assert [item["slug"] for item in guide_response.json()["items"]] == [
+        "dumbbell-bench-press"
+    ]
+    assert guide_response.json()["items"][0]["content_type"] == "guide"
 
 
 def test_list_filters_by_exercise_labels(client: TestClient, db: Session) -> None:

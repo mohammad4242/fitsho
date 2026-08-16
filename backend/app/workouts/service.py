@@ -24,6 +24,7 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseCautionTag,
+    ExerciseContentType,
     ExerciseType,
 )
 from app.exercises.models import Exercise
@@ -708,7 +709,9 @@ class WorkoutGenerationService:
 
     def _load_catalog(self) -> tuple[ExerciseCandidate, ...]:
         exercises = self._db.scalars(
-            select(Exercise).options(
+            select(Exercise)
+            .where(Exercise.content_type == ExerciseContentType.EXERCISE)
+            .options(
                 selectinload(Exercise.secondary_muscles),
                 selectinload(Exercise.equipment_items),
                 selectinload(Exercise.caution_tag_items),

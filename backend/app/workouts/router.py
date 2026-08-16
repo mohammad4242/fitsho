@@ -332,6 +332,7 @@ def to_exercise_summary(exercise: Exercise) -> ExerciseSummary:
         slug=exercise.slug,
         name_en=exercise.name_en,
         name_fa=exercise.name_fa,
+        content_type=exercise.content_type,
         body_region=exercise.body_region,
         primary_muscle=exercise.primary_muscle,
         muscle_focus=exercise.muscle_focus,

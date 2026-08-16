@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.exercises.enums import ExerciseContentType
 from app.exercises.models import Exercise
 from app.workout_reviews.enums import WorkoutReviewQueueView, WorkoutReviewStatus
 from app.workout_reviews.models import WorkoutPlanReview
@@ -64,7 +65,14 @@ def get_active_plan_for_update(db: Session, user_id: UUID) -> WorkoutPlan | None
 def get_exercises(db: Session, exercise_ids: set[UUID]) -> list[Exercise]:
     if not exercise_ids:
         return []
-    return list(db.scalars(select(Exercise).where(Exercise.id.in_(exercise_ids))).all())
+    return list(
+        db.scalars(
+            select(Exercise).where(
+                Exercise.id.in_(exercise_ids),
+                Exercise.content_type == ExerciseContentType.EXERCISE,
+            )
+        ).all()
+    )
 
 
 def list_reviews(

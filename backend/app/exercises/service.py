@@ -35,6 +35,7 @@ def list_exercises(
     filters: ExerciseFilters,
 ) -> tuple[list[Exercise], int]:
     conditions: list[ColumnElement[bool]] = [Exercise.is_active.is_(True)]
+    conditions.append(Exercise.content_type == filters.content_type)
     if filters.body_region is not None:
         conditions.append(Exercise.body_region == filters.body_region)
     if filters.primary_muscle is not None:

@@ -17,6 +17,27 @@ def test_exercise_has_nullable_muscle_focus_column_and_composite_index() -> None
     }
 
 
+def test_exercise_content_type_defaults_to_exercise(db: Session) -> None:
+    from app.exercises.enums import ExerciseContentType
+
+    exercise = make_exercise("default-content-type")
+    db.add(exercise)
+    db.flush()
+
+    assert exercise.content_type is ExerciseContentType.EXERCISE
+
+
+def test_exercise_accepts_guide_content_type(db: Session) -> None:
+    from app.exercises.enums import ExerciseContentType
+
+    exercise = make_exercise("guide-content-type")
+    exercise.content_type = ExerciseContentType.GUIDE
+    db.add(exercise)
+    db.flush()
+
+    assert exercise.content_type is ExerciseContentType.GUIDE
+
+
 def test_exercise_media_role_has_no_thumbnail() -> None:
     from app.exercises.enums import MediaRole
 
@@ -182,6 +203,7 @@ def test_exercise_database_requires_focus_for_known_primary_muscle(db: Session) 
         ("muscle_focus", "inner_chest", "ck_exercises_muscle_focus_values"),
         ("difficulty", "expert", "ck_exercises_difficulty_values"),
         ("media_type", "youtube", "ck_exercises_media_type_values"),
+        ("content_type", "article", "ck_exercises_content_type_values"),
     ],
 )
 def test_exercise_database_rejects_invalid_controlled_values(
@@ -198,6 +220,7 @@ def test_exercise_database_rejects_invalid_controlled_values(
         "muscle_focus": "mid_chest",
         "difficulty": "beginner",
         "media_type": "placeholder",
+        "content_type": "exercise",
     }
     values[column] = invalid_value
 
@@ -208,14 +231,14 @@ def test_exercise_database_rejects_invalid_controlled_values(
                 INSERT INTO exercises (
                     id, slug, name_en, name_fa, body_region, primary_muscle, muscle_focus,
                     difficulty, instructions_en, instructions_fa,
-                    safety_notes_en, safety_notes_fa, media_path, media_type
+                    safety_notes_en, safety_notes_fa, media_path, media_type, content_type
                 ) VALUES (
                     :id, :slug, 'Push-Up', 'شنا سوئدی', :body_region,
                     :primary_muscle, :muscle_focus, :difficulty,
                     '["Step one", "Step two", "Step three"]',
                     '["گام یک", "گام دو", "گام سه"]', '["Use control"]',
                     '["حرکت را کنترل کن"]', '/exercises/exercise-placeholder.svg',
-                    :media_type
+                    :media_type, :content_type
                 )
                 """
             ),

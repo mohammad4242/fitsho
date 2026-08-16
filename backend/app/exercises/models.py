@@ -26,6 +26,7 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseCautionTag,
+    ExerciseContentType,
     ExerciseLabel,
     ExerciseType,
     MediaPresentation,
@@ -115,12 +116,26 @@ class Exercise(Base):
         Index("ix_exercises_difficulty", "difficulty"),
         Index("ix_exercises_is_active", "is_active"),
         Index("ix_exercises_is_programmable", "is_programmable"),
+        Index("ix_exercises_content_type", "content_type"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     slug: Mapped[str] = mapped_column(String(120), nullable=False)
     name_en: Mapped[str] = mapped_column(String(160), nullable=False)
     name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
+    content_type: Mapped[ExerciseContentType] = mapped_column(
+        Enum(
+            ExerciseContentType,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercises_content_type_values",
+        ),
+        default=ExerciseContentType.EXERCISE,
+        server_default=ExerciseContentType.EXERCISE.value,
+        nullable=False,
+    )
     body_region: Mapped[BodyRegion | None] = mapped_column(
         Enum(
             BodyRegion,

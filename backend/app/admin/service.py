@@ -14,7 +14,12 @@ from app.admin.schemas import (
 )
 from app.auth.models import User
 from app.auth.service import normalize_email
-from app.exercises.enums import ExerciseLabel, MediaPresentation, MediaRole, MediaType
+from app.exercises.enums import (
+    ExerciseLabel,
+    MediaPresentation,
+    MediaRole,
+    MediaType,
+)
 from app.exercises.media_metadata import OWNER_ATTRIBUTION, OWNER_LICENSE
 from app.exercises.models import (
     Exercise,
@@ -128,6 +133,8 @@ def list_admin_exercises(
     conditions: list[ColumnElement[bool]] = []
     if filters.body_region is not None:
         conditions.append(Exercise.body_region == filters.body_region)
+    if filters.content_type is not None:
+        conditions.append(Exercise.content_type == filters.content_type)
     if filters.primary_muscle is not None:
         conditions.append(Exercise.primary_muscle == filters.primary_muscle)
     if filters.muscle_focus is not None:
@@ -190,6 +197,7 @@ def create_admin_exercise(
         slug=payload.slug,
         name_en=payload.name_en,
         name_fa=payload.name_fa,
+        content_type=payload.content_type,
         body_region=payload.body_region,
         primary_muscle=payload.primary_muscle,
         muscle_focus=payload.muscle_focus,
@@ -280,6 +288,7 @@ def update_admin_exercise(
         "slug",
         "name_en",
         "name_fa",
+        "content_type",
         "body_region",
         "primary_muscle",
         "muscle_focus",

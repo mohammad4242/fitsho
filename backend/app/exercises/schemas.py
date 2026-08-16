@@ -7,6 +7,7 @@ from app.exercises.enums import (
     BodyRegion,
     Difficulty,
     Equipment,
+    ExerciseContentType,
     ExerciseLabel,
     ExerciseType,
     MediaPresentation,
@@ -24,6 +25,7 @@ SearchText = Annotated[
 
 
 class ExerciseFilters(BaseModel):
+    content_type: ExerciseContentType = ExerciseContentType.EXERCISE
     body_region: BodyRegion | None = None
     primary_muscle: MuscleGroup | None = None
     muscle_focus: MuscleFocus | None = None
@@ -76,6 +78,7 @@ class ExerciseSummary(BaseModel):
     slug: str
     name_en: str
     name_fa: str
+    content_type: ExerciseContentType = ExerciseContentType.EXERCISE
     body_region: BodyRegion | None
     primary_muscle: MuscleGroup | None
     muscle_focus: MuscleFocus | None = None

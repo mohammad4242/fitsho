@@ -203,6 +203,33 @@ html[dir="rtl"] .exercise-catalog-hero h1 {
   gap: 0.75rem;
 }
 
+.catalog-content-switcher {
+  display: inline-flex;
+  gap: 0.2rem;
+  margin-block: 1rem 1.15rem;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--mist-100);
+}
+
+.catalog-content-switcher button {
+  min-width: 7rem;
+  padding: 0.65rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.catalog-content-switcher button.is-active {
+  color: var(--paper);
+  background: var(--petrol-900);
+}
+
 .region-selector {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

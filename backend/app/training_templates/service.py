@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.exercises.enums import ExerciseContentType
 from app.exercises.models import Exercise
 from app.training_templates.catalog_placeholders import (
     ensure_template_catalog_placeholders,
@@ -38,7 +39,10 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
     ensure_template_catalog_placeholders(db, template_slots)
     db.flush()
     exercises_by_slug = {
-        exercise.slug: exercise for exercise in db.scalars(select(Exercise))
+        exercise.slug: exercise
+        for exercise in db.scalars(
+            select(Exercise).where(Exercise.content_type == ExerciseContentType.EXERCISE)
+        )
     }
     linked_slots = 0
     placeholder_slots = 0
@@ -139,6 +143,7 @@ def _exercise_id_for_slot(
         exercises_by_slug[candidate_slug]
         for candidate_slug in candidate_slugs
         if candidate_slug in exercises_by_slug
+        and exercises_by_slug[candidate_slug].content_type is ExerciseContentType.EXERCISE
     ]
     selected = next(
         (exercise for exercise in candidates if not is_template_catalog_placeholder(exercise)),
