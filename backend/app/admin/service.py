@@ -14,6 +14,10 @@ from app.admin.schemas import (
 )
 from app.auth.models import User
 from app.auth.service import normalize_email
+from app.exercises.catalog_visibility import (
+    normal_catalog_exclusion_conditions,
+    should_exclude_special_categories,
+)
 from app.exercises.enums import (
     ExerciseLabel,
     MediaPresentation,
@@ -151,6 +155,8 @@ def list_admin_exercises(
         conditions.extend(
             Exercise.labels.any(ExerciseLabelItem.label == label) for label in filters.labels
         )
+    if should_exclude_special_categories(filters.labels, filters.exercise_type):
+        conditions.extend(normal_catalog_exclusion_conditions())
     if filters.is_active is not None:
         conditions.append(Exercise.is_active.is_(filters.is_active))
     if filters.needs_review is not None:

@@ -5,6 +5,10 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
+from app.exercises.catalog_visibility import (
+    normal_catalog_exclusion_conditions,
+    should_exclude_special_categories,
+)
 from app.exercises.enums import Equipment, ExerciseCautionTag, MuscleGroup
 from app.exercises.models import (
     Exercise,
@@ -54,6 +58,8 @@ def list_exercises(
         conditions.extend(
             Exercise.labels.any(ExerciseLabelItem.label == label) for label in filters.labels
         )
+    if should_exclude_special_categories(filters.labels, filters.exercise_type):
+        conditions.extend(normal_catalog_exclusion_conditions())
     if filters.search is not None:
         pattern = f"%{_escape_like(filters.search)}%"
         conditions.append(

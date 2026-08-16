@@ -5,7 +5,14 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.exercises.enums import ExerciseContentType, ExerciseLabel
+from app.exercises.enums import (
+    BodyRegion,
+    ExerciseContentType,
+    ExerciseLabel,
+    ExerciseType,
+    MuscleFocus,
+    MuscleGroup,
+)
 from app.exercises.models import Exercise, ExerciseLabelItem
 from app.exercises.service import seed_exercises
 
@@ -49,6 +56,30 @@ def prepare_catalog(
     register(client, email)
     complete_profile(client)
     seed_exercises(db)
+
+
+def prepare_catalog_with_special_exercises(
+    client: TestClient,
+    db: Session,
+    email: str = "special-catalog@example.com",
+) -> None:
+    prepare_catalog(client, db, email)
+    cardio = db.scalar(select(Exercise).where(Exercise.slug == "dumbbell-bench-press"))
+    full_body = db.scalar(select(Exercise).where(Exercise.slug == "leg-press"))
+    mobility_upper = db.scalar(select(Exercise).where(Exercise.slug == "barbell-bent-over-row"))
+    mobility_core = db.scalar(select(Exercise).where(Exercise.slug == "romanian-deadlift"))
+    assert cardio is not None
+    assert full_body is not None
+    assert mobility_upper is not None
+    assert mobility_core is not None
+    cardio.labels.append(ExerciseLabelItem(label=ExerciseLabel.CARDIO))
+    full_body.labels.append(ExerciseLabelItem(label=ExerciseLabel.FULL_BODY))
+    mobility_upper.exercise_type = ExerciseType.MOBILITY
+    mobility_core.body_region = BodyRegion.CORE
+    mobility_core.primary_muscle = MuscleGroup.ABS
+    mobility_core.muscle_focus = MuscleFocus.TRUNK_FLEXION
+    mobility_core.exercise_type = ExerciseType.MOBILITY
+    db.commit()
 
 
 @pytest.mark.parametrize(
@@ -238,6 +269,67 @@ def test_list_filters_by_exercise_labels(client: TestClient, db: Session) -> Non
     assert response.status_code == 200
     assert [item["slug"] for item in response.json()["items"]] == ["dumbbell-bench-press"]
     assert response.json()["items"][0]["labels"] == ["cardio"]
+
+
+@pytest.mark.parametrize(
+    ("params", "excluded_slugs"),
+    [
+        (
+            {"body_region": "upper_body"},
+            {"dumbbell-bench-press", "barbell-bent-over-row"},
+        ),
+        ({"primary_muscle": "chest"}, {"dumbbell-bench-press"}),
+        ({"body_region": "lower_body"}, {"leg-press"}),
+        ({"primary_muscle": "quadriceps"}, {"leg-press"}),
+        ({"body_region": "core"}, {"romanian-deadlift"}),
+        ({"primary_muscle": "abs"}, {"romanian-deadlift"}),
+    ],
+)
+def test_normal_anatomy_browsing_excludes_special_exercises(
+    client: TestClient,
+    db: Session,
+    params: dict[str, str],
+    excluded_slugs: set[str],
+) -> None:
+    prepare_catalog_with_special_exercises(client, db)
+
+    response = client.get("/api/v1/exercises", params={**params, "page_size": 50})
+
+    assert response.status_code == 200
+    payload = response.json()
+    listed_slugs = {item["slug"] for item in payload["items"]}
+    assert listed_slugs.isdisjoint(excluded_slugs)
+    assert payload["total"] == len(payload["items"])
+
+
+@pytest.mark.parametrize(
+    ("params", "expected_slugs"),
+    [
+        ({"labels": "cardio"}, {"dumbbell-bench-press"}),
+        ({"labels": "full_body"}, {"leg-press"}),
+        (
+            {"exercise_type": "mobility"},
+            {"barbell-bent-over-row", "romanian-deadlift"},
+        ),
+    ],
+)
+def test_special_filters_include_only_their_special_exercises(
+    client: TestClient,
+    db: Session,
+    params: dict[str, str],
+    expected_slugs: set[str],
+) -> None:
+    prepare_catalog_with_special_exercises(client, db)
+
+    response = client.get(
+        "/api/v1/exercises",
+        params={**params, "page_size": 50},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert {item["slug"] for item in payload["items"]} == expected_slugs
+    assert payload["total"] == len(expected_slugs)
 
 
 def test_detail_returns_complete_bilingual_exercise(
