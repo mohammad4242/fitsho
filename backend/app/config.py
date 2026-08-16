@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     media_root: Path = Path("var/media")
     media_public_path: str = "/media"
     media_max_bytes: int = 20 * 1024 * 1024
+    media_max_video_bytes: int = 64 * 1024 * 1024
     import_media_max_bytes: int = 24 * 1024 * 1024
     media_max_video_duration_seconds: float = 20.0
     media_read_chunk_bytes: int = 1024 * 1024

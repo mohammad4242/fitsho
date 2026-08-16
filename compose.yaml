@@ -31,6 +31,7 @@ services:
       MEDIA_ROOT: /var/lib/fitsho/media
       MEDIA_PUBLIC_PATH: /media
       MEDIA_MAX_BYTES: "20971520"
+      MEDIA_MAX_VIDEO_BYTES: "67108864"
       MEDIA_MAX_VIDEO_DURATION_SECONDS: "20"
     ports:
       - "8000:8000"

@@ -132,6 +132,19 @@ def test_valid_short_video_is_stored(
     assert stored.absolute_path.suffix == Path(filename).suffix
 
 
+def test_video_upload_allows_up_to_64_mebibytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.admin.media._probe_video_duration", lambda *_: 5.0)
+    content = MP4_BYTES + b"\x00" * (64 * 1024 * 1024 - len(MP4_BYTES))
+
+    stored = store_upload(upload("large.mp4", content, "video/mp4"), settings(tmp_path))
+
+    assert stored.media_type is MediaType.VIDEO
+    assert stored.absolute_path.stat().st_size == 64 * 1024 * 1024
+
+
 @pytest.mark.parametrize(
     ("filename", "content", "content_type"),
     [

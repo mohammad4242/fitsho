@@ -102,8 +102,10 @@ def _write_temporary(
     upload: UploadFile,
     settings: Settings,
     storage_root: Path | None = None,
+    max_bytes: int | None = None,
 ) -> Path:
     target_root = storage_root or settings.media_root
+    byte_limit = settings.media_max_bytes if max_bytes is None else max_bytes
     target_root.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
     try:
@@ -118,9 +120,9 @@ def _write_temporary(
             upload.file.seek(0)
             while chunk := upload.file.read(settings.media_read_chunk_bytes):
                 total += len(chunk)
-                if total > settings.media_max_bytes:
+                if total > byte_limit:
                     raise MediaValidationError(
-                        f"Media file exceeds the {settings.media_max_bytes} bytes limit"
+                        f"Media file exceeds the {byte_limit} bytes limit"
                     )
                 temporary.write(chunk)
         if total == 0:
@@ -153,7 +155,15 @@ def store_upload(upload: UploadFile, settings: Settings) -> StoredMedia:
     if upload.content_type != expected_content_type:
         raise MediaValidationError("Media MIME type does not match its extension")
 
-    temporary_path = _write_temporary(upload, settings)
+    temporary_path = _write_temporary(
+        upload,
+        settings,
+        max_bytes=(
+            settings.media_max_video_bytes
+            if media_type is MediaType.VIDEO
+            else settings.media_max_bytes
+        ),
+    )
     try:
         with temporary_path.open("rb") as file_handle:
             detected_extension = _signature_extension(file_handle.read(64))
