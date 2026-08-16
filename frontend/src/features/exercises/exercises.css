@@ -539,6 +539,20 @@ html[dir="rtl"] .exercise-catalog-hero h1 {
   background: transparent;
 }
 
+.exercise-card__delete {
+  width: 100%;
+  min-height: 2.8rem;
+  margin-block-start: 0.55rem;
+  border: 1px solid var(--fitsho-danger, #b44a4a);
+  border-radius: 0.7rem;
+  color: var(--fitsho-danger, #b44a4a);
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 820;
+  cursor: pointer;
+}
+
 .exercise-card__admin-state {
   display: inline-flex;
   margin-block-start: 0.45rem;

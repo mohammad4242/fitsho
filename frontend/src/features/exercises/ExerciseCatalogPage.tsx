@@ -4,7 +4,8 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import heroStrengthFallback from "../../assets/landing/hero-strength-fallback.jpg";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
-import { getAdminExercises } from "../admin/api";
+import { ApiError } from "../../shared/apiClient";
+import { deleteAdminExercise, getAdminExercises } from "../admin/api";
 import { useAuth } from "../auth/AuthContext";
 import { getExerciseCategories, getExercises } from "./api";
 import { ExerciseMedia } from "./ExerciseMedia";
@@ -58,6 +59,7 @@ export function ExerciseCatalogPage() {
   const [exercisePage, setExercisePage] = useState<PaginatedExercises | null>(null);
   const [exerciseState, setExerciseState] = useState<LoadState>("idle");
   const [exerciseRetry, setExerciseRetry] = useState(0);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const query = useMemo(() => parseCatalogQuery(searchParams), [searchParams]);
   const isEnglish = i18n.resolvedLanguage === "en";
@@ -189,6 +191,28 @@ export function ExerciseCatalogPage() {
 
   function resetToRegion() {
     writeQuery({ primary_muscle: undefined, muscle_focus: undefined });
+  }
+
+  async function handleDelete(exercise: CatalogExercise) {
+    const name = isEnglish ? exercise.name_en : exercise.name_fa;
+    if (!window.confirm(t("catalog.confirmDeleteExercise", { name }))) return;
+    setDeleteError(null);
+    try {
+      await deleteAdminExercise(exercise.id);
+      setExercisePage((current) => current === null
+        ? current
+        : {
+            ...current,
+            items: current.items.filter((item) => item.id !== exercise.id),
+            total: Math.max(0, current.total - 1),
+          });
+    } catch (error) {
+      setDeleteError(
+        error instanceof ApiError && error.status === 409
+          ? t("catalog.deleteExerciseInUse")
+          : t("catalog.deleteExerciseError"),
+      );
+    }
   }
 
   const hasResultFilters = Boolean(selectedFocus || query.equipment || query.difficulty || query.search?.trim());
@@ -427,6 +451,10 @@ export function ExerciseCatalogPage() {
               </label>
             </div>
 
+            {deleteError !== null && (
+              <StatusPanel role="alert" message={deleteError} compact />
+            )}
+
             {exerciseState === "loading" && (
               <StatusPanel role="status" message={t("catalog.loadingExercises")} compact />
             )}
@@ -461,6 +489,7 @@ export function ExerciseCatalogPage() {
                       catalogSearch={currentSearch}
                       isAdmin={isAdmin}
                       returnTo={returnTo}
+                      onDelete={handleDelete}
                     />
                   ))}
                 </div>
@@ -583,6 +612,7 @@ function ExerciseCard({
   catalogSearch,
   isAdmin,
   returnTo,
+  onDelete,
 }: {
   exercise: CatalogExercise;
   categories: ExerciseCategories;
@@ -590,6 +620,7 @@ function ExerciseCard({
   catalogSearch: string;
   isAdmin: boolean;
   returnTo: string;
+  onDelete: (exercise: CatalogExercise) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const name = isEnglish ? exercise.name_en : exercise.name_fa;
@@ -647,6 +678,15 @@ function ExerciseCard({
           >
             {t("catalog.editExercise")}
           </Link>
+        )}
+        {isAdmin && (
+          <button
+            className="exercise-card__delete"
+            type="button"
+            onClick={() => void onDelete(exercise)}
+          >
+            {t("catalog.deleteExercise")}
+          </button>
         )}
         {isAdmin && exercise.is_active === false && (
           <span className="exercise-card__admin-state">{t("catalog.adminStatus.inactive")}</span>

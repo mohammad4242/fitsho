@@ -324,3 +324,7 @@ export function updateAdminExercise(
     body,
   });
 }
+
+export function deleteAdminExercise(exerciseId: string): Promise<void> {
+  return request<void>(`${adminExercisesPath}/${exerciseId}`, { method: "DELETE" });
+}

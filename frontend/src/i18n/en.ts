@@ -731,6 +731,10 @@ const en = {
       adminTools: "Exercise administration tools",
       addExercise: "Add Exercise",
       editExercise: "Edit",
+      deleteExercise: "Delete",
+      confirmDeleteExercise: "Delete “{{name}}”? This action cannot be undone.",
+      deleteExerciseInUse: "This exercise is used in a workout plan and cannot be deleted.",
+      deleteExerciseError: "The exercise could not be deleted. Try again.",
       adminStatusLabel: "Administration status",
       adminStatus: {
         published: "Active and published",

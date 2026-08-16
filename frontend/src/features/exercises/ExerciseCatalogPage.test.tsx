@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
+import { ApiError } from "../../shared/apiClient";
 import type {
   ExerciseCategories,
   ExerciseSummary,
@@ -17,6 +18,7 @@ const api = vi.hoisted(() => ({
 }));
 const adminApi = vi.hoisted(() => ({
   getAdminExercises: vi.fn(),
+  deleteAdminExercise: vi.fn(),
 }));
 const auth = vi.hoisted(() => ({ isAdmin: false }));
 
@@ -106,6 +108,7 @@ beforeEach(async () => {
   api.getExerciseCategories.mockReset();
   api.getExercises.mockReset();
   adminApi.getAdminExercises.mockReset();
+  adminApi.deleteAdminExercise.mockReset();
   auth.isAdmin = false;
   api.getExerciseCategories.mockResolvedValue(categories);
   api.getExercises.mockResolvedValue(populatedPage);
@@ -361,6 +364,41 @@ describe("administrator controls", () => {
       "href",
       `/admin/exercises/${benchPress.id}/edit?return_to=${returnTo}`,
     );
+  });
+
+  it("confirms and removes an exercise through the admin delete action", async () => {
+    auth.isAdmin = true;
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    adminApi.deleteAdminExercise.mockResolvedValue(undefined);
+    renderCatalog("/exercises?body_region=upper_body&primary_muscle=chest");
+
+    const card = await screen.findByRole("article", { name: "پرس سینه دمبل" });
+    await user.click(within(card).getByRole("button", { name: "حذف" }));
+
+    expect(confirm).toHaveBeenCalled();
+    expect(adminApi.deleteAdminExercise).toHaveBeenCalledWith(benchPress.id);
+    expect(screen.queryByRole("article", { name: "پرس سینه دمبل" })).not.toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it("shows a safe error when the exercise cannot be deleted", async () => {
+    auth.isAdmin = true;
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    adminApi.deleteAdminExercise.mockRejectedValue(
+      new ApiError(409, "Exercise is used in a workout plan"),
+    );
+    renderCatalog("/exercises?body_region=upper_body&primary_muscle=chest");
+
+    const card = await screen.findByRole("article", { name: "پرس سینه دمبل" });
+    await user.click(within(card).getByRole("button", { name: "حذف" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "این حرکت در یک برنامه تمرینی استفاده شده و قابل حذف نیست.",
+    );
+    expect(screen.getByRole("article", { name: "پرس سینه دمبل" })).toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 
   it("uses the protected admin list only for explicit admin status filters", async () => {

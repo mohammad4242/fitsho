@@ -731,6 +731,10 @@ const fa = {
       adminTools: "ابزارهای مدیریت حرکات",
       addExercise: "افزودن حرکت",
       editExercise: "ویرایش",
+      deleteExercise: "حذف",
+      confirmDeleteExercise: "حرکت «{{name}}» حذف شود؟ این کار قابل بازگشت نیست.",
+      deleteExerciseInUse: "این حرکت در یک برنامه تمرینی استفاده شده و قابل حذف نیست.",
+      deleteExerciseError: "حرکت حذف نشد. دوباره تلاش کنید.",
       adminStatusLabel: "وضعیت مدیریتی",
       adminStatus: {
         published: "فعال و منتشرشده",
