@@ -27,11 +27,14 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-it("renders bilingual fields, placeholder, and RTL/LTR directions", () => {
+it("renders bilingual fields, placeholder, and RTL/LTR directions", async () => {
+  const user = userEvent.setup();
   renderPage();
+  await openSection(user, "هویت حرکت");
 
   expect(screen.getByLabelText("نام انگلیسی")).toHaveAttribute("dir", "ltr");
   expect(screen.getByLabelText("نام فارسی")).toHaveAttribute("dir", "rtl");
+  await openSection(user, "رسانه و مالکیت");
   expect(screen.getByRole("img", { name: /نمایش حرکت/ })).toHaveAttribute(
     "src", "/exercises/exercise-placeholder.svg",
   );
@@ -41,8 +44,10 @@ it("suggests an editable slug and filters muscles by region", async () => {
   const user = userEvent.setup();
   renderPage();
 
+  await openSection(user, "هویت حرکت");
   await user.type(screen.getByLabelText("نام انگلیسی"), "Incline Push Up");
   expect(screen.getByLabelText("شناسه پایدار")).toHaveValue("incline-push-up");
+  await openSection(user, "هدف و تجهیزات");
   await user.selectOptions(screen.getByLabelText("ناحیه بدن"), "upper_body");
   expect(screen.getByLabelText("عضله اصلی")).toContainHTML("chest");
   expect(screen.getByLabelText("عضله اصلی")).not.toContainHTML("quadriceps");
@@ -54,6 +59,7 @@ it("prefills the selected library category and keeps it editable", async () => {
     "/admin/exercises/new?body_region=lower_body&primary_muscle=quadriceps&muscle_focus=vasti&return_to=%2Fexercises%3Fbody_region%3Dlower_body%26primary_muscle%3Dquadriceps%26muscle_focus%3Dvasti%26search%3Dsquat",
   );
 
+  await openSection(user, "هدف و تجهیزات");
   expect(screen.getByLabelText("ناحیه بدن")).toHaveValue("lower_body");
   expect(screen.getByLabelText("عضله اصلی")).toHaveValue("quadriceps");
   expect(screen.queryByLabelText("بخش هدف عضله")).not.toBeInTheDocument();
@@ -72,32 +78,39 @@ it("allows a review record to leave anatomy unassigned and add a cardio label", 
   const user = userEvent.setup();
   renderPage();
 
+  await openSection(user, "اطلاعات برنامه‌سازی");
   await user.click(screen.getByLabelText("نیازمند بازبینی"));
   await user.click(screen.getByLabelText("هوازی"));
+  expect(screen.getByLabelText("هوازی")).toBeChecked();
+  await openSection(user, "هدف و تجهیزات");
 
   expect(screen.getByLabelText("ناحیه بدن")).toBeDisabled();
   expect(screen.getByLabelText("عضله اصلی")).not.toBeRequired();
-  expect(screen.getByLabelText("هوازی")).toBeChecked();
 });
 
 it("supports repeatable instructions and safety notes plus multi-select choices", async () => {
   const user = userEvent.setup();
   renderPage();
 
+  await openSection(user, "آموزش و ایمنی");
   await user.click(screen.getByRole("button", { name: "افزودن مرحله انگلیسی" }));
   await user.click(screen.getByRole("button", { name: "افزودن نکته فارسی" }));
+  await openSection(user, "هدف و تجهیزات");
   await user.click(screen.getByLabelText("وزن بدن"));
   await user.selectOptions(screen.getByLabelText("ناحیه بدن"), "upper_body");
   await user.click(screen.getByLabelText("عضله فرعی: پشت بازو"));
 
-  expect(screen.getByLabelText("مرحله انگلیسی ۴")).toBeInTheDocument();
-  expect(screen.getByLabelText("نکته فارسی ۲")).toBeInTheDocument();
   expect(screen.getByLabelText("وزن بدن")).toBeChecked();
   expect(screen.getByLabelText("عضله فرعی: پشت بازو")).toBeChecked();
+  await openSection(user, "آموزش و ایمنی");
+  expect(screen.getByLabelText("مرحله انگلیسی ۴")).toBeInTheDocument();
+  expect(screen.getByLabelText("نکته فارسی ۲")).toBeInTheDocument();
 });
 
-it("previews GIF and video selections without autoplay", () => {
+it("previews GIF and video selections without autoplay", async () => {
+  const user = userEvent.setup();
   renderPage();
+  await openSection(user, "رسانه و مالکیت");
   const input = screen.getByLabelText("فایل GIF یا ویدئو");
   fireEvent.change(input, {
     target: { files: [new File(["GIF89a"], "demo.gif", { type: "image/gif" })] },
@@ -118,6 +131,7 @@ it("submits male and female videos from separate media galleries", async () => {
   const user = userEvent.setup();
   renderPage();
   await fillMinimumForm(user);
+  await openSection(user, "ویدئوهای زن و مرد");
   const maleVideo = new File(["video"], "male.mp4", { type: "video/mp4" });
   const femaleVideo = new File(["video"], "female.mp4", { type: "video/mp4" });
 
@@ -146,6 +160,7 @@ it("announces validation errors and does not submit an empty form", async () => 
   await user.click(screen.getByRole("button", { name: "ذخیره حرکت" }));
 
   expect(screen.getByRole("alert")).toHaveTextContent("فیلدهای مشخص‌شده");
+  await openSection(user, "هدف و تجهیزات");
   expect(screen.getByText(/حداقل یک وسیله را انتخاب کنید/)).toBeInTheDocument();
   expect(adminApi.createAdminExercise).not.toHaveBeenCalled();
 });
@@ -186,12 +201,15 @@ it("shows duplicate slug and retryable API failures", async () => {
 });
 
 async function fillMinimumForm(user: ReturnType<typeof userEvent.setup>) {
+  await openSection(user, "هویت حرکت");
   await user.type(screen.getByLabelText("نام انگلیسی"), "Incline Push Up");
   await user.type(screen.getByLabelText("نام فارسی"), "شنا شیب‌دار");
+  await openSection(user, "هدف و تجهیزات");
   await user.selectOptions(screen.getByLabelText("ناحیه بدن"), "upper_body");
   await user.selectOptions(screen.getByLabelText("عضله اصلی"), "chest");
   await user.selectOptions(screen.getByLabelText("بخش هدف عضله"), "mid_chest");
   await user.click(screen.getByLabelText("وزن بدن"));
+  await openSection(user, "آموزش و ایمنی");
   const digits = ["۱", "۲", "۳"];
   for (const [index, value] of ["Brace", "Lower", "Press"].entries()) {
     await user.type(screen.getByLabelText(`مرحله انگلیسی ${digits[index]}`), value);
@@ -199,6 +217,10 @@ async function fillMinimumForm(user: ReturnType<typeof userEvent.setup>) {
   }
   await user.type(screen.getByLabelText("نکته انگلیسی ۱"), "Keep aligned");
   await user.type(screen.getByLabelText("نکته فارسی ۱"), "بدن هم‌راستا باشد");
+}
+
+async function openSection(user: ReturnType<typeof userEvent.setup>, title: string) {
+  await user.click(await screen.findByRole("button", { name: title }));
 }
 
 function renderPage(path = "/admin/exercises/new") {

@@ -2,9 +2,14 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MediaPresentation } from "../exercises/types";
+import {
+  AdminAccordionSection,
+  type AdminAccordionSectionControl,
+} from "./AdminAccordionSection";
 import type { AdminExerciseMediaAssetInput, AdminExerciseMediaFiles } from "./types";
 
 type Props = {
+  accordion: AdminAccordionSectionControl;
   assets: AdminExerciseMediaAssetInput[];
   files: AdminExerciseMediaFiles;
   onAssetsChange: (assets: AdminExerciseMediaAssetInput[]) => void;
@@ -23,7 +28,7 @@ function nextSortOrder(
   ) + 1;
 }
 
-export function ExerciseMediaAssetsFields({ assets, files, onAssetsChange, onFilesChange }: Props) {
+export function ExerciseMediaAssetsFields({ accordion, assets, files, onAssetsChange, onFilesChange }: Props) {
   const { t } = useTranslation();
   const [presentation, setPresentation] = useState<"male" | "female">("male");
   const visible = assets.filter((asset) => asset.presentation === presentation);
@@ -69,7 +74,7 @@ export function ExerciseMediaAssetsFields({ assets, files, onAssetsChange, onFil
     onAssetsChange(assets.map((item) => item === asset ? { ...item, upload_index: uploadIndex } : item));
   }
 
-  return <fieldset className="admin-form-section"><legend>{t("admin.fields.mediaVariants")}</legend>
+  return <AdminAccordionSection {...accordion}>
     <div className="admin-media-tabs" role="tablist" aria-label={t("admin.fields.mediaVariants")}>
       <button type="button" role="tab" aria-selected={presentation === "male"} onClick={() => setPresentation("male")}>{t("admin.fields.male")}</button>
       <button type="button" role="tab" aria-selected={presentation === "female"} onClick={() => setPresentation("female")}>{t("admin.fields.female")}</button>
@@ -97,5 +102,5 @@ export function ExerciseMediaAssetsFields({ assets, files, onAssetsChange, onFil
       </section>;
     })}</div>
     <button type="button" className="admin-media-add" onClick={addAsset}>{t("admin.fields.addMedia")}</button>
-  </fieldset>;
+  </AdminAccordionSection>;
 }

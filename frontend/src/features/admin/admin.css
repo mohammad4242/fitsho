@@ -34,6 +34,16 @@
 .admin-primary-link { color: var(--fitsho-petrol); background: var(--fitsho-aqua); }
 .admin-exercise-row, .admin-form-section { border: 0; border-radius: 1.25rem; box-shadow: 0 0.8rem 2rem rgb(10 31 30 / 7%); }
 
+.admin-accordion-section { overflow: hidden; padding: 0; }
+.admin-form-section__header { margin: 0; }
+.admin-form-section__trigger { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 1rem; min-height: 4.25rem; padding: 1rem clamp(1.25rem, 3vw, 2rem); border: 0; color: var(--petrol-900); background: transparent; cursor: pointer; font: inherit; font-size: 1.1rem; font-weight: 850; text-align: start; }
+.admin-form-section__trigger:hover { background: rgb(56 183 165 / 6%); }
+.admin-form-section__trigger:focus-visible { outline: 3px solid rgb(56 183 165 / 32%); outline-offset: -3px; }
+.admin-form-section__icon { display: grid; flex: 0 0 auto; width: 1.8rem; height: 1.8rem; place-items: center; border-radius: 50%; color: var(--turquoise-dark); background: rgb(56 183 165 / 12%); font-size: 1.35rem; font-weight: 900; line-height: 1; }
+.admin-accordion-section[data-expanded="true"] .admin-form-section__icon { color: var(--paper); background: var(--turquoise-dark); }
+.admin-form-section__panel { padding: 0 clamp(1.25rem, 3vw, 2rem) clamp(1.25rem, 3vw, 2rem); animation: admin-accordion-reveal .22s ease-out; }
+.admin-form-section__panel > .admin-media-section { margin: 0; }
+
 .admin-content-type-field { margin-block-start: 1rem; }
 .admin-content-type-field__label { display: block; margin-block-end: .5rem; color: var(--muted); font-weight: 750; }
 .admin-content-type-switch { display: inline-flex; gap: .25rem; padding: .25rem; border: 1px solid var(--line); border-radius: 999px; background: var(--mist-100); }

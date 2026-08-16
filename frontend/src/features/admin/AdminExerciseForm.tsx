@@ -10,6 +10,10 @@ import {
   type ExerciseType,
   type MovementPattern,
 } from "../exercises/types";
+import {
+  AdminAccordionSection,
+  type AdminAccordionSectionControl,
+} from "./AdminAccordionSection";
 
 export type ProgrammingMetadata = {
   movement_pattern: MovementPattern;
@@ -22,13 +26,14 @@ export type ProgrammingMetadata = {
 
 type AdminExerciseFormProps = {
   value: ProgrammingMetadata;
+  accordion: AdminAccordionSectionControl;
   onChange: <K extends keyof ProgrammingMetadata>(
     key: K,
     value: ProgrammingMetadata[K],
   ) => void;
 };
 
-export function AdminExerciseForm({ value, onChange }: AdminExerciseFormProps) {
+export function AdminExerciseForm({ value, accordion, onChange }: AdminExerciseFormProps) {
   const { t } = useTranslation();
 
   function toggleCautionTag(tag: ExerciseCautionTag) {
@@ -46,8 +51,7 @@ export function AdminExerciseForm({ value, onChange }: AdminExerciseFormProps) {
   }
 
   return (
-    <fieldset className="admin-form-section">
-      <legend>{t("admin.sections.programming")}</legend>
+    <AdminAccordionSection {...accordion}>
       <div className="admin-field-grid">
         <label className="admin-field">
           <span>{t("admin.fields.movementPattern")}</span>
@@ -120,6 +124,6 @@ export function AdminExerciseForm({ value, onChange }: AdminExerciseFormProps) {
         />
         <span>{t("admin.fields.isProgrammable")}</span>
       </label>
-    </fieldset>
+    </AdminAccordionSection>
   );
 }

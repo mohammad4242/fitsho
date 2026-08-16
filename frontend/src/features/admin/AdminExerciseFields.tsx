@@ -1,4 +1,4 @@
-import { cloneElement, type ReactElement, useState } from "react";
+import { cloneElement, type ReactElement, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
@@ -12,6 +12,7 @@ import {
   type MuscleGroup,
 } from "../exercises/types";
 import { AdminExerciseForm as ProgrammingMetadataForm, type ProgrammingMetadata } from "./AdminExerciseForm";
+import { AdminAccordionSection, type AdminAccordionSectionControl } from "./AdminAccordionSection";
 import { ExerciseMediaAssetsFields } from "./ExerciseMediaAssetsFields";
 import type { AdminExerciseForm, AdminExerciseMediaFiles } from "./types";
 import {
@@ -21,6 +22,33 @@ import {
 } from "./validation";
 
 type MediaType = "image" | "animated_webp" | "gif" | "video" | "placeholder";
+
+const sectionByField: Partial<Record<keyof AdminExerciseForm, string>> = {
+  slug: "identity",
+  name_en: "identity",
+  name_fa: "identity",
+  content_type: "identity",
+  difficulty: "identity",
+  body_region: "target",
+  primary_muscle: "target",
+  muscle_focus: "target",
+  secondary_muscles: "target",
+  equipment: "target",
+  movement_pattern: "programming",
+  exercise_type: "programming",
+  caution_tags: "programming",
+  labels: "programming",
+  needs_review: "programming",
+  is_programmable: "programming",
+  instructions_en: "guidance",
+  instructions_fa: "guidance",
+  safety_notes_en: "guidance",
+  safety_notes_fa: "guidance",
+  media_source_url: "media",
+  media_license: "media",
+  media_attribution: "media",
+  media_assets: "media-variants",
+};
 
 type AdminExerciseFieldsProps = {
   value: AdminExerciseForm;
@@ -49,12 +77,26 @@ export function AdminExerciseFields({
 }: AdminExerciseFieldsProps) {
   const { t } = useTranslation();
   const [slugEdited, setSlugEdited] = useState(false);
+  const [openSection, setOpenSection] = useState<string | null>(null);
   const availableMuscles = value.body_region ? musclesByRegion[value.body_region] : [];
   const availableFocuses = value.primary_muscle
     ? muscleFocusesByMuscle[value.primary_muscle]
     : [];
   const errorText = (key: keyof AdminExerciseForm) =>
     errors[key] ? t(`admin.validation.${errors[key]}`) : null;
+  const accordion = (id: string, title: string): AdminAccordionSectionControl => ({
+    id,
+    title,
+    isOpen: openSection === id,
+    onToggle: () => setOpenSection((current) => current === id ? null : id),
+  });
+
+  useEffect(() => {
+    const firstError = Object.keys(errors).find((key) => errors[key as keyof AdminExerciseForm]);
+    if (firstError !== undefined) {
+      setOpenSection(sectionByField[firstError as keyof AdminExerciseForm] ?? null);
+    }
+  }, [errors]);
 
   function toggleChoice<K extends "secondary_muscles" | "equipment">(
     key: K,
@@ -88,8 +130,7 @@ export function AdminExerciseFields({
 
   return (
     <>
-      <fieldset className="admin-form-section">
-        <legend>{t("admin.sections.identity")}</legend>
+      <AdminAccordionSection {...accordion("identity", t("admin.sections.identity"))}>
         <div className="admin-field-grid">
           <Field label={t("admin.fields.nameEn")} error={errorText("name_en")}>
             <input
@@ -168,10 +209,9 @@ export function AdminExerciseFields({
             </label>
           </div>
         </div>
-      </fieldset>
+      </AdminAccordionSection>
 
-      <fieldset className="admin-form-section">
-        <legend>{t("admin.sections.target")}</legend>
+      <AdminAccordionSection {...accordion("target", t("admin.sections.target"))}>
         <div className="admin-field-grid">
           <Field label={t("admin.fields.bodyRegion")} error={errorText("body_region")}>
             <select
@@ -235,12 +275,15 @@ export function AdminExerciseFields({
           label={(item) => t(`catalog.equipment.${item}`)}
           onToggle={(item) => toggleChoice("equipment", item)}
         />
-      </fieldset>
+      </AdminAccordionSection>
 
-      <ProgrammingMetadataForm value={value} onChange={setProgrammingField} />
+      <ProgrammingMetadataForm
+        accordion={accordion("programming", t("admin.sections.programming"))}
+        value={value}
+        onChange={setProgrammingField}
+      />
 
-      <fieldset className="admin-form-section">
-        <legend>{t("admin.sections.guidance")}</legend>
+      <AdminAccordionSection {...accordion("guidance", t("admin.sections.guidance"))}>
         <Repeater
           title={t("admin.fields.instructionsEn")}
           itemLabel={t("admin.fields.instructionEn")}
@@ -301,49 +344,51 @@ export function AdminExerciseFields({
             onChange("safety_notes_fa", value.safety_notes_fa.filter((_, item) => item !== index))
           }
         />
-      </fieldset>
+      </AdminAccordionSection>
 
-      <fieldset className="admin-form-section admin-media-section">
-        <legend>{t("admin.sections.media")}</legend>
-        <div className="admin-media-preview">
-          <ExerciseMedia
-            path={primaryMediaPath}
-            mediaType={primaryMediaType}
-            name={value.name_fa || value.name_en || t("admin.fields.previewName")}
-          />
+      <AdminAccordionSection {...accordion("media", t("admin.sections.media"))}>
+        <div className="admin-media-section">
+          <div className="admin-media-preview">
+            <ExerciseMedia
+              path={primaryMediaPath}
+              mediaType={primaryMediaType}
+              name={value.name_fa || value.name_en || t("admin.fields.previewName")}
+            />
+          </div>
+          <div className="admin-field-grid">
+            <Field label={t("admin.fields.mediaFile")}>
+              <input
+                type="file"
+                accept="image/gif,video/mp4,video/webm"
+                onChange={(event) => onPrimaryMediaChange(event.target.files?.[0] ?? null)}
+              />
+            </Field>
+            <Field label={t("admin.fields.sourceUrl")} error={errorText("media_source_url")}>
+              <input
+                dir="ltr"
+                type="url"
+                value={value.media_source_url ?? ""}
+                onChange={(event) => onChange("media_source_url", event.target.value)}
+              />
+            </Field>
+            <Field label={t("admin.fields.license")}>
+              <input
+                value={value.media_license ?? ""}
+                onChange={(event) => onChange("media_license", event.target.value)}
+              />
+            </Field>
+            <Field label={t("admin.fields.attribution")}>
+              <input
+                value={value.media_attribution ?? ""}
+                onChange={(event) => onChange("media_attribution", event.target.value)}
+              />
+            </Field>
+          </div>
         </div>
-        <div className="admin-field-grid">
-          <Field label={t("admin.fields.mediaFile")}>
-            <input
-              type="file"
-              accept="image/gif,video/mp4,video/webm"
-              onChange={(event) => onPrimaryMediaChange(event.target.files?.[0] ?? null)}
-            />
-          </Field>
-          <Field label={t("admin.fields.sourceUrl")} error={errorText("media_source_url")}>
-            <input
-              dir="ltr"
-              type="url"
-              value={value.media_source_url ?? ""}
-              onChange={(event) => onChange("media_source_url", event.target.value)}
-            />
-          </Field>
-          <Field label={t("admin.fields.license")}>
-            <input
-              value={value.media_license ?? ""}
-              onChange={(event) => onChange("media_license", event.target.value)}
-            />
-          </Field>
-          <Field label={t("admin.fields.attribution")}>
-            <input
-              value={value.media_attribution ?? ""}
-              onChange={(event) => onChange("media_attribution", event.target.value)}
-            />
-          </Field>
-        </div>
-      </fieldset>
+      </AdminAccordionSection>
 
       <ExerciseMediaAssetsFields
+        accordion={accordion("media-variants", t("admin.fields.mediaVariants"))}
         assets={value.media_assets}
         files={mediaFiles}
         onAssetsChange={(assets) => onChange("media_assets", assets)}

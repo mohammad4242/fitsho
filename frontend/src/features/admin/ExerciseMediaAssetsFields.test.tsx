@@ -26,6 +26,12 @@ function MediaFieldsHarness() {
   const [files, setFiles] = useState<File[]>([]);
   return (
     <ExerciseMediaAssetsFields
+      accordion={{
+        id: "media-variants",
+        title: "ویدئوهای زن و مرد",
+        isOpen: true,
+        onToggle: () => undefined,
+      }}
       assets={assets}
       files={files}
       onAssetsChange={setAssets}

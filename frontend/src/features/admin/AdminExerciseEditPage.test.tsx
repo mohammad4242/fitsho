@@ -57,6 +57,40 @@ beforeEach(() => {
   adminApi.updateAdminExercise.mockResolvedValue(exercise);
 });
 
+async function openSection(user: ReturnType<typeof userEvent.setup>, title: string) {
+  await user.click(await screen.findByRole("button", { name: title }));
+}
+
+it("opens one edit section at a time from a collapsed default", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={["/admin/exercises/exercise-id/edit"]}>
+      <Routes>
+        <Route path="/admin/exercises/:exerciseId/edit" element={<AdminExerciseEditPage />} />
+        <Route path="/exercises" element={<p>LIST PAGE</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  const identity = await screen.findByRole("button", { name: "هویت حرکت" });
+  const target = screen.getByRole("button", { name: "هدف و تجهیزات" });
+  expect(identity).toHaveAttribute("aria-expanded", "false");
+  expect(target).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByLabelText("نام انگلیسی")).not.toBeInTheDocument();
+
+  await user.click(identity);
+  expect(identity).toHaveAttribute("aria-expanded", "true");
+  expect(identity).toHaveTextContent("⌃");
+  expect(screen.getByLabelText("نام انگلیسی")).toBeInTheDocument();
+
+  await user.click(target);
+  expect(identity).toHaveAttribute("aria-expanded", "false");
+  expect(identity).toHaveTextContent("⌄");
+  expect(target).toHaveAttribute("aria-expanded", "true");
+  expect(screen.queryByLabelText("نام انگلیسی")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("ناحیه بدن")).toBeInTheDocument();
+});
+
 it("loads structured programming metadata and saves an edited exercise", async () => {
   const user = userEvent.setup();
   render(
@@ -68,23 +102,30 @@ it("loads structured programming metadata and saves an edited exercise", async (
     </MemoryRouter>,
   );
 
+  await openSection(user, "اطلاعات برنامه‌سازی");
   expect(await screen.findByLabelText("الگوی حرکت")).toHaveValue("horizontal_push");
   expect(screen.getByLabelText("نوع حرکت")).toHaveValue("compound");
+  await openSection(user, "هدف و تجهیزات");
   expect(screen.getByLabelText("بخش هدف عضله")).toHaveValue("mid_chest");
+  await openSection(user, "اطلاعات برنامه‌سازی");
   expect(screen.getByLabelText("فشار داخلی شانه")).toBeChecked();
   expect(screen.getByLabelText("قابل استفاده برای تولید برنامه")).toBeChecked();
 
+  await openSection(user, "هویت حرکت");
   await user.clear(screen.getByLabelText("نام انگلیسی"));
   await user.type(screen.getByLabelText("نام انگلیسی"), "Advanced Incline Push Up");
   await user.clear(screen.getByLabelText("نام فارسی"));
   await user.type(screen.getByLabelText("نام فارسی"), "شنا شیب‌دار پیشرفته");
-  await user.click(screen.getByLabelText("دمبل"));
   await user.selectOptions(screen.getByLabelText("سطح سختی"), "advanced");
+  await openSection(user, "هدف و تجهیزات");
+  await user.click(screen.getByLabelText("دمبل"));
+  await openSection(user, "آموزش و ایمنی");
   await user.clear(screen.getByLabelText("مرحله انگلیسی ۱"));
   await user.type(screen.getByLabelText("مرحله انگلیسی ۱"), "Set the bench securely");
   await user.clear(screen.getByLabelText("نکته فارسی ۱"));
   await user.type(screen.getByLabelText("نکته فارسی ۱"), "شانه‌ها را ثابت نگه دارید");
 
+  await openSection(user, "اطلاعات برنامه‌سازی");
   await user.selectOptions(screen.getByLabelText("الگوی حرکت"), "vertical_push");
   await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
 
@@ -117,6 +158,7 @@ it("switches an existing catalogue item to guide without uploading media", async
     </MemoryRouter>,
   );
 
+  await openSection(user, "هویت حرکت");
   await user.click(await screen.findByLabelText("راهنما"));
   await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
 
@@ -143,12 +185,14 @@ it("shows and allows editing a cross-region secondary muscle", async () => {
     </MemoryRouter>,
   );
 
+  await openSection(user, "هدف و تجهیزات");
   const calves = await screen.findByLabelText("عضله فرعی: ساق");
   expect(calves).toBeChecked();
   await user.click(calves);
   expect(calves).not.toBeChecked();
   await user.click(calves);
 
+  await openSection(user, "هویت حرکت");
   await user.clear(screen.getByLabelText("نام انگلیسی"));
   await user.type(screen.getByLabelText("نام انگلیسی"), "Renamed Legacy Exercise");
   await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
@@ -179,6 +223,7 @@ it("allows editing muscle focus on a review exercise", async () => {
     </MemoryRouter>,
   );
 
+  await openSection(user, "هدف و تجهیزات");
   const focus = await screen.findByLabelText("بخش هدف عضله");
   expect(focus).not.toBeDisabled();
   await user.selectOptions(focus, "upper_chest");
