@@ -174,6 +174,7 @@ export function AdminExerciseEditPage() {
               value={form}
               errors={errors}
               duplicateSlug={requestError === "duplicate"}
+              allowReviewAnatomyEditing
               primaryMediaPath={preview ?? exercise.media_path}
               primaryMediaType={previewType}
               mediaFiles={mediaAssets}

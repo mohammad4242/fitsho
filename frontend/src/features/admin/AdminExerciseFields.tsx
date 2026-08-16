@@ -55,6 +55,7 @@ type AdminExerciseFieldsProps = {
   errors: AdminValidationErrors;
   duplicateSlug?: boolean;
   suggestSlugFromName?: boolean;
+  allowReviewAnatomyEditing?: boolean;
   primaryMediaPath: string;
   primaryMediaType: MediaType;
   mediaFiles: AdminExerciseMediaFiles;
@@ -68,6 +69,7 @@ export function AdminExerciseFields({
   errors,
   duplicateSlug = false,
   suggestSlugFromName = false,
+  allowReviewAnatomyEditing = false,
   primaryMediaPath,
   primaryMediaType,
   mediaFiles,
@@ -216,7 +218,7 @@ export function AdminExerciseFields({
           <Field label={t("admin.fields.bodyRegion")} error={errorText("body_region")}>
             <select
               value={value.body_region}
-              disabled={value.needs_review}
+              disabled={value.needs_review && !allowReviewAnatomyEditing}
               onChange={(event) => {
                 onChange("body_region", event.target.value as AdminExerciseForm["body_region"]);
                 onChange("primary_muscle", "");
