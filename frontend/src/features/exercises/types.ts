@@ -196,6 +196,7 @@ export type ExerciseDetail = ExerciseSummary & {
   media_source_url: string | null;
   media_license: string | null;
   media_attribution: string | null;
+  media_presentation?: MediaPresentation | null;
   media_assets?: ExerciseMediaAsset[];
 };
 

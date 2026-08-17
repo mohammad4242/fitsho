@@ -118,6 +118,7 @@ class ExerciseDetail(ExerciseSummary):
     media_source_url: str | None
     media_license: str | None
     media_attribution: str | None
+    media_presentation: MediaPresentation | None = None
     media_assets: list[ExerciseMediaAssetDetail] = Field(default_factory=list)
 
 

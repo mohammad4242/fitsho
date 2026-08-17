@@ -489,6 +489,23 @@ def test_admin_creates_gendered_media_assets_and_public_detail_returns_them(
     assert [asset["presentation"] for asset in public_detail.json()["media_assets"]] == ["male"]
     assert all("id" not in asset for asset in public_detail.json()["media_assets"])
 
+    female_detail = client.get("/api/v1/exercises/incline-push-up?presentation=female")
+
+    assert female_detail.status_code == 200
+    assert [asset["presentation"] for asset in female_detail.json()["media_assets"]] == ["female"]
+
+    exercise = db.scalar(select(Exercise).where(Exercise.slug == "incline-push-up"))
+    assert exercise is not None
+    exercise.media_assets = [
+        asset for asset in exercise.media_assets if asset.presentation.value != "male"
+    ]
+    db.flush()
+
+    fallback_detail = client.get("/api/v1/exercises/incline-push-up")
+
+    assert fallback_detail.status_code == 200
+    assert [asset["presentation"] for asset in fallback_detail.json()["media_assets"]] == ["female"]
+
 
 def test_admin_creates_multiple_media_items_for_one_gender_and_role(
     client: TestClient,
@@ -648,7 +665,7 @@ def test_member_exercise_detail_returns_only_profile_gender_videos(
     ]
 
 
-def test_member_exercise_detail_falls_back_to_legacy_media_without_matching_gender_video(
+def test_member_exercise_detail_falls_back_to_other_gender_video_without_matching_profile_gender(
     client: TestClient,
     db: Session,
 ) -> None:
@@ -672,8 +689,10 @@ def test_member_exercise_detail_falls_back_to_legacy_media_without_matching_gend
     response = client.get(f"/api/v1/exercises/{exercise.slug}")
 
     assert response.status_code == 200
-    assert response.json()["media_assets"] == []
-    assert response.json()["media_path"] == exercise.media_path
+    assert [asset["media_path"] for asset in response.json()["media_assets"]] == [
+        "/media/female.mp4"
+    ]
+    assert response.json()["media_presentation"] == "female"
 
 
 def test_invalid_upload_returns_field_error_and_leaves_no_file(

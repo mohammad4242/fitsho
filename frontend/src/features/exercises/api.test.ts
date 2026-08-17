@@ -111,6 +111,17 @@ describe("exercise api", () => {
     );
   });
 
+  it("requests the selected media presentation", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(detail));
+
+    await expect(getExercise("press/advanced", "female")).resolves.toEqual(detail);
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/v1/exercises/press%2Fadvanced?presentation=female",
+      expect.objectContaining({ credentials: "include" }),
+    );
+  });
+
   it("returns null only for an unknown exercise", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(errorResponse(404, "Exercise not found"))

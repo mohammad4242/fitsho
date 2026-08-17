@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ExerciseMedia } from "./ExerciseMedia";
@@ -18,6 +18,11 @@ export function ExerciseMediaCarousel({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const pointerStart = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
   const selectedItem = items[selectedIndex] ?? items[0];
+  const itemKeys = items.map((item) => item.key).join("|");
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [itemKeys]);
 
   if (selectedItem === undefined) return null;
 

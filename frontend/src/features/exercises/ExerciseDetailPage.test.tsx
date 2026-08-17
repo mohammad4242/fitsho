@@ -192,6 +192,32 @@ describe("exercise detail content", () => {
     expect(video).toHaveAttribute("src", "/media/male-second.mp4");
   });
 
+  it("switches between male and female video sets below the carousel", async () => {
+    const user = userEvent.setup();
+    api.getExercise
+      .mockResolvedValueOnce({
+        ...detail,
+        media_presentation: "male",
+        media_assets: [mediaAsset("/media/male.mp4", "male", 0)],
+      })
+      .mockResolvedValueOnce({
+        ...detail,
+        media_presentation: "female",
+        media_assets: [mediaAsset("/media/female.mp4", "female", 0)],
+      });
+    renderDetail();
+
+    expect(await screen.findByRole("button", { name: "ویدئوی مرد" })).toHaveAttribute(
+      "aria-pressed", "true",
+    );
+    await user.click(screen.getByRole("button", { name: "ویدئوی زن" }));
+
+    expect(await screen.findByLabelText("نمایش حرکت پرس سینه دمبل")).toHaveAttribute(
+      "src", "/media/female.mp4",
+    );
+    expect(api.getExercise).toHaveBeenNthCalledWith(2, "dumbbell-bench-press", "female");
+  });
+
   it("uses legacy media when the profile gender has no asset", async () => {
     api.getExercise.mockResolvedValue({
       ...detail,

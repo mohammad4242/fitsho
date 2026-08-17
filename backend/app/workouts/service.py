@@ -26,9 +26,10 @@ from app.exercises.enums import (
     ExerciseCautionTag,
     ExerciseContentType,
     ExerciseType,
+    MediaPresentation,
 )
 from app.exercises.models import Exercise
-from app.profile.enums import ExperienceLevel, HomeTrainingSetup, TrainingLocation
+from app.profile.enums import ExperienceLevel, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.service import ProfileSnapshot, get_profile
 from app.training_templates.engine_reference import load_template_references
 from app.workouts.ai_coach import (
@@ -180,7 +181,7 @@ class WorkoutGenerationService:
             request = self._to_program_request(source_profile, overrides, body_analysis_influence)
         except ValidationError as error:
             raise ProgramGenerationRejectedError("INVALID_PROFILE_INPUT") from error
-        catalog = self._load_catalog()
+        catalog = self._load_catalog(source_profile.profile.sex)
         catalog_hash = self._catalog_hash(catalog)
         references = load_template_references(self._db)
         reference_hash = self._template_reference_hash(references)
@@ -250,7 +251,7 @@ class WorkoutGenerationService:
                 self._body_analysis_resolver.resolve(user_id), self._ruleset
             ),
         )
-        refreshed_catalog = self._load_catalog()
+        refreshed_catalog = self._load_catalog(refreshed_profile.profile.sex)
         if (
             self._generation_signature(
                 refreshed_request,
@@ -331,7 +332,7 @@ class WorkoutGenerationService:
         ):
             return WorkoutPlanGenerationResult(plan=active_plan, reused=True)
         self._enforce_cooldown(user_id)
-        catalog = {item.id: item for item in self._load_catalog()}
+        catalog = {item.id: item for item in self._load_catalog(profile.sex)}
         payloads = tuple(
             candidate_program_payload(
                 candidate,
@@ -707,7 +708,7 @@ class WorkoutGenerationService:
             values["user_id"] = profile.user_id
         return ProgramGenerationRequest.model_validate(values)
 
-    def _load_catalog(self) -> tuple[ExerciseCandidate, ...]:
+    def _load_catalog(self, profile_sex: Sex | None = None) -> tuple[ExerciseCandidate, ...]:
         exercises = self._db.scalars(
             select(Exercise)
             .where(Exercise.content_type == ExerciseContentType.EXERCISE)
@@ -716,18 +717,20 @@ class WorkoutGenerationService:
                 selectinload(Exercise.equipment_items),
                 selectinload(Exercise.caution_tag_items),
                 selectinload(Exercise.labels),
+                selectinload(Exercise.media_assets),
             )
         ).all()
         return tuple(
             sorted(
-                (self._domain_candidate(item) for item in exercises),
+                (self._domain_candidate(item, profile_sex) for item in exercises),
                 key=lambda item: str(item.id),
             )
         )
 
     @staticmethod
-    def _domain_candidate(exercise: Exercise) -> ExerciseCandidate:
+    def _domain_candidate(exercise: Exercise, profile_sex: Sex | None = None) -> ExerciseCandidate:
         caution_tags = frozenset(item.caution_tag for item in exercise.caution_tag_items)
+        selected_media = WorkoutGenerationService._selected_media(exercise, profile_sex)
         balance_demand = (
             StabilityDemand.HIGH
             if ExerciseCautionTag.BALANCE_DEMAND in caution_tags
@@ -783,10 +786,40 @@ class WorkoutGenerationService:
                 "secondary_muscles": [item.muscle.value for item in exercise.secondary_muscles],
                 "equipment": [item.equipment.value for item in exercise.equipment_items],
                 "difficulty": exercise.difficulty.value,
-                "media_path": exercise.media_path,
-                "media_type": exercise.media_type.value,
+                "media_path": selected_media[0],
+                "media_type": selected_media[1],
             },
         )
+
+    @staticmethod
+    def _selected_media(
+        exercise: Exercise,
+        profile_sex: Sex | None,
+    ) -> tuple[str, str]:
+        preferred_presentation = (
+            MediaPresentation.MALE
+            if profile_sex is Sex.MALE
+            else MediaPresentation.FEMALE
+            if profile_sex is Sex.FEMALE
+            else None
+        )
+        assets = sorted(
+            exercise.media_assets,
+            key=lambda asset: (asset.presentation.value, asset.sort_order, str(asset.id)),
+        )
+        if preferred_presentation is not None:
+            preferred_assets = [
+                asset for asset in assets if asset.presentation is preferred_presentation
+            ]
+            fallback_assets = [
+                asset for asset in assets if asset.presentation is not preferred_presentation
+            ]
+            selected = preferred_assets or fallback_assets
+        else:
+            selected = assets
+        if selected:
+            return selected[0].media_path, selected[0].media_type.value
+        return exercise.media_path, exercise.media_type.value
 
     @staticmethod
     def _candidate_snapshot(candidate: ExerciseCandidate) -> dict[str, object]:
@@ -878,7 +911,8 @@ class WorkoutGenerationService:
                 self._body_analysis_resolver.resolve(user_id), self._ruleset
             ),
         )
-        catalog_hash = self._catalog_hash(self._load_catalog())
+        source_profile = get_profile(self._db, user_id)
+        catalog_hash = self._catalog_hash(self._load_catalog(source_profile.profile.sex))
         reference_hash = self._template_reference_hash(load_template_references(self._db))
         is_stale = plan.generation_signature != self._generation_signature(
             request, catalog_hash, reference_hash

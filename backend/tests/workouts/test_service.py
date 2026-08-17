@@ -15,11 +15,12 @@ from app.exercises.enums import (
     Difficulty,
     Equipment,
     ExerciseType,
+    MediaPresentation,
     MediaType,
     MovementPattern,
     MuscleGroup,
 )
-from app.exercises.models import Exercise, ExerciseEquipment
+from app.exercises.models import Exercise, ExerciseEquipment, ExerciseMediaAsset
 from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.models import BodyMeasurement, UserProfile
@@ -153,6 +154,50 @@ def _service(
         ),
         body_analysis_resolver=body_analysis_resolver,
     )
+
+
+def test_catalog_uses_profile_gender_media_and_falls_back_to_other_gender(
+    db: Session,
+) -> None:
+    _user_with_profile(db)
+    exercise = _exercise(
+        db,
+        "gendered-service-push",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+    )
+    exercise.media_assets.extend(
+        [
+            ExerciseMediaAsset(
+                presentation=MediaPresentation.MALE,
+                role="video",
+                sort_order=0,
+                media_path="/media/male.mp4",
+                media_type=MediaType.VIDEO,
+            ),
+            ExerciseMediaAsset(
+                presentation=MediaPresentation.FEMALE,
+                role="video",
+                sort_order=0,
+                media_path="/media/female.mp4",
+                media_type=MediaType.VIDEO,
+            ),
+        ]
+    )
+    db.commit()
+    service = _service(db)
+
+    male_candidate = {item.id: item for item in service._load_catalog(Sex.MALE)}[exercise.id]
+    assert male_candidate.display_snapshot["media_path"] == "/media/male.mp4"
+
+    male_asset = next(
+        asset for asset in exercise.media_assets if asset.presentation is MediaPresentation.MALE
+    )
+    db.delete(male_asset)
+    db.commit()
+
+    fallback_candidate = {item.id: item for item in service._load_catalog(Sex.MALE)}[exercise.id]
+    assert fallback_candidate.display_snapshot["media_path"] == "/media/female.mp4"
 
 
 class _InfluenceResolver:

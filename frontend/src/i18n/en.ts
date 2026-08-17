@@ -834,6 +834,8 @@ const en = {
       instructionsTitle: "Correct execution",
       safetyTitle: "Form and safety notes",
       mediaSelector: "Display media",
+      mediaPresentationLabel: "Choose video gender",
+      mediaSwitchError: "The video for this gender could not be loaded",
       legacyMedia: "Default media",
       maleVideo: "Male video",
       femaleVideo: "Female video",

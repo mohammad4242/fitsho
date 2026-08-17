@@ -104,6 +104,20 @@ def _detail(
     filter_media: bool = False,
 ) -> ExerciseDetail:
     summary = _summary(exercise)
+    media_assets = list(exercise.media_assets)
+    selected_presentation: MediaPresentation | None = None
+    if filter_media:
+        if presentation in {MediaPresentation.MALE, MediaPresentation.FEMALE}:
+            preferred = [asset for asset in media_assets if asset.presentation is presentation]
+            fallback = [
+                asset
+                for asset in media_assets
+                if asset.presentation in {MediaPresentation.MALE, MediaPresentation.FEMALE}
+                and asset.presentation is not presentation
+            ]
+            media_assets = preferred or fallback
+        if media_assets:
+            selected_presentation = media_assets[0].presentation
     return ExerciseDetail(
         **summary.model_dump(),
         instructions_en=exercise.instructions_en,
@@ -122,6 +136,7 @@ def _detail(
         media_source_url=exercise.media_source_url,
         media_license=exercise.media_license,
         media_attribution=exercise.media_attribution,
+        media_presentation=selected_presentation,
         media_assets=[
             ExerciseMediaAssetDetail(
                 presentation=asset.presentation,
@@ -133,8 +148,7 @@ def _detail(
                 media_license=asset.media_license,
                 media_attribution=asset.media_attribution,
             )
-            for asset in exercise.media_assets
-            if not filter_media or asset.presentation is presentation
+            for asset in media_assets
         ],
     )
 
@@ -181,6 +195,7 @@ def read_exercise(
     slug: str,
     db: DatabaseSession,
     user: CurrentUser,
+    presentation: Annotated[MediaPresentation | None, Query()] = None,
 ) -> ExerciseDetail:
     exercise = get_active_exercise_by_slug(db, slug)
     if exercise is None:
@@ -189,10 +204,10 @@ def read_exercise(
             detail="Exercise not found",
         )
     profile = db.get(UserProfile, user.id)
-    presentation = None
-    if profile is not None and profile.sex is not None:
+    profile_presentation = None
+    if presentation is None and profile is not None and profile.sex is not None:
         try:
-            presentation = MediaPresentation(profile.sex.value)
+            profile_presentation = MediaPresentation(profile.sex.value)
         except ValueError:
-            presentation = None
-    return _detail(exercise, presentation, filter_media=True)
+            profile_presentation = None
+    return _detail(exercise, presentation or profile_presentation, filter_media=True)

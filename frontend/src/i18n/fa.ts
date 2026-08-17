@@ -834,6 +834,8 @@ const fa = {
       instructionsTitle: "روش اجرای صحیح",
       safetyTitle: "نکات فرم و ایمنی",
       mediaSelector: "رسانهٔ نمایش",
+      mediaPresentationLabel: "انتخاب جنسیت ویدئو",
+      mediaSwitchError: "ویدیوی این جنسیت دریافت نشد",
       legacyMedia: "رسانهٔ پیش‌فرض",
       maleVideo: "ویدئوی مرد",
       femaleVideo: "ویدئوی زن",

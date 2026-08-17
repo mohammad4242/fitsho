@@ -3,6 +3,7 @@ import type {
   ExerciseCategories,
   ExerciseDetail,
   ExerciseFilters,
+  MediaPresentation,
   PaginatedExercises,
 } from "./types";
 
@@ -29,9 +30,15 @@ export function getExercises(filters: ExerciseFilters = {}): Promise<PaginatedEx
   return request<PaginatedExercises>(query ? `${exercisesPath}?${query}` : exercisesPath);
 }
 
-export async function getExercise(slug: string): Promise<ExerciseDetail | null> {
+export async function getExercise(
+  slug: string,
+  presentation?: Exclude<MediaPresentation, "unspecified">,
+): Promise<ExerciseDetail | null> {
   try {
-    return await request<ExerciseDetail>(`${exercisesPath}/${encodeURIComponent(slug)}`);
+    const query = presentation === undefined ? "" : `?presentation=${presentation}`;
+    return await request<ExerciseDetail>(
+      `${exercisesPath}/${encodeURIComponent(slug)}${query}`,
+    );
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       return null;

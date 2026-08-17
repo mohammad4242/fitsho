@@ -19,6 +19,9 @@ export function ExerciseDetailPage() {
   const [exercise, setExercise] = useState<ExerciseDetail | null>(null);
   const [state, setState] = useState<DetailState>("loading");
   const [retry, setRetry] = useState(0);
+  const [mediaPresentation, setMediaPresentation] = useState<"male" | "female">("male");
+  const [mediaSwitching, setMediaSwitching] = useState(false);
+  const [mediaSwitchError, setMediaSwitchError] = useState(false);
   const isEnglish = i18n.resolvedLanguage === "en";
   const catalogPath = `/exercises${location.search}`;
 
@@ -39,6 +42,8 @@ export function ExerciseDetailPage() {
           return;
         }
         setExercise(response);
+        setMediaPresentation(resolveMediaPresentation(response));
+        setMediaSwitchError(false);
         setState("ready");
       })
       .catch(() => {
@@ -49,6 +54,25 @@ export function ExerciseDetailPage() {
       active = false;
     };
   }, [retry, slug]);
+
+  async function changeMediaPresentation(presentation: "male" | "female") {
+    if (slug === undefined || mediaSwitching || presentation === mediaPresentation) return;
+    setMediaSwitching(true);
+    setMediaSwitchError(false);
+    try {
+      const response = await getExercise(slug, presentation);
+      if (response === null) {
+        setMediaSwitchError(true);
+        return;
+      }
+      setExercise(response);
+      setMediaPresentation(resolveMediaPresentation(response));
+    } catch {
+      setMediaSwitchError(true);
+    } finally {
+      setMediaSwitching(false);
+    }
+  }
 
   return (
     <div className="exercise-catalog-shell exercise-detail-shell">
@@ -80,6 +104,10 @@ export function ExerciseDetailPage() {
             exercise={exercise}
             catalogPath={catalogPath}
             isEnglish={isEnglish}
+            mediaPresentation={mediaPresentation}
+            mediaSwitching={mediaSwitching}
+            mediaSwitchError={mediaSwitchError}
+            onMediaPresentationChange={changeMediaPresentation}
           />
         )}
       </main>
@@ -87,14 +115,29 @@ export function ExerciseDetailPage() {
   );
 }
 
+function resolveMediaPresentation(exercise: ExerciseDetail): "male" | "female" {
+  if (exercise.media_presentation === "female") return "female";
+  if (exercise.media_presentation === "male") return "male";
+  const presentation = exercise.media_assets?.[0]?.presentation;
+  return presentation === "female" ? "female" : "male";
+}
+
 function ReadyExerciseDetail({
   exercise,
   catalogPath,
   isEnglish,
+  mediaPresentation,
+  mediaSwitching,
+  mediaSwitchError,
+  onMediaPresentationChange,
 }: {
   exercise: ExerciseDetail;
   catalogPath: string;
   isEnglish: boolean;
+  mediaPresentation: "male" | "female";
+  mediaSwitching: boolean;
+  mediaSwitchError: boolean;
+  onMediaPresentationChange: (presentation: "male" | "female") => void;
 }) {
   const { t } = useTranslation();
   const name = isEnglish ? exercise.name_en : exercise.name_fa;
@@ -138,6 +181,31 @@ function ReadyExerciseDetail({
             items={mediaItems}
             name={name}
           />
+          <div
+            className="exercise-media-presentation-toggle"
+            role="group"
+            aria-label={t("exerciseDetail.mediaPresentationLabel")}
+          >
+            <button
+              type="button"
+              aria-label={t("exerciseDetail.maleVideo")}
+              aria-pressed={mediaPresentation === "male"}
+              disabled={mediaSwitching}
+              onClick={() => onMediaPresentationChange("male")}
+            >♂️</button>
+            <button
+              type="button"
+              aria-label={t("exerciseDetail.femaleVideo")}
+              aria-pressed={mediaPresentation === "female"}
+              disabled={mediaSwitching}
+              onClick={() => onMediaPresentationChange("female")}
+            >♀️</button>
+          </div>
+          {mediaSwitchError && (
+            <p className="exercise-media-presentation-error" role="alert">
+              {t("exerciseDetail.mediaSwitchError")}
+            </p>
+          )}
         </div>
 
         <header className="exercise-detail-heading">

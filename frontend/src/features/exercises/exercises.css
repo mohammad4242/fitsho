@@ -874,6 +874,42 @@ html[dir="ltr"] .exercise-card__link span {
   background: var(--petrol-900);
 }
 
+.exercise-media-presentation-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.7rem 1rem 0.2rem;
+}
+
+.exercise-media-presentation-toggle button {
+  width: 3rem;
+  height: 3rem;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 50%;
+  color: rgb(255 255 255 / 78%);
+  background: rgb(255 255 255 / 8%);
+  font-size: 1.35rem;
+  cursor: pointer;
+}
+
+.exercise-media-presentation-toggle button[aria-pressed="true"] {
+  border-color: var(--fitsho-aqua);
+  color: var(--fitsho-petrol);
+  background: var(--fitsho-aqua);
+}
+
+.exercise-media-presentation-toggle button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.exercise-media-presentation-error {
+  margin: 0.35rem 1rem 0;
+  color: #ffb3a2;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
 .exercise-detail-heading {
   padding: clamp(1.5rem, 4vw, 3rem);
   border-radius: 2rem 0.45rem 2rem 2rem;
