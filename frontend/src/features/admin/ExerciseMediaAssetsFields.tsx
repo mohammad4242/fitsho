@@ -105,6 +105,7 @@ export function ExerciseMediaAssetsFields({ accordion, assets, files, onAssetsCh
               className="admin-media-order"
               aria-label={t("admin.fields.moveMediaUp", { number })}
               disabled={index === 0}
+              style={{ touchAction: "manipulation" }}
               onClick={() => move(index, -1)}
             >↑</button>
             <button
@@ -112,6 +113,7 @@ export function ExerciseMediaAssetsFields({ accordion, assets, files, onAssetsCh
               className="admin-media-order"
               aria-label={t("admin.fields.moveMediaDown", { number })}
               disabled={index === visible.length - 1}
+              style={{ touchAction: "manipulation" }}
               onClick={() => move(index, 1)}
             >↓</button>
             <button type="button" className="admin-media-remove" onClick={() => remove(index)}>{t("admin.fields.removeMedia")}</button>

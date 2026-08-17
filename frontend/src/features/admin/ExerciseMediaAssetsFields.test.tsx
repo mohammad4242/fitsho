@@ -33,6 +33,9 @@ describe("ExerciseMediaAssetsFields", () => {
 
     expect(screen.getAllByRole("button", { name: /بالا بردن ویدئو/ })[0]).toBeDisabled();
     expect(screen.getAllByRole("button", { name: /پایین بردن ویدئو/ })[2]).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: "پایین بردن ویدئو ۱" })[0]).toHaveStyle({
+      touchAction: "manipulation",
+    });
     await user.click(screen.getAllByRole("button", { name: "پایین بردن ویدئو ۱" })[0]);
 
     expect(screen.getAllByTestId("admin-media-asset").map((item) =>
