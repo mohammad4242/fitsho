@@ -208,75 +208,80 @@ function ReadyExerciseDetail({
           )}
         </div>
 
-        <header className="exercise-detail-heading">
-          <p className="eyebrow eyebrow--accent">{t("exerciseDetail.eyebrow")}</p>
-          <h1 className="fitsho-display" dir={isEnglish ? "ltr" : "rtl"}>{name}</h1>
-          <p className="exercise-detail-heading__secondary" dir={isEnglish ? "rtl" : "ltr"}>
-            {secondaryName}
-          </p>
-          <dl className="exercise-detail-facts">
-            <div>
-              <dt>{t("exerciseDetail.bodyRegion")}</dt>
-              <dd>{exercise.body_region === null ? t("catalog.needsReview") : t(`catalog.bodyRegion.${exercise.body_region}`)}</dd>
-            </div>
-            <div>
-              <dt>{t("catalog.primaryMuscleLabel")}</dt>
-              <dd>{exercise.primary_muscle === null ? t("catalog.needsReview") : t(`catalog.muscle.${exercise.primary_muscle}`)}</dd>
-            </div>
-            {exercise.muscle_focus !== null && (
+        <details className="exercise-detail-accordion exercise-detail-overview">
+          <summary className="exercise-detail-section-heading">
+            <span aria-hidden="true">i</span>
+            <h2 className="fitsho-display">{t("exerciseDetail.eyebrow")}</h2>
+          </summary>
+          <div className="exercise-detail-heading">
+            <h1 className="fitsho-display" dir={isEnglish ? "ltr" : "rtl"}>{name}</h1>
+            <p className="exercise-detail-heading__secondary" dir={isEnglish ? "rtl" : "ltr"}>
+              {secondaryName}
+            </p>
+            <dl className="exercise-detail-facts">
               <div>
-                <dt>{t("catalog.muscleFocusLabel")}</dt>
-                <dd>{t(`catalog.muscleFocus.${exercise.muscle_focus}`)}</dd>
+                <dt>{t("exerciseDetail.bodyRegion")}</dt>
+                <dd>{exercise.body_region === null ? t("catalog.needsReview") : t(`catalog.bodyRegion.${exercise.body_region}`)}</dd>
               </div>
-            )}
-            {labels.length > 0 && (
               <div>
-                <dt>{t("exerciseDetail.labels")}</dt>
-                <dd>{labels.map((label) => t(`catalog.label.${label}`)).join(t("catalog.listSeparator"))}</dd>
+                <dt>{t("catalog.primaryMuscleLabel")}</dt>
+                <dd>{exercise.primary_muscle === null ? t("catalog.needsReview") : t(`catalog.muscle.${exercise.primary_muscle}`)}</dd>
               </div>
-            )}
-            <div>
-              <dt>{t("exerciseDetail.secondaryMuscles")}</dt>
-              <dd>
-                {secondaryMuscles.length > 0
-                  ? secondaryMuscles.join(t("catalog.listSeparator"))
-                  : t("exerciseDetail.none")}
-              </dd>
-            </div>
-            <div>
-              <dt>{t("catalog.equipmentLabel")}</dt>
-              <dd>{equipmentNames.join(t("catalog.listSeparator"))}</dd>
-            </div>
-            <div>
-              <dt>{t("catalog.difficultyLabel")}</dt>
-              <dd>{t(`catalog.difficulty.${exercise.difficulty}`)}</dd>
-            </div>
-          </dl>
-        </header>
+              {exercise.muscle_focus !== null && (
+                <div>
+                  <dt>{t("catalog.muscleFocusLabel")}</dt>
+                  <dd>{t(`catalog.muscleFocus.${exercise.muscle_focus}`)}</dd>
+                </div>
+              )}
+              {labels.length > 0 && (
+                <div>
+                  <dt>{t("exerciseDetail.labels")}</dt>
+                  <dd>{labels.map((label) => t(`catalog.label.${label}`)).join(t("catalog.listSeparator"))}</dd>
+                </div>
+              )}
+              <div>
+                <dt>{t("exerciseDetail.secondaryMuscles")}</dt>
+                <dd>
+                  {secondaryMuscles.length > 0
+                    ? secondaryMuscles.join(t("catalog.listSeparator"))
+                    : t("exerciseDetail.none")}
+                </dd>
+              </div>
+              <div>
+                <dt>{t("catalog.equipmentLabel")}</dt>
+                <dd>{equipmentNames.join(t("catalog.listSeparator"))}</dd>
+              </div>
+              <div>
+                <dt>{t("catalog.difficultyLabel")}</dt>
+                <dd>{t(`catalog.difficulty.${exercise.difficulty}`)}</dd>
+              </div>
+            </dl>
+          </div>
+        </details>
 
-        <section className="exercise-instructions" aria-labelledby="instructions-heading">
-          <div className="exercise-detail-section-heading">
+        <details className="exercise-detail-accordion exercise-instructions">
+          <summary className="exercise-detail-section-heading">
             <span aria-hidden="true">✓</span>
             <h2 id="instructions-heading" className="fitsho-display">{t("exerciseDetail.instructionsTitle")}</h2>
-          </div>
+          </summary>
           <ol>
             {instructions.map((instruction) => (
               <li key={instruction}>{instruction}</li>
             ))}
           </ol>
-        </section>
+        </details>
 
-        <section className="exercise-safety" aria-labelledby="safety-heading">
-          <div className="exercise-detail-section-heading">
+        <details className="exercise-detail-accordion exercise-safety">
+          <summary className="exercise-detail-section-heading">
             <span aria-hidden="true">!</span>
             <h2 id="safety-heading" className="fitsho-display">{t("exerciseDetail.safetyTitle")}</h2>
-          </div>
+          </summary>
           <ul>
             {safetyNotes.map((note) => (
               <li key={note}>{note}</li>
             ))}
           </ul>
-        </section>
+        </details>
 
         <Link className="exercise-detail-back" to={catalogPath}>
           {t("exerciseDetail.backToCatalog")}

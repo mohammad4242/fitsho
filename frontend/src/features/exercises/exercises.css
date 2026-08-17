@@ -813,7 +813,7 @@ html[dir="ltr"] .exercise-card__link span {
 }
 
 .exercise-detail-media,
-.exercise-detail-heading,
+.exercise-detail-accordion,
 .exercise-instructions,
 .exercise-safety {
   overflow: hidden;
@@ -972,7 +972,7 @@ html[dir="rtl"] .exercise-detail-heading h1 {
 .exercise-instructions,
 .exercise-safety {
   grid-column: 1 / -1;
-  padding: clamp(1.4rem, 3vw, 2.4rem);
+  padding: 0;
 }
 
 .exercise-instructions {
@@ -1011,6 +1011,56 @@ html[dir="rtl"] .exercise-detail-heading h1 {
   margin: 0;
   color: var(--petrol-950);
   font-size: clamp(1.3rem, 2.5vw, 2rem);
+}
+
+.exercise-detail-accordion > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: clamp(1.2rem, 3vw, 2rem);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.exercise-detail-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+.exercise-detail-accordion > summary::after {
+  margin-inline-start: auto;
+  color: var(--fitsho-aqua);
+  content: "+";
+  font-size: 1.6rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.exercise-detail-accordion[open] > summary::after {
+  content: "−";
+}
+
+.exercise-detail-accordion > summary:focus-visible {
+  outline: 3px solid var(--fitsho-aqua);
+  outline-offset: -3px;
+}
+
+.exercise-detail-overview {
+  grid-column: 2;
+}
+
+.exercise-detail-heading {
+  border: 0;
+  border-block-start: 1px solid var(--fitsho-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.exercise-instructions > ol,
+.exercise-safety > ul {
+  margin-block-start: 0;
+  padding: 0 clamp(1.2rem, 3vw, 2rem) clamp(1.2rem, 3vw, 2rem) 3.2rem;
 }
 
 .exercise-instructions ol,
@@ -1466,6 +1516,63 @@ html[dir="rtl"] .catalog-dashboard-card__copy h2 {
 
   .exercise-card-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Exercise detail accordions */
+.exercise-detail-accordion > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: clamp(1.2rem, 3vw, 2rem);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.exercise-detail-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+.exercise-detail-accordion > summary::after {
+  margin-inline-start: auto;
+  color: var(--fitsho-aqua);
+  content: "+";
+  font-size: 1.6rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.exercise-detail-accordion[open] > summary::after {
+  content: "−";
+}
+
+.exercise-detail-accordion > summary:focus-visible {
+  outline: 3px solid var(--fitsho-aqua);
+  outline-offset: -3px;
+}
+
+.exercise-detail-overview {
+  grid-column: 2;
+}
+
+.exercise-detail-heading {
+  border: 0;
+  border-block-start: 1px solid var(--fitsho-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.exercise-instructions > ol,
+.exercise-safety > ul {
+  margin-block-start: 0;
+  padding: 0 clamp(1.2rem, 3vw, 2rem) clamp(1.2rem, 3vw, 2rem) 3.2rem;
+}
+
+@media (max-width: 760px) {
+  .exercise-detail-overview {
+    grid-column: 1;
   }
 }
 

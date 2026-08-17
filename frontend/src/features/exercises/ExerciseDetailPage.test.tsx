@@ -74,6 +74,7 @@ describe("exercise detail states", () => {
   });
 
   it("shows a loading state while the exercise is requested", async () => {
+    const user = userEvent.setup();
     const pending = deferred<ExerciseDetail | null>();
     api.getExercise.mockReturnValue(pending.promise);
     renderDetail();
@@ -82,6 +83,7 @@ describe("exercise detail states", () => {
     expect(message.closest('[role="status"]')).toBeInTheDocument();
 
     pending.resolve(detail);
+    await user.click(await screen.findByText("راهنمای حرکت", { exact: true }));
     expect(await screen.findByRole("heading", { name: "پرس سینه دمبل" })).toBeVisible();
   });
 
@@ -97,6 +99,7 @@ describe("exercise detail states", () => {
     );
     await user.click(screen.getByRole("button", { name: "تلاش دوباره" }));
 
+    await user.click(await screen.findByText("راهنمای حرکت", { exact: true }));
     expect(await screen.findByRole("heading", { name: "پرس سینه دمبل" })).toBeVisible();
   });
 
@@ -115,8 +118,29 @@ describe("exercise detail states", () => {
 });
 
 describe("exercise detail content", () => {
-  it("renders bilingual names, media, metadata, steps, safety notes, and navigation", async () => {
+  it("collapses the guide, execution, and safety sections until their titles are clicked", async () => {
+    const user = userEvent.setup();
     renderDetail();
+
+    for (const title of ["راهنمای حرکت", "روش اجرای صحیح", "نکات فرم و ایمنی"]) {
+      const titleNode = await screen.findByText(title, { exact: true });
+      const section = titleNode.closest("details");
+      expect(section).not.toBeNull();
+      expect(section).not.toHaveAttribute("open");
+
+      await user.click(titleNode);
+
+      expect(section).toHaveAttribute("open");
+    }
+  });
+
+  it("renders bilingual names, media, metadata, steps, safety notes, and navigation", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(await screen.findByText("راهنمای حرکت", { exact: true }));
+    await user.click(screen.getByText("روش اجرای صحیح", { exact: true }));
+    await user.click(screen.getByText("نکات فرم و ایمنی", { exact: true }));
 
     const heading = await screen.findByRole("heading", { name: "پرس سینه دمبل" });
     expect(heading).toHaveAttribute("dir", "rtl");
@@ -132,13 +156,15 @@ describe("exercise detail content", () => {
     expect(screen.getByText("دمبل، نیمکت")).toBeVisible();
     expect(screen.getByText("متوسط")).toBeVisible();
 
-    const instructions = screen.getByRole("region", { name: "روش اجرای صحیح" });
-    expect(within(instructions).getAllByRole("listitem")).toHaveLength(3);
-    expect(within(instructions).getByText(detail.instructions_fa[0])).toBeVisible();
+    const instructions = screen.getByText("روش اجرای صحیح", { exact: true }).closest("details");
+    expect(instructions).not.toBeNull();
+    expect(within(instructions!).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(instructions!).getByText(detail.instructions_fa[0])).toBeVisible();
 
-    const safety = screen.getByRole("region", { name: "نکات فرم و ایمنی" });
-    expect(within(safety).getAllByRole("listitem")).toHaveLength(2);
-    expect(within(safety).getByText(detail.safety_notes_fa[1])).toBeVisible();
+    const safety = screen.getByText("نکات فرم و ایمنی", { exact: true }).closest("details");
+    expect(safety).not.toBeNull();
+    expect(within(safety!).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(safety!).getByText(detail.safety_notes_fa[1])).toBeVisible();
 
     const breadcrumb = screen.getByRole("navigation", { name: "مسیر جزئیات حرکت" });
     expect(within(breadcrumb).getByRole("link", { name: "کتابخانه حرکات" })).toHaveAttribute(
@@ -152,8 +178,12 @@ describe("exercise detail content", () => {
   });
 
   it("uses English instructions and preserves Persian name direction in English", async () => {
+    const user = userEvent.setup();
     await i18n.changeLanguage("en");
     renderDetail();
+
+    await user.click(await screen.findByText("Movement guide", { exact: true }));
+    await user.click(screen.getByText("Correct execution", { exact: true }));
 
     expect(
       await screen.findByRole("heading", { name: "Dumbbell Bench Press" }),
