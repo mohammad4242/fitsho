@@ -195,6 +195,7 @@ export function adminExerciseToForm(exercise: import("./types").AdminExercise): 
     media_license: exercise.media_license,
     media_attribution: exercise.media_attribution,
     media_assets: exercise.media_assets?.map((asset) => ({
+      id: asset.id,
       presentation: asset.presentation,
       role: asset.role,
       sort_order: asset.sort_order,

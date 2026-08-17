@@ -14,6 +14,7 @@ from app.exercises.enums import (
     ExerciseType,
     MediaPresentation,
     MediaRole,
+    MediaType,
     MovementPattern,
     MuscleFocus,
     MuscleGroup,
@@ -90,6 +91,18 @@ class AdminExerciseMediaAssetInput(BaseModel):
     media_attribution: OptionalMetadata = None
 
 
+class AdminExerciseMediaAssetDetail(BaseModel):
+    id: UUID
+    presentation: MediaPresentation
+    role: MediaRole
+    sort_order: int
+    media_path: str
+    media_type: MediaType
+    media_source_url: str | None
+    media_license: str | None
+    media_attribution: str | None
+
+
 class AdminExerciseCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -124,6 +137,7 @@ class AdminExerciseCreate(BaseModel):
 
 
 class AdminExerciseDetail(ExerciseDetail):
+    media_assets: list[AdminExerciseMediaAssetDetail] = Field(default_factory=list)  # type: ignore[assignment]
     is_active: bool
     created_at: datetime
     updated_at: datetime

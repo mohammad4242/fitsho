@@ -27,16 +27,21 @@ export function buildExerciseMediaItems(
     items.push({ ...item, key });
   }
 
-  addItem({
-    key: "legacy",
-    presentation: null,
-    sort_order: null,
-    media_path: exercise.media_path,
-    media_type: exercise.media_type,
-    media_attribution: exercise.media_attribution,
-  });
+  const assets = [...(exercise.media_assets ?? [])].sort((left, right) =>
+    left.sort_order - right.sort_order,
+  );
+  if (assets.length === 0) {
+    addItem({
+      key: "legacy",
+      presentation: null,
+      sort_order: null,
+      media_path: exercise.media_path,
+      media_type: exercise.media_type,
+      media_attribution: exercise.media_attribution,
+    });
+  }
 
-  for (const asset of exercise.media_assets ?? []) {
+  for (const asset of assets) {
     addItem(mediaAssetToItem(asset));
   }
 

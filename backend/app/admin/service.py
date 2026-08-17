@@ -2,7 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, object_session, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.admin.exceptions import AdminUserNotFoundError, DuplicateExerciseSlugError
@@ -44,17 +44,37 @@ def _media_asset_key(asset: AdminExerciseMediaAssetInput) -> MediaAssetKey:
 
 
 def _validate_media_assets(
-    existing: dict[MediaAssetKey, ExerciseMediaAsset],
+    existing: list[ExerciseMediaAsset],
     payload_assets: list[AdminExerciseMediaAssetInput],
     stored_assets: dict[MediaAssetKey, StoredMedia],
-) -> None:
+) -> list[tuple[AdminExerciseMediaAssetInput, ExerciseMediaAsset | None]]:
     payload_keys = [_media_asset_key(asset) for asset in payload_assets]
     if len(payload_keys) != len(set(payload_keys)):
         raise ValueError("Each presentation, media role, and display order must be unique")
     if not set(stored_assets).issubset(payload_keys):
         raise ValueError("Each uploaded media file requires matching metadata")
-    if any(key not in existing and key not in stored_assets for key in payload_keys):
-        raise ValueError("New media metadata requires its media file")
+    existing_by_id = {asset.id: asset for asset in existing}
+    existing_by_key = {
+        (asset.presentation, asset.role, asset.sort_order): asset for asset in existing
+    }
+    resolved: list[tuple[AdminExerciseMediaAssetInput, ExerciseMediaAsset | None]] = []
+    for payload_asset, key in zip(payload_assets, payload_keys, strict=True):
+        asset: ExerciseMediaAsset | None = (
+            existing_by_id.get(payload_asset.id) if payload_asset.id is not None else None
+        )
+        if payload_asset.id is not None and asset is None:
+            raise ValueError("Media asset does not belong to this exercise")
+        if asset is None:
+            asset = existing_by_key.get(key)
+        if asset is not None and (
+            asset.presentation is not payload_asset.presentation
+            or asset.role is not payload_asset.role
+        ):
+            raise ValueError("Media asset presentation cannot be changed")
+        if asset is None and key not in stored_assets:
+            raise ValueError("New media metadata requires its media file")
+        resolved.append((payload_asset, asset))
+    return resolved
 
 
 def _sync_media_assets(
@@ -62,14 +82,22 @@ def _sync_media_assets(
     payload_assets: list[AdminExerciseMediaAssetInput],
     stored_assets: dict[MediaAssetKey, StoredMedia],
 ) -> None:
-    existing = {
-        (asset.presentation, asset.role, asset.sort_order): asset for asset in exercise.media_assets
-    }
-    _validate_media_assets(existing, payload_assets, stored_assets)
-    for payload_asset in payload_assets:
+    resolved = _validate_media_assets(list(exercise.media_assets), payload_assets, stored_assets)
+    if exercise.media_assets:
+        temporary_base = max(
+            [asset.sort_order for asset in exercise.media_assets]
+            + [asset.sort_order for asset in payload_assets]
+            + [0]
+        ) + len(exercise.media_assets) + 1
+        for index, existing_asset in enumerate(exercise.media_assets):
+            existing_asset.sort_order = temporary_base + index
+        exercise_db = object_session(exercise)
+        if exercise_db is not None:
+            exercise_db.flush()
+
+    for payload_asset, asset in resolved:
         key = _media_asset_key(payload_asset)
         stored_media = stored_assets.get(key)
-        asset = existing.get(key)
         if asset is None:
             assert stored_media is not None
             asset = ExerciseMediaAsset(
@@ -80,7 +108,9 @@ def _sync_media_assets(
                 media_type=stored_media.media_type,
             )
             exercise.media_assets.append(asset)
-        elif stored_media is not None:
+        else:
+            asset.sort_order = payload_asset.sort_order
+        if stored_media is not None:
             asset.media_path = stored_media.public_path
             asset.media_type = stored_media.media_type
         asset.media_source_url = payload_asset.media_source_url
@@ -92,7 +122,11 @@ def _sync_media_assets(
         )
     desired_keys = {_media_asset_key(asset) for asset in payload_assets}
     for asset in list(exercise.media_assets):
-        if (asset.presentation, asset.role, asset.sort_order) not in desired_keys:
+        if (
+            asset.presentation,
+            asset.role,
+            asset.sort_order,
+        ) not in desired_keys:
             exercise.media_assets.remove(asset)
 
 
@@ -198,7 +232,7 @@ def create_admin_exercise(
     media_assets: dict[MediaAssetKey, StoredMedia] | None = None,
 ) -> Exercise:
     stored_media_assets = media_assets or {}
-    _validate_media_assets({}, payload.media_assets, stored_media_assets)
+    _validate_media_assets([], payload.media_assets, stored_media_assets)
     exercise = Exercise(
         slug=payload.slug,
         name_en=payload.name_en,

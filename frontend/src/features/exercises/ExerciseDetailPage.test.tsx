@@ -164,7 +164,7 @@ describe("exercise detail content", () => {
     expect(document.documentElement).toHaveAttribute("dir", "ltr");
   });
 
-  it("lets the member select an available male or female media asset", async () => {
+  it("lets the member select among ordered assets for their gender", async () => {
     const user = userEvent.setup();
     api.getExercise.mockResolvedValue({
       ...detail,
@@ -176,48 +176,31 @@ describe("exercise detail content", () => {
           media_path: "/media/male.mp4",
           media_type: "video",
           media_source_url: null,
-          media_license: "MIT",
-          media_attribution: "Male creator",
+          media_license: null,
+          media_attribution: null,
         },
+        mediaAsset("/media/male-second.mp4", "male", 1),
       ],
     });
     renderDetail();
 
     const selector = await screen.findByLabelText("رسانهٔ نمایش");
-    await user.selectOptions(selector, "male-video-0");
+    await user.selectOptions(selector, "male-video-1");
 
     const video = screen.getByLabelText("نمایش حرکت پرس سینه دمبل");
     expect(video.tagName).toBe("VIDEO");
-    expect(video).toHaveAttribute("src", "/media/male.mp4");
-    expect(screen.getByText("Male creator")).toBeVisible();
+    expect(video).toHaveAttribute("src", "/media/male-second.mp4");
   });
 
-  it("lets the member select an unspecified owner video", async () => {
-    const user = userEvent.setup();
+  it("uses legacy media when the profile gender has no asset", async () => {
     api.getExercise.mockResolvedValue({
       ...detail,
-      media_assets: [
-        {
-          presentation: "unspecified",
-          role: "video",
-          sort_order: 0,
-          media_path: "/media/owner-video.mp4",
-          media_type: "video",
-          media_source_url: null,
-          media_license: null,
-          media_attribution: "Fitsho owner-provided",
-        },
-      ],
+      media_assets: [],
     });
     renderDetail();
 
-    const selector = await screen.findByLabelText("رسانهٔ نمایش");
-    await user.selectOptions(selector, "unspecified-video-0");
-
-    expect(screen.getByRole("option", { name: "ویدئوی مالک" })).toBeVisible();
-    expect(screen.getByLabelText("نمایش حرکت پرس سینه دمبل")).toHaveAttribute(
-      "src",
-      "/media/owner-video.mp4",
+    expect(await screen.findByRole("img", { name: "نمایش حرکت پرس سینه دمبل" })).toHaveAttribute(
+      "src", detail.media_path,
     );
   });
 
@@ -226,38 +209,7 @@ describe("exercise detail content", () => {
       ...detail,
       media_assets: [
         mediaAsset("/media/male.mp4", "male", 0),
-        mediaAsset("/media/female.mp4", "female", 0),
-      ],
-    });
-    renderDetail();
-
-    await screen.findByTestId("exercise-media-carousel");
-    const carousel = screen.getByTestId("exercise-media-surface");
-    expect(screen.getByText("۱ / ۳")).toBeVisible();
-
-    fireEvent.pointerDown(carousel, { clientX: 240, clientY: 140 });
-    fireEvent.pointerUp(carousel, { clientX: 160, clientY: 140 });
-    expect(screen.getByLabelText("نمایش حرکت پرس سینه دمبل")).toHaveAttribute(
-      "src",
-      "/media/male.mp4",
-    );
-    expect(screen.getByText("۲ / ۳")).toBeVisible();
-
-    fireEvent.pointerDown(carousel, { clientX: 160, clientY: 140 });
-    fireEvent.pointerUp(carousel, { clientX: 240, clientY: 140 });
-    expect(screen.getByRole("img", { name: "نمایش حرکت پرس سینه دمبل" })).toHaveAttribute(
-      "src",
-      detail.media_path,
-    );
-    expect(screen.getByText("۱ / ۳")).toBeVisible();
-  });
-
-  it("deduplicates an asset matching legacy media and keeps unique legacy media", async () => {
-    api.getExercise.mockResolvedValue({
-      ...detail,
-      media_assets: [
-        mediaAsset(detail.media_path, "male", 0),
-        mediaAsset("/media/owner.mp4", "unspecified", 1),
+        mediaAsset("/media/male-second.mp4", "male", 1),
       ],
     });
     renderDetail();
@@ -265,7 +217,36 @@ describe("exercise detail content", () => {
     await screen.findByTestId("exercise-media-carousel");
     const carousel = screen.getByTestId("exercise-media-surface");
     expect(screen.getByText("۱ / ۲")).toBeVisible();
-    expect(screen.getByRole("img", { name: "نمایش حرکت پرس سینه دمبل" })).toHaveAttribute(
+
+    fireEvent.pointerDown(carousel, { clientX: 240, clientY: 140 });
+    fireEvent.pointerUp(carousel, { clientX: 160, clientY: 140 });
+    expect(screen.getByLabelText("نمایش حرکت پرس سینه دمبل")).toHaveAttribute(
+      "src", "/media/male-second.mp4",
+    );
+    expect(screen.getByText("۲ / ۲")).toBeVisible();
+
+    fireEvent.pointerDown(carousel, { clientX: 160, clientY: 140 });
+    fireEvent.pointerUp(carousel, { clientX: 240, clientY: 140 });
+    expect(screen.getByLabelText("نمایش حرکت پرس سینه دمبل")).toHaveAttribute(
+      "src", "/media/male.mp4",
+    );
+    expect(screen.getByText("۱ / ۲")).toBeVisible();
+  });
+
+  it("deduplicates matching assets without adding legacy media", async () => {
+    api.getExercise.mockResolvedValue({
+      ...detail,
+      media_assets: [
+        mediaAsset(detail.media_path, "male", 0),
+        mediaAsset("/media/male-second.mp4", "male", 1),
+      ],
+    });
+    renderDetail();
+
+    await screen.findByTestId("exercise-media-carousel");
+    const carousel = screen.getByTestId("exercise-media-surface");
+    expect(screen.getByText("۱ / ۲")).toBeVisible();
+    expect(screen.getByLabelText("نمایش حرکت پرس سینه دمبل")).toHaveAttribute(
       "src",
       detail.media_path,
     );
@@ -274,7 +255,7 @@ describe("exercise detail content", () => {
     fireEvent.pointerUp(carousel, { clientX: 160, clientY: 140 });
     expect(screen.getByLabelText("نمایش حرکت پرس سینه دمبل")).toHaveAttribute(
       "src",
-      "/media/owner.mp4",
+      "/media/male-second.mp4",
     );
   });
 

@@ -4,6 +4,7 @@ import { useState, type ComponentProps } from "react";
 import { describe, expect, it } from "vitest";
 
 import { ExerciseMediaAssetsFields } from "./ExerciseMediaAssetsFields";
+import type { AdminExerciseMediaAssetInput } from "./types";
 
 describe("ExerciseMediaAssetsFields", () => {
   it("offers videos only", async () => {
@@ -19,10 +20,45 @@ describe("ExerciseMediaAssetsFields", () => {
       "accept", "video/mp4,video/webm",
     );
   });
+
+  it("moves a video down without changing the other gender tab", async () => {
+    const user = userEvent.setup();
+    render(<MediaFieldsHarness initialAssets={[
+      asset("male", 0, "https://source.example/male-first.mp4"),
+      asset("male", 1, "https://source.example/male-second.mp4"),
+      asset("male", 2, "https://source.example/male-third.mp4"),
+      asset("female", 0, "https://source.example/female-first.mp4"),
+      asset("female", 1, "https://source.example/female-second.mp4"),
+    ]} />);
+
+    expect(screen.getAllByRole("button", { name: /بالا بردن ویدئو/ })[0]).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: /پایین بردن ویدئو/ })[2]).toBeDisabled();
+    await user.click(screen.getAllByRole("button", { name: "پایین بردن ویدئو ۱" })[0]);
+
+    expect(screen.getAllByTestId("admin-media-asset").map((item) =>
+      (item.querySelector("input[type='url']") as HTMLInputElement)?.value,
+    )).toEqual([
+      "https://source.example/male-second.mp4",
+      "https://source.example/male-first.mp4",
+      "https://source.example/male-third.mp4",
+    ]);
+
+    await user.click(screen.getByRole("tab", { name: "زن" }));
+    expect(screen.getAllByTestId("admin-media-asset").map((item) =>
+      (item.querySelector("input[type='url']") as HTMLInputElement)?.value,
+    )).toEqual([
+      "https://source.example/female-first.mp4",
+      "https://source.example/female-second.mp4",
+    ]);
+  });
 });
 
-function MediaFieldsHarness() {
-  const [assets, setAssets] = useState<ComponentProps<typeof ExerciseMediaAssetsFields>["assets"]>([]);
+function MediaFieldsHarness({
+  initialAssets = [],
+}: {
+  initialAssets?: ComponentProps<typeof ExerciseMediaAssetsFields>["assets"];
+}) {
+  const [assets, setAssets] = useState<ComponentProps<typeof ExerciseMediaAssetsFields>["assets"]>(initialAssets);
   const [files, setFiles] = useState<File[]>([]);
   return (
     <ExerciseMediaAssetsFields
@@ -38,4 +74,20 @@ function MediaFieldsHarness() {
       onFilesChange={setFiles}
     />
   );
+}
+
+function asset(
+  presentation: "male" | "female",
+  sort_order: number,
+  media_source_url: string,
+): AdminExerciseMediaAssetInput {
+  return {
+    presentation,
+    role: "video",
+    sort_order,
+    upload_index: null,
+    media_source_url,
+    media_license: null,
+    media_attribution: null,
+  };
 }

@@ -9,6 +9,7 @@ import type {
   ExerciseType,
   MediaPresentation,
   MediaRole,
+  MediaType,
   MovementPattern,
   MuscleFocus,
   MuscleGroup,
@@ -28,7 +29,14 @@ export type AdminExerciseMediaAssetInput = {
 
 export type AdminExerciseMediaFiles = File[];
 
-export type AdminExercise = ExerciseDetail & {
+export type AdminExerciseMediaAsset = AdminExerciseMediaAssetInput & {
+  id: string;
+  media_path: string;
+  media_type: MediaType;
+};
+
+export type AdminExercise = Omit<ExerciseDetail, "media_assets"> & {
+  media_assets?: AdminExerciseMediaAsset[];
   movement_pattern: MovementPattern;
   exercise_type: ExerciseType;
   caution_tags: ExerciseCautionTag[];

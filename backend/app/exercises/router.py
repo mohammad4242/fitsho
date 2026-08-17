@@ -3,8 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.auth.dependencies import DatabaseSession
-from app.exercises.dependencies import require_completed_profile
-from app.exercises.enums import BodyRegion, MuscleGroup
+from app.exercises.dependencies import CurrentUser, require_completed_profile
+from app.exercises.enums import BodyRegion, MediaPresentation, MuscleGroup
 from app.exercises.models import Exercise
 from app.exercises.schemas import (
     BodyRegionCategory,
@@ -19,6 +19,7 @@ from app.exercises.schemas import (
 )
 from app.exercises.service import get_active_exercise_by_slug, list_exercises
 from app.exercises.taxonomy import MUSCLE_FOCUS_CATEGORIES
+from app.profile.models import UserProfile
 
 router = APIRouter(
     prefix="/api/v1",
@@ -97,7 +98,11 @@ def _summary(exercise: Exercise) -> ExerciseSummary:
     )
 
 
-def _detail(exercise: Exercise) -> ExerciseDetail:
+def _detail(
+    exercise: Exercise,
+    presentation: MediaPresentation | None = None,
+    filter_media: bool = False,
+) -> ExerciseDetail:
     summary = _summary(exercise)
     return ExerciseDetail(
         **summary.model_dump(),
@@ -129,6 +134,7 @@ def _detail(exercise: Exercise) -> ExerciseDetail:
                 media_attribution=asset.media_attribution,
             )
             for asset in exercise.media_assets
+            if not filter_media or asset.presentation is presentation
         ],
     )
 
@@ -171,11 +177,22 @@ def read_exercises(
 
 
 @router.get("/exercises/{slug}", response_model=ExerciseDetail)
-def read_exercise(slug: str, db: DatabaseSession) -> ExerciseDetail:
+def read_exercise(
+    slug: str,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> ExerciseDetail:
     exercise = get_active_exercise_by_slug(db, slug)
     if exercise is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Exercise not found",
         )
-    return _detail(exercise)
+    profile = db.get(UserProfile, user.id)
+    presentation = None
+    if profile is not None and profile.sex is not None:
+        try:
+            presentation = MediaPresentation(profile.sex.value)
+        except ValueError:
+            presentation = None
+    return _detail(exercise, presentation, filter_media=True)

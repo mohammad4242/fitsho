@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.admin.schemas import AdminExerciseMediaAssetInput
 from app.auth.models import User
 from app.config import Settings
-from app.exercises.models import Exercise
+from app.exercises.models import Exercise, ExerciseMediaAsset
 from app.exercises.service import seed_exercises
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
@@ -486,7 +486,8 @@ def test_admin_creates_gendered_media_assets_and_public_detail_returns_them(
     public_detail = client.get("/api/v1/exercises/incline-push-up")
 
     assert public_detail.status_code == 200
-    assert public_detail.json()["media_assets"] == response.json()["media_assets"]
+    assert [asset["presentation"] for asset in public_detail.json()["media_assets"]] == ["male"]
+    assert all("id" not in asset for asset in public_detail.json()["media_assets"])
 
 
 def test_admin_creates_multiple_media_items_for_one_gender_and_role(
@@ -515,6 +516,164 @@ def test_admin_creates_multiple_media_items_for_one_gender_and_role(
 
     assert response.status_code == 201
     assert [asset["sort_order"] for asset in response.json()["media_assets"]] == [0, 1]
+    assert all("id" in asset for asset in response.json()["media_assets"])
+
+
+def test_admin_reorders_existing_gendered_videos_without_replacing_media(
+    client: TestClient,
+    db: Session,
+) -> None:
+    make_current_user_admin(client, db)
+    created = post_exercise(client, exercise_payload())
+    assert created.status_code == 201
+    exercise = db.get(Exercise, created.json()["id"])
+    assert exercise is not None
+    videos = [
+        ExerciseMediaAsset(
+            exercise_id=exercise.id,
+            presentation="male",
+            role="video",
+            sort_order=sort_order,
+            media_path=f"/media/male-{sort_order}.mp4",
+            media_type="video",
+        )
+        for sort_order in range(3)
+    ]
+    videos.append(
+        ExerciseMediaAsset(
+            exercise_id=exercise.id,
+            presentation="female",
+            role="video",
+            sort_order=0,
+            media_path="/media/female-0.mp4",
+            media_type="video",
+        )
+    )
+    db.add_all(videos)
+    db.commit()
+    payload_assets = [
+        {
+            "id": str(videos[2].id),
+            "presentation": "male",
+            "role": "video",
+            "sort_order": 0,
+        },
+        {
+            "id": str(videos[0].id),
+            "presentation": "male",
+            "role": "video",
+            "sort_order": 1,
+        },
+        {
+            "id": str(videos[1].id),
+            "presentation": "male",
+            "role": "video",
+            "sort_order": 2,
+        },
+        {
+            "id": str(videos[3].id),
+            "presentation": "female",
+            "role": "video",
+            "sort_order": 0,
+        },
+    ]
+
+    response = client.patch(
+        f"/api/v1/admin/exercises/{exercise.id}",
+        headers=ORIGIN,
+        data={"payload": json.dumps(exercise_payload(media_assets=payload_assets))},
+    )
+
+    assert response.status_code == 200
+    db.expire_all()
+    stored = list(
+        db.scalars(
+            select(ExerciseMediaAsset)
+            .where(ExerciseMediaAsset.exercise_id == exercise.id)
+            .order_by(ExerciseMediaAsset.presentation, ExerciseMediaAsset.sort_order)
+        )
+    )
+    assert [(asset.presentation.value, asset.sort_order, asset.media_path) for asset in stored] == [
+        ("female", 0, "/media/female-0.mp4"),
+        ("male", 0, "/media/male-2.mp4"),
+        ("male", 1, "/media/male-0.mp4"),
+        ("male", 2, "/media/male-1.mp4"),
+    ]
+    assert {asset.id for asset in stored} == {video.id for video in videos}
+
+
+def test_member_exercise_detail_returns_only_profile_gender_videos(
+    client: TestClient,
+    db: Session,
+) -> None:
+    make_current_user_admin(client, db)
+    created = post_exercise(client, exercise_payload())
+    assert created.status_code == 201
+    exercise = db.get(Exercise, created.json()["id"])
+    assert exercise is not None
+    exercise.media_assets.extend(
+        [
+            ExerciseMediaAsset(
+                presentation="female",
+                role="video",
+                sort_order=0,
+                media_path="/media/female.mp4",
+                media_type="video",
+            ),
+            ExerciseMediaAsset(
+                presentation="male",
+                role="video",
+                sort_order=1,
+                media_path="/media/male-second.mp4",
+                media_type="video",
+            ),
+            ExerciseMediaAsset(
+                presentation="male",
+                role="video",
+                sort_order=0,
+                media_path="/media/male-first.mp4",
+                media_type="video",
+            ),
+        ]
+    )
+    db.commit()
+    assert client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE).status_code == 201
+
+    response = client.get(f"/api/v1/exercises/{exercise.slug}")
+
+    assert response.status_code == 200
+    assert [asset["media_path"] for asset in response.json()["media_assets"]] == [
+        "/media/male-first.mp4",
+        "/media/male-second.mp4",
+    ]
+
+
+def test_member_exercise_detail_falls_back_to_legacy_media_without_matching_gender_video(
+    client: TestClient,
+    db: Session,
+) -> None:
+    make_current_user_admin(client, db)
+    created = post_exercise(client, exercise_payload())
+    assert created.status_code == 201
+    exercise = db.get(Exercise, created.json()["id"])
+    assert exercise is not None
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation="female",
+            role="video",
+            sort_order=0,
+            media_path="/media/female.mp4",
+            media_type="video",
+        )
+    )
+    db.commit()
+    assert client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE).status_code == 201
+
+    response = client.get(f"/api/v1/exercises/{exercise.slug}")
+
+    assert response.status_code == 200
+    assert response.json()["media_assets"] == []
+    assert response.json()["media_path"] == exercise.media_path
 
 
 def test_invalid_upload_returns_field_error_and_leaves_no_file(

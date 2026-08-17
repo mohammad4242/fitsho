@@ -74,6 +74,20 @@ export function ExerciseMediaAssetsFields({ accordion, assets, files, onAssetsCh
     onAssetsChange(assets.map((item) => item === asset ? { ...item, upload_index: uploadIndex } : item));
   }
 
+  function move(index: number, direction: -1 | 1) {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= visible.length) return;
+    const reordered = [...visible];
+    [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+    let visibleIndex = 0;
+    onAssetsChange(assets.map((asset) => {
+      if (asset.presentation !== presentation) return asset;
+      const nextAsset = reordered[visibleIndex];
+      visibleIndex += 1;
+      return { ...nextAsset, sort_order: visibleIndex - 1 };
+    }));
+  }
+
   return <AdminAccordionSection {...accordion}>
     <div className="admin-media-tabs" role="tablist" aria-label={t("admin.fields.mediaVariants")}>
       <button type="button" role="tab" aria-selected={presentation === "male"} onClick={() => setPresentation("male")}>{t("admin.fields.male")}</button>
@@ -82,10 +96,26 @@ export function ExerciseMediaAssetsFields({ accordion, assets, files, onAssetsCh
     <div className="admin-media-assets">{visible.map((asset, index) => {
       const number = (index + 1).toLocaleString("fa-IR");
       const fileId = `media-${asset.presentation}-${asset.sort_order}`;
-      return <section className="admin-media-asset" key={fileId}>
+      return <section className="admin-media-asset" data-testid="admin-media-asset" key={fileId}>
         <div className="admin-media-asset__header">
           <strong>{t("admin.fields.mediaItem", { number })}</strong>
-          <button type="button" className="admin-media-remove" onClick={() => remove(index)}>{t("admin.fields.removeMedia")}</button>
+          <div className="admin-media-asset__actions">
+            <button
+              type="button"
+              className="admin-media-order"
+              aria-label={t("admin.fields.moveMediaUp", { number })}
+              disabled={index === 0}
+              onClick={() => move(index, -1)}
+            >↑</button>
+            <button
+              type="button"
+              className="admin-media-order"
+              aria-label={t("admin.fields.moveMediaDown", { number })}
+              disabled={index === visible.length - 1}
+              onClick={() => move(index, 1)}
+            >↓</button>
+            <button type="button" className="admin-media-remove" onClick={() => remove(index)}>{t("admin.fields.removeMedia")}</button>
+          </div>
         </div>
         <label htmlFor={`${fileId}-file`}>{t("admin.fields.galleryMediaFile", { number })}</label>
         <input id={`${fileId}-file`} accept="video/mp4,video/webm" type="file" onChange={(event) => changeFile(index, event.target.files?.[0] ?? null)} />

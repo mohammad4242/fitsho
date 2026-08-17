@@ -26,6 +26,7 @@ from app.admin.schemas import (
     AdminExerciseCreate,
     AdminExerciseDetail,
     AdminExerciseFilters,
+    AdminExerciseMediaAssetDetail,
     AdminTrainingProgramTemplate,
     AdminTrainingProgramTemplatesResponse,
     AdminTrainingProgramTemplateWrite,
@@ -46,7 +47,6 @@ from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import AppSettings, DatabaseSession
 from app.exercises.enums import MediaPresentation, MediaRole, MediaType
 from app.exercises.models import Exercise
-from app.exercises.schemas import ExerciseMediaAssetDetail
 from app.exercises.taxonomy import MUSCLES_BY_REGION, is_compatible_muscle_focus
 from app.training_templates.admin_service import (
     TemplateWriteError,
@@ -232,7 +232,8 @@ def _detail(exercise: Exercise) -> AdminExerciseDetail:
         media_license=exercise.media_license,
         media_attribution=exercise.media_attribution,
         media_assets=[
-            ExerciseMediaAssetDetail(
+            AdminExerciseMediaAssetDetail(
+                id=asset.id,
                 presentation=asset.presentation,
                 role=asset.role,
                 sort_order=asset.sort_order,
