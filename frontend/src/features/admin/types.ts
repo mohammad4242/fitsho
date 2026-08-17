@@ -18,6 +18,7 @@ import type { ExperienceLevel, FitnessGoal } from "../profile/types";
 
 export type AdminExerciseMediaAssetInput = {
   id?: string | null;
+  media_path?: string | null;
   presentation: MediaPresentation;
   role: MediaRole;
   sort_order: number;

@@ -33,6 +33,9 @@ describe("ExerciseMediaAssetsFields", () => {
 
     expect(screen.getAllByRole("button", { name: /بالا بردن ویدئو/ })[0]).toBeDisabled();
     expect(screen.getAllByRole("button", { name: /پایین بردن ویدئو/ })[2]).toBeDisabled();
+    expect(screen.getAllByLabelText("پیش‌نمایش ویدئو ۱")[0]).toHaveAttribute(
+      "src", "/media/male-0.mp4",
+    );
     expect(screen.getAllByRole("button", { name: "پایین بردن ویدئو ۱" })[0]).toHaveStyle({
       touchAction: "manipulation",
     });
@@ -45,6 +48,9 @@ describe("ExerciseMediaAssetsFields", () => {
       "https://source.example/male-first.mp4",
       "https://source.example/male-third.mp4",
     ]);
+    expect(screen.getAllByLabelText("پیش‌نمایش ویدئو ۱")[0]).toHaveAttribute(
+      "src", "/media/male-1.mp4",
+    );
 
     await user.click(screen.getByRole("tab", { name: "زن" }));
     expect(screen.getAllByTestId("admin-media-asset").map((item) =>
@@ -53,6 +59,9 @@ describe("ExerciseMediaAssetsFields", () => {
       "https://source.example/female-first.mp4",
       "https://source.example/female-second.mp4",
     ]);
+    expect(screen.getAllByLabelText("پیش‌نمایش ویدئو ۱")[0]).toHaveAttribute(
+      "src", "/media/female-0.mp4",
+    );
   });
 });
 
@@ -90,6 +99,7 @@ function asset(
     sort_order,
     upload_index: null,
     media_source_url,
+    media_path: `/media/${presentation}-${sort_order}.mp4`,
     media_license: null,
     media_attribution: null,
   };

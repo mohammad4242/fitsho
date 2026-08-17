@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MediaPresentation } from "../exercises/types";
@@ -15,6 +15,46 @@ type Props = {
   onAssetsChange: (assets: AdminExerciseMediaAssetInput[]) => void;
   onFilesChange: (files: AdminExerciseMediaFiles) => void;
 };
+
+function MediaAssetPreview({
+  asset,
+  file,
+  label,
+}: {
+  asset: AdminExerciseMediaAssetInput;
+  file?: File;
+  label: string;
+}) {
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!file || typeof URL.createObjectURL !== "function") {
+      setFileUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setFileUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const path = fileUrl ?? asset.media_path;
+  if (!path) return null;
+
+  return (
+    <div className="admin-media-preview">
+      <video
+        aria-label={label}
+        autoPlay
+        controls
+        loop
+        muted
+        playsInline
+        preload="metadata"
+        src={path}
+      />
+    </div>
+  );
+}
 
 function nextSortOrder(
   assets: AdminExerciseMediaAssetInput[],
@@ -119,6 +159,11 @@ export function ExerciseMediaAssetsFields({ accordion, assets, files, onAssetsCh
             <button type="button" className="admin-media-remove" onClick={() => remove(index)}>{t("admin.fields.removeMedia")}</button>
           </div>
         </div>
+        <MediaAssetPreview
+          asset={asset}
+          file={asset.upload_index == null ? undefined : files[asset.upload_index]}
+          label={t("admin.fields.mediaPreview", { number })}
+        />
         <label htmlFor={`${fileId}-file`}>{t("admin.fields.galleryMediaFile", { number })}</label>
         <input id={`${fileId}-file`} accept="video/mp4,video/webm" type="file" onChange={(event) => changeFile(index, event.target.files?.[0] ?? null)} />
         <small>{asset.upload_index === null || asset.upload_index === undefined ? t("admin.fields.existingFile") : files[asset.upload_index]?.name}</small>

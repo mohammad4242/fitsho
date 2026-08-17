@@ -160,12 +160,16 @@ export function toAdminExerciseCreate(form: AdminExerciseForm): AdminExerciseCre
     media_source_url: optional(form.media_source_url),
     media_license: optional(form.media_license),
     media_attribution: optional(form.media_attribution),
-    media_assets: form.media_assets.map((asset) => ({
-      ...asset,
+    media_assets: form.media_assets.map((asset) => {
+      const payloadAsset = { ...asset };
+      delete payloadAsset.media_path;
+      return {
+        ...payloadAsset,
       media_source_url: optional(asset.media_source_url),
       media_license: optional(asset.media_license),
       media_attribution: optional(asset.media_attribution),
-    })),
+      };
+    }),
   };
 }
 
@@ -196,6 +200,7 @@ export function adminExerciseToForm(exercise: import("./types").AdminExercise): 
     media_attribution: exercise.media_attribution,
     media_assets: exercise.media_assets?.map((asset) => ({
       id: asset.id,
+      media_path: asset.media_path,
       presentation: asset.presentation,
       role: asset.role,
       sort_order: asset.sort_order,
