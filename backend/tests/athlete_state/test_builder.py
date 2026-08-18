@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from app.body_analysis.enums import BodyArea
 from app.exercises.enums import MuscleGroup
 from app.workout_cycles.enums import (
     WorkoutCycleFeedbackProgress,
+    WorkoutCycleStatus,
     WorkoutCycleWeeklyCheckInDifficulty,
     WorkoutCycleWeeklyCheckInRecovery,
     WorkoutExerciseReplacementReason,
@@ -18,6 +20,7 @@ from app.workout_cycles.enums import (
 from app.workout_cycles.models import WorkoutCycleWeeklyCheckIn
 from app.workout_cycles.schemas import CompletionFeedbackInput
 from app.workout_cycles.service import complete_cycle, record_exercise_replacement
+from app.workouts.enums import WorkoutPlanStatus
 from tests.workout_cycles.test_cycle_body_progress_comparison import _cycle_with_snapshots
 from tests.workout_cycles.test_replacement_api import _plan_with_cycle, _user
 
@@ -118,6 +121,45 @@ def test_athlete_state_missing_optional_data_is_safe(db: Session) -> None:
     assert state.pain_sensitive_exercises == ()
     assert state.body_progress.comparison_ids == ()
     assert state.provenance.weekly_check_in_ids == ()
+
+
+def test_athlete_state_selects_current_cycle_and_previous_history(db: Session) -> None:
+    user = _user(db)
+    old_plan, _old_item, old_cycle, *_ = _plan_with_cycle(
+        db,
+        user.id,
+        plan_status=WorkoutPlanStatus.SUPERSEDED,
+        days_ago=60,
+    )
+    assert old_cycle is not None
+    old_cycle.status = WorkoutCycleStatus.COMPLETED
+    old_cycle.completed_at = datetime.now(UTC) - timedelta(days=30)
+
+    current_plan, _current_item, current_cycle, *_ = _plan_with_cycle(
+        db,
+        user.id,
+        days_ago=7,
+    )
+    assert current_cycle is not None
+    old_check_in = WorkoutCycleWeeklyCheckIn(
+        user_id=user.id,
+        cycle_id=old_cycle.id,
+        week_number=1,
+        sessions_completed=1,
+        perceived_difficulty=WorkoutCycleWeeklyCheckInDifficulty.APPROPRIATE,
+        recovery_rating=WorkoutCycleWeeklyCheckInRecovery.GOOD,
+        has_pain_or_limitation=False,
+    )
+    db.add(old_check_in)
+    db.commit()
+
+    state = AthleteStateBuilder(db).build(user.id)
+
+    assert state.current_cycle_id == current_cycle.id
+    assert state.previous_cycle_ids == (old_cycle.id,)
+    assert state.provenance.cycle_ids == (current_cycle.id, old_cycle.id)
+    assert state.provenance.weekly_check_in_ids == (old_check_in.id,)
+    assert set(state.provenance.workout_plan_ids) == {current_plan.id, old_plan.id}
 
 
 def test_athlete_state_never_includes_another_users_data(db: Session) -> None:

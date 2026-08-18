@@ -23,6 +23,7 @@ from app.profile.models import UserProfile
 from app.workout_cycles.body_progress_models import WorkoutCycleBodyProgressComparison
 from app.workout_cycles.body_progress_schemas import CycleBodyProgressComparisonResult
 from app.workout_cycles.enums import (
+    WorkoutCycleStatus,
     WorkoutExercisePreferenceType,
 )
 from app.workout_cycles.models import (
@@ -56,7 +57,7 @@ class AthleteStateBuilder:
             current = requested
         else:
             current = next(
-                (cycle for cycle in cycles if cycle.status.value == "active"),
+                (cycle for cycle in cycles if cycle.status is WorkoutCycleStatus.ACTIVE),
                 cycles[0] if cycles else None,
             )
         selected_cycles = self._selected_cycles(cycles, current)
@@ -143,7 +144,7 @@ class AthleteStateBuilder:
             (
                 cycle
                 for cycle in cycles
-                if cycle.id != current.id and cycle.status.value == "completed"
+                if cycle.id != current.id and cycle.status is WorkoutCycleStatus.COMPLETED
             ),
             None,
         )
@@ -163,6 +164,7 @@ class AthleteStateBuilder:
                 .where(
                     WorkoutCycleWeeklyCheckIn.user_id == user_id,
                     WorkoutCycleWeeklyCheckIn.cycle_id.in_(cycle_ids),
+                    WorkoutCycle.user_id == user_id,
                 )
                 .order_by(
                     WorkoutCycle.started_at,
