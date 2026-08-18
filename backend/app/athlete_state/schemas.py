@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from enum import StrEnum
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -159,3 +161,16 @@ class AthleteState(BaseModel):
     schedule: AthleteStateScheduleContext
     body_progress: AthleteStateBodyProgress
     provenance: AthleteStateProvenance
+
+    def to_snapshot(self) -> dict[str, Any]:
+        """Return the public, JSON-compatible state without raw source records."""
+        return self.model_dump(mode="json")
+
+    def to_snapshot_json(self) -> str:
+        """Return a canonical JSON representation suitable for hashing or tracing."""
+        return json.dumps(
+            self.to_snapshot(),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
