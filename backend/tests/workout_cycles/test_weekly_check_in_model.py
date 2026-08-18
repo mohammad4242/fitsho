@@ -3,7 +3,8 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.exc import IntegrityError
+from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
@@ -12,6 +13,7 @@ from app.workout_cycles.enums import (
     WorkoutCycleWeeklyCheckInRecovery,
 )
 from app.workout_cycles.models import WorkoutCycle, WorkoutCycleWeeklyCheckIn
+from app.workout_cycles.schemas import WorkoutCycleWeeklyCheckInClassificationInput
 from app.workout_cycles.service import (
     WorkoutCycleWeeklyCheckInCycleNotFoundError,
     WorkoutCycleWeeklyCheckInSessionsOutOfRangeError,
@@ -209,3 +211,72 @@ def test_wrong_owner_cannot_create_check_in_for_cycle(db: Session) -> None:
         )
 
     assert owner.id != other_user.id
+
+
+@pytest.mark.parametrize("difficulty", list(WorkoutCycleWeeklyCheckInDifficulty))
+def test_classification_schema_accepts_every_canonical_difficulty(
+    difficulty: WorkoutCycleWeeklyCheckInDifficulty,
+) -> None:
+    classification = WorkoutCycleWeeklyCheckInClassificationInput(
+        perceived_difficulty=difficulty.value,
+        recovery_rating=WorkoutCycleWeeklyCheckInRecovery.GOOD.value,
+    )
+
+    assert classification.perceived_difficulty is difficulty
+
+
+@pytest.mark.parametrize("recovery", list(WorkoutCycleWeeklyCheckInRecovery))
+def test_classification_schema_accepts_every_canonical_recovery(
+    recovery: WorkoutCycleWeeklyCheckInRecovery,
+) -> None:
+    classification = WorkoutCycleWeeklyCheckInClassificationInput(
+        perceived_difficulty=WorkoutCycleWeeklyCheckInDifficulty.APPROPRIATE.value,
+        recovery_rating=recovery.value,
+    )
+
+    assert classification.recovery_rating is recovery
+
+
+@pytest.mark.parametrize("field", ["perceived_difficulty", "recovery_rating"])
+def test_classification_schema_rejects_unknown_values(field: str) -> None:
+    payload = {
+        "perceived_difficulty": WorkoutCycleWeeklyCheckInDifficulty.EASY.value,
+        "recovery_rating": WorkoutCycleWeeklyCheckInRecovery.GOOD.value,
+    }
+    payload[field] = "unknown_value"
+
+    with pytest.raises(ValidationError):
+        WorkoutCycleWeeklyCheckInClassificationInput(**payload)
+
+
+@pytest.mark.parametrize("field", ["perceived_difficulty", "recovery_rating"])
+def test_database_rejects_unknown_classification_values(db: Session, field: str) -> None:
+    user, cycle = _cycle(db)
+    check_in = _check_in(user, cycle)
+    setattr(check_in, field, "unknown_value")
+    db.add(check_in)
+
+    with pytest.raises(StatementError):
+        db.flush()
+
+
+@pytest.mark.parametrize("difficulty", list(WorkoutCycleWeeklyCheckInDifficulty))
+@pytest.mark.parametrize("recovery", list(WorkoutCycleWeeklyCheckInRecovery))
+def test_persisted_classifications_round_trip(
+    db: Session,
+    difficulty: WorkoutCycleWeeklyCheckInDifficulty,
+    recovery: WorkoutCycleWeeklyCheckInRecovery,
+) -> None:
+    user, cycle = _cycle(db)
+    check_in = _check_in(user, cycle)
+    check_in.perceived_difficulty = difficulty
+    check_in.recovery_rating = recovery
+    db.add(check_in)
+    db.flush()
+    db.expire(check_in)
+
+    saved = db.get(WorkoutCycleWeeklyCheckIn, check_in.id)
+
+    assert saved is not None
+    assert saved.perceived_difficulty is difficulty
+    assert saved.recovery_rating is recovery

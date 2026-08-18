@@ -5,9 +5,18 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.workout_cycles.enums import (
     WorkoutCycleStatus,
+    WorkoutCycleWeeklyCheckInDifficulty,
+    WorkoutCycleWeeklyCheckInRecovery,
     WorkoutExerciseReplacementReason,
     WorkoutExerciseReplacementScope,
 )
+
+
+class WorkoutCycleWeeklyCheckInClassificationInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    perceived_difficulty: WorkoutCycleWeeklyCheckInDifficulty
+    recovery_rating: WorkoutCycleWeeklyCheckInRecovery
 
 
 class WorkoutExerciseReplacementCreateRequest(BaseModel):
