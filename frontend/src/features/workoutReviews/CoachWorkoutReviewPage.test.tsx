@@ -76,6 +76,7 @@ const detail: WorkoutReviewDetail = {
         estimated_duration_minutes: 45,
         exercises: [
           {
+            id: "workout-plan-exercise-1",
             order_index: 1,
             sets: 3,
             reps_min: 8,

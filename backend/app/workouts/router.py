@@ -191,6 +191,7 @@ def to_plan_response(
                 ai_coach_explanation_fa=day.ai_coach_explanation_fa,
                 exercises=[
                     WorkoutPlanExerciseResponse(
+                        id=item.id,
                         order_index=item.order_index,
                         sets=item.sets,
                         reps_min=item.reps_min,

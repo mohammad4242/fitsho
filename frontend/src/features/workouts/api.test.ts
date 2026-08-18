@@ -6,6 +6,7 @@ import {
   getActiveWorkoutPlan,
   getWorkoutPlan,
   getWorkoutPlanHistory,
+  recordExerciseReplacement,
 } from "./api";
 import type { WorkoutPlan } from "./types";
 
@@ -88,6 +89,32 @@ it("downloads a workout plan PDF through Fitsho", async () => {
   expect(fetch).toHaveBeenCalledWith(
     `/api/v1/workout-plans/${plan.id}/pdf`,
     expect.objectContaining({ credentials: "include" }),
+  );
+});
+
+it("records a replacement through the current workout cycle API", async () => {
+  const replacement = { id: "replacement-1", week_number: 1 };
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(replacement));
+
+  await expect(recordExerciseReplacement({
+    workout_plan_exercise_id: "018f0000-0000-7000-8000-000000000011",
+    replacement_exercise_id: "018f0000-0000-7000-8000-000000000003",
+    reason: "equipment_unavailable",
+    scope: "this_time",
+  })).resolves.toEqual(replacement);
+
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/workout-cycles/current/replacements",
+    expect.objectContaining({
+      credentials: "include",
+      method: "POST",
+      body: JSON.stringify({
+        workout_plan_exercise_id: "018f0000-0000-7000-8000-000000000011",
+        replacement_exercise_id: "018f0000-0000-7000-8000-000000000003",
+        reason: "equipment_unavailable",
+        scope: "this_time",
+      }),
+    }),
   );
 });
 

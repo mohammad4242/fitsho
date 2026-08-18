@@ -13,8 +13,15 @@ import {
   getActiveWorkoutPlan,
   getWorkoutPlan,
   getWorkoutPlanHistory,
+  recordExerciseReplacement,
 } from "./api";
-import type { WorkoutPlan, WorkoutPlanVersionSummary } from "./types";
+import type {
+  WorkoutExerciseReplacementReason,
+  WorkoutExerciseReplacementScope,
+  WorkoutPlan,
+  WorkoutPlanExercise,
+  WorkoutPlanVersionSummary,
+} from "./types";
 import "./workoutPlan.css";
 
 type PlanState = "loading" | "empty" | "ready" | "error";
@@ -249,7 +256,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 )}
               </div>
               {generating && <p className="workout-generating" role="status">{t("workoutPlan.generating")}</p>}
-              <WorkoutDays plan={plan} isEnglish={isEnglish} titleId="workout-schedule-title" />
+              <WorkoutDays plan={plan} isEnglish={isEnglish} titleId="workout-schedule-title" interactive={!isViewingHistorical && plan.status === "active"} />
             </section>
             <div className="workout-plan-statuses">
               {reused && <p className="workout-reused" role="status">{t("workoutPlan.reused")}</p>}
@@ -268,7 +275,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 <h2 id="workout-pending-plan-title" className="fitsho-display">{l("برنامه در انتظار تأیید مربی", "Plan awaiting coach approval")}</h2>
               </div>
             </div>
-            <WorkoutDays plan={pendingPlan} isEnglish={isEnglish} titleId="workout-pending-plan-title" />
+            <WorkoutDays plan={pendingPlan} isEnglish={isEnglish} titleId="workout-pending-plan-title" interactive={false} />
           </section>
         )}
 
@@ -359,7 +366,7 @@ function CoachReviewBanner({ plan, isEnglish, historical }: { plan: WorkoutPlan;
   return null;
 }
 
-function WorkoutDays({ plan, isEnglish, titleId }: { plan: WorkoutPlan; isEnglish: boolean; titleId: string }) {
+function WorkoutDays({ plan, isEnglish, titleId, interactive }: { plan: WorkoutPlan; isEnglish: boolean; titleId: string; interactive: boolean }) {
   const { t } = useTranslation();
   const l = (fa: string, en: string) => isEnglish ? en : fa;
   return (
@@ -404,18 +411,9 @@ function WorkoutDays({ plan, isEnglish, titleId }: { plan: WorkoutPlan; isEnglis
                   {item.alternatives.length > 0 && (
                     <details className="workout-alternatives">
                       <summary>{t("workoutPlan.alternatives")}</summary>
-                      <ul>
-                        {item.alternatives.map((alternative) => (
-                          <li key={alternative.exercise.id}>
-                            <Link to={`/exercises/${alternative.exercise.slug}`}>
-                              {isEnglish
-                                ? alternative.exercise.name_en
-                                : alternative.exercise.name_fa}
-                            </Link>
-                            <span>{isEnglish ? alternative.reason_en : alternative.reason_fa}</span>
-                          </li>
-                        ))}
-                      </ul>
+                      {interactive
+                        ? <WorkoutExerciseReplacementFlow item={item} isEnglish={isEnglish} />
+                        : <AlternativeLinks item={item} isEnglish={isEnglish} />}
                     </details>
                   )}
                 </div>
@@ -424,6 +422,130 @@ function WorkoutDays({ plan, isEnglish, titleId }: { plan: WorkoutPlan; isEnglis
           </ol>
         </details>
       ))}
+    </div>
+  );
+}
+
+const replacementReasons: Array<{ value: WorkoutExerciseReplacementReason; fa: string; en: string }> = [
+  { value: "equipment_unavailable", fa: "تجهیزاتش را ندارم", en: "I don't have the equipment" },
+  { value: "uncomfortable", fa: "با این حرکت راحت نیستم", en: "This movement feels uncomfortable" },
+  { value: "pain_or_discomfort", fa: "درد یا ناراحتی دارم", en: "I have pain or discomfort" },
+  { value: "temporary_unavailable", fa: "فعلاً دستگاه/محل در دسترس نیست", en: "The equipment or place is temporarily unavailable" },
+  { value: "dislike", fa: "این حرکت را دوست ندارم", en: "I don't like this movement" },
+  { value: "other", fa: "دلیل دیگر", en: "Another reason" },
+];
+
+const replacementScopes: Array<{ value: WorkoutExerciseReplacementScope; fa: string; en: string }> = [
+  { value: "this_time", fa: "فقط همین بار", en: "Just this time" },
+  { value: "persistent", fa: "از این به بعد", en: "From now on" },
+];
+
+function AlternativeLinks({ item, isEnglish }: { item: WorkoutPlanExercise; isEnglish: boolean }) {
+  return (
+    <ul>
+      {item.alternatives.map((alternative) => (
+        <li key={alternative.exercise.id}>
+          <Link to={`/exercises/${alternative.exercise.slug}`}>
+            {isEnglish ? alternative.exercise.name_en : alternative.exercise.name_fa}
+          </Link>
+          <span>{isEnglish ? alternative.reason_en : alternative.reason_fa}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function WorkoutExerciseReplacementFlow({ item, isEnglish }: { item: WorkoutPlanExercise; isEnglish: boolean }) {
+  const [reason, setReason] = useState<WorkoutExerciseReplacementReason | null>(null);
+  const [alternativeId, setAlternativeId] = useState<string | null>(null);
+  const [step, setStep] = useState<"reason" | "alternative" | "scope" | "success">("reason");
+  const [error, setError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const l = (fa: string, en: string) => isEnglish ? en : fa;
+  const selectedAlternative = item.alternatives.find(({ exercise }) => exercise.id === alternativeId)?.exercise;
+
+  function chooseReason(value: WorkoutExerciseReplacementReason) {
+    setReason(value);
+    setAlternativeId(null);
+    setError(false);
+    setStep("alternative");
+  }
+
+  function chooseAlternative(value: string) {
+    setAlternativeId(value);
+    setError(false);
+    setStep("scope");
+  }
+
+  function submit(selectedScope: WorkoutExerciseReplacementScope) {
+    if (reason === null || alternativeId === null) return;
+    setError(false);
+    setSubmitting(true);
+    void recordExerciseReplacement({
+      workout_plan_exercise_id: item.id,
+      replacement_exercise_id: alternativeId,
+      reason,
+      scope: selectedScope,
+    })
+      .then(() => setStep("success"))
+      .catch(() => {
+        setError(true);
+        setStep("scope");
+      })
+      .finally(() => setSubmitting(false));
+  }
+
+  if (step === "success" && selectedAlternative !== undefined) {
+    return (
+      <p className="workout-replacement-success" role="status">
+        {l("جایگزین انتخاب‌شده", "Selected replacement")}: {isEnglish ? selectedAlternative.name_en : selectedAlternative.name_fa}
+      </p>
+    );
+  }
+
+  return (
+    <div className="workout-replacement-flow">
+      {step === "reason" && <p>{l("اول دلیل تعویض را انتخاب کن.", "First, choose why you want to replace it.")}</p>}
+      {error && <p className="workout-replacement-error" role="alert">{l("ثبت جایگزین انجام نشد؛ دوباره تلاش کن.", "The replacement could not be saved. Try again.")}</p>}
+      {step === "reason" && (
+        <div className="workout-replacement-options" role="group" aria-label={l("دلیل تعویض", "Replacement reason")}>
+          {replacementReasons.map((option) => (
+            <button type="button" key={option.value} onClick={() => chooseReason(option.value)}>
+              {l(option.fa, option.en)}
+            </button>
+          ))}
+        </div>
+      )}
+      {step === "alternative" && (
+        <>
+          <p>{l("حالا یک حرکت امن از فهرست زیر انتخاب کن.", "Now choose a safe movement from the list below.")}</p>
+          <div className="workout-replacement-options" role="group" aria-label={l("حرکت‌های جایگزین امن", "Safe alternatives")}>
+            {item.alternatives.map((alternative) => (
+              <button
+                type="button"
+                key={alternative.exercise.id}
+                aria-label={isEnglish ? alternative.exercise.name_en : alternative.exercise.name_fa}
+                onClick={() => chooseAlternative(alternative.exercise.id)}
+              >
+                {isEnglish ? alternative.exercise.name_en : alternative.exercise.name_fa}
+                <span>{isEnglish ? alternative.reason_en : alternative.reason_fa}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {step === "scope" && selectedAlternative !== undefined && (
+        <>
+          <p>{l(`برای «${selectedAlternative.name_fa}» این تعویض تا چه زمانی باشد؟`, `How long should “${selectedAlternative.name_en}” replace this movement?`)}</p>
+          <div className="workout-replacement-options" role="group" aria-label={l("مدت جایگزینی", "Replacement scope")}>
+            {replacementScopes.map((option) => (
+              <button type="button" key={option.value} disabled={submitting} onClick={() => submit(option.value)}>
+                {l(option.fa, option.en)}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -126,6 +126,7 @@ class WorkoutPlanExerciseAlternativeResponse(BaseModel):
 class WorkoutPlanExerciseResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    id: UUID
     order_index: int
     sets: int
     reps_min: int

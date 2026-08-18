@@ -66,6 +66,15 @@
 .workout-alternatives ul { display: grid; gap: .3rem; margin: .35rem 0 0; padding: 0; list-style: none; }
 .workout-alternatives li { display: grid; padding-inline-start: .5rem; border-inline-start: 2px solid var(--fitsho-amber); }
 .workout-alternatives span { color: var(--fitsho-muted); font-size: .68rem; }
+.workout-replacement-flow { display: grid; gap: .45rem; margin-top: .45rem; padding: .65rem; border: 1px solid var(--fitsho-line); border-radius: .7rem; background: var(--fitsho-surface-subtle); }
+.workout-replacement-flow p { margin: 0; color: var(--fitsho-muted); font-size: .7rem; line-height: 1.5; }
+.workout-replacement-options { display: grid; gap: .35rem; }
+.workout-replacement-options button { display: grid; gap: .12rem; min-height: 2.35rem; padding: .45rem .55rem; border: 1px solid var(--fitsho-line); border-radius: .55rem; color: var(--fitsho-ink); background: var(--fitsho-surface); font: inherit; font-size: .72rem; font-weight: 800; text-align: start; cursor: pointer; }
+.workout-replacement-options button span { font-size: .65rem; font-weight: 500; }
+.workout-replacement-options button:hover, .workout-replacement-options button:focus-visible { border-color: var(--fitsho-aqua); }
+.workout-replacement-options button:disabled { cursor: wait; opacity: .65; }
+.workout-replacement-error { color: var(--fitsho-coral) !important; }
+.workout-replacement-success { color: var(--fitsho-aqua) !important; font-weight: 850; }
 .workout-ai-coach { display: flex; align-items: flex-start; gap: .65rem; margin: .6rem .8rem; padding: .7rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-sm); background: rgb(80 223 206 / 5%); }
 .workout-ai-coach__icon { color: var(--fitsho-aqua); }
 .workout-ai-coach :where(p, strong) { margin: 0; font-size: .75rem; line-height: 1.55; }

@@ -3,6 +3,7 @@ import type { ExerciseSummary } from "../exercises/types";
 export type WorkoutPlanStatus = "generating" | "pending_review" | "active" | "superseded" | "failed";
 
 export type WorkoutPlanExercise = {
+  id: string;
   order_index: number;
   sets: number;
   reps_min: number;
@@ -14,6 +15,29 @@ export type WorkoutPlanExercise = {
   notes_fa: string | null;
   exercise: ExerciseSummary;
   alternatives: WorkoutPlanExerciseAlternative[];
+};
+
+export type WorkoutExerciseReplacementReason =
+  | "equipment_unavailable"
+  | "uncomfortable"
+  | "pain_or_discomfort"
+  | "temporary_unavailable"
+  | "dislike"
+  | "other";
+
+export type WorkoutExerciseReplacementScope = "this_time" | "persistent";
+
+export type WorkoutExerciseReplacement = {
+  id: string;
+  user_id: string;
+  cycle_id: string;
+  workout_plan_exercise_id: string;
+  original_exercise_id: string;
+  replacement_exercise_id: string;
+  reason: WorkoutExerciseReplacementReason;
+  scope: WorkoutExerciseReplacementScope;
+  week_number: number;
+  created_at: string;
 };
 
 export type WorkoutPlanExerciseAlternative = {

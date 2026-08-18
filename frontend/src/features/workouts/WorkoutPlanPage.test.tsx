@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   getWorkoutPlan: vi.fn(),
   generateWorkoutPlan: vi.fn(),
   downloadWorkoutPlanPdf: vi.fn(),
+  recordExerciseReplacement: vi.fn(),
 }));
 const profileApi = vi.hoisted(() => ({
   getProfile: vi.fn(),
@@ -42,6 +43,7 @@ const plan: WorkoutPlan = {
       estimated_duration_minutes: 45,
       exercises: [
         {
+          id: "018f0000-0000-7000-8000-000000000011",
           order_index: 1,
           sets: 3,
           reps_min: 8,
@@ -140,6 +142,7 @@ beforeEach(() => {
   api.getWorkoutPlan.mockReset();
   api.generateWorkoutPlan.mockReset();
   api.downloadWorkoutPlanPdf.mockReset();
+  api.recordExerciseReplacement.mockReset();
   profileApi.getProfile.mockReset();
   profileApi.updateProfile.mockReset();
   api.getWorkoutPlanHistory.mockResolvedValue([]);
@@ -147,6 +150,18 @@ beforeEach(() => {
   api.downloadWorkoutPlanPdf.mockResolvedValue(
     new Blob(["%PDF-test"], { type: "application/pdf" }),
   );
+  api.recordExerciseReplacement.mockResolvedValue({
+    id: "018f0000-0000-7000-8000-000000000021",
+    user_id: "018f0000-0000-7000-8000-000000000031",
+    cycle_id: "018f0000-0000-7000-8000-000000000041",
+    workout_plan_exercise_id: "018f0000-0000-7000-8000-000000000011",
+    original_exercise_id: "018f0000-0000-7000-8000-000000000002",
+    replacement_exercise_id: "018f0000-0000-7000-8000-000000000003",
+    reason: "equipment_unavailable",
+    scope: "this_time",
+    week_number: 1,
+    created_at: "2026-08-18T10:00:00Z",
+  });
   profileApi.getProfile.mockResolvedValue({ workout_generation_method: "fitsho_coach" });
   profileApi.updateProfile.mockResolvedValue({ workout_generation_method: "ai" });
 });
@@ -401,10 +416,63 @@ it("renders the selected duration, exercise media, and exercise detail link", as
     "/body-progress",
   );
   expect(screen.getByText("حرکت جایگزین")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "شنا سوئدی" })).toHaveAttribute(
-    "href",
-    "/exercises/push-up",
-  );
+  expect(screen.getByText("حرکت جایگزین")).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "شنا سوئدی" })).not.toBeInTheDocument();
+});
+
+it("asks for a reason, then shows only prescribed alternatives and scope before submitting", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  await user.click(await screen.findByText("تمام بدن"));
+  await user.click(screen.getByText("حرکت جایگزین"));
+
+  expect(screen.getByRole("button", { name: "تجهیزاتش را ندارم" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "با این حرکت راحت نیستم" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "درد یا ناراحتی دارم" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "فعلاً دستگاه/محل در دسترس نیست" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "این حرکت را دوست ندارم" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "دلیل دیگر" })).toBeInTheDocument();
+  expect(screen.queryByText("شنا سوئدی")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "تجهیزاتش را ندارم" }));
+  expect(screen.getByRole("button", { name: "شنا سوئدی" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "جایگزین خارج از لیست" })).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "شنا سوئدی" }));
+  expect(screen.getByRole("button", { name: "فقط همین بار" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "از این به بعد" })).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "فقط همین بار" }));
+  await waitFor(() => expect(api.recordExerciseReplacement).toHaveBeenCalledWith({
+    workout_plan_exercise_id: "018f0000-0000-7000-8000-000000000011",
+    replacement_exercise_id: "018f0000-0000-7000-8000-000000000003",
+    reason: "equipment_unavailable",
+    scope: "this_time",
+  }));
+  expect(await screen.findByText("جایگزین انتخاب‌شده: شنا سوئدی")).toBeInTheDocument();
+});
+
+it("submits the selected reason and persistent scope and shows an API error", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  api.recordExerciseReplacement.mockRejectedValue(new ApiError(422, "Replacement is not allowed"));
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  await user.click(await screen.findByText("تمام بدن"));
+  await user.click(screen.getByText("حرکت جایگزین"));
+  await user.click(screen.getByRole("button", { name: "این حرکت را دوست ندارم" }));
+  await user.click(screen.getByRole("button", { name: "شنا سوئدی" }));
+  await user.click(screen.getByRole("button", { name: "از این به بعد" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("ثبت جایگزین انجام نشد");
+  expect(api.recordExerciseReplacement).toHaveBeenCalledWith({
+    workout_plan_exercise_id: "018f0000-0000-7000-8000-000000000011",
+    replacement_exercise_id: "018f0000-0000-7000-8000-000000000003",
+    reason: "dislike",
+    scope: "persistent",
+  });
 });
 
 it("downloads the displayed workout plan from the existing PDF button", async () => {

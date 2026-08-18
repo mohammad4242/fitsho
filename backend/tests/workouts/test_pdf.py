@@ -29,6 +29,7 @@ def _plan_response() -> WorkoutPlanResponse:
                 exercises=[
                     WorkoutPlanExerciseResponse.model_validate(
                         {
+                            "id": "018f0000-0000-7000-8000-000000000011",
                             "order_index": 1,
                             "sets": 3,
                             "reps_min": 8,

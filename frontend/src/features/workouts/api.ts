@@ -1,6 +1,13 @@
 import { ApiError, request, requestBlob } from "../../shared/apiClient";
 
-import type { WorkoutPlan, WorkoutPlanGeneration, WorkoutPlanVersionSummary } from "./types";
+import type {
+  WorkoutExerciseReplacement,
+  WorkoutExerciseReplacementReason,
+  WorkoutExerciseReplacementScope,
+  WorkoutPlan,
+  WorkoutPlanGeneration,
+  WorkoutPlanVersionSummary,
+} from "./types";
 
 const workoutPlansPath = "/api/v1/workout-plans";
 
@@ -29,4 +36,16 @@ export function getWorkoutPlan(planId: string): Promise<WorkoutPlan> {
 
 export function downloadWorkoutPlanPdf(planId: string): Promise<Blob> {
   return requestBlob(`${workoutPlansPath}/${planId}/pdf`);
+}
+
+export function recordExerciseReplacement(input: {
+  workout_plan_exercise_id: string;
+  replacement_exercise_id: string;
+  reason: WorkoutExerciseReplacementReason;
+  scope: WorkoutExerciseReplacementScope;
+}): Promise<WorkoutExerciseReplacement> {
+  return request<WorkoutExerciseReplacement>("/api/v1/workout-cycles/current/replacements", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
