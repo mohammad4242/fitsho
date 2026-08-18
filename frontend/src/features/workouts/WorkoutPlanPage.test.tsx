@@ -109,6 +109,31 @@ const pendingVersion = {
   },
 };
 
+const pendingPlan: WorkoutPlan = {
+  ...plan,
+  id: pendingVersion.id,
+  status: "pending_review",
+  activated_at: null,
+  days: plan.days.map((day) => ({
+    ...day,
+    title_fa: "برنامه در انتظار تأیید",
+    exercises: day.exercises.map((item) => ({
+      ...item,
+      exercise: {
+        ...item.exercise,
+        name_fa: "اسکوات در انتظار تأیید",
+        slug: "pending-squat",
+      },
+    })),
+  })),
+  coach_review: {
+    state: "pending_coach_review",
+    coach_display_name: null,
+    coach_note: null,
+    approved_at: null,
+  },
+};
+
 beforeEach(() => {
   api.getActiveWorkoutPlan.mockReset();
   api.getWorkoutPlanHistory.mockReset();
@@ -202,31 +227,42 @@ it("keeps the initial version visible while coach approval is pending", async ()
 it("keeps the active plan usable while a newer plan awaits coach approval", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue(plan);
   api.getWorkoutPlanHistory.mockResolvedValue([pendingVersion]);
+  api.getWorkoutPlan.mockResolvedValue(pendingPlan);
 
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
-  expect(await screen.findByText("برنامه جدید شما در انتظار بررسی و تأیید مربی است.")).toBeInTheDocument();
+  expect(await screen.findByText("این برنامه هنوز به تأیید مربی نرسیده است؛ فعلاً می‌توانی آن را اجرا کنی.")).toBeInTheDocument();
   expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
-  expect(screen.getByRole("list", { name: "روزهای تمرین تو" })).toBeInTheDocument();
+  expect(screen.getByText("اسکوات در انتظار تأیید")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "برنامه در انتظار تأیید" })).toBeInTheDocument();
+  const activeSchedule = screen.getByRole("list", { name: "روزهای تمرین تو" });
+  const pendingSchedule = screen.getByRole("list", { name: "برنامه در انتظار تأیید مربی" });
+  expect(activeSchedule).toBeInTheDocument();
+  expect(pendingSchedule).toBeInTheDocument();
+  expect(activeSchedule.compareDocumentPosition(pendingSchedule) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(api.getWorkoutPlan).toHaveBeenCalledWith(pendingVersion.id);
 });
 
-it("shows pending review instead of an executable draft when there is no active plan", async () => {
+it("shows the pending plan as executable when there is no active plan", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue(null);
   api.getWorkoutPlanHistory.mockResolvedValue([pendingVersion]);
+  api.getWorkoutPlan.mockResolvedValue(pendingPlan);
 
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
-  expect(await screen.findByText("برنامه جدید شما در انتظار بررسی و تأیید مربی است.")).toBeInTheDocument();
-  expect(screen.queryByRole("list", { name: "روزهای تمرین تو" })).not.toBeInTheDocument();
+  expect(await screen.findByText("این برنامه هنوز به تأیید مربی نرسیده است؛ فعلاً می‌توانی آن را اجرا کنی.")).toBeInTheDocument();
+  expect(screen.getByText("اسکوات در انتظار تأیید")).toBeInTheDocument();
+  expect(screen.getByRole("list", { name: "برنامه در انتظار تأیید مربی" })).toBeInTheDocument();
   expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "ساخت برنامه" })).not.toBeInTheDocument();
 });
 
-it("does not render the pending draft returned by generation", async () => {
+it("renders the pending plan returned by generation with its review warning", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue(null);
   api.getWorkoutPlanHistory
     .mockResolvedValueOnce([])
     .mockResolvedValueOnce([pendingVersion]);
+  api.getWorkoutPlan.mockResolvedValue(pendingPlan);
   api.generateWorkoutPlan.mockResolvedValue({
     plan: { ...plan, status: "pending_review", activated_at: null },
     reused: false,
@@ -237,7 +273,8 @@ it("does not render the pending draft returned by generation", async () => {
 
   await user.click(await screen.findByRole("button", { name: "ساخت برنامه" }));
 
-  expect(await screen.findByText("برنامه جدید شما در انتظار بررسی و تأیید مربی است.")).toBeInTheDocument();
+  expect(await screen.findByText("این برنامه هنوز به تأیید مربی نرسیده است؛ فعلاً می‌توانی آن را اجرا کنی.")).toBeInTheDocument();
+  expect(screen.getByText("اسکوات در انتظار تأیید")).toBeInTheDocument();
   expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
 });
 

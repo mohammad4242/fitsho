@@ -1101,6 +1101,7 @@ const en = {
       currentPlan: "Current plan",
       active: "Active",
       pendingReview: "Your new plan is waiting for coach review and approval.",
+      pendingReviewExecutable: "This plan has not been approved by a coach yet; you can still follow it for now.",
       cycle: "Cycle",
       trainingDays: "Training days",
       daysCount: "{{count}} training days",

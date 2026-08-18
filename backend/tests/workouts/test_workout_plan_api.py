@@ -159,7 +159,7 @@ def test_pending_workout_plan_is_visible_in_member_history(client: TestClient, d
     ]
 
 
-def test_first_pending_workout_plan_is_not_active_or_executable(
+def test_first_pending_workout_plan_is_not_active_but_is_readable(
     client: TestClient, db: Session
 ) -> None:
     user_id = _register_and_complete_profile(client, "first-pending@example.com")
@@ -167,12 +167,16 @@ def test_first_pending_workout_plan_is_not_active_or_executable(
 
     active_response = client.get("/api/v1/workout-plans/active")
     history_response = client.get("/api/v1/workout-plans/history")
+    detail_response = client.get(f"/api/v1/workout-plans/{pending.id}")
 
     assert active_response.status_code == 404
     assert history_response.status_code == 200
     assert history_response.json()[0]["id"] == str(pending.id)
     assert history_response.json()[0]["status"] == WorkoutPlanStatus.PENDING_REVIEW.value
     assert history_response.json()[0]["is_active"] is False
+    assert detail_response.status_code == 200
+    assert detail_response.json()["id"] == str(pending.id)
+    assert detail_response.json()["status"] == WorkoutPlanStatus.PENDING_REVIEW.value
 
 
 def test_workout_plan_is_scoped_to_its_owner(client: TestClient, db: Session) -> None:

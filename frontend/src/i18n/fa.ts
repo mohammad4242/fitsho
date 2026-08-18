@@ -1101,6 +1101,7 @@ const fa = {
       currentPlan: "برنامه فعلی",
       active: "فعال",
       pendingReview: "برنامه جدید شما در انتظار بررسی و تأیید مربی است.",
+      pendingReviewExecutable: "این برنامه هنوز به تأیید مربی نرسیده است؛ فعلاً می‌توانی آن را اجرا کنی.",
       cycle: "دوره",
       trainingDays: "روزهای تمرین",
       daysCount: "{{count}} روز تمرین",

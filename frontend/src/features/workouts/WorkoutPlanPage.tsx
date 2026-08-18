@@ -19,9 +19,22 @@ import "./workoutPlan.css";
 
 type PlanState = "loading" | "empty" | "ready" | "error";
 
+async function loadMemberPlans() {
+  const [currentPlan, versions] = await Promise.all([
+    getActiveWorkoutPlan(),
+    getWorkoutPlanHistory().catch(() => [] as WorkoutPlanVersionSummary[]),
+  ]);
+  const pendingVersion = versions.find((version) => version.status === "pending_review");
+  const pendingPlan = pendingVersion === undefined
+    ? null
+    : await getWorkoutPlan(pendingVersion.id).catch(() => null);
+  return { currentPlan, versions, pendingPlan };
+}
+
 export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: number }) {
   const { i18n, t } = useTranslation();
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<WorkoutPlan | null>(null);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [history, setHistory] = useState<WorkoutPlanVersionSummary[]>([]);
   const [selectingVersionId, setSelectingVersionId] = useState<string | null>(null);
@@ -48,13 +61,11 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   useEffect(() => {
     let active = true;
     setState("loading");
-    void Promise.all([
-      getActiveWorkoutPlan(),
-      getWorkoutPlanHistory().catch(() => [] as WorkoutPlanVersionSummary[]),
-    ])
-      .then(([currentPlan, versions]) => {
+    void loadMemberPlans()
+      .then(({ currentPlan, versions, pendingPlan: loadedPendingPlan }) => {
         if (!active) return;
         setPlan(currentPlan);
+        setPendingPlan(loadedPendingPlan);
         setActivePlanId(currentPlan?.id ?? null);
         setHistory(versions);
         setState(currentPlan === null ? "empty" : "ready");
@@ -88,11 +99,9 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
     setGenerationError(null);
     void generateWorkoutPlan()
       .then(async (result) => {
-        const [currentPlan, versions] = await Promise.all([
-          getActiveWorkoutPlan(),
-          getWorkoutPlanHistory().catch(() => [] as WorkoutPlanVersionSummary[]),
-        ]);
+        const { currentPlan, versions, pendingPlan: loadedPendingPlan } = await loadMemberPlans();
         setPlan(currentPlan);
+        setPendingPlan(loadedPendingPlan);
         setActivePlanId(currentPlan?.id ?? null);
         setHistory(versions);
         setState(currentPlan === null ? "empty" : "ready");
@@ -190,7 +199,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 onAction={generationError === "failed" ? generate : undefined}
               />
             )}
-            {hasPendingReview ? <PendingReviewNotice /> : (
+            {hasPendingReview ? null : (
               <section className="workout-empty" aria-labelledby="workout-empty-title">
                 <h2 id="workout-empty-title" className="fitsho-display">{t("workoutPlan.emptyTitle")}</h2>
                 <p>{t("workoutPlan.emptyBody")}</p>
@@ -206,9 +215,9 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         {state === "ready" && plan !== null && (
           <>
             <CoachReviewBanner plan={plan} isEnglish={isEnglish} historical={isViewingHistorical} />
-            {!isViewingHistorical && hasPendingReview && <PendingReviewNotice />}
           </>
         )}
+        {hasPendingReview && pendingPlan === null && <PendingReviewNotice />}
         <section className="workout-generation-method" aria-labelledby="workout-generation-method-title">
           <h2 id="workout-generation-method-title">{t("workoutPlan.generationMethodTitle")}</h2>
           <div className="workout-generation-method__choices" role="group" aria-labelledby="workout-generation-method-title">
@@ -240,68 +249,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 )}
               </div>
               {generating && <p className="workout-generating" role="status">{t("workoutPlan.generating")}</p>}
-              <div className="workout-days" role="list" aria-labelledby="workout-schedule-title">
-                {plan.days.map((day, dayIndex) => (
-                  <details className={`workout-day${dayIndex === 0 ? " workout-day--focus" : ""}`} key={day.day_number} role="listitem">
-                    <summary>
-                      {dayIndex === 0 && day.exercises[0]?.exercise.media_path && <span className="workout-day__media"><ExerciseMedia ambient path={day.exercises[0].exercise.media_path} name={isEnglish ? day.exercises[0].exercise.name_en : day.exercises[0].exercise.name_fa} mediaType={day.exercises[0].exercise.media_type} /></span>}
-                      <span>{String(day.day_number).padStart(2, "0")}</span>
-                      <div>
-                        {dayIndex === 0 && <small>{l("جلسه بعد", "Next session")}</small>}
-                        <h3>{isEnglish ? day.title_en : day.title_fa}</h3>
-                        <p>{dayIndex === 0 && day.exercises[0] ? `${isEnglish ? day.exercises[0].exercise.name_en : day.exercises[0].exercise.name_fa} · ` : ""}{t("workoutPlan.sessionMinutes", { count: day.estimated_duration_minutes })}</p>
-                      </div>
-                    </summary>
-                    {day.ai_coach_explanation_fa && (
-                      <aside className="workout-ai-coach workout-ai-coach--day">
-                        <span className="workout-ai-coach__icon" aria-hidden="true">✦</span>
-                        <div><p>{t("workoutPlan.aiCoach")}</p><strong>{day.ai_coach_explanation_fa}</strong></div>
-                      </aside>
-                    )}
-                    <ol>
-                      {day.exercises.map((item) => (
-                        <li className="workout-exercise" key={item.order_index}>
-                          <ExerciseMedia
-                            path={item.exercise.media_path}
-                            name={isEnglish ? item.exercise.name_en : item.exercise.name_fa}
-                            mediaType={item.exercise.media_type}
-                          />
-                          <div className="workout-exercise__content">
-                            <h4>{isEnglish ? item.exercise.name_en : item.exercise.name_fa}</h4>
-                            <dl>
-                              <div><dt>{t("workoutPlan.sets")}</dt><dd>{item.sets}</dd></div>
-                              <div><dt>{t("workoutPlan.reps")}</dt><dd>{item.reps_min}–{item.reps_max}</dd></div>
-                              <div><dt>{t("workoutPlan.rest")}</dt><dd>{item.rest_seconds}{t("workoutPlan.seconds")}</dd></div>
-                              <div><dt>{t("workoutPlan.rir")}</dt><dd>{item.rir}</dd></div>
-                            </dl>
-                            {(isEnglish ? item.notes_en : item.notes_fa) !== null && (
-                              <p>{isEnglish ? item.notes_en : item.notes_fa}</p>
-                            )}
-                            <Link to={`/exercises/${item.exercise.slug}`}>{t("workoutPlan.detail")}</Link>
-                            {item.alternatives.length > 0 && (
-                              <details className="workout-alternatives">
-                                <summary>{t("workoutPlan.alternatives")}</summary>
-                                <ul>
-                                  {item.alternatives.map((alternative) => (
-                                    <li key={alternative.exercise.id}>
-                                      <Link to={`/exercises/${alternative.exercise.slug}`}>
-                                        {isEnglish
-                                          ? alternative.exercise.name_en
-                                          : alternative.exercise.name_fa}
-                                      </Link>
-                                      <span>{isEnglish ? alternative.reason_en : alternative.reason_fa}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </details>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
-                  </details>
-                ))}
-              </div>
+              <WorkoutDays plan={plan} isEnglish={isEnglish} titleId="workout-schedule-title" />
             </section>
             <div className="workout-plan-statuses">
               {reused && <p className="workout-reused" role="status">{t("workoutPlan.reused")}</p>}
@@ -310,6 +258,18 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
               {generationError && <StatusPanel role="alert" message={t(generationError === "cooldown" ? "workoutPlan.generateCooldown" : "workoutPlan.generateError")} action={generationError === "failed" ? t("common.retry") : undefined} onAction={generationError === "failed" ? generate : undefined} />}
             </div>
           </>
+        )}
+        {pendingPlan !== null && (
+          <section className="workout-pending-plan" aria-labelledby="workout-pending-plan-title">
+            <PendingReviewNotice executable />
+            <div className="workout-schedule__heading">
+              <div>
+                <p className="eyebrow eyebrow--accent">{l("نسخه جدید", "New version")}</p>
+                <h2 id="workout-pending-plan-title" className="fitsho-display">{l("برنامه در انتظار تأیید مربی", "Plan awaiting coach approval")}</h2>
+              </div>
+            </div>
+            <WorkoutDays plan={pendingPlan} isEnglish={isEnglish} titleId="workout-pending-plan-title" />
+          </section>
         )}
 
         <section className="workout-tools" aria-labelledby="workout-future-title">
@@ -399,12 +359,81 @@ function CoachReviewBanner({ plan, isEnglish, historical }: { plan: WorkoutPlan;
   return null;
 }
 
-function PendingReviewNotice() {
+function WorkoutDays({ plan, isEnglish, titleId }: { plan: WorkoutPlan; isEnglish: boolean; titleId: string }) {
+  const { t } = useTranslation();
+  const l = (fa: string, en: string) => isEnglish ? en : fa;
+  return (
+    <div className="workout-days" role="list" aria-labelledby={titleId}>
+      {plan.days.map((day, dayIndex) => (
+        <details className={`workout-day${dayIndex === 0 ? " workout-day--focus" : ""}`} key={day.day_number} role="listitem">
+          <summary>
+            {dayIndex === 0 && day.exercises[0]?.exercise.media_path && <span className="workout-day__media"><ExerciseMedia ambient path={day.exercises[0].exercise.media_path} name={isEnglish ? day.exercises[0].exercise.name_en : day.exercises[0].exercise.name_fa} mediaType={day.exercises[0].exercise.media_type} /></span>}
+            <span>{String(day.day_number).padStart(2, "0")}</span>
+            <div>
+              {dayIndex === 0 && <small>{l("جلسه بعد", "Next session")}</small>}
+              <h3>{isEnglish ? day.title_en : day.title_fa}</h3>
+              <p>{dayIndex === 0 && day.exercises[0] ? `${isEnglish ? day.exercises[0].exercise.name_en : day.exercises[0].exercise.name_fa} · ` : ""}{t("workoutPlan.sessionMinutes", { count: day.estimated_duration_minutes })}</p>
+            </div>
+          </summary>
+          {day.ai_coach_explanation_fa && (
+            <aside className="workout-ai-coach workout-ai-coach--day">
+              <span className="workout-ai-coach__icon" aria-hidden="true">✦</span>
+              <div><p>{t("workoutPlan.aiCoach")}</p><strong>{day.ai_coach_explanation_fa}</strong></div>
+            </aside>
+          )}
+          <ol>
+            {day.exercises.map((item) => (
+              <li className="workout-exercise" key={item.order_index}>
+                <ExerciseMedia
+                  path={item.exercise.media_path}
+                  name={isEnglish ? item.exercise.name_en : item.exercise.name_fa}
+                  mediaType={item.exercise.media_type}
+                />
+                <div className="workout-exercise__content">
+                  <h4>{isEnglish ? item.exercise.name_en : item.exercise.name_fa}</h4>
+                  <dl>
+                    <div><dt>{t("workoutPlan.sets")}</dt><dd>{item.sets}</dd></div>
+                    <div><dt>{t("workoutPlan.reps")}</dt><dd>{item.reps_min}–{item.reps_max}</dd></div>
+                    <div><dt>{t("workoutPlan.rest")}</dt><dd>{item.rest_seconds}{t("workoutPlan.seconds")}</dd></div>
+                    <div><dt>{t("workoutPlan.rir")}</dt><dd>{item.rir}</dd></div>
+                  </dl>
+                  {(isEnglish ? item.notes_en : item.notes_fa) !== null && (
+                    <p>{isEnglish ? item.notes_en : item.notes_fa}</p>
+                  )}
+                  <Link to={`/exercises/${item.exercise.slug}`}>{t("workoutPlan.detail")}</Link>
+                  {item.alternatives.length > 0 && (
+                    <details className="workout-alternatives">
+                      <summary>{t("workoutPlan.alternatives")}</summary>
+                      <ul>
+                        {item.alternatives.map((alternative) => (
+                          <li key={alternative.exercise.id}>
+                            <Link to={`/exercises/${alternative.exercise.slug}`}>
+                              {isEnglish
+                                ? alternative.exercise.name_en
+                                : alternative.exercise.name_fa}
+                            </Link>
+                            <span>{isEnglish ? alternative.reason_en : alternative.reason_fa}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+function PendingReviewNotice({ executable = false }: { executable?: boolean }) {
   const { t } = useTranslation();
   return (
     <aside className="workout-review-banner workout-review-banner--pending" role="status">
       <span className="workout-review-indicator" aria-hidden="true" />
-      <strong>{t("workoutPlan.pendingReview")}</strong>
+      <strong>{t(executable ? "workoutPlan.pendingReviewExecutable" : "workoutPlan.pendingReview")}</strong>
     </aside>
   );
 }
