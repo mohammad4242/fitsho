@@ -227,6 +227,8 @@ class ProgramGenerationOverrides(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     secondary_goal_optional: Goal | None = None
+    available_training_days: int | None = Field(default=None, ge=1, le=7)
+    session_duration_minutes: int | None = Field(default=None, ge=20, le=180)
     training_age_months: int | None = Field(default=None, ge=0, le=900)
     current_activity_level: ActivityLevel | None = None
     preferred_weekdays: tuple[int, ...] | None = None
