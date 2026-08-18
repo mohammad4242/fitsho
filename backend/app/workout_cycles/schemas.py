@@ -1,4 +1,19 @@
+from datetime import datetime
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.workout_cycles.enums import WorkoutCycleStatus
+
+
+class WorkoutCycleCurrentResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cycle_id: UUID
+    workout_plan_id: UUID
+    started_at: datetime
+    duration_weeks: int
+    status: WorkoutCycleStatus
 
 
 class CompletionFeedbackInput(BaseModel):

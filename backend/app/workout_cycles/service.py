@@ -86,6 +86,21 @@ def get_cycle_for_user(
     )
 
 
+def get_current_active_cycle_for_user(
+    db: Session,
+    *,
+    user_id: UUID,
+) -> WorkoutCycle | None:
+    return db.scalar(
+        select(WorkoutCycle)
+        .where(
+            WorkoutCycle.user_id == user_id,
+            WorkoutCycle.status == WorkoutCycleStatus.ACTIVE,
+        )
+        .order_by(WorkoutCycle.started_at.desc())
+    )
+
+
 def complete_cycle(
     db: Session,
     *,
