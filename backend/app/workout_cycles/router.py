@@ -8,6 +8,13 @@ from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.database.session import get_db
+from app.workout_cycles.body_progress_schemas import (
+    WorkoutCycleBodyProgressComparisonResponse,
+)
+from app.workout_cycles.body_progress_service import (
+    WorkoutCycleBodyProgressComparisonNotFoundError,
+    compare_cycle_body_progress,
+)
 from app.workout_cycles.models import WorkoutCycleWeeklyCheckIn
 from app.workout_cycles.schemas import (
     WorkoutCycleCurrentResponse,
@@ -233,4 +240,29 @@ def read_cycle_exercise_feedback_suggestions(
     return WorkoutCycleExerciseFeedbackSuggestionsResponse(
         cycle_id=cycle_id,
         suggestions=suggestions,
+    )
+
+
+@router.get(
+    "/{cycle_id}/body-progress-comparison",
+    response_model=WorkoutCycleBodyProgressComparisonResponse,
+)
+def read_cycle_body_progress_comparison(
+    cycle_id: UUID,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> WorkoutCycleBodyProgressComparisonResponse:
+    try:
+        comparison = compare_cycle_body_progress(db, user_id=user.id, cycle_id=cycle_id)
+    except WorkoutCycleBodyProgressComparisonNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workout cycle not found",
+        ) from None
+    return WorkoutCycleBodyProgressComparisonResponse(
+        id=comparison.id,
+        cycle_id=comparison.cycle_id,
+        result=comparison.comparison_result,
+        created_at=comparison.created_at,
+        updated_at=comparison.updated_at,
     )

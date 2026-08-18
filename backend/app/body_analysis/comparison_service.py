@@ -149,6 +149,17 @@ class BodyProgressComparisonService:
             return existing
         return comparison
 
+    def compare_result_versions(
+        self,
+        previous_result_version_id: UUID,
+        current_result_version_id: UUID,
+        user_id: UUID,
+    ) -> NormalizedBodyProgressComparison:
+        """Reuse the normalized analysis comparison for an explicit start/end pair."""
+        previous = self._result_input(previous_result_version_id, user_id)
+        current = self._result_input(current_result_version_id, user_id)
+        return self._compare(previous, current)
+
     def _owner_session(
         self,
         session_id: UUID,
