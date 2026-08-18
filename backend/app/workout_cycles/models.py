@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     Text,
     UniqueConstraint,
@@ -17,9 +18,15 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.auth.models import User
 from app.database.base import Base
-from app.workout_cycles.enums import WorkoutCycleStatus
-from app.workouts.models import WorkoutPlan
+from app.exercises.models import Exercise
+from app.workout_cycles.enums import (
+    WorkoutCycleStatus,
+    WorkoutExerciseReplacementReason,
+    WorkoutExerciseReplacementScope,
+)
+from app.workouts.models import WorkoutPlan, WorkoutPlanExercise
 
 
 def enum_values(members: type[StrEnum]) -> list[str]:
@@ -111,3 +118,76 @@ class WorkoutCycleFeedback(Base):
     )
 
     cycle: Mapped[WorkoutCycle] = relationship(back_populates="completion_feedback")
+
+
+class WorkoutExerciseReplacement(Base):
+    __tablename__ = "workout_exercise_replacements"
+    __table_args__ = (
+        CheckConstraint(
+            "original_exercise_id <> replacement_exercise_id",
+            name="ck_workout_exercise_replacements_distinct_exercises",
+        ),
+        CheckConstraint(
+            "week_number BETWEEN 1 AND 8",
+            name="ck_workout_exercise_replacements_week_number_range",
+        ),
+        Index(
+            "ix_workout_exercise_replacements_user_cycle",
+            "user_id",
+            "cycle_id",
+        ),
+        Index(
+            "ix_workout_exercise_replacements_cycle_week",
+            "cycle_id",
+            "week_number",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    cycle_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workout_cycles.id", ondelete="RESTRICT"), nullable=False
+    )
+    workout_plan_exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workout_plan_exercises.id", ondelete="RESTRICT"), nullable=False
+    )
+    original_exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("exercises.id", ondelete="RESTRICT"), nullable=False
+    )
+    replacement_exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("exercises.id", ondelete="RESTRICT"), nullable=False
+    )
+    reason: Mapped[WorkoutExerciseReplacementReason] = mapped_column(
+        Enum(
+            WorkoutExerciseReplacementReason,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_exercise_replacements_reason_values",
+        ),
+        nullable=False,
+    )
+    scope: Mapped[WorkoutExerciseReplacementScope] = mapped_column(
+        Enum(
+            WorkoutExerciseReplacementScope,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_exercise_replacements_scope_values",
+        ),
+        nullable=False,
+    )
+    week_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship()
+    cycle: Mapped[WorkoutCycle] = relationship()
+    workout_plan_exercise: Mapped[WorkoutPlanExercise] = relationship()
+    original_exercise: Mapped[Exercise] = relationship(foreign_keys=[original_exercise_id])
+    replacement_exercise: Mapped[Exercise] = relationship(foreign_keys=[replacement_exercise_id])
