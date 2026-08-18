@@ -33,6 +33,8 @@ from app.exercises.models import Exercise
 from app.profile.enums import ExperienceLevel, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.service import ProfileSnapshot, get_profile
 from app.training_templates.engine_reference import load_template_references
+from app.workout_cycles.enums import WorkoutCycleStatus
+from app.workout_cycles.models import WorkoutCycle, WorkoutCycleWeeklyCheckIn
 from app.workouts.ai_coach import (
     AiCoachProgramCandidate,
     candidate_program_payload,
@@ -68,6 +70,7 @@ from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
     Limitation,
     ProgramGenerationRequest,
+    RecentTrainingHistory,
     TemplateReference,
     WorkoutProgram,
 )
@@ -205,11 +208,14 @@ class WorkoutGenerationService:
         if self._settings.generation_method == "ai":
             return await self._generate_with_ai(user_id)
         source_profile = get_profile(self._db, user_id)
+        effective_overrides = self._with_previous_volume_history(user_id, overrides)
         body_analysis_influence = applicable_body_analysis_influence(
             self._body_analysis_resolver.resolve(user_id), self._ruleset
         )
         try:
-            request = self._to_program_request(source_profile, overrides, body_analysis_influence)
+            request = self._to_program_request(
+                source_profile, effective_overrides, body_analysis_influence
+            )
         except ValidationError as error:
             raise ProgramGenerationRejectedError("INVALID_PROFILE_INPUT") from error
         catalog = self._load_catalog(source_profile.profile.sex)
@@ -277,7 +283,7 @@ class WorkoutGenerationService:
         refreshed_profile = get_profile(self._db, user_id)
         refreshed_request = self._to_program_request(
             refreshed_profile,
-            overrides,
+            effective_overrides,
             applicable_body_analysis_influence(
                 self._body_analysis_resolver.resolve(user_id), self._ruleset
             ),
@@ -326,6 +332,101 @@ class WorkoutGenerationService:
                 [],
             )
             raise WorkoutGenerationFailedError(error_code="persistence_failed") from error
+
+    def _with_previous_volume_history(
+        self,
+        user_id: UUID,
+        overrides: ProgramGenerationOverrides | None,
+    ) -> ProgramGenerationOverrides | None:
+        if overrides is not None and overrides.recent_training_history is not None:
+            return overrides
+        history = self._previous_volume_history(user_id)
+        if history is None:
+            return overrides
+        if overrides is None:
+            return ProgramGenerationOverrides(recent_training_history=history)
+        return overrides.model_copy(update={"recent_training_history": history})
+
+    def _previous_volume_history(self, user_id: UUID) -> RecentTrainingHistory | None:
+        cycle = self._db.scalar(
+            select(WorkoutCycle)
+            .where(
+                WorkoutCycle.user_id == user_id,
+                WorkoutCycle.status == WorkoutCycleStatus.COMPLETED,
+            )
+            .options(
+                selectinload(WorkoutCycle.workout_plan).selectinload(WorkoutPlan.days),
+                selectinload(WorkoutCycle.completion_feedback),
+            )
+            .order_by(WorkoutCycle.completed_at.desc(), WorkoutCycle.id.desc())
+            .limit(1)
+        )
+        if cycle is None or cycle.workout_plan is None:
+            return None
+
+        check_ins = list(
+            self._db.scalars(
+                select(WorkoutCycleWeeklyCheckIn)
+                .where(
+                    WorkoutCycleWeeklyCheckIn.user_id == user_id,
+                    WorkoutCycleWeeklyCheckIn.cycle_id == cycle.id,
+                )
+                .order_by(WorkoutCycleWeeklyCheckIn.week_number, WorkoutCycleWeeklyCheckIn.id)
+            ).all()
+        )
+        adherence = self._previous_cycle_adherence(cycle, check_ins)
+        if adherence is None or adherence <= 0:
+            return None
+
+        metrics = cycle.workout_plan.aggregate_metrics
+        direct = self._volume_metrics(
+            metrics.get("weekly_direct_sets_by_muscle")
+            or metrics.get("planned_direct_sets_by_muscle")
+        )
+        effective = self._volume_metrics(metrics.get("weekly_effective_sets_by_muscle"))
+        if not direct and not effective:
+            return None
+        return RecentTrainingHistory(
+            completed_session_ratio=adherence,
+            previous_weekly_direct_sets_by_muscle=direct,
+            previous_weekly_effective_sets_by_muscle=effective,
+            previous_volume_confidence=adherence,
+            previous_volume_source="prescribed_plan",
+            previous_volume_reason_codes=(
+                "HISTORY_FROM_COMPLETED_PLAN",
+                "HISTORY_SCALED_BY_ADHERENCE",
+            ),
+        )
+
+    @staticmethod
+    def _previous_cycle_adherence(
+        cycle: WorkoutCycle,
+        check_ins: list[WorkoutCycleWeeklyCheckIn],
+    ) -> float | None:
+        prescribed_sessions = len(cycle.workout_plan.days) if cycle.workout_plan else 0
+        if check_ins and prescribed_sessions > 0:
+            planned = prescribed_sessions * len(check_ins)
+            completed = sum(item.sessions_completed for item in check_ins)
+            return round(min(1.0, max(0.0, completed / planned)), 2)
+        feedback = cycle.completion_feedback
+        if feedback is not None and feedback.adherence_percent is not None:
+            return round(min(1.0, max(0.0, feedback.adherence_percent / 100)), 2)
+        return None
+
+    @staticmethod
+    def _volume_metrics(value: object) -> dict[MuscleGroup, float]:
+        if not isinstance(value, dict):
+            return {}
+        metrics: dict[MuscleGroup, float] = {}
+        for raw_muscle, raw_sets in value.items():
+            try:
+                muscle = MuscleGroup(raw_muscle)
+                sets = float(raw_sets)
+            except (TypeError, ValueError):
+                continue
+            if sets > 0:
+                metrics[muscle] = round(sets, 2)
+        return metrics
 
     async def _generate_with_ai(self, user_id: UUID) -> WorkoutPlanGenerationResult:
         if self._ai_coach_provider is None:

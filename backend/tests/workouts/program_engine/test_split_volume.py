@@ -662,6 +662,46 @@ def test_previous_volume_caps_unjustified_jump() -> None:
     assert "VOLUME_CAPPED_FOR_PREVIOUS_VOLUME" in plan.reason_codes
 
 
+def test_history_aware_effective_volume_caps_next_cycle_jump() -> None:
+    history = RecentTrainingHistory(
+        completed_session_ratio=1.0,
+        previous_weekly_direct_sets_by_muscle={MuscleGroup.CHEST: 8.0},
+        previous_weekly_effective_sets_by_muscle={MuscleGroup.CHEST: 8.0},
+        previous_volume_source="prescribed_plan",
+    )
+    request = normalized(
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        priority_muscles=frozenset({MuscleGroup.CHEST}),
+        recent_training_history=history,
+    )
+
+    plan = plan_weekly_volume(request, select_split(request, RULESET), RULESET)
+
+    assert plan.effective_target_for(MuscleGroup.CHEST) <= 9
+    assert "VOLUME_CAPPED_FOR_PREVIOUS_EFFECTIVE_VOLUME" in plan.reason_codes
+
+
+def test_low_adherence_does_not_use_full_prescribed_effective_volume_as_baseline() -> None:
+    history = RecentTrainingHistory(
+        completed_session_ratio=0.25,
+        previous_weekly_direct_sets_by_muscle={MuscleGroup.CHEST: 8.0},
+        previous_weekly_effective_sets_by_muscle={MuscleGroup.CHEST: 10.0},
+        previous_volume_source="prescribed_plan",
+    )
+    request = normalized(
+        primary_goal=Goal.HYPERTROPHY,
+        priority_muscles=frozenset({MuscleGroup.CHEST}),
+        recent_training_history=history,
+    )
+
+    plan = plan_weekly_volume(request, select_split(request, RULESET), RULESET)
+
+    assert plan.effective_target_for(MuscleGroup.CHEST) < 10
+    assert "VOLUME_CAPPED_FOR_PREVIOUS_EFFECTIVE_VOLUME" in plan.reason_codes
+
+
 def test_unknown_history_does_not_reduce_declared_advanced_status() -> None:
     request = normalized(
         training_experience=TrainingExperience.ADVANCED,

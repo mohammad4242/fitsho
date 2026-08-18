@@ -35,6 +35,7 @@ from app.workouts.program_engine.split_selector import select_split
 from app.workouts.program_engine.template_selector import select_template_reference
 from app.workouts.program_engine.template_sessions import build_template_sessions
 from app.workouts.program_engine.validation import validate_program
+from app.workouts.program_engine.volume_history import derive_previous_volume_baseline
 from app.workouts.program_engine.volume_planner import (
     SECONDARY_MUSCLES,
     TRACKED_MUSCLES,
@@ -106,6 +107,7 @@ def generate_program(
                 return reference_result
     split = select_split(normalized, ruleset)
     volume = plan_weekly_volume(normalized, split, ruleset)
+    previous_volume = derive_previous_volume_baseline(normalized.source.recent_training_history)
     try:
         drafts = build_sessions(normalized, split, volume, eligibility.eligible, ruleset)
     except ValueError as exc:
@@ -155,6 +157,19 @@ def generate_program(
         "weekly_effective_sets_by_muscle": complete_tracked_metrics(
             effective_volume.effective_sets_by_muscle
         ),
+        "previous_volume_baseline": {
+            "direct_sets_by_muscle": {
+                muscle.value: sets
+                for muscle, sets in previous_volume.direct_sets_by_muscle.items()
+            },
+            "effective_sets_by_muscle": {
+                muscle.value: sets
+                for muscle, sets in previous_volume.effective_sets_by_muscle.items()
+            },
+            "confidence": previous_volume.confidence,
+            "source": previous_volume.source,
+            "reason_codes": previous_volume.reason_codes,
+        },
         "weekly_cardio_minutes": sum(
             day.cardio.duration_minutes for day in days if day.cardio is not None
         ),
@@ -176,6 +191,11 @@ def generate_program(
         {
             "stage": "volume",
             "reasons": volume.reason_codes,
+            "previous_volume_baseline": {
+                "confidence": previous_volume.confidence,
+                "source": previous_volume.source,
+                "reason_codes": previous_volume.reason_codes,
+            },
             "effective_targets": {
                 target.muscle.value: target.effective_target_sets for target in volume.targets
             },

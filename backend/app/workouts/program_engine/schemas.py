@@ -83,6 +83,13 @@ class RecentTrainingHistory(BaseModel):
     consistent_weeks: int | None = Field(default=None, ge=0, le=520)
     completed_session_ratio: float = Field(default=0.0, ge=0, le=1)
     previous_weekly_sets_by_muscle: dict[MuscleGroup, int] = Field(default_factory=dict)
+    previous_weekly_direct_sets_by_muscle: dict[MuscleGroup, float] = Field(default_factory=dict)
+    previous_weekly_effective_sets_by_muscle: dict[MuscleGroup, float] = Field(default_factory=dict)
+    previous_volume_confidence: float | None = Field(default=None, ge=0, le=1)
+    previous_volume_source: Literal[
+        "none", "prescribed_plan", "observed_effective", "legacy_direct"
+    ] = "none"
+    previous_volume_reason_codes: tuple[str, ...] = ()
     performance_trend: str | None = None
     recovery_problems: bool = False
 

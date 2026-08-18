@@ -25,13 +25,19 @@ from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.models import BodyMeasurement, UserProfile
 from app.profile.service import get_profile
+from app.workout_cycles.enums import (
+    WorkoutCycleStatus,
+    WorkoutCycleWeeklyCheckInDifficulty,
+    WorkoutCycleWeeklyCheckInRecovery,
+)
+from app.workout_cycles.models import WorkoutCycleFeedback, WorkoutCycleWeeklyCheckIn
 from app.workout_cycles.schemas import CompletionFeedbackInput
 from app.workout_cycles.service import complete_cycle, start_cycle
 from app.workout_reviews.enums import WorkoutReviewStatus
 from app.workout_reviews.models import WorkoutPlanReview
 from app.workouts.body_analysis_resolver import BodyAnalysisInfluenceResolver
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
-from app.workouts.models import WorkoutPlan, WorkoutPlanGeneration
+from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanGeneration
 from app.workouts.program_engine.enums import (
     BodyPosition,
     GenerationErrorCode,
@@ -375,6 +381,111 @@ def test_next_generation_reads_confirmed_end_cycle_profile_changes(db: Session) 
     assert request.available_training_days == 3
     assert request.session_duration_minutes == 75
     assert request.preferred_weekdays == (1, 3, 5)
+
+
+def test_previous_cycle_volume_history_uses_plan_metrics_and_confirmed_adherence(
+    db: Session,
+) -> None:
+    user = _user_with_profile(db)
+    plan = _persist_active_plan(db, user)
+    plan.aggregate_metrics = {
+        "weekly_direct_sets_by_muscle": {"chest": 8},
+        "weekly_effective_sets_by_muscle": {"chest": 10.0, "triceps": 4.0},
+    }
+    plan.days.extend(
+        [
+            WorkoutDay(
+                day_number=1,
+                title_en="Day 1",
+                title_fa="روز ۱",
+                estimated_duration_minutes=45,
+            ),
+            WorkoutDay(
+                day_number=2,
+                title_en="Day 2",
+                title_fa="روز ۲",
+                estimated_duration_minutes=45,
+            ),
+        ]
+    )
+    db.flush()
+    cycle = start_cycle(db, user_id=user.id, workout_plan_id=plan.id)
+    cycle.status = WorkoutCycleStatus.COMPLETED
+    cycle.completed_at = datetime.now(UTC)
+    cycle.completion_feedback = WorkoutCycleFeedback(
+        adherence_percent=80,
+        measurements={},
+    )
+    db.flush()
+
+    history = _service(db)._previous_volume_history(user.id)
+
+    assert history is not None
+    assert history.completed_session_ratio == 0.8
+    assert history.previous_volume_source == "prescribed_plan"
+    assert history.previous_weekly_direct_sets_by_muscle[MuscleGroup.CHEST] == 8.0
+    assert history.previous_weekly_effective_sets_by_muscle[MuscleGroup.CHEST] == 10.0
+    assert "HISTORY_FROM_COMPLETED_PLAN" in history.previous_volume_reason_codes
+
+
+def test_previous_cycle_volume_history_scales_from_weekly_check_ins(
+    db: Session,
+) -> None:
+    user = _user_with_profile(db)
+    plan = _persist_active_plan(db, user)
+    plan.aggregate_metrics = {
+        "weekly_direct_sets_by_muscle": {"chest": 8},
+        "weekly_effective_sets_by_muscle": {"chest": 10.0},
+    }
+    plan.days.extend(
+        [
+            WorkoutDay(
+                day_number=1,
+                title_en="Day 1",
+                title_fa="روز ۱",
+                estimated_duration_minutes=45,
+            ),
+            WorkoutDay(
+                day_number=2,
+                title_en="Day 2",
+                title_fa="روز ۲",
+                estimated_duration_minutes=45,
+            ),
+        ]
+    )
+    db.flush()
+    cycle = start_cycle(db, user_id=user.id, workout_plan_id=plan.id)
+    cycle.status = WorkoutCycleStatus.COMPLETED
+    cycle.completed_at = datetime.now(UTC)
+    db.add_all(
+        [
+            WorkoutCycleWeeklyCheckIn(
+                user_id=user.id,
+                cycle_id=cycle.id,
+                week_number=1,
+                sessions_completed=1,
+                perceived_difficulty=WorkoutCycleWeeklyCheckInDifficulty.APPROPRIATE,
+                recovery_rating=WorkoutCycleWeeklyCheckInRecovery.GOOD,
+                has_pain_or_limitation=False,
+            ),
+            WorkoutCycleWeeklyCheckIn(
+                user_id=user.id,
+                cycle_id=cycle.id,
+                week_number=2,
+                sessions_completed=0,
+                perceived_difficulty=WorkoutCycleWeeklyCheckInDifficulty.HARD,
+                recovery_rating=WorkoutCycleWeeklyCheckInRecovery.AVERAGE,
+                has_pain_or_limitation=False,
+            ),
+        ]
+    )
+    db.flush()
+
+    history = _service(db)._previous_volume_history(user.id)
+
+    assert history is not None
+    assert history.completed_session_ratio == 0.25
+    assert history.previous_weekly_effective_sets_by_muscle[MuscleGroup.CHEST] == 10.0
 
 
 def test_catalog_uses_profile_gender_media_and_falls_back_to_other_gender(

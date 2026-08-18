@@ -19,6 +19,7 @@ from app.workouts.program_engine.schemas import (
     VolumeTarget,
     WeeklyVolumePlan,
 )
+from app.workouts.program_engine.volume_history import derive_previous_volume_baseline
 
 MAJOR_MUSCLES = (
     MuscleGroup.CHEST,
@@ -110,6 +111,8 @@ def plan_weekly_volume(
         request, ruleset
     )
     direct_exposures = _direct_exposure_counts(split, effective_priorities)
+    previous_volume = derive_previous_volume_baseline(source.recent_training_history)
+    reasons.extend(previous_volume.reason_codes)
     for muscle in TRACKED_MUSCLES:
         is_secondary = muscle in SECONDARY_MUSCLES
         muscle_minimum = secondary_minimum if is_secondary else minimum
@@ -129,15 +132,20 @@ def plan_weekly_volume(
             )
             sets = min(muscle_maximum, sets + bonus)
             reasons.append("VOLUME_INCREASED_FOR_BODY_ANALYSIS")
-        previous = source.recent_training_history.previous_weekly_sets_by_muscle.get(muscle)
+        previous_effective = previous_volume.effective_sets_by_muscle.get(muscle)
+        previous_direct = previous_volume.direct_sets_by_muscle.get(muscle)
+        previous = previous_effective or previous_direct
         if previous is not None and previous > 0:
-            increase_limit = max(
-                previous,
-                math.floor(previous * (1 + ruleset.max_previous_volume_increase)),
-            )
+            increase_limit = math.floor(previous * (1 + ruleset.max_previous_volume_increase))
+            if previous_effective is not None:
+                increase_limit = max(muscle_minimum, increase_limit)
             if sets > increase_limit:
                 sets = increase_limit
-                reasons.append("VOLUME_CAPPED_FOR_PREVIOUS_VOLUME")
+                reasons.append(
+                    "VOLUME_CAPPED_FOR_PREVIOUS_EFFECTIVE_VOLUME"
+                    if previous_effective is not None
+                    else "VOLUME_CAPPED_FOR_PREVIOUS_VOLUME"
+                )
         if split.split_type is SplitType.BODY_PART_ROTATION and direct_exposures[muscle] > 0:
             split_maximum = ruleset.max_sets_per_muscle_per_session * direct_exposures[muscle]
             if sets > split_maximum:
