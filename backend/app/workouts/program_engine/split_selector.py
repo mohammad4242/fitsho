@@ -97,6 +97,14 @@ def generate_split_candidates(days: int) -> tuple[SplitCandidate, ...]:
         ),
         6: (
             SplitCandidate(
+                SplitType.PUSH_PULL_LEGS_X2,
+                ("push", "pull", "legs", "push", "pull", "legs"),
+            ),
+            SplitCandidate(
+                SplitType.UPPER_LOWER_X3,
+                ("upper", "lower", "upper", "lower", "upper", "lower"),
+            ),
+            SplitCandidate(
                 SplitType.BODY_PART_ROTATION,
                 (
                     "chest_triceps",
@@ -205,7 +213,10 @@ def score_split_candidates(
         ):
             score += ruleset.phul_bonus
             reasons.append("SPLIT_SELECTED_FOR_PERIODIZED_UPPER_LOWER")
-        if candidate.split_type is SplitType.BODY_PART_ROTATION:
+        if candidate.split_type is SplitType.BODY_PART_ROTATION and (
+            len(candidate.day_focuses) < 6
+            or (request.training_status is TrainingStatus.ADVANCED and not recovery_limited)
+        ):
             score += ruleset.body_part_rotation_bonus
             reasons.append("SPLIT_SELECTED_FOR_SPECIALIZED_DIRECT_TARGETS")
 

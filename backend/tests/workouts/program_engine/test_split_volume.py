@@ -299,7 +299,117 @@ def test_five_day_context_can_keep_body_part_rotation_when_recovery_is_good() ->
     assert scored[0].split_type is SplitType.BODY_PART_ROTATION
 
 
-def test_six_day_program_uses_specialized_direct_target_days() -> None:
+def test_six_days_generate_multiple_valid_split_candidates() -> None:
+    candidates = generate_split_candidates(6)
+
+    assert tuple(candidate.split_type for candidate in candidates) == (
+        SplitType.PUSH_PULL_LEGS_X2,
+        SplitType.UPPER_LOWER_X3,
+        SplitType.BODY_PART_ROTATION,
+    )
+    assert all(len(candidate.day_focuses) == 6 for candidate in candidates)
+    assert all(
+        focus
+        in {
+            "push",
+            "pull",
+            "legs",
+            "upper",
+            "lower",
+            "chest_triceps",
+            "back_biceps",
+            "quadriceps_calves",
+            "shoulders_traps",
+            "posterior_chain_core",
+            "specialization",
+        }
+        for candidate in candidates
+        for focus in candidate.day_focuses
+    )
+
+    request = normalized(
+        available_training_days=6,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+    )
+    scored = score_split_candidates(request, candidates, RULESET, preferred_days=6)
+    assert all(len(plan.day_focuses) == len(plan.weekdays) == 6 for plan in scored)
+    assert scored == score_split_candidates(request, candidates, RULESET, preferred_days=6)
+
+
+def test_six_day_goal_and_status_context_can_select_upper_lower_x3() -> None:
+    request = normalized(
+        available_training_days=6,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        recent_training_history=RecentTrainingHistory(consistent_weeks=20),
+    )
+
+    scored = score_split_candidates(
+        request,
+        generate_split_candidates(6),
+        RULESET,
+        preferred_days=6,
+    )
+
+    assert scored[0].split_type is SplitType.UPPER_LOWER_X3
+
+
+def test_six_day_advanced_context_can_select_body_part_rotation() -> None:
+    request = normalized(
+        available_training_days=6,
+        primary_goal=Goal.STRENGTH,
+        training_experience=TrainingExperience.ADVANCED,
+        training_age_months=72,
+    )
+
+    scored = score_split_candidates(
+        request,
+        generate_split_candidates(6),
+        RULESET,
+        preferred_days=6,
+    )
+
+    assert scored[0].split_type is SplitType.BODY_PART_ROTATION
+
+
+def test_six_day_recovery_context_penalizes_more_complex_candidates() -> None:
+    request = normalized(
+        available_training_days=6,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+    )
+    poor_recovery_request = normalized(
+        available_training_days=6,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        sleep_quality=RecoveryRating.POOR,
+    )
+    candidates = generate_split_candidates(6)
+
+    good_scores = {
+        plan.split_type: plan.score
+        for plan in score_split_candidates(request, candidates, RULESET, preferred_days=6)
+    }
+    poor_scores = {
+        plan.split_type: plan.score
+        for plan in score_split_candidates(
+            poor_recovery_request,
+            candidates,
+            RULESET,
+            preferred_days=6,
+        )
+    }
+
+    assert poor_scores[SplitType.BODY_PART_ROTATION] < good_scores[SplitType.BODY_PART_ROTATION]
+    assert poor_scores[SplitType.BODY_PART_ROTATION] < poor_scores[SplitType.UPPER_LOWER_X3]
+
+
+def test_six_day_program_uses_a_valid_generated_split() -> None:
     split = select_split(
         normalized(
             available_training_days=6,
@@ -311,15 +421,8 @@ def test_six_day_program_uses_specialized_direct_target_days() -> None:
         RULESET,
     )
 
-    assert split.split_type is SplitType.BODY_PART_ROTATION
-    assert split.day_focuses == (
-        "chest_triceps",
-        "back_biceps",
-        "quadriceps_calves",
-        "shoulders_traps",
-        "posterior_chain_core",
-        "specialization",
-    )
+    assert split.split_type in {candidate.split_type for candidate in generate_split_candidates(6)}
+    assert len(split.day_focuses) == len(split.weekdays) == 6
 
 
 def test_priority_muscle_receives_more_but_bounded_volume() -> None:

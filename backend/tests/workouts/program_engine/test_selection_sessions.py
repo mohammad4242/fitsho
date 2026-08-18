@@ -256,6 +256,31 @@ def test_each_five_day_candidate_builds_five_sessions(split_type: SplitType) -> 
     assert len(sessions) == 5
 
 
+@pytest.mark.parametrize(
+    "split_type",
+    [
+        SplitType.PUSH_PULL_LEGS_X2,
+        SplitType.UPPER_LOWER_X3,
+        SplitType.BODY_PART_ROTATION,
+    ],
+)
+def test_each_six_day_candidate_builds_six_sessions(split_type: SplitType) -> None:
+    request = normalized(available_training_days=6)
+    eligible = filter_eligible_exercises(request, _body_part_catalog()).eligible
+    candidate = next(item for item in generate_split_candidates(6) if item.split_type is split_type)
+    split = SplitPlan(candidate.split_type, candidate.day_focuses, (0, 1, 2, 3, 4, 5), 1, ())
+
+    sessions = build_sessions(
+        request,
+        split,
+        plan_weekly_volume(request, split, RULESET),
+        eligible,
+        RULESET,
+    )
+
+    assert len(sessions) == 6
+
+
 def test_short_session_keeps_the_minimum_exercise_count() -> None:
     request = normalized(session_duration_minutes=25)
     eligible = filter_eligible_exercises(request, _full_body_catalog()).eligible
