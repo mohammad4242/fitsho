@@ -83,6 +83,14 @@ def generate_split_candidates(days: int) -> tuple[SplitCandidate, ...]:
         ),
         5: (
             SplitCandidate(
+                SplitType.UPPER_LOWER_SPECIALIZATION,
+                ("upper", "lower", "upper", "lower", "specialization"),
+            ),
+            SplitCandidate(
+                SplitType.PUSH_PULL_LEGS_UPPER_LOWER,
+                ("push", "pull", "legs", "upper", "lower"),
+            ),
+            SplitCandidate(
                 SplitType.BODY_PART_ROTATION,
                 ("chest_triceps", "back_biceps", "shoulders_traps", "legs", "specialization"),
             ),

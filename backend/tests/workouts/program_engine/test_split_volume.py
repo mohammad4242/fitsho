@@ -230,12 +230,73 @@ def test_advanced_four_day_scoring_can_select_body_part_rotation() -> None:
 def test_five_days_generate_multiple_valid_split_candidates() -> None:
     candidates = generate_split_candidates(5)
 
-    assert candidates == (
-        type(candidates[0])(
-            SplitType.BODY_PART_ROTATION,
-            ("chest_triceps", "back_biceps", "shoulders_traps", "legs", "specialization"),
-        ),
+    assert tuple(candidate.split_type for candidate in candidates) == (
+        SplitType.UPPER_LOWER_SPECIALIZATION,
+        SplitType.PUSH_PULL_LEGS_UPPER_LOWER,
+        SplitType.BODY_PART_ROTATION,
     )
+    assert all(len(candidate.day_focuses) == 5 for candidate in candidates)
+    assert all(
+        focus
+        in {
+            "upper",
+            "lower",
+            "specialization",
+            "push",
+            "pull",
+            "legs",
+            "chest_triceps",
+            "back_biceps",
+            "shoulders_traps",
+        }
+        for candidate in candidates
+        for focus in candidate.day_focuses
+    )
+
+    request = normalized(
+        available_training_days=5,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+    )
+    scored = score_split_candidates(request, candidates, RULESET, preferred_days=5)
+    assert all(len(plan.day_focuses) == len(plan.weekdays) == 5 for plan in scored)
+    assert scored == score_split_candidates(request, candidates, RULESET, preferred_days=5)
+
+
+def test_five_day_context_can_select_specialization_over_body_part_rotation() -> None:
+    candidates = generate_split_candidates(5)
+    request = normalized(
+        available_training_days=5,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        priority_muscles=[MuscleGroup.SHOULDERS],
+        sleep_quality=RecoveryRating.POOR,
+    )
+
+    scored = score_split_candidates(request, candidates, RULESET, preferred_days=5)
+
+    assert scored[0].split_type is SplitType.UPPER_LOWER_SPECIALIZATION
+    assert "SPLIT_SELECTED_FOR_PRIORITY_MUSCLE" in scored[0].reason_codes
+
+
+def test_five_day_context_can_keep_body_part_rotation_when_recovery_is_good() -> None:
+    request = normalized(
+        available_training_days=5,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+    )
+
+    scored = score_split_candidates(
+        request,
+        generate_split_candidates(5),
+        RULESET,
+        preferred_days=5,
+    )
+
+    assert scored[0].split_type is SplitType.BODY_PART_ROTATION
 
 
 def test_six_day_program_uses_specialized_direct_target_days() -> None:

@@ -32,7 +32,7 @@ from app.workouts.program_engine.schemas import (
     SplitPlan,
 )
 from app.workouts.program_engine.session_builder import build_sessions
-from app.workouts.program_engine.split_selector import select_split
+from app.workouts.program_engine.split_selector import generate_split_candidates, select_split
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 
 
@@ -204,6 +204,56 @@ def test_full_body_session_covers_required_patterns_and_priority_is_first() -> N
     assert (
         "PRIORITY_MUSCLE_PLACED_FIRST" in sessions[0].selection_reasons[sessions[0].exercises[0].id]
     )
+
+
+def test_specialization_session_resolves_to_the_athletes_priority_muscle() -> None:
+    request = normalized(
+        available_training_days=5,
+        priority_muscles=[MuscleGroup.SHOULDERS],
+    )
+    eligible = filter_eligible_exercises(request, _body_part_catalog()).eligible
+    split = SplitPlan(
+        SplitType.UPPER_LOWER_SPECIALIZATION,
+        ("upper", "lower", "upper", "lower", "specialization"),
+        (0, 1, 3, 4, 6),
+        1,
+        (),
+    )
+
+    sessions = build_sessions(
+        request,
+        split,
+        plan_weekly_volume(request, split, RULESET),
+        eligible,
+        RULESET,
+    )
+
+    assert sessions[-1].focus == "shoulders_traps"
+
+
+@pytest.mark.parametrize(
+    "split_type",
+    [
+        SplitType.UPPER_LOWER_SPECIALIZATION,
+        SplitType.PUSH_PULL_LEGS_UPPER_LOWER,
+        SplitType.BODY_PART_ROTATION,
+    ],
+)
+def test_each_five_day_candidate_builds_five_sessions(split_type: SplitType) -> None:
+    request = normalized(available_training_days=5)
+    eligible = filter_eligible_exercises(request, _body_part_catalog()).eligible
+    candidate = next(item for item in generate_split_candidates(5) if item.split_type is split_type)
+    split = SplitPlan(candidate.split_type, candidate.day_focuses, (0, 1, 2, 4, 5), 1, ())
+
+    sessions = build_sessions(
+        request,
+        split,
+        plan_weekly_volume(request, split, RULESET),
+        eligible,
+        RULESET,
+    )
+
+    assert len(sessions) == 5
 
 
 def test_short_session_keeps_the_minimum_exercise_count() -> None:

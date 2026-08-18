@@ -19,6 +19,13 @@ FOUR_DAY_SPLIT_TYPES = frozenset(
         SplitType.BODY_PART_ROTATION,
     }
 )
+FIVE_DAY_SPLIT_TYPES = frozenset(
+    {
+        SplitType.UPPER_LOWER_SPECIALIZATION,
+        SplitType.PUSH_PULL_LEGS_UPPER_LOWER,
+        SplitType.BODY_PART_ROTATION,
+    }
+)
 
 
 @pytest.mark.parametrize(
@@ -28,7 +35,7 @@ FOUR_DAY_SPLIT_TYPES = frozenset(
         ("novice_2_days_35_general", SplitType.FULL_BODY_AB),
         ("novice_3_days_fat_loss_low_impact", SplitType.FULL_BODY_ABC),
         ("intermediate_4_days_hypertrophy", None),
-        ("intermediate_5_days_shoulder_priority", SplitType.BODY_PART_ROTATION),
+        ("intermediate_5_days_shoulder_priority", None),
         ("advanced_4_days_strength", None),
     ],
 )
@@ -41,6 +48,8 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
         assert result.program.split.split_type is split_type
     if source.available_training_days == 4:
         assert result.program.split.split_type in FOUR_DAY_SPLIT_TYPES
+    if source.available_training_days == 5:
+        assert result.program.split.split_type in FIVE_DAY_SPLIT_TYPES
     assert result.program.validation_report.is_valid
     assert all(
         day.estimated_duration_minutes
