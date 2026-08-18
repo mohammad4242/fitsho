@@ -162,6 +162,66 @@ def test_exercise_stores_import_source_metadata_and_review_status(db: Session) -
     assert stored.needs_review is True
 
 
+def test_exercise_stores_programming_metadata(db: Session) -> None:
+    from app.workouts.program_engine.enums import (
+        BodyPosition,
+        ImpactLimit,
+        Laterality,
+        LoadLimit,
+        SkillDemand,
+        StabilityDemand,
+    )
+
+    exercise = make_exercise("programming-metadata")
+    exercise.body_position = BodyPosition.SUPPORTED
+    exercise.stability_demand = StabilityDemand.HIGH
+    exercise.skill_demand = SkillDemand.MODERATE
+    exercise.impact_level = ImpactLimit.LOW
+    exercise.axial_loading_level = LoadLimit.NONE
+    exercise.fatigue_cost = 4
+    exercise.setup_cost = 2
+    exercise.laterality = Laterality.UNILATERAL
+    exercise.substitution_group = "horizontal_push"
+    exercise.range_of_motion_profile = ["deep_knee_flexion", "supported"]
+    db.add(exercise)
+    db.flush()
+    db.expire(exercise)
+
+    stored = db.scalar(select(Exercise).where(Exercise.slug == "programming-metadata"))
+
+    assert stored is not None
+    assert stored.body_position is BodyPosition.SUPPORTED
+    assert stored.stability_demand is StabilityDemand.HIGH
+    assert stored.skill_demand is SkillDemand.MODERATE
+    assert stored.impact_level is ImpactLimit.LOW
+    assert stored.axial_loading_level is LoadLimit.NONE
+    assert stored.fatigue_cost == 4
+    assert stored.setup_cost == 2
+    assert stored.laterality is Laterality.UNILATERAL
+    assert stored.substitution_group == "horizontal_push"
+    assert stored.range_of_motion_profile == ["deep_knee_flexion", "supported"]
+
+
+def test_legacy_exercise_has_nullable_programming_metadata(db: Session) -> None:
+    exercise = make_exercise("legacy-programming-metadata")
+    db.add(exercise)
+    db.flush()
+
+    stored = db.scalar(select(Exercise).where(Exercise.slug == "legacy-programming-metadata"))
+
+    assert stored is not None
+    assert stored.body_position is None
+    assert stored.stability_demand is None
+    assert stored.skill_demand is None
+    assert stored.impact_level is None
+    assert stored.axial_loading_level is None
+    assert stored.fatigue_cost is None
+    assert stored.setup_cost is None
+    assert stored.laterality is None
+    assert stored.substitution_group is None
+    assert stored.range_of_motion_profile is None
+
+
 def test_exercise_slug_is_unique(db: Session) -> None:
     db.add_all([make_exercise(), make_exercise()])
 
@@ -228,6 +288,12 @@ def test_exercise_database_accepts_new_lower_body_muscle_groups(
         ("primary_muscle", "core_stability", "ck_exercises_primary_muscle_values"),
         ("muscle_focus", "inner_chest", "ck_exercises_muscle_focus_values"),
         ("difficulty", "expert", "ck_exercises_difficulty_values"),
+        ("body_position", "hanging", "ck_exercises_body_position_values"),
+        ("stability_demand", "extreme", "ck_exercises_stability_demand_values"),
+        ("skill_demand", "expert", "ck_exercises_skill_demand_values"),
+        ("impact_level", "extreme", "ck_exercises_impact_level_values"),
+        ("axial_loading_level", "extreme", "ck_exercises_axial_loading_level_values"),
+        ("laterality", "alternating", "ck_exercises_laterality_values"),
         ("media_type", "youtube", "ck_exercises_media_type_values"),
         ("content_type", "article", "ck_exercises_content_type_values"),
     ],
@@ -240,13 +306,19 @@ def test_exercise_database_rejects_invalid_controlled_values(
 ) -> None:
     values = {
         "id": uuid4(),
-        "slug": f"invalid-{column}",
+        "slug": f"invalid-{column.replace('_', '-')}",
         "body_region": "upper_body",
         "primary_muscle": "chest",
         "muscle_focus": "mid_chest",
         "difficulty": "beginner",
         "media_type": "placeholder",
         "content_type": "exercise",
+        "body_position": None,
+        "stability_demand": None,
+        "skill_demand": None,
+        "impact_level": None,
+        "axial_loading_level": None,
+        "laterality": None,
     }
     values[column] = invalid_value
 
@@ -256,11 +328,15 @@ def test_exercise_database_rejects_invalid_controlled_values(
                 """
                 INSERT INTO exercises (
                     id, slug, name_en, name_fa, body_region, primary_muscle, muscle_focus,
-                    difficulty, instructions_en, instructions_fa,
+                    difficulty, body_position, stability_demand, skill_demand,
+                    impact_level, axial_loading_level, laterality,
+                    instructions_en, instructions_fa,
                     safety_notes_en, safety_notes_fa, media_path, media_type, content_type
                 ) VALUES (
                     :id, :slug, 'Push-Up', 'شنا سوئدی', :body_region,
                     :primary_muscle, :muscle_focus, :difficulty,
+                    :body_position, :stability_demand, :skill_demand,
+                    :impact_level, :axial_loading_level, :laterality,
                     '["Step one", "Step two", "Step three"]',
                     '["گام یک", "گام دو", "گام سه"]', '["Use control"]',
                     '["حرکت را کنترل کن"]', '/exercises/exercise-placeholder.svg',
@@ -270,6 +346,31 @@ def test_exercise_database_rejects_invalid_controlled_values(
             ),
             values,
         )
+
+    assert constraint_name in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "constraint_name"),
+    [
+        ("fatigue_cost", 0, "ck_exercises_fatigue_cost_range"),
+        ("fatigue_cost", 6, "ck_exercises_fatigue_cost_range"),
+        ("setup_cost", 0, "ck_exercises_setup_cost_range"),
+        ("setup_cost", 6, "ck_exercises_setup_cost_range"),
+    ],
+)
+def test_exercise_database_rejects_out_of_range_programming_cost(
+    db: Session,
+    field: str,
+    value: int,
+    constraint_name: str,
+) -> None:
+    exercise = make_exercise(f"invalid-{field.replace('_', '-')}-{value}")
+    setattr(exercise, field, value)
+    db.add(exercise)
+
+    with pytest.raises(IntegrityError) as error:
+        db.flush()
 
     assert constraint_name in str(error.value)
 

@@ -975,6 +975,16 @@ def test_admin_can_update_programming_metadata(
                     exercise_type="compound",
                     caution_tags=["shoulder_internal_rotation"],
                     is_programmable=True,
+                    body_position="supported",
+                    stability_demand="high",
+                    skill_demand="moderate",
+                    impact_level="low",
+                    axial_loading_level="none",
+                    laterality="unilateral",
+                    fatigue_cost=4,
+                    setup_cost=2,
+                    substitution_group="horizontal_push",
+                    range_of_motion_profile=["supported", "shortened"],
                 )
             )
         },
@@ -986,9 +996,24 @@ def test_admin_can_update_programming_metadata(
     assert body["exercise_type"] == "compound"
     assert body["caution_tags"] == ["shoulder_internal_rotation"]
     assert body["is_programmable"] is True
+    assert body["body_position"] == "supported"
+    assert body["stability_demand"] == "high"
+    assert body["skill_demand"] == "moderate"
+    assert body["impact_level"] == "low"
+    assert body["axial_loading_level"] == "none"
+    assert body["laterality"] == "unilateral"
+    assert body["fatigue_cost"] == 4
+    assert body["setup_cost"] == 2
+    assert body["substitution_group"] == "horizontal_push"
+    assert body["range_of_motion_profile"] == ["supported", "shortened"]
     stored = db.scalar(select(Exercise).where(Exercise.id == created.json()["id"]))
     assert stored is not None
     assert stored.movement_pattern.value == "horizontal_push"
+    assert stored.body_position.value == "supported"
+    assert stored.fatigue_cost == 4
+    assert stored.setup_cost == 2
+    assert stored.substitution_group == "horizontal_push"
+    assert stored.range_of_motion_profile == ["supported", "shortened"]
     assert [item.caution_tag.value for item in stored.caution_tag_items] == [
         "shoulder_internal_rotation"
     ]

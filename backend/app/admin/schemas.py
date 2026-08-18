@@ -23,6 +23,14 @@ from app.exercises.schemas import ExerciseDetail
 from app.exercises.taxonomy import is_compatible_muscle_focus
 from app.profile.enums import ExperienceLevel, FitnessGoal
 from app.training_templates.models import TrainingTemplateMethod, TrainingTemplateSlotPriority
+from app.workouts.program_engine.enums import (
+    BodyPosition,
+    ImpactLimit,
+    Laterality,
+    LoadLimit,
+    SkillDemand,
+    StabilityDemand,
+)
 
 Slug = Annotated[
     str,
@@ -42,6 +50,14 @@ OptionalMetadata = Annotated[
 FocusTag = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=80),
+]
+ProgrammingMetadataTag = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=80),
+]
+SubstitutionGroup = Annotated[
+    str | None,
+    StringConstraints(strip_whitespace=True, max_length=120),
 ]
 SourceUrl = Annotated[
     str,
@@ -123,6 +139,16 @@ class AdminExerciseCreate(BaseModel):
     exercise_type: ExerciseType = ExerciseType.OTHER
     caution_tags: list[ExerciseCautionTag] = Field(default_factory=list)
     is_programmable: bool = False
+    body_position: BodyPosition | None = None
+    stability_demand: StabilityDemand | None = None
+    skill_demand: SkillDemand | None = None
+    impact_level: ImpactLimit | None = None
+    axial_loading_level: LoadLimit | None = None
+    fatigue_cost: int | None = Field(default=None, ge=1, le=5)
+    setup_cost: int | None = Field(default=None, ge=1, le=5)
+    laterality: Laterality | None = None
+    substitution_group: SubstitutionGroup = None
+    range_of_motion_profile: list[ProgrammingMetadataTag] | None = None
     safety_notes_fa: list[TextItem] = Field(default_factory=list)
     is_active: bool = True
     needs_review: bool = False
@@ -146,6 +172,16 @@ class AdminExerciseDetail(ExerciseDetail):
     exercise_type: ExerciseType
     caution_tags: list[ExerciseCautionTag]
     is_programmable: bool
+    body_position: BodyPosition | None = None
+    stability_demand: StabilityDemand | None = None
+    skill_demand: SkillDemand | None = None
+    impact_level: ImpactLimit | None = None
+    axial_loading_level: LoadLimit | None = None
+    fatigue_cost: int | None = None
+    setup_cost: int | None = None
+    laterality: Laterality | None = None
+    substitution_group: str | None = None
+    range_of_motion_profile: list[str] | None = None
 
 
 class PaginatedAdminExercises(BaseModel):

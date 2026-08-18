@@ -253,6 +253,16 @@ def _detail(exercise: Exercise) -> AdminExerciseDetail:
             (item.caution_tag for item in exercise.caution_tag_items), key=lambda value: value.value
         ),
         is_programmable=exercise.is_programmable,
+        body_position=exercise.body_position,
+        stability_demand=exercise.stability_demand,
+        skill_demand=exercise.skill_demand,
+        impact_level=exercise.impact_level,
+        axial_loading_level=exercise.axial_loading_level,
+        fatigue_cost=exercise.fatigue_cost,
+        setup_cost=exercise.setup_cost,
+        laterality=exercise.laterality,
+        substitution_group=exercise.substitution_group,
+        range_of_motion_profile=exercise.range_of_motion_profile,
         updated_at=exercise.updated_at,
     )
 

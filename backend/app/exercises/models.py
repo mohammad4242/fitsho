@@ -13,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     String,
     UniqueConstraint,
     func,
@@ -37,6 +38,14 @@ from app.exercises.enums import (
     MuscleGroup,
 )
 from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
+from app.workouts.program_engine.enums import (
+    BodyPosition,
+    ImpactLimit,
+    Laterality,
+    LoadLimit,
+    SkillDemand,
+    StabilityDemand,
+)
 
 
 def enum_values(members: type[StrEnum]) -> list[str]:
@@ -106,6 +115,18 @@ class Exercise(Base):
             muscle_focus_compatibility_sql(),
             name="ck_exercises_primary_muscle_focus_compatible",
         ),
+        CheckConstraint(
+            "fatigue_cost IS NULL OR fatigue_cost BETWEEN 1 AND 5",
+            name="ck_exercises_fatigue_cost_range",
+        ),
+        CheckConstraint(
+            "setup_cost IS NULL OR setup_cost BETWEEN 1 AND 5",
+            name="ck_exercises_setup_cost_range",
+        ),
+        CheckConstraint(
+            "range_of_motion_profile IS NULL OR json_typeof(range_of_motion_profile) = 'array'",
+            name="ck_exercises_range_of_motion_profile_items",
+        ),
         Index("ix_exercises_body_region", "body_region"),
         Index("ix_exercises_primary_muscle", "primary_muscle"),
         Index(
@@ -117,6 +138,7 @@ class Exercise(Base):
         Index("ix_exercises_is_active", "is_active"),
         Index("ix_exercises_is_programmable", "is_programmable"),
         Index("ix_exercises_content_type", "content_type"),
+        Index("ix_exercises_substitution_group", "substitution_group"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -206,6 +228,79 @@ class Exercise(Base):
         default=ExerciseType.OTHER,
         server_default=ExerciseType.OTHER.value,
         nullable=False,
+    )
+    body_position: Mapped[BodyPosition | None] = mapped_column(
+        Enum(
+            BodyPosition,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercises_body_position_values",
+        ),
+        nullable=True,
+    )
+    stability_demand: Mapped[StabilityDemand | None] = mapped_column(
+        Enum(
+            StabilityDemand,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercises_stability_demand_values",
+        ),
+        nullable=True,
+    )
+    skill_demand: Mapped[SkillDemand | None] = mapped_column(
+        Enum(
+            SkillDemand,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercises_skill_demand_values",
+        ),
+        nullable=True,
+    )
+    impact_level: Mapped[ImpactLimit | None] = mapped_column(
+        Enum(
+            ImpactLimit,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercises_impact_level_values",
+        ),
+        nullable=True,
+    )
+    axial_loading_level: Mapped[LoadLimit | None] = mapped_column(
+        Enum(
+            LoadLimit,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercises_axial_loading_level_values",
+        ),
+        nullable=True,
+    )
+    fatigue_cost: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    setup_cost: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    laterality: Mapped[Laterality | None] = mapped_column(
+        Enum(
+            Laterality,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercises_laterality_values",
+        ),
+        nullable=True,
+    )
+    substitution_group: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    range_of_motion_profile: Mapped[list[str] | None] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=True,
     )
     instructions_en: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     instructions_fa: Mapped[list[str]] = mapped_column(JSON, nullable=False)
