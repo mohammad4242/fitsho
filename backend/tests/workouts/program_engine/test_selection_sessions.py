@@ -17,12 +17,14 @@ from app.workouts.program_engine.enums import (
     Goal,
     ImpactLimit,
     LoadLimit,
+    SkillDemand,
     SplitType,
     StabilityDemand,
     TrainingExperience,
 )
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.normalization import normalize_request
+from app.workouts.program_engine.replacement_ranker import rank_replacement_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -344,6 +346,139 @@ def test_substitutions_are_drawn_only_from_eligible_candidates() -> None:
 
     substitutions = {item for values in sessions[0].substitutions.values() for item in values}
     assert unsafe_sub.id not in substitutions
+
+
+def test_replacement_prefers_same_target_and_substitution_group_over_same_pattern() -> None:
+    request = normalized()
+    target = candidate(
+        "target push",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        substitution_group="horizontal-push",
+    )
+    same_family = candidate(
+        "same family pull",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.CHEST,
+        substitution_group="horizontal-push",
+    )
+    same_pattern = candidate(
+        "same pattern shoulders",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.SHOULDERS,
+        substitution_group="shoulder-push",
+    )
+
+    ranked = rank_replacement_exercises(request, target, (same_pattern, same_family))
+
+    assert ranked[0] is same_family
+
+
+def test_replacement_ranking_excludes_unavailable_and_unsafe_candidates() -> None:
+    blocked_id = uuid4()
+    request = normalized(
+        blocked_exercises=[blocked_id],
+        blocked_caution_tags=[ExerciseCautionTag.WRIST_LOADING],
+    )
+    target = candidate(
+        "target push",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        substitution_group="push",
+    )
+    unavailable = candidate(
+        "barbell push",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        equipment=frozenset({Equipment.BARBELL}),
+        substitution_group="push",
+    )
+    blocked = candidate(
+        "blocked push",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        id=blocked_id,
+        substitution_group="push",
+    )
+    unsafe = candidate(
+        "wrist unsafe push",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        caution_tags=frozenset({ExerciseCautionTag.WRIST_LOADING}),
+        substitution_group="push",
+    )
+
+    ranked = rank_replacement_exercises(request, target, (unavailable, blocked, unsafe))
+
+    assert ranked == ()
+
+
+def test_lower_risk_compatible_replacement_outranks_riskier_candidate() -> None:
+    request = normalized(
+        impact_limit=ImpactLimit.HIGH,
+        axial_load_limit=LoadLimit.HIGH,
+        balance_requirement=BalanceAbility.HIGH,
+    )
+    target = candidate(
+        "target squat",
+        MovementPattern.SQUAT,
+        MuscleGroup.QUADRICEPS,
+        substitution_group="squat",
+    )
+    lower_risk = candidate(
+        "supported squat",
+        MovementPattern.SQUAT,
+        MuscleGroup.QUADRICEPS,
+        substitution_group="squat",
+        impact_level=ImpactLimit.LOW,
+        axial_loading_level=LoadLimit.LOW,
+        stability_demand=StabilityDemand.LOW,
+        skill_demand=SkillDemand.LOW,
+    )
+    riskier = candidate(
+        "heavy squat",
+        MovementPattern.SQUAT,
+        MuscleGroup.QUADRICEPS,
+        substitution_group="squat",
+        impact_level=ImpactLimit.HIGH,
+        axial_loading_level=LoadLimit.HIGH,
+        stability_demand=StabilityDemand.HIGH,
+        skill_demand=SkillDemand.HIGH,
+    )
+
+    ranked = rank_replacement_exercises(request, target, (riskier, lower_risk))
+
+    assert ranked[0] is lower_risk
+
+
+def test_persistent_dislike_is_deprioritized_and_safe_fallback_is_deterministic() -> None:
+    disliked_id = uuid4()
+    request = normalized(disliked_exercises=[disliked_id])
+    target = candidate(
+        "target row",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+        substitution_group="row",
+    )
+    disliked_family = candidate(
+        "disliked family row",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+        id=disliked_id,
+        substitution_group="row",
+    )
+    safe_fallback = candidate(
+        "safe fallback row",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+        substitution_group="different-row",
+    )
+
+    forward = rank_replacement_exercises(request, target, (disliked_family, safe_fallback))
+    reverse = rank_replacement_exercises(request, target, (safe_fallback, disliked_family))
+
+    assert forward[0] is safe_fallback
+    assert tuple(item.id for item in forward) == tuple(item.id for item in reverse)
 
 
 def test_missing_required_safe_pattern_returns_structured_domain_error() -> None:

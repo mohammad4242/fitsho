@@ -5,6 +5,7 @@ from uuid import UUID
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.body_analysis import body_analysis_priority_muscles
 from app.workouts.program_engine.exercise_ranker import rank_exercises
+from app.workouts.program_engine.replacement_ranker import rank_replacement_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -27,9 +28,7 @@ CORE_PATTERNS = frozenset(
         MovementPattern.CORE_ANTI_LATERAL_FLEXION,
     }
 )
-SHOULDER_PATTERNS = frozenset(
-    {MovementPattern.VERTICAL_PUSH, MovementPattern.SHOULDER_ABDUCTION}
-)
+SHOULDER_PATTERNS = frozenset({MovementPattern.VERTICAL_PUSH, MovementPattern.SHOULDER_ABDUCTION})
 
 
 @dataclass(frozen=True)
@@ -117,14 +116,13 @@ def build_sessions(
         substitutions = {
             item.id: tuple(
                 alternative.id
-                for alternative in exercises
-                if alternative.id != item.id
-                and alternative.movement_pattern is item.movement_pattern
-                and (
-                    alternative.substitution_group == item.substitution_group
-                    or item.substitution_group is None
+                for alternative in rank_replacement_exercises(
+                    request,
+                    item,
+                    exercises,
+                    limit=ruleset.substitution_limit,
                 )
-            )[: ruleset.substitution_limit]
+            )
             for item in chosen
         }
         session_reasons = ("SESSION_TRIMMED_FOR_TIME_LIMIT",) if capacity < len(slots) else ()
@@ -279,9 +277,7 @@ def _resolve_focus(
 ) -> str:
     if focus != "specialization":
         return focus
-    priorities = request.source.priority_muscles | body_analysis_priority_muscles(
-        request, ruleset
-    )
+    priorities = request.source.priority_muscles | body_analysis_priority_muscles(request, ruleset)
     for muscle_group, specialized_focus in (
         ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
         ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),
