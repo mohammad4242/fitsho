@@ -32,7 +32,17 @@ from app.workout_reviews.models import WorkoutPlanReview
 from app.workouts.body_analysis_resolver import BodyAnalysisInfluenceResolver
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan, WorkoutPlanGeneration
-from app.workouts.program_engine.enums import GenerationErrorCode, Goal, RedFlag
+from app.workouts.program_engine.enums import (
+    BodyPosition,
+    GenerationErrorCode,
+    Goal,
+    ImpactLimit,
+    Laterality,
+    LoadLimit,
+    RedFlag,
+    SkillDemand,
+    StabilityDemand,
+)
 from app.workouts.program_engine.schemas import BodyAnalysisInfluence, ProgramGenerationResult
 from app.workouts.repository import create_generation, get_plan_for_user
 from app.workouts.router import to_plan_response
@@ -119,6 +129,83 @@ def test_neutral_generation_overrides_do_not_erase_profile_preferences(db: Sessi
 
     assert request.preferred_weekdays == (0, 3)
     assert request.priority_muscles == frozenset({MuscleGroup.BACK})
+
+
+def test_domain_candidate_uses_persisted_programming_metadata(db: Session) -> None:
+    exercise = _exercise(
+        db,
+        "persisted-programming-metadata",
+        MovementPattern.SQUAT,
+        MuscleGroup.QUADRICEPS,
+    )
+    exercise.body_position = BodyPosition.SEATED
+    exercise.stability_demand = StabilityDemand.LOW
+    exercise.skill_demand = SkillDemand.LOW
+    exercise.impact_level = ImpactLimit.HIGH
+    exercise.axial_loading_level = LoadLimit.NONE
+    exercise.fatigue_cost = 5
+    exercise.setup_cost = 4
+    exercise.laterality = Laterality.NOT_APPLICABLE
+    exercise.substitution_group = "curated-squat"
+    exercise.range_of_motion_profile = ["shortened", "supported"]
+    db.flush()
+
+    candidate = WorkoutGenerationService._domain_candidate(exercise)
+
+    assert candidate.body_position is BodyPosition.SEATED
+    assert candidate.stability_demand is StabilityDemand.LOW
+    assert candidate.skill_demand is SkillDemand.LOW
+    assert candidate.impact_level is ImpactLimit.HIGH
+    assert candidate.axial_loading_level is LoadLimit.NONE
+    assert candidate.fatigue_cost == 5
+    assert candidate.setup_cost == 4
+    assert candidate.laterality is Laterality.NOT_APPLICABLE
+    assert candidate.substitution_group == "curated-squat"
+    assert candidate.range_of_motion_profile == frozenset({"shortened", "supported"})
+
+
+def test_domain_candidate_uses_legacy_fallback_only_for_missing_metadata(db: Session) -> None:
+    exercise = _exercise(
+        db,
+        "legacy-programming-metadata",
+        MovementPattern.SQUAT,
+        MuscleGroup.QUADRICEPS,
+    )
+    exercise.difficulty = Difficulty.ADVANCED
+    db.flush()
+
+    candidate = WorkoutGenerationService._domain_candidate(exercise)
+
+    assert candidate.body_position is BodyPosition.STANDING
+    assert candidate.stability_demand is StabilityDemand.MODERATE
+    assert candidate.skill_demand is SkillDemand.HIGH
+    assert candidate.impact_level is ImpactLimit.LOW
+    assert candidate.axial_loading_level is LoadLimit.LOW
+    assert candidate.fatigue_cost == 3
+    assert candidate.setup_cost == 1
+    assert candidate.laterality is Laterality.BILATERAL
+    assert candidate.substitution_group == MovementPattern.SQUAT.value
+    assert candidate.range_of_motion_profile == frozenset()
+
+
+def test_catalog_snapshot_keeps_programming_metadata_and_stable_collections(
+    db: Session,
+) -> None:
+    exercise = _exercise(
+        db,
+        "snapshot-programming-metadata",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+    )
+    exercise.body_position = BodyPosition.SUPPORTED
+    exercise.range_of_motion_profile = ["z_profile", "a_profile"]
+    db.flush()
+
+    candidate = WorkoutGenerationService._domain_candidate(exercise)
+    snapshot = WorkoutGenerationService._candidate_snapshot(candidate)
+
+    assert snapshot["body_position"] == "supported"
+    assert snapshot["range_of_motion_profile"] == ["a_profile", "z_profile"]
 
 
 def _exercise(

@@ -56,6 +56,7 @@ from app.workouts.program_engine.enums import (
     BodyPosition,
     GenerationErrorCode,
     ImpactLimit,
+    Laterality,
     LoadLimit,
     SkillDemand,
     StabilityDemand,
@@ -109,6 +110,22 @@ class WorkoutGenerationSettings:
     ai_coach_temperature: float = 0.0
     ai_coach_max_output_tokens: int = 4096
     ai_coach_routing_preferences: ProviderRoutingPreferences = ProviderRoutingPreferences()
+
+
+@dataclass(frozen=True)
+class _LegacyExerciseProgrammingMetadata:
+    """Conservative mapping for catalog rows predating persisted metadata."""
+
+    body_position: BodyPosition
+    stability_demand: StabilityDemand
+    skill_demand: SkillDemand
+    impact_level: ImpactLimit
+    axial_loading_level: LoadLimit
+    fatigue_cost: int
+    setup_cost: int
+    laterality: Laterality
+    substitution_group: str
+    range_of_motion_profile: frozenset[str]
 
 
 def legacy_training_age_months(experience_level: ExperienceLevel) -> int:
@@ -754,18 +771,23 @@ class WorkoutGenerationService:
     def _domain_candidate(exercise: Exercise, profile_sex: Sex | None = None) -> ExerciseCandidate:
         caution_tags = frozenset(item.caution_tag for item in exercise.caution_tag_items)
         selected_media = WorkoutGenerationService._selected_media(exercise, profile_sex)
-        balance_demand = (
-            StabilityDemand.HIGH
-            if ExerciseCautionTag.BALANCE_DEMAND in caution_tags
-            else StabilityDemand.LOW
-            if exercise.exercise_type in {ExerciseType.ISOLATION, ExerciseType.CORE}
-            else StabilityDemand.MODERATE
+        legacy = WorkoutGenerationService._legacy_candidate_metadata(exercise, caution_tags)
+        secondary_muscles = tuple(
+            sorted(
+                (item.muscle for item in exercise.secondary_muscles),
+                key=lambda muscle: muscle.value,
+            )
+        )
+        range_of_motion_profile = (
+            frozenset(exercise.range_of_motion_profile)
+            if exercise.range_of_motion_profile is not None
+            else legacy.range_of_motion_profile
         )
         return ExerciseCandidate(
             id=exercise.id,
             name=exercise.name_en,
             primary_muscle=exercise.primary_muscle,
-            secondary_muscles=tuple(item.muscle for item in exercise.secondary_muscles),
+            secondary_muscles=secondary_muscles,
             movement_pattern=exercise.movement_pattern,
             exercise_type=exercise.exercise_type,
             equipment=frozenset(item.equipment for item in exercise.equipment_items),
@@ -775,27 +797,42 @@ class WorkoutGenerationService:
             is_active=exercise.is_active,
             is_programmable=exercise.is_programmable,
             needs_review=exercise.needs_review,
-            body_position=BodyPosition.STANDING,
-            stability_demand=balance_demand,
-            skill_demand={
-                Difficulty.BEGINNER: SkillDemand.LOW,
-                Difficulty.INTERMEDIATE: SkillDemand.MODERATE,
-                Difficulty.ADVANCED: SkillDemand.HIGH,
-            }[exercise.difficulty],
-            impact_level=ImpactLimit.LOW,
+            body_position=(
+                exercise.body_position
+                if exercise.body_position is not None
+                else legacy.body_position
+            ),
+            stability_demand=(
+                exercise.stability_demand
+                if exercise.stability_demand is not None
+                else legacy.stability_demand
+            ),
+            skill_demand=(
+                exercise.skill_demand if exercise.skill_demand is not None else legacy.skill_demand
+            ),
+            impact_level=(
+                exercise.impact_level if exercise.impact_level is not None else legacy.impact_level
+            ),
             axial_loading_level=(
-                LoadLimit.HIGH
-                if ExerciseCautionTag.LOWER_BACK_LOADING in caution_tags
-                else LoadLimit.LOW
+                exercise.axial_loading_level
+                if exercise.axial_loading_level is not None
+                else legacy.axial_loading_level
             ),
-            fatigue_cost=3 if exercise.exercise_type is ExerciseType.COMPOUND else 1,
-            setup_cost=1,
-            range_of_motion_profile=(
-                frozenset({"deep_knee_flexion"})
-                if ExerciseCautionTag.DEEP_KNEE_FLEXION in caution_tags
-                else frozenset()
+            fatigue_cost=(
+                exercise.fatigue_cost if exercise.fatigue_cost is not None else legacy.fatigue_cost
             ),
-            substitution_group=exercise.movement_pattern.value,
+            setup_cost=(
+                exercise.setup_cost if exercise.setup_cost is not None else legacy.setup_cost
+            ),
+            laterality=(
+                exercise.laterality if exercise.laterality is not None else legacy.laterality
+            ),
+            range_of_motion_profile=range_of_motion_profile,
+            substitution_group=(
+                exercise.substitution_group
+                if exercise.substitution_group is not None
+                else legacy.substitution_group
+            ),
             display_snapshot={
                 "id": str(exercise.id),
                 "slug": exercise.slug,
@@ -805,13 +842,55 @@ class WorkoutGenerationService:
                 "primary_muscle": (
                     exercise.primary_muscle.value if exercise.primary_muscle else None
                 ),
-                "labels": [item.label.value for item in exercise.labels],
-                "secondary_muscles": [item.muscle.value for item in exercise.secondary_muscles],
-                "equipment": [item.equipment.value for item in exercise.equipment_items],
+                "labels": sorted(item.label.value for item in exercise.labels),
+                "secondary_muscles": sorted(
+                    item.muscle.value for item in exercise.secondary_muscles
+                ),
+                "equipment": sorted(item.equipment.value for item in exercise.equipment_items),
                 "difficulty": exercise.difficulty.value,
                 "media_path": selected_media[0],
                 "media_type": selected_media[1],
             },
+        )
+
+    @staticmethod
+    def _legacy_candidate_metadata(
+        exercise: Exercise,
+        caution_tags: frozenset[ExerciseCautionTag],
+    ) -> _LegacyExerciseProgrammingMetadata:
+        """Infer only the legacy defaults needed by incomplete catalog rows."""
+
+        stability_demand = (
+            StabilityDemand.HIGH
+            if ExerciseCautionTag.BALANCE_DEMAND in caution_tags
+            else StabilityDemand.LOW
+            if exercise.exercise_type in {ExerciseType.ISOLATION, ExerciseType.CORE}
+            else StabilityDemand.MODERATE
+        )
+        skill_demand = {
+            Difficulty.BEGINNER: SkillDemand.LOW,
+            Difficulty.INTERMEDIATE: SkillDemand.MODERATE,
+            Difficulty.ADVANCED: SkillDemand.HIGH,
+        }[exercise.difficulty]
+        return _LegacyExerciseProgrammingMetadata(
+            body_position=BodyPosition.STANDING,
+            stability_demand=stability_demand,
+            skill_demand=skill_demand,
+            impact_level=ImpactLimit.LOW,
+            axial_loading_level=(
+                LoadLimit.HIGH
+                if ExerciseCautionTag.LOWER_BACK_LOADING in caution_tags
+                else LoadLimit.LOW
+            ),
+            fatigue_cost=3 if exercise.exercise_type is ExerciseType.COMPOUND else 1,
+            setup_cost=1,
+            laterality=Laterality.BILATERAL,
+            substitution_group=exercise.movement_pattern.value,
+            range_of_motion_profile=(
+                frozenset({"deep_knee_flexion"})
+                if ExerciseCautionTag.DEEP_KNEE_FLEXION in caution_tags
+                else frozenset()
+            ),
         )
 
     @staticmethod
@@ -985,6 +1064,12 @@ def _json_ready(value: object) -> object:
         return value.value
     if isinstance(value, dict):
         return {str(_json_ready(key)): _json_ready(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set, frozenset)):
+    if isinstance(value, (set, frozenset)):
+        items = [_json_ready(item) for item in value]
+        return sorted(
+            items,
+            key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":")),
+        )
+    if isinstance(value, (list, tuple)):
         return [_json_ready(item) for item in value]
     return value
