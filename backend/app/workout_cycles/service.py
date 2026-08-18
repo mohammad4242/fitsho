@@ -7,6 +7,9 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from app.exercises.models import ExerciseAlternative
+from app.profile.enums import FitnessGoal, TrainingLocation
+from app.profile.schemas import ProfileUpdate
+from app.profile.service import apply_profile_update_without_commit
 from app.workout_cycles.body_progress_schemas import (
     WorkoutCycleBodyProgressComparisonResponse,
     WorkoutCycleFeedbackBodyProgressContext,
@@ -40,6 +43,7 @@ from app.workout_cycles.schemas import (
 )
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
+from app.workouts.program_engine.enums import Goal
 from app.workouts.repository import get_plan_for_user
 
 SUPPORTED_CYCLE_DURATIONS = frozenset({4, 6, 8})
@@ -761,6 +765,58 @@ def get_current_active_cycle_for_user(
     )
 
 
+_FEEDBACK_GOAL_TO_PROFILE_GOAL: dict[Goal, FitnessGoal] = {
+    Goal.FAT_LOSS: FitnessGoal.FAT_LOSS,
+    Goal.HYPERTROPHY: FitnessGoal.BUILD_MUSCLE,
+    Goal.MUSCLE_GAIN: FitnessGoal.BUILD_MUSCLE,
+    Goal.BODY_RECOMPOSITION: FitnessGoal.BODY_RECOMPOSITION,
+    Goal.GENERAL_FITNESS: FitnessGoal.IMPROVE_FITNESS,
+}
+
+
+def _confirmed_profile_update_from_feedback(
+    feedback: CompletionFeedbackInput,
+) -> ProfileUpdate | None:
+    values: dict[str, object] = {}
+    if feedback.goal_changed is True and feedback.next_goal is not None:
+        profile_goal = _FEEDBACK_GOAL_TO_PROFILE_GOAL.get(feedback.next_goal)
+        if profile_goal is not None:
+            values["fitness_goal"] = profile_goal
+
+    if feedback.schedule_changed is True:
+        if feedback.next_training_days is not None:
+            values["training_days_per_week"] = feedback.next_training_days
+        if feedback.next_session_duration_minutes is not None:
+            values["session_duration_minutes"] = feedback.next_session_duration_minutes
+        if feedback.next_preferred_weekdays is not None:
+            values["preferred_weekdays"] = feedback.next_preferred_weekdays
+
+    if feedback.equipment_changed is True and feedback.next_training_location is not None:
+        values["training_location"] = feedback.next_training_location
+        if feedback.next_training_location is TrainingLocation.HOME:
+            values["home_training_setup"] = feedback.next_home_training_setup
+        elif feedback.next_training_location is TrainingLocation.GYM:
+            values["home_training_setup"] = None
+
+    if feedback.new_limitation is not None and feedback.new_limitation.strip():
+        values["physical_limitations"] = feedback.new_limitation
+
+    if not values:
+        return None
+    return ProfileUpdate.model_validate(values)
+
+
+def apply_confirmed_end_cycle_profile_changes(
+    db: Session,
+    *,
+    user_id: UUID,
+    feedback: CompletionFeedbackInput,
+) -> None:
+    profile_update = _confirmed_profile_update_from_feedback(feedback)
+    if profile_update is not None:
+        apply_profile_update_without_commit(db, user_id, profile_update)
+
+
 def complete_cycle(
     db: Session,
     *,
@@ -820,10 +876,18 @@ def complete_cycle(
             schedule_changed=feedback.schedule_changed,
             next_training_days=feedback.next_training_days,
             next_session_duration_minutes=feedback.next_session_duration_minutes,
+            next_preferred_weekdays=(
+                list(feedback.next_preferred_weekdays)
+                if feedback.next_preferred_weekdays is not None
+                else None
+            ),
+            next_training_location=feedback.next_training_location,
+            next_home_training_setup=feedback.next_home_training_setup,
             equipment_changed=feedback.equipment_changed,
             new_limitation=feedback.new_limitation,
             note_optional=feedback.note_optional,
         )
+        apply_confirmed_end_cycle_profile_changes(db, user_id=user_id, feedback=feedback)
     db.flush()
     return cycle
 

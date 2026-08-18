@@ -25,12 +25,14 @@ from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.models import BodyMeasurement, UserProfile
 from app.profile.service import get_profile
+from app.workout_cycles.schemas import CompletionFeedbackInput
+from app.workout_cycles.service import complete_cycle, start_cycle
 from app.workout_reviews.enums import WorkoutReviewStatus
 from app.workout_reviews.models import WorkoutPlanReview
 from app.workouts.body_analysis_resolver import BodyAnalysisInfluenceResolver
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan, WorkoutPlanGeneration
-from app.workouts.program_engine.enums import GenerationErrorCode, RedFlag
+from app.workouts.program_engine.enums import GenerationErrorCode, Goal, RedFlag
 from app.workouts.program_engine.schemas import BodyAnalysisInfluence, ProgramGenerationResult
 from app.workouts.repository import create_generation, get_plan_for_user
 from app.workouts.router import to_plan_response
@@ -259,6 +261,33 @@ def test_program_request_uses_legacy_training_age_fallback_when_missing(
     request = _service(db)._to_program_request(get_profile(db, user.id), None)
 
     assert request.training_age_months == 12
+
+
+def test_next_generation_reads_confirmed_end_cycle_profile_changes(db: Session) -> None:
+    user = _user_with_profile(db)
+    plan = _persist_active_plan(db, user)
+    cycle = start_cycle(db, user_id=user.id, workout_plan_id=plan.id)
+
+    complete_cycle(
+        db,
+        cycle_id=cycle.id,
+        user_id=user.id,
+        feedback=CompletionFeedbackInput(
+            goal_changed=True,
+            next_goal=Goal.FAT_LOSS,
+            schedule_changed=True,
+            next_training_days=3,
+            next_session_duration_minutes=75,
+            next_preferred_weekdays=[1, 3, 5],
+        ),
+    )
+
+    request = _service(db)._to_program_request(get_profile(db, user.id), None)
+
+    assert request.primary_goal == FitnessGoal.FAT_LOSS.value
+    assert request.available_training_days == 3
+    assert request.session_duration_minutes == 75
+    assert request.preferred_weekdays == (1, 3, 5)
 
 
 def test_catalog_uses_profile_gender_media_and_falls_back_to_other_gender(

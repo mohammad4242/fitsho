@@ -1,6 +1,7 @@
 import os
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
+from decimal import Decimal
 from threading import Barrier, Lock
 from uuid import UUID, uuid4
 
@@ -12,6 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.exercises.enums import MuscleGroup
+from app.profile.enums import FitnessGoal, HomeTrainingSetup, Sex, TrainingLocation
+from app.profile.models import BodyMeasurement, UserProfile
 from app.workout_cycles.enums import (
     WorkoutCycleFeedbackProgress,
     WorkoutCycleFeedbackSatisfaction,
@@ -40,6 +43,29 @@ def make_user(db: Session, email: str) -> User:
     db.add(user)
     db.flush()
     return user
+
+
+def make_profile(db: Session, user_id: UUID) -> UserProfile:
+    profile = UserProfile(
+        user_id=user_id,
+        display_name="Cycle Athlete",
+        birth_date=date(1995, 1, 1),
+        sex=Sex.MALE,
+        height_cm=180,
+        fitness_goal=FitnessGoal.BUILD_MUSCLE,
+        experience_level="beginner",
+        training_days_per_week=3,
+        preferred_weekdays=[0, 2, 4],
+        priority_muscles=[MuscleGroup.BACK.value],
+        training_location=TrainingLocation.GYM,
+        home_training_setup=None,
+        session_duration_minutes=60,
+        plan_duration_weeks=4,
+    )
+    db.add(profile)
+    db.add(BodyMeasurement(user_id=user_id, weight_kg=Decimal("80")))
+    db.flush()
+    return profile
 
 
 def make_plan(db: Session, user_id: UUID, *, duration_weeks: int = 4) -> WorkoutPlan:
@@ -255,6 +281,124 @@ def test_complete_cycle_stores_structured_coaching_feedback(db: Session) -> None
     assert stored.equipment_changed is False
     assert stored.new_limitation == "Avoid deep knee flexion."
     assert stored.note_optional == "Felt stronger overall."
+
+
+def test_confirmed_end_cycle_changes_update_only_confirmed_profile_fields(db: Session) -> None:
+    user = make_user(db, "confirmed-profile-changes@example.com")
+    profile = make_profile(db, user.id)
+    plan = make_plan(db, user.id)
+    cycle = start_cycle(db, user_id=user.id, workout_plan_id=plan.id)
+
+    complete_cycle(
+        db,
+        cycle_id=cycle.id,
+        user_id=user.id,
+        feedback=CompletionFeedbackInput(
+            goal_changed=True,
+            next_goal=Goal.FAT_LOSS,
+            schedule_changed=True,
+            next_training_days=4,
+            next_session_duration_minutes=75,
+            next_preferred_weekdays=[1, 3, 5, 6],
+            equipment_changed=True,
+            next_training_location=TrainingLocation.HOME,
+            next_home_training_setup=HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+            new_limitation="Avoid deep knee flexion.",
+        ),
+    )
+
+    assert profile.display_name == "Cycle Athlete"
+    assert profile.height_cm == 180
+    assert profile.fitness_goal is FitnessGoal.FAT_LOSS
+    assert profile.training_days_per_week == 4
+    assert profile.session_duration_minutes == 75
+    assert profile.preferred_weekdays == [1, 3, 5, 6]
+    assert profile.training_location is TrainingLocation.HOME
+    assert profile.home_training_setup is HomeTrainingSetup.DUMBBELLS_AVAILABLE
+    assert profile.physical_limitations == "Avoid deep knee flexion."
+    stored = cycle.completion_feedback
+    assert stored is not None
+    assert stored.next_preferred_weekdays == [1, 3, 5, 6]
+    assert stored.next_training_location is TrainingLocation.HOME
+    assert stored.next_home_training_setup is HomeTrainingSetup.DUMBBELLS_AVAILABLE
+
+
+def test_unconfirmed_end_cycle_values_do_not_change_profile(db: Session) -> None:
+    user = make_user(db, "unconfirmed-profile-changes@example.com")
+    profile = make_profile(db, user.id)
+    plan = make_plan(db, user.id)
+    cycle = start_cycle(db, user_id=user.id, workout_plan_id=plan.id)
+
+    complete_cycle(
+        db,
+        cycle_id=cycle.id,
+        user_id=user.id,
+        feedback=CompletionFeedbackInput(
+            goal_changed=False,
+            next_goal=Goal.FAT_LOSS,
+            schedule_changed=False,
+            next_training_days=4,
+            next_session_duration_minutes=75,
+            next_preferred_weekdays=[1, 3, 5, 6],
+            equipment_changed=False,
+            next_training_location=TrainingLocation.HOME,
+            next_home_training_setup=HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+        ),
+    )
+
+    assert profile.fitness_goal is FitnessGoal.BUILD_MUSCLE
+    assert profile.training_days_per_week == 3
+    assert profile.session_duration_minutes == 60
+    assert profile.preferred_weekdays == [0, 2, 4]
+    assert profile.training_location is TrainingLocation.GYM
+    assert profile.home_training_setup is None
+    assert profile.physical_limitations is None
+
+
+def test_absent_end_cycle_changes_preserve_profile(db: Session) -> None:
+    user = make_user(db, "absent-profile-changes@example.com")
+    profile = make_profile(db, user.id)
+    plan = make_plan(db, user.id)
+    cycle = start_cycle(db, user_id=user.id, workout_plan_id=plan.id)
+
+    complete_cycle(
+        db,
+        cycle_id=cycle.id,
+        user_id=user.id,
+        feedback=CompletionFeedbackInput(
+            pain_or_limitation_feedback="Temporary discomfort was reported this cycle."
+        ),
+    )
+
+    assert profile.training_days_per_week == 3
+    assert profile.session_duration_minutes == 60
+    assert profile.preferred_weekdays == [0, 2, 4]
+    assert profile.priority_muscles == [MuscleGroup.BACK.value]
+    assert profile.physical_limitations is None
+
+
+def test_other_user_cannot_apply_confirmed_end_cycle_changes(db: Session) -> None:
+    owner = make_user(db, "owner-confirmed-profile@example.com")
+    owner_profile = make_profile(db, owner.id)
+    other = make_user(db, "other-confirmed-profile@example.com")
+    other_profile = make_profile(db, other.id)
+    plan = make_plan(db, owner.id)
+    cycle = start_cycle(db, user_id=owner.id, workout_plan_id=plan.id)
+
+    with pytest.raises(WorkoutCycleNotFoundError):
+        complete_cycle(
+            db,
+            cycle_id=cycle.id,
+            user_id=other.id,
+            feedback=CompletionFeedbackInput(
+                schedule_changed=True,
+                next_training_days=4,
+                next_session_duration_minutes=75,
+            ),
+        )
+
+    assert owner_profile.training_days_per_week == 3
+    assert other_profile.training_days_per_week == 3
 
 
 @pytest.mark.parametrize(

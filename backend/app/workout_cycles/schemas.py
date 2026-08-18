@@ -1,9 +1,10 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.exercises.enums import MuscleGroup
+from app.profile.enums import HomeTrainingSetup, TrainingLocation
 from app.profile.schemas import SessionDurationMinutes
 from app.workout_cycles.enums import (
     WorkoutCycleExerciseFeedbackSuggestionKind,
@@ -182,6 +183,39 @@ class CompletionFeedbackInput(BaseModel):
     schedule_changed: bool | None = None
     next_training_days: int | None = Field(default=None, ge=2, le=6)
     next_session_duration_minutes: SessionDurationMinutes | None = None
+    next_preferred_weekdays: tuple[int, ...] | None = None
+    next_training_location: TrainingLocation | None = None
+    next_home_training_setup: HomeTrainingSetup | None = None
     equipment_changed: bool | None = None
     new_limitation: str | None = Field(default=None, max_length=1000)
     note_optional: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("next_preferred_weekdays")
+    @classmethod
+    def validate_next_preferred_weekdays(
+        cls, weekdays: tuple[int, ...] | None
+    ) -> tuple[int, ...] | None:
+        if weekdays is None:
+            return None
+        if len(weekdays) != len(set(weekdays)) or any(day < 0 or day > 6 for day in weekdays):
+            raise ValueError("Preferred weekdays must be unique values from 0 through 6")
+        return tuple(sorted(weekdays))
+
+    @model_validator(mode="after")
+    def validate_confirmed_next_cycle_context(self) -> "CompletionFeedbackInput":
+        if (
+            self.schedule_changed is True
+            and self.next_preferred_weekdays is not None
+            and self.next_training_days is not None
+            and len(self.next_preferred_weekdays) > self.next_training_days
+        ):
+            raise ValueError("Preferred weekdays cannot exceed next training days")
+        if self.equipment_changed is True:
+            if (
+                self.next_training_location == TrainingLocation.HOME
+                and self.next_home_training_setup is None
+            ):
+                raise ValueError("Home training setup is required for a confirmed home change")
+            if self.next_training_location == TrainingLocation.GYM:
+                self.next_home_training_setup = None
+        return self

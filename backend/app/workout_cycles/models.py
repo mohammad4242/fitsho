@@ -22,6 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.auth.models import User
 from app.database.base import Base
 from app.exercises.models import Exercise
+from app.profile.enums import HomeTrainingSetup, TrainingLocation
 from app.workout_cycles.body_progress_models import WorkoutCycleBodyProgressComparison
 from app.workout_cycles.enums import (
     WorkoutCycleExerciseFeedbackType,
@@ -132,6 +133,12 @@ class WorkoutCycleFeedback(Base):
             "note_optional IS NULL OR char_length(note_optional) <= 4000",
             name="ck_workout_cycle_feedback_note_length",
         ),
+        CheckConstraint(
+            "next_training_location IS NULL OR "
+            "(next_training_location = 'home' AND next_home_training_setup IS NOT NULL) OR "
+            "(next_training_location = 'gym' AND next_home_training_setup IS NULL)",
+            name="ck_workout_cycle_feedback_next_training_setup_consistency",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -233,6 +240,27 @@ class WorkoutCycleFeedback(Base):
     schedule_changed: Mapped[bool | None] = mapped_column(Boolean)
     next_training_days: Mapped[int | None] = mapped_column(Integer)
     next_session_duration_minutes: Mapped[int | None] = mapped_column(Integer)
+    next_preferred_weekdays: Mapped[list[int] | None] = mapped_column(JSON)
+    next_training_location: Mapped[TrainingLocation | None] = mapped_column(
+        Enum(
+            TrainingLocation,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_feedback_next_training_location_values",
+        )
+    )
+    next_home_training_setup: Mapped[HomeTrainingSetup | None] = mapped_column(
+        Enum(
+            HomeTrainingSetup,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_feedback_next_home_training_setup_values",
+        )
+    )
     equipment_changed: Mapped[bool | None] = mapped_column(Boolean)
     new_limitation: Mapped[str | None] = mapped_column(Text)
     note_optional: Mapped[str | None] = mapped_column(Text)

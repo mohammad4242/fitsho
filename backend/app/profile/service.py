@@ -321,6 +321,60 @@ def update_profile(
     return ProfileSnapshot(profile=profile, measurement=measurement)
 
 
+def apply_profile_update_without_commit(
+    db: Session,
+    user_id: UUID,
+    payload: ProfileUpdate,
+) -> UserProfile | None:
+    """Apply an already-confirmed profile update inside the caller's transaction."""
+    profile = db.scalar(
+        select(UserProfile)
+        .where(UserProfile.user_id == user_id)
+        .options(selectinload(UserProfile.training_caution_items))
+        .with_for_update()
+    )
+    if profile is None:
+        return None
+
+    supplied_fields = payload.model_dump(exclude_unset=True)
+    supplied_fields.pop("cycle_id", None)
+    supplied_fields.pop("current_weight_kg", None)
+    for field_name in (
+        "shoulder_circumference_cm",
+        "waist_circumference_cm",
+        "hip_circumference_cm",
+    ):
+        supplied_fields.pop(field_name, None)
+    supplied_fields.pop("training_cautions", None)
+    if "preferred_weekdays" in supplied_fields:
+        supplied_fields["preferred_weekdays"] = (
+            list(payload.preferred_weekdays) if payload.preferred_weekdays is not None else None
+        )
+
+    final_location = supplied_fields.get("training_location", profile.training_location)
+    final_home_setup = supplied_fields.get("home_training_setup", profile.home_training_setup)
+    if final_location == TrainingLocation.GYM:
+        supplied_fields["home_training_setup"] = None
+    elif final_location == TrainingLocation.HOME and final_home_setup is None:
+        raise InvalidWorkoutSetupError
+
+    final_training_days = supplied_fields.get(
+        "training_days_per_week", profile.training_days_per_week
+    )
+    final_weekdays = supplied_fields.get("preferred_weekdays", profile.preferred_weekdays)
+    if (
+        final_weekdays is not None
+        and final_training_days is not None
+        and len(final_weekdays) > final_training_days
+    ):
+        raise InvalidProfilePreferencesError
+
+    for field_name, value in supplied_fields.items():
+        setattr(profile, field_name, value)
+    db.flush()
+    return profile
+
+
 def upsert_shared_profile(
     db: Session,
     user_id: UUID,
