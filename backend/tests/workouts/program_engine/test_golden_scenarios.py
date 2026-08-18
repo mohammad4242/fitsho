@@ -131,6 +131,22 @@ def test_aggregate_volume_metrics_expose_every_tracked_muscle() -> None:
     assert all(muscle.value in weekly for muscle in TRACKED_MUSCLES)
 
 
+def test_aggregate_volume_metrics_expose_effective_secondary_credit() -> None:
+    source = golden_scenarios()["intermediate_5_days_shoulder_priority"]
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert result.program is not None, result.errors
+    metrics = result.program.aggregate_metrics
+    direct = metrics["weekly_direct_sets_by_muscle"]
+    secondary = metrics["weekly_fractional_sets_by_muscle"]
+    effective = metrics["weekly_effective_sets_by_muscle"]
+
+    assert effective[MuscleGroup.TRICEPS.value] == pytest.approx(
+        direct[MuscleGroup.TRICEPS.value] + secondary[MuscleGroup.TRICEPS.value]
+    )
+    assert effective[MuscleGroup.TRICEPS.value] > 0
+
+
 def test_four_day_program_uses_a_valid_generated_focus_for_each_day() -> None:
     result = generate_program(
         golden_scenarios()["intermediate_4_days_hypertrophy"], full_catalog(), RULESET

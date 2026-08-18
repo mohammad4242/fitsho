@@ -1,4 +1,4 @@
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import replace
 
 from app.workouts.program_engine.body_analysis import (
@@ -7,6 +7,10 @@ from app.workouts.program_engine.body_analysis import (
     body_analysis_trace,
 )
 from app.workouts.program_engine.cardio import add_cardio, cardio_reserve_minutes
+from app.workouts.program_engine.effective_volume import (
+    calculate_effective_volume,
+    complete_tracked_metrics,
+)
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
 from app.workouts.program_engine.normalization import normalize_request
@@ -122,14 +126,11 @@ def generate_program(
     )
     days = add_cardio(normalized, days, eligibility.eligible, ruleset)
     days, repair_reasons = repair_weekly_volume(days, normalized, volume, ruleset)
-    direct: Counter[str] = Counter()
-    fractional: defaultdict[str, float] = defaultdict(float)
-    for day in days:
-        for item in day.exercises:
-            if item.primary_muscle is not None:
-                direct[item.primary_muscle.value] += item.sets
-            for muscle in item.secondary_muscles:
-                fractional[muscle.value] += item.sets * ruleset.secondary_set_credit
+    effective_volume = calculate_effective_volume(
+        (item for day in days for item in day.exercises),
+        ruleset,
+    )
+    direct = Counter(effective_volume.direct_sets_by_muscle)
     metrics: dict[str, object] = {
         "planned_direct_sets_by_muscle": {
             target.muscle.value: target.direct_sets for target in volume.targets
@@ -143,8 +144,13 @@ def generate_program(
             }
             for target in volume.targets
         },
-        "weekly_direct_sets_by_muscle": _complete_tracked_metrics(dict(direct)),
-        "weekly_fractional_sets_by_muscle": _complete_tracked_metrics(dict(fractional)),
+        "weekly_direct_sets_by_muscle": complete_tracked_metrics(dict(direct)),
+        "weekly_fractional_sets_by_muscle": complete_tracked_metrics(
+            effective_volume.secondary_sets_by_muscle
+        ),
+        "weekly_effective_sets_by_muscle": complete_tracked_metrics(
+            effective_volume.effective_sets_by_muscle
+        ),
         "weekly_cardio_minutes": sum(
             day.cardio.duration_minutes for day in days if day.cardio is not None
         ),
@@ -224,14 +230,11 @@ def _reference_program(
     days: tuple[WorkoutDay, ...],
     ruleset: ProgramRuleset,
 ) -> ProgramGenerationResult:
-    direct: Counter[str] = Counter()
-    fractional: defaultdict[str, float] = defaultdict(float)
-    for day in days:
-        for item in day.exercises:
-            if item.primary_muscle is not None:
-                direct[item.primary_muscle.value] += item.sets
-            for muscle in item.secondary_muscles:
-                fractional[muscle.value] += item.sets * ruleset.secondary_set_credit
+    effective_volume = calculate_effective_volume(
+        (item for day in days for item in day.exercises),
+        ruleset,
+    )
+    direct = Counter(effective_volume.direct_sets_by_muscle)
     split = SplitPlan(
         split_type=SplitType.BODY_PART_ROTATION,
         day_focuses=tuple(day.focus for day in days),
@@ -244,10 +247,15 @@ def _reference_program(
         "reference_max_sets_per_muscle_per_session": (
             ruleset.template_reference_max_sets_per_muscle_per_session[normalized.training_status]
         ),
-        "planned_direct_sets_by_muscle": _complete_tracked_metrics(dict(direct)),
+        "planned_direct_sets_by_muscle": complete_tracked_metrics(dict(direct)),
         "volume_ranges_by_muscle": _reference_volume_ranges(direct, normalized, ruleset),
-        "weekly_direct_sets_by_muscle": _complete_tracked_metrics(dict(direct)),
-        "weekly_fractional_sets_by_muscle": _complete_tracked_metrics(dict(fractional)),
+        "weekly_direct_sets_by_muscle": complete_tracked_metrics(dict(direct)),
+        "weekly_fractional_sets_by_muscle": complete_tracked_metrics(
+            effective_volume.secondary_sets_by_muscle
+        ),
+        "weekly_effective_sets_by_muscle": complete_tracked_metrics(
+            effective_volume.effective_sets_by_muscle
+        ),
         "weekly_cardio_minutes": 0,
         "estimated_weekly_duration": sum(day.estimated_duration_minutes for day in days),
         "hard_training_days": len(days),
@@ -302,13 +310,6 @@ def _reference_program(
         safety_status=safety_status,
         rejected_candidates=rejected,
     )
-
-
-def _complete_tracked_metrics(values: dict[str, int | float]) -> dict[str, int | float]:
-    complete = dict(values)
-    for muscle in TRACKED_MUSCLES:
-        complete.setdefault(muscle.value, 0)
-    return complete
 
 
 def _reference_volume_ranges(

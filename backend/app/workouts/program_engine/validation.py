@@ -1,6 +1,10 @@
 from collections import Counter
 
 from app.exercises.enums import MovementPattern
+from app.workouts.program_engine.effective_volume import (
+    calculate_effective_volume,
+    complete_tracked_metrics,
+)
 from app.workouts.program_engine.enums import SafetyStatus
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -8,7 +12,6 @@ from app.workouts.program_engine.schemas import (
     ValidationReport,
     WorkoutProgram,
 )
-from app.workouts.program_engine.volume_planner import TRACKED_MUSCLES
 
 
 def validate_program(
@@ -158,14 +161,24 @@ def validate_program(
         direct_sets[str(muscle)] < int(target) for muscle, target in planned.items()
     ):
         warnings.append("PLANNED_VOLUME_REDUCED_DURING_SESSION_FIT")
+    effective_volume = calculate_effective_volume(
+        (item for day in program.weekly_schedule for item in day.exercises),
+        ruleset,
+    )
     return ValidationReport(
         errors=tuple(dict.fromkeys(errors)),
         warnings=tuple(dict.fromkeys(warnings)),
         assumptions=program.assumptions,
         metrics={
             **program.aggregate_metrics,
-            "weekly_direct_sets_by_muscle": _complete_tracked_metrics(dict(direct_sets)),
-            "direct_session_frequency_by_muscle": _complete_tracked_metrics(
+            "weekly_direct_sets_by_muscle": complete_tracked_metrics(dict(direct_sets)),
+            "weekly_fractional_sets_by_muscle": complete_tracked_metrics(
+                effective_volume.secondary_sets_by_muscle
+            ),
+            "weekly_effective_sets_by_muscle": complete_tracked_metrics(
+                effective_volume.effective_sets_by_muscle
+            ),
+            "direct_session_frequency_by_muscle": complete_tracked_metrics(
                 dict(direct_session_frequency)
             ),
             "movement_pattern_frequency": {
@@ -174,13 +187,6 @@ def validate_program(
         },
         decision_trace=program.decision_trace,
     )
-
-
-def _complete_tracked_metrics(values: dict[str, int | float]) -> dict[str, int | float]:
-    complete = dict(values)
-    for muscle in TRACKED_MUSCLES:
-        complete.setdefault(muscle.value, 0)
-    return complete
 
 
 def _recovery_spacing_is_valid(program: WorkoutProgram, ruleset: ProgramRuleset) -> bool:
