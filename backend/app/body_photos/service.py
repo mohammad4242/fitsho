@@ -31,6 +31,7 @@ from app.body_photos.storage import (
 )
 from app.config import Settings
 from app.database.session import get_engine
+from app.workout_cycles.models import WorkoutCycle
 
 EDITABLE_STATES = {
     BodyPhotoSessionState.DRAFT,
@@ -42,6 +43,10 @@ EDITABLE_STATES = {
 
 
 class BodyPhotoSessionNotFoundError(LookupError):
+    pass
+
+
+class BodyPhotoSessionCycleNotFoundError(LookupError):
     pass
 
 
@@ -101,8 +106,21 @@ class BodyPhotoService:
             raise BodyPhotoSessionNotFoundError
         return session
 
-    def create_session(self, user_id: UUID, purpose: BodyPhotoPurpose) -> BodyPhotoSession:
-        session = BodyPhotoSession(user_id=user_id, purpose=purpose)
+    def create_session(
+        self,
+        user_id: UUID,
+        purpose: BodyPhotoPurpose,
+        *,
+        cycle_id: UUID | None = None,
+    ) -> BodyPhotoSession:
+        if cycle_id is not None and self._db.scalar(
+            select(WorkoutCycle).where(
+                WorkoutCycle.id == cycle_id,
+                WorkoutCycle.user_id == user_id,
+            )
+        ) is None:
+            raise BodyPhotoSessionCycleNotFoundError
+        session = BodyPhotoSession(user_id=user_id, cycle_id=cycle_id, purpose=purpose)
         self._db.add(session)
         try:
             self._db.commit()

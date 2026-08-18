@@ -14,6 +14,7 @@ from app.profile.exceptions import (
     AgeOutOfRangeError,
     InvalidWorkoutSetupError,
     ProfileAlreadyExistsError,
+    ProfileCycleNotFoundError,
     ProfileInvariantError,
     ProfileNotFoundError,
 )
@@ -23,6 +24,7 @@ from app.profile.models import (
     UserProfileTrainingCaution,
 )
 from app.profile.schemas import ProfileCreate, ProfileUpdate, SharedProfileUpsert, calculate_age
+from app.workout_cycles.models import WorkoutCycle
 
 
 @dataclass(frozen=True)
@@ -215,6 +217,14 @@ def update_profile(
         raise ProfileInvariantError
 
     supplied_fields = payload.model_dump(exclude_unset=True)
+    cycle_id = supplied_fields.pop("cycle_id", None)
+    if cycle_id is not None and db.scalar(
+        select(WorkoutCycle).where(
+            WorkoutCycle.id == cycle_id,
+            WorkoutCycle.user_id == user_id,
+        )
+    ) is None:
+        raise ProfileCycleNotFoundError
     supplied_cautions = supplied_fields.pop("training_cautions", None)
     supplied_weight = supplied_fields.pop("current_weight_kg", None)
     circumference_fields = (
@@ -249,9 +259,10 @@ def update_profile(
         value != getattr(measurement, field_name)
         for field_name, value in supplied_circumferences.items()
     )
-    if changed_weight or changed_circumferences:
+    if cycle_id is not None or changed_weight or changed_circumferences:
         measurement = BodyMeasurement(
             user_id=user_id,
+            cycle_id=cycle_id,
             weight_kg=supplied_weight if changed_weight else measurement.weight_kg,
             shoulder_circumference_cm=supplied_circumferences.get(
                 "shoulder_circumference_cm", measurement.shoulder_circumference_cm

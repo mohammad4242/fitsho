@@ -40,6 +40,9 @@ class BodyPhotoSession(Base):
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    cycle_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("workout_cycles.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     purpose: Mapped[BodyPhotoPurpose] = mapped_column(
         Enum(
             BodyPhotoPurpose,

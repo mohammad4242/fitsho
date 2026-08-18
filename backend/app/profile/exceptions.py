@@ -6,6 +6,10 @@ class ProfileNotFoundError(Exception):
     pass
 
 
+class ProfileCycleNotFoundError(Exception):
+    pass
+
+
 class ProfileInvariantError(Exception):
     pass
 

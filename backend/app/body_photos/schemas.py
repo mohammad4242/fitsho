@@ -8,6 +8,7 @@ from app.body_photos.enums import BodyPhotoPurpose, BodyPhotoSessionState, BodyP
 
 class BodyPhotoSessionCreate(BaseModel):
     purpose: BodyPhotoPurpose
+    cycle_id: UUID | None = None
 
 
 class BodyPhotoConsentInput(BaseModel):
@@ -45,6 +46,7 @@ class BodyPhotoResponse(BaseModel):
 
 class BodyPhotoSessionResponse(BaseModel):
     id: UUID
+    cycle_id: UUID | None
     purpose: BodyPhotoPurpose
     state: BodyPhotoSessionState
     photos: list[BodyPhotoResponse]

@@ -323,6 +323,7 @@ class BodyAnalysisService:
             + 1
         )
         analysis = BodyAnalysis(
+            cycle_id=photo_session.cycle_id,
             session_id=photo_session.id,
             replaces_analysis_id=replaces.id if replaces else None,
             revision=revision,

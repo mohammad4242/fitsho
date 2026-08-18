@@ -33,6 +33,7 @@ from app.body_photos.schemas import (
 from app.body_photos.service import (
     BodyPhotoCleanupPendingError,
     BodyPhotoService,
+    BodyPhotoSessionCycleNotFoundError,
     BodyPhotoSessionNotFoundError,
     BodyPhotoSessionStateError,
     BodyPhotoSessionValidationError,
@@ -69,6 +70,7 @@ def _consent_response(event: BodyPhotoConsent | None) -> BodyPhotoConsentRespons
 def _session_response(session: BodyPhotoSession) -> BodyPhotoSessionResponse:
     return BodyPhotoSessionResponse(
         id=session.id,
+        cycle_id=session.cycle_id,
         purpose=session.purpose,
         state=session.state,
         photos=[
@@ -117,9 +119,19 @@ def create_session(
     user: CurrentUser,
     settings: AppSettings,
 ) -> BodyPhotoSessionResponse:
-    return _session_response(
-        BodyPhotoService(db, settings).create_session(user.id, payload.purpose)
-    )
+    try:
+        return _session_response(
+            BodyPhotoService(db, settings).create_session(
+                user.id,
+                payload.purpose,
+                cycle_id=payload.cycle_id,
+            )
+        )
+    except BodyPhotoSessionCycleNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workout cycle not found",
+        ) from None
 
 
 @router.get("", response_model=BodyPhotoSessionListResponse)

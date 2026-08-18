@@ -217,6 +217,9 @@ class BodyMeasurement(Base):
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    cycle_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("workout_cycles.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     weight_kg: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
     shoulder_circumference_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     waist_circumference_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)

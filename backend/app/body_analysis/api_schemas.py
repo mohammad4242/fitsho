@@ -28,6 +28,7 @@ class SpecialistReviewState(BaseModel):
 
 class BodyAnalysisResponse(BaseModel):
     id: UUID
+    cycle_id: UUID | None
     session_id: UUID
     revision: int
     status: BodyAnalysisStatus

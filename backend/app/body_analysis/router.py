@@ -102,6 +102,7 @@ def _response(db: Session, analysis: BodyAnalysis) -> BodyAnalysisResponse:
                 photo_validation = None
     return BodyAnalysisResponse(
         id=analysis.id,
+        cycle_id=analysis.cycle_id,
         session_id=analysis.session_id,
         revision=analysis.revision,
         status=analysis.status,

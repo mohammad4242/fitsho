@@ -15,6 +15,7 @@ from app.profile.exceptions import (
     AgeOutOfRangeError,
     InvalidWorkoutSetupError,
     ProfileAlreadyExistsError,
+    ProfileCycleNotFoundError,
     ProfileInvariantError,
     ProfileNotFoundError,
 )
@@ -255,6 +256,11 @@ def update(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Fitness profile not found",
+        ) from None
+    except ProfileCycleNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workout cycle not found",
         ) from None
     except InvalidWorkoutSetupError:
         raise HTTPException(

@@ -108,6 +108,7 @@ class ProfileCreate(BaseModel):
 
 
 class ProfileUpdate(BaseModel):
+    cycle_id: UUID | None = None
     display_name: str | None = Field(default=None, min_length=2, max_length=80)
     birth_date: date | None = None
     sex: Sex | None = None
@@ -170,10 +171,11 @@ class ProfileUpdate(BaseModel):
 
     @model_validator(mode="after")
     def validate_supplied_fields(self) -> "ProfileUpdate":
-        if not self.model_fields_set:
+        profile_fields_set = self.model_fields_set - {"cycle_id"}
+        if not profile_fields_set:
             raise ValueError("At least one profile field is required")
 
-        required_fields = self.model_fields_set - {
+        required_fields = profile_fields_set - {
             "home_training_setup",
             "physical_limitations",
             "shoulder_circumference_cm",
