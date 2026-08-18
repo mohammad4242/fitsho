@@ -23,6 +23,7 @@ from app.auth.models import User
 from app.database.base import Base
 from app.exercises.models import Exercise
 from app.workout_cycles.enums import (
+    WorkoutCycleExerciseFeedbackType,
     WorkoutCycleFeedbackProgress,
     WorkoutCycleFeedbackSatisfaction,
     WorkoutCycleStatus,
@@ -97,6 +98,11 @@ class WorkoutCycle(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         uselist=False,
+    )
+    exercise_feedback: Mapped[list[WorkoutCycleExerciseFeedback]] = relationship(
+        back_populates="cycle",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
 
@@ -232,6 +238,73 @@ class WorkoutCycleFeedback(Base):
     )
 
     cycle: Mapped[WorkoutCycle] = relationship(back_populates="completion_feedback")
+
+
+class WorkoutCycleExerciseFeedback(Base):
+    __tablename__ = "workout_cycle_exercise_feedback"
+    __table_args__ = (
+        UniqueConstraint(
+            "cycle_id",
+            "workout_plan_exercise_id",
+            "feedback_type",
+            name="uq_workout_cycle_exercise_feedback_event",
+        ),
+        CheckConstraint(
+            "note_optional IS NULL OR char_length(note_optional) <= 1000",
+            name="ck_workout_cycle_exercise_feedback_note_length",
+        ),
+        Index(
+            "ix_workout_cycle_exercise_feedback_user_cycle",
+            "user_id",
+            "cycle_id",
+        ),
+        Index(
+            "ix_workout_cycle_exercise_feedback_cycle_exercise",
+            "cycle_id",
+            "workout_plan_exercise_id",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    cycle_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workout_cycles.id", ondelete="RESTRICT"), nullable=False
+    )
+    workout_plan_exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workout_plan_exercises.id", ondelete="RESTRICT"), nullable=False
+    )
+    exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("exercises.id", ondelete="RESTRICT"), nullable=False
+    )
+    feedback_type: Mapped[WorkoutCycleExerciseFeedbackType] = mapped_column(
+        Enum(
+            WorkoutCycleExerciseFeedbackType,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_exercise_feedback_type_values",
+        ),
+        nullable=False,
+    )
+    persistent: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    note_optional: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped[User] = relationship()
+    cycle: Mapped[WorkoutCycle] = relationship(back_populates="exercise_feedback")
+    workout_plan_exercise: Mapped[WorkoutPlanExercise] = relationship()
+    exercise: Mapped[Exercise] = relationship()
 
 
 class WorkoutCycleWeeklyCheckIn(Base):

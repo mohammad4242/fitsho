@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.exercises.models import ExerciseAlternative
 from app.workout_cycles.enums import (
+    WorkoutCycleExerciseFeedbackType,
     WorkoutCycleStatus,
     WorkoutCycleWeeklyCheckInDifficulty,
     WorkoutCycleWeeklyCheckInRecovery,
@@ -17,6 +18,7 @@ from app.workout_cycles.enums import (
 )
 from app.workout_cycles.models import (
     WorkoutCycle,
+    WorkoutCycleExerciseFeedback,
     WorkoutCycleFeedback,
     WorkoutCycleWeeklyCheckIn,
     WorkoutCycleWeeklyCheckInPainLimitation,
@@ -26,7 +28,7 @@ from app.workout_cycles.models import (
 )
 from app.workout_cycles.schemas import CompletionFeedbackInput
 from app.workouts.enums import WorkoutPlanStatus
-from app.workouts.models import WorkoutPlan, WorkoutPlanExercise
+from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
 from app.workouts.repository import get_plan_for_user
 
 SUPPORTED_CYCLE_DURATIONS = frozenset({4, 6, 8})
@@ -57,6 +59,14 @@ class WorkoutExerciseReplacementSelfError(Exception):
 
 
 class WorkoutExerciseReplacementAlternativeNotAllowedError(Exception):
+    pass
+
+
+class WorkoutCycleExerciseFeedbackPlanExerciseNotFoundError(Exception):
+    pass
+
+
+class WorkoutCycleExerciseFeedbackDuplicateError(Exception):
     pass
 
 
@@ -323,6 +333,63 @@ def record_exercise_replacement(
         db.rollback()
         raise
     return replacement
+
+
+def record_workout_cycle_exercise_feedback(
+    db: Session,
+    *,
+    user_id: UUID,
+    cycle_id: UUID,
+    workout_plan_exercise_id: UUID,
+    feedback_type: WorkoutCycleExerciseFeedbackType,
+    persistent: bool,
+    note_optional: str | None = None,
+) -> WorkoutCycleExerciseFeedback:
+    cycle = get_cycle_for_user(db, cycle_id=cycle_id, user_id=user_id)
+    if cycle is None:
+        raise WorkoutCycleExerciseFeedbackPlanExerciseNotFoundError
+
+    prescribed = db.scalar(
+        select(WorkoutPlanExercise)
+        .join(WorkoutDay, WorkoutDay.id == WorkoutPlanExercise.workout_day_id)
+        .where(
+            WorkoutPlanExercise.id == workout_plan_exercise_id,
+            WorkoutDay.workout_plan_id == cycle.workout_plan_id,
+        )
+    )
+    if prescribed is None:
+        raise WorkoutCycleExerciseFeedbackPlanExerciseNotFoundError
+    if note_optional is not None and len(note_optional) > 1000:
+        raise ValueError("Exercise feedback note must be at most 1000 characters")
+
+    existing = db.scalar(
+        select(WorkoutCycleExerciseFeedback).where(
+            WorkoutCycleExerciseFeedback.cycle_id == cycle.id,
+            WorkoutCycleExerciseFeedback.workout_plan_exercise_id == prescribed.id,
+            WorkoutCycleExerciseFeedback.feedback_type == feedback_type,
+        )
+    )
+    if existing is not None:
+        raise WorkoutCycleExerciseFeedbackDuplicateError
+
+    feedback = WorkoutCycleExerciseFeedback(
+        user_id=user_id,
+        cycle_id=cycle.id,
+        workout_plan_exercise_id=prescribed.id,
+        exercise_id=prescribed.exercise_id,
+        feedback_type=feedback_type,
+        persistent=persistent,
+        note_optional=note_optional,
+    )
+    db.add(feedback)
+    try:
+        db.flush()
+        db.commit()
+        db.refresh(feedback)
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return feedback
 
 
 def _persist_replacement_meaning(

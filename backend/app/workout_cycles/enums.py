@@ -56,3 +56,11 @@ class WorkoutCycleFeedbackProgress(StrEnum):
     DECLINED = "declined"
     UNCHANGED = "unchanged"
     IMPROVED = "improved"
+
+
+class WorkoutCycleExerciseFeedbackType(StrEnum):
+    LIKED = "liked"
+    UNCOMFORTABLE = "uncomfortable"
+    INEFFECTIVE = "ineffective"
+    EQUIPMENT_UNAVAILABLE = "equipment_unavailable"
+    PAIN = "pain"

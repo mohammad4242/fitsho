@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.exercises.enums import MuscleGroup
 from app.profile.schemas import SessionDurationMinutes
 from app.workout_cycles.enums import (
+    WorkoutCycleExerciseFeedbackType,
     WorkoutCycleFeedbackProgress,
     WorkoutCycleFeedbackSatisfaction,
     WorkoutCycleStatus,
@@ -91,6 +92,14 @@ class WorkoutExerciseReplacementResponse(BaseModel):
     scope: WorkoutExerciseReplacementScope
     week_number: int
     created_at: datetime
+
+
+class WorkoutCycleExerciseFeedbackInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    feedback_type: WorkoutCycleExerciseFeedbackType
+    persistent: bool
+    note_optional: str | None = Field(default=None, max_length=1000)
 
 
 class WorkoutCycleCurrentResponse(BaseModel):
