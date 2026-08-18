@@ -234,6 +234,33 @@ def test_specialization_session_resolves_to_the_athletes_priority_muscle() -> No
 @pytest.mark.parametrize(
     "split_type",
     [
+        SplitType.UPPER_LOWER,
+        SplitType.FULL_BODY_FOUR,
+        SplitType.UPPER_LOWER_FULL,
+        SplitType.PHUL,
+        SplitType.BODY_PART_ROTATION,
+    ],
+)
+def test_each_four_day_candidate_builds_four_sessions(split_type: SplitType) -> None:
+    request = normalized(available_training_days=4)
+    eligible = filter_eligible_exercises(request, _body_part_catalog()).eligible
+    candidate = next(item for item in generate_split_candidates(4) if item.split_type is split_type)
+    split = SplitPlan(candidate.split_type, candidate.day_focuses, (0, 1, 3, 4), 1, ())
+
+    sessions = build_sessions(
+        request,
+        split,
+        plan_weekly_volume(request, split, RULESET),
+        eligible,
+        RULESET,
+    )
+
+    assert len(sessions) == 4
+
+
+@pytest.mark.parametrize(
+    "split_type",
+    [
         SplitType.UPPER_LOWER_SPECIALIZATION,
         SplitType.PUSH_PULL_LEGS_UPPER_LOWER,
         SplitType.BODY_PART_ROTATION,

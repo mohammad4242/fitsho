@@ -409,6 +409,110 @@ def test_six_day_recovery_context_penalizes_more_complex_candidates() -> None:
     assert poor_scores[SplitType.BODY_PART_ROTATION] < poor_scores[SplitType.UPPER_LOWER_X3]
 
 
+def test_six_day_poor_recovery_does_not_promote_advanced_ppl_bonus() -> None:
+    request = normalized(
+        available_training_days=6,
+        primary_goal=Goal.STRENGTH,
+        training_experience=TrainingExperience.ADVANCED,
+        training_age_months=72,
+        recent_training_history=RecentTrainingHistory(consistent_weeks=40),
+        sleep_quality=RecoveryRating.POOR,
+    )
+
+    scored = score_split_candidates(
+        request,
+        generate_split_candidates(6),
+        RULESET,
+        preferred_days=6,
+    )
+
+    assert scored[0].split_type is SplitType.UPPER_LOWER_X3
+
+
+def test_six_day_priority_adds_specialization_context_to_body_part_score() -> None:
+    request = normalized(
+        available_training_days=6,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        priority_muscles=[MuscleGroup.SHOULDERS],
+    )
+
+    scored = score_split_candidates(
+        request,
+        generate_split_candidates(6),
+        RULESET,
+        preferred_days=6,
+    )
+    body_part = next(plan for plan in scored if plan.split_type is SplitType.BODY_PART_ROTATION)
+
+    assert "SPLIT_SELECTED_FOR_PRIORITY_MUSCLE" in body_part.reason_codes
+
+
+def test_goal_specificity_changes_the_score_for_hybrid_candidates() -> None:
+    candidate = next(
+        item
+        for item in generate_split_candidates(5)
+        if item.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
+    )
+    general_request = normalized(available_training_days=5, primary_goal=Goal.GENERAL_FITNESS)
+    goal_request = normalized(available_training_days=5, primary_goal=Goal.HYPERTROPHY)
+
+    general_plan = score_split_candidates(
+        general_request,
+        (candidate,),
+        RULESET,
+        preferred_days=5,
+    )[0]
+    goal_plan = score_split_candidates(
+        goal_request,
+        (candidate,),
+        RULESET,
+        preferred_days=5,
+    )[0]
+
+    assert goal_plan.score > general_plan.score
+    assert "SPLIT_SELECTED_FOR_GOAL_SPECIFICITY" in goal_plan.reason_codes
+
+
+def test_training_status_changes_the_advanced_ppl_score() -> None:
+    candidate = next(
+        item
+        for item in generate_split_candidates(6)
+        if item.split_type is SplitType.PUSH_PULL_LEGS_X2
+    )
+    intermediate_request = normalized(
+        available_training_days=6,
+        primary_goal=Goal.STRENGTH,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        recent_training_history=RecentTrainingHistory(consistent_weeks=20),
+    )
+    advanced_request = normalized(
+        available_training_days=6,
+        primary_goal=Goal.STRENGTH,
+        training_experience=TrainingExperience.ADVANCED,
+        training_age_months=72,
+        recent_training_history=RecentTrainingHistory(consistent_weeks=40),
+    )
+
+    intermediate_plan = score_split_candidates(
+        intermediate_request,
+        (candidate,),
+        RULESET,
+        preferred_days=6,
+    )[0]
+    advanced_plan = score_split_candidates(
+        advanced_request,
+        (candidate,),
+        RULESET,
+        preferred_days=6,
+    )[0]
+
+    assert advanced_plan.score > intermediate_plan.score
+    assert "SPLIT_SELECTED_FOR_ADVANCED_STATUS" in advanced_plan.reason_codes
+
+
 def test_six_day_program_uses_a_valid_generated_split() -> None:
     split = select_split(
         normalized(

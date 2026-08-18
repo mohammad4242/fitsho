@@ -198,6 +198,7 @@ def score_split_candidates(
         if (
             request.training_status is TrainingStatus.ADVANCED
             and candidate.split_type is SplitType.PUSH_PULL_LEGS_X2
+            and not recovery_limited
         ):
             score += weights["goal_specificity"]
             reasons.append("SPLIT_SELECTED_FOR_ADVANCED_STATUS")
@@ -219,6 +220,13 @@ def score_split_candidates(
         ):
             score += ruleset.body_part_rotation_bonus
             reasons.append("SPLIT_SELECTED_FOR_SPECIALIZED_DIRECT_TARGETS")
+        if (
+            request.source.priority_muscles
+            and candidate.split_type is SplitType.BODY_PART_ROTATION
+            and len(candidate.day_focuses) == 6
+        ):
+            score += weights["priority_specialization"]
+            reasons.append("SPLIT_SELECTED_FOR_PRIORITY_MUSCLE")
 
         weekdays = _select_weekdays(
             len(candidate.day_focuses),
