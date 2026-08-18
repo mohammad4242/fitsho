@@ -1,5 +1,7 @@
 from uuid import uuid4
 
+import pytest
+
 from app.exercises.enums import Equipment, MuscleGroup
 from app.profile.enums import TrainingLocation
 from app.workouts.program_engine.enums import (
@@ -22,7 +24,11 @@ from app.workouts.program_engine.split_selector import (
     score_split_candidates,
     select_split,
 )
-from app.workouts.program_engine.volume_planner import plan_weekly_volume
+from app.workouts.program_engine.volume_planner import (
+    SECONDARY_MUSCLES,
+    TRACKED_MUSCLES,
+    plan_weekly_volume,
+)
 
 
 def normalized(**overrides: object) -> NormalizedProgramRequest:
@@ -540,6 +546,77 @@ def test_priority_muscle_receives_more_but_bounded_volume() -> None:
     chest_sets = plan.direct_sets_for(MuscleGroup.CHEST)
     assert shoulder_sets > chest_sets
     assert shoulder_sets <= RULESET.maximum_sets[request.training_status]
+
+
+@pytest.mark.parametrize("muscle", SECONDARY_MUSCLES)
+def test_secondary_muscles_receive_explicit_conservative_volume_targets(
+    muscle: MuscleGroup,
+) -> None:
+    request = normalized(primary_goal=Goal.HYPERTROPHY)
+    plan = plan_weekly_volume(request, select_split(request, RULESET), RULESET)
+    target = next(item for item in plan.targets if item.muscle is muscle)
+
+    assert target.maximum_hard == RULESET.secondary_muscle_maximum_sets[request.training_status]
+    assert target.minimum_soft >= RULESET.secondary_muscle_minimum_sets[request.training_status]
+    assert target.target_sets <= target.maximum_hard
+
+
+@pytest.mark.parametrize(
+    ("experience", "training_age_months", "goal"),
+    [
+        (TrainingExperience.BEGINNER, 3, Goal.GENERAL_FITNESS),
+        (TrainingExperience.INTERMEDIATE, 30, Goal.HYPERTROPHY),
+        (TrainingExperience.ADVANCED, 72, Goal.STRENGTH),
+    ],
+)
+def test_secondary_targets_follow_goal_and_training_status_caps(
+    experience: TrainingExperience,
+    training_age_months: int,
+    goal: Goal,
+) -> None:
+    request = normalized(
+        primary_goal=goal,
+        training_experience=experience,
+        training_age_months=training_age_months,
+    )
+    target = next(
+        item
+        for item in plan_weekly_volume(request, select_split(request, RULESET), RULESET).targets
+        if item.muscle is MuscleGroup.TRICEPS
+    )
+    expected = min(
+        max(
+            RULESET.secondary_muscle_goal_base_sets[goal],
+            RULESET.secondary_muscle_minimum_sets[request.training_status],
+        ),
+        RULESET.secondary_muscle_maximum_sets[request.training_status],
+    )
+
+    assert target.target_sets == expected
+    assert target.target_sets <= target.maximum_hard
+
+
+def test_volume_planner_tracks_all_muscles_and_priority_can_target_biceps() -> None:
+    request = normalized(primary_goal=Goal.HYPERTROPHY)
+    priority_request = normalized(
+        primary_goal=Goal.HYPERTROPHY,
+        priority_muscles=[MuscleGroup.BICEPS],
+    )
+    plan = plan_weekly_volume(request, select_split(request, RULESET), RULESET)
+    priority_plan = plan_weekly_volume(
+        priority_request,
+        select_split(priority_request, RULESET),
+        RULESET,
+    )
+
+    assert tuple(item.muscle for item in plan.targets) == TRACKED_MUSCLES
+    assert priority_plan.direct_sets_for(MuscleGroup.BICEPS) > plan.direct_sets_for(
+        MuscleGroup.BICEPS
+    )
+    assert (
+        priority_plan.direct_sets_for(MuscleGroup.BICEPS)
+        <= (RULESET.secondary_muscle_maximum_sets[priority_request.training_status])
+    )
 
 
 def test_specialized_four_day_split_caps_volume_to_one_safe_exposure() -> None:

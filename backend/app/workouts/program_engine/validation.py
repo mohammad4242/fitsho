@@ -8,6 +8,7 @@ from app.workouts.program_engine.schemas import (
     ValidationReport,
     WorkoutProgram,
 )
+from app.workouts.program_engine.volume_planner import TRACKED_MUSCLES
 
 
 def validate_program(
@@ -25,8 +26,10 @@ def validate_program(
     direct_sets: Counter[str] = Counter()
     direct_session_frequency: Counter[str] = Counter()
     for day in program.weekly_schedule:
-        if not ruleset.minimum_exercises_per_session <= len(day.exercises) <= (
-            ruleset.max_exercises_per_session
+        if (
+            not ruleset.minimum_exercises_per_session
+            <= len(day.exercises)
+            <= (ruleset.max_exercises_per_session)
         ):
             errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
         if day.estimated_duration_minutes > (
@@ -161,14 +164,23 @@ def validate_program(
         assumptions=program.assumptions,
         metrics={
             **program.aggregate_metrics,
-            "weekly_direct_sets_by_muscle": dict(direct_sets),
-            "direct_session_frequency_by_muscle": dict(direct_session_frequency),
+            "weekly_direct_sets_by_muscle": _complete_tracked_metrics(dict(direct_sets)),
+            "direct_session_frequency_by_muscle": _complete_tracked_metrics(
+                dict(direct_session_frequency)
+            ),
             "movement_pattern_frequency": {
                 pattern.value: count for pattern, count in patterns.items()
             },
         },
         decision_trace=program.decision_trace,
     )
+
+
+def _complete_tracked_metrics(values: dict[str, int | float]) -> dict[str, int | float]:
+    complete = dict(values)
+    for muscle in TRACKED_MUSCLES:
+        complete.setdefault(muscle.value, 0)
+    return complete
 
 
 def _recovery_spacing_is_valid(program: WorkoutProgram, ruleset: ProgramRuleset) -> bool:

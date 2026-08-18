@@ -31,7 +31,11 @@ from app.workouts.program_engine.split_selector import select_split
 from app.workouts.program_engine.template_selector import select_template_reference
 from app.workouts.program_engine.template_sessions import build_template_sessions
 from app.workouts.program_engine.validation import validate_program
-from app.workouts.program_engine.volume_planner import plan_weekly_volume
+from app.workouts.program_engine.volume_planner import (
+    SECONDARY_MUSCLES,
+    TRACKED_MUSCLES,
+    plan_weekly_volume,
+)
 from app.workouts.program_engine.volume_repair import repair_weekly_volume
 
 
@@ -139,8 +143,8 @@ def generate_program(
             }
             for target in volume.targets
         },
-        "weekly_direct_sets_by_muscle": dict(direct),
-        "weekly_fractional_sets_by_muscle": dict(fractional),
+        "weekly_direct_sets_by_muscle": _complete_tracked_metrics(dict(direct)),
+        "weekly_fractional_sets_by_muscle": _complete_tracked_metrics(dict(fractional)),
         "weekly_cardio_minutes": sum(
             day.cardio.duration_minutes for day in days if day.cardio is not None
         ),
@@ -240,18 +244,10 @@ def _reference_program(
         "reference_max_sets_per_muscle_per_session": (
             ruleset.template_reference_max_sets_per_muscle_per_session[normalized.training_status]
         ),
-        "planned_direct_sets_by_muscle": dict(direct),
-        "volume_ranges_by_muscle": {
-            muscle: {
-                "minimum_soft": min(sets, ruleset.maximum_sets[normalized.training_status]),
-                "target_sets": min(sets, ruleset.maximum_sets[normalized.training_status]),
-                "maximum_soft": ruleset.maximum_sets[normalized.training_status],
-                "maximum_hard": ruleset.maximum_sets[normalized.training_status],
-            }
-            for muscle, sets in direct.items()
-        },
-        "weekly_direct_sets_by_muscle": dict(direct),
-        "weekly_fractional_sets_by_muscle": dict(fractional),
+        "planned_direct_sets_by_muscle": _complete_tracked_metrics(dict(direct)),
+        "volume_ranges_by_muscle": _reference_volume_ranges(direct, normalized, ruleset),
+        "weekly_direct_sets_by_muscle": _complete_tracked_metrics(dict(direct)),
+        "weekly_fractional_sets_by_muscle": _complete_tracked_metrics(dict(fractional)),
         "weekly_cardio_minutes": 0,
         "estimated_weekly_duration": sum(day.estimated_duration_minutes for day in days),
         "hard_training_days": len(days),
@@ -306,3 +302,50 @@ def _reference_program(
         safety_status=safety_status,
         rejected_candidates=rejected,
     )
+
+
+def _complete_tracked_metrics(values: dict[str, int | float]) -> dict[str, int | float]:
+    complete = dict(values)
+    for muscle in TRACKED_MUSCLES:
+        complete.setdefault(muscle.value, 0)
+    return complete
+
+
+def _reference_volume_ranges(
+    direct: Counter[str],
+    normalized: NormalizedProgramRequest,
+    ruleset: ProgramRuleset,
+) -> dict[str, dict[str, int]]:
+    ranges: dict[str, dict[str, int]] = {}
+    for muscle, sets in direct.items():
+        muscle_enum = next(
+            (tracked for tracked in TRACKED_MUSCLES if tracked.value == muscle),
+            None,
+        )
+        maximum = (
+            ruleset.secondary_muscle_maximum_sets[normalized.training_status]
+            if muscle_enum in SECONDARY_MUSCLES
+            else ruleset.maximum_sets[normalized.training_status]
+        )
+        ranges[muscle] = {
+            "minimum_soft": min(sets, maximum),
+            "target_sets": min(sets, maximum),
+            "maximum_soft": maximum,
+            "maximum_hard": maximum,
+        }
+    for muscle in TRACKED_MUSCLES:
+        maximum = (
+            ruleset.secondary_muscle_maximum_sets[normalized.training_status]
+            if muscle in SECONDARY_MUSCLES
+            else ruleset.maximum_sets[normalized.training_status]
+        )
+        ranges.setdefault(
+            muscle.value,
+            {
+                "minimum_soft": 0,
+                "target_sets": 0,
+                "maximum_soft": maximum,
+                "maximum_hard": maximum,
+            },
+        )
+    return ranges

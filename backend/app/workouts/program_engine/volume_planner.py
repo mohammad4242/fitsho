@@ -30,6 +30,13 @@ MAJOR_MUSCLES = (
     MuscleGroup.ABS,
     MuscleGroup.CALVES,
 )
+SECONDARY_MUSCLES = (
+    MuscleGroup.BICEPS,
+    MuscleGroup.TRICEPS,
+    MuscleGroup.TRAPS,
+    MuscleGroup.FOREARMS,
+)
+TRACKED_MUSCLES = MAJOR_MUSCLES + SECONDARY_MUSCLES
 
 
 def plan_weekly_volume(
@@ -75,6 +82,26 @@ def plan_weekly_volume(
     ):
         soft_allowance += ruleset.good_recovery_soft_maximum_bonus_sets
 
+    secondary_minimum = ruleset.secondary_muscle_minimum_sets[request.training_status]
+    secondary_maximum = ruleset.secondary_muscle_maximum_sets[request.training_status]
+    secondary_base = min(
+        max(ruleset.secondary_muscle_goal_base_sets[request.primary_goal], secondary_minimum),
+        secondary_maximum,
+    )
+    if recovery_signals:
+        secondary_base = max(
+            secondary_minimum,
+            secondary_base - ruleset.poor_recovery_set_reduction * recovery_signals,
+        )
+    if source.session_duration_minutes <= ruleset.short_session_minutes:
+        secondary_base = max(
+            secondary_minimum, secondary_base - ruleset.contextual_volume_reduction_sets
+        )
+    if source.age >= ruleset.older_adult_modifier_age:
+        secondary_base = max(
+            secondary_minimum, secondary_base - ruleset.contextual_volume_reduction_sets
+        )
+
     targets: list[VolumeTarget] = []
     body_priorities = {
         item.muscle: item for item in eligible_body_analysis_priorities(request, ruleset)
@@ -83,12 +110,15 @@ def plan_weekly_volume(
         request, ruleset
     )
     direct_exposures = _direct_exposure_counts(split, effective_priorities)
-    for muscle in MAJOR_MUSCLES:
-        sets = base
+    for muscle in TRACKED_MUSCLES:
+        is_secondary = muscle in SECONDARY_MUSCLES
+        muscle_minimum = secondary_minimum if is_secondary else minimum
+        muscle_maximum = secondary_maximum if is_secondary else maximum
+        sets = secondary_base if is_secondary else base
         if source.priority_muscles and muscle not in source.priority_muscles:
-            sets = max(minimum, sets - ruleset.contextual_volume_reduction_sets)
+            sets = max(muscle_minimum, sets - ruleset.contextual_volume_reduction_sets)
         if muscle in source.priority_muscles:
-            sets = min(maximum, sets + ruleset.priority_muscle_bonus_sets)
+            sets = min(muscle_maximum, sets + ruleset.priority_muscle_bonus_sets)
             reasons.append("VOLUME_INCREASED_FOR_PRIORITY_MUSCLE")
         body_priority = body_priorities.get(muscle)
         if body_priority is not None:
@@ -97,7 +127,7 @@ def plan_weekly_volume(
                 if body_priority.classification == "clear_lag"
                 else ruleset.body_analysis_mild_lag_bonus_sets
             )
-            sets = min(maximum, sets + bonus)
+            sets = min(muscle_maximum, sets + bonus)
             reasons.append("VOLUME_INCREASED_FOR_BODY_ANALYSIS")
         previous = source.recent_training_history.previous_weekly_sets_by_muscle.get(muscle)
         if previous is not None and previous > 0:
@@ -108,20 +138,18 @@ def plan_weekly_volume(
             if sets > increase_limit:
                 sets = increase_limit
                 reasons.append("VOLUME_CAPPED_FOR_PREVIOUS_VOLUME")
-        if split.split_type is SplitType.BODY_PART_ROTATION:
-            split_maximum = (
-                ruleset.max_sets_per_muscle_per_session * direct_exposures[muscle]
-            )
+        if split.split_type is SplitType.BODY_PART_ROTATION and direct_exposures[muscle] > 0:
+            split_maximum = ruleset.max_sets_per_muscle_per_session * direct_exposures[muscle]
             if sets > split_maximum:
                 sets = split_maximum
                 reasons.append("VOLUME_CAPPED_FOR_SPLIT_FREQUENCY")
         targets.append(
             VolumeTarget(
                 muscle=muscle,
-                minimum_soft=min(minimum, sets),
+                minimum_soft=min(muscle_minimum, sets),
                 target_sets=sets,
-                maximum_soft=min(maximum, sets + soft_allowance),
-                maximum_hard=maximum,
+                maximum_soft=min(muscle_maximum, sets + soft_allowance),
+                maximum_hard=muscle_maximum,
                 fractional_sets=round(sets * ruleset.secondary_set_credit, 1),
             )
         )
@@ -135,9 +163,9 @@ def _direct_exposure_counts(
     if split.split_type is not SplitType.BODY_PART_ROTATION:
         return Counter()
     by_focus = {
-        "chest_triceps": (MuscleGroup.CHEST,),
-        "back_biceps": (MuscleGroup.BACK,),
-        "shoulders_traps": (MuscleGroup.SHOULDERS,),
+        "chest_triceps": (MuscleGroup.CHEST, MuscleGroup.TRICEPS),
+        "back_biceps": (MuscleGroup.BACK, MuscleGroup.BICEPS),
+        "shoulders_traps": (MuscleGroup.SHOULDERS, MuscleGroup.TRAPS),
         "legs": (
             MuscleGroup.QUADRICEPS,
             MuscleGroup.HAMSTRINGS,

@@ -44,6 +44,22 @@ class ProgramRuleset:
             TrainingStatus.ADVANCED: 16,
         }
     )
+    secondary_muscle_minimum_sets: dict[TrainingStatus, int] = field(
+        default_factory=lambda: {
+            TrainingStatus.NOVICE: 2,
+            TrainingStatus.EARLY_INTERMEDIATE: 3,
+            TrainingStatus.INTERMEDIATE: 4,
+            TrainingStatus.ADVANCED: 5,
+        }
+    )
+    secondary_muscle_maximum_sets: dict[TrainingStatus, int] = field(
+        default_factory=lambda: {
+            TrainingStatus.NOVICE: 8,
+            TrainingStatus.EARLY_INTERMEDIATE: 10,
+            TrainingStatus.INTERMEDIATE: 12,
+            TrainingStatus.ADVANCED: 14,
+        }
+    )
     soft_maximum_allowance_sets: dict[TrainingStatus, int] = field(
         default_factory=lambda: {
             TrainingStatus.NOVICE: 1,
@@ -62,6 +78,17 @@ class ProgramRuleset:
             Goal.BODY_RECOMPOSITION: 8,
             Goal.GENERAL_FITNESS: 6,
             Goal.MUSCULAR_ENDURANCE: 7,
+        }
+    )
+    secondary_muscle_goal_base_sets: dict[Goal, int] = field(
+        default_factory=lambda: {
+            Goal.FAT_LOSS: 4,
+            Goal.HYPERTROPHY: 6,
+            Goal.STRENGTH: 5,
+            Goal.MUSCLE_GAIN: 6,
+            Goal.BODY_RECOMPOSITION: 5,
+            Goal.GENERAL_FITNESS: 4,
+            Goal.MUSCULAR_ENDURANCE: 5,
         }
     )
     priority_muscle_bonus_sets: int = 2
