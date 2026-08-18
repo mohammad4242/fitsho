@@ -27,6 +27,59 @@ export type WorkoutExerciseReplacementReason =
 
 export type WorkoutExerciseReplacementScope = "this_time" | "persistent";
 
+export type WorkoutCyclePerceivedDifficulty =
+  | "too_easy"
+  | "easy"
+  | "appropriate"
+  | "hard"
+  | "too_hard";
+
+export type WorkoutCycleRecoveryRating = "good" | "average" | "poor";
+
+export type WorkoutCycleCurrent = {
+  cycle_id: string;
+  workout_plan_id: string;
+  started_at: string;
+  duration_weeks: 4 | 6 | 8;
+  status: "active" | "completed";
+  current_week: number;
+};
+
+export type WorkoutCycleWeeklyCheckInPainFollowUp = {
+  id: string;
+  workout_plan_exercise_id: string;
+  note_optional: string | null;
+  created_at: string;
+};
+
+export type WorkoutCycleWeeklyCheckIn = {
+  id: string;
+  user_id: string;
+  cycle_id: string;
+  week_number: number;
+  sessions_completed: number;
+  perceived_difficulty: WorkoutCyclePerceivedDifficulty;
+  recovery_rating: WorkoutCycleRecoveryRating;
+  has_pain_or_limitation: boolean;
+  pain_follow_up: WorkoutCycleWeeklyCheckInPainFollowUp | null;
+  note_optional: string | null;
+  submitted_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkoutCycleWeeklyCheckInInput = {
+  sessions_completed: number;
+  perceived_difficulty: WorkoutCyclePerceivedDifficulty;
+  recovery_rating: WorkoutCycleRecoveryRating;
+  has_pain_or_limitation: boolean;
+  pain_follow_up: {
+    workout_plan_exercise_id: string;
+    note_optional: string | null;
+  } | null;
+  note_optional: string | null;
+};
+
 export type WorkoutExerciseReplacement = {
   id: string;
   user_id: string;

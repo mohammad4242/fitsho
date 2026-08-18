@@ -4,12 +4,25 @@ import type {
   WorkoutExerciseReplacement,
   WorkoutExerciseReplacementReason,
   WorkoutExerciseReplacementScope,
+  WorkoutCycleWeeklyCheckIn,
+  WorkoutCycleWeeklyCheckInInput,
+  WorkoutCycleCurrent,
   WorkoutPlan,
   WorkoutPlanGeneration,
   WorkoutPlanVersionSummary,
 } from "./types";
 
 const workoutPlansPath = "/api/v1/workout-plans";
+const workoutCyclesPath = "/api/v1/workout-cycles";
+
+export async function getCurrentWorkoutCycle(): Promise<WorkoutCycleCurrent | null> {
+  try {
+    return await request<WorkoutCycleCurrent>(`${workoutCyclesPath}/current`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
 
 export async function getActiveWorkoutPlan(): Promise<WorkoutPlan | null> {
   try {
@@ -46,6 +59,30 @@ export function recordExerciseReplacement(input: {
 }): Promise<WorkoutExerciseReplacement> {
   return request<WorkoutExerciseReplacement>("/api/v1/workout-cycles/current/replacements", {
     method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getCurrentWeeklyCheckIn(): Promise<WorkoutCycleWeeklyCheckIn | null> {
+  try {
+    return await request<WorkoutCycleWeeklyCheckIn>(`${workoutCyclesPath}/current/weekly-check-in`);
+  } catch (error) {
+    if (
+      error instanceof ApiError
+      && error.status === 404
+      && error.message === "No weekly check-in for current week"
+    ) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export function saveCurrentWeeklyCheckIn(
+  input: WorkoutCycleWeeklyCheckInInput,
+): Promise<WorkoutCycleWeeklyCheckIn> {
+  return request<WorkoutCycleWeeklyCheckIn>(`${workoutCyclesPath}/current/weekly-check-in`, {
+    method: "PUT",
     body: JSON.stringify(input),
   });
 }

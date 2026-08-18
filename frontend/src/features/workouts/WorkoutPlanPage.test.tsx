@@ -14,6 +14,9 @@ const api = vi.hoisted(() => ({
   generateWorkoutPlan: vi.fn(),
   downloadWorkoutPlanPdf: vi.fn(),
   recordExerciseReplacement: vi.fn(),
+  getCurrentWeeklyCheckIn: vi.fn(),
+  getCurrentWorkoutCycle: vi.fn(),
+  saveCurrentWeeklyCheckIn: vi.fn(),
 }));
 const profileApi = vi.hoisted(() => ({
   getProfile: vi.fn(),
@@ -143,6 +146,9 @@ beforeEach(() => {
   api.generateWorkoutPlan.mockReset();
   api.downloadWorkoutPlanPdf.mockReset();
   api.recordExerciseReplacement.mockReset();
+  api.getCurrentWeeklyCheckIn.mockReset();
+  api.getCurrentWorkoutCycle.mockReset();
+  api.saveCurrentWeeklyCheckIn.mockReset();
   profileApi.getProfile.mockReset();
   profileApi.updateProfile.mockReset();
   api.getWorkoutPlanHistory.mockResolvedValue([]);
@@ -162,6 +168,16 @@ beforeEach(() => {
     week_number: 1,
     created_at: "2026-08-18T10:00:00Z",
   });
+  api.getCurrentWeeklyCheckIn.mockResolvedValue(null);
+  api.getCurrentWorkoutCycle.mockResolvedValue({
+    cycle_id: "018f0000-0000-7000-8000-000000000041",
+    workout_plan_id: plan.id,
+    started_at: "2026-08-18T10:00:00Z",
+    duration_weeks: 4,
+    status: "active",
+    current_week: 1,
+  });
+  api.saveCurrentWeeklyCheckIn.mockResolvedValue(null);
   profileApi.getProfile.mockResolvedValue({ workout_generation_method: "fitsho_coach" });
   profileApi.updateProfile.mockResolvedValue({ workout_generation_method: "ai" });
 });

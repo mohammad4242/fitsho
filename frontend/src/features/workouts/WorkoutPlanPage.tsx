@@ -15,6 +15,7 @@ import {
   getWorkoutPlanHistory,
   recordExerciseReplacement,
 } from "./api";
+import { WeeklyCheckInCard } from "./WeeklyCheckInCard";
 import type {
   WorkoutExerciseReplacementReason,
   WorkoutExerciseReplacementScope,
@@ -222,6 +223,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         {state === "ready" && plan !== null && (
           <>
             <CoachReviewBanner plan={plan} isEnglish={isEnglish} historical={isViewingHistorical} />
+            {!isViewingHistorical && plan.status === "active" && <WeeklyCheckInCard plan={plan} />}
           </>
         )}
         {hasPendingReview && pendingPlan === null && <PendingReviewNotice />}

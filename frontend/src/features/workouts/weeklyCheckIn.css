@@ -1,0 +1,41 @@
+.weekly-check-in { display: grid; gap: .9rem; margin: .8rem 0; padding: 1rem; border: 1px solid var(--fitsho-line-strong); border-radius: 1.15rem; background: linear-gradient(145deg, rgb(80 223 206 / 8%), var(--fitsho-surface)); box-shadow: var(--fitsho-shadow-focus); }
+.weekly-check-in--loading, .weekly-check-in--error { display: block; color: var(--fitsho-muted); line-height: 1.6; }
+.weekly-check-in--error { border-inline-start: .2rem solid var(--fitsho-coral); }
+.weekly-check-in--error p { margin: 0 0 .55rem; }
+.weekly-check-in--error button, .weekly-check-in__edit { min-height: 2.25rem; padding: .4rem .75rem; border: 1px solid var(--fitsho-line-strong); border-radius: 99rem; color: var(--fitsho-aqua); background: transparent; font: inherit; font-size: .73rem; font-weight: 850; cursor: pointer; }
+.weekly-check-in__header { display: flex; align-items: start; justify-content: space-between; gap: .8rem; }
+.weekly-check-in__header .eyebrow { margin: 0 0 .2rem; color: var(--fitsho-aqua); font-size: .67rem; font-weight: 850; }
+.weekly-check-in h2 { margin: 0; font-size: 1.15rem; }
+.weekly-check-in__header p:last-child { margin: .25rem 0 0; color: var(--fitsho-muted); font-size: .73rem; line-height: 1.5; }
+.weekly-check-in__week { flex: 0 0 auto; padding: .35rem .55rem; border: 1px solid rgb(80 223 206 / 26%); border-radius: 99rem; color: var(--fitsho-aqua); background: rgb(80 223 206 / 8%); font-size: .67rem; font-weight: 850; }
+.weekly-check-in form { display: grid; gap: .8rem; }
+.weekly-check-in fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.weekly-check-in legend { margin-bottom: .4rem; color: var(--fitsho-ink); font-size: .77rem; font-weight: 850; }
+.weekly-check-in__choices { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .3rem; }
+.weekly-check-in__choices--sessions { grid-template-columns: repeat(auto-fit, minmax(2.5rem, 1fr)); }
+.weekly-check-in__choices--binary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.weekly-check-in__choices label { position: relative; min-width: 0; min-height: 2.35rem; display: grid; place-items: center; padding: .35rem .25rem; border: 1px solid var(--fitsho-line); border-radius: .65rem; color: var(--fitsho-muted); background: var(--fitsho-surface-subtle); font-size: .71rem; font-weight: 800; text-align: center; cursor: pointer; }
+.weekly-check-in__choices input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
+.weekly-check-in__choices label:has(input:checked) { border-color: var(--fitsho-aqua); color: var(--fitsho-aqua); background: rgb(80 223 206 / 11%); box-shadow: inset 0 0 0 1px rgb(80 223 206 / 18%); }
+.weekly-check-in__choices label:has(input:focus-visible) { outline: 2px solid var(--fitsho-aqua); outline-offset: 2px; }
+.weekly-check-in__pain-follow-up { display: grid; gap: .55rem; padding: .7rem; border-inline-start: .2rem solid var(--fitsho-amber); border-radius: .75rem; background: rgb(250 190 88 / 7%); }
+.weekly-check-in__field { display: grid; gap: .3rem; color: var(--fitsho-muted); font-size: .7rem; font-weight: 750; }
+.weekly-check-in__field :is(select, textarea) { width: 100%; box-sizing: border-box; border: 1px solid var(--fitsho-line-strong); border-radius: .6rem; color: var(--fitsho-ink); background: var(--fitsho-surface); font: inherit; font-size: .75rem; }
+.weekly-check-in__field select { min-height: 2.4rem; padding: .35rem .55rem; }
+.weekly-check-in__field textarea { resize: vertical; padding: .5rem .55rem; line-height: 1.5; }
+.weekly-check-in__field :is(select, textarea):focus-visible { outline: 2px solid var(--fitsho-aqua); outline-offset: 1px; }
+.weekly-check-in__validation { margin: 0; color: var(--fitsho-coral); font-size: .72rem; line-height: 1.5; }
+.weekly-check-in__submit { min-height: 2.55rem; border: 0; border-radius: .7rem; color: var(--fitsho-canvas); background: var(--fitsho-aqua); font: inherit; font-size: .75rem; font-weight: 900; cursor: pointer; }
+.weekly-check-in__submit:disabled { cursor: wait; opacity: .65; }
+.weekly-check-in__submit:focus-visible, .weekly-check-in__edit:focus-visible, .weekly-check-in--error button:focus-visible { outline: 2px solid var(--fitsho-aqua); outline-offset: 2px; }
+.weekly-check-in--completed { border-inline-start: .2rem solid #4fd18b; }
+.weekly-check-in__check { width: 1.8rem; height: 1.8rem; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid #4fd18b; border-radius: 50%; color: #4fd18b; font-weight: 900; }
+.weekly-check-in__complete-message, .weekly-check-in__summary { margin: 0; color: var(--fitsho-muted); font-size: .75rem; line-height: 1.55; }
+.weekly-check-in__complete-message { color: #4fd18b; font-weight: 850; }
+.weekly-check-in__edit { justify-self: start; }
+
+@media (max-width: 430px) {
+  .weekly-check-in { padding: .85rem; }
+  .weekly-check-in__choices { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .weekly-check-in__choices--sessions { grid-template-columns: repeat(auto-fit, minmax(2.45rem, 1fr)); }
+}

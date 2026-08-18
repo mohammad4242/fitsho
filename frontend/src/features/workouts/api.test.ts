@@ -4,9 +4,12 @@ import {
   downloadWorkoutPlanPdf,
   generateWorkoutPlan,
   getActiveWorkoutPlan,
+  getCurrentWorkoutCycle,
   getWorkoutPlan,
   getWorkoutPlanHistory,
+  getCurrentWeeklyCheckIn,
   recordExerciseReplacement,
+  saveCurrentWeeklyCheckIn,
 } from "./api";
 import type { WorkoutPlan } from "./types";
 
@@ -115,6 +118,53 @@ it("records a replacement through the current workout cycle API", async () => {
         scope: "this_time",
       }),
     }),
+  );
+});
+
+it("treats a missing current-week check-in as empty", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(errorResponse(404, "No weekly check-in for current week"));
+
+  await expect(getCurrentWeeklyCheckIn()).resolves.toBeNull();
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/workout-cycles/current/weekly-check-in",
+    expect.objectContaining({ credentials: "include" }),
+  );
+});
+
+it("reads the current active cycle and server-derived week", async () => {
+  const cycle = {
+    cycle_id: "cycle-1",
+    workout_plan_id: plan.id,
+    started_at: "2026-08-01T10:00:00Z",
+    duration_weeks: 4,
+    status: "active",
+    current_week: 2,
+  } as const;
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(cycle));
+
+  await expect(getCurrentWorkoutCycle()).resolves.toEqual(cycle);
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/workout-cycles/current",
+    expect.objectContaining({ credentials: "include" }),
+  );
+});
+
+it("saves the member-entered weekly check-in through the current cycle API", async () => {
+  const checkIn = { id: "check-in-1", week_number: 1 };
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(checkIn));
+  const input = {
+    sessions_completed: 2,
+    perceived_difficulty: "appropriate" as const,
+    recovery_rating: "good" as const,
+    has_pain_or_limitation: false,
+    pain_follow_up: null,
+    note_optional: null,
+  };
+
+  await expect(saveCurrentWeeklyCheckIn(input)).resolves.toEqual(checkIn);
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/workout-cycles/current/weekly-check-in",
+    expect.objectContaining({ credentials: "include", method: "PUT", body: JSON.stringify(input) }),
   );
 });
 
