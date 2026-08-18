@@ -4,24 +4,44 @@ from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
+from app.exercises.enums import (
+    BodyRegion,
+    Difficulty,
+    ExerciseType,
+    MediaType,
+    MovementPattern,
+    MuscleFocus,
+    MuscleGroup,
+)
+from app.exercises.models import Exercise
 from app.workout_cycles.enums import (
     WorkoutCycleWeeklyCheckInDifficulty,
     WorkoutCycleWeeklyCheckInRecovery,
 )
-from app.workout_cycles.models import WorkoutCycle, WorkoutCycleWeeklyCheckIn
-from app.workout_cycles.schemas import WorkoutCycleWeeklyCheckInClassificationInput
+from app.workout_cycles.models import (
+    WorkoutCycle,
+    WorkoutCycleWeeklyCheckIn,
+    WorkoutCycleWeeklyCheckInPainLimitation,
+)
+from app.workout_cycles.schemas import (
+    WorkoutCycleWeeklyCheckInClassificationInput,
+    WorkoutCycleWeeklyCheckInPainFollowUpInput,
+)
 from app.workout_cycles.service import (
     WorkoutCycleWeeklyCheckInCycleNotFoundError,
+    WorkoutCycleWeeklyCheckInPainExerciseNotFoundError,
+    WorkoutCycleWeeklyCheckInPainExerciseRequiredError,
     WorkoutCycleWeeklyCheckInSessionsOutOfRangeError,
     WorkoutCycleWeeklyCheckInWeekOutOfRangeError,
     create_weekly_check_in,
 )
 from app.workouts.enums import WorkoutPlanStatus
-from app.workouts.models import WorkoutDay, WorkoutPlan
+from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
 
 
 def _user(db: Session, email_prefix: str = "weekly-check-in") -> User:
@@ -90,6 +110,51 @@ def _check_in(
         has_pain_or_limitation=False,
         note_optional="Felt good.",
     )
+
+
+def _exercise(db: Session, slug: str) -> Exercise:
+    exercise = Exercise(
+        slug=f"{slug}-{uuid4().hex}",
+        name_en=slug.replace("-", " ").title(),
+        name_fa=f"حرکت {slug}",
+        body_region=BodyRegion.UPPER_BODY,
+        primary_muscle=MuscleGroup.CHEST,
+        muscle_focus=MuscleFocus.MID_CHEST,
+        difficulty=Difficulty.BEGINNER,
+        movement_pattern=MovementPattern.HORIZONTAL_PUSH,
+        exercise_type=ExerciseType.COMPOUND,
+        instructions_en=["Set up.", "Move safely.", "Finish."],
+        instructions_fa=["آماده شو.", "ایمن حرکت کن.", "تمام کن."],
+        safety_notes_en=["Move with control."],
+        safety_notes_fa=["کنترل‌شده حرکت کن."],
+        media_path="/exercises/exercise-placeholder.svg",
+        media_type=MediaType.PLACEHOLDER,
+        is_active=True,
+        is_programmable=True,
+        needs_review=False,
+    )
+    db.add(exercise)
+    db.flush()
+    return exercise
+
+
+def _prescribed_exercise(db: Session, cycle: WorkoutCycle) -> WorkoutPlanExercise:
+    exercise = _exercise(db, "pain-prescribed")
+    prescribed = WorkoutPlanExercise(
+        workout_day_id=cycle.workout_plan.days[0].id,
+        exercise_id=exercise.id,
+        order_index=1,
+        sets=3,
+        reps_min=8,
+        reps_max=12,
+        rest_seconds=90,
+        rir=2,
+        estimated_minutes=5,
+        exercise_snapshot={},
+    )
+    db.add(prescribed)
+    db.flush()
+    return prescribed
 
 
 def test_valid_weekly_check_in_persists_with_explicit_ownership(db: Session) -> None:
@@ -280,3 +345,123 @@ def test_persisted_classifications_round_trip(
     assert saved is not None
     assert saved.perceived_difficulty is difficulty
     assert saved.recovery_rating is recovery
+
+
+def test_check_in_without_pain_has_no_structured_pain_follow_up(db: Session) -> None:
+    user, cycle = _cycle(db)
+
+    check_in = create_weekly_check_in(
+        db,
+        user_id=user.id,
+        cycle_id=cycle.id,
+        week_number=1,
+        sessions_completed=2,
+        perceived_difficulty=WorkoutCycleWeeklyCheckInDifficulty.APPROPRIATE,
+        recovery_rating=WorkoutCycleWeeklyCheckInRecovery.GOOD,
+        has_pain_or_limitation=False,
+    )
+
+    assert check_in.pain_limitation is None
+
+
+def test_pain_check_in_persists_prescribed_exercise_and_note(db: Session) -> None:
+    user, cycle = _cycle(db)
+    prescribed = _prescribed_exercise(db, cycle)
+
+    check_in = create_weekly_check_in(
+        db,
+        user_id=user.id,
+        cycle_id=cycle.id,
+        week_number=1,
+        sessions_completed=2,
+        perceived_difficulty=WorkoutCycleWeeklyCheckInDifficulty.HARD,
+        recovery_rating=WorkoutCycleWeeklyCheckInRecovery.AVERAGE,
+        has_pain_or_limitation=True,
+        pain_workout_plan_exercise_id=prescribed.id,
+        pain_note_optional="زانو هنگام حرکت درد گرفت.",
+    )
+
+    follow_up = db.scalar(
+        select(WorkoutCycleWeeklyCheckInPainLimitation).where(
+            WorkoutCycleWeeklyCheckInPainLimitation.weekly_check_in_id == check_in.id
+        )
+    )
+
+    assert follow_up is not None
+    assert follow_up.user_id == user.id
+    assert follow_up.cycle_id == cycle.id
+    assert follow_up.workout_plan_exercise_id == prescribed.id
+    assert follow_up.note_optional == "زانو هنگام حرکت درد گرفت."
+
+
+def test_pain_check_in_requires_an_exercise_reference(db: Session) -> None:
+    user, cycle = _cycle(db)
+
+    with pytest.raises(WorkoutCycleWeeklyCheckInPainExerciseRequiredError):
+        create_weekly_check_in(
+            db,
+            user_id=user.id,
+            cycle_id=cycle.id,
+            week_number=1,
+            sessions_completed=2,
+            perceived_difficulty=WorkoutCycleWeeklyCheckInDifficulty.HARD,
+            recovery_rating=WorkoutCycleWeeklyCheckInRecovery.POOR,
+            has_pain_or_limitation=True,
+        )
+
+
+def test_pain_check_in_rejects_exercise_from_another_plan_or_user(db: Session) -> None:
+    owner, cycle = _cycle(db)
+    _prescribed_exercise(db, cycle)
+    other_user = _user(db, "other-pain")
+    other_user, other_cycle = _cycle(db, user=other_user)
+    other_prescribed = _prescribed_exercise(db, other_cycle)
+
+    with pytest.raises(WorkoutCycleWeeklyCheckInPainExerciseNotFoundError):
+        create_weekly_check_in(
+            db,
+            user_id=owner.id,
+            cycle_id=cycle.id,
+            week_number=1,
+            sessions_completed=2,
+            perceived_difficulty=WorkoutCycleWeeklyCheckInDifficulty.HARD,
+            recovery_rating=WorkoutCycleWeeklyCheckInRecovery.POOR,
+            has_pain_or_limitation=True,
+            pain_workout_plan_exercise_id=other_prescribed.id,
+        )
+
+    assert other_user.id != owner.id
+
+
+def test_pain_follow_up_note_is_optional_and_short(db: Session) -> None:
+    short_note = WorkoutCycleWeeklyCheckInPainFollowUpInput(
+        workout_plan_exercise_id=uuid4(),
+        note_optional="Short note",
+    )
+
+    assert short_note.note_optional == "Short note"
+
+    with pytest.raises(ValidationError):
+        WorkoutCycleWeeklyCheckInPainFollowUpInput(
+            workout_plan_exercise_id=uuid4(),
+            note_optional="x" * 501,
+        )
+
+
+def test_pain_follow_up_service_rejects_a_long_note(db: Session) -> None:
+    user, cycle = _cycle(db)
+    prescribed = _prescribed_exercise(db, cycle)
+
+    with pytest.raises(ValueError, match="500 characters"):
+        create_weekly_check_in(
+            db,
+            user_id=user.id,
+            cycle_id=cycle.id,
+            week_number=1,
+            sessions_completed=2,
+            perceived_difficulty=WorkoutCycleWeeklyCheckInDifficulty.HARD,
+            recovery_rating=WorkoutCycleWeeklyCheckInRecovery.POOR,
+            has_pain_or_limitation=True,
+            pain_workout_plan_exercise_id=prescribed.id,
+            pain_note_optional="x" * 501,
+        )

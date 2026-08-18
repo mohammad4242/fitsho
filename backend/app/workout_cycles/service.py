@@ -19,6 +19,7 @@ from app.workout_cycles.models import (
     WorkoutCycle,
     WorkoutCycleFeedback,
     WorkoutCycleWeeklyCheckIn,
+    WorkoutCycleWeeklyCheckInPainLimitation,
     WorkoutExercisePreference,
     WorkoutExerciseReplacement,
     WorkoutExerciseSafetySignal,
@@ -71,6 +72,18 @@ class WorkoutCycleWeeklyCheckInSessionsOutOfRangeError(ValueError):
     pass
 
 
+class WorkoutCycleWeeklyCheckInPainExerciseRequiredError(ValueError):
+    pass
+
+
+class WorkoutCycleWeeklyCheckInPainExerciseNotFoundError(Exception):
+    pass
+
+
+class WorkoutCycleWeeklyCheckInPainFollowUpNotAllowedError(ValueError):
+    pass
+
+
 def calculate_current_week(
     started_at: datetime,
     duration_weeks: int,
@@ -98,6 +111,8 @@ def create_weekly_check_in(
     recovery_rating: WorkoutCycleWeeklyCheckInRecovery,
     has_pain_or_limitation: bool,
     note_optional: str | None = None,
+    pain_workout_plan_exercise_id: UUID | None = None,
+    pain_note_optional: str | None = None,
 ) -> WorkoutCycleWeeklyCheckIn:
     cycle = get_cycle_for_user(db, cycle_id=cycle_id, user_id=user_id)
     if cycle is None or cycle.workout_plan.user_id != user_id:
@@ -113,6 +128,24 @@ def create_weekly_check_in(
             "Completed sessions must be within the plan's prescribed weekly days"
         )
 
+    if has_pain_or_limitation:
+        if pain_workout_plan_exercise_id is None:
+            raise WorkoutCycleWeeklyCheckInPainExerciseRequiredError(
+                "A prescribed exercise is required when pain or limitation is reported"
+            )
+        if pain_note_optional is not None and len(pain_note_optional) > 500:
+            raise ValueError("Pain or limitation note must be 500 characters or fewer")
+        prescribed = _find_prescribed_exercise(
+            cycle,
+            workout_plan_exercise_id=pain_workout_plan_exercise_id,
+        )
+        if prescribed is None:
+            raise WorkoutCycleWeeklyCheckInPainExerciseNotFoundError
+    elif pain_workout_plan_exercise_id is not None or pain_note_optional is not None:
+        raise WorkoutCycleWeeklyCheckInPainFollowUpNotAllowedError(
+            "Pain follow-up data requires has_pain_or_limitation=True"
+        )
+
     check_in = WorkoutCycleWeeklyCheckIn(
         user_id=user_id,
         cycle_id=cycle.id,
@@ -123,6 +156,13 @@ def create_weekly_check_in(
         has_pain_or_limitation=has_pain_or_limitation,
         note_optional=note_optional,
     )
+    if has_pain_or_limitation:
+        check_in.pain_limitation = WorkoutCycleWeeklyCheckInPainLimitation(
+            user_id=user_id,
+            cycle_id=cycle.id,
+            workout_plan_exercise_id=pain_workout_plan_exercise_id,
+            note_optional=pain_note_optional,
+        )
     db.add(check_in)
     try:
         db.flush()
@@ -414,6 +454,22 @@ def _plan_duration_weeks(plan: WorkoutPlan) -> int:
     if raw_duration not in SUPPORTED_CYCLE_DURATIONS:
         raise ValueError("Workout cycle duration must be 4, 6, or 8 weeks")
     return raw_duration
+
+
+def _find_prescribed_exercise(
+    cycle: WorkoutCycle,
+    *,
+    workout_plan_exercise_id: UUID,
+) -> WorkoutPlanExercise | None:
+    return next(
+        (
+            item
+            for day in cycle.workout_plan.days
+            for item in day.exercises
+            if item.id == workout_plan_exercise_id
+        ),
+        None,
+    )
 
 
 def _allowed_replacement_ids(item: WorkoutPlanExercise) -> set[UUID]:

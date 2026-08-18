@@ -213,6 +213,62 @@ class WorkoutCycleWeeklyCheckIn(Base):
 
     user: Mapped[User] = relationship()
     cycle: Mapped[WorkoutCycle] = relationship()
+    pain_limitation: Mapped[WorkoutCycleWeeklyCheckInPainLimitation | None] = relationship(
+        back_populates="weekly_check_in",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
+
+
+class WorkoutCycleWeeklyCheckInPainLimitation(Base):
+    __tablename__ = "workout_cycle_weekly_check_in_pain_limitations"
+    __table_args__ = (
+        UniqueConstraint(
+            "weekly_check_in_id",
+            name="uq_weekly_check_in_pain_followup_checkin",
+        ),
+        CheckConstraint(
+            "note_optional IS NULL OR char_length(note_optional) <= 500",
+            name="ck_weekly_check_in_pain_followup_note_length",
+        ),
+        Index(
+            "ix_weekly_check_in_pain_user_cycle",
+            "user_id",
+            "cycle_id",
+        ),
+        Index(
+            "ix_weekly_check_in_pain_cycle_exercise",
+            "cycle_id",
+            "workout_plan_exercise_id",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    weekly_check_in_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workout_cycle_weekly_check_ins.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    cycle_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workout_cycles.id", ondelete="RESTRICT"), nullable=False
+    )
+    workout_plan_exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workout_plan_exercises.id", ondelete="RESTRICT"), nullable=False
+    )
+    note_optional: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    weekly_check_in: Mapped[WorkoutCycleWeeklyCheckIn] = relationship(
+        back_populates="pain_limitation"
+    )
+    user: Mapped[User] = relationship()
+    cycle: Mapped[WorkoutCycle] = relationship()
+    workout_plan_exercise: Mapped[WorkoutPlanExercise] = relationship()
 
 
 class WorkoutExerciseReplacement(Base):

@@ -19,6 +19,13 @@ class WorkoutCycleWeeklyCheckInClassificationInput(BaseModel):
     recovery_rating: WorkoutCycleWeeklyCheckInRecovery
 
 
+class WorkoutCycleWeeklyCheckInPainFollowUpInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workout_plan_exercise_id: UUID
+    note_optional: str | None = Field(default=None, max_length=500)
+
+
 class WorkoutExerciseReplacementCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
