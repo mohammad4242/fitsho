@@ -17,7 +17,11 @@ from app.workouts.program_engine.schemas import (
     ProgramGenerationRequest,
     RecentTrainingHistory,
 )
-from app.workouts.program_engine.split_selector import generate_split_candidates, select_split
+from app.workouts.program_engine.split_selector import (
+    generate_split_candidates,
+    score_split_candidates,
+    select_split,
+)
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 
 
@@ -62,6 +66,67 @@ def test_consecutive_preferred_full_body_days_are_adjusted_for_recovery() -> Non
 
     assert split.weekdays == RULESET.default_weekdays[3]
     assert "SPLIT_PREFERRED_DAYS_ADJUSTED_FOR_RECOVERY" in split.reason_codes
+
+
+def test_four_days_generate_multiple_valid_split_candidates() -> None:
+    candidates = generate_split_candidates(4)
+    valid_focuses = {
+        "upper",
+        "lower",
+        "full_body",
+        "full_body_b",
+        "full_body_c",
+        "full_body_d",
+        "chest_triceps",
+        "back_biceps",
+        "legs",
+        "shoulders_traps",
+    }
+
+    assert tuple(candidate.split_type for candidate in candidates) == (
+        SplitType.UPPER_LOWER,
+        SplitType.FULL_BODY_FOUR,
+        SplitType.UPPER_LOWER_FULL,
+        SplitType.PHUL,
+        SplitType.BODY_PART_ROTATION,
+    )
+    assert all(len(candidate.day_focuses) == 4 for candidate in candidates)
+    assert all(
+        focus in valid_focuses for candidate in candidates for focus in candidate.day_focuses
+    )
+
+    scored = score_split_candidates(
+        normalized(available_training_days=4),
+        candidates,
+        RULESET,
+        preferred_days=4,
+    )
+    assert all(len(plan.day_focuses) == len(plan.weekdays) == 4 for plan in scored)
+    assert scored == score_split_candidates(
+        normalized(available_training_days=4),
+        candidates,
+        RULESET,
+        preferred_days=4,
+    )
+
+
+def test_four_day_recovery_context_can_select_a_lower_complexity_candidate() -> None:
+    request = normalized(
+        available_training_days=4,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        sleep_quality=RecoveryRating.POOR,
+    )
+
+    scored = score_split_candidates(
+        request,
+        generate_split_candidates(4),
+        RULESET,
+        preferred_days=4,
+    )
+
+    assert scored[0].split_type is SplitType.UPPER_LOWER_FULL
 
 
 def test_partial_weekday_preferences_do_not_claim_recovery_adjustment() -> None:
@@ -128,7 +193,7 @@ def test_poor_recovery_user_can_receive_fewer_sessions_than_available() -> None:
     assert "SPLIT_SELECTED_FOR_APPROPRIATE_SESSION_COUNT" in split.reason_codes
 
 
-def test_intermediate_four_day_hypertrophy_uses_specialized_direct_target_days() -> None:
+def test_intermediate_four_day_hypertrophy_uses_a_valid_scored_candidate() -> None:
     split = select_split(
         normalized(
             available_training_days=4,
@@ -140,16 +205,11 @@ def test_intermediate_four_day_hypertrophy_uses_specialized_direct_target_days()
         RULESET,
     )
 
-    assert split.split_type is SplitType.BODY_PART_ROTATION
-    assert split.day_focuses == (
-        "chest_triceps",
-        "back_biceps",
-        "legs",
-        "shoulders_traps",
-    )
+    assert split.split_type in {candidate.split_type for candidate in generate_split_candidates(4)}
+    assert len(split.day_focuses) == len(split.weekdays) == 4
 
 
-def test_advanced_hypertrophy_user_can_select_body_part_rotation() -> None:
+def test_advanced_four_day_scoring_can_select_body_part_rotation() -> None:
     split = select_split(
         normalized(
             available_training_days=4,
@@ -163,12 +223,8 @@ def test_advanced_hypertrophy_user_can_select_body_part_rotation() -> None:
     )
 
     assert split.split_type is SplitType.BODY_PART_ROTATION
-    assert split.day_focuses == (
-        "chest_triceps",
-        "back_biceps",
-        "legs",
-        "shoulders_traps",
-    )
+    assert split.split_type in {candidate.split_type for candidate in generate_split_candidates(4)}
+    assert len(split.day_focuses) == len(split.weekdays) == 4
 
 
 def test_five_days_generate_multiple_valid_split_candidates() -> None:

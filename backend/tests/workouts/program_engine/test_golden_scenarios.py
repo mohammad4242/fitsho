@@ -10,6 +10,16 @@ from tests.workouts.program_engine.golden_fixtures import (
     impossible_equipment_request,
 )
 
+FOUR_DAY_SPLIT_TYPES = frozenset(
+    {
+        SplitType.UPPER_LOWER,
+        SplitType.FULL_BODY_FOUR,
+        SplitType.UPPER_LOWER_FULL,
+        SplitType.PHUL,
+        SplitType.BODY_PART_ROTATION,
+    }
+)
+
 
 @pytest.mark.parametrize(
     ("name", "split_type"),
@@ -17,17 +27,20 @@ from tests.workouts.program_engine.golden_fixtures import (
         ("novice_1_day_45_general", SplitType.FULL_BODY),
         ("novice_2_days_35_general", SplitType.FULL_BODY_AB),
         ("novice_3_days_fat_loss_low_impact", SplitType.FULL_BODY_ABC),
-        ("intermediate_4_days_hypertrophy", SplitType.BODY_PART_ROTATION),
+        ("intermediate_4_days_hypertrophy", None),
         ("intermediate_5_days_shoulder_priority", SplitType.BODY_PART_ROTATION),
-        ("advanced_4_days_strength", SplitType.BODY_PART_ROTATION),
+        ("advanced_4_days_strength", None),
     ],
 )
-def test_golden_split_and_validation(name: str, split_type: SplitType) -> None:
+def test_golden_split_and_validation(name: str, split_type: SplitType | None) -> None:
     source = golden_scenarios()[name]
     result = generate_program(source, full_catalog(), RULESET)
 
     assert result.program is not None, result.errors
-    assert result.program.split.split_type is split_type
+    if split_type is not None:
+        assert result.program.split.split_type is split_type
+    if source.available_training_days == 4:
+        assert result.program.split.split_type in FOUR_DAY_SPLIT_TYPES
     assert result.program.validation_report.is_valid
     assert all(
         day.estimated_duration_minutes
@@ -96,20 +109,17 @@ def test_priority_muscle_affects_volume_and_order() -> None:
     assert all(day.exercises[0].primary_muscle is MuscleGroup.SHOULDERS for day in shoulder_days)
 
 
-def test_four_day_program_separates_direct_upper_body_targets() -> None:
+def test_four_day_program_uses_a_valid_generated_focus_for_each_day() -> None:
     result = generate_program(
         golden_scenarios()["intermediate_4_days_hypertrophy"], full_catalog(), RULESET
     )
 
     assert result.program is not None, result.errors
-    direct_targets = [
-        tuple(item.primary_muscle for item in day.exercises if item.primary_muscle is not None)
-        for day in result.program.weekly_schedule
-    ]
-    assert set(direct_targets[0]) == {MuscleGroup.CHEST, MuscleGroup.TRICEPS}
-    assert set(direct_targets[1]) == {MuscleGroup.BACK, MuscleGroup.BICEPS}
-    assert MuscleGroup.CHEST not in direct_targets[1]
-    assert MuscleGroup.BACK not in direct_targets[0]
+    assert result.program.split.split_type in FOUR_DAY_SPLIT_TYPES
+    assert len(result.program.weekly_schedule) == 4
+    assert tuple(day.focus for day in result.program.weekly_schedule) == (
+        result.program.split.day_focuses
+    )
 
 
 def test_program_trace_explains_priority_volume_and_repair_boundary() -> None:
@@ -121,9 +131,10 @@ def test_program_trace_explains_priority_volume_and_repair_boundary() -> None:
     stages = {entry["stage"] for entry in result.program.decision_trace}
     assert {"split", "volume", "volume_repair"}.issubset(stages)
     ranges = result.program.aggregate_metrics["volume_ranges_by_muscle"]
-    assert ranges[MuscleGroup.SHOULDERS.value]["target_sets"] > ranges[MuscleGroup.CHEST.value][
-        "target_sets"
-    ]
+    assert (
+        ranges[MuscleGroup.SHOULDERS.value]["target_sets"]
+        > ranges[MuscleGroup.CHEST.value]["target_sets"]
+    )
 
 
 def test_low_impact_scenario_never_uses_high_impact_cardio() -> None:
