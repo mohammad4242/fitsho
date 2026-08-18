@@ -64,3 +64,9 @@ class WorkoutCycleExerciseFeedbackType(StrEnum):
     INEFFECTIVE = "ineffective"
     EQUIPMENT_UNAVAILABLE = "equipment_unavailable"
     PAIN = "pain"
+
+
+class WorkoutCycleExerciseFeedbackSuggestionKind(StrEnum):
+    NEGATIVE_EXERCISE_PREFERENCE = "negative_exercise_preference"
+    EQUIPMENT_CONTEXT = "equipment_context"
+    SAFETY = "safety"

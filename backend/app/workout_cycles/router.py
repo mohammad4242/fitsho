@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from app.database.session import get_db
 from app.workout_cycles.models import WorkoutCycleWeeklyCheckIn
 from app.workout_cycles.schemas import (
     WorkoutCycleCurrentResponse,
+    WorkoutCycleExerciseFeedbackSuggestionsResponse,
     WorkoutCycleWeeklyCheckInPainFollowUpResponse,
     WorkoutCycleWeeklyCheckInResponse,
     WorkoutCycleWeeklyCheckInUpsertRequest,
@@ -17,6 +19,7 @@ from app.workout_cycles.schemas import (
     WorkoutExerciseReplacementResponse,
 )
 from app.workout_cycles.service import (
+    WorkoutCycleNotFoundError,
     WorkoutCycleWeeklyCheckInNoActiveCycleError,
     WorkoutCycleWeeklyCheckInNotFoundError,
     WorkoutCycleWeeklyCheckInPainExerciseNotFoundError,
@@ -30,6 +33,7 @@ from app.workout_cycles.service import (
     calculate_current_week,
     get_current_active_cycle_for_user,
     get_current_weekly_check_in,
+    get_cycle_exercise_feedback_suggestions,
     record_exercise_replacement,
     upsert_current_weekly_check_in,
 )
@@ -204,3 +208,29 @@ def create_current_cycle_replacement(
             detail="Replacement exercise is not an allowed alternative",
         ) from None
     return WorkoutExerciseReplacementResponse.model_validate(replacement)
+
+
+@router.get(
+    "/{cycle_id}/exercise-feedback-suggestions",
+    response_model=WorkoutCycleExerciseFeedbackSuggestionsResponse,
+)
+def read_cycle_exercise_feedback_suggestions(
+    cycle_id: UUID,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> WorkoutCycleExerciseFeedbackSuggestionsResponse:
+    try:
+        suggestions = get_cycle_exercise_feedback_suggestions(
+            db,
+            user_id=user.id,
+            cycle_id=cycle_id,
+        )
+    except WorkoutCycleNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workout cycle not found",
+        ) from None
+    return WorkoutCycleExerciseFeedbackSuggestionsResponse(
+        cycle_id=cycle_id,
+        suggestions=suggestions,
+    )

@@ -1,12 +1,14 @@
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.exercises.models import ExerciseAlternative
 from app.workout_cycles.enums import (
+    WorkoutCycleExerciseFeedbackSuggestionKind,
     WorkoutCycleExerciseFeedbackType,
     WorkoutCycleStatus,
     WorkoutCycleWeeklyCheckInDifficulty,
@@ -26,7 +28,12 @@ from app.workout_cycles.models import (
     WorkoutExerciseReplacement,
     WorkoutExerciseSafetySignal,
 )
-from app.workout_cycles.schemas import CompletionFeedbackInput
+from app.workout_cycles.schemas import (
+    CompletionFeedbackInput,
+    WorkoutCycleExerciseFeedbackPersistentStateResponse,
+    WorkoutCycleExerciseFeedbackReplacementSummaryResponse,
+    WorkoutCycleExerciseFeedbackSuggestionResponse,
+)
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
 from app.workouts.repository import get_plan_for_user
@@ -390,6 +397,180 @@ def record_workout_cycle_exercise_feedback(
         db.rollback()
         raise
     return feedback
+
+
+def get_cycle_exercise_feedback_suggestions(
+    db: Session,
+    *,
+    user_id: UUID,
+    cycle_id: UUID,
+) -> list[WorkoutCycleExerciseFeedbackSuggestionResponse]:
+    cycle = get_cycle_for_user(db, cycle_id=cycle_id, user_id=user_id)
+    if cycle is None:
+        raise WorkoutCycleNotFoundError
+
+    replacements = list(
+        db.scalars(
+            select(WorkoutExerciseReplacement)
+            .options(
+                joinedload(WorkoutExerciseReplacement.original_exercise),
+                joinedload(WorkoutExerciseReplacement.replacement_exercise),
+            )
+            .where(
+                WorkoutExerciseReplacement.user_id == user_id,
+                WorkoutExerciseReplacement.cycle_id == cycle.id,
+            )
+            .order_by(
+                WorkoutExerciseReplacement.workout_plan_exercise_id,
+                WorkoutExerciseReplacement.created_at,
+                WorkoutExerciseReplacement.id,
+            )
+        ).all()
+    )
+    if not replacements:
+        return []
+
+    original_exercise_ids = {replacement.original_exercise_id for replacement in replacements}
+    preferences = list(
+        db.scalars(
+            select(WorkoutExercisePreference).where(
+                WorkoutExercisePreference.user_id == user_id,
+                WorkoutExercisePreference.exercise_id.in_(original_exercise_ids),
+            )
+        ).all()
+    )
+    safety_signals = list(
+        db.scalars(
+            select(WorkoutExerciseSafetySignal).where(
+                WorkoutExerciseSafetySignal.user_id == user_id,
+                WorkoutExerciseSafetySignal.cycle_id == cycle.id,
+                WorkoutExerciseSafetySignal.original_exercise_id.in_(original_exercise_ids),
+            )
+        ).all()
+    )
+
+    preferences_by_exercise: dict[UUID, list[WorkoutExercisePreference]] = {}
+    for preference in preferences:
+        preferences_by_exercise.setdefault(preference.exercise_id, []).append(preference)
+    safety_by_exercise: dict[UUID, list[WorkoutExerciseSafetySignal]] = {}
+    for signal in safety_signals:
+        safety_by_exercise.setdefault(signal.original_exercise_id, []).append(signal)
+
+    grouped: dict[UUID, list[WorkoutExerciseReplacement]] = {}
+    for replacement in replacements:
+        if _replacement_suggestion_kind(replacement) is not None:
+            grouped.setdefault(replacement.workout_plan_exercise_id, []).append(replacement)
+
+    suggestions: list[WorkoutCycleExerciseFeedbackSuggestionResponse] = []
+    for prescribed_replacements in grouped.values():
+        by_kind: dict[
+            WorkoutCycleExerciseFeedbackSuggestionKind,
+            list[WorkoutExerciseReplacement],
+        ] = {}
+        for replacement in prescribed_replacements:
+            kind = _replacement_suggestion_kind(replacement)
+            if kind is not None:
+                by_kind.setdefault(kind, []).append(replacement)
+
+        first = prescribed_replacements[0]
+        persistent_state = WorkoutCycleExerciseFeedbackPersistentStateResponse(
+            preference_types=sorted(
+                (preference.preference_type for preference in preferences_by_exercise.get(
+                    first.original_exercise_id, []
+                )),
+                key=lambda preference_type: preference_type.value,
+            ),
+            safety_signal_types=sorted(
+                (
+                    signal.signal_type
+                    for signal in safety_by_exercise.get(first.original_exercise_id, [])
+                ),
+                key=lambda signal_type: signal_type.value,
+            ),
+        )
+        for kind, kind_replacements in by_kind.items():
+            suggestions.append(
+                _build_replacement_suggestion(
+                    kind=kind,
+                    replacements=kind_replacements,
+                    persistent_state=persistent_state,
+                )
+            )
+
+    return suggestions
+
+
+def _replacement_suggestion_kind(
+    replacement: WorkoutExerciseReplacement,
+) -> WorkoutCycleExerciseFeedbackSuggestionKind | None:
+    if replacement.reason is WorkoutExerciseReplacementReason.PAIN_OR_DISCOMFORT:
+        return WorkoutCycleExerciseFeedbackSuggestionKind.SAFETY
+    if replacement.scope is not WorkoutExerciseReplacementScope.PERSISTENT:
+        return None
+    if replacement.reason in {
+        WorkoutExerciseReplacementReason.UNCOMFORTABLE,
+        WorkoutExerciseReplacementReason.DISLIKE,
+    }:
+        return WorkoutCycleExerciseFeedbackSuggestionKind.NEGATIVE_EXERCISE_PREFERENCE
+    if replacement.reason is WorkoutExerciseReplacementReason.EQUIPMENT_UNAVAILABLE:
+        return WorkoutCycleExerciseFeedbackSuggestionKind.EQUIPMENT_CONTEXT
+    return None
+
+
+def _build_replacement_suggestion(
+    *,
+    kind: WorkoutCycleExerciseFeedbackSuggestionKind,
+    replacements: list[WorkoutExerciseReplacement],
+    persistent_state: WorkoutCycleExerciseFeedbackPersistentStateResponse,
+) -> WorkoutCycleExerciseFeedbackSuggestionResponse:
+    first = replacements[0]
+    by_replacement_exercise: dict[UUID, list[WorkoutExerciseReplacement]] = {}
+    for replacement in replacements:
+        by_replacement_exercise.setdefault(replacement.replacement_exercise_id, []).append(
+            replacement
+        )
+
+    replacement_summaries = [
+        WorkoutCycleExerciseFeedbackReplacementSummaryResponse(
+            replacement_exercise_id=rows[0].replacement_exercise_id,
+            replacement_name_en=rows[0].replacement_exercise.name_en,
+            replacement_name_fa=rows[0].replacement_exercise.name_fa,
+            replacement_count=len(rows),
+            replacement_ids=[row.id for row in rows],
+            reasons=_unique_enum_values(row.reason for row in rows),
+            scopes=_unique_enum_values(row.scope for row in rows),
+            week_numbers=_unique_int_values(row.week_number for row in rows),
+        )
+        for rows in by_replacement_exercise.values()
+    ]
+    return WorkoutCycleExerciseFeedbackSuggestionResponse(
+        suggestion_kind=kind,
+        workout_plan_exercise_id=first.workout_plan_exercise_id,
+        original_exercise_id=first.original_exercise_id,
+        original_name_en=first.original_exercise.name_en,
+        original_name_fa=first.original_exercise.name_fa,
+        replacement_count=len(replacements),
+        replacement_ids=[replacement.id for replacement in replacements],
+        reasons=_unique_enum_values(replacement.reason for replacement in replacements),
+        replacement_exercises=replacement_summaries,
+        current_persistent_state=persistent_state,
+    )
+
+
+def _unique_enum_values[
+    EnumValue: (WorkoutExerciseReplacementReason, WorkoutExerciseReplacementScope)
+](values: Iterable[EnumValue]) -> list[EnumValue]:
+    unique: dict[EnumValue, None] = {}
+    for value in values:
+        unique[value] = None
+    return list(unique)
+
+
+def _unique_int_values(values: Iterable[int]) -> list[int]:
+    unique: dict[int, None] = {}
+    for value in values:
+        unique[value] = None
+    return list(unique)
 
 
 def _persist_replacement_meaning(

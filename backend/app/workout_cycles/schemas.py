@@ -6,14 +6,17 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.exercises.enums import MuscleGroup
 from app.profile.schemas import SessionDurationMinutes
 from app.workout_cycles.enums import (
+    WorkoutCycleExerciseFeedbackSuggestionKind,
     WorkoutCycleExerciseFeedbackType,
     WorkoutCycleFeedbackProgress,
     WorkoutCycleFeedbackSatisfaction,
     WorkoutCycleStatus,
     WorkoutCycleWeeklyCheckInDifficulty,
     WorkoutCycleWeeklyCheckInRecovery,
+    WorkoutExercisePreferenceType,
     WorkoutExerciseReplacementReason,
     WorkoutExerciseReplacementScope,
+    WorkoutExerciseSafetySignalType,
 )
 from app.workouts.program_engine.enums import Goal
 
@@ -100,6 +103,51 @@ class WorkoutCycleExerciseFeedbackInput(BaseModel):
     feedback_type: WorkoutCycleExerciseFeedbackType
     persistent: bool
     note_optional: str | None = Field(default=None, max_length=1000)
+
+
+class WorkoutCycleExerciseFeedbackPersistentStateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preference_types: list[WorkoutExercisePreferenceType]
+    safety_signal_types: list[WorkoutExerciseSafetySignalType]
+
+
+class WorkoutCycleExerciseFeedbackReplacementSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    replacement_exercise_id: UUID
+    replacement_name_en: str
+    replacement_name_fa: str
+    replacement_count: int = Field(ge=1)
+    replacement_ids: list[UUID] = Field(min_length=1)
+    reasons: list[WorkoutExerciseReplacementReason] = Field(min_length=1)
+    scopes: list[WorkoutExerciseReplacementScope] = Field(min_length=1)
+    week_numbers: list[int] = Field(min_length=1)
+
+
+class WorkoutCycleExerciseFeedbackSuggestionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    suggestion_kind: WorkoutCycleExerciseFeedbackSuggestionKind
+    workout_plan_exercise_id: UUID
+    original_exercise_id: UUID
+    original_name_en: str
+    original_name_fa: str
+    replacement_count: int = Field(ge=1)
+    replacement_ids: list[UUID] = Field(min_length=1)
+    reasons: list[WorkoutExerciseReplacementReason] = Field(min_length=1)
+    replacement_exercises: list[WorkoutCycleExerciseFeedbackReplacementSummaryResponse] = Field(
+        min_length=1
+    )
+    current_persistent_state: WorkoutCycleExerciseFeedbackPersistentStateResponse
+    requires_confirmation: bool = True
+
+
+class WorkoutCycleExerciseFeedbackSuggestionsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cycle_id: UUID
+    suggestions: list[WorkoutCycleExerciseFeedbackSuggestionResponse]
 
 
 class WorkoutCycleCurrentResponse(BaseModel):
