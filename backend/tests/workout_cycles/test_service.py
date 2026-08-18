@@ -1,5 +1,6 @@
 import os
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta, timezone
 from threading import Barrier, Lock
 from uuid import UUID, uuid4
 
@@ -16,6 +17,7 @@ from app.workout_cycles.service import (
     WorkoutCycleAlreadyCompletedError,
     WorkoutCycleNotFoundError,
     WorkoutCyclePlanInactiveError,
+    calculate_current_week,
     complete_cycle,
     get_cycle_for_user,
     start_cycle,
@@ -62,6 +64,43 @@ def test_start_cycle_accepts_supported_plan_durations(
     assert cycle.duration_weeks == duration_weeks
     assert cycle.user_id == user.id
     assert cycle.workout_plan_id == plan.id
+
+
+@pytest.mark.parametrize(
+    ("elapsed", "duration_weeks", "expected_week"),
+    [
+        (timedelta(days=0), 4, 1),
+        (timedelta(days=6, hours=23), 4, 1),
+        (timedelta(days=7), 4, 2),
+        (timedelta(days=14), 4, 3),
+        (timedelta(days=27), 4, 4),
+        (timedelta(days=28), 4, 4),
+        (timedelta(days=90), 4, 4),
+        (timedelta(days=-1), 4, 1),
+    ],
+)
+def test_calculate_current_week_is_bounded_and_uses_seven_day_weeks(
+    elapsed: timedelta,
+    duration_weeks: int,
+    expected_week: int,
+) -> None:
+    started_at = datetime(2026, 1, 1, 12, tzinfo=UTC)
+
+    assert (
+        calculate_current_week(
+            started_at,
+            duration_weeks,
+            now=started_at + elapsed,
+        )
+        == expected_week
+    )
+
+
+def test_calculate_current_week_normalizes_timezone_aware_datetimes() -> None:
+    started_at = datetime(2026, 1, 1, 15, tzinfo=timezone(timedelta(hours=3)))
+    now = datetime(2026, 1, 8, 12, tzinfo=UTC)
+
+    assert calculate_current_week(started_at, 4, now=now) == 2
 
 
 def test_start_cycle_is_idempotent_for_one_plan(db: Session) -> None:

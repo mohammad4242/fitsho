@@ -7,7 +7,10 @@ from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.database.session import get_db
 from app.workout_cycles.schemas import WorkoutCycleCurrentResponse
-from app.workout_cycles.service import get_current_active_cycle_for_user
+from app.workout_cycles.service import (
+    calculate_current_week,
+    get_current_active_cycle_for_user,
+)
 
 router = APIRouter(prefix="/api/v1/workout-cycles", tags=["workout-cycles"])
 DatabaseSession = Annotated[Session, Depends(get_db)]
@@ -31,4 +34,5 @@ def read_current_cycle(
         started_at=cycle.started_at,
         duration_weeks=cycle.duration_weeks,
         status=cycle.status,
+        current_week=calculate_current_week(cycle.started_at, cycle.duration_weeks),
     )

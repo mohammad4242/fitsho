@@ -14,6 +14,7 @@ class WorkoutCycleCurrentResponse(BaseModel):
     started_at: datetime
     duration_weeks: int
     status: WorkoutCycleStatus
+    current_week: int
 
 
 class CompletionFeedbackInput(BaseModel):

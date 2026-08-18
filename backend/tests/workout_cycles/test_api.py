@@ -79,6 +79,7 @@ def test_current_cycle_returns_the_authenticated_users_active_cycle(
         "started_at": cycle.started_at.isoformat().replace("+00:00", "Z"),
         "duration_weeks": 6,
         "status": WorkoutCycleStatus.ACTIVE.value,
+        "current_week": 1,
     }
 
 

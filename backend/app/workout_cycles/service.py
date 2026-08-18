@@ -26,6 +26,22 @@ class WorkoutCyclePlanInactiveError(Exception):
     pass
 
 
+def calculate_current_week(
+    started_at: datetime,
+    duration_weeks: int,
+    *,
+    now: datetime | None = None,
+) -> int:
+    if duration_weeks < 1:
+        raise ValueError("Workout cycle duration must be at least one week")
+
+    current_at = datetime.now(UTC) if now is None else now
+    started_at_utc = _as_utc(started_at)
+    current_at_utc = _as_utc(current_at)
+    elapsed_days = max(0, (current_at_utc - started_at_utc).days)
+    return min(duration_weeks, elapsed_days // 7 + 1)
+
+
 def start_cycle(
     db: Session,
     *,
@@ -141,3 +157,9 @@ def _plan_duration_weeks(plan: WorkoutPlan) -> int:
     if raw_duration not in SUPPORTED_CYCLE_DURATIONS:
         raise ValueError("Workout cycle duration must be 4, 6, or 8 weeks")
     return raw_duration
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("Workout cycle dates must be timezone-aware")
+    return value.astimezone(UTC)
