@@ -7,6 +7,10 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from app.exercises.models import ExerciseAlternative
+from app.workout_cycles.body_progress_schemas import (
+    WorkoutCycleBodyProgressComparisonResponse,
+    WorkoutCycleFeedbackBodyProgressContext,
+)
 from app.workout_cycles.enums import (
     WorkoutCycleExerciseFeedbackSuggestionKind,
     WorkoutCycleExerciseFeedbackType,
@@ -777,8 +781,19 @@ def complete_cycle(
     if cycle.status is WorkoutCycleStatus.COMPLETED:
         raise WorkoutCycleAlreadyCompletedError
 
+    cycle.status = WorkoutCycleStatus.COMPLETED
+    cycle.completed_at = datetime.now(UTC)
     if feedback is not None:
+        from app.workout_cycles.body_progress_service import compare_cycle_body_progress
+
+        body_progress_comparison = compare_cycle_body_progress(
+            db,
+            user_id=user_id,
+            cycle_id=cycle.id,
+            commit=False,
+        )
         cycle.completion_feedback = WorkoutCycleFeedback(
+            body_progress_comparison_id=body_progress_comparison.id,
             adherence_percent=feedback.adherence_percent,
             performance_changes=feedback.performance_changes,
             pain_or_limitation_feedback=feedback.pain_or_limitation_feedback,
@@ -809,10 +824,44 @@ def complete_cycle(
             new_limitation=feedback.new_limitation,
             note_optional=feedback.note_optional,
         )
-    cycle.status = WorkoutCycleStatus.COMPLETED
-    cycle.completed_at = datetime.now(UTC)
     db.flush()
     return cycle
+
+
+def get_cycle_feedback_body_progress_context(
+    db: Session,
+    *,
+    cycle_id: UUID,
+    user_id: UUID,
+) -> WorkoutCycleFeedbackBodyProgressContext | None:
+    cycle = get_cycle_for_user(db, cycle_id=cycle_id, user_id=user_id)
+    if cycle is None:
+        raise WorkoutCycleNotFoundError
+    feedback = db.scalar(
+        select(WorkoutCycleFeedback).where(WorkoutCycleFeedback.cycle_id == cycle.id)
+    )
+    if feedback is None:
+        return None
+
+    comparison = feedback.body_progress_comparison
+    comparison_response = None
+    if (
+        comparison is not None
+        and comparison.user_id == user_id
+        and comparison.cycle_id == cycle.id
+    ):
+        comparison_response = WorkoutCycleBodyProgressComparisonResponse(
+            id=comparison.id,
+            cycle_id=comparison.cycle_id,
+            result=comparison.comparison_result,
+            created_at=comparison.created_at,
+            updated_at=comparison.updated_at,
+        )
+    return WorkoutCycleFeedbackBodyProgressContext(
+        feedback_id=feedback.id,
+        cycle_id=cycle.id,
+        body_progress_comparison=comparison_response,
+    )
 
 
 def _plan_duration_weeks(plan: WorkoutPlan) -> int:

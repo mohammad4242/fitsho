@@ -10,6 +10,7 @@ from app.auth.models import User
 from app.database.session import get_db
 from app.workout_cycles.body_progress_schemas import (
     WorkoutCycleBodyProgressComparisonResponse,
+    WorkoutCycleFeedbackBodyProgressContext,
 )
 from app.workout_cycles.body_progress_service import (
     WorkoutCycleBodyProgressComparisonNotFoundError,
@@ -41,6 +42,7 @@ from app.workout_cycles.service import (
     get_current_active_cycle_for_user,
     get_current_weekly_check_in,
     get_cycle_exercise_feedback_suggestions,
+    get_cycle_feedback_body_progress_context,
     record_exercise_replacement,
     upsert_current_weekly_check_in,
 )
@@ -266,3 +268,31 @@ def read_cycle_body_progress_comparison(
         created_at=comparison.created_at,
         updated_at=comparison.updated_at,
     )
+
+
+@router.get(
+    "/{cycle_id}/feedback/body-progress",
+    response_model=WorkoutCycleFeedbackBodyProgressContext,
+)
+def read_cycle_feedback_body_progress_context(
+    cycle_id: UUID,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> WorkoutCycleFeedbackBodyProgressContext:
+    try:
+        context = get_cycle_feedback_body_progress_context(
+            db,
+            cycle_id=cycle_id,
+            user_id=user.id,
+        )
+    except WorkoutCycleNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workout cycle not found",
+        ) from None
+    if context is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cycle feedback not found",
+        )
+    return context

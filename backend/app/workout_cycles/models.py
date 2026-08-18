@@ -22,6 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.auth.models import User
 from app.database.base import Base
 from app.exercises.models import Exercise
+from app.workout_cycles.body_progress_models import WorkoutCycleBodyProgressComparison
 from app.workout_cycles.enums import (
     WorkoutCycleExerciseFeedbackType,
     WorkoutCycleFeedbackProgress,
@@ -137,6 +138,11 @@ class WorkoutCycleFeedback(Base):
     cycle_id: Mapped[UUID] = mapped_column(
         ForeignKey("workout_cycles.id", ondelete="CASCADE"), nullable=False
     )
+    body_progress_comparison_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("workout_cycle_body_progress_comparisons.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     adherence_percent: Mapped[int | None] = mapped_column(Integer)
     performance_changes: Mapped[str | None] = mapped_column(Text)
     pain_or_limitation_feedback: Mapped[str | None] = mapped_column(Text)
@@ -238,6 +244,7 @@ class WorkoutCycleFeedback(Base):
     )
 
     cycle: Mapped[WorkoutCycle] = relationship(back_populates="completion_feedback")
+    body_progress_comparison: Mapped[WorkoutCycleBodyProgressComparison | None] = relationship()
 
 
 class WorkoutCycleExerciseFeedback(Base):

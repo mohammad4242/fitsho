@@ -74,3 +74,11 @@ class WorkoutCycleBodyProgressComparisonResponse(BaseModel):
     result: CycleBodyProgressComparisonResult
     created_at: datetime
     updated_at: datetime
+
+
+class WorkoutCycleFeedbackBodyProgressContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    feedback_id: UUID
+    cycle_id: UUID
+    body_progress_comparison: WorkoutCycleBodyProgressComparisonResponse | None

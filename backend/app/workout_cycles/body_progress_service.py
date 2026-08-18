@@ -50,6 +50,7 @@ def compare_cycle_body_progress(
     *,
     user_id: UUID,
     cycle_id: UUID,
+    commit: bool = True,
 ) -> WorkoutCycleBodyProgressComparison:
     cycle = get_cycle_for_user(db, cycle_id=cycle_id, user_id=user_id)
     if cycle is None:
@@ -94,8 +95,10 @@ def compare_cycle_body_progress(
     comparison.schema_version = "1.0"
     comparison.comparison_result = result.model_dump(mode="json")
     db.add(comparison)
-    db.commit()
-    db.refresh(comparison)
+    db.flush()
+    if commit:
+        db.commit()
+        db.refresh(comparison)
     return comparison
 
 
