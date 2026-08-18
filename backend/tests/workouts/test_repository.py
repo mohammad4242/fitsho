@@ -33,6 +33,22 @@ def new_plan(user_id: UUID, signature: str) -> WorkoutPlan:
     )
 
 
+def test_workout_plan_status_includes_pending_review() -> None:
+    assert "pending_review" in {status.value for status in WorkoutPlanStatus}
+
+
+def test_pending_review_workout_plan_status_persists(db: Session) -> None:
+    user = make_user(db)
+    plan = new_plan(user.id, "a" * 64)
+    plan.status = WorkoutPlanStatus.PENDING_REVIEW
+
+    db.add(plan)
+    db.flush()
+    db.expire(plan)
+
+    assert db.get(WorkoutPlan, plan.id).status is WorkoutPlanStatus.PENDING_REVIEW
+
+
 def test_activate_plan_supersedes_previous_active_plan(db: Session) -> None:
     user = make_user(db)
     previous = new_plan(user.id, "a" * 64)

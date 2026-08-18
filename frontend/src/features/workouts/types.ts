@@ -1,6 +1,6 @@
 import type { ExerciseSummary } from "../exercises/types";
 
-export type WorkoutPlanStatus = "generating" | "active" | "superseded" | "failed";
+export type WorkoutPlanStatus = "generating" | "pending_review" | "active" | "superseded" | "failed";
 
 export type WorkoutPlanExercise = {
   order_index: number;
