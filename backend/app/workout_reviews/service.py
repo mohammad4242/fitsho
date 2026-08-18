@@ -18,6 +18,7 @@ from app.workout_reviews.repository import (
     get_review,
     get_review_for_update,
     list_reviews,
+    supersede_open_review,
 )
 from app.workout_reviews.schemas import WorkoutReviewDraftUpdate
 from app.workout_reviews.validation import ValidatedDraft, WorkoutReviewDraftValidator
@@ -118,7 +119,13 @@ class WorkoutReviewService:
         self._require_lease(review, coach_id)
         self._require_revision(review, expected_revision)
         active = get_active_plan_for_update(self._db, review.user_id)
-        if active is None or active.id != review.source_plan_id:
+        if review.source_plan.status not in {
+            WorkoutPlanStatus.PENDING_REVIEW,
+            WorkoutPlanStatus.ACTIVE,
+        } or (
+            review.source_plan.status is WorkoutPlanStatus.ACTIVE
+            and (active is None or active.id != review.source_plan_id)
+        ):
             review.status = WorkoutReviewStatus.SUPERSEDED
             self._db.commit()
             raise ReviewConflict(WorkoutReviewErrorCode.REVIEW_SUPERSEDED)
@@ -134,8 +141,12 @@ class WorkoutReviewService:
         validated = self._validator.validate(review.source_plan, payload)
         approved = self._clone_approved_plan(review.source_plan, validated)
         now = self._clock()
-        active.status = WorkoutPlanStatus.SUPERSEDED
-        active.superseded_at = now
+        if active is not None:
+            active.status = WorkoutPlanStatus.SUPERSEDED
+            active.superseded_at = now
+            supersede_open_review(self._db, active.id)
+        review.source_plan.status = WorkoutPlanStatus.SUPERSEDED
+        review.source_plan.superseded_at = now
         approved.status = WorkoutPlanStatus.ACTIVE
         approved.activated_at = now
         self._db.add(approved)

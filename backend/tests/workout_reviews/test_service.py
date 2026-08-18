@@ -92,10 +92,11 @@ def _active_plan(
     *,
     user: User,
     exercises: list[Exercise],
+    status: WorkoutPlanStatus = WorkoutPlanStatus.ACTIVE,
 ) -> WorkoutPlan:
     plan = WorkoutPlan(
         user_id=user.id,
-        status=WorkoutPlanStatus.ACTIVE,
+        status=status,
         generation_signature="a" * 64,
         profile_snapshot={"plan_duration_weeks": 4, "session_duration_minutes": 45},
         provider="fake",
@@ -247,6 +248,83 @@ def test_approval_creates_new_active_version_and_preserves_source(db: Session) -
     assert approved.days[0].exercises[0].sets == 4
     assert review.approved_plan_id == approved.id
     assert review.status is WorkoutReviewStatus.APPROVED
+
+
+def test_approval_activates_pending_plan_without_creating_review_loop(db: Session) -> None:
+    member = _user(db, "pending-approval-member")
+    coach = _user(db, "pending-approval-coach")
+    exercise = _exercise(db, "pending-press")
+    source = _active_plan(
+        db,
+        user=member,
+        exercises=[exercise],
+        status=WorkoutPlanStatus.PENDING_REVIEW,
+    )
+    review = ensure_pending_review(db, source)
+    service = WorkoutReviewService(db, clock=Clock())
+    service.claim(review.id, coach.id)
+    saved = service.save_draft(review.id, coach.id, _draft(review))
+
+    approved = service.approve(
+        review.id,
+        coach.id,
+        expected_revision=saved.draft_revision,
+    )
+
+    db.refresh(source)
+    db.refresh(review)
+    assert source.status is WorkoutPlanStatus.SUPERSEDED
+    assert approved.status is WorkoutPlanStatus.ACTIVE
+    assert approved.activated_at == Clock().now
+    assert review.status is WorkoutReviewStatus.APPROVED
+    assert review.approved_plan_id == approved.id
+    assert (
+        db.query(WorkoutPlanReview)
+        .filter(WorkoutPlanReview.source_plan_id == approved.id)
+        .count()
+        == 0
+    )
+
+
+def test_approval_supersedes_previous_active_plan_only_at_approval(db: Session) -> None:
+    member = _user(db, "approval-transition-member")
+    coach = _user(db, "approval-transition-coach")
+    previous_exercise = _exercise(db, "previous-press")
+    pending_exercise = _exercise(db, "pending-press")
+    previous = _active_plan(db, user=member, exercises=[previous_exercise])
+    source = _active_plan(
+        db,
+        user=member,
+        exercises=[pending_exercise],
+        status=WorkoutPlanStatus.PENDING_REVIEW,
+    )
+    review = ensure_pending_review(db, source)
+    service = WorkoutReviewService(db, clock=Clock())
+    service.claim(review.id, coach.id)
+    saved = service.save_draft(review.id, coach.id, _draft(review))
+
+    assert previous.status is WorkoutPlanStatus.ACTIVE
+
+    approved = service.approve(
+        review.id,
+        coach.id,
+        expected_revision=saved.draft_revision,
+    )
+
+    db.refresh(previous)
+    assert previous.status is WorkoutPlanStatus.SUPERSEDED
+    assert previous.superseded_at == Clock().now
+    assert approved.status is WorkoutPlanStatus.ACTIVE
+    assert approved.activated_at == Clock().now
+    assert (
+        db.query(WorkoutPlan)
+        .filter(
+            WorkoutPlan.user_id == member.id,
+            WorkoutPlan.status == WorkoutPlanStatus.ACTIVE,
+        )
+        .count()
+        == 1
+    )
 
 
 def test_approval_cannot_replace_a_newer_active_plan(db: Session) -> None:
