@@ -78,7 +78,10 @@ from app.workouts.repository import (
     persist_pending_review_plan,
 )
 from app.workouts.schemas import CandidateSet, ProgramGenerationOverrides, WorkoutGenerationProfile
-from app.workouts.signature import normalize_physical_limitations
+from app.workouts.signature import (
+    build_generation_request_signature,
+    normalize_physical_limitations,
+)
 from app.workouts.time_budget import (
     ExerciseTiming,
     calculate_day_minutes,
@@ -837,15 +840,13 @@ class WorkoutGenerationService:
         catalog_hash: str,
         reference_hash: str = "",
     ) -> str:
-        payload = {
-            "request": request.model_dump(mode="json"),
-            "catalog_hash": catalog_hash,
-            "reference_hash": reference_hash,
-            "engine_version": self._ruleset.engine_version,
-            "ruleset_version": self._ruleset.version,
-        }
-        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-        return hashlib.sha256(encoded).hexdigest()
+        return build_generation_request_signature(
+            request,
+            catalog_hash=catalog_hash,
+            reference_hash=reference_hash,
+            engine_version=self._ruleset.engine_version,
+            ruleset_version=self._ruleset.version,
+        )
 
     @staticmethod
     def _template_reference_hash(references: tuple[TemplateReference, ...]) -> str:

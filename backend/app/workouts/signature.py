@@ -3,11 +3,15 @@ from __future__ import annotations
 import hashlib
 import json
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from decimal import Decimal
 from enum import Enum
 from typing import Any
+from uuid import UUID
 
+from pydantic import BaseModel
+
+from app.workouts.program_engine.schemas import ProgramGenerationRequest
 from app.workouts.schemas import (
     GenerationSignatureContext,
     WorkoutExerciseCandidate,
@@ -28,8 +32,31 @@ def _string_value(value: object) -> str:
 
 def _canonical_hash(payload: object) -> str:
     return hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+        json.dumps(
+            _canonical_value(payload),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode()
     ).hexdigest()
+
+
+def _canonical_value(value: object) -> object:
+    if isinstance(value, (Enum, UUID, Decimal)):
+        return str(_value(value))
+    if isinstance(value, BaseModel):
+        return _canonical_value(value.model_dump(mode="python"))
+    if isinstance(value, Mapping):
+        return {
+            str(_canonical_value(key)): _canonical_value(item)
+            for key, item in sorted(value.items(), key=lambda item: str(item[0]))
+        }
+    if isinstance(value, (set, frozenset)):
+        items = [_canonical_value(item) for item in value]
+        return sorted(items, key=lambda item: json.dumps(item, sort_keys=True))
+    if isinstance(value, (list, tuple)):
+        return [_canonical_value(item) for item in value]
+    return value
 
 
 def normalize_physical_limitations(value: str | None) -> str | None:
@@ -89,5 +116,24 @@ def build_generation_signature(context: GenerationSignatureContext) -> str:
         "model_id": context.model_id,
         "prompt_version": context.prompt_version,
         "generation_policy_version": context.generation_policy_version,
+    }
+    return _canonical_hash(payload)
+
+
+def build_generation_request_signature(
+    request: ProgramGenerationRequest,
+    *,
+    catalog_hash: str,
+    reference_hash: str,
+    engine_version: str,
+    ruleset_version: str,
+) -> str:
+    """Hash effective generation inputs with stable collection serialization."""
+    payload = {
+        "request": request.model_dump(mode="python"),
+        "catalog_hash": catalog_hash,
+        "reference_hash": reference_hash,
+        "engine_version": engine_version,
+        "ruleset_version": ruleset_version,
     }
     return _canonical_hash(payload)
