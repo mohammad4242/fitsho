@@ -78,6 +78,7 @@ export type ProfileInput = {
   hip_circumference_cm: number | null;
   fitness_goal: FitnessGoal;
   experience_level: ExperienceLevel;
+  training_age_months?: number | null;
   training_days_per_week: number;
   training_location: TrainingLocation;
   home_training_setup: HomeTrainingSetup | null;
@@ -110,6 +111,7 @@ export type ProfileFormValues = {
   hip_circumference_cm: string;
   fitness_goal: FitnessGoal | "";
   experience_level: ExperienceLevel | "";
+  training_age_months: string;
   training_days_per_week: string;
   training_location: TrainingLocation | "";
   home_training_setup: HomeTrainingSetup | "";

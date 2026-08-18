@@ -75,6 +75,20 @@ def test_first_month_experience_is_stored_in_profile(db: Session) -> None:
     assert stored.experience_level is ExperienceLevel.FIRST_MONTH
 
 
+def test_training_age_months_is_stored_in_profile(db: Session) -> None:
+    user = make_user(db, "training-age@example.com")
+    profile = make_profile(user)
+    profile.training_age_months = 36
+    db.add(profile)
+    db.flush()
+    db.expire(profile)
+
+    stored = db.scalar(select(UserProfile).where(UserProfile.user_id == user.id))
+
+    assert stored is not None
+    assert stored.training_age_months == 36
+
+
 def test_weight_is_decimal_and_history_is_many_to_one(db: Session) -> None:
     user = make_user(db, "weights@example.com")
     db.add(make_profile(user))
@@ -114,6 +128,8 @@ def test_deleting_user_cascades_profile_and_measurements(db: Session) -> None:
         ("height_cm", 231, "ck_user_profiles_height_cm_range"),
         ("training_days_per_week", 0, "ck_user_profiles_training_days_range"),
         ("training_days_per_week", 8, "ck_user_profiles_training_days_range"),
+        ("training_age_months", -1, "ck_user_profiles_training_age_months_range"),
+        ("training_age_months", 901, "ck_user_profiles_training_age_months_range"),
         ("session_duration_minutes", 50, "ck_user_profiles_session_duration_values"),
         ("physical_limitations", "x" * 1001, "ck_user_profiles_limitations_length"),
     ],

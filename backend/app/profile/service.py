@@ -117,6 +117,7 @@ def create_profile(
         "height_cm": payload.height_cm,
         "fitness_goal": payload.fitness_goal,
         "experience_level": payload.experience_level,
+        "training_age_months": payload.training_age_months,
         "training_days_per_week": payload.training_days_per_week,
         "training_location": payload.training_location,
         "home_training_setup": payload.home_training_setup,

@@ -372,6 +372,7 @@ it("submits one normalized typed profile payload", async () => {
     hip_circumference_cm: null,
     fitness_goal: "build_muscle",
     experience_level: "beginner",
+    training_age_months: null,
     training_days_per_week: 3,
     training_location: "gym",
     home_training_setup: null,

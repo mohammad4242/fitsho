@@ -24,6 +24,7 @@ from app.exercises.models import Exercise, ExerciseEquipment, ExerciseMediaAsset
 from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.models import BodyMeasurement, UserProfile
+from app.profile.service import get_profile
 from app.workout_reviews.enums import WorkoutReviewStatus
 from app.workout_reviews.models import WorkoutPlanReview
 from app.workouts.body_analysis_resolver import BodyAnalysisInfluenceResolver
@@ -180,6 +181,36 @@ def _persist_active_plan(
     db.add(plan)
     db.commit()
     return plan
+
+
+def test_program_request_uses_stored_training_age_over_experience_fallback(
+    db: Session,
+) -> None:
+    user = _user_with_profile(db)
+    profile = db.get(UserProfile, user.id)
+    assert profile is not None
+    profile.experience_level = ExperienceLevel.ADVANCED
+    profile.training_age_months = 7
+    db.flush()
+
+    request = _service(db)._to_program_request(get_profile(db, user.id), None)
+
+    assert request.training_age_months == 7
+
+
+def test_program_request_uses_legacy_training_age_fallback_when_missing(
+    db: Session,
+) -> None:
+    user = _user_with_profile(db)
+    profile = db.get(UserProfile, user.id)
+    assert profile is not None
+    profile.experience_level = ExperienceLevel.INTERMEDIATE
+    profile.training_age_months = None
+    db.flush()
+
+    request = _service(db)._to_program_request(get_profile(db, user.id), None)
+
+    assert request.training_age_months == 12
 
 
 def test_catalog_uses_profile_gender_media_and_falls_back_to_other_gender(

@@ -13,6 +13,7 @@ const values = {
   experience_level: "" as const, training_days_per_week: "", training_location: "" as const,
   home_training_setup: "" as const, session_duration_minutes: "", physical_limitations: "",
   training_intensity: "" as const,
+  training_age_months: "",
   training_cautions: null, plan_duration_weeks: "4",
 };
 
@@ -42,6 +43,8 @@ it("uses fixed experience, weekly-day, and workout-time choices", async () => {
   expect(screen.getByRole("button", { name: "ماه اولمه" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "مبتدی (زیر ۶ ماه)" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "مبتدی (زیر ۶ ماه)" }));
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.type(screen.getByLabelText("سابقه تمرین به ماه"), "24");
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.click(screen.getByRole("button", { name: "۴ روز در هفته" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));

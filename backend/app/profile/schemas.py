@@ -63,6 +63,7 @@ class ProfileCreate(BaseModel):
     )
     fitness_goal: FitnessGoal
     experience_level: ExperienceLevel
+    training_age_months: int | None = Field(default=None, ge=0, le=900)
     training_days_per_week: int = Field(ge=2, le=6)
     training_location: TrainingLocation
     home_training_setup: HomeTrainingSetup | None = None
@@ -131,6 +132,7 @@ class ProfileUpdate(BaseModel):
     )
     fitness_goal: FitnessGoal | None = None
     experience_level: ExperienceLevel | None = None
+    training_age_months: int | None = Field(default=None, ge=0, le=900)
     training_days_per_week: int | None = Field(default=None, ge=2, le=6)
     training_location: TrainingLocation | None = None
     home_training_setup: HomeTrainingSetup | None = None
@@ -178,6 +180,7 @@ class ProfileUpdate(BaseModel):
         required_fields = profile_fields_set - {
             "home_training_setup",
             "physical_limitations",
+            "training_age_months",
             "shoulder_circumference_cm",
             "waist_circumference_cm",
             "hip_circumference_cm",
@@ -205,6 +208,7 @@ class ProfileResponse(BaseModel):
     circumferences_measured_at: datetime | None
     fitness_goal: FitnessGoal
     experience_level: ExperienceLevel
+    training_age_months: int | None
     training_days_per_week: int
     physical_limitations: str | None
     created_at: datetime

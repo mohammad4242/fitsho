@@ -110,6 +110,16 @@ class WorkoutGenerationSettings:
     ai_coach_routing_preferences: ProviderRoutingPreferences = ProviderRoutingPreferences()
 
 
+def legacy_training_age_months(experience_level: ExperienceLevel) -> int:
+    """Temporary fallback for profiles created before training age was persisted."""
+    return {
+        ExperienceLevel.FIRST_MONTH: 0,
+        ExperienceLevel.BEGINNER: 0,
+        ExperienceLevel.INTERMEDIATE: 12,
+        ExperienceLevel.ADVANCED: 48,
+    }[experience_level]
+
+
 @dataclass(frozen=True)
 class WorkoutPlanGenerationResult:
     plan: WorkoutPlan
@@ -678,12 +688,11 @@ class WorkoutGenerationService:
         blocked_caution_tags = set().union(*(CAUTION_EXCLUSIONS[item] for item in cautions))
         sanitized = self._sanitize_limitations(profile.physical_limitations)
         limitations = (Limitation(name=sanitized, stable=False),) if sanitized is not None else ()
-        training_age = {
-            ExperienceLevel.FIRST_MONTH: 0,
-            ExperienceLevel.BEGINNER: 0,
-            ExperienceLevel.INTERMEDIATE: 12,
-            ExperienceLevel.ADVANCED: 48,
-        }[profile.experience_level]
+        training_age = (
+            profile.training_age_months
+            if profile.training_age_months is not None
+            else legacy_training_age_months(profile.experience_level)
+        )
         values: dict[str, object] = {
             "user_id": profile.user_id,
             "age": self._age(profile.birth_date),

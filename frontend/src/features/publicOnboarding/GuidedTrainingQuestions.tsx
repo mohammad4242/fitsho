@@ -15,12 +15,13 @@ type Props = {
 export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete, allowNoTraining = false, onNoTraining }: Props) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage === "en" ? "en" : "fa";
-  const questions = useMemo(() => ["experience", "days", "location", ...(values.training_location === "home" ? ["home"] : []), "duration", "intensity", "cautions", "weeks"] as const, [values.training_location]);
+  const questions = useMemo(() => ["experience", "trainingAge", "days", "location", ...(values.training_location === "home" ? ["home"] : []), "duration", "intensity", "cautions", "weeks"] as const, [values.training_location]);
   const [index, setIndex] = useState(0);
   const [noTrainingSelected, setNoTrainingSelected] = useState(false);
   const question = questions[Math.min(index, questions.length - 1)];
   const title = ({
     experience: language === "en" ? "How much consistent training experience do you have?" : "چقدر سابقه تمرین مداوم داری؟",
+    trainingAge: language === "en" ? "How many months have you trained consistently?" : "چند ماه است منظم تمرین می‌کنی؟",
     days: language === "en" ? "How many days can you train?" : "چند روز در هفته تمرین می‌کنی؟",
     location: language === "en" ? "Where will you train?" : "کجا تمرین می‌کنی؟",
     home: language === "en" ? "What do you have at home?" : "در خانه چه امکاناتی داری؟",
@@ -48,6 +49,7 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete, 
   function toggle(caution: TrainingCaution) { onChange("training_cautions", cautions.includes(caution) ? cautions.filter((item) => item !== caution) : [...cautions, caution]); }
   const ready = ({
     experience: values.experience_level !== "" || noTrainingSelected,
+    trainingAge: true,
     days: Number(values.training_days_per_week) >= 2 && Number(values.training_days_per_week) <= 6,
     location: values.training_location !== "",
     home: values.home_training_setup !== "",
@@ -56,7 +58,7 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete, 
     cautions: true,
     weeks: values.plan_duration_weeks !== "",
   })[question];
-  const activeStage = question === "experience" ? 0 : ["days", "location", "home", "duration", "intensity"].includes(question) ? 1 : 2;
+  const activeStage = ["experience", "trainingAge"].includes(question) ? 0 : ["days", "location", "home", "duration", "intensity"].includes(question) ? 1 : 2;
   const stages = language === "en" ? ["Experience", "Routine", "Safety"] : ["تجربه", "برنامه", "ایمنی"];
 
   return <section className="guided-question" aria-labelledby="guided-training-title">
@@ -70,6 +72,11 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete, 
         ["intermediate", language === "en" ? "Intermediate (6 months to 2 years)" : "متوسط (۶ ماه تا ۲ سال)"],
         ["advanced", language === "en" ? "Advanced (over 2 years)" : "پیشرفته (بیش از ۲ سال)"],
       ] as const).map(([value, label]) => choice("experience_level", value, label))}{allowNoTraining && <button className={noTrainingSelected ? "is-selected" : ""} type="button" onClick={() => { setNoTrainingSelected(true); onChange("experience_level", ""); }}>{language === "en" ? "I do not train" : "تمرین نمی‌کنم"}</button>}</div>}
+      {question === "trainingAge" && <div className="guided-number-field">
+        <label htmlFor="guided-training-age">{language === "en" ? "Training history in months" : "سابقه تمرین به ماه"}</label>
+        <input id="guided-training-age" name="training_age_months" type="number" inputMode="numeric" min={0} max={900} step={1} value={values.training_age_months} onChange={(event) => onChange("training_age_months", event.target.value)} />
+        <small>{language === "en" ? "Optional — leave blank if unsure." : "اختیاری است؛ اگر مطمئن نیستی خالی بگذار."}</small>
+      </div>}
       {question === "days" && <div className="guided-choice-grid">{[2, 3, 4, 5, 6].map((value) => choice("training_days_per_week", String(value), language === "en" ? `${value} days per week` : `${new Intl.NumberFormat("fa-IR").format(value)} روز در هفته`))}</div>}
       {question === "location" && <div className="guided-choice-grid">{["home", "gym"].map((value) => choice("training_location", value, t(`onboarding.options.trainingLocation.${value}`)))}</div>}
       {question === "home" && <div className="guided-choice-grid">{["bodyweight_only", "dumbbells_available"].map((value) => choice("home_training_setup", value, t(`onboarding.options.homeTrainingSetup.${value}`)))}</div>}

@@ -37,6 +37,7 @@ const emptyValues: ProfileFormValues = {
   hip_circumference_cm: "",
   fitness_goal: "",
   experience_level: "",
+  training_age_months: "",
   training_days_per_week: "",
   training_location: "",
   home_training_setup: "",

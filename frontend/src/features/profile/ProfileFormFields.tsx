@@ -320,6 +320,28 @@ export function ExperienceFields({
       </div>
 
       <div className="profile-field">
+        <label htmlFor="profile-training-age">{t("onboarding.fields.trainingAge")}</label>
+        <input
+          id="profile-training-age"
+          name="training_age_months"
+          type="number"
+          inputMode="numeric"
+          autoComplete="off"
+          min={0}
+          max={900}
+          step={1}
+          value={values.training_age_months}
+          aria-invalid={errors.training_age_months !== undefined}
+          aria-describedby={describedBy("training_age_months", errors.training_age_months, true)}
+          onChange={(event) => onChange("training_age_months", event.target.value)}
+        />
+        <p className="profile-field__hint" id="training_age_months-hint">
+          {t("onboarding.hints.trainingAge")}
+        </p>
+        <FieldError field="training_age_months" error={errors.training_age_months} />
+      </div>
+
+      <div className="profile-field">
         <label htmlFor="profile-training-location">
           {t("onboarding.fields.trainingLocation")}
         </label>

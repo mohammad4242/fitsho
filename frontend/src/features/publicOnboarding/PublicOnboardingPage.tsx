@@ -17,6 +17,7 @@ const emptyValues: ProfileFormValues = {
   display_name: "", birth_date: "", sex: "", height_cm: "", current_weight_kg: "",
   shoulder_circumference_cm: "", waist_circumference_cm: "", hip_circumference_cm: "",
   fitness_goal: "", experience_level: "", training_days_per_week: "",
+  training_age_months: "",
   training_location: "", home_training_setup: "", session_duration_minutes: "",
   training_intensity: "",
   physical_limitations: "", training_cautions: null, plan_duration_weeks: "4",

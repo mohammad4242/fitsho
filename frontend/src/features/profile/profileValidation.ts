@@ -25,6 +25,7 @@ export type ProfileValidationCode =
   | "circumferenceRange"
   | "circumferencePrecision"
   | "trainingDaysRange"
+  | "trainingAgeRange"
   | "sessionDurationInvalid"
   | "planDurationInvalid"
   | "limitationsLength";
@@ -162,6 +163,14 @@ function validateStepThree(values: ProfileFormValues): ProfileValidationErrors {
     errors.training_days_per_week = "trainingDaysRange";
   }
 
+  const trainingAge = values.training_age_months.trim();
+  if (
+    trainingAge !== "" &&
+    (!/^\d+$/.test(trainingAge) || Number(trainingAge) > 900)
+  ) {
+    errors.training_age_months = "trainingAgeRange";
+  }
+
   if (values.training_location === "") {
     errors.training_location = "required";
   }
@@ -245,6 +254,9 @@ export function toProfileInput(values: ProfileFormValues): ProfileInput {
       : null,
     fitness_goal: values.fitness_goal as FitnessGoal,
     experience_level: values.experience_level as ExperienceLevel,
+    training_age_months: values.training_age_months.trim()
+      ? Number(values.training_age_months.trim())
+      : null,
     training_days_per_week: Number(values.training_days_per_week.trim()),
     training_location: values.training_location as TrainingLocation,
     home_training_setup:
@@ -273,6 +285,9 @@ export function profileToFormValues(profile: Profile): ProfileFormValues {
     hip_circumference_cm: profile.hip_circumference_cm === null ? "" : String(profile.hip_circumference_cm),
     fitness_goal: profile.fitness_goal,
     experience_level: profile.experience_level,
+    training_age_months: profile.training_age_months == null
+      ? ""
+      : String(profile.training_age_months),
     training_days_per_week: String(profile.training_days_per_week),
     training_location: profile.training_location,
     home_training_setup: profile.home_training_setup ?? "",
@@ -320,6 +335,9 @@ export function toProfilePatch(
   }
   if (input.experience_level !== currentProfile.experience_level) {
     patch.experience_level = input.experience_level;
+  }
+  if (input.training_age_months !== (currentProfile.training_age_months ?? null)) {
+    patch.training_age_months = input.training_age_months;
   }
   if (input.training_days_per_week !== currentProfile.training_days_per_week) {
     patch.training_days_per_week = input.training_days_per_week;

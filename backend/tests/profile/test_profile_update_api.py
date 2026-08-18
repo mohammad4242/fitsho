@@ -17,6 +17,7 @@ VALID_PROFILE = {
     "current_weight_kg": 76.5,
     "fitness_goal": "build_muscle",
     "experience_level": "beginner",
+    "training_age_months": 24,
     "training_days_per_week": 3,
     "training_location": "home",
     "home_training_setup": "dumbbells_available",
@@ -81,6 +82,23 @@ def test_patch_same_weight_is_idempotent(client: TestClient, db: Session) -> Non
         )
         == 1
     )
+
+
+def test_patch_updates_training_age_months(client: TestClient, db: Session) -> None:
+    user_id = register(client, "profile-training-age@example.com")
+    create_profile(client)
+
+    response = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={"training_age_months": 48},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["training_age_months"] == 48
+    profile = db.get(UserProfile, user_id)
+    assert profile is not None
+    assert profile.training_age_months == 48
 
 
 def test_patch_updates_optional_circumferences_as_a_new_measurement(

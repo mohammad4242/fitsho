@@ -16,6 +16,7 @@ def valid_payload() -> dict[str, object]:
         "current_weight_kg": "76.50",
         "fitness_goal": "build_muscle",
         "experience_level": "beginner",
+        "training_age_months": 24,
         "training_days_per_week": 3,
         "training_location": "gym",
         "home_training_setup": None,
@@ -30,6 +31,7 @@ def test_profile_create_normalizes_text_and_decimal() -> None:
     assert profile.display_name == "Mohammad"
     assert profile.current_weight_kg == Decimal("76.50")
     assert profile.physical_limitations is None
+    assert profile.training_age_months == 24
 
 
 def test_profile_create_accepts_optional_circumference_measurements() -> None:
@@ -69,6 +71,8 @@ def test_calculate_age_handles_birthday_boundary() -> None:
         ("training_days_per_week", 1),
         ("training_days_per_week", 7),
         ("training_days_per_week", 8),
+        ("training_age_months", -1),
+        ("training_age_months", 901),
         ("sex", "unknown"),
         ("fitness_goal", "bulk"),
         ("experience_level", "expert"),
@@ -90,6 +94,15 @@ def test_profile_create_accepts_six_training_days() -> None:
     payload["training_days_per_week"] = 6
 
     assert ProfileCreate.model_validate(payload).training_days_per_week == 6
+
+
+def test_profile_update_accepts_and_bounds_training_age() -> None:
+    assert ProfileUpdate.model_validate({"training_age_months": 36}).training_age_months == 36
+
+    with pytest.raises(ValidationError):
+        ProfileUpdate.model_validate({"training_age_months": -1})
+    with pytest.raises(ValidationError):
+        ProfileUpdate.model_validate({"training_age_months": 901})
 
 
 @pytest.mark.parametrize(

@@ -44,6 +44,10 @@ class UserProfile(Base):
             name="ck_user_profiles_training_days_range",
         ),
         CheckConstraint(
+            "training_age_months BETWEEN 0 AND 900",
+            name="ck_user_profiles_training_age_months_range",
+        ),
+        CheckConstraint(
             "physical_limitations IS NULL OR char_length(physical_limitations) <= 1000",
             name="ck_user_profiles_limitations_length",
         ),
@@ -108,6 +112,7 @@ class UserProfile(Base):
         ),
         nullable=True,
     )
+    training_age_months: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     training_days_per_week: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     training_location: Mapped[TrainingLocation | None] = mapped_column(
         Enum(

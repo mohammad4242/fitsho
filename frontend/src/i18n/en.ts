@@ -199,6 +199,7 @@ const en = {
         hipCircumference: "Hip circumference (cm, optional)",
         fitnessGoal: "Fitness goal",
         experience: "Experience level",
+        trainingAge: "Regular training history (months, optional)",
         trainingDays: "Training days per week",
         trainingLocation: "Where do you train?",
         homeTrainingSetup: "What equipment do you have for training at home?",
@@ -211,6 +212,7 @@ const en = {
       hints: {
         birthDate: "Age must be between 18 and 100.",
         limitations: "Injuries or conditions that should be considered during training.",
+        trainingAge: "Leave blank if you have not trained regularly.",
         circumference: "Used for body-proportion analysis; measure at the widest point.",
       },
       options: {
@@ -287,6 +289,7 @@ const en = {
         weightRange: "Weight must be between 35 and 300 kilograms.",
         weightPrecision: "Weight can have at most two decimal places.",
         trainingDaysRange: "Training days must be between 2 and 6.",
+        trainingAgeRange: "Training history must be between 0 and 900 months.",
         sessionDurationInvalid: "Choose one of the available session durations.",
         planDurationInvalid: "Choose 4, 6, or 8 weeks.",
         limitationsLength: "Limitations can have at most 1,000 characters.",

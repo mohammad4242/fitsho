@@ -199,6 +199,7 @@ const fa = {
         hipCircumference: "دور باسن (سانتی‌متر، اختیاری)",
         fitnessGoal: "هدف ورزشی",
         experience: "سطح تجربه",
+        trainingAge: "سابقه تمرین منظم (ماه، اختیاری)",
         trainingDays: "روزهای تمرین در هفته",
         trainingLocation: "کجا تمرین می‌کنی؟",
         homeTrainingSetup: "برای تمرین در خانه چه امکاناتی داری؟",
@@ -211,6 +212,7 @@ const fa = {
       hints: {
         birthDate: "سن باید بین ۱۸ تا ۱۰۰ سال باشد.",
         limitations: "آسیب‌دیدگی یا شرایطی که باید در تمرین در نظر گرفته شود.",
+        trainingAge: "اگر تمرین منظم نداشتی، خالی بگذار.",
         circumference: "برای تحلیل تناسب بدن؛ در پهن‌ترین بخش اندازه بگیر.",
       },
       options: {
@@ -287,6 +289,7 @@ const fa = {
         weightRange: "وزن باید بین ۳۵ تا ۳۰۰ کیلوگرم باشد.",
         weightPrecision: "وزن حداکثر دو رقم اعشار داشته باشد.",
         trainingDaysRange: "روزهای تمرین باید بین ۲ تا ۶ باشد.",
+        trainingAgeRange: "سابقه تمرین باید عددی بین ۰ تا ۹۰۰ ماه باشد.",
         sessionDurationInvalid: "زمان جلسه باید یکی از گزینه‌های موجود باشد.",
         planDurationInvalid: "مدت برنامه باید ۴، ۶ یا ۸ هفته باشد.",
         limitationsLength: "محدودیت‌ها حداکثر ۱۰۰۰ نویسه است.",

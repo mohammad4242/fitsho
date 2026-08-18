@@ -18,6 +18,7 @@ VALID_PROFILE = {
     "current_weight_kg": 76.5,
     "fitness_goal": "build_muscle",
     "experience_level": "beginner",
+    "training_age_months": 24,
     "training_days_per_week": 3,
     "training_location": "gym",
     "home_training_setup": None,
@@ -57,6 +58,7 @@ def test_create_profile_atomically_stores_profile_and_initial_weight(
     assert response.json()["training_location"] == "gym"
     assert response.json()["home_training_setup"] is None
     assert response.json()["session_duration_minutes"] == 60
+    assert response.json()["training_age_months"] == 24
     assert db.get(UserProfile, user_id) is not None
     measurements = db.scalars(
         select(BodyMeasurement).where(BodyMeasurement.user_id == user_id)

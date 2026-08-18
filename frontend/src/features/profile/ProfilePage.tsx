@@ -40,6 +40,7 @@ const personalFields = new Set<keyof ProfilePatch>([
 ]);
 const trainingFields = new Set<keyof ProfilePatch>([
   "experience_level", "training_days_per_week", "training_location",
+  "training_age_months",
   "home_training_setup", "session_duration_minutes", "training_intensity", "physical_limitations",
   "training_cautions", "plan_duration_weeks", "workout_generation_method",
 ]);
@@ -452,6 +453,7 @@ function sharedToFormValues(profile: SharedProfile): ProfileFormValues {
     hip_circumference_cm: "",
     fitness_goal: profile.fitness_goal,
     experience_level: "",
+    training_age_months: "",
     training_days_per_week: "",
     training_location: "",
     home_training_setup: "",

@@ -143,6 +143,7 @@ def to_response(snapshot: ProfileSnapshot) -> ProfileResponse:
         ),
         fitness_goal=profile.fitness_goal,
         experience_level=profile.experience_level,
+        training_age_months=profile.training_age_months,
         training_days_per_week=profile.training_days_per_week,
         training_location=profile.training_location,
         home_training_setup=profile.home_training_setup,

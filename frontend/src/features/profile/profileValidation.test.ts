@@ -22,6 +22,7 @@ const validValues: ProfileFormValues = {
   hip_circumference_cm: "",
   fitness_goal: "build_muscle",
   experience_level: "beginner",
+  training_age_months: "24",
   training_days_per_week: "3",
   training_location: "gym",
   home_training_setup: "",
@@ -46,6 +47,7 @@ const profile: Profile = {
   circumferences_measured_at: null,
   fitness_goal: "build_muscle",
   experience_level: "beginner",
+  training_age_months: 24,
   training_days_per_week: 3,
   training_location: "gym",
   home_training_setup: null,
@@ -76,6 +78,12 @@ describe("profile validation", () => {
     expect(validateStep({ ...validValues, birth_date: "1925-07-27" }, 1, today)).toEqual({
       birth_date: "ageRange",
     });
+  });
+
+  it("validates optional training age when it is supplied", () => {
+    expect(
+      validateStep({ ...validValues, training_age_months: "901" }, 3, today),
+    ).toEqual({ training_age_months: "trainingAgeRange" });
   });
 
   it("catches regressions at exact valid age boundaries", () => {
@@ -215,6 +223,7 @@ describe("profile validation", () => {
       hip_circumference_cm: 98.25,
       fitness_goal: "build_muscle",
       experience_level: "beginner",
+      training_age_months: 24,
       training_days_per_week: 3,
       training_location: "gym",
       home_training_setup: null,
@@ -256,5 +265,11 @@ describe("profile validation", () => {
       home_training_setup: "bodyweight_only",
       session_duration_minutes: 75,
     });
+  });
+
+  it("serializes training age changes", () => {
+    expect(
+      toProfilePatch({ ...validValues, training_age_months: "48" }, profile),
+    ).toEqual({ training_age_months: 48 });
   });
 });
