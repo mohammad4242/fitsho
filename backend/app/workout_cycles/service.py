@@ -535,6 +535,31 @@ def complete_cycle(
             performance_changes=feedback.performance_changes,
             pain_or_limitation_feedback=feedback.pain_or_limitation_feedback,
             measurements=dict(feedback.measurements),
+            overall_difficulty=feedback.overall_difficulty,
+            overall_recovery=feedback.overall_recovery,
+            overall_satisfaction=feedback.overall_satisfaction,
+            strength_progress=feedback.strength_progress,
+            muscle_progress=feedback.muscle_progress,
+            endurance_progress=feedback.endurance_progress,
+            energy_progress=feedback.energy_progress,
+            progressed_muscles=(
+                [muscle.value for muscle in feedback.progressed_muscles]
+                if feedback.progressed_muscles is not None
+                else None
+            ),
+            lagging_muscles=(
+                [muscle.value for muscle in feedback.lagging_muscles]
+                if feedback.lagging_muscles is not None
+                else None
+            ),
+            goal_changed=feedback.goal_changed,
+            next_goal=feedback.next_goal,
+            schedule_changed=feedback.schedule_changed,
+            next_training_days=feedback.next_training_days,
+            next_session_duration_minutes=feedback.next_session_duration_minutes,
+            equipment_changed=feedback.equipment_changed,
+            new_limitation=feedback.new_limitation,
+            note_optional=feedback.note_optional,
         )
     cycle.status = WorkoutCycleStatus.COMPLETED
     cycle.completed_at = datetime.now(UTC)

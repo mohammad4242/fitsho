@@ -5,12 +5,20 @@ from threading import Barrier, Lock
 from uuid import UUID, uuid4
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import create_engine, delete, event, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
-from app.workout_cycles.enums import WorkoutCycleStatus
+from app.exercises.enums import MuscleGroup
+from app.workout_cycles.enums import (
+    WorkoutCycleFeedbackProgress,
+    WorkoutCycleFeedbackSatisfaction,
+    WorkoutCycleStatus,
+    WorkoutCycleWeeklyCheckInDifficulty,
+    WorkoutCycleWeeklyCheckInRecovery,
+)
 from app.workout_cycles.models import WorkoutCycle, WorkoutCycleFeedback
 from app.workout_cycles.schemas import CompletionFeedbackInput
 from app.workout_cycles.service import (
@@ -24,6 +32,7 @@ from app.workout_cycles.service import (
 )
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan
+from app.workouts.program_engine.enums import Goal
 
 
 def make_user(db: Session, email: str) -> User:
@@ -200,6 +209,104 @@ def test_complete_cycle_stores_structured_optional_feedback(db: Session) -> None
         "waist_cm": 84,
     }
     assert completed.completion_feedback.submitted_at is not None
+
+
+def test_complete_cycle_stores_structured_coaching_feedback(db: Session) -> None:
+    user = make_user(db, "structured-cycle-feedback@example.com")
+    plan = make_plan(db, user.id, duration_weeks=8)
+    cycle = start_cycle(db, user_id=user.id, workout_plan_id=plan.id)
+    feedback = CompletionFeedbackInput(
+        overall_difficulty=WorkoutCycleWeeklyCheckInDifficulty.HARD,
+        overall_recovery=WorkoutCycleWeeklyCheckInRecovery.GOOD,
+        overall_satisfaction=WorkoutCycleFeedbackSatisfaction.SATISFIED,
+        strength_progress=WorkoutCycleFeedbackProgress.IMPROVED,
+        muscle_progress=WorkoutCycleFeedbackProgress.IMPROVED,
+        endurance_progress=WorkoutCycleFeedbackProgress.UNCHANGED,
+        energy_progress=WorkoutCycleFeedbackProgress.DECLINED,
+        progressed_muscles=[MuscleGroup.CHEST, MuscleGroup.SHOULDERS],
+        lagging_muscles=[MuscleGroup.BACK],
+        goal_changed=True,
+        next_goal=Goal.STRENGTH,
+        schedule_changed=True,
+        next_training_days=4,
+        next_session_duration_minutes=60,
+        equipment_changed=False,
+        new_limitation="Avoid deep knee flexion.",
+        note_optional="Felt stronger overall.",
+        measurements={"weight_kg": 81.2},
+    )
+
+    completed = complete_cycle(db, cycle_id=cycle.id, user_id=user.id, feedback=feedback)
+
+    stored = completed.completion_feedback
+    assert stored is not None
+    assert stored.overall_difficulty is WorkoutCycleWeeklyCheckInDifficulty.HARD
+    assert stored.overall_recovery is WorkoutCycleWeeklyCheckInRecovery.GOOD
+    assert stored.overall_satisfaction is WorkoutCycleFeedbackSatisfaction.SATISFIED
+    assert stored.strength_progress is WorkoutCycleFeedbackProgress.IMPROVED
+    assert stored.energy_progress is WorkoutCycleFeedbackProgress.DECLINED
+    assert stored.progressed_muscles == [MuscleGroup.CHEST.value, MuscleGroup.SHOULDERS.value]
+    assert stored.lagging_muscles == [MuscleGroup.BACK.value]
+    assert stored.goal_changed is True
+    assert stored.next_goal is Goal.STRENGTH
+    assert stored.schedule_changed is True
+    assert stored.next_training_days == 4
+    assert stored.next_session_duration_minutes == 60
+    assert stored.equipment_changed is False
+    assert stored.new_limitation == "Avoid deep knee flexion."
+    assert stored.note_optional == "Felt stronger overall."
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("next_training_days", 1),
+        ("next_training_days", 7),
+        ("next_session_duration_minutes", 20),
+        ("next_session_duration_minutes", 91),
+    ],
+)
+def test_completion_feedback_rejects_invalid_next_cycle_schedule(field: str, value: int) -> None:
+    with pytest.raises(ValueError):
+        CompletionFeedbackInput(**{field: value})
+
+
+@pytest.mark.parametrize("difficulty", list(WorkoutCycleWeeklyCheckInDifficulty))
+@pytest.mark.parametrize("recovery", list(WorkoutCycleWeeklyCheckInRecovery))
+@pytest.mark.parametrize("satisfaction", list(WorkoutCycleFeedbackSatisfaction))
+def test_completion_feedback_accepts_canonical_classifications(
+    difficulty: WorkoutCycleWeeklyCheckInDifficulty,
+    recovery: WorkoutCycleWeeklyCheckInRecovery,
+    satisfaction: WorkoutCycleFeedbackSatisfaction,
+) -> None:
+    feedback = CompletionFeedbackInput(
+        overall_difficulty=difficulty,
+        overall_recovery=recovery,
+        overall_satisfaction=satisfaction,
+    )
+
+    assert feedback.overall_difficulty is difficulty
+    assert feedback.overall_recovery is recovery
+    assert feedback.overall_satisfaction is satisfaction
+
+
+def test_completion_feedback_rejects_unknown_structured_values() -> None:
+    with pytest.raises(ValidationError):
+        CompletionFeedbackInput(overall_satisfaction="unknown")
+
+
+def test_completion_feedback_allows_legacy_fields_without_new_structured_values() -> None:
+    feedback = CompletionFeedbackInput(
+        adherence_percent=82,
+        performance_changes="Added reps.",
+        pain_or_limitation_feedback="No pain.",
+        measurements={"waist_cm": 84},
+    )
+
+    assert feedback.overall_difficulty is None
+    assert feedback.overall_satisfaction is None
+    assert feedback.performance_changes == "Added reps."
+    assert feedback.measurements == {"waist_cm": 84}
 
 
 def test_completed_cycle_cannot_be_completed_again(db: Session) -> None:

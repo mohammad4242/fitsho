@@ -42,3 +42,17 @@ class WorkoutCycleWeeklyCheckInRecovery(StrEnum):
     GOOD = "good"
     AVERAGE = "average"
     POOR = "poor"
+
+
+class WorkoutCycleFeedbackSatisfaction(StrEnum):
+    VERY_DISSATISFIED = "very_dissatisfied"
+    DISSATISFIED = "dissatisfied"
+    NEUTRAL = "neutral"
+    SATISFIED = "satisfied"
+    VERY_SATISFIED = "very_satisfied"
+
+
+class WorkoutCycleFeedbackProgress(StrEnum):
+    DECLINED = "declined"
+    UNCHANGED = "unchanged"
+    IMPROVED = "improved"

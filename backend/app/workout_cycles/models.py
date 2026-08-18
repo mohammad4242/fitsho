@@ -23,6 +23,8 @@ from app.auth.models import User
 from app.database.base import Base
 from app.exercises.models import Exercise
 from app.workout_cycles.enums import (
+    WorkoutCycleFeedbackProgress,
+    WorkoutCycleFeedbackSatisfaction,
     WorkoutCycleStatus,
     WorkoutCycleWeeklyCheckInDifficulty,
     WorkoutCycleWeeklyCheckInRecovery,
@@ -32,6 +34,7 @@ from app.workout_cycles.enums import (
     WorkoutExerciseSafetySignalType,
 )
 from app.workouts.models import WorkoutPlan, WorkoutPlanExercise
+from app.workouts.program_engine.enums import Goal
 
 
 def enum_values(members: type[StrEnum]) -> list[str]:
@@ -105,6 +108,23 @@ class WorkoutCycleFeedback(Base):
             "adherence_percent IS NULL OR adherence_percent BETWEEN 0 AND 100",
             name="ck_workout_cycle_feedback_adherence_range",
         ),
+        CheckConstraint(
+            "next_training_days IS NULL OR next_training_days BETWEEN 2 AND 6",
+            name="ck_workout_cycle_feedback_training_days_range",
+        ),
+        CheckConstraint(
+            "next_session_duration_minutes IS NULL OR next_session_duration_minutes IN "
+            "(30, 45, 60, 75, 90, 120)",
+            name="ck_workout_cycle_feedback_session_duration_values",
+        ),
+        CheckConstraint(
+            "new_limitation IS NULL OR char_length(new_limitation) <= 1000",
+            name="ck_workout_cycle_feedback_limitation_length",
+        ),
+        CheckConstraint(
+            "note_optional IS NULL OR char_length(note_optional) <= 4000",
+            name="ck_workout_cycle_feedback_note_length",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -115,6 +135,95 @@ class WorkoutCycleFeedback(Base):
     performance_changes: Mapped[str | None] = mapped_column(Text)
     pain_or_limitation_feedback: Mapped[str | None] = mapped_column(Text)
     measurements: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    overall_difficulty: Mapped[WorkoutCycleWeeklyCheckInDifficulty | None] = mapped_column(
+        Enum(
+            WorkoutCycleWeeklyCheckInDifficulty,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_feedback_difficulty_values",
+        )
+    )
+    overall_recovery: Mapped[WorkoutCycleWeeklyCheckInRecovery | None] = mapped_column(
+        Enum(
+            WorkoutCycleWeeklyCheckInRecovery,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_feedback_recovery_values",
+        )
+    )
+    overall_satisfaction: Mapped[WorkoutCycleFeedbackSatisfaction | None] = mapped_column(
+        Enum(
+            WorkoutCycleFeedbackSatisfaction,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_feedback_satisfaction_values",
+        )
+    )
+    strength_progress: Mapped[WorkoutCycleFeedbackProgress | None] = mapped_column(
+        Enum(
+            WorkoutCycleFeedbackProgress,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_feedback_strength_progress_values",
+        )
+    )
+    muscle_progress: Mapped[WorkoutCycleFeedbackProgress | None] = mapped_column(
+        Enum(
+            WorkoutCycleFeedbackProgress,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_feedback_muscle_progress_values",
+        )
+    )
+    endurance_progress: Mapped[WorkoutCycleFeedbackProgress | None] = mapped_column(
+        Enum(
+            WorkoutCycleFeedbackProgress,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_feedback_endurance_progress_values",
+        )
+    )
+    energy_progress: Mapped[WorkoutCycleFeedbackProgress | None] = mapped_column(
+        Enum(
+            WorkoutCycleFeedbackProgress,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_feedback_energy_progress_values",
+        )
+    )
+    progressed_muscles: Mapped[list[str] | None] = mapped_column(JSON)
+    lagging_muscles: Mapped[list[str] | None] = mapped_column(JSON)
+    goal_changed: Mapped[bool | None] = mapped_column(Boolean)
+    next_goal: Mapped[Goal | None] = mapped_column(
+        Enum(
+            Goal,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_feedback_next_goal_values",
+        )
+    )
+    schedule_changed: Mapped[bool | None] = mapped_column(Boolean)
+    next_training_days: Mapped[int | None] = mapped_column(Integer)
+    next_session_duration_minutes: Mapped[int | None] = mapped_column(Integer)
+    equipment_changed: Mapped[bool | None] = mapped_column(Boolean)
+    new_limitation: Mapped[str | None] = mapped_column(Text)
+    note_optional: Mapped[str | None] = mapped_column(Text)
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

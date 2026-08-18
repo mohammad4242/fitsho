@@ -3,13 +3,18 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.exercises.enums import MuscleGroup
+from app.profile.schemas import SessionDurationMinutes
 from app.workout_cycles.enums import (
+    WorkoutCycleFeedbackProgress,
+    WorkoutCycleFeedbackSatisfaction,
     WorkoutCycleStatus,
     WorkoutCycleWeeklyCheckInDifficulty,
     WorkoutCycleWeeklyCheckInRecovery,
     WorkoutExerciseReplacementReason,
     WorkoutExerciseReplacementScope,
 )
+from app.workouts.program_engine.enums import Goal
 
 
 class WorkoutCycleWeeklyCheckInClassificationInput(BaseModel):
@@ -106,3 +111,20 @@ class CompletionFeedbackInput(BaseModel):
     performance_changes: str | None = Field(default=None, max_length=4000)
     pain_or_limitation_feedback: str | None = Field(default=None, max_length=4000)
     measurements: dict[str, int | float | str | None] = Field(default_factory=dict)
+    overall_difficulty: WorkoutCycleWeeklyCheckInDifficulty | None = None
+    overall_recovery: WorkoutCycleWeeklyCheckInRecovery | None = None
+    overall_satisfaction: WorkoutCycleFeedbackSatisfaction | None = None
+    strength_progress: WorkoutCycleFeedbackProgress | None = None
+    muscle_progress: WorkoutCycleFeedbackProgress | None = None
+    endurance_progress: WorkoutCycleFeedbackProgress | None = None
+    energy_progress: WorkoutCycleFeedbackProgress | None = None
+    progressed_muscles: list[MuscleGroup] | None = None
+    lagging_muscles: list[MuscleGroup] | None = None
+    goal_changed: bool | None = None
+    next_goal: Goal | None = None
+    schedule_changed: bool | None = None
+    next_training_days: int | None = Field(default=None, ge=2, le=6)
+    next_session_duration_minutes: SessionDurationMinutes | None = None
+    equipment_changed: bool | None = None
+    new_limitation: str | None = Field(default=None, max_length=1000)
+    note_optional: str | None = Field(default=None, max_length=4000)
