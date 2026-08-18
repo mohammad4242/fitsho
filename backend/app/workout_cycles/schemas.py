@@ -26,6 +26,44 @@ class WorkoutCycleWeeklyCheckInPainFollowUpInput(BaseModel):
     note_optional: str | None = Field(default=None, max_length=500)
 
 
+class WorkoutCycleWeeklyCheckInUpsertRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sessions_completed: int = Field(ge=0)
+    perceived_difficulty: WorkoutCycleWeeklyCheckInDifficulty
+    recovery_rating: WorkoutCycleWeeklyCheckInRecovery
+    has_pain_or_limitation: bool
+    pain_follow_up: WorkoutCycleWeeklyCheckInPainFollowUpInput | None = None
+    note_optional: str | None = Field(default=None, max_length=2000)
+
+
+class WorkoutCycleWeeklyCheckInPainFollowUpResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    id: UUID
+    workout_plan_exercise_id: UUID
+    note_optional: str | None
+    created_at: datetime
+
+
+class WorkoutCycleWeeklyCheckInResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    user_id: UUID
+    cycle_id: UUID
+    week_number: int
+    sessions_completed: int
+    perceived_difficulty: WorkoutCycleWeeklyCheckInDifficulty
+    recovery_rating: WorkoutCycleWeeklyCheckInRecovery
+    has_pain_or_limitation: bool
+    pain_follow_up: WorkoutCycleWeeklyCheckInPainFollowUpResponse | None
+    note_optional: str | None
+    submitted_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
 class WorkoutExerciseReplacementCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -64,6 +64,14 @@ class WorkoutCycleWeeklyCheckInCycleNotFoundError(Exception):
     pass
 
 
+class WorkoutCycleWeeklyCheckInNoActiveCycleError(Exception):
+    pass
+
+
+class WorkoutCycleWeeklyCheckInNotFoundError(Exception):
+    pass
+
+
 class WorkoutCycleWeeklyCheckInWeekOutOfRangeError(ValueError):
     pass
 
@@ -117,34 +125,14 @@ def create_weekly_check_in(
     cycle = get_cycle_for_user(db, cycle_id=cycle_id, user_id=user_id)
     if cycle is None or cycle.workout_plan.user_id != user_id:
         raise WorkoutCycleWeeklyCheckInCycleNotFoundError
-    if not 1 <= week_number <= cycle.duration_weeks:
-        raise WorkoutCycleWeeklyCheckInWeekOutOfRangeError(
-            "Weekly check-in week must be within the workout cycle duration"
-        )
-
-    prescribed_training_days = len(cycle.workout_plan.days)
-    if not 0 <= sessions_completed <= prescribed_training_days:
-        raise WorkoutCycleWeeklyCheckInSessionsOutOfRangeError(
-            "Completed sessions must be within the plan's prescribed weekly days"
-        )
-
-    if has_pain_or_limitation:
-        if pain_workout_plan_exercise_id is None:
-            raise WorkoutCycleWeeklyCheckInPainExerciseRequiredError(
-                "A prescribed exercise is required when pain or limitation is reported"
-            )
-        if pain_note_optional is not None and len(pain_note_optional) > 500:
-            raise ValueError("Pain or limitation note must be 500 characters or fewer")
-        prescribed = _find_prescribed_exercise(
-            cycle,
-            workout_plan_exercise_id=pain_workout_plan_exercise_id,
-        )
-        if prescribed is None:
-            raise WorkoutCycleWeeklyCheckInPainExerciseNotFoundError
-    elif pain_workout_plan_exercise_id is not None or pain_note_optional is not None:
-        raise WorkoutCycleWeeklyCheckInPainFollowUpNotAllowedError(
-            "Pain follow-up data requires has_pain_or_limitation=True"
-        )
+    _validate_weekly_check_in_payload(
+        cycle,
+        week_number=week_number,
+        sessions_completed=sessions_completed,
+        has_pain_or_limitation=has_pain_or_limitation,
+        pain_workout_plan_exercise_id=pain_workout_plan_exercise_id,
+        pain_note_optional=pain_note_optional,
+    )
 
     check_in = WorkoutCycleWeeklyCheckIn(
         user_id=user_id,
@@ -156,14 +144,121 @@ def create_weekly_check_in(
         has_pain_or_limitation=has_pain_or_limitation,
         note_optional=note_optional,
     )
-    if has_pain_or_limitation:
-        check_in.pain_limitation = WorkoutCycleWeeklyCheckInPainLimitation(
+    _set_pain_follow_up(
+        check_in,
+        user_id=user_id,
+        cycle_id=cycle.id,
+        has_pain_or_limitation=has_pain_or_limitation,
+        pain_workout_plan_exercise_id=pain_workout_plan_exercise_id,
+        pain_note_optional=pain_note_optional,
+        db=db,
+    )
+    db.add(check_in)
+    try:
+        db.flush()
+        db.commit()
+        db.refresh(check_in)
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return check_in
+
+
+def get_weekly_check_in_for_cycle_week(
+    db: Session,
+    *,
+    cycle_id: UUID,
+    week_number: int,
+) -> WorkoutCycleWeeklyCheckIn | None:
+    return db.scalar(
+        select(WorkoutCycleWeeklyCheckIn).where(
+            WorkoutCycleWeeklyCheckIn.cycle_id == cycle_id,
+            WorkoutCycleWeeklyCheckIn.week_number == week_number,
+        )
+    )
+
+
+def get_current_weekly_check_in(
+    db: Session,
+    *,
+    user_id: UUID,
+) -> WorkoutCycleWeeklyCheckIn:
+    cycle = get_current_active_cycle_for_user(db, user_id=user_id)
+    if cycle is None:
+        raise WorkoutCycleWeeklyCheckInNoActiveCycleError
+    week_number = calculate_current_week(cycle.started_at, cycle.duration_weeks)
+    check_in = get_weekly_check_in_for_cycle_week(
+        db,
+        cycle_id=cycle.id,
+        week_number=week_number,
+    )
+    if check_in is None:
+        raise WorkoutCycleWeeklyCheckInNotFoundError
+    return check_in
+
+
+def upsert_current_weekly_check_in(
+    db: Session,
+    *,
+    user_id: UUID,
+    sessions_completed: int,
+    perceived_difficulty: WorkoutCycleWeeklyCheckInDifficulty,
+    recovery_rating: WorkoutCycleWeeklyCheckInRecovery,
+    has_pain_or_limitation: bool,
+    note_optional: str | None = None,
+    pain_workout_plan_exercise_id: UUID | None = None,
+    pain_note_optional: str | None = None,
+) -> WorkoutCycleWeeklyCheckIn:
+    cycle = get_current_active_cycle_for_user(db, user_id=user_id)
+    if cycle is None:
+        raise WorkoutCycleWeeklyCheckInNoActiveCycleError
+    week_number = calculate_current_week(cycle.started_at, cycle.duration_weeks)
+    _validate_weekly_check_in_payload(
+        cycle,
+        week_number=week_number,
+        sessions_completed=sessions_completed,
+        has_pain_or_limitation=has_pain_or_limitation,
+        pain_workout_plan_exercise_id=pain_workout_plan_exercise_id,
+        pain_note_optional=pain_note_optional,
+    )
+
+    check_in = db.scalar(
+        select(WorkoutCycleWeeklyCheckIn)
+        .where(
+            WorkoutCycleWeeklyCheckIn.cycle_id == cycle.id,
+            WorkoutCycleWeeklyCheckIn.week_number == week_number,
+        )
+        .with_for_update()
+    )
+    if check_in is None:
+        check_in = WorkoutCycleWeeklyCheckIn(
             user_id=user_id,
             cycle_id=cycle.id,
-            workout_plan_exercise_id=pain_workout_plan_exercise_id,
-            note_optional=pain_note_optional,
+            week_number=week_number,
+            sessions_completed=sessions_completed,
+            perceived_difficulty=perceived_difficulty,
+            recovery_rating=recovery_rating,
+            has_pain_or_limitation=has_pain_or_limitation,
+            note_optional=note_optional,
         )
-    db.add(check_in)
+        db.add(check_in)
+    else:
+        check_in.sessions_completed = sessions_completed
+        check_in.perceived_difficulty = perceived_difficulty
+        check_in.recovery_rating = recovery_rating
+        check_in.has_pain_or_limitation = has_pain_or_limitation
+        check_in.note_optional = note_optional
+        check_in.submitted_at = datetime.now(UTC)
+
+    _set_pain_follow_up(
+        check_in,
+        user_id=user_id,
+        cycle_id=cycle.id,
+        has_pain_or_limitation=has_pain_or_limitation,
+        pain_workout_plan_exercise_id=pain_workout_plan_exercise_id,
+        pain_note_optional=pain_note_optional,
+        db=db,
+    )
     try:
         db.flush()
         db.commit()
@@ -470,6 +565,68 @@ def _find_prescribed_exercise(
         ),
         None,
     )
+
+
+def _validate_weekly_check_in_payload(
+    cycle: WorkoutCycle,
+    *,
+    week_number: int,
+    sessions_completed: int,
+    has_pain_or_limitation: bool,
+    pain_workout_plan_exercise_id: UUID | None,
+    pain_note_optional: str | None,
+) -> None:
+    if not 1 <= week_number <= cycle.duration_weeks:
+        raise WorkoutCycleWeeklyCheckInWeekOutOfRangeError(
+            "Weekly check-in week must be within the workout cycle duration"
+        )
+
+    prescribed_training_days = len(cycle.workout_plan.days)
+    if not 0 <= sessions_completed <= prescribed_training_days:
+        raise WorkoutCycleWeeklyCheckInSessionsOutOfRangeError(
+            "Completed sessions must be within the plan's prescribed weekly days"
+        )
+
+    if has_pain_or_limitation:
+        if pain_workout_plan_exercise_id is None:
+            raise WorkoutCycleWeeklyCheckInPainExerciseRequiredError(
+                "A prescribed exercise is required when pain or limitation is reported"
+            )
+        if pain_note_optional is not None and len(pain_note_optional) > 500:
+            raise ValueError("Pain or limitation note must be 500 characters or fewer")
+        prescribed = _find_prescribed_exercise(
+            cycle,
+            workout_plan_exercise_id=pain_workout_plan_exercise_id,
+        )
+        if prescribed is None:
+            raise WorkoutCycleWeeklyCheckInPainExerciseNotFoundError
+    elif pain_workout_plan_exercise_id is not None or pain_note_optional is not None:
+        raise WorkoutCycleWeeklyCheckInPainFollowUpNotAllowedError(
+            "Pain follow-up data requires has_pain_or_limitation=True"
+        )
+
+
+def _set_pain_follow_up(
+    check_in: WorkoutCycleWeeklyCheckIn,
+    *,
+    user_id: UUID,
+    cycle_id: UUID,
+    has_pain_or_limitation: bool,
+    pain_workout_plan_exercise_id: UUID | None,
+    pain_note_optional: str | None,
+    db: Session,
+) -> None:
+    if check_in.pain_limitation is not None:
+        db.delete(check_in.pain_limitation)
+        check_in.pain_limitation = None
+    if has_pain_or_limitation:
+        assert pain_workout_plan_exercise_id is not None
+        check_in.pain_limitation = WorkoutCycleWeeklyCheckInPainLimitation(
+            user_id=user_id,
+            cycle_id=cycle_id,
+            workout_plan_exercise_id=pain_workout_plan_exercise_id,
+            note_optional=pain_note_optional,
+        )
 
 
 def _allowed_replacement_ids(item: WorkoutPlanExercise) -> set[UUID]:
