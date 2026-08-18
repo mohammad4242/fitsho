@@ -3,7 +3,35 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.workout_cycles.enums import WorkoutCycleStatus
+from app.workout_cycles.enums import (
+    WorkoutCycleStatus,
+    WorkoutExerciseReplacementReason,
+    WorkoutExerciseReplacementScope,
+)
+
+
+class WorkoutExerciseReplacementCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workout_plan_exercise_id: UUID
+    replacement_exercise_id: UUID
+    reason: WorkoutExerciseReplacementReason
+    scope: WorkoutExerciseReplacementScope
+
+
+class WorkoutExerciseReplacementResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    id: UUID
+    user_id: UUID
+    cycle_id: UUID
+    workout_plan_exercise_id: UUID
+    original_exercise_id: UUID
+    replacement_exercise_id: UUID
+    reason: WorkoutExerciseReplacementReason
+    scope: WorkoutExerciseReplacementScope
+    week_number: int
+    created_at: datetime
 
 
 class WorkoutCycleCurrentResponse(BaseModel):

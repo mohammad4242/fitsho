@@ -2,14 +2,24 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.workout_cycles.enums import WorkoutCycleStatus
-from app.workout_cycles.models import WorkoutCycle, WorkoutCycleFeedback
+from app.exercises.models import ExerciseAlternative
+from app.workout_cycles.enums import (
+    WorkoutCycleStatus,
+    WorkoutExerciseReplacementReason,
+    WorkoutExerciseReplacementScope,
+)
+from app.workout_cycles.models import (
+    WorkoutCycle,
+    WorkoutCycleFeedback,
+    WorkoutExerciseReplacement,
+)
 from app.workout_cycles.schemas import CompletionFeedbackInput
 from app.workouts.enums import WorkoutPlanStatus
-from app.workouts.models import WorkoutPlan
+from app.workouts.models import WorkoutPlan, WorkoutPlanExercise
+from app.workouts.repository import get_plan_for_user
 
 SUPPORTED_CYCLE_DURATIONS = frozenset({4, 6, 8})
 
@@ -23,6 +33,22 @@ class WorkoutCycleAlreadyCompletedError(Exception):
 
 
 class WorkoutCyclePlanInactiveError(Exception):
+    pass
+
+
+class WorkoutExerciseReplacementNoActiveCycleError(Exception):
+    pass
+
+
+class WorkoutExerciseReplacementPlanExerciseNotFoundError(Exception):
+    pass
+
+
+class WorkoutExerciseReplacementSelfError(Exception):
+    pass
+
+
+class WorkoutExerciseReplacementAlternativeNotAllowedError(Exception):
     pass
 
 
@@ -40,6 +66,60 @@ def calculate_current_week(
     current_at_utc = _as_utc(current_at)
     elapsed_days = max(0, (current_at_utc - started_at_utc).days)
     return min(duration_weeks, elapsed_days // 7 + 1)
+
+
+def record_exercise_replacement(
+    db: Session,
+    *,
+    user_id: UUID,
+    workout_plan_exercise_id: UUID,
+    replacement_exercise_id: UUID,
+    reason: WorkoutExerciseReplacementReason,
+    scope: WorkoutExerciseReplacementScope,
+) -> WorkoutExerciseReplacement:
+    cycle = get_current_active_cycle_for_user(db, user_id=user_id)
+    if cycle is None:
+        raise WorkoutExerciseReplacementNoActiveCycleError
+
+    plan = get_plan_for_user(db, plan_id=cycle.workout_plan_id, user_id=user_id)
+    if plan is None or plan.status is not WorkoutPlanStatus.ACTIVE:
+        raise WorkoutExerciseReplacementPlanExerciseNotFoundError
+
+    prescribed = next(
+        (
+            item
+            for day in plan.days
+            for item in day.exercises
+            if item.id == workout_plan_exercise_id
+        ),
+        None,
+    )
+    if prescribed is None:
+        raise WorkoutExerciseReplacementPlanExerciseNotFoundError
+
+    if replacement_exercise_id == prescribed.exercise_id:
+        raise WorkoutExerciseReplacementSelfError
+    if replacement_exercise_id not in _allowed_replacement_ids(prescribed):
+        raise WorkoutExerciseReplacementAlternativeNotAllowedError
+
+    replacement = WorkoutExerciseReplacement(
+        user_id=user_id,
+        cycle_id=cycle.id,
+        workout_plan_exercise_id=prescribed.id,
+        original_exercise_id=prescribed.exercise_id,
+        replacement_exercise_id=replacement_exercise_id,
+        reason=reason,
+        scope=scope,
+        week_number=calculate_current_week(cycle.started_at, cycle.duration_weeks),
+    )
+    db.add(replacement)
+    try:
+        db.commit()
+        db.refresh(replacement)
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return replacement
 
 
 def start_cycle(
@@ -157,6 +237,25 @@ def _plan_duration_weeks(plan: WorkoutPlan) -> int:
     if raw_duration not in SUPPORTED_CYCLE_DURATIONS:
         raise ValueError("Workout cycle duration must be 4, 6, or 8 weeks")
     return raw_duration
+
+
+def _allowed_replacement_ids(item: WorkoutPlanExercise) -> set[UUID]:
+    substitution_ids = item.substitution_exercise_ids
+    if substitution_ids:
+        allowed: set[UUID] = set()
+        for value in substitution_ids:
+            try:
+                allowed.add(UUID(value))
+            except (TypeError, ValueError):
+                continue
+        return allowed
+
+    return {
+        alternative.alternative_exercise_id
+        for alternative in item.exercise.alternatives
+        if isinstance(alternative, ExerciseAlternative)
+        and alternative.alternative_exercise.is_active
+    }
 
 
 def _as_utc(value: datetime) -> datetime:
