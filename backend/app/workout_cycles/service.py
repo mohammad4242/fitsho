@@ -8,13 +8,17 @@ from sqlalchemy.orm import Session
 from app.exercises.models import ExerciseAlternative
 from app.workout_cycles.enums import (
     WorkoutCycleStatus,
+    WorkoutExercisePreferenceType,
     WorkoutExerciseReplacementReason,
     WorkoutExerciseReplacementScope,
+    WorkoutExerciseSafetySignalType,
 )
 from app.workout_cycles.models import (
     WorkoutCycle,
     WorkoutCycleFeedback,
+    WorkoutExercisePreference,
     WorkoutExerciseReplacement,
+    WorkoutExerciseSafetySignal,
 )
 from app.workout_cycles.schemas import CompletionFeedbackInput
 from app.workouts.enums import WorkoutPlanStatus
@@ -114,12 +118,123 @@ def record_exercise_replacement(
     )
     db.add(replacement)
     try:
+        db.flush()
+        _persist_replacement_meaning(db, replacement)
         db.commit()
         db.refresh(replacement)
     except SQLAlchemyError:
         db.rollback()
         raise
     return replacement
+
+
+def _persist_replacement_meaning(
+    db: Session,
+    replacement: WorkoutExerciseReplacement,
+) -> None:
+    if replacement.reason is WorkoutExerciseReplacementReason.PAIN_OR_DISCOMFORT:
+        _ensure_safety_signal(db, replacement)
+        return
+
+    if replacement.scope is not WorkoutExerciseReplacementScope.PERSISTENT:
+        return
+
+    preference_type = {
+        WorkoutExerciseReplacementReason.EQUIPMENT_UNAVAILABLE: (
+            WorkoutExercisePreferenceType.EQUIPMENT_UNAVAILABLE
+        ),
+        WorkoutExerciseReplacementReason.UNCOMFORTABLE: WorkoutExercisePreferenceType.UNCOMFORTABLE,
+        WorkoutExerciseReplacementReason.DISLIKE: WorkoutExercisePreferenceType.DISLIKE,
+    }.get(replacement.reason)
+    if preference_type is not None:
+        _ensure_exercise_preference(db, replacement, preference_type)
+
+
+def _ensure_exercise_preference(
+    db: Session,
+    replacement: WorkoutExerciseReplacement,
+    preference_type: WorkoutExercisePreferenceType,
+) -> None:
+    existing = db.scalar(
+        select(WorkoutExercisePreference).where(
+            WorkoutExercisePreference.user_id == replacement.user_id,
+            WorkoutExercisePreference.exercise_id == replacement.original_exercise_id,
+            WorkoutExercisePreference.preference_type == preference_type,
+        )
+    )
+    if existing is not None:
+        return
+
+    preference = WorkoutExercisePreference(
+        user_id=replacement.user_id,
+        exercise_id=replacement.original_exercise_id,
+        preference_type=preference_type,
+        source_replacement_id=replacement.id,
+    )
+    try:
+        with db.begin_nested():
+            db.add(preference)
+            db.flush()
+    except IntegrityError:
+        if db.scalar(
+            select(WorkoutExercisePreference).where(
+                WorkoutExercisePreference.user_id == replacement.user_id,
+                WorkoutExercisePreference.exercise_id == replacement.original_exercise_id,
+                WorkoutExercisePreference.preference_type == preference_type,
+            )
+        ) is None:
+            raise
+
+
+def _ensure_safety_signal(
+    db: Session,
+    replacement: WorkoutExerciseReplacement,
+) -> None:
+    existing = db.scalar(
+        select(WorkoutExerciseSafetySignal).where(
+            WorkoutExerciseSafetySignal.user_id == replacement.user_id,
+            WorkoutExerciseSafetySignal.cycle_id == replacement.cycle_id,
+            WorkoutExerciseSafetySignal.workout_plan_exercise_id
+            == replacement.workout_plan_exercise_id,
+            WorkoutExerciseSafetySignal.replacement_exercise_id
+            == replacement.replacement_exercise_id,
+            WorkoutExerciseSafetySignal.week_number == replacement.week_number,
+            WorkoutExerciseSafetySignal.signal_type
+            == WorkoutExerciseSafetySignalType.PAIN_OR_DISCOMFORT,
+        )
+    )
+    if existing is not None:
+        return
+
+    signal = WorkoutExerciseSafetySignal(
+        user_id=replacement.user_id,
+        cycle_id=replacement.cycle_id,
+        workout_plan_exercise_id=replacement.workout_plan_exercise_id,
+        original_exercise_id=replacement.original_exercise_id,
+        replacement_exercise_id=replacement.replacement_exercise_id,
+        signal_type=WorkoutExerciseSafetySignalType.PAIN_OR_DISCOMFORT,
+        week_number=replacement.week_number,
+        source_replacement_id=replacement.id,
+    )
+    try:
+        with db.begin_nested():
+            db.add(signal)
+            db.flush()
+    except IntegrityError:
+        if db.scalar(
+            select(WorkoutExerciseSafetySignal).where(
+                WorkoutExerciseSafetySignal.user_id == replacement.user_id,
+                WorkoutExerciseSafetySignal.cycle_id == replacement.cycle_id,
+                WorkoutExerciseSafetySignal.workout_plan_exercise_id
+                == replacement.workout_plan_exercise_id,
+                WorkoutExerciseSafetySignal.replacement_exercise_id
+                == replacement.replacement_exercise_id,
+                WorkoutExerciseSafetySignal.week_number == replacement.week_number,
+                WorkoutExerciseSafetySignal.signal_type
+                == WorkoutExerciseSafetySignalType.PAIN_OR_DISCOMFORT,
+            )
+        ) is None:
+            raise
 
 
 def start_cycle(

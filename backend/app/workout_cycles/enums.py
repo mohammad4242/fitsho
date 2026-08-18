@@ -18,3 +18,13 @@ class WorkoutExerciseReplacementReason(StrEnum):
 class WorkoutExerciseReplacementScope(StrEnum):
     THIS_TIME = "this_time"
     PERSISTENT = "persistent"
+
+
+class WorkoutExercisePreferenceType(StrEnum):
+    EQUIPMENT_UNAVAILABLE = "equipment_unavailable"
+    UNCOMFORTABLE = "uncomfortable"
+    DISLIKE = "dislike"
+
+
+class WorkoutExerciseSafetySignalType(StrEnum):
+    PAIN_OR_DISCOMFORT = "pain_or_discomfort"

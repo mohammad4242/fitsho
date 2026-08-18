@@ -23,8 +23,10 @@ from app.database.base import Base
 from app.exercises.models import Exercise
 from app.workout_cycles.enums import (
     WorkoutCycleStatus,
+    WorkoutExercisePreferenceType,
     WorkoutExerciseReplacementReason,
     WorkoutExerciseReplacementScope,
+    WorkoutExerciseSafetySignalType,
 )
 from app.workouts.models import WorkoutPlan, WorkoutPlanExercise
 
@@ -191,3 +193,116 @@ class WorkoutExerciseReplacement(Base):
     workout_plan_exercise: Mapped[WorkoutPlanExercise] = relationship()
     original_exercise: Mapped[Exercise] = relationship(foreign_keys=[original_exercise_id])
     replacement_exercise: Mapped[Exercise] = relationship(foreign_keys=[replacement_exercise_id])
+
+
+class WorkoutExercisePreference(Base):
+    __tablename__ = "workout_exercise_preferences"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "exercise_id",
+            "preference_type",
+            name="uq_workout_exercise_preferences_user_exercise_type",
+        ),
+        Index("ix_workout_exercise_preferences_user", "user_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("exercises.id", ondelete="RESTRICT"), nullable=False
+    )
+    preference_type: Mapped[WorkoutExercisePreferenceType] = mapped_column(
+        Enum(
+            WorkoutExercisePreferenceType,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_exercise_preferences_type_values",
+        ),
+        nullable=False,
+    )
+    source_replacement_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workout_exercise_replacements.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship()
+    exercise: Mapped[Exercise] = relationship()
+    source_replacement: Mapped[WorkoutExerciseReplacement] = relationship()
+
+
+class WorkoutExerciseSafetySignal(Base):
+    __tablename__ = "workout_exercise_safety_signals"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "cycle_id",
+            "workout_plan_exercise_id",
+            "replacement_exercise_id",
+            "week_number",
+            "signal_type",
+            name="uq_workout_exercise_safety_signals_event",
+        ),
+        UniqueConstraint(
+            "source_replacement_id",
+            name="uq_workout_exercise_safety_signals_source_replacement",
+        ),
+        CheckConstraint(
+            "week_number BETWEEN 1 AND 8",
+            name="ck_workout_exercise_safety_signals_week_number_range",
+        ),
+        Index("ix_workout_exercise_safety_signals_user_cycle", "user_id", "cycle_id"),
+        Index(
+            "ix_workout_exercise_safety_signals_cycle_week",
+            "cycle_id",
+            "week_number",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    cycle_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workout_cycles.id", ondelete="RESTRICT"), nullable=False
+    )
+    workout_plan_exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workout_plan_exercises.id", ondelete="RESTRICT"), nullable=False
+    )
+    original_exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("exercises.id", ondelete="RESTRICT"), nullable=False
+    )
+    replacement_exercise_id: Mapped[UUID] = mapped_column(
+        ForeignKey("exercises.id", ondelete="RESTRICT"), nullable=False
+    )
+    signal_type: Mapped[WorkoutExerciseSafetySignalType] = mapped_column(
+        Enum(
+            WorkoutExerciseSafetySignalType,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_exercise_safety_signals_type_values",
+        ),
+        nullable=False,
+    )
+    week_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_replacement_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workout_exercise_replacements.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship()
+    cycle: Mapped[WorkoutCycle] = relationship()
+    workout_plan_exercise: Mapped[WorkoutPlanExercise] = relationship()
+    original_exercise: Mapped[Exercise] = relationship(foreign_keys=[original_exercise_id])
+    replacement_exercise: Mapped[Exercise] = relationship(foreign_keys=[replacement_exercise_id])
+    source_replacement: Mapped[WorkoutExerciseReplacement] = relationship()

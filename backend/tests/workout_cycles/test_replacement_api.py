@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
@@ -18,8 +19,18 @@ from app.exercises.enums import (
     MuscleGroup,
 )
 from app.exercises.models import Exercise
-from app.workout_cycles.enums import WorkoutCycleStatus
-from app.workout_cycles.models import WorkoutCycle, WorkoutPlanExercise
+from app.workout_cycles.enums import (
+    WorkoutCycleStatus,
+    WorkoutExercisePreferenceType,
+    WorkoutExerciseSafetySignalType,
+)
+from app.workout_cycles.models import (
+    WorkoutCycle,
+    WorkoutExercisePreference,
+    WorkoutExerciseReplacement,
+    WorkoutExerciseSafetySignal,
+    WorkoutPlanExercise,
+)
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan
 
@@ -128,12 +139,18 @@ def _plan_with_cycle(
     return plan, prescribed, cycle, original, safe_alternative, unsafe_alternative
 
 
-def _payload(prescribed: WorkoutPlanExercise, replacement: Exercise) -> dict[str, str]:
+def _payload(
+    prescribed: WorkoutPlanExercise,
+    replacement: Exercise,
+    *,
+    reason: str = "equipment_unavailable",
+    scope: str = "this_time",
+) -> dict[str, str]:
     return {
         "workout_plan_exercise_id": str(prescribed.id),
         "replacement_exercise_id": str(replacement.id),
-        "reason": "equipment_unavailable",
-        "scope": "this_time",
+        "reason": reason,
+        "scope": scope,
     }
 
 
@@ -285,3 +302,200 @@ def test_replacement_rejects_invalid_reason_and_scope_schema_values(
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize("reason", ["temporary_unavailable", "other"])
+def test_non_durable_reasons_create_history_without_durable_state(
+    client: TestClient,
+    db: Session,
+    reason: str,
+) -> None:
+    user_id = _register(client, f"non-durable-meaning-{reason}-{uuid4()}@example.com")
+    _plan, prescribed, cycle, _original, safe, _unsafe = _plan_with_cycle(db, user_id)
+    assert cycle is not None
+
+    response = client.post(
+        "/api/v1/workout-cycles/current/replacements",
+        headers=ORIGIN,
+        json=_payload(prescribed, safe, reason=reason, scope="persistent"),
+    )
+
+    assert response.status_code == 201
+    assert db.scalar(
+        select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
+    ) is None
+    assert db.scalar(
+        select(WorkoutExerciseSafetySignal).where(WorkoutExerciseSafetySignal.user_id == user_id)
+    ) is None
+
+
+def test_persistent_equipment_unavailable_creates_durable_context_with_provenance(
+    client: TestClient,
+    db: Session,
+) -> None:
+    user_id = _register(client, f"equipment-meaning-{uuid4()}@example.com")
+    _plan, prescribed, _cycle, original, safe, _unsafe = _plan_with_cycle(db, user_id)
+
+    response = client.post(
+        "/api/v1/workout-cycles/current/replacements",
+        headers=ORIGIN,
+        json=_payload(prescribed, safe, reason="equipment_unavailable", scope="persistent"),
+    )
+
+    assert response.status_code == 201
+    replacement_id = UUID(response.json()["id"])
+    preference = db.scalar(
+        select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
+    )
+    assert preference is not None
+    assert preference.preference_type is WorkoutExercisePreferenceType.EQUIPMENT_UNAVAILABLE
+    assert preference.exercise_id == original.id
+    assert preference.source_replacement_id == replacement_id
+
+
+@pytest.mark.parametrize(
+    ("reason", "preference_type"),
+    [
+        ("uncomfortable", WorkoutExercisePreferenceType.UNCOMFORTABLE),
+        ("dislike", WorkoutExercisePreferenceType.DISLIKE),
+    ],
+)
+def test_persistent_uncomfortable_and_dislike_create_negative_preferences(
+    client: TestClient,
+    db: Session,
+    reason: str,
+    preference_type: WorkoutExercisePreferenceType,
+) -> None:
+    user_id = _register(client, f"negative-meaning-{reason}-{uuid4()}@example.com")
+    _plan, prescribed, _cycle, _original, safe, _unsafe = _plan_with_cycle(db, user_id)
+
+    response = client.post(
+        "/api/v1/workout-cycles/current/replacements",
+        headers=ORIGIN,
+        json=_payload(prescribed, safe, reason=reason, scope="persistent"),
+    )
+
+    assert response.status_code == 201
+    preference = db.scalar(
+        select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
+    )
+    assert preference is not None
+    assert preference.preference_type is preference_type
+    assert db.scalar(
+        select(WorkoutExerciseSafetySignal).where(WorkoutExerciseSafetySignal.user_id == user_id)
+    ) is None
+
+
+def test_pain_replacement_creates_structured_safety_signal_not_negative_preference(
+    client: TestClient,
+    db: Session,
+) -> None:
+    user_id = _register(client, f"pain-meaning-{uuid4()}@example.com")
+    _plan, prescribed, cycle, original, safe, _unsafe = _plan_with_cycle(db, user_id)
+    assert cycle is not None
+
+    response = client.post(
+        "/api/v1/workout-cycles/current/replacements",
+        headers=ORIGIN,
+        json=_payload(prescribed, safe, reason="pain_or_discomfort", scope="this_time"),
+    )
+
+    assert response.status_code == 201
+    signal = db.scalar(
+        select(WorkoutExerciseSafetySignal).where(WorkoutExerciseSafetySignal.user_id == user_id)
+    )
+    assert signal is not None
+    assert signal.signal_type is WorkoutExerciseSafetySignalType.PAIN_OR_DISCOMFORT
+    assert signal.cycle_id == cycle.id
+    assert signal.workout_plan_exercise_id == prescribed.id
+    assert signal.original_exercise_id == original.id
+    assert signal.replacement_exercise_id == safe.id
+    assert signal.week_number == 2
+    assert signal.source_replacement_id == UUID(response.json()["id"])
+    assert db.scalar(
+        select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
+    ) is None
+
+
+@pytest.mark.parametrize("reason", ["equipment_unavailable", "uncomfortable", "dislike"])
+def test_this_time_replacement_creates_no_persistent_preference(
+    client: TestClient,
+    db: Session,
+    reason: str,
+) -> None:
+    user_id = _register(client, f"one-time-meaning-{reason}-{uuid4()}@example.com")
+    _plan, prescribed, _cycle, _original, safe, _unsafe = _plan_with_cycle(db, user_id)
+
+    response = client.post(
+        "/api/v1/workout-cycles/current/replacements",
+        headers=ORIGIN,
+        json=_payload(prescribed, safe, reason=reason, scope="this_time"),
+    )
+
+    assert response.status_code == 201
+    assert db.scalar(
+        select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
+    ) is None
+
+
+def test_repeated_persistent_replacements_keep_one_preference_with_original_provenance(
+    client: TestClient,
+    db: Session,
+) -> None:
+    user_id = _register(client, f"repeat-meaning-{uuid4()}@example.com")
+    _plan, prescribed, _cycle, _original, safe, _unsafe = _plan_with_cycle(db, user_id)
+    payload = _payload(prescribed, safe, reason="dislike", scope="persistent")
+
+    first = client.post(
+        "/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload
+    )
+    second = client.post(
+        "/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert db.scalar(
+        select(func.count()).select_from(WorkoutExerciseReplacement).where(
+            WorkoutExerciseReplacement.user_id == user_id
+        )
+    ) == 2
+    assert db.scalar(
+        select(func.count()).select_from(WorkoutExercisePreference).where(
+            WorkoutExercisePreference.user_id == user_id
+        )
+    ) == 1
+    preference = db.scalar(
+        select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
+    )
+    assert preference is not None
+    assert preference.source_replacement_id == UUID(first.json()["id"])
+
+
+def test_repeated_pain_replacements_keep_one_safety_signal(
+    client: TestClient,
+    db: Session,
+) -> None:
+    user_id = _register(client, f"repeat-pain-meaning-{uuid4()}@example.com")
+    _plan, prescribed, _cycle, _original, safe, _unsafe = _plan_with_cycle(db, user_id)
+    payload = _payload(prescribed, safe, reason="pain_or_discomfort", scope="persistent")
+
+    first = client.post(
+        "/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload
+    )
+    second = client.post(
+        "/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert db.scalar(
+        select(func.count()).select_from(WorkoutExerciseSafetySignal).where(
+            WorkoutExerciseSafetySignal.user_id == user_id
+        )
+    ) == 1
+    signal = db.scalar(
+        select(WorkoutExerciseSafetySignal).where(WorkoutExerciseSafetySignal.user_id == user_id)
+    )
+    assert signal is not None
+    assert signal.source_replacement_id == UUID(first.json()["id"])
