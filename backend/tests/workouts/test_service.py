@@ -71,6 +71,54 @@ def _user_with_profile(db: Session) -> User:
     return user
 
 
+def test_program_request_uses_persisted_profile_preferences(db: Session) -> None:
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.preferred_weekdays = [0, 3]
+    profile.priority_muscles = [MuscleGroup.BACK.value]
+    db.flush()
+    service = _service(db)
+
+    request = service._to_program_request(get_profile(db, user.id), None)
+
+    assert request.preferred_weekdays == (0, 3)
+    assert request.priority_muscles == frozenset({MuscleGroup.BACK})
+
+
+def test_current_generation_overrides_take_precedence_over_profile_preferences(
+    db: Session,
+) -> None:
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.preferred_weekdays = [0, 3]
+    profile.priority_muscles = [MuscleGroup.BACK.value]
+    db.flush()
+    service = _service(db)
+    overrides = ProgramGenerationOverrides(
+        preferred_weekdays=(1, 4),
+        priority_muscles=frozenset({MuscleGroup.CHEST}),
+    )
+
+    request = service._to_program_request(get_profile(db, user.id), overrides)
+
+    assert request.preferred_weekdays == (1, 4)
+    assert request.priority_muscles == frozenset({MuscleGroup.CHEST})
+
+
+def test_neutral_generation_overrides_do_not_erase_profile_preferences(db: Session) -> None:
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.preferred_weekdays = [0, 3]
+    profile.priority_muscles = [MuscleGroup.BACK.value]
+    db.flush()
+    service = _service(db)
+
+    request = service._to_program_request(get_profile(db, user.id), ProgramGenerationOverrides())
+
+    assert request.preferred_weekdays == (0, 3)
+    assert request.priority_muscles == frozenset({MuscleGroup.BACK})
+
+
 def _exercise(
     db: Session,
     slug: str,

@@ -374,6 +374,8 @@ it("submits one normalized typed profile payload", async () => {
     experience_level: "beginner",
     training_age_months: null,
     training_days_per_week: 3,
+    preferred_weekdays: null,
+    priority_muscles: null,
     training_location: "gym",
     home_training_setup: null,
     session_duration_minutes: 60,

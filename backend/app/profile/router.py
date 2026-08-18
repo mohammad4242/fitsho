@@ -8,11 +8,13 @@ from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.database.session import get_db
+from app.exercises.enums import MuscleGroup
 from app.nutrition.models import NutritionProfile, NutritionSafetyDecision
 from app.profile.enums import ProfileCompletionState
 from app.profile.exceptions import (
     AgeNotSupportedError,
     AgeOutOfRangeError,
+    InvalidProfilePreferencesError,
     InvalidWorkoutSetupError,
     ProfileAlreadyExistsError,
     ProfileCycleNotFoundError,
@@ -145,6 +147,14 @@ def to_response(snapshot: ProfileSnapshot) -> ProfileResponse:
         experience_level=profile.experience_level,
         training_age_months=profile.training_age_months,
         training_days_per_week=profile.training_days_per_week,
+        preferred_weekdays=(
+            tuple(profile.preferred_weekdays) if profile.preferred_weekdays is not None else None
+        ),
+        priority_muscles=(
+            tuple(MuscleGroup(value) for value in profile.priority_muscles)
+            if profile.priority_muscles is not None
+            else None
+        ),
         training_location=profile.training_location,
         home_training_setup=profile.home_training_setup,
         session_duration_minutes=profile.session_duration_minutes,
@@ -267,6 +277,11 @@ def update(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Home training setup is required for home training",
+        ) from None
+    except InvalidProfilePreferencesError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Preferred weekdays cannot exceed training days per week",
         ) from None
     except ProfileInvariantError:
         raise HTTPException(

@@ -31,6 +31,15 @@ export type SessionDurationMinutes = (typeof sessionDurations)[number];
 export const trainingCautions = ["lower_back", "knee", "shoulder", "neck", "wrist", "other"] as const;
 export type TrainingCaution = (typeof trainingCautions)[number];
 
+export const preferredWeekdays = [0, 1, 2, 3, 4, 5, 6] as const;
+export type PreferredWeekday = (typeof preferredWeekdays)[number];
+export const muscleGroups = [
+  "chest", "back", "shoulders", "biceps", "triceps", "traps", "forearms", "neck",
+  "glutes", "quadriceps", "hamstrings", "adductors", "abductors", "legs", "calves",
+  "abs", "obliques", "lower_back",
+] as const;
+export type MuscleGroup = (typeof muscleGroups)[number];
+
 export const planDurations = [4, 6, 8] as const;
 export type PlanDurationWeeks = (typeof planDurations)[number];
 export const workoutGenerationMethods = ["fitsho_coach", "ai"] as const;
@@ -80,6 +89,8 @@ export type ProfileInput = {
   experience_level: ExperienceLevel;
   training_age_months?: number | null;
   training_days_per_week: number;
+  preferred_weekdays?: number[] | null;
+  priority_muscles?: MuscleGroup[] | null;
   training_location: TrainingLocation;
   home_training_setup: HomeTrainingSetup | null;
   session_duration_minutes: SessionDurationMinutes;
@@ -113,6 +124,8 @@ export type ProfileFormValues = {
   experience_level: ExperienceLevel | "";
   training_age_months: string;
   training_days_per_week: string;
+  preferred_weekdays: number[];
+  priority_muscles: MuscleGroup[];
   training_location: TrainingLocation | "";
   home_training_setup: HomeTrainingSetup | "";
   session_duration_minutes: string;
@@ -121,3 +134,11 @@ export type ProfileFormValues = {
   training_cautions: TrainingCaution[] | null;
   plan_duration_weeks: string;
 };
+
+export type ProfileFormValue =
+  | string
+  | TrainingCaution[]
+  | number[]
+  | PreferredWeekday[]
+  | MuscleGroup[]
+  | null;

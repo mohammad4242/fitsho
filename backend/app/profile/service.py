@@ -12,6 +12,7 @@ from app.profile.enums import ProductMode, ProfileCompletionState, TrainingLocat
 from app.profile.exceptions import (
     AgeNotSupportedError,
     AgeOutOfRangeError,
+    InvalidProfilePreferencesError,
     InvalidWorkoutSetupError,
     ProfileAlreadyExistsError,
     ProfileCycleNotFoundError,
@@ -118,6 +119,14 @@ def create_profile(
         "fitness_goal": payload.fitness_goal,
         "experience_level": payload.experience_level,
         "training_age_months": payload.training_age_months,
+        "preferred_weekdays": (
+            list(payload.preferred_weekdays) if payload.preferred_weekdays is not None else None
+        ),
+        "priority_muscles": (
+            [muscle.value for muscle in payload.priority_muscles]
+            if payload.priority_muscles is not None
+            else None
+        ),
         "training_days_per_week": payload.training_days_per_week,
         "training_location": payload.training_location,
         "home_training_setup": payload.home_training_setup,
@@ -227,6 +236,16 @@ def update_profile(
     ) is None:
         raise ProfileCycleNotFoundError
     supplied_cautions = supplied_fields.pop("training_cautions", None)
+    if "preferred_weekdays" in supplied_fields:
+        supplied_fields["preferred_weekdays"] = (
+            list(payload.preferred_weekdays) if payload.preferred_weekdays is not None else None
+        )
+    if "priority_muscles" in supplied_fields:
+        supplied_fields["priority_muscles"] = (
+            [muscle.value for muscle in payload.priority_muscles]
+            if payload.priority_muscles is not None
+            else None
+        )
     supplied_weight = supplied_fields.pop("current_weight_kg", None)
     circumference_fields = (
         "shoulder_circumference_cm",
@@ -245,6 +264,17 @@ def update_profile(
         supplied_fields["home_training_setup"] = None
     elif final_home_setup is None:
         raise InvalidWorkoutSetupError
+
+    final_training_days = supplied_fields.get(
+        "training_days_per_week", profile.training_days_per_week
+    )
+    final_weekdays = supplied_fields.get("preferred_weekdays", profile.preferred_weekdays)
+    if (
+        final_weekdays is not None
+        and final_training_days is not None
+        and len(final_weekdays) > final_training_days
+    ):
+        raise InvalidProfilePreferencesError
 
     for field_name, value in supplied_fields.items():
         setattr(profile, field_name, value)

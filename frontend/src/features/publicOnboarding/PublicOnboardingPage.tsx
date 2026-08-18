@@ -7,7 +7,7 @@ import { authErrorMessage } from "../auth/authError";
 import { useAuth } from "../auth/AuthContext";
 import { NutritionOnboardingFlow } from "../nutrition/NutritionOnboardingFlow";
 import { toProfileInput, validateStep, type ProfileValidationErrors } from "../profile/profileValidation";
-import type { ProductMode, ProfileFormValues } from "../profile/types";
+import type { ProductMode, ProfileFormValue, ProfileFormValues } from "../profile/types";
 import { clearOnboardingDraft, hydrateOnboardingDraft, loadOnboardingDraft, saveOnboardingDraft, type OnboardingDraft } from "./onboardingDraft";
 import { GuidedSharedProfileQuestions } from "./GuidedSharedProfileQuestions";
 import { GuidedTrainingQuestions } from "./GuidedTrainingQuestions";
@@ -18,6 +18,7 @@ const emptyValues: ProfileFormValues = {
   shoulder_circumference_cm: "", waist_circumference_cm: "", hip_circumference_cm: "",
   fitness_goal: "", experience_level: "", training_days_per_week: "",
   training_age_months: "",
+  preferred_weekdays: [], priority_muscles: [],
   training_location: "", home_training_setup: "", session_duration_minutes: "",
   training_intensity: "",
   physical_limitations: "", training_cautions: null, plan_duration_weeks: "4",
@@ -125,7 +126,7 @@ function TrainingDraftFlow({ onExit, onComplete }: { onExit: () => void; onCompl
     if (first) document.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
   }, [errors]);
 
-  function update(field: keyof ProfileFormValues, value: string | ProfileFormValues["training_cautions"]) {
+  function update(field: keyof ProfileFormValues, value: ProfileFormValue) {
     setValues((current) => ({ ...current, [field]: value, ...(field === "training_location" && value === "gym" ? { home_training_setup: "" } : {}) }));
     setErrors((current) => { const next = { ...current }; delete next[field]; return next; });
   }

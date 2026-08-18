@@ -13,7 +13,11 @@ import {
   sexes,
   trainingCautions,
   trainingIntensities,
+  muscleGroups,
+  preferredWeekdays,
   type TrainingCaution,
+  type MuscleGroup,
+  type ProfileFormValue,
   trainingLocations,
   type ProfileFormValues,
 } from "./types";
@@ -24,7 +28,7 @@ type FieldGroupProps = {
   disabled?: boolean;
   onChange: (
     field: keyof ProfileFormValues,
-    value: string | ProfileFormValues["training_cautions"],
+    value: ProfileFormValue,
   ) => void;
 };
 
@@ -262,6 +266,26 @@ export function ExperienceFields({
     );
   }
 
+  function toggleWeekday(day: number) {
+    const selected = values.preferred_weekdays;
+    onChange(
+      "preferred_weekdays",
+      selected.includes(day)
+        ? selected.filter((item) => item !== day)
+        : [...selected, day].sort((a, b) => a - b),
+    );
+  }
+
+  function togglePriorityMuscle(muscle: MuscleGroup) {
+    const selected = values.priority_muscles;
+    onChange(
+      "priority_muscles",
+      selected.includes(muscle)
+        ? selected.filter((item) => item !== muscle)
+        : [...selected, muscle].sort(),
+    );
+  }
+
   return (
     <fieldset className="profile-fieldset" disabled={disabled}>
       <legend>{t("onboarding.steps.experience")}</legend>
@@ -340,6 +364,44 @@ export function ExperienceFields({
         </p>
         <FieldError field="training_age_months" error={errors.training_age_months} />
       </div>
+
+      <fieldset className="profile-field" aria-describedby={describedBy("preferred_weekdays", errors.preferred_weekdays)}>
+        <legend>{t("onboarding.fields.preferredWeekdays")}</legend>
+        <p className="profile-field__hint">{t("onboarding.hints.preferredWeekdays")}</p>
+        <div className="profile-checkboxes">
+          {preferredWeekdays.map((day) => (
+            <label key={day}>
+              <input
+                type="checkbox"
+                name="preferred_weekdays"
+                checked={values.preferred_weekdays.includes(day)}
+                disabled={!values.preferred_weekdays.includes(day) && values.preferred_weekdays.length >= Number(values.training_days_per_week)}
+                onChange={() => toggleWeekday(day)}
+              />
+              {t(`onboarding.options.weekday.${day}`)}
+            </label>
+          ))}
+        </div>
+        <FieldError field="preferred_weekdays" error={errors.preferred_weekdays} />
+      </fieldset>
+
+      <fieldset className="profile-field">
+        <legend>{t("onboarding.fields.priorityMuscles")}</legend>
+        <p className="profile-field__hint">{t("onboarding.hints.priorityMuscles")}</p>
+        <div className="profile-checkboxes">
+          {muscleGroups.map((muscle) => (
+            <label key={muscle}>
+              <input
+                type="checkbox"
+                name="priority_muscles"
+                checked={values.priority_muscles.includes(muscle)}
+                onChange={() => togglePriorityMuscle(muscle)}
+              />
+              {t(`onboarding.options.muscle.${muscle}`)}
+            </label>
+          ))}
+        </div>
+      </fieldset>
 
       <div className="profile-field">
         <label htmlFor="profile-training-location">

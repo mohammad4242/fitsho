@@ -21,7 +21,7 @@ import {
   validateStep,
   type ProfileValidationErrors,
 } from "./profileValidation";
-import type { ProductMode, ProfileFormValues } from "./types";
+import type { ProductMode, ProfileFormValue, ProfileFormValues } from "./types";
 import "./profile.css";
 
 type Step = 1 | 2 | 3;
@@ -39,6 +39,8 @@ const emptyValues: ProfileFormValues = {
   experience_level: "",
   training_age_months: "",
   training_days_per_week: "",
+  preferred_weekdays: [],
+  priority_muscles: [],
   training_location: "",
   home_training_setup: "",
   session_duration_minutes: "",
@@ -77,7 +79,7 @@ export function OnboardingPage() {
 
   function updateValue(
     field: keyof ProfileFormValues,
-    value: string | ProfileFormValues["training_cautions"],
+    value: ProfileFormValue,
   ) {
     const clearsHomeSetup = field === "training_location" && value === "gym";
     setValues((current) => ({

@@ -18,6 +18,8 @@ def valid_payload() -> dict[str, object]:
         "experience_level": "beginner",
         "training_age_months": 24,
         "training_days_per_week": 3,
+        "preferred_weekdays": [0, 2, 4],
+        "priority_muscles": ["back", "glutes"],
         "training_location": "gym",
         "home_training_setup": None,
         "session_duration_minutes": 60,
@@ -32,6 +34,8 @@ def test_profile_create_normalizes_text_and_decimal() -> None:
     assert profile.current_weight_kg == Decimal("76.50")
     assert profile.physical_limitations is None
     assert profile.training_age_months == 24
+    assert profile.preferred_weekdays == (0, 2, 4)
+    assert profile.priority_muscles == ("back", "glutes")
 
 
 def test_profile_create_accepts_optional_circumference_measurements() -> None:
@@ -73,6 +77,10 @@ def test_calculate_age_handles_birthday_boundary() -> None:
         ("training_days_per_week", 8),
         ("training_age_months", -1),
         ("training_age_months", 901),
+        ("preferred_weekdays", [0, 0]),
+        ("preferred_weekdays", [7]),
+        ("priority_muscles", ["back", "back"]),
+        ("priority_muscles", ["not_a_muscle"]),
         ("sex", "unknown"),
         ("fitness_goal", "bulk"),
         ("experience_level", "expert"),
@@ -94,6 +102,24 @@ def test_profile_create_accepts_six_training_days() -> None:
     payload["training_days_per_week"] = 6
 
     assert ProfileCreate.model_validate(payload).training_days_per_week == 6
+
+
+def test_profile_create_rejects_more_preferred_weekdays_than_training_days() -> None:
+    payload = {**valid_payload(), "training_days_per_week": 2, "preferred_weekdays": [0, 2, 4]}
+
+    with pytest.raises(ValidationError, match="Preferred weekdays"):
+        ProfileCreate.model_validate(payload)
+
+
+def test_profile_update_validates_preferred_weekday_count_when_supplied() -> None:
+    assert ProfileUpdate.model_validate(
+        {"training_days_per_week": 3, "preferred_weekdays": [0, 2, 4]}
+    ).preferred_weekdays == (0, 2, 4)
+
+    with pytest.raises(ValidationError, match="Preferred weekdays"):
+        ProfileUpdate.model_validate(
+            {"training_days_per_week": 2, "preferred_weekdays": [0, 2, 4]}
+        )
 
 
 def test_profile_update_accepts_and_bounds_training_age() -> None:

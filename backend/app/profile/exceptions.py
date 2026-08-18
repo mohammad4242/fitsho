@@ -18,6 +18,10 @@ class InvalidWorkoutSetupError(Exception):
     pass
 
 
+class InvalidProfilePreferencesError(Exception):
+    pass
+
+
 class AgeNotSupportedError(Exception):
     pass
 

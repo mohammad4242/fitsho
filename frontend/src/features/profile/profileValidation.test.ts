@@ -24,6 +24,8 @@ const validValues: ProfileFormValues = {
   experience_level: "beginner",
   training_age_months: "24",
   training_days_per_week: "3",
+  preferred_weekdays: [0, 2, 4],
+  priority_muscles: ["back", "glutes"],
   training_location: "gym",
   home_training_setup: "",
   session_duration_minutes: "60",
@@ -49,6 +51,8 @@ const profile: Profile = {
   experience_level: "beginner",
   training_age_months: 24,
   training_days_per_week: 3,
+  preferred_weekdays: [0, 2, 4],
+  priority_muscles: ["back", "glutes"],
   training_location: "gym",
   home_training_setup: null,
   session_duration_minutes: 60,
@@ -156,6 +160,15 @@ describe("profile validation", () => {
     ).toEqual({ physical_limitations: "limitationsLength" });
   });
 
+  it("limits preferred weekdays to the configured training days", () => {
+    expect(
+      validateStep({ ...validValues, training_days_per_week: "2" }, 3, today),
+    ).toEqual({ preferred_weekdays: "preferredWeekdaysInvalid" });
+    expect(
+      validateStep({ ...validValues, training_days_per_week: "3" }, 3, today),
+    ).toEqual({});
+  });
+
   it("requires a home setup only for home training and accepts supported durations", () => {
     expect(
       validateStep(
@@ -225,6 +238,8 @@ describe("profile validation", () => {
       experience_level: "beginner",
       training_age_months: 24,
       training_days_per_week: 3,
+      preferred_weekdays: [0, 2, 4],
+      priority_muscles: ["back", "glutes"],
       training_location: "gym",
       home_training_setup: null,
       session_duration_minutes: 60,

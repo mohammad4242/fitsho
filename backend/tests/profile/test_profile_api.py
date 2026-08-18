@@ -20,6 +20,8 @@ VALID_PROFILE = {
     "experience_level": "beginner",
     "training_age_months": 24,
     "training_days_per_week": 3,
+    "preferred_weekdays": [0, 2, 4],
+    "priority_muscles": ["back", "glutes"],
     "training_location": "gym",
     "home_training_setup": None,
     "session_duration_minutes": 60,
@@ -59,6 +61,8 @@ def test_create_profile_atomically_stores_profile_and_initial_weight(
     assert response.json()["home_training_setup"] is None
     assert response.json()["session_duration_minutes"] == 60
     assert response.json()["training_age_months"] == 24
+    assert response.json()["preferred_weekdays"] == [0, 2, 4]
+    assert response.json()["priority_muscles"] == ["back", "glutes"]
     assert db.get(UserProfile, user_id) is not None
     measurements = db.scalars(
         select(BodyMeasurement).where(BodyMeasurement.user_id == user_id)
@@ -333,6 +337,37 @@ def test_profile_rejects_duplicate_training_cautions(client: TestClient) -> None
         "/api/v1/profile",
         headers=ORIGIN,
         json={**VALID_PROFILE, "training_cautions": ["knee", "knee"]},
+    )
+
+    assert response.status_code == 422
+
+
+def test_profile_preferences_can_be_read_and_updated(client: TestClient) -> None:
+    register(client, "profile-preferences@example.com")
+    created = client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE)
+    assert created.status_code == 201
+
+    updated = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={"preferred_weekdays": [1, 3], "priority_muscles": ["chest", "quadriceps"]},
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["preferred_weekdays"] == [1, 3]
+    assert updated.json()["priority_muscles"] == ["chest", "quadriceps"]
+    assert client.get("/api/v1/profile").json()["preferred_weekdays"] == [1, 3]
+
+
+def test_profile_preferences_reject_weekday_count_above_training_days(client: TestClient) -> None:
+    register(client, "profile-preferences-count@example.com")
+    created = client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE)
+    assert created.status_code == 201
+
+    response = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={"preferred_weekdays": [0, 1, 2, 3]},
     )
 
     assert response.status_code == 422

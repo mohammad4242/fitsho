@@ -3,6 +3,7 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     Date,
     DateTime,
@@ -113,6 +114,8 @@ class UserProfile(Base):
         nullable=True,
     )
     training_age_months: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    preferred_weekdays: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
+    priority_muscles: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     training_days_per_week: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     training_location: Mapped[TrainingLocation | None] = mapped_column(
         Enum(

@@ -23,6 +23,7 @@ import type {
   ProductMode,
   Profile,
   ProfileFormValues,
+  ProfileFormValue,
   ProfilePatch,
   SharedProfile,
   SharedProfileInput,
@@ -41,6 +42,7 @@ const personalFields = new Set<keyof ProfilePatch>([
 const trainingFields = new Set<keyof ProfilePatch>([
   "experience_level", "training_days_per_week", "training_location",
   "training_age_months",
+  "preferred_weekdays", "priority_muscles",
   "home_training_setup", "session_duration_minutes", "training_intensity", "physical_limitations",
   "training_cautions", "plan_duration_weeks", "workout_generation_method",
 ]);
@@ -166,7 +168,7 @@ function ReadyProfilePage({
 
   function updateValue(
     field: keyof ProfileFormValues,
-    value: string | ProfileFormValues["training_cautions"],
+    value: ProfileFormValue,
   ) {
     const clearsHomeSetup = field === "training_location" && value === "gym";
     setValues((current) => ({
@@ -455,6 +457,8 @@ function sharedToFormValues(profile: SharedProfile): ProfileFormValues {
     experience_level: "",
     training_age_months: "",
     training_days_per_week: "",
+    preferred_weekdays: [],
+    priority_muscles: [],
     training_location: "",
     home_training_setup: "",
     session_duration_minutes: "",

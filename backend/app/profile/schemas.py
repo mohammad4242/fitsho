@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
+from app.exercises.enums import MuscleGroup
 from app.profile.enums import (
     ExperienceLevel,
     FitnessGoal,
@@ -65,6 +66,8 @@ class ProfileCreate(BaseModel):
     experience_level: ExperienceLevel
     training_age_months: int | None = Field(default=None, ge=0, le=900)
     training_days_per_week: int = Field(ge=2, le=6)
+    preferred_weekdays: tuple[int, ...] | None = None
+    priority_muscles: tuple[MuscleGroup, ...] | None = None
     training_location: TrainingLocation
     home_training_setup: HomeTrainingSetup | None = None
     training_cautions: list[TrainingCaution] = Field(default_factory=list)
@@ -94,6 +97,28 @@ class ProfileCreate(BaseModel):
             raise ValueError("Training cautions must be unique")
         return cautions
 
+    @field_validator("preferred_weekdays")
+    @classmethod
+    def validate_preferred_weekdays(
+        cls, weekdays: tuple[int, ...] | None
+    ) -> tuple[int, ...] | None:
+        if weekdays is None:
+            return None
+        if len(weekdays) != len(set(weekdays)) or any(day < 0 or day > 6 for day in weekdays):
+            raise ValueError("Preferred weekdays must be unique values from 0 through 6")
+        return tuple(sorted(weekdays))
+
+    @field_validator("priority_muscles")
+    @classmethod
+    def validate_priority_muscles(
+        cls, muscles: tuple[MuscleGroup, ...] | None
+    ) -> tuple[MuscleGroup, ...] | None:
+        if muscles is None:
+            return None
+        if len(muscles) != len(set(muscles)):
+            raise ValueError("Priority muscles must be unique")
+        return tuple(sorted(muscles, key=lambda muscle: muscle.value))
+
     @field_validator("birth_date")
     @classmethod
     def validate_age(cls, birth_date: date) -> date:
@@ -105,6 +130,11 @@ class ProfileCreate(BaseModel):
             self.home_training_setup = None
         elif self.home_training_setup is None:
             raise ValueError("Home training setup is required for home training")
+        if (
+            self.preferred_weekdays is not None
+            and len(self.preferred_weekdays) > self.training_days_per_week
+        ):
+            raise ValueError("Preferred weekdays cannot exceed training days per week")
         return self
 
 
@@ -134,6 +164,8 @@ class ProfileUpdate(BaseModel):
     experience_level: ExperienceLevel | None = None
     training_age_months: int | None = Field(default=None, ge=0, le=900)
     training_days_per_week: int | None = Field(default=None, ge=2, le=6)
+    preferred_weekdays: tuple[int, ...] | None = None
+    priority_muscles: tuple[MuscleGroup, ...] | None = None
     training_location: TrainingLocation | None = None
     home_training_setup: HomeTrainingSetup | None = None
     training_cautions: list[TrainingCaution] | None = None
@@ -163,6 +195,28 @@ class ProfileUpdate(BaseModel):
             raise ValueError("Training cautions must be unique")
         return cautions
 
+    @field_validator("preferred_weekdays")
+    @classmethod
+    def validate_preferred_weekdays(
+        cls, weekdays: tuple[int, ...] | None
+    ) -> tuple[int, ...] | None:
+        if weekdays is None:
+            return None
+        if len(weekdays) != len(set(weekdays)) or any(day < 0 or day > 6 for day in weekdays):
+            raise ValueError("Preferred weekdays must be unique values from 0 through 6")
+        return tuple(sorted(weekdays))
+
+    @field_validator("priority_muscles")
+    @classmethod
+    def validate_priority_muscles(
+        cls, muscles: tuple[MuscleGroup, ...] | None
+    ) -> tuple[MuscleGroup, ...] | None:
+        if muscles is None:
+            return None
+        if len(muscles) != len(set(muscles)):
+            raise ValueError("Priority muscles must be unique")
+        return tuple(sorted(muscles, key=lambda muscle: muscle.value))
+
     @field_validator("birth_date")
     @classmethod
     def validate_age(cls, birth_date: date | None) -> date | None:
@@ -181,6 +235,8 @@ class ProfileUpdate(BaseModel):
             "home_training_setup",
             "physical_limitations",
             "training_age_months",
+            "preferred_weekdays",
+            "priority_muscles",
             "shoulder_circumference_cm",
             "waist_circumference_cm",
             "hip_circumference_cm",
@@ -191,6 +247,12 @@ class ProfileUpdate(BaseModel):
             self.home_training_setup = None
         elif self.training_location == TrainingLocation.HOME and self.home_training_setup is None:
             raise ValueError("Home training setup is required for home training")
+        if (
+            self.training_days_per_week is not None
+            and self.preferred_weekdays is not None
+            and len(self.preferred_weekdays) > self.training_days_per_week
+        ):
+            raise ValueError("Preferred weekdays cannot exceed training days per week")
         return self
 
 
@@ -210,6 +272,8 @@ class ProfileResponse(BaseModel):
     experience_level: ExperienceLevel
     training_age_months: int | None
     training_days_per_week: int
+    preferred_weekdays: tuple[int, ...] | None
+    priority_muscles: tuple[MuscleGroup, ...] | None
     physical_limitations: str | None
     created_at: datetime
     updated_at: datetime

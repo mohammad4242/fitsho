@@ -26,6 +26,7 @@ export type ProfileValidationCode =
   | "circumferencePrecision"
   | "trainingDaysRange"
   | "trainingAgeRange"
+  | "preferredWeekdaysInvalid"
   | "sessionDurationInvalid"
   | "planDurationInvalid"
   | "limitationsLength";
@@ -163,6 +164,17 @@ function validateStepThree(values: ProfileFormValues): ProfileValidationErrors {
     errors.training_days_per_week = "trainingDaysRange";
   }
 
+  if (
+    values.preferred_weekdays.length > 0 &&
+    trainingDays !== "" &&
+    Number.isInteger(Number(trainingDays)) &&
+    Number(trainingDays) >= 2 &&
+    Number(trainingDays) <= 6 &&
+    values.preferred_weekdays.length > Number(trainingDays)
+  ) {
+    errors.preferred_weekdays = "preferredWeekdaysInvalid";
+  }
+
   const trainingAge = values.training_age_months.trim();
   if (
     trainingAge !== "" &&
@@ -258,6 +270,12 @@ export function toProfileInput(values: ProfileFormValues): ProfileInput {
       ? Number(values.training_age_months.trim())
       : null,
     training_days_per_week: Number(values.training_days_per_week.trim()),
+    preferred_weekdays: values.preferred_weekdays.length > 0
+      ? [...values.preferred_weekdays]
+      : null,
+    priority_muscles: values.priority_muscles.length > 0
+      ? [...values.priority_muscles]
+      : null,
     training_location: values.training_location as TrainingLocation,
     home_training_setup:
       values.training_location === "home"
@@ -289,6 +307,8 @@ export function profileToFormValues(profile: Profile): ProfileFormValues {
       ? ""
       : String(profile.training_age_months),
     training_days_per_week: String(profile.training_days_per_week),
+    preferred_weekdays: [...(profile.preferred_weekdays ?? [])].sort((a, b) => a - b),
+    priority_muscles: [...(profile.priority_muscles ?? [])].sort(),
     training_location: profile.training_location,
     home_training_setup: profile.home_training_setup ?? "",
     session_duration_minutes: String(profile.session_duration_minutes),
@@ -341,6 +361,12 @@ export function toProfilePatch(
   }
   if (input.training_days_per_week !== currentProfile.training_days_per_week) {
     patch.training_days_per_week = input.training_days_per_week;
+  }
+  if (input.preferred_weekdays?.join(",") !== currentProfile.preferred_weekdays?.join(",")) {
+    patch.preferred_weekdays = input.preferred_weekdays;
+  }
+  if (input.priority_muscles?.join(",") !== currentProfile.priority_muscles?.join(",")) {
+    patch.priority_muscles = input.priority_muscles;
   }
   if (input.training_location !== currentProfile.training_location) {
     patch.training_location = input.training_location;

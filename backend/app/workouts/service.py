@@ -27,6 +27,7 @@ from app.exercises.enums import (
     ExerciseContentType,
     ExerciseType,
     MediaPresentation,
+    MuscleGroup,
 )
 from app.exercises.models import Exercise
 from app.profile.enums import ExperienceLevel, HomeTrainingSetup, Sex, TrainingLocation
@@ -707,6 +708,10 @@ class WorkoutGenerationService:
             ),
             "training_age_months": training_age,
             "available_training_days": profile.training_days_per_week,
+            "preferred_weekdays": tuple(profile.preferred_weekdays or ()),
+            "priority_muscles": frozenset(
+                MuscleGroup(value) for value in (profile.priority_muscles or ())
+            ),
             "session_duration_minutes": profile.session_duration_minutes,
             "available_equipment": equipment,
             "training_location": profile.training_location,
@@ -716,7 +721,13 @@ class WorkoutGenerationService:
             "body_analysis_influence": body_analysis_influence,
         }
         if overrides is not None:
-            values.update(overrides.model_dump(exclude_none=True))
+            override_values = overrides.model_dump(exclude_none=True)
+            if (
+                "priority_muscles" not in overrides.model_fields_set
+                and not overrides.priority_muscles
+            ):
+                override_values.pop("priority_muscles", None)
+            values.update(override_values)
             values["user_id"] = profile.user_id
         return ProgramGenerationRequest.model_validate(values)
 
