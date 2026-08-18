@@ -71,11 +71,11 @@ from app.workouts.program_engine.schemas import (
 )
 from app.workouts.program_engine.session_targets import persian_session_title
 from app.workouts.repository import (
-    activate_plan,
     create_generation,
     fail_generation,
     get_active_plan,
     get_latest_completed_generation_at,
+    persist_pending_review_plan,
 )
 from app.workouts.schemas import CandidateSet, ProgramGenerationOverrides, WorkoutGenerationProfile
 from app.workouts.signature import normalize_physical_limitations
@@ -283,7 +283,7 @@ class WorkoutGenerationService:
             generation.validation_diagnostics = [
                 cast(dict[str, object], _json_ready(asdict(result.program.validation_report)))
             ]
-            activate_plan(self._db, plan, generation)
+            persist_pending_review_plan(self._db, plan, generation)
             self._db.commit()
             return WorkoutPlanGenerationResult(plan=plan, reused=False)
         except SQLAlchemyError as error:
@@ -301,9 +301,9 @@ class WorkoutGenerationService:
             raise WorkoutGenerationFailedError(error_code="no_enabled_ai_model")
         source_profile = get_profile(self._db, user_id)
         profile = self._to_generation_profile(source_profile)
-        eligible_exercises = WorkoutCandidateSelector(
-            self._db, maximum_candidates=None
-        ).select(profile)
+        eligible_exercises = WorkoutCandidateSelector(self._db, maximum_candidates=None).select(
+            profile
+        )
         if not eligible_exercises.is_sufficient:
             raise NoEligibleExercisesError("INSUFFICIENT_ELIGIBLE_EXERCISES")
         body_analysis = applicable_body_analysis_influence(
@@ -390,7 +390,7 @@ class WorkoutGenerationService:
             generation.input_tokens = recommendation.input_tokens
             generation.output_tokens = recommendation.output_tokens
             generation.latency_ms = int((perf_counter() - started_at) * 1000)
-            activate_plan(self._db, plan, generation)
+            persist_pending_review_plan(self._db, plan, generation)
             self._db.commit()
             return WorkoutPlanGenerationResult(plan=plan, reused=False)
         except WorkoutProviderError as error:

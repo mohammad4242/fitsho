@@ -110,6 +110,26 @@ def activate_plan(
     return plan
 
 
+def persist_pending_review_plan(
+    db: Session,
+    plan: WorkoutPlan,
+    generation: WorkoutPlanGeneration,
+) -> WorkoutPlan:
+    plan.status = WorkoutPlanStatus.PENDING_REVIEW
+    plan.activated_at = None
+    db.add(plan)
+    db.flush()
+
+    generation.workout_plan = plan
+    generation.status = WorkoutGenerationStatus.SUCCEEDED
+    generation.completed_at = datetime.now(UTC)
+    from app.workout_reviews.repository import ensure_pending_review
+
+    ensure_pending_review(db, plan)
+    db.flush()
+    return plan
+
+
 def get_plan_for_user(
     db: Session,
     *,

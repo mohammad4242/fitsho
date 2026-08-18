@@ -24,6 +24,8 @@ from app.exercises.models import Exercise, ExerciseEquipment, ExerciseMediaAsset
 from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.models import BodyMeasurement, UserProfile
+from app.workout_reviews.enums import WorkoutReviewStatus
+from app.workout_reviews.models import WorkoutPlanReview
 from app.workouts.body_analysis_resolver import BodyAnalysisInfluenceResolver
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan, WorkoutPlanGeneration
@@ -156,6 +158,30 @@ def _service(
     )
 
 
+def _persist_active_plan(
+    db: Session,
+    user: User,
+    *,
+    activated_at: datetime | None = None,
+) -> WorkoutPlan:
+    plan = WorkoutPlan(
+        user_id=user.id,
+        status=WorkoutPlanStatus.ACTIVE,
+        generation_signature="z" * 64,
+        profile_snapshot={"plan_duration_weeks": 4},
+        provider="fitsho_domain",
+        model_id="program_engine_v1",
+        prompt_version="none",
+        generation_policy_version="resistance_training_v2",
+        candidate_set_hash="y" * 64,
+        generation_method="deterministic_domain",
+        activated_at=activated_at or datetime.now(UTC),
+    )
+    db.add(plan)
+    db.commit()
+    return plan
+
+
 def test_catalog_uses_profile_gender_media_and_falls_back_to_other_gender(
     db: Session,
 ) -> None:
@@ -230,25 +256,38 @@ def _body_influence(*, result_version_id=None, source="ai_provisional", confiden
     )
 
 
-def test_generation_persists_valid_snapshot_then_reuses_signature(db: Session) -> None:
+def test_generation_persists_valid_snapshot_for_pending_review(db: Session) -> None:
     user = _user_with_profile(db)
     _seed_candidates(db)
     service = _service(db)
 
-    first = asyncio.run(service.generate(user.id))
-    second = asyncio.run(service.generate(user.id))
+    result = asyncio.run(service.generate(user.id))
+    review = db.query(WorkoutPlanReview).filter_by(source_plan_id=result.plan.id).one()
 
-    assert not first.reused
-    assert second.reused
-    assert second.plan.id == first.plan.id
-    assert first.plan.status is WorkoutPlanStatus.ACTIVE
-    assert first.plan.engine_version == "program_engine_v1"
-    assert first.plan.ruleset_version == "resistance_training_v2"
-    assert first.plan.validation_report["errors"] == []
-    assert first.plan.exercise_catalog_snapshot["hash"] == first.plan.candidate_set_hash
-    assert first.plan.generation_records[0].status is WorkoutGenerationStatus.SUCCEEDED
-    assert first.plan.days[0].title_en == "Day 1: Chest + Back + Quadriceps + Hamstrings + Abs"
-    assert first.plan.days[0].title_fa == "روز 1: سینه + زیربغل + چهارسر + پشت پا + شکم"
+    assert not result.reused
+    assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert result.plan.activated_at is None
+    assert result.plan.engine_version == "program_engine_v1"
+    assert result.plan.ruleset_version == "resistance_training_v2"
+    assert result.plan.validation_report["errors"] == []
+    assert result.plan.exercise_catalog_snapshot["hash"] == result.plan.candidate_set_hash
+    assert result.plan.generation_records[0].status is WorkoutGenerationStatus.SUCCEEDED
+    assert review.status is WorkoutReviewStatus.PENDING
+    assert result.plan.days[0].title_en == "Day 1: Chest + Back + Quadriceps + Hamstrings + Abs"
+    assert result.plan.days[0].title_fa == "روز 1: سینه + زیربغل + چهارسر + پشت پا + شکم"
+
+
+def test_generation_keeps_existing_active_plan_when_new_plan_is_pending_review(
+    db: Session,
+) -> None:
+    user = _user_with_profile(db)
+    _seed_candidates(db)
+    active_plan = _persist_active_plan(db, user)
+
+    result = asyncio.run(_service(db).generate(user.id))
+
+    assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert db.get(WorkoutPlan, active_plan.id).status is WorkoutPlanStatus.ACTIVE
 
 
 def test_generation_uses_the_deterministic_domain_engine(db: Session) -> None:
@@ -257,7 +296,7 @@ def test_generation_uses_the_deterministic_domain_engine(db: Session) -> None:
 
     result = asyncio.run(_service(db).generate(user.id))
 
-    assert result.plan.status is WorkoutPlanStatus.ACTIVE
+    assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
     assert result.plan.generation_method == "deterministic_domain"
     assert result.plan.generation_method == "deterministic_domain"
 
@@ -366,6 +405,7 @@ def test_request_time_seed_and_priority_are_persisted(db: Session) -> None:
 def test_failed_replacement_preserves_previous_active_plan(db: Session) -> None:
     user = _user_with_profile(db)
     exercises = _seed_candidates(db)
+    active_plan = _persist_active_plan(db, user)
     initial = asyncio.run(_service(db).generate(user.id))
     profile = db.get(UserProfile, user.id)
     assert profile is not None
@@ -376,7 +416,8 @@ def test_failed_replacement_preserves_previous_active_plan(db: Session) -> None:
     with pytest.raises(NoEligibleExercisesError):
         asyncio.run(_service(db).generate(user.id))
 
-    assert db.get(WorkoutPlan, initial.plan.id).status is WorkoutPlanStatus.ACTIVE  # type: ignore[union-attr]
+    assert initial.plan.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert db.get(WorkoutPlan, active_plan.id).status is WorkoutPlanStatus.ACTIVE
 
 
 def test_generation_in_progress_rejects_second_request(db: Session) -> None:
@@ -400,21 +441,25 @@ def test_generation_in_progress_rejects_second_request(db: Session) -> None:
 def test_expired_plan_is_replaced_with_structured_difference(db: Session) -> None:
     user = _user_with_profile(db)
     _seed_candidates(db)
-    first = asyncio.run(_service(db).generate(user.id))
-    first.plan.activated_at = datetime.now(UTC) - timedelta(days=29)
-    db.commit()
+    first = _persist_active_plan(
+        db,
+        user,
+        activated_at=datetime.now(UTC) - timedelta(days=29),
+    )
 
     replacement = asyncio.run(_service(db).generate(user.id))
 
     assert not replacement.reused
-    assert replacement.plan.previous_program_id == first.plan.id
-    assert replacement.plan.difference_summary["previous_program_id"] == str(first.plan.id)
-    assert db.get(WorkoutPlan, first.plan.id).status is WorkoutPlanStatus.SUPERSEDED  # type: ignore[union-attr]
+    assert replacement.plan.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert replacement.plan.previous_program_id == first.id
+    assert replacement.plan.difference_summary["previous_program_id"] == str(first.id)
+    assert db.get(WorkoutPlan, first.id).status is WorkoutPlanStatus.ACTIVE
 
 
 def test_active_plan_is_stale_when_profile_changes(db: Session) -> None:
     user = _user_with_profile(db)
     _seed_candidates(db)
+    _persist_active_plan(db, user)
     asyncio.run(_service(db).generate(user.id))
     profile = db.get(UserProfile, user.id)
     assert profile is not None
@@ -459,6 +504,7 @@ def test_specialist_correction_changes_signature_and_marks_active_plan_stale(
 ) -> None:
     user = _user_with_profile(db)
     _seed_candidates(db)
+    _persist_active_plan(db, user)
     resolver = _InfluenceResolver(_body_influence())
     service = _service(db, body_analysis_resolver=resolver)
     first = asyncio.run(service.generate(user.id))
@@ -473,6 +519,7 @@ def test_specialist_correction_changes_signature_and_marks_active_plan_stale(
 
     assert active is not None and active.is_stale
     assert replacement.plan.id != first.plan.id
+    assert replacement.plan.status is WorkoutPlanStatus.PENDING_REVIEW
     assert replacement.plan.body_analysis_provenance["source"] == "fully_reviewed"
 
 
@@ -482,6 +529,9 @@ def test_low_confidence_analysis_reuses_same_plan_signature(db: Session) -> None
     resolver = _InfluenceResolver(None)
     service = _service(db, body_analysis_resolver=resolver)
     first = asyncio.run(service.generate(user.id))
+    first.plan.status = WorkoutPlanStatus.ACTIVE
+    first.plan.activated_at = datetime.now(UTC)
+    db.commit()
 
     resolver.influence = _body_influence(confidence=0.4)
     second = asyncio.run(service.generate(user.id))
@@ -518,5 +568,5 @@ def test_failed_body_analysis_does_not_block_normal_plan_generation(db: Session)
 
     result = asyncio.run(_service(db).generate(user.id))
 
-    assert result.plan.status is WorkoutPlanStatus.ACTIVE
+    assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
     assert result.plan.body_analysis_provenance == {}
