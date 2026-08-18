@@ -7,6 +7,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.workout_cycles.service import start_cycle
 from app.workout_reviews.enums import (
     WorkoutReviewErrorCode,
     WorkoutReviewQueueView,
@@ -151,6 +152,11 @@ class WorkoutReviewService:
         approved.activated_at = now
         self._db.add(approved)
         self._db.flush()
+        start_cycle(
+            self._db,
+            user_id=approved.user_id,
+            workout_plan_id=approved.id,
+        )
         review.status = WorkoutReviewStatus.APPROVED
         review.approved_plan_id = approved.id
         review.approved_at = now

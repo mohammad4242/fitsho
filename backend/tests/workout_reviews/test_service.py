@@ -19,6 +19,8 @@ from app.exercises.enums import (
     MuscleGroup,
 )
 from app.exercises.models import Exercise
+from app.workout_cycles.models import WorkoutCycle
+from app.workout_cycles.service import start_cycle
 from app.workout_reviews.enums import WorkoutReviewErrorCode, WorkoutReviewStatus
 from app.workout_reviews.models import WorkoutPlanReview
 from app.workout_reviews.repository import ensure_pending_review
@@ -261,6 +263,9 @@ def test_approval_activates_pending_plan_without_creating_review_loop(db: Sessio
         status=WorkoutPlanStatus.PENDING_REVIEW,
     )
     review = ensure_pending_review(db, source)
+    assert db.scalars(
+        select(WorkoutCycle).where(WorkoutCycle.workout_plan_id == source.id)
+    ).all() == []
     service = WorkoutReviewService(db, clock=Clock())
     service.claim(review.id, coach.id)
     saved = service.save_draft(review.id, coach.id, _draft(review))
@@ -276,6 +281,10 @@ def test_approval_activates_pending_plan_without_creating_review_loop(db: Sessio
     assert source.status is WorkoutPlanStatus.SUPERSEDED
     assert approved.status is WorkoutPlanStatus.ACTIVE
     assert approved.activated_at == Clock().now
+    cycle = db.scalar(select(WorkoutCycle).where(WorkoutCycle.workout_plan_id == approved.id))
+    assert cycle is not None
+    assert cycle.user_id == member.id
+    assert cycle.duration_weeks == approved.profile_snapshot["plan_duration_weeks"] == 4
     assert review.status is WorkoutReviewStatus.APPROVED
     assert review.approved_plan_id == approved.id
     assert (
@@ -284,6 +293,25 @@ def test_approval_activates_pending_plan_without_creating_review_loop(db: Sessio
         .count()
         == 0
     )
+
+    repeated = start_cycle(
+        db,
+        user_id=member.id,
+        workout_plan_id=approved.id,
+    )
+    assert repeated.id == cycle.id
+    assert db.scalars(
+        select(WorkoutCycle).where(WorkoutCycle.workout_plan_id == approved.id)
+    ).all() == [cycle]
+
+    with pytest.raises(ReviewConflict) as error:
+        service.approve(
+            review.id,
+            coach.id,
+            expected_revision=saved.draft_revision,
+        )
+    assert error.value.code is WorkoutReviewErrorCode.REVIEW_ALREADY_APPROVED
+    assert db.scalars(select(WorkoutCycle)).all() == [cycle]
 
 
 def test_approval_supersedes_previous_active_plan_only_at_approval(db: Session) -> None:
@@ -325,6 +353,9 @@ def test_approval_supersedes_previous_active_plan_only_at_approval(db: Session) 
         .count()
         == 1
     )
+    cycles = db.scalars(select(WorkoutCycle).where(WorkoutCycle.user_id == member.id)).all()
+    assert len(cycles) == 1
+    assert cycles[0].workout_plan_id == approved.id
 
 
 def test_approval_cannot_replace_a_newer_active_plan(db: Session) -> None:
