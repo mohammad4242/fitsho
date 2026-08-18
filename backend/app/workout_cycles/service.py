@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.exercises.models import ExerciseAlternative
 from app.workout_cycles.enums import (
     WorkoutCycleStatus,
+    WorkoutCycleWeeklyCheckInDifficulty,
+    WorkoutCycleWeeklyCheckInRecovery,
     WorkoutExercisePreferenceType,
     WorkoutExerciseReplacementReason,
     WorkoutExerciseReplacementScope,
@@ -16,6 +18,7 @@ from app.workout_cycles.enums import (
 from app.workout_cycles.models import (
     WorkoutCycle,
     WorkoutCycleFeedback,
+    WorkoutCycleWeeklyCheckIn,
     WorkoutExercisePreference,
     WorkoutExerciseReplacement,
     WorkoutExerciseSafetySignal,
@@ -56,6 +59,18 @@ class WorkoutExerciseReplacementAlternativeNotAllowedError(Exception):
     pass
 
 
+class WorkoutCycleWeeklyCheckInCycleNotFoundError(Exception):
+    pass
+
+
+class WorkoutCycleWeeklyCheckInWeekOutOfRangeError(ValueError):
+    pass
+
+
+class WorkoutCycleWeeklyCheckInSessionsOutOfRangeError(ValueError):
+    pass
+
+
 def calculate_current_week(
     started_at: datetime,
     duration_weeks: int,
@@ -70,6 +85,53 @@ def calculate_current_week(
     current_at_utc = _as_utc(current_at)
     elapsed_days = max(0, (current_at_utc - started_at_utc).days)
     return min(duration_weeks, elapsed_days // 7 + 1)
+
+
+def create_weekly_check_in(
+    db: Session,
+    *,
+    user_id: UUID,
+    cycle_id: UUID,
+    week_number: int,
+    sessions_completed: int,
+    perceived_difficulty: WorkoutCycleWeeklyCheckInDifficulty,
+    recovery_rating: WorkoutCycleWeeklyCheckInRecovery,
+    has_pain_or_limitation: bool,
+    note_optional: str | None = None,
+) -> WorkoutCycleWeeklyCheckIn:
+    cycle = get_cycle_for_user(db, cycle_id=cycle_id, user_id=user_id)
+    if cycle is None or cycle.workout_plan.user_id != user_id:
+        raise WorkoutCycleWeeklyCheckInCycleNotFoundError
+    if not 1 <= week_number <= cycle.duration_weeks:
+        raise WorkoutCycleWeeklyCheckInWeekOutOfRangeError(
+            "Weekly check-in week must be within the workout cycle duration"
+        )
+
+    prescribed_training_days = len(cycle.workout_plan.days)
+    if not 0 <= sessions_completed <= prescribed_training_days:
+        raise WorkoutCycleWeeklyCheckInSessionsOutOfRangeError(
+            "Completed sessions must be within the plan's prescribed weekly days"
+        )
+
+    check_in = WorkoutCycleWeeklyCheckIn(
+        user_id=user_id,
+        cycle_id=cycle.id,
+        week_number=week_number,
+        sessions_completed=sessions_completed,
+        perceived_difficulty=perceived_difficulty,
+        recovery_rating=recovery_rating,
+        has_pain_or_limitation=has_pain_or_limitation,
+        note_optional=note_optional,
+    )
+    db.add(check_in)
+    try:
+        db.flush()
+        db.commit()
+        db.refresh(check_in)
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return check_in
 
 
 def record_exercise_replacement(

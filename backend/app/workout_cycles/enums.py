@@ -28,3 +28,17 @@ class WorkoutExercisePreferenceType(StrEnum):
 
 class WorkoutExerciseSafetySignalType(StrEnum):
     PAIN_OR_DISCOMFORT = "pain_or_discomfort"
+
+
+class WorkoutCycleWeeklyCheckInDifficulty(StrEnum):
+    TOO_EASY = "too_easy"
+    EASY = "easy"
+    APPROPRIATE = "appropriate"
+    HARD = "hard"
+    TOO_HARD = "too_hard"
+
+
+class WorkoutCycleWeeklyCheckInRecovery(StrEnum):
+    GOOD = "good"
+    AVERAGE = "average"
+    POOR = "poor"

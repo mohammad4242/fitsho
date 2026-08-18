@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     DateTime,
     Enum,
@@ -23,6 +24,8 @@ from app.database.base import Base
 from app.exercises.models import Exercise
 from app.workout_cycles.enums import (
     WorkoutCycleStatus,
+    WorkoutCycleWeeklyCheckInDifficulty,
+    WorkoutCycleWeeklyCheckInRecovery,
     WorkoutExercisePreferenceType,
     WorkoutExerciseReplacementReason,
     WorkoutExerciseReplacementScope,
@@ -120,6 +123,96 @@ class WorkoutCycleFeedback(Base):
     )
 
     cycle: Mapped[WorkoutCycle] = relationship(back_populates="completion_feedback")
+
+
+class WorkoutCycleWeeklyCheckIn(Base):
+    __tablename__ = "workout_cycle_weekly_check_ins"
+    __table_args__ = (
+        UniqueConstraint(
+            "cycle_id",
+            "week_number",
+            name="uq_workout_cycle_weekly_checkins_cycle_week",
+        ),
+        CheckConstraint(
+            "week_number >= 1",
+            name="ck_workout_cycle_weekly_check_ins_week_positive",
+        ),
+        CheckConstraint(
+            "week_number <= 8",
+            name="ck_workout_cycle_weekly_check_ins_week_max",
+        ),
+        CheckConstraint(
+            "sessions_completed >= 0",
+            name="ck_weekly_check_ins_sessions_completed_nonnegative",
+        ),
+        CheckConstraint(
+            "sessions_completed <= 7",
+            name="ck_workout_cycle_weekly_check_ins_sessions_completed_max",
+        ),
+        CheckConstraint(
+            "note_optional IS NULL OR char_length(note_optional) <= 2000",
+            name="ck_workout_cycle_weekly_check_ins_note_length",
+        ),
+        Index(
+            "ix_workout_cycle_weekly_check_ins_user_cycle",
+            "user_id",
+            "cycle_id",
+        ),
+        Index(
+            "ix_workout_cycle_weekly_check_ins_cycle_week",
+            "cycle_id",
+            "week_number",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    cycle_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workout_cycles.id", ondelete="RESTRICT"), nullable=False
+    )
+    week_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    sessions_completed: Mapped[int] = mapped_column(Integer, nullable=False)
+    perceived_difficulty: Mapped[WorkoutCycleWeeklyCheckInDifficulty] = mapped_column(
+        Enum(
+            WorkoutCycleWeeklyCheckInDifficulty,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_weekly_check_ins_difficulty_values",
+        ),
+        nullable=False,
+    )
+    recovery_rating: Mapped[WorkoutCycleWeeklyCheckInRecovery] = mapped_column(
+        Enum(
+            WorkoutCycleWeeklyCheckInRecovery,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_cycle_weekly_check_ins_recovery_values",
+        ),
+        nullable=False,
+    )
+    has_pain_or_limitation: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    note_optional: Mapped[str | None] = mapped_column(Text)
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped[User] = relationship()
+    cycle: Mapped[WorkoutCycle] = relationship()
 
 
 class WorkoutExerciseReplacement(Base):
