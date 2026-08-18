@@ -49,10 +49,14 @@ def _register_and_complete_profile(client: TestClient, email: str) -> UUID:
     return UUID(registration.json()["id"])
 
 
-def _plan(db: Session, user_id: UUID) -> WorkoutPlan:
+def _plan(
+    db: Session,
+    user_id: UUID,
+    status: WorkoutPlanStatus = WorkoutPlanStatus.ACTIVE,
+) -> WorkoutPlan:
     plan = WorkoutPlan(
         user_id=user_id,
-        status=WorkoutPlanStatus.ACTIVE,
+        status=status,
         generation_signature="a" * 64,
         profile_snapshot={"fitness_goal": "build_muscle", "plan_duration_weeks": 4},
         provider="fake",
@@ -115,6 +119,60 @@ def test_active_workout_plan_reports_backend_staleness(client: TestClient, db: S
     assert response.status_code == 200
     assert response.json()["plan_duration_weeks"] == 4
     assert response.json()["is_stale"] is True
+
+
+def test_active_workout_plan_returns_only_the_active_version(
+    client: TestClient, db: Session
+) -> None:
+    user_id = _register_and_complete_profile(client, "active-only@example.com")
+    active = _plan(db, user_id)
+    _plan(db, user_id, status=WorkoutPlanStatus.PENDING_REVIEW)
+
+    response = client.get("/api/v1/workout-plans/active")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == str(active.id)
+    assert response.json()["status"] == WorkoutPlanStatus.ACTIVE.value
+
+
+def test_pending_workout_plan_is_visible_in_member_history(client: TestClient, db: Session) -> None:
+    user_id = _register_and_complete_profile(client, "pending-history@example.com")
+    pending = _plan(db, user_id, status=WorkoutPlanStatus.PENDING_REVIEW)
+
+    response = client.get("/api/v1/workout-plans/history")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "id": str(pending.id),
+            "status": WorkoutPlanStatus.PENDING_REVIEW.value,
+            "created_at": pending.created_at.isoformat().replace("+00:00", "Z"),
+            "activated_at": None,
+            "is_active": False,
+            "coach_review": {
+                "state": "none",
+                "coach_display_name": None,
+                "coach_note": None,
+                "approved_at": None,
+            },
+        }
+    ]
+
+
+def test_first_pending_workout_plan_is_not_active_or_executable(
+    client: TestClient, db: Session
+) -> None:
+    user_id = _register_and_complete_profile(client, "first-pending@example.com")
+    pending = _plan(db, user_id, status=WorkoutPlanStatus.PENDING_REVIEW)
+
+    active_response = client.get("/api/v1/workout-plans/active")
+    history_response = client.get("/api/v1/workout-plans/history")
+
+    assert active_response.status_code == 404
+    assert history_response.status_code == 200
+    assert history_response.json()[0]["id"] == str(pending.id)
+    assert history_response.json()[0]["status"] == WorkoutPlanStatus.PENDING_REVIEW.value
+    assert history_response.json()[0]["is_active"] is False
 
 
 def test_workout_plan_is_scoped_to_its_owner(client: TestClient, db: Session) -> None:

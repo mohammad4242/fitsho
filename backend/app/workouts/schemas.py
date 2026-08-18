@@ -206,6 +206,7 @@ class WorkoutPlanVersionSummaryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: UUID
+    status: WorkoutPlanStatus
     created_at: datetime
     activated_at: datetime | None
     is_active: bool

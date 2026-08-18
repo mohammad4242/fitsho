@@ -1100,6 +1100,7 @@ const fa = {
       contextLabel: "خلاصه برنامه فعال",
       currentPlan: "برنامه فعلی",
       active: "فعال",
+      pendingReview: "برنامه جدید شما در انتظار بررسی و تأیید مربی است.",
       cycle: "دوره",
       trainingDays: "روزهای تمرین",
       daysCount: "{{count}} روز تمرین",

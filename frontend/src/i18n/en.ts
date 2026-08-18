@@ -1100,6 +1100,7 @@ const en = {
       contextLabel: "Active plan summary",
       currentPlan: "Current plan",
       active: "Active",
+      pendingReview: "Your new plan is waiting for coach review and approval.",
       cycle: "Cycle",
       trainingDays: "Training days",
       daysCount: "{{count}} training days",

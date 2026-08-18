@@ -52,6 +52,7 @@ it("requests generation from Fitsho instead of an AI provider", async () => {
 it("reads member plan history and a selected immutable version", async () => {
   const history = [{
     id: plan.id,
+    status: "active" as const,
     created_at: plan.created_at,
     activated_at: plan.activated_at,
     is_active: true,

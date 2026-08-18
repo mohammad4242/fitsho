@@ -38,6 +38,8 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   const l = (fa: string, en: string) => isEnglish ? en : fa;
   const displayedPlanDuration = plan?.plan_duration_weeks ?? planDurationWeeks;
   const isViewingHistorical = plan !== null && activePlanId !== null && plan.id !== activePlanId;
+  const hasPendingReview = history.some((version) => version.status === "pending_review");
+  const memberHistory = history.filter((version) => version.status !== "pending_review");
   const number = new Intl.NumberFormat(isEnglish ? "en-US" : "fa-IR");
   const sessionDurations = plan?.days.map((day) => day.estimated_duration_minutes) ?? [];
   const shortestSession = sessionDurations.length > 0 ? Math.min(...sessionDurations) : null;
@@ -85,12 +87,16 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
     setReused(false);
     setGenerationError(null);
     void generateWorkoutPlan()
-      .then((result) => {
-        setPlan(result.plan);
-        setActivePlanId(result.plan.id);
-        setState("ready");
+      .then(async (result) => {
+        const [currentPlan, versions] = await Promise.all([
+          getActiveWorkoutPlan(),
+          getWorkoutPlanHistory().catch(() => [] as WorkoutPlanVersionSummary[]),
+        ]);
+        setPlan(currentPlan);
+        setActivePlanId(currentPlan?.id ?? null);
+        setHistory(versions);
+        setState(currentPlan === null ? "empty" : "ready");
         setReused(result.reused);
-        void getWorkoutPlanHistory().then(setHistory).catch(() => undefined);
       })
       .catch((error: unknown) => {
         const errorKind = error instanceof ApiError && error.status === 429 ? "cooldown" : "failed";
@@ -184,19 +190,24 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 onAction={generationError === "failed" ? generate : undefined}
               />
             )}
-            <section className="workout-empty" aria-labelledby="workout-empty-title">
-              <h2 id="workout-empty-title" className="fitsho-display">{t("workoutPlan.emptyTitle")}</h2>
-              <p>{t("workoutPlan.emptyBody")}</p>
-              <GenerateButton
-                generating={generating}
-                onClick={generate}
-                disabled={generationError === "cooldown"}
-              />
-            </section>
+            {hasPendingReview ? <PendingReviewNotice /> : (
+              <section className="workout-empty" aria-labelledby="workout-empty-title">
+                <h2 id="workout-empty-title" className="fitsho-display">{t("workoutPlan.emptyTitle")}</h2>
+                <p>{t("workoutPlan.emptyBody")}</p>
+                <GenerateButton
+                  generating={generating}
+                  onClick={generate}
+                  disabled={generationError === "cooldown"}
+                />
+              </section>
+            )}
           </>
         )}
         {state === "ready" && plan !== null && (
-          <CoachReviewBanner plan={plan} isEnglish={isEnglish} historical={isViewingHistorical} />
+          <>
+            <CoachReviewBanner plan={plan} isEnglish={isEnglish} historical={isViewingHistorical} />
+            {!isViewingHistorical && hasPendingReview && <PendingReviewNotice />}
+          </>
         )}
         <section className="workout-generation-method" aria-labelledby="workout-generation-method-title">
           <h2 id="workout-generation-method-title">{t("workoutPlan.generationMethodTitle")}</h2>
@@ -339,11 +350,11 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 <div><p>{t("workoutPlan.aiCoach")}</p><strong>{plan.ai_coach_program_explanation_fa}</strong></div>
               </aside>
             )}
-            {plan !== null && history.length > 1 && (
+            {plan !== null && memberHistory.length > 1 && (
               <section className="workout-version-history" aria-labelledby="workout-version-history-title">
                 <div><p className="eyebrow eyebrow--accent">{l("نسخه‌های برنامه", "Plan versions")}</p><h2 id="workout-version-history-title">{l("تاریخچه برنامه", "Plan history")}</h2></div>
                 <div className="workout-version-history__list">
-                  {history.map((version) => {
+                  {memberHistory.map((version) => {
                     const label = version.coach_review.state === "coach_approved" ? l("نسخه تأیید مربی", "Coach-approved version") : l("نسخه اولیه", "Initial version");
                     return <button type="button" key={version.id} className={version.id === plan.id ? "workout-version-history__active" : undefined} disabled={selectingVersionId !== null} aria-label={`${label} — ${new Intl.DateTimeFormat(isEnglish ? "en" : "fa-IR", { dateStyle: "medium" }).format(new Date(version.created_at))}`} onClick={() => selectVersion(version)}><strong>{label}</strong><span>{version.is_active ? l("فعال", "Active") : l("آرشیو", "Archived")}</span></button>;
                   })}
@@ -386,6 +397,16 @@ function CoachReviewBanner({ plan, isEnglish, historical }: { plan: WorkoutPlan;
     );
   }
   return null;
+}
+
+function PendingReviewNotice() {
+  const { t } = useTranslation();
+  return (
+    <aside className="workout-review-banner workout-review-banner--pending" role="status">
+      <span className="workout-review-indicator" aria-hidden="true" />
+      <strong>{t("workoutPlan.pendingReview")}</strong>
+    </aside>
+  );
 }
 
 function FixedGuidance() {

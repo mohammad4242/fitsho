@@ -57,6 +57,7 @@ export type WorkoutPlanGeneration = {
 
 export type WorkoutPlanVersionSummary = {
   id: string;
+  status: WorkoutPlanStatus;
   created_at: string;
   activated_at: string | null;
   is_active: boolean;

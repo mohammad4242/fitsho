@@ -95,6 +95,20 @@ const plan: WorkoutPlan = {
   ],
 };
 
+const pendingVersion = {
+  id: "018f0000-0000-7000-8000-000000000099",
+  status: "pending_review" as const,
+  created_at: "2026-08-10T10:00:00Z",
+  activated_at: null,
+  is_active: false,
+  coach_review: {
+    state: "pending_coach_review" as const,
+    coach_display_name: null,
+    coach_note: null,
+    approved_at: null,
+  },
+};
+
 beforeEach(() => {
   api.getActiveWorkoutPlan.mockReset();
   api.getWorkoutPlanHistory.mockReset();
@@ -185,6 +199,48 @@ it("keeps the initial version visible while coach approval is pending", async ()
   expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
 });
 
+it("keeps the active plan usable while a newer plan awaits coach approval", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  api.getWorkoutPlanHistory.mockResolvedValue([pendingVersion]);
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByText("برنامه جدید شما در انتظار بررسی و تأیید مربی است.")).toBeInTheDocument();
+  expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
+  expect(screen.getByRole("list", { name: "روزهای تمرین تو" })).toBeInTheDocument();
+});
+
+it("shows pending review instead of an executable draft when there is no active plan", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(null);
+  api.getWorkoutPlanHistory.mockResolvedValue([pendingVersion]);
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByText("برنامه جدید شما در انتظار بررسی و تأیید مربی است.")).toBeInTheDocument();
+  expect(screen.queryByRole("list", { name: "روزهای تمرین تو" })).not.toBeInTheDocument();
+  expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ساخت برنامه" })).not.toBeInTheDocument();
+});
+
+it("does not render the pending draft returned by generation", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(null);
+  api.getWorkoutPlanHistory
+    .mockResolvedValueOnce([])
+    .mockResolvedValueOnce([pendingVersion]);
+  api.generateWorkoutPlan.mockResolvedValue({
+    plan: { ...plan, status: "pending_review", activated_at: null },
+    reused: false,
+  });
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: "ساخت برنامه" }));
+
+  expect(await screen.findByText("برنامه جدید شما در انتظار بررسی و تأیید مربی است.")).toBeInTheDocument();
+  expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
+});
+
 it("lets the member inspect old and coach-approved immutable versions", async () => {
   const approvedPlan: WorkoutPlan = {
     ...plan,
@@ -200,6 +256,7 @@ it("lets the member inspect old and coach-approved immutable versions", async ()
   api.getWorkoutPlanHistory.mockResolvedValue([
     {
       id: approvedPlan.id,
+      status: "active",
       created_at: approvedPlan.created_at,
       activated_at: approvedPlan.activated_at,
       is_active: true,
@@ -207,6 +264,7 @@ it("lets the member inspect old and coach-approved immutable versions", async ()
     },
     {
       id: plan.id,
+      status: "superseded",
       created_at: plan.created_at,
       activated_at: plan.activated_at,
       is_active: false,
@@ -369,6 +427,7 @@ it("downloads the historical plan currently displayed", async () => {
   api.getWorkoutPlanHistory.mockResolvedValue([
     {
       id: plan.id,
+      status: "active",
       created_at: plan.created_at,
       activated_at: plan.activated_at,
       is_active: true,
@@ -376,6 +435,7 @@ it("downloads the historical plan currently displayed", async () => {
     },
     {
       id: historicalPlan.id,
+      status: "superseded",
       created_at: "2026-07-01T10:00:00Z",
       activated_at: "2026-07-01T10:00:00Z",
       is_active: false,

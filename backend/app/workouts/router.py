@@ -121,6 +121,7 @@ def read_plan_history(
     return [
         WorkoutPlanVersionSummaryResponse(
             id=plan.id,
+            status=plan.status,
             created_at=plan.created_at,
             activated_at=plan.activated_at,
             is_active=plan.status.value == "active",
