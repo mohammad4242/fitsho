@@ -21,6 +21,41 @@ class AthleteStateTrendDirection(StrEnum):
     UNKNOWN = "unknown"
 
 
+class AthleteStateRecoverySummary(StrEnum):
+    GOOD = "good"
+    MIXED = "mixed"
+    POOR = "poor"
+    UNKNOWN = "unknown"
+
+
+class AthleteStateDifficultySummary(StrEnum):
+    TOO_EASY = "too_easy"
+    APPROPRIATE = "appropriate"
+    TOO_HARD = "too_hard"
+    MIXED = "mixed"
+    UNKNOWN = "unknown"
+
+
+class AthleteStateReasonCode(StrEnum):
+    ADHERENCE_CALCULATED_FROM_WEEKLY_CHECK_INS = "adherence_calculated_from_weekly_check_ins"
+    NO_WEEKLY_CHECK_IN_DATA = "no_weekly_check_in_data"
+    ALL_RECENT_RECOVERY_GOOD = "all_recent_recovery_good"
+    ALL_RECENT_RECOVERY_POOR = "all_recent_recovery_poor"
+    MIXED_RECENT_RECOVERY = "mixed_recent_recovery"
+    NO_RECOVERY_DATA = "no_recovery_data"
+    CONSISTENTLY_TOO_EASY = "consistently_too_easy"
+    CONSISTENTLY_APPROPRIATE = "consistently_appropriate"
+    CONSISTENTLY_TOO_HARD = "consistently_too_hard"
+    MIXED_RECENT_DIFFICULTY = "mixed_recent_difficulty"
+    NO_DIFFICULTY_DATA = "no_difficulty_data"
+    PERSISTENT_EQUIPMENT_CONTEXT = "persistent_equipment_context"
+    LATEST_CONFIRMED_FEEDBACK_SCHEDULE = "latest_confirmed_feedback_schedule"
+    PROFILE_SCHEDULE_FALLBACK = "profile_schedule_fallback"
+    NO_SCHEDULE_DATA = "no_schedule_data"
+    BODY_COMPARISON_EVIDENCE = "body_comparison_evidence"
+    NO_BODY_PROGRESS_DATA = "no_body_progress_data"
+
+
 class AthleteStateAdherence(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -28,6 +63,7 @@ class AthleteStateAdherence(BaseModel):
     planned_sessions: int = Field(ge=0)
     percent: float | None = Field(default=None, ge=0, le=100)
     source_check_in_ids: tuple[UUID, ...] = ()
+    reason_codes: tuple[AthleteStateReasonCode, ...] = ()
 
 
 class AthleteStateRecoveryTrend(BaseModel):
@@ -37,6 +73,8 @@ class AthleteStateRecoveryTrend(BaseModel):
     values: tuple[WorkoutCycleWeeklyCheckInRecovery, ...] = ()
     direction: AthleteStateTrendDirection = AthleteStateTrendDirection.UNKNOWN
     source_check_in_ids: tuple[UUID, ...] = ()
+    summary: AthleteStateRecoverySummary = AthleteStateRecoverySummary.UNKNOWN
+    reason_codes: tuple[AthleteStateReasonCode, ...] = ()
 
 
 class AthleteStateDifficultyTrend(BaseModel):
@@ -46,6 +84,8 @@ class AthleteStateDifficultyTrend(BaseModel):
     values: tuple[WorkoutCycleWeeklyCheckInDifficulty, ...] = ()
     direction: AthleteStateTrendDirection = AthleteStateTrendDirection.UNKNOWN
     source_check_in_ids: tuple[UUID, ...] = ()
+    summary: AthleteStateDifficultySummary = AthleteStateDifficultySummary.UNKNOWN
+    reason_codes: tuple[AthleteStateReasonCode, ...] = ()
 
 
 class AthleteStateExerciseContext(BaseModel):
@@ -54,6 +94,7 @@ class AthleteStateExerciseContext(BaseModel):
     exercise_id: UUID
     source_preference_ids: tuple[UUID, ...] = ()
     source_replacement_ids: tuple[UUID, ...] = ()
+    reason_codes: tuple[AthleteStateReasonCode, ...] = ()
 
 
 class AthleteStateScheduleContext(BaseModel):
@@ -67,6 +108,7 @@ class AthleteStateScheduleContext(BaseModel):
     home_training_setup: HomeTrainingSetup | None = None
     source_feedback_id: UUID | None = None
     source_profile_user_id: UUID | None = None
+    reason_codes: tuple[AthleteStateReasonCode, ...] = ()
 
 
 class AthleteStateBodyProgress(BaseModel):
@@ -76,6 +118,7 @@ class AthleteStateBodyProgress(BaseModel):
     unchanged_areas: tuple[BodyArea, ...] = ()
     lagging_areas: tuple[BodyArea, ...] = ()
     comparison_ids: tuple[UUID, ...] = ()
+    reason_codes: tuple[AthleteStateReasonCode, ...] = ()
 
 
 class AthleteStateProvenance(BaseModel):
