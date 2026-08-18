@@ -151,6 +151,8 @@ def plan_weekly_volume(
                 maximum_soft=min(muscle_maximum, sets + soft_allowance),
                 maximum_hard=muscle_maximum,
                 fractional_sets=round(sets * ruleset.secondary_set_credit, 1),
+                effective_target_sets=sets,
+                minimum_direct_sets=min(muscle_minimum, sets),
             )
         )
     return WeeklyVolumePlan(targets=tuple(targets), reason_codes=tuple(dict.fromkeys(reasons)))

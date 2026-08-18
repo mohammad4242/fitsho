@@ -26,7 +26,14 @@ from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import allocate_direct_sets
 from app.workouts.program_engine.progression import double_progression_policy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-from app.workouts.program_engine.schemas import ExerciseCandidate, ProgramGenerationRequest
+from app.workouts.program_engine.schemas import (
+    ExerciseCandidate,
+    NormalizedProgramRequest,
+    ProgramGenerationRequest,
+    ProgrammedExercise,
+    WorkoutDay,
+)
+from app.workouts.program_engine.split_selector import select_split
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from app.workouts.program_engine.volume_repair import repair_weekly_volume
@@ -207,9 +214,7 @@ def test_volume_repair_reduces_hard_excess_before_validation() -> None:
     normalized = normalize_request(source, RULESET)
     volume = plan_weekly_volume(normalized, result.program.split, RULESET)
 
-    repaired_days, reasons = repair_weekly_volume(
-        (excessive_day,), normalized, volume, RULESET
-    )
+    repaired_days, reasons = repair_weekly_volume((excessive_day,), normalized, volume, RULESET)
 
     repaired_chest = next(
         item for item in repaired_days[0].exercises if item.primary_muscle is MuscleGroup.CHEST
@@ -218,6 +223,148 @@ def test_volume_repair_reduces_hard_excess_before_validation() -> None:
         RULESET.maximum_sets[result.program.training_status],
         RULESET.max_sets_per_muscle_per_session,
     )
+    assert "VOLUME_REPAIR_REDUCED_SET" in reasons
+
+
+def test_volume_target_keeps_effective_target_and_direct_minimum_separate() -> None:
+    source = request()
+    normalized = normalize_request(source, RULESET)
+    volume = plan_weekly_volume(normalized, select_split(normalized, RULESET), RULESET)
+
+    target = next(item for item in volume.targets if item.muscle is MuscleGroup.TRICEPS)
+
+    assert target.effective_target_sets == target.target_sets
+    assert target.minimum_direct_sets == target.minimum_soft
+
+
+def programmed_volume_exercise(
+    primary: MuscleGroup,
+    secondary: tuple[MuscleGroup, ...],
+    sets: int,
+) -> ProgrammedExercise:
+    return ProgrammedExercise(
+        exercise_id=uuid4(),
+        exercise_name="volume test exercise",
+        order=1,
+        sets=sets,
+        rep_min=8,
+        rep_max=12,
+        target_rir=2,
+        rest_seconds=90,
+        estimated_minutes=8,
+        reason_codes=("TEST",),
+        movement_pattern=MovementPattern.HORIZONTAL_PUSH,
+        primary_muscle=primary,
+        secondary_muscles=secondary,
+    )
+
+
+def volume_test_day(exercise: ProgrammedExercise) -> WorkoutDay:
+    return WorkoutDay(
+        day_index=1,
+        weekday=0,
+        title="Volume test",
+        focus="full_body",
+        estimated_duration_minutes=13,
+        exercises=(exercise,),
+    )
+
+
+def volume_with_targets(
+    normalized: NormalizedProgramRequest,
+    *,
+    effective_target: dict[MuscleGroup, int],
+    minimum_direct: dict[MuscleGroup, int] | None = None,
+    maximum_hard: dict[MuscleGroup, int] | None = None,
+):
+    source = normalized
+    volume = plan_weekly_volume(source, select_split(source, RULESET), RULESET)
+    minimum_direct = minimum_direct or {}
+    maximum_hard = maximum_hard or {}
+    return replace(
+        volume,
+        targets=tuple(
+            replace(
+                target,
+                effective_target_sets=effective_target.get(
+                    target.muscle, target.effective_target_sets
+                ),
+                minimum_direct_sets=minimum_direct.get(target.muscle, target.minimum_direct_sets),
+                maximum_hard=maximum_hard.get(target.muscle, target.maximum_hard),
+            )
+            for target in volume.targets
+        ),
+    )
+
+
+def test_volume_repair_does_not_add_sets_when_effective_target_is_satisfied() -> None:
+    source = request()
+    normalized = normalize_request(source, RULESET)
+    volume = volume_with_targets(
+        normalized,
+        effective_target={muscle: 0 for muscle in MuscleGroup},
+    )
+    volume = replace(
+        volume,
+        targets=tuple(
+            replace(
+                target,
+                effective_target_sets=2
+                if target.muscle is MuscleGroup.TRICEPS
+                else target.effective_target_sets,
+            )
+            for target in volume.targets
+        ),
+    )
+    day = volume_test_day(programmed_volume_exercise(MuscleGroup.CHEST, (MuscleGroup.TRICEPS,), 4))
+
+    repaired, reasons = repair_weekly_volume((day,), normalized, volume, RULESET)
+
+    assert repaired[0].exercises[0].sets == 4
+    assert "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET" not in reasons
+
+
+def test_volume_repair_adds_existing_compound_set_when_effective_volume_is_under_target() -> None:
+    source = request()
+    normalized = normalize_request(source, RULESET)
+    volume = volume_with_targets(
+        normalized,
+        effective_target={muscle: 0 for muscle in MuscleGroup},
+    )
+    volume = replace(
+        volume,
+        targets=tuple(
+            replace(
+                target,
+                effective_target_sets=5
+                if target.muscle is MuscleGroup.CHEST
+                else target.effective_target_sets,
+            )
+            for target in volume.targets
+        ),
+    )
+    day = volume_test_day(programmed_volume_exercise(MuscleGroup.CHEST, (), 4))
+
+    repaired, reasons = repair_weekly_volume((day,), normalized, volume, RULESET)
+
+    assert repaired[0].exercises[0].sets == 5
+    assert "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET" in reasons
+
+
+def test_volume_repair_reduces_effective_secondary_cap() -> None:
+    source = request()
+    normalized = normalize_request(source, RULESET)
+    volume = volume_with_targets(
+        normalized,
+        effective_target={muscle: 0 for muscle in MuscleGroup},
+        minimum_direct={muscle: 0 for muscle in MuscleGroup},
+        maximum_hard={MuscleGroup.TRICEPS: 1},
+    )
+    day = volume_test_day(programmed_volume_exercise(MuscleGroup.CHEST, (MuscleGroup.TRICEPS,), 4))
+
+    repaired, reasons = repair_weekly_volume((day,), normalized, volume, RULESET)
+
+    assert repaired[0].exercises[0].sets == 2
     assert "VOLUME_REPAIR_REDUCED_SET" in reasons
 
 
@@ -238,6 +385,52 @@ def test_validator_rejects_hard_weekly_volume_excess() -> None:
     report = validate_program(invalid, source, RULESET)
 
     assert "WEEKLY_MUSCLE_VOLUME_EXCEEDED" in report.errors
+
+
+def test_validator_uses_effective_target_without_hiding_direct_work_requirement() -> None:
+    candidates = catalog()
+    candidates[0] = replace(
+        candidates[0],
+        secondary_muscles=(MuscleGroup.TRICEPS,),
+    )
+    result = generate_program(request(), candidates, RULESET)
+
+    assert result.program is not None, result.errors
+    actual_effective = result.program.aggregate_metrics["weekly_effective_sets_by_muscle"][
+        MuscleGroup.TRICEPS.value
+    ]
+    actual_direct = result.program.aggregate_metrics["weekly_direct_sets_by_muscle"][
+        MuscleGroup.TRICEPS.value
+    ]
+    assert actual_effective > 0
+    assert actual_direct == 0
+
+    ranges = dict(result.program.aggregate_metrics["volume_ranges_by_muscle"])
+    ranges = {
+        muscle: {
+            **values,
+            "effective_target_sets": int(
+                result.program.aggregate_metrics["weekly_effective_sets_by_muscle"].get(muscle, 0)
+            ),
+        }
+        for muscle, values in ranges.items()
+    }
+    ranges[MuscleGroup.TRICEPS.value] = {
+        **ranges[MuscleGroup.TRICEPS.value],
+        "minimum_direct_sets": 1,
+    }
+    program = replace(
+        result.program,
+        aggregate_metrics={
+            **result.program.aggregate_metrics,
+            "volume_ranges_by_muscle": ranges,
+        },
+    )
+
+    report = validate_program(program, request(), RULESET)
+
+    assert "EFFECTIVE_VOLUME_BELOW_TARGET" not in report.warnings
+    assert "DIRECT_VOLUME_BELOW_MINIMUM" in report.warnings
 
 
 def test_fat_loss_retains_resistance_and_adds_separate_cardio() -> None:

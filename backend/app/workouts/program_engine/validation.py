@@ -136,35 +136,48 @@ def validate_program(
                 errors.append("UNJUSTIFIED_DUPLICATE_EXERCISE")
     planned = program.aggregate_metrics.get("planned_direct_sets_by_muscle", {})
     ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
-    if isinstance(ranges, dict):
-        for muscle, range_values in ranges.items():
-            if not isinstance(range_values, dict):
-                continue
-            actual = direct_sets[str(muscle)]
-            maximum_hard = int(
-                range_values.get(
-                    "maximum_hard",
-                    ruleset.maximum_sets[program.training_status],
-                )
-            )
-            if actual > maximum_hard:
-                errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
-            if actual > int(range_values.get("maximum_soft", maximum_hard)):
-                warnings.append("SOFT_WEEKLY_VOLUME_EXCEEDED")
-            if actual < int(range_values.get("minimum_soft", 0)):
-                warnings.append("SOFT_WEEKLY_VOLUME_BELOW_MINIMUM")
-    else:
-        maximum = ruleset.maximum_sets[program.training_status]
-        if any(value > maximum for value in direct_sets.values()):
-            errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
-    if isinstance(planned, dict) and any(
-        direct_sets[str(muscle)] < int(target) for muscle, target in planned.items()
-    ):
-        warnings.append("PLANNED_VOLUME_REDUCED_DURING_SESSION_FIT")
     effective_volume = calculate_effective_volume(
         (item for day in program.weekly_schedule for item in day.exercises),
         ruleset,
     )
+    effective_sets = effective_volume.effective_sets_by_muscle
+    if isinstance(ranges, dict):
+        for muscle, range_values in ranges.items():
+            if not isinstance(range_values, dict):
+                continue
+            muscle_key = str(muscle)
+            actual_effective = effective_sets.get(muscle_key, 0)
+            effective_maximum_hard = _int_metric(
+                range_values.get("effective_maximum_hard"),
+                ruleset.maximum_sets[program.training_status],
+            )
+            if actual_effective > effective_maximum_hard:
+                errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
+            if actual_effective > _int_metric(
+                range_values.get("effective_maximum_soft", range_values.get("maximum_soft")),
+                effective_maximum_hard,
+            ):
+                warnings.append("SOFT_WEEKLY_VOLUME_EXCEEDED")
+            if actual_effective < _int_metric(
+                range_values.get("effective_target_sets", range_values.get("target_sets")),
+                0,
+            ):
+                warnings.append("EFFECTIVE_VOLUME_BELOW_TARGET")
+            minimum_direct = _int_metric(
+                range_values.get("minimum_direct_sets", range_values.get("minimum_soft")),
+                0,
+            )
+            if direct_sets[muscle_key] < minimum_direct:
+                warnings.append("DIRECT_VOLUME_BELOW_MINIMUM")
+                warnings.append("SOFT_WEEKLY_VOLUME_BELOW_MINIMUM")
+    else:
+        maximum = ruleset.maximum_sets[program.training_status]
+        if any(value > maximum for value in effective_sets.values()):
+            errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
+    if isinstance(planned, dict) and any(
+        effective_sets.get(str(muscle), 0) < int(target) for muscle, target in planned.items()
+    ):
+        warnings.append("PLANNED_VOLUME_REDUCED_DURING_SESSION_FIT")
     return ValidationReport(
         errors=tuple(dict.fromkeys(errors)),
         warnings=tuple(dict.fromkeys(warnings)),
@@ -187,6 +200,12 @@ def validate_program(
         },
         decision_trace=program.decision_trace,
     )
+
+
+def _int_metric(value: object, fallback: int) -> int:
+    if isinstance(value, (int, float, str)):
+        return int(value)
+    return fallback
 
 
 def _recovery_spacing_is_valid(program: WorkoutProgram, ruleset: ProgramRuleset) -> bool:

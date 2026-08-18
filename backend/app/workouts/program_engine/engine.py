@@ -141,6 +141,10 @@ def generate_program(
                 "target_sets": target.target_sets,
                 "maximum_soft": target.maximum_soft,
                 "maximum_hard": target.maximum_hard,
+                "effective_maximum_soft": target.maximum_soft,
+                "effective_maximum_hard": target.maximum_hard,
+                "effective_target_sets": target.effective_target_sets,
+                "minimum_direct_sets": target.minimum_direct_sets,
             }
             for target in volume.targets
         },
@@ -169,8 +173,22 @@ def generate_program(
         },
         *((body_trace,) if body_trace is not None else ()),
         {"stage": "split", "selected": split.split_type.value, "reasons": split.reason_codes},
-        {"stage": "volume", "reasons": volume.reason_codes},
-        {"stage": "volume_repair", "reasons": repair_reasons},
+        {
+            "stage": "volume",
+            "reasons": volume.reason_codes,
+            "effective_targets": {
+                target.muscle.value: target.effective_target_sets for target in volume.targets
+            },
+            "minimum_direct_targets": {
+                target.muscle.value: target.minimum_direct_sets for target in volume.targets
+            },
+        },
+        {
+            "stage": "volume_repair",
+            "reasons": repair_reasons,
+            "weekly_direct_sets": dict(direct),
+            "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
+        },
     )
     empty_report = ValidationReport(
         errors=(),
@@ -333,6 +351,10 @@ def _reference_volume_ranges(
             "target_sets": min(sets, maximum),
             "maximum_soft": maximum,
             "maximum_hard": maximum,
+            "effective_maximum_soft": maximum,
+            "effective_maximum_hard": maximum,
+            "effective_target_sets": min(sets, maximum),
+            "minimum_direct_sets": 0,
         }
     for muscle in TRACKED_MUSCLES:
         maximum = (
@@ -347,6 +369,10 @@ def _reference_volume_ranges(
                 "target_sets": 0,
                 "maximum_soft": maximum,
                 "maximum_hard": maximum,
+                "effective_maximum_soft": maximum,
+                "effective_maximum_hard": maximum,
+                "effective_target_sets": 0,
+                "minimum_direct_sets": 0,
             },
         )
     return ranges

@@ -168,6 +168,14 @@ def test_program_trace_explains_priority_volume_and_repair_boundary() -> None:
     assert result.program is not None, result.errors
     stages = {entry["stage"] for entry in result.program.decision_trace}
     assert {"split", "volume", "volume_repair"}.issubset(stages)
+    volume_trace = next(
+        entry for entry in result.program.decision_trace if entry["stage"] == "volume"
+    )
+    repair_trace = next(
+        entry for entry in result.program.decision_trace if entry["stage"] == "volume_repair"
+    )
+    assert "effective_targets" in volume_trace
+    assert "weekly_effective_sets" in repair_trace
     ranges = result.program.aggregate_metrics["volume_ranges_by_muscle"]
     assert (
         ranges[MuscleGroup.SHOULDERS.value]["target_sets"]

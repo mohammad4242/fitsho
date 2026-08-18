@@ -275,6 +275,8 @@ class VolumeTarget:
     maximum_soft: int
     maximum_hard: int
     fractional_sets: float
+    effective_target_sets: int
+    minimum_direct_sets: int
 
     @property
     def direct_sets(self) -> int:
@@ -289,6 +291,18 @@ class WeeklyVolumePlan:
 
     def direct_sets_for(self, muscle: MuscleGroup) -> int:
         return next((item.direct_sets for item in self.targets if item.muscle is muscle), 0)
+
+    def effective_target_for(self, muscle: MuscleGroup) -> int:
+        return next(
+            (item.effective_target_sets for item in self.targets if item.muscle is muscle),
+            0,
+        )
+
+    def minimum_direct_sets_for(self, muscle: MuscleGroup) -> int:
+        return next(
+            (item.minimum_direct_sets for item in self.targets if item.muscle is muscle),
+            0,
+        )
 
 
 @dataclass(frozen=True)
