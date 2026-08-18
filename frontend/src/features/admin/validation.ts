@@ -43,6 +43,16 @@ export function emptyAdminExerciseForm(): AdminExerciseForm {
     labels: [],
     needs_review: false,
     is_programmable: false,
+    body_position: "",
+    stability_demand: "",
+    skill_demand: "",
+    impact_level: "",
+    axial_loading_level: "",
+    fatigue_cost: null,
+    setup_cost: null,
+    laterality: "",
+    substitution_group: "",
+    range_of_motion_profile: "",
     instructions_en: ["", "", ""],
     instructions_fa: ["", "", ""],
     safety_notes_en: [""],
@@ -145,6 +155,10 @@ export function toAdminExerciseCreate(form: AdminExerciseForm): AdminExerciseCre
   }
   const trimList = (items: string[]) => items.map((item) => item.trim()).filter(Boolean);
   const optional = (value: string | null) => value?.trim() || null;
+  const optionalList = (value: string) => {
+    const items = value.split(",").map((item) => item.trim()).filter(Boolean);
+    return items.length > 0 ? items : null;
+  };
   return {
     ...form,
     slug: form.slug.trim(),
@@ -153,6 +167,14 @@ export function toAdminExerciseCreate(form: AdminExerciseForm): AdminExerciseCre
     body_region: form.body_region || null,
     primary_muscle: form.primary_muscle || null,
     muscle_focus: form.muscle_focus || null,
+    body_position: form.body_position || null,
+    stability_demand: form.stability_demand || null,
+    skill_demand: form.skill_demand || null,
+    impact_level: form.impact_level || null,
+    axial_loading_level: form.axial_loading_level || null,
+    laterality: form.laterality || null,
+    substitution_group: optional(form.substitution_group),
+    range_of_motion_profile: optionalList(form.range_of_motion_profile),
     instructions_en: trimList(form.instructions_en),
     instructions_fa: trimList(form.instructions_fa),
     safety_notes_en: trimList(form.safety_notes_en),
@@ -191,6 +213,16 @@ export function adminExerciseToForm(exercise: import("./types").AdminExercise): 
     labels: exercise.labels,
     needs_review: exercise.needs_review,
     is_programmable: exercise.is_programmable,
+    body_position: exercise.body_position ?? "",
+    stability_demand: exercise.stability_demand ?? "",
+    skill_demand: exercise.skill_demand ?? "",
+    impact_level: exercise.impact_level ?? "",
+    axial_loading_level: exercise.axial_loading_level ?? "",
+    fatigue_cost: exercise.fatigue_cost,
+    setup_cost: exercise.setup_cost,
+    laterality: exercise.laterality ?? "",
+    substitution_group: exercise.substitution_group ?? "",
+    range_of_motion_profile: exercise.range_of_motion_profile?.join(", ") ?? "",
     instructions_en: exercise.instructions_en,
     instructions_fa: exercise.instructions_fa,
     safety_notes_en: exercise.safety_notes_en,

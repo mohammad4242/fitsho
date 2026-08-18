@@ -30,6 +30,19 @@ export type AdminExerciseMediaAssetInput = {
 
 export type AdminExerciseMediaFiles = File[];
 
+export const bodyPositions = ["standing", "seated", "lying", "supported"] as const;
+export type BodyPosition = (typeof bodyPositions)[number];
+export const stabilityDemands = ["low", "moderate", "high"] as const;
+export type StabilityDemand = (typeof stabilityDemands)[number];
+export const skillDemands = ["low", "moderate", "high"] as const;
+export type SkillDemand = (typeof skillDemands)[number];
+export const impactLevels = ["low", "moderate", "high"] as const;
+export type ImpactLevel = (typeof impactLevels)[number];
+export const axialLoadingLevels = ["none", "low", "moderate", "high"] as const;
+export type AxialLoadingLevel = (typeof axialLoadingLevels)[number];
+export const lateralities = ["bilateral", "unilateral", "not_applicable"] as const;
+export type Laterality = (typeof lateralities)[number];
+
 export type AdminExerciseMediaAsset = AdminExerciseMediaAssetInput & {
   id: string;
   media_path: string;
@@ -44,6 +57,16 @@ export type AdminExercise = Omit<ExerciseDetail, "media_assets"> & {
   labels: ExerciseLabel[];
   needs_review: boolean;
   is_programmable: boolean;
+  body_position: BodyPosition | null;
+  stability_demand: StabilityDemand | null;
+  skill_demand: SkillDemand | null;
+  impact_level: ImpactLevel | null;
+  axial_loading_level: AxialLoadingLevel | null;
+  fatigue_cost: number | null;
+  setup_cost: number | null;
+  laterality: Laterality | null;
+  substitution_group: string | null;
+  range_of_motion_profile: string[] | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -66,6 +89,16 @@ export type AdminExerciseCreate = {
   labels: ExerciseLabel[];
   needs_review: boolean;
   is_programmable: boolean;
+  body_position: BodyPosition | null;
+  stability_demand: StabilityDemand | null;
+  skill_demand: SkillDemand | null;
+  impact_level: ImpactLevel | null;
+  axial_loading_level: AxialLoadingLevel | null;
+  fatigue_cost: number | null;
+  setup_cost: number | null;
+  laterality: Laterality | null;
+  substitution_group: string | null;
+  range_of_motion_profile: string[] | null;
   instructions_en: string[];
   instructions_fa: string[];
   safety_notes_en: string[];
@@ -79,11 +112,32 @@ export type AdminExerciseCreate = {
 
 export type AdminExerciseForm = Omit<
   AdminExerciseCreate,
-  "body_region" | "primary_muscle" | "muscle_focus" | "media_assets"
+  | "body_region"
+  | "primary_muscle"
+  | "muscle_focus"
+  | "body_position"
+  | "stability_demand"
+  | "skill_demand"
+  | "impact_level"
+  | "axial_loading_level"
+  | "laterality"
+  | "substitution_group"
+  | "range_of_motion_profile"
+  | "media_assets"
 > & {
   body_region: BodyRegion | "";
   primary_muscle: MuscleGroup | "";
   muscle_focus: MuscleFocus | "";
+  body_position: BodyPosition | "";
+  stability_demand: StabilityDemand | "";
+  skill_demand: SkillDemand | "";
+  impact_level: ImpactLevel | "";
+  axial_loading_level: AxialLoadingLevel | "";
+  laterality: Laterality | "";
+  fatigue_cost: number | null;
+  setup_cost: number | null;
+  substitution_group: string;
+  range_of_motion_profile: string;
   media_assets: AdminExerciseMediaAssetInput[];
 };
 

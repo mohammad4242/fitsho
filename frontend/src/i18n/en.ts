@@ -711,6 +711,8 @@ const en = {
       sections: { identity: "Exercise identity", target: "Target and equipment", programming: "Programming metadata", guidance: "Guidance and safety", media: "Media and ownership" },
       fields: {
         nameEn: "English name", nameFa: "Persian name", slug: "Stable slug", difficulty: "Difficulty",
+        bodyPosition: "Body position", stabilityDemand: "Stability demand", skillDemand: "Skill demand", impactLevel: "Impact level", axialLoadingLevel: "Axial loading level", fatigueCost: "Fatigue cost", setupCost: "Setup cost", laterality: "Laterality", substitutionGroup: "Substitution group", rangeOfMotionProfile: "Range-of-motion profile", notSet: "Not set",
+        bodyPositionOption: { standing: "Standing", seated: "Seated", lying: "Lying", supported: "Supported" }, stabilityDemandOption: { low: "Low", moderate: "Moderate", high: "High" }, skillDemandOption: { low: "Low", moderate: "Moderate", high: "High" }, impactLevelOption: { low: "Low", moderate: "Moderate", high: "High" }, axialLoadingLevelOption: { none: "None", low: "Low", moderate: "Moderate", high: "High" }, lateralityOption: { bilateral: "Bilateral", unilateral: "Unilateral", not_applicable: "Not applicable" },
         bodyRegion: "Body region", primaryMuscle: "Primary muscle", muscleFocus: "Muscle focus", secondaryMuscles: "Secondary muscles", secondaryPrefix: "Secondary muscle", equipment: "Equipment", select: "Select",
         instructionsEn: "English instructions", instructionsFa: "Persian instructions", instructionEn: "English step", instructionFa: "Persian step",
         safetyEn: "English safety notes", safetyFa: "Persian safety notes", noteEn: "English note", noteFa: "Persian note",

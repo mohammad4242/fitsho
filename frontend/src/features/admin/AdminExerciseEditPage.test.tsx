@@ -33,6 +33,16 @@ const exercise = {
   movement_pattern: "horizontal_push",
   exercise_type: "compound",
   caution_tags: ["shoulder_internal_rotation"],
+  body_position: "supported",
+  stability_demand: "high",
+  skill_demand: "moderate",
+  impact_level: "low",
+  axial_loading_level: "none",
+  fatigue_cost: 4,
+  setup_cost: 2,
+  laterality: "unilateral",
+  substitution_group: "horizontal_push",
+  range_of_motion_profile: ["supported", "shortened"],
   labels: [],
   needs_review: false,
   is_programmable: true,
@@ -145,6 +155,53 @@ it("loads structured programming metadata and saves an edited exercise", async (
     [],
   );
   expect(await screen.findByText("LIST PAGE")).toBeInTheDocument();
+});
+
+it("edits all persisted exercise programming metadata fields", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={["/admin/exercises/exercise-id/edit"]}>
+      <Routes>
+        <Route path="/admin/exercises/:exerciseId/edit" element={<AdminExerciseEditPage />} />
+        <Route path="/exercises" element={<p>LIST PAGE</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await openSection(user, "اطلاعات برنامه‌سازی");
+  await user.selectOptions(screen.getByLabelText("وضعیت بدن"), "lying");
+  await user.selectOptions(screen.getByLabelText("نیاز به ثبات"), "low");
+  await user.selectOptions(screen.getByLabelText("نیاز به مهارت"), "low");
+  await user.selectOptions(screen.getByLabelText("سطح ضربه"), "moderate");
+  await user.selectOptions(screen.getByLabelText("سطح بار محوری"), "moderate");
+  await user.clear(screen.getByLabelText("هزینه خستگی"));
+  await user.type(screen.getByLabelText("هزینه خستگی"), "2");
+  await user.clear(screen.getByLabelText("هزینه آماده‌سازی"));
+  await user.type(screen.getByLabelText("هزینه آماده‌سازی"), "3");
+  await user.selectOptions(screen.getByLabelText("طرفیت حرکت"), "bilateral");
+  await user.clear(screen.getByLabelText("گروه جایگزینی"));
+  await user.type(screen.getByLabelText("گروه جایگزینی"), "squat");
+  await user.clear(screen.getByLabelText("الگوی دامنه حرکت"));
+  await user.type(screen.getByLabelText("الگوی دامنه حرکت"), "deep_knee_flexion, supported");
+  await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
+
+  expect(adminApi.updateAdminExercise).toHaveBeenCalledWith(
+    "exercise-id",
+    expect.objectContaining({
+      body_position: "lying",
+      stability_demand: "low",
+      skill_demand: "low",
+      impact_level: "moderate",
+      axial_loading_level: "moderate",
+      fatigue_cost: 2,
+      setup_cost: 3,
+      laterality: "bilateral",
+      substitution_group: "squat",
+      range_of_motion_profile: ["deep_knee_flexion", "supported"],
+    }),
+    null,
+    [],
+  );
 });
 
 it("saves a name-only edit when safety notes are empty", async () => {

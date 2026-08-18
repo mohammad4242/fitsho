@@ -711,6 +711,8 @@ const fa = {
       sections: { identity: "هویت حرکت", target: "هدف و تجهیزات", programming: "اطلاعات برنامه‌سازی", guidance: "آموزش و ایمنی", media: "رسانه و مالکیت" },
       fields: {
         nameEn: "نام انگلیسی", nameFa: "نام فارسی", slug: "شناسه پایدار", difficulty: "سطح سختی",
+        bodyPosition: "وضعیت بدن", stabilityDemand: "نیاز به ثبات", skillDemand: "نیاز به مهارت", impactLevel: "سطح ضربه", axialLoadingLevel: "سطح بار محوری", fatigueCost: "هزینه خستگی", setupCost: "هزینه آماده‌سازی", laterality: "طرفیت حرکت", substitutionGroup: "گروه جایگزینی", rangeOfMotionProfile: "الگوی دامنه حرکت", notSet: "تنظیم نشده",
+        bodyPositionOption: { standing: "ایستاده", seated: "نشسته", lying: "خوابیده", supported: "با تکیه‌گاه" }, stabilityDemandOption: { low: "کم", moderate: "متوسط", high: "زیاد" }, skillDemandOption: { low: "کم", moderate: "متوسط", high: "زیاد" }, impactLevelOption: { low: "کم", moderate: "متوسط", high: "زیاد" }, axialLoadingLevelOption: { none: "بدون بار", low: "کم", moderate: "متوسط", high: "زیاد" }, lateralityOption: { bilateral: "دوطرفه", unilateral: "یک‌طرفه", not_applicable: "قابل اعمال نیست" },
         bodyRegion: "ناحیه بدن", primaryMuscle: "عضله اصلی", muscleFocus: "بخش هدف عضله", secondaryMuscles: "عضلات فرعی", secondaryPrefix: "عضله فرعی", equipment: "تجهیزات", select: "انتخاب کنید",
         instructionsEn: "مراحل انگلیسی", instructionsFa: "مراحل فارسی", instructionEn: "مرحله انگلیسی", instructionFa: "مرحله فارسی",
         safetyEn: "نکات انگلیسی", safetyFa: "نکات فارسی", noteEn: "نکته انگلیسی", noteFa: "نکته فارسی",

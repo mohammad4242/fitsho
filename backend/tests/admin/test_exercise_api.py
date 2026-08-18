@@ -1018,6 +1018,19 @@ def test_admin_can_update_programming_metadata(
         "shoulder_internal_rotation"
     ]
 
+    read = client.get(f"/api/v1/admin/exercises/{created.json()['id']}")
+    assert read.status_code == 200
+    assert read.json()["body_position"] == "supported"
+    assert read.json()["stability_demand"] == "high"
+    assert read.json()["skill_demand"] == "moderate"
+    assert read.json()["impact_level"] == "low"
+    assert read.json()["axial_loading_level"] == "none"
+    assert read.json()["fatigue_cost"] == 4
+    assert read.json()["setup_cost"] == 2
+    assert read.json()["laterality"] == "unilateral"
+    assert read.json()["substitution_group"] == "horizontal_push"
+    assert read.json()["range_of_motion_profile"] == ["supported", "shortened"]
+
 
 def test_admin_can_update_name_without_safety_notes(
     client: TestClient,
