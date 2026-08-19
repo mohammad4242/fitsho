@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import RecoveryRating
@@ -142,6 +144,28 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
         ),
     )
     return template, catalog
+
+
+def _repeated_core_reference() -> tuple[TemplateReference, list[ExerciseCandidate]]:
+    template, catalog = _upper_lower_reference()
+    repeated_id = template.days[0].slots[0].exercise_id
+    repeated_slot = replace(
+        template.days[2].slots[0],
+        exercise_id=repeated_id,
+        exercise_slug_hint="intentional-repeated-push-up",
+    )
+    repeated_day = replace(
+        template.days[2],
+        slots=(repeated_slot, template.days[2].slots[1]),
+    )
+    return (
+        replace(
+            template,
+            slug="four-day-repeated-core-reference",
+            days=(template.days[0], template.days[1], repeated_day, template.days[3]),
+        ),
+        catalog,
+    )
 
 
 def test_safe_matching_template_becomes_deterministic_program_reference() -> None:
@@ -441,3 +465,129 @@ def test_template_generation_is_deterministic_and_strictly_valid() -> None:
         first.program.aggregate_metrics["planned_direct_sets_by_muscle"]["chest"]
         != original_chest_sets
     )
+
+
+def test_template_with_adjacent_direct_muscle_overlap_falls_back_to_dynamic() -> None:
+    template, catalog = _upper_lower_reference()
+    unsafe = replace(
+        template,
+        slug="adjacent-upper-lower-reference",
+        days=(template.days[0], template.days[2], template.days[1], template.days[3]),
+    )
+
+    result = generate_program(
+        request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+        ),
+        catalog,
+        RULESET,
+        reference_templates=(unsafe,),
+    )
+
+    assert result.program is not None, result.errors
+    assert result.program.aggregate_metrics.get("reference_template") is None
+    rejection = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "template_reference" and entry.get("status") == "rejected"
+    )
+    assert "RECOVERY_SPACING_INVALID" in rejection["reason_codes"]
+
+
+def test_template_with_alternating_direct_muscles_keeps_valid_recovery_spacing() -> None:
+    template, catalog = _upper_lower_reference()
+
+    result = generate_program(
+        request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+        ),
+        catalog,
+        RULESET,
+        reference_templates=(template,),
+    )
+
+    assert result.program is not None, result.errors
+    assert result.program.aggregate_metrics["reference_template"] == template.slug
+    assert result.program.validation_report.is_valid
+
+
+def test_intentional_repeated_safe_template_core_is_preserved_deterministically() -> None:
+    template, catalog = _repeated_core_reference()
+    repeated_id = template.days[0].slots[0].exercise_id
+    source = request(
+        available_training_days=4,
+        primary_goal="build_muscle",
+        training_experience="intermediate",
+        training_age_months=24,
+        session_duration_minutes=60,
+    )
+
+    first = generate_program(source, catalog, RULESET, reference_templates=(template,))
+    second = generate_program(source, catalog, RULESET, reference_templates=(template,))
+
+    assert first.program is not None, first.errors
+    assert second.program is not None, second.errors
+    assert first.program == second.program
+    occurrences = [
+        item
+        for day in first.program.weekly_schedule
+        for item in day.exercises
+        if item.exercise_id == repeated_id
+    ]
+    assert len(occurrences) == 2
+    assert "CORE_MOVEMENT_REPEATED_FOR_PROGRESSION" in occurrences[1].reason_codes
+    assert first.program.validation_report.is_valid
+
+
+def test_repeated_blocked_template_core_uses_distinct_safe_substitutions() -> None:
+    template, catalog = _repeated_core_reference()
+    repeated_id = template.days[0].slots[0].exercise_id
+    assert repeated_id is not None
+    catalog.append(
+        exercise(
+            "extra-repeat-safe-chest-press",
+            MovementPattern.HORIZONTAL_PUSH,
+            MuscleGroup.CHEST,
+        )
+    )
+
+    result = generate_program(
+        request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+            blocked_exercises=[repeated_id],
+        ),
+        catalog,
+        RULESET,
+        reference_templates=(template,),
+    )
+
+    assert result.program is not None, result.errors
+    assert result.program.aggregate_metrics["reference_template"] == template.slug
+    programmed_ids = [
+        item.exercise_id for day in result.program.weekly_schedule for item in day.exercises
+    ]
+    assert repeated_id not in programmed_ids
+    adaptation_trace = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "template_adaptation"
+    )
+    substitutions = [
+        item
+        for item in adaptation_trace["substitutions"]
+        if item["requested_exercise_id"] == str(repeated_id)
+    ]
+    assert len(substitutions) == 2
+    assert len({item["selected_exercise_id"] for item in substitutions}) == 2

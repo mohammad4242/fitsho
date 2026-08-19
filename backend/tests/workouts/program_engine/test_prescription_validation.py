@@ -539,6 +539,27 @@ def test_validator_rejects_adjacent_full_body_sessions() -> None:
     assert "RECOVERY_SPACING_INVALID" in report.errors
 
 
+def test_validator_still_rejects_an_unjustified_duplicate_exercise() -> None:
+    source = request(available_training_days=1)
+    result = generate_program(source, catalog(), RULESET)
+    assert result.program is not None
+    day = result.program.weekly_schedule[0]
+    accidental_duplicate = replace(
+        day.exercises[1],
+        exercise_id=day.exercises[0].exercise_id,
+        reason_codes=("ACCIDENTAL_DUPLICATE",),
+    )
+    invalid_day = replace(
+        day,
+        exercises=(day.exercises[0], accidental_duplicate, *day.exercises[2:]),
+    )
+    invalid = replace(result.program, weekly_schedule=(invalid_day,))
+
+    report = validate_program(invalid, source, RULESET)
+
+    assert "UNJUSTIFIED_DUPLICATE_EXERCISE" in report.errors
+
+
 def test_validator_rejects_a_third_direct_weekly_muscle_exposure_for_four_day_programs() -> None:
     source = request(available_training_days=4)
     result = generate_program(source, catalog(), RULESET)

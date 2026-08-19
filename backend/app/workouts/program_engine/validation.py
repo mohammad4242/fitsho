@@ -1,6 +1,6 @@
 from collections import Counter
 
-from app.exercises.enums import MovementPattern
+from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
     complete_tracked_metrics,
@@ -10,6 +10,7 @@ from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramR
 from app.workouts.program_engine.schemas import (
     ProgramGenerationRequest,
     ValidationReport,
+    WorkoutDay,
     WorkoutProgram,
 )
 
@@ -210,17 +211,36 @@ def _int_metric(value: object, fallback: int) -> int:
 
 def _recovery_spacing_is_valid(program: WorkoutProgram, ruleset: ProgramRuleset) -> bool:
     scheduled = sorted(
-        (day.weekday, day.focus) for day in program.weekly_schedule if day.weekday is not None
+        ((day.weekday, day) for day in program.weekly_schedule if day.weekday is not None),
+        key=lambda item: item[0],
     )
     if len(scheduled) <= 1:
         return True
+    template_derived = isinstance(program.aggregate_metrics.get("reference_template"), str)
     circular = scheduled + [(scheduled[0][0] + ruleset.days_per_week, scheduled[0][1])]
     for current, following in zip(circular, circular[1:], strict=False):
+        current_day = current[1]
+        following_day = following[1]
+        direct_overlap = _direct_muscles(current_day).intersection(
+            _direct_muscles(following_day)
+        )
         recovery_sensitive = (
-            current[1].startswith("full_body")
-            or following[1].startswith("full_body")
-            or current[1] == following[1]
+            bool(direct_overlap)
+            if template_derived
+            else (
+                current_day.focus.startswith("full_body")
+                or following_day.focus.startswith("full_body")
+                or current_day.focus == following_day.focus
+            )
         )
         if recovery_sensitive and following[0] - current[0] < ruleset.minimum_recovery_gap_days:
             return False
     return True
+
+
+def _direct_muscles(day: WorkoutDay) -> set[MuscleGroup]:
+    return {
+        item.primary_muscle
+        for item in day.exercises
+        if item.primary_muscle is not None
+    }

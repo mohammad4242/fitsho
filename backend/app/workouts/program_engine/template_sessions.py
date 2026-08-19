@@ -75,6 +75,7 @@ def build_template_sessions(
     drafts: list[SessionDraft] = []
     resolutions: list[TemplateSlotResolution] = []
     build_reasons: list[str] = []
+    preserved_template_occurrences: Counter[UUID] = Counter()
     weekly_patterns: set[MovementPattern] = set()
     capacity = max(
         ruleset.minimum_exercises_per_session,
@@ -92,7 +93,12 @@ def build_template_sessions(
             candidate = (
                 eligible_by_id.get(slot.exercise_id) if slot.exercise_id is not None else None
             )
-            if candidate is None or used[candidate.id]:
+            repeated_explicit_slot = (
+                candidate is not None
+                and bool(used[candidate.id])
+                and all(selected_candidate.id != candidate.id for selected_candidate, _ in selected)
+            )
+            if candidate is None or (used[candidate.id] and not repeated_explicit_slot):
                 candidate = next(
                     (
                         item
@@ -188,11 +194,23 @@ def build_template_sessions(
         for candidate, slot in selected:
             exercises.append(candidate)
             preserved = candidate.id == slot.exercise_id
+            is_template_slot = slot.exercise_slug_hint not in {
+                "engine-targeted-accessory",
+                "engine-required-core",
+            }
+            intentional_repeat = (
+                preserved
+                and is_template_slot
+                and bool(preserved_template_occurrences[candidate.id])
+            )
             reasons[candidate.id] = (
                 "TEMPLATE_REFERENCE_EXERCISE" if preserved else "TEMPLATE_SAFE_SUBSTITUTION",
                 f"TEMPLATE_ADAPTATION_PRIORITY:{slot.adaptation_priority}",
                 f"TEMPLATE_INTENSITY_METHOD:{slot.intensity_method}",
+                *(("CORE_MOVEMENT_REPEATED_FOR_PROGRESSION",) if intentional_repeat else ()),
             )
+            if preserved and is_template_slot:
+                preserved_template_occurrences[candidate.id] += 1
             substitutions[candidate.id] = tuple(
                 alternative.id
                 for alternative in rank_replacement_exercises(
@@ -216,8 +234,7 @@ def build_template_sessions(
                         slot.target_rir,
                         slot.rest_seconds,
                     ),
-                    is_template_slot=slot.exercise_slug_hint
-                    not in {"engine-targeted-accessory", "engine-required-core"},
+                    is_template_slot=is_template_slot,
                 )
             )
         drafts.append(
@@ -243,12 +260,14 @@ def apply_template_intent(
     days: tuple[WorkoutDay, ...],
     build: TemplateSessionBuild,
 ) -> tuple[WorkoutDay, ...]:
-    resolutions = {item.selected_exercise_id: item for item in build.resolutions}
+    resolutions = {
+        (item.day_index, item.selected_exercise_id): item for item in build.resolutions
+    }
     personalized: list[WorkoutDay] = []
     for day, title in zip(days, build.titles, strict=True):
         exercises = []
         for exercise in day.exercises:
-            resolution = resolutions[exercise.exercise_id]
+            resolution = resolutions[(day.day_index, exercise.exercise_id)]
             prescription = (
                 exercise.sets,
                 exercise.rep_min,
@@ -278,12 +297,12 @@ def template_resolution_trace(
     days: tuple[WorkoutDay, ...],
 ) -> dict[str, object]:
     programmed = {
-        item.exercise_id: item for day in days for item in day.exercises
+        (day.day_index, item.exercise_id): item for day in days for item in day.exercises
     }
     preserved = tuple(
         str(item.selected_exercise_id)
         for item in build.resolutions
-        if item.preserved_exactly and item.selected_exercise_id in programmed
+        if item.preserved_exactly and (item.day_index, item.selected_exercise_id) in programmed
     )
     substitutions = tuple(
         {
@@ -306,21 +325,21 @@ def template_resolution_trace(
             "intensity_method": item.intensity_method,
             "before": item.original_prescription,
             "after": (
-                programmed[item.selected_exercise_id].sets,
-                programmed[item.selected_exercise_id].rep_min,
-                programmed[item.selected_exercise_id].rep_max,
-                programmed[item.selected_exercise_id].target_rir,
-                programmed[item.selected_exercise_id].rest_seconds,
+                programmed[(item.day_index, item.selected_exercise_id)].sets,
+                programmed[(item.day_index, item.selected_exercise_id)].rep_min,
+                programmed[(item.day_index, item.selected_exercise_id)].rep_max,
+                programmed[(item.day_index, item.selected_exercise_id)].target_rir,
+                programmed[(item.day_index, item.selected_exercise_id)].rest_seconds,
             ),
         }
         for item in build.resolutions
-        if item.selected_exercise_id in programmed
+        if (item.day_index, item.selected_exercise_id) in programmed
         and (
-            programmed[item.selected_exercise_id].sets,
-            programmed[item.selected_exercise_id].rep_min,
-            programmed[item.selected_exercise_id].rep_max,
-            programmed[item.selected_exercise_id].target_rir,
-            programmed[item.selected_exercise_id].rest_seconds,
+            programmed[(item.day_index, item.selected_exercise_id)].sets,
+            programmed[(item.day_index, item.selected_exercise_id)].rep_min,
+            programmed[(item.day_index, item.selected_exercise_id)].rep_max,
+            programmed[(item.day_index, item.selected_exercise_id)].target_rir,
+            programmed[(item.day_index, item.selected_exercise_id)].rest_seconds,
         )
         != item.original_prescription
     )
