@@ -102,7 +102,7 @@
 .workout-version-history button.workout-version-history__active { border-color: var(--fitsho-aqua); }
 .workout-tools { margin-top: .65rem; }
 .workout-tools > h2 { margin: 0 0 .4rem; color: var(--fitsho-muted); font-size: .72rem; }
-.workout-quick-actions { min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--fitsho-line); border-radius: .9rem; background: var(--fitsho-surface-subtle); }
+.workout-quick-actions { min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--fitsho-line); border-radius: .9rem; background: var(--fitsho-surface-subtle); }
 .workout-quick-action { min-width: 0; min-height: 4.8rem; display: grid; place-items: center; align-content: center; gap: .22rem; padding: .55rem .3rem; border: 0; color: var(--fitsho-ink); background: transparent; font: inherit; text-align: center; text-decoration: none; cursor: pointer; }
 .workout-quick-action + .workout-quick-action { border-inline-start: 1px solid var(--fitsho-line); }
 .workout-quick-action svg { width: 1.25rem; height: 1.25rem; color: var(--fitsho-aqua); }

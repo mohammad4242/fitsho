@@ -8,8 +8,10 @@ import {
   getWorkoutPlan,
   getWorkoutPlanHistory,
   getCurrentWeeklyCheckIn,
+  getCurrentCompletionFeedback,
   recordExerciseReplacement,
   saveCurrentWeeklyCheckIn,
+  saveCurrentCompletionFeedback,
 } from "./api";
 import type { WorkoutPlan } from "./types";
 
@@ -164,6 +166,47 @@ it("saves the member-entered weekly check-in through the current cycle API", asy
   await expect(saveCurrentWeeklyCheckIn(input)).resolves.toEqual(checkIn);
   expect(fetch).toHaveBeenCalledWith(
     "/api/v1/workout-cycles/current/weekly-check-in",
+    expect.objectContaining({ credentials: "include", method: "PUT", body: JSON.stringify(input) }),
+  );
+});
+
+it("reads and submits end-of-cycle feedback through the current cycle API", async () => {
+  const response = {
+    cycle_id: "cycle-1",
+    status: "active" as const,
+    duration_weeks: 4 as const,
+    current_week: 4,
+    is_due: true,
+    feedback_id: null,
+    feedback: null,
+    submitted_at: null,
+  };
+  const input = {
+    overall_difficulty: "appropriate" as const,
+    overall_recovery: "good" as const,
+    overall_satisfaction: "satisfied" as const,
+    strength_progress: "improved" as const,
+    muscle_progress: "unchanged" as const,
+    endurance_progress: "improved" as const,
+    energy_progress: "improved" as const,
+    performance_changes: "Felt stronger.",
+    pain_or_limitation_feedback: null,
+    note_optional: "Ready for the next cycle.",
+  };
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(jsonResponse(response))
+    .mockResolvedValueOnce(jsonResponse({ ...response, status: "completed", is_due: false }));
+
+  await expect(getCurrentCompletionFeedback()).resolves.toEqual(response);
+  await expect(saveCurrentCompletionFeedback(input)).resolves.toMatchObject({ status: "completed" });
+  expect(fetch).toHaveBeenNthCalledWith(
+    1,
+    "/api/v1/workout-cycles/current/completion-feedback",
+    expect.objectContaining({ credentials: "include" }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    "/api/v1/workout-cycles/current/completion-feedback",
     expect.objectContaining({ credentials: "include", method: "PUT", body: JSON.stringify(input) }),
   );
 });

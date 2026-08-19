@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
   downloadWorkoutPlanPdf: vi.fn(),
   recordExerciseReplacement: vi.fn(),
   getCurrentWeeklyCheckIn: vi.fn(),
+  getCurrentCompletionFeedback: vi.fn(),
   getCurrentWorkoutCycle: vi.fn(),
   saveCurrentWeeklyCheckIn: vi.fn(),
 }));
@@ -147,6 +148,7 @@ beforeEach(() => {
   api.downloadWorkoutPlanPdf.mockReset();
   api.recordExerciseReplacement.mockReset();
   api.getCurrentWeeklyCheckIn.mockReset();
+  api.getCurrentCompletionFeedback.mockReset();
   api.getCurrentWorkoutCycle.mockReset();
   api.saveCurrentWeeklyCheckIn.mockReset();
   profileApi.getProfile.mockReset();
@@ -169,6 +171,7 @@ beforeEach(() => {
     created_at: "2026-08-18T10:00:00Z",
   });
   api.getCurrentWeeklyCheckIn.mockResolvedValue(null);
+  api.getCurrentCompletionFeedback.mockResolvedValue(null);
   api.getCurrentWorkoutCycle.mockResolvedValue({
     cycle_id: "018f0000-0000-7000-8000-000000000041",
     workout_plan_id: plan.id,
@@ -426,7 +429,7 @@ it("renders the selected duration, exercise media, and exercise detail link", as
   const quickActions = screen.getByRole("group", { name: "ابزارهای برنامه" });
   expect(quickActions).toHaveClass("workout-quick-actions");
   expect(screen.getByRole("button", { name: "دانلود PDF" })).toBeEnabled();
-  expect(screen.getByRole("button", { name: "بازخورد پایان دوره" })).toBeDisabled();
+  expect(screen.queryByRole("heading", { name: "بازخورد پایان دوره" })).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Body Analysis" })).toHaveAttribute(
     "href",
     "/body-progress",

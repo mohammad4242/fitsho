@@ -16,6 +16,7 @@ import {
   recordExerciseReplacement,
 } from "./api";
 import { WeeklyCheckInCard } from "./WeeklyCheckInCard";
+import { EndCycleFeedbackCard } from "./EndCycleFeedbackCard";
 import type {
   WorkoutExerciseReplacementReason,
   WorkoutExerciseReplacementScope,
@@ -280,6 +281,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
             <WorkoutDays plan={pendingPlan} isEnglish={isEnglish} titleId="workout-pending-plan-title" interactive={false} />
           </section>
         )}
+        {state === "ready" && plan !== null && <EndCycleFeedbackCard />}
 
         <section className="workout-tools" aria-labelledby="workout-future-title">
           <h2 id="workout-future-title">{t("workoutPlan.futureTitle")}</h2>
@@ -295,11 +297,6 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
               <AppIcon name="document" />
               <strong>{t("workoutPlan.pdf.title")}</strong>
               <small>{t(downloadingPdf ? "workoutPlan.pdf.loading" : "workoutPlan.pdf.body")}</small>
-            </button>
-            <button className="workout-quick-action" type="button" disabled aria-label={t("workoutPlan.feedback.title")}>
-              <AppIcon name="feedback" />
-              <strong>{t("workoutPlan.feedback.title")}</strong>
-              <small>{t("workoutPlan.comingSoon")}</small>
             </button>
             <Link className="workout-quick-action" aria-label={t("workoutPlan.body.title")} to="/body-progress">
               <AppIcon name="progress" />

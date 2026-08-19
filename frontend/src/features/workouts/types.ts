@@ -80,6 +80,30 @@ export type WorkoutCycleWeeklyCheckInInput = {
   note_optional: string | null;
 };
 
+export type WorkoutCycleCompletionFeedbackInput = {
+  overall_difficulty: WorkoutCyclePerceivedDifficulty | null;
+  overall_recovery: WorkoutCycleRecoveryRating | null;
+  overall_satisfaction: "very_dissatisfied" | "dissatisfied" | "neutral" | "satisfied" | "very_satisfied" | null;
+  strength_progress: "declined" | "unchanged" | "improved" | null;
+  muscle_progress: "declined" | "unchanged" | "improved" | null;
+  endurance_progress: "declined" | "unchanged" | "improved" | null;
+  energy_progress: "declined" | "unchanged" | "improved" | null;
+  performance_changes: string | null;
+  pain_or_limitation_feedback: string | null;
+  note_optional: string | null;
+};
+
+export type WorkoutCycleCompletionFeedbackContext = {
+  cycle_id: string;
+  status: "active" | "completed";
+  duration_weeks: 4 | 6 | 8;
+  current_week: number;
+  is_due: boolean;
+  feedback_id: string | null;
+  feedback: WorkoutCycleCompletionFeedbackInput | null;
+  submitted_at: string | null;
+};
+
 export type WorkoutExerciseReplacement = {
   id: string;
   user_id: string;

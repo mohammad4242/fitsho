@@ -7,6 +7,8 @@ import type {
   WorkoutCycleWeeklyCheckIn,
   WorkoutCycleWeeklyCheckInInput,
   WorkoutCycleCurrent,
+  WorkoutCycleCompletionFeedbackContext,
+  WorkoutCycleCompletionFeedbackInput,
   WorkoutPlan,
   WorkoutPlanGeneration,
   WorkoutPlanVersionSummary,
@@ -82,6 +84,24 @@ export function saveCurrentWeeklyCheckIn(
   input: WorkoutCycleWeeklyCheckInInput,
 ): Promise<WorkoutCycleWeeklyCheckIn> {
   return request<WorkoutCycleWeeklyCheckIn>(`${workoutCyclesPath}/current/weekly-check-in`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getCurrentCompletionFeedback(): Promise<WorkoutCycleCompletionFeedbackContext | null> {
+  try {
+    return await request<WorkoutCycleCompletionFeedbackContext>(`${workoutCyclesPath}/current/completion-feedback`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export function saveCurrentCompletionFeedback(
+  input: WorkoutCycleCompletionFeedbackInput,
+): Promise<WorkoutCycleCompletionFeedbackContext> {
+  return request<WorkoutCycleCompletionFeedbackContext>(`${workoutCyclesPath}/current/completion-feedback`, {
     method: "PUT",
     body: JSON.stringify(input),
   });

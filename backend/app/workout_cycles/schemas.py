@@ -219,3 +219,16 @@ class CompletionFeedbackInput(BaseModel):
             if self.next_training_location == TrainingLocation.GYM:
                 self.next_home_training_setup = None
         return self
+
+
+class WorkoutCycleCompletionFeedbackResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cycle_id: UUID
+    status: WorkoutCycleStatus
+    duration_weeks: int
+    current_week: int
+    is_due: bool
+    feedback_id: UUID | None
+    feedback: CompletionFeedbackInput | None
+    submitted_at: datetime | None

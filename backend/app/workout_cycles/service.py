@@ -1,11 +1,12 @@
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
+from app.exercises.enums import MuscleGroup
 from app.exercises.models import ExerciseAlternative
 from app.profile.enums import FitnessGoal, TrainingLocation
 from app.profile.schemas import ProfileUpdate
@@ -54,6 +55,14 @@ class WorkoutCycleNotFoundError(Exception):
 
 
 class WorkoutCycleAlreadyCompletedError(Exception):
+    pass
+
+
+class WorkoutCycleCompletionFeedbackNotDueError(Exception):
+    pass
+
+
+class WorkoutCycleCompletionFeedbackNotFoundError(Exception):
     pass
 
 
@@ -131,6 +140,16 @@ def calculate_current_week(
     current_at_utc = _as_utc(current_at)
     elapsed_days = max(0, (current_at_utc - started_at_utc).days)
     return min(duration_weeks, elapsed_days // 7 + 1)
+
+
+def cycle_has_reached_nominal_end(
+    cycle: WorkoutCycle,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    current_at = _as_utc(datetime.now(UTC) if now is None else now)
+    started_at = _as_utc(cycle.started_at)
+    return current_at - started_at >= timedelta(days=cycle.duration_weeks * 7)
 
 
 def create_weekly_check_in(
@@ -762,6 +781,90 @@ def get_current_active_cycle_for_user(
             WorkoutCycle.status == WorkoutCycleStatus.ACTIVE,
         )
         .order_by(WorkoutCycle.started_at.desc())
+    )
+
+
+def get_current_completion_feedback_cycle(
+    db: Session,
+    *,
+    user_id: UUID,
+) -> WorkoutCycle:
+    cycles = db.scalars(
+        select(WorkoutCycle)
+        .options(joinedload(WorkoutCycle.completion_feedback))
+        .where(WorkoutCycle.user_id == user_id)
+        .order_by(WorkoutCycle.started_at.desc(), WorkoutCycle.id.desc())
+    ).all()
+    for cycle in cycles:
+        if cycle.status is WorkoutCycleStatus.ACTIVE:
+            return cycle
+    for cycle in cycles:
+        if cycle.status is WorkoutCycleStatus.COMPLETED and cycle.completion_feedback is not None:
+            return cycle
+    raise WorkoutCycleCompletionFeedbackNotFoundError
+
+
+def completion_feedback_input(
+    feedback: WorkoutCycleFeedback | None,
+) -> CompletionFeedbackInput | None:
+    if feedback is None:
+        return None
+    return CompletionFeedbackInput(
+        adherence_percent=feedback.adherence_percent,
+        performance_changes=feedback.performance_changes,
+        pain_or_limitation_feedback=feedback.pain_or_limitation_feedback,
+        measurements=dict(feedback.measurements),
+        overall_difficulty=feedback.overall_difficulty,
+        overall_recovery=feedback.overall_recovery,
+        overall_satisfaction=feedback.overall_satisfaction,
+        strength_progress=feedback.strength_progress,
+        muscle_progress=feedback.muscle_progress,
+        endurance_progress=feedback.endurance_progress,
+        energy_progress=feedback.energy_progress,
+        progressed_muscles=(
+            [MuscleGroup(value) for value in feedback.progressed_muscles]
+            if feedback.progressed_muscles is not None
+            else None
+        ),
+        lagging_muscles=(
+            [MuscleGroup(value) for value in feedback.lagging_muscles]
+            if feedback.lagging_muscles is not None
+            else None
+        ),
+        goal_changed=feedback.goal_changed,
+        next_goal=feedback.next_goal,
+        schedule_changed=feedback.schedule_changed,
+        next_training_days=feedback.next_training_days,
+        next_session_duration_minutes=feedback.next_session_duration_minutes,
+        next_preferred_weekdays=(
+            tuple(feedback.next_preferred_weekdays)
+            if feedback.next_preferred_weekdays is not None
+            else None
+        ),
+        next_training_location=feedback.next_training_location,
+        next_home_training_setup=feedback.next_home_training_setup,
+        equipment_changed=feedback.equipment_changed,
+        new_limitation=feedback.new_limitation,
+        note_optional=feedback.note_optional,
+    )
+
+
+def submit_current_completion_feedback(
+    db: Session,
+    *,
+    user_id: UUID,
+    feedback: CompletionFeedbackInput,
+) -> WorkoutCycle:
+    cycle = get_current_completion_feedback_cycle(db, user_id=user_id)
+    if cycle.status is WorkoutCycleStatus.COMPLETED:
+        return cycle
+    if not cycle_has_reached_nominal_end(cycle):
+        raise WorkoutCycleCompletionFeedbackNotDueError
+    return complete_cycle(
+        db,
+        cycle_id=cycle.id,
+        user_id=user_id,
+        feedback=feedback,
     )
 
 

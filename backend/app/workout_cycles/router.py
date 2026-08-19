@@ -16,8 +16,10 @@ from app.workout_cycles.body_progress_service import (
     WorkoutCycleBodyProgressComparisonNotFoundError,
     compare_cycle_body_progress,
 )
-from app.workout_cycles.models import WorkoutCycleWeeklyCheckIn
+from app.workout_cycles.models import WorkoutCycle, WorkoutCycleWeeklyCheckIn
 from app.workout_cycles.schemas import (
+    CompletionFeedbackInput,
+    WorkoutCycleCompletionFeedbackResponse,
     WorkoutCycleCurrentResponse,
     WorkoutCycleExerciseFeedbackSuggestionsResponse,
     WorkoutCycleWeeklyCheckInPainFollowUpResponse,
@@ -27,6 +29,8 @@ from app.workout_cycles.schemas import (
     WorkoutExerciseReplacementResponse,
 )
 from app.workout_cycles.service import (
+    WorkoutCycleCompletionFeedbackNotDueError,
+    WorkoutCycleCompletionFeedbackNotFoundError,
     WorkoutCycleNotFoundError,
     WorkoutCycleWeeklyCheckInNoActiveCycleError,
     WorkoutCycleWeeklyCheckInNotFoundError,
@@ -39,11 +43,15 @@ from app.workout_cycles.service import (
     WorkoutExerciseReplacementPlanExerciseNotFoundError,
     WorkoutExerciseReplacementSelfError,
     calculate_current_week,
+    completion_feedback_input,
+    cycle_has_reached_nominal_end,
     get_current_active_cycle_for_user,
+    get_current_completion_feedback_cycle,
     get_current_weekly_check_in,
     get_cycle_exercise_feedback_suggestions,
     get_cycle_feedback_body_progress_context,
     record_exercise_replacement,
+    submit_current_completion_feedback,
     upsert_current_weekly_check_in,
 )
 
@@ -71,6 +79,69 @@ def read_current_cycle(
         status=cycle.status,
         current_week=calculate_current_week(cycle.started_at, cycle.duration_weeks),
     )
+
+
+def _completion_feedback_response(
+    cycle: WorkoutCycle,
+) -> WorkoutCycleCompletionFeedbackResponse:
+    feedback = cycle.completion_feedback
+    return WorkoutCycleCompletionFeedbackResponse(
+        cycle_id=cycle.id,
+        status=cycle.status,
+        duration_weeks=cycle.duration_weeks,
+        current_week=calculate_current_week(cycle.started_at, cycle.duration_weeks),
+        is_due=cycle.status.value == "active" and cycle_has_reached_nominal_end(cycle),
+        feedback_id=feedback.id if feedback is not None else None,
+        feedback=completion_feedback_input(feedback),
+        submitted_at=feedback.submitted_at if feedback is not None else None,
+    )
+
+
+@router.get(
+    "/current/completion-feedback",
+    response_model=WorkoutCycleCompletionFeedbackResponse,
+)
+def read_current_completion_feedback(
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> WorkoutCycleCompletionFeedbackResponse:
+    try:
+        cycle = get_current_completion_feedback_cycle(db, user_id=user.id)
+    except WorkoutCycleCompletionFeedbackNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No workout cycle available",
+        ) from None
+    return _completion_feedback_response(cycle)
+
+
+@router.put(
+    "/current/completion-feedback",
+    response_model=WorkoutCycleCompletionFeedbackResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def submit_current_completion_feedback_route(
+    payload: CompletionFeedbackInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> WorkoutCycleCompletionFeedbackResponse:
+    try:
+        cycle = submit_current_completion_feedback(
+            db,
+            user_id=user.id,
+            feedback=payload,
+        )
+    except WorkoutCycleCompletionFeedbackNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No workout cycle available",
+        ) from None
+    except WorkoutCycleCompletionFeedbackNotDueError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workout cycle has not reached its end",
+        ) from None
+    return _completion_feedback_response(cycle)
 
 
 def _weekly_check_in_response(
