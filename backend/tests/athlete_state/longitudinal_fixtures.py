@@ -17,13 +17,14 @@ from app.body_analysis.enums import BodyArea
 from app.exercises.enums import (
     BodyRegion,
     Difficulty,
+    Equipment,
     ExerciseType,
     MediaType,
     MovementPattern,
-    MuscleFocus,
     MuscleGroup,
 )
-from app.exercises.models import Exercise
+from app.exercises.models import Exercise, ExerciseEquipment
+from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.profile.enums import (
     ExperienceLevel,
     FitnessGoal,
@@ -163,7 +164,17 @@ def materialize_scenario(
         plan_duration_weeks=scenario.cycles[-1].duration_weeks,
     )
     db.add(profile)
+    db.add(
+        BodyMeasurement(
+            id=_id(scenario.key, "profile-measurement"),
+            user_id=user.id,
+            weight_kg=Decimal("75.00"),
+            measured_at=_BASE_TIME - timedelta(days=1),
+        )
+    )
     db.flush()
+
+    catalog = _create_exercise_catalog(db, scenario)
 
     cycles: list[WorkoutCycle] = []
     for index, cycle_fixture in enumerate(scenario.cycles):
@@ -173,6 +184,8 @@ def materialize_scenario(
             index=index,
             duration_weeks=cycle_fixture.duration_weeks,
             replacement_count=len(cycle_fixture.replacements),
+            original=catalog["chest"],
+            alternatives=tuple(catalog.values()),
         )
         started_at = _BASE_TIME + timedelta(days=index * 40)
         is_current = index == len(scenario.cycles) - 1
@@ -255,7 +268,7 @@ def longitudinal_scenarios() -> tuple[LongitudinalScenario, ...]:
                         CheckInFixture(
                             1,
                             4,
-                            WorkoutCycleWeeklyCheckInDifficulty.EASY,
+                            WorkoutCycleWeeklyCheckInDifficulty.APPROPRIATE,
                             WorkoutCycleWeeklyCheckInRecovery.GOOD,
                         ),
                     ),
@@ -302,6 +315,14 @@ def longitudinal_scenarios() -> tuple[LongitudinalScenario, ...]:
             cycles=(
                 CycleFixture(
                     6,
+                    check_ins=(
+                        CheckInFixture(
+                            1,
+                            4,
+                            WorkoutCycleWeeklyCheckInDifficulty.APPROPRIATE,
+                            WorkoutCycleWeeklyCheckInRecovery.GOOD,
+                        ),
+                    ),
                     feedback=FeedbackFixture(lagging_muscles=(MuscleGroup.SHOULDERS,)),
                     body_progress=BodyProgressFixture(lagging_areas=(BodyArea.SHOULDERS,)),
                 ),
@@ -442,12 +463,12 @@ def _create_plan(
     index: int,
     duration_weeks: int,
     replacement_count: int,
+    original: Exercise,
+    alternatives: tuple[Exercise, ...],
 ) -> tuple[WorkoutPlan, Any, Exercise, tuple[Exercise, ...]]:
-    original = _exercise(db, scenario.key, index, "original")
-    alternatives = tuple(
-        _exercise(db, scenario.key, index, f"alternative-{alternative_index}")
-        for alternative_index in range(replacement_count)
-    )
+    plan_alternatives = tuple(item for item in alternatives if item.id != original.id)[
+        :replacement_count
+    ]
     plan = WorkoutPlan(
         id=_id(scenario.key, f"plan/{index}"),
         user_id=_id(scenario.key, "user"),
@@ -462,6 +483,16 @@ def _create_plan(
         generation_policy_version="fixture",
         candidate_set_hash="f" * 64,
         generation_method="coach_review",
+        aggregate_metrics={
+            "weekly_direct_sets_by_muscle": {
+                muscle.value: float(scenario.profile.training_days_per_week * 2)
+                for muscle in _fixture_tracked_muscles()
+            },
+            "weekly_effective_sets_by_muscle": {
+                muscle.value: float(scenario.profile.training_days_per_week * 2)
+                for muscle in _fixture_tracked_muscles()
+            },
+        },
     )
     for day_number in range(1, scenario.profile.training_days_per_week + 1):
         day = WorkoutDay(
@@ -483,13 +514,30 @@ def _create_plan(
                 rir=2,
                 estimated_minutes=10,
                 exercise_snapshot={},
-                substitution_exercise_ids=[str(item.id) for item in alternatives],
+                substitution_exercise_ids=[str(item.id) for item in plan_alternatives],
             )
         )
         plan.days.append(day)
     db.add(plan)
     db.flush()
-    return plan, plan.days[0].exercises[0], original, alternatives
+    return plan, plan.days[0].exercises[0], original, plan_alternatives
+
+
+def _fixture_tracked_muscles() -> tuple[MuscleGroup, ...]:
+    return (
+        MuscleGroup.CHEST,
+        MuscleGroup.BACK,
+        MuscleGroup.SHOULDERS,
+        MuscleGroup.BICEPS,
+        MuscleGroup.TRICEPS,
+        MuscleGroup.TRAPS,
+        MuscleGroup.FOREARMS,
+        MuscleGroup.GLUTES,
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.CALVES,
+        MuscleGroup.ABS,
+    )
 
 
 def _create_check_ins(
@@ -669,18 +717,84 @@ def _create_body_progress(
     db.add(comparison)
 
 
-def _exercise(db: Session, scenario_key: str, cycle_index: int, role: str) -> Exercise:
+def _create_exercise_catalog(db: Session, scenario: LongitudinalScenario) -> dict[str, Exercise]:
+    m = MuscleGroup
+    p = MovementPattern
+    u = BodyRegion.UPPER_BODY
+    lower = BodyRegion.LOWER_BODY
+    c = BodyRegion.CORE
+    definitions = (
+        ("chest", m.CHEST, p.HORIZONTAL_PUSH, u),
+        ("dumbbell_chest", m.CHEST, p.HORIZONTAL_PUSH, u),
+        ("chest_alt", m.CHEST, p.HORIZONTAL_PUSH, u),
+        ("chest_extra", m.CHEST, p.HORIZONTAL_PUSH, u),
+        ("back", m.BACK, p.HORIZONTAL_PULL, u),
+        ("back_alt", m.BACK, p.HORIZONTAL_PULL, u),
+        ("back_tertiary", m.BACK, p.HORIZONTAL_PULL, u),
+        ("back_vertical", m.BACK, p.VERTICAL_PULL, u),
+        ("back_vertical_alt", m.BACK, p.VERTICAL_PULL, u),
+        ("shoulders", m.SHOULDERS, p.VERTICAL_PUSH, u),
+        ("shoulders_alt", m.SHOULDERS, p.VERTICAL_PUSH, u),
+        ("shoulder_abduction", m.SHOULDERS, p.SHOULDER_ABDUCTION, u),
+        ("shoulder_abduction_alt", m.SHOULDERS, p.SHOULDER_ABDUCTION, u),
+        ("shoulders_row", m.SHOULDERS, p.HORIZONTAL_PULL, u),
+        ("traps", m.TRAPS, p.SHRUG, u),
+        ("traps_alt", m.TRAPS, p.SHRUG, u),
+        ("biceps", m.BICEPS, p.ELBOW_FLEXION, u),
+        ("biceps_alt", m.BICEPS, p.ELBOW_FLEXION, u),
+        ("biceps_tertiary", m.BICEPS, p.ELBOW_FLEXION, u),
+        ("triceps", m.TRICEPS, p.ELBOW_EXTENSION, u),
+        ("triceps_alt", m.TRICEPS, p.ELBOW_EXTENSION, u),
+        ("triceps_tertiary", m.TRICEPS, p.ELBOW_EXTENSION, u),
+        ("quadriceps", m.QUADRICEPS, p.SQUAT, lower),
+        ("quadriceps_extension", m.QUADRICEPS, p.KNEE_EXTENSION, lower),
+        ("hamstrings", m.HAMSTRINGS, p.HIP_HINGE, lower),
+        ("hamstrings_curl", m.HAMSTRINGS, p.KNEE_FLEXION, lower),
+        ("glutes", m.GLUTES, p.HIP_EXTENSION, lower),
+        ("abs", m.ABS, p.CORE_ANTI_EXTENSION, c),
+        ("abs_rotation", m.ABS, p.CORE_ANTI_ROTATION, c),
+        ("calves", m.CALVES, p.CALF_RAISE, lower),
+        ("calves_alt", m.CALVES, p.CALF_RAISE, lower),
+    )
+    return {
+        role: _exercise(
+            db,
+            scenario.key,
+            role,
+            muscle=muscle,
+            pattern=pattern,
+            body_region=body_region,
+            equipment=(
+                (Equipment.DUMBBELL,) if role == "dumbbell_chest" else (Equipment.BODYWEIGHT,)
+            ),
+        )
+        for role, muscle, pattern, body_region in definitions
+    }
+
+
+def _exercise(
+    db: Session,
+    scenario_key: str,
+    role: str,
+    *,
+    muscle: MuscleGroup,
+    pattern: MovementPattern,
+    body_region: BodyRegion,
+    equipment: tuple[Equipment, ...],
+) -> Exercise:
+    focuses = FOCUSES_BY_MUSCLE[muscle]
     slug_key = scenario_key.replace("_", "-")
+    role_slug = role.replace("_", "-")
     exercise = Exercise(
-        id=_id(scenario_key, f"exercise/{cycle_index}/{role}"),
-        slug=f"longitudinal-{slug_key}-{cycle_index}-{role}",
+        id=_id(scenario_key, f"exercise/{role}"),
+        slug=f"longitudinal-{slug_key}-{role_slug}",
         name_en=f"Longitudinal {scenario_key} {role}",
         name_fa=f"حرکت طولی {scenario_key} {role}",
-        body_region=BodyRegion.UPPER_BODY,
-        primary_muscle=MuscleGroup.CHEST,
-        muscle_focus=MuscleFocus.MID_CHEST,
+        body_region=body_region,
+        primary_muscle=muscle,
+        muscle_focus=focuses[0] if focuses else None,
         difficulty=Difficulty.BEGINNER,
-        movement_pattern=MovementPattern.HORIZONTAL_PUSH,
+        movement_pattern=pattern,
         exercise_type=ExerciseType.COMPOUND,
         instructions_en=["Set up.", "Move safely.", "Finish."],
         instructions_fa=["آماده شو.", "ایمن حرکت کن.", "تمام کن."],
@@ -692,6 +806,7 @@ def _exercise(db: Session, scenario_key: str, cycle_index: int, role: str) -> Ex
         is_programmable=True,
         needs_review=False,
     )
+    exercise.equipment_items.extend(ExerciseEquipment(equipment=item) for item in equipment)
     db.add(exercise)
     db.flush()
     return exercise
