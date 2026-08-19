@@ -35,6 +35,7 @@ from app.exercises.models import Exercise
 from app.workout_cycles.enums import WorkoutExerciseReplacementReason
 from app.workout_cycles.models import WorkoutCycle
 from app.workout_cycles.service import start_cycle
+from app.workout_reviews.diff import build_coach_diff
 from app.workout_reviews.enums import WorkoutReviewErrorCode, WorkoutReviewStatus
 from app.workout_reviews.models import WorkoutPlanReview
 from app.workout_reviews.repository import ensure_pending_review
@@ -510,11 +511,105 @@ def test_approval_creates_new_active_version_and_preserves_source(db: Session) -
     assert review.approved_at == Clock().now
     assert review.coach_note == "Approved with reviewed prescription."
     assert approved.difference_summary == {
+        "schema_version": "1.0",
         "source_plan_id": str(source.id),
         "review_id": str(review.id),
+        "approved_plan_id": str(approved.id),
         "reviewed_by_coach_id": str(coach.id),
         "reviewed_by_coach": True,
         "previous_active_plan_id": str(source.id),
+        "coach_diff": [
+            {
+                "change_type": "exercise_changed",
+                "day_number": 1,
+                "order_index": 1,
+                "generated": str(original_exercise.id),
+                "approved": str(replacement.id),
+                "generated_exercise_id": str(original_exercise.id),
+                "approved_exercise_id": str(replacement.id),
+                "provenance": {
+                    "source_plan_id": str(source.id),
+                    "review_id": str(review.id),
+                    "approved_plan_id": str(approved.id),
+                    "coach_id": str(coach.id),
+                },
+            },
+            {
+                "change_type": "sets_changed",
+                "day_number": 1,
+                "order_index": 1,
+                "generated": 3,
+                "approved": 4,
+                "generated_exercise_id": str(original_exercise.id),
+                "approved_exercise_id": str(replacement.id),
+                "provenance": {
+                    "source_plan_id": str(source.id),
+                    "review_id": str(review.id),
+                    "approved_plan_id": str(approved.id),
+                    "coach_id": str(coach.id),
+                },
+            },
+            {
+                "change_type": "reps_range_changed",
+                "day_number": 1,
+                "order_index": 1,
+                "generated": {"min": 8, "max": 12},
+                "approved": {"min": 6, "max": 10},
+                "generated_exercise_id": str(original_exercise.id),
+                "approved_exercise_id": str(replacement.id),
+                "provenance": {
+                    "source_plan_id": str(source.id),
+                    "review_id": str(review.id),
+                    "approved_plan_id": str(approved.id),
+                    "coach_id": str(coach.id),
+                },
+            },
+            {
+                "change_type": "rir_changed",
+                "day_number": 1,
+                "order_index": 1,
+                "generated": 2,
+                "approved": 4,
+                "generated_exercise_id": str(original_exercise.id),
+                "approved_exercise_id": str(replacement.id),
+                "provenance": {
+                    "source_plan_id": str(source.id),
+                    "review_id": str(review.id),
+                    "approved_plan_id": str(approved.id),
+                    "coach_id": str(coach.id),
+                },
+            },
+            {
+                "change_type": "rest_changed",
+                "day_number": 1,
+                "order_index": 1,
+                "generated": 90,
+                "approved": 120,
+                "generated_exercise_id": str(original_exercise.id),
+                "approved_exercise_id": str(replacement.id),
+                "provenance": {
+                    "source_plan_id": str(source.id),
+                    "review_id": str(review.id),
+                    "approved_plan_id": str(approved.id),
+                    "coach_id": str(coach.id),
+                },
+            },
+            {
+                "change_type": "notes_changed",
+                "day_number": 1,
+                "order_index": 1,
+                "generated": {"en": None, "fa": None},
+                "approved": {"en": "Coach-adjusted note", "fa": "یادداشت مربی"},
+                "generated_exercise_id": str(original_exercise.id),
+                "approved_exercise_id": str(replacement.id),
+                "provenance": {
+                    "source_plan_id": str(source.id),
+                    "review_id": str(review.id),
+                    "approved_plan_id": str(approved.id),
+                    "coach_id": str(coach.id),
+                },
+            },
+        ],
     }
 
 
@@ -630,6 +725,126 @@ def test_approval_activates_pending_plan_without_creating_review_loop(db: Sessio
     assert repeated.days[0].exercises[0].sets == approved.days[0].exercises[0].sets
     assert db.scalars(select(WorkoutPlan)).all() == [source, approved]
     assert db.scalars(select(WorkoutCycle)).all() == [cycle]
+
+
+def test_approval_without_coach_changes_persists_empty_structured_diff(db: Session) -> None:
+    member = _user(db, "no-diff-member")
+    coach = _user(db, "no-diff-coach")
+    source = _active_plan(db, user=member, exercises=[_exercise(db, "no-diff-press")])
+    review = ensure_pending_review(db, source)
+    service = WorkoutReviewService(db, clock=Clock())
+    service.claim(review.id, coach.id)
+    saved = service.save_draft(review.id, coach.id, _draft(review))
+
+    approved = service.approve(
+        review.id,
+        coach.id,
+        expected_revision=saved.draft_revision,
+    )
+
+    first_summary = deepcopy(approved.difference_summary)
+    assert first_summary["coach_diff"] == []
+    db.expire(approved)
+    reloaded = service.detail(review.id).approved_plan
+    assert reloaded is not None
+    assert reloaded.difference_summary == first_summary
+
+
+def test_structured_diff_captures_reorder_add_remove_and_is_deterministic(db: Session) -> None:
+    member = _user(db, "diff-structure-member")
+    first = _exercise(db, "diff-first")
+    second = _exercise(db, "diff-second")
+    added = _exercise(db, "diff-added")
+    source = _active_plan(
+        db,
+        user=member,
+        exercises=[first, second],
+        status=WorkoutPlanStatus.PENDING_REVIEW,
+    )
+    source.days[0].exercises.append(
+        WorkoutPlanExercise(
+            exercise_id=second.id,
+            order_index=2,
+            sets=3,
+            reps_min=8,
+            reps_max=12,
+            rest_seconds=90,
+            rir=2,
+            estimated_minutes=5,
+            exercise_snapshot=_candidate_snapshot(second),
+        )
+    )
+    db.flush()
+
+    reordered_only = _active_plan(
+        db,
+        user=member,
+        exercises=[second],
+        status=WorkoutPlanStatus.SUPERSEDED,
+    )
+    reordered_only.days[0].exercises.append(
+        WorkoutPlanExercise(
+            exercise_id=first.id,
+            order_index=2,
+            sets=3,
+            reps_min=8,
+            reps_max=12,
+            rest_seconds=90,
+            rir=2,
+            estimated_minutes=5,
+            exercise_snapshot=_candidate_snapshot(first),
+        )
+    )
+    db.flush()
+
+    reordered = _active_plan(
+        db,
+        user=member,
+        exercises=[second],
+        status=WorkoutPlanStatus.SUPERSEDED,
+    )
+    reordered.days[0].exercises.append(
+        WorkoutPlanExercise(
+            exercise_id=first.id,
+            order_index=2,
+            sets=3,
+            reps_min=8,
+            reps_max=12,
+            rest_seconds=90,
+            rir=2,
+            estimated_minutes=5,
+            exercise_snapshot=_candidate_snapshot(first),
+        )
+    )
+    reordered.days[0].exercises.append(
+        WorkoutPlanExercise(
+            exercise_id=added.id,
+            order_index=3,
+            sets=3,
+            reps_min=8,
+            reps_max=12,
+            rest_seconds=90,
+            rir=2,
+            estimated_minutes=5,
+            exercise_snapshot=_candidate_snapshot(added),
+        )
+    )
+    db.flush()
+
+    removed = _active_plan(db, user=member, exercises=[first], status=WorkoutPlanStatus.SUPERSEDED)
+    provenance = {"source_plan_id": str(source.id), "review_id": str(uuid4())}
+    diff = build_coach_diff(source, reordered, provenance=provenance)
+    assert {item["change_type"] for item in diff} == {
+        "exercise_added",
+        "exercise_changed",
+        "exercise_reordered",
+    }
+    assert any(item["approved_exercise_id"] == str(added.id) for item in diff)
+    reordered_only_diff = build_coach_diff(source, reordered_only, provenance=provenance)
+    assert {item["change_type"] for item in reordered_only_diff} == {"exercise_reordered"}
+    assert build_coach_diff(source, reordered, provenance=provenance) == diff
+    removed_diff = build_coach_diff(source, removed, provenance=provenance)
+    assert any(item["change_type"] == "exercise_removed" for item in removed_diff)
 
 
 def test_approval_supersedes_previous_active_plan_only_at_approval(db: Session) -> None:

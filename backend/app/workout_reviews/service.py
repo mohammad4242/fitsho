@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.workout_cycles.service import start_cycle
+from app.workout_reviews.diff import build_coach_difference_summary
 from app.workout_reviews.enums import (
     WorkoutReviewErrorCode,
     WorkoutReviewQueueView,
@@ -147,9 +148,6 @@ class WorkoutReviewService:
         approved = self._clone_approved_plan(
             review.source_plan,
             validated,
-            review_id=review.id,
-            coach_id=coach_id,
-            previous_active_plan_id=active.id if active is not None else None,
         )
         now = self._clock()
         if active is not None:
@@ -161,6 +159,14 @@ class WorkoutReviewService:
         approved.status = WorkoutPlanStatus.ACTIVE
         approved.activated_at = now
         self._db.add(approved)
+        self._db.flush()
+        approved.difference_summary = build_coach_difference_summary(
+            review.source_plan,
+            approved,
+            review_id=review.id,
+            coach_id=coach_id,
+            previous_active_plan_id=active.id if active is not None else None,
+        )
         self._db.flush()
         start_cycle(
             self._db,
@@ -227,10 +233,6 @@ class WorkoutReviewService:
     def _clone_approved_plan(
         source: WorkoutPlan,
         validated: ValidatedDraft,
-        *,
-        review_id: UUID,
-        coach_id: UUID,
-        previous_active_plan_id: UUID | None,
     ) -> WorkoutPlan:
         plan = WorkoutPlan(
             user_id=source.user_id,
@@ -262,15 +264,6 @@ class WorkoutReviewService:
             progression_policy=deepcopy(source.progression_policy),
             previous_program_id=source.id,
             regeneration_reason="coach_review_approved",
-            difference_summary={
-                "source_plan_id": str(source.id),
-                "review_id": str(review_id),
-                "reviewed_by_coach_id": str(coach_id),
-                "reviewed_by_coach": True,
-                "previous_active_plan_id": (
-                    str(previous_active_plan_id) if previous_active_plan_id is not None else None
-                ),
-            },
         )
         source_days = {day.day_number: day for day in source.days}
         source_slots = {
