@@ -284,7 +284,8 @@ def test_generation_exhausts_safe_splits_when_required_pull_is_unavailable() -> 
     assert result.program is None
     assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
     assert result.errors[0] == "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED"
-    assert "REQUIRED_MOVEMENT_PATTERN_MISSING" in result.errors
+    assert "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT" in result.errors
+    assert any(error.startswith("REQUIRED_PATTERN_UNAVAILABLE:") for error in result.errors)
     assert result.decision_trace[-1]["status"] == "exhausted"
 
 
@@ -314,3 +315,7 @@ def test_generation_uses_next_ranked_split_when_selected_layout_cannot_be_filled
     )
     assert recovery["reason_codes"] == ("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE",)
     assert recovery["rejected_splits"][0]["split"] == SplitType.BODY_PART_ROTATION.value
+    assert (
+        "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT"
+        in recovery["rejected_splits"][0]["reason_codes"]
+    )

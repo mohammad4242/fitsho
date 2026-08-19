@@ -16,6 +16,7 @@ from app.workouts.schemas import ProgramGenerationOverrides
 from app.workouts.service import (
     GenerationCooldownError,
     ProgramGenerationRejectedError,
+    WorkoutConstructionUnsatisfiedError,
     WorkoutGenerationFailedError,
     WorkoutPlanGenerationResult,
 )
@@ -444,6 +445,27 @@ def test_generate_returns_structured_professional_review_status(client: TestClie
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "PROGRAM_REJECTED_SAFETY_STATUS"
     assert response.json()["detail"]["safety_status"] == "stop_and_refer"
+
+
+def test_generate_returns_construction_exhaustion_as_a_specific_422(client: TestClient) -> None:
+    _register_and_complete_profile(client, "construction-exhausted@example.com")
+
+    class FakeService:
+        async def generate(self, current_user_id: UUID) -> WorkoutPlanGenerationResult:
+            raise WorkoutConstructionUnsatisfiedError()
+
+    from app.workouts.dependencies import get_workout_generation_service
+
+    app = cast(FastAPI, client.app)
+    app.dependency_overrides[get_workout_generation_service] = lambda: FakeService()
+    response = client.post("/api/v1/workout-plans/generate", headers=ORIGIN)
+    app.dependency_overrides.pop(get_workout_generation_service)
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == {
+        "code": "UNSATISFIED_CONSTRAINT",
+        "message": "No safe workout layout satisfies all required session constraints",
+    }
 
 
 def test_generate_returns_retry_after_during_a_generation_cooldown(

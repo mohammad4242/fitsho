@@ -41,6 +41,23 @@ class SlotSpec:
     target_muscle: MuscleGroup | None = None
 
 
+class SessionConstructionError(ValueError):
+    def __init__(self, day_index: int, focus: str, slot: SlotSpec) -> None:
+        patterns = tuple(sorted(pattern.value for pattern in slot.patterns))
+        target = slot.target_muscle.value if slot.target_muscle is not None else None
+        self.day_index = day_index
+        self.focus = focus
+        self.patterns = patterns
+        self.target_muscle = target
+        self.reason_codes = (
+            "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT",
+            f"REQUIRED_SESSION_SLOT_UNAVAILABLE:{focus}",
+            f"REQUIRED_PATTERN_UNAVAILABLE:{','.join(patterns)}",
+            *((f"REQUIRED_TARGET_MUSCLE_UNAVAILABLE:{target}",) if target is not None else ()),
+        )
+        super().__init__(";".join(self.reason_codes))
+
+
 def build_sessions(
     request: NormalizedProgramRequest,
     split: SplitPlan,
@@ -65,11 +82,16 @@ def build_sessions(
             ),
         )
         slots = _slots_for_focus(focus)
+        ordered_slots = tuple(slot for slot in slots if slot.required) + tuple(
+            slot for slot in slots if not slot.required
+        )
         chosen: list[ExerciseCandidate] = []
         reasons: dict[UUID, tuple[str, ...]] = {}
         session_reasons: tuple[str, ...] = ()
-        for slot in slots:
+        for slot in ordered_slots:
             if len(chosen) >= capacity:
+                if slot.required:
+                    raise SessionConstructionError(index + 1, focus, slot)
                 break
             options = [
                 item
@@ -80,8 +102,7 @@ def build_sessions(
             ]
             if not options:
                 if slot.required:
-                    missing = sorted(pattern.value for pattern in slot.patterns)
-                    session_reasons = session_reasons + (f"REQUIRED_PATTERN_UNAVAILABLE:{missing}",)
+                    raise SessionConstructionError(index + 1, focus, slot)
                 continue
             ranked = rank_exercises(
                 request,

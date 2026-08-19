@@ -33,7 +33,7 @@ from app.workouts.program_engine.schemas import (
     RecentTrainingHistory,
     SplitPlan,
 )
-from app.workouts.program_engine.session_builder import build_sessions
+from app.workouts.program_engine.session_builder import SessionConstructionError, build_sessions
 from app.workouts.program_engine.split_selector import generate_split_candidates, select_split
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 
@@ -481,11 +481,47 @@ def test_persistent_dislike_is_deprioritized_and_safe_fallback_is_deterministic(
     assert tuple(item.id for item in forward) == tuple(item.id for item in reverse)
 
 
-def test_missing_required_safe_pattern_returns_structured_domain_error() -> None:
+def test_missing_required_slot_rejects_session_before_supplements() -> None:
     request = normalized()
     eligible = filter_eligible_exercises(
         request,
-        [candidate("push", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST)],
+        [
+            candidate("push one", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+            candidate("push two", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+            candidate("push three", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+            candidate("squat", MovementPattern.SQUAT, MuscleGroup.QUADRICEPS),
+            candidate("hinge", MovementPattern.HIP_HINGE, MuscleGroup.HAMSTRINGS),
+            candidate("plank", MovementPattern.CORE_ANTI_EXTENSION, MuscleGroup.ABS),
+        ],
+    ).eligible
+    split = select_split(request, RULESET)
+
+    with pytest.raises(SessionConstructionError) as error:
+        build_sessions(
+            request,
+            split,
+            plan_weekly_volume(request, split, RULESET),
+            eligible,
+            RULESET,
+        )
+
+    assert error.value.reason_codes[0] == "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT"
+    assert any(
+        code.startswith("REQUIRED_PATTERN_UNAVAILABLE:") for code in error.value.reason_codes
+    )
+
+
+def test_supplements_are_added_only_after_required_slots_are_satisfied() -> None:
+    request = normalized()
+    eligible = filter_eligible_exercises(
+        request,
+        [
+            candidate("push one", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+            candidate("push two", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+            candidate("push three", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+            candidate("row", MovementPattern.HORIZONTAL_PULL, MuscleGroup.BACK),
+            candidate("squat", MovementPattern.SQUAT, MuscleGroup.QUADRICEPS),
+        ],
     ).eligible
     split = select_split(request, RULESET)
 
@@ -497,9 +533,14 @@ def test_missing_required_safe_pattern_returns_structured_domain_error() -> None
         RULESET,
     )
 
-    assert sessions
-    all_reasons = [code for s in sessions for code in s.reason_codes]
-    assert any("REQUIRED_PATTERN_UNAVAILABLE" in code for code in all_reasons)
+    patterns = {item.movement_pattern for item in sessions[0].exercises}
+    assert {
+        MovementPattern.HORIZONTAL_PUSH,
+        MovementPattern.HORIZONTAL_PULL,
+        MovementPattern.SQUAT,
+    }.issubset(patterns)
+    assert len(sessions[0].exercises) == RULESET.minimum_exercises_per_session
+    assert "SESSION_SUPPLEMENTED_TO_MINIMUM" in sessions[0].reason_codes
 
 
 def test_body_part_rotation_places_chest_and_direct_triceps_in_one_session() -> None:

@@ -65,8 +65,8 @@ from app.workouts.schemas import ProgramGenerationOverrides
 from app.workouts.service import (
     GenerationCooldownError,
     GenerationInProgressError,
-    NoEligibleExercisesError,
     ProgramGenerationRejectedError,
+    WorkoutConstructionUnsatisfiedError,
     WorkoutGenerationFailedError,
     WorkoutGenerationService,
     WorkoutGenerationSettings,
@@ -849,11 +849,21 @@ def test_missing_safe_pattern_does_not_persist_partial_plan(db: Session) -> None
     exercises[1].needs_review = True
     db.flush()
 
-    with pytest.raises(NoEligibleExercisesError) as error:
+    with pytest.raises(WorkoutConstructionUnsatisfiedError) as error:
         asyncio.run(_service(db).generate(user.id))
 
     assert error.value.error_code == "UNSATISFIED_CONSTRAINT"
     assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0
+    generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
+    assert generation.safe_error_message == (
+        "No safe workout layout satisfies all required session constraints."
+    )
+    assert generation.validation_diagnostics is not None
+    assert {
+        problem["message"]
+        for diagnostic in generation.validation_diagnostics
+        for problem in diagnostic["problems"]
+    } == {"Safe program construction exhausted all ranked split alternatives."}
 
 
 def test_historical_response_uses_saved_exercise_snapshot_after_catalog_edit(
@@ -903,7 +913,7 @@ def test_failed_replacement_preserves_previous_active_plan(db: Session) -> None:
     exercises[1].needs_review = True
     db.commit()
 
-    with pytest.raises(NoEligibleExercisesError):
+    with pytest.raises(WorkoutConstructionUnsatisfiedError):
         asyncio.run(_service(db).generate(user.id))
 
     assert initial.plan.status is WorkoutPlanStatus.PENDING_REVIEW

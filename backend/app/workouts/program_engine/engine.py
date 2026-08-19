@@ -30,7 +30,7 @@ from app.workouts.program_engine.schemas import (
     WorkoutDay,
     WorkoutProgram,
 )
-from app.workouts.program_engine.session_builder import build_sessions
+from app.workouts.program_engine.session_builder import SessionConstructionError, build_sessions
 from app.workouts.program_engine.split_selector import rank_split_candidates
 from app.workouts.program_engine.template_selector import select_template_reference
 from app.workouts.program_engine.template_sessions import build_template_sessions
@@ -136,14 +136,15 @@ def generate_program(
         if result.is_success:
             return result
         collected_errors.extend(result.errors)
-        rejected_splits.append(
-            {
-                "split": split.split_type.value,
-                "day_focuses": split.day_focuses,
-                "status": "rejected",
-                "reason_codes": result.errors,
-            }
-        )
+        rejected_attempt: dict[str, object] = {
+            "split": split.split_type.value,
+            "day_focuses": split.day_focuses,
+            "status": "rejected",
+            "reason_codes": result.errors,
+        }
+        if result.decision_trace:
+            rejected_attempt["decision_trace"] = result.decision_trace
+        rejected_splits.append(rejected_attempt)
     errors = (
         "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED",
         *tuple(dict.fromkeys(collected_errors)),
@@ -182,13 +183,26 @@ def _program_for_split(
     volume = plan_weekly_volume(normalized, split, ruleset, previous_volume=previous_volume)
     try:
         drafts = build_sessions(normalized, split, volume, eligible, ruleset)
-    except ValueError as exc:
+    except SessionConstructionError as exc:
+        construction_trace: tuple[dict[str, object], ...] = (
+            {
+                "stage": "session_construction",
+                "status": "rejected",
+                "split": split.split_type.value,
+                "day_index": exc.day_index,
+                "focus": exc.focus,
+                "required_patterns": exc.patterns,
+                "required_target_muscle": exc.target_muscle,
+                "reason_codes": exc.reason_codes,
+            },
+        )
         return ProgramGenerationResult(
             program=None,
             error_code=GenerationErrorCode.NO_SAFE_EXERCISE_FOR_PATTERN,
-            errors=(str(exc),),
+            errors=exc.reason_codes,
             safety_status=safety_status,
             rejected_candidates=rejected,
+            decision_trace=construction_trace,
         )
     days = prescribe_sessions(
         normalized,

@@ -167,6 +167,11 @@ class NoEligibleExercisesError(Exception):
         self.error_code = error_code
 
 
+class WorkoutConstructionUnsatisfiedError(Exception):
+    def __init__(self, error_code: str = "UNSATISFIED_CONSTRAINT") -> None:
+        self.error_code = error_code
+
+
 class ProgramGenerationRejectedError(Exception):
     def __init__(self, error_code: str, safety_status: str | None = None) -> None:
         self.error_code = error_code
@@ -259,10 +264,11 @@ class WorkoutGenerationService:
                 if result.error_code is not None
                 else GenerationErrorCode.PROGRAM_VALIDATION_FAILED.value
             )
+            safe_message, problem_message = _generation_failure_messages(result.error_code)
             self._mark_failure(
                 generation,
                 error_code,
-                "A safe valid workout program could not be generated.",
+                safe_message,
                 [
                     {
                         "model_id": self._ruleset.engine_version,
@@ -270,9 +276,7 @@ class WorkoutGenerationService:
                         "problems": [
                             {
                                 "code": error,
-                                "message": (
-                                    "Deterministic program validation rejected this generation."
-                                ),
+                                "message": problem_message,
                             }
                             for error in result.errors
                         ],
@@ -284,11 +288,12 @@ class WorkoutGenerationService:
                     }
                 ],
             )
+            if result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT:
+                raise WorkoutConstructionUnsatisfiedError(error_code)
             if result.error_code in {
                 GenerationErrorCode.NO_SAFE_EXERCISE_FOR_PATTERN,
                 GenerationErrorCode.NO_AVAILABLE_EQUIPMENT_MATCH,
                 GenerationErrorCode.INSUFFICIENT_ELIGIBLE_EXERCISES,
-                GenerationErrorCode.UNSATISFIED_CONSTRAINT,
             }:
                 raise NoEligibleExercisesError(error_code)
             if result.error_code is GenerationErrorCode.PROGRAM_REJECTED_SAFETY_STATUS:
@@ -1262,6 +1267,34 @@ class WorkoutGenerationService:
     def _is_plan_expired(cls, plan: WorkoutPlan) -> bool:
         started_at = plan.activated_at or plan.created_at
         return datetime.now(UTC) >= started_at + timedelta(weeks=cls.plan_duration_weeks(plan))
+
+
+def _generation_failure_messages(
+    error_code: GenerationErrorCode | None,
+) -> tuple[str, str]:
+    if error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT:
+        return (
+            "No safe workout layout satisfies all required session constraints.",
+            "Safe program construction exhausted all ranked split alternatives.",
+        )
+    if error_code in {
+        GenerationErrorCode.NO_SAFE_EXERCISE_FOR_PATTERN,
+        GenerationErrorCode.NO_AVAILABLE_EQUIPMENT_MATCH,
+        GenerationErrorCode.INSUFFICIENT_ELIGIBLE_EXERCISES,
+    }:
+        return (
+            "A safe workout cannot be generated from the currently eligible exercises.",
+            "No eligible exercise satisfies this required workout constraint.",
+        )
+    if error_code is GenerationErrorCode.PROGRAM_REJECTED_SAFETY_STATUS:
+        return (
+            "Professional review is required before automatic programming.",
+            "The current safety status disallows automatic workout generation.",
+        )
+    return (
+        "A safe valid workout program could not be generated.",
+        "Deterministic program validation rejected this generation.",
+    )
 
 
 def _json_ready(value: object) -> object:

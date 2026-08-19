@@ -39,6 +39,7 @@ from app.workouts.service import (
     GenerationInProgressError,
     NoEligibleExercisesError,
     ProgramGenerationRejectedError,
+    WorkoutConstructionUnsatisfiedError,
     WorkoutGenerationFailedError,
     WorkoutGenerationService,
 )
@@ -93,6 +94,14 @@ async def generate_plan(
             detail={
                 "code": error.error_code,
                 "message": "Not enough eligible exercises for a safe workout plan",
+            },
+        ) from None
+    except WorkoutConstructionUnsatisfiedError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": error.error_code,
+                "message": "No safe workout layout satisfies all required session constraints",
             },
         ) from None
     except ProgramGenerationRejectedError as error:
