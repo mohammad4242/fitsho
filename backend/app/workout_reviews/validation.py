@@ -142,7 +142,7 @@ class WorkoutReviewDraftValidator:
                         reps_min=item.reps_min,
                         reps_max=item.reps_max,
                         rest_seconds=item.rest_seconds,
-                        rir=source_item.rir,
+                        rir=item.rir if item.rir is not None else source_item.rir,
                         estimated_minutes=calculate_exercise_minutes(timing),
                         notes_en=item.notes_en,
                         notes_fa=item.notes_fa,

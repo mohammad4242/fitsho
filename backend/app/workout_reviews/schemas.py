@@ -19,6 +19,7 @@ class WorkoutReviewExerciseDraft(BaseModel):
     sets: int = Field(ge=1, le=10)
     reps_min: int = Field(ge=1, le=100)
     reps_max: int = Field(ge=1, le=100)
+    rir: int | None = Field(default=None, ge=0, le=5)
     rest_seconds: int = Field(ge=0, le=600)
     notes_en: str | None = Field(default=None, max_length=1000)
     notes_fa: str | None = Field(default=None, max_length=1000)

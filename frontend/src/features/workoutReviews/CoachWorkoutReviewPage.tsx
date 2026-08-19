@@ -254,6 +254,7 @@ export function CoachWorkoutReviewPage() {
                               <NumberField label={l(`تعداد ست ${labelSuffix}`, `Sets ${labelSuffix}`)} value={exercise.sets} onChange={(sets) => updateExercise(dayIndex, exerciseIndex, { sets })} />
                               <NumberField label={l(`حداقل تکرار ${labelSuffix}`, `Minimum reps ${labelSuffix}`)} value={exercise.reps_min} onChange={(reps_min) => updateExercise(dayIndex, exerciseIndex, { reps_min })} />
                               <NumberField label={l(`حداکثر تکرار ${labelSuffix}`, `Maximum reps ${labelSuffix}`)} value={exercise.reps_max} onChange={(reps_max) => updateExercise(dayIndex, exerciseIndex, { reps_max })} />
+                              <NumberField label={`RIR ${labelSuffix}`} value={exercise.rir ?? 0} min={0} max={5} onChange={(rir) => updateExercise(dayIndex, exerciseIndex, { rir })} />
                               <NumberField label={l(`استراحت ${labelSuffix}`, `Rest ${labelSuffix}`)} value={exercise.rest_seconds} step={15} onChange={(rest_seconds) => updateExercise(dayIndex, exerciseIndex, { rest_seconds })} />
                             </div>
                             <label>
@@ -291,8 +292,8 @@ export function CoachWorkoutReviewPage() {
   );
 }
 
-function NumberField({ label, value, onChange, step = 1 }: { label: string; value: number; onChange: (value: number) => void; step?: number }) {
-  return <label>{label}<input aria-label={label} type="number" min="1" step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
+function NumberField({ label, value, onChange, step = 1, min = 1, max }: { label: string; value: number; onChange: (value: number) => void; step?: number; min?: number; max?: number }) {
+  return <label>{label}<input aria-label={label} type="number" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
 }
 
 function queueTitle(view: WorkoutReviewQueueView, fa: boolean) {

@@ -38,7 +38,7 @@ from app.workout_cycles.service import start_cycle
 from app.workout_reviews.enums import WorkoutReviewErrorCode, WorkoutReviewStatus
 from app.workout_reviews.models import WorkoutPlanReview
 from app.workout_reviews.repository import ensure_pending_review
-from app.workout_reviews.schemas import WorkoutReviewDraftUpdate
+from app.workout_reviews.schemas import WorkoutReviewDraftUpdate, WorkoutReviewExerciseDraft
 from app.workout_reviews.service import ReviewConflict, WorkoutReviewService
 from app.workout_reviews.summary import build_athlete_summary, build_fitsho_recommendation
 from app.workout_reviews.validation import DraftValidationError
@@ -458,10 +458,27 @@ def test_approval_creates_new_active_version_and_preserves_source(db: Session) -
     review = ensure_pending_review(db, source)
     service = WorkoutReviewService(db, clock=Clock())
     service.claim(review.id, coach.id)
-    payload = _draft(review, exercise_id=str(replacement.id))
-    payload.days[0].exercises[0].sets = 4
+    raw_payload = deepcopy(review.draft_payload)
+    assert raw_payload is not None
+    raw_payload["expected_revision"] = review.draft_revision
+    raw_payload["days"][0]["exercises"][0].update(
+        {
+            "exercise_id": str(replacement.id),
+            "sets": 4,
+            "reps_min": 6,
+            "reps_max": 10,
+            "rir": 4,
+            "rest_seconds": 120,
+            "notes_en": "Coach-adjusted note",
+            "notes_fa": "یادداشت مربی",
+        }
+    )
+    payload = WorkoutReviewDraftUpdate.model_validate(raw_payload)
     saved = service.save_draft(review.id, coach.id, payload)
     source_payload = deepcopy(saved.source_plan.days[0].exercises[0].exercise_snapshot)
+
+    assert saved.draft_payload is not None
+    assert saved.draft_payload["days"][0]["exercises"][0]["rir"] == 4
 
     approved = service.approve(
         review.id,
@@ -473,13 +490,57 @@ def test_approval_creates_new_active_version_and_preserves_source(db: Session) -
     db.refresh(review)
     assert source.status is WorkoutPlanStatus.SUPERSEDED
     assert source.days[0].exercises[0].exercise_id == original_exercise.id
+    assert source.days[0].exercises[0].sets == 3
+    assert source.days[0].exercises[0].rir == 2
     assert source.days[0].exercises[0].exercise_snapshot == source_payload
     assert approved.status is WorkoutPlanStatus.ACTIVE
     assert approved.previous_program_id == source.id
     assert approved.days[0].exercises[0].exercise_id == replacement.id
     assert approved.days[0].exercises[0].sets == 4
+    assert approved.days[0].exercises[0].reps_min == 6
+    assert approved.days[0].exercises[0].reps_max == 10
+    assert approved.days[0].exercises[0].rir == 4
+    assert approved.days[0].exercises[0].rest_seconds == 120
+    assert approved.days[0].exercises[0].notes_en == "Coach-adjusted note"
+    assert approved.days[0].exercises[0].notes_fa == "یادداشت مربی"
     assert review.approved_plan_id == approved.id
     assert review.status is WorkoutReviewStatus.APPROVED
+
+
+def test_review_draft_rejects_rir_outside_supported_range() -> None:
+    with pytest.raises(ValueError):
+        WorkoutReviewExerciseDraft(
+            order_index=1,
+            exercise_id=uuid4(),
+            sets=3,
+            reps_min=8,
+            reps_max=12,
+            rir=6,
+            rest_seconds=90,
+        )
+
+
+def test_review_draft_rejects_invalid_rep_and_rest_ranges() -> None:
+    with pytest.raises(ValueError):
+        WorkoutReviewExerciseDraft(
+            order_index=1,
+            exercise_id=uuid4(),
+            sets=3,
+            reps_min=13,
+            reps_max=12,
+            rir=2,
+            rest_seconds=90,
+        )
+    with pytest.raises(ValueError):
+        WorkoutReviewExerciseDraft(
+            order_index=1,
+            exercise_id=uuid4(),
+            sets=3,
+            reps_min=8,
+            reps_max=12,
+            rir=2,
+            rest_seconds=601,
+        )
 
 
 def test_approval_activates_pending_plan_without_creating_review_loop(db: Session) -> None:

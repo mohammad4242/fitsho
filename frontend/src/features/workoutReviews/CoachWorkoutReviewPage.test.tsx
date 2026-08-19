@@ -53,6 +53,7 @@ const detail: WorkoutReviewDetail = {
             sets: 3,
             reps_min: 8,
             reps_max: 12,
+            rir: 2,
             rest_seconds: 90,
             notes_en: null,
             notes_fa: null,
@@ -171,6 +172,28 @@ it("saves permitted edits with the current revision", async () => {
       days: expect.arrayContaining([
         expect.objectContaining({
           exercises: expect.arrayContaining([expect.objectContaining({ sets: 4 })]),
+        }),
+      ]),
+    }),
+  );
+});
+
+it("allows the coach to edit RIR and sends it with the draft", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByRole("button", { name: "شروع بازبینی" }));
+  const rir = await screen.findByLabelText("RIR روز ۱ حرکت ۱");
+
+  await user.clear(rir);
+  await user.type(rir, "4");
+  await user.click(screen.getByRole("button", { name: "ذخیره پیش‌نویس" }));
+
+  expect(api.saveWorkoutReviewDraft).toHaveBeenCalledWith(
+    "review-1",
+    expect.objectContaining({
+      days: expect.arrayContaining([
+        expect.objectContaining({
+          exercises: expect.arrayContaining([expect.objectContaining({ rir: 4 })]),
         }),
       ]),
     }),

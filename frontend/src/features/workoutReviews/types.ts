@@ -9,6 +9,7 @@ export type WorkoutReviewExerciseDraft = {
   sets: number;
   reps_min: number;
   reps_max: number;
+  rir: number | null;
   rest_seconds: number;
   notes_en: string | null;
   notes_fa: string | null;
