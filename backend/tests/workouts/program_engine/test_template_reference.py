@@ -1,17 +1,19 @@
-from app.exercises.enums import MovementPattern, MuscleGroup
+from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
+from app.workouts.program_engine.enums import RecoveryRating
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
+    ExerciseCandidate,
+    RecentTrainingHistory,
     TemplateReference,
     TemplateReferenceDay,
     TemplateReferenceSlot,
 )
-from tests.workouts.program_engine.golden_fixtures import full_catalog, request
+from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
 
 
-def test_safe_matching_template_becomes_deterministic_program_reference() -> None:
-    catalog = full_catalog()
-    template = TemplateReference(
+def _four_day_reference() -> TemplateReference:
+    return TemplateReference(
         slug="four-day-chest-reference",
         days_per_week=4,
         training_level="intermediate",
@@ -76,6 +78,76 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
         ),
     )
 
+
+def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]]:
+    catalog = full_catalog()
+    by_name = {candidate.name: candidate for candidate in catalog}
+    upper_focus = (MuscleGroup.CHEST, MuscleGroup.BACK)
+    lower_focus = (
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+        MuscleGroup.ABS,
+    )
+
+    def slot(name: str, focus: tuple[MuscleGroup, ...]) -> TemplateReferenceSlot:
+        candidate = by_name[name]
+        return TemplateReferenceSlot(
+            exercise_id=candidate.id,
+            exercise_slug_hint=name,
+            target_muscles=focus,
+            movement_pattern=candidate.movement_pattern,
+            intensity_method="rest_pause" if name == "Dumbbell Press" else "standard",
+            adaptation_priority="core",
+            superset_group=None,
+            sets=4,
+            rep_min=8,
+            rep_max=10,
+            target_rir=1,
+            rest_seconds=75,
+        )
+
+    template = TemplateReference(
+        slug="four-day-upper-lower-reference",
+        days_per_week=4,
+        training_level="intermediate",
+        fitness_goal="build_muscle",
+        focus_tags=("classic", "chest_priority", "back_priority"),
+        intensity_methods=("standard", "rest_pause"),
+        days=(
+            TemplateReferenceDay(
+                1,
+                "Upper A",
+                upper_focus,
+                (slot("Push Up", upper_focus), slot("Bodyweight Row", upper_focus)),
+            ),
+            TemplateReferenceDay(
+                2,
+                "Lower A",
+                lower_focus,
+                (slot("Bodyweight Squat", lower_focus), slot("Bodyweight Hinge", lower_focus)),
+            ),
+            TemplateReferenceDay(
+                3,
+                "Upper B",
+                upper_focus,
+                (slot("Dumbbell Press", upper_focus), slot("Dumbbell Row", upper_focus)),
+            ),
+            TemplateReferenceDay(
+                4,
+                "Lower B",
+                lower_focus,
+                (slot("Wall Knee Extension", lower_focus), slot("Dumbbell Rdl", lower_focus)),
+            ),
+        ),
+    )
+    return template, catalog
+
+
+def test_safe_matching_template_becomes_deterministic_program_reference() -> None:
+    catalog = full_catalog()
+    template = _four_day_reference()
+
     result = generate_program(
         request(
             available_training_days=4,
@@ -94,4 +166,278 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
     assert any(
         entry["stage"] == "template_reference" and entry["selected"] == template.slug
         for entry in result.program.decision_trace
+    )
+
+
+def test_template_uses_shared_volume_and_prescription_rules() -> None:
+    result = generate_program(
+        request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+        ),
+        full_catalog(),
+        RULESET,
+        reference_templates=(_four_day_reference(),),
+    )
+
+    assert result.program is not None, result.errors
+    first_exercise = result.program.weekly_schedule[0].exercises[0]
+    assert (
+        first_exercise.rest_seconds
+        == RULESET.prescription_rules["hypertrophy_compound"].rest_seconds
+    )
+    assert any(entry["stage"] == "volume" for entry in result.program.decision_trace)
+    assert any(entry["stage"] == "volume_repair" for entry in result.program.decision_trace)
+
+
+def test_same_template_personalizes_weekly_volume_for_different_priority_muscles() -> None:
+    template, catalog = _upper_lower_reference()
+
+    chest_result = generate_program(
+        request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+            priority_muscles=[MuscleGroup.CHEST],
+        ),
+        catalog,
+        RULESET,
+        reference_templates=(template,),
+    )
+    back_result = generate_program(
+        request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+            priority_muscles=[MuscleGroup.BACK],
+        ),
+        catalog,
+        RULESET,
+        reference_templates=(template,),
+    )
+
+    assert chest_result.program is not None, chest_result.errors
+    assert back_result.program is not None, back_result.errors
+    chest_volume = chest_result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
+    back_volume = back_result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
+    assert chest_volume["chest"] > back_volume["chest"]
+    assert back_volume["back"] > chest_volume["back"]
+    for day_index in (0, 2):
+        expected_core_ids = {
+            slot.exercise_id for slot in template.days[day_index].slots
+        }
+        actual_core = chest_result.program.weekly_schedule[day_index].exercises[:2]
+        assert {exercise.exercise_id for exercise in actual_core} == expected_core_ids
+        assert all("TEMPLATE_REFERENCE_EXERCISE" in item.reason_codes for item in actual_core)
+
+
+def test_template_volume_uses_recovery_history_and_short_session_prescription() -> None:
+    template, catalog = _upper_lower_reference()
+    history = RecentTrainingHistory(
+        completed_session_ratio=1.0,
+        previous_weekly_direct_sets_by_muscle={MuscleGroup.CHEST: 5.0},
+        previous_volume_source="prescribed_plan",
+        recovery_problems=True,
+    )
+
+    baseline = generate_program(
+        request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+            priority_muscles=[MuscleGroup.CHEST],
+        ),
+        catalog,
+        RULESET,
+        reference_templates=(template,),
+    )
+    constrained = generate_program(
+        request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=30,
+            priority_muscles=[MuscleGroup.CHEST],
+            sleep_quality=RecoveryRating.POOR,
+            recent_training_history=history,
+        ),
+        catalog,
+        RULESET,
+        reference_templates=(template,),
+    )
+
+    assert baseline.program is not None, baseline.errors
+    assert constrained.program is not None, constrained.errors
+    baseline_sets = baseline.program.aggregate_metrics["weekly_direct_sets_by_muscle"]["chest"]
+    constrained_sets = constrained.program.aggregate_metrics["weekly_direct_sets_by_muscle"][
+        "chest"
+    ]
+    assert constrained_sets < baseline_sets
+    assert constrained.program.weekly_schedule[0].exercises[0].rest_seconds == (
+        RULESET.minimum_rest_seconds
+    )
+    assert constrained.program.aggregate_metrics["previous_volume_baseline"]["source"] == (
+        "prescribed_plan"
+    )
+    volume_trace = next(
+        entry for entry in constrained.program.decision_trace if entry["stage"] == "volume"
+    )
+    assert "VOLUME_REDUCED_FOR_RECOVERY" in volume_trace["reasons"]
+    assert "VOLUME_CAPPED_FOR_PREVIOUS_VOLUME" in volume_trace["reasons"]
+
+
+def test_unsafe_template_exercise_is_substituted_and_trace_is_auditable() -> None:
+    template, catalog = _upper_lower_reference()
+    catalog.append(
+        exercise(
+            "extra-safe-chest-press",
+            MovementPattern.HORIZONTAL_PUSH,
+            MuscleGroup.CHEST,
+        )
+    )
+    unsafe_id = template.days[0].slots[0].exercise_id
+    assert unsafe_id is not None
+
+    result = generate_program(
+        request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+            blocked_exercises=[unsafe_id],
+        ),
+        catalog,
+        RULESET,
+        reference_templates=(template,),
+    )
+
+    assert result.program is not None, result.errors
+    programmed = [
+        exercise for day in result.program.weekly_schedule for exercise in day.exercises
+    ]
+    assert unsafe_id not in {exercise.exercise_id for exercise in programmed}
+    assert all(
+        item.equipment.issubset({Equipment.BODYWEIGHT, Equipment.DUMBBELL})
+        for item in programmed
+    )
+    assert all(not item.needs_review for item in programmed)
+    adaptation_trace = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "template_adaptation"
+    )
+    assert any(
+        item["requested_exercise_id"] == str(unsafe_id)
+        for item in adaptation_trace["substitutions"]
+    )
+    assert adaptation_trace["prescription_changes"]
+
+
+def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> None:
+    base = _four_day_reference()
+    unadaptable = TemplateReference(
+        slug="unadaptable-repeated-chest-reference",
+        days_per_week=4,
+        training_level="intermediate",
+        fitness_goal="build_muscle",
+        focus_tags=("classic",),
+        intensity_methods=("standard",),
+        days=(base.days[0],) * 4,
+    )
+
+    result = generate_program(
+        request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+        ),
+        full_catalog(),
+        RULESET,
+        reference_templates=(unadaptable,),
+    )
+
+    assert result.program is not None, result.errors
+    assert result.program.aggregate_metrics.get("reference_template") is None
+    rejection = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "template_reference" and entry.get("status") == "rejected"
+    )
+    assert rejection["selected"] == unadaptable.slug
+    assert rejection["reason_codes"]
+
+
+def test_template_that_cannot_cover_priority_volume_falls_back_to_dynamic() -> None:
+    template = _four_day_reference()
+
+    result = generate_program(
+        request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+            priority_muscles=[MuscleGroup.SHOULDERS],
+        ),
+        full_catalog(),
+        RULESET,
+        reference_templates=(template,),
+    )
+
+    assert result.program is not None, result.errors
+    assert result.program.aggregate_metrics.get("reference_template") is None
+    rejection = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "template_reference" and entry.get("status") == "rejected"
+    )
+    assert "TEMPLATE_PRIORITY_VOLUME_UNSATISFIED:shoulders" in rejection["reason_codes"]
+
+
+def test_template_generation_is_deterministic_and_strictly_valid() -> None:
+    template, catalog = _upper_lower_reference()
+    source = request(
+        available_training_days=4,
+        primary_goal="build_muscle",
+        training_experience="intermediate",
+        training_age_months=24,
+        session_duration_minutes=45,
+        priority_muscles=[MuscleGroup.CHEST],
+    )
+
+    first = generate_program(source, catalog, RULESET, reference_templates=(template,))
+    second = generate_program(source, catalog, RULESET, reference_templates=(template,))
+
+    assert first.program is not None, first.errors
+    assert second.program is not None, second.errors
+    assert first.program == second.program
+    assert first.program.validation_report.is_valid
+    assert all(
+        day.estimated_duration_minutes
+        <= source.session_duration_minutes + RULESET.duration_tolerance_minutes
+        for day in first.program.weekly_schedule
+    )
+    primary_by_id = {candidate.id: candidate.primary_muscle for candidate in catalog}
+    original_chest_sets = sum(
+        slot.sets
+        for day in template.days
+        for slot in day.slots
+        if primary_by_id.get(slot.exercise_id) is MuscleGroup.CHEST
+    )
+    assert (
+        first.program.aggregate_metrics["planned_direct_sets_by_muscle"]["chest"]
+        != original_chest_sets
     )

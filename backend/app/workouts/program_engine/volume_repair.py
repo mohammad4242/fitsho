@@ -98,6 +98,7 @@ def repair_weekly_volume(
             repaired,
             direct_under,
             effective_under,
+            direct,
             targets,
             tuple(day.cardio.duration_minutes if day.cardio else 0 for day in days),
             request,
@@ -187,6 +188,7 @@ def _select_addition_candidate(
     days: list[list[ProgrammedExercise]],
     direct_under: set[MuscleGroup],
     effective_under: set[MuscleGroup],
+    weekly_direct: Counter[str],
     targets: dict[MuscleGroup, VolumeTarget],
     cardio_minutes_by_day: tuple[int, ...],
     request: NormalizedProgramRequest,
@@ -204,6 +206,13 @@ def _select_addition_candidate(
             direct_needs = primary in direct_under
             effective_needs = bool(affected.intersection(effective_under))
             if not direct_needs and not effective_needs:
+                continue
+            primary_target = targets.get(primary)
+            if (
+                not direct_needs
+                and primary_target is not None
+                and weekly_direct[primary.value] >= primary_target.direct_sets
+            ):
                 continue
             if direct_by_session[primary] >= ruleset.max_sets_per_muscle_per_session:
                 continue

@@ -3,6 +3,7 @@ from dataclasses import replace
 
 from app.workouts.program_engine.body_analysis import (
     applicable_body_analysis_influence,
+    body_analysis_priority_muscles,
     body_analysis_provenance,
     body_analysis_trace,
 )
@@ -27,23 +28,26 @@ from app.workouts.program_engine.schemas import (
     SplitPlan,
     TemplateReference,
     ValidationReport,
+    WeeklyVolumePlan,
     WorkoutDay,
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_builder import SessionConstructionError, build_sessions
 from app.workouts.program_engine.split_selector import rank_split_candidates
 from app.workouts.program_engine.template_selector import select_template_reference
-from app.workouts.program_engine.template_sessions import build_template_sessions
+from app.workouts.program_engine.template_sessions import (
+    TemplateConstructionError,
+    TemplateSessionBuild,
+    apply_template_intent,
+    build_template_sessions,
+    template_resolution_trace,
+)
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_history import (
     PreviousVolumeBaseline,
     derive_previous_volume_baseline,
 )
-from app.workouts.program_engine.volume_planner import (
-    SECONDARY_MUSCLES,
-    TRACKED_MUSCLES,
-    plan_weekly_volume,
-)
+from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from app.workouts.program_engine.volume_repair import repair_weekly_volume
 
 
@@ -87,29 +91,50 @@ def generate_program(
             safety_status=safety.status,
             rejected_candidates=eligibility.rejected,
         )
+    previous_volume = derive_previous_volume_baseline(normalized.source.recent_training_history)
+    reserve = cardio_reserve_minutes(normalized, eligibility.eligible, ruleset)
+    template_rejection_trace: tuple[dict[str, object], ...] = ()
     reference = select_template_reference(
         normalized, eligibility.eligible, reference_templates, ruleset
     )
     if reference is not None:
-        reference_days = build_template_sessions(
-            normalized, reference, eligibility.eligible, ruleset
-        )
-        if reference_days is not None:
+        try:
+            reference_build = build_template_sessions(
+                normalized, reference, eligibility.eligible, ruleset
+            )
             reference_result = _reference_program(
                 request,
                 normalized,
                 safety.status,
                 safety.reason_codes,
                 eligibility.rejected,
-                len(eligibility.eligible),
+                eligibility.eligible,
                 reference,
-                reference_days,
+                reference_build,
                 ruleset,
+                previous_volume=previous_volume,
+                cardio_reserve=reserve,
             )
             if reference_result.is_success:
                 return reference_result
-    previous_volume = derive_previous_volume_baseline(normalized.source.recent_training_history)
-    reserve = cardio_reserve_minutes(normalized, eligibility.eligible, ruleset)
+            template_rejection_trace = (
+                {
+                    "stage": "template_reference",
+                    "selected": reference.slug,
+                    "status": "rejected",
+                    "reason_codes": reference_result.errors,
+                    "decision_trace": reference_result.decision_trace,
+                },
+            )
+        except TemplateConstructionError as exc:
+            template_rejection_trace = (
+                {
+                    "stage": "template_reference",
+                    "selected": reference.slug,
+                    "status": "rejected",
+                    "reason_codes": exc.reason_codes,
+                },
+            )
     rejected_splits: list[dict[str, object]] = []
     collected_errors: list[str] = []
     for attempt_index, candidate in enumerate(rank_split_candidates(normalized, ruleset)):
@@ -132,6 +157,7 @@ def generate_program(
             previous_volume=previous_volume,
             cardio_reserve=reserve,
             rejected_splits=tuple(rejected_splits),
+            template_rejection_trace=template_rejection_trace,
         )
         if result.is_success:
             return result
@@ -179,12 +205,13 @@ def _program_for_split(
     previous_volume: PreviousVolumeBaseline,
     cardio_reserve: int,
     rejected_splits: tuple[dict[str, object], ...],
+    template_rejection_trace: tuple[dict[str, object], ...],
 ) -> ProgramGenerationResult:
     volume = plan_weekly_volume(normalized, split, ruleset, previous_volume=previous_volume)
     try:
         drafts = build_sessions(normalized, split, volume, eligible, ruleset)
     except SessionConstructionError as exc:
-        construction_trace: tuple[dict[str, object], ...] = (
+        construction_trace: tuple[dict[str, object], ...] = template_rejection_trace + (
             {
                 "stage": "session_construction",
                 "status": "rejected",
@@ -218,51 +245,7 @@ def _program_for_split(
         ruleset,
     )
     direct = Counter(effective_volume.direct_sets_by_muscle)
-    metrics: dict[str, object] = {
-        "planned_direct_sets_by_muscle": {
-            target.muscle.value: target.direct_sets for target in volume.targets
-        },
-        "volume_ranges_by_muscle": {
-            target.muscle.value: {
-                "minimum_soft": target.minimum_soft,
-                "target_sets": target.target_sets,
-                "maximum_soft": target.maximum_soft,
-                "maximum_hard": target.maximum_hard,
-                "effective_maximum_soft": target.maximum_soft
-                + round(target.maximum_soft * ruleset.secondary_set_credit),
-                "effective_maximum_hard": target.maximum_hard
-                + round(target.maximum_hard * ruleset.secondary_set_credit),
-                "effective_target_sets": target.effective_target_sets,
-                "minimum_direct_sets": target.minimum_direct_sets,
-            }
-            for target in volume.targets
-        },
-        "weekly_direct_sets_by_muscle": complete_tracked_metrics(dict(direct)),
-        "weekly_fractional_sets_by_muscle": complete_tracked_metrics(
-            effective_volume.secondary_sets_by_muscle
-        ),
-        "weekly_effective_sets_by_muscle": complete_tracked_metrics(
-            effective_volume.effective_sets_by_muscle
-        ),
-        "previous_volume_baseline": {
-            "direct_sets_by_muscle": {
-                muscle.value: sets for muscle, sets in previous_volume.direct_sets_by_muscle.items()
-            },
-            "effective_sets_by_muscle": {
-                muscle.value: sets
-                for muscle, sets in previous_volume.effective_sets_by_muscle.items()
-            },
-            "confidence": previous_volume.confidence,
-            "source": previous_volume.source,
-            "reason_codes": previous_volume.reason_codes,
-        },
-        "weekly_cardio_minutes": sum(
-            day.cardio.duration_minutes for day in days if day.cardio is not None
-        ),
-        "estimated_weekly_duration": sum(day.estimated_duration_minutes for day in days),
-        "hard_training_days": len(days),
-        "recovery_days": ruleset.days_per_week - len(days),
-    }
+    metrics = _volume_metrics(days, volume, previous_volume, ruleset)
     body_trace = body_analysis_trace(normalized, ruleset)
     session_reasons = tuple(
         dict.fromkeys(reason for draft in drafts for reason in draft.reason_codes)
@@ -275,7 +258,7 @@ def _program_for_split(
             )
         )
     )
-    trace: tuple[dict[str, object], ...] = (
+    trace: tuple[dict[str, object], ...] = template_rejection_trace + (
         {"stage": "normalization", "assumptions": normalized.assumptions},
         {"stage": "safety", "status": safety_status.value, "reasons": safety_reasons},
         {
@@ -378,61 +361,112 @@ def _reference_program(
     safety_status: SafetyStatus,
     safety_reasons: tuple[str, ...],
     rejected: tuple[RejectedCandidate, ...],
-    eligible_count: int,
+    eligible: tuple[ExerciseCandidate, ...],
     reference: TemplateReference,
-    days: tuple[WorkoutDay, ...],
+    build: TemplateSessionBuild,
     ruleset: ProgramRuleset,
+    *,
+    previous_volume: PreviousVolumeBaseline,
+    cardio_reserve: int,
 ) -> ProgramGenerationResult:
-    effective_volume = calculate_effective_volume(
-        (item for day in days for item in day.exercises),
-        ruleset,
-    )
-    direct = Counter(effective_volume.direct_sets_by_muscle)
     split = SplitPlan(
         split_type=SplitType.BODY_PART_ROTATION,
-        day_focuses=tuple(day.focus for day in days),
-        weekdays=tuple(day.weekday for day in days if day.weekday is not None),
+        day_focuses=tuple(draft.focus for draft in build.drafts),
+        weekdays=tuple(draft.weekday for draft in build.drafts if draft.weekday is not None),
         score=100,
         reason_codes=("TEMPLATE_REFERENCE_SELECTED",),
     )
-    metrics: dict[str, object] = {
-        "reference_template": reference.slug,
-        "reference_max_sets_per_muscle_per_session": (
-            ruleset.template_reference_max_sets_per_muscle_per_session[normalized.training_status]
-        ),
-        "planned_direct_sets_by_muscle": complete_tracked_metrics(dict(direct)),
-        "volume_ranges_by_muscle": _reference_volume_ranges(direct, normalized, ruleset),
-        "weekly_direct_sets_by_muscle": complete_tracked_metrics(dict(direct)),
-        "weekly_fractional_sets_by_muscle": complete_tracked_metrics(
-            effective_volume.secondary_sets_by_muscle
-        ),
-        "weekly_effective_sets_by_muscle": complete_tracked_metrics(
-            effective_volume.effective_sets_by_muscle
-        ),
-        "weekly_cardio_minutes": 0,
-        "estimated_weekly_duration": sum(day.estimated_duration_minutes for day in days),
-        "hard_training_days": len(days),
-        "recovery_days": ruleset.days_per_week - len(days),
-        "previous_volume_baseline": {
-            "direct_sets_by_muscle": {},
-            "effective_sets_by_muscle": {},
-            "confidence": 0.0,
-            "source": "none",
-            "reason_codes": ("HISTORY_NOT_USED_IN_TEMPLATE_PATH",),
-        },
-    }
+    volume = plan_weekly_volume(
+        normalized,
+        split,
+        ruleset,
+        previous_volume=previous_volume,
+        direct_exposure_counts=build.direct_exposure_counts(),
+    )
+    days = prescribe_sessions(
+        normalized,
+        build.drafts,
+        volume,
+        ruleset,
+        cardio_reserve_minutes=cardio_reserve,
+    )
+    days = apply_template_intent(days, build)
+    days = add_cardio(normalized, days, eligible, ruleset)
+    days, repair_reasons = repair_weekly_volume(days, normalized, volume, ruleset)
+    metrics = _volume_metrics(
+        days,
+        volume,
+        previous_volume,
+        ruleset,
+        reference_template=reference.slug,
+    )
+    effective_volume = calculate_effective_volume(
+        (item for day in days for item in day.exercises), ruleset
+    )
+    direct = Counter(effective_volume.direct_sets_by_muscle)
     body_trace = body_analysis_trace(normalized, ruleset)
     trace: tuple[dict[str, object], ...] = (
         {"stage": "normalization", "assumptions": normalized.assumptions},
         {"stage": "safety", "status": safety_status.value, "reasons": safety_reasons},
         {
             "stage": "eligibility",
-            "eligible_count": eligible_count,
+            "eligible_count": len(eligible),
             "rejected_count": len(rejected),
         },
         *((body_trace,) if body_trace is not None else ()),
-        {"stage": "template_reference", "selected": reference.slug},
+        {
+            "stage": "template_reference",
+            "selected": reference.slug,
+            "status": "adapted",
+            "focus_tags": reference.focus_tags,
+            "intensity_methods": reference.intensity_methods,
+        },
+        template_resolution_trace(build, days),
+        {
+            "stage": "volume",
+            "reasons": volume.reason_codes,
+            "previous_volume_baseline": {
+                "confidence": previous_volume.confidence,
+                "source": previous_volume.source,
+                "reason_codes": previous_volume.reason_codes,
+            },
+            "effective_targets": {
+                target.muscle.value: target.effective_target_sets for target in volume.targets
+            },
+            "minimum_direct_targets": {
+                target.muscle.value: target.minimum_direct_sets for target in volume.targets
+            },
+        },
+        {
+            "stage": "volume_repair",
+            "reasons": repair_reasons,
+            "weekly_direct_sets": dict(direct),
+            "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
+        },
     )
+    priority_muscles = normalized.source.priority_muscles | body_analysis_priority_muscles(
+        normalized, ruleset
+    )
+    unmet_priorities = tuple(
+        muscle
+        for muscle in sorted(priority_muscles, key=lambda item: item.value)
+        if direct[muscle.value] < volume.minimum_direct_sets_for(muscle)
+        or effective_volume.effective_sets_by_muscle.get(muscle.value, 0)
+        < volume.effective_target_for(muscle)
+    )
+    if unmet_priorities:
+        errors = tuple(
+            f"TEMPLATE_PRIORITY_VOLUME_UNSATISFIED:{muscle.value}"
+            for muscle in unmet_priorities
+        )
+        return ProgramGenerationResult(
+            program=None,
+            error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
+            errors=errors,
+            safety_status=safety_status,
+            rejected_candidates=rejected,
+            decision_trace=trace,
+        )
     program = WorkoutProgram(
         user_profile_snapshot=request.model_dump(mode="json"),
         engine_version=ruleset.engine_version,
@@ -464,59 +498,73 @@ def _reference_program(
             errors=report.errors,
             safety_status=safety_status,
             rejected_candidates=rejected,
+            decision_trace=trace,
         )
     return ProgramGenerationResult(
         program=replace(program, validation_report=report, warnings=report.warnings),
         safety_status=safety_status,
         rejected_candidates=rejected,
+        decision_trace=trace,
     )
 
 
-def _reference_volume_ranges(
-    direct: Counter[str],
-    normalized: NormalizedProgramRequest,
+def _volume_metrics(
+    days: tuple[WorkoutDay, ...],
+    volume: WeeklyVolumePlan,
+    previous_volume: PreviousVolumeBaseline,
     ruleset: ProgramRuleset,
-) -> dict[str, dict[str, int]]:
-    ranges: dict[str, dict[str, int]] = {}
-    for muscle, sets in direct.items():
-        muscle_enum = next(
-            (tracked for tracked in TRACKED_MUSCLES if tracked.value == muscle),
-            None,
-        )
-        maximum = (
-            ruleset.secondary_muscle_maximum_sets[normalized.training_status]
-            if muscle_enum in SECONDARY_MUSCLES
-            else ruleset.maximum_sets[normalized.training_status]
-        )
-        effective_maximum_soft = maximum + round(maximum * ruleset.secondary_set_credit)
-        ranges[muscle] = {
-            "minimum_soft": min(sets, maximum),
-            "target_sets": min(sets, maximum),
-            "maximum_soft": maximum,
-            "maximum_hard": maximum,
-            "effective_maximum_soft": effective_maximum_soft,
-            "effective_maximum_hard": effective_maximum_soft,
-            "effective_target_sets": min(sets, maximum),
-            "minimum_direct_sets": 0,
-        }
-    for muscle in TRACKED_MUSCLES:
-        maximum = (
-            ruleset.secondary_muscle_maximum_sets[normalized.training_status]
-            if muscle in SECONDARY_MUSCLES
-            else ruleset.maximum_sets[normalized.training_status]
-        )
-        effective_maximum_soft = maximum + round(maximum * ruleset.secondary_set_credit)
-        ranges.setdefault(
-            muscle.value,
-            {
-                "minimum_soft": 0,
-                "target_sets": 0,
-                "maximum_soft": maximum,
-                "maximum_hard": maximum,
-                "effective_maximum_soft": effective_maximum_soft,
-                "effective_maximum_hard": effective_maximum_soft,
-                "effective_target_sets": 0,
-                "minimum_direct_sets": 0,
+    *,
+    reference_template: str | None = None,
+) -> dict[str, object]:
+    effective_volume = calculate_effective_volume(
+        (item for day in days for item in day.exercises), ruleset
+    )
+    direct = Counter(effective_volume.direct_sets_by_muscle)
+    metrics: dict[str, object] = {
+        "planned_direct_sets_by_muscle": {
+            target.muscle.value: target.direct_sets for target in volume.targets
+        },
+        "volume_ranges_by_muscle": {
+            target.muscle.value: {
+                "minimum_soft": target.minimum_soft,
+                "target_sets": target.target_sets,
+                "maximum_soft": target.maximum_soft,
+                "maximum_hard": target.maximum_hard,
+                "effective_maximum_soft": target.maximum_soft
+                + round(target.maximum_soft * ruleset.secondary_set_credit),
+                "effective_maximum_hard": target.maximum_hard
+                + round(target.maximum_hard * ruleset.secondary_set_credit),
+                "effective_target_sets": target.effective_target_sets,
+                "minimum_direct_sets": target.minimum_direct_sets,
+            }
+            for target in volume.targets
+        },
+        "weekly_direct_sets_by_muscle": complete_tracked_metrics(dict(direct)),
+        "weekly_fractional_sets_by_muscle": complete_tracked_metrics(
+            effective_volume.secondary_sets_by_muscle
+        ),
+        "weekly_effective_sets_by_muscle": complete_tracked_metrics(
+            effective_volume.effective_sets_by_muscle
+        ),
+        "previous_volume_baseline": {
+            "direct_sets_by_muscle": {
+                muscle.value: sets for muscle, sets in previous_volume.direct_sets_by_muscle.items()
             },
-        )
-    return ranges
+            "effective_sets_by_muscle": {
+                muscle.value: sets
+                for muscle, sets in previous_volume.effective_sets_by_muscle.items()
+            },
+            "confidence": previous_volume.confidence,
+            "source": previous_volume.source,
+            "reason_codes": previous_volume.reason_codes,
+        },
+        "weekly_cardio_minutes": sum(
+            day.cardio.duration_minutes for day in days if day.cardio is not None
+        ),
+        "estimated_weekly_duration": sum(day.estimated_duration_minutes for day in days),
+        "hard_training_days": len(days),
+        "recovery_days": ruleset.days_per_week - len(days),
+    }
+    if reference_template is not None:
+        metrics["reference_template"] = reference_template
+    return metrics

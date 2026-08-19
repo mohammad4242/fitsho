@@ -49,6 +49,7 @@ def plan_weekly_volume(
     ruleset: ProgramRuleset,
     *,
     previous_volume: PreviousVolumeBaseline | None = None,
+    direct_exposure_counts: Counter[MuscleGroup] | None = None,
 ) -> WeeklyVolumePlan:
     source = request.source
     minimum = ruleset.minimum_sets[request.training_status]
@@ -115,7 +116,11 @@ def plan_weekly_volume(
     effective_priorities = source.priority_muscles | body_analysis_priority_muscles(
         request, ruleset
     )
-    direct_exposures = _direct_exposure_counts(split, effective_priorities)
+    direct_exposures = (
+        direct_exposure_counts
+        if direct_exposure_counts is not None
+        else _direct_exposure_counts(split, effective_priorities)
+    )
     previous_volume = previous_volume or derive_previous_volume_baseline(
         source.recent_training_history
     )

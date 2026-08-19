@@ -111,14 +111,6 @@ class ProgramRuleset:
     adaptation_repeated_pain_signal_count: int = 2
     max_sets_per_muscle_per_session: int = 6
     maximum_direct_sessions_per_muscle_per_week: int = 2
-    template_reference_max_sets_per_muscle_per_session: dict[TrainingStatus, int] = field(
-        default_factory=lambda: {
-            TrainingStatus.NOVICE: 15,
-            TrainingStatus.EARLY_INTERMEDIATE: 20,
-            TrainingStatus.INTERMEDIATE: 20,
-            TrainingStatus.ADVANCED: 28,
-        }
-    )
     max_exercises_per_session: int = MAXIMUM_EXERCISES_PER_SESSION
     minimum_exercises_per_session: int = MINIMUM_EXERCISES_PER_SESSION
     minutes_per_exercise_slot: int = 7
