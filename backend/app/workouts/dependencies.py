@@ -92,7 +92,7 @@ def get_workout_generation_service(
             max_candidates=settings.workout_max_candidates,
             max_request_bytes=settings.workout_max_request_bytes,
             warmup_minutes=settings.workout_warmup_minutes,
-            deterministic_fallback_enabled=False,
+            deterministic_fallback_enabled=settings.workout_deterministic_fallback_enabled,
             generation_method=method.value,
             ai_coach_fallback_models=ai_coach_fallback_models,
             ai_coach_temperature=ai_coach_temperature,

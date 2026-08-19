@@ -5,6 +5,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.orm import Session
 
+from app.ai.schemas import ProviderErrorCode, WorkoutProviderError
 from app.auth.models import User
 from app.body_analysis.enums import BodyAnalysisStatus
 from app.body_analysis.models import BodyAnalysis
@@ -35,6 +36,8 @@ from app.workout_cycles.schemas import CompletionFeedbackInput
 from app.workout_cycles.service import complete_cycle, start_cycle
 from app.workout_reviews.enums import WorkoutReviewStatus
 from app.workout_reviews.models import WorkoutPlanReview
+from app.workouts.ai_coach import AiCoachProgramCandidate
+from app.workouts.ai_coach_provider import AiCoachRecommendation, OpenRouterAiCoachProvider
 from app.workouts.body_analysis_resolver import BodyAnalysisInfluenceResolver
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanGeneration
@@ -49,7 +52,13 @@ from app.workouts.program_engine.enums import (
     SkillDemand,
     StabilityDemand,
 )
-from app.workouts.program_engine.schemas import BodyAnalysisInfluence, ProgramGenerationResult
+from app.workouts.program_engine.schemas import (
+    BodyAnalysisInfluence,
+    ProgramGenerationResult,
+    TemplateReference,
+    TemplateReferenceDay,
+    TemplateReferenceSlot,
+)
 from app.workouts.repository import create_generation, get_plan_for_user
 from app.workouts.router import to_plan_response
 from app.workouts.schemas import ProgramGenerationOverrides
@@ -278,14 +287,65 @@ def _seed_candidates(db: Session) -> list[Exercise]:
     ]
 
 
+def _ai_template(slug: str, exercise_ids: tuple[object, ...]) -> TemplateReference:
+    return TemplateReference(
+        slug=slug,
+        days_per_week=2,
+        training_level="beginner",
+        fitness_goal="build_muscle",
+        focus_tags=("general",),
+        intensity_methods=("standard",),
+        days=tuple(
+            TemplateReferenceDay(
+                day_number=index,
+                title=f"Day {index}",
+                focus=(MuscleGroup.CHEST,),
+                slots=(
+                    TemplateReferenceSlot(
+                        exercise_id=exercise_id,
+                        exercise_slug_hint="service-push",
+                        target_muscles=(MuscleGroup.CHEST,),
+                        movement_pattern=MovementPattern.HORIZONTAL_PUSH,
+                        intensity_method="standard",
+                        adaptation_priority="core",
+                        superset_group=None,
+                        sets=3,
+                        rep_min=8,
+                        rep_max=12,
+                        target_rir=2,
+                        rest_seconds=90,
+                    ),
+                ),
+            )
+            for index, exercise_id in enumerate(exercise_ids, start=1)
+        ),
+    )
+
+
+class _FailingAiCoachProvider(OpenRouterAiCoachProvider):
+    def __init__(self, failure: BaseException | object) -> None:
+        self.calls = 0
+        self._failure = failure
+
+    async def recommend(self, request: object) -> object:
+        self.calls += 1
+        if isinstance(self._failure, BaseException):
+            raise self._failure
+        return self._failure
+
+
 def _service(
     db: Session,
     *,
     cooldown_seconds: int = 0,
     body_analysis_resolver: BodyAnalysisInfluenceResolver | None = None,
+    ai_coach_provider: OpenRouterAiCoachProvider | None = None,
+    generation_method: str = "deterministic_domain",
+    deterministic_fallback_enabled: bool = True,
 ) -> WorkoutGenerationService:
     return WorkoutGenerationService(
         db,
+        ai_coach_provider=ai_coach_provider,
         settings=WorkoutGenerationSettings(
             provider_name="fitsho_domain",
             model_id="program_engine_v1",
@@ -297,6 +357,8 @@ def _service(
             max_candidates=5000,
             max_request_bytes=262144,
             warmup_minutes=5,
+            deterministic_fallback_enabled=deterministic_fallback_enabled,
+            generation_method=generation_method,
         ),
         body_analysis_resolver=body_analysis_resolver,
     )
@@ -605,6 +667,128 @@ def test_generation_uses_the_deterministic_domain_engine(db: Session) -> None:
     assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
     assert result.plan.generation_method == "deterministic_domain"
     assert result.plan.generation_method == "deterministic_domain"
+
+
+def test_internal_generation_never_calls_ai_provider(db: Session) -> None:
+    user = _user_with_profile(db)
+    _seed_candidates(db)
+    provider = _FailingAiCoachProvider(TimeoutError("must not be called"))
+
+    result = asyncio.run(
+        _service(
+            db,
+            ai_coach_provider=provider,
+            generation_method="deterministic_domain",
+        ).generate(user.id)
+    )
+
+    assert result.plan.generation_method == "deterministic_domain"
+    assert provider.calls == 0
+
+
+def test_ai_provider_unavailable_falls_back_to_one_deterministic_reviewable_plan(
+    db: Session,
+) -> None:
+    user = _user_with_profile(db)
+    _seed_candidates(db)
+
+    result = asyncio.run(
+        _service(
+            db,
+            generation_method="ai",
+            deterministic_fallback_enabled=True,
+        ).generate(user.id)
+    )
+
+    assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert result.plan.generation_method == "deterministic_domain"
+    assert "AI_REASONING_FALLBACK" in result.plan.warnings
+    assert result.plan.decision_trace[-1] == {
+        "stage": "ai_reasoning",
+        "status": "fallback",
+        "reason_code": "AI_PROVIDER_UNAVAILABLE",
+        "source": "deterministic_domain",
+        "ai_output_persisted": False,
+    }
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 1
+    assert db.query(WorkoutPlanReview).filter_by(user_id=user.id).count() == 1
+    generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
+    assert generation.status is WorkoutGenerationStatus.SUCCEEDED
+    assert generation.provider == "fitsho_domain"
+    assert generation.workout_plan_id == result.plan.id
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected_reason_code"),
+    [
+        (
+            WorkoutProviderError(ProviderErrorCode.TIMEOUT, "AI timed out"),
+            "TIMEOUT",
+        ),
+        (
+            WorkoutProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE, "AI unavailable"),
+            "PROVIDER_UNAVAILABLE",
+        ),
+        (
+            WorkoutProviderError(ProviderErrorCode.INVALID_OUTPUT, "AI schema was invalid"),
+            "INVALID_OUTPUT",
+        ),
+        (object(), "AI_OUTPUT_INVALID"),
+        (
+            AiCoachRecommendation(
+                selected_candidate_id="not-supplied",
+                program_explanation_fa="نامعتبر",
+                day_explanations=(),
+                model_id="test-model",
+                provider_request_id=None,
+                input_tokens=None,
+                output_tokens=None,
+            ),
+            "AI_OUTPUT_INVALID",
+        ),
+    ],
+)
+def test_ai_failure_keeps_deterministic_plan_and_does_not_duplicate_records(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: BaseException | object,
+    expected_reason_code: str,
+) -> None:
+    user = _user_with_profile(db)
+    exercises = _seed_candidates(db)
+    templates = (
+        AiCoachProgramCandidate(
+            template=_ai_template("candidate-a", (exercises[0].id, exercises[1].id)),
+            score=100,
+        ),
+        AiCoachProgramCandidate(
+            template=_ai_template("candidate-b", (exercises[1].id, exercises[0].id)),
+            score=90,
+        ),
+    )
+    monkeypatch.setattr(
+        "app.workouts.service.select_ai_coach_candidates",
+        lambda **_kwargs: templates,
+    )
+    provider = _FailingAiCoachProvider(failure)
+
+    result = asyncio.run(
+        _service(
+            db,
+            ai_coach_provider=provider,
+            generation_method="ai",
+            deterministic_fallback_enabled=True,
+        ).generate(user.id)
+    )
+
+    assert provider.calls == 1
+    assert result.plan.generation_method == "deterministic_domain"
+    assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert result.plan.decision_trace[-1]["reason_code"] == expected_reason_code
+    assert result.plan.decision_trace[-1]["ai_output_persisted"] is False
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 1
+    assert db.query(WorkoutPlanReview).filter_by(user_id=user.id).count() == 1
+    assert db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).count() == 1
 
 
 def test_validation_failure_is_recorded_before_any_plan_is_persisted(

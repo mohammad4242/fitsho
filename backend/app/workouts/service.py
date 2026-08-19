@@ -107,7 +107,7 @@ class WorkoutGenerationSettings:
     max_candidates: int
     max_request_bytes: int
     warmup_minutes: int
-    deterministic_fallback_enabled: bool = False
+    deterministic_fallback_enabled: bool = True
     generation_method: str = "fitsho_coach"
     ai_coach_fallback_models: tuple[str, ...] = ()
     ai_coach_temperature: float = 0.0
@@ -207,6 +207,16 @@ class WorkoutGenerationService:
     ) -> WorkoutPlanGenerationResult:
         if self._settings.generation_method == "ai":
             return await self._generate_with_ai(user_id)
+        return await self._generate_deterministic(user_id, overrides)
+
+    async def _generate_deterministic(
+        self,
+        user_id: UUID,
+        overrides: ProgramGenerationOverrides | None = None,
+        *,
+        generation: WorkoutPlanGeneration | None = None,
+        fallback_reason_code: str | None = None,
+    ) -> WorkoutPlanGenerationResult:
         source_profile = get_profile(self._db, user_id)
         effective_overrides = self._with_previous_volume_history(user_id, overrides)
         body_analysis_influence = applicable_body_analysis_influence(
@@ -232,7 +242,10 @@ class WorkoutGenerationService:
             return WorkoutPlanGenerationResult(plan=active_plan, reused=True)
 
         self._enforce_cooldown(user_id)
-        generation = self._start_generation(user_id, len(catalog))
+        if generation is None:
+            generation = self._start_generation(user_id, len(catalog))
+        else:
+            generation.candidate_count = len(catalog)
         started_at = perf_counter()
         result = generate_program(
             request,
@@ -314,6 +327,18 @@ class WorkoutGenerationService:
                 program=result.program,
                 previous=active_plan,
             )
+            if fallback_reason_code is not None:
+                plan.warnings = [*plan.warnings, "AI_REASONING_FALLBACK"]
+                plan.decision_trace = [
+                    *plan.decision_trace,
+                    {
+                        "stage": "ai_reasoning",
+                        "status": "fallback",
+                        "reason_code": fallback_reason_code,
+                        "source": "deterministic_domain",
+                        "ai_output_persisted": False,
+                    },
+                ]
             generation.provider = "fitsho_domain"
             generation.model_id = result.program.engine_version
             generation.latency_ms = int((perf_counter() - started_at) * 1000)
@@ -430,6 +455,11 @@ class WorkoutGenerationService:
 
     async def _generate_with_ai(self, user_id: UUID) -> WorkoutPlanGenerationResult:
         if self._ai_coach_provider is None:
+            if self._settings.deterministic_fallback_enabled:
+                return await self._generate_deterministic(
+                    user_id,
+                    fallback_reason_code="AI_PROVIDER_UNAVAILABLE",
+                )
             raise WorkoutGenerationFailedError(error_code="no_enabled_ai_model")
         source_profile = get_profile(self._db, user_id)
         profile = self._to_generation_profile(source_profile)
@@ -437,6 +467,11 @@ class WorkoutGenerationService:
             profile
         )
         if not eligible_exercises.is_sufficient:
+            if self._settings.deterministic_fallback_enabled:
+                return await self._generate_deterministic(
+                    user_id,
+                    fallback_reason_code="DETERMINISTIC_INPUT_UNAVAILABLE",
+                )
             raise NoEligibleExercisesError("INSUFFICIENT_ELIGIBLE_EXERCISES")
         body_analysis = applicable_body_analysis_influence(
             self._body_analysis_resolver.resolve(user_id), self._ruleset
@@ -452,6 +487,11 @@ class WorkoutGenerationService:
             ),
         )
         if len(library_candidates) < 2:
+            if self._settings.deterministic_fallback_enabled:
+                return await self._generate_deterministic(
+                    user_id,
+                    fallback_reason_code="AI_CANDIDATES_UNAVAILABLE",
+                )
             raise WorkoutGenerationFailedError(error_code="insufficient_library_programs")
         signature = self._ai_coach_generation_signature(
             profile, library_candidates, eligible_exercises
@@ -486,6 +526,11 @@ class WorkoutGenerationService:
             ).encode()
         )
         if request_size > self._settings.max_request_bytes:
+            if self._settings.deterministic_fallback_enabled:
+                return await self._generate_deterministic(
+                    user_id,
+                    fallback_reason_code="AI_REQUEST_TOO_LARGE",
+                )
             raise WorkoutGenerationFailedError(error_code="request_too_large")
         generation = self._start_generation(user_id, len(library_candidates))
         started_at = perf_counter()
@@ -501,6 +546,34 @@ class WorkoutGenerationService:
                     routing_preferences=self._settings.ai_coach_routing_preferences,
                 )
             )
+            if not isinstance(recommendation, AiCoachRecommendation):
+                raise ValueError("AI coach returned an invalid recommendation object")
+        except WorkoutProviderError as error:
+            if self._settings.deterministic_fallback_enabled:
+                return await self._generate_deterministic(
+                    user_id,
+                    generation=generation,
+                    fallback_reason_code=error.code.value.upper(),
+                )
+            self._mark_failure(generation, error.code.value, error.safe_message, [])
+            raise WorkoutGenerationFailedError(error.code) from None
+        except Exception:
+            if self._settings.deterministic_fallback_enabled:
+                return await self._generate_deterministic(
+                    user_id,
+                    generation=generation,
+                    fallback_reason_code="AI_OUTPUT_INVALID",
+                )
+            self._mark_failure(
+                generation,
+                ProviderErrorCode.INVALID_OUTPUT.value,
+                "Workout generation returned an invalid AI response.",
+                [],
+            )
+            raise WorkoutGenerationFailedError(
+                error_code=ProviderErrorCode.INVALID_OUTPUT.value
+            ) from None
+        try:
             selected = next(
                 candidate
                 for candidate in library_candidates
@@ -526,9 +599,21 @@ class WorkoutGenerationService:
             self._db.commit()
             return WorkoutPlanGenerationResult(plan=plan, reused=False)
         except WorkoutProviderError as error:
+            if self._settings.deterministic_fallback_enabled:
+                return await self._generate_deterministic(
+                    user_id,
+                    generation=generation,
+                    fallback_reason_code=error.code.value.upper(),
+                )
             self._mark_failure(generation, error.code.value, error.safe_message, [])
             raise WorkoutGenerationFailedError(error.code) from None
         except WorkoutPlanValidationError as error:
+            if self._settings.deterministic_fallback_enabled:
+                return await self._generate_deterministic(
+                    user_id,
+                    generation=generation,
+                    fallback_reason_code="AI_SCHEMA_INVALID",
+                )
             self._mark_failure(
                 generation,
                 "semantic_validation_failed",
@@ -536,6 +621,22 @@ class WorkoutGenerationService:
                 [{"errors": [problem.code for problem in error.problems]}],
             )
             raise WorkoutGenerationFailedError(error_code="semantic_validation_failed") from None
+        except (StopIteration, ValueError, ValidationError):
+            if self._settings.deterministic_fallback_enabled:
+                return await self._generate_deterministic(
+                    user_id,
+                    generation=generation,
+                    fallback_reason_code="AI_OUTPUT_INVALID",
+                )
+            self._mark_failure(
+                generation,
+                ProviderErrorCode.INVALID_OUTPUT.value,
+                "Workout generation returned an invalid AI response.",
+                [],
+            )
+            raise WorkoutGenerationFailedError(
+                error_code=ProviderErrorCode.INVALID_OUTPUT.value
+            ) from None
 
     def _build_ai_coach_plan(
         self,
