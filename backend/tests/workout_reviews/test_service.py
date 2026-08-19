@@ -40,7 +40,7 @@ from app.workout_reviews.models import WorkoutPlanReview
 from app.workout_reviews.repository import ensure_pending_review
 from app.workout_reviews.schemas import WorkoutReviewDraftUpdate
 from app.workout_reviews.service import ReviewConflict, WorkoutReviewService
-from app.workout_reviews.summary import build_athlete_summary
+from app.workout_reviews.summary import build_athlete_summary, build_fitsho_recommendation
 from app.workout_reviews.validation import DraftValidationError
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
@@ -263,6 +263,136 @@ def test_athlete_summary_preserves_distinct_signals_and_provenance() -> None:
         safety_source_id,
     )
     assert response.athlete_state.provenance.preference_ids == (preference_source_id,)
+
+
+def test_fitsho_recommendation_reuses_adaptation_difference_reasons(db: Session) -> None:
+    member = _user(db, "recommendation-member")
+    previous_exercise = _exercise(db, "recommendation-previous")
+    previous = _active_plan(db, user=member, exercises=[previous_exercise])
+    previous.status = WorkoutPlanStatus.SUPERSEDED
+    previous.aggregate_metrics = {
+        "weekly_effective_sets_by_muscle": {MuscleGroup.SHOULDERS.value: 10.0},
+        "weekly_direct_sets_by_muscle": {MuscleGroup.SHOULDERS.value: 8.0},
+    }
+    db.flush()
+    proposed = _active_plan(db, user=member, exercises=[previous_exercise])
+    proposed.status = WorkoutPlanStatus.PENDING_REVIEW
+    proposed.previous_program_id = previous.id
+    proposed.aggregate_metrics = {
+        "weekly_effective_sets_by_muscle": {MuscleGroup.SHOULDERS.value: 12.0},
+        "weekly_direct_sets_by_muscle": {MuscleGroup.SHOULDERS.value: 9.0},
+    }
+    review = ensure_pending_review(db, proposed)
+    state = AthleteState(
+        user_id=member.id,
+        adherence=AthleteStateAdherence(sessions_completed=19, planned_sessions=20, percent=95),
+        recovery_trend=AthleteStateRecoveryTrend(
+            summary="good",
+        ),
+        difficulty_trend=AthleteStateDifficultyTrend(
+            summary="appropriate",
+        ),
+        lagging_muscles=(MuscleGroup.SHOULDERS,),
+        priority_muscles=(MuscleGroup.SHOULDERS,),
+        schedule=AthleteStateScheduleContext(),
+        body_progress=AthleteStateBodyProgress(),
+        provenance=AthleteStateProvenance(
+            cycle_ids=(uuid4(),),
+            workout_plan_ids=(previous.id, proposed.id),
+        ),
+    )
+    db.flush()
+
+    recommendation = build_fitsho_recommendation(db, review, state=state)
+
+    volume = next(
+        item
+        for item in recommendation.difference_summary
+        if item.change.value == "muscle_volume"
+    )
+    priority = next(
+        item
+        for item in recommendation.difference_summary
+        if item.change.value == "priority_muscle"
+    )
+    assert recommendation.overall_action.value == "increase"
+    assert volume.previous == 10.0
+    assert volume.next == 12.0
+    assert "LAGGING_MUSCLE_SUPPORTED_CONSERVATIVELY" in volume.reason_codes
+    assert priority.previous is False
+    assert priority.next is True
+    assert recommendation.to_snapshot_json() == build_fitsho_recommendation(
+        db,
+        review,
+        state=state,
+    ).to_snapshot_json()
+
+
+def test_fitsho_recommendation_keeps_safety_and_preference_decisions_distinct(
+    db: Session,
+) -> None:
+    member = _user(db, "recommendation-safety-member")
+    exercise = _exercise(db, "recommendation-safety")
+    replacement = _exercise(db, "recommendation-safe-alternative")
+    previous = _active_plan(db, user=member, exercises=[exercise])
+    previous.status = WorkoutPlanStatus.SUPERSEDED
+    db.flush()
+    proposed = _active_plan(db, user=member, exercises=[exercise])
+    proposed.status = WorkoutPlanStatus.PENDING_REVIEW
+    proposed.previous_program_id = previous.id
+    review = ensure_pending_review(db, proposed)
+    source_replacement_id = uuid4()
+    signal_id = uuid4()
+    state = AthleteState(
+        user_id=member.id,
+        adherence=AthleteStateAdherence(sessions_completed=0, planned_sessions=0, percent=None),
+        recovery_trend=AthleteStateRecoveryTrend(),
+        difficulty_trend=AthleteStateDifficultyTrend(),
+        persistent_disliked_exercises=(exercise.id,),
+        pain_sensitive_exercises=(exercise.id,),
+        replacement_context=(
+            AthleteStateReplacementContext(
+                original_exercise_id=exercise.id,
+                replacement_exercise_id=replacement.id,
+                persistent_count=2,
+                reasons=(WorkoutExerciseReplacementReason.DISLIKE,),
+                source_replacement_ids=(source_replacement_id,),
+            ),
+        ),
+        safety_context=(
+            AthleteStateSafetyContext(
+                exercise_id=exercise.id,
+                signal_count=1,
+                source_safety_signal_ids=(signal_id,),
+                source_replacement_ids=(source_replacement_id,),
+            ),
+        ),
+        schedule=AthleteStateScheduleContext(),
+        body_progress=AthleteStateBodyProgress(),
+        provenance=AthleteStateProvenance(
+            replacement_ids=(source_replacement_id,),
+            safety_signal_ids=(signal_id,),
+        ),
+    )
+
+    recommendation = build_fitsho_recommendation(db, review, state=state)
+
+    safety = next(
+        item
+        for item in recommendation.difference_summary
+        if item.change.value == "safety_constraint"
+    )
+    replacement_item = next(
+        item
+        for item in recommendation.difference_summary
+        if item.change.value == "exercise_replacement"
+    )
+    assert safety.target == str(exercise.id)
+    assert "PAIN_SIGNAL_PRESENT" in safety.reason_codes
+    assert "PREFERENCE_OVERRIDDEN_BY_SAFETY" in recommendation.reason_codes
+    assert replacement_item.target == str(exercise.id)
+    assert "PREFERRED_ALTERNATIVE" in replacement_item.reason_codes
+    assert signal_id in safety.provenance.safety_signal_ids
 
 
 def test_claim_rejects_second_coach_until_lease_expires(db: Session) -> None:

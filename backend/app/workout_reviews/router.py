@@ -27,7 +27,10 @@ from app.workout_reviews.schemas import (
     WorkoutReviewQueueItemResponse,
 )
 from app.workout_reviews.service import ReviewConflict
-from app.workout_reviews.summary import build_review_athlete_summary
+from app.workout_reviews.summary import (
+    build_fitsho_recommendation,
+    build_review_athlete_summary,
+)
 from app.workout_reviews.validation import DraftValidationError
 from app.workouts.router import to_plan_response
 
@@ -205,6 +208,7 @@ def _detail_response(db: Session, review: WorkoutPlanReview) -> WorkoutReviewDet
         source_plan=to_plan_response(review.source_plan, db=db).model_dump(mode="json"),
         exercise_options=options,
         athlete_summary=build_review_athlete_summary(db, review),
+        fitsho_recommendation=build_fitsho_recommendation(db, review),
     )
 
 

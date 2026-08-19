@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.athlete_state.schemas import AthleteState
 from app.workout_reviews.enums import WorkoutReviewStatus
+from app.workouts.program_engine.adaptation_policy import CycleAdaptationDecision
 
 
 class WorkoutReviewExerciseDraft(BaseModel):
@@ -90,6 +91,7 @@ class WorkoutReviewDetailResponse(WorkoutReviewQueueItemResponse):
     source_plan: dict[str, object]
     exercise_options: list[WorkoutReviewExerciseOption]
     athlete_summary: WorkoutReviewAthleteSummary
+    fitsho_recommendation: CycleAdaptationDecision
 
 
 class WorkoutReviewAccessResponse(BaseModel):
