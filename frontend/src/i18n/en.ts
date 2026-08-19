@@ -1188,6 +1188,7 @@ const en = {
         loading: "Preparing end-of-cycle feedback…",
         loadError: "End-of-cycle feedback could not be loaded.",
         locked: "After your {{weeks}}-week cycle ends, this form will unlock to make your next plan more targeted. Please complete it carefully.",
+        lockedPending: "This plan is still waiting for coach approval. After approval and completion of your {{weeks}}-week cycle, this form will unlock to make your next plan more targeted. Please complete it carefully.",
         difficulty: "Overall program difficulty",
         recovery: "Overall recovery",
         satisfaction: "Overall satisfaction",

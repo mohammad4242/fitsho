@@ -281,12 +281,17 @@ it("shows the pending plan as executable when there is no active plan", async ()
   api.getActiveWorkoutPlan.mockResolvedValue(null);
   api.getWorkoutPlanHistory.mockResolvedValue([pendingVersion]);
   api.getWorkoutPlan.mockResolvedValue(pendingPlan);
+  const user = userEvent.setup();
 
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
   expect(await screen.findByText("این برنامه هنوز به تأیید مربی نرسیده است؛ فعلاً می‌توانی آن را اجرا کنی.")).toBeInTheDocument();
   expect(screen.getByText("اسکوات در انتظار تأیید")).toBeInTheDocument();
   expect(screen.getByRole("list", { name: "برنامه در انتظار تأیید مربی" })).toBeInTheDocument();
+  const feedbackTrigger = await screen.findByRole("button", { name: "بازخورد پایان دوره" });
+  expect(feedbackTrigger).toBeInTheDocument();
+  await user.click(feedbackTrigger);
+  expect(screen.getByText(/پس از تأیید مربی و اتمام دوره ۴ هفته‌ای/)).toBeVisible();
   expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "ساخت برنامه" })).not.toBeInTheDocument();
 });

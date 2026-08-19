@@ -11,6 +11,11 @@ import "./endCycleFeedback.css";
 
 type CardState = "loading" | "hidden" | "draft" | "completed" | "error";
 
+type EndCycleFeedbackCardProps = {
+  planDurationWeeks?: number;
+  awaitingCoachApproval?: boolean;
+};
+
 const emptyDraft: WorkoutCycleCompletionFeedbackInput = {
   overall_difficulty: "appropriate",
   overall_recovery: "good",
@@ -52,7 +57,10 @@ const progressOptions = [
   ["improved", "بهتر شد", "Improved"],
 ] as const;
 
-export function EndCycleFeedbackCard() {
+export function EndCycleFeedbackCard({
+  planDurationWeeks,
+  awaitingCoachApproval = false,
+}: EndCycleFeedbackCardProps) {
   const { i18n, t } = useTranslation();
   const [state, setState] = useState<CardState>("loading");
   const [context, setContext] = useState<WorkoutCycleCompletionFeedbackContext | null>(null);
@@ -108,8 +116,12 @@ export function EndCycleFeedbackCard() {
       .finally(() => setSaving(false));
   }
 
-  if (state === "hidden" && context !== null) {
-    const weeks = new Intl.NumberFormat(isEnglish ? "en-US" : "fa-IR").format(context.duration_weeks);
+  if (state === "hidden" && (context !== null || planDurationWeeks !== undefined)) {
+    const durationWeeks = context?.duration_weeks ?? planDurationWeeks ?? 4;
+    const weeks = new Intl.NumberFormat(isEnglish ? "en-US" : "fa-IR").format(durationWeeks);
+    const lockedMessage = awaitingCoachApproval
+      ? "workoutPlan.endCycleFeedback.lockedPending"
+      : "workoutPlan.endCycleFeedback.locked";
     return (
       <section className="end-cycle-feedback end-cycle-feedback--locked" aria-labelledby="end-cycle-feedback-title">
         <button
@@ -137,7 +149,7 @@ export function EndCycleFeedbackCard() {
           role="tooltip"
           aria-hidden={!lockedInfoOpen}
         >
-          {t("workoutPlan.endCycleFeedback.locked", { weeks })}
+          {t(lockedMessage, { weeks })}
         </span>
       </section>
     );
