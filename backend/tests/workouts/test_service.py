@@ -849,10 +849,10 @@ def test_missing_safe_pattern_does_not_persist_partial_plan(db: Session) -> None
     exercises[1].needs_review = True
     db.flush()
 
-    with pytest.raises(NoEligibleExercisesError) as error:
+    with pytest.raises(WorkoutGenerationFailedError) as error:
         asyncio.run(_service(db).generate(user.id))
 
-    assert error.value.error_code == "NO_SAFE_EXERCISE_FOR_PATTERN"
+    assert error.value.error_code == "PROGRAM_VALIDATION_FAILED"
     assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0
 
 
@@ -903,7 +903,7 @@ def test_failed_replacement_preserves_previous_active_plan(db: Session) -> None:
     exercises[1].needs_review = True
     db.commit()
 
-    with pytest.raises(NoEligibleExercisesError):
+    with pytest.raises(WorkoutGenerationFailedError):
         asyncio.run(_service(db).generate(user.id))
 
     assert initial.plan.status is WorkoutPlanStatus.PENDING_REVIEW

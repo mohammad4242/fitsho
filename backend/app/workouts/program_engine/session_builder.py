@@ -64,6 +64,7 @@ def build_sessions(
         slots = _slots_for_focus(focus)
         chosen: list[ExerciseCandidate] = []
         reasons: dict[UUID, tuple[str, ...]] = {}
+        session_reasons: tuple[str, ...] = ()
         for slot in slots:
             if len(chosen) >= capacity:
                 break
@@ -77,7 +78,9 @@ def build_sessions(
             if not options:
                 if slot.required:
                     missing = sorted(pattern.value for pattern in slot.patterns)
-                    raise ValueError(f"NO_SAFE_EXERCISE_FOR_PATTERN:{missing}")
+                    session_reasons = session_reasons + (
+                        f"REQUIRED_PATTERN_UNAVAILABLE:{missing}",
+                    )
                 continue
             ranked = rank_exercises(
                 request,
@@ -125,7 +128,8 @@ def build_sessions(
             )
             for item in chosen
         }
-        session_reasons = ("SESSION_TRIMMED_FOR_TIME_LIMIT",) if capacity < len(slots) else ()
+        if capacity < len(slots):
+            session_reasons = session_reasons + ("SESSION_TRIMMED_FOR_TIME_LIMIT",)
         sessions.append(
             SessionDraft(
                 day_index=index + 1,

@@ -489,14 +489,17 @@ def test_missing_required_safe_pattern_returns_structured_domain_error() -> None
     ).eligible
     split = select_split(request, RULESET)
 
-    with pytest.raises(ValueError, match="NO_SAFE_EXERCISE_FOR_PATTERN"):
-        build_sessions(
-            request,
-            split,
-            plan_weekly_volume(request, split, RULESET),
-            eligible,
-            RULESET,
-        )
+    sessions = build_sessions(
+        request,
+        split,
+        plan_weekly_volume(request, split, RULESET),
+        eligible,
+        RULESET,
+    )
+
+    assert sessions
+    all_reasons = [code for s in sessions for code in s.reason_codes]
+    assert any("REQUIRED_PATTERN_UNAVAILABLE" in code for code in all_reasons)
 
 
 def test_body_part_rotation_places_chest_and_direct_triceps_in_one_session() -> None:

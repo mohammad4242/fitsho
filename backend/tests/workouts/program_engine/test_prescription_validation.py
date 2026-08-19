@@ -479,7 +479,8 @@ def test_missing_safe_candidates_returns_structured_failure() -> None:
     )
 
     assert not result.is_success
-    assert result.error_code is GenerationErrorCode.NO_SAFE_EXERCISE_FOR_PATTERN
+    assert result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
+    assert "REQUIRED_MOVEMENT_PATTERN_MISSING" in result.errors
 
 
 def test_every_successful_program_passes_independent_validator() -> None:
