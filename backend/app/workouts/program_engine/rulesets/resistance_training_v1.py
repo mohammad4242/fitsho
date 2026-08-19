@@ -104,6 +104,8 @@ class ProgramRuleset:
     adaptation_max_volume_increase_ratio: float = 0.1
     adaptation_lagging_muscle_volume_delta_sets: int = 1
     adaptation_lagging_muscle_priority_delta: int = 1
+    adaptation_repeated_poor_recovery_weeks: int = 2
+    adaptation_repeated_too_hard_weeks: int = 2
     max_sets_per_muscle_per_session: int = 6
     maximum_direct_sessions_per_muscle_per_week: int = 2
     template_reference_max_sets_per_muscle_per_session: dict[TrainingStatus, int] = field(

@@ -12,6 +12,10 @@ from app.athlete_state.schemas import (
     AthleteStateScheduleContext,
 )
 from app.exercises.enums import MuscleGroup
+from app.workout_cycles.enums import (
+    WorkoutCycleWeeklyCheckInDifficulty,
+    WorkoutCycleWeeklyCheckInRecovery,
+)
 from app.workouts.program_engine.adaptation_policy import (
     CycleAdaptationAction,
     decide_cycle_adaptation,
@@ -25,6 +29,8 @@ def _state(
     adherence_percent: float | None = 95,
     recovery: AthleteStateRecoverySummary = AthleteStateRecoverySummary.GOOD,
     difficulty: AthleteStateDifficultySummary = AthleteStateDifficultySummary.APPROPRIATE,
+    recovery_values: tuple[WorkoutCycleWeeklyCheckInRecovery, ...] = (),
+    difficulty_values: tuple[WorkoutCycleWeeklyCheckInDifficulty, ...] = (),
     lagging: tuple[MuscleGroup, ...] = (),
     progressing: tuple[MuscleGroup, ...] = (),
     disliked: tuple = (),
@@ -38,8 +44,10 @@ def _state(
             planned_sessions=20,
             percent=adherence_percent,
         ),
-        recovery_trend=AthleteStateRecoveryTrend(summary=recovery),
-        difficulty_trend=AthleteStateDifficultyTrend(summary=difficulty),
+        recovery_trend=AthleteStateRecoveryTrend(summary=recovery, values=recovery_values),
+        difficulty_trend=AthleteStateDifficultyTrend(
+            summary=difficulty, values=difficulty_values
+        ),
         persistent_disliked_exercises=disliked,
         unavailable_exercises=unavailable,
         pain_sensitive_exercises=pain_sensitive,
@@ -80,17 +88,59 @@ def test_good_supported_history_allows_conservative_increase() -> None:
     assert decision.volume_context.confidence == 0.95
     assert decision.recovery_constraints.max_volume_increase_ratio == 0.1
     assert "PROGRESSION_SUPPORTED_BY_ADHERENCE_RECOVERY_DIFFICULTY" in decision.reason_codes
+    assert "HIGH_ADHERENCE" in decision.reason_codes
+    assert "GOOD_RECOVERY" in decision.reason_codes
+    assert "PROGRESSION_ALLOWED" in decision.reason_codes
 
 
 def test_poor_recovery_blocks_progression_and_reduces_demand() -> None:
     decision = decide_cycle_adaptation(
-        _state(recovery=AthleteStateRecoverySummary.POOR),
+        _state(
+            recovery=AthleteStateRecoverySummary.POOR,
+            recovery_values=(
+                WorkoutCycleWeeklyCheckInRecovery.POOR,
+                WorkoutCycleWeeklyCheckInRecovery.POOR,
+            ),
+        ),
         _history(),
         RULESET,
     )
 
     assert decision.overall_action is CycleAdaptationAction.REDUCE
     assert decision.recovery_constraints.prevent_increase is True
+    assert "POOR_RECOVERY_REQUIRES_REDUCTION" in decision.reason_codes
+
+
+def test_single_poor_recovery_week_holds_progression() -> None:
+    decision = decide_cycle_adaptation(
+        _state(
+            recovery=AthleteStateRecoverySummary.POOR,
+            recovery_values=(WorkoutCycleWeeklyCheckInRecovery.POOR,),
+        ),
+        _history(),
+        RULESET,
+    )
+
+    assert decision.overall_action is CycleAdaptationAction.MAINTAIN
+    assert "POOR_RECOVERY" in decision.reason_codes
+    assert "RECOVERY_LIMITED" in decision.reason_codes
+    assert "PROGRESSION_HELD" in decision.reason_codes
+
+
+def test_repeated_poor_recovery_weeks_reduce_demand() -> None:
+    decision = decide_cycle_adaptation(
+        _state(
+            recovery=AthleteStateRecoverySummary.POOR,
+            recovery_values=(
+                WorkoutCycleWeeklyCheckInRecovery.POOR,
+                WorkoutCycleWeeklyCheckInRecovery.POOR,
+            ),
+        ),
+        _history(),
+        RULESET,
+    )
+
+    assert decision.overall_action is CycleAdaptationAction.REDUCE
     assert "POOR_RECOVERY_REQUIRES_REDUCTION" in decision.reason_codes
 
 
@@ -111,13 +161,35 @@ def test_low_adherence_does_not_treat_prescribed_history_as_tolerated_volume() -
 
 def test_consistently_too_hard_feedback_reduces_demand() -> None:
     decision = decide_cycle_adaptation(
-        _state(difficulty=AthleteStateDifficultySummary.TOO_HARD),
+        _state(
+            difficulty=AthleteStateDifficultySummary.TOO_HARD,
+            difficulty_values=(
+                WorkoutCycleWeeklyCheckInDifficulty.TOO_HARD,
+                WorkoutCycleWeeklyCheckInDifficulty.TOO_HARD,
+            ),
+        ),
         _history(),
         RULESET,
     )
 
     assert decision.overall_action is CycleAdaptationAction.REDUCE
     assert "TOO_HARD_REQUIRES_REDUCTION" in decision.reason_codes
+    assert "DIFFICULTY_TOO_HARD" in decision.reason_codes
+
+
+def test_single_too_hard_week_holds_progression() -> None:
+    decision = decide_cycle_adaptation(
+        _state(
+            difficulty=AthleteStateDifficultySummary.TOO_HARD,
+            difficulty_values=(WorkoutCycleWeeklyCheckInDifficulty.TOO_HARD,),
+        ),
+        _history(),
+        RULESET,
+    )
+
+    assert decision.overall_action is CycleAdaptationAction.MAINTAIN
+    assert "DIFFICULTY_TOO_HARD" in decision.reason_codes
+    assert "PROGRESSION_HELD" in decision.reason_codes
 
 
 def test_lagging_muscle_gets_one_conservative_adjustment_when_supported() -> None:
@@ -167,10 +239,40 @@ def test_missing_or_conflicting_data_falls_back_conservatively() -> None:
 
     assert missing.overall_action is CycleAdaptationAction.MAINTAIN
     assert "INSUFFICIENT_RELIABLE_EVIDENCE" in missing.reason_codes
+    assert "PROGRESSION_HELD" in missing.reason_codes
     assert conflicting.overall_action is CycleAdaptationAction.INCREASE
 
 
-def test_recovery_conflict_takes_precedence_over_easy_difficulty() -> None:
+def test_good_recovery_with_low_adherence_holds_progression() -> None:
+    decision = decide_cycle_adaptation(
+        _state(adherence_percent=50),
+        _history(adherence=0.5),
+        RULESET,
+    )
+
+    assert decision.overall_action is CycleAdaptationAction.MAINTAIN
+    assert "GOOD_RECOVERY" in decision.reason_codes
+    assert "LOW_ADHERENCE" in decision.reason_codes
+    assert "PROGRESSION_HELD" in decision.reason_codes
+
+
+def test_high_adherence_with_poor_recovery_holds_or_reduces_conservatively() -> None:
+    decision = decide_cycle_adaptation(
+        _state(
+            recovery=AthleteStateRecoverySummary.POOR,
+            recovery_values=(WorkoutCycleWeeklyCheckInRecovery.POOR,),
+        ),
+        _history(),
+        RULESET,
+    )
+
+    assert decision.overall_action is CycleAdaptationAction.MAINTAIN
+    assert "HIGH_ADHERENCE" in decision.reason_codes
+    assert "POOR_RECOVERY" in decision.reason_codes
+    assert "RECOVERY_LIMITED" in decision.reason_codes
+
+
+def test_single_poor_recovery_takes_precedence_over_easy_difficulty() -> None:
     state = _state(
         recovery=AthleteStateRecoverySummary.POOR,
         difficulty=AthleteStateDifficultySummary.TOO_EASY,
@@ -182,8 +284,9 @@ def test_recovery_conflict_takes_precedence_over_easy_difficulty() -> None:
     )
     repeated = decide_cycle_adaptation(state, _history(), RULESET)
 
-    assert decision.overall_action is CycleAdaptationAction.REDUCE
-    assert decision.reason_codes[0] == "POOR_RECOVERY_REQUIRES_REDUCTION"
+    assert decision.overall_action is CycleAdaptationAction.MAINTAIN
+    assert "POOR_RECOVERY" in decision.reason_codes
+    assert "PROGRESSION_HELD" in decision.reason_codes
     assert decision.to_snapshot_json() == repeated.to_snapshot_json()
 
 

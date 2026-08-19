@@ -12,6 +12,10 @@ from app.athlete_state.schemas import (
     AthleteStateRecoverySummary,
 )
 from app.exercises.enums import MuscleGroup
+from app.workout_cycles.enums import (
+    WorkoutCycleWeeklyCheckInDifficulty,
+    WorkoutCycleWeeklyCheckInRecovery,
+)
 from app.workouts.program_engine.rulesets.resistance_training_v1 import (
     RULESET,
     ProgramRuleset,
@@ -43,6 +47,14 @@ class CycleAdaptationReasonCode(StrEnum):
         "PROGRESSING_MUSCLE_NOT_AUTOMATICALLY_INCREASED"
     )
     PERSISTENT_PREFERENCES_PRESERVED = "PERSISTENT_PREFERENCES_PRESERVED"
+    HIGH_ADHERENCE = "HIGH_ADHERENCE"
+    LOW_ADHERENCE = "LOW_ADHERENCE"
+    GOOD_RECOVERY = "GOOD_RECOVERY"
+    POOR_RECOVERY = "POOR_RECOVERY"
+    DIFFICULTY_TOO_HARD = "DIFFICULTY_TOO_HARD"
+    PROGRESSION_ALLOWED = "PROGRESSION_ALLOWED"
+    PROGRESSION_HELD = "PROGRESSION_HELD"
+    RECOVERY_LIMITED = "RECOVERY_LIMITED"
 
 
 class CycleAdaptationMuscleAdjustment(BaseModel):
@@ -134,6 +146,16 @@ def decide_cycle_adaptation(
     )
     unavailable_ids = _sorted_ids(state.unavailable_exercises)
     reasons: list[CycleAdaptationReasonCode] = []
+    poor_recovery = state.recovery_trend.summary is AthleteStateRecoverySummary.POOR
+    repeated_poor_recovery = poor_recovery and _signal_count(
+        state.recovery_trend.values,
+        WorkoutCycleWeeklyCheckInRecovery.POOR,
+    ) >= ruleset.adaptation_repeated_poor_recovery_weeks
+    too_hard = state.difficulty_trend.summary is AthleteStateDifficultySummary.TOO_HARD
+    repeated_too_hard = too_hard and _signal_count(
+        state.difficulty_trend.values,
+        WorkoutCycleWeeklyCheckInDifficulty.TOO_HARD,
+    ) >= ruleset.adaptation_repeated_too_hard_weeks
 
     action = CycleAdaptationAction.MAINTAIN
     if safety_ids:
@@ -146,10 +168,10 @@ def decide_cycle_adaptation(
                 else CycleAdaptationReasonCode.SAFETY_OVERRIDES_PROGRESSION,
             )
         )
-    elif state.recovery_trend.summary is AthleteStateRecoverySummary.POOR:
+    elif repeated_poor_recovery:
         action = CycleAdaptationAction.REDUCE
         reasons.append(CycleAdaptationReasonCode.POOR_RECOVERY_REQUIRES_REDUCTION)
-    elif state.difficulty_trend.summary is AthleteStateDifficultySummary.TOO_HARD:
+    elif repeated_too_hard:
         action = CycleAdaptationAction.REDUCE
         reasons.append(CycleAdaptationReasonCode.TOO_HARD_REQUIRES_REDUCTION)
     elif adherence is None:
@@ -175,6 +197,23 @@ def decide_cycle_adaptation(
 
     if adherence_conflict:
         reasons.append(CycleAdaptationReasonCode.MIXED_SIGNAL_RESOLVED_CONSERVATIVELY)
+    if adherence is not None and adherence >= ruleset.adaptation_min_adherence_for_progression:
+        reasons.append(CycleAdaptationReasonCode.HIGH_ADHERENCE)
+    elif adherence is not None:
+        reasons.append(CycleAdaptationReasonCode.LOW_ADHERENCE)
+    if state.recovery_trend.summary is AthleteStateRecoverySummary.GOOD:
+        reasons.append(CycleAdaptationReasonCode.GOOD_RECOVERY)
+    elif poor_recovery:
+        reasons.append(CycleAdaptationReasonCode.POOR_RECOVERY)
+    if too_hard:
+        reasons.append(CycleAdaptationReasonCode.DIFFICULTY_TOO_HARD)
+    if poor_recovery or too_hard:
+        reasons.append(CycleAdaptationReasonCode.RECOVERY_LIMITED)
+    reasons.append(
+        CycleAdaptationReasonCode.PROGRESSION_ALLOWED
+        if action is CycleAdaptationAction.INCREASE
+        else CycleAdaptationReasonCode.PROGRESSION_HELD
+    )
     if state.progressing_muscles:
         reasons.append(CycleAdaptationReasonCode.PROGRESSING_MUSCLE_NOT_AUTOMATICALLY_INCREASED)
     if disliked_ids or unavailable_ids:
@@ -245,3 +284,8 @@ def _adherence_ratio(
 
 def _sorted_ids(values: tuple[UUID, ...] | set[UUID]) -> tuple[UUID, ...]:
     return tuple(sorted(set(values), key=str))
+
+
+def _signal_count(values: tuple[StrEnum, ...], expected: StrEnum) -> int:
+    matching = sum(value is expected for value in values)
+    return matching if matching else 1
