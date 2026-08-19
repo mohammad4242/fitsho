@@ -117,6 +117,10 @@ class WorkoutReviewService:
         expected_revision: int,
     ) -> WorkoutPlan:
         review = self._required_review(review_id)
+        if review.status is WorkoutReviewStatus.APPROVED:
+            if review.approved_plan is None:
+                raise ReviewConflict(WorkoutReviewErrorCode.INVALID_DRAFT)
+            return review.approved_plan
         self._require_lease(review, coach_id)
         self._require_revision(review, expected_revision)
         active = get_active_plan_for_update(self._db, review.user_id)
@@ -140,7 +144,13 @@ class WorkoutReviewService:
             }
         )
         validated = self._validator.validate(review.source_plan, payload)
-        approved = self._clone_approved_plan(review.source_plan, validated)
+        approved = self._clone_approved_plan(
+            review.source_plan,
+            validated,
+            review_id=review.id,
+            coach_id=coach_id,
+            previous_active_plan_id=active.id if active is not None else None,
+        )
         now = self._clock()
         if active is not None:
             active.status = WorkoutPlanStatus.SUPERSEDED
@@ -214,7 +224,14 @@ class WorkoutReviewService:
         }
 
     @staticmethod
-    def _clone_approved_plan(source: WorkoutPlan, validated: ValidatedDraft) -> WorkoutPlan:
+    def _clone_approved_plan(
+        source: WorkoutPlan,
+        validated: ValidatedDraft,
+        *,
+        review_id: UUID,
+        coach_id: UUID,
+        previous_active_plan_id: UUID | None,
+    ) -> WorkoutPlan:
         plan = WorkoutPlan(
             user_id=source.user_id,
             status=WorkoutPlanStatus.GENERATING,
@@ -247,7 +264,12 @@ class WorkoutReviewService:
             regeneration_reason="coach_review_approved",
             difference_summary={
                 "source_plan_id": str(source.id),
+                "review_id": str(review_id),
+                "reviewed_by_coach_id": str(coach_id),
                 "reviewed_by_coach": True,
+                "previous_active_plan_id": (
+                    str(previous_active_plan_id) if previous_active_plan_id is not None else None
+                ),
             },
         )
         source_days = {day.day_number: day for day in source.days}

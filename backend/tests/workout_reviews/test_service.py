@@ -473,6 +473,7 @@ def test_approval_creates_new_active_version_and_preserves_source(db: Session) -
             "notes_fa": "یادداشت مربی",
         }
     )
+    raw_payload["coach_note"] = "Approved with reviewed prescription."
     payload = WorkoutReviewDraftUpdate.model_validate(raw_payload)
     saved = service.save_draft(review.id, coach.id, payload)
     source_payload = deepcopy(saved.source_plan.days[0].exercises[0].exercise_snapshot)
@@ -505,6 +506,16 @@ def test_approval_creates_new_active_version_and_preserves_source(db: Session) -
     assert approved.days[0].exercises[0].notes_fa == "یادداشت مربی"
     assert review.approved_plan_id == approved.id
     assert review.status is WorkoutReviewStatus.APPROVED
+    assert review.claimed_by_user_id == coach.id
+    assert review.approved_at == Clock().now
+    assert review.coach_note == "Approved with reviewed prescription."
+    assert approved.difference_summary == {
+        "source_plan_id": str(source.id),
+        "review_id": str(review.id),
+        "reviewed_by_coach_id": str(coach.id),
+        "reviewed_by_coach": True,
+        "previous_active_plan_id": str(source.id),
+    }
 
 
 def test_review_draft_rejects_rir_outside_supported_range() -> None:
@@ -559,7 +570,17 @@ def test_approval_activates_pending_plan_without_creating_review_loop(db: Sessio
     ).all() == []
     service = WorkoutReviewService(db, clock=Clock())
     service.claim(review.id, coach.id)
-    saved = service.save_draft(review.id, coach.id, _draft(review))
+    raw_payload = deepcopy(review.draft_payload)
+    assert raw_payload is not None
+    raw_payload["expected_revision"] = review.draft_revision
+    raw_payload["coach_note"] = "Pending source stays immutable."
+    raw_payload["days"][0]["exercises"][0]["sets"] = 5
+    raw_payload["days"][0]["exercises"][0]["rir"] = 3
+    saved = service.save_draft(
+        review.id,
+        coach.id,
+        WorkoutReviewDraftUpdate.model_validate(raw_payload),
+    )
 
     approved = service.approve(
         review.id,
@@ -570,7 +591,12 @@ def test_approval_activates_pending_plan_without_creating_review_loop(db: Sessio
     db.refresh(source)
     db.refresh(review)
     assert source.status is WorkoutPlanStatus.SUPERSEDED
+    assert source.days[0].exercises[0].sets == 3
+    assert source.days[0].exercises[0].rir == 2
     assert approved.status is WorkoutPlanStatus.ACTIVE
+    assert approved.days[0].exercises[0].sets == 5
+    assert approved.days[0].exercises[0].rir == 3
+    assert review.coach_note == "Pending source stays immutable."
     assert approved.activated_at == Clock().now
     cycle = db.scalar(select(WorkoutCycle).where(WorkoutCycle.workout_plan_id == approved.id))
     assert cycle is not None
@@ -595,13 +621,14 @@ def test_approval_activates_pending_plan_without_creating_review_loop(db: Sessio
         select(WorkoutCycle).where(WorkoutCycle.workout_plan_id == approved.id)
     ).all() == [cycle]
 
-    with pytest.raises(ReviewConflict) as error:
-        service.approve(
-            review.id,
-            coach.id,
-            expected_revision=saved.draft_revision,
-        )
-    assert error.value.code is WorkoutReviewErrorCode.REVIEW_ALREADY_APPROVED
+    repeated = service.approve(
+        review.id,
+        coach.id,
+        expected_revision=saved.draft_revision,
+    )
+    assert repeated.id == approved.id
+    assert repeated.days[0].exercises[0].sets == approved.days[0].exercises[0].sets
+    assert db.scalars(select(WorkoutPlan)).all() == [source, approved]
     assert db.scalars(select(WorkoutCycle)).all() == [cycle]
 
 
@@ -635,6 +662,7 @@ def test_approval_supersedes_previous_active_plan_only_at_approval(db: Session) 
     assert previous.superseded_at == Clock().now
     assert approved.status is WorkoutPlanStatus.ACTIVE
     assert approved.activated_at == Clock().now
+    assert approved.difference_summary["previous_active_plan_id"] == str(previous.id)
     assert (
         db.query(WorkoutPlan)
         .filter(
