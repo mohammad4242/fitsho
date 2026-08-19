@@ -143,8 +143,10 @@ def generate_program(
                 "target_sets": target.target_sets,
                 "maximum_soft": target.maximum_soft,
                 "maximum_hard": target.maximum_hard,
-                "effective_maximum_soft": target.maximum_soft,
-                "effective_maximum_hard": target.maximum_hard,
+                "effective_maximum_soft": target.maximum_soft
+                + round(target.maximum_soft * ruleset.secondary_set_credit),
+                "effective_maximum_hard": target.maximum_hard
+                + round(target.maximum_hard * ruleset.secondary_set_credit),
                 "effective_target_sets": target.effective_target_sets,
                 "minimum_direct_sets": target.minimum_direct_sets,
             }

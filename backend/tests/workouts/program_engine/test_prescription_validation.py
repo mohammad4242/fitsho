@@ -377,7 +377,7 @@ def test_validator_rejects_hard_weekly_volume_excess() -> None:
     invalid_day = replace(
         day,
         exercises=tuple(
-            replace(item, sets=10) if item is chest else item for item in day.exercises
+            replace(item, sets=14) if item is chest else item for item in day.exercises
         ),
     )
     invalid = replace(result.program, weekly_schedule=(invalid_day,))
