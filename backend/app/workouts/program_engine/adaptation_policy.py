@@ -421,8 +421,7 @@ def _sorted_ids(values: tuple[UUID, ...] | set[UUID]) -> tuple[UUID, ...]:
 
 
 def _signal_count(values: tuple[StrEnum, ...], expected: StrEnum) -> int:
-    matching = sum(value is expected for value in values)
-    return matching if matching else 1
+    return sum(value is expected for value in values)
 
 
 def _replacement_preference_constraints(
