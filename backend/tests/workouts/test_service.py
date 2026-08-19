@@ -21,7 +21,12 @@ from app.exercises.enums import (
     MovementPattern,
     MuscleGroup,
 )
-from app.exercises.models import Exercise, ExerciseEquipment, ExerciseMediaAsset
+from app.exercises.models import (
+    Exercise,
+    ExerciseEquipment,
+    ExerciseMediaAsset,
+    ExerciseSecondaryMuscle,
+)
 from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.models import BodyMeasurement, UserProfile
@@ -231,6 +236,7 @@ def _exercise(
     *,
     body_region: BodyRegion = BodyRegion.UPPER_BODY,
     exercise_type: ExerciseType = ExerciseType.COMPOUND,
+    secondary_muscles: tuple[MuscleGroup, ...] = (),
 ) -> Exercise:
     item = Exercise(
         slug=slug,
@@ -252,6 +258,7 @@ def _exercise(
         is_programmable=True,
         needs_review=False,
         equipment_items=[ExerciseEquipment(equipment=Equipment.BODYWEIGHT)],
+        secondary_muscles=[ExerciseSecondaryMuscle(muscle=value) for value in secondary_muscles],
     )
     db.add(item)
     db.flush()
@@ -260,7 +267,13 @@ def _exercise(
 
 def _seed_candidates(db: Session) -> list[Exercise]:
     return [
-        _exercise(db, "service-push", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+        _exercise(
+            db,
+            "service-push",
+            MovementPattern.HORIZONTAL_PUSH,
+            MuscleGroup.CHEST,
+            secondary_muscles=(MuscleGroup.SHOULDERS,),
+        ),
         _exercise(db, "service-pull", MovementPattern.HORIZONTAL_PULL, MuscleGroup.BACK),
         _exercise(
             db,
@@ -268,6 +281,7 @@ def _seed_candidates(db: Session) -> list[Exercise]:
             MovementPattern.SQUAT,
             MuscleGroup.QUADRICEPS,
             body_region=BodyRegion.LOWER_BODY,
+            secondary_muscles=(MuscleGroup.GLUTES,),
         ),
         _exercise(
             db,
@@ -283,6 +297,14 @@ def _seed_candidates(db: Session) -> list[Exercise]:
             MuscleGroup.ABS,
             body_region=BodyRegion.CORE,
             exercise_type=ExerciseType.CORE,
+        ),
+        _exercise(
+            db,
+            "service-calf-raise",
+            MovementPattern.CALF_RAISE,
+            MuscleGroup.CALVES,
+            body_region=BodyRegion.LOWER_BODY,
+            exercise_type=ExerciseType.ISOLATION,
         ),
     ]
 
@@ -641,8 +663,10 @@ def test_generation_persists_valid_snapshot_for_pending_review(db: Session) -> N
     assert result.plan.exercise_catalog_snapshot["hash"] == result.plan.candidate_set_hash
     assert result.plan.generation_records[0].status is WorkoutGenerationStatus.SUCCEEDED
     assert review.status is WorkoutReviewStatus.PENDING
-    assert result.plan.days[0].title_en == "Day 1: Chest + Back + Quadriceps + Hamstrings + Abs"
-    assert result.plan.days[0].title_fa == "روز 1: سینه + زیربغل + چهارسر + پشت پا + شکم"
+    assert result.plan.days[0].title_en == (
+        "Day 1: Chest + Back + Quadriceps + Hamstrings + Calves"
+    )
+    assert result.plan.days[0].title_fa == "روز 1: سینه + زیربغل + چهارسر + پشت پا + ساق"
 
 
 def test_generation_keeps_existing_active_plan_when_new_plan_is_pending_review(

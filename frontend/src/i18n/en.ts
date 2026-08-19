@@ -233,6 +233,7 @@ const en = {
           fat_loss: "Fat loss",
           build_muscle: "Build muscle",
           body_recomposition: "Fat loss + build muscle",
+          strength: "Build strength",
           improve_fitness: "Improve fitness",
           maintain_weight: "Maintain weight",
         },

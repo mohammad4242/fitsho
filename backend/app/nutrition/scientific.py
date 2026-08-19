@@ -17,6 +17,7 @@ FitnessGoal = Literal[
     "body_recomposition",
     "maintain_weight",
     "improve_fitness",
+    "strength",
 ]
 Confidence = Literal["high", "medium", "low"]
 
@@ -260,7 +261,11 @@ def _goal_calorie_band(
     exercise_type = (
         inputs.structured_exercise.exercise_type if inputs.structured_exercise is not None else None
     )
-    if inputs.fitness_goal in {"build_muscle", "body_recomposition"} and exercise_type not in {
+    if inputs.fitness_goal in {
+        "build_muscle",
+        "body_recomposition",
+        "strength",
+    } and exercise_type not in {
         "resistance",
         "mixed",
     }:

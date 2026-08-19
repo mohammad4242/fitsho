@@ -254,9 +254,7 @@ def test_same_template_personalizes_weekly_volume_for_different_priority_muscles
     assert chest_volume["chest"] > back_volume["chest"]
     assert back_volume["back"] > chest_volume["back"]
     for day_index in (0, 2):
-        expected_core_ids = {
-            slot.exercise_id for slot in template.days[day_index].slots
-        }
+        expected_core_ids = {slot.exercise_id for slot in template.days[day_index].slots}
         actual_core = chest_result.program.weekly_schedule[day_index].exercises[:2]
         assert {exercise.exercise_id for exercise in actual_core} == expected_core_ids
         assert all("TEMPLATE_REFERENCE_EXERCISE" in item.reason_codes for item in actual_core)
@@ -347,19 +345,14 @@ def test_unsafe_template_exercise_is_substituted_and_trace_is_auditable() -> Non
     )
 
     assert result.program is not None, result.errors
-    programmed = [
-        exercise for day in result.program.weekly_schedule for exercise in day.exercises
-    ]
+    programmed = [exercise for day in result.program.weekly_schedule for exercise in day.exercises]
     assert unsafe_id not in {exercise.exercise_id for exercise in programmed}
     assert all(
-        item.equipment.issubset({Equipment.BODYWEIGHT, Equipment.DUMBBELL})
-        for item in programmed
+        item.equipment.issubset({Equipment.BODYWEIGHT, Equipment.DUMBBELL}) for item in programmed
     )
     assert all(not item.needs_review for item in programmed)
     adaptation_trace = next(
-        entry
-        for entry in result.program.decision_trace
-        if entry["stage"] == "template_adaptation"
+        entry for entry in result.program.decision_trace if entry["stage"] == "template_adaptation"
     )
     assert any(
         item["requested_exercise_id"] == str(unsafe_id)
@@ -404,7 +397,7 @@ def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> N
     assert rejection["reason_codes"]
 
 
-def test_template_that_cannot_cover_priority_volume_falls_back_to_dynamic() -> None:
+def test_template_priority_volume_is_repaired_when_safe_capacity_exists() -> None:
     template = _four_day_reference()
 
     result = generate_program(
@@ -422,13 +415,11 @@ def test_template_that_cannot_cover_priority_volume_falls_back_to_dynamic() -> N
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics.get("reference_template") is None
-    rejection = next(
-        entry
-        for entry in result.program.decision_trace
-        if entry["stage"] == "template_reference" and entry.get("status") == "rejected"
+    assert result.program.aggregate_metrics.get("reference_template") == template.slug
+    repair = next(
+        entry for entry in result.program.decision_trace if entry["stage"] == "volume_repair"
     )
-    assert "TEMPLATE_PRIORITY_VOLUME_UNSATISFIED:shoulders" in rejection["reason_codes"]
+    assert "VOLUME_REPAIR_ADDED_EXERCISE_FOR_MINIMUM_COVERAGE" in repair["reasons"]
 
 
 def test_template_generation_is_deterministic_and_strictly_valid() -> None:
@@ -467,7 +458,7 @@ def test_template_generation_is_deterministic_and_strictly_valid() -> None:
     )
 
 
-def test_template_with_adjacent_direct_muscle_overlap_falls_back_to_dynamic() -> None:
+def test_template_with_adjacent_direct_muscle_overlap_is_rearranged() -> None:
     template, catalog = _upper_lower_reference()
     unsafe = replace(
         template,
@@ -489,13 +480,10 @@ def test_template_with_adjacent_direct_muscle_overlap_falls_back_to_dynamic() ->
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics.get("reference_template") is None
-    rejection = next(
-        entry
-        for entry in result.program.decision_trace
-        if entry["stage"] == "template_reference" and entry.get("status") == "rejected"
+    assert result.program.aggregate_metrics.get("reference_template") == unsafe.slug
+    assert "RECOVERY_WEEKDAYS_REARRANGED_FOR_DIRECT_MUSCLE_OVERLAP" in (
+        result.program.split.reason_codes
     )
-    assert "RECOVERY_SPACING_INVALID" in rejection["reason_codes"]
 
 
 def test_template_with_alternating_direct_muscles_keeps_valid_recovery_spacing() -> None:
@@ -580,9 +568,7 @@ def test_repeated_blocked_template_core_uses_distinct_safe_substitutions() -> No
     ]
     assert repeated_id not in programmed_ids
     adaptation_trace = next(
-        entry
-        for entry in result.program.decision_trace
-        if entry["stage"] == "template_adaptation"
+        entry for entry in result.program.decision_trace if entry["stage"] == "template_adaptation"
     )
     substitutions = [
         item

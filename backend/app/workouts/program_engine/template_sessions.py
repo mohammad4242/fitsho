@@ -75,6 +75,8 @@ def build_template_sessions(
     drafts: list[SessionDraft] = []
     resolutions: list[TemplateSlotResolution] = []
     build_reasons: list[str] = []
+    complementary_replacements: set[UUID] = set()
+    deliberate_redundancies: set[UUID] = set()
     preserved_template_occurrences: Counter[UUID] = Counter()
     weekly_patterns: set[MovementPattern] = set()
     capacity = max(
@@ -119,6 +121,23 @@ def build_template_sessions(
                     )
                 build_reasons.append("TEMPLATE_OPTIONAL_SLOT_OMITTED_UNAVAILABLE")
                 continue
+            if _template_role_is_excessive(candidate, selected):
+                complementary = _complementary_template_candidate(
+                    request,
+                    reference_day,
+                    selected,
+                    eligible,
+                    used,
+                    reserved,
+                    ruleset,
+                )
+                if complementary is not None:
+                    candidate = complementary
+                    complementary_replacements.add(candidate.id)
+                    build_reasons.append("TEMPLATE_REDUNDANCY_REPLACED_WITH_COMPLEMENTARY_ROLE")
+                else:
+                    deliberate_redundancies.add(candidate.id)
+                    build_reasons.append("DELIBERATE_REDUNDANCY_FOR_TEMPLATE_STRUCTURE")
             selected.append((candidate, slot))
             used[candidate.id] += 1
             weekly_patterns.add(candidate.movement_pattern)
@@ -180,8 +199,10 @@ def build_template_sessions(
             removed, _ = selected.pop(removable)
             used[removed.id] -= 1
             build_reasons.append("TEMPLATE_ACCESSORY_TRIMMED_FOR_TIME_LIMIT")
-        if not ruleset.minimum_exercises_per_session <= len(selected) <= (
-            ruleset.max_exercises_per_session
+        if (
+            not ruleset.minimum_exercises_per_session
+            <= len(selected)
+            <= (ruleset.max_exercises_per_session)
         ):
             raise TemplateConstructionError(
                 "TEMPLATE_SESSION_EXERCISE_COUNT_UNSATISFIED",
@@ -207,6 +228,16 @@ def build_template_sessions(
                 "TEMPLATE_REFERENCE_EXERCISE" if preserved else "TEMPLATE_SAFE_SUBSTITUTION",
                 f"TEMPLATE_ADAPTATION_PRIORITY:{slot.adaptation_priority}",
                 f"TEMPLATE_INTENSITY_METHOD:{slot.intensity_method}",
+                *(
+                    ("TEMPLATE_REDUNDANCY_REPLACED_WITH_COMPLEMENTARY_ROLE",)
+                    if candidate.id in complementary_replacements
+                    else ()
+                ),
+                *(
+                    ("DELIBERATE_REDUNDANCY_FOR_TEMPLATE_STRUCTURE",)
+                    if candidate.id in deliberate_redundancies
+                    else ()
+                ),
                 *(("CORE_MOVEMENT_REPEATED_FOR_PROGRESSION",) if intentional_repeat else ()),
             )
             if preserved and is_template_slot:
@@ -256,13 +287,52 @@ def build_template_sessions(
     )
 
 
+def _template_role_is_excessive(
+    candidate: ExerciseCandidate,
+    selected: list[tuple[ExerciseCandidate, TemplateReferenceSlot]],
+) -> bool:
+    role_count = sum(
+        item.primary_muscle is candidate.primary_muscle
+        and item.movement_pattern is candidate.movement_pattern
+        for item, _slot in selected
+    )
+    role_limit = 1 if candidate.movement_pattern is MovementPattern.SHRUG else 2
+    return role_count >= role_limit
+
+
+def _complementary_template_candidate(
+    request: NormalizedProgramRequest,
+    reference_day: TemplateReferenceDay,
+    selected: list[tuple[ExerciseCandidate, TemplateReferenceSlot]],
+    eligible: tuple[ExerciseCandidate, ...],
+    used: Counter[object],
+    reserved: Counter[UUID],
+    ruleset: ProgramRuleset,
+) -> ExerciseCandidate | None:
+    focus = set(reference_day.focus)
+    if focus.intersection({MuscleGroup.CHEST, MuscleGroup.TRICEPS}):
+        focus.add(MuscleGroup.SHOULDERS)
+    if focus.intersection({MuscleGroup.BACK, MuscleGroup.BICEPS}):
+        focus.update({MuscleGroup.SHOULDERS, MuscleGroup.TRAPS})
+    options = [
+        item
+        for item in eligible
+        if not used[item.id]
+        and not reserved[item.id]
+        and item.primary_muscle in focus
+        and item.movement_pattern is not MovementPattern.OTHER
+        and not _template_role_is_excessive(item, selected)
+    ]
+    if not options:
+        return None
+    return rank_exercises(request, options, ruleset)[0].exercise
+
+
 def apply_template_intent(
     days: tuple[WorkoutDay, ...],
     build: TemplateSessionBuild,
 ) -> tuple[WorkoutDay, ...]:
-    resolutions = {
-        (item.day_index, item.selected_exercise_id): item for item in build.resolutions
-    }
+    resolutions = {(item.day_index, item.selected_exercise_id): item for item in build.resolutions}
     personalized: list[WorkoutDay] = []
     for day, title in zip(days, build.titles, strict=True):
         exercises = []
@@ -296,9 +366,7 @@ def template_resolution_trace(
     build: TemplateSessionBuild,
     days: tuple[WorkoutDay, ...],
 ) -> dict[str, object]:
-    programmed = {
-        (day.day_index, item.exercise_id): item for day in days for item in day.exercises
-    }
+    programmed = {(day.day_index, item.exercise_id): item for day in days for item in day.exercises}
     preserved = tuple(
         str(item.selected_exercise_id)
         for item in build.resolutions
@@ -384,9 +452,7 @@ def _add_targeted_accessories(
         options = [
             item
             for item in eligible
-            if not used[item.id]
-            and not reserved[item.id]
-            and item.primary_muscle in target_muscles
+            if not used[item.id] and not reserved[item.id] and item.primary_muscle in target_muscles
         ]
         if not options:
             return

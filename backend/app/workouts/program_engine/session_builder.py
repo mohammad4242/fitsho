@@ -113,6 +113,7 @@ def build_sessions(
             selected = min(
                 ranked,
                 key=lambda item: (
+                    _role_repeated(item.exercise, chosen),
                     usage[item.exercise.id],
                     -item.score,
                     str(item.exercise.id),
@@ -120,6 +121,14 @@ def build_sessions(
             )
             chosen.append(selected.exercise)
             selection_reasons = list(selected.reason_codes)
+            if _role_repeated(selected.exercise, chosen[:-1]):
+                redundancy_reason = (
+                    "DELIBERATE_REDUNDANCY_FOR_REQUIRED_PATTERN"
+                    if slot.required
+                    else "DELIBERATE_REDUNDANCY_FOR_TARGET_VOLUME"
+                )
+                selection_reasons.append(redundancy_reason)
+                session_reasons = session_reasons + (redundancy_reason,)
             if usage[selected.exercise.id]:
                 selection_reasons.append("CORE_MOVEMENT_REPEATED_FOR_PROGRESSION")
             reasons[selected.exercise.id] = tuple(selection_reasons)
@@ -135,6 +144,7 @@ def build_sessions(
             selected = min(
                 rank_exercises(request, options, ruleset),
                 key=lambda item: (
+                    _role_repeated(item.exercise, chosen),
                     usage[item.exercise.id],
                     -item.score,
                     str(item.exercise.id),
@@ -142,6 +152,9 @@ def build_sessions(
             )
             chosen.append(selected.exercise)
             selection_reasons = [*selected.reason_codes, "COMPATIBLE_SESSION_SUPPLEMENT"]
+            if _role_repeated(selected.exercise, chosen[:-1]):
+                selection_reasons.append("DELIBERATE_REDUNDANCY_FOR_SESSION_COVERAGE")
+                session_reasons = session_reasons + ("DELIBERATE_REDUNDANCY_FOR_SESSION_COVERAGE",)
             if usage[selected.exercise.id]:
                 selection_reasons.append("CORE_MOVEMENT_REPEATED_FOR_PROGRESSION")
             reasons[selected.exercise.id] = tuple(selection_reasons)
@@ -203,20 +216,35 @@ def _compatible_supplements(
     exercises: tuple[ExerciseCandidate, ...],
     chosen: list[ExerciseCandidate],
 ) -> list[ExerciseCandidate]:
-    patterns, muscles = _supplement_scope(focus)
     chosen_ids = {item.id for item in chosen}
     return [
-        item
-        for item in exercises
-        if item.id not in chosen_ids
-        and item.movement_pattern in patterns
-        and (muscles is None or item.primary_muscle in muscles)
+        item for item in exercises if item.id not in chosen_ids and exercise_fits_focus(item, focus)
     ]
+
+
+def exercise_fits_focus(exercise: ExerciseCandidate, focus: str) -> bool:
+    patterns, muscles = _supplement_scope(focus)
+    return exercise.movement_pattern in patterns and (
+        muscles is None or exercise.primary_muscle in muscles
+    )
+
+
+def _role_repeated(
+    exercise: ExerciseCandidate,
+    chosen: list[ExerciseCandidate],
+) -> bool:
+    return any(
+        item.primary_muscle is exercise.primary_muscle
+        and item.movement_pattern is exercise.movement_pattern
+        for item in chosen
+    )
 
 
 def _supplement_scope(
     focus: str,
 ) -> tuple[frozenset[MovementPattern], frozenset[MuscleGroup] | None]:
+    if focus.startswith("template_reference"):
+        return frozenset(MovementPattern) - {MovementPattern.OTHER}, None
     if focus.startswith("full_body"):
         return (
             PUSH_PATTERNS
@@ -308,9 +336,9 @@ def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
             SlotSpec(PULL_PATTERNS, True),
             SlotSpec(KNEE_PATTERNS, True),
             SlotSpec(HINGE_PATTERNS, True),
+            SlotSpec(frozenset({MovementPattern.CALF_RAISE}), False),
             SlotSpec(PUSH_PATTERNS, False),
             SlotSpec(CORE_PATTERNS, False),
-            SlotSpec(frozenset({MovementPattern.CALF_RAISE}), False),
         )
     if focus == "full_body_d":
         return (
@@ -327,8 +355,8 @@ def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
             SlotSpec(PULL_PATTERNS, True),
             SlotSpec(KNEE_PATTERNS, True),
             SlotSpec(HINGE_PATTERNS, False),
-            SlotSpec(CORE_PATTERNS, False),
             SlotSpec(frozenset({MovementPattern.CALF_RAISE}), False),
+            SlotSpec(CORE_PATTERNS, False),
         )
     if focus.startswith("upper"):
         return (
@@ -360,9 +388,9 @@ def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
             SlotSpec(KNEE_PATTERNS, True),
             SlotSpec(HINGE_PATTERNS, True),
             SlotSpec(CORE_PATTERNS, True),
+            SlotSpec(frozenset({MovementPattern.CALF_RAISE}), False),
             SlotSpec(frozenset({MovementPattern.KNEE_FLEXION}), False),
             SlotSpec(frozenset({MovementPattern.KNEE_EXTENSION}), False),
-            SlotSpec(frozenset({MovementPattern.CALF_RAISE}), False),
         )
     if focus == "push":
         return (
@@ -384,7 +412,7 @@ def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
         return (
             SlotSpec(frozenset({MovementPattern.HORIZONTAL_PUSH}), True, MuscleGroup.CHEST),
             SlotSpec(frozenset({MovementPattern.HORIZONTAL_PUSH}), False, MuscleGroup.CHEST),
-            SlotSpec(frozenset({MovementPattern.HORIZONTAL_PUSH}), False, MuscleGroup.CHEST),
+            SlotSpec(frozenset({MovementPattern.VERTICAL_PUSH}), False, MuscleGroup.SHOULDERS),
             SlotSpec(frozenset({MovementPattern.ELBOW_EXTENSION}), False, MuscleGroup.TRICEPS),
             SlotSpec(frozenset({MovementPattern.ELBOW_EXTENSION}), False, MuscleGroup.TRICEPS),
         )
@@ -402,7 +430,11 @@ def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
             SlotSpec(frozenset({MovementPattern.SHOULDER_ABDUCTION}), False, MuscleGroup.SHOULDERS),
             SlotSpec(frozenset({MovementPattern.HORIZONTAL_PULL}), False, MuscleGroup.SHOULDERS),
             SlotSpec(frozenset({MovementPattern.SHRUG}), False, MuscleGroup.TRAPS),
-            SlotSpec(frozenset({MovementPattern.SHRUG}), False, MuscleGroup.TRAPS),
+            SlotSpec(
+                frozenset({MovementPattern.SHOULDER_EXTERNAL_ROTATION}),
+                False,
+                MuscleGroup.SHOULDERS,
+            ),
         )
     warnings.warn(
         f"Unrecognized session focus {focus!r}; falling back to full_body slot layout.",

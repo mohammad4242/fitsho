@@ -402,7 +402,7 @@ function ageFromBirthDate(value: string) {
 
 function profileValueLabel(value: string, language: "fa" | "en") {
   const labels: Record<string, [string, string]> = {
-    fat_loss: ["کاهش چربی", "Fat loss"], maintain_weight: ["حفظ وزن", "Maintain weight"], build_muscle: ["عضله‌سازی", "Build muscle"], improve_fitness: ["بهبود آمادگی", "Improve fitness"],
+    fat_loss: ["کاهش چربی", "Fat loss"], maintain_weight: ["حفظ وزن", "Maintain weight"], build_muscle: ["عضله‌سازی", "Build muscle"], strength: ["افزایش قدرت", "Build strength"], improve_fitness: ["بهبود آمادگی", "Improve fitness"],
   };
   return labels[value]?.[language === "fa" ? 0 : 1] ?? value.replaceAll("_", " ");
 }

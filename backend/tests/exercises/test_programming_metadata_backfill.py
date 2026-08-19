@@ -14,9 +14,10 @@ from app.exercises.enums import (
 from app.exercises.models import Exercise, ExerciseCautionTagItem, ExerciseEquipment
 from app.exercises.programming_metadata import (
     backfill_programming_metadata,
+    infer_exercise_demands,
     infer_programming_metadata,
 )
-from app.workouts.program_engine.enums import BodyPosition, LoadLimit, SkillDemand
+from app.workouts.program_engine.enums import BodyPosition, ImpactLimit, LoadLimit, SkillDemand
 
 
 def make_exercise(slug: str) -> Exercise:
@@ -135,3 +136,15 @@ def test_backfill_dry_run_reports_without_persisting_values(db: Session) -> None
     assert report.field_updates["body_position"] == 1
     assert stored.body_position is None
     assert stored.fatigue_cost is None
+
+
+def test_generic_cardio_is_not_inferred_as_low_impact() -> None:
+    exercise = make_exercise("generic-cardio")
+    exercise.name_en = "Cardio Exercise"
+    exercise.movement_pattern = MovementPattern.OTHER
+    exercise.exercise_type = ExerciseType.OTHER
+
+    demands = infer_exercise_demands(exercise)
+
+    assert demands.impact_level is ImpactLimit.MODERATE
+    assert demands.fatigue_cost >= 3

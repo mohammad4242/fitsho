@@ -67,12 +67,13 @@ def exercise(
     exercise_type: ExerciseType = ExerciseType.COMPOUND,
     labels: frozenset[ExerciseLabel] = frozenset(),
     impact: ImpactLimit = ImpactLimit.LOW,
+    secondary: tuple[MuscleGroup, ...] = (),
 ) -> ExerciseCandidate:
     return ExerciseCandidate(
         id=uuid4(),
         name=name,
         primary_muscle=muscle,
-        secondary_muscles=(),
+        secondary_muscles=secondary,
         movement_pattern=pattern,
         exercise_type=exercise_type,
         equipment=frozenset({Equipment.BODYWEIGHT}),
@@ -85,9 +86,19 @@ def exercise(
 
 def catalog(*, cardio_impact: ImpactLimit = ImpactLimit.LOW) -> list[ExerciseCandidate]:
     return [
-        exercise("push-up", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+        exercise(
+            "push-up",
+            MovementPattern.HORIZONTAL_PUSH,
+            MuscleGroup.CHEST,
+            secondary=(MuscleGroup.SHOULDERS,),
+        ),
         exercise("row", MovementPattern.HORIZONTAL_PULL, MuscleGroup.BACK),
-        exercise("squat", MovementPattern.SQUAT, MuscleGroup.QUADRICEPS),
+        exercise(
+            "squat",
+            MovementPattern.SQUAT,
+            MuscleGroup.QUADRICEPS,
+            secondary=(MuscleGroup.GLUTES,),
+        ),
         exercise("hinge", MovementPattern.HIP_HINGE, MuscleGroup.HAMSTRINGS),
         exercise(
             "plank",
@@ -169,7 +180,7 @@ def test_session_title_lists_direct_targets_but_not_secondary_muscles() -> None:
 
     assert result.program is not None
     assert result.program.weekly_schedule[0].title == (
-        "Day 1: Chest + Back + Quadriceps + Hamstrings + Abs"
+        "Day 1: Chest + Back + Quadriceps + Hamstrings + Calves + Abs"
     )
     assert "Triceps" not in result.program.weekly_schedule[0].title
 
@@ -388,10 +399,15 @@ def test_validator_rejects_hard_weekly_volume_excess() -> None:
 
 
 def test_validator_uses_effective_target_without_hiding_direct_work_requirement() -> None:
-    candidates = catalog()
-    candidates[0] = replace(
-        candidates[0],
-        secondary_muscles=(MuscleGroup.TRICEPS,),
+    candidates = [
+        item
+        for item in full_catalog()
+        if item.equipment.issubset({Equipment.BODYWEIGHT})
+        and item.primary_muscle is not MuscleGroup.TRICEPS
+    ]
+    push_index = next(index for index, item in enumerate(candidates) if item.name == "Push Up")
+    candidates[push_index] = replace(
+        candidates[push_index], secondary_muscles=(MuscleGroup.TRICEPS,)
     )
     result = generate_program(request(), candidates, RULESET)
 
@@ -429,8 +445,8 @@ def test_validator_uses_effective_target_without_hiding_direct_work_requirement(
 
     report = validate_program(program, request(), RULESET)
 
-    assert "EFFECTIVE_VOLUME_BELOW_TARGET" not in report.warnings
-    assert "DIRECT_VOLUME_BELOW_MINIMUM" in report.warnings
+    assert "EFFECTIVE_VOLUME_BELOW_SOFT_TARGET" not in report.warnings
+    assert "DIRECT_VOLUME_BELOW_SOFT_TARGET" in report.warnings
 
 
 def test_fat_loss_retains_resistance_and_adds_separate_cardio() -> None:

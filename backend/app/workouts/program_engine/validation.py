@@ -1,16 +1,16 @@
 from collections import Counter
 
-from app.exercises.enums import MovementPattern, MuscleGroup
+from app.exercises.enums import MovementPattern
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
     complete_tracked_metrics,
 )
 from app.workouts.program_engine.enums import SafetyStatus
+from app.workouts.program_engine.recovery import recovery_spacing_is_valid
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ProgramGenerationRequest,
     ValidationReport,
-    WorkoutDay,
     WorkoutProgram,
 )
 
@@ -102,7 +102,7 @@ def validate_program(
         for frequency in direct_session_frequency.values()
     ):
         errors.append("MUSCLE_DIRECT_FREQUENCY_EXCEEDED")
-    if not _recovery_spacing_is_valid(program, ruleset):
+    if not recovery_spacing_is_valid(program.weekly_schedule, ruleset):
         errors.append("RECOVERY_SPACING_INVALID")
     if program.safety_status not in {
         SafetyStatus.CLEAR,
@@ -163,14 +163,23 @@ def validate_program(
                 range_values.get("effective_target_sets", range_values.get("target_sets")),
                 0,
             ):
-                warnings.append("EFFECTIVE_VOLUME_BELOW_TARGET")
+                warnings.append("EFFECTIVE_VOLUME_BELOW_SOFT_TARGET")
+            minimum_effective = _int_metric(
+                range_values.get("minimum_effective_sets", range_values.get("minimum_soft")),
+                0,
+            )
+            coverage_required = range_values.get("minimum_coverage_required") is True
+            if coverage_required and actual_effective < minimum_effective:
+                errors.append(f"MINIMUM_MUSCLE_COVERAGE_UNSATISFIED:{muscle_key}")
             minimum_direct = _int_metric(
                 range_values.get("minimum_direct_sets", range_values.get("minimum_soft")),
                 0,
             )
             if direct_sets[muscle_key] < minimum_direct:
-                warnings.append("DIRECT_VOLUME_BELOW_MINIMUM")
-                warnings.append("SOFT_WEEKLY_VOLUME_BELOW_MINIMUM")
+                if range_values.get("direct_minimum_required") is True:
+                    errors.append(f"MINIMUM_DIRECT_MUSCLE_COVERAGE_UNSATISFIED:{muscle_key}")
+                else:
+                    warnings.append("DIRECT_VOLUME_BELOW_SOFT_TARGET")
     else:
         maximum = ruleset.maximum_sets[program.training_status]
         if any(value > maximum for value in effective_sets.values()):
@@ -178,7 +187,7 @@ def validate_program(
     if isinstance(planned, dict) and any(
         effective_sets.get(str(muscle), 0) < int(target) for muscle, target in planned.items()
     ):
-        warnings.append("PLANNED_VOLUME_REDUCED_DURING_SESSION_FIT")
+        warnings.append("PLANNED_SOFT_VOLUME_REDUCED_DURING_SESSION_FIT")
     return ValidationReport(
         errors=tuple(dict.fromkeys(errors)),
         warnings=tuple(dict.fromkeys(warnings)),
@@ -207,40 +216,3 @@ def _int_metric(value: object, fallback: int) -> int:
     if isinstance(value, (int, float, str)):
         return int(value)
     return fallback
-
-
-def _recovery_spacing_is_valid(program: WorkoutProgram, ruleset: ProgramRuleset) -> bool:
-    scheduled = sorted(
-        ((day.weekday, day) for day in program.weekly_schedule if day.weekday is not None),
-        key=lambda item: item[0],
-    )
-    if len(scheduled) <= 1:
-        return True
-    template_derived = isinstance(program.aggregate_metrics.get("reference_template"), str)
-    circular = scheduled + [(scheduled[0][0] + ruleset.days_per_week, scheduled[0][1])]
-    for current, following in zip(circular, circular[1:], strict=False):
-        current_day = current[1]
-        following_day = following[1]
-        direct_overlap = _direct_muscles(current_day).intersection(
-            _direct_muscles(following_day)
-        )
-        recovery_sensitive = (
-            bool(direct_overlap)
-            if template_derived
-            else (
-                current_day.focus.startswith("full_body")
-                or following_day.focus.startswith("full_body")
-                or current_day.focus == following_day.focus
-            )
-        )
-        if recovery_sensitive and following[0] - current[0] < ruleset.minimum_recovery_gap_days:
-            return False
-    return True
-
-
-def _direct_muscles(day: WorkoutDay) -> set[MuscleGroup]:
-    return {
-        item.primary_muscle
-        for item in day.exercises
-        if item.primary_muscle is not None
-    }

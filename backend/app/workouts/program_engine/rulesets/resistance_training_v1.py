@@ -36,6 +36,14 @@ class ProgramRuleset:
             TrainingStatus.ADVANCED: 10,
         }
     )
+    minimum_coverage_sets: dict[TrainingStatus, int] = field(
+        default_factory=lambda: {
+            TrainingStatus.NOVICE: 1,
+            TrainingStatus.EARLY_INTERMEDIATE: 2,
+            TrainingStatus.INTERMEDIATE: 2,
+            TrainingStatus.ADVANCED: 3,
+        }
+    )
     maximum_sets: dict[TrainingStatus, int] = field(
         default_factory=lambda: {
             TrainingStatus.NOVICE: 8,
@@ -219,6 +227,9 @@ class ProgramRuleset:
             "beginner_friendly": 12,
             "preference": 10,
             "stability": 8,
+            "skill": 8,
+            "older_novice_suitability": 18,
+            "older_novice_demand_penalty": 4,
             "time_efficiency": 6,
             "fatigue_cost": 4,
             "dislike": -12,

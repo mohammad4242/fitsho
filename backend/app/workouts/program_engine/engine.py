@@ -17,6 +17,7 @@ from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus,
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import prescribe_sessions
 from app.workouts.program_engine.progression import deload_policy, double_progression_policy
+from app.workouts.program_engine.recovery import repair_recovery_weekdays
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.safety import screen_safety
 from app.workouts.program_engine.schemas import (
@@ -92,7 +93,7 @@ def generate_program(
             rejected_candidates=eligibility.rejected,
         )
     previous_volume = derive_previous_volume_baseline(normalized.source.recent_training_history)
-    reserve = cardio_reserve_minutes(normalized, eligibility.eligible, ruleset)
+    reserve = cardio_reserve_minutes(normalized, eligibility.cardio_eligible, ruleset)
     template_rejection_trace: tuple[dict[str, object], ...] = ()
     reference = select_template_reference(
         normalized, eligibility.eligible, reference_templates, ruleset
@@ -109,6 +110,7 @@ def generate_program(
                 safety.reason_codes,
                 eligibility.rejected,
                 eligibility.eligible,
+                eligibility.cardio_eligible,
                 reference,
                 reference_build,
                 ruleset,
@@ -152,6 +154,7 @@ def generate_program(
             safety.reason_codes,
             eligibility.rejected,
             eligibility.eligible,
+            eligibility.cardio_eligible,
             split,
             ruleset,
             previous_volume=previous_volume,
@@ -199,6 +202,7 @@ def _program_for_split(
     safety_reasons: tuple[str, ...],
     rejected: tuple[RejectedCandidate, ...],
     eligible: tuple[ExerciseCandidate, ...],
+    cardio_eligible: tuple[ExerciseCandidate, ...],
     split: SplitPlan,
     ruleset: ProgramRuleset,
     *,
@@ -238,8 +242,16 @@ def _program_for_split(
         ruleset,
         cardio_reserve_minutes=cardio_reserve,
     )
-    days = add_cardio(normalized, days, eligible, ruleset)
-    days, repair_reasons = repair_weekly_volume(days, normalized, volume, ruleset)
+    days, repair_reasons = repair_weekly_volume(
+        days,
+        normalized,
+        volume,
+        ruleset,
+        candidates=eligible,
+        cardio_reserve_minutes=cardio_reserve,
+    )
+    days = add_cardio(normalized, days, cardio_eligible, ruleset)
+    split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises),
         ruleset,
@@ -255,6 +267,7 @@ def _program_for_split(
             (
                 *(("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE",) if rejected_splits else ()),
                 *session_reasons,
+                *recovery_repair_reasons,
             )
         )
     )
@@ -284,24 +297,10 @@ def _program_for_split(
             ),
         },
         {"stage": "split", "selected": split.split_type.value, "reasons": split.reason_codes},
-        {
-            "stage": "volume",
-            "reasons": volume.reason_codes,
-            "previous_volume_baseline": {
-                "confidence": previous_volume.confidence,
-                "source": previous_volume.source,
-                "reason_codes": previous_volume.reason_codes,
-            },
-            "effective_targets": {
-                target.muscle.value: target.effective_target_sets for target in volume.targets
-            },
-            "minimum_direct_targets": {
-                target.muscle.value: target.minimum_direct_sets for target in volume.targets
-            },
-        },
+        _volume_decision_trace(volume, previous_volume),
         {
             "stage": "volume_repair",
-            "reasons": repair_reasons,
+            "reasons": tuple(dict.fromkeys((*repair_reasons, *recovery_repair_reasons))),
             "weekly_direct_sets": dict(direct),
             "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
         },
@@ -362,6 +361,7 @@ def _reference_program(
     safety_reasons: tuple[str, ...],
     rejected: tuple[RejectedCandidate, ...],
     eligible: tuple[ExerciseCandidate, ...],
+    cardio_eligible: tuple[ExerciseCandidate, ...],
     reference: TemplateReference,
     build: TemplateSessionBuild,
     ruleset: ProgramRuleset,
@@ -391,8 +391,16 @@ def _reference_program(
         cardio_reserve_minutes=cardio_reserve,
     )
     days = apply_template_intent(days, build)
-    days = add_cardio(normalized, days, eligible, ruleset)
-    days, repair_reasons = repair_weekly_volume(days, normalized, volume, ruleset)
+    days, repair_reasons = repair_weekly_volume(
+        days,
+        normalized,
+        volume,
+        ruleset,
+        candidates=eligible,
+        cardio_reserve_minutes=cardio_reserve,
+    )
+    days = add_cardio(normalized, days, cardio_eligible, ruleset)
+    split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
     metrics = _volume_metrics(
         days,
         volume,
@@ -422,24 +430,10 @@ def _reference_program(
             "intensity_methods": reference.intensity_methods,
         },
         template_resolution_trace(build, days),
-        {
-            "stage": "volume",
-            "reasons": volume.reason_codes,
-            "previous_volume_baseline": {
-                "confidence": previous_volume.confidence,
-                "source": previous_volume.source,
-                "reason_codes": previous_volume.reason_codes,
-            },
-            "effective_targets": {
-                target.muscle.value: target.effective_target_sets for target in volume.targets
-            },
-            "minimum_direct_targets": {
-                target.muscle.value: target.minimum_direct_sets for target in volume.targets
-            },
-        },
+        _volume_decision_trace(volume, previous_volume),
         {
             "stage": "volume_repair",
-            "reasons": repair_reasons,
+            "reasons": tuple(dict.fromkeys((*repair_reasons, *recovery_repair_reasons))),
             "weekly_direct_sets": dict(direct),
             "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
         },
@@ -456,8 +450,7 @@ def _reference_program(
     )
     if unmet_priorities:
         errors = tuple(
-            f"TEMPLATE_PRIORITY_VOLUME_UNSATISFIED:{muscle.value}"
-            for muscle in unmet_priorities
+            f"TEMPLATE_PRIORITY_VOLUME_UNSATISFIED:{muscle.value}" for muscle in unmet_priorities
         )
         return ProgramGenerationResult(
             program=None,
@@ -536,6 +529,9 @@ def _volume_metrics(
                 + round(target.maximum_hard * ruleset.secondary_set_credit),
                 "effective_target_sets": target.effective_target_sets,
                 "minimum_direct_sets": target.minimum_direct_sets,
+                "minimum_effective_sets": target.minimum_effective_sets,
+                "minimum_coverage_required": target.minimum_coverage_required,
+                "direct_minimum_required": target.direct_minimum_required,
             }
             for target in volume.targets
         },
@@ -568,3 +564,32 @@ def _volume_metrics(
     if reference_template is not None:
         metrics["reference_template"] = reference_template
     return metrics
+
+
+def _volume_decision_trace(
+    volume: WeeklyVolumePlan,
+    previous_volume: PreviousVolumeBaseline,
+) -> dict[str, object]:
+    return {
+        "stage": "volume",
+        "reasons": volume.reason_codes,
+        "previous_volume_baseline": {
+            "confidence": previous_volume.confidence,
+            "source": previous_volume.source,
+            "reason_codes": previous_volume.reason_codes,
+        },
+        "effective_targets": {
+            target.muscle.value: target.effective_target_sets for target in volume.targets
+        },
+        "minimum_direct_targets": {
+            target.muscle.value: target.minimum_direct_sets for target in volume.targets
+        },
+        "minimum_effective_coverage": {
+            target.muscle.value: target.minimum_effective_sets
+            for target in volume.targets
+            if target.minimum_coverage_required
+        },
+        "direct_minimum_required_muscles": tuple(
+            target.muscle.value for target in volume.targets if target.direct_minimum_required
+        ),
+    }

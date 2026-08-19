@@ -3,15 +3,23 @@ from dataclasses import replace
 
 from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
-from app.workouts.program_engine.prescription import estimate_exercise_minutes
+from app.workouts.program_engine.exercise_ranker import rank_exercises
+from app.workouts.program_engine.prescription import (
+    estimate_exercise_minutes,
+    prescription_for,
+)
+from app.workouts.program_engine.replacement_ranker import rank_replacement_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
+    ExerciseCandidate,
     NormalizedProgramRequest,
     ProgrammedExercise,
     VolumeTarget,
     WeeklyVolumePlan,
     WorkoutDay,
 )
+from app.workouts.program_engine.session_builder import exercise_fits_focus
+from app.workouts.program_engine.session_targets import english_session_title
 
 
 def repair_weekly_volume(
@@ -19,6 +27,9 @@ def repair_weekly_volume(
     request: NormalizedProgramRequest,
     volume: WeeklyVolumePlan,
     ruleset: ProgramRuleset,
+    *,
+    candidates: tuple[ExerciseCandidate, ...] = (),
+    cardio_reserve_minutes: int = 0,
 ) -> tuple[tuple[WorkoutDay, ...], tuple[str, ...]]:
     """Keep effective volume inside targets and hard caps before validation.
 
@@ -94,18 +105,112 @@ def repair_weekly_volume(
             for muscle, target in targets.items()
             if effective.get(muscle.value, 0) < target.effective_target_sets
         }
+        hard_direct_under = {
+            muscle for muscle in direct_under if targets[muscle].direct_minimum_required
+        }
+        hard_effective_under = {
+            muscle
+            for muscle, target in targets.items()
+            if target.minimum_coverage_required
+            and effective.get(muscle.value, 0) < target.minimum_effective_sets
+        }
+        repairing_hard_minimum = bool(hard_direct_under or hard_effective_under)
+        if repairing_hard_minimum and hard_direct_under:
+            redistribution = _select_set_redistribution(
+                repaired,
+                hard_direct_under,
+                targets,
+                request,
+                ruleset,
+            )
+            if redistribution is not None:
+                day_index, recipient_index, donor_index = redistribution
+                recipient = repaired[day_index][recipient_index]
+                donor = repaired[day_index][donor_index]
+                repaired[day_index][recipient_index] = replace(
+                    recipient,
+                    sets=recipient.sets + 1,
+                    estimated_minutes=estimate_exercise_minutes(
+                        recipient.sets + 1,
+                        recipient.rest_seconds,
+                        recipient.warmup_sets,
+                        ruleset,
+                    ),
+                    reason_codes=recipient.reason_codes
+                    + ("VOLUME_REPAIR_REDISTRIBUTED_SET_TO_DIRECT_MINIMUM",),
+                )
+                repaired[day_index][donor_index] = replace(
+                    donor,
+                    sets=donor.sets - 1,
+                    estimated_minutes=estimate_exercise_minutes(
+                        donor.sets - 1,
+                        donor.rest_seconds,
+                        donor.warmup_sets,
+                        ruleset,
+                    ),
+                    reason_codes=donor.reason_codes
+                    + ("VOLUME_REPAIR_REDISTRIBUTED_SET_FROM_SURPLUS",),
+                )
+                reasons.append("VOLUME_REPAIR_REDISTRIBUTED_SET_FOR_MINIMUM_COVERAGE")
+                continue
         addition = _select_addition_candidate(
             repaired,
-            direct_under,
-            effective_under,
+            hard_direct_under if repairing_hard_minimum else direct_under,
+            hard_effective_under if repairing_hard_minimum else effective_under,
             direct,
             targets,
-            tuple(day.cardio.duration_minutes if day.cardio else 0 for day in days),
+            tuple(
+                day.cardio.duration_minutes
+                if day.cardio
+                else (0 if repairing_hard_minimum else cardio_reserve_minutes)
+                for day in days
+            ),
             request,
             ruleset,
         )
         if addition is None:
-            break
+            exercise_addition = _select_exercise_addition(
+                repaired,
+                days,
+                hard_direct_under,
+                hard_effective_under,
+                candidates,
+                request,
+                targets,
+                ruleset,
+            )
+            if exercise_addition is None:
+                if repairing_hard_minimum and not candidates:
+                    soft_addition = _select_addition_candidate(
+                        repaired,
+                        direct_under,
+                        effective_under,
+                        direct,
+                        targets,
+                        tuple(day.cardio.duration_minutes if day.cardio else 0 for day in days),
+                        request,
+                        ruleset,
+                    )
+                    if soft_addition is not None:
+                        day_index, exercise_index, exercise, reason = soft_addition
+                        repaired[day_index][exercise_index] = replace(
+                            exercise,
+                            sets=exercise.sets + 1,
+                            estimated_minutes=estimate_exercise_minutes(
+                                exercise.sets + 1,
+                                exercise.rest_seconds,
+                                exercise.warmup_sets,
+                                ruleset,
+                            ),
+                            reason_codes=exercise.reason_codes + (reason,),
+                        )
+                        reasons.append(reason)
+                        continue
+                break
+            day_index, programmed = exercise_addition
+            repaired[day_index].append(programmed)
+            reasons.append("VOLUME_REPAIR_ADDED_EXERCISE_FOR_MINIMUM_COVERAGE")
+            continue
         day_index, exercise_index, exercise, reason = addition
         repaired[day_index][exercise_index] = replace(
             exercise,
@@ -121,6 +226,215 @@ def repair_weekly_volume(
         reasons.append(reason)
 
     return _rebuild_days(days, repaired, ruleset), tuple(dict.fromkeys(reasons))
+
+
+def _select_set_redistribution(
+    days: list[list[ProgrammedExercise]],
+    hard_direct_under: set[MuscleGroup],
+    targets: dict[MuscleGroup, VolumeTarget],
+    request: NormalizedProgramRequest,
+    ruleset: ProgramRuleset,
+) -> tuple[int, int, int] | None:
+    direct = _direct_sets(days)
+    options: list[tuple[int, int, int, int, str, str]] = []
+    for day_index, exercises in enumerate(days):
+        direct_by_session = _direct_sets([exercises])
+        for recipient_index, recipient in enumerate(exercises):
+            recipient_muscle = recipient.primary_muscle
+            if (
+                not recipient.counts_toward_volume
+                or recipient_muscle not in hard_direct_under
+                or direct_by_session[recipient_muscle] >= ruleset.max_sets_per_muscle_per_session
+            ):
+                continue
+            for donor_index, donor in enumerate(exercises):
+                donor_muscle = donor.primary_muscle
+                if (
+                    donor_index == recipient_index
+                    or not donor.counts_toward_volume
+                    or donor_muscle is None
+                    or donor.sets <= ruleset.minimum_working_sets
+                ):
+                    continue
+                donor_target = targets.get(donor_muscle)
+                if (
+                    donor_target is not None
+                    and donor_target.direct_minimum_required
+                    and direct[donor_muscle] - 1 < donor_target.minimum_direct_sets
+                ):
+                    continue
+                updated_recipient = replace(
+                    recipient,
+                    sets=recipient.sets + 1,
+                    estimated_minutes=estimate_exercise_minutes(
+                        recipient.sets + 1,
+                        recipient.rest_seconds,
+                        recipient.warmup_sets,
+                        ruleset,
+                    ),
+                )
+                updated_donor = replace(
+                    donor,
+                    sets=donor.sets - 1,
+                    estimated_minutes=estimate_exercise_minutes(
+                        donor.sets - 1,
+                        donor.rest_seconds,
+                        donor.warmup_sets,
+                        ruleset,
+                    ),
+                )
+                simulated = [list(items) for items in days]
+                simulated[day_index][recipient_index] = updated_recipient
+                simulated[day_index][donor_index] = updated_donor
+                simulated_volume = calculate_effective_volume(
+                    (item for items in simulated for item in items),
+                    ruleset,
+                )
+                if any(
+                    target.minimum_coverage_required
+                    and muscle not in hard_direct_under
+                    and simulated_volume.effective_sets_by_muscle.get(muscle.value, 0)
+                    < target.minimum_effective_sets
+                    for muscle, target in targets.items()
+                ):
+                    continue
+                duration = ruleset.general_warmup_minutes + sum(
+                    item.estimated_minutes for item in simulated[day_index]
+                )
+                if duration > (
+                    request.source.session_duration_minutes + ruleset.duration_tolerance_minutes
+                ):
+                    continue
+                options.append(
+                    (
+                        donor_muscle in request.source.priority_muscles,
+                        day_index,
+                        recipient_index,
+                        donor_index,
+                        str(recipient.exercise_id),
+                        str(donor.exercise_id),
+                    )
+                )
+    if not options:
+        return None
+    selected = min(options)
+    return selected[1], selected[2], selected[3]
+
+
+def _select_exercise_addition(
+    days: list[list[ProgrammedExercise]],
+    originals: tuple[WorkoutDay, ...],
+    direct_under: set[MuscleGroup],
+    effective_under: set[MuscleGroup],
+    candidates: tuple[ExerciseCandidate, ...],
+    request: NormalizedProgramRequest,
+    targets: dict[MuscleGroup, VolumeTarget],
+    ruleset: ProgramRuleset,
+) -> tuple[int, ProgrammedExercise] | None:
+    needed = direct_under | effective_under
+    if not needed or not candidates:
+        return None
+    selected_ids = {item.exercise_id for day in days for item in day}
+    options: list[tuple[int, int, int, int, str, ProgrammedExercise]] = []
+    for muscle in sorted(needed, key=lambda item: item.value):
+        muscle_candidates = tuple(
+            candidate
+            for candidate in candidates
+            if candidate.primary_muscle is muscle and candidate.id not in selected_ids
+        )
+        for ranked in rank_exercises(request, muscle_candidates, ruleset, needed_muscle=muscle):
+            candidate = ranked.exercise
+            required_sets = (
+                targets[muscle].minimum_direct_sets
+                if muscle in direct_under
+                else targets[muscle].minimum_effective_sets
+            )
+            sets = max(ruleset.minimum_working_sets, required_sets)
+            sets = min(sets, ruleset.max_sets_per_muscle_per_session)
+            rep_min, rep_max, rir, rest = prescription_for(
+                request.primary_goal,
+                candidate.exercise_type,
+                request.training_status,
+                ruleset,
+            )
+            estimated = estimate_exercise_minutes(sets, rest, 0, ruleset)
+            for day_index, (day, original) in enumerate(zip(days, originals, strict=True)):
+                if len(day) >= ruleset.max_exercises_per_session:
+                    continue
+                if not exercise_fits_focus(candidate, original.focus):
+                    continue
+                direct_by_session = _direct_sets([day])
+                if direct_by_session[muscle] + sets > ruleset.max_sets_per_muscle_per_session:
+                    continue
+                duration = (
+                    ruleset.general_warmup_minutes
+                    + sum(item.estimated_minutes for item in day)
+                    + estimated
+                    + (original.cardio.duration_minutes if original.cardio else 0)
+                )
+                if duration > (
+                    request.source.session_duration_minutes + ruleset.duration_tolerance_minutes
+                ):
+                    continue
+                role_repeated = any(
+                    item.primary_muscle is muscle
+                    and item.movement_pattern is candidate.movement_pattern
+                    for item in day
+                )
+                reasons = [
+                    *ranked.reason_codes,
+                    "VOLUME_REPAIR_ADDED_EXERCISE_FOR_MINIMUM_COVERAGE",
+                ]
+                if role_repeated:
+                    reasons.append("DELIBERATE_REDUNDANCY_FOR_MINIMUM_COVERAGE")
+                substitutions = tuple(
+                    item.id
+                    for item in rank_replacement_exercises(
+                        request,
+                        candidate,
+                        candidates,
+                        limit=ruleset.substitution_limit,
+                    )
+                )
+                programmed = ProgrammedExercise(
+                    exercise_id=candidate.id,
+                    exercise_name=candidate.name,
+                    order=len(day) + 1,
+                    sets=sets,
+                    rep_min=rep_min,
+                    rep_max=rep_max,
+                    target_rir=rir,
+                    rest_seconds=rest,
+                    estimated_minutes=estimated,
+                    reason_codes=tuple(dict.fromkeys(reasons)),
+                    substitution_exercise_ids=substitutions,
+                    movement_pattern=candidate.movement_pattern,
+                    primary_muscle=candidate.primary_muscle,
+                    secondary_muscles=candidate.secondary_muscles,
+                    equipment=candidate.equipment,
+                    caution_tags=candidate.caution_tags,
+                    range_of_motion_profile=candidate.range_of_motion_profile,
+                    impact_level=candidate.impact_level,
+                    axial_loading_level=candidate.axial_loading_level,
+                    stability_demand=candidate.stability_demand,
+                    is_active=candidate.is_active,
+                    is_programmable=candidate.is_programmable,
+                    needs_review=candidate.needs_review,
+                )
+                options.append(
+                    (
+                        0 if muscle in direct_under else 1,
+                        day_index,
+                        -ranked.score,
+                        1 if role_repeated else 0,
+                        str(candidate.id),
+                        programmed,
+                    )
+                )
+    if not options:
+        return None
+    selected = min(options, key=lambda item: item[:-1])
+    return selected[1], selected[-1]
 
 
 def _maximum_for(
@@ -307,6 +621,7 @@ def _rebuild_days(
             replace(
                 original,
                 exercises=reordered,
+                title=english_session_title(original.day_index, reordered),
                 estimated_duration_minutes=(
                     ruleset.general_warmup_minutes
                     + sum(item.estimated_minutes for item in reordered)

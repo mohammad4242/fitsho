@@ -2,7 +2,13 @@ import hashlib
 
 from app.exercises.enums import ExerciseType, MuscleGroup
 from app.workouts.program_engine.body_analysis import eligible_body_analysis_priorities
-from app.workouts.program_engine.enums import Goal, StabilityDemand, TrainingStatus
+from app.workouts.program_engine.enums import (
+    Goal,
+    ImpactLimit,
+    SkillDemand,
+    StabilityDemand,
+    TrainingStatus,
+)
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -52,6 +58,33 @@ def rank_exercises(
                 reasons.append("BEGINNER_FRIENDLY")
             if exercise.difficulty.value == "beginner":
                 score += weights["beginner_friendly"]
+            if exercise.skill_demand is SkillDemand.LOW:
+                score += weights["skill"]
+        older_novice = (
+            request.source.age >= ruleset.older_adult_modifier_age
+            and request.training_status is TrainingStatus.NOVICE
+            and request.source.training_age_months < ruleset.novice_training_age_months
+        )
+        if older_novice:
+            demand = (
+                _demand_rank(exercise.stability_demand)
+                + _demand_rank(exercise.skill_demand)
+                + _demand_rank(exercise.impact_level)
+                + max(0, exercise.fatigue_cost - 1)
+                + max(0, exercise.setup_cost - 1)
+            )
+            score -= demand * weights["older_novice_demand_penalty"]
+            if demand:
+                reasons.append("OLDER_NOVICE_DEMAND_PENALTY")
+            if (
+                exercise.stability_demand is StabilityDemand.LOW
+                and exercise.skill_demand is SkillDemand.LOW
+                and exercise.impact_level is ImpactLimit.LOW
+                and exercise.fatigue_cost <= 2
+                and exercise.setup_cost <= 2
+            ):
+                score += weights["older_novice_suitability"]
+                reasons.append("OLDER_NOVICE_SUITABILITY")
         if request.primary_goal in {Goal.STRENGTH, Goal.GENERAL_FITNESS} and (
             exercise.exercise_type is ExerciseType.COMPOUND
         ):
@@ -75,3 +108,7 @@ def rank_exercises(
         )
     ranked.sort(key=lambda item: (-item[0].score, item[1], str(item[0].exercise.id)))
     return tuple(item[0] for item in ranked)
+
+
+def _demand_rank(value: StabilityDemand | SkillDemand | ImpactLimit) -> int:
+    return {"low": 0, "moderate": 1, "high": 2}[value.value]

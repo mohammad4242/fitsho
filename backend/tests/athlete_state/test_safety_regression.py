@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.ai.reasoning import AIReasoningInput, AIReasoningOutputError, AIReasoningService
 from app.athlete_state.generation_adapter import AthleteStateToGenerationOverridesAdapter
 from app.athlete_state.service import AthleteStateBuilder
-from app.exercises.enums import ExerciseCautionTag, MovementPattern
+from app.exercises.enums import ExerciseCautionTag, MovementPattern, MuscleGroup
 from app.profile.enums import WorkoutGenerationMethod
 from app.profile.service import get_profile
 from app.workout_cycles.enums import (
@@ -140,6 +140,20 @@ def test_cycle_two_never_selects_exercise_rejected_by_hard_safety_rule(
     if name == "overhead":
         target = next(
             item for item in catalog if item.movement_pattern is MovementPattern.VERTICAL_PUSH
+        )
+    if name == "movement pattern":
+        alternative = next(
+            item for item in catalog if item.movement_pattern is MovementPattern.VERTICAL_PUSH
+        )
+        catalog = tuple(
+            replace(
+                item,
+                primary_muscle=MuscleGroup.CHEST,
+                secondary_muscles=(MuscleGroup.SHOULDERS,),
+            )
+            if item.id == alternative.id
+            else item
+            for item in catalog
         )
     if name == "balance":
         catalog = tuple(

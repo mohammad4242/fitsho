@@ -126,6 +126,23 @@ def test_no_training_rejects_muscle_building_goal() -> None:
         )
 
 
+def test_strength_goal_accepts_resistance_training_with_maintenance_energy() -> None:
+    scientific = scientific_module()
+    exercise = scientific.StructuredExercise(
+        exercise_type="resistance",
+        days_per_week=3,
+        minutes_per_session=60,
+        met_value=Decimal("5"),
+        met_baseline_kcal_per_kg_hour=Decimal("1"),
+    )
+
+    result = scientific.calculate_targets(
+        make_inputs(fitness_goal="strength", structured_exercise=exercise)
+    )
+
+    assert result.goal_calories.preferred == result.tdee.preferred
+
+
 def test_macro_energy_conflict_is_structured_as_target_infeasible() -> None:
     scientific = scientific_module()
 

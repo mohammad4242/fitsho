@@ -233,6 +233,7 @@ const fa = {
           fat_loss: "چربی‌سوزی",
           build_muscle: "عضله‌سازی",
           body_recomposition: "چربی‌سوزی + عضله‌سازی",
+          strength: "افزایش قدرت",
           improve_fitness: "بهبود آمادگی جسمانی",
           maintain_weight: "حفظ وزن",
         },

@@ -70,8 +70,7 @@ def prescribe_sessions(
                 counts_toward_volume = False
             if primary_muscle is not None and counts_toward_volume:
                 remaining_direct_sets = (
-                    ruleset.max_sets_per_muscle_per_session
-                    - direct_session_sets[primary_muscle]
+                    ruleset.max_sets_per_muscle_per_session - direct_session_sets[primary_muscle]
                 )
                 if remaining_direct_sets < ruleset.minimum_working_sets:
                     sets = ruleset.default_untracked_muscle_sets
@@ -79,7 +78,7 @@ def prescribe_sessions(
                 else:
                     sets = min(sets, remaining_direct_sets)
                     direct_session_sets[primary_muscle] += sets
-            rep_min, rep_max, rir, rest = _prescription_for(
+            rep_min, rep_max, rir, rest = prescription_for(
                 request.primary_goal,
                 exercise.exercise_type,
                 request.training_status,
@@ -172,7 +171,7 @@ def allocate_direct_sets(
     )
 
 
-def _prescription_for(
+def prescription_for(
     goal: Goal,
     exercise_type: ExerciseType,
     status: TrainingStatus,

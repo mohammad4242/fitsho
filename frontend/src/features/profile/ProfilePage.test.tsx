@@ -199,6 +199,7 @@ it("renders every saved profile value in its editable profile page", async () =>
   expect(screen.getByLabelText("قد (سانتی‌متر)")).toHaveValue(178);
   expect(screen.getByLabelText("وزن فعلی (کیلوگرم)")).toHaveValue(76.5);
   expect(screen.getByLabelText("هدف ورزشی")).toHaveValue("build_muscle");
+  expect(screen.getByRole("option", { name: "افزایش قدرت" })).toHaveValue("strength");
 
   await openTrainingPage(user);
   expect(screen.getByLabelText("سطح تجربه")).toHaveValue("beginner");

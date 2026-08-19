@@ -69,6 +69,16 @@ class ProgrammingMetadataBackfillReport:
     field_updates: dict[str, int] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class InferredExerciseDemands:
+    body_position: BodyPosition
+    stability_demand: StabilityDemand
+    skill_demand: SkillDemand
+    impact_level: ImpactLimit
+    fatigue_cost: int
+    setup_cost: int
+
+
 def _values(items: Iterable[object]) -> set[object]:
     return set(items)
 
@@ -141,6 +151,77 @@ def _infer_range_of_motion_profile(exercise: Exercise) -> list[str] | None:
     cautions = _values(item.caution_tag for item in exercise.caution_tag_items)
     profile = [value for caution, value in _ROM_BY_CAUTION if caution in cautions]
     return profile or None
+
+
+def infer_exercise_demands(exercise: Exercise) -> InferredExerciseDemands:
+    """Infer conservative demand signals for catalog rows with incomplete metadata."""
+
+    name = _name_tokens(exercise)
+    equipment = _values(item.equipment for item in exercise.equipment_items)
+    body_position = _infer_body_position(exercise) or BodyPosition.STANDING
+    stability = _infer_stability_demand(exercise, body_position) or StabilityDemand.MODERATE
+    skill = _infer_skill_demand(exercise)
+    impact = ImpactLimit.LOW
+    fatigue = _FATIGUE_BY_TYPE.get(exercise.exercise_type, 2)
+    setup = 1 if equipment == {Equipment.BODYWEIGHT} else 2
+
+    if any(
+        token in name
+        for token in (
+            "between chairs",
+            "plyometric",
+            "plank pike",
+            "with straps",
+            "ring ",
+        )
+    ):
+        stability = StabilityDemand.HIGH
+    if any(
+        token in name
+        for token in (
+            "dip",
+            "between chairs",
+            "plyometric",
+            "plank pike",
+            "bench pull up",
+            "with straps",
+            "ring ",
+        )
+    ):
+        skill = SkillDemand.HIGH
+    if "cardio exercise" in name or "cardio machine" in name:
+        impact = ImpactLimit.MODERATE
+        fatigue = max(fatigue, 3)
+    if any(
+        token in name
+        for token in (
+            "plyometric",
+            "jump",
+            "burpee",
+            "bound",
+            "running",
+            "mountain climber",
+        )
+    ):
+        impact = ImpactLimit.HIGH
+        fatigue = max(fatigue, 3)
+    if any(token in name for token in ("dip", "plyometric", "burpee", "plank pike")):
+        fatigue = max(fatigue, 4)
+    if any(token in name for token in ("between chairs", "with straps", "ring ")):
+        setup = 4
+    elif "bench pull up" in name:
+        setup = 3
+    elif "dip" in name:
+        setup = max(setup, 2)
+
+    return InferredExerciseDemands(
+        body_position=body_position,
+        stability_demand=stability,
+        skill_demand=skill,
+        impact_level=impact,
+        fatigue_cost=fatigue,
+        setup_cost=setup,
+    )
 
 
 def infer_programming_metadata(exercise: Exercise) -> dict[str, object]:

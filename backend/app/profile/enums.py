@@ -33,6 +33,7 @@ class FitnessGoal(StrEnum):
     FAT_LOSS = "fat_loss"
     BUILD_MUSCLE = "build_muscle"
     BODY_RECOMPOSITION = "body_recomposition"
+    STRENGTH = "strength"
     # Kept for profiles created before the five-goal onboarding update.
     IMPROVE_FITNESS = "improve_fitness"
     MAINTAIN_WEIGHT = "maintain_weight"

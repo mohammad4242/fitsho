@@ -1,4 +1,10 @@
-from app.exercises.enums import Difficulty, ExerciseCautionTag, MovementPattern
+from app.exercises.enums import (
+    Difficulty,
+    ExerciseCautionTag,
+    ExerciseLabel,
+    ExerciseType,
+    MovementPattern,
+)
 from app.workouts.program_engine.enums import (
     BalanceAbility,
     ImpactLimit,
@@ -38,11 +44,20 @@ _BALANCE_RANK = {
 }
 
 
+def _looks_like_mobility_content(exercise_name: str) -> bool:
+    normalized = exercise_name.lower().replace("-", " ")
+    return any(
+        marker in normalized
+        for marker in ("stretch", "mobility", " yoga", "yoga ", " pose", "pose ", "asana")
+    )
+
+
 def filter_eligible_exercises(
     request: NormalizedProgramRequest,
     catalog: list[ExerciseCandidate] | tuple[ExerciseCandidate, ...],
 ) -> EligibilityResult:
     eligible: list[ExerciseCandidate] = []
+    cardio_eligible: list[ExerciseCandidate] = []
     rejected: list[RejectedCandidate] = []
     constraints = request.constraints
     for exercise in catalog:
@@ -84,8 +99,26 @@ def filter_eligible_exercises(
             or not exercise.range_of_motion_profile.issubset(constraints.allowed_range_of_motion)
         ):
             reasons.append("EXERCISE_REJECTED_RANGE_OF_MOTION")
+        if not reasons and (
+            exercise.exercise_type is ExerciseType.MOBILITY
+            or _looks_like_mobility_content(exercise.name)
+        ):
+            reasons.append("EXERCISE_REJECTED_NOT_RESISTANCE_TRAINING")
         if reasons:
             rejected.append(RejectedCandidate(exercise_id=exercise.id, reason_codes=tuple(reasons)))
+        elif ExerciseLabel.CARDIO in exercise.labels:
+            cardio_eligible.append(exercise)
+        elif exercise.exercise_type is ExerciseType.OTHER:
+            rejected.append(
+                RejectedCandidate(
+                    exercise_id=exercise.id,
+                    reason_codes=("EXERCISE_REJECTED_NOT_RESISTANCE_TRAINING",),
+                )
+            )
         else:
             eligible.append(exercise)
-    return EligibilityResult(eligible=tuple(eligible), rejected=tuple(rejected))
+    return EligibilityResult(
+        eligible=tuple(eligible),
+        rejected=tuple(rejected),
+        cardio_eligible=tuple(cardio_eligible),
+    )

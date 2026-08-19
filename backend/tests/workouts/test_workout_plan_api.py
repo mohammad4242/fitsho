@@ -7,11 +7,23 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.ai.schemas import ProviderErrorCode
-from app.exercises.enums import BodyRegion, Difficulty, MediaType, MuscleGroup
-from app.exercises.models import Exercise, ExerciseAlternative
+from app.exercises.enums import (
+    BodyRegion,
+    Difficulty,
+    MediaType,
+    MuscleGroup,
+)
+from app.exercises.models import (
+    Exercise,
+    ExerciseAlternative,
+    ExerciseCautionTagItem,
+    ExerciseEquipment,
+    ExerciseLabelItem,
+    ExerciseSecondaryMuscle,
+)
 from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.workouts.enums import WorkoutPlanStatus
-from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
+from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise, WorkoutPlanGeneration
 from app.workouts.schemas import ProgramGenerationOverrides
 from app.workouts.service import (
     GenerationCooldownError,
@@ -20,6 +32,7 @@ from app.workouts.service import (
     WorkoutGenerationFailedError,
     WorkoutPlanGenerationResult,
 )
+from tests.workouts.program_engine.golden_fixtures import full_catalog
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 PROFILE = {
@@ -95,6 +108,70 @@ def _exercise(
         media_type=MediaType.PLACEHOLDER,
         is_active=is_active,
     )
+
+
+def _store_program_engine_catalog(db: Session) -> None:
+    lower = {
+        MuscleGroup.GLUTES,
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.CALVES,
+    }
+    for candidate in full_catalog():
+        region = (
+            BodyRegion.CORE
+            if candidate.primary_muscle is MuscleGroup.ABS
+            else BodyRegion.LOWER_BODY
+            if candidate.primary_muscle in lower
+            else BodyRegion.UPPER_BODY
+        )
+        exercise = Exercise(
+            id=candidate.id,
+            slug=f"strength-api-{candidate.id}",
+            name_en=candidate.name,
+            name_fa=f"حرکت {candidate.name}",
+            body_region=region,
+            primary_muscle=candidate.primary_muscle,
+            muscle_focus=(
+                next(iter(FOCUSES_BY_MUSCLE[candidate.primary_muscle]), None)
+                if candidate.primary_muscle is not None
+                else None
+            ),
+            movement_pattern=candidate.movement_pattern,
+            exercise_type=candidate.exercise_type,
+            difficulty=candidate.difficulty,
+            instructions_en=["Set up.", "Perform the movement.", "Finish safely."],
+            instructions_fa=["شروع کن.", "حرکت را انجام بده.", "ایمن تمام کن."],
+            safety_notes_en=["Move with control."],
+            safety_notes_fa=["کنترل‌شده حرکت کن."],
+            media_path="/exercises/exercise-placeholder.svg",
+            media_type=MediaType.PLACEHOLDER,
+            is_active=candidate.is_active,
+            is_programmable=candidate.is_programmable,
+            needs_review=candidate.needs_review,
+            body_position=candidate.body_position,
+            stability_demand=candidate.stability_demand,
+            skill_demand=candidate.skill_demand,
+            impact_level=candidate.impact_level,
+            axial_loading_level=candidate.axial_loading_level,
+            fatigue_cost=candidate.fatigue_cost,
+            setup_cost=candidate.setup_cost,
+            laterality=candidate.laterality,
+            substitution_group=candidate.substitution_group,
+            range_of_motion_profile=list(candidate.range_of_motion_profile),
+        )
+        exercise.equipment_items.extend(
+            ExerciseEquipment(equipment=value) for value in candidate.equipment
+        )
+        exercise.secondary_muscles.extend(
+            ExerciseSecondaryMuscle(muscle=value) for value in candidate.secondary_muscles
+        )
+        exercise.caution_tag_items.extend(
+            ExerciseCautionTagItem(caution_tag=value) for value in candidate.caution_tags
+        )
+        exercise.labels.extend(ExerciseLabelItem(label=value) for value in candidate.labels)
+        db.add(exercise)
+    db.commit()
 
 
 def test_workout_plan_routes_require_authentication(client: TestClient) -> None:
@@ -396,6 +473,48 @@ def test_generate_uses_authenticated_user_and_returns_reuse_flag(
     assert response.status_code == 200
     assert response.json()["reused"] is True
     assert called_user_ids == [user_id]
+
+
+def test_strength_profile_is_created_and_reaches_real_fitsho_coach_generation(
+    client: TestClient, db: Session
+) -> None:
+    registration = client.post(
+        "/api/v1/auth/register",
+        headers=ORIGIN,
+        json={"email": "strength-profile@example.com", "password": "long password"},
+    )
+    assert registration.status_code == 201
+    profile = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={
+            **PROFILE,
+            "fitness_goal": "strength",
+            "experience_level": "advanced",
+            "training_age_months": 96,
+            "training_days_per_week": 5,
+            "session_duration_minutes": 75,
+        },
+    )
+    assert profile.status_code == 201
+    assert profile.json()["fitness_goal"] == "strength"
+    _store_program_engine_catalog(db)
+
+    response = client.post(
+        "/api/v1/workout-plans/generate",
+        headers=ORIGIN,
+        json={"seed_optional": 20260820},
+    )
+
+    generation = (
+        db.query(WorkoutPlanGeneration).order_by(WorkoutPlanGeneration.created_at.desc()).first()
+    )
+    assert response.status_code == 200, (
+        response.json(),
+        generation.validation_diagnostics if generation is not None else None,
+    )
+    assert response.json()["plan"]["primary_goal"] == "strength"
+    assert response.json()["plan"]["validation_report"]["errors"] == []
 
 
 def test_generate_accepts_typed_optional_engine_evidence(client: TestClient, db: Session) -> None:

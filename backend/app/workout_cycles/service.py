@@ -874,6 +874,7 @@ _FEEDBACK_GOAL_TO_PROFILE_GOAL: dict[Goal, FitnessGoal] = {
     Goal.MUSCLE_GAIN: FitnessGoal.BUILD_MUSCLE,
     Goal.BODY_RECOMPOSITION: FitnessGoal.BODY_RECOMPOSITION,
     Goal.GENERAL_FITNESS: FitnessGoal.IMPROVE_FITNESS,
+    Goal.STRENGTH: FitnessGoal.STRENGTH,
 }
 
 

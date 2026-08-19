@@ -21,15 +21,14 @@ from app.ai.schemas import (
 )
 from app.body_analysis.providers import ProviderRoutingPreferences
 from app.exercises.enums import (
-    Difficulty,
     Equipment,
     ExerciseCautionTag,
     ExerciseContentType,
-    ExerciseType,
     MediaPresentation,
     MuscleGroup,
 )
 from app.exercises.models import Exercise
+from app.exercises.programming_metadata import infer_exercise_demands
 from app.profile.enums import ExperienceLevel, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.service import ProfileSnapshot, get_profile
 from app.training_templates.engine_reference import load_template_references
@@ -1072,30 +1071,19 @@ class WorkoutGenerationService:
     ) -> _LegacyExerciseProgrammingMetadata:
         """Infer only the legacy defaults needed by incomplete catalog rows."""
 
-        stability_demand = (
-            StabilityDemand.HIGH
-            if ExerciseCautionTag.BALANCE_DEMAND in caution_tags
-            else StabilityDemand.LOW
-            if exercise.exercise_type in {ExerciseType.ISOLATION, ExerciseType.CORE}
-            else StabilityDemand.MODERATE
-        )
-        skill_demand = {
-            Difficulty.BEGINNER: SkillDemand.LOW,
-            Difficulty.INTERMEDIATE: SkillDemand.MODERATE,
-            Difficulty.ADVANCED: SkillDemand.HIGH,
-        }[exercise.difficulty]
+        demands = infer_exercise_demands(exercise)
         return _LegacyExerciseProgrammingMetadata(
-            body_position=BodyPosition.STANDING,
-            stability_demand=stability_demand,
-            skill_demand=skill_demand,
-            impact_level=ImpactLimit.LOW,
+            body_position=demands.body_position,
+            stability_demand=demands.stability_demand,
+            skill_demand=demands.skill_demand,
+            impact_level=demands.impact_level,
             axial_loading_level=(
                 LoadLimit.HIGH
                 if ExerciseCautionTag.LOWER_BACK_LOADING in caution_tags
                 else LoadLimit.LOW
             ),
-            fatigue_cost=3 if exercise.exercise_type is ExerciseType.COMPOUND else 1,
-            setup_cost=1,
+            fatigue_cost=demands.fatigue_cost,
+            setup_cost=demands.setup_cost,
             laterality=Laterality.BILATERAL,
             substitution_group=exercise.movement_pattern.value,
             range_of_motion_profile=(

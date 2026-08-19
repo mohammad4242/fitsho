@@ -284,6 +284,9 @@ class VolumeTarget:
     fractional_sets: float
     effective_target_sets: int
     minimum_direct_sets: int
+    minimum_effective_sets: int = 0
+    minimum_coverage_required: bool = False
+    direct_minimum_required: bool = False
 
     @property
     def direct_sets(self) -> int:
@@ -322,6 +325,7 @@ class RejectedCandidate:
 class EligibilityResult:
     eligible: tuple[ExerciseCandidate, ...]
     rejected: tuple[RejectedCandidate, ...]
+    cardio_eligible: tuple[ExerciseCandidate, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -7,6 +7,7 @@ export const fitnessGoals = [
   "fat_loss",
   "build_muscle",
   "body_recomposition",
+  "strength",
 ] as const;
 const legacyFitnessGoals = [
   "improve_fitness",

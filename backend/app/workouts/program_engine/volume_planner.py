@@ -34,6 +34,8 @@ MAJOR_MUSCLES = (
     MuscleGroup.ABS,
     MuscleGroup.CALVES,
 )
+# Calves remain a soft accessory target unless the user prioritizes them.
+MINIMUM_COVERAGE_MUSCLES = frozenset(MAJOR_MUSCLES) - {MuscleGroup.CALVES}
 SECONDARY_MUSCLES = (
     MuscleGroup.BICEPS,
     MuscleGroup.TRICEPS,
@@ -173,6 +175,18 @@ def plan_weekly_volume(
                 fractional_sets=round(sets * ruleset.secondary_set_credit, 1),
                 effective_target_sets=sets,
                 minimum_direct_sets=min(muscle_minimum, sets),
+                minimum_effective_sets=min(
+                    (
+                        muscle_minimum
+                        if muscle in effective_priorities
+                        else ruleset.minimum_coverage_sets[request.training_status]
+                    ),
+                    sets,
+                ),
+                minimum_coverage_required=(
+                    muscle in MINIMUM_COVERAGE_MUSCLES or muscle in effective_priorities
+                ),
+                direct_minimum_required=muscle in effective_priorities,
             )
         )
     return WeeklyVolumePlan(targets=tuple(targets), reason_codes=tuple(dict.fromkeys(reasons)))
