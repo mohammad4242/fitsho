@@ -9,6 +9,7 @@ from tests.workouts.program_engine.golden_fixtures import (
     full_catalog,
     golden_scenarios,
     impossible_equipment_request,
+    request,
 )
 
 FOUR_DAY_SPLIT_TYPES = frozenset(
@@ -220,3 +221,96 @@ def test_bodyweight_program_does_not_select_dumbbells() -> None:
         for day in result.program.weekly_schedule
         for item in day.exercises
     )
+
+
+def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> None:
+    source = request(
+        biological_sex_optional="female",
+        primary_goal="build_muscle",
+        training_experience="intermediate",
+        training_age_months=30,
+        available_training_days=4,
+        session_duration_minutes=60,
+        available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
+        priority_muscles=[MuscleGroup.GLUTES, MuscleGroup.QUADRICEPS],
+    )
+    catalog = [item for item in full_catalog() if item.name != "Isometric Shrug"]
+
+    first = generate_program(source, catalog, RULESET)
+    second = generate_program(source, list(reversed(catalog)), RULESET)
+
+    assert first.program is not None, first.errors
+    assert second.program == first.program
+    assert first.program.validation_report.is_valid
+    assert all(
+        RULESET.minimum_exercises_per_session
+        <= len(day.exercises)
+        <= RULESET.max_exercises_per_session
+        for day in first.program.weekly_schedule
+    )
+    assert all(
+        day.estimated_duration_minutes
+        <= source.session_duration_minutes + RULESET.duration_tolerance_minutes
+        for day in first.program.weekly_schedule
+    )
+    selected = [item for day in first.program.weekly_schedule for item in day.exercises]
+    assert all(item.equipment.issubset(source.available_equipment) for item in selected)
+    assert all(
+        item.is_active and item.is_programmable and not item.needs_review for item in selected
+    )
+    recovery = next(
+        entry for entry in first.program.decision_trace if entry["stage"] == "construction_recovery"
+    )
+    assert "SESSION_SUPPLEMENTED_TO_MINIMUM" in recovery["reason_codes"]
+
+
+def test_generation_exhausts_safe_splits_when_required_pull_is_unavailable() -> None:
+    source = request(
+        primary_goal="build_muscle",
+        training_experience="intermediate",
+        training_age_months=30,
+        available_training_days=4,
+        session_duration_minutes=60,
+    )
+    catalog = [
+        item
+        for item in full_catalog()
+        if item.movement_pattern
+        not in {MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL}
+    ]
+
+    result = generate_program(source, catalog, RULESET)
+
+    assert result.program is None
+    assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
+    assert result.errors[0] == "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED"
+    assert "REQUIRED_MOVEMENT_PATTERN_MISSING" in result.errors
+    assert result.decision_trace[-1]["status"] == "exhausted"
+
+
+def test_generation_uses_next_ranked_split_when_selected_layout_cannot_be_filled() -> None:
+    source = request(
+        primary_goal="build_muscle",
+        training_experience="intermediate",
+        training_age_months=30,
+        available_training_days=4,
+        session_duration_minutes=60,
+        priority_muscles=[MuscleGroup.GLUTES, MuscleGroup.QUADRICEPS],
+    )
+    catalog = [
+        item
+        for item in full_catalog()
+        if item.primary_muscle not in {MuscleGroup.SHOULDERS, MuscleGroup.TRAPS}
+    ]
+
+    result = generate_program(source, catalog, RULESET)
+
+    assert result.program is not None, result.errors
+    assert result.program.split.split_type is SplitType.UPPER_LOWER
+    recovery = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "construction_recovery"
+    )
+    assert recovery["reason_codes"] == ("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE",)
+    assert recovery["rejected_splits"][0]["split"] == SplitType.BODY_PART_ROTATION.value

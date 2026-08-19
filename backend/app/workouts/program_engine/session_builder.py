@@ -30,6 +30,8 @@ CORE_PATTERNS = frozenset(
     }
 )
 SHOULDER_PATTERNS = frozenset({MovementPattern.VERTICAL_PUSH, MovementPattern.SHOULDER_ABDUCTION})
+ARM_PATTERNS = frozenset({MovementPattern.ELBOW_FLEXION, MovementPattern.ELBOW_EXTENSION})
+LOWER_ACCESSORY_PATTERNS = frozenset({MovementPattern.KNEE_FLEXION, MovementPattern.CALF_RAISE})
 
 
 @dataclass(frozen=True)
@@ -79,9 +81,7 @@ def build_sessions(
             if not options:
                 if slot.required:
                     missing = sorted(pattern.value for pattern in slot.patterns)
-                    session_reasons = session_reasons + (
-                        f"REQUIRED_PATTERN_UNAVAILABLE:{missing}",
-                    )
+                    session_reasons = session_reasons + (f"REQUIRED_PATTERN_UNAVAILABLE:{missing}",)
                 continue
             ranked = rank_exercises(
                 request,
@@ -103,6 +103,29 @@ def build_sessions(
                 selection_reasons.append("CORE_MOVEMENT_REPEATED_FOR_PROGRESSION")
             reasons[selected.exercise.id] = tuple(selection_reasons)
             usage[selected.exercise.id] += 1
+
+        while len(chosen) < min(capacity, ruleset.minimum_exercises_per_session):
+            options = _compatible_supplements(focus, exercises, chosen)
+            if not options:
+                session_reasons = session_reasons + (
+                    "SESSION_MINIMUM_UNSATISFIED_AFTER_SUPPLEMENTS",
+                )
+                break
+            selected = min(
+                rank_exercises(request, options, ruleset),
+                key=lambda item: (
+                    usage[item.exercise.id],
+                    -item.score,
+                    str(item.exercise.id),
+                ),
+            )
+            chosen.append(selected.exercise)
+            selection_reasons = [*selected.reason_codes, "COMPATIBLE_SESSION_SUPPLEMENT"]
+            if usage[selected.exercise.id]:
+                selection_reasons.append("CORE_MOVEMENT_REPEATED_FOR_PROGRESSION")
+            reasons[selected.exercise.id] = tuple(selection_reasons)
+            usage[selected.exercise.id] += 1
+            session_reasons = session_reasons + ("SESSION_SUPPLEMENTED_TO_MINIMUM",)
 
         chosen.sort(
             key=lambda item: (
@@ -139,7 +162,7 @@ def build_sessions(
                 exercises=chosen,
                 selection_reasons=reasons,
                 substitutions=substitutions,
-                reason_codes=session_reasons,
+                reason_codes=tuple(dict.fromkeys(session_reasons)),
             )
         )
     return tuple(sessions)
@@ -152,6 +175,101 @@ def _by_pattern(
         pattern: tuple(item for item in exercises if item.movement_pattern is pattern)
         for pattern in MovementPattern
     }
+
+
+def _compatible_supplements(
+    focus: str,
+    exercises: tuple[ExerciseCandidate, ...],
+    chosen: list[ExerciseCandidate],
+) -> list[ExerciseCandidate]:
+    patterns, muscles = _supplement_scope(focus)
+    chosen_ids = {item.id for item in chosen}
+    return [
+        item
+        for item in exercises
+        if item.id not in chosen_ids
+        and item.movement_pattern in patterns
+        and (muscles is None or item.primary_muscle in muscles)
+    ]
+
+
+def _supplement_scope(
+    focus: str,
+) -> tuple[frozenset[MovementPattern], frozenset[MuscleGroup] | None]:
+    if focus.startswith("full_body"):
+        return (
+            PUSH_PATTERNS
+            | PULL_PATTERNS
+            | KNEE_PATTERNS
+            | HINGE_PATTERNS
+            | CORE_PATTERNS
+            | LOWER_ACCESSORY_PATTERNS,
+            None,
+        )
+    if focus.startswith("upper"):
+        return (
+            PUSH_PATTERNS
+            | PULL_PATTERNS
+            | ARM_PATTERNS
+            | frozenset({MovementPattern.SHOULDER_ABDUCTION, MovementPattern.SHRUG}),
+            frozenset(
+                {
+                    MuscleGroup.CHEST,
+                    MuscleGroup.BACK,
+                    MuscleGroup.SHOULDERS,
+                    MuscleGroup.TRAPS,
+                    MuscleGroup.BICEPS,
+                    MuscleGroup.TRICEPS,
+                }
+            ),
+        )
+    if focus in {"lower", "legs"} or focus.startswith("lower"):
+        return (
+            KNEE_PATTERNS | HINGE_PATTERNS | CORE_PATTERNS | LOWER_ACCESSORY_PATTERNS,
+            frozenset(
+                {
+                    MuscleGroup.QUADRICEPS,
+                    MuscleGroup.HAMSTRINGS,
+                    MuscleGroup.GLUTES,
+                    MuscleGroup.CALVES,
+                    MuscleGroup.ABS,
+                }
+            ),
+        )
+    scopes: dict[str, tuple[frozenset[MovementPattern], frozenset[MuscleGroup]]] = {
+        "push": (
+            PUSH_PATTERNS | frozenset({MovementPattern.ELBOW_EXTENSION}),
+            frozenset({MuscleGroup.CHEST, MuscleGroup.SHOULDERS, MuscleGroup.TRICEPS}),
+        ),
+        "pull": (
+            PULL_PATTERNS | frozenset({MovementPattern.ELBOW_FLEXION}),
+            frozenset({MuscleGroup.BACK, MuscleGroup.BICEPS}),
+        ),
+        "chest_triceps": (
+            PUSH_PATTERNS | frozenset({MovementPattern.ELBOW_EXTENSION}),
+            frozenset({MuscleGroup.CHEST, MuscleGroup.TRICEPS}),
+        ),
+        "back_biceps": (
+            PULL_PATTERNS | frozenset({MovementPattern.ELBOW_FLEXION}),
+            frozenset({MuscleGroup.BACK, MuscleGroup.BICEPS}),
+        ),
+        "shoulders_traps": (
+            SHOULDER_PATTERNS | frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.SHRUG}),
+            frozenset({MuscleGroup.SHOULDERS, MuscleGroup.TRAPS}),
+        ),
+        "quadriceps_calves": (
+            KNEE_PATTERNS | frozenset({MovementPattern.CALF_RAISE}),
+            frozenset({MuscleGroup.QUADRICEPS, MuscleGroup.CALVES}),
+        ),
+        "posterior_chain_core": (
+            HINGE_PATTERNS | CORE_PATTERNS | frozenset({MovementPattern.KNEE_FLEXION}),
+            frozenset({MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.ABS}),
+        ),
+    }
+    return scopes.get(
+        focus,
+        (PUSH_PATTERNS | PULL_PATTERNS | KNEE_PATTERNS | HINGE_PATTERNS | CORE_PATTERNS, None),
+    )
 
 
 def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:

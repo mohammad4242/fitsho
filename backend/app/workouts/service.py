@@ -276,6 +276,11 @@ class WorkoutGenerationService:
                             }
                             for error in result.errors
                         ],
+                        **(
+                            {"decision_trace": _json_ready(result.decision_trace)}
+                            if result.decision_trace
+                            else {}
+                        ),
                     }
                 ],
             )

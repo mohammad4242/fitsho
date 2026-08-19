@@ -31,11 +31,14 @@ from app.workouts.program_engine.schemas import (
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_builder import build_sessions
-from app.workouts.program_engine.split_selector import select_split
+from app.workouts.program_engine.split_selector import rank_split_candidates
 from app.workouts.program_engine.template_selector import select_template_reference
 from app.workouts.program_engine.template_sessions import build_template_sessions
 from app.workouts.program_engine.validation import validate_program
-from app.workouts.program_engine.volume_history import derive_previous_volume_baseline
+from app.workouts.program_engine.volume_history import (
+    PreviousVolumeBaseline,
+    derive_previous_volume_baseline,
+)
 from app.workouts.program_engine.volume_planner import (
     SECONDARY_MUSCLES,
     TRACKED_MUSCLES,
@@ -105,28 +108,96 @@ def generate_program(
             )
             if reference_result.is_success:
                 return reference_result
-    split = select_split(normalized, ruleset)
     previous_volume = derive_previous_volume_baseline(normalized.source.recent_training_history)
+    reserve = cardio_reserve_minutes(normalized, eligibility.eligible, ruleset)
+    rejected_splits: list[dict[str, object]] = []
+    collected_errors: list[str] = []
+    for attempt_index, candidate in enumerate(rank_split_candidates(normalized, ruleset)):
+        split = candidate
+        if attempt_index:
+            split = replace(
+                candidate,
+                reason_codes=candidate.reason_codes
+                + ("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE",),
+            )
+        result = _program_for_split(
+            request,
+            normalized,
+            safety.status,
+            safety.reason_codes,
+            eligibility.rejected,
+            eligibility.eligible,
+            split,
+            ruleset,
+            previous_volume=previous_volume,
+            cardio_reserve=reserve,
+            rejected_splits=tuple(rejected_splits),
+        )
+        if result.is_success:
+            return result
+        collected_errors.extend(result.errors)
+        rejected_splits.append(
+            {
+                "split": split.split_type.value,
+                "day_focuses": split.day_focuses,
+                "status": "rejected",
+                "reason_codes": result.errors,
+            }
+        )
+    errors = (
+        "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED",
+        *tuple(dict.fromkeys(collected_errors)),
+    )
+    return ProgramGenerationResult(
+        program=None,
+        error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
+        errors=errors,
+        safety_status=safety.status,
+        rejected_candidates=eligibility.rejected,
+        decision_trace=(
+            {
+                "stage": "construction_recovery",
+                "status": "exhausted",
+                "attempts": tuple(rejected_splits),
+                "reason_codes": errors,
+            },
+        ),
+    )
+
+
+def _program_for_split(
+    request: ProgramGenerationRequest,
+    normalized: NormalizedProgramRequest,
+    safety_status: SafetyStatus,
+    safety_reasons: tuple[str, ...],
+    rejected: tuple[RejectedCandidate, ...],
+    eligible: tuple[ExerciseCandidate, ...],
+    split: SplitPlan,
+    ruleset: ProgramRuleset,
+    *,
+    previous_volume: PreviousVolumeBaseline,
+    cardio_reserve: int,
+    rejected_splits: tuple[dict[str, object], ...],
+) -> ProgramGenerationResult:
     volume = plan_weekly_volume(normalized, split, ruleset, previous_volume=previous_volume)
     try:
-        drafts = build_sessions(normalized, split, volume, eligibility.eligible, ruleset)
+        drafts = build_sessions(normalized, split, volume, eligible, ruleset)
     except ValueError as exc:
         return ProgramGenerationResult(
             program=None,
             error_code=GenerationErrorCode.NO_SAFE_EXERCISE_FOR_PATTERN,
             errors=(str(exc),),
-            safety_status=safety.status,
-            rejected_candidates=eligibility.rejected,
+            safety_status=safety_status,
+            rejected_candidates=rejected,
         )
-    reserve = cardio_reserve_minutes(normalized, eligibility.eligible, ruleset)
     days = prescribe_sessions(
         normalized,
         drafts,
         volume,
         ruleset,
-        cardio_reserve_minutes=reserve,
+        cardio_reserve_minutes=cardio_reserve,
     )
-    days = add_cardio(normalized, days, eligibility.eligible, ruleset)
+    days = add_cardio(normalized, days, eligible, ruleset)
     days, repair_reasons = repair_weekly_volume(days, normalized, volume, ruleset)
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises),
@@ -161,8 +232,7 @@ def generate_program(
         ),
         "previous_volume_baseline": {
             "direct_sets_by_muscle": {
-                muscle.value: sets
-                for muscle, sets in previous_volume.direct_sets_by_muscle.items()
+                muscle.value: sets for muscle, sets in previous_volume.direct_sets_by_muscle.items()
             },
             "effective_sets_by_muscle": {
                 muscle.value: sets
@@ -180,15 +250,42 @@ def generate_program(
         "recovery_days": ruleset.days_per_week - len(days),
     }
     body_trace = body_analysis_trace(normalized, ruleset)
+    session_reasons = tuple(
+        dict.fromkeys(reason for draft in drafts for reason in draft.reason_codes)
+    )
+    recovery_reasons = tuple(
+        dict.fromkeys(
+            (
+                *(("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE",) if rejected_splits else ()),
+                *session_reasons,
+            )
+        )
+    )
     trace: tuple[dict[str, object], ...] = (
         {"stage": "normalization", "assumptions": normalized.assumptions},
-        {"stage": "safety", "status": safety.status.value, "reasons": safety.reason_codes},
+        {"stage": "safety", "status": safety_status.value, "reasons": safety_reasons},
         {
             "stage": "eligibility",
-            "eligible_count": len(eligibility.eligible),
-            "rejected_count": len(eligibility.rejected),
+            "eligible_count": len(eligible),
+            "rejected_count": len(rejected),
         },
         *((body_trace,) if body_trace is not None else ()),
+        {
+            "stage": "construction_recovery",
+            "status": "recovered" if recovery_reasons else "not_required",
+            "selected_split": split.split_type.value,
+            "rejected_splits": rejected_splits,
+            "reason_codes": recovery_reasons,
+            "session_reasons": tuple(
+                {
+                    "day_index": draft.day_index,
+                    "focus": draft.focus,
+                    "reason_codes": draft.reason_codes,
+                }
+                for draft in drafts
+                if draft.reason_codes
+            ),
+        },
         {"stage": "split", "selected": split.split_type.value, "reasons": split.reason_codes},
         {
             "stage": "volume",
@@ -227,7 +324,7 @@ def generate_program(
         primary_goal=normalized.primary_goal,
         secondary_goal=request.secondary_goal_optional,
         training_status=normalized.training_status,
-        safety_status=safety.status,
+        safety_status=safety_status,
         assumptions=normalized.assumptions,
         warnings=(),
         duration_weeks=request.program_duration_weeks,
@@ -248,14 +345,16 @@ def generate_program(
             program=None,
             error_code=GenerationErrorCode.PROGRAM_VALIDATION_FAILED,
             errors=report.errors,
-            safety_status=safety.status,
-            rejected_candidates=eligibility.rejected,
+            safety_status=safety_status,
+            rejected_candidates=rejected,
+            decision_trace=trace,
         )
     program = replace(program, validation_report=report, warnings=report.warnings)
     return ProgramGenerationResult(
         program=program,
-        safety_status=safety.status,
-        rejected_candidates=eligibility.rejected,
+        safety_status=safety_status,
+        rejected_candidates=rejected,
+        decision_trace=trace,
     )
 
 

@@ -461,6 +461,7 @@ class ProgramGenerationResult:
     errors: tuple[str, ...] = ()
     safety_status: SafetyStatus | None = None
     rejected_candidates: tuple[RejectedCandidate, ...] = ()
+    decision_trace: tuple[dict[str, object], ...] = ()
 
     @property
     def is_success(self) -> bool:

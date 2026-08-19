@@ -16,6 +16,13 @@ from app.workouts.program_engine.schemas import (
 
 
 def select_split(request: NormalizedProgramRequest, ruleset: ProgramRuleset) -> SplitPlan:
+    return rank_split_candidates(request, ruleset)[0]
+
+
+def rank_split_candidates(
+    request: NormalizedProgramRequest,
+    ruleset: ProgramRuleset,
+) -> tuple[SplitPlan, ...]:
     available_days = min(request.resistance_training_days, ruleset.max_resistance_days)
     recovery_limited = _recovery_is_limited(request)
     preferred_days = min(
@@ -33,15 +40,17 @@ def select_split(request: NormalizedProgramRequest, ruleset: ProgramRuleset) -> 
         for candidate in generate_split_candidates(days)
     )
     scored = score_split_candidates(request, candidates, ruleset, preferred_days)
-    selected = scored[0]
-    reasons = list(selected.reason_codes)
-    if request.source.available_training_days > ruleset.max_resistance_days:
-        reasons.append("RESISTANCE_DAYS_CAPPED_AT_RULESET_MAXIMUM")
-    if len(selected.day_focuses) < request.source.available_training_days:
-        reasons.append("SPLIT_SELECTED_FOR_APPROPRIATE_SESSION_COUNT")
-    if recovery_limited and len(selected.day_focuses) < available_days:
-        reasons.append("SPLIT_REDUCED_FOR_RECOVERY")
-    return replace(selected, reason_codes=tuple(dict.fromkeys(reasons)))
+    ranked: list[SplitPlan] = []
+    for candidate in scored:
+        reasons = list(candidate.reason_codes)
+        if request.source.available_training_days > ruleset.max_resistance_days:
+            reasons.append("RESISTANCE_DAYS_CAPPED_AT_RULESET_MAXIMUM")
+        if len(candidate.day_focuses) < request.source.available_training_days:
+            reasons.append("SPLIT_SELECTED_FOR_APPROPRIATE_SESSION_COUNT")
+        if recovery_limited and len(candidate.day_focuses) < available_days:
+            reasons.append("SPLIT_REDUCED_FOR_RECOVERY")
+        ranked.append(replace(candidate, reason_codes=tuple(dict.fromkeys(reasons))))
+    return tuple(ranked)
 
 
 def generate_split_candidates(days: int) -> tuple[SplitCandidate, ...]:

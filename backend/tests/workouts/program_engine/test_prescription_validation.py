@@ -479,7 +479,8 @@ def test_missing_safe_candidates_returns_structured_failure() -> None:
     )
 
     assert not result.is_success
-    assert result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
+    assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
+    assert result.errors[0] == "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED"
     assert "REQUIRED_MOVEMENT_PATTERN_MISSING" in result.errors
 
 
