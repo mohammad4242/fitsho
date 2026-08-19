@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.athlete_state.schemas import AthleteState
 from app.workout_reviews.enums import WorkoutReviewStatus
 
 
@@ -57,6 +58,15 @@ class WorkoutReviewExerciseOption(BaseModel):
     name_fa: str
 
 
+class WorkoutReviewAthleteSummary(BaseModel):
+    """Compact, derived athlete context for the coach review surface."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    athlete_state: AthleteState
+    previous_approved_plan_id: UUID | None = None
+
+
 class WorkoutReviewQueueItemResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -79,6 +89,7 @@ class WorkoutReviewDetailResponse(WorkoutReviewQueueItemResponse):
     draft: dict[str, object] | None
     source_plan: dict[str, object]
     exercise_options: list[WorkoutReviewExerciseOption]
+    athlete_summary: WorkoutReviewAthleteSummary
 
 
 class WorkoutReviewAccessResponse(BaseModel):

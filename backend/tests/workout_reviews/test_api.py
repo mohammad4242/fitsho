@@ -162,6 +162,36 @@ def test_coach_lists_and_claims_pending_review(client: TestClient, db: Session) 
     assert claimed.json()["draft_revision"] == 1
 
 
+def test_coach_review_detail_includes_safe_athlete_summary(
+    client: TestClient,
+    db: Session,
+) -> None:
+    member_id = _register(client, f"summary-member-{uuid4()}@example.com")
+    previous = _plan(db, member_id)
+    previous.status = WorkoutPlanStatus.SUPERSEDED
+    db.flush()
+    source = _plan(db, member_id)
+    source.status = WorkoutPlanStatus.PENDING_REVIEW
+    source.previous_program_id = previous.id
+    db.flush()
+    review = ensure_pending_review(db, source)
+    db.commit()
+    coach_id = _switch_user(client, f"summary-coach-{uuid4()}@example.com")
+    db.add(UserSpecialistRole(user_id=coach_id, role=SpecialistRole.COACH))
+    db.commit()
+
+    response = client.get(f"/api/v1/coach/workout-reviews/{review.id}")
+
+    assert response.status_code == 200
+    summary = response.json()["athlete_summary"]
+    assert summary["previous_approved_plan_id"] == str(previous.id)
+    assert summary["athlete_state"]["user_id"] == str(member_id)
+    assert summary["athlete_state"]["adherence"]["percent"] is None
+    assert summary["athlete_state"]["recovery_trend"]["summary"] == "unknown"
+    assert summary["athlete_state"]["difficulty_trend"]["summary"] == "unknown"
+    assert summary["athlete_state"]["provenance"]["profile_user_id"] is None
+
+
 def test_member_history_keeps_generated_and_coach_approved_versions(
     client: TestClient,
     db: Session,

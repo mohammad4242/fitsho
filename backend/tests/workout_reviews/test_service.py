@@ -8,6 +8,19 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.athlete_state.schemas import (
+    AthleteState,
+    AthleteStateAdherence,
+    AthleteStateBodyProgress,
+    AthleteStateDifficultyTrend,
+    AthleteStateExerciseContext,
+    AthleteStateProvenance,
+    AthleteStateReasonCode,
+    AthleteStateRecoveryTrend,
+    AthleteStateReplacementContext,
+    AthleteStateSafetyContext,
+    AthleteStateScheduleContext,
+)
 from app.auth.models import User
 from app.exercises.enums import (
     BodyRegion,
@@ -19,6 +32,7 @@ from app.exercises.enums import (
     MuscleGroup,
 )
 from app.exercises.models import Exercise
+from app.workout_cycles.enums import WorkoutExerciseReplacementReason
 from app.workout_cycles.models import WorkoutCycle
 from app.workout_cycles.service import start_cycle
 from app.workout_reviews.enums import WorkoutReviewErrorCode, WorkoutReviewStatus
@@ -26,6 +40,7 @@ from app.workout_reviews.models import WorkoutPlanReview
 from app.workout_reviews.repository import ensure_pending_review
 from app.workout_reviews.schemas import WorkoutReviewDraftUpdate
 from app.workout_reviews.service import ReviewConflict, WorkoutReviewService
+from app.workout_reviews.summary import build_athlete_summary
 from app.workout_reviews.validation import DraftValidationError
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
@@ -163,6 +178,91 @@ def test_ensure_pending_review_is_idempotent(db: Session) -> None:
 
     assert first.id == second.id
     assert db.scalars(select(WorkoutPlanReview)).all() == [first]
+
+
+def test_athlete_summary_maps_state_without_rederiving_signals(db: Session) -> None:
+    member = _user(db, "summary-state-member")
+    source = _active_plan(db, user=member, exercises=[_exercise(db, "summary-press")])
+    state = AthleteState(
+        user_id=member.id,
+        adherence=AthleteStateAdherence(sessions_completed=3, planned_sessions=4, percent=75),
+        recovery_trend=AthleteStateRecoveryTrend(),
+        difficulty_trend=AthleteStateDifficultyTrend(),
+        schedule=AthleteStateScheduleContext(),
+        body_progress=AthleteStateBodyProgress(),
+        provenance=AthleteStateProvenance(),
+    )
+    ensure_pending_review(db, source)
+
+    summary = build_athlete_summary(state, previous_approved_plan_id=source.id)
+
+    assert summary.athlete_state is state
+    assert summary.previous_approved_plan_id == source.id
+    assert summary.athlete_state.adherence.percent == 75
+
+
+def test_athlete_summary_preserves_distinct_signals_and_provenance() -> None:
+    user_id = uuid4()
+    original_id = uuid4()
+    replacement_id = uuid4()
+    replacement_source_id = uuid4()
+    safety_source_id = uuid4()
+    preference_source_id = uuid4()
+    state = AthleteState(
+        user_id=user_id,
+        adherence=AthleteStateAdherence(
+            sessions_completed=6,
+            planned_sessions=6,
+            percent=100,
+            reason_codes=(AthleteStateReasonCode.ADHERENCE_CALCULATED_FROM_WEEKLY_CHECK_INS,),
+        ),
+        recovery_trend=AthleteStateRecoveryTrend(),
+        difficulty_trend=AthleteStateDifficultyTrend(),
+        persistent_disliked_exercises=(original_id,),
+        unavailable_equipment_context=(
+            AthleteStateExerciseContext(
+                exercise_id=original_id,
+                source_preference_ids=(preference_source_id,),
+                reason_codes=(AthleteStateReasonCode.PERSISTENT_EQUIPMENT_CONTEXT,),
+            ),
+        ),
+        replacement_context=(
+            AthleteStateReplacementContext(
+                original_exercise_id=original_id,
+                replacement_exercise_id=replacement_id,
+                persistent_count=2,
+                reasons=(WorkoutExerciseReplacementReason.DISLIKE,),
+                source_replacement_ids=(replacement_source_id,),
+            ),
+        ),
+        safety_context=(
+            AthleteStateSafetyContext(
+                exercise_id=original_id,
+                signal_count=1,
+                source_safety_signal_ids=(safety_source_id,),
+            ),
+        ),
+        pain_sensitive_exercises=(original_id,),
+        schedule=AthleteStateScheduleContext(),
+        body_progress=AthleteStateBodyProgress(),
+        provenance=AthleteStateProvenance(
+            replacement_ids=(replacement_source_id,),
+            preference_ids=(preference_source_id,),
+            safety_signal_ids=(safety_source_id,),
+        ),
+    )
+
+    response = build_athlete_summary(state, previous_approved_plan_id=None)
+
+    assert response.athlete_state.persistent_disliked_exercises == (original_id,)
+    assert response.athlete_state.pain_sensitive_exercises == (original_id,)
+    assert response.athlete_state.replacement_context[0].source_replacement_ids == (
+        replacement_source_id,
+    )
+    assert response.athlete_state.safety_context[0].source_safety_signal_ids == (
+        safety_source_id,
+    )
+    assert response.athlete_state.provenance.preference_ids == (preference_source_id,)
 
 
 def test_claim_rejects_second_coach_until_lease_expires(db: Session) -> None:
