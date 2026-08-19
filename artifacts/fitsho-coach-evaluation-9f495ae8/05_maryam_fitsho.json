@@ -1,0 +1,4969 @@
+{
+  "aggregate_metrics": {
+    "estimated_weekly_duration": 78,
+    "hard_training_days": 2,
+    "planned_direct_sets_by_muscle": {
+      "abs": 5,
+      "back": 5,
+      "biceps": 3,
+      "calves": 5,
+      "chest": 5,
+      "forearms": 3,
+      "glutes": 5,
+      "hamstrings": 5,
+      "quadriceps": 5,
+      "shoulders": 5,
+      "traps": 3,
+      "triceps": 3
+    },
+    "previous_volume_baseline": {
+      "confidence": 0.0,
+      "direct_sets_by_muscle": {},
+      "effective_sets_by_muscle": {},
+      "reason_codes": [],
+      "source": "none"
+    },
+    "recovery_days": 5,
+    "volume_ranges_by_muscle": {
+      "abs": {
+        "effective_maximum_hard": 12,
+        "effective_maximum_soft": 9,
+        "effective_target_sets": 5,
+        "maximum_hard": 8,
+        "maximum_soft": 6,
+        "minimum_direct_sets": 4,
+        "minimum_soft": 4,
+        "target_sets": 5
+      },
+      "back": {
+        "effective_maximum_hard": 12,
+        "effective_maximum_soft": 9,
+        "effective_target_sets": 5,
+        "maximum_hard": 8,
+        "maximum_soft": 6,
+        "minimum_direct_sets": 4,
+        "minimum_soft": 4,
+        "target_sets": 5
+      },
+      "biceps": {
+        "effective_maximum_hard": 12,
+        "effective_maximum_soft": 6,
+        "effective_target_sets": 3,
+        "maximum_hard": 8,
+        "maximum_soft": 4,
+        "minimum_direct_sets": 2,
+        "minimum_soft": 2,
+        "target_sets": 3
+      },
+      "calves": {
+        "effective_maximum_hard": 12,
+        "effective_maximum_soft": 9,
+        "effective_target_sets": 5,
+        "maximum_hard": 8,
+        "maximum_soft": 6,
+        "minimum_direct_sets": 4,
+        "minimum_soft": 4,
+        "target_sets": 5
+      },
+      "chest": {
+        "effective_maximum_hard": 12,
+        "effective_maximum_soft": 9,
+        "effective_target_sets": 5,
+        "maximum_hard": 8,
+        "maximum_soft": 6,
+        "minimum_direct_sets": 4,
+        "minimum_soft": 4,
+        "target_sets": 5
+      },
+      "forearms": {
+        "effective_maximum_hard": 12,
+        "effective_maximum_soft": 6,
+        "effective_target_sets": 3,
+        "maximum_hard": 8,
+        "maximum_soft": 4,
+        "minimum_direct_sets": 2,
+        "minimum_soft": 2,
+        "target_sets": 3
+      },
+      "glutes": {
+        "effective_maximum_hard": 12,
+        "effective_maximum_soft": 9,
+        "effective_target_sets": 5,
+        "maximum_hard": 8,
+        "maximum_soft": 6,
+        "minimum_direct_sets": 4,
+        "minimum_soft": 4,
+        "target_sets": 5
+      },
+      "hamstrings": {
+        "effective_maximum_hard": 12,
+        "effective_maximum_soft": 9,
+        "effective_target_sets": 5,
+        "maximum_hard": 8,
+        "maximum_soft": 6,
+        "minimum_direct_sets": 4,
+        "minimum_soft": 4,
+        "target_sets": 5
+      },
+      "quadriceps": {
+        "effective_maximum_hard": 12,
+        "effective_maximum_soft": 9,
+        "effective_target_sets": 5,
+        "maximum_hard": 8,
+        "maximum_soft": 6,
+        "minimum_direct_sets": 4,
+        "minimum_soft": 4,
+        "target_sets": 5
+      },
+      "shoulders": {
+        "effective_maximum_hard": 12,
+        "effective_maximum_soft": 9,
+        "effective_target_sets": 5,
+        "maximum_hard": 8,
+        "maximum_soft": 6,
+        "minimum_direct_sets": 4,
+        "minimum_soft": 4,
+        "target_sets": 5
+      },
+      "traps": {
+        "effective_maximum_hard": 12,
+        "effective_maximum_soft": 6,
+        "effective_target_sets": 3,
+        "maximum_hard": 8,
+        "maximum_soft": 4,
+        "minimum_direct_sets": 2,
+        "minimum_soft": 2,
+        "target_sets": 3
+      },
+      "triceps": {
+        "effective_maximum_hard": 12,
+        "effective_maximum_soft": 6,
+        "effective_target_sets": 3,
+        "maximum_hard": 8,
+        "maximum_soft": 4,
+        "minimum_direct_sets": 2,
+        "minimum_soft": 2,
+        "target_sets": 3
+      }
+    },
+    "weekly_cardio_minutes": 10,
+    "weekly_direct_sets_by_muscle": {
+      "abs": 5,
+      "adductors": 2,
+      "back": 5,
+      "biceps": 0,
+      "calves": 0,
+      "chest": 0,
+      "forearms": 0,
+      "glutes": 3,
+      "hamstrings": 0,
+      "obliques": 2,
+      "quadriceps": 5,
+      "shoulders": 0,
+      "traps": 0,
+      "triceps": 3
+    },
+    "weekly_effective_sets_by_muscle": {
+      "abductors": 1.5,
+      "abs": 5.0,
+      "adductors": 6.0,
+      "back": 6.5,
+      "biceps": 0,
+      "calves": 1.5,
+      "chest": 0,
+      "forearms": 1.5,
+      "glutes": 7.5,
+      "hamstrings": 5.0,
+      "legs": 1.5,
+      "lower_back": 5.5,
+      "obliques": 4.5,
+      "quadriceps": 7.5,
+      "shoulders": 4.0,
+      "traps": 1.5,
+      "triceps": 3.0
+    },
+    "weekly_fractional_sets_by_muscle": {
+      "abductors": 1.5,
+      "abs": 0,
+      "adductors": 4.0,
+      "back": 1.5,
+      "biceps": 0,
+      "calves": 1.5,
+      "chest": 0,
+      "forearms": 1.5,
+      "glutes": 4.5,
+      "hamstrings": 5.0,
+      "legs": 1.5,
+      "lower_back": 5.5,
+      "obliques": 2.5,
+      "quadriceps": 2.5,
+      "shoulders": 4.0,
+      "traps": 1.5,
+      "triceps": 0
+    }
+  },
+  "api_flow": {
+    "generation_overrides_request": {
+      "available_training_days": 2,
+      "physical_job_demand": "low",
+      "priority_muscles": [],
+      "seed_optional": 20260819,
+      "session_duration_minutes": 45,
+      "sleep_quality": "average",
+      "stress_level": "average",
+      "training_age_months": 2
+    },
+    "generation_response": {
+      "body": {
+        "plan": {
+          "activated_at": null,
+          "aggregate_metrics": {
+            "estimated_weekly_duration": 78,
+            "hard_training_days": 2,
+            "planned_direct_sets_by_muscle": {
+              "abs": 5,
+              "back": 5,
+              "biceps": 3,
+              "calves": 5,
+              "chest": 5,
+              "forearms": 3,
+              "glutes": 5,
+              "hamstrings": 5,
+              "quadriceps": 5,
+              "shoulders": 5,
+              "traps": 3,
+              "triceps": 3
+            },
+            "previous_volume_baseline": {
+              "confidence": 0.0,
+              "direct_sets_by_muscle": {},
+              "effective_sets_by_muscle": {},
+              "reason_codes": [],
+              "source": "none"
+            },
+            "recovery_days": 5,
+            "volume_ranges_by_muscle": {
+              "abs": {
+                "effective_maximum_hard": 12,
+                "effective_maximum_soft": 9,
+                "effective_target_sets": 5,
+                "maximum_hard": 8,
+                "maximum_soft": 6,
+                "minimum_direct_sets": 4,
+                "minimum_soft": 4,
+                "target_sets": 5
+              },
+              "back": {
+                "effective_maximum_hard": 12,
+                "effective_maximum_soft": 9,
+                "effective_target_sets": 5,
+                "maximum_hard": 8,
+                "maximum_soft": 6,
+                "minimum_direct_sets": 4,
+                "minimum_soft": 4,
+                "target_sets": 5
+              },
+              "biceps": {
+                "effective_maximum_hard": 12,
+                "effective_maximum_soft": 6,
+                "effective_target_sets": 3,
+                "maximum_hard": 8,
+                "maximum_soft": 4,
+                "minimum_direct_sets": 2,
+                "minimum_soft": 2,
+                "target_sets": 3
+              },
+              "calves": {
+                "effective_maximum_hard": 12,
+                "effective_maximum_soft": 9,
+                "effective_target_sets": 5,
+                "maximum_hard": 8,
+                "maximum_soft": 6,
+                "minimum_direct_sets": 4,
+                "minimum_soft": 4,
+                "target_sets": 5
+              },
+              "chest": {
+                "effective_maximum_hard": 12,
+                "effective_maximum_soft": 9,
+                "effective_target_sets": 5,
+                "maximum_hard": 8,
+                "maximum_soft": 6,
+                "minimum_direct_sets": 4,
+                "minimum_soft": 4,
+                "target_sets": 5
+              },
+              "forearms": {
+                "effective_maximum_hard": 12,
+                "effective_maximum_soft": 6,
+                "effective_target_sets": 3,
+                "maximum_hard": 8,
+                "maximum_soft": 4,
+                "minimum_direct_sets": 2,
+                "minimum_soft": 2,
+                "target_sets": 3
+              },
+              "glutes": {
+                "effective_maximum_hard": 12,
+                "effective_maximum_soft": 9,
+                "effective_target_sets": 5,
+                "maximum_hard": 8,
+                "maximum_soft": 6,
+                "minimum_direct_sets": 4,
+                "minimum_soft": 4,
+                "target_sets": 5
+              },
+              "hamstrings": {
+                "effective_maximum_hard": 12,
+                "effective_maximum_soft": 9,
+                "effective_target_sets": 5,
+                "maximum_hard": 8,
+                "maximum_soft": 6,
+                "minimum_direct_sets": 4,
+                "minimum_soft": 4,
+                "target_sets": 5
+              },
+              "quadriceps": {
+                "effective_maximum_hard": 12,
+                "effective_maximum_soft": 9,
+                "effective_target_sets": 5,
+                "maximum_hard": 8,
+                "maximum_soft": 6,
+                "minimum_direct_sets": 4,
+                "minimum_soft": 4,
+                "target_sets": 5
+              },
+              "shoulders": {
+                "effective_maximum_hard": 12,
+                "effective_maximum_soft": 9,
+                "effective_target_sets": 5,
+                "maximum_hard": 8,
+                "maximum_soft": 6,
+                "minimum_direct_sets": 4,
+                "minimum_soft": 4,
+                "target_sets": 5
+              },
+              "traps": {
+                "effective_maximum_hard": 12,
+                "effective_maximum_soft": 6,
+                "effective_target_sets": 3,
+                "maximum_hard": 8,
+                "maximum_soft": 4,
+                "minimum_direct_sets": 2,
+                "minimum_soft": 2,
+                "target_sets": 3
+              },
+              "triceps": {
+                "effective_maximum_hard": 12,
+                "effective_maximum_soft": 6,
+                "effective_target_sets": 3,
+                "maximum_hard": 8,
+                "maximum_soft": 4,
+                "minimum_direct_sets": 2,
+                "minimum_soft": 2,
+                "target_sets": 3
+              }
+            },
+            "weekly_cardio_minutes": 10,
+            "weekly_direct_sets_by_muscle": {
+              "abs": 5,
+              "adductors": 2,
+              "back": 5,
+              "biceps": 0,
+              "calves": 0,
+              "chest": 0,
+              "forearms": 0,
+              "glutes": 3,
+              "hamstrings": 0,
+              "obliques": 2,
+              "quadriceps": 5,
+              "shoulders": 0,
+              "traps": 0,
+              "triceps": 3
+            },
+            "weekly_effective_sets_by_muscle": {
+              "abductors": 1.5,
+              "abs": 5.0,
+              "adductors": 6.0,
+              "back": 6.5,
+              "biceps": 0,
+              "calves": 1.5,
+              "chest": 0,
+              "forearms": 1.5,
+              "glutes": 7.5,
+              "hamstrings": 5.0,
+              "legs": 1.5,
+              "lower_back": 5.5,
+              "obliques": 4.5,
+              "quadriceps": 7.5,
+              "shoulders": 4.0,
+              "traps": 1.5,
+              "triceps": 3.0
+            },
+            "weekly_fractional_sets_by_muscle": {
+              "abductors": 1.5,
+              "abs": 0,
+              "adductors": 4.0,
+              "back": 1.5,
+              "biceps": 0,
+              "calves": 1.5,
+              "chest": 0,
+              "forearms": 1.5,
+              "glutes": 4.5,
+              "hamstrings": 5.0,
+              "legs": 1.5,
+              "lower_back": 5.5,
+              "obliques": 2.5,
+              "quadriceps": 2.5,
+              "shoulders": 4.0,
+              "traps": 1.5,
+              "triceps": 0
+            }
+          },
+          "ai_coach_program_explanation_fa": null,
+          "ai_coach_template_slug": null,
+          "assumptions": [],
+          "body_analysis_provenance": {},
+          "coach_review": {
+            "approved_at": null,
+            "coach_display_name": null,
+            "coach_note": null,
+            "state": "pending_coach_review"
+          },
+          "created_at": "2026-08-19T18:29:52.965365Z",
+          "days": [
+            {
+              "ai_coach_explanation_fa": null,
+              "cardio": {
+                "duration_minutes": 10,
+                "intensity": "moderate",
+                "modality_exercise_id": "7a439087-278c-4e8d-8c84-ca9bf77fda50",
+                "modality_name": "Cardio Exercise",
+                "reason_codes": [
+                  "LOW_IMPACT_CARDIO_SELECTED",
+                  "CARDIO_SCHEDULED_AFTER_RESISTANCE"
+                ]
+              },
+              "day_number": 1,
+              "estimated_duration_minutes": 49,
+              "exercises": [
+                {
+                  "alternatives": [
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "99167504-57f7-4443-b700-0b27cbc23d55",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/42/42c0176d4b6664879d1d94686bbcb189209e39b51462df813d66aa39ff120bb9.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Reverse Dip Stretch",
+                        "name_fa": "کشش شیب معکوس",
+                        "primary_muscle": "triceps",
+                        "secondary_muscles": [
+                          "chest",
+                          "shoulders"
+                        ],
+                        "slug": "fedb-0672-reverse-dip-stretch"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "6f444d7a-b0a6-46fe-a44a-5d89e45d2ebf",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/c6/c6994de1b1d541bf1c4466d65a6dc8bcc4434b2ffb789b1803bfe2a3c873e001.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Bench Dips",
+                        "name_fa": "دیپ روی نیمکت",
+                        "primary_muscle": "triceps",
+                        "secondary_muscles": [
+                          "chest"
+                        ],
+                        "slug": "fedb-drv-bench-dips-bench-dips"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "7b99e29f-be2d-46c9-a9cd-0b9342fdee9b",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/d9/d95df597bea6a9cd66558a951bf82449235326fedfb2c8979b2f24f9140aec1a.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Close-Grip Push-Up",
+                        "name_fa": "شنا دست جمع",
+                        "primary_muscle": "triceps",
+                        "secondary_muscles": [
+                          "shoulders"
+                        ],
+                        "slug": "fedb-0259-close-grip-push-up"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    }
+                  ],
+                  "estimated_minutes": 8,
+                  "exercise": {
+                    "body_region": "upper_body",
+                    "content_type": "exercise",
+                    "difficulty": "beginner",
+                    "equipment": [
+                      "bodyweight"
+                    ],
+                    "id": "587fb36d-8bf7-4d50-b073-5707ad9798c6",
+                    "labels": [],
+                    "media_path": "/media/free-exercise-db/b4/b4984fad28fe81dbe95eee218a1375d15265714980b3f6dfaff3f3c0d94f8b3a.mp4",
+                    "media_type": "video",
+                    "muscle_focus": null,
+                    "name_en": "Triceps Dips",
+                    "name_fa": "دیپ پشت بازو",
+                    "primary_muscle": "triceps",
+                    "secondary_muscles": [],
+                    "slug": "fedb-drv-triceps-dips-triceps-dips"
+                  },
+                  "id": "a6a7b60f-3b43-46e3-a67c-8c99bb595dd2",
+                  "load_guidance": "Select a load that preserves the target RIR.",
+                  "notes_en": null,
+                  "notes_fa": null,
+                  "order_index": 1,
+                  "progression_rule": "double_progression_v1",
+                  "reason_codes": [
+                    "GOAL_SPECIFIC",
+                    "EQUIPMENT_MATCH",
+                    "TIME_EFFICIENT",
+                    "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+                  ],
+                  "reps_max": 15,
+                  "reps_min": 6,
+                  "rest_seconds": 90,
+                  "rir": 3,
+                  "sets": 3,
+                  "warmup_sets": 2
+                },
+                {
+                  "alternatives": [
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "953d461c-4fed-4adc-8b35-d0f34ec2d9da",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/12/126a6a871cd9a8adaa31ed096a657eb7cb63cdca5e29b10145d9b8e945a4882c.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Inverted Row Between Chairs",
+                        "name_fa": "بارفیکس استرالیایی",
+                        "primary_muscle": "back",
+                        "secondary_muscles": [
+                          "shoulders"
+                        ],
+                        "slug": "fedb-0499-inverted-row-between-chairs"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "efd181ea-546b-46c9-b84e-a38d0760d13c",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/a4/a46a3954efd7e27678c1ea6a43eb5ce76008cfa471b93b9d92145e53df906e04.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Inverted Row With Straps",
+                        "name_fa": "زیربغل با کش از بالا",
+                        "primary_muscle": "back",
+                        "secondary_muscles": [
+                          "biceps"
+                        ],
+                        "slug": "fedb-0498-inverted-row-with-straps"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "99167504-57f7-4443-b700-0b27cbc23d55",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/42/42c0176d4b6664879d1d94686bbcb189209e39b51462df813d66aa39ff120bb9.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Reverse Dip Stretch",
+                        "name_fa": "کشش شیب معکوس",
+                        "primary_muscle": "triceps",
+                        "secondary_muscles": [
+                          "chest",
+                          "shoulders"
+                        ],
+                        "slug": "fedb-0672-reverse-dip-stretch"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    }
+                  ],
+                  "estimated_minutes": 6,
+                  "exercise": {
+                    "body_region": "upper_body",
+                    "content_type": "exercise",
+                    "difficulty": "beginner",
+                    "equipment": [
+                      "bodyweight"
+                    ],
+                    "id": "26b14230-fda7-40e1-b26a-e8528d49189d",
+                    "labels": [],
+                    "media_path": "/media/free-exercise-db/c0/c070c8a8e96f01a4511e856565ace27645a77ad6ba73b371df7e9319f4377693.mp4",
+                    "media_type": "video",
+                    "muscle_focus": null,
+                    "name_en": "Bench Pull-Up",
+                    "name_fa": "کشش نیمکت",
+                    "primary_muscle": "back",
+                    "secondary_muscles": [
+                      "forearms",
+                      "shoulders"
+                    ],
+                    "slug": "fedb-0570-bench-pull-up"
+                  },
+                  "id": "0a23b913-c34d-4b1c-b990-91d4e5b6d1dc",
+                  "load_guidance": "Select a load that preserves the target RIR.",
+                  "notes_en": null,
+                  "notes_fa": null,
+                  "order_index": 2,
+                  "progression_rule": "double_progression_v1",
+                  "reason_codes": [
+                    "GOAL_SPECIFIC",
+                    "EQUIPMENT_MATCH",
+                    "TIME_EFFICIENT"
+                  ],
+                  "reps_max": 15,
+                  "reps_min": 6,
+                  "rest_seconds": 90,
+                  "rir": 3,
+                  "sets": 3,
+                  "warmup_sets": 0
+                },
+                {
+                  "alternatives": [
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "4a3aadbb-6d8a-4017-87ed-a8566c04d20b",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/91/91bb53d7fda1a5e7dc4a7188d4b7fa6e7deec414c2123da125b0e73ac35acad5.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Seated Wide Angle Pose Sequence",
+                        "name_fa": "سکانس ژست زاویه باز نشسته",
+                        "primary_muscle": "adductors",
+                        "secondary_muscles": [
+                          "hamstrings",
+                          "lower_back"
+                        ],
+                        "slug": "fedb-1587-seated-wide-angle-pose-sequence"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "core",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "03552b19-9c04-4f79-9830-1ae0442e2490",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/49/49575f925de2b0cd34e4b617d70173e625b2d6db354f7a6a2d0a7255249084f9.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "plank pike",
+                        "name_fa": "پلانک پایک",
+                        "primary_muscle": "abs",
+                        "secondary_muscles": [
+                          "abductors",
+                          "adductors",
+                          "back",
+                          "calves",
+                          "glutes",
+                          "legs",
+                          "lower_back",
+                          "obliques",
+                          "quadriceps",
+                          "shoulders",
+                          "traps"
+                        ],
+                        "slug": "fedb-drv-hip-raise-bridge-glute-bridge"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "core",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "11b40ec3-14ca-42c9-bcc0-cbd8858eb3b0",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/37/37dfb90c62e421f35383dcd8e7d496640e145126725db45820c241124348282c.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Bridge Pose (Setu Bandhasana)",
+                        "name_fa": "ژست پل (ستو بانداسانا)",
+                        "primary_muscle": "glutes",
+                        "secondary_muscles": [
+                          "hamstrings",
+                          "lower_back"
+                        ],
+                        "slug": "fedb-drv-stretching-bridge-pose-setu-bandhasana-bridge-pose-setu-bandhasana"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    }
+                  ],
+                  "estimated_minutes": 10,
+                  "exercise": {
+                    "body_region": "lower_body",
+                    "content_type": "exercise",
+                    "difficulty": "beginner",
+                    "equipment": [
+                      "bodyweight"
+                    ],
+                    "id": "f254aa06-e482-4082-a007-ed7cc09fe4e1",
+                    "labels": [],
+                    "media_path": "/media/free-exercise-db/d3/d3f2a202ecf0d7c24822c3c2c298df82a6bc1f909e9078618254cdfda0c12363.mp4",
+                    "media_type": "video",
+                    "muscle_focus": null,
+                    "name_en": "Squat",
+                    "name_fa": "اسکات",
+                    "primary_muscle": "quadriceps",
+                    "secondary_muscles": [
+                      "adductors",
+                      "hamstrings",
+                      "lower_back"
+                    ],
+                    "slug": "fedb-drv-squat-squat"
+                  },
+                  "id": "8dab4349-f9b6-4290-9915-afa60b0286e9",
+                  "load_guidance": "Select a load that preserves the target RIR.",
+                  "notes_en": null,
+                  "notes_fa": null,
+                  "order_index": 3,
+                  "progression_rule": "double_progression_v1",
+                  "reason_codes": [
+                    "GOAL_SPECIFIC",
+                    "EQUIPMENT_MATCH",
+                    "TIME_EFFICIENT",
+                    "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM",
+                    "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+                  ],
+                  "reps_max": 15,
+                  "reps_min": 6,
+                  "rest_seconds": 90,
+                  "rir": 3,
+                  "sets": 5,
+                  "warmup_sets": 0
+                },
+                {
+                  "alternatives": [
+                    {
+                      "exercise": {
+                        "body_region": "core",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "11b40ec3-14ca-42c9-bcc0-cbd8858eb3b0",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/37/37dfb90c62e421f35383dcd8e7d496640e145126725db45820c241124348282c.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Bridge Pose (Setu Bandhasana)",
+                        "name_fa": "ژست پل (ستو بانداسانا)",
+                        "primary_muscle": "glutes",
+                        "secondary_muscles": [
+                          "hamstrings",
+                          "lower_back"
+                        ],
+                        "slug": "fedb-drv-stretching-bridge-pose-setu-bandhasana-bridge-pose-setu-bandhasana"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "lower_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "d85dc3fc-a435-433d-9837-4131d5bf4471",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/66/66c81ab856c8dbc7f4b3690ba1a454cbb45c33962dfaaf12bacbbcafe65753c2.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Glute Bridge",
+                        "name_fa": "پل باسن",
+                        "primary_muscle": "glutes",
+                        "secondary_muscles": [
+                          "hamstrings",
+                          "lower_back"
+                        ],
+                        "slug": "fedb-0668-rear-decline-bridge"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "core",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "b6b0bc77-1ec8-477e-a0f8-1489e2873370",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/78/78b40862cbac1a64be869846b20a494298e4e04b87c7e4d66df373444101ba8e.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Front Plank",
+                        "name_fa": "پلانک جلو",
+                        "primary_muscle": "abs",
+                        "secondary_muscles": [
+                          "glutes",
+                          "obliques"
+                        ],
+                        "slug": "fedb-0464-front-plank"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    }
+                  ],
+                  "estimated_minutes": 6,
+                  "exercise": {
+                    "body_region": "core",
+                    "content_type": "exercise",
+                    "difficulty": "beginner",
+                    "equipment": [
+                      "bodyweight"
+                    ],
+                    "id": "03552b19-9c04-4f79-9830-1ae0442e2490",
+                    "labels": [],
+                    "media_path": "/media/free-exercise-db/49/49575f925de2b0cd34e4b617d70173e625b2d6db354f7a6a2d0a7255249084f9.mp4",
+                    "media_type": "video",
+                    "muscle_focus": null,
+                    "name_en": "plank pike",
+                    "name_fa": "پلانک پایک",
+                    "primary_muscle": "abs",
+                    "secondary_muscles": [
+                      "abductors",
+                      "adductors",
+                      "back",
+                      "calves",
+                      "glutes",
+                      "legs",
+                      "lower_back",
+                      "obliques",
+                      "quadriceps",
+                      "shoulders",
+                      "traps"
+                    ],
+                    "slug": "fedb-drv-hip-raise-bridge-glute-bridge"
+                  },
+                  "id": "99f3fb20-dc37-42e5-acc2-e28d602f0a3c",
+                  "load_guidance": "Select a load that preserves the target RIR.",
+                  "notes_en": null,
+                  "notes_fa": null,
+                  "order_index": 4,
+                  "progression_rule": "double_progression_v1",
+                  "reason_codes": [
+                    "GOAL_SPECIFIC",
+                    "EQUIPMENT_MATCH",
+                    "TIME_EFFICIENT"
+                  ],
+                  "reps_max": 15,
+                  "reps_min": 6,
+                  "rest_seconds": 90,
+                  "rir": 3,
+                  "sets": 3,
+                  "warmup_sets": 0
+                },
+                {
+                  "alternatives": [
+                    {
+                      "exercise": {
+                        "body_region": "core",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "352ad30c-5d67-48f2-9a19-0354b16690f4",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/24/24d234f20a6ffad90d8fbfd1f090da86dc6cede65fe77d04859ea7bea20e8d38.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Seated Straight Arm Twist",
+                        "name_fa": "چرخش بازوی مستقیم نشسته",
+                        "primary_muscle": "obliques",
+                        "secondary_muscles": [
+                          "abs"
+                        ],
+                        "slug": "fedb-1011-seated-straight-arm-twist"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "core",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "daae3415-c9f3-4a21-b3cf-f02d1322c024",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/a4/a4afb5745fe0313c2a717408dcaa9c9920079b5eb911578d930955dce1aaf95c.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Twisting Crunch",
+                        "name_fa": "کرانچ چرخشی",
+                        "primary_muscle": "obliques",
+                        "secondary_muscles": [
+                          "abs"
+                        ],
+                        "slug": "fedb-0985-twisting-crunch"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "core",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "267b9a03-9fb9-46ba-844b-0a1cc4dc5bbd",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/65/65f0277565e5fa20b5dfbdbc169eb62b56d7a13a17e3d2d62c1bee3d061fb68a.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Seated Twist Stretch (Straight Arm)",
+                        "name_fa": "کشش چرخشی نشسته (بازوی مستقیم)",
+                        "primary_muscle": "obliques",
+                        "secondary_muscles": [
+                          "lower_back"
+                        ],
+                        "slug": "fedb-drv-stretching-seated-twist-straight-arm-seated-twist-stretch-straight-arm"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    }
+                  ],
+                  "estimated_minutes": 4,
+                  "exercise": {
+                    "body_region": "core",
+                    "content_type": "exercise",
+                    "difficulty": "beginner",
+                    "equipment": [
+                      "bodyweight"
+                    ],
+                    "id": "5e74f316-5106-4a2c-a280-1f83df374c04",
+                    "labels": [],
+                    "media_path": "/media/free-exercise-db/c7/c7d51d54b6263ae86448acc8c78d6516bd751e0cb172f1799637e4db18b41ea7.mp4",
+                    "media_type": "video",
+                    "muscle_focus": null,
+                    "name_en": "Side Plank",
+                    "name_fa": "پلانک کناری",
+                    "primary_muscle": "obliques",
+                    "secondary_muscles": [
+                      "glutes"
+                    ],
+                    "slug": "fedb-0705-side-plank"
+                  },
+                  "id": "1e7a514c-1b4e-4c69-8545-7af00ae4fd35",
+                  "load_guidance": "Select a load that preserves the target RIR.",
+                  "notes_en": null,
+                  "notes_fa": null,
+                  "order_index": 5,
+                  "progression_rule": "double_progression_v1",
+                  "reason_codes": [
+                    "BEGINNER_FRIENDLY",
+                    "EQUIPMENT_MATCH",
+                    "TIME_EFFICIENT"
+                  ],
+                  "reps_max": 15,
+                  "reps_min": 6,
+                  "rest_seconds": 90,
+                  "rir": 3,
+                  "sets": 2,
+                  "warmup_sets": 0
+                }
+              ],
+              "focus": "full_body_a",
+              "title_en": "Day 1: Triceps + Back + Quadriceps + Abs + Obliques",
+              "title_fa": "روز 1: پشت بازو + زیربغل + چهارسر + شکم + پهلو",
+              "weekday": 0
+            },
+            {
+              "ai_coach_explanation_fa": null,
+              "cardio": null,
+              "day_number": 2,
+              "estimated_duration_minutes": 29,
+              "exercises": [
+                {
+                  "alternatives": [
+                    {
+                      "exercise": {
+                        "body_region": "lower_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "d85dc3fc-a435-433d-9837-4131d5bf4471",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/66/66c81ab856c8dbc7f4b3690ba1a454cbb45c33962dfaaf12bacbbcafe65753c2.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Glute Bridge",
+                        "name_fa": "پل باسن",
+                        "primary_muscle": "glutes",
+                        "secondary_muscles": [
+                          "hamstrings",
+                          "lower_back"
+                        ],
+                        "slug": "fedb-0668-rear-decline-bridge"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "core",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "03552b19-9c04-4f79-9830-1ae0442e2490",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/49/49575f925de2b0cd34e4b617d70173e625b2d6db354f7a6a2d0a7255249084f9.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "plank pike",
+                        "name_fa": "پلانک پایک",
+                        "primary_muscle": "abs",
+                        "secondary_muscles": [
+                          "abductors",
+                          "adductors",
+                          "back",
+                          "calves",
+                          "glutes",
+                          "legs",
+                          "lower_back",
+                          "obliques",
+                          "quadriceps",
+                          "shoulders",
+                          "traps"
+                        ],
+                        "slug": "fedb-drv-hip-raise-bridge-glute-bridge"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "4a3aadbb-6d8a-4017-87ed-a8566c04d20b",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/91/91bb53d7fda1a5e7dc4a7188d4b7fa6e7deec414c2123da125b0e73ac35acad5.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Seated Wide Angle Pose Sequence",
+                        "name_fa": "سکانس ژست زاویه باز نشسته",
+                        "primary_muscle": "adductors",
+                        "secondary_muscles": [
+                          "hamstrings",
+                          "lower_back"
+                        ],
+                        "slug": "fedb-1587-seated-wide-angle-pose-sequence"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    }
+                  ],
+                  "estimated_minutes": 8,
+                  "exercise": {
+                    "body_region": "core",
+                    "content_type": "exercise",
+                    "difficulty": "beginner",
+                    "equipment": [
+                      "bodyweight"
+                    ],
+                    "id": "11b40ec3-14ca-42c9-bcc0-cbd8858eb3b0",
+                    "labels": [],
+                    "media_path": "/media/free-exercise-db/37/37dfb90c62e421f35383dcd8e7d496640e145126725db45820c241124348282c.mp4",
+                    "media_type": "video",
+                    "muscle_focus": null,
+                    "name_en": "Bridge Pose (Setu Bandhasana)",
+                    "name_fa": "ژست پل (ستو بانداسانا)",
+                    "primary_muscle": "glutes",
+                    "secondary_muscles": [
+                      "hamstrings",
+                      "lower_back"
+                    ],
+                    "slug": "fedb-drv-stretching-bridge-pose-setu-bandhasana-bridge-pose-setu-bandhasana"
+                  },
+                  "id": "cd9d801e-5508-4e15-87b1-5f8f6457f72f",
+                  "load_guidance": "Select a load that preserves the target RIR.",
+                  "notes_en": null,
+                  "notes_fa": null,
+                  "order_index": 1,
+                  "progression_rule": "double_progression_v1",
+                  "reason_codes": [
+                    "GOAL_SPECIFIC",
+                    "EQUIPMENT_MATCH",
+                    "TIME_EFFICIENT",
+                    "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM"
+                  ],
+                  "reps_max": 15,
+                  "reps_min": 6,
+                  "rest_seconds": 90,
+                  "rir": 3,
+                  "sets": 3,
+                  "warmup_sets": 2
+                },
+                {
+                  "alternatives": [
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "99167504-57f7-4443-b700-0b27cbc23d55",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/42/42c0176d4b6664879d1d94686bbcb189209e39b51462df813d66aa39ff120bb9.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Reverse Dip Stretch",
+                        "name_fa": "کشش شیب معکوس",
+                        "primary_muscle": "triceps",
+                        "secondary_muscles": [
+                          "chest",
+                          "shoulders"
+                        ],
+                        "slug": "fedb-0672-reverse-dip-stretch"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "587fb36d-8bf7-4d50-b073-5707ad9798c6",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/b4/b4984fad28fe81dbe95eee218a1375d15265714980b3f6dfaff3f3c0d94f8b3a.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Triceps Dips",
+                        "name_fa": "دیپ پشت بازو",
+                        "primary_muscle": "triceps",
+                        "secondary_muscles": [],
+                        "slug": "fedb-drv-triceps-dips-triceps-dips"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "7b99e29f-be2d-46c9-a9cd-0b9342fdee9b",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/d9/d95df597bea6a9cd66558a951bf82449235326fedfb2c8979b2f24f9140aec1a.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Close-Grip Push-Up",
+                        "name_fa": "شنا دست جمع",
+                        "primary_muscle": "triceps",
+                        "secondary_muscles": [
+                          "shoulders"
+                        ],
+                        "slug": "fedb-0259-close-grip-push-up"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    }
+                  ],
+                  "estimated_minutes": 4,
+                  "exercise": {
+                    "body_region": "upper_body",
+                    "content_type": "exercise",
+                    "difficulty": "beginner",
+                    "equipment": [
+                      "bodyweight"
+                    ],
+                    "id": "6f444d7a-b0a6-46fe-a44a-5d89e45d2ebf",
+                    "labels": [],
+                    "media_path": "/media/free-exercise-db/c6/c6994de1b1d541bf1c4466d65a6dc8bcc4434b2ffb789b1803bfe2a3c873e001.mp4",
+                    "media_type": "video",
+                    "muscle_focus": null,
+                    "name_en": "Bench Dips",
+                    "name_fa": "دیپ روی نیمکت",
+                    "primary_muscle": "triceps",
+                    "secondary_muscles": [
+                      "chest"
+                    ],
+                    "slug": "fedb-drv-bench-dips-bench-dips"
+                  },
+                  "id": "969c36f3-96b2-4700-90de-5b598c606a27",
+                  "load_guidance": "Select a load that preserves the target RIR.",
+                  "notes_en": null,
+                  "notes_fa": null,
+                  "order_index": 2,
+                  "progression_rule": "double_progression_v1",
+                  "reason_codes": [
+                    "GOAL_SPECIFIC",
+                    "EQUIPMENT_MATCH",
+                    "TIME_EFFICIENT",
+                    "SESSION_SIZE_ACCESSORY"
+                  ],
+                  "reps_max": 15,
+                  "reps_min": 6,
+                  "rest_seconds": 90,
+                  "rir": 3,
+                  "sets": 2,
+                  "warmup_sets": 0
+                },
+                {
+                  "alternatives": [
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "efd181ea-546b-46c9-b84e-a38d0760d13c",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/a4/a46a3954efd7e27678c1ea6a43eb5ce76008cfa471b93b9d92145e53df906e04.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Inverted Row With Straps",
+                        "name_fa": "زیربغل با کش از بالا",
+                        "primary_muscle": "back",
+                        "secondary_muscles": [
+                          "biceps"
+                        ],
+                        "slug": "fedb-0498-inverted-row-with-straps"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "26b14230-fda7-40e1-b26a-e8528d49189d",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/c0/c070c8a8e96f01a4511e856565ace27645a77ad6ba73b371df7e9319f4377693.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Bench Pull-Up",
+                        "name_fa": "کشش نیمکت",
+                        "primary_muscle": "back",
+                        "secondary_muscles": [
+                          "forearms",
+                          "shoulders"
+                        ],
+                        "slug": "fedb-0570-bench-pull-up"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "99167504-57f7-4443-b700-0b27cbc23d55",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/42/42c0176d4b6664879d1d94686bbcb189209e39b51462df813d66aa39ff120bb9.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Reverse Dip Stretch",
+                        "name_fa": "کشش شیب معکوس",
+                        "primary_muscle": "triceps",
+                        "secondary_muscles": [
+                          "chest",
+                          "shoulders"
+                        ],
+                        "slug": "fedb-0672-reverse-dip-stretch"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    }
+                  ],
+                  "estimated_minutes": 4,
+                  "exercise": {
+                    "body_region": "upper_body",
+                    "content_type": "exercise",
+                    "difficulty": "beginner",
+                    "equipment": [
+                      "bodyweight"
+                    ],
+                    "id": "953d461c-4fed-4adc-8b35-d0f34ec2d9da",
+                    "labels": [],
+                    "media_path": "/media/free-exercise-db/12/126a6a871cd9a8adaa31ed096a657eb7cb63cdca5e29b10145d9b8e945a4882c.mp4",
+                    "media_type": "video",
+                    "muscle_focus": null,
+                    "name_en": "Inverted Row Between Chairs",
+                    "name_fa": "بارفیکس استرالیایی",
+                    "primary_muscle": "back",
+                    "secondary_muscles": [
+                      "shoulders"
+                    ],
+                    "slug": "fedb-0499-inverted-row-between-chairs"
+                  },
+                  "id": "14304a4e-4a15-49ee-b1c9-2b2330fe1982",
+                  "load_guidance": "Select a load that preserves the target RIR.",
+                  "notes_en": null,
+                  "notes_fa": null,
+                  "order_index": 3,
+                  "progression_rule": "double_progression_v1",
+                  "reason_codes": [
+                    "GOAL_SPECIFIC",
+                    "EQUIPMENT_MATCH",
+                    "TIME_EFFICIENT"
+                  ],
+                  "reps_max": 15,
+                  "reps_min": 6,
+                  "rest_seconds": 90,
+                  "rir": 3,
+                  "sets": 2,
+                  "warmup_sets": 0
+                },
+                {
+                  "alternatives": [
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "4a3aadbb-6d8a-4017-87ed-a8566c04d20b",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/91/91bb53d7fda1a5e7dc4a7188d4b7fa6e7deec414c2123da125b0e73ac35acad5.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Seated Wide Angle Pose Sequence",
+                        "name_fa": "سکانس ژست زاویه باز نشسته",
+                        "primary_muscle": "adductors",
+                        "secondary_muscles": [
+                          "hamstrings",
+                          "lower_back"
+                        ],
+                        "slug": "fedb-1587-seated-wide-angle-pose-sequence"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "upper_body",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "ba92ef84-a61a-413f-9624-43ecec469f24",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/da/daf40eb9f09cec2f41fd307dd6225baaf23ab4da4b948b5f6c2944ac938a992e.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Butterfly Yoga Pose",
+                        "name_fa": "ژست یوگا پروانه",
+                        "primary_muscle": "adductors",
+                        "secondary_muscles": [
+                          "lower_back"
+                        ],
+                        "slug": "fedb-1494-butterfly-yoga-pose"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "core",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "03552b19-9c04-4f79-9830-1ae0442e2490",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/49/49575f925de2b0cd34e4b617d70173e625b2d6db354f7a6a2d0a7255249084f9.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "plank pike",
+                        "name_fa": "پلانک پایک",
+                        "primary_muscle": "abs",
+                        "secondary_muscles": [
+                          "abductors",
+                          "adductors",
+                          "back",
+                          "calves",
+                          "glutes",
+                          "legs",
+                          "lower_back",
+                          "obliques",
+                          "quadriceps",
+                          "shoulders",
+                          "traps"
+                        ],
+                        "slug": "fedb-drv-hip-raise-bridge-glute-bridge"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    }
+                  ],
+                  "estimated_minutes": 4,
+                  "exercise": {
+                    "body_region": null,
+                    "content_type": "exercise",
+                    "difficulty": "beginner",
+                    "equipment": [
+                      "bodyweight"
+                    ],
+                    "id": "b3edb606-4f9c-432d-b7b5-83e1f455077c",
+                    "labels": [],
+                    "media_path": "/media/free-exercise-db/94/94bd0894db79b6deeafeef5e482d2727e47270bf21207d0c15272f69c9db8d16.mp4",
+                    "media_type": "video",
+                    "muscle_focus": null,
+                    "name_en": "Plyometric Side Lunge Stretch",
+                    "name_fa": "کشش لانج جانبی پلایومتریک",
+                    "primary_muscle": "adductors",
+                    "secondary_muscles": [
+                      "glutes",
+                      "hamstrings",
+                      "quadriceps"
+                    ],
+                    "slug": "fedb-drv-stretching-plyo-side-lunge-stretch-plyometric-side-lunge-stretch"
+                  },
+                  "id": "6100b237-f82e-494f-9f42-11a66d23622a",
+                  "load_guidance": "Select a load that preserves the target RIR.",
+                  "notes_en": null,
+                  "notes_fa": null,
+                  "order_index": 4,
+                  "progression_rule": "double_progression_v1",
+                  "reason_codes": [
+                    "EQUIPMENT_MATCH",
+                    "TIME_EFFICIENT"
+                  ],
+                  "reps_max": 15,
+                  "reps_min": 6,
+                  "rest_seconds": 90,
+                  "rir": 3,
+                  "sets": 2,
+                  "warmup_sets": 0
+                },
+                {
+                  "alternatives": [
+                    {
+                      "exercise": {
+                        "body_region": "core",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "03552b19-9c04-4f79-9830-1ae0442e2490",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/49/49575f925de2b0cd34e4b617d70173e625b2d6db354f7a6a2d0a7255249084f9.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "plank pike",
+                        "name_fa": "پلانک پایک",
+                        "primary_muscle": "abs",
+                        "secondary_muscles": [
+                          "abductors",
+                          "adductors",
+                          "back",
+                          "calves",
+                          "glutes",
+                          "legs",
+                          "lower_back",
+                          "obliques",
+                          "quadriceps",
+                          "shoulders",
+                          "traps"
+                        ],
+                        "slug": "fedb-drv-hip-raise-bridge-glute-bridge"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "core",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "06d76afc-2434-415a-8208-21a336ae634b",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/98/9827ed19dac1c8f28db33608754151f9af594cf505fc6020162909830392decb.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Leg Raise Crunch",
+                        "name_fa": "کرانچ بلند کردن پا",
+                        "primary_muscle": "abs",
+                        "secondary_muscles": [
+                          "obliques"
+                        ],
+                        "slug": "fedb-0600-leg-raise-crunch"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    },
+                    {
+                      "exercise": {
+                        "body_region": "core",
+                        "content_type": "exercise",
+                        "difficulty": "beginner",
+                        "equipment": [
+                          "bodyweight"
+                        ],
+                        "id": "2a2899a1-a60c-47cb-9fb2-74a7b3f9f86e",
+                        "labels": [],
+                        "media_path": "/media/free-exercise-db/94/94ac8f185d60e3c8538119042b78c1753dceb94225ded52ee841f88aabee1659.mp4",
+                        "media_type": "video",
+                        "muscle_focus": null,
+                        "name_en": "Sit-Up",
+                        "name_fa": "دراز و نشست",
+                        "primary_muscle": "abs",
+                        "secondary_muscles": [
+                          "obliques"
+                        ],
+                        "slug": "fedb-drv-sit-ups-sit-up"
+                      },
+                      "reason_en": "Safe substitution selected by the program rules.",
+                      "reason_fa": "جایگزین ایمن بر اساس قواعد برنامه انتخاب شده است."
+                    }
+                  ],
+                  "estimated_minutes": 4,
+                  "exercise": {
+                    "body_region": "core",
+                    "content_type": "exercise",
+                    "difficulty": "beginner",
+                    "equipment": [
+                      "bodyweight"
+                    ],
+                    "id": "b6b0bc77-1ec8-477e-a0f8-1489e2873370",
+                    "labels": [],
+                    "media_path": "/media/free-exercise-db/78/78b40862cbac1a64be869846b20a494298e4e04b87c7e4d66df373444101ba8e.mp4",
+                    "media_type": "video",
+                    "muscle_focus": null,
+                    "name_en": "Front Plank",
+                    "name_fa": "پلانک جلو",
+                    "primary_muscle": "abs",
+                    "secondary_muscles": [
+                      "glutes",
+                      "obliques"
+                    ],
+                    "slug": "fedb-0464-front-plank"
+                  },
+                  "id": "8898be68-8e76-4a46-9891-a34e8805a00d",
+                  "load_guidance": "Select a load that preserves the target RIR.",
+                  "notes_en": null,
+                  "notes_fa": null,
+                  "order_index": 5,
+                  "progression_rule": "double_progression_v1",
+                  "reason_codes": [
+                    "BEGINNER_FRIENDLY",
+                    "EQUIPMENT_MATCH",
+                    "TIME_EFFICIENT"
+                  ],
+                  "reps_max": 15,
+                  "reps_min": 6,
+                  "rest_seconds": 90,
+                  "rir": 3,
+                  "sets": 2,
+                  "warmup_sets": 0
+                }
+              ],
+              "focus": "full_body_b",
+              "title_en": "Day 2: Glutes + Triceps + Back + Adductors + Abs",
+              "title_fa": "روز 2: باسن + پشت بازو + زیربغل + داخل ران + شکم",
+              "weekday": 3
+            }
+          ],
+          "decision_trace": [
+            {
+              "assumptions": [],
+              "stage": "normalization"
+            },
+            {
+              "reasons": [
+                "SAFETY_SCREEN_CLEAR"
+              ],
+              "stage": "safety",
+              "status": "clear"
+            },
+            {
+              "eligible_count": 31,
+              "rejected_count": 357,
+              "stage": "eligibility"
+            },
+            {
+              "reason_codes": [
+                "SESSION_TRIMMED_FOR_TIME_LIMIT"
+              ],
+              "rejected_splits": [],
+              "selected_split": "full_body_ab",
+              "session_reasons": [
+                {
+                  "day_index": 1,
+                  "focus": "full_body_a",
+                  "reason_codes": [
+                    "SESSION_TRIMMED_FOR_TIME_LIMIT"
+                  ]
+                },
+                {
+                  "day_index": 2,
+                  "focus": "full_body_b",
+                  "reason_codes": [
+                    "SESSION_TRIMMED_FOR_TIME_LIMIT"
+                  ]
+                }
+              ],
+              "stage": "construction_recovery",
+              "status": "recovered"
+            },
+            {
+              "reasons": [
+                "SPLIT_SIMPLIFIED_FOR_NOVICE",
+                "SPLIT_FULL_BODY_FOR_LOW_FREQUENCY"
+              ],
+              "selected": "full_body_ab",
+              "stage": "split"
+            },
+            {
+              "effective_targets": {
+                "abs": 5,
+                "back": 5,
+                "biceps": 3,
+                "calves": 5,
+                "chest": 5,
+                "forearms": 3,
+                "glutes": 5,
+                "hamstrings": 5,
+                "quadriceps": 5,
+                "shoulders": 5,
+                "traps": 3,
+                "triceps": 3
+              },
+              "minimum_direct_targets": {
+                "abs": 4,
+                "back": 4,
+                "biceps": 2,
+                "calves": 4,
+                "chest": 4,
+                "forearms": 2,
+                "glutes": 4,
+                "hamstrings": 4,
+                "quadriceps": 4,
+                "shoulders": 4,
+                "traps": 2,
+                "triceps": 2
+              },
+              "previous_volume_baseline": {
+                "confidence": 0.0,
+                "reason_codes": [],
+                "source": "none"
+              },
+              "reasons": [
+                "VOLUME_REDUCED_FOR_RECOVERY"
+              ],
+              "stage": "volume"
+            },
+            {
+              "reasons": [
+                "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM",
+                "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+              ],
+              "stage": "volume_repair",
+              "weekly_direct_sets": {
+                "abs": 5,
+                "adductors": 2,
+                "back": 5,
+                "glutes": 3,
+                "obliques": 2,
+                "quadriceps": 5,
+                "triceps": 3
+              },
+              "weekly_effective_sets": {
+                "abductors": 1.5,
+                "abs": 5.0,
+                "adductors": 6.0,
+                "back": 6.5,
+                "calves": 1.5,
+                "forearms": 1.5,
+                "glutes": 7.5,
+                "hamstrings": 5.0,
+                "legs": 1.5,
+                "lower_back": 5.5,
+                "obliques": 4.5,
+                "quadriceps": 7.5,
+                "shoulders": 4.0,
+                "traps": 1.5,
+                "triceps": 3.0
+              }
+            }
+          ],
+          "engine_version": "program_engine_v1",
+          "id": "7b093ed0-0e2e-4ebc-919b-b07801333579",
+          "is_stale": false,
+          "plan_duration_weeks": 6,
+          "primary_goal": "general_fitness",
+          "progression_policy": {
+            "conditions": [
+              "top_of_rep_range_for_all_working_sets",
+              "within_target_rir",
+              "acceptable_technique"
+            ],
+            "deload": {
+              "load_reduction_percent": [
+                5,
+                10
+              ],
+              "maintain_main_movement_patterns": true,
+              "never_override_safety_referral": true,
+              "trigger_requires_multiple_signals": true,
+              "volume_reduction_percent": [
+                30,
+                50
+              ]
+            },
+            "increase_volume_and_load_together": false,
+            "lower_body_load_increase_percent": [
+              5.0,
+              10.0
+            ],
+            "qualifying_sessions": 2,
+            "regression_actions": [
+              "reduce_load",
+              "remove_one_low_priority_set",
+              "increase_target_rir",
+              "use_eligible_regression",
+              "review_recovery"
+            ],
+            "type": "double_progression",
+            "upper_body_load_increase_percent": [
+              2.5,
+              5.0
+            ],
+            "use_smallest_available_increment": true
+          },
+          "ruleset_version": "resistance_training_v2",
+          "safety_status": "clear",
+          "secondary_goal": null,
+          "seed": 20260819,
+          "status": "pending_review",
+          "training_status": "novice",
+          "validation_report": {
+            "assumptions": [],
+            "decision_trace": [
+              {
+                "assumptions": [],
+                "stage": "normalization"
+              },
+              {
+                "reasons": [
+                  "SAFETY_SCREEN_CLEAR"
+                ],
+                "stage": "safety",
+                "status": "clear"
+              },
+              {
+                "eligible_count": 31,
+                "rejected_count": 357,
+                "stage": "eligibility"
+              },
+              {
+                "reason_codes": [
+                  "SESSION_TRIMMED_FOR_TIME_LIMIT"
+                ],
+                "rejected_splits": [],
+                "selected_split": "full_body_ab",
+                "session_reasons": [
+                  {
+                    "day_index": 1,
+                    "focus": "full_body_a",
+                    "reason_codes": [
+                      "SESSION_TRIMMED_FOR_TIME_LIMIT"
+                    ]
+                  },
+                  {
+                    "day_index": 2,
+                    "focus": "full_body_b",
+                    "reason_codes": [
+                      "SESSION_TRIMMED_FOR_TIME_LIMIT"
+                    ]
+                  }
+                ],
+                "stage": "construction_recovery",
+                "status": "recovered"
+              },
+              {
+                "reasons": [
+                  "SPLIT_SIMPLIFIED_FOR_NOVICE",
+                  "SPLIT_FULL_BODY_FOR_LOW_FREQUENCY"
+                ],
+                "selected": "full_body_ab",
+                "stage": "split"
+              },
+              {
+                "effective_targets": {
+                  "abs": 5,
+                  "back": 5,
+                  "biceps": 3,
+                  "calves": 5,
+                  "chest": 5,
+                  "forearms": 3,
+                  "glutes": 5,
+                  "hamstrings": 5,
+                  "quadriceps": 5,
+                  "shoulders": 5,
+                  "traps": 3,
+                  "triceps": 3
+                },
+                "minimum_direct_targets": {
+                  "abs": 4,
+                  "back": 4,
+                  "biceps": 2,
+                  "calves": 4,
+                  "chest": 4,
+                  "forearms": 2,
+                  "glutes": 4,
+                  "hamstrings": 4,
+                  "quadriceps": 4,
+                  "shoulders": 4,
+                  "traps": 2,
+                  "triceps": 2
+                },
+                "previous_volume_baseline": {
+                  "confidence": 0.0,
+                  "reason_codes": [],
+                  "source": "none"
+                },
+                "reasons": [
+                  "VOLUME_REDUCED_FOR_RECOVERY"
+                ],
+                "stage": "volume"
+              },
+              {
+                "reasons": [
+                  "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM",
+                  "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+                ],
+                "stage": "volume_repair",
+                "weekly_direct_sets": {
+                  "abs": 5,
+                  "adductors": 2,
+                  "back": 5,
+                  "glutes": 3,
+                  "obliques": 2,
+                  "quadriceps": 5,
+                  "triceps": 3
+                },
+                "weekly_effective_sets": {
+                  "abductors": 1.5,
+                  "abs": 5.0,
+                  "adductors": 6.0,
+                  "back": 6.5,
+                  "calves": 1.5,
+                  "forearms": 1.5,
+                  "glutes": 7.5,
+                  "hamstrings": 5.0,
+                  "legs": 1.5,
+                  "lower_back": 5.5,
+                  "obliques": 4.5,
+                  "quadriceps": 7.5,
+                  "shoulders": 4.0,
+                  "traps": 1.5,
+                  "triceps": 3.0
+                }
+              }
+            ],
+            "errors": [],
+            "metrics": {
+              "direct_session_frequency_by_muscle": {
+                "abs": 2,
+                "adductors": 1,
+                "back": 2,
+                "biceps": 0,
+                "calves": 0,
+                "chest": 0,
+                "forearms": 0,
+                "glutes": 1,
+                "hamstrings": 0,
+                "obliques": 1,
+                "quadriceps": 1,
+                "shoulders": 0,
+                "traps": 0,
+                "triceps": 1
+              },
+              "estimated_weekly_duration": 78,
+              "hard_training_days": 2,
+              "movement_pattern_frequency": {
+                "core_anti_extension": 1,
+                "core_anti_lateral_flexion": 1,
+                "hip_extension": 2,
+                "horizontal_pull": 1,
+                "horizontal_push": 2,
+                "lunge": 1,
+                "squat": 1,
+                "vertical_pull": 1
+              },
+              "planned_direct_sets_by_muscle": {
+                "abs": 5,
+                "back": 5,
+                "biceps": 3,
+                "calves": 5,
+                "chest": 5,
+                "forearms": 3,
+                "glutes": 5,
+                "hamstrings": 5,
+                "quadriceps": 5,
+                "shoulders": 5,
+                "traps": 3,
+                "triceps": 3
+              },
+              "previous_volume_baseline": {
+                "confidence": 0.0,
+                "direct_sets_by_muscle": {},
+                "effective_sets_by_muscle": {},
+                "reason_codes": [],
+                "source": "none"
+              },
+              "recovery_days": 5,
+              "volume_ranges_by_muscle": {
+                "abs": {
+                  "effective_maximum_hard": 12,
+                  "effective_maximum_soft": 9,
+                  "effective_target_sets": 5,
+                  "maximum_hard": 8,
+                  "maximum_soft": 6,
+                  "minimum_direct_sets": 4,
+                  "minimum_soft": 4,
+                  "target_sets": 5
+                },
+                "back": {
+                  "effective_maximum_hard": 12,
+                  "effective_maximum_soft": 9,
+                  "effective_target_sets": 5,
+                  "maximum_hard": 8,
+                  "maximum_soft": 6,
+                  "minimum_direct_sets": 4,
+                  "minimum_soft": 4,
+                  "target_sets": 5
+                },
+                "biceps": {
+                  "effective_maximum_hard": 12,
+                  "effective_maximum_soft": 6,
+                  "effective_target_sets": 3,
+                  "maximum_hard": 8,
+                  "maximum_soft": 4,
+                  "minimum_direct_sets": 2,
+                  "minimum_soft": 2,
+                  "target_sets": 3
+                },
+                "calves": {
+                  "effective_maximum_hard": 12,
+                  "effective_maximum_soft": 9,
+                  "effective_target_sets": 5,
+                  "maximum_hard": 8,
+                  "maximum_soft": 6,
+                  "minimum_direct_sets": 4,
+                  "minimum_soft": 4,
+                  "target_sets": 5
+                },
+                "chest": {
+                  "effective_maximum_hard": 12,
+                  "effective_maximum_soft": 9,
+                  "effective_target_sets": 5,
+                  "maximum_hard": 8,
+                  "maximum_soft": 6,
+                  "minimum_direct_sets": 4,
+                  "minimum_soft": 4,
+                  "target_sets": 5
+                },
+                "forearms": {
+                  "effective_maximum_hard": 12,
+                  "effective_maximum_soft": 6,
+                  "effective_target_sets": 3,
+                  "maximum_hard": 8,
+                  "maximum_soft": 4,
+                  "minimum_direct_sets": 2,
+                  "minimum_soft": 2,
+                  "target_sets": 3
+                },
+                "glutes": {
+                  "effective_maximum_hard": 12,
+                  "effective_maximum_soft": 9,
+                  "effective_target_sets": 5,
+                  "maximum_hard": 8,
+                  "maximum_soft": 6,
+                  "minimum_direct_sets": 4,
+                  "minimum_soft": 4,
+                  "target_sets": 5
+                },
+                "hamstrings": {
+                  "effective_maximum_hard": 12,
+                  "effective_maximum_soft": 9,
+                  "effective_target_sets": 5,
+                  "maximum_hard": 8,
+                  "maximum_soft": 6,
+                  "minimum_direct_sets": 4,
+                  "minimum_soft": 4,
+                  "target_sets": 5
+                },
+                "quadriceps": {
+                  "effective_maximum_hard": 12,
+                  "effective_maximum_soft": 9,
+                  "effective_target_sets": 5,
+                  "maximum_hard": 8,
+                  "maximum_soft": 6,
+                  "minimum_direct_sets": 4,
+                  "minimum_soft": 4,
+                  "target_sets": 5
+                },
+                "shoulders": {
+                  "effective_maximum_hard": 12,
+                  "effective_maximum_soft": 9,
+                  "effective_target_sets": 5,
+                  "maximum_hard": 8,
+                  "maximum_soft": 6,
+                  "minimum_direct_sets": 4,
+                  "minimum_soft": 4,
+                  "target_sets": 5
+                },
+                "traps": {
+                  "effective_maximum_hard": 12,
+                  "effective_maximum_soft": 6,
+                  "effective_target_sets": 3,
+                  "maximum_hard": 8,
+                  "maximum_soft": 4,
+                  "minimum_direct_sets": 2,
+                  "minimum_soft": 2,
+                  "target_sets": 3
+                },
+                "triceps": {
+                  "effective_maximum_hard": 12,
+                  "effective_maximum_soft": 6,
+                  "effective_target_sets": 3,
+                  "maximum_hard": 8,
+                  "maximum_soft": 4,
+                  "minimum_direct_sets": 2,
+                  "minimum_soft": 2,
+                  "target_sets": 3
+                }
+              },
+              "weekly_cardio_minutes": 10,
+              "weekly_direct_sets_by_muscle": {
+                "abs": 5,
+                "adductors": 2,
+                "back": 5,
+                "biceps": 0,
+                "calves": 0,
+                "chest": 0,
+                "forearms": 0,
+                "glutes": 3,
+                "hamstrings": 0,
+                "obliques": 2,
+                "quadriceps": 5,
+                "shoulders": 0,
+                "traps": 0,
+                "triceps": 3
+              },
+              "weekly_effective_sets_by_muscle": {
+                "abductors": 1.5,
+                "abs": 5.0,
+                "adductors": 6.0,
+                "back": 6.5,
+                "biceps": 0,
+                "calves": 1.5,
+                "chest": 0,
+                "forearms": 1.5,
+                "glutes": 7.5,
+                "hamstrings": 5.0,
+                "legs": 1.5,
+                "lower_back": 5.5,
+                "obliques": 4.5,
+                "quadriceps": 7.5,
+                "shoulders": 4.0,
+                "traps": 1.5,
+                "triceps": 3.0
+              },
+              "weekly_fractional_sets_by_muscle": {
+                "abductors": 1.5,
+                "abs": 0,
+                "adductors": 4.0,
+                "back": 1.5,
+                "biceps": 0,
+                "calves": 1.5,
+                "chest": 0,
+                "forearms": 1.5,
+                "glutes": 4.5,
+                "hamstrings": 5.0,
+                "legs": 1.5,
+                "lower_back": 5.5,
+                "obliques": 2.5,
+                "quadriceps": 2.5,
+                "shoulders": 4.0,
+                "traps": 1.5,
+                "triceps": 0
+              }
+            },
+            "warnings": [
+              "EFFECTIVE_VOLUME_BELOW_TARGET",
+              "DIRECT_VOLUME_BELOW_MINIMUM",
+              "SOFT_WEEKLY_VOLUME_BELOW_MINIMUM",
+              "PLANNED_VOLUME_REDUCED_DURING_SESSION_FIT"
+            ]
+          },
+          "warnings": [
+            "EFFECTIVE_VOLUME_BELOW_TARGET",
+            "DIRECT_VOLUME_BELOW_MINIMUM",
+            "SOFT_WEEKLY_VOLUME_BELOW_MINIMUM",
+            "PLANNED_VOLUME_REDUCED_DURING_SESSION_FIT"
+          ]
+        },
+        "reused": false
+      },
+      "status_code": 200
+    },
+    "profile_request": {
+      "birth_date": "1964-05-11",
+      "current_weight_kg": 73,
+      "display_name": "Maryam",
+      "experience_level": "beginner",
+      "fitness_goal": "improve_fitness",
+      "height_cm": 158,
+      "home_training_setup": "bodyweight_only",
+      "physical_limitations": null,
+      "plan_duration_weeks": 6,
+      "priority_muscles": [],
+      "session_duration_minutes": 45,
+      "sex": "female",
+      "training_age_months": 2,
+      "training_cautions": [],
+      "training_days_per_week": 2,
+      "training_location": "home",
+      "workout_generation_method": "fitsho_coach"
+    },
+    "profile_response": {
+      "body": {
+        "birth_date": "1964-05-11",
+        "circumferences_measured_at": null,
+        "created_at": "2026-08-19T18:29:52.594950Z",
+        "current_weight_kg": 73.0,
+        "display_name": "Maryam",
+        "experience_level": "beginner",
+        "fitness_goal": "improve_fitness",
+        "height_cm": 158,
+        "hip_circumference_cm": null,
+        "home_training_setup": "bodyweight_only",
+        "physical_limitations": null,
+        "plan_duration_weeks": 6,
+        "preferred_weekdays": null,
+        "priority_muscles": [],
+        "session_duration_minutes": 45,
+        "sex": "female",
+        "shoulder_circumference_cm": null,
+        "training_age_months": 2,
+        "training_cautions": [],
+        "training_days_per_week": 2,
+        "training_intensity": null,
+        "training_location": "home",
+        "updated_at": "2026-08-19T18:29:52.594950Z",
+        "user_id": "9867df0d-9201-4fdd-b182-a45123c80e2b",
+        "waist_circumference_cm": null,
+        "weight_measured_at": "2026-08-19T18:29:52.594950Z",
+        "workout_generation_method": "fitsho_coach"
+      },
+      "status_code": 201
+    },
+    "register_response": {
+      "body": {
+        "created_at": "2026-08-19T18:29:52.582038Z",
+        "email": "eval-9f495ae8-05@example.com",
+        "id": "9867df0d-9201-4fdd-b182-a45123c80e2b",
+        "is_admin": false,
+        "phone_number": null
+      },
+      "status_code": 201
+    }
+  },
+  "decision_trace": [
+    {
+      "assumptions": [],
+      "stage": "normalization"
+    },
+    {
+      "reasons": [
+        "SAFETY_SCREEN_CLEAR"
+      ],
+      "stage": "safety",
+      "status": "clear"
+    },
+    {
+      "eligible_count": 31,
+      "rejected_count": 357,
+      "stage": "eligibility"
+    },
+    {
+      "reason_codes": [
+        "SESSION_TRIMMED_FOR_TIME_LIMIT"
+      ],
+      "rejected_splits": [],
+      "selected_split": "full_body_ab",
+      "session_reasons": [
+        {
+          "day_index": 1,
+          "focus": "full_body_a",
+          "reason_codes": [
+            "SESSION_TRIMMED_FOR_TIME_LIMIT"
+          ]
+        },
+        {
+          "day_index": 2,
+          "focus": "full_body_b",
+          "reason_codes": [
+            "SESSION_TRIMMED_FOR_TIME_LIMIT"
+          ]
+        }
+      ],
+      "stage": "construction_recovery",
+      "status": "recovered"
+    },
+    {
+      "reasons": [
+        "SPLIT_SIMPLIFIED_FOR_NOVICE",
+        "SPLIT_FULL_BODY_FOR_LOW_FREQUENCY"
+      ],
+      "selected": "full_body_ab",
+      "stage": "split"
+    },
+    {
+      "effective_targets": {
+        "abs": 5,
+        "back": 5,
+        "biceps": 3,
+        "calves": 5,
+        "chest": 5,
+        "forearms": 3,
+        "glutes": 5,
+        "hamstrings": 5,
+        "quadriceps": 5,
+        "shoulders": 5,
+        "traps": 3,
+        "triceps": 3
+      },
+      "minimum_direct_targets": {
+        "abs": 4,
+        "back": 4,
+        "biceps": 2,
+        "calves": 4,
+        "chest": 4,
+        "forearms": 2,
+        "glutes": 4,
+        "hamstrings": 4,
+        "quadriceps": 4,
+        "shoulders": 4,
+        "traps": 2,
+        "triceps": 2
+      },
+      "previous_volume_baseline": {
+        "confidence": 0.0,
+        "reason_codes": [],
+        "source": "none"
+      },
+      "reasons": [
+        "VOLUME_REDUCED_FOR_RECOVERY"
+      ],
+      "stage": "volume"
+    },
+    {
+      "reasons": [
+        "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM",
+        "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+      ],
+      "stage": "volume_repair",
+      "weekly_direct_sets": {
+        "abs": 5,
+        "adductors": 2,
+        "back": 5,
+        "glutes": 3,
+        "obliques": 2,
+        "quadriceps": 5,
+        "triceps": 3
+      },
+      "weekly_effective_sets": {
+        "abductors": 1.5,
+        "abs": 5.0,
+        "adductors": 6.0,
+        "back": 6.5,
+        "calves": 1.5,
+        "forearms": 1.5,
+        "glutes": 7.5,
+        "hamstrings": 5.0,
+        "legs": 1.5,
+        "lower_back": 5.5,
+        "obliques": 4.5,
+        "quadriceps": 7.5,
+        "shoulders": 4.0,
+        "traps": 1.5,
+        "triceps": 3.0
+      }
+    }
+  ],
+  "evaluation_metadata": {
+    "ai_workout_generator_used": false,
+    "catalog_count_seen_by_engine": 388,
+    "database_isolation": "dedicated clone fitsho_eval_9f495ae8_20260819_01",
+    "engine_invocation": "FastAPI register -> profile POST -> workout generate POST -> WorkoutGenerationService -> generate_program",
+    "head_sha": "9f495ae813b45a5c6542cdf621fd9bbcc2a9438c",
+    "reference_template_count_seen_by_engine": 35,
+    "workout_generation_method_required": "fitsho_coach"
+  },
+  "evaluation_status": {
+    "failure_stage": null,
+    "generation_reused": false,
+    "reason": null,
+    "status": "success"
+  },
+  "generated_workout_program": {
+    "aggregate_metrics": {
+      "estimated_weekly_duration": 78,
+      "hard_training_days": 2,
+      "planned_direct_sets_by_muscle": {
+        "abs": 5,
+        "back": 5,
+        "biceps": 3,
+        "calves": 5,
+        "chest": 5,
+        "forearms": 3,
+        "glutes": 5,
+        "hamstrings": 5,
+        "quadriceps": 5,
+        "shoulders": 5,
+        "traps": 3,
+        "triceps": 3
+      },
+      "previous_volume_baseline": {
+        "confidence": 0.0,
+        "direct_sets_by_muscle": {},
+        "effective_sets_by_muscle": {},
+        "reason_codes": [],
+        "source": "none"
+      },
+      "recovery_days": 5,
+      "volume_ranges_by_muscle": {
+        "abs": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "back": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "biceps": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 6,
+          "effective_target_sets": 3,
+          "maximum_hard": 8,
+          "maximum_soft": 4,
+          "minimum_direct_sets": 2,
+          "minimum_soft": 2,
+          "target_sets": 3
+        },
+        "calves": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "chest": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "forearms": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 6,
+          "effective_target_sets": 3,
+          "maximum_hard": 8,
+          "maximum_soft": 4,
+          "minimum_direct_sets": 2,
+          "minimum_soft": 2,
+          "target_sets": 3
+        },
+        "glutes": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "hamstrings": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "quadriceps": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "shoulders": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "traps": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 6,
+          "effective_target_sets": 3,
+          "maximum_hard": 8,
+          "maximum_soft": 4,
+          "minimum_direct_sets": 2,
+          "minimum_soft": 2,
+          "target_sets": 3
+        },
+        "triceps": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 6,
+          "effective_target_sets": 3,
+          "maximum_hard": 8,
+          "maximum_soft": 4,
+          "minimum_direct_sets": 2,
+          "minimum_soft": 2,
+          "target_sets": 3
+        }
+      },
+      "weekly_cardio_minutes": 10,
+      "weekly_direct_sets_by_muscle": {
+        "abs": 5,
+        "adductors": 2,
+        "back": 5,
+        "biceps": 0,
+        "calves": 0,
+        "chest": 0,
+        "forearms": 0,
+        "glutes": 3,
+        "hamstrings": 0,
+        "obliques": 2,
+        "quadriceps": 5,
+        "shoulders": 0,
+        "traps": 0,
+        "triceps": 3
+      },
+      "weekly_effective_sets_by_muscle": {
+        "abductors": 1.5,
+        "abs": 5.0,
+        "adductors": 6.0,
+        "back": 6.5,
+        "biceps": 0,
+        "calves": 1.5,
+        "chest": 0,
+        "forearms": 1.5,
+        "glutes": 7.5,
+        "hamstrings": 5.0,
+        "legs": 1.5,
+        "lower_back": 5.5,
+        "obliques": 4.5,
+        "quadriceps": 7.5,
+        "shoulders": 4.0,
+        "traps": 1.5,
+        "triceps": 3.0
+      },
+      "weekly_fractional_sets_by_muscle": {
+        "abductors": 1.5,
+        "abs": 0,
+        "adductors": 4.0,
+        "back": 1.5,
+        "biceps": 0,
+        "calves": 1.5,
+        "chest": 0,
+        "forearms": 1.5,
+        "glutes": 4.5,
+        "hamstrings": 5.0,
+        "legs": 1.5,
+        "lower_back": 5.5,
+        "obliques": 2.5,
+        "quadriceps": 2.5,
+        "shoulders": 4.0,
+        "traps": 1.5,
+        "triceps": 0
+      }
+    },
+    "assumptions": [],
+    "body_analysis_provenance": {},
+    "decision_trace": [
+      {
+        "assumptions": [],
+        "stage": "normalization"
+      },
+      {
+        "reasons": [
+          "SAFETY_SCREEN_CLEAR"
+        ],
+        "stage": "safety",
+        "status": "clear"
+      },
+      {
+        "eligible_count": 31,
+        "rejected_count": 357,
+        "stage": "eligibility"
+      },
+      {
+        "reason_codes": [
+          "SESSION_TRIMMED_FOR_TIME_LIMIT"
+        ],
+        "rejected_splits": [],
+        "selected_split": "full_body_ab",
+        "session_reasons": [
+          {
+            "day_index": 1,
+            "focus": "full_body_a",
+            "reason_codes": [
+              "SESSION_TRIMMED_FOR_TIME_LIMIT"
+            ]
+          },
+          {
+            "day_index": 2,
+            "focus": "full_body_b",
+            "reason_codes": [
+              "SESSION_TRIMMED_FOR_TIME_LIMIT"
+            ]
+          }
+        ],
+        "stage": "construction_recovery",
+        "status": "recovered"
+      },
+      {
+        "reasons": [
+          "SPLIT_SIMPLIFIED_FOR_NOVICE",
+          "SPLIT_FULL_BODY_FOR_LOW_FREQUENCY"
+        ],
+        "selected": "full_body_ab",
+        "stage": "split"
+      },
+      {
+        "effective_targets": {
+          "abs": 5,
+          "back": 5,
+          "biceps": 3,
+          "calves": 5,
+          "chest": 5,
+          "forearms": 3,
+          "glutes": 5,
+          "hamstrings": 5,
+          "quadriceps": 5,
+          "shoulders": 5,
+          "traps": 3,
+          "triceps": 3
+        },
+        "minimum_direct_targets": {
+          "abs": 4,
+          "back": 4,
+          "biceps": 2,
+          "calves": 4,
+          "chest": 4,
+          "forearms": 2,
+          "glutes": 4,
+          "hamstrings": 4,
+          "quadriceps": 4,
+          "shoulders": 4,
+          "traps": 2,
+          "triceps": 2
+        },
+        "previous_volume_baseline": {
+          "confidence": 0.0,
+          "reason_codes": [],
+          "source": "none"
+        },
+        "reasons": [
+          "VOLUME_REDUCED_FOR_RECOVERY"
+        ],
+        "stage": "volume"
+      },
+      {
+        "reasons": [
+          "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM",
+          "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+        ],
+        "stage": "volume_repair",
+        "weekly_direct_sets": {
+          "abs": 5,
+          "adductors": 2,
+          "back": 5,
+          "glutes": 3,
+          "obliques": 2,
+          "quadriceps": 5,
+          "triceps": 3
+        },
+        "weekly_effective_sets": {
+          "abductors": 1.5,
+          "abs": 5.0,
+          "adductors": 6.0,
+          "back": 6.5,
+          "calves": 1.5,
+          "forearms": 1.5,
+          "glutes": 7.5,
+          "hamstrings": 5.0,
+          "legs": 1.5,
+          "lower_back": 5.5,
+          "obliques": 4.5,
+          "quadriceps": 7.5,
+          "shoulders": 4.0,
+          "traps": 1.5,
+          "triceps": 3.0
+        }
+      }
+    ],
+    "duration_weeks": 6,
+    "engine_version": "program_engine_v1",
+    "primary_goal": "general_fitness",
+    "progression_policy": {
+      "conditions": [
+        "top_of_rep_range_for_all_working_sets",
+        "within_target_rir",
+        "acceptable_technique"
+      ],
+      "deload": {
+        "load_reduction_percent": [
+          5,
+          10
+        ],
+        "maintain_main_movement_patterns": true,
+        "never_override_safety_referral": true,
+        "trigger_requires_multiple_signals": true,
+        "volume_reduction_percent": [
+          30,
+          50
+        ]
+      },
+      "increase_volume_and_load_together": false,
+      "lower_body_load_increase_percent": [
+        5.0,
+        10.0
+      ],
+      "qualifying_sessions": 2,
+      "regression_actions": [
+        "reduce_load",
+        "remove_one_low_priority_set",
+        "increase_target_rir",
+        "use_eligible_regression",
+        "review_recovery"
+      ],
+      "type": "double_progression",
+      "upper_body_load_increase_percent": [
+        2.5,
+        5.0
+      ],
+      "use_smallest_available_increment": true
+    },
+    "ruleset_version": "resistance_training_v2",
+    "safety_status": "clear",
+    "secondary_goal": null,
+    "seed": 20260819,
+    "split": {
+      "day_focuses": [
+        "full_body_a",
+        "full_body_b"
+      ],
+      "reason_codes": [
+        "SPLIT_SIMPLIFIED_FOR_NOVICE",
+        "SPLIT_FULL_BODY_FOR_LOW_FREQUENCY"
+      ],
+      "score": 116,
+      "split_type": "full_body_ab",
+      "weekdays": [
+        0,
+        3
+      ]
+    },
+    "training_status": "novice",
+    "user_profile_snapshot": {
+      "age": 62,
+      "allowed_range_of_motion": [],
+      "available_equipment": [
+        "bodyweight"
+      ],
+      "available_training_days": 2,
+      "axial_load_limit": "high",
+      "balance_requirement": "normal",
+      "biological_sex_optional": "female",
+      "blocked_caution_tags": [],
+      "blocked_exercises": [],
+      "blocked_movement_patterns": [],
+      "body_analysis_influence": null,
+      "cardio_tolerance": "moderate",
+      "current_activity_level": "moderate",
+      "current_pain_or_red_flags": [],
+      "disliked_exercises": [],
+      "height_cm": 158,
+      "impact_limit": "high",
+      "injuries_and_limitations": [],
+      "known_strength_data": {},
+      "medical_clearance_status": "not_required",
+      "overhead_limit": "high",
+      "physical_job_demand": "low",
+      "preferred_exercises": [],
+      "preferred_weekdays": [],
+      "pregnancy_or_postpartum": false,
+      "primary_goal": "general_fitness",
+      "priority_muscles": [],
+      "program_duration_weeks": 6,
+      "recent_training_history": {
+        "completed_session_ratio": 0.0,
+        "consistent_weeks": null,
+        "performance_trend": null,
+        "previous_volume_confidence": null,
+        "previous_volume_reason_codes": [],
+        "previous_volume_source": "none",
+        "previous_weekly_direct_sets_by_muscle": {},
+        "previous_weekly_effective_sets_by_muscle": {},
+        "previous_weekly_sets_by_muscle": {},
+        "recovery_problems": false
+      },
+      "reports_uncontrolled_medical_condition": false,
+      "secondary_goal_optional": null,
+      "seed_optional": 20260819,
+      "session_duration_minutes": 45,
+      "sleep_quality": "average",
+      "stress_level": "average",
+      "training_age_months": 2,
+      "training_experience": "beginner",
+      "training_location": "home",
+      "user_id": "9867df0d-9201-4fdd-b182-a45123c80e2b",
+      "weight_kg": 73.0
+    },
+    "validation_report": {
+      "assumptions": [],
+      "decision_trace": [
+        {
+          "assumptions": [],
+          "stage": "normalization"
+        },
+        {
+          "reasons": [
+            "SAFETY_SCREEN_CLEAR"
+          ],
+          "stage": "safety",
+          "status": "clear"
+        },
+        {
+          "eligible_count": 31,
+          "rejected_count": 357,
+          "stage": "eligibility"
+        },
+        {
+          "reason_codes": [
+            "SESSION_TRIMMED_FOR_TIME_LIMIT"
+          ],
+          "rejected_splits": [],
+          "selected_split": "full_body_ab",
+          "session_reasons": [
+            {
+              "day_index": 1,
+              "focus": "full_body_a",
+              "reason_codes": [
+                "SESSION_TRIMMED_FOR_TIME_LIMIT"
+              ]
+            },
+            {
+              "day_index": 2,
+              "focus": "full_body_b",
+              "reason_codes": [
+                "SESSION_TRIMMED_FOR_TIME_LIMIT"
+              ]
+            }
+          ],
+          "stage": "construction_recovery",
+          "status": "recovered"
+        },
+        {
+          "reasons": [
+            "SPLIT_SIMPLIFIED_FOR_NOVICE",
+            "SPLIT_FULL_BODY_FOR_LOW_FREQUENCY"
+          ],
+          "selected": "full_body_ab",
+          "stage": "split"
+        },
+        {
+          "effective_targets": {
+            "abs": 5,
+            "back": 5,
+            "biceps": 3,
+            "calves": 5,
+            "chest": 5,
+            "forearms": 3,
+            "glutes": 5,
+            "hamstrings": 5,
+            "quadriceps": 5,
+            "shoulders": 5,
+            "traps": 3,
+            "triceps": 3
+          },
+          "minimum_direct_targets": {
+            "abs": 4,
+            "back": 4,
+            "biceps": 2,
+            "calves": 4,
+            "chest": 4,
+            "forearms": 2,
+            "glutes": 4,
+            "hamstrings": 4,
+            "quadriceps": 4,
+            "shoulders": 4,
+            "traps": 2,
+            "triceps": 2
+          },
+          "previous_volume_baseline": {
+            "confidence": 0.0,
+            "reason_codes": [],
+            "source": "none"
+          },
+          "reasons": [
+            "VOLUME_REDUCED_FOR_RECOVERY"
+          ],
+          "stage": "volume"
+        },
+        {
+          "reasons": [
+            "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM",
+            "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+          ],
+          "stage": "volume_repair",
+          "weekly_direct_sets": {
+            "abs": 5,
+            "adductors": 2,
+            "back": 5,
+            "glutes": 3,
+            "obliques": 2,
+            "quadriceps": 5,
+            "triceps": 3
+          },
+          "weekly_effective_sets": {
+            "abductors": 1.5,
+            "abs": 5.0,
+            "adductors": 6.0,
+            "back": 6.5,
+            "calves": 1.5,
+            "forearms": 1.5,
+            "glutes": 7.5,
+            "hamstrings": 5.0,
+            "legs": 1.5,
+            "lower_back": 5.5,
+            "obliques": 4.5,
+            "quadriceps": 7.5,
+            "shoulders": 4.0,
+            "traps": 1.5,
+            "triceps": 3.0
+          }
+        }
+      ],
+      "errors": [],
+      "metrics": {
+        "direct_session_frequency_by_muscle": {
+          "abs": 2,
+          "adductors": 1,
+          "back": 2,
+          "biceps": 0,
+          "calves": 0,
+          "chest": 0,
+          "forearms": 0,
+          "glutes": 1,
+          "hamstrings": 0,
+          "obliques": 1,
+          "quadriceps": 1,
+          "shoulders": 0,
+          "traps": 0,
+          "triceps": 1
+        },
+        "estimated_weekly_duration": 78,
+        "hard_training_days": 2,
+        "movement_pattern_frequency": {
+          "core_anti_extension": 1,
+          "core_anti_lateral_flexion": 1,
+          "hip_extension": 2,
+          "horizontal_pull": 1,
+          "horizontal_push": 2,
+          "lunge": 1,
+          "squat": 1,
+          "vertical_pull": 1
+        },
+        "planned_direct_sets_by_muscle": {
+          "abs": 5,
+          "back": 5,
+          "biceps": 3,
+          "calves": 5,
+          "chest": 5,
+          "forearms": 3,
+          "glutes": 5,
+          "hamstrings": 5,
+          "quadriceps": 5,
+          "shoulders": 5,
+          "traps": 3,
+          "triceps": 3
+        },
+        "previous_volume_baseline": {
+          "confidence": 0.0,
+          "direct_sets_by_muscle": {},
+          "effective_sets_by_muscle": {},
+          "reason_codes": [],
+          "source": "none"
+        },
+        "recovery_days": 5,
+        "volume_ranges_by_muscle": {
+          "abs": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "back": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "biceps": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 6,
+            "effective_target_sets": 3,
+            "maximum_hard": 8,
+            "maximum_soft": 4,
+            "minimum_direct_sets": 2,
+            "minimum_soft": 2,
+            "target_sets": 3
+          },
+          "calves": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "chest": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "forearms": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 6,
+            "effective_target_sets": 3,
+            "maximum_hard": 8,
+            "maximum_soft": 4,
+            "minimum_direct_sets": 2,
+            "minimum_soft": 2,
+            "target_sets": 3
+          },
+          "glutes": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "hamstrings": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "quadriceps": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "shoulders": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "traps": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 6,
+            "effective_target_sets": 3,
+            "maximum_hard": 8,
+            "maximum_soft": 4,
+            "minimum_direct_sets": 2,
+            "minimum_soft": 2,
+            "target_sets": 3
+          },
+          "triceps": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 6,
+            "effective_target_sets": 3,
+            "maximum_hard": 8,
+            "maximum_soft": 4,
+            "minimum_direct_sets": 2,
+            "minimum_soft": 2,
+            "target_sets": 3
+          }
+        },
+        "weekly_cardio_minutes": 10,
+        "weekly_direct_sets_by_muscle": {
+          "abs": 5,
+          "adductors": 2,
+          "back": 5,
+          "biceps": 0,
+          "calves": 0,
+          "chest": 0,
+          "forearms": 0,
+          "glutes": 3,
+          "hamstrings": 0,
+          "obliques": 2,
+          "quadriceps": 5,
+          "shoulders": 0,
+          "traps": 0,
+          "triceps": 3
+        },
+        "weekly_effective_sets_by_muscle": {
+          "abductors": 1.5,
+          "abs": 5.0,
+          "adductors": 6.0,
+          "back": 6.5,
+          "biceps": 0,
+          "calves": 1.5,
+          "chest": 0,
+          "forearms": 1.5,
+          "glutes": 7.5,
+          "hamstrings": 5.0,
+          "legs": 1.5,
+          "lower_back": 5.5,
+          "obliques": 4.5,
+          "quadriceps": 7.5,
+          "shoulders": 4.0,
+          "traps": 1.5,
+          "triceps": 3.0
+        },
+        "weekly_fractional_sets_by_muscle": {
+          "abductors": 1.5,
+          "abs": 0,
+          "adductors": 4.0,
+          "back": 1.5,
+          "biceps": 0,
+          "calves": 1.5,
+          "chest": 0,
+          "forearms": 1.5,
+          "glutes": 4.5,
+          "hamstrings": 5.0,
+          "legs": 1.5,
+          "lower_back": 5.5,
+          "obliques": 2.5,
+          "quadriceps": 2.5,
+          "shoulders": 4.0,
+          "traps": 1.5,
+          "triceps": 0
+        }
+      },
+      "warnings": [
+        "EFFECTIVE_VOLUME_BELOW_TARGET",
+        "DIRECT_VOLUME_BELOW_MINIMUM",
+        "SOFT_WEEKLY_VOLUME_BELOW_MINIMUM",
+        "PLANNED_VOLUME_REDUCED_DURING_SESSION_FIT"
+      ]
+    },
+    "warnings": [
+      "EFFECTIVE_VOLUME_BELOW_TARGET",
+      "DIRECT_VOLUME_BELOW_MINIMUM",
+      "SOFT_WEEKLY_VOLUME_BELOW_MINIMUM",
+      "PLANNED_VOLUME_REDUCED_DURING_SESSION_FIT"
+    ],
+    "weekly_schedule": [
+      {
+        "cardio": {
+          "duration_minutes": 10,
+          "intensity": "moderate",
+          "modality_exercise_id": "7a439087-278c-4e8d-8c84-ca9bf77fda50",
+          "modality_name": "Cardio Exercise",
+          "reason_codes": [
+            "LOW_IMPACT_CARDIO_SELECTED",
+            "CARDIO_SCHEDULED_AFTER_RESISTANCE"
+          ]
+        },
+        "day_index": 1,
+        "estimated_duration_minutes": 49,
+        "exercises": [
+          {
+            "axial_loading_level": "low",
+            "caution_tags": [],
+            "counts_toward_volume": true,
+            "equipment": [
+              "bodyweight"
+            ],
+            "estimated_minutes": 8,
+            "exercise_id": "587fb36d-8bf7-4d50-b073-5707ad9798c6",
+            "exercise_name": "Triceps Dips",
+            "impact_level": "low",
+            "is_active": true,
+            "is_programmable": true,
+            "load_guidance": "Select a load that preserves the target RIR.",
+            "movement_pattern": "horizontal_push",
+            "needs_review": false,
+            "notes": null,
+            "order": 1,
+            "primary_muscle": "triceps",
+            "progression_rule": "double_progression_v1",
+            "range_of_motion_profile": [],
+            "reason_codes": [
+              "GOAL_SPECIFIC",
+              "EQUIPMENT_MATCH",
+              "TIME_EFFICIENT",
+              "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+            ],
+            "rep_max": 15,
+            "rep_min": 6,
+            "rest_seconds": 90,
+            "secondary_muscles": [],
+            "sets": 3,
+            "stability_demand": "moderate",
+            "substitution_exercise_ids": [
+              "99167504-57f7-4443-b700-0b27cbc23d55",
+              "6f444d7a-b0a6-46fe-a44a-5d89e45d2ebf",
+              "7b99e29f-be2d-46c9-a9cd-0b9342fdee9b"
+            ],
+            "target_rir": 3,
+            "warmup_sets": 2
+          },
+          {
+            "axial_loading_level": "low",
+            "caution_tags": [
+              "overhead_position"
+            ],
+            "counts_toward_volume": true,
+            "equipment": [
+              "bodyweight"
+            ],
+            "estimated_minutes": 6,
+            "exercise_id": "26b14230-fda7-40e1-b26a-e8528d49189d",
+            "exercise_name": "Bench Pull-Up",
+            "impact_level": "low",
+            "is_active": true,
+            "is_programmable": true,
+            "load_guidance": "Select a load that preserves the target RIR.",
+            "movement_pattern": "vertical_pull",
+            "needs_review": false,
+            "notes": null,
+            "order": 2,
+            "primary_muscle": "back",
+            "progression_rule": "double_progression_v1",
+            "range_of_motion_profile": [],
+            "reason_codes": [
+              "GOAL_SPECIFIC",
+              "EQUIPMENT_MATCH",
+              "TIME_EFFICIENT"
+            ],
+            "rep_max": 15,
+            "rep_min": 6,
+            "rest_seconds": 90,
+            "secondary_muscles": [
+              "forearms",
+              "shoulders"
+            ],
+            "sets": 3,
+            "stability_demand": "moderate",
+            "substitution_exercise_ids": [
+              "953d461c-4fed-4adc-8b35-d0f34ec2d9da",
+              "efd181ea-546b-46c9-b84e-a38d0760d13c",
+              "99167504-57f7-4443-b700-0b27cbc23d55"
+            ],
+            "target_rir": 3,
+            "warmup_sets": 0
+          },
+          {
+            "axial_loading_level": "low",
+            "caution_tags": [
+              "deep_knee_flexion"
+            ],
+            "counts_toward_volume": true,
+            "equipment": [
+              "bodyweight"
+            ],
+            "estimated_minutes": 10,
+            "exercise_id": "f254aa06-e482-4082-a007-ed7cc09fe4e1",
+            "exercise_name": "Squat",
+            "impact_level": "low",
+            "is_active": true,
+            "is_programmable": true,
+            "load_guidance": "Select a load that preserves the target RIR.",
+            "movement_pattern": "squat",
+            "needs_review": false,
+            "notes": null,
+            "order": 3,
+            "primary_muscle": "quadriceps",
+            "progression_rule": "double_progression_v1",
+            "range_of_motion_profile": [
+              "deep_knee_flexion"
+            ],
+            "reason_codes": [
+              "GOAL_SPECIFIC",
+              "EQUIPMENT_MATCH",
+              "TIME_EFFICIENT",
+              "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM",
+              "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+            ],
+            "rep_max": 15,
+            "rep_min": 6,
+            "rest_seconds": 90,
+            "secondary_muscles": [
+              "adductors",
+              "hamstrings",
+              "lower_back"
+            ],
+            "sets": 5,
+            "stability_demand": "moderate",
+            "substitution_exercise_ids": [
+              "4a3aadbb-6d8a-4017-87ed-a8566c04d20b",
+              "03552b19-9c04-4f79-9830-1ae0442e2490",
+              "11b40ec3-14ca-42c9-bcc0-cbd8858eb3b0"
+            ],
+            "target_rir": 3,
+            "warmup_sets": 0
+          },
+          {
+            "axial_loading_level": "low",
+            "caution_tags": [],
+            "counts_toward_volume": true,
+            "equipment": [
+              "bodyweight"
+            ],
+            "estimated_minutes": 6,
+            "exercise_id": "03552b19-9c04-4f79-9830-1ae0442e2490",
+            "exercise_name": "plank pike",
+            "impact_level": "low",
+            "is_active": true,
+            "is_programmable": true,
+            "load_guidance": "Select a load that preserves the target RIR.",
+            "movement_pattern": "hip_extension",
+            "needs_review": false,
+            "notes": null,
+            "order": 4,
+            "primary_muscle": "abs",
+            "progression_rule": "double_progression_v1",
+            "range_of_motion_profile": [],
+            "reason_codes": [
+              "GOAL_SPECIFIC",
+              "EQUIPMENT_MATCH",
+              "TIME_EFFICIENT"
+            ],
+            "rep_max": 15,
+            "rep_min": 6,
+            "rest_seconds": 90,
+            "secondary_muscles": [
+              "abductors",
+              "adductors",
+              "back",
+              "calves",
+              "glutes",
+              "legs",
+              "lower_back",
+              "obliques",
+              "quadriceps",
+              "shoulders",
+              "traps"
+            ],
+            "sets": 3,
+            "stability_demand": "moderate",
+            "substitution_exercise_ids": [
+              "11b40ec3-14ca-42c9-bcc0-cbd8858eb3b0",
+              "d85dc3fc-a435-433d-9837-4131d5bf4471",
+              "b6b0bc77-1ec8-477e-a0f8-1489e2873370"
+            ],
+            "target_rir": 3,
+            "warmup_sets": 0
+          },
+          {
+            "axial_loading_level": "low",
+            "caution_tags": [],
+            "counts_toward_volume": true,
+            "equipment": [
+              "bodyweight"
+            ],
+            "estimated_minutes": 4,
+            "exercise_id": "5e74f316-5106-4a2c-a280-1f83df374c04",
+            "exercise_name": "Side Plank",
+            "impact_level": "low",
+            "is_active": true,
+            "is_programmable": true,
+            "load_guidance": "Select a load that preserves the target RIR.",
+            "movement_pattern": "core_anti_lateral_flexion",
+            "needs_review": false,
+            "notes": null,
+            "order": 5,
+            "primary_muscle": "obliques",
+            "progression_rule": "double_progression_v1",
+            "range_of_motion_profile": [],
+            "reason_codes": [
+              "BEGINNER_FRIENDLY",
+              "EQUIPMENT_MATCH",
+              "TIME_EFFICIENT"
+            ],
+            "rep_max": 15,
+            "rep_min": 6,
+            "rest_seconds": 90,
+            "secondary_muscles": [
+              "glutes"
+            ],
+            "sets": 2,
+            "stability_demand": "low",
+            "substitution_exercise_ids": [
+              "352ad30c-5d67-48f2-9a19-0354b16690f4",
+              "daae3415-c9f3-4a21-b3cf-f02d1322c024",
+              "267b9a03-9fb9-46ba-844b-0a1cc4dc5bbd"
+            ],
+            "target_rir": 3,
+            "warmup_sets": 0
+          }
+        ],
+        "focus": "full_body_a",
+        "title": "Day 1: Triceps + Back + Quadriceps + Abs + Obliques",
+        "weekday": 0
+      },
+      {
+        "cardio": null,
+        "day_index": 2,
+        "estimated_duration_minutes": 29,
+        "exercises": [
+          {
+            "axial_loading_level": "low",
+            "caution_tags": [],
+            "counts_toward_volume": true,
+            "equipment": [
+              "bodyweight"
+            ],
+            "estimated_minutes": 8,
+            "exercise_id": "11b40ec3-14ca-42c9-bcc0-cbd8858eb3b0",
+            "exercise_name": "Bridge Pose (Setu Bandhasana)",
+            "impact_level": "low",
+            "is_active": true,
+            "is_programmable": true,
+            "load_guidance": "Select a load that preserves the target RIR.",
+            "movement_pattern": "hip_extension",
+            "needs_review": false,
+            "notes": null,
+            "order": 1,
+            "primary_muscle": "glutes",
+            "progression_rule": "double_progression_v1",
+            "range_of_motion_profile": [],
+            "reason_codes": [
+              "GOAL_SPECIFIC",
+              "EQUIPMENT_MATCH",
+              "TIME_EFFICIENT",
+              "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM"
+            ],
+            "rep_max": 15,
+            "rep_min": 6,
+            "rest_seconds": 90,
+            "secondary_muscles": [
+              "hamstrings",
+              "lower_back"
+            ],
+            "sets": 3,
+            "stability_demand": "moderate",
+            "substitution_exercise_ids": [
+              "d85dc3fc-a435-433d-9837-4131d5bf4471",
+              "03552b19-9c04-4f79-9830-1ae0442e2490",
+              "4a3aadbb-6d8a-4017-87ed-a8566c04d20b"
+            ],
+            "target_rir": 3,
+            "warmup_sets": 2
+          },
+          {
+            "axial_loading_level": "low",
+            "caution_tags": [],
+            "counts_toward_volume": false,
+            "equipment": [
+              "bodyweight"
+            ],
+            "estimated_minutes": 4,
+            "exercise_id": "6f444d7a-b0a6-46fe-a44a-5d89e45d2ebf",
+            "exercise_name": "Bench Dips",
+            "impact_level": "low",
+            "is_active": true,
+            "is_programmable": true,
+            "load_guidance": "Select a load that preserves the target RIR.",
+            "movement_pattern": "horizontal_push",
+            "needs_review": false,
+            "notes": null,
+            "order": 2,
+            "primary_muscle": "triceps",
+            "progression_rule": "double_progression_v1",
+            "range_of_motion_profile": [],
+            "reason_codes": [
+              "GOAL_SPECIFIC",
+              "EQUIPMENT_MATCH",
+              "TIME_EFFICIENT",
+              "SESSION_SIZE_ACCESSORY"
+            ],
+            "rep_max": 15,
+            "rep_min": 6,
+            "rest_seconds": 90,
+            "secondary_muscles": [
+              "chest"
+            ],
+            "sets": 2,
+            "stability_demand": "moderate",
+            "substitution_exercise_ids": [
+              "99167504-57f7-4443-b700-0b27cbc23d55",
+              "587fb36d-8bf7-4d50-b073-5707ad9798c6",
+              "7b99e29f-be2d-46c9-a9cd-0b9342fdee9b"
+            ],
+            "target_rir": 3,
+            "warmup_sets": 0
+          },
+          {
+            "axial_loading_level": "low",
+            "caution_tags": [
+              "neck_loading"
+            ],
+            "counts_toward_volume": true,
+            "equipment": [
+              "bodyweight"
+            ],
+            "estimated_minutes": 4,
+            "exercise_id": "953d461c-4fed-4adc-8b35-d0f34ec2d9da",
+            "exercise_name": "Inverted Row Between Chairs",
+            "impact_level": "low",
+            "is_active": true,
+            "is_programmable": true,
+            "load_guidance": "Select a load that preserves the target RIR.",
+            "movement_pattern": "horizontal_pull",
+            "needs_review": false,
+            "notes": null,
+            "order": 3,
+            "primary_muscle": "back",
+            "progression_rule": "double_progression_v1",
+            "range_of_motion_profile": [],
+            "reason_codes": [
+              "GOAL_SPECIFIC",
+              "EQUIPMENT_MATCH",
+              "TIME_EFFICIENT"
+            ],
+            "rep_max": 15,
+            "rep_min": 6,
+            "rest_seconds": 90,
+            "secondary_muscles": [
+              "shoulders"
+            ],
+            "sets": 2,
+            "stability_demand": "moderate",
+            "substitution_exercise_ids": [
+              "efd181ea-546b-46c9-b84e-a38d0760d13c",
+              "26b14230-fda7-40e1-b26a-e8528d49189d",
+              "99167504-57f7-4443-b700-0b27cbc23d55"
+            ],
+            "target_rir": 3,
+            "warmup_sets": 0
+          },
+          {
+            "axial_loading_level": "low",
+            "caution_tags": [
+              "deep_knee_flexion"
+            ],
+            "counts_toward_volume": true,
+            "equipment": [
+              "bodyweight"
+            ],
+            "estimated_minutes": 4,
+            "exercise_id": "b3edb606-4f9c-432d-b7b5-83e1f455077c",
+            "exercise_name": "Plyometric Side Lunge Stretch",
+            "impact_level": "low",
+            "is_active": true,
+            "is_programmable": true,
+            "load_guidance": "Select a load that preserves the target RIR.",
+            "movement_pattern": "lunge",
+            "needs_review": false,
+            "notes": null,
+            "order": 4,
+            "primary_muscle": "adductors",
+            "progression_rule": "double_progression_v1",
+            "range_of_motion_profile": [
+              "deep_knee_flexion"
+            ],
+            "reason_codes": [
+              "EQUIPMENT_MATCH",
+              "TIME_EFFICIENT"
+            ],
+            "rep_max": 15,
+            "rep_min": 6,
+            "rest_seconds": 90,
+            "secondary_muscles": [
+              "glutes",
+              "hamstrings",
+              "quadriceps"
+            ],
+            "sets": 2,
+            "stability_demand": "moderate",
+            "substitution_exercise_ids": [
+              "4a3aadbb-6d8a-4017-87ed-a8566c04d20b",
+              "ba92ef84-a61a-413f-9624-43ecec469f24",
+              "03552b19-9c04-4f79-9830-1ae0442e2490"
+            ],
+            "target_rir": 3,
+            "warmup_sets": 0
+          },
+          {
+            "axial_loading_level": "low",
+            "caution_tags": [],
+            "counts_toward_volume": true,
+            "equipment": [
+              "bodyweight"
+            ],
+            "estimated_minutes": 4,
+            "exercise_id": "b6b0bc77-1ec8-477e-a0f8-1489e2873370",
+            "exercise_name": "Front Plank",
+            "impact_level": "low",
+            "is_active": true,
+            "is_programmable": true,
+            "load_guidance": "Select a load that preserves the target RIR.",
+            "movement_pattern": "core_anti_extension",
+            "needs_review": false,
+            "notes": null,
+            "order": 5,
+            "primary_muscle": "abs",
+            "progression_rule": "double_progression_v1",
+            "range_of_motion_profile": [],
+            "reason_codes": [
+              "BEGINNER_FRIENDLY",
+              "EQUIPMENT_MATCH",
+              "TIME_EFFICIENT"
+            ],
+            "rep_max": 15,
+            "rep_min": 6,
+            "rest_seconds": 90,
+            "secondary_muscles": [
+              "glutes",
+              "obliques"
+            ],
+            "sets": 2,
+            "stability_demand": "low",
+            "substitution_exercise_ids": [
+              "03552b19-9c04-4f79-9830-1ae0442e2490",
+              "06d76afc-2434-415a-8208-21a336ae634b",
+              "2a2899a1-a60c-47cb-9fb2-74a7b3f9f86e"
+            ],
+            "target_rir": 3,
+            "warmup_sets": 0
+          }
+        ],
+        "focus": "full_body_b",
+        "title": "Day 2: Glutes + Back + Adductors + Abs",
+        "weekday": 3
+      }
+    ]
+  },
+  "generation_path": {
+    "exercises_preserved": [],
+    "path": "dynamic_program_engine",
+    "prescription_changes": [],
+    "selected_split": {
+      "day_focuses": [
+        "full_body_a",
+        "full_body_b"
+      ],
+      "reason_codes": [
+        "SPLIT_SIMPLIFIED_FOR_NOVICE",
+        "SPLIT_FULL_BODY_FOR_LOW_FREQUENCY"
+      ],
+      "score": 116,
+      "split_type": "full_body_ab",
+      "weekdays": [
+        0,
+        3
+      ]
+    },
+    "substitutions": [],
+    "template_rejection_or_fallback": [],
+    "template_selection": null,
+    "template_slug": null,
+    "volume_adaptation": {
+      "planned": {
+        "effective_targets": {
+          "abs": 5,
+          "back": 5,
+          "biceps": 3,
+          "calves": 5,
+          "chest": 5,
+          "forearms": 3,
+          "glutes": 5,
+          "hamstrings": 5,
+          "quadriceps": 5,
+          "shoulders": 5,
+          "traps": 3,
+          "triceps": 3
+        },
+        "minimum_direct_targets": {
+          "abs": 4,
+          "back": 4,
+          "biceps": 2,
+          "calves": 4,
+          "chest": 4,
+          "forearms": 2,
+          "glutes": 4,
+          "hamstrings": 4,
+          "quadriceps": 4,
+          "shoulders": 4,
+          "traps": 2,
+          "triceps": 2
+        },
+        "previous_volume_baseline": {
+          "confidence": 0.0,
+          "reason_codes": [],
+          "source": "none"
+        },
+        "reasons": [
+          "VOLUME_REDUCED_FOR_RECOVERY"
+        ],
+        "stage": "volume"
+      },
+      "repair": {
+        "reasons": [
+          "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM",
+          "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+        ],
+        "stage": "volume_repair",
+        "weekly_direct_sets": {
+          "abs": 5,
+          "adductors": 2,
+          "back": 5,
+          "glutes": 3,
+          "obliques": 2,
+          "quadriceps": 5,
+          "triceps": 3
+        },
+        "weekly_effective_sets": {
+          "abductors": 1.5,
+          "abs": 5.0,
+          "adductors": 6.0,
+          "back": 6.5,
+          "calves": 1.5,
+          "forearms": 1.5,
+          "glutes": 7.5,
+          "hamstrings": 5.0,
+          "legs": 1.5,
+          "lower_back": 5.5,
+          "obliques": 4.5,
+          "quadriceps": 7.5,
+          "shoulders": 4.0,
+          "traps": 1.5,
+          "triceps": 3.0
+        }
+      }
+    }
+  },
+  "persisted_plan_verification": {
+    "aggregate_metrics": {
+      "estimated_weekly_duration": 78,
+      "hard_training_days": 2,
+      "planned_direct_sets_by_muscle": {
+        "abs": 5,
+        "back": 5,
+        "biceps": 3,
+        "calves": 5,
+        "chest": 5,
+        "forearms": 3,
+        "glutes": 5,
+        "hamstrings": 5,
+        "quadriceps": 5,
+        "shoulders": 5,
+        "traps": 3,
+        "triceps": 3
+      },
+      "previous_volume_baseline": {
+        "confidence": 0.0,
+        "direct_sets_by_muscle": {},
+        "effective_sets_by_muscle": {},
+        "reason_codes": [],
+        "source": "none"
+      },
+      "recovery_days": 5,
+      "volume_ranges_by_muscle": {
+        "abs": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "back": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "biceps": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 6,
+          "effective_target_sets": 3,
+          "maximum_hard": 8,
+          "maximum_soft": 4,
+          "minimum_direct_sets": 2,
+          "minimum_soft": 2,
+          "target_sets": 3
+        },
+        "calves": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "chest": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "forearms": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 6,
+          "effective_target_sets": 3,
+          "maximum_hard": 8,
+          "maximum_soft": 4,
+          "minimum_direct_sets": 2,
+          "minimum_soft": 2,
+          "target_sets": 3
+        },
+        "glutes": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "hamstrings": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "quadriceps": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "shoulders": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "traps": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 6,
+          "effective_target_sets": 3,
+          "maximum_hard": 8,
+          "maximum_soft": 4,
+          "minimum_direct_sets": 2,
+          "minimum_soft": 2,
+          "target_sets": 3
+        },
+        "triceps": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 6,
+          "effective_target_sets": 3,
+          "maximum_hard": 8,
+          "maximum_soft": 4,
+          "minimum_direct_sets": 2,
+          "minimum_soft": 2,
+          "target_sets": 3
+        }
+      },
+      "weekly_cardio_minutes": 10,
+      "weekly_direct_sets_by_muscle": {
+        "abs": 5,
+        "adductors": 2,
+        "back": 5,
+        "biceps": 0,
+        "calves": 0,
+        "chest": 0,
+        "forearms": 0,
+        "glutes": 3,
+        "hamstrings": 0,
+        "obliques": 2,
+        "quadriceps": 5,
+        "shoulders": 0,
+        "traps": 0,
+        "triceps": 3
+      },
+      "weekly_effective_sets_by_muscle": {
+        "abductors": 1.5,
+        "abs": 5.0,
+        "adductors": 6.0,
+        "back": 6.5,
+        "biceps": 0,
+        "calves": 1.5,
+        "chest": 0,
+        "forearms": 1.5,
+        "glutes": 7.5,
+        "hamstrings": 5.0,
+        "legs": 1.5,
+        "lower_back": 5.5,
+        "obliques": 4.5,
+        "quadriceps": 7.5,
+        "shoulders": 4.0,
+        "traps": 1.5,
+        "triceps": 3.0
+      },
+      "weekly_fractional_sets_by_muscle": {
+        "abductors": 1.5,
+        "abs": 0,
+        "adductors": 4.0,
+        "back": 1.5,
+        "biceps": 0,
+        "calves": 1.5,
+        "chest": 0,
+        "forearms": 1.5,
+        "glutes": 4.5,
+        "hamstrings": 5.0,
+        "legs": 1.5,
+        "lower_back": 5.5,
+        "obliques": 2.5,
+        "quadriceps": 2.5,
+        "shoulders": 4.0,
+        "traps": 1.5,
+        "triceps": 0
+      }
+    },
+    "candidate_set_hash": "9407f49b2683e696647e0f945f90c8402e74418dfeed39a978e6675ba4440763",
+    "decision_trace": [
+      {
+        "assumptions": [],
+        "stage": "normalization"
+      },
+      {
+        "reasons": [
+          "SAFETY_SCREEN_CLEAR"
+        ],
+        "stage": "safety",
+        "status": "clear"
+      },
+      {
+        "eligible_count": 31,
+        "rejected_count": 357,
+        "stage": "eligibility"
+      },
+      {
+        "reason_codes": [
+          "SESSION_TRIMMED_FOR_TIME_LIMIT"
+        ],
+        "rejected_splits": [],
+        "selected_split": "full_body_ab",
+        "session_reasons": [
+          {
+            "day_index": 1,
+            "focus": "full_body_a",
+            "reason_codes": [
+              "SESSION_TRIMMED_FOR_TIME_LIMIT"
+            ]
+          },
+          {
+            "day_index": 2,
+            "focus": "full_body_b",
+            "reason_codes": [
+              "SESSION_TRIMMED_FOR_TIME_LIMIT"
+            ]
+          }
+        ],
+        "stage": "construction_recovery",
+        "status": "recovered"
+      },
+      {
+        "reasons": [
+          "SPLIT_SIMPLIFIED_FOR_NOVICE",
+          "SPLIT_FULL_BODY_FOR_LOW_FREQUENCY"
+        ],
+        "selected": "full_body_ab",
+        "stage": "split"
+      },
+      {
+        "effective_targets": {
+          "abs": 5,
+          "back": 5,
+          "biceps": 3,
+          "calves": 5,
+          "chest": 5,
+          "forearms": 3,
+          "glutes": 5,
+          "hamstrings": 5,
+          "quadriceps": 5,
+          "shoulders": 5,
+          "traps": 3,
+          "triceps": 3
+        },
+        "minimum_direct_targets": {
+          "abs": 4,
+          "back": 4,
+          "biceps": 2,
+          "calves": 4,
+          "chest": 4,
+          "forearms": 2,
+          "glutes": 4,
+          "hamstrings": 4,
+          "quadriceps": 4,
+          "shoulders": 4,
+          "traps": 2,
+          "triceps": 2
+        },
+        "previous_volume_baseline": {
+          "confidence": 0.0,
+          "reason_codes": [],
+          "source": "none"
+        },
+        "reasons": [
+          "VOLUME_REDUCED_FOR_RECOVERY"
+        ],
+        "stage": "volume"
+      },
+      {
+        "reasons": [
+          "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM",
+          "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+        ],
+        "stage": "volume_repair",
+        "weekly_direct_sets": {
+          "abs": 5,
+          "adductors": 2,
+          "back": 5,
+          "glutes": 3,
+          "obliques": 2,
+          "quadriceps": 5,
+          "triceps": 3
+        },
+        "weekly_effective_sets": {
+          "abductors": 1.5,
+          "abs": 5.0,
+          "adductors": 6.0,
+          "back": 6.5,
+          "calves": 1.5,
+          "forearms": 1.5,
+          "glutes": 7.5,
+          "hamstrings": 5.0,
+          "legs": 1.5,
+          "lower_back": 5.5,
+          "obliques": 4.5,
+          "quadriceps": 7.5,
+          "shoulders": 4.0,
+          "traps": 1.5,
+          "triceps": 3.0
+        }
+      }
+    ],
+    "engine_version": "program_engine_v1",
+    "found": true,
+    "generation_method": "deterministic_domain",
+    "generation_signature": "cc6f340080e5b0512b5de494952cb2712c125e1e1a9b46ab6df27da741a880c7",
+    "id": "7b093ed0-0e2e-4ebc-919b-b07801333579",
+    "model_id": "program_engine_v1",
+    "provider": "fitsho_domain",
+    "ruleset_version": "resistance_training_v2",
+    "seed": 20260819,
+    "status": "pending_review",
+    "validation_report": {
+      "assumptions": [],
+      "decision_trace": [
+        {
+          "assumptions": [],
+          "stage": "normalization"
+        },
+        {
+          "reasons": [
+            "SAFETY_SCREEN_CLEAR"
+          ],
+          "stage": "safety",
+          "status": "clear"
+        },
+        {
+          "eligible_count": 31,
+          "rejected_count": 357,
+          "stage": "eligibility"
+        },
+        {
+          "reason_codes": [
+            "SESSION_TRIMMED_FOR_TIME_LIMIT"
+          ],
+          "rejected_splits": [],
+          "selected_split": "full_body_ab",
+          "session_reasons": [
+            {
+              "day_index": 1,
+              "focus": "full_body_a",
+              "reason_codes": [
+                "SESSION_TRIMMED_FOR_TIME_LIMIT"
+              ]
+            },
+            {
+              "day_index": 2,
+              "focus": "full_body_b",
+              "reason_codes": [
+                "SESSION_TRIMMED_FOR_TIME_LIMIT"
+              ]
+            }
+          ],
+          "stage": "construction_recovery",
+          "status": "recovered"
+        },
+        {
+          "reasons": [
+            "SPLIT_SIMPLIFIED_FOR_NOVICE",
+            "SPLIT_FULL_BODY_FOR_LOW_FREQUENCY"
+          ],
+          "selected": "full_body_ab",
+          "stage": "split"
+        },
+        {
+          "effective_targets": {
+            "abs": 5,
+            "back": 5,
+            "biceps": 3,
+            "calves": 5,
+            "chest": 5,
+            "forearms": 3,
+            "glutes": 5,
+            "hamstrings": 5,
+            "quadriceps": 5,
+            "shoulders": 5,
+            "traps": 3,
+            "triceps": 3
+          },
+          "minimum_direct_targets": {
+            "abs": 4,
+            "back": 4,
+            "biceps": 2,
+            "calves": 4,
+            "chest": 4,
+            "forearms": 2,
+            "glutes": 4,
+            "hamstrings": 4,
+            "quadriceps": 4,
+            "shoulders": 4,
+            "traps": 2,
+            "triceps": 2
+          },
+          "previous_volume_baseline": {
+            "confidence": 0.0,
+            "reason_codes": [],
+            "source": "none"
+          },
+          "reasons": [
+            "VOLUME_REDUCED_FOR_RECOVERY"
+          ],
+          "stage": "volume"
+        },
+        {
+          "reasons": [
+            "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM",
+            "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+          ],
+          "stage": "volume_repair",
+          "weekly_direct_sets": {
+            "abs": 5,
+            "adductors": 2,
+            "back": 5,
+            "glutes": 3,
+            "obliques": 2,
+            "quadriceps": 5,
+            "triceps": 3
+          },
+          "weekly_effective_sets": {
+            "abductors": 1.5,
+            "abs": 5.0,
+            "adductors": 6.0,
+            "back": 6.5,
+            "calves": 1.5,
+            "forearms": 1.5,
+            "glutes": 7.5,
+            "hamstrings": 5.0,
+            "legs": 1.5,
+            "lower_back": 5.5,
+            "obliques": 4.5,
+            "quadriceps": 7.5,
+            "shoulders": 4.0,
+            "traps": 1.5,
+            "triceps": 3.0
+          }
+        }
+      ],
+      "errors": [],
+      "metrics": {
+        "direct_session_frequency_by_muscle": {
+          "abs": 2,
+          "adductors": 1,
+          "back": 2,
+          "biceps": 0,
+          "calves": 0,
+          "chest": 0,
+          "forearms": 0,
+          "glutes": 1,
+          "hamstrings": 0,
+          "obliques": 1,
+          "quadriceps": 1,
+          "shoulders": 0,
+          "traps": 0,
+          "triceps": 1
+        },
+        "estimated_weekly_duration": 78,
+        "hard_training_days": 2,
+        "movement_pattern_frequency": {
+          "core_anti_extension": 1,
+          "core_anti_lateral_flexion": 1,
+          "hip_extension": 2,
+          "horizontal_pull": 1,
+          "horizontal_push": 2,
+          "lunge": 1,
+          "squat": 1,
+          "vertical_pull": 1
+        },
+        "planned_direct_sets_by_muscle": {
+          "abs": 5,
+          "back": 5,
+          "biceps": 3,
+          "calves": 5,
+          "chest": 5,
+          "forearms": 3,
+          "glutes": 5,
+          "hamstrings": 5,
+          "quadriceps": 5,
+          "shoulders": 5,
+          "traps": 3,
+          "triceps": 3
+        },
+        "previous_volume_baseline": {
+          "confidence": 0.0,
+          "direct_sets_by_muscle": {},
+          "effective_sets_by_muscle": {},
+          "reason_codes": [],
+          "source": "none"
+        },
+        "recovery_days": 5,
+        "volume_ranges_by_muscle": {
+          "abs": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "back": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "biceps": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 6,
+            "effective_target_sets": 3,
+            "maximum_hard": 8,
+            "maximum_soft": 4,
+            "minimum_direct_sets": 2,
+            "minimum_soft": 2,
+            "target_sets": 3
+          },
+          "calves": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "chest": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "forearms": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 6,
+            "effective_target_sets": 3,
+            "maximum_hard": 8,
+            "maximum_soft": 4,
+            "minimum_direct_sets": 2,
+            "minimum_soft": 2,
+            "target_sets": 3
+          },
+          "glutes": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "hamstrings": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "quadriceps": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "shoulders": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 9,
+            "effective_target_sets": 5,
+            "maximum_hard": 8,
+            "maximum_soft": 6,
+            "minimum_direct_sets": 4,
+            "minimum_soft": 4,
+            "target_sets": 5
+          },
+          "traps": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 6,
+            "effective_target_sets": 3,
+            "maximum_hard": 8,
+            "maximum_soft": 4,
+            "minimum_direct_sets": 2,
+            "minimum_soft": 2,
+            "target_sets": 3
+          },
+          "triceps": {
+            "effective_maximum_hard": 12,
+            "effective_maximum_soft": 6,
+            "effective_target_sets": 3,
+            "maximum_hard": 8,
+            "maximum_soft": 4,
+            "minimum_direct_sets": 2,
+            "minimum_soft": 2,
+            "target_sets": 3
+          }
+        },
+        "weekly_cardio_minutes": 10,
+        "weekly_direct_sets_by_muscle": {
+          "abs": 5,
+          "adductors": 2,
+          "back": 5,
+          "biceps": 0,
+          "calves": 0,
+          "chest": 0,
+          "forearms": 0,
+          "glutes": 3,
+          "hamstrings": 0,
+          "obliques": 2,
+          "quadriceps": 5,
+          "shoulders": 0,
+          "traps": 0,
+          "triceps": 3
+        },
+        "weekly_effective_sets_by_muscle": {
+          "abductors": 1.5,
+          "abs": 5.0,
+          "adductors": 6.0,
+          "back": 6.5,
+          "biceps": 0,
+          "calves": 1.5,
+          "chest": 0,
+          "forearms": 1.5,
+          "glutes": 7.5,
+          "hamstrings": 5.0,
+          "legs": 1.5,
+          "lower_back": 5.5,
+          "obliques": 4.5,
+          "quadriceps": 7.5,
+          "shoulders": 4.0,
+          "traps": 1.5,
+          "triceps": 3.0
+        },
+        "weekly_fractional_sets_by_muscle": {
+          "abductors": 1.5,
+          "abs": 0,
+          "adductors": 4.0,
+          "back": 1.5,
+          "biceps": 0,
+          "calves": 1.5,
+          "chest": 0,
+          "forearms": 1.5,
+          "glutes": 4.5,
+          "hamstrings": 5.0,
+          "legs": 1.5,
+          "lower_back": 5.5,
+          "obliques": 2.5,
+          "quadriceps": 2.5,
+          "shoulders": 4.0,
+          "traps": 1.5,
+          "triceps": 0
+        }
+      },
+      "warnings": [
+        "EFFECTIVE_VOLUME_BELOW_TARGET",
+        "DIRECT_VOLUME_BELOW_MINIMUM",
+        "SOFT_WEEKLY_VOLUME_BELOW_MINIMUM",
+        "PLANNED_VOLUME_REDUCED_DURING_SESSION_FIT"
+      ]
+    }
+  },
+  "program_generation_request": {
+    "age": 62,
+    "allowed_range_of_motion": [],
+    "available_equipment": [
+      "bodyweight"
+    ],
+    "available_training_days": 2,
+    "axial_load_limit": "high",
+    "balance_requirement": "normal",
+    "biological_sex_optional": "female",
+    "blocked_caution_tags": [],
+    "blocked_exercises": [],
+    "blocked_movement_patterns": [],
+    "body_analysis_influence": null,
+    "cardio_tolerance": "moderate",
+    "current_activity_level": "moderate",
+    "current_pain_or_red_flags": [],
+    "disliked_exercises": [],
+    "height_cm": 158,
+    "impact_limit": "high",
+    "injuries_and_limitations": [],
+    "known_strength_data": {},
+    "medical_clearance_status": "not_required",
+    "overhead_limit": "high",
+    "physical_job_demand": "low",
+    "preferred_exercises": [],
+    "preferred_weekdays": [],
+    "pregnancy_or_postpartum": false,
+    "primary_goal": "general_fitness",
+    "priority_muscles": [],
+    "program_duration_weeks": 6,
+    "recent_training_history": {
+      "completed_session_ratio": 0.0,
+      "consistent_weeks": null,
+      "performance_trend": null,
+      "previous_volume_confidence": null,
+      "previous_volume_reason_codes": [],
+      "previous_volume_source": "none",
+      "previous_weekly_direct_sets_by_muscle": {},
+      "previous_weekly_effective_sets_by_muscle": {},
+      "previous_weekly_sets_by_muscle": {},
+      "recovery_problems": false
+    },
+    "reports_uncontrolled_medical_condition": false,
+    "secondary_goal_optional": null,
+    "seed_optional": 20260819,
+    "session_duration_minutes": 45,
+    "sleep_quality": "average",
+    "stress_level": "average",
+    "training_age_months": 2,
+    "training_experience": "beginner",
+    "training_location": "home",
+    "user_id": "9867df0d-9201-4fdd-b182-a45123c80e2b",
+    "weight_kg": 73.0
+  },
+  "program_payload_sha256": "10f0eb7da1176222b87b8c6a0c286b51e7871ce1b9820e96201f2915a2bc554a",
+  "requested_input_conditions": {
+    "birth_date": "1964-05-11",
+    "current_weight_kg": 73,
+    "display_name": "Maryam",
+    "evaluation_seed": 20260819,
+    "experience_level": "beginner",
+    "fitness_goal": "improve_fitness",
+    "height_cm": 158,
+    "home_training_setup": "bodyweight_only",
+    "physical_job_demand": "low",
+    "physical_limitations": null,
+    "plan_duration_weeks": 6,
+    "priority_muscles": [],
+    "session_duration_minutes": 45,
+    "sex": "female",
+    "sleep_quality": "average",
+    "stress_level": "average",
+    "training_age_months": 2,
+    "training_cautions": [],
+    "training_days_per_week": 2,
+    "training_location": "home",
+    "workout_generation_method": "fitsho_coach"
+  },
+  "user": {
+    "name": "Maryam",
+    "number": "05",
+    "slug": "maryam"
+  },
+  "validator_verification": {
+    "assumptions": [],
+    "decision_trace": [
+      {
+        "assumptions": [],
+        "stage": "normalization"
+      },
+      {
+        "reasons": [
+          "SAFETY_SCREEN_CLEAR"
+        ],
+        "stage": "safety",
+        "status": "clear"
+      },
+      {
+        "eligible_count": 31,
+        "rejected_count": 357,
+        "stage": "eligibility"
+      },
+      {
+        "reason_codes": [
+          "SESSION_TRIMMED_FOR_TIME_LIMIT"
+        ],
+        "rejected_splits": [],
+        "selected_split": "full_body_ab",
+        "session_reasons": [
+          {
+            "day_index": 1,
+            "focus": "full_body_a",
+            "reason_codes": [
+              "SESSION_TRIMMED_FOR_TIME_LIMIT"
+            ]
+          },
+          {
+            "day_index": 2,
+            "focus": "full_body_b",
+            "reason_codes": [
+              "SESSION_TRIMMED_FOR_TIME_LIMIT"
+            ]
+          }
+        ],
+        "stage": "construction_recovery",
+        "status": "recovered"
+      },
+      {
+        "reasons": [
+          "SPLIT_SIMPLIFIED_FOR_NOVICE",
+          "SPLIT_FULL_BODY_FOR_LOW_FREQUENCY"
+        ],
+        "selected": "full_body_ab",
+        "stage": "split"
+      },
+      {
+        "effective_targets": {
+          "abs": 5,
+          "back": 5,
+          "biceps": 3,
+          "calves": 5,
+          "chest": 5,
+          "forearms": 3,
+          "glutes": 5,
+          "hamstrings": 5,
+          "quadriceps": 5,
+          "shoulders": 5,
+          "traps": 3,
+          "triceps": 3
+        },
+        "minimum_direct_targets": {
+          "abs": 4,
+          "back": 4,
+          "biceps": 2,
+          "calves": 4,
+          "chest": 4,
+          "forearms": 2,
+          "glutes": 4,
+          "hamstrings": 4,
+          "quadriceps": 4,
+          "shoulders": 4,
+          "traps": 2,
+          "triceps": 2
+        },
+        "previous_volume_baseline": {
+          "confidence": 0.0,
+          "reason_codes": [],
+          "source": "none"
+        },
+        "reasons": [
+          "VOLUME_REDUCED_FOR_RECOVERY"
+        ],
+        "stage": "volume"
+      },
+      {
+        "reasons": [
+          "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM",
+          "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
+        ],
+        "stage": "volume_repair",
+        "weekly_direct_sets": {
+          "abs": 5,
+          "adductors": 2,
+          "back": 5,
+          "glutes": 3,
+          "obliques": 2,
+          "quadriceps": 5,
+          "triceps": 3
+        },
+        "weekly_effective_sets": {
+          "abductors": 1.5,
+          "abs": 5.0,
+          "adductors": 6.0,
+          "back": 6.5,
+          "calves": 1.5,
+          "forearms": 1.5,
+          "glutes": 7.5,
+          "hamstrings": 5.0,
+          "legs": 1.5,
+          "lower_back": 5.5,
+          "obliques": 4.5,
+          "quadriceps": 7.5,
+          "shoulders": 4.0,
+          "traps": 1.5,
+          "triceps": 3.0
+        }
+      }
+    ],
+    "errors": [],
+    "metrics": {
+      "direct_session_frequency_by_muscle": {
+        "abs": 2,
+        "adductors": 1,
+        "back": 2,
+        "biceps": 0,
+        "calves": 0,
+        "chest": 0,
+        "forearms": 0,
+        "glutes": 1,
+        "hamstrings": 0,
+        "obliques": 1,
+        "quadriceps": 1,
+        "shoulders": 0,
+        "traps": 0,
+        "triceps": 1
+      },
+      "estimated_weekly_duration": 78,
+      "hard_training_days": 2,
+      "movement_pattern_frequency": {
+        "core_anti_extension": 1,
+        "core_anti_lateral_flexion": 1,
+        "hip_extension": 2,
+        "horizontal_pull": 1,
+        "horizontal_push": 2,
+        "lunge": 1,
+        "squat": 1,
+        "vertical_pull": 1
+      },
+      "planned_direct_sets_by_muscle": {
+        "abs": 5,
+        "back": 5,
+        "biceps": 3,
+        "calves": 5,
+        "chest": 5,
+        "forearms": 3,
+        "glutes": 5,
+        "hamstrings": 5,
+        "quadriceps": 5,
+        "shoulders": 5,
+        "traps": 3,
+        "triceps": 3
+      },
+      "previous_volume_baseline": {
+        "confidence": 0.0,
+        "direct_sets_by_muscle": {},
+        "effective_sets_by_muscle": {},
+        "reason_codes": [],
+        "source": "none"
+      },
+      "recovery_days": 5,
+      "volume_ranges_by_muscle": {
+        "abs": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "back": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "biceps": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 6,
+          "effective_target_sets": 3,
+          "maximum_hard": 8,
+          "maximum_soft": 4,
+          "minimum_direct_sets": 2,
+          "minimum_soft": 2,
+          "target_sets": 3
+        },
+        "calves": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "chest": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "forearms": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 6,
+          "effective_target_sets": 3,
+          "maximum_hard": 8,
+          "maximum_soft": 4,
+          "minimum_direct_sets": 2,
+          "minimum_soft": 2,
+          "target_sets": 3
+        },
+        "glutes": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "hamstrings": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "quadriceps": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "shoulders": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 9,
+          "effective_target_sets": 5,
+          "maximum_hard": 8,
+          "maximum_soft": 6,
+          "minimum_direct_sets": 4,
+          "minimum_soft": 4,
+          "target_sets": 5
+        },
+        "traps": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 6,
+          "effective_target_sets": 3,
+          "maximum_hard": 8,
+          "maximum_soft": 4,
+          "minimum_direct_sets": 2,
+          "minimum_soft": 2,
+          "target_sets": 3
+        },
+        "triceps": {
+          "effective_maximum_hard": 12,
+          "effective_maximum_soft": 6,
+          "effective_target_sets": 3,
+          "maximum_hard": 8,
+          "maximum_soft": 4,
+          "minimum_direct_sets": 2,
+          "minimum_soft": 2,
+          "target_sets": 3
+        }
+      },
+      "weekly_cardio_minutes": 10,
+      "weekly_direct_sets_by_muscle": {
+        "abs": 5,
+        "adductors": 2,
+        "back": 5,
+        "biceps": 0,
+        "calves": 0,
+        "chest": 0,
+        "forearms": 0,
+        "glutes": 3,
+        "hamstrings": 0,
+        "obliques": 2,
+        "quadriceps": 5,
+        "shoulders": 0,
+        "traps": 0,
+        "triceps": 3
+      },
+      "weekly_effective_sets_by_muscle": {
+        "abductors": 1.5,
+        "abs": 5.0,
+        "adductors": 6.0,
+        "back": 6.5,
+        "biceps": 0,
+        "calves": 1.5,
+        "chest": 0,
+        "forearms": 1.5,
+        "glutes": 7.5,
+        "hamstrings": 5.0,
+        "legs": 1.5,
+        "lower_back": 5.5,
+        "obliques": 4.5,
+        "quadriceps": 7.5,
+        "shoulders": 4.0,
+        "traps": 1.5,
+        "triceps": 3.0
+      },
+      "weekly_fractional_sets_by_muscle": {
+        "abductors": 1.5,
+        "abs": 0,
+        "adductors": 4.0,
+        "back": 1.5,
+        "biceps": 0,
+        "calves": 1.5,
+        "chest": 0,
+        "forearms": 1.5,
+        "glutes": 4.5,
+        "hamstrings": 5.0,
+        "legs": 1.5,
+        "lower_back": 5.5,
+        "obliques": 2.5,
+        "quadriceps": 2.5,
+        "shoulders": 4.0,
+        "traps": 1.5,
+        "triceps": 0
+      }
+    },
+    "warnings": [
+      "EFFECTIVE_VOLUME_BELOW_TARGET",
+      "DIRECT_VOLUME_BELOW_MINIMUM",
+      "SOFT_WEEKLY_VOLUME_BELOW_MINIMUM",
+      "PLANNED_VOLUME_REDUCED_DURING_SESSION_FIT"
+    ]
+  }
+}

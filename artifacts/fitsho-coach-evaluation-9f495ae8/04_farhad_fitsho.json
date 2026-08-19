@@ -1,0 +1,154 @@
+{
+  "aggregate_metrics": null,
+  "api_flow": {
+    "generation_overrides_request": {
+      "available_training_days": 5,
+      "physical_job_demand": "high",
+      "priority_muscles": [
+        "back",
+        "chest"
+      ],
+      "seed_optional": 20260819,
+      "session_duration_minutes": 75,
+      "sleep_quality": "poor",
+      "stress_level": "poor",
+      "training_age_months": 96
+    },
+    "generation_response": {
+      "body": {
+        "detail": "Completed fitness profile required"
+      },
+      "status_code": 403
+    },
+    "profile_request": {
+      "birth_date": "1985-01-18",
+      "current_weight_kg": 91,
+      "display_name": "Farhad",
+      "experience_level": "advanced",
+      "fitness_goal": "strength",
+      "height_cm": 181,
+      "home_training_setup": null,
+      "physical_limitations": null,
+      "plan_duration_weeks": 8,
+      "priority_muscles": [
+        "back",
+        "chest"
+      ],
+      "session_duration_minutes": 75,
+      "sex": "male",
+      "training_age_months": 96,
+      "training_cautions": [
+        "lower_back"
+      ],
+      "training_days_per_week": 5,
+      "training_location": "gym",
+      "workout_generation_method": "fitsho_coach"
+    },
+    "profile_response": {
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body",
+              "fitness_goal"
+            ],
+            "msg": "Input should be 'lose_weight', 'gain_weight', 'fat_loss', 'build_muscle', 'body_recomposition', 'improve_fitness' or 'maintain_weight'",
+            "type": "enum"
+          }
+        ]
+      },
+      "status_code": 422
+    },
+    "register_response": {
+      "body": {
+        "created_at": "2026-08-19T18:29:52.217074Z",
+        "email": "eval-9f495ae8-04@example.com",
+        "id": "53569b16-2bc2-4abe-b644-0f6a26c6a1f9",
+        "is_admin": false,
+        "phone_number": null
+      },
+      "status_code": 201
+    }
+  },
+  "decision_trace": [],
+  "evaluation_metadata": {
+    "ai_workout_generator_used": false,
+    "catalog_count_seen_by_engine": null,
+    "database_isolation": "dedicated clone fitsho_eval_9f495ae8_20260819_01",
+    "engine_invocation": "FastAPI register -> profile POST -> workout generate POST -> WorkoutGenerationService -> generate_program",
+    "head_sha": "9f495ae813b45a5c6542cdf621fd9bbcc2a9438c",
+    "reference_template_count_seen_by_engine": null,
+    "workout_generation_method_required": "fitsho_coach"
+  },
+  "evaluation_status": {
+    "failure_stage": "profile_api",
+    "generation_reused": null,
+    "reason": {
+      "detail": [
+        {
+          "loc": [
+            "body",
+            "fitness_goal"
+          ],
+          "msg": "Input should be 'lose_weight', 'gain_weight', 'fat_loss', 'build_muscle', 'body_recomposition', 'improve_fitness' or 'maintain_weight'",
+          "type": "enum"
+        }
+      ]
+    },
+    "status": "failure"
+  },
+  "generated_workout_program": null,
+  "generation_path": {
+    "exercises_preserved": [],
+    "path": "not_reached",
+    "prescription_changes": [],
+    "selected_split": null,
+    "substitutions": [],
+    "template_rejection_or_fallback": [],
+    "template_selection": null,
+    "template_slug": null,
+    "volume_adaptation": {
+      "planned": null,
+      "repair": null
+    }
+  },
+  "persisted_plan_verification": {
+    "found": false
+  },
+  "program_generation_request": null,
+  "program_payload_sha256": "f1063d7d757d0f79fdad40fb644c1a41250044579471012d83b9c05108977a85",
+  "requested_input_conditions": {
+    "birth_date": "1985-01-18",
+    "current_weight_kg": 91,
+    "display_name": "Farhad",
+    "evaluation_seed": 20260819,
+    "experience_level": "advanced",
+    "fitness_goal": "strength",
+    "height_cm": 181,
+    "home_training_setup": null,
+    "physical_job_demand": "high",
+    "physical_limitations": null,
+    "plan_duration_weeks": 8,
+    "priority_muscles": [
+      "back",
+      "chest"
+    ],
+    "session_duration_minutes": 75,
+    "sex": "male",
+    "sleep_quality": "poor",
+    "stress_level": "poor",
+    "training_age_months": 96,
+    "training_cautions": [
+      "lower_back"
+    ],
+    "training_days_per_week": 5,
+    "training_location": "gym",
+    "workout_generation_method": "fitsho_coach"
+  },
+  "user": {
+    "name": "Farhad",
+    "number": "04",
+    "slug": "farhad"
+  },
+  "validator_verification": null
+}

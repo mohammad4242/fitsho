@@ -1,0 +1,53 @@
+{
+  "cardio_differences": [],
+  "code_driven_reason_if_different": null,
+  "comparison_method": "mechanical_structural_comparison",
+  "comparison_status": "complete",
+  "conclusion": "BIOLOGICAL_SEX_DID_NOT_CHANGE_PROGRAMMING_IN_CONTROL_PAIR",
+  "control_setup": {
+    "all_nonidentity_nonsex_generation_inputs_equal": true,
+    "exact_program_generation_request_differences": [
+      {
+        "path": "$.biological_sex_optional",
+        "user_01": "female",
+        "user_02": "male"
+      },
+      {
+        "path": "$.user_id",
+        "user_01": "24282661-2542-4065-9c98-3a45c9e0e9e3",
+        "user_02": "552716d4-790d-438c-b513-1126c010cc3b"
+      }
+    ],
+    "note": "Fresh user IDs differ by necessity; explicit equal seeds prevent identity-derived seed variance.",
+    "profile_input_differences": [
+      {
+        "path": "$.display_name",
+        "user_01": "Sahar",
+        "user_02": "Amir"
+      },
+      {
+        "path": "$.sex",
+        "user_01": "female",
+        "user_02": "male"
+      }
+    ],
+    "shared_explicit_seed": 20260819
+  },
+  "decision_trace_differences": [],
+  "exercise_differences": {
+    "user_01_only_occurrences": [],
+    "user_02_only_occurrences": []
+  },
+  "exercise_order_differences": [],
+  "head_sha": "9f495ae813b45a5c6542cdf621fd9bbcc2a9438c",
+  "programming_equal_after_excluding_user_profile_snapshot": true,
+  "selected_template_or_split_differences": {
+    "split": [],
+    "template": []
+  },
+  "sets_reps_rir_rest_differences": [],
+  "weekly_volume_differences_by_muscle": {
+    "weekly_direct_sets_by_muscle": {},
+    "weekly_effective_sets_by_muscle": {}
+  }
+}
