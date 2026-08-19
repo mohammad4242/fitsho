@@ -723,7 +723,9 @@ def test_approval_activates_pending_plan_without_creating_review_loop(db: Sessio
     )
     assert repeated.id == approved.id
     assert repeated.days[0].exercises[0].sets == approved.days[0].exercises[0].sets
-    assert db.scalars(select(WorkoutPlan)).all() == [source, approved]
+    plans = db.scalars(select(WorkoutPlan)).all()
+    assert len(plans) == 2
+    assert {plan.id for plan in plans} == {source.id, approved.id}
     assert db.scalars(select(WorkoutCycle)).all() == [cycle]
 
 
