@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -104,6 +104,26 @@ class WorkoutReviewDraftValidator:
         raw_session_duration = source.profile_snapshot.get("session_duration_minutes", 45)
         session_duration = raw_session_duration if isinstance(raw_session_duration, int) else 45
         policy = WorkoutGenerationPolicy.for_session_duration(session_duration)
+        source_sets = [item.sets for day in source.days for item in day.exercises]
+        source_max_exercises = max((len(day.exercises) for day in source.days), default=1)
+        policy = replace(
+            policy,
+            session_duration_minutes=max(
+                session_duration + 5,
+                max(
+                    (
+                        day.estimated_duration_minutes + policy.model_duration_tolerance_minutes
+                        for day in source.days
+                    ),
+                    default=0,
+                ),
+            ),
+            maximum_exercises_per_day=max(
+                policy.maximum_exercises_per_day,
+                source_max_exercises,
+            ),
+            maximum_sets=max(policy.maximum_sets, max(source_sets, default=0)),
+        )
         try:
             WorkoutPlanValidator(
                 candidates=CandidateSet(

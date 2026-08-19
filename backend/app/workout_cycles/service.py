@@ -930,6 +930,8 @@ def get_cycle_feedback_body_progress_context(
 
 def _plan_duration_weeks(plan: WorkoutPlan) -> int:
     raw_duration = plan.profile_snapshot.get("plan_duration_weeks")
+    if raw_duration is None:
+        raw_duration = plan.profile_snapshot.get("program_duration_weeks")
     if isinstance(raw_duration, bool) or not isinstance(raw_duration, int):
         raise ValueError("Workout cycle duration must be 4, 6, or 8 weeks")
     if raw_duration not in SUPPORTED_CYCLE_DURATIONS:
