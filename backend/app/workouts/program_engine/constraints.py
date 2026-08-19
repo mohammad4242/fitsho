@@ -21,7 +21,9 @@ def derive_constraints(request: ProgramGenerationRequest) -> DerivedConstraints:
         if limitation.overhead_limit is not None:
             overhead_limit = min(overhead_limit, limitation.overhead_limit, key=_limit_rank)
         if limitation.balance_requirement is not None:
-            balance_requirement = limitation.balance_requirement
+            balance_requirement = min(
+                balance_requirement, limitation.balance_requirement, key=_balance_rank
+            )
 
     return DerivedConstraints(
         available_equipment=request.available_equipment,
@@ -38,3 +40,7 @@ def derive_constraints(request: ProgramGenerationRequest) -> DerivedConstraints:
 
 def _limit_rank(value: object) -> int:
     return {"none": 0, "low": 1, "moderate": 2, "high": 3}[str(value)]
+
+
+def _balance_rank(value: object) -> int:
+    return {"limited": 0, "normal": 1, "high": 2}[str(value)]
