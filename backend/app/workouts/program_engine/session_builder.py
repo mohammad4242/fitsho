@@ -1,3 +1,4 @@
+import warnings
 from collections import Counter
 from dataclasses import dataclass
 from uuid import UUID
@@ -264,6 +265,11 @@ def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
             SlotSpec(frozenset({MovementPattern.SHRUG}), False, MuscleGroup.TRAPS),
             SlotSpec(frozenset({MovementPattern.SHRUG}), False, MuscleGroup.TRAPS),
         )
+    warnings.warn(
+        f"Unrecognized session focus {focus!r}; falling back to full_body slot layout.",
+        UserWarning,
+        stacklevel=2,
+    )
     return (
         SlotSpec(PUSH_PATTERNS, True),
         SlotSpec(PULL_PATTERNS, True),
