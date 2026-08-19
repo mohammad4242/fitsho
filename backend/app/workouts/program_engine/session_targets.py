@@ -16,6 +16,8 @@ ENGLISH_MUSCLE_NAMES: dict[MuscleGroup, str] = {
     MuscleGroup.QUADRICEPS: "Quadriceps",
     MuscleGroup.HAMSTRINGS: "Hamstrings",
     MuscleGroup.ADDUCTORS: "Adductors",
+    MuscleGroup.ABDUCTORS: "Abductors",
+    MuscleGroup.LEGS: "Legs",
     MuscleGroup.CALVES: "Calves",
     MuscleGroup.ABS: "Abs",
     MuscleGroup.OBLIQUES: "Obliques",
@@ -35,6 +37,8 @@ PERSIAN_MUSCLE_NAMES: dict[MuscleGroup, str] = {
     MuscleGroup.QUADRICEPS: "چهارسر",
     MuscleGroup.HAMSTRINGS: "پشت پا",
     MuscleGroup.ADDUCTORS: "داخل ران",
+    MuscleGroup.ABDUCTORS: "بیرون ران",
+    MuscleGroup.LEGS: "پاها",
     MuscleGroup.CALVES: "ساق",
     MuscleGroup.ABS: "شکم",
     MuscleGroup.OBLIQUES: "پهلو",
@@ -74,11 +78,19 @@ def persian_session_title(day_index: int, exercises: Iterable[ProgrammedExercise
     return persian_session_title_for_targets(day_index, direct_target_muscles(exercises))
 
 
+def _english_muscle_name(muscle: MuscleGroup) -> str:
+    return ENGLISH_MUSCLE_NAMES.get(muscle, muscle.value.replace("_", " ").title())
+
+
+def _persian_muscle_name(muscle: MuscleGroup) -> str:
+    return PERSIAN_MUSCLE_NAMES.get(muscle, muscle.value.replace("_", " "))
+
+
 def english_session_title_for_targets(day_index: int, targets: Iterable[MuscleGroup]) -> str:
-    label = " + ".join(ENGLISH_MUSCLE_NAMES[muscle] for muscle in targets) or "Full Body"
+    label = " + ".join(_english_muscle_name(muscle) for muscle in targets) or "Full Body"
     return f"Day {day_index}: {label}"
 
 
 def persian_session_title_for_targets(day_index: int, targets: Iterable[MuscleGroup]) -> str:
-    label = " + ".join(PERSIAN_MUSCLE_NAMES[muscle] for muscle in targets) or "تمام بدن"
+    label = " + ".join(_persian_muscle_name(muscle) for muscle in targets) or "تمام بدن"
     return f"روز {day_index}: {label}"
