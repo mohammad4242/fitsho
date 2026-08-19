@@ -28,7 +28,14 @@ def repair_weekly_volume(
     repaired = [list(day.exercises) for day in days]
     targets = {target.muscle: target for target in volume.targets}
     reasons: list[str] = []
+    total_sets = sum(item.sets for day in days for item in day.exercises)
+    max_iterations = max(total_sets * 2, 1)
+    iteration = 0
     while True:
+        if iteration >= max_iterations:
+            reasons.append("VOLUME_REPAIR_ITERATION_LIMIT_REACHED")
+            break
+        iteration += 1
         effective_volume = calculate_effective_volume(
             (item for exercises in repaired for item in exercises),
             ruleset,
