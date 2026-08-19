@@ -10,6 +10,7 @@ from app.athlete_state.schemas import (
     AthleteStateRecoverySummary,
     AthleteStateRecoveryTrend,
     AthleteStateReplacementContext,
+    AthleteStateSafetyContext,
     AthleteStateScheduleContext,
 )
 from app.exercises.enums import MuscleGroup
@@ -40,6 +41,7 @@ def _state(
     unavailable: tuple = (),
     pain_sensitive: tuple = (),
     replacement_context: tuple[AthleteStateReplacementContext, ...] = (),
+    safety_context: tuple[AthleteStateSafetyContext, ...] = (),
 ) -> AthleteState:
     return AthleteState(
         user_id=uuid4(),
@@ -55,6 +57,7 @@ def _state(
         unavailable_exercises=unavailable,
         pain_sensitive_exercises=pain_sensitive,
         replacement_context=replacement_context,
+        safety_context=safety_context,
         priority_muscles=lagging,
         progressing_muscles=progressing,
         lagging_muscles=lagging,
@@ -221,6 +224,101 @@ def test_pain_safety_overrides_progression_and_preference() -> None:
     assert "SAFETY_OVERRIDES_PREFERENCE" in decision.reason_codes
 
 
+def test_pain_signal_is_a_hard_constraint_with_safety_reasons() -> None:
+    exercise_id = uuid4()
+    signal_ids = (uuid4(), uuid4())
+    decision = decide_cycle_adaptation(
+        _state(
+            pain_sensitive=(exercise_id,),
+            safety_context=(
+                AthleteStateSafetyContext(
+                    exercise_id=exercise_id,
+                    signal_count=2,
+                    source_safety_signal_ids=signal_ids,
+                ),
+            ),
+        ),
+        _history(),
+        RULESET,
+    )
+
+    assert decision.overall_action is CycleAdaptationAction.REDUCE
+    assert decision.recovery_constraints.prevent_increase is True
+    assert decision.safety_constraints.blocked_exercises == (exercise_id,)
+    assert decision.safety_constraints.signal_counts_by_exercise == {exercise_id: 2}
+    assert "PAIN_SIGNAL_PRESENT" in decision.reason_codes
+    assert "REPEATED_PAIN_SIGNAL" in decision.reason_codes
+    assert "EXERCISE_BLOCKED_FOR_SAFETY" in decision.reason_codes
+    assert "PROGRESSION_HELD_FOR_SAFETY" in decision.reason_codes
+    assert set(signal_ids).issubset(decision.provenance.safety_signal_ids)
+
+
+def test_pain_replacement_produces_only_an_eligible_safe_substitution() -> None:
+    original_id = uuid4()
+    alternative_id = uuid4()
+    replacement_id = uuid4()
+    safety_signal_id = uuid4()
+    state = _state(
+        pain_sensitive=(original_id,),
+        replacement_context=(
+            AthleteStateReplacementContext(
+                original_exercise_id=original_id,
+                replacement_exercise_id=alternative_id,
+                persistent_count=0,
+                this_time_count=1,
+                reasons=(WorkoutExerciseReplacementReason.PAIN_OR_DISCOMFORT,),
+                source_replacement_ids=(replacement_id,),
+                safe=True,
+            ),
+        ),
+        safety_context=(
+            AthleteStateSafetyContext(
+                exercise_id=original_id,
+                signal_count=1,
+                source_safety_signal_ids=(safety_signal_id,),
+                source_replacement_ids=(replacement_id,),
+            ),
+        ),
+    )
+
+    decision = decide_cycle_adaptation(state, _history(), RULESET)
+
+    assert len(decision.safety_constraints.safe_substitutions) == 1
+    substitution = decision.safety_constraints.safe_substitutions[0]
+    assert substitution.blocked_exercise_id == original_id
+    assert substitution.replacement_exercise_id == alternative_id
+    assert substitution.source_replacement_ids == (replacement_id,)
+    assert substitution.source_safety_signal_ids == (safety_signal_id,)
+    assert "SAFE_SUBSTITUTION_REQUIRED" in decision.reason_codes
+
+
+def test_unsafe_or_blocked_pain_replacements_are_not_safe_substitutions() -> None:
+    original_id = uuid4()
+    alternative_id = uuid4()
+    context = AthleteStateReplacementContext(
+        original_exercise_id=original_id,
+        replacement_exercise_id=alternative_id,
+        persistent_count=0,
+        this_time_count=1,
+        reasons=(WorkoutExerciseReplacementReason.PAIN_OR_DISCOMFORT,),
+        source_replacement_ids=(uuid4(),),
+        safe=False,
+    )
+    decision = decide_cycle_adaptation(
+        _state(
+            pain_sensitive=(original_id, alternative_id),
+            replacement_context=(context,),
+        ),
+        _history(),
+        RULESET,
+    )
+
+    assert decision.safety_constraints.safe_substitutions == ()
+    assert decision.safety_constraints.blocked_exercises == tuple(
+        sorted((original_id, alternative_id), key=str)
+    )
+
+
 def test_missing_or_conflicting_data_falls_back_conservatively() -> None:
     missing = decide_cycle_adaptation(
         _state(
@@ -240,6 +338,8 @@ def test_missing_or_conflicting_data_falls_back_conservatively() -> None:
     assert missing.overall_action is CycleAdaptationAction.MAINTAIN
     assert "INSUFFICIENT_RELIABLE_EVIDENCE" in missing.reason_codes
     assert "PROGRESSION_HELD" in missing.reason_codes
+    assert missing.safety_constraints.blocked_exercises == ()
+    assert "PAIN_SIGNAL_PRESENT" not in missing.reason_codes
     assert conflicting.overall_action is CycleAdaptationAction.INCREASE
 
 

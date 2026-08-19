@@ -19,6 +19,7 @@ from app.athlete_state.schemas import (
     AthleteStateRecoverySummary,
     AthleteStateRecoveryTrend,
     AthleteStateReplacementContext,
+    AthleteStateSafetyContext,
     AthleteStateScheduleContext,
     AthleteStateTrendDirection,
 )
@@ -111,6 +112,7 @@ class AthleteStateBuilder:
                 preferences, excluded_ids=pain_sensitive_exercises
             ),
             replacement_context=self._replacement_context(replacements),
+            safety_context=self._safety_context(safety_signals),
             pain_sensitive_exercises=pain_sensitive_exercises,
             priority_muscles=self._feedback_muscles(feedbacks, "lagging_muscles"),
             progressing_muscles=self._feedback_muscles(feedbacks, "progressed_muscles"),
@@ -477,6 +479,7 @@ class AthleteStateBuilder:
                     replacement_exercise_id=replacement_id,
                     persistent_count=cast(int, entry["persistent_count"]),
                     this_time_count=cast(int, entry["this_time_count"]),
+                    safe=True,
                     reasons=tuple(sorted(reasons, key=lambda reason: reason.value)),
                     source_replacement_ids=tuple(sorted(source_ids, key=str)),
                 )
@@ -490,6 +493,40 @@ class AthleteStateBuilder:
                 ),
             )
         )
+
+    @staticmethod
+    def _safety_context(
+        signals: list[WorkoutExerciseSafetySignal],
+    ) -> tuple[AthleteStateSafetyContext, ...]:
+        grouped: dict[UUID, dict[str, object]] = {}
+        for signal in signals:
+            entry = grouped.setdefault(
+                signal.original_exercise_id,
+                {"signal_count": 0, "signal_ids": [], "replacement_ids": []},
+            )
+            entry["signal_count"] = cast(int, entry["signal_count"]) + 1
+            signal_ids = entry["signal_ids"]
+            replacement_ids = entry["replacement_ids"]
+            assert isinstance(signal_ids, list)
+            assert isinstance(replacement_ids, list)
+            signal_ids.append(signal.id)
+            replacement_ids.append(signal.source_replacement_id)
+
+        contexts = []
+        for exercise_id, entry in grouped.items():
+            signal_ids = entry["signal_ids"]
+            replacement_ids = entry["replacement_ids"]
+            assert isinstance(signal_ids, list)
+            assert isinstance(replacement_ids, list)
+            contexts.append(
+                AthleteStateSafetyContext(
+                    exercise_id=exercise_id,
+                    signal_count=cast(int, entry["signal_count"]),
+                    source_safety_signal_ids=tuple(sorted(signal_ids, key=str)),
+                    source_replacement_ids=tuple(sorted(replacement_ids, key=str)),
+                )
+            )
+        return tuple(sorted(contexts, key=lambda context: str(context.exercise_id)))
 
     @staticmethod
     def _feedback_muscles(

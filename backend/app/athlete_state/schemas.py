@@ -109,7 +109,19 @@ class AthleteStateReplacementContext(BaseModel):
     replacement_exercise_id: UUID
     persistent_count: int = Field(ge=0)
     this_time_count: int = Field(default=0, ge=0)
+    safe: bool = False
     reasons: tuple[WorkoutExerciseReplacementReason, ...] = ()
+    source_replacement_ids: tuple[UUID, ...] = ()
+
+
+class AthleteStateSafetyContext(BaseModel):
+    """Derived safety history, preserving signal provenance and recurrence."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    exercise_id: UUID
+    signal_count: int = Field(ge=1)
+    source_safety_signal_ids: tuple[UUID, ...] = ()
     source_replacement_ids: tuple[UUID, ...] = ()
 
 
@@ -169,6 +181,7 @@ class AthleteState(BaseModel):
     unavailable_exercises: tuple[UUID, ...] = ()
     unavailable_equipment_context: tuple[AthleteStateExerciseContext, ...] = ()
     replacement_context: tuple[AthleteStateReplacementContext, ...] = ()
+    safety_context: tuple[AthleteStateSafetyContext, ...] = ()
     pain_sensitive_exercises: tuple[UUID, ...] = ()
     priority_muscles: tuple[MuscleGroup, ...] = ()
     progressing_muscles: tuple[MuscleGroup, ...] = ()

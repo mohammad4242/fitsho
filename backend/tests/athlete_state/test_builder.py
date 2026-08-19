@@ -291,8 +291,7 @@ def test_athlete_state_never_includes_another_users_data(db: Session) -> None:
 
     assert other_original_id not in state.persistent_disliked_exercises
     assert all(
-        context.original_exercise_id != other_original_id
-        for context in state.replacement_context
+        context.original_exercise_id != other_original_id for context in state.replacement_context
     )
     assert all(cycle_id != other_cycle.id for cycle_id in state.provenance.cycle_ids)
 
@@ -323,6 +322,9 @@ def test_safety_signal_takes_precedence_over_preference_for_same_exercise(
 
     assert original_id in state.pain_sensitive_exercises
     assert original_id not in state.persistent_disliked_exercises
+    assert state.safety_context[0].exercise_id == original_id
+    assert state.safety_context[0].signal_count == 1
+    assert state.safety_context[0].source_safety_signal_ids == state.provenance.safety_signal_ids
 
 
 def test_temporary_replacement_does_not_create_a_durable_preference(

@@ -64,6 +64,11 @@ class CycleAdaptationReasonCode(StrEnum):
     PREFERRED_ALTERNATIVE = "PREFERRED_ALTERNATIVE"
     PREFERENCE_OVERRIDDEN_BY_SAFETY = "PREFERENCE_OVERRIDDEN_BY_SAFETY"
     PREFERENCE_OVERRIDDEN_BY_AVAILABILITY = "PREFERENCE_OVERRIDDEN_BY_AVAILABILITY"
+    PAIN_SIGNAL_PRESENT = "PAIN_SIGNAL_PRESENT"
+    REPEATED_PAIN_SIGNAL = "REPEATED_PAIN_SIGNAL"
+    EXERCISE_BLOCKED_FOR_SAFETY = "EXERCISE_BLOCKED_FOR_SAFETY"
+    SAFE_SUBSTITUTION_REQUIRED = "SAFE_SUBSTITUTION_REQUIRED"
+    PROGRESSION_HELD_FOR_SAFETY = "PROGRESSION_HELD_FOR_SAFETY"
 
 
 class CycleAdaptationMuscleAdjustment(BaseModel):
@@ -110,10 +115,23 @@ class CycleAdaptationPreferenceConstraints(BaseModel):
     preferred_alternatives: tuple[CycleAdaptationPreferredAlternative, ...] = ()
 
 
+class CycleAdaptationSafetySubstitution(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    blocked_exercise_id: UUID
+    replacement_exercise_id: UUID
+    strength: int = Field(ge=1, le=10)
+    source_replacement_ids: tuple[UUID, ...] = ()
+    source_safety_signal_ids: tuple[UUID, ...] = ()
+    reason_codes: tuple[CycleAdaptationReasonCode, ...] = ()
+
+
 class CycleAdaptationSafetyConstraints(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     blocked_exercises: tuple[UUID, ...] = ()
+    signal_counts_by_exercise: dict[UUID, int] = Field(default_factory=dict)
+    safe_substitutions: tuple[CycleAdaptationSafetySubstitution, ...] = ()
 
 
 class CycleAdaptationProvenance(BaseModel):
@@ -158,14 +176,23 @@ def decide_cycle_adaptation(
     recent_history = history or RecentTrainingHistory()
     baseline = derive_previous_volume_baseline(recent_history)
     adherence, adherence_conflict = _adherence_ratio(state, recent_history)
-    safety_ids = _sorted_ids(state.pain_sensitive_exercises)
+    safety_ids = _sorted_ids(
+        set(state.pain_sensitive_exercises)
+        | {context.exercise_id for context in state.safety_context}
+    )
     raw_preference_ids = set(state.persistent_disliked_exercises) | set(
         state.uncomfortable_exercises
     )
     disliked_ids, unavailable_ids, preferred_alternatives, preference_reasons = (
         _replacement_preference_constraints(state, set(safety_ids), ruleset)
     )
-    reasons: list[CycleAdaptationReasonCode] = []
+    safety_constraints, safety_reasons = _safety_constraints(
+        state,
+        set(safety_ids),
+        set(unavailable_ids),
+        ruleset,
+    )
+    reasons: list[CycleAdaptationReasonCode] = list(safety_reasons)
     poor_recovery = state.recovery_trend.summary is AthleteStateRecoverySummary.POOR
     repeated_poor_recovery = (
         poor_recovery
@@ -193,10 +220,6 @@ def decide_cycle_adaptation(
                 CycleAdaptationReasonCode.SAFETY_OVERRIDES_PROGRESSION,
                 CycleAdaptationReasonCode.SAFETY_OVERRIDES_PREFERENCE
                 if raw_preference_ids & set(safety_ids)
-                or any(
-                    alternative.replacement_exercise_id in set(safety_ids)
-                    for alternative in preferred_alternatives
-                )
                 else CycleAdaptationReasonCode.SAFETY_OVERRIDES_PROGRESSION,
             )
         )
@@ -290,7 +313,7 @@ def decide_cycle_adaptation(
             unavailable_exercises=unavailable_ids,
             preferred_alternatives=preferred_alternatives,
         ),
-        safety_constraints=CycleAdaptationSafetyConstraints(blocked_exercises=safety_ids),
+        safety_constraints=safety_constraints,
         reason_codes=tuple(reasons),
         provenance=CycleAdaptationProvenance(
             cycle_ids=state.provenance.cycle_ids,
@@ -305,7 +328,14 @@ def decide_cycle_adaptation(
                 }
             ),
             preference_ids=state.provenance.preference_ids,
-            safety_signal_ids=state.provenance.safety_signal_ids,
+            safety_signal_ids=_sorted_ids(
+                set(state.provenance.safety_signal_ids)
+                | {
+                    signal_id
+                    for context in state.safety_context
+                    for signal_id in context.source_safety_signal_ids
+                }
+            ),
             workout_plan_ids=state.provenance.workout_plan_ids,
         ),
     )
@@ -366,9 +396,7 @@ def _replacement_preference_constraints(
                 "source_replacement_ids": set(),
             },
         )
-        entry["persistent_count"] = (
-            cast(int, entry["persistent_count"]) + context.persistent_count
-        )
+        entry["persistent_count"] = cast(int, entry["persistent_count"]) + context.persistent_count
         context_reasons = entry["reasons"]
         source_ids = entry["source_replacement_ids"]
         assert isinstance(context_reasons, set)
@@ -425,3 +453,84 @@ def _replacement_preference_constraints(
         )
     )
     return disliked_ids, unavailable_ids, tuple(preferred), tuple(dict.fromkeys(reasons))
+
+
+def _safety_constraints(
+    state: AthleteState,
+    safety_ids: set[UUID],
+    unavailable_ids: set[UUID],
+    ruleset: ProgramRuleset,
+) -> tuple[CycleAdaptationSafetyConstraints, tuple[CycleAdaptationReasonCode, ...]]:
+    signal_counts = {context.exercise_id: context.signal_count for context in state.safety_context}
+    signal_counts.update(
+        {exercise_id: signal_counts.get(exercise_id, 1) for exercise_id in safety_ids}
+    )
+    reasons: list[CycleAdaptationReasonCode] = []
+    if safety_ids:
+        reasons.extend(
+            (
+                CycleAdaptationReasonCode.PAIN_SIGNAL_PRESENT,
+                CycleAdaptationReasonCode.EXERCISE_BLOCKED_FOR_SAFETY,
+                CycleAdaptationReasonCode.SAFE_SUBSTITUTION_REQUIRED,
+                CycleAdaptationReasonCode.PROGRESSION_HELD_FOR_SAFETY,
+            )
+        )
+    if any(
+        count >= ruleset.adaptation_repeated_pain_signal_count for count in signal_counts.values()
+    ):
+        reasons.append(CycleAdaptationReasonCode.REPEATED_PAIN_SIGNAL)
+
+    contexts_by_exercise = {context.exercise_id: context for context in state.safety_context}
+    substitutions: list[CycleAdaptationSafetySubstitution] = []
+    for replacement in state.replacement_context:
+        if replacement.original_exercise_id not in safety_ids:
+            continue
+        if not replacement.safe:
+            continue
+        if replacement.replacement_exercise_id in safety_ids:
+            continue
+        if replacement.replacement_exercise_id in unavailable_ids:
+            continue
+        if WorkoutExerciseReplacementReason.PAIN_OR_DISCOMFORT not in replacement.reasons:
+            continue
+        source_context = contexts_by_exercise.get(replacement.original_exercise_id)
+        if source_context is None:
+            continue
+        source_replacement_ids = tuple(
+            sorted(
+                set(replacement.source_replacement_ids)
+                & set(source_context.source_replacement_ids),
+                key=str,
+            )
+        )
+        if not source_replacement_ids:
+            continue
+        substitutions.append(
+            CycleAdaptationSafetySubstitution(
+                blocked_exercise_id=replacement.original_exercise_id,
+                replacement_exercise_id=replacement.replacement_exercise_id,
+                strength=min(len(source_replacement_ids), 10),
+                source_replacement_ids=source_replacement_ids,
+                source_safety_signal_ids=source_context.source_safety_signal_ids,
+                reason_codes=(CycleAdaptationReasonCode.SAFE_SUBSTITUTION_REQUIRED,),
+            )
+        )
+
+    substitutions.sort(
+        key=lambda substitution: (
+            str(substitution.blocked_exercise_id),
+            -substitution.strength,
+            str(substitution.replacement_exercise_id),
+        )
+    )
+    return (
+        CycleAdaptationSafetyConstraints(
+            blocked_exercises=_sorted_ids(safety_ids),
+            signal_counts_by_exercise={
+                exercise_id: signal_counts[exercise_id]
+                for exercise_id in sorted(signal_counts, key=str)
+            },
+            safe_substitutions=tuple(substitutions),
+        ),
+        tuple(dict.fromkeys(reasons)),
+    )

@@ -108,6 +108,7 @@ class ProgramRuleset:
     adaptation_repeated_too_hard_weeks: int = 2
     adaptation_repeated_replacement_count: int = 2
     adaptation_max_replacement_preference_strength: int = 5
+    adaptation_repeated_pain_signal_count: int = 2
     max_sets_per_muscle_per_session: int = 6
     maximum_direct_sessions_per_muscle_per_week: int = 2
     template_reference_max_sets_per_muscle_per_session: dict[TrainingStatus, int] = field(
