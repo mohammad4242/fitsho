@@ -184,7 +184,7 @@ def _prescription_for(
         key = (
             "strength_compound" if exercise_type is ExerciseType.COMPOUND else "strength_accessory"
         )
-    if goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN}:
+    elif goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN}:
         key = (
             "hypertrophy_isolation"
             if exercise_type is ExerciseType.ISOLATION
@@ -195,7 +195,7 @@ def _prescription_for(
         rir = ruleset.novice_target_rir
     elif goal in {Goal.FAT_LOSS, Goal.BODY_RECOMPOSITION}:
         key = "fat_loss"
-    elif goal is not Goal.STRENGTH:
+    else:
         key = "general_fitness"
     rule = ruleset.prescription_rules[key]
     return rule.rep_min, rule.rep_max, rir, rule.rest_seconds
