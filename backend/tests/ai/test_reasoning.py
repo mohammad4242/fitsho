@@ -63,6 +63,16 @@ class _Provider:
         }
 
 
+class _CountingProvider:
+    def __init__(self, output: object) -> None:
+        self.calls = 0
+        self.output = output
+
+    async def reason(self, request: object) -> object:
+        self.calls += 1
+        return self.output
+
+
 def test_reasoning_service_accepts_valid_structured_provider_output() -> None:
     from app.ai.reasoning import AIReasoningInput, AIReasoningOutput, AIReasoningService
 
@@ -162,3 +172,144 @@ def test_provider_failure_can_use_explicit_deterministic_fallback() -> None:
 
     assert output.source == "deterministic_fallback"
     assert output.selected_candidate_id == "safe-candidate-a"
+
+
+def test_ai_coach_interprets_feedback_into_validated_proposal() -> None:
+    from app.ai.reasoning import AIReasoningInput, AIReasoningService
+
+    source_id = uuid4()
+    raw = _input()
+    raw["feedback_context"] = {
+        "text": "این حرکت باعث درد شد",
+        "source_id": source_id,
+        "source_field": "note_optional",
+    }
+
+    class FeedbackProvider:
+        async def reason(self, request: object) -> object:
+            return {
+                "summary": "A possible safety concern was found.",
+                "reason_codes": ["FEEDBACK_INTERPRETATION"],
+                "feedback_proposals": [
+                    {
+                        "signal": "pain_or_safety_concern",
+                        "confidence": 0.94,
+                        "source_id": source_id,
+                        "source_field": "note_optional",
+                    }
+                ],
+            }
+
+    reasoning_input = AIReasoningInput.model_validate(raw)
+    output = asyncio.run(AIReasoningService().reason(reasoning_input, FeedbackProvider()))
+    approved = AIReasoningService().validate_feedback_proposals(reasoning_input, output)
+
+    assert len(approved) == 1
+    assert approved[0].signal == "pain_or_safety_concern"
+    assert approved[0].confidence == 0.94
+    assert approved[0].source_id == source_id
+
+
+def test_low_confidence_feedback_proposal_is_rejected_without_state_change() -> None:
+    from app.ai.reasoning import AIReasoningInput, AIReasoningService
+
+    source_id = uuid4()
+    raw = _input()
+    raw["feedback_context"] = {
+        "text": "این حرکت را دوست ندارم",
+        "source_id": source_id,
+        "source_field": "note_optional",
+    }
+    reasoning_input = AIReasoningInput.model_validate(raw)
+    original_state = reasoning_input.athlete_state
+
+    class LowConfidenceProvider:
+        async def reason(self, request: object) -> object:
+            return {
+                "summary": "The text is ambiguous.",
+                "reason_codes": ["FEEDBACK_INTERPRETATION"],
+                "feedback_proposals": [
+                    {
+                        "signal": "dislike",
+                        "confidence": 0.49,
+                        "source_id": source_id,
+                        "source_field": "note_optional",
+                    }
+                ],
+            }
+
+    output = asyncio.run(AIReasoningService().reason(reasoning_input, LowConfidenceProvider()))
+    approved = AIReasoningService().validate_feedback_proposals(reasoning_input, output)
+
+    assert output.feedback_proposals == ()
+    assert approved == ()
+    assert reasoning_input.athlete_state == original_state
+
+
+def test_feedback_provenance_must_match_supplied_text() -> None:
+    from app.ai.reasoning import AIReasoningInput, AIReasoningOutputError, AIReasoningService
+
+    source_id = uuid4()
+    raw = _input()
+    raw["feedback_context"] = {
+        "text": "درد دارم",
+        "source_id": source_id,
+        "source_field": "pain_or_limitation_feedback",
+    }
+    reasoning_input = AIReasoningInput.model_validate(raw)
+
+    class WrongProvenanceProvider:
+        async def reason(self, request: object) -> object:
+            return {
+                "summary": "Possible pain.",
+                "reason_codes": ["FEEDBACK_INTERPRETATION"],
+                "feedback_proposals": [
+                    {
+                        "signal": "pain_or_safety_concern",
+                        "confidence": 0.98,
+                        "source_id": uuid4(),
+                        "source_field": "pain_or_limitation_feedback",
+                    }
+                ],
+            }
+
+    with pytest.raises(AIReasoningOutputError):
+        asyncio.run(AIReasoningService().reason(reasoning_input, WrongProvenanceProvider()))
+
+
+def test_pain_proposal_is_not_a_dislike_proposal() -> None:
+    from app.ai.reasoning import AIReasoningFeedbackSignal
+
+    assert AIReasoningFeedbackSignal.PAIN_OR_SAFETY_CONCERN != AIReasoningFeedbackSignal.DISLIKE
+
+
+def test_ai_output_cannot_create_persistent_or_safety_state_directly() -> None:
+    from app.ai.reasoning import AIReasoningInput, AIReasoningOutputError, AIReasoningService
+
+    reasoning_input = AIReasoningInput.model_validate(_input())
+
+    class StateMutatingProvider:
+        async def reason(self, request: object) -> object:
+            return {
+                "summary": "invalid state mutation",
+                "reason_codes": ["FEEDBACK_INTERPRETATION"],
+                "blocked_exercises": [str(uuid4())],
+                "persistent_preferences": [str(uuid4())],
+            }
+
+    with pytest.raises(AIReasoningOutputError):
+        asyncio.run(AIReasoningService().reason(reasoning_input, StateMutatingProvider()))
+
+
+def test_deterministic_mode_makes_zero_ai_calls() -> None:
+    from app.ai.reasoning import AIReasoningInput, AIReasoningNotAllowedError, AIReasoningService
+
+    provider = _CountingProvider({})
+    reasoning_input = AIReasoningInput.model_validate(
+        _input(method=WorkoutGenerationMethod.FITSHO_COACH)
+    )
+
+    with pytest.raises(AIReasoningNotAllowedError):
+        asyncio.run(AIReasoningService().reason(reasoning_input, provider))
+
+    assert provider.calls == 0

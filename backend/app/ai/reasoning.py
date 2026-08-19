@@ -24,6 +24,32 @@ class AIReasoningReasonCode(StrEnum):
     SAFETY_CONSTRAINT_PRESERVED = "SAFETY_CONSTRAINT_PRESERVED"
     STRUCTURED_CONTEXT = "STRUCTURED_CONTEXT"
     DETERMINISTIC_FALLBACK = "DETERMINISTIC_FALLBACK"
+    FEEDBACK_INTERPRETATION = "FEEDBACK_INTERPRETATION"
+
+
+class AIReasoningFeedbackSignal(StrEnum):
+    DISCOMFORT = "discomfort"
+    DISLIKE = "dislike"
+    EQUIPMENT_UNAVAILABLE = "equipment_unavailable"
+    PAIN_OR_SAFETY_CONCERN = "pain_or_safety_concern"
+    RECOVERY_CONCERN = "recovery_concern"
+    SCHEDULE_CONTEXT_CHANGE = "schedule_context_change"
+
+
+class AIReasoningFeedbackSourceField(StrEnum):
+    NOTE_OPTIONAL = "note_optional"
+    PAIN_OR_LIMITATION_FEEDBACK = "pain_or_limitation_feedback"
+    PERFORMANCE_CHANGES = "performance_changes"
+    NEW_LIMITATION = "new_limitation"
+    WEEKLY_NOTE_OPTIONAL = "weekly_note_optional"
+
+
+class AIReasoningFeedbackContext(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: str = Field(min_length=1, max_length=4_000)
+    source_id: UUID | None = None
+    source_field: AIReasoningFeedbackSourceField
 
 
 class AIReasoningSafeCandidate(BaseModel):
@@ -44,10 +70,8 @@ class AIReasoningInput(BaseModel):
     adaptation_decision: CycleAdaptationDecision
     previous_program: CycleAdaptationProgramSnapshot | None = None
     proposed_program: CycleAdaptationProgramSnapshot | None = None
-    safe_candidates: tuple[AIReasoningSafeCandidate, ...] = Field(
-        min_length=1,
-        max_length=8,
-    )
+    feedback_context: AIReasoningFeedbackContext | None = None
+    safe_candidates: tuple[AIReasoningSafeCandidate, ...] = Field(default=(), max_length=8)
     deterministic_selected_candidate_id: str | None = None
 
     @model_validator(mode="after")
@@ -79,6 +103,17 @@ class AIReasoningCandidateRanking(BaseModel):
     rationale: str = Field(min_length=1, max_length=1_000)
 
 
+class AIReasoningFeedbackProposal(BaseModel):
+    """A proposal only; it is never a persisted preference or safety state."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    signal: AIReasoningFeedbackSignal
+    confidence: float = Field(ge=0, le=1)
+    source_id: UUID | None = None
+    source_field: AIReasoningFeedbackSourceField
+
+
 class AIReasoningOutput(BaseModel):
     """Validated explanation/ranking output; it contains no prescription controls."""
 
@@ -93,6 +128,7 @@ class AIReasoningOutput(BaseModel):
     )
     selected_candidate_id: str | None = None
     rankings: tuple[AIReasoningCandidateRanking, ...] = Field(default=(), max_length=8)
+    feedback_proposals: tuple[AIReasoningFeedbackProposal, ...] = Field(default=(), max_length=8)
 
 
 class AIReasoningError(Exception):
@@ -112,6 +148,8 @@ class AIReasoningProviderError(AIReasoningError):
 
 
 class AIReasoningService:
+    MIN_FEEDBACK_CONFIDENCE = 0.75
+
     async def reason(
         self,
         request: AIReasoningInput,
@@ -131,8 +169,13 @@ class AIReasoningService:
                 "AI reasoning provider failed after its configured fallback policy"
             ) from error
         output = self._validate_output(raw_output)
-        self._validate_output_against_input(output, request)
-        return output.model_copy(update={"source": AIReasoningSource.PROVIDER})
+        approved_proposals = self.validate_feedback_proposals(request, output)
+        return output.model_copy(
+            update={
+                "source": AIReasoningSource.PROVIDER,
+                "feedback_proposals": approved_proposals,
+            }
+        )
 
     @staticmethod
     def deterministic_fallback(request: AIReasoningInput) -> AIReasoningOutput:
@@ -156,6 +199,24 @@ class AIReasoningService:
             ),
             selected_candidate_id=request.deterministic_selected_candidate_id,
             rankings=rankings,
+        )
+
+    @classmethod
+    def validate_feedback_proposals(
+        cls,
+        request: AIReasoningInput,
+        output: AIReasoningOutput,
+    ) -> tuple[AIReasoningFeedbackProposal, ...]:
+        """Approve only high-confidence, correctly-provenanced proposals.
+
+        This returns data for a later deterministic domain service to apply. It
+        never writes preferences, safety signals, or other persistent state.
+        """
+        cls._validate_output_against_input(output, request)
+        return tuple(
+            proposal
+            for proposal in output.feedback_proposals
+            if proposal.confidence >= cls.MIN_FEEDBACK_CONFIDENCE
         )
 
     @staticmethod
@@ -194,3 +255,23 @@ class AIReasoningService:
         ranks = sorted(item.rank for item in output.rankings)
         if ranks != list(range(1, len(ranks) + 1)):
             raise AIReasoningOutputError("AI reasoning ranks must be contiguous and deterministic")
+
+        proposals = output.feedback_proposals
+        if not proposals:
+            return
+        feedback_context = request.feedback_context
+        if feedback_context is None:
+            raise AIReasoningOutputError(
+                "AI reasoning returned feedback proposals without supplied feedback text"
+            )
+        proposal_keys = [(item.signal, item.source_id, item.source_field) for item in proposals]
+        if len(proposal_keys) != len(set(proposal_keys)):
+            raise AIReasoningOutputError("AI reasoning returned duplicate feedback proposals")
+        for proposal in proposals:
+            if (
+                proposal.source_id != feedback_context.source_id
+                or proposal.source_field != feedback_context.source_field
+            ):
+                raise AIReasoningOutputError(
+                    "AI reasoning feedback provenance does not match supplied feedback text"
+                )
