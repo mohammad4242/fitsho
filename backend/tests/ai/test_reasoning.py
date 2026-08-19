@@ -315,6 +315,20 @@ def test_deterministic_mode_makes_zero_ai_calls() -> None:
     assert provider.calls == 0
 
 
+def test_deterministic_mode_makes_zero_ai_calls_for_coach_summary() -> None:
+    from app.ai.reasoning import AIReasoningInput, AIReasoningNotAllowedError, AIReasoningService
+
+    provider = _CountingProvider({})
+    reasoning_input = AIReasoningInput.model_validate(
+        _input(method=WorkoutGenerationMethod.FITSHO_COACH)
+    )
+
+    with pytest.raises(AIReasoningNotAllowedError):
+        asyncio.run(AIReasoningService().summarize_for_coach(reasoning_input, provider))
+
+    assert provider.calls == 0
+
+
 def test_ai_coach_ranks_multiple_safe_candidates_with_structured_reasons() -> None:
     from app.ai.reasoning import AIReasoningInput, AIReasoningService
 
@@ -358,3 +372,122 @@ def test_ai_coach_ranks_multiple_safe_candidates_with_structured_reasons() -> No
         "safe-candidate-a",
     ]
     assert output.reason_codes == ("SAFE_CANDIDATE_SET", "STRUCTURED_CONTEXT")
+
+
+def test_ai_coach_produces_validated_persian_coach_summary() -> None:
+    from app.ai.reasoning import AIReasoningInput, AIReasoningService
+
+    source_id = uuid4()
+    raw = _input()
+    state = raw["athlete_state"]
+    raw["athlete_state"] = state.model_copy(
+        update={"provenance": state.provenance.model_copy(update={"cycle_ids": (source_id,)})}
+    )
+    decision = raw["adaptation_decision"]
+    raw["adaptation_decision"] = decision.model_copy(
+        update={"provenance": decision.provenance.model_copy(update={"cycle_ids": (source_id,)})}
+    )
+    reasoning_input = AIReasoningInput.model_validate(raw)
+    reason_code = reasoning_input.adaptation_decision.reason_codes[0].value
+
+    class SummaryProvider:
+        async def reason(self, request: object) -> object:
+            return {
+                "summary": "Structured coach summary.",
+                "reason_codes": ["STRUCTURED_CONTEXT"],
+                "coach_summary": {
+                    "summary_fa": "دوره قبلی با شواهد موجود بررسی شد و نیاز به توجه مربی دارد.",
+                    "attention_points_fa": ["روند ریکاوری و محدودیت‌های ایمنی بررسی شود."],
+                    "covered_sections": [
+                        "previous_cycle",
+                        "adherence_recovery_difficulty",
+                        "program_changes",
+                        "coach_attention",
+                    ],
+                    "source_reason_codes": [reason_code],
+                    "source_ids": [source_id],
+                },
+            }
+
+    output = asyncio.run(
+        AIReasoningService().summarize_for_coach(reasoning_input, SummaryProvider())
+    )
+
+    assert output.coach_summary is not None
+    assert output.coach_summary.summary_fa.startswith("دوره قبلی")
+    assert output.coach_summary.source_reason_codes == (reason_code,)
+    assert output.coach_summary.source_ids == (source_id,)
+
+
+def test_coach_summary_rejects_unsupported_claim_evidence() -> None:
+    from app.ai.reasoning import AIReasoningInput, AIReasoningOutputError, AIReasoningService
+
+    reasoning_input = AIReasoningInput.model_validate(_input())
+
+    class InventingProvider:
+        async def reason(self, request: object) -> object:
+            return {
+                "summary": "Invented summary.",
+                "reason_codes": ["STRUCTURED_CONTEXT"],
+                "coach_summary": {
+                    "summary_fa": "برنامه قطعاً باعث افزایش قدرت می‌شود.",
+                    "attention_points_fa": [],
+                    "covered_sections": ["progress"],
+                    "source_reason_codes": ["INVENTED_REASON"],
+                    "source_ids": [uuid4()],
+                },
+            }
+
+    with pytest.raises(AIReasoningOutputError):
+        asyncio.run(AIReasoningService().summarize_for_coach(reasoning_input, InventingProvider()))
+
+
+def test_coach_summary_provider_failure_keeps_deterministic_context_available() -> None:
+    from app.ai.reasoning import AIReasoningInput, AIReasoningService
+
+    reasoning_input = AIReasoningInput.model_validate(_input())
+
+    class FailingProvider:
+        async def reason(self, request: object) -> object:
+            raise RuntimeError("provider unavailable")
+
+    output = asyncio.run(
+        AIReasoningService().summarize_for_coach(
+            reasoning_input,
+            FailingProvider(),
+            fallback_on_provider_failure=True,
+        )
+    )
+
+    assert output.coach_summary is None
+    assert output.source == "deterministic_fallback"
+    assert output.summary.startswith("Deterministic coaching remains authoritative")
+
+
+def test_summary_does_not_mutate_athlete_state_or_program_inputs() -> None:
+    from app.ai.reasoning import AIReasoningInput, AIReasoningOutputError, AIReasoningService
+
+    reasoning_input = AIReasoningInput.model_validate(_input())
+    original_state = reasoning_input.athlete_state
+    original_decision = reasoning_input.adaptation_decision
+
+    class SummaryProvider:
+        async def reason(self, request: object) -> object:
+            return {
+                "summary": "invalid mutation",
+                "reason_codes": ["STRUCTURED_CONTEXT"],
+                "coach_summary": {
+                    "summary_fa": "تغییر state",
+                    "attention_points_fa": [],
+                    "covered_sections": ["coach_attention"],
+                    "source_reason_codes": [],
+                    "source_ids": [],
+                },
+                "sets": 10,
+            }
+
+    with pytest.raises(AIReasoningOutputError):
+        asyncio.run(AIReasoningService().summarize_for_coach(reasoning_input, SummaryProvider()))
+
+    assert reasoning_input.athlete_state == original_state
+    assert reasoning_input.adaptation_decision == original_decision

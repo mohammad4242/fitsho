@@ -11,6 +11,7 @@ from app.profile.enums import WorkoutGenerationMethod
 from app.workouts.program_engine.adaptation_policy import (
     CycleAdaptationDecision,
     CycleAdaptationProgramSnapshot,
+    CycleAdaptationReasonCode,
 )
 
 
@@ -42,6 +43,16 @@ class AIReasoningFeedbackSourceField(StrEnum):
     PERFORMANCE_CHANGES = "performance_changes"
     NEW_LIMITATION = "new_limitation"
     WEEKLY_NOTE_OPTIONAL = "weekly_note_optional"
+
+
+class AIReasoningCoachSummarySection(StrEnum):
+    PREVIOUS_CYCLE = "previous_cycle"
+    PROGRESS = "progress"
+    ADHERENCE_RECOVERY_DIFFICULTY = "adherence_recovery_difficulty"
+    PROGRAM_CHANGES = "program_changes"
+    PREFERENCES_REPLACEMENTS = "preferences_replacements"
+    SAFETY = "safety"
+    COACH_ATTENTION = "coach_attention"
 
 
 class AIReasoningFeedbackContext(BaseModel):
@@ -114,6 +125,18 @@ class AIReasoningFeedbackProposal(BaseModel):
     source_field: AIReasoningFeedbackSourceField
 
 
+class AIReasoningCoachSummary(BaseModel):
+    """Concise coach-facing explanation tied to deterministic evidence."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    summary_fa: str = Field(min_length=1, max_length=2_000)
+    attention_points_fa: tuple[str, ...] = Field(default=(), max_length=5)
+    covered_sections: tuple[AIReasoningCoachSummarySection, ...] = Field(min_length=1, max_length=7)
+    source_reason_codes: tuple[str, ...] = Field(min_length=1, max_length=16)
+    source_ids: tuple[UUID, ...] = Field(default=(), max_length=32)
+
+
 class AIReasoningOutput(BaseModel):
     """Validated explanation/ranking output; it contains no prescription controls."""
 
@@ -129,6 +152,7 @@ class AIReasoningOutput(BaseModel):
     selected_candidate_id: str | None = None
     rankings: tuple[AIReasoningCandidateRanking, ...] = Field(default=(), max_length=8)
     feedback_proposals: tuple[AIReasoningFeedbackProposal, ...] = Field(default=(), max_length=8)
+    coach_summary: AIReasoningCoachSummary | None = None
 
 
 class AIReasoningError(Exception):
@@ -158,6 +182,20 @@ class AIReasoningService:
         fallback_on_provider_failure: bool = False,
     ) -> AIReasoningOutput:
         """Rank or explain only candidates already approved by Fitsho."""
+        return await self.reason(
+            request,
+            provider,
+            fallback_on_provider_failure=fallback_on_provider_failure,
+        )
+
+    async def summarize_for_coach(
+        self,
+        request: AIReasoningInput,
+        provider: AIReasoningProvider | None,
+        *,
+        fallback_on_provider_failure: bool = False,
+    ) -> AIReasoningOutput:
+        """Summarize supplied evidence without changing any domain input."""
         return await self.reason(
             request,
             provider,
@@ -271,21 +309,85 @@ class AIReasoningService:
             raise AIReasoningOutputError("AI reasoning ranks must be contiguous and deterministic")
 
         proposals = output.feedback_proposals
-        if not proposals:
-            return
-        feedback_context = request.feedback_context
-        if feedback_context is None:
-            raise AIReasoningOutputError(
-                "AI reasoning returned feedback proposals without supplied feedback text"
-            )
-        proposal_keys = [(item.signal, item.source_id, item.source_field) for item in proposals]
-        if len(proposal_keys) != len(set(proposal_keys)):
-            raise AIReasoningOutputError("AI reasoning returned duplicate feedback proposals")
-        for proposal in proposals:
-            if (
-                proposal.source_id != feedback_context.source_id
-                or proposal.source_field != feedback_context.source_field
-            ):
+        if proposals:
+            feedback_context = request.feedback_context
+            if feedback_context is None:
                 raise AIReasoningOutputError(
-                    "AI reasoning feedback provenance does not match supplied feedback text"
+                    "AI reasoning returned feedback proposals without supplied feedback text"
                 )
+            proposal_keys = [(item.signal, item.source_id, item.source_field) for item in proposals]
+            if len(proposal_keys) != len(set(proposal_keys)):
+                raise AIReasoningOutputError("AI reasoning returned duplicate feedback proposals")
+            for proposal in proposals:
+                if (
+                    proposal.source_id != feedback_context.source_id
+                    or proposal.source_field != feedback_context.source_field
+                ):
+                    raise AIReasoningOutputError(
+                        "AI reasoning feedback provenance does not match supplied feedback text"
+                    )
+
+        coach_summary = output.coach_summary
+        if coach_summary is None:
+            return
+        available_reason_codes = AIReasoningService._summary_reason_codes(request)
+        if not set(coach_summary.source_reason_codes).issubset(available_reason_codes):
+            raise AIReasoningOutputError(
+                "AI reasoning coach summary referenced an unsupported reason code"
+            )
+        available_source_ids = AIReasoningService._summary_source_ids(request)
+        if not set(coach_summary.source_ids).issubset(available_source_ids):
+            raise AIReasoningOutputError(
+                "AI reasoning coach summary referenced unsupported source evidence"
+            )
+
+    @staticmethod
+    def _summary_reason_codes(request: AIReasoningInput) -> set[str]:
+        values = AIReasoningService._collect_strings(
+            request.adaptation_decision.model_dump(mode="json")
+        )
+        known_codes = {code.value for code in CycleAdaptationReasonCode}
+        return values & known_codes
+
+    @staticmethod
+    def _summary_source_ids(request: AIReasoningInput) -> set[UUID]:
+        source = {
+            *AIReasoningService._collect_uuids(request.athlete_state.provenance.model_dump()),
+            *AIReasoningService._collect_uuids(request.adaptation_decision.provenance.model_dump()),
+        }
+        for program in (request.previous_program, request.proposed_program):
+            if program is not None:
+                source.update(AIReasoningService._collect_uuids(program.model_dump()))
+        return source
+
+    @staticmethod
+    def _collect_strings(value: object) -> set[str]:
+        if isinstance(value, str):
+            return {value}
+        if isinstance(value, dict):
+            result: set[str] = set()
+            for item in value.values():
+                result.update(AIReasoningService._collect_strings(item))
+            return result
+        if isinstance(value, (list, tuple, set, frozenset)):
+            result = set()
+            for item in value:
+                result.update(AIReasoningService._collect_strings(item))
+            return result
+        return set()
+
+    @staticmethod
+    def _collect_uuids(value: object) -> set[UUID]:
+        if isinstance(value, UUID):
+            return {value}
+        if isinstance(value, dict):
+            result: set[UUID] = set()
+            for item in value.values():
+                result.update(AIReasoningService._collect_uuids(item))
+            return result
+        if isinstance(value, (list, tuple, set, frozenset)):
+            result = set()
+            for item in value:
+                result.update(AIReasoningService._collect_uuids(item))
+            return result
+        return set()
