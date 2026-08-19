@@ -281,16 +281,13 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
             <WorkoutDays plan={pendingPlan} isEnglish={isEnglish} titleId="workout-pending-plan-title" interactive={false} />
           </section>
         )}
-        {state !== "loading" && (plan !== null || pendingPlan !== null) && (
-          <EndCycleFeedbackCard
-            planDurationWeeks={pendingPlan?.plan_duration_weeks ?? displayedPlanDuration}
-            awaitingCoachApproval={plan === null && pendingPlan !== null}
-          />
-        )}
-
         <section className="workout-tools" aria-labelledby="workout-future-title">
           <h2 id="workout-future-title">{t("workoutPlan.futureTitle")}</h2>
-          <div className="workout-quick-actions" role="group" aria-labelledby="workout-future-title">
+          <div
+            className={`workout-quick-actions${plan !== null || pendingPlan !== null ? " workout-quick-actions--with-feedback" : ""}`}
+            role="group"
+            aria-labelledby="workout-future-title"
+          >
             <button
               className="workout-quick-action"
               type="button"
@@ -303,6 +300,12 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
               <strong>{t("workoutPlan.pdf.title")}</strong>
               <small>{t(downloadingPdf ? "workoutPlan.pdf.loading" : "workoutPlan.pdf.body")}</small>
             </button>
+            {state !== "loading" && (plan !== null || pendingPlan !== null) && (
+              <EndCycleFeedbackCard
+                planDurationWeeks={pendingPlan?.plan_duration_weeks ?? displayedPlanDuration}
+                awaitingCoachApproval={plan === null && pendingPlan !== null}
+              />
+            )}
             <Link className="workout-quick-action" aria-label={t("workoutPlan.body.title")} to="/body-progress">
               <AppIcon name="progress" />
               <strong>{t("workoutPlan.body.title")}</strong>

@@ -103,6 +103,16 @@
 .workout-tools { margin-top: .65rem; }
 .workout-tools > h2 { margin: 0 0 .4rem; color: var(--fitsho-muted); font-size: .72rem; }
 .workout-quick-actions { min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--fitsho-line); border-radius: .9rem; background: var(--fitsho-surface-subtle); }
+.workout-quick-actions--with-feedback { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.workout-quick-actions > .end-cycle-feedback--locked { margin: 0; padding: .55rem .3rem; border: 0; border-inline-start: 1px solid var(--fitsho-line); border-radius: 0; background: transparent; box-shadow: none; }
+.workout-quick-actions > .end-cycle-feedback--locked .end-cycle-feedback__locked-trigger { min-height: 4.8rem; display: grid; justify-items: center; align-content: center; gap: .22rem; text-align: center; }
+.workout-quick-actions > .end-cycle-feedback--locked .end-cycle-feedback__locked-icon { flex: 0 0 2rem; width: 2rem; height: 2rem; }
+.workout-quick-actions > .end-cycle-feedback--locked .end-cycle-feedback__locked-copy { justify-items: center; }
+.workout-quick-actions > .end-cycle-feedback--locked .end-cycle-feedback__locked-copy .eyebrow { font-size: .58rem; }
+.workout-quick-actions > .end-cycle-feedback--locked .end-cycle-feedback__locked-copy strong { font-size: .63rem; line-height: 1.35; }
+.workout-quick-actions > .end-cycle-feedback--locked .end-cycle-feedback__locked-chevron { display: none; }
+.workout-quick-actions > .end-cycle-feedback--locked .end-cycle-feedback__locked-message { padding-inline: .25rem; text-align: center; font-size: .63rem; }
+.workout-quick-actions > .end-cycle-feedback:not(.end-cycle-feedback--locked) { grid-column: 1 / -1; margin: 0; border: 0; border-top: 1px solid var(--fitsho-line); border-radius: 0; box-shadow: none; }
 .workout-quick-action { min-width: 0; min-height: 4.8rem; display: grid; place-items: center; align-content: center; gap: .22rem; padding: .55rem .3rem; border: 0; color: var(--fitsho-ink); background: transparent; font: inherit; text-align: center; text-decoration: none; cursor: pointer; }
 .workout-quick-action + .workout-quick-action { border-inline-start: 1px solid var(--fitsho-line); }
 .workout-quick-action svg { width: 1.25rem; height: 1.25rem; color: var(--fitsho-aqua); }

@@ -238,6 +238,18 @@ it("uses the compact English generation labels", async () => {
   }
 });
 
+it("places the locked end-of-cycle feedback between PDF and Body Analysis tools", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  const feedback = await screen.findByRole("button", { name: "بازخورد پایان دوره" });
+  const pdf = screen.getByRole("button", { name: "دانلود PDF" });
+  const body = screen.getByRole("link", { name: "Body Analysis" });
+  expect(pdf.compareDocumentPosition(feedback) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(feedback.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 it("keeps the initial version visible while coach approval is pending", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue({
     ...plan,
