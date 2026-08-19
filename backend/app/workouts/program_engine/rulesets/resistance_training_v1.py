@@ -99,6 +99,11 @@ class ProgramRuleset:
     body_analysis_clear_lag_template_boost: int = 35
     poor_recovery_set_reduction: int = 2
     max_previous_volume_increase: float = 0.2
+    adaptation_min_adherence_for_progression: float = 0.8
+    adaptation_min_volume_confidence_for_progression: float = 0.8
+    adaptation_max_volume_increase_ratio: float = 0.1
+    adaptation_lagging_muscle_volume_delta_sets: int = 1
+    adaptation_lagging_muscle_priority_delta: int = 1
     max_sets_per_muscle_per_session: int = 6
     maximum_direct_sessions_per_muscle_per_week: int = 2
     template_reference_max_sets_per_muscle_per_session: dict[TrainingStatus, int] = field(
