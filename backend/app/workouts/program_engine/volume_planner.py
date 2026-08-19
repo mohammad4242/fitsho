@@ -19,7 +19,10 @@ from app.workouts.program_engine.schemas import (
     VolumeTarget,
     WeeklyVolumePlan,
 )
-from app.workouts.program_engine.volume_history import derive_previous_volume_baseline
+from app.workouts.program_engine.volume_history import (
+    PreviousVolumeBaseline,
+    derive_previous_volume_baseline,
+)
 
 MAJOR_MUSCLES = (
     MuscleGroup.CHEST,
@@ -44,6 +47,8 @@ def plan_weekly_volume(
     request: NormalizedProgramRequest,
     split: SplitPlan,
     ruleset: ProgramRuleset,
+    *,
+    previous_volume: PreviousVolumeBaseline | None = None,
 ) -> WeeklyVolumePlan:
     source = request.source
     minimum = ruleset.minimum_sets[request.training_status]
@@ -111,7 +116,9 @@ def plan_weekly_volume(
         request, ruleset
     )
     direct_exposures = _direct_exposure_counts(split, effective_priorities)
-    previous_volume = derive_previous_volume_baseline(source.recent_training_history)
+    previous_volume = previous_volume or derive_previous_volume_baseline(
+        source.recent_training_history
+    )
     reasons.extend(previous_volume.reason_codes)
     for muscle in TRACKED_MUSCLES:
         is_secondary = muscle in SECONDARY_MUSCLES

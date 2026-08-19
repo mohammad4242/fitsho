@@ -106,8 +106,8 @@ def generate_program(
             if reference_result.is_success:
                 return reference_result
     split = select_split(normalized, ruleset)
-    volume = plan_weekly_volume(normalized, split, ruleset)
     previous_volume = derive_previous_volume_baseline(normalized.source.recent_training_history)
+    volume = plan_weekly_volume(normalized, split, ruleset, previous_volume=previous_volume)
     try:
         drafts = build_sessions(normalized, split, volume, eligibility.eligible, ruleset)
     except ValueError as exc:
