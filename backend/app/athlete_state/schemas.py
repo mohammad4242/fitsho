@@ -13,6 +13,7 @@ from app.profile.enums import HomeTrainingSetup, TrainingLocation
 from app.workout_cycles.enums import (
     WorkoutCycleWeeklyCheckInDifficulty,
     WorkoutCycleWeeklyCheckInRecovery,
+    WorkoutExerciseReplacementReason,
 )
 
 
@@ -99,6 +100,19 @@ class AthleteStateExerciseContext(BaseModel):
     reason_codes: tuple[AthleteStateReasonCode, ...] = ()
 
 
+class AthleteStateReplacementContext(BaseModel):
+    """Derived replacement history, without copying replacement records."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    original_exercise_id: UUID
+    replacement_exercise_id: UUID
+    persistent_count: int = Field(ge=0)
+    this_time_count: int = Field(default=0, ge=0)
+    reasons: tuple[WorkoutExerciseReplacementReason, ...] = ()
+    source_replacement_ids: tuple[UUID, ...] = ()
+
+
 class AthleteStateScheduleContext(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -154,6 +168,7 @@ class AthleteState(BaseModel):
     uncomfortable_exercises: tuple[UUID, ...] = ()
     unavailable_exercises: tuple[UUID, ...] = ()
     unavailable_equipment_context: tuple[AthleteStateExerciseContext, ...] = ()
+    replacement_context: tuple[AthleteStateReplacementContext, ...] = ()
     pain_sensitive_exercises: tuple[UUID, ...] = ()
     priority_muscles: tuple[MuscleGroup, ...] = ()
     progressing_muscles: tuple[MuscleGroup, ...] = ()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from enum import StrEnum
+from typing import cast
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,6 +16,7 @@ from app.exercises.enums import MuscleGroup
 from app.workout_cycles.enums import (
     WorkoutCycleWeeklyCheckInDifficulty,
     WorkoutCycleWeeklyCheckInRecovery,
+    WorkoutExerciseReplacementReason,
 )
 from app.workouts.program_engine.rulesets.resistance_training_v1 import (
     RULESET,
@@ -55,6 +57,13 @@ class CycleAdaptationReasonCode(StrEnum):
     PROGRESSION_ALLOWED = "PROGRESSION_ALLOWED"
     PROGRESSION_HELD = "PROGRESSION_HELD"
     RECOVERY_LIMITED = "RECOVERY_LIMITED"
+    PERSISTENT_EXERCISE_DISLIKE = "PERSISTENT_EXERCISE_DISLIKE"
+    PERSISTENT_EXERCISE_DISCOMFORT = "PERSISTENT_EXERCISE_DISCOMFORT"
+    EQUIPMENT_UNAVAILABLE = "EQUIPMENT_UNAVAILABLE"
+    REPEATED_REPLACEMENT = "REPEATED_REPLACEMENT"
+    PREFERRED_ALTERNATIVE = "PREFERRED_ALTERNATIVE"
+    PREFERENCE_OVERRIDDEN_BY_SAFETY = "PREFERENCE_OVERRIDDEN_BY_SAFETY"
+    PREFERENCE_OVERRIDDEN_BY_AVAILABILITY = "PREFERENCE_OVERRIDDEN_BY_AVAILABILITY"
 
 
 class CycleAdaptationMuscleAdjustment(BaseModel):
@@ -83,11 +92,22 @@ class CycleAdaptationVolumeContext(BaseModel):
     source: str
 
 
+class CycleAdaptationPreferredAlternative(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    original_exercise_id: UUID
+    replacement_exercise_id: UUID
+    strength: int = Field(ge=1, le=10)
+    source_replacement_ids: tuple[UUID, ...] = ()
+    reason_codes: tuple[CycleAdaptationReasonCode, ...] = ()
+
+
 class CycleAdaptationPreferenceConstraints(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     disliked_exercises: tuple[UUID, ...] = ()
     unavailable_exercises: tuple[UUID, ...] = ()
+    preferred_alternatives: tuple[CycleAdaptationPreferredAlternative, ...] = ()
 
 
 class CycleAdaptationSafetyConstraints(BaseModel):
@@ -102,6 +122,7 @@ class CycleAdaptationProvenance(BaseModel):
     cycle_ids: tuple[UUID, ...] = ()
     weekly_check_in_ids: tuple[UUID, ...] = ()
     end_feedback_ids: tuple[UUID, ...] = ()
+    replacement_ids: tuple[UUID, ...] = ()
     preference_ids: tuple[UUID, ...] = ()
     safety_signal_ids: tuple[UUID, ...] = ()
     workout_plan_ids: tuple[UUID, ...] = ()
@@ -138,24 +159,31 @@ def decide_cycle_adaptation(
     baseline = derive_previous_volume_baseline(recent_history)
     adherence, adherence_conflict = _adherence_ratio(state, recent_history)
     safety_ids = _sorted_ids(state.pain_sensitive_exercises)
-    preference_source_ids = set(state.persistent_disliked_exercises) | set(
+    raw_preference_ids = set(state.persistent_disliked_exercises) | set(
         state.uncomfortable_exercises
     )
-    disliked_ids = _sorted_ids(
-        preference_source_ids - set(safety_ids)
+    disliked_ids, unavailable_ids, preferred_alternatives, preference_reasons = (
+        _replacement_preference_constraints(state, set(safety_ids), ruleset)
     )
-    unavailable_ids = _sorted_ids(state.unavailable_exercises)
     reasons: list[CycleAdaptationReasonCode] = []
     poor_recovery = state.recovery_trend.summary is AthleteStateRecoverySummary.POOR
-    repeated_poor_recovery = poor_recovery and _signal_count(
-        state.recovery_trend.values,
-        WorkoutCycleWeeklyCheckInRecovery.POOR,
-    ) >= ruleset.adaptation_repeated_poor_recovery_weeks
+    repeated_poor_recovery = (
+        poor_recovery
+        and _signal_count(
+            state.recovery_trend.values,
+            WorkoutCycleWeeklyCheckInRecovery.POOR,
+        )
+        >= ruleset.adaptation_repeated_poor_recovery_weeks
+    )
     too_hard = state.difficulty_trend.summary is AthleteStateDifficultySummary.TOO_HARD
-    repeated_too_hard = too_hard and _signal_count(
-        state.difficulty_trend.values,
-        WorkoutCycleWeeklyCheckInDifficulty.TOO_HARD,
-    ) >= ruleset.adaptation_repeated_too_hard_weeks
+    repeated_too_hard = (
+        too_hard
+        and _signal_count(
+            state.difficulty_trend.values,
+            WorkoutCycleWeeklyCheckInDifficulty.TOO_HARD,
+        )
+        >= ruleset.adaptation_repeated_too_hard_weeks
+    )
 
     action = CycleAdaptationAction.MAINTAIN
     if safety_ids:
@@ -164,7 +192,11 @@ def decide_cycle_adaptation(
             (
                 CycleAdaptationReasonCode.SAFETY_OVERRIDES_PROGRESSION,
                 CycleAdaptationReasonCode.SAFETY_OVERRIDES_PREFERENCE
-                if preference_source_ids & set(safety_ids)
+                if raw_preference_ids & set(safety_ids)
+                or any(
+                    alternative.replacement_exercise_id in set(safety_ids)
+                    for alternative in preferred_alternatives
+                )
                 else CycleAdaptationReasonCode.SAFETY_OVERRIDES_PROGRESSION,
             )
         )
@@ -218,6 +250,7 @@ def decide_cycle_adaptation(
         reasons.append(CycleAdaptationReasonCode.PROGRESSING_MUSCLE_NOT_AUTOMATICALLY_INCREASED)
     if disliked_ids or unavailable_ids:
         reasons.append(CycleAdaptationReasonCode.PERSISTENT_PREFERENCES_PRESERVED)
+    reasons.extend(preference_reasons)
 
     adjustments: tuple[CycleAdaptationMuscleAdjustment, ...] = ()
     if action is CycleAdaptationAction.INCREASE:
@@ -255,6 +288,7 @@ def decide_cycle_adaptation(
         preference_constraints=CycleAdaptationPreferenceConstraints(
             disliked_exercises=disliked_ids,
             unavailable_exercises=unavailable_ids,
+            preferred_alternatives=preferred_alternatives,
         ),
         safety_constraints=CycleAdaptationSafetyConstraints(blocked_exercises=safety_ids),
         reason_codes=tuple(reasons),
@@ -262,6 +296,14 @@ def decide_cycle_adaptation(
             cycle_ids=state.provenance.cycle_ids,
             weekly_check_in_ids=state.provenance.weekly_check_in_ids,
             end_feedback_ids=state.provenance.end_feedback_ids,
+            replacement_ids=_sorted_ids(
+                set(state.provenance.replacement_ids)
+                | {
+                    replacement_id
+                    for context in state.replacement_context
+                    for replacement_id in context.source_replacement_ids
+                }
+            ),
             preference_ids=state.provenance.preference_ids,
             safety_signal_ids=state.provenance.safety_signal_ids,
             workout_plan_ids=state.provenance.workout_plan_ids,
@@ -289,3 +331,97 @@ def _sorted_ids(values: tuple[UUID, ...] | set[UUID]) -> tuple[UUID, ...]:
 def _signal_count(values: tuple[StrEnum, ...], expected: StrEnum) -> int:
     matching = sum(value is expected for value in values)
     return matching if matching else 1
+
+
+def _replacement_preference_constraints(
+    state: AthleteState,
+    safety_ids: set[UUID],
+    ruleset: ProgramRuleset,
+) -> tuple[
+    tuple[UUID, ...],
+    tuple[UUID, ...],
+    tuple[CycleAdaptationPreferredAlternative, ...],
+    tuple[CycleAdaptationReasonCode, ...],
+]:
+    raw_disliked = set(state.persistent_disliked_exercises) | set(state.uncomfortable_exercises)
+    unavailable_source_ids = set(state.unavailable_exercises)
+    disliked_ids = _sorted_ids(raw_disliked - safety_ids - unavailable_source_ids)
+    unavailable_ids = _sorted_ids(unavailable_source_ids - safety_ids)
+    reasons: list[CycleAdaptationReasonCode] = []
+    if state.persistent_disliked_exercises:
+        reasons.append(CycleAdaptationReasonCode.PERSISTENT_EXERCISE_DISLIKE)
+    if state.uncomfortable_exercises:
+        reasons.append(CycleAdaptationReasonCode.PERSISTENT_EXERCISE_DISCOMFORT)
+    if state.unavailable_exercises:
+        reasons.append(CycleAdaptationReasonCode.EQUIPMENT_UNAVAILABLE)
+
+    grouped: dict[tuple[UUID, UUID], dict[str, object]] = {}
+    for context in state.replacement_context:
+        key = (context.original_exercise_id, context.replacement_exercise_id)
+        entry = grouped.setdefault(
+            key,
+            {
+                "persistent_count": 0,
+                "reasons": set(),
+                "source_replacement_ids": set(),
+            },
+        )
+        entry["persistent_count"] = (
+            cast(int, entry["persistent_count"]) + context.persistent_count
+        )
+        context_reasons = entry["reasons"]
+        source_ids = entry["source_replacement_ids"]
+        assert isinstance(context_reasons, set)
+        assert isinstance(source_ids, set)
+        context_reasons.update(context.reasons)
+        source_ids.update(context.source_replacement_ids)
+
+    preferred: list[CycleAdaptationPreferredAlternative] = []
+    for (original_id, replacement_id), entry in grouped.items():
+        persistent_count = cast(int, entry["persistent_count"])
+        context_reasons = entry["reasons"]
+        source_ids = entry["source_replacement_ids"]
+        assert isinstance(context_reasons, set)
+        assert isinstance(source_ids, set)
+        if persistent_count < ruleset.adaptation_repeated_replacement_count:
+            continue
+        if not context_reasons.intersection(
+            {
+                WorkoutExerciseReplacementReason.DISLIKE,
+                WorkoutExerciseReplacementReason.UNCOMFORTABLE,
+                WorkoutExerciseReplacementReason.EQUIPMENT_UNAVAILABLE,
+            }
+        ):
+            continue
+        if replacement_id in safety_ids:
+            reasons.append(CycleAdaptationReasonCode.PREFERENCE_OVERRIDDEN_BY_SAFETY)
+            continue
+        if replacement_id in set(unavailable_ids):
+            reasons.append(CycleAdaptationReasonCode.PREFERENCE_OVERRIDDEN_BY_AVAILABILITY)
+            continue
+        preferred_reasons = [
+            CycleAdaptationReasonCode.REPEATED_REPLACEMENT,
+            CycleAdaptationReasonCode.PREFERRED_ALTERNATIVE,
+        ]
+        preferred.append(
+            CycleAdaptationPreferredAlternative(
+                original_exercise_id=original_id,
+                replacement_exercise_id=replacement_id,
+                strength=min(
+                    persistent_count,
+                    ruleset.adaptation_max_replacement_preference_strength,
+                ),
+                source_replacement_ids=tuple(sorted(source_ids, key=str)),
+                reason_codes=tuple(preferred_reasons),
+            )
+        )
+        reasons.extend(preferred_reasons)
+
+    preferred.sort(
+        key=lambda alternative: (
+            -alternative.strength,
+            str(alternative.original_exercise_id),
+            str(alternative.replacement_exercise_id),
+        )
+    )
+    return disliked_ids, unavailable_ids, tuple(preferred), tuple(dict.fromkeys(reasons))

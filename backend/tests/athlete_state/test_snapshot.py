@@ -134,6 +134,10 @@ def test_repeated_persistent_replacements_are_deduplicated_but_traceable(
     assert len(state.provenance.replacement_ids) == 2
     assert len(state.provenance.preference_ids) == 1
     assert len(state.provenance.preference_source_replacement_ids) == 1
+    assert len(state.replacement_context) == 1
+    assert state.replacement_context[0].persistent_count == 2
+    assert state.replacement_context[0].this_time_count == 0
+    assert state.replacement_context[0].source_replacement_ids == state.provenance.replacement_ids
 
 
 def test_newer_weekly_evidence_overrides_older_evidence_in_recent_summary(

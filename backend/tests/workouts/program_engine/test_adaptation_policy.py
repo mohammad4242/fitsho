@@ -9,12 +9,14 @@ from app.athlete_state.schemas import (
     AthleteStateProvenance,
     AthleteStateRecoverySummary,
     AthleteStateRecoveryTrend,
+    AthleteStateReplacementContext,
     AthleteStateScheduleContext,
 )
 from app.exercises.enums import MuscleGroup
 from app.workout_cycles.enums import (
     WorkoutCycleWeeklyCheckInDifficulty,
     WorkoutCycleWeeklyCheckInRecovery,
+    WorkoutExerciseReplacementReason,
 )
 from app.workouts.program_engine.adaptation_policy import (
     CycleAdaptationAction,
@@ -34,8 +36,10 @@ def _state(
     lagging: tuple[MuscleGroup, ...] = (),
     progressing: tuple[MuscleGroup, ...] = (),
     disliked: tuple = (),
+    uncomfortable: tuple = (),
     unavailable: tuple = (),
     pain_sensitive: tuple = (),
+    replacement_context: tuple[AthleteStateReplacementContext, ...] = (),
 ) -> AthleteState:
     return AthleteState(
         user_id=uuid4(),
@@ -45,12 +49,12 @@ def _state(
             percent=adherence_percent,
         ),
         recovery_trend=AthleteStateRecoveryTrend(summary=recovery, values=recovery_values),
-        difficulty_trend=AthleteStateDifficultyTrend(
-            summary=difficulty, values=difficulty_values
-        ),
+        difficulty_trend=AthleteStateDifficultyTrend(summary=difficulty, values=difficulty_values),
         persistent_disliked_exercises=disliked,
+        uncomfortable_exercises=uncomfortable,
         unavailable_exercises=unavailable,
         pain_sensitive_exercises=pain_sensitive,
+        replacement_context=replacement_context,
         priority_muscles=lagging,
         progressing_muscles=progressing,
         lagging_muscles=lagging,
@@ -82,9 +86,7 @@ def test_good_supported_history_allows_conservative_increase() -> None:
     decision = decide_cycle_adaptation(_state(), _history(), RULESET)
 
     assert decision.overall_action is CycleAdaptationAction.INCREASE
-    assert decision.volume_context.previous_effective_sets_by_muscle == {
-        MuscleGroup.CHEST: 10.0
-    }
+    assert decision.volume_context.previous_effective_sets_by_muscle == {MuscleGroup.CHEST: 10.0}
     assert decision.volume_context.confidence == 0.95
     assert decision.recovery_constraints.max_volume_increase_ratio == 0.1
     assert "PROGRESSION_SUPPORTED_BY_ADHERENCE_RECOVERY_DIFFICULTY" in decision.reason_codes
@@ -153,9 +155,7 @@ def test_low_adherence_does_not_treat_prescribed_history_as_tolerated_volume() -
 
     assert decision.overall_action is CycleAdaptationAction.MAINTAIN
     assert decision.muscle_adjustments == ()
-    assert decision.volume_context.previous_effective_sets_by_muscle == {
-        MuscleGroup.CHEST: 5.0
-    }
+    assert decision.volume_context.previous_effective_sets_by_muscle == {MuscleGroup.CHEST: 5.0}
     assert "LOW_ADHERENCE_BLOCKS_PROGRESSION" in decision.reason_codes
 
 
@@ -301,3 +301,180 @@ def test_preferences_and_provenance_are_preserved_in_decision() -> None:
     assert decision.preference_constraints.unavailable_exercises == (unavailable_id,)
     assert decision.provenance.cycle_ids == state.provenance.cycle_ids
     assert decision.to_snapshot()["overall_action"] == "increase"
+
+
+def test_persistent_dislike_is_deprioritized_but_not_blocked() -> None:
+    exercise_id = uuid4()
+    decision = decide_cycle_adaptation(
+        _state(disliked=(exercise_id,)),
+        _history(),
+        RULESET,
+    )
+
+    assert decision.preference_constraints.disliked_exercises == (exercise_id,)
+    assert decision.safety_constraints.blocked_exercises == ()
+    assert "PERSISTENT_EXERCISE_DISLIKE" in decision.reason_codes
+
+
+def test_persistent_uncomfortable_is_a_preference_not_a_safety_block() -> None:
+    exercise_id = uuid4()
+    decision = decide_cycle_adaptation(
+        _state(uncomfortable=(exercise_id,)),
+        _history(),
+        RULESET,
+    )
+
+    assert decision.preference_constraints.disliked_exercises == (exercise_id,)
+    assert decision.safety_constraints.blocked_exercises == ()
+    assert "PERSISTENT_EXERCISE_DISCOMFORT" in decision.reason_codes
+
+
+def test_persistent_equipment_unavailable_is_an_availability_constraint() -> None:
+    exercise_id = uuid4()
+    decision = decide_cycle_adaptation(
+        _state(unavailable=(exercise_id,)),
+        _history(),
+        RULESET,
+    )
+
+    assert decision.preference_constraints.unavailable_exercises == (exercise_id,)
+    assert decision.safety_constraints.blocked_exercises == ()
+    assert "EQUIPMENT_UNAVAILABLE" in decision.reason_codes
+
+
+def test_availability_constraint_overrides_a_persistent_dislike() -> None:
+    exercise_id = uuid4()
+    decision = decide_cycle_adaptation(
+        _state(disliked=(exercise_id,), unavailable=(exercise_id,)),
+        _history(),
+        RULESET,
+    )
+
+    assert decision.preference_constraints.disliked_exercises == ()
+    assert decision.preference_constraints.unavailable_exercises == (exercise_id,)
+
+
+def test_repeated_persistent_replacements_prefer_the_confirmed_alternative() -> None:
+    original_id = uuid4()
+    alternative_id = uuid4()
+    replacement_ids = (uuid4(), uuid4())
+    context = AthleteStateReplacementContext(
+        original_exercise_id=original_id,
+        replacement_exercise_id=alternative_id,
+        persistent_count=2,
+        this_time_count=0,
+        reasons=(WorkoutExerciseReplacementReason.DISLIKE,),
+        source_replacement_ids=replacement_ids,
+    )
+
+    decision = decide_cycle_adaptation(
+        _state(replacement_context=(context,)),
+        _history(),
+        RULESET,
+    )
+
+    preferred = decision.preference_constraints.preferred_alternatives
+    assert len(preferred) == 1
+    assert preferred[0].original_exercise_id == original_id
+    assert preferred[0].replacement_exercise_id == alternative_id
+    assert preferred[0].strength == 2
+    assert set(preferred[0].source_replacement_ids) == set(replacement_ids)
+    assert "REPEATED_REPLACEMENT" in decision.reason_codes
+    assert "PREFERRED_ALTERNATIVE" in decision.reason_codes
+    assert set(decision.provenance.replacement_ids) == set(replacement_ids)
+
+
+def test_this_time_replacements_have_no_future_preference_effect() -> None:
+    context = AthleteStateReplacementContext(
+        original_exercise_id=uuid4(),
+        replacement_exercise_id=uuid4(),
+        persistent_count=0,
+        this_time_count=3,
+        reasons=(WorkoutExerciseReplacementReason.DISLIKE,),
+        source_replacement_ids=(uuid4(), uuid4(), uuid4()),
+    )
+
+    decision = decide_cycle_adaptation(
+        _state(replacement_context=(context,)),
+        _history(),
+        RULESET,
+    )
+
+    assert decision.preference_constraints.preferred_alternatives == ()
+    assert decision.provenance.replacement_ids == tuple(
+        sorted(context.source_replacement_ids, key=str)
+    )
+
+
+def test_more_repeated_persistent_replacements_have_stronger_preference() -> None:
+    first = AthleteStateReplacementContext(
+        original_exercise_id=uuid4(),
+        replacement_exercise_id=uuid4(),
+        persistent_count=2,
+        reasons=(WorkoutExerciseReplacementReason.UNCOMFORTABLE,),
+        source_replacement_ids=(uuid4(), uuid4()),
+    )
+    second = AthleteStateReplacementContext(
+        original_exercise_id=uuid4(),
+        replacement_exercise_id=uuid4(),
+        persistent_count=3,
+        reasons=(WorkoutExerciseReplacementReason.DISLIKE,),
+        source_replacement_ids=(uuid4(), uuid4(), uuid4()),
+    )
+
+    decision = decide_cycle_adaptation(
+        _state(replacement_context=(first, second)),
+        _history(),
+        RULESET,
+    )
+
+    preferred = decision.preference_constraints.preferred_alternatives
+    assert [item.strength for item in preferred] == [3, 2]
+
+
+def test_safety_overrides_a_preferred_alternative() -> None:
+    alternative_id = uuid4()
+    context = AthleteStateReplacementContext(
+        original_exercise_id=uuid4(),
+        replacement_exercise_id=alternative_id,
+        persistent_count=2,
+        reasons=(WorkoutExerciseReplacementReason.DISLIKE,),
+        source_replacement_ids=(uuid4(), uuid4()),
+    )
+
+    decision = decide_cycle_adaptation(
+        _state(pain_sensitive=(alternative_id,), replacement_context=(context,)),
+        _history(),
+        RULESET,
+    )
+
+    assert decision.preference_constraints.preferred_alternatives == ()
+    assert decision.safety_constraints.blocked_exercises == (alternative_id,)
+    assert "PREFERENCE_OVERRIDDEN_BY_SAFETY" in decision.reason_codes
+
+
+def test_replacement_preference_output_is_deterministic_for_conflicting_input_order() -> None:
+    first = AthleteStateReplacementContext(
+        original_exercise_id=uuid4(),
+        replacement_exercise_id=uuid4(),
+        persistent_count=2,
+        reasons=(WorkoutExerciseReplacementReason.DISLIKE,),
+        source_replacement_ids=(uuid4(), uuid4()),
+    )
+    second = AthleteStateReplacementContext(
+        original_exercise_id=uuid4(),
+        replacement_exercise_id=uuid4(),
+        persistent_count=2,
+        reasons=(WorkoutExerciseReplacementReason.EQUIPMENT_UNAVAILABLE,),
+        source_replacement_ids=(uuid4(), uuid4()),
+    )
+    state = _state(replacement_context=(first, second))
+
+    forward = decide_cycle_adaptation(state, _history(), RULESET)
+    reverse = decide_cycle_adaptation(
+        state.model_copy(update={"replacement_context": (second, first)}),
+        _history(),
+        RULESET,
+    )
+
+    assert forward.to_snapshot_json() == reverse.to_snapshot_json()

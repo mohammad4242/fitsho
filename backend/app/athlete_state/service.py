@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import select
@@ -17,6 +18,7 @@ from app.athlete_state.schemas import (
     AthleteStateReasonCode,
     AthleteStateRecoverySummary,
     AthleteStateRecoveryTrend,
+    AthleteStateReplacementContext,
     AthleteStateScheduleContext,
     AthleteStateTrendDirection,
 )
@@ -30,6 +32,7 @@ from app.workout_cycles.enums import (
     WorkoutCycleWeeklyCheckInDifficulty,
     WorkoutCycleWeeklyCheckInRecovery,
     WorkoutExercisePreferenceType,
+    WorkoutExerciseReplacementScope,
 )
 from app.workout_cycles.models import (
     WorkoutCycle,
@@ -107,6 +110,7 @@ class AthleteStateBuilder:
             unavailable_equipment_context=self._equipment_context(
                 preferences, excluded_ids=pain_sensitive_exercises
             ),
+            replacement_context=self._replacement_context(replacements),
             pain_sensitive_exercises=pain_sensitive_exercises,
             priority_muscles=self._feedback_muscles(feedbacks, "lagging_muscles"),
             progressing_muscles=self._feedback_muscles(feedbacks, "progressed_muscles"),
@@ -432,6 +436,59 @@ class AthleteStateBuilder:
             for preference in preferences
             if preference.preference_type is WorkoutExercisePreferenceType.EQUIPMENT_UNAVAILABLE
             and preference.exercise_id not in excluded_ids
+        )
+
+    @staticmethod
+    def _replacement_context(
+        replacements: list[WorkoutExerciseReplacement],
+    ) -> tuple[AthleteStateReplacementContext, ...]:
+        grouped: dict[tuple[UUID, UUID], dict[str, object]] = {}
+        for replacement in replacements:
+            key = (replacement.original_exercise_id, replacement.replacement_exercise_id)
+            entry = grouped.setdefault(
+                key,
+                {
+                    "persistent_count": 0,
+                    "this_time_count": 0,
+                    "reasons": set(),
+                    "source_replacement_ids": [],
+                },
+            )
+            if replacement.scope is WorkoutExerciseReplacementScope.PERSISTENT:
+                entry["persistent_count"] = cast(int, entry["persistent_count"]) + 1
+            else:
+                entry["this_time_count"] = cast(int, entry["this_time_count"]) + 1
+            cast_reasons = entry["reasons"]
+            assert isinstance(cast_reasons, set)
+            cast_reasons.add(replacement.reason)
+            cast_ids = entry["source_replacement_ids"]
+            assert isinstance(cast_ids, list)
+            cast_ids.append(replacement.id)
+
+        contexts: list[AthleteStateReplacementContext] = []
+        for (original_id, replacement_id), entry in grouped.items():
+            reasons = entry["reasons"]
+            source_ids = entry["source_replacement_ids"]
+            assert isinstance(reasons, set)
+            assert isinstance(source_ids, list)
+            contexts.append(
+                AthleteStateReplacementContext(
+                    original_exercise_id=original_id,
+                    replacement_exercise_id=replacement_id,
+                    persistent_count=cast(int, entry["persistent_count"]),
+                    this_time_count=cast(int, entry["this_time_count"]),
+                    reasons=tuple(sorted(reasons, key=lambda reason: reason.value)),
+                    source_replacement_ids=tuple(sorted(source_ids, key=str)),
+                )
+            )
+        return tuple(
+            sorted(
+                contexts,
+                key=lambda context: (
+                    str(context.original_exercise_id),
+                    str(context.replacement_exercise_id),
+                ),
+            )
         )
 
     @staticmethod
