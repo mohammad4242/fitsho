@@ -21,6 +21,9 @@ from app.workout_cycles.enums import (
 )
 from app.workouts.program_engine.adaptation_policy import (
     CycleAdaptationAction,
+    CycleAdaptationChangeType,
+    CycleAdaptationPreferredAlternative,
+    CycleAdaptationProgramSnapshot,
     decide_cycle_adaptation,
 )
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -575,6 +578,197 @@ def test_replacement_preference_output_is_deterministic_for_conflicting_input_or
         state.model_copy(update={"replacement_context": (second, first)}),
         _history(),
         RULESET,
+    )
+
+    assert forward.to_snapshot_json() == reverse.to_snapshot_json()
+
+
+def test_difference_summary_explains_volume_priority_and_schedule_changes() -> None:
+    program_id = uuid4()
+    cycle_id = uuid4()
+    decision = decide_cycle_adaptation(
+        _state(lagging=(MuscleGroup.SHOULDERS,)),
+        _history(),
+        RULESET,
+        previous_program=CycleAdaptationProgramSnapshot(
+            program_id=uuid4(),
+            cycle_id=uuid4(),
+            weekly_effective_sets_by_muscle={MuscleGroup.SHOULDERS: 10.0},
+            priority_muscles=(),
+            training_days=4,
+            session_duration_minutes=60,
+        ),
+        proposed_program=CycleAdaptationProgramSnapshot(
+            program_id=program_id,
+            cycle_id=cycle_id,
+            weekly_effective_sets_by_muscle={MuscleGroup.SHOULDERS: 12.0},
+            priority_muscles=(MuscleGroup.SHOULDERS,),
+            training_days=5,
+            session_duration_minutes=45,
+        ),
+    )
+
+    changes = decision.difference_summary
+    volume = next(
+        item for item in changes if item.change is CycleAdaptationChangeType.MUSCLE_VOLUME
+    )
+    priority = next(
+        item for item in changes if item.change is CycleAdaptationChangeType.PRIORITY_MUSCLE
+    )
+    schedule = next(item for item in changes if item.change is CycleAdaptationChangeType.SCHEDULE)
+    assert volume.previous == 10.0
+    assert volume.next == 12.0
+    assert "LAGGING_MUSCLE_SUPPORTED_CONSERVATIVELY" in volume.reason_codes
+    assert priority.previous is False
+    assert priority.next is True
+    assert schedule.previous == {"training_days": 4, "session_duration_minutes": 60}
+    assert schedule.next == {"training_days": 5, "session_duration_minutes": 45}
+    assert str(program_id) in {str(value) for value in schedule.provenance.workout_plan_ids}
+    assert str(cycle_id) in {str(value) for value in schedule.provenance.cycle_ids}
+
+
+def test_difference_summary_keeps_preference_and_replacement_reasons_distinct() -> None:
+    original_id = uuid4()
+    alternative_id = uuid4()
+    equipment_id = uuid4()
+    decision = decide_cycle_adaptation(
+        _state(
+            disliked=(original_id,),
+            unavailable=(equipment_id,),
+            replacement_context=(
+                AthleteStateReplacementContext(
+                    original_exercise_id=original_id,
+                    replacement_exercise_id=alternative_id,
+                    persistent_count=2,
+                    reasons=(WorkoutExerciseReplacementReason.DISLIKE,),
+                    source_replacement_ids=(uuid4(), uuid4()),
+                ),
+            ),
+        ),
+        _history(),
+        RULESET,
+        previous_program=CycleAdaptationProgramSnapshot(),
+        proposed_program=CycleAdaptationProgramSnapshot(
+            disliked_exercises=(original_id,),
+            unavailable_exercises=(equipment_id,),
+            preferred_alternatives=(
+                CycleAdaptationPreferredAlternative(
+                    original_exercise_id=original_id,
+                    replacement_exercise_id=alternative_id,
+                    strength=2,
+                ),
+            ),
+        ),
+    )
+
+    changes = decision.difference_summary
+    avoidance = next(item for item in changes if item.target == str(original_id))
+    equipment = next(item for item in changes if item.target == str(equipment_id))
+    replacement = next(
+        item for item in changes if item.change is CycleAdaptationChangeType.EXERCISE_REPLACEMENT
+    )
+    assert avoidance.change is CycleAdaptationChangeType.EXERCISE_AVOIDANCE
+    assert avoidance.previous is False
+    assert avoidance.next is True
+    assert "PERSISTENT_EXERCISE_DISLIKE" in avoidance.reason_codes
+    assert equipment.change is CycleAdaptationChangeType.EQUIPMENT_CONSTRAINT
+    assert equipment.previous is False
+    assert equipment.next is True
+    assert "EQUIPMENT_UNAVAILABLE" in equipment.reason_codes
+    assert "PREFERRED_ALTERNATIVE" in replacement.reason_codes
+    assert replacement.previous is None
+    assert replacement.next == {
+        "replacement_exercise_id": str(alternative_id),
+        "strength": 2,
+    }
+    assert decision.provenance.replacement_ids
+
+
+def test_difference_summary_keeps_safety_explicit_over_preference() -> None:
+    exercise_id = uuid4()
+    signal_id = uuid4()
+    decision = decide_cycle_adaptation(
+        _state(
+            disliked=(exercise_id,),
+            pain_sensitive=(exercise_id,),
+            safety_context=(
+                AthleteStateSafetyContext(
+                    exercise_id=exercise_id,
+                    signal_count=1,
+                    source_safety_signal_ids=(signal_id,),
+                ),
+            ),
+        ),
+        _history(),
+        RULESET,
+        previous_program=CycleAdaptationProgramSnapshot(
+            disliked_exercises=(exercise_id,),
+        ),
+        proposed_program=CycleAdaptationProgramSnapshot(
+            blocked_exercises=(exercise_id,),
+        ),
+    )
+
+    safety = next(
+        item
+        for item in decision.difference_summary
+        if item.change is CycleAdaptationChangeType.SAFETY_CONSTRAINT
+    )
+    assert "PAIN_SIGNAL_PRESENT" in safety.reason_codes
+    assert "EXERCISE_BLOCKED_FOR_SAFETY" in safety.reason_codes
+    assert "PREFERENCE_OVERRIDDEN_BY_SAFETY" in decision.reason_codes
+    assert signal_id in safety.provenance.safety_signal_ids
+    assert "PAIN_SIGNAL_PRESENT" in decision.decision_trace[0]["reason_codes"]
+
+
+def test_unchanged_program_elements_do_not_create_difference_noise() -> None:
+    snapshot = CycleAdaptationProgramSnapshot(
+        weekly_effective_sets_by_muscle={MuscleGroup.CHEST: 10.0},
+        priority_muscles=(MuscleGroup.CHEST,),
+        training_days=4,
+        session_duration_minutes=60,
+        disliked_exercises=(uuid4(),),
+    )
+    decision = decide_cycle_adaptation(
+        _state(),
+        _history(),
+        RULESET,
+        previous_program=snapshot,
+        proposed_program=snapshot.model_copy(),
+    )
+
+    assert decision.difference_summary == ()
+    assert len(decision.decision_trace) == 1
+    assert decision.decision_trace[0]["stage"] == "cycle_adaptation"
+
+
+def test_difference_summary_is_deterministic_for_collection_order() -> None:
+    chest_id = uuid4()
+    back_id = uuid4()
+    previous = CycleAdaptationProgramSnapshot(
+        weekly_effective_sets_by_muscle={MuscleGroup.BACK: 8.0, MuscleGroup.CHEST: 10.0},
+        priority_muscles=(MuscleGroup.BACK, MuscleGroup.CHEST),
+        disliked_exercises=(back_id, chest_id),
+    )
+    proposed = CycleAdaptationProgramSnapshot(
+        weekly_effective_sets_by_muscle={MuscleGroup.CHEST: 10.0, MuscleGroup.BACK: 8.0},
+        priority_muscles=(MuscleGroup.CHEST, MuscleGroup.BACK),
+        disliked_exercises=(chest_id, back_id),
+    )
+    state = _state()
+    forward = decide_cycle_adaptation(
+        state, _history(), RULESET, previous_program=previous, proposed_program=proposed
+    )
+    reverse = decide_cycle_adaptation(
+        state,
+        _history(),
+        RULESET,
+        previous_program=previous.model_copy(
+            update={"priority_muscles": tuple(reversed(previous.priority_muscles))}
+        ),
+        proposed_program=proposed.model_copy(
+            update={"priority_muscles": tuple(reversed(proposed.priority_muscles))}
+        ),
     )
 
     assert forward.to_snapshot_json() == reverse.to_snapshot_json()

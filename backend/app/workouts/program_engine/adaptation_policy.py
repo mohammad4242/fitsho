@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from enum import StrEnum
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -30,6 +30,17 @@ class CycleAdaptationAction(StrEnum):
     INCREASE = "increase"
     MAINTAIN = "maintain"
     REDUCE = "reduce"
+
+
+class CycleAdaptationChangeType(StrEnum):
+    OVERALL_TRAINING_DEMAND = "overall_training_demand"
+    MUSCLE_VOLUME = "muscle_volume"
+    PRIORITY_MUSCLE = "priority_muscle"
+    SCHEDULE = "schedule"
+    EXERCISE_AVOIDANCE = "exercise_avoidance"
+    EXERCISE_REPLACEMENT = "exercise_replacement"
+    EQUIPMENT_CONSTRAINT = "equipment_constraint"
+    SAFETY_CONSTRAINT = "safety_constraint"
 
 
 class CycleAdaptationReasonCode(StrEnum):
@@ -146,6 +157,34 @@ class CycleAdaptationProvenance(BaseModel):
     workout_plan_ids: tuple[UUID, ...] = ()
 
 
+class CycleAdaptationProgramSnapshot(BaseModel):
+    """Small, raw-record-free comparison contract for two cycle programs."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    program_id: UUID | None = None
+    cycle_id: UUID | None = None
+    weekly_effective_sets_by_muscle: dict[MuscleGroup, float] = Field(default_factory=dict)
+    priority_muscles: tuple[MuscleGroup, ...] = ()
+    training_days: int | None = Field(default=None, ge=1, le=7)
+    session_duration_minutes: int | None = Field(default=None, ge=20, le=180)
+    disliked_exercises: tuple[UUID, ...] = ()
+    unavailable_exercises: tuple[UUID, ...] = ()
+    blocked_exercises: tuple[UUID, ...] = ()
+    preferred_alternatives: tuple[CycleAdaptationPreferredAlternative, ...] = ()
+
+
+class CycleAdaptationDifference(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    change: CycleAdaptationChangeType
+    target: str
+    previous: Any | None = None
+    next: Any | None = None
+    reason_codes: tuple[CycleAdaptationReasonCode, ...] = ()
+    provenance: CycleAdaptationProvenance
+
+
 class CycleAdaptationDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -158,6 +197,8 @@ class CycleAdaptationDecision(BaseModel):
     safety_constraints: CycleAdaptationSafetyConstraints
     reason_codes: tuple[CycleAdaptationReasonCode, ...] = ()
     provenance: CycleAdaptationProvenance
+    difference_summary: tuple[CycleAdaptationDifference, ...] = ()
+    decision_trace: tuple[dict[str, object], ...] = ()
 
     def to_snapshot(self) -> dict[str, object]:
         return self.model_dump(mode="json")
@@ -167,11 +208,27 @@ class CycleAdaptationDecision(BaseModel):
             self.to_snapshot(), ensure_ascii=False, sort_keys=True, separators=(",", ":")
         )
 
+    def with_program_comparison(
+        self,
+        previous: CycleAdaptationProgramSnapshot,
+        proposed: CycleAdaptationProgramSnapshot,
+    ) -> CycleAdaptationDecision:
+        differences = build_cycle_difference_summary(self, previous, proposed)
+        return self.model_copy(
+            update={
+                "difference_summary": differences,
+                "decision_trace": _decision_trace(self, differences),
+            }
+        )
+
 
 def decide_cycle_adaptation(
     state: AthleteState,
     history: RecentTrainingHistory | None = None,
     ruleset: ProgramRuleset = RULESET,
+    *,
+    previous_program: CycleAdaptationProgramSnapshot | None = None,
+    proposed_program: CycleAdaptationProgramSnapshot | None = None,
 ) -> CycleAdaptationDecision:
     recent_history = history or RecentTrainingHistory()
     baseline = derive_previous_volume_baseline(recent_history)
@@ -223,6 +280,8 @@ def decide_cycle_adaptation(
                 else CycleAdaptationReasonCode.SAFETY_OVERRIDES_PROGRESSION,
             )
         )
+        if raw_preference_ids & set(safety_ids):
+            reasons.append(CycleAdaptationReasonCode.PREFERENCE_OVERRIDDEN_BY_SAFETY)
     elif repeated_poor_recovery:
         action = CycleAdaptationAction.REDUCE
         reasons.append(CycleAdaptationReasonCode.POOR_RECOVERY_REQUIRES_REDUCTION)
@@ -291,7 +350,7 @@ def decide_cycle_adaptation(
             reasons.append(CycleAdaptationReasonCode.LAGGING_MUSCLE_SUPPORTED_CONSERVATIVELY)
 
     reasons = list(dict.fromkeys(reasons))
-    return CycleAdaptationDecision(
+    decision = CycleAdaptationDecision(
         overall_action=action,
         muscle_adjustments=adjustments,
         volume_context=CycleAdaptationVolumeContext(
@@ -339,6 +398,9 @@ def decide_cycle_adaptation(
             workout_plan_ids=state.provenance.workout_plan_ids,
         ),
     )
+    if previous_program is not None and proposed_program is not None:
+        return decision.with_program_comparison(previous_program, proposed_program)
+    return decision.model_copy(update={"decision_trace": _decision_trace(decision, ())})
 
 
 def _adherence_ratio(
@@ -534,3 +596,306 @@ def _safety_constraints(
         ),
         tuple(dict.fromkeys(reasons)),
     )
+
+
+def build_cycle_difference_summary(
+    decision: CycleAdaptationDecision,
+    previous: CycleAdaptationProgramSnapshot,
+    proposed: CycleAdaptationProgramSnapshot,
+) -> tuple[CycleAdaptationDifference, ...]:
+    """Compare effective programming choices without copying source records."""
+
+    provenance = _comparison_provenance(decision, previous, proposed)
+    differences: list[CycleAdaptationDifference] = []
+    previous_total = sum(previous.weekly_effective_sets_by_muscle.values())
+    proposed_total = sum(proposed.weekly_effective_sets_by_muscle.values())
+    if previous_total != proposed_total:
+        differences.append(
+            CycleAdaptationDifference(
+                change=CycleAdaptationChangeType.OVERALL_TRAINING_DEMAND,
+                target="weekly_effective_sets_total",
+                previous=previous_total,
+                next=proposed_total,
+                reason_codes=_change_reasons(
+                    decision,
+                    {
+                        CycleAdaptationReasonCode.HIGH_ADHERENCE,
+                        CycleAdaptationReasonCode.LOW_ADHERENCE,
+                        CycleAdaptationReasonCode.GOOD_RECOVERY,
+                        CycleAdaptationReasonCode.POOR_RECOVERY,
+                        CycleAdaptationReasonCode.DIFFICULTY_TOO_HARD,
+                        CycleAdaptationReasonCode.PROGRESSION_ALLOWED,
+                        CycleAdaptationReasonCode.PROGRESSION_HELD,
+                        CycleAdaptationReasonCode.PROGRESSION_HELD_FOR_SAFETY,
+                    },
+                ),
+                provenance=provenance,
+            )
+        )
+
+    previous_muscles = previous.weekly_effective_sets_by_muscle
+    proposed_muscles = proposed.weekly_effective_sets_by_muscle
+    adjustments = {item.muscle: item for item in decision.muscle_adjustments}
+    for muscle in sorted(
+        set(previous_muscles) | set(proposed_muscles), key=lambda item: item.value
+    ):
+        previous_value = previous_muscles.get(muscle, 0.0)
+        proposed_value = proposed_muscles.get(muscle, 0.0)
+        if previous_value == proposed_value:
+            continue
+        adjustment = adjustments.get(muscle)
+        extra_reasons = adjustment.reason_codes if adjustment else ()
+        differences.append(
+            CycleAdaptationDifference(
+                change=CycleAdaptationChangeType.MUSCLE_VOLUME,
+                target=muscle.value,
+                previous=previous_value,
+                next=proposed_value,
+                reason_codes=_change_reasons(
+                    decision,
+                    {
+                        CycleAdaptationReasonCode.HIGH_ADHERENCE,
+                        CycleAdaptationReasonCode.LOW_ADHERENCE,
+                        CycleAdaptationReasonCode.GOOD_RECOVERY,
+                        CycleAdaptationReasonCode.POOR_RECOVERY,
+                        CycleAdaptationReasonCode.LAGGING_MUSCLE_SUPPORTED_CONSERVATIVELY,
+                        CycleAdaptationReasonCode.PROGRESSING_MUSCLE_NOT_AUTOMATICALLY_INCREASED,
+                        CycleAdaptationReasonCode.PROGRESSION_ALLOWED,
+                        CycleAdaptationReasonCode.PROGRESSION_HELD,
+                        CycleAdaptationReasonCode.PROGRESSION_HELD_FOR_SAFETY,
+                    },
+                    extra=extra_reasons,
+                ),
+                provenance=provenance,
+            )
+        )
+
+    previous_priorities = set(previous.priority_muscles)
+    proposed_priorities = set(proposed.priority_muscles)
+    for muscle in sorted(previous_priorities ^ proposed_priorities, key=lambda item: item.value):
+        differences.append(
+            CycleAdaptationDifference(
+                change=CycleAdaptationChangeType.PRIORITY_MUSCLE,
+                target=muscle.value,
+                previous=muscle in previous_priorities,
+                next=muscle in proposed_priorities,
+                reason_codes=_change_reasons(
+                    decision,
+                    {
+                        CycleAdaptationReasonCode.LAGGING_MUSCLE_SUPPORTED_CONSERVATIVELY,
+                        CycleAdaptationReasonCode.PROGRESSING_MUSCLE_NOT_AUTOMATICALLY_INCREASED,
+                        CycleAdaptationReasonCode.HIGH_ADHERENCE,
+                        CycleAdaptationReasonCode.GOOD_RECOVERY,
+                        CycleAdaptationReasonCode.PROGRESSION_ALLOWED,
+                        CycleAdaptationReasonCode.PROGRESSION_HELD,
+                    },
+                ),
+                provenance=provenance,
+            )
+        )
+
+    schedule_previous: dict[str, int] = {}
+    schedule_proposed: dict[str, int] = {}
+    for field_name in ("training_days", "session_duration_minutes"):
+        previous_value = getattr(previous, field_name)
+        proposed_value = getattr(proposed, field_name)
+        if previous_value != proposed_value:
+            schedule_previous[field_name] = previous_value
+            schedule_proposed[field_name] = proposed_value
+    if schedule_previous:
+        differences.append(
+            CycleAdaptationDifference(
+                change=CycleAdaptationChangeType.SCHEDULE,
+                target="schedule",
+                previous=schedule_previous,
+                next=schedule_proposed,
+                reason_codes=_change_reasons(
+                    decision,
+                    {
+                        CycleAdaptationReasonCode.HIGH_ADHERENCE,
+                        CycleAdaptationReasonCode.LOW_ADHERENCE,
+                        CycleAdaptationReasonCode.PROGRESSION_ALLOWED,
+                        CycleAdaptationReasonCode.PROGRESSION_HELD,
+                    },
+                ),
+                provenance=provenance,
+            )
+        )
+
+    _append_exercise_membership_differences(
+        differences,
+        decision,
+        provenance,
+        CycleAdaptationChangeType.EXERCISE_AVOIDANCE,
+        previous.disliked_exercises,
+        proposed.disliked_exercises,
+        {
+            CycleAdaptationReasonCode.PERSISTENT_EXERCISE_DISLIKE,
+            CycleAdaptationReasonCode.PERSISTENT_EXERCISE_DISCOMFORT,
+            CycleAdaptationReasonCode.PREFERENCE_OVERRIDDEN_BY_SAFETY,
+        },
+    )
+    _append_exercise_membership_differences(
+        differences,
+        decision,
+        provenance,
+        CycleAdaptationChangeType.EQUIPMENT_CONSTRAINT,
+        previous.unavailable_exercises,
+        proposed.unavailable_exercises,
+        {CycleAdaptationReasonCode.EQUIPMENT_UNAVAILABLE},
+    )
+    _append_exercise_membership_differences(
+        differences,
+        decision,
+        provenance,
+        CycleAdaptationChangeType.SAFETY_CONSTRAINT,
+        previous.blocked_exercises,
+        proposed.blocked_exercises,
+        {
+            CycleAdaptationReasonCode.PAIN_SIGNAL_PRESENT,
+            CycleAdaptationReasonCode.REPEATED_PAIN_SIGNAL,
+            CycleAdaptationReasonCode.EXERCISE_BLOCKED_FOR_SAFETY,
+            CycleAdaptationReasonCode.SAFE_SUBSTITUTION_REQUIRED,
+            CycleAdaptationReasonCode.PROGRESSION_HELD_FOR_SAFETY,
+            CycleAdaptationReasonCode.PREFERENCE_OVERRIDDEN_BY_SAFETY,
+        },
+    )
+
+    previous_replacements = {
+        (item.original_exercise_id, item.replacement_exercise_id): item
+        for item in previous.preferred_alternatives
+    }
+    proposed_replacements = {
+        (item.original_exercise_id, item.replacement_exercise_id): item
+        for item in proposed.preferred_alternatives
+    }
+    for pair in sorted(
+        set(previous_replacements) | set(proposed_replacements),
+        key=lambda value: (str(value[0]), str(value[1])),
+    ):
+        previous_item = previous_replacements.get(pair)
+        proposed_item = proposed_replacements.get(pair)
+        previous_replacement_value = _alternative_snapshot(previous_item)
+        proposed_replacement_value = _alternative_snapshot(proposed_item)
+        if previous_replacement_value == proposed_replacement_value:
+            continue
+        differences.append(
+            CycleAdaptationDifference(
+                change=CycleAdaptationChangeType.EXERCISE_REPLACEMENT,
+                target=str(pair[0]),
+                previous=previous_replacement_value,
+                next=proposed_replacement_value,
+                reason_codes=_change_reasons(
+                    decision,
+                    {
+                        CycleAdaptationReasonCode.REPEATED_REPLACEMENT,
+                        CycleAdaptationReasonCode.PREFERRED_ALTERNATIVE,
+                        CycleAdaptationReasonCode.PREFERENCE_OVERRIDDEN_BY_SAFETY,
+                        CycleAdaptationReasonCode.PREFERENCE_OVERRIDDEN_BY_AVAILABILITY,
+                    },
+                    extra=proposed_item.reason_codes if proposed_item else (),
+                ),
+                provenance=provenance,
+            )
+        )
+
+    return tuple(
+        sorted(
+            differences,
+            key=lambda item: (
+                item.change.value,
+                item.target,
+                json.dumps(item.next, sort_keys=True, default=str),
+            ),
+        )
+    )
+
+
+def _append_exercise_membership_differences(
+    differences: list[CycleAdaptationDifference],
+    decision: CycleAdaptationDecision,
+    provenance: CycleAdaptationProvenance,
+    change: CycleAdaptationChangeType,
+    previous_values: tuple[UUID, ...],
+    proposed_values: tuple[UUID, ...],
+    allowed_reasons: set[CycleAdaptationReasonCode],
+) -> None:
+    previous_set = set(previous_values)
+    proposed_set = set(proposed_values)
+    for exercise_id in sorted(previous_set ^ proposed_set, key=str):
+        differences.append(
+            CycleAdaptationDifference(
+                change=change,
+                target=str(exercise_id),
+                previous=exercise_id in previous_set,
+                next=exercise_id in proposed_set,
+                reason_codes=_change_reasons(decision, allowed_reasons),
+                provenance=provenance,
+            )
+        )
+
+
+def _alternative_snapshot(
+    alternative: CycleAdaptationPreferredAlternative | None,
+) -> dict[str, object] | None:
+    if alternative is None:
+        return None
+    return {
+        "replacement_exercise_id": str(alternative.replacement_exercise_id),
+        "strength": alternative.strength,
+    }
+
+
+def _change_reasons(
+    decision: CycleAdaptationDecision,
+    allowed: set[CycleAdaptationReasonCode],
+    *,
+    extra: tuple[CycleAdaptationReasonCode, ...] = (),
+) -> tuple[CycleAdaptationReasonCode, ...]:
+    reasons = list(extra)
+    reasons.extend(code for code in decision.reason_codes if code in allowed)
+    if not reasons:
+        reasons.extend(decision.reason_codes)
+    return tuple(dict.fromkeys(reasons))
+
+
+def _comparison_provenance(
+    decision: CycleAdaptationDecision,
+    previous: CycleAdaptationProgramSnapshot,
+    proposed: CycleAdaptationProgramSnapshot,
+) -> CycleAdaptationProvenance:
+    return decision.provenance.model_copy(
+        update={
+            "cycle_ids": _sorted_ids(
+                set(decision.provenance.cycle_ids)
+                | {value for value in (previous.cycle_id, proposed.cycle_id) if value}
+            ),
+            "workout_plan_ids": _sorted_ids(
+                set(decision.provenance.workout_plan_ids)
+                | {value for value in (previous.program_id, proposed.program_id) if value}
+            ),
+        }
+    )
+
+
+def _decision_trace(
+    decision: CycleAdaptationDecision,
+    differences: tuple[CycleAdaptationDifference, ...],
+) -> tuple[dict[str, object], ...]:
+    trace: list[dict[str, object]] = [
+        {
+            "stage": "cycle_adaptation",
+            "action": decision.overall_action.value,
+            "reason_codes": [code.value for code in decision.reason_codes],
+            "provenance": decision.provenance.model_dump(mode="json"),
+        }
+    ]
+    if differences:
+        trace.append(
+            {
+                "stage": "difference_summary",
+                "change_count": len(differences),
+                "changes": [item.model_dump(mode="json") for item in differences],
+            }
+        )
+    return tuple(trace)
