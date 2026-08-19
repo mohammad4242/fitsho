@@ -45,6 +45,28 @@ it("shows the end-of-cycle form only when the cycle is due", async () => {
   expect(screen.getByRole("combobox", { name: "رضایت کلی" })).toBeInTheDocument();
 });
 
+it("keeps end-of-cycle feedback discoverable and explains the lock before the cycle ends", async () => {
+  const user = userEvent.setup();
+  api.getCurrentCompletionFeedback.mockResolvedValue({
+    ...dueContext,
+    current_week: 2,
+    is_due: false,
+  });
+
+  render(<EndCycleFeedbackCard />);
+
+  const trigger = await screen.findByRole("button", { name: "بازخورد پایان دوره" });
+  expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await user.click(trigger);
+
+  expect(trigger).toHaveAttribute("aria-expanded", "true");
+  expect(
+    screen.getByText(
+      "پس از اتمام دوره ۴ هفته‌ای، این فرم برای هدفمندتر شدن برنامه بعدی فعال می‌شود. لطفاً فرم را کامل و با دقت پر کنید.",
+    ),
+  ).toBeVisible();
+});
+
 it("submits structured feedback and shows the completed state", async () => {
   const user = userEvent.setup();
   render(<EndCycleFeedbackCard />);

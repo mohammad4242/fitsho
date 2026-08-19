@@ -4,7 +4,7 @@ export type IconName =
   | "home" | "dumbbell" | "nutrition" | "progress" | "more"
   | "arrow" | "profile" | "camera" | "catalogue" | "settings"
   | "body" | "target" | "language" | "logout" | "chevron"
-  | "document" | "feedback";
+  | "document" | "feedback" | "lock";
 
 type Props = {
   name: IconName;
@@ -30,6 +30,7 @@ export function AppIcon({ name, className }: Props) {
     chevron: <><path d="m9 18 6-6-6-6"/></>,
     document: <><path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v5h4M9 13h6M9 17h4"/></>,
     feedback: <><path d="M4 5h16v12H9l-5 4Z"/><path d="m9 11 2 2 4-5"/></>,
+    lock: <><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
   };
 
   return (

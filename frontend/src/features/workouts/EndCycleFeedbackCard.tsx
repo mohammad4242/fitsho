@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { AppIcon } from "../../shared/AppIcon";
 import { getCurrentCompletionFeedback, saveCurrentCompletionFeedback } from "./api";
 import type {
   WorkoutCycleCompletionFeedbackContext,
@@ -58,6 +59,7 @@ export function EndCycleFeedbackCard() {
   const [draft, setDraft] = useState(emptyDraft);
   const [saving, setSaving] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [lockedInfoOpen, setLockedInfoOpen] = useState(false);
   const isEnglish = i18n.resolvedLanguage === "en";
   const l = (fa: string, en: string) => isEnglish ? en : fa;
 
@@ -106,6 +108,40 @@ export function EndCycleFeedbackCard() {
       .finally(() => setSaving(false));
   }
 
+  if (state === "hidden" && context !== null) {
+    const weeks = new Intl.NumberFormat(isEnglish ? "en-US" : "fa-IR").format(context.duration_weeks);
+    return (
+      <section className="end-cycle-feedback end-cycle-feedback--locked" aria-labelledby="end-cycle-feedback-title">
+        <button
+          className="end-cycle-feedback__locked-trigger"
+          type="button"
+          aria-controls="end-cycle-feedback-locked-message"
+          aria-expanded={lockedInfoOpen}
+          aria-label={t("workoutPlan.endCycleFeedback.title")}
+          onClick={() => setLockedInfoOpen((open) => !open)}
+        >
+          <span className="end-cycle-feedback__locked-icon" aria-hidden="true">
+            <AppIcon name="feedback" />
+            <span className="end-cycle-feedback__lock-badge"><AppIcon name="lock" /></span>
+          </span>
+          <span className="end-cycle-feedback__locked-copy">
+            <span className="eyebrow">{t("workoutPlan.endCycleFeedback.eyebrow")}</span>
+            <strong id="end-cycle-feedback-title">{t("workoutPlan.endCycleFeedback.title")}</strong>
+          </span>
+          <span className="end-cycle-feedback__locked-chevron" aria-hidden="true">⌄</span>
+        </button>
+        <span
+          className="end-cycle-feedback__locked-message"
+          id="end-cycle-feedback-locked-message"
+          data-visible={lockedInfoOpen}
+          role="tooltip"
+          aria-hidden={!lockedInfoOpen}
+        >
+          {t("workoutPlan.endCycleFeedback.locked", { weeks })}
+        </span>
+      </section>
+    );
+  }
   if (state === "hidden") return null;
   if (state === "loading") {
     return <section className="end-cycle-feedback end-cycle-feedback--loading" role="status">{t("workoutPlan.endCycleFeedback.loading")}</section>;
