@@ -300,6 +300,13 @@ def _reference_program(
         "estimated_weekly_duration": sum(day.estimated_duration_minutes for day in days),
         "hard_training_days": len(days),
         "recovery_days": ruleset.days_per_week - len(days),
+        "previous_volume_baseline": {
+            "direct_sets_by_muscle": {},
+            "effective_sets_by_muscle": {},
+            "confidence": 0.0,
+            "source": "none",
+            "reason_codes": ("HISTORY_NOT_USED_IN_TEMPLATE_PATH",),
+        },
     }
     body_trace = body_analysis_trace(normalized, ruleset)
     trace: tuple[dict[str, object], ...] = (
@@ -368,13 +375,14 @@ def _reference_volume_ranges(
             if muscle_enum in SECONDARY_MUSCLES
             else ruleset.maximum_sets[normalized.training_status]
         )
+        effective_maximum_soft = maximum + round(maximum * ruleset.secondary_set_credit)
         ranges[muscle] = {
             "minimum_soft": min(sets, maximum),
             "target_sets": min(sets, maximum),
             "maximum_soft": maximum,
             "maximum_hard": maximum,
-            "effective_maximum_soft": maximum,
-            "effective_maximum_hard": maximum,
+            "effective_maximum_soft": effective_maximum_soft,
+            "effective_maximum_hard": effective_maximum_soft,
             "effective_target_sets": min(sets, maximum),
             "minimum_direct_sets": 0,
         }
@@ -384,6 +392,7 @@ def _reference_volume_ranges(
             if muscle in SECONDARY_MUSCLES
             else ruleset.maximum_sets[normalized.training_status]
         )
+        effective_maximum_soft = maximum + round(maximum * ruleset.secondary_set_credit)
         ranges.setdefault(
             muscle.value,
             {
@@ -391,8 +400,8 @@ def _reference_volume_ranges(
                 "target_sets": 0,
                 "maximum_soft": maximum,
                 "maximum_hard": maximum,
-                "effective_maximum_soft": maximum,
-                "effective_maximum_hard": maximum,
+                "effective_maximum_soft": effective_maximum_soft,
+                "effective_maximum_hard": effective_maximum_soft,
                 "effective_target_sets": 0,
                 "minimum_direct_sets": 0,
             },
