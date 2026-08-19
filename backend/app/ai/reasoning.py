@@ -150,6 +150,20 @@ class AIReasoningProviderError(AIReasoningError):
 class AIReasoningService:
     MIN_FEEDBACK_CONFIDENCE = 0.75
 
+    async def rank_safe_candidates(
+        self,
+        request: AIReasoningInput,
+        provider: AIReasoningProvider | None,
+        *,
+        fallback_on_provider_failure: bool = False,
+    ) -> AIReasoningOutput:
+        """Rank or explain only candidates already approved by Fitsho."""
+        return await self.reason(
+            request,
+            provider,
+            fallback_on_provider_failure=fallback_on_provider_failure,
+        )
+
     async def reason(
         self,
         request: AIReasoningInput,

@@ -313,3 +313,48 @@ def test_deterministic_mode_makes_zero_ai_calls() -> None:
         asyncio.run(AIReasoningService().reason(reasoning_input, provider))
 
     assert provider.calls == 0
+
+
+def test_ai_coach_ranks_multiple_safe_candidates_with_structured_reasons() -> None:
+    from app.ai.reasoning import AIReasoningInput, AIReasoningService
+
+    raw = _input()
+    raw["safe_candidates"] = (
+        raw["safe_candidates"][0],
+        {
+            "candidate_id": "safe-candidate-b",
+            "exercise_ids": (uuid4(),),
+        },
+    )
+
+    class RankingProvider:
+        async def reason(self, request: object) -> object:
+            return {
+                "summary": "Candidate B better matches the supplied context.",
+                "reason_codes": ["SAFE_CANDIDATE_SET", "STRUCTURED_CONTEXT"],
+                "selected_candidate_id": "safe-candidate-b",
+                "rankings": [
+                    {
+                        "candidate_id": "safe-candidate-b",
+                        "rank": 1,
+                        "rationale": "It best matches the supplied safe context.",
+                    },
+                    {
+                        "candidate_id": "safe-candidate-a",
+                        "rank": 2,
+                        "rationale": "It remains eligible but is a weaker fit.",
+                    },
+                ],
+            }
+
+    reasoning_input = AIReasoningInput.model_validate(raw)
+    output = asyncio.run(
+        AIReasoningService().rank_safe_candidates(reasoning_input, RankingProvider())
+    )
+
+    assert output.selected_candidate_id == "safe-candidate-b"
+    assert [item.candidate_id for item in output.rankings] == [
+        "safe-candidate-b",
+        "safe-candidate-a",
+    ]
+    assert output.reason_codes == ("SAFE_CANDIDATE_SET", "STRUCTURED_CONTEXT")
