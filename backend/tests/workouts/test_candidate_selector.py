@@ -103,6 +103,44 @@ def test_dumbbell_home_requires_all_equipment(db: Session) -> None:
     assert bench_press.id not in result.ids
 
 
+def test_home_rejects_vertical_pull_with_incomplete_bodyweight_metadata(db: Session) -> None:
+    pull_up = exercise(
+        db,
+        "metadata-pull-up",
+        equipment=(Equipment.BODYWEIGHT,),
+        movement_pattern=MovementPattern.VERTICAL_PULL,
+    )
+    safe = exercise(db, "bodyweight-row", equipment=(Equipment.BODYWEIGHT,))
+
+    result = WorkoutCandidateSelector(db).select(
+        profile(location=TrainingLocation.HOME, setup=HomeTrainingSetup.BODYWEIGHT_ONLY)
+    )
+
+    assert safe.id in result.ids
+    assert pull_up.id not in result.ids
+
+
+def test_home_dumbbells_do_not_imply_pull_up_bar(db: Session) -> None:
+    pull_up = exercise(
+        db,
+        "pull-up-bar-required",
+        equipment=(Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR),
+        movement_pattern=MovementPattern.VERTICAL_PULL,
+    )
+    dumbbell_row = exercise(
+        db,
+        "dumbbell-row",
+        equipment=(Equipment.DUMBBELL,),
+        movement_pattern=MovementPattern.HORIZONTAL_PULL,
+    )
+
+    result = WorkoutCandidateSelector(db).select(
+        profile(location=TrainingLocation.HOME, setup=HomeTrainingSetup.DUMBBELLS_AVAILABLE)
+    )
+
+    assert dumbbell_row.id in result.ids
+    assert pull_up.id not in result.ids
+
 def test_selector_excludes_inactive_nonprogrammable_unsafe_and_too_hard_exercises(
     db: Session,
 ) -> None:

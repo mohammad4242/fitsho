@@ -126,6 +126,23 @@ def test_generate_program_excludes_metadata_unsafe_wrist_exercises() -> None:
     assert bodyweight_press_ids.isdisjoint(selected_ids)
 
 
+def test_generate_program_home_excludes_bodyweight_pull_up_without_bar_metadata() -> None:
+    source = request(available_equipment=[Equipment.BODYWEIGHT])
+    pull_up = next(
+        item
+        for item in full_catalog()
+        if item.name == "Chin Up"
+    )
+
+    result = generate_program(source, [pull_up, *full_catalog()], RULESET)
+
+    assert result.program is not None, result.errors
+    selected_ids = {
+        item.exercise_id for day in result.program.weekly_schedule for item in day.exercises
+    }
+    assert pull_up.id not in selected_ids
+
+
 def test_final_validation_rejects_metadata_unsafe_programmed_exercise() -> None:
     source = request(blocked_caution_tags=[ExerciseCautionTag.WRIST_LOADING])
     result = generate_program(request(), full_catalog(), RULESET)
@@ -158,6 +175,33 @@ def test_final_validation_rejects_metadata_unsafe_programmed_exercise() -> None:
     report = validate_program(tampered_program, source, RULESET)
 
     assert "BLOCKED_CAUTION_TAG_SELECTED" in report.errors
+
+
+def test_final_validation_rejects_vertical_pull_without_pull_up_bar() -> None:
+    source = request(available_equipment=[Equipment.BODYWEIGHT])
+    result = generate_program(source, full_catalog(), RULESET)
+    assert result.program is not None, result.errors
+    target_day = result.program.weekly_schedule[0]
+    target = target_day.exercises[0]
+    tampered_day = replace(
+        target_day,
+        exercises=(
+            replace(
+                target,
+                movement_pattern=MovementPattern.VERTICAL_PULL,
+                equipment=frozenset({Equipment.BODYWEIGHT}),
+            ),
+            *target_day.exercises[1:],
+        ),
+    )
+    tampered_program = replace(
+        result.program,
+        weekly_schedule=(tampered_day, *result.program.weekly_schedule[1:]),
+    )
+
+    report = validate_program(tampered_program, source, RULESET)
+
+    assert "UNAVAILABLE_EQUIPMENT_SELECTED" in report.errors
 
 
 def test_priority_muscle_affects_volume_and_order() -> None:

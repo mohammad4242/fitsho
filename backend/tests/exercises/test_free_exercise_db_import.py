@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -292,6 +293,47 @@ def test_programming_metadata_classifies_sample_movements_conservatively() -> No
         assert result.movement_pattern is pattern
         assert result.exercise_type is exercise_type
         assert result.caution_tags == cautions
+
+
+@pytest.mark.parametrize(
+    ("name", "expected_equipment"),
+    [
+        (
+            "Pull-Up",
+            {Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR},
+        ),
+        (
+            "Bench Pull-Up",
+            {Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR, Equipment.BENCH},
+        ),
+    ],
+)
+def test_importer_assigns_complete_vertical_pull_equipment_metadata(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+    name: str,
+    expected_equipment: set[Equipment],
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    record = source_record()
+    record.update({"name": name, "bodyPart": "back", "target": "latissimus dorsi"})
+    write_source(source_root, record)
+
+    report = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=FakeTranslator(),
+    ).run()
+    imported = db.scalar(select(Exercise).where(Exercise.source_id == "0001"))
+
+    assert report.imported_records == ["0001"]
+    assert imported is not None
+    assert imported.movement_pattern is MovementPattern.VERTICAL_PULL
+    assert {item.equipment for item in imported.equipment_items} == expected_equipment
 
 
 def test_importer_prevents_duplicates_on_a_second_run(

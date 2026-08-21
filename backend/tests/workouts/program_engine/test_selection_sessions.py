@@ -249,6 +249,78 @@ def test_structurally_incomplete_metadata_fails_closed() -> None:
     assert "EXERCISE_REJECTED_MISSING_METADATA" in result.rejected[0].reason_codes
 
 
+@pytest.mark.parametrize(
+    "available_equipment",
+    [
+        frozenset({Equipment.BODYWEIGHT}),
+        frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL}),
+    ],
+)
+def test_home_rejects_bodyweight_vertical_pull_without_pull_up_bar(
+    available_equipment: frozenset[Equipment],
+) -> None:
+    pull_up_with_incomplete_metadata = candidate(
+        "metadata pull up",
+        MovementPattern.VERTICAL_PULL,
+        MuscleGroup.BACK,
+        equipment=frozenset({Equipment.BODYWEIGHT}),
+    )
+
+    result = filter_eligible_exercises(
+        normalized(available_equipment=available_equipment),
+        [pull_up_with_incomplete_metadata],
+    )
+
+    assert not result.eligible
+    assert "EXERCISE_REJECTED_MISSING_EQUIPMENT" in result.rejected[0].reason_codes
+
+
+def test_multi_equipment_candidate_requires_every_equipment_item() -> None:
+    bench_press = candidate(
+        "multi equipment press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        equipment=frozenset({Equipment.DUMBBELL, Equipment.BENCH}),
+    )
+
+    missing_bench = filter_eligible_exercises(
+        normalized(available_equipment=frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL})),
+        [bench_press],
+    )
+    with_bench = filter_eligible_exercises(
+        normalized(
+            available_equipment=frozenset(
+                {Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.BENCH}
+            )
+        ),
+        [bench_press],
+    )
+
+    assert not missing_bench.eligible
+    assert with_bench.eligible == (bench_press,)
+
+
+def test_gym_keeps_candidates_requiring_supported_gym_equipment() -> None:
+    gym_exercise = candidate(
+        "gym multi equipment row",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+        equipment=frozenset(
+            {Equipment.BARBELL, Equipment.CABLE, Equipment.MACHINE, Equipment.PULL_UP_BAR}
+        ),
+    )
+
+    result = filter_eligible_exercises(
+        normalized(
+            training_location=TrainingLocation.GYM,
+            available_equipment=frozenset(Equipment),
+        ),
+        [gym_exercise],
+    )
+
+    assert result.eligible == (gym_exercise,)
+
+
 def test_ranking_is_stable_explainable_and_seeded_for_ties() -> None:
     preferred_id = UUID("00000000-0000-0000-0000-000000000001")
     preferred = candidate(
