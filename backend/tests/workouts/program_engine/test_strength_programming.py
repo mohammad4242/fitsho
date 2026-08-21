@@ -205,9 +205,7 @@ def test_strength_ranking_never_resurrects_ineligible_primary_candidate(blocked_
     if blocked_by == "caution":
         normalized_request = normalize_request(
             source.model_copy(
-                update={
-                    "blocked_caution_tags": frozenset({ExerciseCautionTag.WRIST_LOADING})
-                }
+                update={"blocked_caution_tags": frozenset({ExerciseCautionTag.WRIST_LOADING})}
             )
         )
 

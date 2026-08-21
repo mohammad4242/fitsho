@@ -33,8 +33,7 @@ class PriorityAllocationPolicy:
     ) -> PriorityAllocationPolicy:
         priorities = tuple(
             sorted(
-                request.source.priority_muscles
-                | body_analysis_priority_muscles(request, ruleset),
+                request.source.priority_muscles | body_analysis_priority_muscles(request, ruleset),
                 key=lambda muscle: muscle.value,
             )
         )
@@ -83,9 +82,7 @@ class PriorityAllocationPolicy:
         balance_penalty = ruleset.split_weights.get("priority_distribution", 4)
         score = fulfilled * frequency_weight + covered - spread * balance_penalty
         reasons: list[str] = []
-        if all(
-            exposure_counts[muscle] >= self.preferred_frequency for muscle in self.priorities
-        ):
+        if all(exposure_counts[muscle] >= self.preferred_frequency for muscle in self.priorities):
             reasons.append("PRIORITY_FREQUENCY_INCREASED")
             if len(self.priorities) > 1:
                 reasons.append("PRIORITY_VOLUME_REDISTRIBUTED")
@@ -150,9 +147,7 @@ class PriorityAllocationPolicy:
     ) -> bool:
         if day_index in exposure_indexes:
             return True
-        weekdays = [
-            _day_weekday(days[index]) for index in exposure_indexes + [day_index]
-        ]
+        weekdays = [_day_weekday(days[index]) for index in exposure_indexes + [day_index]]
         if any(weekday is None for weekday in weekdays):
             return True
         candidate = weekdays[-1]

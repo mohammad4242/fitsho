@@ -141,12 +141,10 @@ def test_goal_specific_prescriptions_use_ranges_rir_and_rest() -> None:
     hypertrophy_main = hypertrophy.program.weekly_schedule[0].exercises[0]
     endurance_main = endurance.program.weekly_schedule[0].exercises[0]
     assert (
-        strength_main.rep_min
-        >= RULESET.prescription_rules["strength_secondary_compound"].rep_min
+        strength_main.rep_min >= RULESET.prescription_rules["strength_secondary_compound"].rep_min
     )
     assert (
-        strength_main.rest_seconds
-        >= RULESET.prescription_rules["strength_accessory"].rest_seconds
+        strength_main.rest_seconds >= RULESET.prescription_rules["strength_accessory"].rest_seconds
     )
     assert (hypertrophy_main.rep_min, hypertrophy_main.rep_max) == (6, 12)
     assert (endurance_main.rep_min, endurance_main.rep_max) == (12, 25)
@@ -345,7 +343,7 @@ def test_volume_repair_does_not_add_sets_when_effective_target_is_satisfied() ->
 
 
 def test_volume_repair_adds_existing_compound_set_when_effective_volume_is_under_target() -> None:
-    source = request()
+    source = request(primary_goal="strength")
     normalized = normalize_request(source, RULESET)
     volume = volume_with_targets(
         normalized,
@@ -363,7 +361,13 @@ def test_volume_repair_adds_existing_compound_set_when_effective_volume_is_under
             for target in volume.targets
         ),
     )
-    day = volume_test_day(programmed_volume_exercise(MuscleGroup.CHEST, (), 4))
+    exercise = programmed_volume_exercise(MuscleGroup.CHEST, (), 4)
+    exercise = replace(
+        exercise,
+        exercise_type=ExerciseType.COMPOUND,
+        reason_codes=("STRENGTH_PRIMARY_COMPOUND",),
+    )
+    day = volume_test_day(exercise)
 
     repaired, reasons = repair_weekly_volume((day,), normalized, volume, RULESET)
 

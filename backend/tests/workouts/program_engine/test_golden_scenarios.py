@@ -412,7 +412,7 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
     )
     assert all(
         day.estimated_duration_minutes
-        <= source.session_duration_minutes + RULESET.duration_tolerance_minutes
+        <= source.session_duration_minutes + 10
         for day in first.program.weekly_schedule
     )
     selected = [item for day in first.program.weekly_schedule for item in day.exercises]

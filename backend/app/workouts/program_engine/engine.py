@@ -244,9 +244,27 @@ def generate_program(
     weekdays_fallback = (
         exact_day_splits[0].weekdays if exact_day_splits else tuple(range(requested_days))
     )
+    dynamic_focuses: tuple[str, ...]
+    if requested_days == 1:
+        dynamic_focuses = ("full_body",)
+    elif requested_days == 2:
+        dynamic_focuses = ("upper", "lower")
+    elif requested_days == 3:
+        dynamic_focuses = ("upper", "lower", "full_body")
+    elif requested_days == 4:
+        dynamic_focuses = ("upper", "lower", "upper", "lower")
+    elif requested_days == 5:
+        dynamic_focuses = ("upper", "lower", "push", "pull", "legs")
+    else:
+        dynamic_focuses = (
+            ("push", "pull", "legs") * (requested_days // 3)
+            + ("upper", "lower") * ((requested_days % 3) // 2)
+            + ("full_body",) * (requested_days % 3 % 2)
+        )
+
     fallback_split = SplitPlan(
-        split_type=SplitType.FULL_BODY,
-        day_focuses=tuple(["full_body"] * requested_days),
+        split_type=SplitType.DYNAMIC_FALLBACK,
+        day_focuses=tuple(dynamic_focuses[:requested_days]),
         weekdays=weekdays_fallback,
         score=-1000,
         reason_codes=("DYNAMIC_EXACT_N_FALLBACK",),

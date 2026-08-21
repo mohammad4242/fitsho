@@ -17,6 +17,7 @@ from app.workouts.program_engine.schemas import (
     WeeklyVolumePlan,
 )
 from app.workouts.program_engine.slot_compatibility import (
+    SlotCompatibility,
     evaluate_candidate_slot_compatibility,
     focus_scope,
 )
@@ -130,19 +131,7 @@ def build_sessions(
                 session_reasons = session_reasons + tuple(rejected_slot_reasons)
             if not options:
                 if slot.required:
-                    fallback_options = []
-                    for pattern in slot.patterns:
-                        for item in by_pattern.get(pattern, ()):
-                            if item.id not in chosen_ids:
-                                fallback_options.append(item)
-                    if fallback_options:
-                        options = fallback_options
-                        for item in options:
-                            comp_levels[item.id] = CompatibilityLevel.HARD_INCOMPATIBLE
-                        session_reasons = session_reasons + (
-                            "RECOVERY_RELAXED_SEMANTICS_FOR_REQUIRED_SLOT",
-                        )
-                    elif slot.patterns in relaxable_required_pattern_groups:
+                    if slot.patterns in relaxable_required_pattern_groups:
                         relaxed = tuple(sorted(slot.patterns, key=lambda item: item.value))
                         this_session_relaxed_groups.append(relaxed)
                         session_reasons = session_reasons + (
@@ -291,7 +280,9 @@ def _compatible_supplements(
     return options, levels
 
 
-def evaluate_exercise_focus_compatibility(exercise: ExerciseCandidate, focus: str) -> SlotCompatibility:
+def evaluate_exercise_focus_compatibility(
+    exercise: ExerciseCandidate, focus: str
+) -> SlotCompatibility:
     patterns, muscles = _supplement_scope(focus)
     return evaluate_candidate_slot_compatibility(
         exercise,

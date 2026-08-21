@@ -66,9 +66,9 @@ def validate_program(
                 # exercises to fill every session to minimum; demote to warning.
                 warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
             else:
-                warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
+                errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
         elif exercise_count > ruleset.max_exercises_per_session:
-            warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
+            errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
         if day.estimated_duration_minutes < duration_policy.minimum_minutes:
             errors.append("SESSION_DURATION_UNDER_TARGET")
             errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
@@ -126,9 +126,10 @@ def validate_program(
                     exercise_type=item.exercise_type,
                     is_priority=item.primary_muscle in priority_muscles,
                     weekly_exposure_count=weekly_exposures[item.primary_muscle],
+                    is_primary_strength="STRENGTH_PRIMARY_COMPOUND" in item.reason_codes,
                 )
             ):
-                warnings.append("PER_EXERCISE_SET_CAP_EXCEEDED")
+                errors.append("PER_EXERCISE_SET_CAP_EXCEEDED")
             if item.prescription_mode is PrescriptionMode.REPS:
                 if (
                     item.rep_min is None
@@ -174,7 +175,7 @@ def validate_program(
             else ruleset.max_sets_per_muscle_per_session
         )
         if any(value > per_session_limit for value in per_session.values()):
-            warnings.append("PER_SESSION_MUSCLE_VOLUME_EXCEEDED")
+            errors.append("PER_SESSION_MUSCLE_VOLUME_EXCEEDED")
         if (
             day.cardio
             and day.cardio.intensity.value == "vigorous"
@@ -207,9 +208,9 @@ def validate_program(
     if training_days >= 4 and any(
         frequency > effective_frequency_cap for frequency in direct_session_frequency.values()
     ):
-        warnings.append("MUSCLE_DIRECT_FREQUENCY_EXCEEDED")
+        errors.append("MUSCLE_DIRECT_FREQUENCY_EXCEEDED")
     if not recovery_spacing_is_valid(program.weekly_schedule, ruleset):
-        warnings.append("RECOVERY_SPACING_INVALID")
+        errors.append("RECOVERY_SPACING_INVALID")
     if program.safety_status not in {
         SafetyStatus.CLEAR,
         SafetyStatus.CLEAR_WITH_MODIFICATIONS,
@@ -236,7 +237,7 @@ def validate_program(
         if frozenset(pattern.value for pattern in group) in relaxed_pattern_groups:
             continue
         if not any(patterns[pattern] for pattern in group):
-            warnings.append("REQUIRED_MOVEMENT_PATTERN_MISSING")
+            errors.append("REQUIRED_MOVEMENT_PATTERN_MISSING")
     for exercise_id, count in exercise_usage.items():
         if count > 1:
             occurrences = [
@@ -249,7 +250,7 @@ def validate_program(
                 "CORE_MOVEMENT_REPEATED_FOR_PROGRESSION" in item.reason_codes
                 for item in occurrences[1:]
             ):
-                warnings.append("UNJUSTIFIED_DUPLICATE_EXERCISE")
+                errors.append("UNJUSTIFIED_DUPLICATE_EXERCISE")
     planned = program.aggregate_metrics.get("planned_direct_sets_by_muscle", {})
     ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
     priority_metrics = program.aggregate_metrics.get("priority_metrics", {})
@@ -276,7 +277,7 @@ def validate_program(
                 ruleset.maximum_sets[program.training_status],
             )
             if actual_effective > effective_maximum_hard:
-                warnings.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
+                errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
             if actual_effective > _int_metric(
                 range_values.get("effective_maximum_soft", range_values.get("maximum_soft")),
                 effective_maximum_hard,
@@ -316,7 +317,7 @@ def validate_program(
     else:
         maximum = ruleset.maximum_sets[program.training_status]
         if any(value > maximum for value in effective_sets.values()):
-            warnings.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
+            errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
     if isinstance(planned, dict) and any(
         effective_sets.get(str(muscle), 0) < int(target) for muscle, target in planned.items()
     ):

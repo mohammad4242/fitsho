@@ -64,9 +64,7 @@ def repair_weekly_volume(
             if sets > _maximum_for(muscle, targets, ruleset, request)
         }
         per_session_excessive = _per_session_excessive(repaired, ruleset)
-        per_exercise_excessive = _per_exercise_excessive(
-            repaired, request, targets, ruleset
-        )
+        per_exercise_excessive = _per_exercise_excessive(repaired, request, targets, ruleset)
         reduction = _select_reduction_candidate(
             repaired,
             weekly_excessive,
@@ -291,8 +289,7 @@ def _select_set_redistribution(
                 not recipient.counts_toward_volume
                 or recipient_muscle not in hard_direct_under
                 or direct_by_session[recipient_muscle] >= ruleset.max_sets_per_muscle_per_session
-                or recipient.sets
-                >= _exercise_set_cap(recipient, days, request, targets, ruleset)
+                or recipient.sets >= _exercise_set_cap(recipient, days, request, targets, ruleset)
             ):
                 continue
             for donor_index, donor in enumerate(exercises):
@@ -539,8 +536,7 @@ def _select_reduction_candidate(
     priority_over_target = {
         muscle.value
         for muscle, target in targets.items()
-        if target.direct_minimum_required
-        and direct.get(muscle.value, 0) > target.target_sets
+        if target.direct_minimum_required and direct.get(muscle.value, 0) > target.target_sets
     }
     candidates = []
     for day_index, exercises in enumerate(days):
@@ -726,6 +722,7 @@ def _exercise_set_cap(
             else exercise.primary_muscle in request.source.priority_muscles
         ),
         weekly_exposure_count=_weekly_exposure_count(days, exercise.primary_muscle),
+        is_primary_strength="STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes,
     )
 
 
@@ -746,12 +743,11 @@ def _candidate_set_cap(
             else candidate.primary_muscle in request.source.priority_muscles
         ),
         weekly_exposure_count=_weekly_exposure_count(days, candidate.primary_muscle),
+        is_primary_strength=False,
     )
 
 
-def _weekly_exposure_count(
-    days: list[list[ProgrammedExercise]], muscle: MuscleGroup | None
-) -> int:
+def _weekly_exposure_count(days: list[list[ProgrammedExercise]], muscle: MuscleGroup | None) -> int:
     if muscle is None:
         return 0
     return sum(

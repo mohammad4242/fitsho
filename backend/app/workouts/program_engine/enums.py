@@ -88,6 +88,7 @@ class RedFlag(StrEnum):
 
 
 class SplitType(StrEnum):
+    DYNAMIC_FALLBACK = "dynamic_fallback"
     FULL_BODY = "full_body"
     FULL_BODY_AB = "full_body_ab"
     FULL_BODY_ABC = "full_body_abc"

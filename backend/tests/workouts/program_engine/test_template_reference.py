@@ -55,6 +55,26 @@ def _four_day_reference() -> TemplateReference:
                     (
                         TemplateReferenceSlot(
                             exercise_id=None,
+                            exercise_slug_hint="lateral_raise",
+                            target_muscles=(MuscleGroup.SHOULDERS,),
+                            movement_pattern=MovementPattern.SHOULDER_ABDUCTION,
+                            intensity_method="standard",
+                            adaptation_priority="accessory",
+                            superset_group=None,
+                            sets=3,
+                            rep_min=10,
+                            rep_max=15,
+                            target_rir=2,
+                            rest_seconds=60,
+                        ),
+                    )
+                    if index == 1
+                    else ()
+                )
+                + (
+                    (
+                        TemplateReferenceSlot(
+                            exercise_id=None,
                             exercise_slug_hint="hip_hinge",
                             target_muscles=(MuscleGroup.HAMSTRINGS,),
                             movement_pattern=MovementPattern.HIP_HINGE,
@@ -129,7 +149,7 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
                 1,
                 "Upper A",
                 upper_focus,
-                (slot("Push Up", upper_focus), slot("Bodyweight Row", upper_focus)),
+                (slot("Push Up", upper_focus), slot("Bodyweight Row", upper_focus), slot("Incline Push Up", upper_focus)),
             ),
             TemplateReferenceDay(
                 2,
@@ -141,7 +161,7 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
                 3,
                 "Upper B",
                 upper_focus,
-                (slot("Dumbbell Press", upper_focus), slot("Dumbbell Row", upper_focus)),
+                (slot("Dumbbell Press", upper_focus), slot("Dumbbell Row", upper_focus), slot("Decline Push Up", upper_focus)),
             ),
             TemplateReferenceDay(
                 4,
@@ -263,7 +283,7 @@ def test_same_template_personalizes_weekly_volume_for_different_priority_muscles
     assert back_volume["back"] > chest_volume["back"]
     for day_index in (0, 2):
         expected_core_ids = {slot.exercise_id for slot in template.days[day_index].slots}
-        actual_core = chest_result.program.weekly_schedule[day_index].exercises[:2]
+        actual_core = chest_result.program.weekly_schedule[day_index].exercises[:3]
         assert {exercise.exercise_id for exercise in actual_core} == expected_core_ids
         assert all("TEMPLATE_REFERENCE_EXERCISE" in item.reason_codes for item in actual_core)
 
@@ -485,8 +505,7 @@ def test_template_generation_is_deterministic_and_strictly_valid() -> None:
     assert first.program == second.program
     assert first.program.validation_report.is_valid
     assert all(
-        day.estimated_duration_minutes
-        <= source.session_duration_minutes + RULESET.duration_tolerance_minutes
+        day.estimated_duration_minutes <= source.session_duration_minutes + 10
         for day in first.program.weekly_schedule
     )
     primary_by_id = {candidate.id: candidate.primary_muscle for candidate in catalog}

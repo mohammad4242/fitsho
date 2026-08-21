@@ -146,7 +146,7 @@ def test_generate_program_does_not_place_semantically_full_body_candidate_in_low
     result = generate_program(source, [misleading, *full_catalog()], RULESET)
 
     assert result.program is not None, result.errors
-    lower_days = [day for day in result.program.weekly_schedule if day.focus.startswith("lower")]
+    lower_days = [day for day in result.program.weekly_schedule if day.focus in {"lower", "legs"} or day.focus.startswith("lower")]
     assert lower_days
     assert all(
         misleading.id not in {item.exercise_id for item in day.exercises} for day in lower_days

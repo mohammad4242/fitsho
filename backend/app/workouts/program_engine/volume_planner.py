@@ -174,9 +174,7 @@ def plan_weekly_volume(
             split.split_type is SplitType.BODY_PART_ROTATION and direct_exposures[muscle] > 0
         )
         direct_min_required = muscle in effective_priorities and (
-            muscle not in SECONDARY_MUSCLES
-            or has_dedicated_exposure
-            or len(split.day_focuses) >= 3
+            muscle not in SECONDARY_MUSCLES or has_dedicated_exposure or len(split.day_focuses) >= 3
         )
         # For secondary muscles without a dedicated session, coverage via compound secondary
         # stimulation is sufficient — don't enforce a hard coverage requirement.

@@ -22,8 +22,7 @@ def derive_previous_volume_baseline(
     direct = _positive_values(
         history.previous_weekly_direct_sets_by_muscle
         or {
-            muscle: float(value)
-            for muscle, value in history.previous_weekly_sets_by_muscle.items()
+            muscle: float(value) for muscle, value in history.previous_weekly_sets_by_muscle.items()
         }
     )
     input_reasons = tuple(dict.fromkeys(history.previous_volume_reason_codes))
@@ -32,9 +31,7 @@ def derive_previous_volume_baseline(
         if history.previous_volume_source == "prescribed_plan":
             adherence = history.completed_session_ratio
             if adherence <= 0:
-                return _empty_baseline(
-                    (*input_reasons, "HISTORY_NO_RELIABLE_COMPLETED_VOLUME")
-                )
+                return _empty_baseline((*input_reasons, "HISTORY_NO_RELIABLE_COMPLETED_VOLUME"))
             return _scaled_baseline(
                 direct,
                 effective,
@@ -58,9 +55,7 @@ def derive_previous_volume_baseline(
         if history.previous_volume_source == "prescribed_plan":
             adherence = history.completed_session_ratio
             if adherence <= 0:
-                return _empty_baseline(
-                    (*input_reasons, "HISTORY_NO_RELIABLE_COMPLETED_VOLUME")
-                )
+                return _empty_baseline((*input_reasons, "HISTORY_NO_RELIABLE_COMPLETED_VOLUME"))
             return _scaled_baseline(
                 direct,
                 {},
@@ -74,9 +69,7 @@ def derive_previous_volume_baseline(
             effective_sets_by_muscle={},
             confidence=history.previous_volume_confidence or 1.0,
             source="legacy_direct",
-            reason_codes=tuple(
-                dict.fromkeys((*input_reasons, "HISTORY_DIRECT_VOLUME_FALLBACK"))
-            ),
+            reason_codes=tuple(dict.fromkeys((*input_reasons, "HISTORY_DIRECT_VOLUME_FALLBACK"))),
         )
     return _empty_baseline(input_reasons)
 
@@ -99,11 +92,7 @@ def _scaled_baseline(
 
 
 def _positive_values(values: dict[MuscleGroup, float]) -> dict[MuscleGroup, float]:
-    return {
-        muscle: round(float(value), 2)
-        for muscle, value in values.items()
-        if float(value) > 0
-    }
+    return {muscle: round(float(value), 2) for muscle, value in values.items() if float(value) > 0}
 
 
 def _scale(values: dict[MuscleGroup, float], factor: float) -> dict[MuscleGroup, float]:

@@ -53,9 +53,9 @@ def classify_strength_role(
     if (
         exercise.id in constraints.blocked_exercises
         or exercise.movement_pattern in constraints.blocked_movement_patterns
-        or not effective_required_equipment(
-            exercise.equipment, exercise.movement_pattern
-        ).issubset(constraints.available_equipment)
+        or not effective_required_equipment(exercise.equipment, exercise.movement_pattern).issubset(
+            constraints.available_equipment
+        )
         or effective_caution_tags(exercise).intersection(constraints.blocked_caution_tags)
     ):
         return StrengthRoleDecision(
@@ -70,10 +70,7 @@ def classify_strength_role(
         )
 
     high_demand = _is_high_demand(exercise)
-    if (
-        request.training_status is TrainingStatus.NOVICE
-        and high_demand
-    ):
+    if request.training_status is TrainingStatus.NOVICE and high_demand:
         return StrengthRoleDecision(
             StrengthExerciseRole.SECONDARY_COMPOUND,
             ("STRENGTH_ROLE_BEGINNER_DEMAND_LIMIT",),

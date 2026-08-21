@@ -147,6 +147,7 @@ def _select_set_increment(
             exercise_type=exercise.exercise_type,
             is_priority=exercise.primary_muscle in request.source.priority_muscles,
             weekly_exposure_count=weekly_exposures[exercise.primary_muscle],
+            is_primary_strength="STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes,
         )
         direct_sets = sum(
             item.sets
@@ -212,6 +213,7 @@ def _select_untracked_set_increment(
             exercise_type=exercise.exercise_type,
             is_priority=False,
             weekly_exposure_count=exposures[exercise.primary_muscle],
+            is_primary_strength="STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes,
         )
         if exercise.sets >= cap:
             continue
@@ -277,6 +279,7 @@ def _select_exercise_addition(
                 exercise_type=candidate.exercise_type,
                 is_priority=candidate.primary_muscle in request.source.priority_muscles,
                 weekly_exposure_count=1,
+                is_primary_strength=False,
             ),
         )
         if sets < 1:

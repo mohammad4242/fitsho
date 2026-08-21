@@ -1,4 +1,5 @@
 import hashlib
+from uuid import UUID
 
 from app.exercises.enums import ExerciseType, MuscleGroup
 from app.workouts.program_engine.body_analysis import eligible_body_analysis_priorities
