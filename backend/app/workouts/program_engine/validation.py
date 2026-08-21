@@ -16,6 +16,11 @@ from app.workouts.program_engine.schemas import (
     ValidationReport,
     WorkoutProgram,
 )
+from app.workouts.program_engine.session_builder import _slots_for_focus
+from app.workouts.program_engine.slot_compatibility import (
+    evaluate_candidate_slot_compatibility,
+    focus_scope,
+)
 
 
 def validate_program(
@@ -68,6 +73,25 @@ def validate_program(
             errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
         per_session: Counter[str] = Counter()
         for item in day.exercises:
+            semantic_patterns, semantic_muscles = focus_scope(day.focus)
+            if not day.focus.startswith("template_reference"):
+                slots = _slots_for_focus(day.focus)
+                semantic_patterns = semantic_patterns | frozenset(
+                    pattern for slot in slots for pattern in slot.patterns
+                )
+                if semantic_muscles is not None:
+                    semantic_muscles = semantic_muscles | frozenset(
+                        slot.target_muscle for slot in slots if slot.target_muscle is not None
+                    )
+            semantic_compatible = evaluate_candidate_slot_compatibility(
+                item,
+                allowed_patterns=semantic_patterns,
+                target_muscles=semantic_muscles,
+                day_focus=day.focus,
+                allow_full_body=day.focus.startswith("full_body"),
+            ).compatible
+            if not semantic_compatible:
+                errors.append("SEMANTIC_SLOT_MISMATCH_SELECTED")
             patterns[item.movement_pattern] += 1
             exercise_usage[item.exercise_id] += 1
             if not item.is_active:

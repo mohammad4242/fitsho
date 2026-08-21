@@ -15,6 +15,7 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceSlot,
     WorkoutDay,
 )
+from app.workouts.program_engine.slot_compatibility import evaluate_candidate_slot_compatibility
 
 
 @dataclass(frozen=True)
@@ -95,6 +96,9 @@ def build_template_sessions(
             candidate = (
                 eligible_by_id.get(slot.exercise_id) if slot.exercise_id is not None else None
             )
+            if candidate is not None and not _template_slot_is_compatible(candidate, slot, index):
+                build_reasons.append("TEMPLATE_SLOT_SEMANTIC_MISMATCH")
+                candidate = None
             repeated_explicit_slot = (
                 candidate is not None
                 and bool(used[candidate.id])
@@ -107,8 +111,7 @@ def build_template_sessions(
                         for item in eligible
                         if not used[item.id]
                         and not reserved[item.id]
-                        and item.movement_pattern is slot.movement_pattern
-                        and item.primary_muscle in slot.target_muscles
+                        and _template_slot_is_compatible(item, slot, index)
                     ),
                     None,
                 )
@@ -156,12 +159,18 @@ def build_template_sessions(
                     if not used[candidate.id]
                     and not reserved[candidate.id]
                     and candidate.primary_muscle is MuscleGroup.ABS
-                    and candidate.movement_pattern
-                    in {
-                        MovementPattern.CORE_ANTI_EXTENSION,
-                        MovementPattern.CORE_ANTI_ROTATION,
-                        MovementPattern.CORE_ANTI_LATERAL_FLEXION,
-                    }
+                    and evaluate_candidate_slot_compatibility(
+                        candidate,
+                        allowed_patterns=frozenset(
+                            {
+                                MovementPattern.CORE_ANTI_EXTENSION,
+                                MovementPattern.CORE_ANTI_ROTATION,
+                                MovementPattern.CORE_ANTI_LATERAL_FLEXION,
+                            }
+                        ),
+                        target_muscles=frozenset({MuscleGroup.ABS}),
+                        day_focus=f"template_reference_{index}",
+                    ).compatible
                 ),
                 None,
             )
@@ -319,8 +328,12 @@ def _complementary_template_candidate(
         for item in eligible
         if not used[item.id]
         and not reserved[item.id]
-        and item.primary_muscle in focus
-        and item.movement_pattern is not MovementPattern.OTHER
+        and evaluate_candidate_slot_compatibility(
+            item,
+            allowed_patterns=frozenset(MovementPattern) - {MovementPattern.OTHER},
+            target_muscles=frozenset(focus),
+            day_focus=f"template_reference_{reference_day.day_number}",
+        ).compatible
         and not _template_role_is_excessive(item, selected)
     ]
     if not options:
@@ -452,7 +465,14 @@ def _add_targeted_accessories(
         options = [
             item
             for item in eligible
-            if not used[item.id] and not reserved[item.id] and item.primary_muscle in target_muscles
+            if not used[item.id]
+            and not reserved[item.id]
+            and evaluate_candidate_slot_compatibility(
+                item,
+                allowed_patterns=frozenset(MovementPattern) - {MovementPattern.OTHER},
+                target_muscles=frozenset(target_muscles),
+                day_focus=f"template_reference_{reference_day.day_number}",
+            ).compatible
         ]
         if not options:
             return
@@ -477,3 +497,16 @@ def _add_targeted_accessories(
             )
         )
         used[candidate.id] += 1
+
+
+def _template_slot_is_compatible(
+    candidate: ExerciseCandidate,
+    slot: TemplateReferenceSlot,
+    day_index: int,
+) -> bool:
+    return evaluate_candidate_slot_compatibility(
+        candidate,
+        allowed_patterns=frozenset({slot.movement_pattern}),
+        target_muscles=frozenset(slot.target_muscles),
+        day_focus=f"template_reference_{day_index}",
+    ).compatible

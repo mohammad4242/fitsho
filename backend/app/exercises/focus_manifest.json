@@ -121,9 +121,9 @@
     "slug": "fedb-0028-barbell-clean-and-press",
     "name_en": "Barbell Clean And Press",
     "previous_primary_muscle": "quadriceps",
-    "primary_muscle": "quadriceps",
-    "muscle_focus": null,
-    "basis": "focus:not_applicable"
+    "primary_muscle": "shoulders",
+    "muscle_focus": "front_delt",
+    "basis": "mechanics:full_body_overhead_press"
   },
   {
     "key": "free-exercise-db:0030",

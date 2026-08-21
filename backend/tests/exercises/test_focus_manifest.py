@@ -68,8 +68,8 @@ def test_manifest_entry_records_approved_core_primary_correction() -> None:
 
 def test_checked_in_manifest_covers_the_reviewed_live_catalogue() -> None:
     assert len(FOCUS_MANIFEST) == 341
-    assert sum(item.muscle_focus is not None for item in FOCUS_MANIFEST.values()) == 291
-    assert sum(item.muscle_focus is None for item in FOCUS_MANIFEST.values()) == 50
+    assert sum(item.muscle_focus is not None for item in FOCUS_MANIFEST.values()) == 292
+    assert sum(item.muscle_focus is None for item in FOCUS_MANIFEST.values()) == 49
     assert all(
         item.muscle_focus is None
         for item in FOCUS_MANIFEST.values()
@@ -85,3 +85,11 @@ def test_checked_in_manifest_covers_the_reviewed_live_catalogue() -> None:
         for item in FOCUS_MANIFEST.values()
         if item.muscle_focus
     )
+
+
+def test_clean_and_press_manifest_uses_canonical_overhead_metadata() -> None:
+    entry = FOCUS_MANIFEST["free-exercise-db:0028"]
+
+    assert entry.previous_primary_muscle is MuscleGroup.QUADRICEPS
+    assert entry.primary_muscle is MuscleGroup.SHOULDERS
+    assert entry.muscle_focus is MuscleFocus.FRONT_DELT

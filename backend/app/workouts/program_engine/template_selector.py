@@ -11,6 +11,7 @@ from app.workouts.program_engine.schemas import (
     NormalizedProgramRequest,
     TemplateReference,
 )
+from app.workouts.program_engine.slot_compatibility import evaluate_candidate_slot_compatibility
 
 
 def select_template_reference(
@@ -79,10 +80,21 @@ def _core_slots_are_resolvable(
             if slot.adaptation_priority != "core":
                 continue
             if slot.exercise_id in eligible_by_id:
-                continue
+                requested = next(item for item in eligible if item.id == slot.exercise_id)
+                if evaluate_candidate_slot_compatibility(
+                    requested,
+                    allowed_patterns=frozenset({slot.movement_pattern}),
+                    target_muscles=frozenset(slot.target_muscles),
+                    day_focus=f"template_reference_{day.day_number}",
+                ).compatible:
+                    continue
             if not any(
-                candidate.movement_pattern is slot.movement_pattern
-                and candidate.primary_muscle in slot.target_muscles
+                evaluate_candidate_slot_compatibility(
+                    candidate,
+                    allowed_patterns=frozenset({slot.movement_pattern}),
+                    target_muscles=frozenset(slot.target_muscles),
+                    day_focus=f"template_reference_{day.day_number}",
+                ).compatible
                 for candidate in eligible
             ):
                 return False

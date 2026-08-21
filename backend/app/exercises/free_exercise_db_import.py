@@ -170,6 +170,7 @@ class ProgrammingMetadata:
     movement_pattern: MovementPattern
     exercise_type: ExerciseType
     caution_tags: tuple[ExerciseCautionTag, ...]
+    is_full_body: bool = False
 
 
 def classify_programming_metadata(
@@ -193,10 +194,14 @@ def classify_programming_metadata(
         movement_pattern = MovementPattern.VERTICAL_PULL
     elif _contains_any(name, ("row", "rear delt fly", "reverse fly")):
         movement_pattern = MovementPattern.HORIZONTAL_PULL
+    elif _contains_any(name, ("leg press", "hack squat")):
+        movement_pattern = MovementPattern.SQUAT
     elif _contains_any(name, ("overhead press", "shoulder press", "military press")):
         movement_pattern = MovementPattern.VERTICAL_PUSH
     elif _contains_any(name, ("bench press", "push up", "pushup", "chest press", "dip")):
         movement_pattern = MovementPattern.HORIZONTAL_PUSH
+    elif "press" in name:
+        movement_pattern = MovementPattern.VERTICAL_PUSH
     elif "squat" in name:
         movement_pattern = MovementPattern.SQUAT
     elif _contains_any(name, ("deadlift", "good morning", "hyperextension")):
@@ -301,10 +306,30 @@ def classify_programming_metadata(
     if _contains_any(source_text, ("balance", "single leg", "one leg")):
         cautions.append(ExerciseCautionTag.BALANCE_DEMAND)
 
+    lower_body_signal = _contains_any(
+        name,
+        (
+            "clean",
+            "snatch",
+            "deadlift",
+            "squat",
+            "lunge",
+            "step up",
+            "thrust",
+            "bridge",
+        ),
+    )
+    upper_body_signal = _contains_any(
+        name,
+        ("press", "row", "pull", "curl", "raise", "fly", "dip"),
+    )
     return ProgrammingMetadata(
         movement_pattern=movement_pattern,
         exercise_type=exercise_type,
         caution_tags=tuple(dict.fromkeys(cautions)),
+        is_full_body=(
+            exercise_type is ExerciseType.COMPOUND and lower_body_signal and upper_body_signal
+        ),
     )
 
 
@@ -317,9 +342,10 @@ def classify_exercise_labels(
     body_part: str,
     target: str,
     exercise_type: ExerciseType,
+    is_full_body: bool = False,
 ) -> tuple[ExerciseLabel, ...]:
     labels: list[ExerciseLabel] = []
-    if target.strip().lower() == "full body":
+    if target.strip().lower() == "full body" or is_full_body:
         labels.append(ExerciseLabel.FULL_BODY)
     if exercise_type is not ExerciseType.MOBILITY and (
         body_part.strip().lower() == "cardio" or target.strip().lower() == "cardiovascular system"
@@ -665,6 +691,29 @@ class FreeExerciseDbImporter:
             form_cues_en=form_cues,
             common_mistakes_en=common_mistakes,
         )
+        if (
+            programming_metadata.is_full_body
+            and programming_metadata.movement_pattern is MovementPattern.VERTICAL_PUSH
+        ):
+            secondary_muscles = [
+                muscle
+                for muscle in secondary_muscles
+                if muscle
+                in {
+                    MuscleGroup.QUADRICEPS,
+                    MuscleGroup.GLUTES,
+                    MuscleGroup.TRICEPS,
+                    MuscleGroup.TRAPS,
+                }
+            ]
+        if (
+            programming_metadata.is_full_body
+            and programming_metadata.movement_pattern is MovementPattern.VERTICAL_PUSH
+            and primary_muscle is not MuscleGroup.SHOULDERS
+        ):
+            if primary_muscle is not None and primary_muscle not in secondary_muscles:
+                secondary_muscles.append(primary_muscle)
+            primary_muscle = MuscleGroup.SHOULDERS
         primary_muscle = refine_primary_muscle(
             primary_muscle,
             name_en,
@@ -689,6 +738,7 @@ class FreeExerciseDbImporter:
             body_part=body_part,
             target=target,
             exercise_type=programming_metadata.exercise_type,
+            is_full_body=programming_metadata.is_full_body,
         )
         media_assets = self._media_assets(raw_record, source_id, report)
         if not any(asset.role is MediaRole.VIDEO for asset in media_assets):

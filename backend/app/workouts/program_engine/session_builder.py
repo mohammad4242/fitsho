@@ -16,6 +16,10 @@ from app.workouts.program_engine.schemas import (
     SplitPlan,
     WeeklyVolumePlan,
 )
+from app.workouts.program_engine.slot_compatibility import (
+    evaluate_candidate_slot_compatibility,
+    focus_scope,
+)
 from app.workouts.program_engine.strength_programming import classify_strength_role
 
 PUSH_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH})
@@ -98,13 +102,30 @@ def build_sessions(
                 if slot.required:
                     raise SessionConstructionError(index + 1, focus, slot)
                 break
-            options = [
-                item
-                for pattern in slot.patterns
-                for item in by_pattern.get(pattern, ())
-                if item.id not in {selected.id for selected in chosen}
-                and (slot.target_muscle is None or item.primary_muscle is slot.target_muscle)
-            ]
+            chosen_ids = {selected.id for selected in chosen}
+            options: list[ExerciseCandidate] = []
+            rejected_slot_reasons: list[str] = []
+            for pattern in slot.patterns:
+                for item in by_pattern.get(pattern, ()):
+                    if item.id in chosen_ids:
+                        continue
+                    compatibility = evaluate_candidate_slot_compatibility(
+                        item,
+                        allowed_patterns=slot.patterns,
+                        target_muscles=(
+                            frozenset({slot.target_muscle})
+                            if slot.target_muscle is not None
+                            else None
+                        ),
+                        day_focus=focus,
+                        allow_full_body=focus.startswith("full_body"),
+                    )
+                    if compatibility.compatible:
+                        options.append(item)
+                    else:
+                        rejected_slot_reasons.extend(compatibility.reason_codes)
+            if rejected_slot_reasons:
+                session_reasons = session_reasons + tuple(rejected_slot_reasons)
             if not options:
                 if slot.required:
                     if slot.patterns in relaxable_required_pattern_groups:
@@ -251,9 +272,13 @@ def _compatible_supplements(
 
 def exercise_fits_focus(exercise: ExerciseCandidate, focus: str) -> bool:
     patterns, muscles = _supplement_scope(focus)
-    return exercise.movement_pattern in patterns and (
-        muscles is None or exercise.primary_muscle in muscles
-    )
+    return evaluate_candidate_slot_compatibility(
+        exercise,
+        allowed_patterns=patterns,
+        target_muscles=muscles,
+        day_focus=focus,
+        allow_full_body=focus.startswith("full_body"),
+    ).compatible
 
 
 def _role_repeated(
@@ -270,82 +295,7 @@ def _role_repeated(
 def _supplement_scope(
     focus: str,
 ) -> tuple[frozenset[MovementPattern], frozenset[MuscleGroup] | None]:
-    if focus.startswith("template_reference"):
-        return frozenset(MovementPattern) - {MovementPattern.OTHER}, None
-    if focus.startswith("full_body"):
-        return (
-            PUSH_PATTERNS
-            | PULL_PATTERNS
-            | KNEE_PATTERNS
-            | HINGE_PATTERNS
-            | CORE_PATTERNS
-            | LOWER_ACCESSORY_PATTERNS,
-            None,
-        )
-    if focus.startswith("upper"):
-        return (
-            PUSH_PATTERNS
-            | PULL_PATTERNS
-            | ARM_PATTERNS
-            | frozenset({MovementPattern.SHOULDER_ABDUCTION, MovementPattern.SHRUG}),
-            frozenset(
-                {
-                    MuscleGroup.CHEST,
-                    MuscleGroup.BACK,
-                    MuscleGroup.SHOULDERS,
-                    MuscleGroup.TRAPS,
-                    MuscleGroup.BICEPS,
-                    MuscleGroup.TRICEPS,
-                }
-            ),
-        )
-    if focus in {"lower", "legs"} or focus.startswith("lower"):
-        return (
-            KNEE_PATTERNS | HINGE_PATTERNS | CORE_PATTERNS | LOWER_ACCESSORY_PATTERNS,
-            frozenset(
-                {
-                    MuscleGroup.QUADRICEPS,
-                    MuscleGroup.HAMSTRINGS,
-                    MuscleGroup.GLUTES,
-                    MuscleGroup.CALVES,
-                    MuscleGroup.ABS,
-                }
-            ),
-        )
-    scopes: dict[str, tuple[frozenset[MovementPattern], frozenset[MuscleGroup]]] = {
-        "push": (
-            PUSH_PATTERNS | frozenset({MovementPattern.ELBOW_EXTENSION}),
-            frozenset({MuscleGroup.CHEST, MuscleGroup.SHOULDERS, MuscleGroup.TRICEPS}),
-        ),
-        "pull": (
-            PULL_PATTERNS | frozenset({MovementPattern.ELBOW_FLEXION}),
-            frozenset({MuscleGroup.BACK, MuscleGroup.BICEPS}),
-        ),
-        "chest_triceps": (
-            PUSH_PATTERNS | frozenset({MovementPattern.ELBOW_EXTENSION}),
-            frozenset({MuscleGroup.CHEST, MuscleGroup.TRICEPS}),
-        ),
-        "back_biceps": (
-            PULL_PATTERNS | frozenset({MovementPattern.ELBOW_FLEXION}),
-            frozenset({MuscleGroup.BACK, MuscleGroup.BICEPS}),
-        ),
-        "shoulders_traps": (
-            SHOULDER_PATTERNS | frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.SHRUG}),
-            frozenset({MuscleGroup.SHOULDERS, MuscleGroup.TRAPS}),
-        ),
-        "quadriceps_calves": (
-            KNEE_PATTERNS | frozenset({MovementPattern.CALF_RAISE}),
-            frozenset({MuscleGroup.QUADRICEPS, MuscleGroup.CALVES}),
-        ),
-        "posterior_chain_core": (
-            HINGE_PATTERNS | CORE_PATTERNS | frozenset({MovementPattern.KNEE_FLEXION}),
-            frozenset({MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.ABS}),
-        ),
-    }
-    return scopes.get(
-        focus,
-        (PUSH_PATTERNS | PULL_PATTERNS | KNEE_PATTERNS | HINGE_PATTERNS | CORE_PATTERNS, None),
-    )
+    return focus_scope(focus)
 
 
 def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
