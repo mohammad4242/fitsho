@@ -7,6 +7,7 @@ from app.workouts.program_engine.enums import (
     SplitType,
     TrainingStatus,
 )
+from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     NormalizedProgramRequest,
@@ -140,6 +141,7 @@ def score_split_candidates(
     weights = ruleset.split_weights
     scored: list[tuple[SplitPlan, int]] = []
     recovery_limited = _recovery_is_limited(request)
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     goal_specific = request.primary_goal in {
         Goal.HYPERTROPHY,
         Goal.MUSCLE_GAIN,
@@ -236,6 +238,12 @@ def score_split_candidates(
         ):
             score += weights["priority_specialization"]
             reasons.append("SPLIT_SELECTED_FOR_PRIORITY_MUSCLE")
+
+        priority_adjustment, priority_reasons = priority_policy.split_adjustment(
+            candidate.day_focuses, ruleset
+        )
+        score += priority_adjustment
+        reasons.extend(priority_reasons)
 
         weekdays = _select_weekdays(
             len(candidate.day_focuses),

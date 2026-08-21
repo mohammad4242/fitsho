@@ -17,6 +17,7 @@ from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import prescribe_sessions
+from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.progression import deload_policy, double_progression_policy
 from app.workouts.program_engine.recovery import repair_recovery_weekdays
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
@@ -394,6 +395,7 @@ def _program_for_split(
         volume,
         previous_volume,
         ruleset,
+        request=normalized,
         relaxed_required_pattern_groups=relaxed_groups,
     )
     body_trace = body_analysis_trace(normalized, ruleset)
@@ -444,7 +446,7 @@ def _program_for_split(
             "reason_codes": ("REQUESTED_TRAINING_DAYS_SATISFIED",),
         },
         {"stage": "split", "selected": split.split_type.value, "reasons": split.reason_codes},
-        _volume_decision_trace(volume, previous_volume),
+        _volume_decision_trace(volume, previous_volume, normalized, ruleset),
         {
             "stage": "volume_repair",
             "reasons": tuple(dict.fromkeys((*repair_reasons, *recovery_repair_reasons))),
@@ -579,6 +581,7 @@ def _reference_program(
         volume,
         previous_volume,
         ruleset,
+        request=normalized,
         reference_template=reference.slug,
     )
     effective_volume = calculate_effective_volume(
@@ -615,7 +618,7 @@ def _reference_program(
         },
         template_resolution_trace(build, days),
         day_count_trace,
-        _volume_decision_trace(volume, previous_volume),
+        _volume_decision_trace(volume, previous_volume, normalized, ruleset),
         {
             "stage": "volume_repair",
             "reasons": tuple(dict.fromkeys((*repair_reasons, *recovery_repair_reasons))),
@@ -733,12 +736,14 @@ def _volume_metrics(
     previous_volume: PreviousVolumeBaseline,
     ruleset: ProgramRuleset,
     *,
+    request: NormalizedProgramRequest,
     reference_template: str | None = None,
     relaxed_required_pattern_groups: tuple[tuple[MovementPattern, ...], ...] = (),
 ) -> dict[str, object]:
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises), ruleset
     )
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     direct = Counter(effective_volume.direct_sets_by_muscle)
     metrics: dict[str, object] = {
         "planned_direct_sets_by_muscle": {
@@ -787,6 +792,13 @@ def _volume_metrics(
         "estimated_weekly_duration": sum(day.estimated_duration_minutes for day in days),
         "hard_training_days": len(days),
         "recovery_days": ruleset.days_per_week - len(days),
+        "priority_metrics": _priority_metrics(
+            days,
+            volume,
+            effective_volume.direct_sets_by_muscle,
+            effective_volume.effective_sets_by_muscle,
+            priority_policy,
+        ),
     }
     if reference_template is not None:
         metrics["reference_template"] = reference_template
@@ -803,13 +815,72 @@ def _volume_metrics(
     return metrics
 
 
+def _priority_metrics(
+    days: tuple[WorkoutDay, ...],
+    volume: WeeklyVolumePlan,
+    direct_sets: dict[str, int],
+    effective_sets: dict[str, float],
+    policy: PriorityAllocationPolicy,
+) -> dict[str, dict[str, object]]:
+    metrics: dict[str, dict[str, object]] = {}
+    for muscle in policy.priorities:
+        session_indexes = tuple(
+            day.day_index
+            for day in days
+            if any(
+                item.primary_muscle is muscle and item.counts_toward_volume
+                for item in day.exercises
+            )
+        )
+        direct = direct_sets.get(muscle.value, 0)
+        effective = effective_sets.get(muscle.value, 0.0)
+        target = volume.direct_sets_for(muscle)
+        effective_target = volume.effective_target_for(muscle)
+        target_available = target > 0 or effective_target > 0
+        direct_satisfied = target_available and direct >= volume.minimum_direct_sets_for(muscle)
+        effective_satisfied = target_available and effective >= effective_target
+        frequency_satisfied = len(session_indexes) >= policy.preferred_frequency
+        status = (
+            "satisfied"
+            if direct_satisfied and effective_satisfied and frequency_satisfied
+            else "partial"
+        )
+        reason_codes: list[str] = []
+        if direct_satisfied and effective_satisfied:
+            reason_codes.append("PRIORITY_VOLUME_INCREASED")
+        else:
+            reason_codes.append("PRIORITY_TARGET_PARTIALLY_SATISFIED")
+        if frequency_satisfied and policy.preferred_frequency > 1:
+            reason_codes.append("PRIORITY_FREQUENCY_INCREASED")
+        else:
+            reason_codes.append("PRIORITY_TARGET_CONSTRAINED")
+        metrics[muscle.value] = {
+            "direct_sets": direct,
+            "effective_sets": effective,
+            "target_sets": target,
+            "effective_target_sets": effective_target,
+            "preferred_frequency": policy.preferred_frequency,
+            "session_frequency": len(session_indexes),
+            "session_indexes": session_indexes,
+            "distributed": frequency_satisfied,
+            "status": status,
+            "reason_codes": tuple(dict.fromkeys(reason_codes)),
+        }
+    return metrics
+
+
 def _volume_decision_trace(
     volume: WeeklyVolumePlan,
     previous_volume: PreviousVolumeBaseline,
+    request: NormalizedProgramRequest,
+    ruleset: ProgramRuleset,
 ) -> dict[str, object]:
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     return {
         "stage": "volume",
         "reasons": volume.reason_codes,
+        "priority_muscles": tuple(muscle.value for muscle in priority_policy.priorities),
+        "priority_preferred_frequency": priority_policy.preferred_frequency,
         "previous_volume_baseline": {
             "confidence": previous_volume.confidence,
             "source": previous_volume.source,

@@ -423,7 +423,12 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
     recovery = next(
         entry for entry in first.program.decision_trace if entry["stage"] == "construction_recovery"
     )
-    assert "SESSION_SUPPLEMENTED_TO_MINIMUM" in recovery["reason_codes"]
+    assert "SESSION_DURATION_REPAIR_APPLIED" in recovery["reason_codes"]
+    priority_metrics = first.program.aggregate_metrics["priority_metrics"]
+    assert all(
+        priority_metrics[muscle.value]["session_frequency"] >= 2
+        for muscle in (MuscleGroup.GLUTES, MuscleGroup.QUADRICEPS)
+    )
 
 
 def test_generation_exhausts_safe_splits_when_required_pull_is_unavailable() -> None:
@@ -451,7 +456,7 @@ def test_generation_exhausts_safe_splits_when_required_pull_is_unavailable() -> 
     assert result.decision_trace[-1]["status"] == "exhausted"
 
 
-def test_generation_uses_next_ranked_split_when_selected_layout_cannot_be_filled() -> None:
+def test_priority_selection_prefers_a_fillable_split_with_distributed_exposure() -> None:
     source = request(
         primary_goal="build_muscle",
         training_experience="intermediate",
@@ -470,14 +475,8 @@ def test_generation_uses_next_ranked_split_when_selected_layout_cannot_be_filled
 
     assert result.program is not None, result.errors
     assert result.program.split.split_type is SplitType.UPPER_LOWER
-    recovery = next(
-        entry
-        for entry in result.program.decision_trace
-        if entry["stage"] == "construction_recovery"
-    )
-    assert "SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE" in recovery["reason_codes"]
-    assert recovery["rejected_splits"][0]["split"] == SplitType.BODY_PART_ROTATION.value
-    assert (
-        "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT"
-        in recovery["rejected_splits"][0]["reason_codes"]
+    priority_metrics = result.program.aggregate_metrics["priority_metrics"]
+    assert all(
+        priority_metrics[muscle.value]["session_frequency"] >= 2
+        for muscle in (MuscleGroup.GLUTES, MuscleGroup.QUADRICEPS)
     )

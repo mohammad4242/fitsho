@@ -9,6 +9,7 @@ from app.workouts.program_engine.prescription import (
     estimate_exercise_minutes,
     prescription_for,
 )
+from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.replacement_ranker import rank_replacement_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -41,6 +42,7 @@ def repair_weekly_volume(
     """
     repaired = [list(day.exercises) for day in days]
     targets = {target.muscle: target for target in volume.targets}
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     reasons: list[str] = []
     total_sets = sum(item.sets for day in days for item in day.exercises)
     max_iterations = max(total_sets * 2, 1)
@@ -78,6 +80,12 @@ def repair_weekly_volume(
         if reduction is not None:
             day_index, exercise_index, exercise = reduction
             if exercise.sets > ruleset.minimum_working_sets:
+                priority_over_target = (
+                    exercise.primary_muscle in priority_policy.priorities
+                    and exercise.primary_muscle in targets
+                    and direct.get(exercise.primary_muscle.value, 0)
+                    > targets[exercise.primary_muscle].target_sets
+                )
                 reduction_reason = (
                     "VOLUME_REPAIR_REDUCED_SET_FOR_EXERCISE_CAP"
                     if (day_index, exercise_index) in per_exercise_excessive
@@ -95,6 +103,8 @@ def repair_weekly_volume(
                     reason_codes=exercise.reason_codes + (reduction_reason,),
                 )
                 reasons.append(reduction_reason)
+                if priority_over_target:
+                    reasons.append("PRIORITY_VOLUME_REDISTRIBUTED")
                 continue
             same_muscle_exposures = sum(
                 1
@@ -194,6 +204,8 @@ def repair_weekly_volume(
             day_index, programmed = exercise_addition
             repaired[day_index].append(programmed)
             reasons.append("VOLUME_REPAIR_ADDED_EXERCISE_FOR_MINIMUM_COVERAGE")
+            if programmed.primary_muscle in priority_policy.priorities:
+                reasons.append("PRIORITY_VOLUME_REDISTRIBUTED")
             continue
         addition = _select_addition_candidate(
             repaired,
@@ -256,6 +268,8 @@ def repair_weekly_volume(
             reason_codes=exercise.reason_codes + (reason,),
         )
         reasons.append(reason)
+        if exercise.primary_muscle in priority_policy.priorities:
+            reasons.append("PRIORITY_VOLUME_REDISTRIBUTED")
 
     return _rebuild_days(days, repaired, ruleset), tuple(dict.fromkeys(reasons))
 
@@ -369,8 +383,17 @@ def _select_exercise_addition(
     if not needed or not candidates:
         return None
     selected_ids = {item.exercise_id for day in days for item in day}
-    options: list[tuple[int, int, int, int, int, str, ProgrammedExercise]] = []
-    for muscle in sorted(needed, key=lambda item: item.value):
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
+    day_contexts = tuple(
+        replace(original, exercises=tuple(exercises))
+        for original, exercises in zip(originals, days, strict=True)
+    )
+    priority_order = {muscle: index for index, muscle in enumerate(priority_policy.priorities)}
+    options: list[tuple[tuple[object, ...], int, ProgrammedExercise]] = []
+    for muscle in sorted(
+        needed,
+        key=lambda item: (priority_order.get(item, len(priority_order)), item.value),
+    ):
         muscle_candidates = tuple(
             candidate
             for candidate in candidates
@@ -471,19 +494,23 @@ def _select_exercise_addition(
                 )
                 options.append(
                     (
-                        0 if muscle in direct_under else 1,
-                        direct_by_session[muscle],
+                        (
+                            0 if muscle in direct_under else 1,
+                            0 if muscle in priority_policy.priorities else 1,
+                            *priority_policy.day_priority_key(day_contexts, muscle, day_index),
+                            direct_by_session[muscle],
+                            -ranked.score,
+                            1 if role_repeated else 0,
+                            str(candidate.id),
+                        ),
                         day_index,
-                        -ranked.score,
-                        1 if role_repeated else 0,
-                        str(candidate.id),
                         programmed,
                     )
                 )
     if not options:
         return None
-    selected = min(options, key=lambda item: item[:-1])
-    return selected[2], selected[-1]
+    selected = min(options, key=lambda item: item[0])
+    return selected[1], selected[2]
 
 
 def _maximum_for(
@@ -509,6 +536,12 @@ def _select_reduction_candidate(
     ruleset: ProgramRuleset,
     per_exercise_excessive: set[tuple[int, int]],
 ) -> tuple[int, int, ProgrammedExercise] | None:
+    priority_over_target = {
+        muscle.value
+        for muscle, target in targets.items()
+        if target.direct_minimum_required
+        and direct.get(muscle.value, 0) > target.target_sets
+    }
     candidates = []
     for day_index, exercises in enumerate(days):
         for exercise_index, exercise in enumerate(exercises):
@@ -524,6 +557,7 @@ def _select_reduction_candidate(
                     exercise.primary_muscle,
                 )
                 not in per_session_excessive
+                and exercise.primary_muscle.value not in priority_over_target
             ):
                 continue
             minimum_direct = targets.get(exercise.primary_muscle)
@@ -558,6 +592,7 @@ def _select_addition_candidate(
     request: NormalizedProgramRequest,
     ruleset: ProgramRuleset,
 ) -> tuple[int, int, ProgrammedExercise, str] | None:
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     candidates = []
     hard_maximums = {muscle.value: target.maximum_hard for muscle, target in targets.items()}
     for day_index, exercises in enumerate(days):
@@ -614,9 +649,16 @@ def _select_addition_candidate(
             )
             candidates.append(
                 (
-                    0 if direct_needs else 1,
-                    0 if primary in effective_under else 1,
-                    direct_by_session[primary],
+                    (
+                        0 if direct_needs else 1,
+                        0 if primary in effective_under else 1,
+                        0 if primary in priority_policy.priorities else 1,
+                        *priority_policy.day_priority_key(days, primary, day_index),
+                        direct_by_session[primary],
+                        day_index,
+                        exercise_index,
+                        str(exercise.exercise_id),
+                    ),
                     day_index,
                     exercise_index,
                     exercise,
@@ -625,17 +667,8 @@ def _select_addition_candidate(
             )
     if not candidates:
         return None
-    _, _, _, day_index, exercise_index, exercise, reason = min(
-        candidates,
-        key=lambda candidate: (
-            candidate[0],
-            candidate[1],
-            candidate[2],
-            candidate[3],
-            str(candidate[5].exercise_id),
-        ),
-    )
-    return day_index, exercise_index, exercise, reason
+    selected = min(candidates, key=lambda candidate: candidate[0])
+    return selected[1], selected[2], selected[3], selected[4]
 
 
 def _direct_sets(days: list[list[ProgrammedExercise]]) -> Counter[MuscleGroup]:

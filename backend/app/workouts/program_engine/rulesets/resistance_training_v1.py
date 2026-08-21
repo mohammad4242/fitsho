@@ -226,6 +226,8 @@ class ProgramRuleset:
             "goal_specificity": 12,
             "twice_weekly_frequency": 6,
             "priority_specialization": 10,
+            "priority_frequency": 20,
+            "priority_distribution": 4,
             "short_session_full_body": 8,
             "recovery_complexity_penalty": 8,
         }

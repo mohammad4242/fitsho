@@ -245,6 +245,14 @@ def validate_program(
                 errors.append("UNJUSTIFIED_DUPLICATE_EXERCISE")
     planned = program.aggregate_metrics.get("planned_direct_sets_by_muscle", {})
     ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
+    priority_metrics = program.aggregate_metrics.get("priority_metrics", {})
+    if isinstance(priority_metrics, dict):
+        for metric in priority_metrics.values():
+            if not isinstance(metric, dict) or metric.get("status") != "partial":
+                continue
+            warnings.append("PRIORITY_TARGET_PARTIALLY_SATISFIED")
+            if "PRIORITY_TARGET_CONSTRAINED" in _sequence_metric(metric.get("reason_codes")):
+                warnings.append("PRIORITY_TARGET_CONSTRAINED")
     effective_volume = calculate_effective_volume(
         (item for day in program.weekly_schedule for item in day.exercises),
         ruleset,

@@ -3,7 +3,6 @@ from collections import Counter
 
 from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.body_analysis import (
-    body_analysis_priority_muscles,
     eligible_body_analysis_priorities,
 )
 from app.workouts.program_engine.enums import (
@@ -12,6 +11,7 @@ from app.workouts.program_engine.enums import (
     SplitType,
     TrainingStatus,
 )
+from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     NormalizedProgramRequest,
@@ -115,9 +115,8 @@ def plan_weekly_volume(
     body_priorities = {
         item.muscle: item for item in eligible_body_analysis_priorities(request, ruleset)
     }
-    effective_priorities = source.priority_muscles | body_analysis_priority_muscles(
-        request, ruleset
-    )
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
+    effective_priorities = frozenset(priority_policy.priorities)
     direct_exposures = (
         direct_exposure_counts
         if direct_exposure_counts is not None
@@ -137,6 +136,7 @@ def plan_weekly_volume(
         if muscle in source.priority_muscles:
             sets = min(muscle_maximum, sets + ruleset.priority_muscle_bonus_sets)
             reasons.append("VOLUME_INCREASED_FOR_PRIORITY_MUSCLE")
+            reasons.append("PRIORITY_VOLUME_INCREASED")
         body_priority = body_priorities.get(muscle)
         if body_priority is not None:
             bonus = (
