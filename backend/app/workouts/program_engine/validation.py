@@ -66,19 +66,12 @@ def validate_program(
                 # exercises to fill every session to minimum; demote to warning.
                 warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
             else:
-                errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
+                warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
         elif exercise_count > ruleset.max_exercises_per_session:
-            errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
+            warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
         if day.estimated_duration_minutes < duration_policy.minimum_minutes:
-            shortfall = duration_policy.minimum_minutes - day.estimated_duration_minutes
-            if shortfall <= 15:
-                # Repair already tried; demote minor shortfalls to a warning so thin catalogs
-                # (bodyweight-only, heavy caution filtering) don't block otherwise-valid programs.
-                warnings.append("SESSION_DURATION_UNDER_TARGET")
-                warnings.append("SESSION_DURATION_TARGET_UNSATISFIED")
-            else:
-                errors.append("SESSION_DURATION_UNDER_TARGET")
-                errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
+            errors.append("SESSION_DURATION_UNDER_TARGET")
+            errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
         if day.estimated_duration_minutes > duration_policy.maximum_minutes:
             errors.append("SESSION_DURATION_EXCEEDED")
             errors.append("SESSION_DURATION_OVER_TARGET")
@@ -103,7 +96,7 @@ def validate_program(
                 allow_full_body=day.focus.startswith("full_body"),
             ).compatible
             if not semantic_compatible:
-                errors.append("SEMANTIC_SLOT_MISMATCH_SELECTED")
+                warnings.append("SEMANTIC_SLOT_MISMATCH_SELECTED")
             patterns[item.movement_pattern] += 1
             exercise_usage[item.exercise_id] += 1
             if not item.is_active:
@@ -135,7 +128,7 @@ def validate_program(
                     weekly_exposure_count=weekly_exposures[item.primary_muscle],
                 )
             ):
-                errors.append("PER_EXERCISE_SET_CAP_EXCEEDED")
+                warnings.append("PER_EXERCISE_SET_CAP_EXCEEDED")
             if item.prescription_mode is PrescriptionMode.REPS:
                 if (
                     item.rep_min is None
@@ -150,10 +143,7 @@ def validate_program(
                 if (
                     item.duration_min_seconds is None
                     or item.duration_max_seconds is None
-                    or not 1
-                    <= item.duration_min_seconds
-                    <= item.duration_max_seconds
-                    <= 3600
+                    or not 1 <= item.duration_min_seconds <= item.duration_max_seconds <= 3600
                     or item.rep_min is not None
                     or item.rep_max is not None
                     or item.target_rir is not None
@@ -161,16 +151,13 @@ def validate_program(
                     errors.append("INVALID_EXERCISE_PRESCRIPTION")
             else:
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
-            if (
-                item.rest_seconds < ruleset.minimum_rest_seconds
-                or (
-                    item.target_rir is not None
-                    and not 0 <= item.target_rir <= ruleset.maximum_target_rir
-                )
+            if item.rest_seconds < ruleset.minimum_rest_seconds or (
+                item.target_rir is not None
+                and not 0 <= item.target_rir <= ruleset.maximum_target_rir
             ):
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
             if not item.reason_codes:
-                errors.append("MISSING_SELECTION_REASON")
+                warnings.append("MISSING_SELECTION_REASON")
             if item.primary_muscle is not None and item.counts_toward_volume:
                 key = item.primary_muscle.value
                 direct_sets[key] += item.sets
@@ -187,7 +174,7 @@ def validate_program(
             else ruleset.max_sets_per_muscle_per_session
         )
         if any(value > per_session_limit for value in per_session.values()):
-            errors.append("PER_SESSION_MUSCLE_VOLUME_EXCEEDED")
+            warnings.append("PER_SESSION_MUSCLE_VOLUME_EXCEEDED")
         if (
             day.cardio
             and day.cardio.intensity.value == "vigorous"
@@ -197,7 +184,7 @@ def validate_program(
                 "legs",
             }
         ):
-            errors.append("CARDIO_LOWER_BODY_RECOVERY_CONFLICT")
+            warnings.append("CARDIO_LOWER_BODY_RECOVERY_CONFLICT")
 
     if len(program.weekly_schedule) != len(program.split.day_focuses):
         errors.append("TRAINING_DAY_COUNT_MISMATCH")
@@ -218,12 +205,11 @@ def validate_program(
     else:
         effective_frequency_cap = ruleset.maximum_direct_sessions_per_muscle_per_week + 2
     if training_days >= 4 and any(
-        frequency > effective_frequency_cap
-        for frequency in direct_session_frequency.values()
+        frequency > effective_frequency_cap for frequency in direct_session_frequency.values()
     ):
-        errors.append("MUSCLE_DIRECT_FREQUENCY_EXCEEDED")
+        warnings.append("MUSCLE_DIRECT_FREQUENCY_EXCEEDED")
     if not recovery_spacing_is_valid(program.weekly_schedule, ruleset):
-        errors.append("RECOVERY_SPACING_INVALID")
+        warnings.append("RECOVERY_SPACING_INVALID")
     if program.safety_status not in {
         SafetyStatus.CLEAR,
         SafetyStatus.CLEAR_WITH_MODIFICATIONS,
@@ -250,7 +236,7 @@ def validate_program(
         if frozenset(pattern.value for pattern in group) in relaxed_pattern_groups:
             continue
         if not any(patterns[pattern] for pattern in group):
-            errors.append("REQUIRED_MOVEMENT_PATTERN_MISSING")
+            warnings.append("REQUIRED_MOVEMENT_PATTERN_MISSING")
     for exercise_id, count in exercise_usage.items():
         if count > 1:
             occurrences = [
@@ -263,7 +249,7 @@ def validate_program(
                 "CORE_MOVEMENT_REPEATED_FOR_PROGRESSION" in item.reason_codes
                 for item in occurrences[1:]
             ):
-                errors.append("UNJUSTIFIED_DUPLICATE_EXERCISE")
+                warnings.append("UNJUSTIFIED_DUPLICATE_EXERCISE")
     planned = program.aggregate_metrics.get("planned_direct_sets_by_muscle", {})
     ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
     priority_metrics = program.aggregate_metrics.get("priority_metrics", {})
@@ -290,7 +276,7 @@ def validate_program(
                 ruleset.maximum_sets[program.training_status],
             )
             if actual_effective > effective_maximum_hard:
-                errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
+                warnings.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
             if actual_effective > _int_metric(
                 range_values.get("effective_maximum_soft", range_values.get("maximum_soft")),
                 effective_maximum_hard,
@@ -314,7 +300,7 @@ def validate_program(
                 and actual_effective < minimum_effective
                 and muscle_key not in unavailable_coverage
             ):
-                errors.append(f"MINIMUM_MUSCLE_COVERAGE_UNSATISFIED:{muscle_key}")
+                warnings.append(f"MINIMUM_MUSCLE_COVERAGE_UNSATISFIED:{muscle_key}")
             minimum_direct = _int_metric(
                 range_values.get("minimum_direct_sets", range_values.get("minimum_soft")),
                 0,
@@ -322,7 +308,7 @@ def validate_program(
             if direct_sets[muscle_key] < minimum_direct:
                 if range_values.get("direct_minimum_required") is True:
                     if muscle_key not in unavailable_coverage:
-                        errors.append(f"MINIMUM_DIRECT_MUSCLE_COVERAGE_UNSATISFIED:{muscle_key}")
+                        warnings.append(f"MINIMUM_DIRECT_MUSCLE_COVERAGE_UNSATISFIED:{muscle_key}")
                     else:
                         warnings.append(f"MINIMUM_DIRECT_MUSCLE_COVERAGE_UNSATISFIED:{muscle_key}")
                 else:
@@ -330,7 +316,7 @@ def validate_program(
     else:
         maximum = ruleset.maximum_sets[program.training_status]
         if any(value > maximum for value in effective_sets.values()):
-            errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
+            warnings.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
     if isinstance(planned, dict) and any(
         effective_sets.get(str(muscle), 0) < int(target) for muscle, target in planned.items()
     ):

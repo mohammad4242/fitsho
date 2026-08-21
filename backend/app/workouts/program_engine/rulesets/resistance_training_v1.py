@@ -194,17 +194,21 @@ class ProgramRuleset:
             self.max_working_sets_per_exercise_per_session[training_status],
             self.exercise_type_set_cap[exercise_type],
         )
-        if goal is Goal.STRENGTH and exercise_type is ExerciseType.COMPOUND:
+        is_strength_compound = goal is Goal.STRENGTH and exercise_type is ExerciseType.COMPOUND
+        if is_strength_compound:
             cap += self.strength_compound_set_cap_bonus
         if is_priority:
             cap += self.priority_set_cap_bonus
         if weekly_exposure_count <= 1:
             cap += self.single_exposure_set_cap_bonus
+
+        absolute_cap = 5 if is_strength_compound else 4
         return min(
             cap,
-            self.max_working_sets_per_exercise_absolute,
+            absolute_cap,
             self.max_sets_per_muscle_per_session,
         )
+
     upper_body_load_increase_percent: tuple[float, float] = (2.5, 5.0)
     lower_body_load_increase_percent: tuple[float, float] = (5.0, 10.0)
     deload_volume_reduction_percent: tuple[int, int] = (30, 50)

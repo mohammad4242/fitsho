@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.exercises.enums import ExerciseLabel, ExerciseType, MovementPattern, MuscleGroup
+from app.workouts.program_engine.enums import CompatibilityLevel
 
 
 class SemanticCandidate(Protocol):
@@ -18,6 +19,7 @@ class SemanticCandidate(Protocol):
 
     @property
     def exercise_type(self) -> ExerciseType: ...
+
 
 PUSH_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH})
 PULL_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL})
@@ -39,8 +41,12 @@ LOWER_ACCESSORY_PATTERNS = frozenset({MovementPattern.KNEE_FLEXION, MovementPatt
 
 @dataclass(frozen=True)
 class SlotCompatibility:
-    compatible: bool
+    level: CompatibilityLevel
     reason_codes: tuple[str, ...]
+
+    @property
+    def compatible(self) -> bool:
+        return self.level != CompatibilityLevel.HARD_INCOMPATIBLE
 
 
 def evaluate_candidate_slot_compatibility(
@@ -53,13 +59,19 @@ def evaluate_candidate_slot_compatibility(
 ) -> SlotCompatibility:
     pattern = candidate.movement_pattern
     if pattern is MovementPattern.OTHER:
-        return SlotCompatibility(False, ("SLOT_SEMANTIC_METADATA_INCOMPLETE",))
+        return SlotCompatibility(
+            CompatibilityLevel.HARD_INCOMPATIBLE, ("SLOT_SEMANTIC_METADATA_INCOMPLETE",)
+        )
     if pattern not in allowed_patterns:
-        return SlotCompatibility(False, ("SLOT_MOVEMENT_PATTERN_MISMATCH",))
+        return SlotCompatibility(
+            CompatibilityLevel.HARD_INCOMPATIBLE, ("SLOT_MOVEMENT_PATTERN_MISMATCH",)
+        )
 
     _focus_patterns, focus_muscles = _scope_for_focus(day_focus)
     if day_focus is not None and pattern not in _focus_patterns:
-        return SlotCompatibility(False, ("SLOT_MOVEMENT_PATTERN_MISMATCH",))
+        return SlotCompatibility(
+            CompatibilityLevel.HARD_INCOMPATIBLE, ("SLOT_MOVEMENT_PATTERN_MISMATCH",)
+        )
 
     effective_targets = target_muscles if target_muscles is not None else focus_muscles
     specialized = effective_targets is not None
@@ -70,20 +82,22 @@ def evaluate_candidate_slot_compatibility(
         and (ExerciseLabel.FULL_BODY in getattr(candidate, "labels", ()) or cross_region_compound)
     ):
         return SlotCompatibility(
-            False,
+            CompatibilityLevel.HARD_INCOMPATIBLE,
             ("SLOT_FULL_BODY_INCOMPATIBLE_WITH_SPECIALIZED_FOCUS",),
         )
 
     if effective_targets is None:
-        return SlotCompatibility(True, ())
+        return SlotCompatibility(CompatibilityLevel.PREFERRED, ())
     if candidate.primary_muscle in effective_targets:
-        return SlotCompatibility(True, ())
-    if (
-        candidate.exercise_type is ExerciseType.COMPOUND
-        and set(candidate.secondary_muscles).intersection(effective_targets)
-    ):
-        return SlotCompatibility(True, ("SLOT_COMPATIBLE_COMPOUND_SECONDARY_TARGET",))
-    return SlotCompatibility(False, ("SLOT_SEMANTIC_MISMATCH",))
+        return SlotCompatibility(CompatibilityLevel.PREFERRED, ())
+    if candidate.exercise_type is ExerciseType.COMPOUND and set(
+        candidate.secondary_muscles
+    ).intersection(effective_targets):
+        return SlotCompatibility(
+            CompatibilityLevel.VALID_BUT_SUBOPTIMAL,
+            ("SLOT_COMPATIBLE_COMPOUND_SECONDARY_TARGET",),
+        )
+    return SlotCompatibility(CompatibilityLevel.HARD_INCOMPATIBLE, ("SLOT_SEMANTIC_MISMATCH",))
 
 
 def is_candidate_compatible_with_slot(

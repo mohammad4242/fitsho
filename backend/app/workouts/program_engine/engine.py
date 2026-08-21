@@ -196,28 +196,14 @@ def generate_program(
         candidate for candidate in ranked_splits if len(candidate.day_focuses) == requested_days
     )
     if not exact_day_splits:
-        reason_codes = (
+        collected_errors: list[str] = [
             "REQUESTED_TRAINING_DAYS_UNSATISFIED",
             "NO_EXACT_DAY_SPLIT_AVAILABLE",
-        )
-        return ProgramGenerationResult(
-            program=None,
-            error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
-            errors=reason_codes,
-            safety_status=safety.status,
-            rejected_candidates=eligibility.rejected,
-            decision_trace=(
-                {
-                    "stage": "day_count_invariant",
-                    "status": "rejected",
-                    "expected_days": requested_days,
-                    "actual_days": None,
-                    "reason_codes": reason_codes,
-                },
-            ),
-        )
-    rejected_splits: list[dict[str, object]] = []
-    collected_errors: list[str] = []
+        ]
+        rejected_splits: list[dict[str, object]] = []
+    else:
+        rejected_splits = []
+        collected_errors = []
     for attempt_index, candidate in enumerate(exact_day_splits):
         split = candidate
         if attempt_index:
@@ -254,6 +240,36 @@ def generate_program(
         if result.decision_trace:
             rejected_attempt["decision_trace"] = result.decision_trace
         rejected_splits.append(rejected_attempt)
+
+    weekdays_fallback = (
+        exact_day_splits[0].weekdays if exact_day_splits else tuple(range(requested_days))
+    )
+    fallback_split = SplitPlan(
+        split_type=SplitType.FULL_BODY,
+        day_focuses=tuple(["full_body"] * requested_days),
+        weekdays=weekdays_fallback,
+        score=-1000,
+        reason_codes=("DYNAMIC_EXACT_N_FALLBACK",),
+    )
+    result = _program_for_split(
+        request,
+        normalized,
+        safety.status,
+        safety.reason_codes,
+        eligibility.rejected,
+        eligibility.eligible,
+        eligibility.cardio_eligible,
+        fallback_split,
+        ruleset,
+        previous_volume=previous_volume,
+        cardio_reserve=reserve,
+        rejected_splits=tuple(rejected_splits),
+        template_rejection_trace=template_rejection_trace,
+        relaxable_required_pattern_groups=relaxable_required_pattern_groups,
+    )
+    if result.is_success:
+        return result
+    collected_errors.extend(result.errors)
     errors = (
         "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED",
         "EXACT_DAY_SPLIT_ALTERNATIVES_EXHAUSTED",
@@ -811,15 +827,13 @@ def _volume_metrics(
             tuple(pattern.value for pattern in group) for group in relaxed_required_pattern_groups
         )
         metrics["relaxed_required_pattern_groups"] = relaxed_group_values
-        
+
     if global_relaxable_groups:
         # Map each globally relaxable pattern group to the muscles whose coverage becomes
         # unavailable.
         # This prevents the validator from raising MINIMUM_MUSCLE_COVERAGE_UNSATISFIED
         # when the exercise pool simply cannot supply those movement patterns.
-        _pattern_group_to_unavailable_muscles: dict[
-            frozenset[MovementPattern], tuple[str, ...]
-        ] = {
+        _pattern_group_to_unavailable_muscles: dict[frozenset[MovementPattern], tuple[str, ...]] = {
             KNEE_PATTERNS: (MuscleGroup.QUADRICEPS.value,),
             PULL_PATTERNS: (MuscleGroup.BACK.value, MuscleGroup.BICEPS.value),
             PUSH_PATTERNS: (

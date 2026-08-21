@@ -140,3 +140,9 @@ class CardioIntensity(StrEnum):
     EASY = "easy"
     MODERATE = "moderate"
     VIGOROUS = "vigorous"
+
+
+class CompatibilityLevel(StrEnum):
+    PREFERRED = "PREFERRED"
+    VALID_BUT_SUBOPTIMAL = "VALID_BUT_SUBOPTIMAL"
+    HARD_INCOMPATIBLE = "HARD_INCOMPATIBLE"

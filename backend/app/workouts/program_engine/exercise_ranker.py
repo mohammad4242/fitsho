@@ -3,6 +3,7 @@ import hashlib
 from app.exercises.enums import ExerciseType, MuscleGroup
 from app.workouts.program_engine.body_analysis import eligible_body_analysis_priorities
 from app.workouts.program_engine.enums import (
+    CompatibilityLevel,
     Goal,
     ImpactLimit,
     SkillDemand,
@@ -24,6 +25,7 @@ def rank_exercises(
     ruleset: ProgramRuleset,
     *,
     needed_muscle: MuscleGroup | None = None,
+    compatibility_levels: dict[UUID, CompatibilityLevel] | None = None,
 ) -> tuple[RankedCandidate, ...]:
     ranked: list[tuple[RankedCandidate, str]] = []
     weights = ruleset.selection_weights
@@ -103,6 +105,15 @@ def rank_exercises(
             reasons.append("HIGH_STIMULUS_LOW_FATIGUE")
         score += max(0, weights["time_efficiency"] - exercise.setup_cost)
         reasons.extend(("EQUIPMENT_MATCH", "TIME_EFFICIENT"))
+
+        if compatibility_levels and exercise.id in compatibility_levels:
+            if compatibility_levels[exercise.id] == CompatibilityLevel.VALID_BUT_SUBOPTIMAL:
+                score -= 1000
+                reasons.append("VALID_BUT_SUBOPTIMAL_SEMANTICS")
+            elif compatibility_levels[exercise.id] == CompatibilityLevel.HARD_INCOMPATIBLE:
+                score -= 10000
+                reasons.append("RECOVERED_INCOMPATIBLE_SEMANTICS")
+
         tie_key = hashlib.sha256(f"{request.seed}:{exercise.id}".encode()).hexdigest()
         ranked.append(
             (

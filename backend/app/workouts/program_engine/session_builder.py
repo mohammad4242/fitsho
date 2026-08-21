@@ -5,7 +5,7 @@ from uuid import UUID
 
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.body_analysis import body_analysis_priority_muscles
-from app.workouts.program_engine.enums import Goal
+from app.workouts.program_engine.enums import CompatibilityLevel, Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.replacement_ranker import rank_replacement_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
@@ -105,6 +105,7 @@ def build_sessions(
             chosen_ids = {selected.id for selected in chosen}
             options: list[ExerciseCandidate] = []
             rejected_slot_reasons: list[str] = []
+            comp_levels = {}
             for pattern in slot.patterns:
                 for item in by_pattern.get(pattern, ()):
                     if item.id in chosen_ids:
@@ -122,13 +123,26 @@ def build_sessions(
                     )
                     if compatibility.compatible:
                         options.append(item)
+                        comp_levels[item.id] = compatibility.level
                     else:
                         rejected_slot_reasons.extend(compatibility.reason_codes)
             if rejected_slot_reasons:
                 session_reasons = session_reasons + tuple(rejected_slot_reasons)
             if not options:
                 if slot.required:
-                    if slot.patterns in relaxable_required_pattern_groups:
+                    fallback_options = []
+                    for pattern in slot.patterns:
+                        for item in by_pattern.get(pattern, ()):
+                            if item.id not in chosen_ids:
+                                fallback_options.append(item)
+                    if fallback_options:
+                        options = fallback_options
+                        for item in options:
+                            comp_levels[item.id] = CompatibilityLevel.HARD_INCOMPATIBLE
+                        session_reasons = session_reasons + (
+                            "RECOVERY_RELAXED_SEMANTICS_FOR_REQUIRED_SLOT",
+                        )
+                    elif slot.patterns in relaxable_required_pattern_groups:
                         relaxed = tuple(sorted(slot.patterns, key=lambda item: item.value))
                         this_session_relaxed_groups.append(relaxed)
                         session_reasons = session_reasons + (
@@ -136,13 +150,16 @@ def build_sessions(
                             "RECOVERY_APPLIED_REQUIRED_SLOT_RELAXATION",
                         )
                         continue
-                    raise SessionConstructionError(index + 1, focus, slot)
-                continue
+                    else:
+                        raise SessionConstructionError(index + 1, focus, slot)
+                else:
+                    continue
             ranked = rank_exercises(
                 request,
                 options,
                 ruleset,
                 needed_muscle=slot.target_muscle,
+                compatibility_levels=comp_levels,
             )
             selected = min(
                 ranked,
@@ -169,14 +186,14 @@ def build_sessions(
             usage[selected.exercise.id] += 1
 
         while len(chosen) < min(capacity, ruleset.minimum_exercises_per_session):
-            options = _compatible_supplements(focus, exercises, chosen)
+            options, comp_levels = _compatible_supplements(focus, exercises, chosen)
             if not options:
                 session_reasons = session_reasons + (
                     "SESSION_MINIMUM_UNSATISFIED_AFTER_SUPPLEMENTS",
                 )
                 break
             selected = min(
-                rank_exercises(request, options, ruleset),
+                rank_exercises(request, options, ruleset, compatibility_levels=comp_levels),
                 key=lambda item: (
                     _role_repeated(item.exercise, chosen),
                     usage[item.exercise.id],
@@ -242,9 +259,7 @@ def build_sessions(
                 selection_reasons=reasons,
                 substitutions=substitutions,
                 reason_codes=tuple(dict.fromkeys(session_reasons)),
-                relaxed_required_pattern_groups=tuple(
-                    dict.fromkeys(this_session_relaxed_groups)
-                ),
+                relaxed_required_pattern_groups=tuple(dict.fromkeys(this_session_relaxed_groups)),
             )
         )
     return tuple(sessions)
@@ -263,14 +278,20 @@ def _compatible_supplements(
     focus: str,
     exercises: tuple[ExerciseCandidate, ...],
     chosen: list[ExerciseCandidate],
-) -> list[ExerciseCandidate]:
+) -> tuple[list[ExerciseCandidate], dict[UUID, CompatibilityLevel]]:
     chosen_ids = {item.id for item in chosen}
-    return [
-        item for item in exercises if item.id not in chosen_ids and exercise_fits_focus(item, focus)
-    ]
+    options = []
+    levels: dict[UUID, CompatibilityLevel] = {}
+    for item in exercises:
+        if item.id not in chosen_ids:
+            comp = evaluate_exercise_focus_compatibility(item, focus)
+            if comp.compatible:
+                options.append(item)
+                levels[item.id] = comp.level
+    return options, levels
 
 
-def exercise_fits_focus(exercise: ExerciseCandidate, focus: str) -> bool:
+def evaluate_exercise_focus_compatibility(exercise: ExerciseCandidate, focus: str) -> SlotCompatibility:
     patterns, muscles = _supplement_scope(focus)
     return evaluate_candidate_slot_compatibility(
         exercise,
@@ -278,7 +299,11 @@ def exercise_fits_focus(exercise: ExerciseCandidate, focus: str) -> bool:
         target_muscles=muscles,
         day_focus=focus,
         allow_full_body=focus.startswith("full_body"),
-    ).compatible
+    )
+
+
+def exercise_fits_focus(exercise: ExerciseCandidate, focus: str) -> bool:
+    return evaluate_exercise_focus_compatibility(exercise, focus).compatible
 
 
 def _role_repeated(
