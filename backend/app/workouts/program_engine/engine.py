@@ -273,6 +273,23 @@ def generate_program(
     )
 
 
+def _rejected_split_recovery_reasons(
+    rejected_splits: tuple[dict[str, object], ...],
+) -> tuple[str, ...]:
+    reasons: list[str] = []
+    for rejected_split in rejected_splits:
+        decision_trace = rejected_split.get("decision_trace")
+        if not isinstance(decision_trace, tuple):
+            continue
+        for entry in decision_trace:
+            if not isinstance(entry, dict) or entry.get("stage") != "construction_recovery":
+                continue
+            reason_codes = entry.get("reason_codes")
+            if isinstance(reason_codes, tuple):
+                reasons.extend(code for code in reason_codes if isinstance(code, str))
+    return tuple(dict.fromkeys(reasons))
+
+
 def _program_for_split(
     request: ProgramGenerationRequest,
     normalized: NormalizedProgramRequest,
@@ -383,6 +400,7 @@ def _program_for_split(
         dict.fromkeys(
             (
                 *(("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE",) if rejected_splits else ()),
+                *_rejected_split_recovery_reasons(rejected_splits),
                 *session_reasons,
                 *recovery_repair_reasons,
             )
@@ -535,6 +553,7 @@ def _reference_program(
         ruleset,
         candidates=eligible,
         cardio_reserve_minutes=cardio_reserve,
+        allow_soft_exercise_additions=False,
     )
     days = add_cardio(normalized, days, cardio_eligible, ruleset)
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)

@@ -40,6 +40,13 @@ def prescribe_sessions(
         for item in draft.exercises
         if item.primary_muscle is not None
     )
+    exposure_counts = Counter(
+        muscle
+        for draft in drafts
+        for muscle in {item.primary_muscle for item in draft.exercises}
+        if muscle is not None
+    )
+    targets = {target.muscle: target for target in volume.targets}
     allocations = {
         muscle: iter(
             allocate_direct_sets(
@@ -90,6 +97,21 @@ def prescribe_sessions(
                 else:
                     sets = min(sets, remaining_direct_sets)
                     direct_session_sets[primary_muscle] += sets
+            cap = ruleset.max_working_sets_for_exercise(
+                training_status=request.training_status,
+                goal=request.primary_goal,
+                exercise_type=exercise.exercise_type,
+                is_priority=(
+                    targets[primary_muscle].direct_minimum_required
+                    if primary_muscle is not None and primary_muscle in targets
+                    else primary_muscle in request.source.priority_muscles
+                ),
+                weekly_exposure_count=(
+                    exposure_counts[primary_muscle] if primary_muscle is not None else 0
+                ),
+            )
+            cap_applied = sets > cap
+            sets = min(sets, cap)
             prescription = prescription_for(
                 request.primary_goal,
                 exercise.exercise_type,
@@ -135,6 +157,7 @@ def prescribe_sessions(
                     estimated_minutes=estimate_exercise_minutes(sets, rest, warmup_sets, ruleset),
                     reason_codes=(
                         draft.selection_reasons[exercise.id]
+                        + (("VOLUME_SET_CAP_APPLIED",) if cap_applied else ())
                         + (("SESSION_SIZE_ACCESSORY",) if not counts_toward_volume else ())
                     ),
                     substitution_exercise_ids=draft.substitutions[exercise.id],
@@ -152,6 +175,7 @@ def prescribe_sessions(
                     is_active=exercise.is_active,
                     is_programmable=exercise.is_programmable,
                     needs_review=exercise.needs_review,
+                    exercise_type=exercise.exercise_type,
                 )
             )
         estimated = ruleset.general_warmup_minutes + sum(

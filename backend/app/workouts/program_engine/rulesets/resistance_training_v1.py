@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 
+from app.exercises.enums import ExerciseType
 from app.workouts.program_engine.enums import Goal, SplitType, TrainingStatus
 
 MINIMUM_EXERCISES_PER_SESSION = 5
@@ -118,6 +119,27 @@ class ProgramRuleset:
     adaptation_max_replacement_preference_strength: int = 5
     adaptation_repeated_pain_signal_count: int = 2
     max_sets_per_muscle_per_session: int = 6
+    max_working_sets_per_exercise_per_session: dict[TrainingStatus, int] = field(
+        default_factory=lambda: {
+            TrainingStatus.NOVICE: 4,
+            TrainingStatus.EARLY_INTERMEDIATE: 4,
+            TrainingStatus.INTERMEDIATE: 5,
+            TrainingStatus.ADVANCED: 5,
+        }
+    )
+    max_working_sets_per_exercise_absolute: int = 5
+    exercise_type_set_cap: dict[ExerciseType, int] = field(
+        default_factory=lambda: {
+            ExerciseType.COMPOUND: 5,
+            ExerciseType.ISOLATION: 4,
+            ExerciseType.CORE: 5,
+            ExerciseType.MOBILITY: 3,
+            ExerciseType.OTHER: 4,
+        }
+    )
+    strength_compound_set_cap_bonus: int = 1
+    priority_set_cap_bonus: int = 1
+    single_exposure_set_cap_bonus: int = 1
     maximum_direct_sessions_per_muscle_per_week: int = 2
     max_exercises_per_session: int = MAXIMUM_EXERCISES_PER_SESSION
     minimum_exercises_per_session: int = MINIMUM_EXERCISES_PER_SESSION
@@ -158,6 +180,31 @@ class ProgramRuleset:
     fat_loss_cardio_days: int = 2
     maintenance_cardio_days: int = 1
     double_progression_qualifying_sessions: int = 2
+
+    def max_working_sets_for_exercise(
+        self,
+        *,
+        training_status: TrainingStatus,
+        goal: Goal,
+        exercise_type: ExerciseType,
+        is_priority: bool,
+        weekly_exposure_count: int,
+    ) -> int:
+        cap = min(
+            self.max_working_sets_per_exercise_per_session[training_status],
+            self.exercise_type_set_cap[exercise_type],
+        )
+        if goal is Goal.STRENGTH and exercise_type is ExerciseType.COMPOUND:
+            cap += self.strength_compound_set_cap_bonus
+        if is_priority:
+            cap += self.priority_set_cap_bonus
+        if weekly_exposure_count <= 1:
+            cap += self.single_exposure_set_cap_bonus
+        return min(
+            cap,
+            self.max_working_sets_per_exercise_absolute,
+            self.max_sets_per_muscle_per_session,
+        )
     upper_body_load_increase_percent: tuple[float, float] = (2.5, 5.0)
     lower_body_load_increase_percent: tuple[float, float] = (5.0, 10.0)
     deload_volume_reduction_percent: tuple[int, int] = (30, 50)

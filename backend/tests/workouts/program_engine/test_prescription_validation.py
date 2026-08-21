@@ -230,11 +230,14 @@ def test_volume_repair_reduces_hard_excess_before_validation() -> None:
     repaired_chest = next(
         item for item in repaired_days[0].exercises if item.primary_muscle is MuscleGroup.CHEST
     )
-    assert repaired_chest.sets == min(
-        RULESET.maximum_sets[result.program.training_status],
-        RULESET.max_sets_per_muscle_per_session,
+    assert repaired_chest.sets == RULESET.max_working_sets_for_exercise(
+        training_status=result.program.training_status,
+        goal=source.primary_goal,
+        exercise_type=chest.exercise_type,
+        is_priority=False,
+        weekly_exposure_count=1,
     )
-    assert "VOLUME_REPAIR_REDUCED_SET" in reasons
+    assert "VOLUME_REPAIR_REDUCED_SET_FOR_EXERCISE_CAP" in reasons
 
 
 def test_volume_target_keeps_effective_target_and_direct_minimum_separate() -> None:

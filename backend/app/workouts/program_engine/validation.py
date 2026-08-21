@@ -1,6 +1,6 @@
 from collections import Counter
 
-from app.exercises.enums import MovementPattern, PrescriptionMode
+from app.exercises.enums import MovementPattern, MuscleGroup, PrescriptionMode
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
     complete_tracked_metrics,
@@ -31,6 +31,25 @@ def validate_program(
     exercise_usage: Counter[object] = Counter()
     direct_sets: Counter[str] = Counter()
     direct_session_frequency: Counter[str] = Counter()
+    volume_ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
+    priority_muscles = set(request.priority_muscles)
+    if isinstance(volume_ranges, dict):
+        priority_muscles.update(
+            MuscleGroup(muscle)
+            for muscle, values in volume_ranges.items()
+            if isinstance(values, dict)
+            and values.get("direct_minimum_required") is True
+            and muscle in {item.value for item in MuscleGroup}
+        )
+    weekly_exposures: Counter[MuscleGroup] = Counter()
+    for day in program.weekly_schedule:
+        weekly_exposures.update(
+            {
+                item.primary_muscle
+                for item in day.exercises
+                if item.primary_muscle is not None and item.counts_toward_volume
+            }
+        )
     for day in program.weekly_schedule:
         if (
             not ruleset.minimum_exercises_per_session
@@ -64,7 +83,19 @@ def validate_program(
                 errors.append("UNAVAILABLE_EQUIPMENT_SELECTED")
             if item.sets < 1:
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
-            elif item.prescription_mode is PrescriptionMode.REPS:
+            if (
+                item.primary_muscle is not None
+                and item.sets
+                > ruleset.max_working_sets_for_exercise(
+                    training_status=program.training_status,
+                    goal=request.primary_goal,
+                    exercise_type=item.exercise_type,
+                    is_priority=item.primary_muscle in priority_muscles,
+                    weekly_exposure_count=weekly_exposures[item.primary_muscle],
+                )
+            ):
+                errors.append("PER_EXERCISE_SET_CAP_EXCEEDED")
+            if item.prescription_mode is PrescriptionMode.REPS:
                 if (
                     item.rep_min is None
                     or item.rep_max is None

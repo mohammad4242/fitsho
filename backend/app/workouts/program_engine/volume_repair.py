@@ -30,6 +30,7 @@ def repair_weekly_volume(
     *,
     candidates: tuple[ExerciseCandidate, ...] = (),
     cardio_reserve_minutes: int = 0,
+    allow_soft_exercise_additions: bool = True,
 ) -> tuple[tuple[WorkoutDay, ...], tuple[str, ...]]:
     """Keep effective volume inside targets and hard caps before validation.
 
@@ -59,6 +60,9 @@ def repair_weekly_volume(
             if sets > _maximum_for(muscle, targets, ruleset, request)
         }
         per_session_excessive = _per_session_excessive(repaired, ruleset)
+        per_exercise_excessive = _per_exercise_excessive(
+            repaired, request, targets, ruleset
+        )
         reduction = _select_reduction_candidate(
             repaired,
             weekly_excessive,
@@ -67,10 +71,16 @@ def repair_weekly_volume(
             targets,
             request,
             ruleset,
+            per_exercise_excessive,
         )
         if reduction is not None:
             day_index, exercise_index, exercise = reduction
             if exercise.sets > ruleset.minimum_working_sets:
+                reduction_reason = (
+                    "VOLUME_REPAIR_REDUCED_SET_FOR_EXERCISE_CAP"
+                    if (day_index, exercise_index) in per_exercise_excessive
+                    else "VOLUME_REPAIR_REDUCED_SET"
+                )
                 repaired[day_index][exercise_index] = replace(
                     exercise,
                     sets=exercise.sets - 1,
@@ -80,9 +90,9 @@ def repair_weekly_volume(
                         exercise.warmup_sets,
                         ruleset,
                     ),
-                    reason_codes=exercise.reason_codes + ("VOLUME_REPAIR_REDUCED_SET",),
+                    reason_codes=exercise.reason_codes + (reduction_reason,),
                 )
-                reasons.append("VOLUME_REPAIR_REDUCED_SET")
+                reasons.append(reduction_reason)
                 continue
             same_muscle_exposures = sum(
                 1
@@ -153,6 +163,36 @@ def repair_weekly_volume(
                 )
                 reasons.append("VOLUME_REPAIR_REDISTRIBUTED_SET_FOR_MINIMUM_COVERAGE")
                 continue
+        exercise_addition = _select_exercise_addition(
+            repaired,
+            days,
+            hard_direct_under,
+            hard_effective_under,
+            candidates,
+            request,
+            targets,
+            ruleset,
+        )
+        if (
+            exercise_addition is None
+            and not repairing_hard_minimum
+            and allow_soft_exercise_additions
+        ):
+            exercise_addition = _select_exercise_addition(
+                repaired,
+                days,
+                direct_under,
+                effective_under,
+                candidates,
+                request,
+                targets,
+                ruleset,
+            )
+        if exercise_addition is not None:
+            day_index, programmed = exercise_addition
+            repaired[day_index].append(programmed)
+            reasons.append("VOLUME_REPAIR_ADDED_EXERCISE_FOR_MINIMUM_COVERAGE")
+            continue
         addition = _select_addition_candidate(
             repaired,
             hard_direct_under if repairing_hard_minimum else direct_under,
@@ -169,48 +209,38 @@ def repair_weekly_volume(
             ruleset,
         )
         if addition is None:
-            exercise_addition = _select_exercise_addition(
-                repaired,
-                days,
-                hard_direct_under,
-                hard_effective_under,
-                candidates,
-                request,
-                targets,
-                ruleset,
-            )
-            if exercise_addition is None:
-                if repairing_hard_minimum and not candidates:
-                    soft_addition = _select_addition_candidate(
-                        repaired,
-                        direct_under,
-                        effective_under,
-                        direct,
-                        targets,
-                        tuple(day.cardio.duration_minutes if day.cardio else 0 for day in days),
-                        request,
-                        ruleset,
+            if repairing_hard_minimum and not candidates:
+                soft_addition = _select_addition_candidate(
+                    repaired,
+                    direct_under,
+                    effective_under,
+                    direct,
+                    targets,
+                    tuple(day.cardio.duration_minutes if day.cardio else 0 for day in days),
+                    request,
+                    ruleset,
+                )
+                if soft_addition is not None:
+                    day_index, exercise_index, exercise, reason = soft_addition
+                    repaired[day_index][exercise_index] = replace(
+                        exercise,
+                        sets=exercise.sets + 1,
+                        estimated_minutes=estimate_exercise_minutes(
+                            exercise.sets + 1,
+                            exercise.rest_seconds,
+                            exercise.warmup_sets,
+                            ruleset,
+                        ),
+                        reason_codes=exercise.reason_codes + (reason,),
                     )
-                    if soft_addition is not None:
-                        day_index, exercise_index, exercise, reason = soft_addition
-                        repaired[day_index][exercise_index] = replace(
-                            exercise,
-                            sets=exercise.sets + 1,
-                            estimated_minutes=estimate_exercise_minutes(
-                                exercise.sets + 1,
-                                exercise.rest_seconds,
-                                exercise.warmup_sets,
-                                ruleset,
-                            ),
-                            reason_codes=exercise.reason_codes + (reason,),
-                        )
-                        reasons.append(reason)
-                        continue
-                break
-            day_index, programmed = exercise_addition
-            repaired[day_index].append(programmed)
-            reasons.append("VOLUME_REPAIR_ADDED_EXERCISE_FOR_MINIMUM_COVERAGE")
-            continue
+                    reasons.append(reason)
+                    continue
+            reasons.append(
+                "VOLUME_REPAIR_HARD_MINIMUM_UNSATISFIED"
+                if repairing_hard_minimum
+                else "VOLUME_REPAIR_SOFT_TARGET_REDUCED"
+            )
+            break
         day_index, exercise_index, exercise, reason = addition
         repaired[day_index][exercise_index] = replace(
             exercise,
@@ -245,6 +275,8 @@ def _select_set_redistribution(
                 not recipient.counts_toward_volume
                 or recipient_muscle not in hard_direct_under
                 or direct_by_session[recipient_muscle] >= ruleset.max_sets_per_muscle_per_session
+                or recipient.sets
+                >= _exercise_set_cap(recipient, days, request, targets, ruleset)
             ):
                 continue
             for donor_index, donor in enumerate(exercises):
@@ -335,7 +367,7 @@ def _select_exercise_addition(
     if not needed or not candidates:
         return None
     selected_ids = {item.exercise_id for day in days for item in day}
-    options: list[tuple[int, int, int, int, str, ProgrammedExercise]] = []
+    options: list[tuple[int, int, int, int, int, str, ProgrammedExercise]] = []
     for muscle in sorted(needed, key=lambda item: item.value):
         muscle_candidates = tuple(
             candidate
@@ -351,6 +383,7 @@ def _select_exercise_addition(
             )
             sets = max(ruleset.minimum_working_sets, required_sets)
             sets = min(sets, ruleset.max_sets_per_muscle_per_session)
+            sets = min(sets, _candidate_set_cap(candidate, days, request, targets, ruleset))
             prescription = prescription_for(
                 request.primary_goal,
                 candidate.exercise_type,
@@ -426,10 +459,12 @@ def _select_exercise_addition(
                     is_active=candidate.is_active,
                     is_programmable=candidate.is_programmable,
                     needs_review=candidate.needs_review,
+                    exercise_type=candidate.exercise_type,
                 )
                 options.append(
                     (
                         0 if muscle in direct_under else 1,
+                        direct_by_session[muscle],
                         day_index,
                         -ranked.score,
                         1 if role_repeated else 0,
@@ -440,7 +475,7 @@ def _select_exercise_addition(
     if not options:
         return None
     selected = min(options, key=lambda item: item[:-1])
-    return selected[1], selected[-1]
+    return selected[2], selected[-1]
 
 
 def _maximum_for(
@@ -464,6 +499,7 @@ def _select_reduction_candidate(
     targets: dict[MuscleGroup, VolumeTarget],
     request: NormalizedProgramRequest,
     ruleset: ProgramRuleset,
+    per_exercise_excessive: set[tuple[int, int]],
 ) -> tuple[int, int, ProgrammedExercise] | None:
     candidates = []
     for day_index, exercises in enumerate(days):
@@ -473,7 +509,7 @@ def _select_reduction_candidate(
             affected = {exercise.primary_muscle.value} | {
                 muscle.value for muscle in exercise.secondary_muscles
             }
-            if (
+            if (day_index, exercise_index) not in per_exercise_excessive and (
                 not affected.intersection(weekly_excessive)
                 and (
                     day_index,
@@ -536,6 +572,8 @@ def _select_addition_candidate(
                 continue
             if direct_by_session[primary] >= ruleset.max_sets_per_muscle_per_session:
                 continue
+            if exercise.sets >= _exercise_set_cap(exercise, days, request, targets, ruleset):
+                continue
             updated = replace(
                 exercise,
                 sets=exercise.sets + 1,
@@ -570,6 +608,7 @@ def _select_addition_candidate(
                 (
                     0 if direct_needs else 1,
                     0 if primary in effective_under else 1,
+                    direct_by_session[primary],
                     day_index,
                     exercise_index,
                     exercise,
@@ -578,14 +617,14 @@ def _select_addition_candidate(
             )
     if not candidates:
         return None
-    _, _, day_index, exercise_index, exercise, reason = min(
+    _, _, _, day_index, exercise_index, exercise, reason = min(
         candidates,
         key=lambda candidate: (
             candidate[0],
             candidate[1],
             candidate[2],
             candidate[3],
-            str(candidate[4].exercise_id),
+            str(candidate[5].exercise_id),
         ),
     )
     return day_index, exercise_index, exercise, reason
@@ -613,6 +652,71 @@ def _per_session_excessive(
             if sets > ruleset.max_sets_per_muscle_per_session
         )
     return excessive
+
+
+def _per_exercise_excessive(
+    days: list[list[ProgrammedExercise]],
+    request: NormalizedProgramRequest,
+    targets: dict[MuscleGroup, VolumeTarget],
+    ruleset: ProgramRuleset,
+) -> set[tuple[int, int]]:
+    return {
+        (day_index, exercise_index)
+        for day_index, exercises in enumerate(days)
+        for exercise_index, exercise in enumerate(exercises)
+        if exercise.sets > _exercise_set_cap(exercise, days, request, targets, ruleset)
+    }
+
+
+def _exercise_set_cap(
+    exercise: ProgrammedExercise,
+    days: list[list[ProgrammedExercise]],
+    request: NormalizedProgramRequest,
+    targets: dict[MuscleGroup, VolumeTarget],
+    ruleset: ProgramRuleset,
+) -> int:
+    return ruleset.max_working_sets_for_exercise(
+        training_status=request.training_status,
+        goal=request.primary_goal,
+        exercise_type=exercise.exercise_type,
+        is_priority=(
+            targets[exercise.primary_muscle].direct_minimum_required
+            if exercise.primary_muscle in targets
+            else exercise.primary_muscle in request.source.priority_muscles
+        ),
+        weekly_exposure_count=_weekly_exposure_count(days, exercise.primary_muscle),
+    )
+
+
+def _candidate_set_cap(
+    candidate: ExerciseCandidate,
+    days: list[list[ProgrammedExercise]],
+    request: NormalizedProgramRequest,
+    targets: dict[MuscleGroup, VolumeTarget],
+    ruleset: ProgramRuleset,
+) -> int:
+    return ruleset.max_working_sets_for_exercise(
+        training_status=request.training_status,
+        goal=request.primary_goal,
+        exercise_type=candidate.exercise_type,
+        is_priority=(
+            targets[candidate.primary_muscle].direct_minimum_required
+            if candidate.primary_muscle in targets
+            else candidate.primary_muscle in request.source.priority_muscles
+        ),
+        weekly_exposure_count=_weekly_exposure_count(days, candidate.primary_muscle),
+    )
+
+
+def _weekly_exposure_count(
+    days: list[list[ProgrammedExercise]], muscle: MuscleGroup | None
+) -> int:
+    if muscle is None:
+        return 0
+    return sum(
+        any(item.primary_muscle is muscle and item.counts_toward_volume for item in exercises)
+        for exercises in days
+    )
 
 
 def _rebuild_days(

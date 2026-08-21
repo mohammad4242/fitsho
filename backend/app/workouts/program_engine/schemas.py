@@ -420,6 +420,7 @@ class ProgrammedExercise:
     is_programmable: bool = True
     needs_review: bool = False
     prescription_mode: PrescriptionMode = PrescriptionMode.REPS
+    exercise_type: ExerciseType = ExerciseType.OTHER
     duration_min_seconds: int | None = None
     duration_max_seconds: int | None = None
 
