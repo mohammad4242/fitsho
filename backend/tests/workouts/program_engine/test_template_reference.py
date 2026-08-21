@@ -404,6 +404,7 @@ def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> N
     )
     assert rejection["selected"] == unadaptable.slug
     assert rejection["reason_codes"]
+    assert "INITIAL_TEMPLATE_REJECTED_UNFILLABLE" in rejection["reason_codes"]
 
 
 def test_template_priority_volume_is_repaired_when_safe_capacity_exists() -> None:

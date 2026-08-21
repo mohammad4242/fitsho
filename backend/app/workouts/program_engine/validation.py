@@ -113,6 +113,13 @@ def validate_program(
         SafetyStatus.CLEAR_WITH_MODIFICATIONS,
     }:
         errors.append("SAFETY_STATUS_DISALLOWS_GENERATION")
+    relaxed_pattern_groups = {
+        frozenset(group)
+        for group in _sequence_metric(
+            program.aggregate_metrics.get("relaxed_required_pattern_groups", ())
+        )
+        if isinstance(group, (tuple, list, set, frozenset))
+    }
     for group in (
         {MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH},
         {MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL},
@@ -124,6 +131,8 @@ def validate_program(
             MovementPattern.CORE_ANTI_LATERAL_FLEXION,
         },
     ):
+        if frozenset(pattern.value for pattern in group) in relaxed_pattern_groups:
+            continue
         if not any(patterns[pattern] for pattern in group):
             errors.append("REQUIRED_MOVEMENT_PATTERN_MISSING")
     for exercise_id, count in exercise_usage.items():
@@ -173,7 +182,14 @@ def validate_program(
                 0,
             )
             coverage_required = range_values.get("minimum_coverage_required") is True
-            if coverage_required and actual_effective < minimum_effective:
+            unavailable_coverage = _sequence_metric(
+                program.aggregate_metrics.get("unavailable_muscle_coverage", ())
+            )
+            if (
+                coverage_required
+                and actual_effective < minimum_effective
+                and muscle_key not in unavailable_coverage
+            ):
                 errors.append(f"MINIMUM_MUSCLE_COVERAGE_UNSATISFIED:{muscle_key}")
             minimum_direct = _int_metric(
                 range_values.get("minimum_direct_sets", range_values.get("minimum_soft")),
@@ -220,3 +236,9 @@ def _int_metric(value: object, fallback: int) -> int:
     if isinstance(value, (int, float, str)):
         return int(value)
     return fallback
+
+
+def _sequence_metric(value: object) -> tuple[object, ...]:
+    if isinstance(value, (tuple, list, set, frozenset)):
+        return tuple(value)
+    return ()

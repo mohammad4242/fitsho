@@ -485,3 +485,4 @@ class SessionDraft:
     selection_reasons: dict[UUID, tuple[str, ...]] = field(default_factory=dict)
     substitutions: dict[UUID, tuple[UUID, ...]] = field(default_factory=dict)
     reason_codes: tuple[str, ...] = ()
+    relaxed_required_pattern_groups: tuple[tuple[MovementPattern, ...], ...] = ()

@@ -497,7 +497,7 @@ def test_missing_safe_candidates_returns_structured_failure() -> None:
     assert not result.is_success
     assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
     assert result.errors[0] == "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED"
-    assert "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT" in result.errors
+    assert "MINIMUM_MUSCLE_COVERAGE_UNSATISFIED:back" in result.errors
 
 
 def test_every_successful_program_passes_independent_validator() -> None:

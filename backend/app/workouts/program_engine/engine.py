@@ -1,6 +1,7 @@
 from collections import Counter
 from dataclasses import replace
 
+from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.body_analysis import (
     applicable_body_analysis_influence,
     body_analysis_priority_muscles,
@@ -33,7 +34,15 @@ from app.workouts.program_engine.schemas import (
     WorkoutDay,
     WorkoutProgram,
 )
-from app.workouts.program_engine.session_builder import SessionConstructionError, build_sessions
+from app.workouts.program_engine.session_builder import (
+    CORE_PATTERNS,
+    HINGE_PATTERNS,
+    KNEE_PATTERNS,
+    PULL_PATTERNS,
+    PUSH_PATTERNS,
+    SessionConstructionError,
+    build_sessions,
+)
 from app.workouts.program_engine.split_selector import rank_split_candidates
 from app.workouts.program_engine.template_selector import select_template_reference
 from app.workouts.program_engine.template_sessions import (
@@ -50,6 +59,38 @@ from app.workouts.program_engine.volume_history import (
 )
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from app.workouts.program_engine.volume_repair import repair_weekly_volume
+
+_RECOVERABLE_PATTERN_GROUPS = (
+    PUSH_PATTERNS,
+    PULL_PATTERNS,
+    KNEE_PATTERNS,
+    HINGE_PATTERNS,
+    CORE_PATTERNS,
+)
+
+
+def _recoverable_required_pattern_groups(
+    catalog: list[ExerciseCandidate] | tuple[ExerciseCandidate, ...],
+    eligible: tuple[ExerciseCandidate, ...],
+    rejected: tuple[RejectedCandidate, ...],
+) -> tuple[frozenset[MovementPattern], ...]:
+    """Find required groups absent only because hard constraints rejected them."""
+    eligible_patterns = {item.movement_pattern for item in eligible}
+    rejected_by_id = {item.exercise_id: item.reason_codes for item in rejected}
+    recoverable: list[frozenset[MovementPattern]] = []
+    for group in _RECOVERABLE_PATTERN_GROUPS:
+        if any(pattern in eligible_patterns for pattern in group):
+            continue
+        if any(
+            candidate.movement_pattern in group
+            and any(
+                reason.startswith("EXERCISE_REJECTED_")
+                for reason in rejected_by_id.get(candidate.id, ())
+            )
+            for candidate in catalog
+        ):
+            recoverable.append(group)
+    return tuple(recoverable)
 
 
 def generate_program(
@@ -94,6 +135,11 @@ def generate_program(
         )
     previous_volume = derive_previous_volume_baseline(normalized.source.recent_training_history)
     reserve = cardio_reserve_minutes(normalized, eligibility.cardio_eligible, ruleset)
+    relaxable_required_pattern_groups = _recoverable_required_pattern_groups(
+        exercise_catalog,
+        eligibility.eligible,
+        eligibility.rejected,
+    )
     template_rejection_trace: tuple[dict[str, object], ...] = ()
     reference = select_template_reference(
         normalized, eligibility.eligible, reference_templates, ruleset
@@ -134,7 +180,10 @@ def generate_program(
                     "stage": "template_reference",
                     "selected": reference.slug,
                     "status": "rejected",
-                    "reason_codes": exc.reason_codes,
+                    "reason_codes": (
+                        "INITIAL_TEMPLATE_REJECTED_UNFILLABLE",
+                        *exc.reason_codes,
+                    ),
                 },
             )
     rejected_splits: list[dict[str, object]] = []
@@ -161,6 +210,7 @@ def generate_program(
             cardio_reserve=reserve,
             rejected_splits=tuple(rejected_splits),
             template_rejection_trace=template_rejection_trace,
+            relaxable_required_pattern_groups=relaxable_required_pattern_groups,
         )
         if result.is_success:
             return result
@@ -210,10 +260,18 @@ def _program_for_split(
     cardio_reserve: int,
     rejected_splits: tuple[dict[str, object], ...],
     template_rejection_trace: tuple[dict[str, object], ...],
+    relaxable_required_pattern_groups: tuple[frozenset[MovementPattern], ...],
 ) -> ProgramGenerationResult:
     volume = plan_weekly_volume(normalized, split, ruleset, previous_volume=previous_volume)
     try:
-        drafts = build_sessions(normalized, split, volume, eligible, ruleset)
+        drafts = build_sessions(
+            normalized,
+            split,
+            volume,
+            eligible,
+            ruleset,
+            relaxable_required_pattern_groups=relaxable_required_pattern_groups,
+        )
     except SessionConstructionError as exc:
         construction_trace: tuple[dict[str, object], ...] = template_rejection_trace + (
             {
@@ -257,7 +315,16 @@ def _program_for_split(
         ruleset,
     )
     direct = Counter(effective_volume.direct_sets_by_muscle)
-    metrics = _volume_metrics(days, volume, previous_volume, ruleset)
+    relaxed_groups = tuple(
+        dict.fromkeys(group for draft in drafts for group in draft.relaxed_required_pattern_groups)
+    )
+    metrics = _volume_metrics(
+        days,
+        volume,
+        previous_volume,
+        ruleset,
+        relaxed_required_pattern_groups=relaxed_groups,
+    )
     body_trace = body_analysis_trace(normalized, ruleset)
     session_reasons = tuple(
         dict.fromkeys(reason for draft in drafts for reason in draft.reason_codes)
@@ -345,12 +412,25 @@ def _program_for_split(
             rejected_candidates=rejected,
             decision_trace=trace,
         )
-    program = replace(program, validation_report=report, warnings=report.warnings)
+    final_trace = trace + (
+        {
+            "stage": "final_construction",
+            "status": "succeeded",
+            "reason_codes": ("FINAL_CONSTRUCTION_SUCCEEDED",),
+        },
+    )
+    report = replace(report, decision_trace=final_trace)
+    program = replace(
+        program,
+        validation_report=report,
+        warnings=report.warnings,
+        decision_trace=final_trace,
+    )
     return ProgramGenerationResult(
         program=program,
         safety_status=safety_status,
         rejected_candidates=rejected,
-        decision_trace=trace,
+        decision_trace=final_trace,
     )
 
 
@@ -493,11 +573,24 @@ def _reference_program(
             rejected_candidates=rejected,
             decision_trace=trace,
         )
+    final_trace = trace + (
+        {
+            "stage": "final_construction",
+            "status": "succeeded",
+            "reason_codes": ("FINAL_CONSTRUCTION_SUCCEEDED",),
+        },
+    )
+    report = replace(report, decision_trace=final_trace)
     return ProgramGenerationResult(
-        program=replace(program, validation_report=report, warnings=report.warnings),
+        program=replace(
+            program,
+            validation_report=report,
+            warnings=report.warnings,
+            decision_trace=final_trace,
+        ),
         safety_status=safety_status,
         rejected_candidates=rejected,
-        decision_trace=trace,
+        decision_trace=final_trace,
     )
 
 
@@ -508,6 +601,7 @@ def _volume_metrics(
     ruleset: ProgramRuleset,
     *,
     reference_template: str | None = None,
+    relaxed_required_pattern_groups: tuple[tuple[MovementPattern, ...], ...] = (),
 ) -> dict[str, object]:
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises), ruleset
@@ -563,6 +657,16 @@ def _volume_metrics(
     }
     if reference_template is not None:
         metrics["reference_template"] = reference_template
+    if relaxed_required_pattern_groups:
+        relaxed_group_values = tuple(
+            tuple(pattern.value for pattern in group) for group in relaxed_required_pattern_groups
+        )
+        metrics["relaxed_required_pattern_groups"] = relaxed_group_values
+        knee_group = tuple(
+            pattern.value for pattern in sorted(KNEE_PATTERNS, key=lambda item: item.value)
+        )
+        if knee_group in relaxed_group_values:
+            metrics["unavailable_muscle_coverage"] = (MuscleGroup.QUADRICEPS.value,)
     return metrics
 
 

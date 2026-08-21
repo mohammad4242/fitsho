@@ -14,9 +14,9 @@ from app.workouts.program_engine.enums import (
     GenerationErrorCode,
     ImpactLimit,
     SkillDemand,
+    SplitType,
     StabilityDemand,
     TrainingExperience,
-    SplitType,
 )
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.normalization import normalize_request
@@ -104,7 +104,9 @@ def test_safe_layout_recovery_omits_hard_blocked_required_pattern() -> None:
         for day in sessions
         if day.focus == "lower"
     )
-    assert all(item.movement_pattern not in KNEE_PATTERNS for day in sessions for item in day.exercises)
+    assert all(
+        item.movement_pattern not in KNEE_PATTERNS for day in sessions for item in day.exercises
+    )
 
 
 def test_exact_valid_knee_caution_profile_recovers_without_unsafe_exercises() -> None:
@@ -136,12 +138,24 @@ def test_exact_valid_knee_caution_profile_recovers_without_unsafe_exercises() ->
         for day in result.program.weekly_schedule
         for item in day.exercises
     )
+    assert all(
+        item.equipment.issubset(source.available_equipment)
+        and item.caution_tags.isdisjoint(source.blocked_caution_tags)
+        for day in result.program.weekly_schedule
+        for item in day.exercises
+    )
     recovery = next(
         entry
         for entry in result.program.decision_trace
         if entry["stage"] == "construction_recovery"
     )
     assert "RECOVERY_APPLIED_REQUIRED_SLOT_RELAXATION" in recovery["reason_codes"]
+    final = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "final_construction"
+    )
+    assert final["reason_codes"] == ("FINAL_CONSTRUCTION_SUCCEEDED",)
 
 
 def test_constructible_major_coverage_is_repaired_before_success() -> None:
