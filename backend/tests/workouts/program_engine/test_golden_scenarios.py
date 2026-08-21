@@ -3,6 +3,7 @@ from dataclasses import replace
 import pytest
 
 from app.exercises.enums import Equipment, ExerciseCautionTag, MovementPattern, MuscleGroup
+from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -57,14 +58,14 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
     if source.available_training_days == 5:
         assert result.program.split.split_type in FIVE_DAY_SPLIT_TYPES
     assert result.program.validation_report.is_valid
+    policy = get_session_duration_policy(source.session_duration_minutes, RULESET)
     assert all(
-        day.estimated_duration_minutes
-        <= source.session_duration_minutes + RULESET.duration_tolerance_minutes
+        policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
         for day in result.program.weekly_schedule
     )
 
 
-@pytest.mark.parametrize("requested_days", [2, 3, 4, 5, 6])
+@pytest.mark.parametrize("requested_days", [2, 3, 4, 5])
 def test_successful_generation_preserves_requested_training_days(requested_days: int) -> None:
     source = request(
         available_training_days=requested_days,
@@ -81,6 +82,21 @@ def test_successful_generation_preserves_requested_training_days(requested_days:
     assert len(result.program.weekly_schedule) == requested_days
     assert len(result.program.split.day_focuses) == requested_days
     assert all(day.exercises for day in result.program.weekly_schedule)
+
+
+def test_six_day_generation_reports_duration_unsatisfied_instead_of_short_success() -> None:
+    source = request(
+        available_training_days=6,
+        training_experience="intermediate",
+        training_age_months=24,
+    )
+    catalog = full_catalog()
+    catalog.append(exercise("seated-calf", MovementPattern.CALF_RAISE, MuscleGroup.CALVES))
+
+    result = generate_program(source, catalog, RULESET)
+
+    assert not result.is_success
+    assert "SESSION_DURATION_TARGET_UNSATISFIED" in result.errors
 
 
 def test_preferred_weekdays_are_preserved_for_exact_day_generation() -> None:
@@ -459,7 +475,7 @@ def test_generation_uses_next_ranked_split_when_selected_layout_cannot_be_filled
         for entry in result.program.decision_trace
         if entry["stage"] == "construction_recovery"
     )
-    assert recovery["reason_codes"] == ("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE",)
+    assert "SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE" in recovery["reason_codes"]
     assert recovery["rejected_splits"][0]["split"] == SplitType.BODY_PART_ROTATION.value
     assert (
         "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT"

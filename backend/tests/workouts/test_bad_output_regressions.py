@@ -1,4 +1,5 @@
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
+from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     Goal,
@@ -43,7 +44,11 @@ def test_regression_thirty_minute_session_keeps_the_exercise_count_floor() -> No
         <= RULESET.max_exercises_per_session
         for day in result.program.weekly_schedule
     )
-    assert all(day.estimated_duration_minutes <= 35 for day in result.program.weekly_schedule)
+    policy = get_session_duration_policy(source.session_duration_minutes, RULESET)
+    assert all(
+        policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
+        for day in result.program.weekly_schedule
+    )
 
 
 def test_regression_repeated_exercises_have_progression_reason() -> None:

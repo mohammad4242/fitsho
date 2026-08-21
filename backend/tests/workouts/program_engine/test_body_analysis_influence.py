@@ -275,7 +275,7 @@ def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> Non
             training_experience="intermediate",
             training_age_months=24,
             available_training_days=4,
-            session_duration_minutes=120,
+            session_duration_minutes=90,
             available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
         ),
         full_catalog(),
@@ -321,7 +321,9 @@ def test_program_trace_preserves_provisional_analysis_version() -> None:
         for item in result.program.decision_trace
     )
     stages = [item["stage"] for item in result.program.decision_trace]
-    assert stages.index("safety") < stages.index("eligibility") < stages.index(
-        "body_analysis_influence"
+    assert (
+        stages.index("safety")
+        < stages.index("eligibility")
+        < stages.index("body_analysis_influence")
     )
     assert "BODY_ANALYSIS_NOT_FULLY_REVIEWED" in result.program.warnings

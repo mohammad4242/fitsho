@@ -43,6 +43,7 @@ from app.workouts.program_engine.session_builder import (
     SessionConstructionError,
     build_sessions,
 )
+from app.workouts.program_engine.session_duration import repair_session_durations
 from app.workouts.program_engine.split_selector import rank_split_candidates
 from app.workouts.program_engine.template_selector import select_template_reference
 from app.workouts.program_engine.template_sessions import (
@@ -354,6 +355,9 @@ def _program_for_split(
         cardio_reserve_minutes=cardio_reserve,
     )
     days = add_cardio(normalized, days, cardio_eligible, ruleset)
+    days, duration_repair_reasons = repair_session_durations(
+        days, normalized, eligible, ruleset, volume=volume
+    )
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
     day_count_errors = _day_count_errors(
         len(days), normalized.resistance_training_days, stage="dynamic_construction"
@@ -403,6 +407,7 @@ def _program_for_split(
                 *_rejected_split_recovery_reasons(rejected_splits),
                 *session_reasons,
                 *recovery_repair_reasons,
+                *duration_repair_reasons,
             )
         )
     )
@@ -445,6 +450,15 @@ def _program_for_split(
             "reasons": tuple(dict.fromkeys((*repair_reasons, *recovery_repair_reasons))),
             "weekly_direct_sets": dict(direct),
             "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
+        },
+        {
+            "stage": "session_duration",
+            "status": (
+                "repaired"
+                if "SESSION_DURATION_REPAIR_APPLIED" in duration_repair_reasons
+                else "validated"
+            ),
+            "reason_codes": duration_repair_reasons,
         },
     )
     empty_report = ValidationReport(
@@ -556,6 +570,9 @@ def _reference_program(
         allow_soft_exercise_additions=False,
     )
     days = add_cardio(normalized, days, cardio_eligible, ruleset)
+    days, duration_repair_reasons = repair_session_durations(
+        days, normalized, eligible, ruleset, volume=volume
+    )
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
     metrics = _volume_metrics(
         days,
@@ -604,6 +621,15 @@ def _reference_program(
             "reasons": tuple(dict.fromkeys((*repair_reasons, *recovery_repair_reasons))),
             "weekly_direct_sets": dict(direct),
             "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
+        },
+        {
+            "stage": "session_duration",
+            "status": (
+                "repaired"
+                if "SESSION_DURATION_REPAIR_APPLIED" in duration_repair_reasons
+                else "validated"
+            ),
+            "reason_codes": duration_repair_reasons,
         },
     )
     if day_count_errors:

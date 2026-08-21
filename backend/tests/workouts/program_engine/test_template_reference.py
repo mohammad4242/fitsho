@@ -423,7 +423,7 @@ def test_unadaptable_five_day_template_recovers_without_dropping_days() -> None:
             primary_goal="build_muscle",
             training_experience="beginner",
             training_age_months=3,
-            session_duration_minutes=60,
+            session_duration_minutes=45,
         ),
         full_catalog(),
         RULESET,

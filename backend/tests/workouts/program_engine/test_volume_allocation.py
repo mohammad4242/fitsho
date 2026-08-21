@@ -9,6 +9,7 @@ from app.exercises.enums import (
     MovementPattern,
     MuscleGroup,
 )
+from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
@@ -104,10 +105,7 @@ def test_volume_repair_uses_a_second_exercise_before_dumping_sets() -> None:
     )
 
     chest = [
-        item
-        for day in days
-        for item in day.exercises
-        if item.primary_muscle is MuscleGroup.CHEST
+        item for day in days for item in day.exercises if item.primary_muscle is MuscleGroup.CHEST
     ]
     assert len(chest) == 2
     assert max(item.sets for item in chest) <= 5
@@ -175,11 +173,7 @@ def test_priority_muscle_keeps_extra_volume_without_set_dumping() -> None:
     assert result.program is not None, result.errors
     direct = result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
     assert direct[MuscleGroup.SHOULDERS.value] > direct[MuscleGroup.CHEST.value]
-    assert all(
-        item.sets <= 5
-        for day in result.program.weekly_schedule
-        for item in day.exercises
-    )
+    assert all(item.sets <= 5 for day in result.program.weekly_schedule for item in day.exercises)
 
 
 def test_generate_program_preserves_volume_and_duration_constraints_without_set_dump() -> None:
@@ -191,10 +185,11 @@ def test_generate_program_preserves_volume_and_duration_constraints_without_set_
 
     assert result.program is not None, result.errors
     assert all(item.sets <= 5 for day in result.program.weekly_schedule for item in day.exercises)
+    policy = get_session_duration_policy(
+        int(result.program.user_profile_snapshot["session_duration_minutes"]), RULESET
+    )
     assert all(
-        day.estimated_duration_minutes
-        <= result.program.user_profile_snapshot["session_duration_minutes"]
-        + RULESET.duration_tolerance_minutes
+        policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
         for day in result.program.weekly_schedule
     )
     metrics = result.program.aggregate_metrics

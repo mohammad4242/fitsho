@@ -1,6 +1,7 @@
 from collections import Counter
 
 from app.exercises.enums import MovementPattern, MuscleGroup, PrescriptionMode
+from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
     complete_tracked_metrics,
@@ -33,6 +34,7 @@ def validate_program(
     direct_session_frequency: Counter[str] = Counter()
     volume_ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
     priority_muscles = set(request.priority_muscles)
+    duration_policy = get_session_duration_policy(request.session_duration_minutes, ruleset)
     if isinstance(volume_ranges, dict):
         priority_muscles.update(
             MuscleGroup(muscle)
@@ -57,10 +59,13 @@ def validate_program(
             <= (ruleset.max_exercises_per_session)
         ):
             errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-        if day.estimated_duration_minutes > (
-            request.session_duration_minutes + ruleset.duration_tolerance_minutes
-        ):
+        if day.estimated_duration_minutes < duration_policy.minimum_minutes:
+            errors.append("SESSION_DURATION_UNDER_TARGET")
+            errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
+        if day.estimated_duration_minutes > duration_policy.maximum_minutes:
             errors.append("SESSION_DURATION_EXCEEDED")
+            errors.append("SESSION_DURATION_OVER_TARGET")
+            errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
         per_session: Counter[str] = Counter()
         for item in day.exercises:
             patterns[item.movement_pattern] += 1
