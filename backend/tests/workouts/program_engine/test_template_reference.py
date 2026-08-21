@@ -407,6 +407,43 @@ def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> N
     assert "INITIAL_TEMPLATE_REJECTED_UNFILLABLE" in rejection["reason_codes"]
 
 
+def test_unadaptable_five_day_template_recovers_without_dropping_days() -> None:
+    base = _four_day_reference()
+    unadaptable = replace(
+        base,
+        slug="unadaptable-five-day-reference",
+        days_per_week=5,
+        training_level="beginner",
+        days=tuple(
+            replace(base.days[0], day_number=day_number)
+            for day_number in range(1, 6)
+        ),
+    )
+
+    result = generate_program(
+        template_request(
+            available_training_days=5,
+            primary_goal="build_muscle",
+            training_experience="beginner",
+            training_age_months=3,
+            session_duration_minutes=60,
+        ),
+        full_catalog(),
+        RULESET,
+        reference_templates=(unadaptable,),
+    )
+
+    assert result.program is not None, result.errors
+    assert len(result.program.weekly_schedule) == 5
+    assert all(day.exercises for day in result.program.weekly_schedule)
+    recovery = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "construction_recovery"
+    )
+    assert recovery["selected_split"] in {"body_part_rotation", "upper_lower_specialization"}
+
+
 def test_template_priority_volume_is_repaired_when_safe_capacity_exists() -> None:
     template = _four_day_reference()
 

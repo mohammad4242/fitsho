@@ -63,6 +63,51 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
     )
 
 
+@pytest.mark.parametrize("requested_days", [2, 3, 4, 5, 6])
+def test_successful_generation_preserves_requested_training_days(requested_days: int) -> None:
+    source = request(
+        available_training_days=requested_days,
+        training_experience="intermediate",
+        training_age_months=24,
+    )
+
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert result.program is not None, result.errors
+    assert len(result.program.weekly_schedule) == requested_days
+    assert len(result.program.split.day_focuses) == requested_days
+    assert all(day.exercises for day in result.program.weekly_schedule)
+
+
+def test_preferred_weekdays_are_preserved_for_exact_day_generation() -> None:
+    source = request(
+        available_training_days=3,
+        preferred_weekdays=(0, 2, 4),
+        training_experience="intermediate",
+        training_age_months=24,
+    )
+
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert result.program is not None, result.errors
+    assert tuple(day.weekday for day in result.program.weekly_schedule) == (0, 2, 4)
+
+
+def test_exact_day_construction_failure_does_not_return_shorter_success() -> None:
+    source = request(
+        available_training_days=5,
+        training_experience="intermediate",
+        training_age_months=24,
+    )
+    catalog = [item for item in full_catalog() if item.primary_muscle is MuscleGroup.CHEST]
+
+    result = generate_program(source, catalog, RULESET)
+
+    assert result.program is None
+    assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
+    assert "REQUESTED_TRAINING_DAYS_UNSATISFIED" in result.errors
+
+
 @pytest.mark.parametrize(
     "name",
     [
