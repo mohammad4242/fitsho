@@ -8,6 +8,7 @@ from app.workouts.program_engine.effective_volume import (
 from app.workouts.program_engine.enums import SafetyStatus
 from app.workouts.program_engine.recovery import recovery_spacing_is_valid
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
+from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
     ProgramGenerationRequest,
     ValidationReport,
@@ -54,7 +55,7 @@ def validate_program(
                 errors.append("BLOCKED_EXERCISE_SELECTED")
             if item.movement_pattern in constraints.blocked_movement_patterns:
                 errors.append("BLOCKED_MOVEMENT_PATTERN_SELECTED")
-            if item.caution_tags.intersection(constraints.blocked_caution_tags):
+            if effective_caution_tags(item).intersection(constraints.blocked_caution_tags):
                 errors.append("BLOCKED_CAUTION_TAG_SELECTED")
             if not item.equipment.issubset(constraints.available_equipment):
                 errors.append("UNAVAILABLE_EQUIPMENT_SELECTED")

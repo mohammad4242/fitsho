@@ -15,6 +15,7 @@ from app.exercises.enums import (
     BodyRegion,
     Difficulty,
     Equipment,
+    ExerciseCautionTag,
     ExerciseType,
     MediaPresentation,
     MediaType,
@@ -28,8 +29,15 @@ from app.exercises.models import (
     ExerciseSecondaryMuscle,
 )
 from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
-from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, Sex, TrainingLocation
-from app.profile.models import BodyMeasurement, UserProfile
+from app.profile.enums import (
+    ExperienceLevel,
+    FitnessGoal,
+    HomeTrainingSetup,
+    Sex,
+    TrainingCaution,
+    TrainingLocation,
+)
+from app.profile.models import BodyMeasurement, UserProfile, UserProfileTrainingCaution
 from app.profile.service import get_profile
 from app.workout_cycles.enums import (
     WorkoutCycleStatus,
@@ -149,6 +157,32 @@ def test_neutral_generation_overrides_do_not_erase_profile_preferences(db: Sessi
 
     assert request.preferred_weekdays == (0, 3)
     assert request.priority_muscles == frozenset({MuscleGroup.BACK})
+
+
+def test_generation_overrides_do_not_erase_profile_caution_constraints(db: Session) -> None:
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.training_caution_items.extend(
+        [
+            UserProfileTrainingCaution(caution=TrainingCaution.SHOULDER),
+            UserProfileTrainingCaution(caution=TrainingCaution.NECK),
+        ]
+    )
+    db.flush()
+
+    request = _service(db)._to_program_request(
+        get_profile(db, user.id),
+        ProgramGenerationOverrides(),
+    )
+
+    assert request.blocked_caution_tags == frozenset(
+        {
+            ExerciseCautionTag.OVERHEAD_POSITION,
+            ExerciseCautionTag.SHOULDER_INTERNAL_ROTATION,
+            ExerciseCautionTag.SHOULDER_EXTERNAL_ROTATION,
+            ExerciseCautionTag.NECK_LOADING,
+        }
+    )
 
 
 def test_domain_candidate_uses_persisted_programming_metadata(db: Session) -> None:

@@ -138,6 +138,117 @@ def test_no_overhead_limit_blocks_vertical_press() -> None:
     assert "EXERCISE_REJECTED_OVERHEAD_LIMIT" in result.rejected[0].reason_codes
 
 
+@pytest.mark.parametrize(
+    ("blocked_tags", "exercise_values"),
+    [
+        (
+            frozenset({ExerciseCautionTag.WRIST_LOADING}),
+            {"movement_pattern": MovementPattern.HORIZONTAL_PUSH},
+        ),
+        (
+            frozenset({ExerciseCautionTag.NECK_LOADING}),
+            {"movement_pattern": MovementPattern.SHRUG, "primary_muscle": MuscleGroup.TRAPS},
+        ),
+        (
+            frozenset({ExerciseCautionTag.SHOULDER_INTERNAL_ROTATION}),
+            {
+                "movement_pattern": MovementPattern.HORIZONTAL_PULL,
+                "primary_muscle": MuscleGroup.SHOULDERS,
+                "equipment": frozenset({Equipment.DUMBBELL}),
+            },
+        ),
+        (
+            frozenset({ExerciseCautionTag.DEEP_KNEE_FLEXION}),
+            {"movement_pattern": MovementPattern.SQUAT},
+        ),
+        (
+            frozenset({ExerciseCautionTag.LOWER_BACK_LOADING}),
+            {"movement_pattern": MovementPattern.HIP_HINGE},
+        ),
+    ],
+)
+def test_existing_metadata_derives_conservative_caution_tags_before_ranking(
+    blocked_tags: frozenset[ExerciseCautionTag],
+    exercise_values: dict[str, object],
+) -> None:
+    request = normalized(blocked_caution_tags=blocked_tags)
+    values = dict(exercise_values)
+    pattern = values.pop("movement_pattern")
+    muscle = values.pop("primary_muscle", MuscleGroup.CHEST)
+    unsafe = candidate("metadata unsafe", pattern, muscle, **values)  # type: ignore[arg-type]
+
+    result = filter_eligible_exercises(request, [unsafe])
+
+    assert not result.eligible
+    assert "EXERCISE_REJECTED_BLOCKED_CAUTION_TAG" in result.rejected[0].reason_codes
+
+
+def test_multiple_cautions_apply_the_union_of_existing_caution_tags() -> None:
+    request = normalized(
+        blocked_caution_tags=[
+            ExerciseCautionTag.SHOULDER_INTERNAL_ROTATION,
+            ExerciseCautionTag.NECK_LOADING,
+        ]
+    )
+    unsafe = candidate(
+        "metadata shoulder shrug",
+        MovementPattern.SHRUG,
+        MuscleGroup.SHOULDERS,
+        equipment=frozenset({Equipment.DUMBBELL}),
+        caution_tags=frozenset({ExerciseCautionTag.SHOULDER_INTERNAL_ROTATION}),
+    )
+
+    result = filter_eligible_exercises(request, [unsafe])
+
+    assert not result.eligible
+    assert result.rejected[0].reason_codes.count("EXERCISE_REJECTED_BLOCKED_CAUTION_TAG") == 1
+
+
+def test_lower_back_and_wrist_constraints_intersect_for_one_candidate() -> None:
+    request = normalized(
+        blocked_caution_tags=[
+            ExerciseCautionTag.LOWER_BACK_LOADING,
+            ExerciseCautionTag.WRIST_LOADING,
+        ]
+    )
+    unsafe = candidate(
+        "metadata combined risk",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        caution_tags=frozenset({ExerciseCautionTag.LOWER_BACK_LOADING}),
+    )
+
+    result = filter_eligible_exercises(request, [unsafe])
+
+    assert not result.eligible
+    assert "EXERCISE_REJECTED_BLOCKED_CAUTION_TAG" in result.rejected[0].reason_codes
+
+
+def test_without_caution_normal_exercise_remains_eligible() -> None:
+    exercise_item = candidate("normal push", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST)
+
+    result = filter_eligible_exercises(normalized(), [exercise_item])
+
+    assert result.eligible == (exercise_item,)
+
+
+def test_structurally_incomplete_metadata_fails_closed() -> None:
+    incomplete = candidate(
+        "incomplete metadata",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        equipment=frozenset(),
+    )
+
+    result = filter_eligible_exercises(
+        normalized(blocked_caution_tags=[ExerciseCautionTag.WRIST_LOADING]),
+        [incomplete],
+    )
+
+    assert not result.eligible
+    assert "EXERCISE_REJECTED_MISSING_METADATA" in result.rejected[0].reason_codes
+
+
 def test_ranking_is_stable_explainable_and_seeded_for_ties() -> None:
     preferred_id = UUID("00000000-0000-0000-0000-000000000001")
     preferred = candidate(
@@ -325,7 +436,12 @@ def test_short_session_keeps_the_minimum_exercise_count() -> None:
 def test_substitutions_are_drawn_only_from_eligible_candidates() -> None:
     request = normalized(blocked_caution_tags=[ExerciseCautionTag.WRIST_LOADING])
     selected = candidate("push", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST)
-    safe_sub = candidate("safe push", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST)
+    safe_sub = candidate(
+        "safe push",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        equipment=frozenset({Equipment.DUMBBELL}),
+    )
     unsafe_sub = candidate(
         "unsafe push",
         MovementPattern.HORIZONTAL_PUSH,

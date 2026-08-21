@@ -1,9 +1,12 @@
+from dataclasses import replace
+
 import pytest
 
-from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
+from app.exercises.enums import Equipment, ExerciseCautionTag, MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import TRACKED_MUSCLES
 from tests.workouts.program_engine.golden_fixtures import (
     full_catalog,
@@ -102,6 +105,59 @@ def test_golden_constraints_and_recovery(name: str) -> None:
             <= RULESET.max_exercises_per_session
             for day in result.program.weekly_schedule
         )
+
+
+def test_generate_program_excludes_metadata_unsafe_wrist_exercises() -> None:
+    source = request(blocked_caution_tags=[ExerciseCautionTag.WRIST_LOADING])
+    catalog = full_catalog()
+    bodyweight_press_ids = {
+        item.id
+        for item in catalog
+        if item.movement_pattern is MovementPattern.HORIZONTAL_PUSH
+        and Equipment.BODYWEIGHT in item.equipment
+    }
+
+    result = generate_program(source, catalog, RULESET)
+
+    assert result.program is not None, result.errors
+    selected_ids = {
+        item.exercise_id for day in result.program.weekly_schedule for item in day.exercises
+    }
+    assert bodyweight_press_ids.isdisjoint(selected_ids)
+
+
+def test_final_validation_rejects_metadata_unsafe_programmed_exercise() -> None:
+    source = request(blocked_caution_tags=[ExerciseCautionTag.WRIST_LOADING])
+    result = generate_program(request(), full_catalog(), RULESET)
+    assert result.program is not None, result.errors
+    target_day = next(
+        day
+        for day in result.program.weekly_schedule
+        if any(
+            item.movement_pattern is MovementPattern.HORIZONTAL_PUSH
+            and Equipment.BODYWEIGHT in item.equipment
+            for item in day.exercises
+        )
+    )
+    tampered_days = tuple(
+        replace(
+            day,
+            exercises=tuple(
+                replace(item, caution_tags=frozenset())
+                if day is target_day
+                and item.movement_pattern is MovementPattern.HORIZONTAL_PUSH
+                and Equipment.BODYWEIGHT in item.equipment
+                else item
+                for item in day.exercises
+            ),
+        )
+        for day in result.program.weekly_schedule
+    )
+    tampered_program = replace(result.program, weekly_schedule=tampered_days)
+
+    report = validate_program(tampered_program, source, RULESET)
+
+    assert "BLOCKED_CAUTION_TAG_SELECTED" in report.errors
 
 
 def test_priority_muscle_affects_volume_and_order() -> None:

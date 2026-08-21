@@ -42,6 +42,13 @@ CAUTION_EXCLUSIONS: dict[TrainingCaution, frozenset[ExerciseCautionTag]] = {
 }
 SOFT_CAUTIONS = frozenset({TrainingCaution.OTHER})
 
+
+def caution_tags_for_training_cautions(
+    cautions: Iterable[TrainingCaution],
+) -> frozenset[ExerciseCautionTag]:
+    return frozenset().union(*(CAUTION_EXCLUSIONS[caution] for caution in cautions))
+
+
 _ALLOWED_DIFFICULTIES: dict[ExperienceLevel, frozenset[Difficulty]] = {
     ExperienceLevel.FIRST_MONTH: frozenset({Difficulty.BEGINNER}),
     ExperienceLevel.BEGINNER: frozenset({Difficulty.BEGINNER}),
@@ -73,9 +80,7 @@ class WorkoutCandidateSelector:
             )
         ).all()
         available_equipment = self._available_equipment(profile)
-        excluded_tags = set().union(
-            *(CAUTION_EXCLUSIONS[caution] for caution in profile.training_cautions)
-        )
+        excluded_tags = caution_tags_for_training_cautions(profile.training_cautions)
         candidates = [
             self._to_candidate(exercise)
             for exercise in exercises
@@ -115,7 +120,7 @@ class WorkoutCandidateSelector:
         *,
         available_equipment: frozenset[Equipment],
         allowed_difficulties: frozenset[Difficulty],
-        excluded_tags: set[ExerciseCautionTag],
+        excluded_tags: frozenset[ExerciseCautionTag],
     ) -> bool:
         required_equipment = {item.equipment for item in exercise.equipment_items}
         caution_tags = {item.caution_tag for item in exercise.caution_tag_items}

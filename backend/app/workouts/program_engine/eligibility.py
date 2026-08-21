@@ -12,6 +12,7 @@ from app.workouts.program_engine.enums import (
     StabilityDemand,
     TrainingStatus,
 )
+from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
     EligibilityResult,
     ExerciseCandidate,
@@ -62,6 +63,7 @@ def filter_eligible_exercises(
     constraints = request.constraints
     for exercise in catalog:
         reasons: list[str] = []
+        caution_tags = effective_caution_tags(exercise)
         if not exercise.is_active:
             reasons.append("EXERCISE_REJECTED_INACTIVE")
         if not exercise.is_programmable:
@@ -78,7 +80,7 @@ def filter_eligible_exercises(
             reasons.append("EXERCISE_REJECTED_MISSING_EQUIPMENT")
         if _DIFFICULTY_RANK[exercise.difficulty] > _STATUS_DIFFICULTY[request.training_status]:
             reasons.append("EXERCISE_REJECTED_SKILL_TOO_HIGH")
-        if exercise.caution_tags.intersection(constraints.blocked_caution_tags):
+        if caution_tags.intersection(constraints.blocked_caution_tags):
             reasons.append("EXERCISE_REJECTED_BLOCKED_CAUTION_TAG")
         if _IMPACT_RANK[exercise.impact_level] > _IMPACT_RANK[constraints.impact_limit]:
             reasons.append("EXERCISE_REJECTED_IMPACT_LIMIT")
@@ -91,7 +93,7 @@ def filter_eligible_exercises(
             reasons.append("EXERCISE_REJECTED_BALANCE_DEMAND")
         if (
             exercise.movement_pattern is MovementPattern.VERTICAL_PUSH
-            or ExerciseCautionTag.OVERHEAD_POSITION in exercise.caution_tags
+            or ExerciseCautionTag.OVERHEAD_POSITION in caution_tags
         ) and constraints.overhead_limit is LoadLimit.NONE:
             reasons.append("EXERCISE_REJECTED_OVERHEAD_LIMIT")
         if constraints.allowed_range_of_motion and (

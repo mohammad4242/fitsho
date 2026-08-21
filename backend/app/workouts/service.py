@@ -48,7 +48,10 @@ from app.workouts.body_analysis_resolver import (
     BodyAnalysisInfluenceResolver,
     WorkoutBodyAnalysisResolver,
 )
-from app.workouts.candidate_selector import CAUTION_EXCLUSIONS, WorkoutCandidateSelector
+from app.workouts.candidate_selector import (
+    WorkoutCandidateSelector,
+    caution_tags_for_training_cautions,
+)
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise, WorkoutPlanGeneration
 from app.workouts.program_engine.body_analysis import applicable_body_analysis_influence
@@ -914,7 +917,7 @@ class WorkoutGenerationService:
             profile.home_training_setup,
         )
         cautions = tuple(item.caution for item in profile.training_caution_items)
-        blocked_caution_tags = set().union(*(CAUTION_EXCLUSIONS[item] for item in cautions))
+        blocked_caution_tags = caution_tags_for_training_cautions(cautions)
         sanitized = self._sanitize_limitations(profile.physical_limitations)
         limitations = (Limitation(name=sanitized, stable=False),) if sanitized is not None else ()
         training_age = (
@@ -955,6 +958,15 @@ class WorkoutGenerationService:
                 and not overrides.priority_muscles
             ):
                 override_values.pop("priority_muscles", None)
+            if "blocked_caution_tags" in override_values:
+                values["blocked_caution_tags"] = frozenset(
+                    cast(frozenset[ExerciseCautionTag], values["blocked_caution_tags"])
+                ) | frozenset(
+                    cast(
+                        frozenset[ExerciseCautionTag],
+                        override_values.pop("blocked_caution_tags"),
+                    )
+                )
             values.update(override_values)
             values["user_id"] = profile.user_id
         return ProgramGenerationRequest.model_validate(values)

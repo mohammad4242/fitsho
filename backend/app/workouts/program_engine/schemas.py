@@ -256,7 +256,11 @@ class ExerciseCandidate:
     def has_required_metadata(self) -> bool:
         if ExerciseLabel.CARDIO in self.labels:
             return bool(self.name and self.equipment)
-        return self.primary_muscle is not None and self.movement_pattern.value != "other"
+        return (
+            self.primary_muscle is not None
+            and self.movement_pattern.value != "other"
+            and bool(self.equipment)
+        )
 
 
 @dataclass(frozen=True)
