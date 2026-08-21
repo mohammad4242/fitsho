@@ -1,6 +1,12 @@
 from dataclasses import replace
 
-from app.exercises.enums import ExerciseLabel, ExerciseType, MovementPattern, MuscleGroup
+from app.exercises.enums import (
+    ExerciseCautionTag,
+    ExerciseLabel,
+    ExerciseType,
+    MovementPattern,
+    MuscleGroup,
+)
 from app.workouts.program_engine.cardio import add_cardio
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.engine import generate_program
@@ -10,6 +16,7 @@ from app.workouts.program_engine.enums import (
     SkillDemand,
     StabilityDemand,
     TrainingExperience,
+    SplitType,
 )
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.normalization import normalize_request
@@ -20,7 +27,7 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceSlot,
     WorkoutDay,
 )
-from app.workouts.program_engine.session_builder import build_sessions
+from app.workouts.program_engine.session_builder import KNEE_PATTERNS, build_sessions
 from app.workouts.program_engine.split_selector import (
     generate_split_candidates,
     score_split_candidates,
@@ -51,6 +58,90 @@ def test_required_muscle_without_any_safe_coverage_is_structured_unsatisfied() -
     assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
     assert "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED" in result.errors
     assert any("MINIMUM_MUSCLE_COVERAGE_UNSATISFIED:chest" in error for error in result.errors)
+
+
+def test_safe_layout_recovery_omits_hard_blocked_required_pattern() -> None:
+    source = request(
+        age=46,
+        primary_goal="lose_weight",
+        available_training_days=4,
+        session_duration_minutes=75,
+        blocked_caution_tags=[ExerciseCautionTag.DEEP_KNEE_FLEXION],
+    )
+    normalized = normalize_request(source, RULESET)
+    catalog = [
+        replace(
+            item,
+            caution_tags=item.caution_tags | {ExerciseCautionTag.DEEP_KNEE_FLEXION},
+        )
+        if item.movement_pattern in KNEE_PATTERNS
+        else item
+        for item in full_catalog()
+    ]
+    eligibility = filter_eligible_exercises(normalized, catalog)
+    split = next(
+        item
+        for item in score_split_candidates(
+            normalized,
+            generate_split_candidates(4),
+            RULESET,
+        )
+        if item.split_type is SplitType.UPPER_LOWER
+    )
+
+    sessions = build_sessions(
+        normalized,
+        split,
+        plan_weekly_volume(normalized, split, RULESET),
+        eligibility.eligible,
+        RULESET,
+        relaxable_required_pattern_groups=(KNEE_PATTERNS,),
+    )
+
+    assert len(sessions) == 4
+    assert all(
+        any("RECOVERY_APPLIED_REQUIRED_SLOT_RELAXATION" in code for code in day.reason_codes)
+        for day in sessions
+        if day.focus == "lower"
+    )
+    assert all(item.movement_pattern not in KNEE_PATTERNS for day in sessions for item in day.exercises)
+
+
+def test_exact_valid_knee_caution_profile_recovers_without_unsafe_exercises() -> None:
+    source = request(
+        age=46,
+        primary_goal="lose_weight",
+        training_experience=TrainingExperience.BEGINNER,
+        training_age_months=3,
+        available_training_days=4,
+        session_duration_minutes=75,
+        blocked_caution_tags=[ExerciseCautionTag.DEEP_KNEE_FLEXION],
+    )
+
+    catalog = [
+        replace(
+            item,
+            caution_tags=item.caution_tags | {ExerciseCautionTag.DEEP_KNEE_FLEXION},
+        )
+        if item.movement_pattern in KNEE_PATTERNS
+        else item
+        for item in full_catalog()
+    ]
+    result = generate_program(source, catalog, RULESET)
+
+    assert result.program is not None, result.errors
+    assert result.program.validation_report.is_valid
+    assert all(
+        item.movement_pattern not in KNEE_PATTERNS
+        for day in result.program.weekly_schedule
+        for item in day.exercises
+    )
+    recovery = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "construction_recovery"
+    )
+    assert "RECOVERY_APPLIED_REQUIRED_SLOT_RELAXATION" in recovery["reason_codes"]
 
 
 def test_constructible_major_coverage_is_repaired_before_success() -> None:
