@@ -2,6 +2,7 @@ from html import escape
 
 from weasyprint import HTML  # type: ignore[import-untyped]
 
+from app.exercises.enums import PrescriptionMode
 from app.workouts.schemas import WorkoutDayResponse, WorkoutPlanResponse
 
 _PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
@@ -73,8 +74,11 @@ def _render_day(day: WorkoutDayResponse) -> str:
             position=position,
             name=item.exercise.name_fa,
             sets=item.sets,
+            prescription_mode=item.prescription_mode,
             reps_min=item.reps_min,
             reps_max=item.reps_max,
+            duration_min_seconds=item.duration_min_seconds,
+            duration_max_seconds=item.duration_max_seconds,
             rest_seconds=item.rest_seconds,
             notes=item.notes_fa or item.notes_en,
         )
@@ -105,13 +109,25 @@ def _render_exercise(
     position: int,
     name: str,
     sets: int,
-    reps_min: int,
-    reps_max: int,
+    prescription_mode: PrescriptionMode,
+    reps_min: int | None,
+    reps_max: int | None,
+    duration_min_seconds: int | None,
+    duration_max_seconds: int | None,
     rest_seconds: int,
     notes: str | None,
 ) -> str:
+    if prescription_mode is PrescriptionMode.REPS:
+        assert reps_min is not None and reps_max is not None
+        target = f"{_fa_number(reps_min)} تا {_fa_number(reps_max)} تکرار"
+    else:
+        assert duration_min_seconds is not None and duration_max_seconds is not None
+        target = (
+            f"{_fa_number(duration_min_seconds)} تا "
+            f"{_fa_number(duration_max_seconds)} ثانیه"
+        )
     prescription = (
-        f"{_fa_number(sets)} ست · {_fa_number(reps_min)} تا {_fa_number(reps_max)} تکرار · "
+        f"{_fa_number(sets)} ست · {target} · "
         f"{_fa_number(rest_seconds)} ثانیه استراحت"
     )
     note = _paragraph("یادداشت", notes, class_name="instruction")

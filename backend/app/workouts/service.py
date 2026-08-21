@@ -716,8 +716,11 @@ class WorkoutGenerationService:
                         exercise_id=slot.exercise_id,
                         order_index=order,
                         sets=slot.sets,
+                        prescription_mode="reps",
                         reps_min=slot.rep_min,
                         reps_max=slot.rep_max,
+                        duration_min_seconds=None,
+                        duration_max_seconds=None,
                         rest_seconds=slot.rest_seconds,
                         rir=slot.target_rir,
                         estimated_minutes=calculate_exercise_minutes(
@@ -877,8 +880,11 @@ class WorkoutGenerationService:
                         exercise_id=item.exercise_id,
                         order_index=item.order,
                         sets=item.sets,
+                        prescription_mode=item.prescription_mode,
                         reps_min=item.rep_min,
                         reps_max=item.rep_max,
+                        duration_min_seconds=item.duration_min_seconds,
+                        duration_max_seconds=item.duration_max_seconds,
                         rest_seconds=item.rest_seconds,
                         rir=item.target_rir,
                         estimated_minutes=item.estimated_minutes,
@@ -1078,6 +1084,9 @@ class WorkoutGenerationService:
                 "media_path": selected_media[0],
                 "media_type": selected_media[1],
             },
+            prescription_mode=exercise.prescription_mode,
+            duration_min_seconds=exercise.duration_min_seconds,
+            duration_max_seconds=exercise.duration_max_seconds,
         )
 
     @staticmethod

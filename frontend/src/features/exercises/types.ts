@@ -116,6 +116,8 @@ export type ExerciseContentType = (typeof exerciseContentTypes)[number];
 export const exerciseLabels = ["full_body", "cardio"] as const;
 export type ExerciseLabel = (typeof exerciseLabels)[number];
 
+export type PrescriptionMode = "reps" | "duration";
+
 export const exerciseCautionTags = [
   "lower_back_loading",
   "spinal_flexion",
@@ -186,6 +188,9 @@ export type ExerciseSummary = {
   difficulty: Difficulty;
   media_path: string;
   media_type: MediaType;
+  prescription_mode?: PrescriptionMode;
+  duration_min_seconds?: number | null;
+  duration_max_seconds?: number | null;
 };
 
 export type ExerciseDetail = ExerciseSummary & {

@@ -151,6 +151,9 @@ class WorkoutCandidateSelector:
             difficulty=exercise.difficulty,
             caution_tags=tuple(item.caution_tag for item in exercise.caution_tag_items),
             labels=tuple(item.label for item in exercise.labels),
+            prescription_mode=exercise.prescription_mode,
+            duration_min_seconds=exercise.duration_min_seconds,
+            duration_max_seconds=exercise.duration_max_seconds,
         )
 
     def _cap_for_movement_coverage(

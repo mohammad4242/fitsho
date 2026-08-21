@@ -84,6 +84,27 @@ def test_html_contains_persian_plan_details_and_rtl_layout() -> None:
     assert "۹۰ ثانیه استراحت" in html
 
 
+def test_html_formats_duration_prescription_without_repetition_range() -> None:
+    plan = _plan_response()
+    payload = plan.days[0].exercises[0].model_dump()
+    payload.update(
+        {
+            "prescription_mode": "duration",
+            "reps_min": None,
+            "reps_max": None,
+            "duration_min_seconds": 20,
+            "duration_max_seconds": 40,
+            "rir": None,
+        }
+    )
+    plan.days[0].exercises[0] = WorkoutPlanExerciseResponse.model_validate(payload)
+
+    html = build_workout_plan_html(plan)
+
+    assert "۲۰ تا ۴۰ ثانیه" in html
+    assert "۸ تا ۱۲ تکرار" not in html
+
+
 def test_html_uses_vazirmatn_and_numbers_exercises_per_day() -> None:
     plan = _plan_response()
     second_exercise = plan.days[0].exercises[0].model_copy(

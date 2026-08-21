@@ -13,10 +13,11 @@ _CHANGE_ORDER = {
     "exercise_reordered": 2,
     "exercise_changed": 3,
     "sets_changed": 4,
-    "reps_range_changed": 5,
-    "rir_changed": 6,
-    "rest_changed": 7,
-    "notes_changed": 8,
+    "prescription_changed": 5,
+    "reps_range_changed": 6,
+    "rir_changed": 7,
+    "rest_changed": 8,
+    "notes_changed": 9,
 }
 
 
@@ -220,6 +221,31 @@ def _append_field_entries(
                 "approved": approved_item.sets,
             }
         )
+    if (
+        source_item.prescription_mode,
+        source_item.duration_min_seconds,
+        source_item.duration_max_seconds,
+    ) != (
+        approved_item.prescription_mode,
+        approved_item.duration_min_seconds,
+        approved_item.duration_max_seconds,
+    ):
+        entries.append(
+            {
+                **common,
+                "change_type": "prescription_changed",
+                "generated": {
+                    "mode": source_item.prescription_mode.value,
+                    "duration_min_seconds": source_item.duration_min_seconds,
+                    "duration_max_seconds": source_item.duration_max_seconds,
+                },
+                "approved": {
+                    "mode": approved_item.prescription_mode.value,
+                    "duration_min_seconds": approved_item.duration_min_seconds,
+                    "duration_max_seconds": approved_item.duration_max_seconds,
+                },
+            }
+        )
     if (source_item.reps_min, source_item.reps_max) != (
         approved_item.reps_min,
         approved_item.reps_max,
@@ -293,8 +319,11 @@ def _item_snapshot(item: WorkoutPlanExercise | None) -> dict[str, object] | None
         "exercise_id": str(item.exercise_id),
         "order_index": item.order_index,
         "sets": item.sets,
+        "prescription_mode": item.prescription_mode.value,
         "reps_min": item.reps_min,
         "reps_max": item.reps_max,
+        "duration_min_seconds": item.duration_min_seconds,
+        "duration_max_seconds": item.duration_max_seconds,
         "rir": item.rir,
         "rest_seconds": item.rest_seconds,
         "notes_en": item.notes_en,

@@ -21,6 +21,7 @@ from app.exercises.models import (
     ExerciseEquipment,
     ExerciseSecondaryMuscle,
 )
+from app.exercises.prescription_metadata import prescription_metadata_for_identifier
 from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.training_templates.seed_data import TemplateSlotSeed
 
@@ -117,6 +118,10 @@ def _placeholder_exercise(slot: TemplateSlotSeed) -> Exercise:
     if primary_muscle is None:
         raise ValueError(f"Template placeholder {slot.exercise_slug_hint} has no primary muscle")
     exercise_type = _exercise_type(slot)
+    prescription = prescription_metadata_for_identifier(
+        TEMPLATE_PLACEHOLDER_SOURCE,
+        slot.exercise_slug_hint,
+    )
     muscle_focus = _placeholder_focus(
         primary_muscle,
         name_en,
@@ -166,6 +171,9 @@ def _placeholder_exercise(slot: TemplateSlotSeed) -> Exercise:
             "created_for": "training_program_template",
             "target_muscles": [muscle.value for muscle in slot.target_muscles],
         },
+        prescription_mode=prescription.mode,
+        duration_min_seconds=prescription.duration_min_seconds,
+        duration_max_seconds=prescription.duration_max_seconds,
         needs_review=True,
         is_active=True,
         is_programmable=False,

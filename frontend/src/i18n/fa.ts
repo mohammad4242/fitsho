@@ -1155,7 +1155,7 @@ const fa = {
       emptyTitle: "برنامه‌ات آماده ساختن است",
       emptyBody: "فیتشو از تنظیمات ذخیره‌شده و حرکت‌های مجاز استفاده می‌کند.",
       generate: "ساخت برنامه", generating: "در حال ساخت برنامه…", update: "به‌روزرسانی برنامه", reused: "برنامه فعلی‌ات هنوز با شرایط فعلی هماهنگ است.", stale: "این برنامه دیگر با شرایط فعلی یا دورهٔ انتخاب‌شده هماهنگ نیست؛ هر وقت آماده بودی برنامه بعدی را بساز.", generateError: "ساخت برنامه انجام نشد؛ برنامه فعلی حفظ شده است. دوباره تلاش کن.", generateCooldown: "لطفاً چند دقیقه دیگر دوباره تلاش کن.",
-      weekly: "برنامه هفتگی", scheduleTitle: "روزهای تمرین تو", sessionMinutes: "{{count}} دقیقه", sets: "ست", reps: "تکرار", rest: "استراحت", seconds: "ث", rir: "RIR", detail: "مشاهده جزئیات حرکت", alternatives: "حرکت جایگزین",
+      weekly: "برنامه هفتگی", scheduleTitle: "روزهای تمرین تو", sessionMinutes: "{{count}} دقیقه", sets: "ست", reps: "تکرار", durationTarget: "مدت", rest: "استراحت", seconds: "ث", rir: "RIR", detail: "مشاهده جزئیات حرکت", alternatives: "حرکت جایگزین",
       weeklyCheckIn: {
         eyebrow: "چک‌این هفته",
         title: "چک‌این هفتگی",

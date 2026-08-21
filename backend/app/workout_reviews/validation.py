@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.ai.schemas import WorkoutPlanDayOutput, WorkoutPlanExerciseOutput, WorkoutPlanModelOutput
+from app.exercises.enums import PrescriptionMode
 from app.exercises.models import Exercise
 from app.workout_reviews.enums import WorkoutReviewErrorCode
 from app.workout_reviews.repository import get_exercises
@@ -96,6 +97,16 @@ class WorkoutReviewDraftValidator:
                         "exercise_id": str(exercise_id),
                     }
                 )
+        for item in draft_slots.values():
+            exercise = live.get(item.exercise_id)
+            if exercise is not None and item.prescription_mode is not exercise.prescription_mode:
+                problems.append(
+                    {
+                        "code": "PRESCRIPTION_MODE_MISMATCH",
+                        "message": "Prescription mode must match the selected exercise metadata.",
+                        "exercise_id": str(item.exercise_id),
+                    }
+                )
         if problems:
             raise DraftValidationError(problems)
 
@@ -159,10 +170,17 @@ class WorkoutReviewDraftValidator:
                     WorkoutPlanExerciseOutput(
                         exercise_id=item.exercise_id,
                         sets=item.sets,
+                        prescription_mode=item.prescription_mode,
                         reps_min=item.reps_min,
                         reps_max=item.reps_max,
+                        duration_min_seconds=item.duration_min_seconds,
+                        duration_max_seconds=item.duration_max_seconds,
                         rest_seconds=item.rest_seconds,
-                        rir=item.rir if item.rir is not None else source_item.rir,
+                        rir=(
+                            None
+                            if item.prescription_mode is PrescriptionMode.DURATION
+                            else item.rir if item.rir is not None else source_item.rir
+                        ),
                         estimated_minutes=calculate_exercise_minutes(timing),
                         notes_en=item.notes_en,
                         notes_fa=item.notes_fa,
@@ -192,6 +210,9 @@ class WorkoutReviewDraftValidator:
             difficulty=exercise.difficulty,
             caution_tags=tuple(item.caution_tag for item in exercise.caution_tag_items),
             labels=tuple(item.label for item in exercise.labels),
+            prescription_mode=exercise.prescription_mode,
+            duration_min_seconds=exercise.duration_min_seconds,
+            duration_max_seconds=exercise.duration_max_seconds,
         )
 
 

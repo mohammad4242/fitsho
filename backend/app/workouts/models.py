@@ -24,6 +24,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
+from app.exercises.enums import PrescriptionMode
 from app.exercises.models import Exercise
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 
@@ -208,6 +209,23 @@ class WorkoutPlanExercise(Base):
             name="ck_workout_plan_exercises_reps_range",
         ),
         CheckConstraint(
+            "(prescription_mode = 'reps' "
+            "AND reps_min BETWEEN 1 AND 100 "
+            "AND reps_max BETWEEN 1 AND 100 "
+            "AND reps_min <= reps_max "
+            "AND duration_min_seconds IS NULL "
+            "AND duration_max_seconds IS NULL "
+            "AND rir BETWEEN 0 AND 5) OR "
+            "(prescription_mode = 'duration' "
+            "AND duration_min_seconds BETWEEN 1 AND 3600 "
+            "AND duration_max_seconds BETWEEN 1 AND 3600 "
+            "AND duration_min_seconds <= duration_max_seconds "
+            "AND reps_min IS NULL "
+            "AND reps_max IS NULL "
+            "AND rir IS NULL)",
+            name="ck_workout_plan_exercises_prescription_contract",
+        ),
+        CheckConstraint(
             "rest_seconds BETWEEN 0 AND 600",
             name="ck_workout_plan_exercises_rest_range",
         ),
@@ -235,10 +253,25 @@ class WorkoutPlanExercise(Base):
     )
     order_index: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     sets: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    reps_min: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    reps_max: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    prescription_mode: Mapped[PrescriptionMode] = mapped_column(
+        Enum(
+            PrescriptionMode,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_workout_plan_exercises_prescription_mode_values",
+        ),
+        default=PrescriptionMode.REPS,
+        server_default=PrescriptionMode.REPS.value,
+        nullable=False,
+    )
+    reps_min: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    reps_max: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    duration_min_seconds: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    duration_max_seconds: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     rest_seconds: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    rir: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    rir: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     estimated_minutes: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     notes_en: Mapped[str | None] = mapped_column(Text)
     notes_fa: Mapped[str | None] = mapped_column(Text)

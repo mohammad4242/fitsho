@@ -14,6 +14,7 @@ from app.exercises.enums import (
     ExerciseType,
     MovementPattern,
     MuscleGroup,
+    PrescriptionMode,
 )
 from app.profile.enums import TrainingLocation
 from app.workouts.program_engine.enums import (
@@ -251,9 +252,22 @@ class ExerciseCandidate:
     progression_exercise_ids: tuple[UUID, ...] = ()
     regression_exercise_ids: tuple[UUID, ...] = ()
     display_snapshot: dict[str, object] = field(default_factory=dict)
+    prescription_mode: PrescriptionMode = PrescriptionMode.REPS
+    duration_min_seconds: int | None = None
+    duration_max_seconds: int | None = None
 
     @property
     def has_required_metadata(self) -> bool:
+        if self.prescription_mode is PrescriptionMode.DURATION and not (
+            self.duration_min_seconds is not None
+            and self.duration_max_seconds is not None
+            and 1 <= self.duration_min_seconds <= self.duration_max_seconds <= 3600
+        ):
+            return False
+        if self.prescription_mode is PrescriptionMode.REPS and (
+            self.duration_min_seconds is not None or self.duration_max_seconds is not None
+        ):
+            return False
         if ExerciseLabel.CARDIO in self.labels:
             return bool(self.name and self.equipment)
         return (
@@ -381,9 +395,9 @@ class ProgrammedExercise:
     exercise_name: str
     order: int
     sets: int
-    rep_min: int
-    rep_max: int
-    target_rir: int
+    rep_min: int | None
+    rep_max: int | None
+    target_rir: int | None
     rest_seconds: int
     estimated_minutes: int
     reason_codes: tuple[str, ...]
@@ -405,6 +419,34 @@ class ProgrammedExercise:
     is_active: bool = True
     is_programmable: bool = True
     needs_review: bool = False
+    prescription_mode: PrescriptionMode = PrescriptionMode.REPS
+    duration_min_seconds: int | None = None
+    duration_max_seconds: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.prescription_mode is PrescriptionMode.REPS:
+            if (
+                self.rep_min is None
+                or self.rep_max is None
+                or not 1 <= self.rep_min <= self.rep_max <= 100
+                or self.duration_min_seconds is not None
+                or self.duration_max_seconds is not None
+                or self.target_rir is None
+            ):
+                raise ValueError("rep prescriptions require reps, no duration, and RIR")
+            return
+        if self.prescription_mode is PrescriptionMode.DURATION:
+            if (
+                self.duration_min_seconds is None
+                or self.duration_max_seconds is None
+                or not 1 <= self.duration_min_seconds <= self.duration_max_seconds <= 3600
+                or self.rep_min is not None
+                or self.rep_max is not None
+                or self.target_rir is not None
+            ):
+                raise ValueError("duration prescriptions require duration, no reps, and null RIR")
+            return
+        raise ValueError(f"unsupported prescription mode: {self.prescription_mode}")
 
 
 @dataclass(frozen=True)

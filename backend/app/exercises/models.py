@@ -36,6 +36,7 @@ from app.exercises.enums import (
     MovementPattern,
     MuscleFocus,
     MuscleGroup,
+    PrescriptionMode,
 )
 from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
 from app.workouts.program_engine.enums import (
@@ -122,6 +123,15 @@ class Exercise(Base):
         CheckConstraint(
             "setup_cost IS NULL OR setup_cost BETWEEN 1 AND 5",
             name="ck_exercises_setup_cost_range",
+        ),
+        CheckConstraint(
+            "(prescription_mode = 'reps' AND duration_min_seconds IS NULL "
+            "AND duration_max_seconds IS NULL) OR "
+            "(prescription_mode = 'duration' "
+            "AND duration_min_seconds BETWEEN 1 AND 3600 "
+            "AND duration_max_seconds BETWEEN 1 AND 3600 "
+            "AND duration_min_seconds <= duration_max_seconds)",
+            name="ck_exercises_prescription_contract",
         ),
         CheckConstraint(
             "range_of_motion_profile IS NULL OR json_typeof(range_of_motion_profile) = 'array'",
@@ -229,6 +239,21 @@ class Exercise(Base):
         server_default=ExerciseType.OTHER.value,
         nullable=False,
     )
+    prescription_mode: Mapped[PrescriptionMode] = mapped_column(
+        Enum(
+            PrescriptionMode,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_exercises_prescription_mode_values",
+        ),
+        default=PrescriptionMode.REPS,
+        server_default=PrescriptionMode.REPS.value,
+        nullable=False,
+    )
+    duration_min_seconds: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    duration_max_seconds: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     body_position: Mapped[BodyPosition | None] = mapped_column(
         Enum(
             BodyPosition,

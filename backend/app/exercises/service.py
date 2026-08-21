@@ -115,6 +115,9 @@ def _apply_seed_fields(exercise: Exercise, seed: ExerciseSeed) -> None:
     exercise.difficulty = seed.difficulty
     exercise.movement_pattern = seed.movement_pattern
     exercise.exercise_type = seed.exercise_type
+    exercise.prescription_mode = seed.prescription_mode
+    exercise.duration_min_seconds = seed.duration_min_seconds
+    exercise.duration_max_seconds = seed.duration_max_seconds
     exercise.is_programmable = seed.is_programmable
     exercise.needs_review = False
     exercise.instructions_en = list(seed.instructions_en)

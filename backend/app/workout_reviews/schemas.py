@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.athlete_state.schemas import AthleteState
+from app.exercises.enums import PrescriptionMode
 from app.workout_reviews.enums import WorkoutReviewStatus
 from app.workouts.program_engine.adaptation_policy import CycleAdaptationDecision
 
@@ -17,8 +18,11 @@ class WorkoutReviewExerciseDraft(BaseModel):
     order_index: int = Field(ge=1)
     exercise_id: UUID
     sets: int = Field(ge=1, le=10)
-    reps_min: int = Field(ge=1, le=100)
-    reps_max: int = Field(ge=1, le=100)
+    prescription_mode: PrescriptionMode = PrescriptionMode.REPS
+    reps_min: int | None = Field(default=None, ge=1, le=100)
+    reps_max: int | None = Field(default=None, ge=1, le=100)
+    duration_min_seconds: int | None = Field(default=None, ge=1, le=3600)
+    duration_max_seconds: int | None = Field(default=None, ge=1, le=3600)
     rir: int | None = Field(default=None, ge=0, le=5)
     rest_seconds: int = Field(ge=0, le=600)
     notes_en: str | None = Field(default=None, max_length=1000)
@@ -26,8 +30,27 @@ class WorkoutReviewExerciseDraft(BaseModel):
 
     @model_validator(mode="after")
     def validate_repetition_range(self) -> WorkoutReviewExerciseDraft:
-        if self.reps_min > self.reps_max:
-            raise ValueError("reps_min must not exceed reps_max")
+        if self.prescription_mode is PrescriptionMode.REPS:
+            if (
+                self.reps_min is None
+                or self.reps_max is None
+                or self.reps_min > self.reps_max
+                or self.duration_min_seconds is not None
+                or self.duration_max_seconds is not None
+            ):
+                raise ValueError("rep prescriptions require reps, no duration, and RIR")
+        elif self.prescription_mode is PrescriptionMode.DURATION:
+            if (
+                self.duration_min_seconds is None
+                or self.duration_max_seconds is None
+                or self.duration_min_seconds > self.duration_max_seconds
+                or self.reps_min is not None
+                or self.reps_max is not None
+                or self.rir is not None
+            ):
+                raise ValueError("duration prescriptions require duration, no reps, and null RIR")
+        else:
+            raise ValueError(f"unsupported prescription mode: {self.prescription_mode}")
         return self
 
 
@@ -58,6 +81,9 @@ class WorkoutReviewExerciseOption(BaseModel):
     id: UUID
     name_en: str
     name_fa: str
+    prescription_mode: PrescriptionMode = PrescriptionMode.REPS
+    duration_min_seconds: int | None = None
+    duration_max_seconds: int | None = None
 
 
 class WorkoutReviewAthleteSummary(BaseModel):

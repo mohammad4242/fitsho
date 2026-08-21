@@ -351,13 +351,16 @@ def _select_exercise_addition(
             )
             sets = max(ruleset.minimum_working_sets, required_sets)
             sets = min(sets, ruleset.max_sets_per_muscle_per_session)
-            rep_min, rep_max, rir, rest = prescription_for(
+            prescription = prescription_for(
                 request.primary_goal,
                 candidate.exercise_type,
                 request.training_status,
                 ruleset,
+                prescription_mode=candidate.prescription_mode,
+                duration_min_seconds=candidate.duration_min_seconds,
+                duration_max_seconds=candidate.duration_max_seconds,
             )
-            estimated = estimate_exercise_minutes(sets, rest, 0, ruleset)
+            estimated = estimate_exercise_minutes(sets, prescription.rest_seconds, 0, ruleset)
             for day_index, (day, original) in enumerate(zip(days, originals, strict=True)):
                 if len(day) >= ruleset.max_exercises_per_session:
                     continue
@@ -401,10 +404,13 @@ def _select_exercise_addition(
                     exercise_name=candidate.name,
                     order=len(day) + 1,
                     sets=sets,
-                    rep_min=rep_min,
-                    rep_max=rep_max,
-                    target_rir=rir,
-                    rest_seconds=rest,
+                    rep_min=prescription.rep_min,
+                    rep_max=prescription.rep_max,
+                    duration_min_seconds=prescription.duration_min_seconds,
+                    duration_max_seconds=prescription.duration_max_seconds,
+                    prescription_mode=prescription.mode,
+                    target_rir=prescription.target_rir,
+                    rest_seconds=prescription.rest_seconds,
                     estimated_minutes=estimated,
                     reason_codes=tuple(dict.fromkeys(reasons)),
                     substitution_exercise_ids=substitutions,

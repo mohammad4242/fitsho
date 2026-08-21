@@ -17,6 +17,7 @@ import {
 } from "./api";
 import { WeeklyCheckInCard } from "./WeeklyCheckInCard";
 import { EndCycleFeedbackCard } from "./EndCycleFeedbackCard";
+import { formatPrescriptionTarget } from "./prescriptionFormatter";
 import type {
   WorkoutExerciseReplacementReason,
   WorkoutExerciseReplacementScope,
@@ -407,9 +408,9 @@ function WorkoutDays({ plan, isEnglish, titleId, interactive }: { plan: WorkoutP
                   <h4>{isEnglish ? item.exercise.name_en : item.exercise.name_fa}</h4>
                   <dl>
                     <div><dt>{t("workoutPlan.sets")}</dt><dd>{item.sets}</dd></div>
-                    <div><dt>{t("workoutPlan.reps")}</dt><dd>{item.reps_min}–{item.reps_max}</dd></div>
+                    <div><dt>{item.prescription_mode === "duration" ? t("workoutPlan.durationTarget") : t("workoutPlan.reps")}</dt><dd>{formatPrescriptionTarget(item, isEnglish ? "en" : "fa")}</dd></div>
                     <div><dt>{t("workoutPlan.rest")}</dt><dd>{item.rest_seconds}{t("workoutPlan.seconds")}</dd></div>
-                    <div><dt>{t("workoutPlan.rir")}</dt><dd>{item.rir}</dd></div>
+                    {item.rir !== null && <div><dt>{t("workoutPlan.rir")}</dt><dd>{item.rir}</dd></div>}
                   </dl>
                   {(isEnglish ? item.notes_en : item.notes_fa) !== null && (
                     <p>{isEnglish ? item.notes_en : item.notes_fa}</p>

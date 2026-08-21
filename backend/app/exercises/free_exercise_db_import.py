@@ -43,6 +43,7 @@ from app.exercises.models import (
     ExerciseMediaAsset,
     ExerciseSecondaryMuscle,
 )
+from app.exercises.prescription_metadata import prescription_metadata_for_identifier
 
 BODY_REGION_MAP: dict[str, BodyRegion] = {
     "back": BodyRegion.UPPER_BODY,
@@ -791,6 +792,7 @@ class FreeExerciseDbImporter:
         )
 
     def _is_current(self, exercise: Exercise, candidate: ImportCandidate) -> bool:
+        prescription = prescription_metadata_for_identifier(SOURCE_NAME, candidate.source_id)
         expected_assets = {
             (asset.presentation, asset.role, asset.source_url) for asset in candidate.media_assets
         }
@@ -806,6 +808,9 @@ class FreeExerciseDbImporter:
             and exercise.primary_muscle is candidate.primary_muscle
             and exercise.muscle_focus is candidate.muscle_focus
             and exercise.exercise_type is candidate.programming_metadata.exercise_type
+            and exercise.prescription_mode is prescription.mode
+            and exercise.duration_min_seconds == prescription.duration_min_seconds
+            and exercise.duration_max_seconds == prescription.duration_max_seconds
             and {item.equipment for item in exercise.equipment_items} == set(candidate.equipment)
             and exercise.is_programmable is True
             and {item.label for item in exercise.labels} == set(candidate.labels)
@@ -901,6 +906,10 @@ class FreeExerciseDbImporter:
         exercise.difficulty = candidate.difficulty
         exercise.movement_pattern = candidate.programming_metadata.movement_pattern
         exercise.exercise_type = candidate.programming_metadata.exercise_type
+        prescription = prescription_metadata_for_identifier(SOURCE_NAME, candidate.source_id)
+        exercise.prescription_mode = prescription.mode
+        exercise.duration_min_seconds = prescription.duration_min_seconds
+        exercise.duration_max_seconds = prescription.duration_max_seconds
         exercise.instructions_en = candidate.instructions_en
         exercise.instructions_fa = [item.strip() for item in translation.instructions_fa]
         exercise.safety_notes_en = []

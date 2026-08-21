@@ -101,6 +101,35 @@ export function CoachWorkoutReviewPage() {
     }));
   }
 
+  function updateExerciseSelection(
+    dayIndex: number,
+    exerciseIndex: number,
+    exerciseId: string,
+  ) {
+    const option = selected?.exercise_options.find((item) => item.id === exerciseId);
+    if (option?.prescription_mode === "duration") {
+      updateExercise(dayIndex, exerciseIndex, {
+        exercise_id: exerciseId,
+        prescription_mode: "duration",
+        reps_min: null,
+        reps_max: null,
+        duration_min_seconds: option.duration_min_seconds ?? null,
+        duration_max_seconds: option.duration_max_seconds ?? null,
+        rir: null,
+      });
+      return;
+    }
+    updateExercise(dayIndex, exerciseIndex, {
+      exercise_id: exerciseId,
+      prescription_mode: "reps",
+      reps_min: 8,
+      reps_max: 12,
+      duration_min_seconds: null,
+      duration_max_seconds: null,
+      rir: 2,
+    });
+  }
+
   async function saveDraft() {
     if (!selected) return;
     setBusy(true);
@@ -244,7 +273,7 @@ export function CoachWorkoutReviewPage() {
                             <legend>{l(`حرکت ${faNumber(exercise.order_index)}`, `Exercise ${exercise.order_index}`)}</legend>
                             <label>
                               {l("انتخاب حرکت", "Exercise")}
-                              <select value={exercise.exercise_id} onChange={(event) => updateExercise(dayIndex, exerciseIndex, { exercise_id: event.target.value })}>
+                              <select value={exercise.exercise_id} onChange={(event) => updateExerciseSelection(dayIndex, exerciseIndex, event.target.value)}>
                                 {selected.exercise_options.map((option) => (
                                   <option key={option.id} value={option.id}>{fa ? option.name_fa : option.name_en}</option>
                                 ))}
@@ -252,9 +281,18 @@ export function CoachWorkoutReviewPage() {
                             </label>
                             <div className="coach-review-prescription">
                               <NumberField label={l(`تعداد ست ${labelSuffix}`, `Sets ${labelSuffix}`)} value={exercise.sets} onChange={(sets) => updateExercise(dayIndex, exerciseIndex, { sets })} />
-                              <NumberField label={l(`حداقل تکرار ${labelSuffix}`, `Minimum reps ${labelSuffix}`)} value={exercise.reps_min} onChange={(reps_min) => updateExercise(dayIndex, exerciseIndex, { reps_min })} />
-                              <NumberField label={l(`حداکثر تکرار ${labelSuffix}`, `Maximum reps ${labelSuffix}`)} value={exercise.reps_max} onChange={(reps_max) => updateExercise(dayIndex, exerciseIndex, { reps_max })} />
-                              <NumberField label={`RIR ${labelSuffix}`} value={exercise.rir ?? 0} min={0} max={5} onChange={(rir) => updateExercise(dayIndex, exerciseIndex, { rir })} />
+                              {exercise.prescription_mode === "duration" ? (
+                                <>
+                                  <NumberField label={l(`حداقل ثانیه ${labelSuffix}`, `Minimum seconds ${labelSuffix}`)} value={exercise.duration_min_seconds ?? 0} onChange={(duration_min_seconds) => updateExercise(dayIndex, exerciseIndex, { duration_min_seconds })} />
+                                  <NumberField label={l(`حداکثر ثانیه ${labelSuffix}`, `Maximum seconds ${labelSuffix}`)} value={exercise.duration_max_seconds ?? 0} onChange={(duration_max_seconds) => updateExercise(dayIndex, exerciseIndex, { duration_max_seconds })} />
+                                </>
+                              ) : (
+                                <>
+                                  <NumberField label={l(`حداقل تکرار ${labelSuffix}`, `Minimum reps ${labelSuffix}`)} value={exercise.reps_min ?? 8} onChange={(reps_min) => updateExercise(dayIndex, exerciseIndex, { reps_min })} />
+                                  <NumberField label={l(`حداکثر تکرار ${labelSuffix}`, `Maximum reps ${labelSuffix}`)} value={exercise.reps_max ?? 12} onChange={(reps_max) => updateExercise(dayIndex, exerciseIndex, { reps_max })} />
+                                  <NumberField label={`RIR ${labelSuffix}`} value={exercise.rir ?? 2} min={0} max={5} onChange={(rir) => updateExercise(dayIndex, exerciseIndex, { rir })} />
+                                </>
+                              )}
                               <NumberField label={l(`استراحت ${labelSuffix}`, `Rest ${labelSuffix}`)} value={exercise.rest_seconds} step={15} onChange={(rest_seconds) => updateExercise(dayIndex, exerciseIndex, { rest_seconds })} />
                             </div>
                             <label>

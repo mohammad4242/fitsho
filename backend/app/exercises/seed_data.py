@@ -10,6 +10,7 @@ from app.exercises.enums import (
     MovementPattern,
     MuscleFocus,
     MuscleGroup,
+    PrescriptionMode,
 )
 from app.exercises.media_metadata import OWNER_ATTRIBUTION, OWNER_LICENSE
 
@@ -38,6 +39,9 @@ class ExerciseSeed:
     media_source_url: str | None
     media_license: str
     media_attribution: str
+    prescription_mode: PrescriptionMode = PrescriptionMode.REPS
+    duration_min_seconds: int | None = None
+    duration_max_seconds: int | None = None
 
 
 @dataclass(frozen=True)
@@ -148,6 +152,7 @@ def _exercise(
         movement_pattern=movement_pattern,
         exercise_type=exercise_type,
         caution_tags=caution_tags,
+        prescription_mode=PrescriptionMode.REPS,
         is_programmable=True,
         difficulty=difficulty,
         instructions_en=instructions_en,

@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
+
+from app.exercises.enums import PrescriptionMode
 
 
 class WorkoutPlanExerciseOutput(BaseModel):
@@ -12,13 +14,42 @@ class WorkoutPlanExerciseOutput(BaseModel):
 
     exercise_id: UUID
     sets: int
-    reps_min: int
-    reps_max: int
+    prescription_mode: PrescriptionMode = PrescriptionMode.REPS
+    reps_min: int | None
+    reps_max: int | None
+    duration_min_seconds: int | None = None
+    duration_max_seconds: int | None = None
     rest_seconds: int
-    rir: int
+    rir: int | None
     estimated_minutes: int
     notes_en: str | None
     notes_fa: str | None
+
+    @model_validator(mode="after")
+    def validate_prescription(self) -> WorkoutPlanExerciseOutput:
+        if self.prescription_mode is PrescriptionMode.REPS:
+            if (
+                self.reps_min is None
+                or self.reps_max is None
+                or not 1 <= self.reps_min <= self.reps_max <= 100
+                or self.duration_min_seconds is not None
+                or self.duration_max_seconds is not None
+                or self.rir is None
+            ):
+                raise ValueError("rep prescriptions require reps, no duration, and RIR")
+        elif self.prescription_mode is PrescriptionMode.DURATION:
+            if (
+                self.duration_min_seconds is None
+                or self.duration_max_seconds is None
+                or not 1 <= self.duration_min_seconds <= self.duration_max_seconds <= 3600
+                or self.reps_min is not None
+                or self.reps_max is not None
+                or self.rir is not None
+            ):
+                raise ValueError("duration prescriptions require duration, no reps, and null RIR")
+        else:
+            raise ValueError(f"unsupported prescription mode: {self.prescription_mode}")
+        return self
 
 
 class WorkoutPlanDayOutput(BaseModel):

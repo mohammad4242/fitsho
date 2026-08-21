@@ -1,4 +1,4 @@
-import type { ExerciseSummary } from "../exercises/types";
+import type { ExerciseSummary, PrescriptionMode } from "../exercises/types";
 
 export type WorkoutPlanStatus = "generating" | "pending_review" | "active" | "superseded" | "failed";
 
@@ -6,10 +6,13 @@ export type WorkoutPlanExercise = {
   id: string;
   order_index: number;
   sets: number;
-  reps_min: number;
-  reps_max: number;
+  prescription_mode?: PrescriptionMode;
+  reps_min: number | null;
+  reps_max: number | null;
+  duration_min_seconds?: number | null;
+  duration_max_seconds?: number | null;
   rest_seconds: number;
-  rir: number;
+  rir: number | null;
   estimated_minutes: number;
   notes_en: string | null;
   notes_fa: string | null;

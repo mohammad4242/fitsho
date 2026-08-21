@@ -3,7 +3,13 @@ from collections import Counter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.exercises.enums import MediaType, MovementPattern, MuscleFocus, MuscleGroup
+from app.exercises.enums import (
+    MediaType,
+    MovementPattern,
+    MuscleFocus,
+    MuscleGroup,
+    PrescriptionMode,
+)
 from app.exercises.models import Exercise
 from app.exercises.service import seed_exercises
 from app.profile.enums import ExperienceLevel
@@ -218,6 +224,19 @@ def test_seed_creates_missing_template_exercise_as_safe_catalog_placeholder(db: 
     assert slot.exercise.needs_review is True
     assert slot.exercise.is_programmable is False
     assert slot.exercise.media_type is MediaType.PLACEHOLDER
+
+
+def test_side_plank_placeholder_uses_duration_metadata(db: Session) -> None:
+    seed_exercises(db)
+    seed_training_program_templates(db)
+
+    side_plank = db.scalar(select(Exercise).where(Exercise.slug == "side-plank"))
+
+    assert side_plank is not None
+    assert side_plank.source == "fitsho_training_template"
+    assert side_plank.source_id == "side-plank"
+    assert side_plank.prescription_mode is PrescriptionMode.DURATION
+    assert (side_plank.duration_min_seconds, side_plank.duration_max_seconds) == (20, 40)
 
 
 def test_template_placeholder_seed_preserves_admin_media_and_review_updates(db: Session) -> None:

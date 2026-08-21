@@ -1,3 +1,4 @@
+import type { PrescriptionMode } from "../exercises/types";
 import type { WorkoutPlan } from "../workouts/types";
 
 export type WorkoutReviewStatus = "pending" | "claimed" | "approved" | "superseded";
@@ -7,8 +8,11 @@ export type WorkoutReviewExerciseDraft = {
   order_index: number;
   exercise_id: string;
   sets: number;
-  reps_min: number;
-  reps_max: number;
+  prescription_mode?: PrescriptionMode;
+  reps_min: number | null;
+  reps_max: number | null;
+  duration_min_seconds?: number | null;
+  duration_max_seconds?: number | null;
   rir: number | null;
   rest_seconds: number;
   notes_en: string | null;
@@ -49,5 +53,8 @@ export type WorkoutReviewDetail = WorkoutReviewQueueItem & {
     id: string;
     name_en: string;
     name_fa: string;
+    prescription_mode?: PrescriptionMode;
+    duration_min_seconds?: number | null;
+    duration_max_seconds?: number | null;
   }>;
 };

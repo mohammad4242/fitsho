@@ -1,6 +1,6 @@
 from collections import Counter
 
-from app.exercises.enums import MovementPattern
+from app.exercises.enums import MovementPattern, PrescriptionMode
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
     complete_tracked_metrics,
@@ -62,11 +62,39 @@ def validate_program(
                 constraints.available_equipment
             ):
                 errors.append("UNAVAILABLE_EQUIPMENT_SELECTED")
-            if item.sets < 1 or item.rep_min < 1 or item.rep_max < item.rep_min:
+            if item.sets < 1:
+                errors.append("INVALID_EXERCISE_PRESCRIPTION")
+            elif item.prescription_mode is PrescriptionMode.REPS:
+                if (
+                    item.rep_min is None
+                    or item.rep_max is None
+                    or not 1 <= item.rep_min <= item.rep_max <= 100
+                    or item.duration_min_seconds is not None
+                    or item.duration_max_seconds is not None
+                    or item.target_rir is None
+                ):
+                    errors.append("INVALID_EXERCISE_PRESCRIPTION")
+            elif item.prescription_mode is PrescriptionMode.DURATION:
+                if (
+                    item.duration_min_seconds is None
+                    or item.duration_max_seconds is None
+                    or not 1
+                    <= item.duration_min_seconds
+                    <= item.duration_max_seconds
+                    <= 3600
+                    or item.rep_min is not None
+                    or item.rep_max is not None
+                    or item.target_rir is not None
+                ):
+                    errors.append("INVALID_EXERCISE_PRESCRIPTION")
+            else:
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
             if (
-                not 0 <= item.target_rir <= ruleset.maximum_target_rir
-                or item.rest_seconds < ruleset.minimum_rest_seconds
+                item.rest_seconds < ruleset.minimum_rest_seconds
+                or (
+                    item.target_rir is not None
+                    and not 0 <= item.target_rir <= ruleset.maximum_target_rir
+                )
             ):
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
             if not item.reason_codes:

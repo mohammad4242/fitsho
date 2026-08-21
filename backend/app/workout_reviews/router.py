@@ -192,7 +192,14 @@ def _detail_response(db: Session, review: WorkoutPlanReview) -> WorkoutReviewDet
         else set()
     )
     options = [
-        WorkoutReviewExerciseOption(id=item.id, name_en=item.name_en, name_fa=item.name_fa)
+        WorkoutReviewExerciseOption(
+            id=item.id,
+            name_en=item.name_en,
+            name_fa=item.name_fa,
+            prescription_mode=item.prescription_mode,
+            duration_min_seconds=item.duration_min_seconds,
+            duration_max_seconds=item.duration_max_seconds,
+        )
         for item in sorted(get_exercises(db, candidate_ids), key=lambda exercise: exercise.name_en)
         if (
             item.is_active

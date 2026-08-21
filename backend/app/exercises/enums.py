@@ -152,6 +152,11 @@ class ExerciseType(StrEnum):
     OTHER = "other"
 
 
+class PrescriptionMode(StrEnum):
+    REPS = "reps"
+    DURATION = "duration"
+
+
 class ExerciseLabel(StrEnum):
     FULL_BODY = "full_body"
     CARDIO = "cardio"

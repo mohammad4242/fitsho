@@ -1,7 +1,8 @@
 import math
 from collections import Counter
+from dataclasses import dataclass
 
-from app.exercises.enums import ExerciseType
+from app.exercises.enums import ExerciseType, PrescriptionMode
 from app.workouts.program_engine.enums import Goal, TrainingStatus
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -12,6 +13,17 @@ from app.workouts.program_engine.schemas import (
     WorkoutDay,
 )
 from app.workouts.program_engine.session_targets import english_session_title
+
+
+@dataclass(frozen=True)
+class ExercisePrescription:
+    mode: PrescriptionMode
+    rep_min: int | None
+    rep_max: int | None
+    duration_min_seconds: int | None
+    duration_max_seconds: int | None
+    target_rir: int | None
+    rest_seconds: int
 
 
 def prescribe_sessions(
@@ -78,12 +90,16 @@ def prescribe_sessions(
                 else:
                     sets = min(sets, remaining_direct_sets)
                     direct_session_sets[primary_muscle] += sets
-            rep_min, rep_max, rir, rest = prescription_for(
+            prescription = prescription_for(
                 request.primary_goal,
                 exercise.exercise_type,
                 request.training_status,
                 ruleset,
+                prescription_mode=exercise.prescription_mode,
+                duration_min_seconds=exercise.duration_min_seconds,
+                duration_max_seconds=exercise.duration_max_seconds,
             )
+            rest = prescription.rest_seconds
             if compact_session:
                 rest = ruleset.minimum_rest_seconds
             warmup_sets = 0
@@ -109,9 +125,12 @@ def prescribe_sessions(
                     exercise_name=exercise.name,
                     order=len(programmed) + 1,
                     sets=sets,
-                    rep_min=rep_min,
-                    rep_max=rep_max,
-                    target_rir=rir,
+                    rep_min=prescription.rep_min,
+                    rep_max=prescription.rep_max,
+                    duration_min_seconds=prescription.duration_min_seconds,
+                    duration_max_seconds=prescription.duration_max_seconds,
+                    prescription_mode=prescription.mode,
+                    target_rir=prescription.target_rir,
                     rest_seconds=rest,
                     estimated_minutes=estimate_exercise_minutes(sets, rest, warmup_sets, ruleset),
                     reason_codes=(
@@ -176,7 +195,11 @@ def prescription_for(
     exercise_type: ExerciseType,
     status: TrainingStatus,
     ruleset: ProgramRuleset,
-) -> tuple[int, int, int, int]:
+    *,
+    prescription_mode: PrescriptionMode = PrescriptionMode.REPS,
+    duration_min_seconds: int | None = None,
+    duration_max_seconds: int | None = None,
+) -> ExercisePrescription:
     novice = status is TrainingStatus.NOVICE
     rir = ruleset.novice_target_rir if novice else ruleset.experienced_target_rir
     if goal is Goal.STRENGTH:
@@ -197,7 +220,33 @@ def prescription_for(
     else:
         key = "general_fitness"
     rule = ruleset.prescription_rules[key]
-    return rule.rep_min, rule.rep_max, rir, rule.rest_seconds
+    if prescription_mode is PrescriptionMode.REPS:
+        return ExercisePrescription(
+            mode=PrescriptionMode.REPS,
+            rep_min=rule.rep_min,
+            rep_max=rule.rep_max,
+            duration_min_seconds=None,
+            duration_max_seconds=None,
+            target_rir=rir,
+            rest_seconds=rule.rest_seconds,
+        )
+    if prescription_mode is PrescriptionMode.DURATION:
+        if (
+            duration_min_seconds is None
+            or duration_max_seconds is None
+            or not 1 <= duration_min_seconds <= duration_max_seconds <= 3600
+        ):
+            raise ValueError("duration prescriptions require valid exercise metadata")
+        return ExercisePrescription(
+            mode=PrescriptionMode.DURATION,
+            rep_min=None,
+            rep_max=None,
+            duration_min_seconds=duration_min_seconds,
+            duration_max_seconds=duration_max_seconds,
+            target_rir=None,
+            rest_seconds=rule.rest_seconds,
+        )
+    raise ValueError(f"unsupported prescription mode: {prescription_mode}")
 
 
 def estimate_exercise_minutes(

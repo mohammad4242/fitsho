@@ -4,7 +4,13 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from app.ai.schemas import WorkoutPlanDayOutput, WorkoutPlanModelOutput
-from app.exercises.enums import ExerciseLabel, ExerciseType, MovementPattern, MuscleGroup
+from app.exercises.enums import (
+    ExerciseLabel,
+    ExerciseType,
+    MovementPattern,
+    MuscleGroup,
+    PrescriptionMode,
+)
 from app.workouts.schemas import CandidateSet, WorkoutExerciseCandidate
 from app.workouts.time_budget import (
     ExerciseTiming,
@@ -231,16 +237,33 @@ class WorkoutPlanValidator:
                     exercise_id=exercise.exercise_id,
                 )
             )
-        if not (
-            self._policy.minimum_repetitions
-            <= exercise.reps_min
-            <= exercise.reps_max
-            <= self._policy.maximum_repetitions
+        if exercise.prescription_mode is PrescriptionMode.REPS:
+            if not (
+                exercise.reps_min is not None
+                and exercise.reps_max is not None
+                and self._policy.minimum_repetitions
+                <= exercise.reps_min
+                <= exercise.reps_max
+                <= self._policy.maximum_repetitions
+            ):
+                problems.append(
+                    ValidationProblem(
+                        code="repetitions_out_of_policy",
+                        message="Repetitions are outside the allowed range.",
+                        day_number=day_number,
+                        exercise_id=exercise.exercise_id,
+                    )
+                )
+        elif not (
+            exercise.duration_min_seconds is not None
+            and exercise.duration_max_seconds is not None
+            and 1 <= exercise.duration_min_seconds <= exercise.duration_max_seconds <= 3600
+            and exercise.rir is None
         ):
             problems.append(
                 ValidationProblem(
-                    code="repetitions_out_of_policy",
-                    message="Repetitions are outside the allowed range.",
+                    code="duration_out_of_policy",
+                    message="Duration prescriptions are invalid.",
                     day_number=day_number,
                     exercise_id=exercise.exercise_id,
                 )
@@ -254,7 +277,10 @@ class WorkoutPlanValidator:
                     exercise_id=exercise.exercise_id,
                 )
             )
-        if exercise.rir not in self._policy.allowed_rir:
+        if (
+            exercise.prescription_mode is PrescriptionMode.REPS
+            and exercise.rir not in self._policy.allowed_rir
+        ):
             problems.append(
                 ValidationProblem(
                     code="rir_out_of_policy",
