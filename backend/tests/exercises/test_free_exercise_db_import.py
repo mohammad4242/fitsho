@@ -296,15 +296,22 @@ def test_programming_metadata_classifies_sample_movements_conservatively() -> No
 
 
 @pytest.mark.parametrize(
-    ("name", "expected_equipment"),
+    ("name", "equipment", "expected_equipment"),
     [
         (
             "Pull-Up",
+            "body weight",
             {Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR},
         ),
         (
             "Bench Pull-Up",
+            "body weight",
             {Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR, Equipment.BENCH},
+        ),
+        (
+            "Band Assisted Pull-up",
+            "band",
+            {Equipment.RESISTANCE_BAND, Equipment.PULL_UP_BAR},
         ),
     ],
 )
@@ -313,13 +320,21 @@ def test_importer_assigns_complete_vertical_pull_equipment_metadata(
     test_settings: Settings,
     tmp_path: Path,
     name: str,
+    equipment: str,
     expected_equipment: set[Equipment],
 ) -> None:
     from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
 
     source_root = tmp_path / "source"
     record = source_record()
-    record.update({"name": name, "bodyPart": "back", "target": "latissimus dorsi"})
+    record.update(
+        {
+            "name": name,
+            "equipment": equipment,
+            "bodyPart": "back",
+            "target": "latissimus dorsi",
+        }
+    )
     write_source(source_root, record)
 
     report = FreeExerciseDbImporter(
@@ -366,9 +381,7 @@ def test_importer_prevents_duplicates_on_a_second_run(
     assert second.skipped_records == ["0001"]
     assert (
         db.scalar(
-            select(func.count())
-            .select_from(Exercise)
-            .where(Exercise.source == "free-exercise-db")
+            select(func.count()).select_from(Exercise).where(Exercise.source == "free-exercise-db")
         )
         == 1
     )
@@ -395,9 +408,7 @@ def test_importer_recopies_existing_media_when_target_storage_is_empty(
         source_root=source_root,
         translator=translator,
     ).run()
-    replica_settings = test_settings.model_copy(
-        update={"media_root": tmp_path / "replica-media"}
-    )
+    replica_settings = test_settings.model_copy(update={"media_root": tmp_path / "replica-media"})
 
     second = FreeExerciseDbImporter(
         db,
@@ -482,9 +493,7 @@ def test_importer_dry_run_does_not_write_database_files_or_translations(
     assert report.imported_records == ["0001"]
     assert (
         db.scalar(
-            select(func.count())
-            .select_from(Exercise)
-            .where(Exercise.source == "free-exercise-db")
+            select(func.count()).select_from(Exercise).where(Exercise.source == "free-exercise-db")
         )
         == 0
     )
@@ -539,9 +548,7 @@ def test_importer_reports_invalid_records_without_writing_them(
     assert report.skipped_records == ["0001"]
     assert (
         db.scalar(
-            select(func.count())
-            .select_from(Exercise)
-            .where(Exercise.source == "free-exercise-db")
+            select(func.count()).select_from(Exercise).where(Exercise.source == "free-exercise-db")
         )
         == 0
     )

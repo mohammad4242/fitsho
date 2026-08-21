@@ -131,6 +131,26 @@ def map_equipment(value: str) -> Equipment | None:
     return EQUIPMENT_MAP.get(value.strip().lower())
 
 
+def complete_import_equipment(
+    equipment: Equipment,
+    *,
+    name_en: str,
+    movement_pattern: MovementPattern,
+) -> tuple[Equipment, ...]:
+    required = [equipment]
+    normalized_name = name_en.casefold().replace("-", " ")
+    is_pull_up_variant = "pull up" in normalized_name or "chin up" in normalized_name
+    if movement_pattern is MovementPattern.VERTICAL_PULL and (
+        equipment is Equipment.BODYWEIGHT or is_pull_up_variant
+    ):
+        required.append(Equipment.PULL_UP_BAR)
+    if movement_pattern is MovementPattern.VERTICAL_PULL and (
+        "bench" in normalized_name and is_pull_up_variant
+    ):
+        required.append(Equipment.BENCH)
+    return tuple(dict.fromkeys(required))
+
+
 def map_difficulty(value: str) -> Difficulty | None:
     return DIFFICULTY_MAP.get(value.strip().lower())
 
@@ -663,9 +683,7 @@ class FreeExerciseDbImporter:
             report.validation_failures.append(f"{source_id}: muscle focus is unresolved")
             return None
         muscle_focus = classification.focus if classification is not None else None
-        secondary_muscles = [
-            muscle for muscle in secondary_muscles if muscle is not primary_muscle
-        ]
+        secondary_muscles = [muscle for muscle in secondary_muscles if muscle is not primary_muscle]
         labels = classify_exercise_labels(
             body_part=body_part,
             target=target,
@@ -687,7 +705,13 @@ class FreeExerciseDbImporter:
             muscle_focus=muscle_focus,
             labels=labels,
             secondary_muscles=secondary_muscles,
-            equipment=[equipment],
+            equipment=list(
+                complete_import_equipment(
+                    equipment,
+                    name_en=name_en,
+                    movement_pattern=programming_metadata.movement_pattern,
+                )
+            ),
             difficulty=difficulty,
             programming_metadata=programming_metadata,
             aliases_en=aliases,
@@ -782,6 +806,7 @@ class FreeExerciseDbImporter:
             and exercise.primary_muscle is candidate.primary_muscle
             and exercise.muscle_focus is candidate.muscle_focus
             and exercise.exercise_type is candidate.programming_metadata.exercise_type
+            and {item.equipment for item in exercise.equipment_items} == set(candidate.equipment)
             and exercise.is_programmable is True
             and {item.label for item in exercise.labels} == set(candidate.labels)
             and {item.caution_tag for item in exercise.caution_tag_items}

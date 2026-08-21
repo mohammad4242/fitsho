@@ -128,11 +128,7 @@ def test_generate_program_excludes_metadata_unsafe_wrist_exercises() -> None:
 
 def test_generate_program_home_excludes_bodyweight_pull_up_without_bar_metadata() -> None:
     source = request(available_equipment=[Equipment.BODYWEIGHT])
-    pull_up = next(
-        item
-        for item in full_catalog()
-        if item.name == "Chin Up"
-    )
+    pull_up = next(item for item in full_catalog() if item.name == "Chin Up")
 
     result = generate_program(source, [pull_up, *full_catalog()], RULESET)
 

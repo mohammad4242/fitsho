@@ -1,5 +1,6 @@
 from uuid import uuid4
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.exercises.enums import (
@@ -140,6 +141,48 @@ def test_home_dumbbells_do_not_imply_pull_up_bar(db: Session) -> None:
 
     assert dumbbell_row.id in result.ids
     assert pull_up.id not in result.ids
+
+
+@pytest.mark.parametrize(
+    "required_equipment",
+    [
+        Equipment.DUMBBELL,
+        Equipment.BARBELL,
+        Equipment.CABLE,
+        Equipment.MACHINE,
+        Equipment.PULL_UP_BAR,
+        Equipment.BENCH,
+    ],
+)
+def test_bodyweight_home_excludes_every_unavailable_equipment(
+    db: Session,
+    required_equipment: Equipment,
+) -> None:
+    unavailable = exercise(db, "home-unavailable", equipment=(required_equipment,))
+
+    result = WorkoutCandidateSelector(db).select(
+        profile(location=TrainingLocation.HOME, setup=HomeTrainingSetup.BODYWEIGHT_ONLY)
+    )
+
+    assert unavailable.id not in result.ids
+
+
+@pytest.mark.parametrize(
+    "required_equipment",
+    [Equipment.BARBELL, Equipment.CABLE, Equipment.MACHINE, Equipment.PULL_UP_BAR],
+)
+def test_dumbbell_home_excludes_non_dumbbell_equipment(
+    db: Session,
+    required_equipment: Equipment,
+) -> None:
+    unavailable = exercise(db, "dumbbell-home-unavailable", equipment=(required_equipment,))
+
+    result = WorkoutCandidateSelector(db).select(
+        profile(location=TrainingLocation.HOME, setup=HomeTrainingSetup.DUMBBELLS_AVAILABLE)
+    )
+
+    assert unavailable.id not in result.ids
+
 
 def test_selector_excludes_inactive_nonprogrammable_unsafe_and_too_hard_exercises(
     db: Session,

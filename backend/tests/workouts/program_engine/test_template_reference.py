@@ -14,6 +14,14 @@ from app.workouts.program_engine.schemas import (
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
 
 
+def template_request(**overrides: object):
+    values: dict[str, object] = {
+        "available_equipment": [Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.PULL_UP_BAR],
+    }
+    values.update(overrides)
+    return request(**values)
+
+
 def _four_day_reference() -> TemplateReference:
     return TemplateReference(
         slug="four-day-chest-reference",
@@ -173,7 +181,7 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
     template = _four_day_reference()
 
     result = generate_program(
-        request(
+        template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",
@@ -195,7 +203,7 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
 
 def test_template_uses_shared_volume_and_prescription_rules() -> None:
     result = generate_program(
-        request(
+        template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",
@@ -221,7 +229,7 @@ def test_same_template_personalizes_weekly_volume_for_different_priority_muscles
     template, catalog = _upper_lower_reference()
 
     chest_result = generate_program(
-        request(
+        template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",
@@ -234,7 +242,7 @@ def test_same_template_personalizes_weekly_volume_for_different_priority_muscles
         reference_templates=(template,),
     )
     back_result = generate_program(
-        request(
+        template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",
@@ -270,7 +278,7 @@ def test_template_volume_uses_recovery_history_and_short_session_prescription() 
     )
 
     baseline = generate_program(
-        request(
+        template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",
@@ -283,7 +291,7 @@ def test_template_volume_uses_recovery_history_and_short_session_prescription() 
         reference_templates=(template,),
     )
     constrained = generate_program(
-        request(
+        template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",
@@ -331,7 +339,7 @@ def test_unsafe_template_exercise_is_substituted_and_trace_is_auditable() -> Non
     assert unsafe_id is not None
 
     result = generate_program(
-        request(
+        template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",
@@ -348,7 +356,8 @@ def test_unsafe_template_exercise_is_substituted_and_trace_is_auditable() -> Non
     programmed = [exercise for day in result.program.weekly_schedule for exercise in day.exercises]
     assert unsafe_id not in {exercise.exercise_id for exercise in programmed}
     assert all(
-        item.equipment.issubset({Equipment.BODYWEIGHT, Equipment.DUMBBELL}) for item in programmed
+        item.equipment.issubset({Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.PULL_UP_BAR})
+        for item in programmed
     )
     assert all(not item.needs_review for item in programmed)
     adaptation_trace = next(
@@ -374,7 +383,7 @@ def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> N
     )
 
     result = generate_program(
-        request(
+        template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",
@@ -401,7 +410,7 @@ def test_template_priority_volume_is_repaired_when_safe_capacity_exists() -> Non
     template = _four_day_reference()
 
     result = generate_program(
-        request(
+        template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",
@@ -424,7 +433,7 @@ def test_template_priority_volume_is_repaired_when_safe_capacity_exists() -> Non
 
 def test_template_generation_is_deterministic_and_strictly_valid() -> None:
     template, catalog = _upper_lower_reference()
-    source = request(
+    source = template_request(
         available_training_days=4,
         primary_goal="build_muscle",
         training_experience="intermediate",
@@ -467,7 +476,7 @@ def test_template_with_adjacent_direct_muscle_overlap_is_rearranged() -> None:
     )
 
     result = generate_program(
-        request(
+        template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",
@@ -490,7 +499,7 @@ def test_template_with_alternating_direct_muscles_keeps_valid_recovery_spacing()
     template, catalog = _upper_lower_reference()
 
     result = generate_program(
-        request(
+        template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",
@@ -510,7 +519,7 @@ def test_template_with_alternating_direct_muscles_keeps_valid_recovery_spacing()
 def test_intentional_repeated_safe_template_core_is_preserved_deterministically() -> None:
     template, catalog = _repeated_core_reference()
     repeated_id = template.days[0].slots[0].exercise_id
-    source = request(
+    source = template_request(
         available_training_days=4,
         primary_goal="build_muscle",
         training_experience="intermediate",
@@ -548,7 +557,7 @@ def test_repeated_blocked_template_core_uses_distinct_safe_substitutions() -> No
     )
 
     result = generate_program(
-        request(
+        template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",

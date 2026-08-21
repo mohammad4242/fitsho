@@ -66,6 +66,7 @@ from app.workouts.program_engine.enums import (
     StabilityDemand,
     TrainingExperience,
 )
+from app.workouts.program_engine.equipment import effective_required_equipment
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET, ProgramRuleset
 from app.workouts.program_engine.schemas import (
     BodyAnalysisInfluence,
@@ -1013,7 +1014,10 @@ class WorkoutGenerationService:
             secondary_muscles=secondary_muscles,
             movement_pattern=exercise.movement_pattern,
             exercise_type=exercise.exercise_type,
-            equipment=frozenset(item.equipment for item in exercise.equipment_items),
+            equipment=effective_required_equipment(
+                (item.equipment for item in exercise.equipment_items),
+                exercise.movement_pattern,
+            ),
             difficulty=exercise.difficulty,
             caution_tags=caution_tags,
             labels=frozenset(item.label for item in exercise.labels),

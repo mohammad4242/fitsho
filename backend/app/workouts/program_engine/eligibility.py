@@ -12,6 +12,7 @@ from app.workouts.program_engine.enums import (
     StabilityDemand,
     TrainingStatus,
 )
+from app.workouts.program_engine.equipment import effective_required_equipment
 from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
     EligibilityResult,
@@ -76,7 +77,9 @@ def filter_eligible_exercises(
             reasons.append("EXERCISE_REJECTED_BLOCKED_EXERCISE")
         if exercise.movement_pattern in constraints.blocked_movement_patterns:
             reasons.append("EXERCISE_REJECTED_BLOCKED_PATTERN")
-        if not exercise.equipment.issubset(constraints.available_equipment):
+        if not effective_required_equipment(exercise.equipment, exercise.movement_pattern).issubset(
+            constraints.available_equipment
+        ):
             reasons.append("EXERCISE_REJECTED_MISSING_EQUIPMENT")
         if _DIFFICULTY_RANK[exercise.difficulty] > _STATUS_DIFFICULTY[request.training_status]:
             reasons.append("EXERCISE_REJECTED_SKILL_TOO_HIGH")

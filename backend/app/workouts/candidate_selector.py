@@ -21,6 +21,7 @@ from app.profile.enums import (
     TrainingCaution,
     TrainingLocation,
 )
+from app.workouts.program_engine.equipment import effective_required_equipment
 from app.workouts.schemas import CandidateSet, WorkoutExerciseCandidate, WorkoutGenerationProfile
 from app.workouts.signature import hash_candidate_set
 
@@ -122,10 +123,13 @@ class WorkoutCandidateSelector:
         allowed_difficulties: frozenset[Difficulty],
         excluded_tags: frozenset[ExerciseCautionTag],
     ) -> bool:
-        required_equipment = {item.equipment for item in exercise.equipment_items}
+        required_equipment = effective_required_equipment(
+            (item.equipment for item in exercise.equipment_items), exercise.movement_pattern
+        )
         caution_tags = {item.caution_tag for item in exercise.caution_tag_items}
         return (
-            required_equipment.issubset(available_equipment)
+            bool(required_equipment)
+            and required_equipment.issubset(available_equipment)
             and exercise.difficulty in allowed_difficulties
             and not caution_tags.intersection(excluded_tags)
         )
@@ -138,7 +142,12 @@ class WorkoutCandidateSelector:
             secondary_muscles=tuple(item.muscle for item in exercise.secondary_muscles),
             movement_pattern=exercise.movement_pattern,
             exercise_type=exercise.exercise_type,
-            equipment=tuple(item.equipment for item in exercise.equipment_items),
+            equipment=tuple(
+                effective_required_equipment(
+                    (item.equipment for item in exercise.equipment_items),
+                    exercise.movement_pattern,
+                )
+            ),
             difficulty=exercise.difficulty,
             caution_tags=tuple(item.caution_tag for item in exercise.caution_tag_items),
             labels=tuple(item.label for item in exercise.labels),

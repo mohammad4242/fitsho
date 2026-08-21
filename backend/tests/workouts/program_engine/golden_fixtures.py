@@ -182,7 +182,12 @@ def full_catalog() -> list[ExerciseCandidate]:
             MuscleGroup.TRICEPS,
             exercise_type=ExerciseType.ISOLATION,
         ),
-        exercise("chin-up", MovementPattern.VERTICAL_PULL, MuscleGroup.BACK),
+        exercise(
+            "chin-up",
+            MovementPattern.VERTICAL_PULL,
+            MuscleGroup.BACK,
+            equipment=frozenset({Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR}),
+        ),
         exercise("inverted-row", MovementPattern.HORIZONTAL_PULL, MuscleGroup.BACK),
         exercise(
             "dumbbell-pullover",
