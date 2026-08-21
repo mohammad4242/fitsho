@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from app.exercises.enums import ExerciseType
+from app.exercises.enums import Equipment, ExerciseType
 from app.workouts.program_engine.enums import Goal, SplitType, TrainingStatus
 
 MINIMUM_EXERCISES_PER_SESSION = 5
@@ -253,9 +253,43 @@ class ProgramRuleset:
             "trunk": 2,
         }
     )
+    strength_role_score_weights: dict[str, int] = field(
+        default_factory=lambda: {
+            "primary_strength": 30,
+            "secondary_compound": 8,
+            "accessory": 0,
+        }
+    )
+    strength_role_order: dict[str, int] = field(
+        default_factory=lambda: {
+            "primary_strength": 0,
+            "secondary_compound": 1,
+            "accessory": 2,
+        }
+    )
+    strength_equipment_scores: dict[Equipment, int] = field(
+        default_factory=lambda: {
+            Equipment.BARBELL: 4,
+            Equipment.MACHINE: 3,
+            Equipment.CABLE: 3,
+            Equipment.DUMBBELL: 2,
+            Equipment.RESISTANCE_BAND: 1,
+            Equipment.BODYWEIGHT: 0,
+        }
+    )
+    strength_primary_minimum_equipment_score: int = 2
+    strength_primary_allows_high_demand: dict[TrainingStatus, bool] = field(
+        default_factory=lambda: {
+            TrainingStatus.NOVICE: False,
+            TrainingStatus.EARLY_INTERMEDIATE: False,
+            TrainingStatus.INTERMEDIATE: True,
+            TrainingStatus.ADVANCED: True,
+        }
+    )
     prescription_rules: dict[str, PrescriptionRule] = field(
         default_factory=lambda: {
             "strength_compound": PrescriptionRule(3, 6, 180),
+            "strength_secondary_compound": PrescriptionRule(5, 10, 150),
             "strength_accessory": PrescriptionRule(6, 12, 120),
             "hypertrophy_compound": PrescriptionRule(6, 12, 120),
             "hypertrophy_isolation": PrescriptionRule(10, 20, 90),
@@ -264,6 +298,22 @@ class ProgramRuleset:
             "general_fitness": PrescriptionRule(6, 15, 90),
         }
     )
+    strength_beginner_rep_minimums: dict[str, int] = field(
+        default_factory=lambda: {
+            "primary_strength": 5,
+            "secondary_compound": 6,
+            "accessory": 8,
+        }
+    )
+    strength_beginner_rep_maximums: dict[str, int] = field(
+        default_factory=lambda: {
+            "primary_strength": 8,
+            "secondary_compound": 12,
+            "accessory": 15,
+        }
+    )
+    strength_high_fatigue_cost: int = 4
+    strength_high_fatigue_rest_bonus_seconds: int = 30
     selection_weights: dict[str, int] = field(
         default_factory=lambda: {
             "goal_specificity": 20,

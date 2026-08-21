@@ -15,6 +15,7 @@ from app.workouts.program_engine.schemas import (
     NormalizedProgramRequest,
     RankedCandidate,
 )
+from app.workouts.program_engine.strength_programming import classify_strength_role
 
 
 def rank_exercises(
@@ -85,7 +86,14 @@ def rank_exercises(
             ):
                 score += weights["older_novice_suitability"]
                 reasons.append("OLDER_NOVICE_SUITABILITY")
-        if request.primary_goal in {Goal.STRENGTH, Goal.GENERAL_FITNESS} and (
+        if request.primary_goal is Goal.STRENGTH:
+            strength_role = classify_strength_role(exercise, request, ruleset)
+            score += weights.get(
+                f"strength_{strength_role.role.value}",
+                ruleset.strength_role_score_weights[strength_role.role.value],
+            )
+            reasons.extend(strength_role.reason_codes)
+        elif request.primary_goal is Goal.GENERAL_FITNESS and (
             exercise.exercise_type is ExerciseType.COMPOUND
         ):
             score += weights["goal_specificity"]

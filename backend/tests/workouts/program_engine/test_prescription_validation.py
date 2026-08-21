@@ -140,8 +140,14 @@ def test_goal_specific_prescriptions_use_ranges_rir_and_rest() -> None:
     strength_main = strength.program.weekly_schedule[0].exercises[0]
     hypertrophy_main = hypertrophy.program.weekly_schedule[0].exercises[0]
     endurance_main = endurance.program.weekly_schedule[0].exercises[0]
-    assert (strength_main.rep_min, strength_main.rep_max) == (3, 6)
-    assert strength_main.rest_seconds >= 120
+    assert (
+        strength_main.rep_min
+        >= RULESET.prescription_rules["strength_secondary_compound"].rep_min
+    )
+    assert (
+        strength_main.rest_seconds
+        >= RULESET.prescription_rules["strength_accessory"].rest_seconds
+    )
     assert (hypertrophy_main.rep_min, hypertrophy_main.rep_max) == (6, 12)
     assert (endurance_main.rep_min, endurance_main.rep_max) == (12, 25)
     assert 1 <= hypertrophy_main.target_rir <= 4

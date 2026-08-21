@@ -5,6 +5,7 @@ from uuid import UUID
 
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.body_analysis import body_analysis_priority_muscles
+from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.replacement_ranker import rank_replacement_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
@@ -15,6 +16,7 @@ from app.workouts.program_engine.schemas import (
     SplitPlan,
     WeeklyVolumePlan,
 )
+from app.workouts.program_engine.strength_programming import classify_strength_role
 
 PUSH_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH})
 PULL_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL})
@@ -172,12 +174,23 @@ def build_sessions(
             usage[selected.exercise.id] += 1
             session_reasons = session_reasons + ("SESSION_SUPPLEMENTED_TO_MINIMUM",)
 
-        chosen.sort(
-            key=lambda item: (
-                item.primary_muscle not in effective_priorities,
-                _order_rank(item.movement_pattern, ruleset),
+        if request.primary_goal is Goal.STRENGTH:
+            chosen.sort(
+                key=lambda item: (
+                    ruleset.strength_role_order[
+                        classify_strength_role(item, request, ruleset).role.value
+                    ],
+                    item.primary_muscle not in effective_priorities,
+                    _order_rank(item.movement_pattern, ruleset),
+                )
             )
-        )
+        else:
+            chosen.sort(
+                key=lambda item: (
+                    item.primary_muscle not in effective_priorities,
+                    _order_rank(item.movement_pattern, ruleset),
+                )
+            )
         if chosen and chosen[0].primary_muscle in effective_priorities:
             placement_reason = (
                 "PRIORITY_MUSCLE_PLACED_FIRST"

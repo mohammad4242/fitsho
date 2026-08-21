@@ -13,6 +13,10 @@ from app.workouts.program_engine.schemas import (
     WorkoutDay,
 )
 from app.workouts.program_engine.session_targets import english_session_title
+from app.workouts.program_engine.strength_programming import (
+    StrengthExerciseRole,
+    classify_strength_role,
+)
 
 
 @dataclass(frozen=True)
@@ -75,6 +79,11 @@ def prescribe_sessions(
         programmed: list[ProgrammedExercise] = []
         direct_session_sets: Counter[object] = Counter()
         for exercise in draft.exercises:
+            strength_role = (
+                classify_strength_role(exercise, request, ruleset)
+                if request.primary_goal is Goal.STRENGTH
+                else None
+            )
             primary_muscle = exercise.primary_muscle
             counts_toward_volume = True
             if primary_muscle in allocations:
@@ -120,6 +129,8 @@ def prescribe_sessions(
                 prescription_mode=exercise.prescription_mode,
                 duration_min_seconds=exercise.duration_min_seconds,
                 duration_max_seconds=exercise.duration_max_seconds,
+                strength_role=strength_role.role if strength_role is not None else None,
+                fatigue_cost=exercise.fatigue_cost,
             )
             rest = prescription.rest_seconds
             if compact_session:
@@ -157,6 +168,7 @@ def prescribe_sessions(
                     estimated_minutes=estimate_exercise_minutes(sets, rest, warmup_sets, ruleset),
                     reason_codes=(
                         draft.selection_reasons[exercise.id]
+                        + (strength_role.reason_codes if strength_role is not None else ())
                         + (("VOLUME_SET_CAP_APPLIED",) if cap_applied else ())
                         + (("SESSION_SIZE_ACCESSORY",) if not counts_toward_volume else ())
                     ),
@@ -223,13 +235,22 @@ def prescription_for(
     prescription_mode: PrescriptionMode = PrescriptionMode.REPS,
     duration_min_seconds: int | None = None,
     duration_max_seconds: int | None = None,
+    strength_role: StrengthExerciseRole | None = None,
+    fatigue_cost: int = 2,
 ) -> ExercisePrescription:
     novice = status is TrainingStatus.NOVICE
     rir = ruleset.novice_target_rir if novice else ruleset.experienced_target_rir
     if goal is Goal.STRENGTH:
-        key = (
-            "strength_compound" if exercise_type is ExerciseType.COMPOUND else "strength_accessory"
+        role = strength_role or (
+            StrengthExerciseRole.PRIMARY_STRENGTH
+            if exercise_type is ExerciseType.COMPOUND
+            else StrengthExerciseRole.ACCESSORY
         )
+        key = {
+            StrengthExerciseRole.PRIMARY_STRENGTH: "strength_compound",
+            StrengthExerciseRole.SECONDARY_COMPOUND: "strength_secondary_compound",
+            StrengthExerciseRole.ACCESSORY: "strength_accessory",
+        }[role]
     elif goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN}:
         key = (
             "hypertrophy_isolation"
@@ -244,15 +265,28 @@ def prescription_for(
     else:
         key = "general_fitness"
     rule = ruleset.prescription_rules[key]
+    rep_min = rule.rep_min
+    rep_max = rule.rep_max
+    rest_seconds = rule.rest_seconds
+    if goal is Goal.STRENGTH:
+        role_key = role.value
+        if novice:
+            rep_min = max(rep_min, ruleset.strength_beginner_rep_minimums[role_key])
+            rep_max = max(rep_max, ruleset.strength_beginner_rep_maximums[role_key])
+        if (
+            role is not StrengthExerciseRole.PRIMARY_STRENGTH
+            and fatigue_cost >= ruleset.strength_high_fatigue_cost
+        ):
+            rest_seconds += ruleset.strength_high_fatigue_rest_bonus_seconds
     if prescription_mode is PrescriptionMode.REPS:
         return ExercisePrescription(
             mode=PrescriptionMode.REPS,
-            rep_min=rule.rep_min,
-            rep_max=rule.rep_max,
+            rep_min=rep_min,
+            rep_max=rep_max,
             duration_min_seconds=None,
             duration_max_seconds=None,
             target_rir=rir,
-            rest_seconds=rule.rest_seconds,
+            rest_seconds=rest_seconds,
         )
     if prescription_mode is PrescriptionMode.DURATION:
         if (
@@ -268,7 +302,7 @@ def prescription_for(
             duration_min_seconds=duration_min_seconds,
             duration_max_seconds=duration_max_seconds,
             target_rir=None,
-            rest_seconds=rule.rest_seconds,
+            rest_seconds=rest_seconds,
         )
     raise ValueError(f"unsupported prescription mode: {prescription_mode}")
 

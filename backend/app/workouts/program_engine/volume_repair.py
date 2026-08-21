@@ -3,6 +3,7 @@ from dataclasses import replace
 
 from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
+from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.prescription import (
     estimate_exercise_minutes,
@@ -20,6 +21,7 @@ from app.workouts.program_engine.schemas import (
 )
 from app.workouts.program_engine.session_builder import exercise_fits_focus
 from app.workouts.program_engine.session_targets import english_session_title
+from app.workouts.program_engine.strength_programming import classify_strength_role
 
 
 def repair_weekly_volume(
@@ -392,6 +394,12 @@ def _select_exercise_addition(
                 prescription_mode=candidate.prescription_mode,
                 duration_min_seconds=candidate.duration_min_seconds,
                 duration_max_seconds=candidate.duration_max_seconds,
+                strength_role=(
+                    classify_strength_role(candidate, request, ruleset).role
+                    if request.primary_goal is Goal.STRENGTH
+                    else None
+                ),
+                fatigue_cost=candidate.fatigue_cost,
             )
             estimated = estimate_exercise_minutes(sets, prescription.rest_seconds, 0, ruleset)
             for day_index, (day, original) in enumerate(zip(days, originals, strict=True)):

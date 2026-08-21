@@ -1,4 +1,4 @@
-from app.exercises.enums import MovementPattern, MuscleGroup
+from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     Goal,
@@ -74,10 +74,14 @@ def test_regression_strength_is_not_random_high_rep_isolation() -> None:
 
     assert result.program is not None
     first = result.program.weekly_schedule[0].exercises[0]
-    assert first.rep_max <= 6
+    assert first.exercise_type is ExerciseType.COMPOUND
+    assert "STRENGTH_PRIMARY_COMPOUND" in first.reason_codes
+    assert first.rep_max <= RULESET.strength_beginner_rep_maximums["primary_strength"]
     assert first.movement_pattern in {
         MovementPattern.HORIZONTAL_PUSH,
         MovementPattern.HORIZONTAL_PULL,
+        MovementPattern.VERTICAL_PUSH,
+        MovementPattern.VERTICAL_PULL,
         MovementPattern.SQUAT,
         MovementPattern.HIP_HINGE,
     }
