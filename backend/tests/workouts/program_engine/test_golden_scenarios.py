@@ -9,6 +9,7 @@ from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import TRACKED_MUSCLES
 from tests.workouts.program_engine.golden_fixtures import (
+    exercise,
     full_catalog,
     golden_scenarios,
     impossible_equipment_request,
@@ -71,7 +72,10 @@ def test_successful_generation_preserves_requested_training_days(requested_days:
         training_age_months=24,
     )
 
-    result = generate_program(source, full_catalog(), RULESET)
+    catalog = full_catalog()
+    if requested_days == 6:
+        catalog.append(exercise("seated-calf", MovementPattern.CALF_RAISE, MuscleGroup.CALVES))
+    result = generate_program(source, catalog, RULESET)
 
     assert result.program is not None, result.errors
     assert len(result.program.weekly_schedule) == requested_days
@@ -106,6 +110,7 @@ def test_exact_day_construction_failure_does_not_return_shorter_success() -> Non
     assert result.program is None
     assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
     assert "REQUESTED_TRAINING_DAYS_UNSATISFIED" in result.errors
+    assert "EXACT_DAY_SPLIT_ALTERNATIVES_EXHAUSTED" in result.errors
 
 
 @pytest.mark.parametrize(
@@ -137,7 +142,7 @@ def test_golden_constraints_and_recovery(name: str) -> None:
     if name == "no_spinal_flexion":
         assert all(item.movement_pattern is not MovementPattern.SPINAL_FLEXION for item in selected)
     if name == "high_job_poor_recovery":
-        assert len(result.program.weekly_schedule) <= 3
+        assert len(result.program.weekly_schedule) == source.available_training_days
         assert "VOLUME_REDUCED_FOR_RECOVERY" in next(
             entry["reasons"]
             for entry in result.program.decision_trace

@@ -577,8 +577,12 @@ def test_validator_still_rejects_an_unjustified_duplicate_exercise() -> None:
 
 
 def test_validator_rejects_a_third_direct_weekly_muscle_exposure_for_four_day_programs() -> None:
-    source = request(available_training_days=4)
-    result = generate_program(source, catalog(), RULESET)
+    source = request(
+        available_training_days=4,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=24,
+    )
+    result = generate_program(source, full_catalog(), RULESET)
     assert result.program is not None
 
     base_day = result.program.weekly_schedule[0]

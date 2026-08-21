@@ -186,9 +186,35 @@ def generate_program(
                     ),
                 },
             )
+    requested_days = normalized.resistance_training_days
+    ranked_splits = rank_split_candidates(normalized, ruleset)
+    exact_day_splits = tuple(
+        candidate for candidate in ranked_splits if len(candidate.day_focuses) == requested_days
+    )
+    if not exact_day_splits:
+        reason_codes = (
+            "REQUESTED_TRAINING_DAYS_UNSATISFIED",
+            "NO_EXACT_DAY_SPLIT_AVAILABLE",
+        )
+        return ProgramGenerationResult(
+            program=None,
+            error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
+            errors=reason_codes,
+            safety_status=safety.status,
+            rejected_candidates=eligibility.rejected,
+            decision_trace=(
+                {
+                    "stage": "day_count_invariant",
+                    "status": "rejected",
+                    "expected_days": requested_days,
+                    "actual_days": None,
+                    "reason_codes": reason_codes,
+                },
+            ),
+        )
     rejected_splits: list[dict[str, object]] = []
     collected_errors: list[str] = []
-    for attempt_index, candidate in enumerate(rank_split_candidates(normalized, ruleset)):
+    for attempt_index, candidate in enumerate(exact_day_splits):
         split = candidate
         if attempt_index:
             split = replace(
@@ -226,6 +252,8 @@ def generate_program(
         rejected_splits.append(rejected_attempt)
     errors = (
         "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED",
+        "EXACT_DAY_SPLIT_ALTERNATIVES_EXHAUSTED",
+        "REQUESTED_TRAINING_DAYS_UNSATISFIED",
         *tuple(dict.fromkeys(collected_errors)),
     )
     return ProgramGenerationResult(
@@ -310,6 +338,28 @@ def _program_for_split(
     )
     days = add_cardio(normalized, days, cardio_eligible, ruleset)
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
+    day_count_errors = _day_count_errors(
+        len(days), normalized.resistance_training_days, stage="dynamic_construction"
+    )
+    if day_count_errors:
+        return ProgramGenerationResult(
+            program=None,
+            error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
+            errors=day_count_errors,
+            safety_status=safety_status,
+            rejected_candidates=rejected,
+            decision_trace=template_rejection_trace
+            + (
+                {
+                    "stage": "day_count_invariant",
+                    "status": "rejected",
+                    "expected_days": normalized.resistance_training_days,
+                    "actual_days": len(days),
+                    "split": split.split_type.value,
+                    "reason_codes": day_count_errors,
+                },
+            ),
+        )
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises),
         ruleset,
@@ -362,6 +412,13 @@ def _program_for_split(
                 for draft in drafts
                 if draft.reason_codes
             ),
+        },
+        {
+            "stage": "day_count_invariant",
+            "status": "satisfied",
+            "expected_days": normalized.resistance_training_days,
+            "actual_days": len(days),
+            "reason_codes": ("REQUESTED_TRAINING_DAYS_SATISFIED",),
         },
         {"stage": "split", "selected": split.split_type.value, "reasons": split.reason_codes},
         _volume_decision_trace(volume, previous_volume),
@@ -493,6 +550,17 @@ def _reference_program(
     )
     direct = Counter(effective_volume.direct_sets_by_muscle)
     body_trace = body_analysis_trace(normalized, ruleset)
+    day_count_errors = _day_count_errors(
+        len(days), normalized.resistance_training_days, stage="template_construction"
+    )
+    day_count_trace: dict[str, object] = {
+        "stage": "day_count_invariant",
+        "status": "rejected" if day_count_errors else "satisfied",
+        "expected_days": normalized.resistance_training_days,
+        "actual_days": len(days),
+        "split": split.split_type.value,
+        "reason_codes": day_count_errors or ("REQUESTED_TRAINING_DAYS_SATISFIED",),
+    }
     trace: tuple[dict[str, object], ...] = (
         {"stage": "normalization", "assumptions": normalized.assumptions},
         {"stage": "safety", "status": safety_status.value, "reasons": safety_reasons},
@@ -510,6 +578,7 @@ def _reference_program(
             "intensity_methods": reference.intensity_methods,
         },
         template_resolution_trace(build, days),
+        day_count_trace,
         _volume_decision_trace(volume, previous_volume),
         {
             "stage": "volume_repair",
@@ -518,6 +587,15 @@ def _reference_program(
             "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
         },
     )
+    if day_count_errors:
+        return ProgramGenerationResult(
+            program=None,
+            error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
+            errors=day_count_errors,
+            safety_status=safety_status,
+            rejected_candidates=rejected,
+            decision_trace=trace,
+        )
     priority_muscles = normalized.source.priority_muscles | body_analysis_priority_muscles(
         normalized, ruleset
     )
@@ -591,6 +669,16 @@ def _reference_program(
         safety_status=safety_status,
         rejected_candidates=rejected,
         decision_trace=final_trace,
+    )
+
+
+def _day_count_errors(actual: int, expected: int, *, stage: str) -> tuple[str, ...]:
+    if actual == expected:
+        return ()
+    return (
+        "REQUESTED_TRAINING_DAYS_UNSATISFIED",
+        f"REQUESTED_TRAINING_DAYS_MISMATCH:expected={expected}:actual={actual}",
+        f"DAY_COUNT_INVARIANT_FAILED:{stage}",
     )
 
 

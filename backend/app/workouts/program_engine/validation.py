@@ -101,6 +101,13 @@ def validate_program(
 
     if len(program.weekly_schedule) != len(program.split.day_focuses):
         errors.append("TRAINING_DAY_COUNT_MISMATCH")
+    expected_training_days = min(request.available_training_days, ruleset.max_resistance_days)
+    if len(program.weekly_schedule) != expected_training_days:
+        errors.append("REQUESTED_TRAINING_DAYS_UNSATISFIED")
+        errors.append(
+            f"REQUESTED_TRAINING_DAYS_MISMATCH:expected={expected_training_days}:"
+            f"actual={len(program.weekly_schedule)}"
+        )
     if len(program.weekly_schedule) >= 4 and any(
         frequency > ruleset.maximum_direct_sessions_per_muscle_per_week
         for frequency in direct_session_frequency.values()

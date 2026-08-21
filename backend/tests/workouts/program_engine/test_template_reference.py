@@ -414,10 +414,7 @@ def test_unadaptable_five_day_template_recovers_without_dropping_days() -> None:
         slug="unadaptable-five-day-reference",
         days_per_week=5,
         training_level="beginner",
-        days=tuple(
-            replace(base.days[0], day_number=day_number)
-            for day_number in range(1, 6)
-        ),
+        days=tuple(replace(base.days[0], day_number=day_number) for day_number in range(1, 6)),
     )
 
     result = generate_program(
