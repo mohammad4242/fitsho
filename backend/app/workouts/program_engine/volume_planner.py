@@ -165,6 +165,36 @@ def plan_weekly_volume(
             if sets > split_maximum:
                 sets = split_maximum
                 reasons.append("VOLUME_CAPPED_FOR_SPLIT_FREQUENCY")
+        # Secondary muscles (biceps, triceps, traps, forearms) as priorities in 1-2 day
+        # full-body programs cannot realistically satisfy a direct-only minimum — compounds
+        # in those sessions cover them effectively.  Only enforce the hard direct minimum
+        # when the program has ≥3 days (enough room for dedicated work) or the muscle is
+        # a primary major muscle group.
+        has_dedicated_exposure = (
+            split.split_type is SplitType.BODY_PART_ROTATION and direct_exposures[muscle] > 0
+        )
+        direct_min_required = muscle in effective_priorities and (
+            muscle not in SECONDARY_MUSCLES
+            or has_dedicated_exposure
+            or len(split.day_focuses) >= 3
+        )
+        # For secondary muscles without a dedicated session, coverage via compound secondary
+        # stimulation is sufficient — don't enforce a hard coverage requirement.
+        secondary_without_session = muscle in SECONDARY_MUSCLES and not has_dedicated_exposure
+        coverage_required = muscle in MINIMUM_COVERAGE_MUSCLES or (
+            muscle in effective_priorities and not secondary_without_session
+        )
+        # Use the soft coverage minimum (not the full muscle_minimum) for secondary muscles
+        # without dedicated sessions so that compound secondary stimulation can satisfy it.
+        effective_minimum = (
+            ruleset.minimum_coverage_sets[request.training_status]
+            if secondary_without_session and muscle in effective_priorities
+            else (
+                muscle_minimum
+                if muscle in effective_priorities
+                else ruleset.minimum_coverage_sets[request.training_status]
+            )
+        )
         targets.append(
             VolumeTarget(
                 muscle=muscle,
@@ -175,18 +205,9 @@ def plan_weekly_volume(
                 fractional_sets=round(sets * ruleset.secondary_set_credit, 1),
                 effective_target_sets=sets,
                 minimum_direct_sets=min(muscle_minimum, sets),
-                minimum_effective_sets=min(
-                    (
-                        muscle_minimum
-                        if muscle in effective_priorities
-                        else ruleset.minimum_coverage_sets[request.training_status]
-                    ),
-                    sets,
-                ),
-                minimum_coverage_required=(
-                    muscle in MINIMUM_COVERAGE_MUSCLES or muscle in effective_priorities
-                ),
-                direct_minimum_required=muscle in effective_priorities,
+                minimum_effective_sets=min(effective_minimum, sets),
+                minimum_coverage_required=coverage_required,
+                direct_minimum_required=direct_min_required,
             )
         )
     return WeeklyVolumePlan(targets=tuple(targets), reason_codes=tuple(dict.fromkeys(reasons)))

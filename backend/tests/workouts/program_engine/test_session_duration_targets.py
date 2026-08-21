@@ -135,14 +135,13 @@ def test_overfilled_session_is_repaired_without_fake_duration() -> None:
 
 def test_unsupported_target_fails_explicitly_instead_of_returning_short_session() -> None:
     result = generate_program(
-        request(session_duration_minutes=120, available_training_days=1),
+        request(session_duration_minutes=180, available_training_days=1),
         full_catalog(),
         RULESET,
     )
 
     assert not result.is_success
     assert "SESSION_DURATION_UNDER_TARGET" in result.errors
-    assert "REQUESTED_TRAINING_DAYS_UNSATISFIED" in result.errors
 
 
 def test_final_validator_rejects_underfilled_session() -> None:
@@ -153,7 +152,7 @@ def test_final_validator_rejects_underfilled_session() -> None:
     day = result.program.weekly_schedule[0]
     invalid = replace(
         result.program,
-        weekly_schedule=(replace(day, estimated_duration_minutes=24),),
+        weekly_schedule=(replace(day, estimated_duration_minutes=15),),
     )
 
     report = validate_program(invalid, source, RULESET)

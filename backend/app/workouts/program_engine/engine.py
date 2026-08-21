@@ -41,6 +41,7 @@ from app.workouts.program_engine.session_builder import (
     KNEE_PATTERNS,
     PULL_PATTERNS,
     PUSH_PATTERNS,
+    SHOULDER_PATTERNS,
     SessionConstructionError,
     build_sessions,
 )
@@ -68,6 +69,7 @@ _RECOVERABLE_PATTERN_GROUPS = (
     KNEE_PATTERNS,
     HINGE_PATTERNS,
     CORE_PATTERNS,
+    SHOULDER_PATTERNS,
 )
 
 
@@ -397,6 +399,7 @@ def _program_for_split(
         ruleset,
         request=normalized,
         relaxed_required_pattern_groups=relaxed_groups,
+        global_relaxable_groups=relaxable_required_pattern_groups,
     )
     body_trace = body_analysis_trace(normalized, ruleset)
     session_reasons = tuple(
@@ -739,6 +742,7 @@ def _volume_metrics(
     request: NormalizedProgramRequest,
     reference_template: str | None = None,
     relaxed_required_pattern_groups: tuple[tuple[MovementPattern, ...], ...] = (),
+    global_relaxable_groups: tuple[frozenset[MovementPattern], ...] = (),
 ) -> dict[str, object]:
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises), ruleset
@@ -807,11 +811,32 @@ def _volume_metrics(
             tuple(pattern.value for pattern in group) for group in relaxed_required_pattern_groups
         )
         metrics["relaxed_required_pattern_groups"] = relaxed_group_values
-        knee_group = tuple(
-            pattern.value for pattern in sorted(KNEE_PATTERNS, key=lambda item: item.value)
-        )
-        if knee_group in relaxed_group_values:
-            metrics["unavailable_muscle_coverage"] = (MuscleGroup.QUADRICEPS.value,)
+        
+    if global_relaxable_groups:
+        # Map each globally relaxable pattern group to the muscles whose coverage becomes
+        # unavailable.
+        # This prevents the validator from raising MINIMUM_MUSCLE_COVERAGE_UNSATISFIED
+        # when the exercise pool simply cannot supply those movement patterns.
+        _pattern_group_to_unavailable_muscles: dict[
+            frozenset[MovementPattern], tuple[str, ...]
+        ] = {
+            KNEE_PATTERNS: (MuscleGroup.QUADRICEPS.value,),
+            PULL_PATTERNS: (MuscleGroup.BACK.value, MuscleGroup.BICEPS.value),
+            PUSH_PATTERNS: (
+                MuscleGroup.CHEST.value,
+                MuscleGroup.SHOULDERS.value,
+                MuscleGroup.TRICEPS.value,
+            ),
+            HINGE_PATTERNS: (MuscleGroup.HAMSTRINGS.value, MuscleGroup.GLUTES.value),
+            CORE_PATTERNS: (MuscleGroup.ABS.value,),
+            SHOULDER_PATTERNS: (MuscleGroup.SHOULDERS.value, MuscleGroup.TRAPS.value),
+        }
+        unavailable: list[str] = []
+        for pattern_group, muscles in _pattern_group_to_unavailable_muscles.items():
+            if pattern_group in global_relaxable_groups:
+                unavailable.extend(muscles)
+        if unavailable:
+            metrics["unavailable_muscle_coverage"] = tuple(dict.fromkeys(unavailable))
     return metrics
 
 

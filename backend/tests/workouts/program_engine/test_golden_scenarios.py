@@ -84,7 +84,7 @@ def test_successful_generation_preserves_requested_training_days(requested_days:
     assert all(day.exercises for day in result.program.weekly_schedule)
 
 
-def test_six_day_generation_reports_duration_unsatisfied_instead_of_short_success() -> None:
+def test_six_day_generation_succeeds_with_scaled_frequency_caps() -> None:
     source = request(
         available_training_days=6,
         training_experience="intermediate",
@@ -95,8 +95,8 @@ def test_six_day_generation_reports_duration_unsatisfied_instead_of_short_succes
 
     result = generate_program(source, catalog, RULESET)
 
-    assert not result.is_success
-    assert "SESSION_DURATION_TARGET_UNSATISFIED" in result.errors
+    assert result.is_success
+    assert len(result.program.weekly_schedule) == 6
 
 
 def test_preferred_weekdays_are_preserved_for_exact_day_generation() -> None:

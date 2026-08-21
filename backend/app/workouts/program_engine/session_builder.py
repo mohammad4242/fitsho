@@ -96,7 +96,7 @@ def build_sessions(
         chosen: list[ExerciseCandidate] = []
         reasons: dict[UUID, tuple[str, ...]] = {}
         session_reasons: tuple[str, ...] = ()
-        relaxed_required_pattern_groups: list[tuple[MovementPattern, ...]] = []
+        this_session_relaxed_groups: list[tuple[MovementPattern, ...]] = []
         for slot in ordered_slots:
             if len(chosen) >= capacity:
                 if slot.required:
@@ -130,7 +130,7 @@ def build_sessions(
                 if slot.required:
                     if slot.patterns in relaxable_required_pattern_groups:
                         relaxed = tuple(sorted(slot.patterns, key=lambda item: item.value))
-                        relaxed_required_pattern_groups.append(relaxed)
+                        this_session_relaxed_groups.append(relaxed)
                         session_reasons = session_reasons + (
                             "SESSION_LAYOUT_UNFILLABLE",
                             "RECOVERY_APPLIED_REQUIRED_SLOT_RELAXATION",
@@ -243,7 +243,7 @@ def build_sessions(
                 substitutions=substitutions,
                 reason_codes=tuple(dict.fromkeys(session_reasons)),
                 relaxed_required_pattern_groups=tuple(
-                    dict.fromkeys(relaxed_required_pattern_groups)
+                    dict.fromkeys(this_session_relaxed_groups)
                 ),
             )
         )
