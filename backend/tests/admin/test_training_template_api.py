@@ -104,7 +104,7 @@ def test_admin_creates_a_complete_program_template_with_catalog_exercise(
             "days_per_week": 4,
             "training_level": training_level,
             "fitness_goal": "build_muscle",
-            "focus_tags": ["balanced"],
+            "focus_tags": ["full_body", "balanced"],
             "intensity_methods": ["standard"],
             "programming_rationale": _rationale_payload(),
             "source_name": "Fitsho admin library",
@@ -186,7 +186,7 @@ def test_admin_rejects_template_slot_with_unknown_exercise(client: TestClient, d
         "days_per_week": 2,
         "training_level": "beginner",
         "fitness_goal": "build_muscle",
-        "focus_tags": ["balanced"],
+        "focus_tags": ["full_body", "balanced"],
         "intensity_methods": ["standard"],
         "programming_rationale": _rationale_payload(),
         "source_name": "Fitsho admin library",
@@ -202,6 +202,38 @@ def test_admin_rejects_template_slot_with_unknown_exercise(client: TestClient, d
 
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"] == ["body", "days"]
+
+
+def test_admin_rejects_conflicting_canonical_template_tags(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    exercise_id = client.get("/api/v1/admin/exercises?search=bench").json()["items"][0]["id"]
+
+    response = client.post(
+        "/api/v1/admin/training-program-templates",
+        headers=ORIGIN,
+        json={
+            "name_en": "Conflicting Tag Program",
+            "name_fa": "برنامه با برچسب متناقض",
+            "description_en": "Conflicting canonical tag test.",
+            "description_fa": "آزمون برچسب‌های متناقض.",
+            "days_per_week": 2,
+            "training_level": "beginner",
+            "fitness_goal": "build_muscle",
+            "focus_tags": ["full_body", "balanced", "chest_priority"],
+            "intensity_methods": ["standard"],
+            "programming_rationale": _rationale_payload(),
+            "source_name": "Fitsho admin library",
+            "source_url": "https://fitsho.local/admin-library",
+            "days": [_day_payload(day, exercise_id) for day in range(1, 3)],
+        },
+    )
+
+    assert response.status_code == 422
+    assert "Balanced templates cannot declare priority tags" in response.text
 
 
 def test_admin_rejects_guide_from_training_template_slots(client: TestClient, db: Session) -> None:
@@ -223,7 +255,7 @@ def test_admin_rejects_guide_from_training_template_slots(client: TestClient, db
             "days_per_week": 2,
             "training_level": "beginner",
             "fitness_goal": "build_muscle",
-            "focus_tags": ["balanced"],
+            "focus_tags": ["full_body", "balanced"],
             "intensity_methods": ["standard"],
             "programming_rationale": _rationale_payload(),
             "source_name": "Fitsho admin library",
@@ -249,17 +281,31 @@ def _rationale_payload() -> list[dict[str, str]]:
 
 
 def _day_payload(day_number: int, exercise_id: str) -> dict[str, object]:
+    slot_specs = (
+        (["chest"], "horizontal_push"),
+        (["back"], "horizontal_pull"),
+        (["shoulders"], "vertical_push"),
+        (["quadriceps"], "squat"),
+        (["hamstrings", "glutes"], "hip_hinge"),
+    )
     return {
         "title_en": f"Day {day_number}",
         "title_fa": f"روز {day_number}",
-        "direct_target_muscles": ["chest"],
+        "direct_target_muscles": [
+            "chest",
+            "back",
+            "shoulders",
+            "quadriceps",
+            "hamstrings",
+            "glutes",
+        ],
         "slots": [
             {
                 "exercise_id": exercise_id,
                 "display_name_en": None,
                 "display_name_fa": None,
-                "target_muscles": ["chest"],
-                "movement_pattern": "horizontal_push",
+                "target_muscles": target_muscles,
+                "movement_pattern": movement_pattern,
                 "intensity_method": "standard",
                 "adaptation_priority": "core",
                 "superset_group": None,
@@ -269,7 +315,7 @@ def _day_payload(day_number: int, exercise_id: str) -> dict[str, object]:
                 "target_rir": 2,
                 "rest_seconds": 90,
             }
-            for _ in range(5)
+            for target_muscles, movement_pattern in slot_specs
         ],
     }
 

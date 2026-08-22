@@ -82,7 +82,7 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
         template.days_per_week = seed.days_per_week
         template.training_level = seed.training_level
         template.fitness_goal = seed.fitness_goal
-        template.focus_tags = list(seed.focus_tags)
+        template.focus_tags = [tag.value for tag in seed.focus_tags]
         template.intensity_methods = [method.value for method in seed.intensity_methods]
         template.programming_rationale = [
             {

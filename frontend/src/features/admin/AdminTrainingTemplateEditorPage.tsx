@@ -337,7 +337,7 @@ function emptyTemplate(daysPerWeek: number, level: ExperienceLevel): AdminTraini
     days_per_week: daysPerWeek,
     training_level: level,
     fitness_goal: "build_muscle",
-    focus_tags: ["hypertrophy"],
+    focus_tags: ["full_body", "balanced"],
     intensity_methods: ["standard"],
     programming_rationale: Array.from({ length: 5 }, (_, index) => ({ title_en: `Reason ${index + 1}`, title_fa: `علت ${index + 1}`, detail_en: "Explain this program decision.", detail_fa: "دلیل این تصمیم برنامه‌نویسی را بنویس.", })),
     source_name: "Fitsho admin library",

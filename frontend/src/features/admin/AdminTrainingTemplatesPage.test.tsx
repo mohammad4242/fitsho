@@ -24,7 +24,7 @@ const template = {
   days_per_week: 4,
   training_level: "intermediate" as const,
   fitness_goal: "build_muscle" as const,
-  focus_tags: ["classic", "direct_targets"],
+  focus_tags: ["body_part_rotation", "balanced"],
   intensity_methods: ["standard" as const],
   source_name: "Fitsho original evidence-informed template",
   source_url: "https://pubmed.ncbi.nlm.nih.gov/38595233/",

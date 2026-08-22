@@ -84,7 +84,7 @@ normalizer, dynamic tag construction, or per-template tag rewrite table.
 
 ### Primary structure
 
-- `full_body`: every session trains major upper and lower movement regions.
+- `full_body`: the week trains the whole body through repeated mixed-region sessions.
 - `upper_lower`: the week contains explicit upper- and lower-body session blocks.
 - `push_pull_legs`: the week contains explicit push, pull, and leg session blocks.
 - `body_part_rotation`: the week rotates dedicated muscle or body-region sessions.

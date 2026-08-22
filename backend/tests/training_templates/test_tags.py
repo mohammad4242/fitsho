@@ -1,21 +1,25 @@
+from types import SimpleNamespace
+
 import pytest
 
 from app.exercises.enums import MuscleGroup
+from app.training_templates import tags as template_tags
 from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS
 from app.training_templates.tags import (
     CANONICAL_TEMPLATE_FOCUS_TAGS,
+    MINIMUM_DIRECT_SLOTS_BY_PRIORITY_TAG,
+    MUSCLE_PRIORITY_TAGS,
+    MUSCLES_BY_PRIORITY_TAG,
     TEMPLATE_FOCUS_TAG_DEFINITIONS,
     TemplateFocusTag,
-    normalize_focus_tags,
     validate_focus_tags,
 )
+from app.workouts.program_engine import body_analysis
 
 
 def test_focus_tags_have_one_canonical_vocabulary() -> None:
-    assert set(TEMPLATE_FOCUS_TAG_DEFINITIONS) == {
-        tag.value for tag in TemplateFocusTag
-    }
-    assert {
+    assert set(TEMPLATE_FOCUS_TAG_DEFINITIONS) == {tag.value for tag in TemplateFocusTag}
+    assert CANONICAL_TEMPLATE_FOCUS_TAGS == {
         "full_body",
         "upper_lower",
         "push_pull_legs",
@@ -33,9 +37,38 @@ def test_focus_tags_have_one_canonical_vocabulary() -> None:
         "strength_bias",
         "compound_focus",
         "specialization",
-        "time_efficient",
-    }.issubset(CANONICAL_TEMPLATE_FOCUS_TAGS)
+    }
     assert TemplateFocusTag.BALANCED.value == "balanced"
+
+
+def test_every_focus_tag_has_one_semantic_category_and_documented_contract() -> None:
+    category_type = getattr(template_tags, "TemplateTagCategory", None)
+    assert category_type is not None
+    expected_categories = {
+        "full_body": "primary_structure",
+        "upper_lower": "primary_structure",
+        "push_pull_legs": "primary_structure",
+        "body_part_rotation": "primary_structure",
+        "balanced": "regional_balance",
+        "upper_priority": "regional_balance",
+        "lower_priority": "regional_balance",
+        "chest_priority": "muscle_priority",
+        "back_priority": "muscle_priority",
+        "shoulders_priority": "muscle_priority",
+        "arms_priority": "muscle_priority",
+        "glute_priority": "muscle_priority",
+        "quad_priority": "muscle_priority",
+        "hamstrings_priority": "muscle_priority",
+        "strength_bias": "structural_character",
+        "compound_focus": "structural_character",
+        "specialization": "structural_character",
+    }
+
+    assert {
+        tag.value: definition.category.value
+        for tag, definition in TEMPLATE_FOCUS_TAG_DEFINITIONS.items()
+    } == expected_categories
+    assert all(definition.meaning.strip() for definition in TEMPLATE_FOCUS_TAG_DEFINITIONS.values())
 
 
 def test_unknown_and_duplicate_focus_tags_are_rejected() -> None:
@@ -46,11 +79,82 @@ def test_unknown_and_duplicate_focus_tags_are_rejected() -> None:
         validate_focus_tags(("balanced", "balanced"))
 
 
-def test_normalization_deduplicates_canonical_tags() -> None:
-    assert normalize_focus_tags(("balanced", "full_body", "balanced")) == (
-        "balanced",
-        "full_body",
+@pytest.mark.parametrize(
+    ("tags", "message"),
+    (
+        ((TemplateFocusTag.BALANCED,), "primary structure"),
+        (
+            (TemplateFocusTag.FULL_BODY, TemplateFocusTag.UPPER_LOWER),
+            "Unsupported primary structure combination",
+        ),
+        (
+            (
+                TemplateFocusTag.FULL_BODY,
+                TemplateFocusTag.BALANCED,
+                TemplateFocusTag.CHEST_PRIORITY,
+            ),
+            "Balanced templates cannot declare priority tags",
+        ),
+        (
+            (
+                TemplateFocusTag.BODY_PART_ROTATION,
+                TemplateFocusTag.UPPER_PRIORITY,
+                TemplateFocusTag.LOWER_PRIORITY,
+            ),
+            "Upper and lower priority tags conflict",
+        ),
+        (
+            (TemplateFocusTag.BODY_PART_ROTATION, TemplateFocusTag.SPECIALIZATION),
+            "Specialization requires a priority tag",
+        ),
+    ),
+)
+def test_focus_tag_category_invariants_are_rejected(
+    tags: tuple[TemplateFocusTag, ...],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        validate_focus_tags(tags)
+
+
+def test_priority_muscles_map_to_one_explicit_canonical_vocabulary() -> None:
+    mapper = getattr(template_tags, "priority_tags_for_muscles", None)
+    membership = getattr(template_tags, "has_template_tag", None)
+    assert mapper is not None
+    assert membership is not None
+
+    assert mapper(
+        (
+            MuscleGroup.CHEST,
+            MuscleGroup.BACK,
+            MuscleGroup.SHOULDERS,
+            MuscleGroup.BICEPS,
+            MuscleGroup.TRICEPS,
+            MuscleGroup.FOREARMS,
+            MuscleGroup.GLUTES,
+            MuscleGroup.QUADRICEPS,
+            MuscleGroup.HAMSTRINGS,
+        )
+    ) == frozenset(
+        {
+            TemplateFocusTag.CHEST_PRIORITY,
+            TemplateFocusTag.BACK_PRIORITY,
+            TemplateFocusTag.SHOULDERS_PRIORITY,
+            TemplateFocusTag.ARMS_PRIORITY,
+            TemplateFocusTag.GLUTE_PRIORITY,
+            TemplateFocusTag.QUAD_PRIORITY,
+            TemplateFocusTag.HAMSTRINGS_PRIORITY,
+        }
     )
+    assert mapper((MuscleGroup.CALVES, MuscleGroup.ABS, MuscleGroup.TRAPS)) == frozenset()
+    assert membership(
+        (TemplateFocusTag.FULL_BODY, TemplateFocusTag.CHEST_PRIORITY),
+        TemplateFocusTag.CHEST_PRIORITY,
+    )
+
+
+def test_body_analysis_does_not_keep_a_competing_template_tag_mapping() -> None:
+    assert not hasattr(body_analysis, "TEMPLATE_TAGS_BY_MUSCLE")
 
 
 def test_seed_library_contains_only_unique_canonical_tags() -> None:
@@ -59,6 +163,82 @@ def test_seed_library_contains_only_unique_canonical_tags() -> None:
         and set(template.focus_tags).issubset(CANONICAL_TEMPLATE_FOCUS_TAGS)
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
     )
+
+
+def test_seed_tags_are_declared_canonically_without_alias_normalizers() -> None:
+    assert all(
+        isinstance(tag, TemplateFocusTag)
+        for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
+        for tag in template.focus_tags
+    )
+    assert not hasattr(template_tags, "LEGACY_FOCUS_TAG_REPLACEMENTS")
+    assert not hasattr(template_tags, "STRUCTURAL_FOCUS_TAG_ADDITIONS_BY_TEMPLATE")
+    assert not hasattr(template_tags, "normalize_seed_focus_tags")
+    assert not hasattr(template_tags, "normalize_focus_tags")
+
+
+def test_every_active_seed_passes_central_structural_tag_validation() -> None:
+    validator = getattr(template_tags, "validate_template_focus_tags", None)
+    assert validator is not None
+
+    for template in TRAINING_PROGRAM_TEMPLATE_SEEDS:
+        assert validator(
+            template.focus_tags,
+            intensity_methods=template.intensity_methods,
+            days=template.days,
+        ) == tuple(TemplateFocusTag(tag) for tag in template.focus_tags)
+
+
+def test_structural_validator_rejects_a_false_primary_structure_claim() -> None:
+    classic = next(
+        template
+        for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
+        if template.slug == "five-day-classic-body-part"
+    )
+
+    with pytest.raises(ValueError, match="full_body lacks structural evidence"):
+        template_tags.validate_template_focus_tags(
+            (TemplateFocusTag.FULL_BODY, TemplateFocusTag.BALANCED),
+            intensity_methods=classic.intensity_methods,
+            days=classic.days,
+        )
+
+
+def test_structural_validator_rejects_an_incidental_muscle_priority_claim() -> None:
+    classic = next(
+        template
+        for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
+        if template.slug == "five-day-classic-body-part"
+    )
+
+    with pytest.raises(ValueError, match="glute_priority lacks structural evidence"):
+        template_tags.validate_template_focus_tags(
+            (TemplateFocusTag.BODY_PART_ROTATION, TemplateFocusTag.GLUTE_PRIORITY),
+            intensity_methods=classic.intensity_methods,
+            days=classic.days,
+        )
+
+
+def test_structural_validator_rejects_a_materially_unbalanced_week() -> None:
+    chest_slot = SimpleNamespace(
+        target_muscles=(MuscleGroup.CHEST,),
+        movement_pattern="horizontal_push",
+        adaptation_priority="core",
+    )
+    days = tuple(
+        SimpleNamespace(
+            direct_target_muscles=(MuscleGroup.CHEST, MuscleGroup.QUADRICEPS),
+            slots=(chest_slot,) * 5,
+        )
+        for _ in range(3)
+    )
+
+    with pytest.raises(ValueError, match="balanced lacks structural evidence"):
+        template_tags.validate_template_focus_tags(
+            (TemplateFocusTag.FULL_BODY, TemplateFocusTag.BALANCED),
+            intensity_methods=("standard",),
+            days=days,
+        )
     assert all(
         not {
             "female",
@@ -74,43 +254,33 @@ def test_seed_library_contains_only_unique_canonical_tags() -> None:
 
 
 def test_priority_tags_have_structural_exposure_and_balanced_is_not_priority() -> None:
-    priority_muscles = {
-        "chest_priority": (MuscleGroup.CHEST,),
-        "back_priority": (MuscleGroup.BACK,),
-        "shoulders_priority": (MuscleGroup.SHOULDERS,),
-        "arms_priority": (MuscleGroup.BICEPS, MuscleGroup.TRICEPS),
-        "quad_priority": (MuscleGroup.QUADRICEPS,),
-        "hamstrings_priority": (MuscleGroup.HAMSTRINGS,),
-        "glute_priority": (MuscleGroup.GLUTES,),
-    }
     for template in TRAINING_PROGRAM_TEMPLATE_SEEDS:
-        priority_tags = {
-            tag for tag in template.focus_tags if tag.endswith("_priority")
-        }
-        if "balanced" in template.focus_tags:
+        priority_tags = set(template.focus_tags) & MUSCLE_PRIORITY_TAGS
+        if TemplateFocusTag.BALANCED in template.focus_tags:
             assert not priority_tags, template.slug
-        for tag, muscles in priority_muscles.items():
-            if tag not in template.focus_tags:
-                continue
+        for tag in priority_tags:
+            muscles = MUSCLES_BY_PRIORITY_TAG[tag]
             direct_slots = sum(
-                muscle in slot.target_muscles
+                bool(set(slot.target_muscles) & muscles)
                 for day in template.days
                 for slot in day.slots
-                for muscle in muscles
             )
-            assert direct_slots >= 3, (template.slug, tag)
+            assert direct_slots >= MINIMUM_DIRECT_SLOTS_BY_PRIORITY_TAG[tag], (
+                template.slug,
+                tag,
+            )
 
 
 def test_upper_and_lower_priority_tags_match_the_weekly_layout() -> None:
     upper = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if "upper_priority" in template.focus_tags
+        if TemplateFocusTag.UPPER_PRIORITY in template.focus_tags
     )
     lower = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if "lower_priority" in template.focus_tags
+        if TemplateFocusTag.LOWER_PRIORITY in template.focus_tags
     )
     upper_muscles = {
         MuscleGroup.CHEST,
@@ -137,16 +307,16 @@ def test_seed_library_keeps_structural_emphasis_tags_without_user_mutation() -> 
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
         if template.slug == "five-day-ppl-upper-lower"
     )
-    assert "upper_priority" in upper_priority.focus_tags
-    assert "push_pull_legs" in upper_priority.focus_tags
-    assert "upper_lower" in upper_priority.focus_tags
+    assert TemplateFocusTag.UPPER_PRIORITY in upper_priority.focus_tags
+    assert TemplateFocusTag.PUSH_PULL_LEGS in upper_priority.focus_tags
+    assert TemplateFocusTag.UPPER_LOWER in upper_priority.focus_tags
 
     lower_priority = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
         if template.slug == "five-day-advanced-leg-specialization"
     )
-    assert "lower_priority" in lower_priority.focus_tags
-    assert {"glute_priority", "hamstrings_priority"}.issubset(
+    assert TemplateFocusTag.LOWER_PRIORITY in lower_priority.focus_tags
+    assert {TemplateFocusTag.GLUTE_PRIORITY, TemplateFocusTag.HAMSTRINGS_PRIORITY}.issubset(
         lower_priority.focus_tags
     )

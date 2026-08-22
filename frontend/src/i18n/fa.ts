@@ -647,7 +647,7 @@ const fa = {
         editProgram: "ویرایش برنامه",
         editProgramAria: "ویرایش برنامه: {{name}}",
         addProgram: "افزودن برنامه جدید",
-        tags: { classic: "کلاسیک", full_body: "تمام‌بدن", foundation: "پایه", upper_lower: "بالاتنه / پایین‌تنه", hypertrophy: "هایپرتروفی", balanced: "متعادل", strength_hypertrophy: "قدرت / هایپرتروفی", compound_first: "چندمفصلی اول", time_efficient: "زمان‌بهینه", superset: "سوپرست", three_day: "سه روزه", push_pull_legs: "پوش / پول / پا", chest_priority: "تأکید سینه", back_priority: "تأکید زیربغل", weak_point: "نقطهٔ ضعف", drop_set: "دراپ‌ست", body_part_rotation: "تفکیک عضلات", direct_targets: "عضلات هدف مستقیم", quad_priority: "تأکید چهارسر", hamstrings_glutes: "همسترینگ / باسن", frequency_two: "فراوانی دو بار", volume: "حجم بیشتر", high_frequency: "فراوانی بالا", specialization: "تخصصی" },
+        tags: { full_body: "تمام‌بدن", upper_lower: "بالاتنه / پایین‌تنه", push_pull_legs: "پوش / پول / پا", body_part_rotation: "تفکیک عضلات", balanced: "متعادل", upper_priority: "اولویت بالاتنه", lower_priority: "اولویت پایین‌تنه", chest_priority: "اولویت سینه", back_priority: "اولویت زیربغل", shoulders_priority: "اولویت سرشانه", arms_priority: "اولویت بازو", glute_priority: "اولویت باسن", quad_priority: "اولویت چهارسر", hamstrings_priority: "اولویت همسترینگ", strength_bias: "گرایش قدرتی", compound_focus: "تمرکز چندمفصلی", specialization: "تخصصی" },
         methods: { superset: "سوپرست", drop_set: "دراپ‌ست" },
       },
       templateEditor: {

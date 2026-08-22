@@ -44,6 +44,9 @@ it("creates a new program with the selected day and level defaults", async () =>
   expect(await screen.findByRole("heading", { name: "افزودن برنامه تمرینی" })).toBeInTheDocument();
   expect(screen.getByLabelText("تعداد روز تمرین")).toHaveValue("4");
   expect(screen.getByLabelText("سطح تمرین")).toHaveValue("intermediate");
+  expect(screen.getByLabelText("برچسب‌های تمرکز (با کاما جدا کن)")).toHaveValue(
+    "full_body, balanced",
+  );
   expect(screen.getAllByText("روز 1")).toHaveLength(1);
   expect(screen.getAllByRole("button", { name: "افزودن حرکت" })).toHaveLength(4);
 });

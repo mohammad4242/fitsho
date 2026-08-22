@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from app.exercises.enums import MuscleGroup
-from app.training_templates.tags import priority_tag_for_muscle
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     BodyAnalysisInfluence,
@@ -10,11 +9,6 @@ from app.workouts.program_engine.schemas import (
 )
 
 BODY_ANALYSIS_TRAINING_MAPPING_VERSION = "body_analysis_training_map_v2"
-
-TEMPLATE_TAGS_BY_MUSCLE: dict[MuscleGroup, frozenset[str]] = {
-    muscle: frozenset({tag}) if (tag := priority_tag_for_muscle(muscle)) else frozenset()
-    for muscle in MuscleGroup
-}
 
 
 def eligible_body_analysis_priorities(

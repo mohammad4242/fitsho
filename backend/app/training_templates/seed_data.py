@@ -3,7 +3,11 @@ from dataclasses import dataclass, replace
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.profile.enums import ExperienceLevel, FitnessGoal
 from app.training_templates.models import TrainingTemplateMethod, TrainingTemplateSlotPriority
-from app.training_templates.tags import normalize_seed_focus_tags
+from app.training_templates.tags import (
+    TemplateFocusTag,
+    validate_focus_tags,
+    validate_template_focus_tags,
+)
 from app.workouts.program_engine.rulesets.resistance_training_v1 import (
     MAXIMUM_EXERCISES_PER_SESSION,
     MINIMUM_EXERCISES_PER_SESSION,
@@ -53,7 +57,7 @@ class TrainingProgramTemplateSeed:
     description_fa: str
     days_per_week: int
     training_level: ExperienceLevel
-    focus_tags: tuple[str, ...]
+    focus_tags: tuple[TemplateFocusTag, ...]
     intensity_methods: tuple[TrainingTemplateMethod, ...]
     days: tuple[TemplateDaySeed, ...]
     programming_rationale: tuple[TemplateProgrammingRationaleSeed, ...]
@@ -66,6 +70,7 @@ P = MovementPattern
 Method = TrainingTemplateMethod
 Priority = TrainingTemplateSlotPriority
 Level = ExperienceLevel
+Tag = TemplateFocusTag
 
 SOURCE_NAME = "Fitsho synthesis: Stronger By Science · Jeff Nippard · RP Strength"
 SOURCE_URL = "https://www.strongerbyscience.com/exercise-order-video/"
@@ -112,6 +117,7 @@ def _reclassify_goal_template(template: TrainingProgramTemplateSeed) -> Training
     if template.fitness_goal is FitnessGoal.BUILD_MUSCLE:
         return template
     return replace(template, fitness_goal=FitnessGoal.BUILD_MUSCLE)
+
 
 CATALOG_SLUG_ALIASES: dict[str, tuple[str, ...]] = {
     "barbell-bench-press": ("fedb-0025-barbell-bench-press",),
@@ -480,7 +486,7 @@ _MOVEMENT_FLOOR_SLOTS: dict[tuple[MuscleGroup, ...], tuple[TemplateSlotSeed, ...
 def _specialized_template_movement_floors(
     template: TrainingProgramTemplateSeed,
 ) -> TrainingProgramTemplateSeed:
-    if template.days_per_week < 4 or "body_part_rotation" not in template.focus_tags:
+    if template.days_per_week < 4 or Tag.BODY_PART_ROTATION not in template.focus_tags:
         return template
     return replace(
         template,
@@ -749,17 +755,17 @@ def _programming_rationale(
     )
 
 
-def _priority_focus(tags: tuple[str, ...]) -> tuple[str, str]:
+def _priority_focus(tags: tuple[TemplateFocusTag, ...]) -> tuple[str, str]:
     priorities = {
-        "chest_priority": ("Chest priority", "اولویت سینه"),
-        "back_priority": ("Back priority", "اولویت زیربغل"),
-        "shoulders_priority": ("Shoulder priority", "اولویت سرشانه"),
-        "quad_priority": ("Quadriceps priority", "اولویت چهارسر"),
-        "lower_priority": ("Lower-body priority", "اولویت پا"),
-        "arms_priority": ("Arm priority", "اولویت بازو"),
-        "hamstrings_priority": ("Hamstrings priority", "اولویت همسترینگ"),
-        "glute_priority": ("Glute priority", "اولویت باسن"),
-        "upper_priority": ("Upper-body priority", "اولویت بالاتنه"),
+        Tag.CHEST_PRIORITY: ("Chest priority", "اولویت سینه"),
+        Tag.BACK_PRIORITY: ("Back priority", "اولویت زیربغل"),
+        Tag.SHOULDERS_PRIORITY: ("Shoulder priority", "اولویت سرشانه"),
+        Tag.QUAD_PRIORITY: ("Quadriceps priority", "اولویت چهارسر"),
+        Tag.LOWER_PRIORITY: ("Lower-body priority", "اولویت پا"),
+        Tag.ARMS_PRIORITY: ("Arm priority", "اولویت بازو"),
+        Tag.HAMSTRINGS_PRIORITY: ("Hamstrings priority", "اولویت همسترینگ"),
+        Tag.GLUTE_PRIORITY: ("Glute priority", "اولویت باسن"),
+        Tag.UPPER_PRIORITY: ("Upper-body priority", "اولویت بالاتنه"),
     }
     return next(
         (priorities[tag] for tag in tags if tag in priorities),
@@ -767,8 +773,8 @@ def _priority_focus(tags: tuple[str, ...]) -> tuple[str, str]:
     )
 
 
-def _split_focus(tags: tuple[str, ...], days_per_week: int) -> tuple[str, str]:
-    if "full_body" in tags:
+def _split_focus(tags: tuple[TemplateFocusTag, ...], days_per_week: int) -> tuple[str, str]:
+    if Tag.FULL_BODY in tags:
         return (
             (
                 f"Full-body exposure is distributed across {days_per_week} days "
@@ -776,7 +782,7 @@ def _split_focus(tags: tuple[str, ...], days_per_week: int) -> tuple[str, str]:
             ),
             f"فشار تمام‌بدن در {days_per_week} روز پخش شده تا تمرین و حجم قابل‌مدیریت بماند.",
         )
-    if "push_pull_legs" in tags:
+    if Tag.PUSH_PULL_LEGS in tags:
         return (
             (
                 "Push, pull, and lower-body work are separated to limit overlap "
@@ -784,7 +790,7 @@ def _split_focus(tags: tuple[str, ...], days_per_week: int) -> tuple[str, str]:
             ),
             "پوش، پول و پا جدا شده‌اند تا هم‌پوشانی خستگی کم و کیفیت ست‌ها حفظ شود.",
         )
-    if "body_part_rotation" in tags:
+    if Tag.BODY_PART_ROTATION in tags:
         return (
             (
                 "Direct target-muscle days concentrate useful work while leaving "
@@ -873,7 +879,7 @@ def _template(
     description_fa: str,
     days_per_week: int,
     level: ExperienceLevel,
-    tags: tuple[str, ...],
+    tags: tuple[TemplateFocusTag, ...],
     methods: tuple[TrainingTemplateMethod, ...],
     *days: TemplateDaySeed,
     fitness_goal: FitnessGoal = FitnessGoal.BUILD_MUSCLE,
@@ -888,7 +894,7 @@ def _template(
         days_per_week=days_per_week,
         training_level=level,
         fitness_goal=fitness_goal,
-        focus_tags=normalize_seed_focus_tags(slug, tags),
+        focus_tags=validate_focus_tags(tags),
         intensity_methods=methods,
         days=days,
         programming_rationale=(),
@@ -897,10 +903,25 @@ def _template(
     return replace(template, programming_rationale=_programming_rationale(template))
 
 
+def _validate_template_tags(
+    template: TrainingProgramTemplateSeed,
+) -> TrainingProgramTemplateSeed:
+    validate_template_focus_tags(
+        template.focus_tags,
+        intensity_methods=template.intensity_methods,
+        days=template.days,
+    )
+    return template
+
+
 TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple(
+    _validate_template_tags(
     _reclassify_goal_template(
         _evidence_informed_template_order(
-            _fit_template_session_exercise_count(_specialized_template_movement_floors(template))
+                _fit_template_session_exercise_count(
+                    _specialized_template_movement_floors(template)
+                )
+            )
         )
     )
     for template in (
@@ -912,7 +933,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "جلسات تمام‌بدن چرخشی برای مبتدی که روی تکرار باکیفیت حرکات پایه تمرکز دارد.",
             2,
             Level.BEGINNER,
-            ("full_body", "balanced"),
+            (Tag.FULL_BODY, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
                 "Full Body A",
@@ -942,7 +963,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "برنامهٔ A/B تمام‌بدن بر پایهٔ الگوهای اصلی هالتر و سیم‌کش.",
             2,
             Level.BEGINNER,
-            ("full_body", "balanced"),
+            (Tag.FULL_BODY, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
                 "Full Body A",
@@ -973,7 +994,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "ساختار A/B تمام‌بدن با حجم بیشتر برای ورزشکار متوسط با دو روز تمرین.",
             2,
             Level.INTERMEDIATE,
-            ("full_body", "balanced"),
+            (Tag.FULL_BODY, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
                 "Full Body A",
@@ -1005,7 +1026,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "جلسات تمام‌بدن با اولویت حرکات چندمفصلی که الگوهای اصلی را در هر دو روز حفظ می‌کند.",
             2,
             Level.INTERMEDIATE,
-            ("full_body", "compound_focus", "balanced"),
+            (Tag.FULL_BODY, Tag.COMPOUND_FOCUS, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
                 "Full Body A",
@@ -1038,7 +1059,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "جفت‌کردن عضلات مخالف برای ورزشکار باتجربه با زمان محدود در هفته.",
             2,
             Level.ADVANCED,
-            ("full_body",),
+            (Tag.FULL_BODY,),
             (Method.STANDARD, Method.SUPERSET),
             _day(
                 "Full Body A",
@@ -1081,7 +1102,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "سه مواجههٔ تمام‌بدن کم‌پیچیدگی برای ورزشکار تازه‌کار.",
             3,
             Level.BEGINNER,
-            ("full_body", "balanced"),
+            (Tag.FULL_BODY, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
                 "Full Body A",
@@ -1120,7 +1141,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "چرخش کلاسیک سه‌روزهٔ پوش، پول و پایین‌تنه.",
             3,
             Level.INTERMEDIATE,
-            ("push_pull_legs", "balanced"),
+            (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
                 "Push",
@@ -1159,7 +1180,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "چرخش تمام‌بدن که به سینه دو مواجههٔ مستقیم با اولویت می‌دهد.",
             3,
             Level.INTERMEDIATE,
-            ("full_body", "chest_priority"),
+            (Tag.FULL_BODY, Tag.CHEST_PRIORITY),
             (Method.STANDARD,),
             _day(
                 "Chest + Quads",
@@ -1199,7 +1220,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "چرخش تمام‌بدن که به زیربغل دو مواجههٔ مستقیم با اولویت می‌دهد.",
             3,
             Level.INTERMEDIATE,
-            ("full_body", "back_priority"),
+            (Tag.FULL_BODY, Tag.BACK_PRIORITY),
             (Method.STANDARD,),
             _day(
                 "Back + Quads",
@@ -1238,7 +1259,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "ساختار پیشرفتهٔ سه‌روزه که دراپ‌ست را برای حرکات ایزولهٔ کم‌ریسک نگه می‌دارد.",
             3,
             Level.ADVANCED,
-            ("full_body", "balanced"),
+            (Tag.FULL_BODY, Tag.BALANCED),
             (Method.STANDARD, Method.DROP_SET),
             _day(
                 "Full Body A",
@@ -1292,7 +1313,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "جفت‌کردن عضلات هدف برای ورزشکاری که در چهار جلسه آمادهٔ تفکیک بالاتنه است.",
             4,
             Level.INTERMEDIATE,
-            ("body_part_rotation", "balanced"),
+            (Tag.BODY_PART_ROTATION, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
                 "Chest + Triceps",
@@ -1343,7 +1364,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "تفکیک عضلات با دو مواجههٔ سینه و حفظ تمرین مستقیم بازوها.",
             4,
             Level.INTERMEDIATE,
-            ("body_part_rotation", "chest_priority"),
+            (Tag.BODY_PART_ROTATION, Tag.CHEST_PRIORITY),
             (Method.STANDARD,),
             _day(
                 "Chest + Triceps",
@@ -1390,7 +1411,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "تفکیک عضلات با دو مواجههٔ مستقیم زیربغل و جلو بازوی جداشده.",
             4,
             Level.INTERMEDIATE,
-            ("body_part_rotation", "back_priority"),
+            (Tag.BODY_PART_ROTATION, Tag.BACK_PRIORITY),
             (Method.STANDARD,),
             _day(
                 "Chest + Triceps",
@@ -1430,7 +1451,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "گونهٔ پیشرفتهٔ بالاتنه/پایین‌تنه که چهارسر و زنجیرهٔ خلفی را جدا می‌کند.",
             4,
             Level.ADVANCED,
-            ("upper_lower", "quad_priority"),
+            (Tag.UPPER_LOWER, Tag.QUAD_PRIORITY),
             (Method.STANDARD,),
             _day(
                 "Chest + Back",
@@ -1477,7 +1498,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "الگوی بالاتنه/پایین‌تنهٔ چهارروزه با ترکیب حرکات پایه و هایپرتروفی.",
             4,
             Level.ADVANCED,
-            ("upper_lower", "compound_focus", "balanced"),
+            (Tag.UPPER_LOWER, Tag.COMPOUND_FOCUS, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
                 "Upper Compound",
@@ -1526,7 +1547,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "چرخش متعارف پنج‌روزه با گروه عضلانی هدف روشن در هر جلسه.",
             5,
             Level.INTERMEDIATE,
-            ("body_part_rotation", "balanced"),
+            (Tag.BODY_PART_ROTATION, Tag.BALANCED),
             (Method.STANDARD,),
             _day("Chest", "سینه", (M.CHEST,), CHEST, INCLINE_CHEST, CABLE_FLY),
             _day("Back", "زیربغل", (M.BACK,), BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN),
@@ -1559,7 +1580,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "ترکیب پنج‌روزه که بعد از پایهٔ پوش پول پا، یک مواجههٔ بالاتنه/پایین‌تنه اضافه می‌کند.",
             5,
             Level.INTERMEDIATE,
-            ("push_pull_legs", "upper_lower", "upper_priority"),
+            (Tag.PUSH_PULL_LEGS, Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
             (Method.STANDARD,),
             _day("Push", "پوش", (M.CHEST, M.SHOULDERS, M.TRICEPS), CHEST, SHOULDER_PRESS, TRICEPS),
             _day("Pull", "پول", (M.BACK, M.BICEPS), BACK_ROW, LAT_PULLDOWN, BICEPS),
@@ -1592,7 +1613,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "مواجههٔ مستقیم اضافهٔ سینه در ابتدای دو جلسهٔ هفتگی برای دورهٔ اولویت سینه.",
             5,
             Level.ADVANCED,
-            ("body_part_rotation", "chest_priority", "specialization"),
+            (Tag.BODY_PART_ROTATION, Tag.CHEST_PRIORITY, Tag.SPECIALIZATION),
             (Method.STANDARD,),
             _day(
                 "Chest + Triceps",
@@ -1647,7 +1668,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "مواجههٔ مستقیم اضافهٔ زیربغل بدون قراردادن جلو بازو در تمام جلسات پشت.",
             5,
             Level.ADVANCED,
-            ("body_part_rotation", "back_priority", "specialization"),
+            (Tag.BODY_PART_ROTATION, Tag.BACK_PRIORITY, Tag.SPECIALIZATION),
             (Method.STANDARD,),
             _day(
                 "Chest + Triceps",
@@ -1704,10 +1725,10 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             5,
             Level.ADVANCED,
             (
-                "body_part_rotation",
-                "lower_priority",
-                "hamstrings_priority",
-                "glute_priority",
+                Tag.BODY_PART_ROTATION,
+                Tag.LOWER_PRIORITY,
+                Tag.HAMSTRINGS_PRIORITY,
+                Tag.GLUTE_PRIORITY,
             ),
             (Method.STANDARD, Method.SUPERSET),
             _day(
@@ -1766,7 +1787,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "شروع محافظه‌کارانهٔ تفکیک عضلات با سه حرکت مستقیم عضلات بزرگ و دو حرکت مستقیم بازو.",
             4,
             Level.BEGINNER,
-            ("body_part_rotation", "balanced"),
+            (Tag.BODY_PART_ROTATION, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
                 "Chest + Triceps",
@@ -1818,7 +1839,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "تفکیک متوسط با تمرین مستقیم تمام بخش‌های سرشانه و حفظ روزهای جدا برای سینه و زیربغل.",
             4,
             Level.INTERMEDIATE,
-            ("body_part_rotation", "shoulders_priority"),
+            (Tag.BODY_PART_ROTATION, Tag.SHOULDERS_PRIORITY),
             (Method.STANDARD,),
             _day(
                 "Chest + Triceps",
@@ -1876,7 +1897,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "تفکیک متوسط با حفظ روزهای عضلانی و یک تمرکز مستقیم سه‌حرکتی برای جلو بازو و پشت بازو.",
             4,
             Level.INTERMEDIATE,
-            ("body_part_rotation", "arms_priority"),
+            (Tag.BODY_PART_ROTATION, Tag.ARMS_PRIORITY),
             (Method.STANDARD,),
             _day(
                 "Chest + Triceps",
@@ -1934,7 +1955,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "دورهٔ پیشرفتهٔ سینه برای جلسات طولانی با پنج حرکت مستقیم سینه و سه حرکت پشت بازو.",
             4,
             Level.ADVANCED,
-            ("body_part_rotation", "chest_priority", "specialization"),
+            (Tag.BODY_PART_ROTATION, Tag.CHEST_PRIORITY, Tag.SPECIALIZATION),
             (Method.STANDARD, Method.DROP_SET),
             _day(
                 "Chest + Triceps",
@@ -2004,11 +2025,11 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             4,
             Level.ADVANCED,
             (
-                "body_part_rotation",
-                "specialization",
-                "lower_priority",
-                "hamstrings_priority",
-                "glute_priority",
+                Tag.BODY_PART_ROTATION,
+                Tag.SPECIALIZATION,
+                Tag.LOWER_PRIORITY,
+                Tag.HAMSTRINGS_PRIORITY,
+                Tag.GLUTE_PRIORITY,
             ),
             (Method.STANDARD, Method.SUPERSET),
             _day(
@@ -2090,7 +2111,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "چرخش پنج‌روزهٔ مبتدی با سه حرکت محافظه‌کارانه برای عضلات بزرگ و دو حرکت مستقیم بازو.",
             5,
             Level.BEGINNER,
-            ("body_part_rotation", "balanced"),
+            (Tag.BODY_PART_ROTATION, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
                 "Chest + Triceps",
@@ -2151,7 +2172,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "چرخش متوسط با روز کامل سرشانه و تمرین جدا برای سینه و بازو.",
             5,
             Level.INTERMEDIATE,
-            ("body_part_rotation", "shoulders_priority"),
+            (Tag.BODY_PART_ROTATION, Tag.SHOULDERS_PRIORITY),
             (Method.STANDARD,),
             _day(
                 "Chest + Triceps",
@@ -2219,7 +2240,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "چرخش پنج‌روزهٔ متوسط با روز کامل چهارسر و نگهداری زنجیرهٔ خلفی.",
             5,
             Level.INTERMEDIATE,
-            ("body_part_rotation", "quad_priority", "lower_priority"),
+            (Tag.BODY_PART_ROTATION, Tag.QUAD_PRIORITY, Tag.LOWER_PRIORITY),
             (Method.STANDARD,),
             _day(
                 "Chest + Triceps",
@@ -2288,7 +2309,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "تکنیک شدت روی حرکات ایزوله.",
             5,
             Level.ADVANCED,
-            ("body_part_rotation", "arms_priority", "specialization"),
+            (Tag.BODY_PART_ROTATION, Tag.ARMS_PRIORITY, Tag.SPECIALIZATION),
             (Method.STANDARD, Method.DROP_SET),
             _day(
                 "Chest",
@@ -2374,11 +2395,11 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             5,
             Level.ADVANCED,
             (
-                "body_part_rotation",
-                "lower_priority",
-                "quad_priority",
-                "hamstrings_priority",
-                "glute_priority",
+                Tag.BODY_PART_ROTATION,
+                Tag.LOWER_PRIORITY,
+                Tag.QUAD_PRIORITY,
+                Tag.HAMSTRINGS_PRIORITY,
+                Tag.GLUTE_PRIORITY,
             ),
             (Method.STANDARD, Method.SUPERSET, Method.DROP_SET),
             _day(
@@ -2480,7 +2501,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "چرخش متعارف شش‌روزهٔ پوش پول پا با دو مواجههٔ مستقیم برای هر الگو.",
             6,
             Level.INTERMEDIATE,
-            ("push_pull_legs", "balanced"),
+            (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
                 "Push A", "پوش A", (M.CHEST, M.SHOULDERS, M.TRICEPS), CHEST, SHOULDER_PRESS, TRICEPS
@@ -2515,7 +2536,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "چرخش حجمی پوش پول پا که کار مستقیم را در دو روز پوش، پول و پا پخش می‌کند.",
             6,
             Level.ADVANCED,
-            ("push_pull_legs", "balanced"),
+            (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
                 "Push Chest",
@@ -2579,7 +2600,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "تفکیک کلاسیک عضلات برای ورزشکار پیشرفته با ریکاوری مناسب از جلسات پرتعداد.",
             6,
             Level.ADVANCED,
-            ("body_part_rotation", "balanced"),
+            (Tag.BODY_PART_ROTATION, Tag.BALANCED),
             (Method.STANDARD,),
             _day("Chest", "سینه", (M.CHEST,), CHEST, INCLINE_CHEST, CABLE_FLY),
             _day("Back", "زیربغل", (M.BACK,), BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN),
@@ -2620,7 +2641,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "دورهٔ تخصصی با دو مواجههٔ سینه و یک جلسهٔ جداگانهٔ ساق و میان‌تنه.",
             6,
             Level.ADVANCED,
-            ("body_part_rotation", "chest_priority", "specialization"),
+            (Tag.BODY_PART_ROTATION, Tag.CHEST_PRIORITY, Tag.SPECIALIZATION),
             (Method.STANDARD,),
             _day("Chest Heavy", "سینه سنگین", (M.CHEST,), CHEST, INCLINE_CHEST, CABLE_FLY),
             _day(
@@ -2668,7 +2689,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "دورهٔ تخصصی با دو مواجههٔ زیربغل و یک جلسهٔ جداگانهٔ ساق و میان‌تنه.",
             6,
             Level.ADVANCED,
-            ("body_part_rotation", "back_priority", "specialization"),
+            (Tag.BODY_PART_ROTATION, Tag.BACK_PRIORITY, Tag.SPECIALIZATION),
             (Method.STANDARD,),
             _day("Back Width", "عرض زیربغل", (M.BACK,), LAT_PULLDOWN, CABLE_PULLDOWN, BACK_ROW),
             _day(
@@ -2720,9 +2741,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "توسعه می‌دهد.",
             2,
             Level.BEGINNER,
-            ("full_body", "compound_focus", "strength_bias"),
+            (Tag.FULL_BODY, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
             (Method.STANDARD,),
-            
                 _day(
                     "Full Body A",
                     "تمام‌بدن A",
@@ -2802,9 +2822,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "که قدرت خطی می‌سازد.",
             3,
             Level.BEGINNER,
-            ("full_body", "compound_focus", "strength_bias"),
+            (Tag.FULL_BODY, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
             (Method.STANDARD,),
-            
                 _day(
                     "Full Body A",
                     "تمام‌بدن A",
@@ -2914,9 +2933,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "برای ورزشکار میانی.",
             3,
             Level.INTERMEDIATE,
-            ("full_body", "compound_focus", "strength_bias"),
+            (Tag.FULL_BODY, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
             (Method.STANDARD,),
-            
                 _day(
                     "Full Body A",
                     "تمام‌بدن A",
@@ -3021,9 +3039,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "تمرین کلاسیک بالاتنه/پایین‌تنه با روزهای اختصاصی قدرت برای ورزشکار میانی.",
             4,
             Level.INTERMEDIATE,
-            ("upper_lower", "compound_focus", "strength_bias"),
+            (Tag.UPPER_LOWER, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
             (Method.STANDARD,),
-            
                 _day(
                     "Lower Power",
                     "قدرت پایین‌تنه",
@@ -3119,13 +3136,11 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "قدرت بالاتنه/پایین‌تنه چهار روزه - پیشرفته",
             "Advanced power/hypertrophy split with heavy barbell primaries and targeted "
             "accessory work.",
-            "تمرین قدرت/هایپرتروفی پیشرفته با حرکات مرکب هالتری سنگین و لوازم جانبی "
-            "هدفمند.",
+            "تمرین قدرت/هایپرتروفی پیشرفته با حرکات مرکب هالتری سنگین و لوازم جانبی هدفمند.",
             4,
             Level.ADVANCED,
-            ("upper_lower", "compound_focus", "strength_bias"),
+            (Tag.UPPER_LOWER, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
             (Method.STANDARD,),
-            
                 _day(
                     "Lower Power",
                     "قدرت پایین‌تنه",
@@ -3233,9 +3248,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "برای ورزشکار قدرتی میانی.",
             5,
             Level.INTERMEDIATE,
-            ("upper_lower", "push_pull_legs", "compound_focus", "strength_bias"),
+            (Tag.UPPER_LOWER, Tag.PUSH_PULL_LEGS, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
             (Method.STANDARD,),
-            
                 _day(
                     "Squat Day",
                     "روز اسکوات",
@@ -3321,13 +3335,11 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "برنامهٔ قدرت پنج روزه - پیشرفته",
             "Advanced five-day programme with maximal compound loading and targeted "
             "accessory blocks.",
-            "برنامهٔ پنج روزهٔ پیشرفته با بارگذاری مرکب حداکثری و بلوک‌های جانبی "
-            "هدفمند.",
+            "برنامهٔ پنج روزهٔ پیشرفته با بارگذاری مرکب حداکثری و بلوک‌های جانبی هدفمند.",
             5,
             Level.ADVANCED,
-            ("upper_lower", "push_pull_legs", "compound_focus", "strength_bias"),
+            (Tag.UPPER_LOWER, Tag.PUSH_PULL_LEGS, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
             (Method.STANDARD,),
-            
                 _day(
                     "Squat — Heavy",
                     "اسکوات سنگین",
@@ -3411,13 +3423,11 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "قدرت پوش‌پول‌لگ شش روزه",
             "Six-day push/pull/legs rotation with weekly compound primaries for an "
             "advanced strength athlete.",
-            "چرخش پوش/پول/لگ شش روزه با حرکات مرکب اصلی هفتگی برای ورزشکار قدرتی "
-            "پیشرفته.",
+            "چرخش پوش/پول/لگ شش روزه با حرکات مرکب اصلی هفتگی برای ورزشکار قدرتی پیشرفته.",
             6,
             Level.ADVANCED,
-            ("push_pull_legs", "compound_focus", "strength_bias"),
+            (Tag.PUSH_PULL_LEGS, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
             (Method.STANDARD,),
-            
                 _day(
                     "Push — Heavy",
                     "پوش سنگین",
@@ -3520,9 +3530,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "دو جلسهٔ مقاومتی تمام‌بدن در هفته برای حفظ عضله در کمبود کالری برای مبتدی.",
             2,
             Level.BEGINNER,
-            ("full_body", "balanced"),
+            (Tag.FULL_BODY, Tag.BALANCED),
             (Method.STANDARD,),
-            
                 _day(
                     "Full Body A",
                     "تمام‌بدن A",
@@ -3551,13 +3560,11 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "چربی‌سوزی تمام‌بدن سه روزه",
             "Three full-body sessions per week designed to maintain lean mass during a "
             "fat loss phase for a beginner.",
-            "سه جلسهٔ تمام‌بدن در هفته برای حفظ توده‌ٔ عضلانی در فاز چربی‌سوزی "
-            "برای مبتدی.",
+            "سه جلسهٔ تمام‌بدن در هفته برای حفظ توده‌ٔ عضلانی در فاز چربی‌سوزی برای مبتدی.",
             3,
             Level.BEGINNER,
-            ("full_body", "balanced"),
+            (Tag.FULL_BODY, Tag.BALANCED),
             (Method.STANDARD,),
-            
                 _day(
                     "Full Body A",
                     "تمام‌بدن A",
@@ -3599,9 +3606,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "ورزشکار میانی در فاز چربی‌سوزی.",
             3,
             Level.INTERMEDIATE,
-            ("full_body", "balanced"),
+            (Tag.FULL_BODY, Tag.BALANCED),
             (Method.STANDARD,),
-            
                 _day(
                     "Full Body A",
                     "تمام‌بدن A",
@@ -3644,9 +3650,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "متابولیک ورزشکار میانی در فاز چربی‌سوزی.",
             4,
             Level.INTERMEDIATE,
-            ("upper_lower", "balanced"),
+            (Tag.UPPER_LOWER, Tag.BALANCED),
             (Method.STANDARD,),
-            
                 _day(
                     "Upper A",
                     "بالاتنه A",
@@ -3697,9 +3702,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "ورزشکار پیشرفته در فاز چربی‌سوزی.",
             4,
             Level.ADVANCED,
-            ("upper_lower", "balanced"),
+            (Tag.UPPER_LOWER, Tag.BALANCED),
             (Method.STANDARD,),
-            
                 _day(
                     "Upper A",
                     "بالاتنه A",
@@ -3748,13 +3752,11 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "چربی‌سوزی پوش‌پول‌لگ پنج روزه",
             "Push/pull/legs split plus two extra upper sessions for maximum weekly "
             "frequency and metabolic stimulus.",
-            "تمرین پوش/پول/لگ با دو جلسهٔ اضافی بالاتنه برای بیشترین تکرار هفتگی "
-            "و محرک متابولیک.",
+            "تمرین پوش/پول/لگ با دو جلسهٔ اضافی بالاتنه برای بیشترین تکرار هفتگی و محرک متابولیک.",
             5,
             Level.INTERMEDIATE,
-            ("push_pull_legs", "balanced"),
+            (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
             (Method.STANDARD,),
-            
                 _day(
                     "Push",
                     "پوش",
@@ -3808,13 +3810,11 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "چربی‌سوزی پوش‌پول‌لگ پنج روزه - پیشرفته",
             "Advanced five-day push/pull/legs with two full-body finisher sessions for "
             "maximum weekly caloric expenditure.",
-            "پنج روز پوش/پول/لگ پیشرفته با دو جلسهٔ تمام‌بدن برای حداکثر کالری‌سوزی "
-            "هفتگی.",
+            "پنج روز پوش/پول/لگ پیشرفته با دو جلسهٔ تمام‌بدن برای حداکثر کالری‌سوزی هفتگی.",
             5,
             Level.ADVANCED,
-            ("push_pull_legs", "balanced"),
+            (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
             (Method.STANDARD,),
-            
                 _day(
                     "Push",
                     "پوش",
@@ -3875,9 +3875,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "و محرک متابولیک در فاز چربی‌سوزی.",
             6,
             Level.ADVANCED,
-            ("push_pull_legs", "balanced"),
+            (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
             (Method.STANDARD,),
-            
                 _day(
                     "Push A",
                     "پوش A",
@@ -3942,13 +3941,11 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "آمادگی عمومی تمام‌بدن دو روزه",
             "Two well-rounded full-body sessions per week for a beginner building "
             "foundational fitness.",
-            "دو جلسهٔ جامع تمام‌بدن در هفته برای مبتدی که آمادگی جسمانی پایه را "
-            "توسعه می‌دهد.",
+            "دو جلسهٔ جامع تمام‌بدن در هفته برای مبتدی که آمادگی جسمانی پایه را توسعه می‌دهد.",
             2,
             Level.BEGINNER,
-            ("full_body", "balanced"),
+            (Tag.FULL_BODY, Tag.BALANCED),
             (Method.STANDARD,),
-            
                 _day(
                     "Full Body A",
                     "تمام‌بدن A",
@@ -3981,9 +3978,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "که آمادگی عمومی می‌سازد.",
             3,
             Level.BEGINNER,
-            ("full_body", "balanced"),
+            (Tag.FULL_BODY, Tag.BALANCED),
             (Method.STANDARD,),
-            
                 _day(
                     "Full Body A",
                     "تمام‌بدن A",
@@ -4021,13 +4017,11 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "آمادگی عمومی تمام‌بدن سه روزه - میانی",
             "Three full-body sessions per week for an intermediate lifter maintaining "
             "or improving overall fitness.",
-            "سه جلسهٔ تمام‌بدن در هفته برای ورزشکار میانی که آمادگی کلی را حفظ یا "
-            "بهبود می‌دهد.",
+            "سه جلسهٔ تمام‌بدن در هفته برای ورزشکار میانی که آمادگی کلی را حفظ یا بهبود می‌دهد.",
             3,
             Level.INTERMEDIATE,
-            ("full_body", "balanced"),
+            (Tag.FULL_BODY, Tag.BALANCED),
             (Method.STANDARD,),
-            
                 _day(
                     "Full Body A",
                     "تمام‌بدن A",
@@ -4070,9 +4064,8 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             "با تمرکز بر آمادگی کلی.",
             4,
             Level.INTERMEDIATE,
-            ("upper_lower", "balanced"),
+            (Tag.UPPER_LOWER, Tag.BALANCED),
             (Method.STANDARD,),
-            
                 _day(
                     "Upper A",
                     "بالاتنه A",
@@ -4113,7 +4106,5 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             fitness_goal=FitnessGoal.IMPROVE_FITNESS,
         ),
     )
-    if template.slug not in (
-        RETIRED_REDUNDANT_TEMPLATE_SLUGS | RETIRED_UNSUPPORTED_TEMPLATE_SLUGS
-    )
+    if template.slug not in (RETIRED_REDUNDANT_TEMPLATE_SLUGS | RETIRED_UNSUPPORTED_TEMPLATE_SLUGS)
 )

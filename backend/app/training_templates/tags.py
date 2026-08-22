@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from enum import StrEnum
 
-from app.exercises.enums import MuscleGroup
+from app.exercises.enums import MovementPattern, MuscleGroup
 
 
 class TemplateFocusTag(StrEnum):
@@ -29,135 +30,113 @@ class TemplateFocusTag(StrEnum):
     STRENGTH_BIAS = "strength_bias"
     COMPOUND_FOCUS = "compound_focus"
     SPECIALIZATION = "specialization"
-    TIME_EFFICIENT = "time_efficient"
 
 
-TEMPLATE_FOCUS_TAG_DEFINITIONS: dict[str, str] = {
-    TemplateFocusTag.FULL_BODY: "Each training day directly trains the major movement regions.",
-    TemplateFocusTag.UPPER_LOWER: "The week alternates upper-body and lower-body sessions.",
-    TemplateFocusTag.PUSH_PULL_LEGS: (
-        "The week separates pushing, pulling, and lower-body sessions."
+class TemplateTagCategory(StrEnum):
+    PRIMARY_STRUCTURE = "primary_structure"
+    REGIONAL_BALANCE = "regional_balance"
+    MUSCLE_PRIORITY = "muscle_priority"
+    STRUCTURAL_CHARACTER = "structural_character"
+
+
+@dataclass(frozen=True)
+class TemplateTagDefinition:
+    category: TemplateTagCategory
+    meaning: str
+
+
+TEMPLATE_FOCUS_TAG_DEFINITIONS: dict[TemplateFocusTag, TemplateTagDefinition] = {
+    TemplateFocusTag.FULL_BODY: TemplateTagDefinition(
+        TemplateTagCategory.PRIMARY_STRUCTURE,
+        "The week trains the whole body through repeated mixed-region sessions.",
     ),
-    TemplateFocusTag.BODY_PART_ROTATION: (
-        "The week rotates dedicated body-part or muscle-region sessions."
+    TemplateFocusTag.UPPER_LOWER: TemplateTagDefinition(
+        TemplateTagCategory.PRIMARY_STRUCTURE,
+        "The week contains explicit upper-body and lower-body session blocks.",
     ),
-    TemplateFocusTag.BALANCED: "No muscle region receives a deliberate structural priority.",
-    TemplateFocusTag.UPPER_PRIORITY: (
-        "The weekly layout dedicates additional upper-body sessions relative to a balanced split."
+    TemplateFocusTag.PUSH_PULL_LEGS: TemplateTagDefinition(
+        TemplateTagCategory.PRIMARY_STRUCTURE,
+        "The week contains explicit push, pull, and lower-body session blocks.",
     ),
-    TemplateFocusTag.LOWER_PRIORITY: (
-        "The weekly layout dedicates additional lower-body sessions relative to a balanced split."
+    TemplateFocusTag.BODY_PART_ROTATION: TemplateTagDefinition(
+        TemplateTagCategory.PRIMARY_STRUCTURE,
+        "The week rotates dedicated muscle or body-region sessions.",
     ),
-    TemplateFocusTag.CHEST_PRIORITY: (
-        "Chest receives repeated or additional direct structural exposure."
+    TemplateFocusTag.BALANCED: TemplateTagDefinition(
+        TemplateTagCategory.REGIONAL_BALANCE,
+        "No region or muscle receives deliberate additional structural exposure.",
     ),
-    TemplateFocusTag.BACK_PRIORITY: (
-        "Back receives repeated or additional direct structural exposure."
+    TemplateFocusTag.UPPER_PRIORITY: TemplateTagDefinition(
+        TemplateTagCategory.REGIONAL_BALANCE,
+        "The weekly layout deliberately adds upper-body structural exposure.",
     ),
-    TemplateFocusTag.SHOULDERS_PRIORITY: (
-        "Shoulders receive repeated or additional direct structural exposure."
+    TemplateFocusTag.LOWER_PRIORITY: TemplateTagDefinition(
+        TemplateTagCategory.REGIONAL_BALANCE,
+        "The weekly layout deliberately adds lower-body structural exposure.",
     ),
-    TemplateFocusTag.ARMS_PRIORITY: (
-        "Biceps and/or triceps receive repeated or additional direct structural exposure."
+    TemplateFocusTag.CHEST_PRIORITY: TemplateTagDefinition(
+        TemplateTagCategory.MUSCLE_PRIORITY,
+        "Chest receives deliberate additional direct structural exposure.",
     ),
-    TemplateFocusTag.GLUTE_PRIORITY: (
-        "Glutes receive repeated or additional direct structural exposure."
+    TemplateFocusTag.BACK_PRIORITY: TemplateTagDefinition(
+        TemplateTagCategory.MUSCLE_PRIORITY,
+        "Back receives deliberate additional direct structural exposure.",
     ),
-    TemplateFocusTag.QUAD_PRIORITY: (
-        "Quadriceps receive repeated or additional direct structural exposure."
+    TemplateFocusTag.SHOULDERS_PRIORITY: TemplateTagDefinition(
+        TemplateTagCategory.MUSCLE_PRIORITY,
+        "Shoulders receive deliberate additional direct structural exposure.",
     ),
-    TemplateFocusTag.HAMSTRINGS_PRIORITY: (
-        "Hamstrings receive repeated or additional direct structural exposure."
+    TemplateFocusTag.ARMS_PRIORITY: TemplateTagDefinition(
+        TemplateTagCategory.MUSCLE_PRIORITY,
+        "Biceps and/or triceps receive deliberate additional direct structural exposure.",
     ),
-    TemplateFocusTag.STRENGTH_BIAS: (
-        "The layout gives compound strength-oriented work a structural priority."
+    TemplateFocusTag.GLUTE_PRIORITY: TemplateTagDefinition(
+        TemplateTagCategory.MUSCLE_PRIORITY,
+        "Glutes receive deliberate additional direct structural exposure.",
     ),
-    TemplateFocusTag.COMPOUND_FOCUS: (
-        "Primary compound movement roles lead the sessions before accessory work."
+    TemplateFocusTag.QUAD_PRIORITY: TemplateTagDefinition(
+        TemplateTagCategory.MUSCLE_PRIORITY,
+        "Quadriceps receive deliberate additional direct structural exposure.",
     ),
-    TemplateFocusTag.SPECIALIZATION: (
-        "The template contains a dedicated or repeated specialization exposure."
+    TemplateFocusTag.HAMSTRINGS_PRIORITY: TemplateTagDefinition(
+        TemplateTagCategory.MUSCLE_PRIORITY,
+        "Hamstrings receive deliberate additional direct structural exposure.",
     ),
-    TemplateFocusTag.TIME_EFFICIENT: (
-        "The session layout deliberately concentrates work to reduce transition time."
+    TemplateFocusTag.STRENGTH_BIAS: TemplateTagDefinition(
+        TemplateTagCategory.STRUCTURAL_CHARACTER,
+        "Compound exposure, ordering, frequency, and recovery make the layout strength-friendly.",
+    ),
+    TemplateFocusTag.COMPOUND_FOCUS: TemplateTagDefinition(
+        TemplateTagCategory.STRUCTURAL_CHARACTER,
+        "Compound movement roles consistently lead meaningful session structure.",
+    ),
+    TemplateFocusTag.SPECIALIZATION: TemplateTagDefinition(
+        TemplateTagCategory.STRUCTURAL_CHARACTER,
+        "The week deliberately adds dedicated or repeated specialization exposure.",
     ),
 }
 
 CANONICAL_TEMPLATE_FOCUS_TAGS = frozenset(TEMPLATE_FOCUS_TAG_DEFINITIONS)
-
-# These aliases exist only for deterministic seed migration. They are not
-# accepted by the admin API or persisted in the active library.
-LEGACY_FOCUS_TAG_REPLACEMENTS: dict[str, tuple[str, ...]] = {
-    "classic": (TemplateFocusTag.BALANCED,),
-    "foundation": (),
-    "compound_first": (TemplateFocusTag.COMPOUND_FOCUS,),
-    "strength_hypertrophy": (TemplateFocusTag.COMPOUND_FOCUS,),
-    "legs_priority": (TemplateFocusTag.LOWER_PRIORITY,),
-    "hamstrings_glutes": (),
-    "direct_targets": (),
-    "drop_set": (),
-    "frequency_two": (),
-    "general_fitness": (TemplateFocusTag.BALANCED,),
-    "high_frequency": (),
-    "hypertrophy": (TemplateFocusTag.BALANCED,),
-    "long_session": (),
-    "strength": (),
-    "fat_loss": (TemplateFocusTag.BALANCED,),
-    "build_muscle": (),
-    "superset": (),
-    "three_day": (),
-    "volume": (),
-    "weak_point": (),
+TEMPLATE_FOCUS_TAGS_BY_CATEGORY: dict[TemplateTagCategory, frozenset[TemplateFocusTag]] = {
+    category: frozenset(
+        tag
+        for tag, definition in TEMPLATE_FOCUS_TAG_DEFINITIONS.items()
+        if definition.category is category
+    )
+    for category in TemplateTagCategory
 }
+PRIMARY_STRUCTURE_TAGS = TEMPLATE_FOCUS_TAGS_BY_CATEGORY[TemplateTagCategory.PRIMARY_STRUCTURE]
+REGIONAL_BALANCE_TAGS = TEMPLATE_FOCUS_TAGS_BY_CATEGORY[TemplateTagCategory.REGIONAL_BALANCE]
+MUSCLE_PRIORITY_TAGS = TEMPLATE_FOCUS_TAGS_BY_CATEGORY[TemplateTagCategory.MUSCLE_PRIORITY]
+REGIONAL_PRIORITY_TAGS = frozenset(
+    {TemplateFocusTag.UPPER_PRIORITY, TemplateFocusTag.LOWER_PRIORITY}
+)
+PRIORITY_TAGS = REGIONAL_PRIORITY_TAGS | MUSCLE_PRIORITY_TAGS
+_ALLOWED_HYBRID_STRUCTURES = frozenset(
+    {frozenset({TemplateFocusTag.PUSH_PULL_LEGS, TemplateFocusTag.UPPER_LOWER})}
+)
 
-# Additions are explicit because the old tags did not always describe the
-# complete structural layout. Values are canonical and are de-duplicated.
-STRUCTURAL_FOCUS_TAG_ADDITIONS_BY_TEMPLATE: dict[str, tuple[str, ...]] = {
-    "two-day-full-body-foundation": (TemplateFocusTag.BALANCED,),
-    "two-day-upper-lower-foundation": (TemplateFocusTag.BALANCED,),
-    "two-day-upper-lower-strength-hypertrophy": (TemplateFocusTag.BALANCED,),
-    "three-day-full-body-foundation": (TemplateFocusTag.BALANCED,),
-    "three-day-full-body-drop-set": (TemplateFocusTag.BALANCED,),
-    "four-day-classic-body-part": (TemplateFocusTag.BALANCED,),
-    "four-day-phul": (TemplateFocusTag.BALANCED,),
-    "five-day-ppl-upper-lower": (TemplateFocusTag.UPPER_PRIORITY,),
-    "five-day-posterior-chain-superset": (
-        TemplateFocusTag.BODY_PART_ROTATION,
-        TemplateFocusTag.LOWER_PRIORITY,
-        TemplateFocusTag.HAMSTRINGS_PRIORITY,
-        TemplateFocusTag.GLUTE_PRIORITY,
-    ),
-    "four-day-beginner-body-part-foundation": (TemplateFocusTag.BALANCED,),
-    "four-day-advanced-posterior-chain": (
-        TemplateFocusTag.LOWER_PRIORITY,
-        TemplateFocusTag.HAMSTRINGS_PRIORITY,
-        TemplateFocusTag.GLUTE_PRIORITY,
-    ),
-    "five-day-quad-priority": (TemplateFocusTag.LOWER_PRIORITY,),
-    "five-day-advanced-leg-specialization": (
-        TemplateFocusTag.QUAD_PRIORITY,
-        TemplateFocusTag.HAMSTRINGS_PRIORITY,
-        TemplateFocusTag.GLUTE_PRIORITY,
-    ),
-    "six-day-ppl-twice": (TemplateFocusTag.BALANCED,),
-    "six-day-ppl-volume": (TemplateFocusTag.BALANCED,),
-    "six-day-chest-back-legs-shoulders-arms-legs": (TemplateFocusTag.BALANCED,),
-    "two-day-full-body-strength-beginner": (TemplateFocusTag.STRENGTH_BIAS,),
-    "three-day-full-body-strength-beginner": (TemplateFocusTag.STRENGTH_BIAS,),
-    "three-day-full-body-strength-intermediate": (TemplateFocusTag.STRENGTH_BIAS,),
-    "four-day-upper-lower-strength-intermediate": (TemplateFocusTag.STRENGTH_BIAS,),
-    "four-day-upper-lower-strength-advanced": (TemplateFocusTag.STRENGTH_BIAS,),
-    "five-day-strength-intermediate": (TemplateFocusTag.STRENGTH_BIAS,),
-    "five-day-strength-advanced": (TemplateFocusTag.STRENGTH_BIAS,),
-    "six-day-push-pull-legs-strength": (TemplateFocusTag.STRENGTH_BIAS,),
-}
-
-TEMPLATE_FOCUS_TAGS_TO_REMOVE: dict[str, frozenset[str]] = {
-    "three-day-full-body-drop-set": frozenset({TemplateFocusTag.TIME_EFFICIENT}),
-    "five-day-posterior-chain-superset": frozenset({TemplateFocusTag.TIME_EFFICIENT}),
-}
-
-PRIORITY_TAG_BY_MUSCLE: dict[MuscleGroup, str] = {
+PRIORITY_TAG_BY_MUSCLE: dict[MuscleGroup, TemplateFocusTag] = {
     MuscleGroup.CHEST: TemplateFocusTag.CHEST_PRIORITY,
     MuscleGroup.BACK: TemplateFocusTag.BACK_PRIORITY,
     MuscleGroup.SHOULDERS: TemplateFocusTag.SHOULDERS_PRIORITY,
@@ -169,37 +148,261 @@ PRIORITY_TAG_BY_MUSCLE: dict[MuscleGroup, str] = {
     MuscleGroup.HAMSTRINGS: TemplateFocusTag.HAMSTRINGS_PRIORITY,
 }
 
+MUSCLES_BY_PRIORITY_TAG: dict[TemplateFocusTag, frozenset[MuscleGroup]] = {
+    TemplateFocusTag.CHEST_PRIORITY: frozenset({MuscleGroup.CHEST}),
+    TemplateFocusTag.BACK_PRIORITY: frozenset({MuscleGroup.BACK}),
+    TemplateFocusTag.SHOULDERS_PRIORITY: frozenset({MuscleGroup.SHOULDERS}),
+    TemplateFocusTag.ARMS_PRIORITY: frozenset({MuscleGroup.BICEPS, MuscleGroup.TRICEPS}),
+    TemplateFocusTag.GLUTE_PRIORITY: frozenset({MuscleGroup.GLUTES}),
+    TemplateFocusTag.QUAD_PRIORITY: frozenset({MuscleGroup.QUADRICEPS}),
+    TemplateFocusTag.HAMSTRINGS_PRIORITY: frozenset({MuscleGroup.HAMSTRINGS}),
+}
 
-def validate_focus_tags(tags: Iterable[str]) -> tuple[str, ...]:
+MINIMUM_DIRECT_SLOTS_BY_PRIORITY_TAG: dict[TemplateFocusTag, int] = {
+    TemplateFocusTag.CHEST_PRIORITY: 5,
+    TemplateFocusTag.BACK_PRIORITY: 5,
+    TemplateFocusTag.SHOULDERS_PRIORITY: 5,
+    TemplateFocusTag.ARMS_PRIORITY: 6,
+    TemplateFocusTag.GLUTE_PRIORITY: 3,
+    TemplateFocusTag.QUAD_PRIORITY: 5,
+    TemplateFocusTag.HAMSTRINGS_PRIORITY: 3,
+}
+
+_UPPER_BODY_MUSCLES = frozenset(
+    {
+        MuscleGroup.CHEST,
+        MuscleGroup.BACK,
+        MuscleGroup.SHOULDERS,
+        MuscleGroup.BICEPS,
+        MuscleGroup.TRICEPS,
+    }
+)
+_LOWER_BODY_MUSCLES = frozenset(
+    {
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+        MuscleGroup.CALVES,
+    }
+)
+_BALANCE_AUDIT_MUSCLES = (
+    MuscleGroup.CHEST,
+    MuscleGroup.BACK,
+    MuscleGroup.SHOULDERS,
+    MuscleGroup.QUADRICEPS,
+    MuscleGroup.HAMSTRINGS,
+    MuscleGroup.GLUTES,
+)
+_PUSH_MUSCLES = frozenset({MuscleGroup.CHEST, MuscleGroup.SHOULDERS, MuscleGroup.TRICEPS})
+_PULL_MUSCLES = frozenset({MuscleGroup.BACK, MuscleGroup.BICEPS})
+_COMPOUND_MOVEMENT_PATTERNS = frozenset(
+    {
+        MovementPattern.SQUAT,
+        MovementPattern.HIP_HINGE,
+        MovementPattern.LUNGE,
+        MovementPattern.HORIZONTAL_PUSH,
+        MovementPattern.HORIZONTAL_PULL,
+        MovementPattern.VERTICAL_PUSH,
+        MovementPattern.VERTICAL_PULL,
+        MovementPattern.HIP_EXTENSION,
+    }
+)
+
+
+def validate_focus_tags(tags: Iterable[str | TemplateFocusTag]) -> tuple[TemplateFocusTag, ...]:
     values = tuple(str(tag) for tag in tags)
     unknown = sorted(set(values) - CANONICAL_TEMPLATE_FOCUS_TAGS)
     if unknown:
         raise ValueError(f"Unknown template focus tag(s): {', '.join(unknown)}")
     if len(values) != len(set(values)):
         raise ValueError("Focus tags must be unique")
-    return values
+    canonical = tuple(TemplateFocusTag(value) for value in values)
+    tag_set = frozenset(canonical)
+    structures = tag_set & PRIMARY_STRUCTURE_TAGS
+    if not structures:
+        raise ValueError("Focus tags require a primary structure")
+    if len(structures) > 1 and structures not in _ALLOWED_HYBRID_STRUCTURES:
+        raise ValueError("Unsupported primary structure combination")
+    if TemplateFocusTag.BALANCED in tag_set and tag_set & PRIORITY_TAGS:
+        raise ValueError("Balanced templates cannot declare priority tags")
+    if {
+        TemplateFocusTag.UPPER_PRIORITY,
+        TemplateFocusTag.LOWER_PRIORITY,
+    }.issubset(tag_set):
+        raise ValueError("Upper and lower priority tags conflict")
+    if TemplateFocusTag.SPECIALIZATION in tag_set and not tag_set & PRIORITY_TAGS:
+        raise ValueError("Specialization requires a priority tag")
+    return canonical
 
 
-def normalize_focus_tags(tags: Iterable[str]) -> tuple[str, ...]:
-    values = tuple(str(tag) for tag in tags)
-    unknown = sorted(set(values) - CANONICAL_TEMPLATE_FOCUS_TAGS)
-    if unknown:
-        raise ValueError(f"Unknown template focus tag(s): {', '.join(unknown)}")
-    return tuple(dict.fromkeys(values))
+def validate_template_focus_tags(
+    tags: Iterable[str | TemplateFocusTag],
+    *,
+    intensity_methods: Iterable[object] = (),
+    days: Iterable[object] = (),
+) -> tuple[TemplateFocusTag, ...]:
+    canonical = validate_focus_tags(tags)
+    tag_values = {tag.value for tag in canonical}
+    method_values = {_enum_value(method) for method in intensity_methods}
+    if overlap := sorted(tag_values & method_values):
+        raise ValueError(f"Intensity methods cannot be template focus tags: {', '.join(overlap)}")
+    day_items = tuple(days)
+    if day_items:
+        _validate_structural_evidence(frozenset(canonical), day_items)
+    return canonical
 
 
-def normalize_seed_focus_tags(slug: str, tags: Iterable[str]) -> tuple[str, ...]:
-    normalized: list[str] = []
-    for tag in tags:
-        replacement = LEGACY_FOCUS_TAG_REPLACEMENTS.get(tag, (tag,))
-        normalized.extend(replacement)
-    normalized.extend(STRUCTURAL_FOCUS_TAG_ADDITIONS_BY_TEMPLATE.get(slug, ()))
-    removed = TEMPLATE_FOCUS_TAGS_TO_REMOVE.get(slug, frozenset())
-    normalized = [tag for tag in normalized if tag not in removed]
-    if any(tag.endswith("_priority") for tag in normalized):
-        normalized = [tag for tag in normalized if tag != TemplateFocusTag.BALANCED]
-    return normalize_focus_tags(normalized)
+def _enum_value(value: object) -> str:
+    raw = getattr(value, "value", value)
+    return str(raw)
 
 
-def priority_tag_for_muscle(muscle: MuscleGroup) -> str | None:
+def _validate_structural_evidence(
+    tags: frozenset[TemplateFocusTag],
+    days: tuple[object, ...],
+) -> None:
+    direct_muscles = tuple(_direct_muscles_for_day(day) for day in days)
+    slot_groups = tuple(
+        tuple(_muscles_for_slot(slot) for slot in _slots_for_day(day)) for day in days
+    )
+
+    if TemplateFocusTag.FULL_BODY in tags:
+        mixed_days = sum(
+            bool(muscles & _UPPER_BODY_MUSCLES) and bool(muscles & _LOWER_BODY_MUSCLES)
+            for muscles in direct_muscles
+        )
+        if mixed_days < (len(days) + 1) // 2:
+            raise ValueError("full_body lacks structural evidence")
+    if TemplateFocusTag.UPPER_LOWER in tags and not (
+        any(
+            muscles & _UPPER_BODY_MUSCLES and not muscles & _LOWER_BODY_MUSCLES
+            for muscles in direct_muscles
+        )
+        and any(
+            muscles & _LOWER_BODY_MUSCLES and not muscles & _UPPER_BODY_MUSCLES
+            for muscles in direct_muscles
+        )
+    ):
+        raise ValueError("upper_lower lacks structural evidence")
+    if TemplateFocusTag.PUSH_PULL_LEGS in tags and not (
+        any(muscles & _PUSH_MUSCLES and not muscles & _PULL_MUSCLES for muscles in direct_muscles)
+        and any(
+            muscles & _PULL_MUSCLES and not muscles & _PUSH_MUSCLES for muscles in direct_muscles
+        )
+        and any(muscles & _LOWER_BODY_MUSCLES for muscles in direct_muscles)
+    ):
+        raise ValueError("push_pull_legs lacks structural evidence")
+    if TemplateFocusTag.BODY_PART_ROTATION in tags and (
+        len(days) < 3 or len(set(direct_muscles)) < 3
+    ):
+        raise ValueError("body_part_rotation lacks structural evidence")
+
+    upper_days = sum(
+        bool(muscles & _UPPER_BODY_MUSCLES) and not bool(muscles & _LOWER_BODY_MUSCLES)
+        for muscles in direct_muscles
+    )
+    lower_days = sum(
+        bool(muscles & _LOWER_BODY_MUSCLES) and not bool(muscles & _UPPER_BODY_MUSCLES)
+        for muscles in direct_muscles
+    )
+    if TemplateFocusTag.UPPER_PRIORITY in tags and not (
+        upper_days >= 3 and upper_days > lower_days
+    ):
+        raise ValueError("upper_priority lacks structural evidence")
+    if TemplateFocusTag.LOWER_PRIORITY in tags and lower_days < 2:
+        raise ValueError("lower_priority lacks structural evidence")
+    if TemplateFocusTag.BALANCED in tags:
+        exposure_days = tuple(
+            sum(
+                any(muscle in slot_muscles for slot_muscles in day_slot_groups)
+                for day_slot_groups in slot_groups
+            )
+            for muscle in _BALANCE_AUDIT_MUSCLES
+        )
+        if max(exposure_days) - min(exposure_days) > 2:
+            raise ValueError("balanced lacks structural evidence")
+
+    for tag in tags & MUSCLE_PRIORITY_TAGS:
+        muscles = MUSCLES_BY_PRIORITY_TAG[tag]
+        direct_slots = sum(
+            bool(slot_muscles & muscles)
+            for day_slot_groups in slot_groups
+            for slot_muscles in day_slot_groups
+        )
+        if direct_slots < MINIMUM_DIRECT_SLOTS_BY_PRIORITY_TAG[tag]:
+            raise ValueError(f"{tag.value} lacks structural evidence")
+
+    if TemplateFocusTag.COMPOUND_FOCUS in tags:
+        compound_led_days = sum(
+            bool(slots) and _movement_pattern_for_slot(slots[0]) in _COMPOUND_MOVEMENT_PATTERNS
+            for slots in (_slots_for_day(day) for day in days)
+        )
+        compound_core_days = sum(
+            sum(
+                _movement_pattern_for_slot(slot) in _COMPOUND_MOVEMENT_PATTERNS
+                and _enum_value(getattr(slot, "adaptation_priority", "")) == "core"
+                for slot in _slots_for_day(day)
+            )
+            >= 2
+            for day in days
+        )
+        required_core_days = (4 * len(days) + 4) // 5
+        if compound_led_days != len(days) or compound_core_days < required_core_days:
+            raise ValueError("compound_focus lacks structural evidence")
+    if TemplateFocusTag.STRENGTH_BIAS in tags and TemplateFocusTag.COMPOUND_FOCUS not in tags:
+        raise ValueError("strength_bias lacks structural evidence")
+    if TemplateFocusTag.SPECIALIZATION in tags:
+        priority_muscles = frozenset(
+            muscle for tag in tags & MUSCLE_PRIORITY_TAGS for muscle in MUSCLES_BY_PRIORITY_TAG[tag]
+        )
+        specialized_slots = sum(
+            bool(slot_muscles & priority_muscles)
+            for day_slot_groups in slot_groups
+            for slot_muscles in day_slot_groups
+        )
+        if specialized_slots < 5:
+            raise ValueError("specialization lacks structural evidence")
+
+
+def _direct_muscles_for_day(day: object) -> frozenset[MuscleGroup]:
+    raw = getattr(day, "direct_target_muscles", getattr(day, "focus", ()))
+    return _muscle_values(raw)
+
+
+def _slots_for_day(day: object) -> tuple[object, ...]:
+    return tuple(getattr(day, "slots", ()))
+
+
+def _muscles_for_slot(slot: object) -> frozenset[MuscleGroup]:
+    return _muscle_values(getattr(slot, "target_muscles", ()))
+
+
+def _muscle_values(values: Iterable[object]) -> frozenset[MuscleGroup]:
+    return frozenset(MuscleGroup(_enum_value(value)) for value in values)
+
+
+def _movement_pattern_for_slot(slot: object) -> MovementPattern | None:
+    raw = _enum_value(getattr(slot, "movement_pattern", ""))
+    try:
+        return MovementPattern(raw)
+    except ValueError:
+        return None
+
+
+def priority_tag_for_muscle(muscle: MuscleGroup) -> TemplateFocusTag | None:
     return PRIORITY_TAG_BY_MUSCLE.get(muscle)
+
+
+def priority_tags_for_muscles(
+    muscles: Iterable[MuscleGroup],
+) -> frozenset[TemplateFocusTag]:
+    return frozenset(
+        tag for muscle in muscles if (tag := priority_tag_for_muscle(muscle)) is not None
+    )
+
+
+def has_template_tag(
+    tags: Iterable[str | TemplateFocusTag],
+    tag: TemplateFocusTag,
+) -> bool:
+    return tag.value in {str(value) for value in tags}

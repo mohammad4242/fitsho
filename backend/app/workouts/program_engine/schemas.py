@@ -17,6 +17,7 @@ from app.exercises.enums import (
     PrescriptionMode,
 )
 from app.profile.enums import TrainingLocation
+from app.training_templates.tags import TemplateFocusTag
 from app.workouts.program_engine.enums import (
     ActivityLevel,
     BalanceAbility,
@@ -397,7 +398,7 @@ class TemplateReference:
     days_per_week: int
     training_level: str
     fitness_goal: str
-    focus_tags: tuple[str, ...]
+    focus_tags: tuple[TemplateFocusTag, ...]
     intensity_methods: tuple[str, ...]
     days: tuple[TemplateReferenceDay, ...]
 

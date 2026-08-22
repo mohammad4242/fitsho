@@ -647,7 +647,7 @@ const en = {
         editProgram: "Edit program",
         editProgramAria: "Edit program: {{name}}",
         addProgram: "Add new program",
-        tags: { classic: "Classic", full_body: "Full body", foundation: "Foundation", upper_lower: "Upper / lower", hypertrophy: "Hypertrophy", balanced: "Balanced", strength_hypertrophy: "Strength / hypertrophy", compound_first: "Compound first", time_efficient: "Time efficient", superset: "Superset", three_day: "Three day", push_pull_legs: "Push / pull / legs", chest_priority: "Chest priority", back_priority: "Back priority", weak_point: "Weak point", drop_set: "Drop set", body_part_rotation: "Body-part rotation", direct_targets: "Direct targets", quad_priority: "Quadriceps priority", hamstrings_glutes: "Hamstrings / glutes", frequency_two: "Twice weekly", volume: "Higher volume", high_frequency: "High frequency", specialization: "Specialization" },
+        tags: { full_body: "Full body", upper_lower: "Upper / lower", push_pull_legs: "Push / pull / legs", body_part_rotation: "Body-part rotation", balanced: "Balanced", upper_priority: "Upper-body priority", lower_priority: "Lower-body priority", chest_priority: "Chest priority", back_priority: "Back priority", shoulders_priority: "Shoulder priority", arms_priority: "Arm priority", glute_priority: "Glute priority", quad_priority: "Quadriceps priority", hamstrings_priority: "Hamstrings priority", strength_bias: "Strength bias", compound_focus: "Compound focus", specialization: "Specialization" },
         methods: { superset: "Superset", drop_set: "Drop set" },
       },
       templateEditor: {

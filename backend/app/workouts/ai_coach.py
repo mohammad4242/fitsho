@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from app.exercises.enums import MuscleGroup
-from app.training_templates.tags import priority_tag_for_muscle
+from app.training_templates.tags import priority_tags_for_muscles
 from app.workouts.program_engine.schemas import TemplateReference
 from app.workouts.schemas import WorkoutGenerationProfile
 
@@ -47,11 +47,7 @@ def select_ai_coach_candidates(
     maximum_candidates: int = 3,
 ) -> tuple[AiCoachProgramCandidate, ...]:
     """Return only fully eligible library programs in deterministic priority order."""
-    priority_tags = {
-        tag
-        for muscle in priority_muscles
-        if (tag := priority_tag_for_muscle(muscle)) is not None
-    }
+    priority_tags = priority_tags_for_muscles(priority_muscles)
     candidates: list[AiCoachProgramCandidate] = []
     for template in templates:
         if (
@@ -60,11 +56,7 @@ def select_ai_coach_candidates(
             or template.fitness_goal != str(profile.fitness_goal)
         ):
             continue
-        exercise_ids = tuple(
-            slot.exercise_id
-            for day in template.days
-            for slot in day.slots
-        )
+        exercise_ids = tuple(slot.exercise_id for day in template.days for slot in day.slots)
         if not exercise_ids or any(exercise_id is None for exercise_id in exercise_ids):
             continue
         if not set(exercise_ids).issubset(eligible_exercise_ids):

@@ -1,8 +1,12 @@
 from uuid import UUID
 
-from app.training_templates.tags import TemplateFocusTag, priority_tag_for_muscle
+from app.training_templates.tags import (
+    TemplateFocusTag,
+    has_template_tag,
+    priority_tag_for_muscle,
+    priority_tags_for_muscles,
+)
 from app.workouts.program_engine.body_analysis import (
-    TEMPLATE_TAGS_BY_MUSCLE,
     eligible_body_analysis_priorities,
 )
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
@@ -59,22 +63,18 @@ def _score(
     template: TemplateReference,
     ruleset: ProgramRuleset,
 ) -> int:
-    priority_tags = {
-        tag
-        for muscle in request.source.priority_muscles
-        if (tag := priority_tag_for_muscle(muscle)) is not None
-    }
+    priority_tags = priority_tags_for_muscles(request.source.priority_muscles)
     score = 100 + 35 * len(priority_tags.intersection(template.focus_tags))
-    template_tags = set(template.focus_tags)
     for priority in eligible_body_analysis_priorities(request, ruleset):
-        if not template_tags.intersection(TEMPLATE_TAGS_BY_MUSCLE.get(priority.muscle, ())):
+        priority_tag = priority_tag_for_muscle(priority.muscle)
+        if priority_tag is None or not has_template_tag(template.focus_tags, priority_tag):
             continue
         score += (
             ruleset.body_analysis_clear_lag_template_boost
             if priority.classification == "clear_lag"
             else ruleset.body_analysis_mild_lag_template_boost
         )
-    if TemplateFocusTag.BALANCED in template_tags and not priority_tags:
+    if has_template_tag(template.focus_tags, TemplateFocusTag.BALANCED) and not priority_tags:
         score += 10
     return score
 

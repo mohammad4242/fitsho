@@ -23,7 +23,7 @@ from app.exercises.schemas import ExerciseDetail
 from app.exercises.taxonomy import is_compatible_muscle_focus
 from app.profile.enums import ExperienceLevel, FitnessGoal
 from app.training_templates.models import TrainingTemplateMethod, TrainingTemplateSlotPriority
-from app.training_templates.tags import TemplateFocusTag
+from app.training_templates.tags import TemplateFocusTag, validate_template_focus_tags
 from app.workouts.program_engine.enums import (
     BodyPosition,
     ImpactLimit,
@@ -242,7 +242,7 @@ class AdminTrainingProgramTemplate(BaseModel):
     days_per_week: int
     training_level: ExperienceLevel
     fitness_goal: FitnessGoal
-    focus_tags: list[str]
+    focus_tags: list[TemplateFocusTag]
     intensity_methods: list[TrainingTemplateMethod]
     programming_rationale: list[AdminTrainingTemplateProgrammingRationale]
     source_name: str
@@ -327,4 +327,9 @@ class AdminTrainingProgramTemplateWrite(BaseModel):
             raise ValueError("Intensity methods must be unique")
         if len(self.focus_tags) != len(set(self.focus_tags)):
             raise ValueError("Focus tags must be unique")
+        validate_template_focus_tags(
+            self.focus_tags,
+            intensity_methods=self.intensity_methods,
+            days=self.days,
+        )
         return self

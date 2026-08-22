@@ -7,7 +7,7 @@ from app.training_templates.models import (
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
 )
-from app.training_templates.tags import validate_focus_tags
+from app.training_templates.tags import validate_template_focus_tags
 from app.workouts.program_engine.schemas import (
     TemplateReference,
     TemplateReferenceDay,
@@ -39,7 +39,11 @@ def _reference(template: TrainingProgramTemplate) -> TemplateReference:
         days_per_week=template.days_per_week,
         training_level=template.training_level.value,
         fitness_goal=template.fitness_goal.value,
-        focus_tags=validate_focus_tags(template.focus_tags),
+        focus_tags=validate_template_focus_tags(
+            template.focus_tags,
+            intensity_methods=template.intensity_methods,
+            days=template.days,
+        ),
         intensity_methods=tuple(template.intensity_methods),
         days=tuple(
             TemplateReferenceDay(
