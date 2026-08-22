@@ -170,6 +170,33 @@ def test_selector_breaks_equal_scores_by_template_slug() -> None:
     assert selected.slug == "z-template"
 
 
+def test_dynamic_fallback_retains_the_template_selection_rejection_trace() -> None:
+    source = request(
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=24,
+        available_training_days=4,
+    )
+    wrong_days = _template("wrong-days", days_per_week=3)
+
+    result = generate_program(
+        source,
+        tuple(full_catalog()),
+        RULESET,
+        reference_templates=(wrong_days,),
+    )
+
+    assert result.program is not None, result.errors
+    selection_trace = next(
+        item for item in result.program.decision_trace if item["stage"] == "template_selection"
+    )
+    assert selection_trace["selected"] is None
+    assert selection_trace["candidates"] == ()
+    assert selection_trace["hard_rejections"] == (
+        {"slug": "wrong-days", "reason_codes": ("DAYS_MISMATCH",)},
+    )
+
+
 def test_first_month_and_beginner_select_distinct_template_levels() -> None:
     templates = (
         _template("first-month-template", training_level="first_month"),

@@ -234,6 +234,7 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
     )
     assert template_trace["goal_used_for_exclusion"] is False
     assert [entry["stage"] for entry in result.program.decision_trace] == [
+        "template_selection",
         "normalization",
         "safety",
         "eligibility",
@@ -245,6 +246,22 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
         "session_duration",
         "final_construction",
     ]
+    selection_trace = result.program.decision_trace[0]
+    assert selection_trace["selected"] == template.slug
+    assert selection_trace["candidates"] == (
+        {
+            "slug": template.slug,
+            "score": {
+                "priority": 0,
+                "body_analysis": 0,
+                "goal": 0,
+                "sex": 0,
+                "fallback": 0,
+                "total": 0,
+            },
+            "reason_codes": (),
+        },
+    )
 
 
 def test_template_uses_shared_volume_and_prescription_rules() -> None:

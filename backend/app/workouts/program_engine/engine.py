@@ -48,7 +48,7 @@ from app.workouts.program_engine.split_selector import (
     rank_availability_aware_fallbacks,
     rank_split_candidates,
 )
-from app.workouts.program_engine.template_selector import select_template_reference
+from app.workouts.program_engine.template_selector import select_template_reference_result
 from app.workouts.program_engine.template_sessions import (
     TemplateConstructionError,
     TemplateSessionBuild,
@@ -96,6 +96,13 @@ def generate_program(
             safety_status=safety.status,
         )
     eligibility = filter_eligible_exercises(normalized, exercise_catalog)
+    template_selection = select_template_reference_result(
+        normalized,
+        eligibility.eligible,
+        reference_templates,
+        ruleset,
+    )
+    template_selection_trace = (template_selection.decision_trace(),)
     if not eligibility.eligible:
         missing_equipment = any(
             "EXERCISE_REJECTED_MISSING_EQUIPMENT" in item.reason_codes
@@ -111,6 +118,7 @@ def generate_program(
             errors=("NO_ELIGIBLE_EXERCISES",),
             safety_status=safety.status,
             rejected_candidates=eligibility.rejected,
+            decision_trace=template_selection_trace,
         )
     previous_volume = derive_previous_volume_baseline(normalized.source.recent_training_history)
     reserve = cardio_reserve_minutes(normalized, eligibility.cardio_eligible, ruleset)
@@ -120,9 +128,11 @@ def generate_program(
         for candidate in exercise_catalog
         if candidate.id in rejected_by_id
     )
-    template_rejection_trace: tuple[dict[str, object], ...] = ()
-    reference = select_template_reference(
-        normalized, eligibility.eligible, reference_templates, ruleset
+    template_rejection_trace: tuple[dict[str, object], ...] = template_selection_trace
+    reference = (
+        template_selection.selected.template
+        if template_selection.selected is not None
+        else None
     )
     if reference is not None:
         try:
@@ -142,10 +152,11 @@ def generate_program(
                 ruleset,
                 previous_volume=previous_volume,
                 cardio_reserve=reserve,
+                template_selection_trace=template_selection_trace,
             )
             if reference_result.is_success:
                 return reference_result
-            template_rejection_trace = (
+            template_rejection_trace = template_selection_trace + (
                 {
                     "stage": "template_reference",
                     "selected": reference.slug,
@@ -161,7 +172,7 @@ def generate_program(
                 },
             )
         except TemplateConstructionError as exc:
-            template_rejection_trace = (
+            template_rejection_trace = template_selection_trace + (
                 {
                     "stage": "template_reference",
                     "selected": reference.slug,
@@ -591,6 +602,7 @@ def _reference_program(
     *,
     previous_volume: PreviousVolumeBaseline,
     cardio_reserve: int,
+    template_selection_trace: tuple[dict[str, object], ...],
 ) -> ProgramGenerationResult:
     split = SplitPlan(
         split_type=SplitType.BODY_PART_ROTATION,
@@ -655,7 +667,7 @@ def _reference_program(
         "split": split.split_type.value,
         "reason_codes": day_count_errors or ("REQUESTED_TRAINING_DAYS_SATISFIED",),
     }
-    trace: tuple[dict[str, object], ...] = (
+    trace: tuple[dict[str, object], ...] = template_selection_trace + (
         {"stage": "normalization", "assumptions": normalized.assumptions},
         {"stage": "safety", "status": safety_status.value, "reasons": safety_reasons},
         {

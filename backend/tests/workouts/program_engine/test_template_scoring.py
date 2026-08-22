@@ -15,11 +15,10 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceDay,
     TemplateReferenceSlot,
 )
+from app.workouts.program_engine.template_scoring import TemplateScore, score_template_reference
 from app.workouts.program_engine.template_selector import (
-    TemplateScore,
     eligible_template_references,
     rank_template_references,
-    score_template_reference,
     select_template_reference,
 )
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
@@ -301,8 +300,8 @@ def test_ranking_is_repeatable_and_uses_stable_slug_tie_break() -> None:
     second = rank_template_references(normalized, catalog, templates, RULESET)
 
     assert first == second
-    assert tuple(item[0].slug for item in first) == ("z-template", "a-template")
-    assert all(item[1] == TemplateScore(0, 0, 0, 0, 0) for item in first)
+    assert tuple(item.template.slug for item in first) == ("z-template", "a-template")
+    assert all(item.score == TemplateScore(0, 0, 0, 0, 0) for item in first)
 
 
 def test_days_level_and_resolvable_core_slots_remain_hard_eligibility() -> None:
