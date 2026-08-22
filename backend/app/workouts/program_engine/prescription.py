@@ -63,7 +63,6 @@ def prescribe_sessions(
         if volume.direct_sets_for(muscle) > 0
     }
     days: list[WorkoutDay] = []
-    compact_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
     for draft in drafts:
         exercise_count = max(1, len(draft.exercises))
         available = max(
@@ -78,7 +77,17 @@ def prescribe_sessions(
         )
         programmed: list[ProgrammedExercise] = []
         direct_session_sets: Counter[object] = Counter()
-        for exercise in draft.exercises:
+        ordered_exercises = (
+            sorted(
+                draft.exercises,
+                key=lambda exercise: ruleset.strength_role_order[
+                    classify_strength_role(exercise, request, ruleset).role.value
+                ],
+            )
+            if request.primary_goal is Goal.STRENGTH
+            else draft.exercises
+        )
+        for exercise in ordered_exercises:
             strength_role = (
                 classify_strength_role(exercise, request, ruleset)
                 if request.primary_goal is Goal.STRENGTH
@@ -129,12 +138,9 @@ def prescribe_sessions(
                 fatigue_cost=exercise.fatigue_cost,
             )
             rest = prescription.rest_seconds
-            if compact_session:
-                rest = ruleset.minimum_rest_seconds
             warmup_sets = 0
             if (
-                not compact_session
-                and not programmed
+                not programmed
                 and exercise.exercise_type is ExerciseType.COMPOUND
             ):
                 warmup_sets = (
@@ -240,17 +246,18 @@ def prescription_for(
 ) -> ExercisePrescription:
     novice = status is TrainingStatus.NOVICE
     rir = ruleset.novice_target_rir if novice else ruleset.experienced_target_rir
+    role: StrengthExerciseRole | None = None
     if goal is Goal.STRENGTH:
-        role = strength_role or (
-            StrengthExerciseRole.PRIMARY_STRENGTH
-            if exercise_type is ExerciseType.COMPOUND
-            else StrengthExerciseRole.ACCESSORY
-        )
-        key = {
-            StrengthExerciseRole.PRIMARY_STRENGTH: "strength_compound",
-            StrengthExerciseRole.SECONDARY_COMPOUND: "strength_secondary_compound",
-            StrengthExerciseRole.ACCESSORY: "strength_accessory",
-        }[role]
+        if exercise_type is ExerciseType.ISOLATION:
+            key = "hypertrophy_isolation"
+            role = None
+        else:
+            role = strength_role or StrengthExerciseRole.SECONDARY_COMPOUND
+            key = {
+                StrengthExerciseRole.PRIMARY_STRENGTH: "strength_compound",
+                StrengthExerciseRole.SECONDARY_COMPOUND: "strength_secondary_compound",
+                StrengthExerciseRole.ACCESSORY: "strength_accessory",
+            }[role]
     elif goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN}:
         key = (
             "hypertrophy_isolation"
@@ -268,7 +275,7 @@ def prescription_for(
     rep_min = rule.rep_min
     rep_max = rule.rep_max
     rest_seconds = rule.rest_seconds
-    if goal is Goal.STRENGTH:
+    if goal is Goal.STRENGTH and role is not None:
         role_key = role.value
         if novice:
             rep_min = max(rep_min, ruleset.strength_beginner_rep_minimums[role_key])
