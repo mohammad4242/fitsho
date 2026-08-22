@@ -1,5 +1,6 @@
 import pytest
 
+from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, TrainingExperience
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -170,3 +171,21 @@ def test_first_month_normalization_and_selection_are_deterministic() -> None:
     assert select_template_reference(first, tuple(full_catalog()), templates, RULESET) == (
         select_template_reference(second, tuple(full_catalog()), templates, RULESET)
     )
+
+
+def test_first_month_program_generation_remains_deterministic() -> None:
+    source = request(
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.FIRST_MONTH,
+        training_age_months=0,
+        available_training_days=3,
+        seed_optional=77,
+    )
+    catalog = tuple(full_catalog())
+
+    first = generate_program(source, catalog, RULESET)
+    second = generate_program(source, catalog, RULESET)
+
+    assert first.program is not None, first.errors
+    assert second.program is not None, second.errors
+    assert first.program == second.program
