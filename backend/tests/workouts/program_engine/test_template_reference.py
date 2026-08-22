@@ -223,10 +223,16 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
 
     assert result.program is not None, result.errors
     assert result.program.aggregate_metrics["reference_template"] == template.slug
-    assert any(
-        entry["stage"] == "template_reference" and entry["selected"] == template.slug
-        for entry in result.program.decision_trace
+    template_trace = next(
+        entry for entry in result.program.decision_trace if entry["stage"] == "template_reference"
     )
+    assert template_trace["selected"] == template.slug
+    assert template_trace["hard_eligibility"] == (
+        "days",
+        "training_level",
+        "core_slots_resolvable",
+    )
+    assert template_trace["goal_used_for_exclusion"] is False
     assert [entry["stage"] for entry in result.program.decision_trace] == [
         "normalization",
         "safety",

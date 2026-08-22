@@ -150,6 +150,12 @@ def generate_program(
                     "stage": "template_reference",
                     "selected": reference.slug,
                     "status": "rejected",
+                    "hard_eligibility": (
+                        "days",
+                        "training_level",
+                        "core_slots_resolvable",
+                    ),
+                    "goal_used_for_exclusion": False,
                     "reason_codes": reference_result.errors,
                     "decision_trace": reference_result.decision_trace,
                 },
@@ -160,6 +166,12 @@ def generate_program(
                     "stage": "template_reference",
                     "selected": reference.slug,
                     "status": "rejected",
+                    "hard_eligibility": (
+                        "days",
+                        "training_level",
+                        "core_slots_resolvable",
+                    ),
+                    "goal_used_for_exclusion": False,
                     "reason_codes": (
                         "INITIAL_TEMPLATE_REJECTED_UNFILLABLE",
                         *exc.reason_codes,
@@ -656,6 +668,12 @@ def _reference_program(
             "stage": "template_reference",
             "selected": reference.slug,
             "status": "adapted",
+            "hard_eligibility": (
+                "days",
+                "training_level",
+                "core_slots_resolvable",
+            ),
+            "goal_used_for_exclusion": False,
             "focus_tags": reference.focus_tags,
             "intensity_methods": reference.intensity_methods,
         },

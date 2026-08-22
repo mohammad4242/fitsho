@@ -4,7 +4,6 @@ from app.workouts.program_engine.body_analysis import (
     TEMPLATE_TAGS_BY_MUSCLE,
     eligible_body_analysis_priorities,
 )
-from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -20,27 +19,38 @@ def select_template_reference(
     templates: tuple[TemplateReference, ...],
     ruleset: ProgramRuleset,
 ) -> TemplateReference | None:
-    level = _template_level(request)
-    eligible_by_id = {candidate.id for candidate in eligible}
     scored = [
         (template, _score(request, template, ruleset))
-        for template in templates
-        if template.days_per_week == request.resistance_training_days
-        and template.training_level == level
-        and _matches_goal(request.primary_goal, template.fitness_goal)
-        and _core_slots_are_resolvable(template, eligible, eligible_by_id)
+        for template in eligible_template_references(request, eligible, templates)
     ]
     if not scored:
         return None
     return max(scored, key=lambda item: (item[1], item[0].slug))[0]
 
 
+def eligible_template_references(
+    request: NormalizedProgramRequest,
+    eligible: tuple[ExerciseCandidate, ...],
+    templates: tuple[TemplateReference, ...],
+) -> tuple[TemplateReference, ...]:
+    """Return templates that pass structural hard eligibility.
+
+    Goal remains available to downstream programming, but template metadata
+    ``fitness_goal`` is intentionally not an exclusion criterion here.
+    """
+    level = _template_level(request)
+    eligible_by_id = {candidate.id for candidate in eligible}
+    return tuple(
+        template
+        for template in templates
+        if template.days_per_week == request.resistance_training_days
+        and template.training_level == level
+        and _core_slots_are_resolvable(template, eligible, eligible_by_id)
+    )
+
+
 def _template_level(request: NormalizedProgramRequest) -> str:
     return request.source.training_experience.value
-
-
-def _matches_goal(goal: Goal, template_goal: str) -> bool:
-    return goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN} and template_goal == "build_muscle"
 
 
 def _score(

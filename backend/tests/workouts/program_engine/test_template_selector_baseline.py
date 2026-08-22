@@ -1,40 +1,20 @@
-import pytest
+from dataclasses import replace
 
+from app.exercises.enums import MovementPattern
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, TrainingExperience
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-from app.workouts.program_engine.schemas import TemplateReference
+from app.workouts.program_engine.schemas import (
+    TemplateReference,
+    TemplateReferenceDay,
+    TemplateReferenceSlot,
+)
 from app.workouts.program_engine.template_selector import (
-    _matches_goal,
+    eligible_template_references,
     select_template_reference,
 )
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
-
-
-@pytest.mark.parametrize(
-    ("goal", "template_goal", "expected"),
-    [
-        (Goal.HYPERTROPHY, "build_muscle", True),
-        (Goal.MUSCLE_GAIN, "build_muscle", True),
-        (Goal.FAT_LOSS, "fat_loss", True),
-        (Goal.STRENGTH, "strength", True),
-        (Goal.BODY_RECOMPOSITION, "body_recomposition", True),
-        (Goal.BODY_RECOMPOSITION, "build_muscle", True),
-        (Goal.GENERAL_FITNESS, "improve_fitness", True),
-        (Goal.GENERAL_FITNESS, "maintain_weight", True),
-        (Goal.MUSCULAR_ENDURANCE, "improve_fitness", True),
-        (Goal.HYPERTROPHY, "strength", False),
-        (Goal.FAT_LOSS, "build_muscle", False),
-        (Goal.STRENGTH, "fat_loss", False),
-    ],
-)
-def test_current_goal_to_template_mapping_is_characterized(
-    goal: Goal,
-    template_goal: str,
-    expected: bool,
-) -> None:
-    assert _matches_goal(goal, template_goal) is expected
 
 
 def _template(
@@ -68,13 +48,73 @@ def _normalized_request():
     )
 
 
-def test_selector_keeps_days_level_and_goal_as_hard_filters() -> None:
+def test_selector_ignores_template_goal_for_hard_eligibility() -> None:
     templates = (
-        _template("valid"),
+        _template("strength-template", fitness_goal="strength"),
+        _template("fat-loss-template", fitness_goal="fat_loss"),
         _template("wrong-days", days_per_week=3),
         _template("wrong-level", training_level="advanced"),
-        _template("wrong-goal", fitness_goal="strength"),
     )
+
+    selected_by_goal = []
+    for goal in Goal:
+        normalized = normalize_request(
+            request(
+                primary_goal=goal,
+                training_experience=TrainingExperience.INTERMEDIATE,
+                training_age_months=24,
+                available_training_days=4,
+            ),
+            RULESET,
+        )
+        selected = select_template_reference(normalized, tuple(full_catalog()), templates, RULESET)
+        assert selected is not None
+        selected_by_goal.append(selected.slug)
+
+    assert selected_by_goal == ["strength-template"] * len(Goal)
+
+
+def test_same_days_and_level_have_same_eligible_pool_for_each_goal() -> None:
+    templates = (
+        _template("build-muscle-template", fitness_goal="build_muscle"),
+        _template("fat-loss-template", fitness_goal="fat_loss"),
+        _template("strength-template", fitness_goal="strength"),
+    )
+
+    pools = []
+    for goal in Goal:
+        normalized = normalize_request(
+            request(
+                primary_goal=goal,
+                training_experience=TrainingExperience.INTERMEDIATE,
+                training_age_months=24,
+                available_training_days=4,
+            ),
+            RULESET,
+        )
+        pools.append(
+            tuple(
+                template.slug
+                for template in eligible_template_references(
+                    normalized, tuple(full_catalog()), templates
+                )
+            )
+        )
+
+    assert pools == [("build-muscle-template", "fat-loss-template", "strength-template")] * len(
+        Goal
+    )
+
+
+def test_selector_still_excludes_days_and_level_mismatches() -> None:
+    templates = (
+        _template("valid", fitness_goal="strength"),
+        _template("wrong-days", days_per_week=3),
+        _template("wrong-level", training_level="advanced"),
+    )
+
+    eligible = eligible_template_references(_normalized_request(), tuple(full_catalog()), templates)
+    assert tuple(template.slug for template in eligible) == ("valid",)
 
     selected = select_template_reference(
         _normalized_request(), tuple(full_catalog()), templates, RULESET
@@ -82,6 +122,41 @@ def test_selector_keeps_days_level_and_goal_as_hard_filters() -> None:
 
     assert selected is not None
     assert selected.slug == "valid"
+
+
+def test_selector_excludes_unresolvable_core_structure() -> None:
+    template = _template(
+        "unresolvable",
+        fitness_goal="strength",
+    )
+    template = replace(
+        template,
+        days=(
+            TemplateReferenceDay(
+                day_number=1,
+                title="Unresolvable",
+                focus=(),
+                slots=(
+                    TemplateReferenceSlot(
+                        exercise_id=None,
+                        exercise_slug_hint="missing",
+                        target_muscles=(),
+                        movement_pattern=MovementPattern.HORIZONTAL_PUSH,
+                        intensity_method="standard",
+                        adaptation_priority="core",
+                        superset_group=None,
+                        sets=3,
+                        rep_min=8,
+                        rep_max=12,
+                        target_rir=2,
+                        rest_seconds=90,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    assert select_template_reference(_normalized_request(), (), (template,), RULESET) is None
 
 
 def test_selector_breaks_equal_scores_by_template_slug() -> None:

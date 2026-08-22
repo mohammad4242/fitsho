@@ -15,18 +15,17 @@ from sqlalchemy.orm import Session
 from app.training_templates.service import seed_training_program_templates
 
 @pytest.mark.parametrize(
-    "goal,days,expected_slug_prefix",
+    "goal,days",
     [
-        (Goal.STRENGTH, 3, "three-day-full-body-strength"),
-        (Goal.FAT_LOSS, 4, "four-day-upper-lower-fat-loss"),
-        (Goal.GENERAL_FITNESS, 3, "three-day-full-body-general-fitness"),
+        (Goal.STRENGTH, 3),
+        (Goal.FAT_LOSS, 4),
+        (Goal.GENERAL_FITNESS, 3),
     ],
 )
 def test_new_goals_use_template_path(
     db: Session,
     goal: Goal,
     days: int,
-    expected_slug_prefix: str,
 ) -> None:
     seed_training_program_templates(db)
     req = request(
@@ -76,7 +75,12 @@ def test_new_goals_use_template_path(
     )
     assert template_stage is not None, f"Expected template path for {goal.name} {days}d"
     assert template_stage.get("status") != "rejected", f"Template rejected for {goal.name} {days}d"
-    assert template_stage["selected"].startswith(expected_slug_prefix)
+    assert template_stage["hard_eligibility"] == (
+        "days",
+        "training_level",
+        "core_slots_resolvable",
+    )
+    assert template_stage["goal_used_for_exclusion"] is False
 
 def test_strength_isolation_rest_is_short(db: Session) -> None:
     print("REQUEST EQ:", request(available_equipment=list(Equipment)).available_equipment)
