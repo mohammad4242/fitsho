@@ -194,6 +194,118 @@
 
 .coach-review-profile-strip strong { color: #e7f7f3; }
 
+.coach-template-selection {
+  position: relative;
+  display: grid;
+  gap: 0.85rem;
+  margin: 0 0 1.25rem;
+  padding: 1.1rem 1.2rem;
+  overflow: hidden;
+  border: 1px solid rgb(239 186 98 / 24%);
+  border-inline-start: 0.28rem solid #efba62;
+  border-radius: 1.1rem;
+  background:
+    linear-gradient(105deg, rgb(239 186 98 / 8%), transparent 44%),
+    rgb(5 27 26 / 72%);
+}
+
+.coach-template-selection > header {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.coach-template-selection > header > span {
+  display: grid;
+  width: 2.35rem;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 50%;
+  color: #06201e;
+  background: #efba62;
+  font: 800 1.35rem "Sora Variable", sans-serif;
+}
+
+.coach-template-selection small { color: #c6a66e; }
+
+.coach-template-selection h3 {
+  margin: 0.15rem 0 0;
+  color: #f2fffb;
+  font-size: 1.15rem;
+}
+
+.coach-template-selection > p {
+  max-width: 78ch;
+  margin: 0;
+  color: #b8d4cf;
+  line-height: 1.9;
+}
+
+.coach-template-selection details {
+  padding-top: 0.75rem;
+  border-top: 1px solid rgb(239 186 98 / 16%);
+}
+
+.coach-template-selection summary {
+  width: fit-content;
+  color: #efc47c;
+  cursor: pointer;
+  user-select: none;
+}
+
+.coach-template-selection summary:focus-visible {
+  border-radius: 0.35rem;
+  outline: 2px solid #7de0d2;
+  outline-offset: 0.25rem;
+}
+
+.coach-template-selection-details {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 0.85rem;
+}
+
+.coach-template-slug {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  color: #83aaa4;
+  font-size: 0.78rem;
+}
+
+.coach-template-slug code {
+  padding: 0.28rem 0.5rem;
+  border-radius: 0.4rem;
+  color: #d9f7f1;
+  background: #041a19;
+}
+
+.coach-template-selection dl {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(5.5rem, 1fr));
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.coach-template-selection dl > div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem;
+  border-radius: 0.7rem;
+  background: rgb(3 21 20 / 70%);
+}
+
+.coach-template-selection dl > div.is-total {
+  color: #06201e;
+  background: #efba62;
+}
+
+.coach-template-selection dt { color: #789f99; font-size: 0.72rem; }
+.coach-template-selection dd { margin: 0; color: #edfdf9; font-weight: 750; }
+.coach-template-selection .is-total dt,
+.coach-template-selection .is-total dd { color: inherit; }
+
 .coach-review-version-labels {
   display: grid;
   grid-template-columns: 1fr 2fr;
@@ -296,6 +408,7 @@
   .coach-review-tabs { grid-template-columns: 1fr; }
   .coach-review-profile-strip,
   .coach-review-version-labels { grid-template-columns: 1fr; }
+  .coach-template-selection dl { grid-template-columns: repeat(2, 1fr); }
   .coach-review-day fieldset { grid-template-columns: 1fr; }
   .coach-review-prescription { grid-template-columns: repeat(2, 1fr); }
   .coach-review-actions { flex-direction: column; }

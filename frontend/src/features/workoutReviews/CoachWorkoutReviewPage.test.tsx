@@ -119,6 +119,19 @@ const detail: WorkoutReviewDetail = {
     { id: "exercise-1", name_en: "Bench Press", name_fa: "پرس سینه" },
     { id: "exercise-2", name_en: "Push-Up", name_fa: "شنا سوئدی" },
   ],
+  template_selection: {
+    selected_template: "four-day-chest-priority",
+    explanation_fa: "این ساختار به‌دلیل اولویت عضلانی صریح انتخاب شد.",
+    explanation_en: "This structure was selected because of an explicit muscle priority.",
+    score: {
+      priority: 100,
+      body_analysis: 20,
+      goal: 10,
+      sex: 0,
+      fallback: 0,
+      total: 130,
+    },
+  },
 };
 
 beforeEach(() => {
@@ -151,6 +164,23 @@ it("shows the three review queues and claims a pending plan", async () => {
 
   expect(api.claimWorkoutReview).toHaveBeenCalledWith("review-1");
   expect(await screen.findByLabelText("تعداد ست روز ۱ حرکت ۱")).toBeEnabled();
+});
+
+it("shows the coach explanation and keeps score details collapsed", async () => {
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByRole("button", { name: "شروع بازبینی" }));
+
+  expect(await screen.findByRole("heading", { name: "علت انتخاب برنامه" })).toBeVisible();
+  expect(screen.getByText(detail.template_selection!.explanation_fa)).toBeVisible();
+  expect(screen.getByText("four-day-chest-priority")).not.toBeVisible();
+
+  await user.click(screen.getByText("جزئیات امتیازدهی"));
+
+  expect(screen.getByText("four-day-chest-priority")).toBeVisible();
+  expect(screen.getByText("۱۳۰")).toBeVisible();
+  expect(screen.queryByText("DAYS_MISMATCH")).not.toBeInTheDocument();
 });
 
 it("saves permitted edits with the current revision", async () => {

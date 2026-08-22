@@ -12,6 +12,7 @@ import {
   saveWorkoutReviewDraft,
 } from "./api";
 import type {
+  CoachTemplateSelection,
   WorkoutReviewDayDraft,
   WorkoutReviewDetail,
   WorkoutReviewExerciseDraft,
@@ -251,6 +252,13 @@ export function CoachWorkoutReviewPage() {
                   <span>{l("مدت", "Duration")}<strong>{selected.source_plan.plan_duration_weeks} {l("هفته", "weeks")}</strong></span>
                 </div>
 
+                {selected.template_selection && (
+                  <TemplateSelectionAudit
+                    selection={selected.template_selection}
+                    fa={fa}
+                  />
+                )}
+
                 <div className="coach-review-version-labels">
                   <span>{l("نسخه اولیه — فقط خواندنی", "Initial version — read only")}</span>
                   <span>{readOnly ? l("نسخه تأییدشده", "Approved version") : l("پیش‌نویس مربی", "Coach draft")}</span>
@@ -327,6 +335,54 @@ export function CoachWorkoutReviewPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+function TemplateSelectionAudit({
+  selection,
+  fa,
+}: {
+  selection: CoachTemplateSelection;
+  fa: boolean;
+}) {
+  const scores = [
+    [fa ? "اولویت عضلانی" : "Priority", selection.score.priority],
+    [fa ? "آنالیز بدن" : "Body Analysis", selection.score.body_analysis],
+    [fa ? "هدف" : "Goal", selection.score.goal],
+    [fa ? "پیش‌فرض جنسیتی" : "Sex prior", selection.score.sex],
+    [fa ? "ساختار متعادل" : "Fallback", selection.score.fallback],
+    [fa ? "مجموع" : "Total", selection.score.total],
+  ] as const;
+  const number = new Intl.NumberFormat(fa ? "fa-IR" : "en");
+
+  return (
+    <section className="coach-template-selection" aria-labelledby="template-selection-title">
+      <header>
+        <span aria-hidden="true">⌁</span>
+        <div>
+          <small>{fa ? "منطق ساختاری" : "Structural rationale"}</small>
+          <h3 id="template-selection-title">{fa ? "علت انتخاب برنامه" : "Why this program was selected"}</h3>
+        </div>
+      </header>
+      <p>{fa ? selection.explanation_fa : selection.explanation_en}</p>
+      <details>
+        <summary>{fa ? "جزئیات امتیازدهی" : "Scoring details"}</summary>
+        <div className="coach-template-selection-details">
+          <div className="coach-template-slug">
+            <span>{fa ? "قالب منتخب" : "Selected template"}</span>
+            <code dir="ltr">{selection.selected_template}</code>
+          </div>
+          <dl>
+            {scores.map(([label, value]) => (
+              <div key={label} className={label === (fa ? "مجموع" : "Total") ? "is-total" : undefined}>
+                <dt>{label}</dt>
+                <dd>{number.format(value)}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </details>
+    </section>
   );
 }
 

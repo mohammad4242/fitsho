@@ -45,6 +45,20 @@ export type WorkoutReviewQueueItem = {
   approved_at: string | null;
 };
 
+export type CoachTemplateSelection = {
+  selected_template: string;
+  explanation_fa: string;
+  explanation_en: string;
+  score: {
+    priority: number;
+    body_analysis: number;
+    goal: number;
+    sex: number;
+    fallback: number;
+    total: number;
+  };
+};
+
 export type WorkoutReviewDetail = WorkoutReviewQueueItem & {
   coach_note: string | null;
   draft: { days: WorkoutReviewDayDraft[] } | null;
@@ -57,4 +71,5 @@ export type WorkoutReviewDetail = WorkoutReviewQueueItem & {
     duration_min_seconds?: number | null;
     duration_max_seconds?: number | null;
   }>;
+  template_selection: CoachTemplateSelection | null;
 };

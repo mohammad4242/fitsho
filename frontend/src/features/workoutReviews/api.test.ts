@@ -39,6 +39,7 @@ const detail: WorkoutReviewDetail = {
     },
   },
   exercise_options: [],
+  template_selection: null,
 };
 
 afterEach(() => vi.restoreAllMocks());
