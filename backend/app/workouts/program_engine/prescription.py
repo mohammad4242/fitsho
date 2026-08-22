@@ -87,26 +87,9 @@ def prescribe_sessions(
             primary_muscle = exercise.primary_muscle
             session_size_accessory = False
             if primary_muscle in allocations:
-                _ = next(allocations[primary_muscle])
-
-                # Check how many tracked sets we have accumulated globally
-                current_weekly_sets = sum(
-                    ex.sets
-                    for day in days
-                    for ex in day.exercises
-                    if ex.primary_muscle == primary_muscle
-                ) + direct_session_sets.get(primary_muscle, 0)
-
-                if primary_muscle in targets:
-                    target = targets[primary_muscle].target_sets
-                else:
-                    target = 99999  # Effectively unlimited — no volume cap
-
-                if current_weekly_sets >= target:
-                    sets = ruleset.minimum_working_sets
-                    session_size_accessory = True
-                else:
-                    sets = ruleset.minimum_working_sets
+                allocated_sets = next(allocations[primary_muscle])
+                sets = max(ruleset.minimum_working_sets, allocated_sets)
+                session_size_accessory = allocated_sets < ruleset.minimum_working_sets
             else:
                 sets = min(
                     ruleset.max_sets_per_muscle_per_session,
