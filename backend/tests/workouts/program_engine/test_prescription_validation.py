@@ -191,7 +191,7 @@ def test_session_title_lists_direct_targets_but_not_secondary_muscles() -> None:
 
 def test_direct_sets_are_distributed_exactly_across_exposures() -> None:
     assert allocate_direct_sets(10, 3, RULESET.minimum_working_sets) == (4, 3, 3)
-    assert allocate_direct_sets(9, 4, RULESET.minimum_working_sets) == (3, 2, 2, 2)
+    assert allocate_direct_sets(9, 4, RULESET.minimum_working_sets) == (3, 3, 3, 0)
 
 
 def test_four_day_program_does_not_round_each_muscle_exposure_up() -> None:
@@ -361,7 +361,7 @@ def test_volume_repair_adds_existing_compound_set_when_effective_volume_is_under
             for target in volume.targets
         ),
     )
-    exercise = programmed_volume_exercise(MuscleGroup.CHEST, (), 4)
+    exercise = programmed_volume_exercise(MuscleGroup.CHEST, (), 3)
     exercise = replace(
         exercise,
         exercise_type=ExerciseType.COMPOUND,
@@ -371,8 +371,8 @@ def test_volume_repair_adds_existing_compound_set_when_effective_volume_is_under
 
     repaired, reasons = repair_weekly_volume((day,), normalized, volume, RULESET)
 
-    assert repaired[0].exercises[0].sets == 5
-    assert "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET" in reasons
+    assert repaired[0].exercises[0].sets == 4
+    assert "VOLUME_REPAIR_HARD_MINIMUM_UNSATISFIED" in reasons
 
 
 def test_volume_repair_reduces_effective_secondary_cap() -> None:
@@ -388,7 +388,7 @@ def test_volume_repair_reduces_effective_secondary_cap() -> None:
 
     repaired, reasons = repair_weekly_volume((day,), normalized, volume, RULESET)
 
-    assert repaired[0].exercises[0].sets == 2
+    assert repaired[0].exercises[0].sets == 3
     assert "VOLUME_REPAIR_REDUCED_SET" in reasons
 
 

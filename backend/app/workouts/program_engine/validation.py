@@ -1,6 +1,6 @@
 from collections import Counter
 
-from app.exercises.enums import MovementPattern, MuscleGroup, PrescriptionMode
+from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup, PrescriptionMode
 from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
@@ -116,6 +116,11 @@ def validate_program(
             ):
                 errors.append("UNAVAILABLE_EQUIPMENT_SELECTED")
             if item.sets < 1:
+                errors.append("INVALID_EXERCISE_PRESCRIPTION")
+            if item.exercise_type in {
+                ExerciseType.COMPOUND,
+                ExerciseType.ISOLATION,
+            } and item.sets not in {3, 4}:
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
             if (
                 item.primary_muscle is not None

@@ -57,7 +57,7 @@ class ProgramRuleset:
             TrainingStatus.NOVICE: 2,
             TrainingStatus.EARLY_INTERMEDIATE: 3,
             TrainingStatus.INTERMEDIATE: 4,
-            TrainingStatus.ADVANCED: 5,
+            TrainingStatus.ADVANCED: 4,
         }
     )
     secondary_muscle_maximum_sets: dict[TrainingStatus, int] = field(
@@ -122,16 +122,16 @@ class ProgramRuleset:
         default_factory=lambda: {
             TrainingStatus.NOVICE: 4,
             TrainingStatus.EARLY_INTERMEDIATE: 4,
-            TrainingStatus.INTERMEDIATE: 5,
-            TrainingStatus.ADVANCED: 5,
+            TrainingStatus.INTERMEDIATE: 4,
+            TrainingStatus.ADVANCED: 4,
         }
     )
-    max_working_sets_per_exercise_absolute: int = 5
+    max_working_sets_per_exercise_absolute: int = 4
     exercise_type_set_cap: dict[ExerciseType, int] = field(
         default_factory=lambda: {
-            ExerciseType.COMPOUND: 5,
+            ExerciseType.COMPOUND: 4,
             ExerciseType.ISOLATION: 4,
-            ExerciseType.CORE: 5,
+            ExerciseType.CORE: 4,
             ExerciseType.MOBILITY: 3,
             ExerciseType.OTHER: 4,
         }
@@ -145,14 +145,14 @@ class ProgramRuleset:
     minutes_per_exercise_slot: int = 7
     minimum_session_work_minutes: int = 10
     minimum_exercise_budget_minutes: int = 3
-    default_untracked_muscle_sets: int = 2
+    default_untracked_muscle_sets: int = 3
     substitution_limit: int = 3
     maximum_novice_recovery_days: int = 3
     recommended_resistance_days: dict[TrainingStatus, int] = field(
         default_factory=lambda: {
             TrainingStatus.NOVICE: 3,
             TrainingStatus.EARLY_INTERMEDIATE: 4,
-            TrainingStatus.INTERMEDIATE: 5,
+            TrainingStatus.INTERMEDIATE: 4,
             TrainingStatus.ADVANCED: 6,
         }
     )
@@ -163,7 +163,7 @@ class ProgramRuleset:
     short_session_minutes: int = 30
     older_adult_modifier_age: int = 60
     contextual_volume_reduction_sets: int = 1
-    minimum_working_sets: int = 2
+    minimum_working_sets: int = 3
     novice_target_rir: int = 3
     experienced_target_rir: int = 2
     first_compound_warmup_sets: int = 2
@@ -201,7 +201,7 @@ class ProgramRuleset:
         if weekly_exposure_count <= 1:
             cap += self.single_exposure_set_cap_bonus
 
-        absolute_cap = 5 if is_primary_strength else 4
+        absolute_cap = 4
         return min(
             cap,
             absolute_cap,
