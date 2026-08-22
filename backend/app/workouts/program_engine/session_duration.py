@@ -15,6 +15,7 @@ from app.workouts.program_engine.prescription import (
     estimate_exercise_minutes,
     prescription_for,
 )
+from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
@@ -139,7 +140,8 @@ def _select_set_increment(
 ) -> tuple[int, ProgrammedExercise] | None:
     if not exercises:
         return None
-    options: list[tuple[int, int, int, str, int, ProgrammedExercise]] = []
+    options: list[tuple[tuple[object, ...], int, ProgrammedExercise]] = []
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     weekly_exposures = _weekly_exposure_count((*other_days, _rebuild_day_for_exercises(exercises)))
     for index, exercise in enumerate(exercises):
         if exercise.primary_muscle is None:
@@ -148,7 +150,7 @@ def _select_set_increment(
             training_status=request.training_status,
             goal=request.primary_goal,
             exercise_type=exercise.exercise_type,
-            is_priority=exercise.primary_muscle in request.source.priority_muscles,
+            is_priority=exercise.primary_muscle in priority_policy.priorities,
             weekly_exposure_count=weekly_exposures[exercise.primary_muscle],
             is_primary_strength="STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes,
         )
@@ -176,10 +178,12 @@ def _select_set_increment(
             continue
         options.append(
             (
-                0 if exercise.primary_muscle in request.source.priority_muscles else 1,
-                exercise.sets,
-                direct_sets,
-                str(exercise.exercise_id),
+                (
+                    *priority_policy.precedence_key(exercise.primary_muscle),
+                    exercise.sets,
+                    direct_sets,
+                    str(exercise.exercise_id),
+                ),
                 index,
                 updated,
             )
@@ -187,7 +191,7 @@ def _select_set_increment(
     if not options:
         return None
     selected = min(options)
-    return selected[4], selected[5]
+    return selected[1], selected[2]
 
 
 def _select_exercise_addition(
@@ -212,7 +216,17 @@ def _select_exercise_addition(
         and _candidate_is_safe(item, request)
         and ExerciseLabel.CARDIO not in item.labels
     )
-    ranked = rank_exercises(request, options, ruleset)
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
+    ranked = tuple(
+        sorted(
+            rank_exercises(request, options, ruleset),
+            key=lambda item: (
+                *priority_policy.precedence_key(item.exercise.primary_muscle),
+                -item.score,
+                str(item.exercise.id),
+            ),
+        )
+    )
     for ranked_item in ranked:
         candidate = ranked_item.exercise
         if candidate.primary_muscle is None:
@@ -229,7 +243,7 @@ def _select_exercise_addition(
                 training_status=request.training_status,
                 goal=request.primary_goal,
                 exercise_type=candidate.exercise_type,
-                is_priority=candidate.primary_muscle in request.source.priority_muscles,
+                is_priority=candidate.primary_muscle in priority_policy.priorities,
                 weekly_exposure_count=1,
                 is_primary_strength=False,
             ),
@@ -390,19 +404,19 @@ def _repair_overfill(
     ruleset: ProgramRuleset,
 ) -> WorkoutDay:
     exercises = list(day.exercises)
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     while day.estimated_duration_minutes > policy.maximum_minutes:
         options = [
             (index, item)
             for index, item in enumerate(exercises)
-            if item.primary_muscle not in request.source.priority_muscles
-            and item.sets > ruleset.minimum_working_sets
+            if item.sets > ruleset.minimum_working_sets
             and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
         ]
         if options:
             index, item = min(
                 options,
                 key=lambda pair: (
-                    template_removal_rank(pair[1]),
+                    _duration_preservation_rank(pair[1], priority_policy),
                     "SESSION_SIZE_ACCESSORY" not in pair[1].reason_codes,
                     pair[1].sets,
                     -pair[1].estimated_minutes,
@@ -416,7 +430,6 @@ def _repair_overfill(
             (index, item)
             for index, item in enumerate(exercises)
             if len(exercises) > ruleset.minimum_exercises_per_session
-            and item.primary_muscle not in request.source.priority_muscles
             and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
         ]
         if not removable:
@@ -424,7 +437,7 @@ def _repair_overfill(
         index, _ = min(
             removable,
             key=lambda pair: (
-                template_removal_rank(pair[1]),
+                _duration_preservation_rank(pair[1], priority_policy),
                 "SESSION_SIZE_ACCESSORY" not in pair[1].reason_codes,
                 -pair[1].estimated_minutes,
                 str(pair[1].exercise_id),
@@ -433,6 +446,19 @@ def _repair_overfill(
         exercises.pop(index)
         day = _rebuild_day(day, tuple(exercises), ruleset)
     return day
+
+
+def _duration_preservation_rank(
+    exercise: ProgrammedExercise,
+    policy: PriorityAllocationPolicy,
+) -> int:
+    template_rank = template_removal_rank(exercise)
+    if template_rank == 3:
+        return 50
+    priority_rank = policy.preservation_rank(exercise.primary_muscle)
+    if priority_rank:
+        return 20 + priority_rank * 5
+    return {0: 0, 1: 10, 2: 15}.get(template_rank, 15)
 
 
 def _program_candidate(

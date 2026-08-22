@@ -296,6 +296,7 @@ def _select_set_redistribution(
     duration_policy = get_session_duration_policy(
         request.source.session_duration_minutes,
     )
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     direct = _direct_sets(days)
     options: list[tuple[int, int, int, int, str, str]] = []
     for day_index, exercises in enumerate(days):
@@ -317,6 +318,10 @@ def _select_set_redistribution(
                 ):
                     continue
                 donor_target = targets.get(donor_muscle)
+                if priority_policy.preservation_rank(
+                    donor_muscle
+                ) > priority_policy.preservation_rank(recipient_muscle):
+                    continue
                 if (
                     donor_target is not None
                     and donor_target.direct_minimum_required
@@ -365,7 +370,7 @@ def _select_set_redistribution(
                     continue
                 options.append(
                     (
-                        donor_muscle in request.source.priority_muscles,
+                        priority_policy.preservation_rank(donor_muscle),
                         day_index,
                         recipient_index,
                         donor_index,
@@ -596,6 +601,7 @@ def _select_reduction_candidate(
     per_exercise_excessive: set[tuple[int, int]],
     hard_weekly_excessive: set[str],
 ) -> tuple[int, int, ProgrammedExercise] | None:
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     priority_over_target = {
         muscle.value
         for muscle, target in targets.items()
@@ -656,7 +662,7 @@ def _select_reduction_candidate(
     return min(
         candidates,
         key=lambda candidate: (
-            candidate[2].primary_muscle in request.source.priority_muscles,
+            priority_policy.preservation_rank(candidate[2].primary_muscle),
             -sum(
                 item.sets
                 for item in days[candidate[0]]
