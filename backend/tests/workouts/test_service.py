@@ -374,7 +374,7 @@ def _ai_template(slug: str, exercise_ids: tuple[object, ...]) -> TemplateReferen
         days_per_week=2,
         training_level="beginner",
         fitness_goal="build_muscle",
-        focus_tags=("general",),
+        focus_tags=("balanced",),
         intensity_methods=("standard",),
         days=tuple(
             TemplateReferenceDay(

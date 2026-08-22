@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.exercises.enums import MuscleGroup
+from app.training_templates.tags import priority_tag_for_muscle
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     BodyAnalysisInfluence,
@@ -8,20 +9,11 @@ from app.workouts.program_engine.schemas import (
     NormalizedProgramRequest,
 )
 
-BODY_ANALYSIS_TRAINING_MAPPING_VERSION = "body_analysis_training_map_v1"
+BODY_ANALYSIS_TRAINING_MAPPING_VERSION = "body_analysis_training_map_v2"
 
 TEMPLATE_TAGS_BY_MUSCLE: dict[MuscleGroup, frozenset[str]] = {
-    MuscleGroup.CHEST: frozenset({"chest_priority"}),
-    MuscleGroup.BACK: frozenset({"back_priority"}),
-    MuscleGroup.SHOULDERS: frozenset({"shoulders_priority"}),
-    MuscleGroup.BICEPS: frozenset({"arms_priority"}),
-    MuscleGroup.TRICEPS: frozenset({"arms_priority"}),
-    MuscleGroup.FOREARMS: frozenset({"arms_priority"}),
-    MuscleGroup.QUADRICEPS: frozenset({"quad_priority", "legs_priority"}),
-    MuscleGroup.HAMSTRINGS: frozenset({"posterior_chain_priority", "legs_priority"}),
-    MuscleGroup.GLUTES: frozenset({"posterior_chain_priority", "legs_priority"}),
-    MuscleGroup.CALVES: frozenset({"calf_priority", "legs_priority"}),
-    MuscleGroup.ABS: frozenset({"core_priority"}),
+    muscle: frozenset({tag}) if (tag := priority_tag_for_muscle(muscle)) else frozenset()
+    for muscle in MuscleGroup
 }
 
 

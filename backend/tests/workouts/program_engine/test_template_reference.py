@@ -28,7 +28,7 @@ def _four_day_reference() -> TemplateReference:
         days_per_week=4,
         training_level="intermediate",
         fitness_goal="build_muscle",
-        focus_tags=("classic", "chest_priority"),
+        focus_tags=("chest_priority",),
         intensity_methods=("standard",),
         days=tuple(
             TemplateReferenceDay(
@@ -142,7 +142,7 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
         days_per_week=4,
         training_level="intermediate",
         fitness_goal="build_muscle",
-        focus_tags=("classic", "chest_priority", "back_priority"),
+        focus_tags=("chest_priority", "back_priority"),
         intensity_methods=("standard", "rest_pause"),
         days=(
             TemplateReferenceDay(
@@ -442,7 +442,7 @@ def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> N
         days_per_week=4,
         training_level="intermediate",
         fitness_goal="build_muscle",
-        focus_tags=("classic",),
+        focus_tags=("balanced",),
         intensity_methods=("standard",),
         days=(base.days[0],) * 4,
     )

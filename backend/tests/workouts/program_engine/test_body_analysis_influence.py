@@ -168,7 +168,7 @@ def test_reference_template_path_scores_body_analysis_emphasis_tags() -> None:
             days_per_week=4,
             training_level="intermediate",
             fitness_goal="build_muscle",
-            focus_tags=("classic",),
+            focus_tags=("balanced",),
             intensity_methods=("standard",),
             days=(),
         ),
@@ -312,7 +312,7 @@ def test_program_trace_preserves_provisional_analysis_version() -> None:
         "schema_version": "1.0",
         "source": "ai_provisional",
         "provisional": True,
-        "mapping_version": "body_analysis_training_map_v1",
+        "mapping_version": "body_analysis_training_map_v2",
     }
     assert any(
         item["stage"] == "body_analysis_influence"

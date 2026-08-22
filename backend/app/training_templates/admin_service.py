@@ -94,7 +94,7 @@ def _replace_template_content(
     template.days_per_week = payload.days_per_week
     template.training_level = payload.training_level
     template.fitness_goal = payload.fitness_goal
-    template.focus_tags = payload.focus_tags
+    template.focus_tags = [tag.value for tag in payload.focus_tags]
     template.intensity_methods = [method.value for method in payload.intensity_methods]
     template.programming_rationale = [item.model_dump() for item in payload.programming_rationale]
     template.source_name = payload.source_name

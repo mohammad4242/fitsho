@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from app.training_templates.tags import TemplateFocusTag, priority_tag_for_muscle
 from app.workouts.program_engine.body_analysis import (
     TEMPLATE_TAGS_BY_MUSCLE,
     eligible_body_analysis_priorities,
@@ -58,7 +59,11 @@ def _score(
     template: TemplateReference,
     ruleset: ProgramRuleset,
 ) -> int:
-    priority_tags = {f"{muscle.value}_priority" for muscle in request.source.priority_muscles}
+    priority_tags = {
+        tag
+        for muscle in request.source.priority_muscles
+        if (tag := priority_tag_for_muscle(muscle)) is not None
+    }
     score = 100 + 35 * len(priority_tags.intersection(template.focus_tags))
     template_tags = set(template.focus_tags)
     for priority in eligible_body_analysis_priorities(request, ruleset):
@@ -69,10 +74,8 @@ def _score(
             if priority.classification == "clear_lag"
             else ruleset.body_analysis_mild_lag_template_boost
         )
-    if "classic" in template.focus_tags and not priority_tags:
+    if TemplateFocusTag.BALANCED in template_tags and not priority_tags:
         score += 10
-    if "long_session" in template.focus_tags and request.source.session_duration_minutes < 80:
-        score -= 50
     return score
 
 

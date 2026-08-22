@@ -23,6 +23,7 @@ from app.exercises.schemas import ExerciseDetail
 from app.exercises.taxonomy import is_compatible_muscle_focus
 from app.profile.enums import ExperienceLevel, FitnessGoal
 from app.training_templates.models import TrainingTemplateMethod, TrainingTemplateSlotPriority
+from app.training_templates.tags import TemplateFocusTag
 from app.workouts.program_engine.enums import (
     BodyPosition,
     ImpactLimit,
@@ -46,10 +47,6 @@ TextItem = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
 OptionalMetadata = Annotated[
     str | None,
     StringConstraints(strip_whitespace=True, max_length=500),
-]
-FocusTag = Annotated[
-    str,
-    StringConstraints(strip_whitespace=True, min_length=1, max_length=80),
 ]
 ProgrammingMetadataTag = Annotated[
     str,
@@ -312,7 +309,7 @@ class AdminTrainingProgramTemplateWrite(BaseModel):
     days_per_week: int = Field(ge=2, le=6)
     training_level: ExperienceLevel
     fitness_goal: FitnessGoal
-    focus_tags: list[FocusTag] = Field(min_length=1, max_length=12)
+    focus_tags: list[TemplateFocusTag] = Field(min_length=1, max_length=12)
     intensity_methods: list[TrainingTemplateMethod] = Field(min_length=1, max_length=3)
     programming_rationale: list[AdminTrainingTemplateRationaleWrite] = Field(
         min_length=5,
@@ -328,4 +325,6 @@ class AdminTrainingProgramTemplateWrite(BaseModel):
             raise ValueError("Program must contain one configured day per training day")
         if len(self.intensity_methods) != len(set(self.intensity_methods)):
             raise ValueError("Intensity methods must be unique")
+        if len(self.focus_tags) != len(set(self.focus_tags)):
+            raise ValueError("Focus tags must be unique")
         return self

@@ -279,7 +279,7 @@ def test_template_session_replaces_excess_redundancy_with_complementary_role() -
         days_per_week=1,
         training_level="intermediate",
         fitness_goal="build_muscle",
-        focus_tags=("chest",),
+        focus_tags=("chest_priority",),
         intensity_methods=("standard",),
         days=(
             TemplateReferenceDay(

@@ -173,7 +173,7 @@ def test_template_substitution_rejects_semantically_incompatible_reference() -> 
         days_per_week=1,
         training_level="advanced",
         fitness_goal="build_muscle",
-        focus_tags=("classic",),
+        focus_tags=("balanced",),
         intensity_methods=("standard",),
         days=(
             TemplateReferenceDay(
@@ -228,7 +228,7 @@ def test_template_substitution_ids_exclude_matching_group_with_incompatible_role
         days_per_week=1,
         training_level="beginner",
         fitness_goal="general_fitness",
-        focus_tags=("classic",),
+        focus_tags=("balanced",),
         intensity_methods=("standard",),
         days=(
             TemplateReferenceDay(

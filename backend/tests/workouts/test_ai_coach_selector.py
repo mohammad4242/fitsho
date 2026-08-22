@@ -78,9 +78,9 @@ def test_ai_coach_selects_distinct_eligible_library_programs_in_priority_order()
 
     candidates = select_ai_coach_candidates(
         templates=(
-            _template("balanced", focus=("general",), exercise_id=eligible_exercise),
-            _template("chest-focus", focus=("chest",), exercise_id=eligible_exercise),
-            _template("unavailable", focus=("chest",), exercise_id=unavailable_exercise),
+            _template("balanced", focus=("balanced",), exercise_id=eligible_exercise),
+            _template("chest-focus", focus=("chest_priority",), exercise_id=eligible_exercise),
+            _template("unavailable", focus=("chest_priority",), exercise_id=unavailable_exercise),
         ),
         profile=_profile(),
         eligible_exercise_ids=frozenset({eligible_exercise}),
@@ -93,7 +93,9 @@ def test_ai_coach_selects_distinct_eligible_library_programs_in_priority_order()
 def test_ai_coach_candidate_payload_contains_fixed_library_exercises_only() -> None:
     exercise_id = uuid4()
     candidate = AiCoachProgramCandidate(
-        template=_template("fixed-library-plan", focus=("chest",), exercise_id=exercise_id),
+        template=_template(
+            "fixed-library-plan", focus=("chest_priority",), exercise_id=exercise_id
+        ),
         score=110,
     )
 

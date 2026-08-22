@@ -55,7 +55,7 @@ def test_admin_lists_complete_four_day_template_details(client: TestClient, db: 
     assert len(templates) == 15
     classic = next(item for item in templates if item["slug"] == "four-day-classic-body-part")
     assert classic["training_level"] == "intermediate"
-    assert "classic" in classic["focus_tags"]
+    assert "balanced" in classic["focus_tags"]
     assert len(classic["programming_rationale"]) == 5
     assert classic["programming_rationale"][0]["title_fa"] == "ترتیب حرکات"
     assert [day["title_fa"] for day in classic["days"]] == [
@@ -104,7 +104,7 @@ def test_admin_creates_a_complete_program_template_with_catalog_exercise(
             "days_per_week": 4,
             "training_level": training_level,
             "fitness_goal": "build_muscle",
-            "focus_tags": ["classic"],
+            "focus_tags": ["balanced"],
             "intensity_methods": ["standard"],
             "programming_rationale": _rationale_payload(),
             "source_name": "Fitsho admin library",
@@ -186,7 +186,7 @@ def test_admin_rejects_template_slot_with_unknown_exercise(client: TestClient, d
         "days_per_week": 2,
         "training_level": "beginner",
         "fitness_goal": "build_muscle",
-        "focus_tags": ["foundation"],
+        "focus_tags": ["balanced"],
         "intensity_methods": ["standard"],
         "programming_rationale": _rationale_payload(),
         "source_name": "Fitsho admin library",
@@ -223,7 +223,7 @@ def test_admin_rejects_guide_from_training_template_slots(client: TestClient, db
             "days_per_week": 2,
             "training_level": "beginner",
             "fitness_goal": "build_muscle",
-            "focus_tags": ["foundation"],
+            "focus_tags": ["balanced"],
             "intensity_methods": ["standard"],
             "programming_rationale": _rationale_payload(),
             "source_name": "Fitsho admin library",

@@ -379,6 +379,25 @@ def test_seed_can_be_rerun_without_duplicate_template_days(db: Session) -> None:
     )
 
 
+def test_reseed_replaces_legacy_managed_focus_tags_with_canonical_tags(db: Session) -> None:
+    seed_exercises(db)
+    seed_training_program_templates(db)
+    template = db.scalar(
+        select(TrainingProgramTemplate).where(
+            TrainingProgramTemplate.slug == "four-day-classic-body-part"
+        )
+    )
+    assert template is not None
+    template.focus_tags = ["classic", "body_part_rotation", "classic"]
+    db.commit()
+
+    seed_training_program_templates(db)
+
+    refreshed = db.get(TrainingProgramTemplate, template.id)
+    assert refreshed is not None
+    assert refreshed.focus_tags == ["body_part_rotation", "balanced"]
+
+
 def test_reseed_deactivates_obsolete_fitsho_templates_but_keeps_custom_templates(
     db: Session,
 ) -> None:
