@@ -39,6 +39,7 @@ from app.profile.enums import (
 )
 from app.profile.models import BodyMeasurement, UserProfile, UserProfileTrainingCaution
 from app.profile.service import get_profile
+from app.profile.training_compatibility import UnsupportedResistanceTrainingCombinationError
 from app.workout_cycles.enums import (
     WorkoutCycleStatus,
     WorkoutCycleWeeklyCheckInDifficulty,
@@ -137,6 +138,16 @@ def test_program_request_preserves_first_month_experience_level(db: Session) -> 
     request = _service(db)._to_program_request(get_profile(db, user.id), None)
 
     assert request.training_experience is TrainingExperience.FIRST_MONTH
+
+
+def test_program_request_rejects_unsupported_training_day_override(db: Session) -> None:
+    user = _user_with_profile(db)
+
+    with pytest.raises(UnsupportedResistanceTrainingCombinationError):
+        _service(db)._to_program_request(
+            get_profile(db, user.id),
+            ProgramGenerationOverrides(available_training_days=5),
+        )
 
 
 def test_current_generation_overrides_take_precedence_over_profile_preferences(
@@ -465,6 +476,7 @@ def test_program_request_uses_stored_training_age_over_experience_fallback(
     profile = db.get(UserProfile, user.id)
     assert profile is not None
     profile.experience_level = ExperienceLevel.ADVANCED
+    profile.training_days_per_week = 3
     profile.training_age_months = 7
     db.flush()
 

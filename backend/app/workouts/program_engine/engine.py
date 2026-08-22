@@ -2,6 +2,12 @@ from collections import Counter
 from dataclasses import replace
 
 from app.exercises.enums import MovementPattern, MuscleGroup
+from app.profile.enums import ExperienceLevel
+from app.profile.training_compatibility import (
+    SUPPORTED_RESISTANCE_TRAINING_DAYS,
+    ResistanceTrainingDayStatus,
+    resistance_training_day_status,
+)
 from app.workouts.program_engine.body_analysis import (
     applicable_body_analysis_influence,
     body_analysis_priority_muscles,
@@ -66,6 +72,13 @@ def generate_program(
     *,
     reference_templates: tuple[TemplateReference, ...] = (),
 ) -> ProgramGenerationResult:
+    training_day_error = _training_day_error(request, ruleset)
+    if training_day_error is not None:
+        return ProgramGenerationResult(
+            program=None,
+            error_code=GenerationErrorCode.UNSUPPORTED_RESISTANCE_TRAINING_DAYS,
+            errors=(training_day_error,),
+        )
     request = request.model_copy(
         update={
             "body_analysis_influence": applicable_body_analysis_influence(
@@ -264,6 +277,26 @@ def generate_program(
             },
         ),
     )
+
+
+def _training_day_error(
+    request: ProgramGenerationRequest,
+    ruleset: ProgramRuleset,
+) -> str | None:
+    requested_days = request.available_training_days
+    if requested_days > SUPPORTED_RESISTANCE_TRAINING_DAYS[-1]:
+        return "UNSUPPORTED_RESISTANCE_TRAINING_DAYS"
+    if requested_days < SUPPORTED_RESISTANCE_TRAINING_DAYS[0]:
+        return None
+    if requested_days > ruleset.max_resistance_days:
+        return "UNSUPPORTED_RESISTANCE_TRAINING_DAYS"
+    experience_level = ExperienceLevel(request.training_experience.value)
+    if (
+        resistance_training_day_status(experience_level, requested_days)
+        is ResistanceTrainingDayStatus.UNSUPPORTED
+    ):
+        return "UNSUPPORTED_RESISTANCE_TRAINING_DAYS"
+    return None
 
 
 def _rejected_split_recovery_reasons(

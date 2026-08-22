@@ -41,6 +41,10 @@ from app.profile.service import (
     update_profile,
     upsert_shared_profile,
 )
+from app.profile.training_compatibility import (
+    UnsupportedResistanceTrainingCombinationError,
+    resistance_training_day_status,
+)
 
 router = APIRouter(prefix="/api/v1/profile", tags=["profile"])
 
@@ -108,6 +112,8 @@ def read_status(db: DatabaseSession, user: CurrentUser) -> ProfileStatusResponse
 def to_response(snapshot: ProfileSnapshot) -> ProfileResponse:
     profile = snapshot.profile
     measurement = snapshot.measurement
+    assert profile.experience_level is not None
+    assert profile.training_days_per_week is not None
     return ProfileResponse(
         user_id=profile.user_id,
         display_name=profile.display_name,
@@ -147,6 +153,9 @@ def to_response(snapshot: ProfileSnapshot) -> ProfileResponse:
         experience_level=profile.experience_level,
         training_age_months=profile.training_age_months,
         training_days_per_week=profile.training_days_per_week,
+        training_days_compatibility=resistance_training_day_status(
+            profile.experience_level, profile.training_days_per_week
+        ),
         preferred_weekdays=(
             tuple(profile.preferred_weekdays) if profile.preferred_weekdays is not None else None
         ),
@@ -242,6 +251,14 @@ def create(
             status_code=status.HTTP_409_CONFLICT,
             detail="Fitness profile already exists",
         ) from None
+    except UnsupportedResistanceTrainingCombinationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "UNSUPPORTED_RESISTANCE_TRAINING_DAYS",
+                "message": str(error),
+            },
+        ) from None
     except ProfileInvariantError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -282,6 +299,14 @@ def update(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Preferred weekdays cannot exceed training days per week",
+        ) from None
+    except UnsupportedResistanceTrainingCombinationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "UNSUPPORTED_RESISTANCE_TRAINING_DAYS",
+                "message": str(error),
+            },
         ) from None
     except ProfileInvariantError:
         raise HTTPException(

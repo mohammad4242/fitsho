@@ -61,6 +61,7 @@ def test_create_profile_atomically_stores_profile_and_initial_weight(
     assert response.json()["home_training_setup"] is None
     assert response.json()["session_duration_minutes"] == 60
     assert response.json()["training_age_months"] == 24
+    assert response.json()["training_days_compatibility"] == "recommended"
     assert response.json()["preferred_weekdays"] == [0, 2, 4]
     assert response.json()["priority_muscles"] == ["back", "glutes"]
     assert db.get(UserProfile, user_id) is not None
@@ -83,10 +84,26 @@ def test_create_profile_persists_first_month_experience(
 
     assert response.status_code == 201
     assert response.json()["experience_level"] == "first_month"
+    assert response.json()["training_days_compatibility"] == "recommended"
     profile = db.get(UserProfile, user_id)
     assert profile is not None
     assert profile.experience_level is not None
     assert profile.experience_level.value == "first_month"
+
+
+def test_profile_response_exposes_allowed_training_schedule_status(
+    client: TestClient,
+) -> None:
+    register(client, "allowed-training-schedule@example.com")
+
+    response = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={**VALID_PROFILE, "training_days_per_week": 4},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["training_days_compatibility"] == "allowed"
 
 
 @pytest.mark.parametrize(

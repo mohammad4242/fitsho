@@ -340,6 +340,8 @@ def golden_scenarios() -> dict[str, ProgramGenerationRequest]:
         ),
         "high_job_poor_recovery": request(
             available_training_days=6,
+            training_experience=TrainingExperience.INTERMEDIATE,
+            training_age_months=24,
             sleep_quality=RecoveryRating.POOR,
             stress_level=RecoveryRating.POOR,
             physical_job_demand=PhysicalJobDemand.HIGH,

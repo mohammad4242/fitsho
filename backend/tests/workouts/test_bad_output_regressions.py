@@ -16,6 +16,8 @@ from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 def test_regression_novice_poor_recovery_keeps_exact_days_with_valid_spacing() -> None:
     source = request(
         available_training_days=6,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=24,
         sleep_quality=RecoveryRating.POOR,
         stress_level=RecoveryRating.POOR,
         physical_job_demand=PhysicalJobDemand.HIGH,

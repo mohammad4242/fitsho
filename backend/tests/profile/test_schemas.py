@@ -99,6 +99,7 @@ def test_profile_create_rejects_invalid_values(field: str, value: object) -> Non
 
 def test_profile_create_accepts_six_training_days() -> None:
     payload = valid_payload()
+    payload["experience_level"] = "intermediate"
     payload["training_days_per_week"] = 6
 
     assert ProfileCreate.model_validate(payload).training_days_per_week == 6

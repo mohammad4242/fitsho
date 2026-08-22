@@ -31,6 +31,10 @@ from app.exercises.models import Exercise
 from app.exercises.programming_metadata import infer_exercise_demands
 from app.profile.enums import ExperienceLevel, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.service import ProfileSnapshot, get_profile
+from app.profile.training_compatibility import (
+    UnsupportedResistanceTrainingCombinationError,
+    require_supported_resistance_training_days,
+)
 from app.training_templates.engine_reference import load_template_references
 from app.workout_cycles.enums import WorkoutCycleStatus
 from app.workout_cycles.models import WorkoutCycle, WorkoutCycleWeeklyCheckIn
@@ -234,6 +238,8 @@ class WorkoutGenerationService:
             request = self._to_program_request(
                 source_profile, effective_overrides, body_analysis_influence
             )
+        except UnsupportedResistanceTrainingCombinationError as error:
+            raise ProgramGenerationRejectedError("UNSUPPORTED_RESISTANCE_TRAINING_DAYS") from error
         except ValidationError as error:
             raise ProgramGenerationRejectedError("INVALID_PROFILE_INPUT") from error
         catalog = self._load_catalog(source_profile.profile.sex)
@@ -304,6 +310,8 @@ class WorkoutGenerationService:
                     error_code,
                     result.safety_status.value if result.safety_status else None,
                 )
+            if result.error_code is GenerationErrorCode.UNSUPPORTED_RESISTANCE_TRAINING_DAYS:
+                raise ProgramGenerationRejectedError(error_code)
             raise WorkoutGenerationFailedError(error_code=error_code)
 
         refreshed_profile = get_profile(self._db, user_id)
@@ -972,6 +980,10 @@ class WorkoutGenerationService:
                 )
             values.update(override_values)
             values["user_id"] = profile.user_id
+        require_supported_resistance_training_days(
+            profile.experience_level,
+            cast(int, values["available_training_days"]),
+        )
         return ProgramGenerationRequest.model_validate(values)
 
     def _load_catalog(self, profile_sex: Sex | None = None) -> tuple[ExerciseCandidate, ...]:
@@ -1281,6 +1293,13 @@ class WorkoutGenerationService:
 def _generation_failure_messages(
     error_code: GenerationErrorCode | None,
 ) -> tuple[str, str]:
+    if error_code is GenerationErrorCode.UNSUPPORTED_RESISTANCE_TRAINING_DAYS:
+        return (
+            "The requested resistance-training schedule is not supported "
+            "for this experience level.",
+            "The requested resistance-training day count is outside the official "
+            "compatibility matrix.",
+        )
     if error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT:
         return (
             "No safe workout layout satisfies all required session constraints.",

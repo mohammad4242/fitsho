@@ -101,6 +101,25 @@ def test_patch_updates_training_age_months(client: TestClient, db: Session) -> N
     assert profile.training_age_months == 48
 
 
+def test_patch_rejects_unsupported_effective_training_schedule(
+    client: TestClient, db: Session
+) -> None:
+    user_id = register(client, "profile-unsupported-schedule@example.com")
+    create_profile(client)
+
+    response = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={"training_days_per_week": 5},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "UNSUPPORTED_RESISTANCE_TRAINING_DAYS"
+    profile = db.get(UserProfile, user_id)
+    assert profile is not None
+    assert profile.training_days_per_week == 3
+
+
 def test_patch_updates_optional_circumferences_as_a_new_measurement(
     client: TestClient, db: Session
 ) -> None:

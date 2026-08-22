@@ -25,6 +25,7 @@ from app.profile.models import (
     UserProfileTrainingCaution,
 )
 from app.profile.schemas import ProfileCreate, ProfileUpdate, SharedProfileUpsert, calculate_age
+from app.profile.training_compatibility import require_supported_resistance_training_days
 from app.workout_cycles.models import WorkoutCycle
 
 
@@ -105,6 +106,9 @@ def create_profile(
     payload: ProfileCreate,
 ) -> ProfileSnapshot:
     ensure_supported_age(payload.birth_date)
+    require_supported_resistance_training_days(
+        payload.experience_level, payload.training_days_per_week
+    )
     profile = db.scalar(select(UserProfile).where(UserProfile.user_id == user_id).with_for_update())
     if profile is not None and profile.experience_level is not None:
         raise ProfileAlreadyExistsError
@@ -268,6 +272,11 @@ def update_profile(
     final_training_days = supplied_fields.get(
         "training_days_per_week", profile.training_days_per_week
     )
+    final_experience_level = supplied_fields.get(
+        "experience_level", profile.experience_level
+    )
+    if final_experience_level is not None and final_training_days is not None:
+        require_supported_resistance_training_days(final_experience_level, final_training_days)
     final_weekdays = supplied_fields.get("preferred_weekdays", profile.preferred_weekdays)
     if (
         final_weekdays is not None
@@ -361,6 +370,11 @@ def apply_profile_update_without_commit(
     final_training_days = supplied_fields.get(
         "training_days_per_week", profile.training_days_per_week
     )
+    final_experience_level = supplied_fields.get(
+        "experience_level", profile.experience_level
+    )
+    if final_experience_level is not None and final_training_days is not None:
+        require_supported_resistance_training_days(final_experience_level, final_training_days)
     final_weekdays = supplied_fields.get("preferred_weekdays", profile.preferred_weekdays)
     if (
         final_weekdays is not None

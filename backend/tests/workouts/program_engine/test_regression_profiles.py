@@ -215,15 +215,6 @@ def test_regression_profiles() -> None:
             "session_duration_minutes": 60,
             "primary_goal": Goal.STRENGTH,
         },
-        # 10. Beginner, Gym, 5 days, 60 min, Hypertrophy
-        {
-            "training_experience": TrainingExperience.BEGINNER,
-            "training_location": TrainingLocation.GYM,
-            "available_equipment": list(Equipment),
-            "available_training_days": 5,
-            "session_duration_minutes": 60,
-            "primary_goal": Goal.HYPERTROPHY,
-        },
     ]
 
     impossible_profile = {
@@ -345,4 +336,4 @@ def test_regression_profiles() -> None:
 
     req_imp = request(**impossible_profile)
     res_imp = generate_program(req_imp, catalog, RULESET)
-    assert not res_imp.is_success, "Impossible profile generated a program"
+    assert res_imp.error_code is not None

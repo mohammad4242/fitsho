@@ -110,7 +110,11 @@ async def generate_plan(
             detail={
                 "code": error.error_code,
                 "safety_status": error.safety_status,
-                "message": "Professional review is required before automatic programming",
+                "message": (
+                    "Requested resistance-training days are not supported for this experience level"
+                    if error.error_code == "UNSUPPORTED_RESISTANCE_TRAINING_DAYS"
+                    else "Professional review is required before automatic programming"
+                ),
             },
         ) from None
     except WorkoutGenerationFailedError as error:

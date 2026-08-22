@@ -27,6 +27,7 @@ from app.profile.enums import (
     TrainingCaution,
     TrainingLocation,
 )
+from app.profile.training_compatibility import SUPPORTED_RESISTANCE_TRAINING_DAYS
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.program_engine.enums import (
     ActivityLevel,
@@ -260,7 +261,11 @@ class ProgramGenerationOverrides(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     secondary_goal_optional: Goal | None = None
-    available_training_days: int | None = Field(default=None, ge=1, le=7)
+    available_training_days: int | None = Field(
+        default=None,
+        ge=SUPPORTED_RESISTANCE_TRAINING_DAYS[0],
+        le=SUPPORTED_RESISTANCE_TRAINING_DAYS[-1],
+    )
     session_duration_minutes: int | None = Field(default=None, ge=20, le=180)
     training_age_months: int | None = Field(default=None, ge=0, le=900)
     current_activity_level: ActivityLevel | None = None

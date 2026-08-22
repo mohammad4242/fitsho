@@ -19,6 +19,11 @@ from app.profile.enums import (
     TrainingLocation,
     WorkoutGenerationMethod,
 )
+from app.profile.training_compatibility import (
+    SUPPORTED_RESISTANCE_TRAINING_DAYS,
+    ResistanceTrainingDayStatus,
+    require_supported_resistance_training_days,
+)
 
 SessionDurationMinutes = Literal[30, 45, 60, 75, 90, 120]
 PlanDurationWeeks = Literal[4, 6, 8]
@@ -65,7 +70,10 @@ class ProfileCreate(BaseModel):
     fitness_goal: FitnessGoal
     experience_level: ExperienceLevel
     training_age_months: int | None = Field(default=None, ge=0, le=900)
-    training_days_per_week: int = Field(ge=2, le=6)
+    training_days_per_week: int = Field(
+        ge=SUPPORTED_RESISTANCE_TRAINING_DAYS[0],
+        le=SUPPORTED_RESISTANCE_TRAINING_DAYS[-1],
+    )
     preferred_weekdays: tuple[int, ...] | None = None
     priority_muscles: tuple[MuscleGroup, ...] | None = None
     training_location: TrainingLocation
@@ -135,6 +143,9 @@ class ProfileCreate(BaseModel):
             and len(self.preferred_weekdays) > self.training_days_per_week
         ):
             raise ValueError("Preferred weekdays cannot exceed training days per week")
+        require_supported_resistance_training_days(
+            self.experience_level, self.training_days_per_week
+        )
         return self
 
 
@@ -163,7 +174,11 @@ class ProfileUpdate(BaseModel):
     fitness_goal: FitnessGoal | None = None
     experience_level: ExperienceLevel | None = None
     training_age_months: int | None = Field(default=None, ge=0, le=900)
-    training_days_per_week: int | None = Field(default=None, ge=2, le=6)
+    training_days_per_week: int | None = Field(
+        default=None,
+        ge=SUPPORTED_RESISTANCE_TRAINING_DAYS[0],
+        le=SUPPORTED_RESISTANCE_TRAINING_DAYS[-1],
+    )
     preferred_weekdays: tuple[int, ...] | None = None
     priority_muscles: tuple[MuscleGroup, ...] | None = None
     training_location: TrainingLocation | None = None
@@ -253,6 +268,10 @@ class ProfileUpdate(BaseModel):
             and len(self.preferred_weekdays) > self.training_days_per_week
         ):
             raise ValueError("Preferred weekdays cannot exceed training days per week")
+        if self.experience_level is not None and self.training_days_per_week is not None:
+            require_supported_resistance_training_days(
+                self.experience_level, self.training_days_per_week
+            )
         return self
 
 
@@ -272,6 +291,7 @@ class ProfileResponse(BaseModel):
     experience_level: ExperienceLevel
     training_age_months: int | None
     training_days_per_week: int
+    training_days_compatibility: ResistanceTrainingDayStatus
     preferred_weekdays: tuple[int, ...] | None
     priority_muscles: tuple[MuscleGroup, ...] | None
     physical_limitations: str | None

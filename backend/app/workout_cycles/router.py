@@ -8,6 +8,7 @@ from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.database.session import get_db
+from app.profile.training_compatibility import UnsupportedResistanceTrainingCombinationError
 from app.workout_cycles.body_progress_schemas import (
     WorkoutCycleBodyProgressComparisonResponse,
     WorkoutCycleFeedbackBodyProgressContext,
@@ -140,6 +141,14 @@ def submit_current_completion_feedback_route(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Workout cycle has not reached its end",
+        ) from None
+    except UnsupportedResistanceTrainingCombinationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "UNSUPPORTED_RESISTANCE_TRAINING_DAYS",
+                "message": str(error),
+            },
         ) from None
     return _completion_feedback_response(cycle)
 

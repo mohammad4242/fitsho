@@ -472,7 +472,7 @@ def test_unadaptable_five_day_template_recovers_without_dropping_days() -> None:
         base,
         slug="unadaptable-five-day-reference",
         days_per_week=5,
-        training_level="beginner",
+        training_level="intermediate",
         days=tuple(replace(base.days[0], day_number=day_number) for day_number in range(1, 6)),
     )
 
@@ -480,8 +480,8 @@ def test_unadaptable_five_day_template_recovers_without_dropping_days() -> None:
         template_request(
             available_training_days=5,
             primary_goal="build_muscle",
-            training_experience="beginner",
-            training_age_months=3,
+            training_experience="intermediate",
+            training_age_months=24,
             session_duration_minutes=45,
         ),
         full_catalog(),
