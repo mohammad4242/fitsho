@@ -939,11 +939,7 @@ class WorkoutGenerationService:
             "height_cm": profile.height_cm,
             "weight_kg": float(source.measurement.weight_kg),
             "primary_goal": profile.fitness_goal.value,
-            "training_experience": (
-                TrainingExperience.BEGINNER
-                if profile.experience_level is ExperienceLevel.FIRST_MONTH
-                else TrainingExperience(profile.experience_level.value)
-            ),
+            "training_experience": TrainingExperience(profile.experience_level.value),
             "training_age_months": training_age,
             "available_training_days": profile.training_days_per_week,
             "preferred_weekdays": tuple(profile.preferred_weekdays or ()),

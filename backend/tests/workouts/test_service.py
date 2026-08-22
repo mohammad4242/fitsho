@@ -64,6 +64,7 @@ from app.workouts.program_engine.enums import (
     RedFlag,
     SkillDemand,
     StabilityDemand,
+    TrainingExperience,
 )
 from app.workouts.program_engine.schemas import (
     BodyAnalysisInfluence,
@@ -123,6 +124,19 @@ def test_program_request_uses_persisted_profile_preferences(db: Session) -> None
 
     assert request.preferred_weekdays == (0, 3)
     assert request.priority_muscles == frozenset({MuscleGroup.BACK})
+
+
+def test_program_request_preserves_first_month_experience_level(db: Session) -> None:
+    user = _user_with_profile(db)
+    profile = db.get(UserProfile, user.id)
+    assert profile is not None
+    profile.experience_level = ExperienceLevel.FIRST_MONTH
+    profile.training_age_months = 0
+    db.flush()
+
+    request = _service(db)._to_program_request(get_profile(db, user.id), None)
+
+    assert request.training_experience is TrainingExperience.FIRST_MONTH
 
 
 def test_current_generation_overrides_take_precedence_over_profile_preferences(

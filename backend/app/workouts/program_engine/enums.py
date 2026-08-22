@@ -12,6 +12,7 @@ class Goal(StrEnum):
 
 
 class TrainingExperience(StrEnum):
+    FIRST_MONTH = "first_month"
     BEGINNER = "beginner"
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"

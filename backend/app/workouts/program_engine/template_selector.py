@@ -4,7 +4,7 @@ from app.workouts.program_engine.body_analysis import (
     TEMPLATE_TAGS_BY_MUSCLE,
     eligible_body_analysis_priorities,
 )
-from app.workouts.program_engine.enums import Goal, TrainingStatus
+from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -20,7 +20,7 @@ def select_template_reference(
     templates: tuple[TemplateReference, ...],
     ruleset: ProgramRuleset,
 ) -> TemplateReference | None:
-    level = _template_level(request.training_status)
+    level = _template_level(request)
     eligible_by_id = {candidate.id for candidate in eligible}
     scored = [
         (template, _score(request, template, ruleset))
@@ -35,12 +35,8 @@ def select_template_reference(
     return max(scored, key=lambda item: (item[1], item[0].slug))[0]
 
 
-def _template_level(status: TrainingStatus) -> str:
-    if status is TrainingStatus.NOVICE:
-        return "beginner"
-    if status in {TrainingStatus.EARLY_INTERMEDIATE, TrainingStatus.INTERMEDIATE}:
-        return "intermediate"
-    return "advanced"
+def _template_level(request: NormalizedProgramRequest) -> str:
+    return request.source.training_experience.value
 
 
 def _matches_goal(goal: Goal, template_goal: str) -> bool:

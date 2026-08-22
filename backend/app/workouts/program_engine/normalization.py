@@ -44,6 +44,7 @@ def _classify_status(
         else TrainingStatus.ADVANCED
     )
     label_status = {
+        TrainingExperience.FIRST_MONTH: TrainingStatus.NOVICE,
         TrainingExperience.BEGINNER: TrainingStatus.NOVICE,
         TrainingExperience.INTERMEDIATE: TrainingStatus.INTERMEDIATE,
         TrainingExperience.ADVANCED: TrainingStatus.ADVANCED,

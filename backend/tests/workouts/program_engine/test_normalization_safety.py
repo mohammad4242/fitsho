@@ -53,6 +53,44 @@ def test_goal_aliases_are_normalized(source: str, expected: Goal) -> None:
 
 
 @pytest.mark.parametrize(
+    ("experience", "training_age_months", "expected_status"),
+    [
+        (TrainingExperience.FIRST_MONTH, 24, TrainingStatus.NOVICE),
+        (TrainingExperience.BEGINNER, 24, TrainingStatus.NOVICE),
+        (TrainingExperience.INTERMEDIATE, 24, TrainingStatus.INTERMEDIATE),
+        (TrainingExperience.ADVANCED, 72, TrainingStatus.ADVANCED),
+    ],
+)
+def test_template_experience_and_training_status_remain_separate(
+    experience: TrainingExperience,
+    training_age_months: int,
+    expected_status: TrainingStatus,
+) -> None:
+    normalized = normalize_request(
+        request(
+            training_experience=experience,
+            training_age_months=training_age_months,
+        )
+    )
+
+    assert normalized.source.training_experience is experience
+    assert normalized.training_status is expected_status
+
+
+def test_training_age_can_reduce_status_without_changing_template_experience() -> None:
+    normalized = normalize_request(
+        request(
+            training_experience=TrainingExperience.INTERMEDIATE,
+            training_age_months=1,
+        )
+    )
+
+    assert normalized.source.training_experience is TrainingExperience.INTERMEDIATE
+    assert normalized.training_status is TrainingStatus.NOVICE
+    assert "TRAINING_STATUS_REDUCED_FOR_TRAINING_AGE" in normalized.assumptions
+
+
+@pytest.mark.parametrize(
     ("field", "value"),
     [("age", 17), ("height_cm", 119), ("weight_kg", 34), ("available_training_days", 0)],
 )
