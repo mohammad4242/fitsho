@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 
-from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
-
 SESSION_DURATION_TOLERANCE_MINUTES = 10
 
 
@@ -17,7 +15,6 @@ class SessionDurationPolicy:
 
 def get_session_duration_policy(
     requested_minutes: int,
-    ruleset: ProgramRuleset,
 ) -> SessionDurationPolicy:
     tolerance = SESSION_DURATION_TOLERANCE_MINUTES
     return SessionDurationPolicy(

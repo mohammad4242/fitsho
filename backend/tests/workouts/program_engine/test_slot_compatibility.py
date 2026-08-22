@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from app.exercises.enums import ExerciseLabel, ExerciseType, MovementPattern, MuscleGroup
 from app.exercises.free_exercise_db_import import classify_programming_metadata
 from app.workouts.program_engine.engine import generate_program
@@ -146,7 +148,11 @@ def test_generate_program_does_not_place_semantically_full_body_candidate_in_low
     result = generate_program(source, [misleading, *full_catalog()], RULESET)
 
     assert result.program is not None, result.errors
-    lower_days = [day for day in result.program.weekly_schedule if day.focus in {"lower", "legs"} or day.focus.startswith("lower")]
+    lower_days = [
+        day
+        for day in result.program.weekly_schedule
+        if day.focus in {"lower", "legs"} or day.focus.startswith("lower")
+    ]
     assert lower_days
     assert all(
         misleading.id not in {item.exercise_id for item in day.exercises} for day in lower_days
@@ -204,3 +210,56 @@ def test_template_substitution_rejects_semantically_incompatible_reference() -> 
     assert valid.id in {item.id for item in build.drafts[0].exercises}
     assert misleading.id not in {item.id for item in build.drafts[0].exercises}
     assert "TEMPLATE_SLOT_SEMANTIC_MISMATCH" in build.reason_codes
+
+
+def test_template_substitution_ids_exclude_matching_group_with_incompatible_role() -> None:
+    candidates = full_catalog()
+    target = next(item for item in candidates if item.name == "Push Up")
+    incompatible = replace(
+        exercise(
+            "template-incompatible-pull",
+            MovementPattern.HORIZONTAL_PULL,
+            MuscleGroup.CHEST,
+        ),
+        substitution_group=target.substitution_group,
+    )
+    template = TemplateReference(
+        slug="semantic-substitution-template",
+        days_per_week=1,
+        training_level="beginner",
+        fitness_goal="general_fitness",
+        focus_tags=("classic",),
+        intensity_methods=("standard",),
+        days=(
+            TemplateReferenceDay(
+                day_number=1,
+                title="Push",
+                focus=(MuscleGroup.CHEST,),
+                slots=(
+                    TemplateReferenceSlot(
+                        exercise_id=target.id,
+                        exercise_slug_hint=target.name,
+                        target_muscles=(MuscleGroup.CHEST,),
+                        movement_pattern=MovementPattern.HORIZONTAL_PUSH,
+                        intensity_method="standard",
+                        adaptation_priority="core",
+                        superset_group=None,
+                        sets=3,
+                        rep_min=8,
+                        rep_max=12,
+                        target_rir=2,
+                        rest_seconds=90,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    build = build_template_sessions(
+        normalize_request(request(available_training_days=1)),
+        template,
+        tuple([incompatible, *candidates]),
+        RULESET,
+    )
+
+    assert incompatible.id not in build.drafts[0].substitutions[target.id]

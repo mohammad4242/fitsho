@@ -35,18 +35,12 @@ from app.workouts.program_engine.schemas import (
     WorkoutDay,
     WorkoutProgram,
 )
-from app.workouts.program_engine.session_builder import (
-    CORE_PATTERNS,
-    HINGE_PATTERNS,
-    KNEE_PATTERNS,
-    PULL_PATTERNS,
-    PUSH_PATTERNS,
-    SHOULDER_PATTERNS,
-    SessionConstructionError,
-    build_sessions,
-)
+from app.workouts.program_engine.session_builder import SessionConstructionError, build_sessions
 from app.workouts.program_engine.session_duration import repair_session_durations
-from app.workouts.program_engine.split_selector import rank_split_candidates
+from app.workouts.program_engine.split_selector import (
+    rank_availability_aware_fallbacks,
+    rank_split_candidates,
+)
 from app.workouts.program_engine.template_selector import select_template_reference
 from app.workouts.program_engine.template_sessions import (
     TemplateConstructionError,
@@ -62,39 +56,6 @@ from app.workouts.program_engine.volume_history import (
 )
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from app.workouts.program_engine.volume_repair import repair_weekly_volume
-
-_RECOVERABLE_PATTERN_GROUPS = (
-    PUSH_PATTERNS,
-    PULL_PATTERNS,
-    KNEE_PATTERNS,
-    HINGE_PATTERNS,
-    CORE_PATTERNS,
-    SHOULDER_PATTERNS,
-)
-
-
-def _recoverable_required_pattern_groups(
-    catalog: list[ExerciseCandidate] | tuple[ExerciseCandidate, ...],
-    eligible: tuple[ExerciseCandidate, ...],
-    rejected: tuple[RejectedCandidate, ...],
-) -> tuple[frozenset[MovementPattern], ...]:
-    """Find required groups absent only because hard constraints rejected them."""
-    eligible_patterns = {item.movement_pattern for item in eligible}
-    rejected_by_id = {item.exercise_id: item.reason_codes for item in rejected}
-    recoverable: list[frozenset[MovementPattern]] = []
-    for group in _RECOVERABLE_PATTERN_GROUPS:
-        if any(pattern in eligible_patterns for pattern in group):
-            continue
-        if any(
-            candidate.movement_pattern in group
-            and any(
-                reason.startswith("EXERCISE_REJECTED_")
-                for reason in rejected_by_id.get(candidate.id, ())
-            )
-            for candidate in catalog
-        ):
-            recoverable.append(group)
-    return tuple(recoverable)
 
 
 def generate_program(
@@ -139,10 +100,11 @@ def generate_program(
         )
     previous_volume = derive_previous_volume_baseline(normalized.source.recent_training_history)
     reserve = cardio_reserve_minutes(normalized, eligibility.cardio_eligible, ruleset)
-    relaxable_required_pattern_groups = _recoverable_required_pattern_groups(
-        exercise_catalog,
-        eligibility.eligible,
-        eligibility.rejected,
+    rejected_by_id = {item.exercise_id: item.reason_codes for item in eligibility.rejected}
+    rejected_slot_candidates = tuple(
+        (candidate, rejected_by_id[candidate.id])
+        for candidate in exercise_catalog
+        if candidate.id in rejected_by_id
     )
     template_rejection_trace: tuple[dict[str, object], ...] = ()
     reference = select_template_reference(
@@ -226,7 +188,7 @@ def generate_program(
             cardio_reserve=reserve,
             rejected_splits=tuple(rejected_splits),
             template_rejection_trace=template_rejection_trace,
-            relaxable_required_pattern_groups=relaxable_required_pattern_groups,
+            rejected_slot_candidates=rejected_slot_candidates,
         )
         if result.is_success:
             return result
@@ -244,50 +206,42 @@ def generate_program(
     weekdays_fallback = (
         exact_day_splits[0].weekdays if exact_day_splits else tuple(range(requested_days))
     )
-    dynamic_focuses: tuple[str, ...]
-    if requested_days == 1:
-        dynamic_focuses = ("full_body",)
-    elif requested_days == 2:
-        dynamic_focuses = ("upper", "lower")
-    elif requested_days == 3:
-        dynamic_focuses = ("upper", "lower", "full_body")
-    elif requested_days == 4:
-        dynamic_focuses = ("upper", "lower", "upper", "lower")
-    elif requested_days == 5:
-        dynamic_focuses = ("upper", "lower", "push", "pull", "legs")
-    else:
-        dynamic_focuses = (
-            ("push", "pull", "legs") * (requested_days // 3)
-            + ("upper", "lower") * ((requested_days % 3) // 2)
-            + ("full_body",) * (requested_days % 3 % 2)
-        )
-
-    fallback_split = SplitPlan(
-        split_type=SplitType.DYNAMIC_FALLBACK,
-        day_focuses=tuple(dynamic_focuses[:requested_days]),
-        weekdays=weekdays_fallback,
-        score=-1000,
-        reason_codes=("DYNAMIC_EXACT_N_FALLBACK",),
-    )
-    result = _program_for_split(
-        request,
+    dynamic_splits = rank_availability_aware_fallbacks(
         normalized,
-        safety.status,
-        safety.reason_codes,
-        eligibility.rejected,
         eligibility.eligible,
-        eligibility.cardio_eligible,
-        fallback_split,
         ruleset,
-        previous_volume=previous_volume,
-        cardio_reserve=reserve,
-        rejected_splits=tuple(rejected_splits),
-        template_rejection_trace=template_rejection_trace,
-        relaxable_required_pattern_groups=relaxable_required_pattern_groups,
+        weekdays=weekdays_fallback,
+        excluded_layouts=frozenset(candidate.day_focuses for candidate in exact_day_splits),
     )
-    if result.is_success:
-        return result
-    collected_errors.extend(result.errors)
+    for fallback_split in dynamic_splits:
+        result = _program_for_split(
+            request,
+            normalized,
+            safety.status,
+            safety.reason_codes,
+            eligibility.rejected,
+            eligibility.eligible,
+            eligibility.cardio_eligible,
+            fallback_split,
+            ruleset,
+            previous_volume=previous_volume,
+            cardio_reserve=reserve,
+            rejected_splits=tuple(rejected_splits),
+            template_rejection_trace=template_rejection_trace,
+            rejected_slot_candidates=rejected_slot_candidates,
+        )
+        if result.is_success:
+            return result
+        collected_errors.extend(result.errors)
+        rejected_splits.append(
+            {
+                "split": fallback_split.split_type.value,
+                "day_focuses": fallback_split.day_focuses,
+                "status": "rejected",
+                "reason_codes": result.errors,
+                "decision_trace": result.decision_trace,
+            }
+        )
     errors = (
         "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED",
         "EXACT_DAY_SPLIT_ALTERNATIVES_EXHAUSTED",
@@ -343,7 +297,7 @@ def _program_for_split(
     cardio_reserve: int,
     rejected_splits: tuple[dict[str, object], ...],
     template_rejection_trace: tuple[dict[str, object], ...],
-    relaxable_required_pattern_groups: tuple[frozenset[MovementPattern], ...],
+    rejected_slot_candidates: tuple[tuple[ExerciseCandidate, tuple[str, ...]], ...],
 ) -> ProgramGenerationResult:
     volume = plan_weekly_volume(normalized, split, ruleset, previous_volume=previous_volume)
     try:
@@ -353,7 +307,7 @@ def _program_for_split(
             volume,
             eligible,
             ruleset,
-            relaxable_required_pattern_groups=relaxable_required_pattern_groups,
+            rejected_slot_candidates=rejected_slot_candidates,
         )
     except SessionConstructionError as exc:
         construction_trace: tuple[dict[str, object], ...] = template_rejection_trace + (
@@ -365,6 +319,7 @@ def _program_for_split(
                 "focus": exc.focus,
                 "required_patterns": exc.patterns,
                 "required_target_muscle": exc.target_muscle,
+                "candidate_rejection_reasons": exc.rejection_reasons,
                 "reason_codes": exc.reason_codes,
             },
         )
@@ -426,6 +381,17 @@ def _program_for_split(
     relaxed_groups = tuple(
         dict.fromkeys(group for draft in drafts for group in draft.relaxed_required_pattern_groups)
     )
+    relaxed_slots = tuple(
+        dict.fromkeys(
+            (group, target)
+            for draft in drafts
+            for group, target in zip(
+                draft.relaxed_required_pattern_groups,
+                draft.relaxed_required_target_muscles,
+                strict=True,
+            )
+        )
+    )
     metrics = _volume_metrics(
         days,
         volume,
@@ -433,7 +399,7 @@ def _program_for_split(
         ruleset,
         request=normalized,
         relaxed_required_pattern_groups=relaxed_groups,
-        global_relaxable_groups=relaxable_required_pattern_groups,
+        relaxed_required_slots=relaxed_slots,
     )
     body_trace = body_analysis_trace(normalized, ruleset)
     session_reasons = tuple(
@@ -776,7 +742,7 @@ def _volume_metrics(
     request: NormalizedProgramRequest,
     reference_template: str | None = None,
     relaxed_required_pattern_groups: tuple[tuple[MovementPattern, ...], ...] = (),
-    global_relaxable_groups: tuple[frozenset[MovementPattern], ...] = (),
+    relaxed_required_slots: tuple[tuple[tuple[MovementPattern, ...], MuscleGroup | None], ...] = (),
 ) -> dict[str, object]:
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises), ruleset
@@ -845,30 +811,47 @@ def _volume_metrics(
             tuple(pattern.value for pattern in group) for group in relaxed_required_pattern_groups
         )
         metrics["relaxed_required_pattern_groups"] = relaxed_group_values
-
-    if global_relaxable_groups:
-        # Map each globally relaxable pattern group to the muscles whose coverage becomes
-        # unavailable.
-        # This prevents the validator from raising MINIMUM_MUSCLE_COVERAGE_UNSATISFIED
-        # when the exercise pool simply cannot supply those movement patterns.
-        _pattern_group_to_unavailable_muscles: dict[frozenset[MovementPattern], tuple[str, ...]] = {
-            KNEE_PATTERNS: (MuscleGroup.QUADRICEPS.value,),
-            PULL_PATTERNS: (MuscleGroup.BACK.value, MuscleGroup.BICEPS.value),
-            PUSH_PATTERNS: (
-                MuscleGroup.CHEST.value,
-                MuscleGroup.SHOULDERS.value,
-                MuscleGroup.TRICEPS.value,
+        metrics["relaxed_required_slots"] = tuple(
+            {
+                "patterns": tuple(pattern.value for pattern in group),
+                "target_muscle": target.value if target is not None else None,
+            }
+            for group, target in relaxed_required_slots
+        )
+        target_values: set[str] = set()
+        pattern_muscles: dict[frozenset[MovementPattern], tuple[MuscleGroup, ...]] = {
+            frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH}): (
+                MuscleGroup.CHEST,
+                MuscleGroup.SHOULDERS,
+                MuscleGroup.TRICEPS,
             ),
-            HINGE_PATTERNS: (MuscleGroup.HAMSTRINGS.value, MuscleGroup.GLUTES.value),
-            CORE_PATTERNS: (MuscleGroup.ABS.value,),
-            SHOULDER_PATTERNS: (MuscleGroup.SHOULDERS.value, MuscleGroup.TRAPS.value),
+            frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL}): (
+                MuscleGroup.BACK,
+                MuscleGroup.BICEPS,
+            ),
+            frozenset(
+                {MovementPattern.SQUAT, MovementPattern.LUNGE, MovementPattern.KNEE_EXTENSION}
+            ): (MuscleGroup.QUADRICEPS,),
+            frozenset({MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION}): (
+                MuscleGroup.HAMSTRINGS,
+                MuscleGroup.GLUTES,
+            ),
+            frozenset(
+                {
+                    MovementPattern.CORE_ANTI_EXTENSION,
+                    MovementPattern.CORE_ANTI_ROTATION,
+                    MovementPattern.CORE_ANTI_LATERAL_FLEXION,
+                }
+            ): (MuscleGroup.ABS,),
         }
-        unavailable: list[str] = []
-        for pattern_group, muscles in _pattern_group_to_unavailable_muscles.items():
-            if pattern_group in global_relaxable_groups:
-                unavailable.extend(muscles)
-        if unavailable:
-            metrics["unavailable_muscle_coverage"] = tuple(dict.fromkeys(unavailable))
+        for group, target in relaxed_required_slots:
+            if target is None:
+                target_values.update(
+                    muscle.value for muscle in pattern_muscles.get(frozenset(group), ())
+                )
+        if target_values:
+            metrics["unavailable_muscle_coverage"] = tuple(sorted(target_values))
+
     return metrics
 
 

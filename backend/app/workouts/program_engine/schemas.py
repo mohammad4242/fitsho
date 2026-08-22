@@ -529,3 +529,4 @@ class SessionDraft:
     substitutions: dict[UUID, tuple[UUID, ...]] = field(default_factory=dict)
     reason_codes: tuple[str, ...] = ()
     relaxed_required_pattern_groups: tuple[tuple[MovementPattern, ...], ...] = ()
+    relaxed_required_target_muscles: tuple[MuscleGroup | None, ...] = ()

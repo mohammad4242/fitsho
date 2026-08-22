@@ -49,18 +49,28 @@ class SlotSpec:
 
 
 class SessionConstructionError(ValueError):
-    def __init__(self, day_index: int, focus: str, slot: SlotSpec) -> None:
+    def __init__(
+        self,
+        day_index: int,
+        focus: str,
+        slot: SlotSpec,
+        *,
+        rejection_reasons: tuple[str, ...] = (),
+    ) -> None:
         patterns = tuple(sorted(pattern.value for pattern in slot.patterns))
         target = slot.target_muscle.value if slot.target_muscle is not None else None
         self.day_index = day_index
         self.focus = focus
         self.patterns = patterns
         self.target_muscle = target
+        self.rejection_reasons = rejection_reasons
         self.reason_codes = (
             "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT",
+            "REQUIRED_SLOT_HARD_IMPOSSIBILITY",
             f"REQUIRED_SESSION_SLOT_UNAVAILABLE:{focus}",
             f"REQUIRED_PATTERN_UNAVAILABLE:{','.join(patterns)}",
             *((f"REQUIRED_TARGET_MUSCLE_UNAVAILABLE:{target}",) if target is not None else ()),
+            *rejection_reasons,
         )
         super().__init__(";".join(self.reason_codes))
 
@@ -72,9 +82,8 @@ def build_sessions(
     exercises: tuple[ExerciseCandidate, ...],
     ruleset: ProgramRuleset,
     *,
-    relaxable_required_pattern_groups: tuple[frozenset[MovementPattern], ...] = (),
+    rejected_slot_candidates: tuple[tuple[ExerciseCandidate, tuple[str, ...]], ...] = (),
 ) -> tuple[SessionDraft, ...]:
-    by_pattern = _by_pattern(exercises)
     effective_priorities = request.source.priority_muscles | body_analysis_priority_muscles(
         request, ruleset
     )
@@ -90,14 +99,16 @@ def build_sessions(
                 // ruleset.minutes_per_exercise_slot,
             ),
         )
-        slots = _slots_for_focus(focus)
+        slots = slots_for_focus(focus)
         ordered_slots = tuple(slot for slot in slots if slot.required) + tuple(
             slot for slot in slots if not slot.required
         )
         chosen: list[ExerciseCandidate] = []
+        selected_slots: dict[UUID, SlotSpec] = {}
         reasons: dict[UUID, tuple[str, ...]] = {}
         session_reasons: tuple[str, ...] = ()
         this_session_relaxed_groups: list[tuple[MovementPattern, ...]] = []
+        this_session_relaxed_targets: list[MuscleGroup | None] = []
         for slot in ordered_slots:
             if len(chosen) >= capacity:
                 if slot.required:
@@ -107,40 +118,58 @@ def build_sessions(
             options: list[ExerciseCandidate] = []
             rejected_slot_reasons: list[str] = []
             comp_levels = {}
-            for pattern in slot.patterns:
-                for item in by_pattern.get(pattern, ()):
-                    if item.id in chosen_ids:
-                        continue
-                    compatibility = evaluate_candidate_slot_compatibility(
-                        item,
-                        allowed_patterns=slot.patterns,
-                        target_muscles=(
-                            frozenset({slot.target_muscle})
-                            if slot.target_muscle is not None
-                            else None
-                        ),
-                        day_focus=focus,
-                        allow_full_body=focus.startswith("full_body"),
-                    )
-                    if compatibility.compatible:
-                        options.append(item)
-                        comp_levels[item.id] = compatibility.level
-                    else:
-                        rejected_slot_reasons.extend(compatibility.reason_codes)
-            if rejected_slot_reasons:
-                session_reasons = session_reasons + tuple(rejected_slot_reasons)
+            for item in exercises:
+                if item.id in chosen_ids:
+                    continue
+                compatibility = evaluate_candidate_slot_compatibility(
+                    item,
+                    allowed_patterns=slot.patterns,
+                    target_muscles=(
+                        frozenset({slot.target_muscle}) if slot.target_muscle is not None else None
+                    ),
+                    day_focus=focus,
+                    allow_full_body=focus.startswith("full_body"),
+                )
+                if compatibility.compatible:
+                    options.append(item)
+                    comp_levels[item.id] = compatibility.level
+                else:
+                    rejected_slot_reasons.extend(compatibility.reason_codes)
             if not options:
                 if slot.required:
-                    if slot.patterns in relaxable_required_pattern_groups:
+                    unique_rejections = tuple(dict.fromkeys(rejected_slot_reasons))
+                    if _required_slot_is_relaxable(
+                        slot,
+                        focus,
+                        exercises,
+                        chosen,
+                        minimum_exercises=max(
+                            1,
+                            ruleset.minimum_exercises_per_session - 2,
+                        ),
+                        rejected_slot_candidates=rejected_slot_candidates,
+                    ):
                         relaxed = tuple(sorted(slot.patterns, key=lambda item: item.value))
                         this_session_relaxed_groups.append(relaxed)
+                        this_session_relaxed_targets.append(slot.target_muscle)
                         session_reasons = session_reasons + (
+                            *unique_rejections,
                             "SESSION_LAYOUT_UNFILLABLE",
+                            "REQUIRED_SLOT_RELAXABLE_TRAINING_QUALITY",
                             "RECOVERY_APPLIED_REQUIRED_SLOT_RELAXATION",
+                            *(
+                                (f"RECOVERY_RELAXED_TARGET_MUSCLE:{slot.target_muscle.value}",)
+                                if slot.target_muscle is not None
+                                else ()
+                            ),
                         )
                         continue
-                    else:
-                        raise SessionConstructionError(index + 1, focus, slot)
+                    raise SessionConstructionError(
+                        index + 1,
+                        focus,
+                        slot,
+                        rejection_reasons=unique_rejections,
+                    )
                 else:
                     continue
             ranked = rank_exercises(
@@ -160,6 +189,7 @@ def build_sessions(
                 ),
             )
             chosen.append(selected.exercise)
+            selected_slots[selected.exercise.id] = slot
             selection_reasons = list(selected.reason_codes)
             if _role_repeated(selected.exercise, chosen[:-1]):
                 redundancy_reason = (
@@ -233,6 +263,24 @@ def build_sessions(
                     item,
                     exercises,
                     limit=ruleset.substitution_limit,
+                    allowed_patterns=(
+                        selected_slots[item.id].patterns
+                        if item.id in selected_slots
+                        else focus_scope(focus)[0]
+                    ),
+                    target_muscles=frozenset(
+                        {
+                            (
+                                selected_slots[item.id].target_muscle
+                                if item.id in selected_slots
+                                else None
+                            )
+                            or item.primary_muscle
+                        }
+                    )
+                    if item.primary_muscle is not None
+                    else None,
+                    day_focus=focus,
                 )
             )
             for item in chosen
@@ -249,18 +297,81 @@ def build_sessions(
                 substitutions=substitutions,
                 reason_codes=tuple(dict.fromkeys(session_reasons)),
                 relaxed_required_pattern_groups=tuple(dict.fromkeys(this_session_relaxed_groups)),
+                relaxed_required_target_muscles=tuple(this_session_relaxed_targets),
             )
         )
     return tuple(sessions)
 
 
-def _by_pattern(
+def _safe_session_completion_is_possible(
+    focus: str,
     exercises: tuple[ExerciseCandidate, ...],
-) -> dict[MovementPattern, tuple[ExerciseCandidate, ...]]:
-    return {
-        pattern: tuple(item for item in exercises if item.movement_pattern is pattern)
-        for pattern in MovementPattern
+    chosen: list[ExerciseCandidate],
+    *,
+    minimum_exercises: int,
+) -> bool:
+    compatible_ids = {item.id for item in chosen}
+    compatible_ids.update(
+        item.id
+        for item in exercises
+        if evaluate_exercise_focus_compatibility(item, focus).compatible
+    )
+    return len(compatible_ids) >= minimum_exercises
+
+
+_RELAXABLE_ELIGIBILITY_REJECTIONS = frozenset(
+    {
+        "EXERCISE_REJECTED_MISSING_EQUIPMENT",
+        "EXERCISE_REJECTED_BLOCKED_EXERCISE",
+        "EXERCISE_REJECTED_BLOCKED_PATTERN",
+        "EXERCISE_REJECTED_BLOCKED_CAUTION_TAG",
+        "EXERCISE_REJECTED_IMPACT_LIMIT",
+        "EXERCISE_REJECTED_AXIAL_LOAD_LIMIT",
+        "EXERCISE_REJECTED_OVERHEAD_LIMIT",
+        "EXERCISE_REJECTED_BALANCE_DEMAND",
+        "EXERCISE_REJECTED_SKILL_TOO_HIGH",
+        "EXERCISE_REJECTED_RANGE_OF_MOTION",
     }
+)
+
+
+def _required_slot_is_relaxable(
+    slot: SlotSpec,
+    focus: str,
+    exercises: tuple[ExerciseCandidate, ...],
+    chosen: list[ExerciseCandidate],
+    *,
+    minimum_exercises: int,
+    rejected_slot_candidates: tuple[tuple[ExerciseCandidate, tuple[str, ...]], ...],
+) -> bool:
+    if not _safe_session_completion_is_possible(
+        focus,
+        exercises,
+        chosen,
+        minimum_exercises=minimum_exercises,
+    ):
+        return False
+    if slot.target_muscle is not None and any(
+        item.movement_pattern in slot.patterns for item in exercises
+    ):
+        return True
+    for item, reasons in rejected_slot_candidates:
+        if not reasons or not all(
+            reason in _RELAXABLE_ELIGIBILITY_REJECTIONS for reason in reasons
+        ):
+            continue
+        compatibility = evaluate_candidate_slot_compatibility(
+            item,
+            allowed_patterns=slot.patterns,
+            target_muscles=(
+                frozenset({slot.target_muscle}) if slot.target_muscle is not None else None
+            ),
+            day_focus=focus,
+            allow_full_body=focus.startswith("full_body"),
+        )
+        if compatibility.compatible:
+            return True
+    return False
 
 
 def _compatible_supplements(
@@ -314,7 +425,7 @@ def _supplement_scope(
     return focus_scope(focus)
 
 
-def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
+def slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
     if focus == "full_body_b":
         return (
             SlotSpec(HINGE_PATTERNS, True),
@@ -441,6 +552,9 @@ def _slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
         SlotSpec(HINGE_PATTERNS, False),
         SlotSpec(CORE_PATTERNS, False),
     )
+
+
+_slots_for_focus = slots_for_focus
 
 
 def _resolve_focus(

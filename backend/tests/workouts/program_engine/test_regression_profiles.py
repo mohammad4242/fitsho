@@ -1,9 +1,121 @@
-from app.exercises.enums import Equipment, ExerciseCautionTag, ExerciseType, PrescriptionMode
+from collections import Counter
+
+from app.exercises.enums import (
+    Equipment,
+    ExerciseCautionTag,
+    ExerciseType,
+    MovementPattern,
+    MuscleGroup,
+    PrescriptionMode,
+)
 from app.profile.enums import TrainingLocation
 from app.workouts.program_engine.engine import generate_program
-from app.workouts.program_engine.enums import Goal, TrainingExperience
+from app.workouts.program_engine.enums import CompatibilityLevel, Goal, TrainingExperience
+from app.workouts.program_engine.normalization import normalize_request
+from app.workouts.program_engine.recovery import recovery_spacing_is_valid
+from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+from app.workouts.program_engine.session_builder import build_sessions
+from app.workouts.program_engine.slot_compatibility import (
+    evaluate_candidate_slot_compatibility,
+    focus_scope,
+)
+from app.workouts.program_engine.split_selector import (
+    generate_split_candidates,
+    rank_availability_aware_fallbacks,
+)
 from app.workouts.program_engine.validation import validate_program
-from tests.workouts.program_engine.golden_fixtures import full_catalog, request
+from app.workouts.program_engine.volume_planner import plan_weekly_volume
+from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
+
+
+def test_five_day_fallback_is_built_from_available_focuses() -> None:
+    upper = [
+        exercise(f"limited-push-{index}", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST)
+        for index in range(1)
+    ] + [
+        exercise(f"limited-pull-{index}", MovementPattern.HORIZONTAL_PULL, MuscleGroup.BACK)
+        for index in range(4)
+    ]
+    lower = (
+        [
+            exercise(f"limited-squat-{index}", MovementPattern.SQUAT, MuscleGroup.QUADRICEPS)
+            for index in range(2)
+        ]
+        + [
+            exercise(f"limited-hinge-{index}", MovementPattern.HIP_HINGE, MuscleGroup.HAMSTRINGS)
+            for index in range(2)
+        ]
+        + [
+            exercise(f"limited-core-{index}", MovementPattern.CORE_ANTI_EXTENSION, MuscleGroup.ABS)
+            for index in range(2)
+        ]
+    )
+    source = request(
+        available_training_days=5,
+        session_duration_minutes=30,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+    )
+
+    result = generate_program(source, [*upper, *lower], RULESET)
+
+    assert result.is_success, result.errors
+    assert result.program is not None
+    assert result.program.split.split_type.value == "dynamic_fallback"
+    assert result.program.split.day_focuses != ("upper", "lower", "push", "pull", "legs")
+    assert set(result.program.split.day_focuses).issubset({"upper", "lower", "legs"})
+    assert len(result.program.weekly_schedule) == 5
+    assert all(day.exercises for day in result.program.weekly_schedule)
+    assert not validate_program(result.program, source, RULESET).errors
+
+    reversed_result = generate_program(source, [*reversed([*upper, *lower])], RULESET)
+    assert reversed_result.program is not None
+    assert reversed_result.program.split.day_focuses == result.program.split.day_focuses
+
+
+def test_six_day_fallback_layouts_are_feasible_distinct_and_deterministic() -> None:
+    source = request(
+        available_training_days=6,
+        primary_goal=Goal.STRENGTH,
+        training_experience=TrainingExperience.ADVANCED,
+        training_age_months=72,
+    )
+    normalized = normalize_request(source, RULESET)
+    catalog = tuple(full_catalog())
+    excluded = frozenset(item.day_focuses for item in generate_split_candidates(6))
+
+    layouts = rank_availability_aware_fallbacks(
+        normalized,
+        catalog,
+        RULESET,
+        weekdays=RULESET.default_weekdays[6],
+        excluded_layouts=excluded,
+    )
+    reversed_layouts = rank_availability_aware_fallbacks(
+        normalized,
+        tuple(reversed(catalog)),
+        RULESET,
+        weekdays=RULESET.default_weekdays[6],
+        excluded_layouts=excluded,
+    )
+
+    assert layouts
+    assert all(len(item.day_focuses) == 6 for item in layouts)
+    assert all(item.day_focuses not in excluded for item in layouts)
+    assert tuple(item.day_focuses for item in reversed_layouts) == tuple(
+        item.day_focuses for item in layouts
+    )
+    selected = layouts[0]
+    drafts = build_sessions(
+        normalized,
+        selected,
+        plan_weekly_volume(normalized, selected, RULESET),
+        catalog,
+        RULESET,
+    )
+    assert len(drafts) == 6
+    assert all(draft.exercises for draft in drafts)
 
 
 def test_regression_profiles() -> None:
@@ -26,13 +138,13 @@ def test_regression_profiles() -> None:
             "session_duration_minutes": 60,
             "primary_goal": Goal.HYPERTROPHY,
         },
-        # 3. Advanced, Gym, 6 days, 90 min, Strength
+        # 3. Advanced, Gym, 6 days, 75 min, Strength
         {
             "training_experience": TrainingExperience.ADVANCED,
             "training_location": TrainingLocation.GYM,
             "available_equipment": list(Equipment),
             "available_training_days": 6,
-            "session_duration_minutes": 60,
+            "session_duration_minutes": 75,
             "primary_goal": Goal.STRENGTH,
         },
         # 4. Beginner, Home Dumbbells, 2 days, 30 min, Fat loss
@@ -118,26 +230,36 @@ def test_regression_profiles() -> None:
         "primary_goal": Goal.MUSCLE_GAIN,
     }
 
-    from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-
     catalog = full_catalog()
+    catalog_by_id = {item.id: item for item in catalog}
     for profile in profiles:
         req = request(**profile)
         result = generate_program(req, catalog, RULESET)
         assert result.is_success, f"Profile {profile} failed to generate: {result.errors}"
         program = result.program
         assert program is not None
-        
+
         # Verify final validator has zero errors
         validation_report = validate_program(program, req, RULESET)
         assert not validation_report.errors, f"Validation errors found: {validation_report.errors}"
 
         # Verify exact requested days
         assert len(program.weekly_schedule) == req.available_training_days
+        assert recovery_spacing_is_valid(program.weekly_schedule, RULESET)
 
         for day in program.weekly_schedule:
             # Verify no empty days
             assert len(day.exercises) > 0
+            per_session_sets = Counter(
+                item.primary_muscle
+                for item in day.exercises
+                for _set in range(item.sets)
+                if item.primary_muscle is not None and item.counts_toward_volume
+            )
+            assert all(
+                sets <= RULESET.max_sets_per_muscle_per_session
+                for sets in per_session_sets.values()
+            )
 
             # Verify session duration strictly within +-10 of requested duration
             target_min = req.session_duration_minutes - 10
@@ -151,35 +273,68 @@ def test_regression_profiles() -> None:
                 for eq in ex.equipment:
                     if eq != Equipment.BODYWEIGHT:
                         assert eq in req.available_equipment, f"Unavailable eq {eq}"
-                
+
                 # No blocked caution tags
                 if req.blocked_caution_tags:
                     for tag in ex.caution_tags:
                         assert tag not in req.blocked_caution_tags, f"Blocked tag {tag}"
-                        
+
                 # No HARD_INCOMPATIBLE selected
                 assert "RECOVERED_INCOMPATIBLE_SEMANTICS" not in ex.reason_codes
                 assert "HARD_INCOMPATIBLE" not in ex.reason_codes
-                
+
                 # No inactive/non-programmable exercise
                 assert ex.is_active is True
                 assert ex.is_programmable is True
-                
+
+                target = catalog_by_id[ex.exercise_id]
+                focus_patterns, _focus_muscles = focus_scope(day.focus)
+                for replacement_id in ex.substitution_exercise_ids:
+                    replacement = catalog_by_id[replacement_id]
+                    compatibility = evaluate_candidate_slot_compatibility(
+                        replacement,
+                        allowed_patterns=focus_patterns,
+                        target_muscles=(
+                            frozenset({target.primary_muscle})
+                            if target.primary_muscle is not None
+                            else None
+                        ),
+                        day_focus=day.focus,
+                        allow_full_body=day.focus.startswith("full_body"),
+                    )
+                    assert compatibility.level is not CompatibilityLevel.HARD_INCOMPATIBLE
+
                 # Valid reps-vs-duration prescription
                 if ex.prescription_mode == PrescriptionMode.REPS:
                     assert ex.rep_min is not None and ex.rep_max is not None
                     assert 1 <= ex.rep_min <= ex.rep_max <= 100
                     assert ex.duration_min_seconds is None and ex.duration_max_seconds is None
                 elif ex.prescription_mode == PrescriptionMode.DURATION:
-                    assert ex.duration_min_seconds is not None and ex.duration_max_seconds is not None
+                    assert ex.duration_min_seconds is not None
+                    assert ex.duration_max_seconds is not None
                     assert 1 <= ex.duration_min_seconds <= ex.duration_max_seconds <= 3600
                     assert ex.rep_min is None and ex.rep_max is None
-                
+
                 # Verify that we don't dump 5 sets (unless explicitly strength and compound)
                 if ex.sets >= 5:
-                    assert req.primary_goal == Goal.STRENGTH, f"5 sets dumped on non-strength profile for exercise {ex.exercise_name}"
-                    assert ex.exercise_type == ExerciseType.COMPOUND, f"5 sets dumped on non-compound exercise {ex.exercise_name}"
-                    assert "STRENGTH_PRIMARY_COMPOUND" in ex.reason_codes, f"5 sets dumped on non-primary strength work {ex.exercise_name} (reasons: {ex.reason_codes})"
+                    assert req.primary_goal == Goal.STRENGTH, (
+                        f"5 sets dumped on non-strength profile for {ex.exercise_name}"
+                    )
+                    assert ex.exercise_type == ExerciseType.COMPOUND, (
+                        f"5 sets dumped on non-compound exercise {ex.exercise_name}"
+                    )
+                    assert "STRENGTH_PRIMARY_COMPOUND" in ex.reason_codes, (
+                        f"5 sets dumped on non-primary strength work {ex.exercise_name} "
+                        f"(reasons: {ex.reason_codes})"
+                    )
+
+        ranges = program.aggregate_metrics["volume_ranges_by_muscle"]
+        effective = program.aggregate_metrics["weekly_effective_sets_by_muscle"]
+        assert all(
+            sets <= ranges[muscle]["effective_maximum_hard"]
+            for muscle, sets in effective.items()
+            if muscle in ranges
+        )
 
     req_imp = request(**impossible_profile)
     res_imp = generate_program(req_imp, catalog, RULESET)

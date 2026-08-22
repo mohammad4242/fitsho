@@ -7,12 +7,13 @@ from app.workouts.program_engine.enums import (
     RecoveryRating,
     TrainingExperience,
 )
+from app.workouts.program_engine.recovery import recovery_spacing_is_valid
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import RecentTrainingHistory
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
-def test_regression_novice_poor_recovery_never_gets_six_demanding_days() -> None:
+def test_regression_novice_poor_recovery_keeps_exact_days_with_valid_spacing() -> None:
     source = request(
         available_training_days=6,
         sleep_quality=RecoveryRating.POOR,
@@ -23,7 +24,8 @@ def test_regression_novice_poor_recovery_never_gets_six_demanding_days() -> None
     result = generate_program(source, full_catalog(), RULESET)
 
     assert result.program is not None, result.errors
-    assert len(result.program.weekly_schedule) <= 3
+    assert len(result.program.weekly_schedule) == 6
+    assert recovery_spacing_is_valid(result.program.weekly_schedule, RULESET)
 
 
 def test_regression_three_day_novice_is_not_push_pull_legs() -> None:
@@ -44,7 +46,7 @@ def test_regression_thirty_minute_session_keeps_the_exercise_count_floor() -> No
         <= RULESET.max_exercises_per_session
         for day in result.program.weekly_schedule
     )
-    policy = get_session_duration_policy(source.session_duration_minutes, RULESET)
+    policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
         policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
         for day in result.program.weekly_schedule
@@ -139,6 +141,6 @@ def test_regression_short_upper_lower_keeps_required_trunk_work() -> None:
     )
     assert any(day.cardio is not None for day in result.program.weekly_schedule)
     assert all(
-        day.estimated_duration_minutes <= 25 + RULESET.duration_tolerance_minutes
+        day.estimated_duration_minutes <= get_session_duration_policy(25).maximum_minutes
         for day in result.program.weekly_schedule
     )

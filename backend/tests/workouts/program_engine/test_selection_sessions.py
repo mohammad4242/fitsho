@@ -536,7 +536,7 @@ def test_substitutions_are_drawn_only_from_eligible_candidates() -> None:
     assert unsafe_sub.id not in substitutions
 
 
-def test_replacement_prefers_same_target_and_substitution_group_over_same_pattern() -> None:
+def test_replacement_excludes_incompatible_candidate_despite_matching_substitution_group() -> None:
     request = normalized()
     target = candidate(
         "target push",
@@ -551,15 +551,15 @@ def test_replacement_prefers_same_target_and_substitution_group_over_same_patter
         substitution_group="horizontal-push",
     )
     same_pattern = candidate(
-        "same pattern shoulders",
+        "same pattern chest",
         MovementPattern.HORIZONTAL_PUSH,
-        MuscleGroup.SHOULDERS,
+        MuscleGroup.CHEST,
         substitution_group="shoulder-push",
     )
 
     ranked = rank_replacement_exercises(request, target, (same_pattern, same_family))
 
-    assert ranked[0] is same_family
+    assert ranked == (same_pattern,)
 
 
 def test_replacement_ranking_excludes_unavailable_and_unsafe_candidates() -> None:
@@ -676,10 +676,6 @@ def test_missing_required_slot_rejects_session_before_supplements() -> None:
         [
             candidate("push one", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
             candidate("push two", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
-            candidate("push three", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
-            candidate("squat", MovementPattern.SQUAT, MuscleGroup.QUADRICEPS),
-            candidate("hinge", MovementPattern.HIP_HINGE, MuscleGroup.HAMSTRINGS),
-            candidate("plank", MovementPattern.CORE_ANTI_EXTENSION, MuscleGroup.ABS),
         ],
     ).eligible
     split = select_split(request, RULESET)
@@ -729,6 +725,72 @@ def test_supplements_are_added_only_after_required_slots_are_satisfied() -> None
     }.issubset(patterns)
     assert len(sessions[0].exercises) == RULESET.minimum_exercises_per_session
     assert "SESSION_SUPPLEMENTED_TO_MINIMUM" in sessions[0].reason_codes
+
+
+def test_required_slot_recovery_uses_target_muscle_not_global_pattern_presence() -> None:
+    request = normalized()
+    split = SplitPlan(
+        split_type=SplitType.BODY_PART_ROTATION,
+        day_focuses=("shoulders_traps",),
+        weekdays=(1,),
+        score=0,
+        reason_codes=(),
+    )
+    globally_matching_but_wrong_target = candidate(
+        "chest vertical press",
+        MovementPattern.VERTICAL_PUSH,
+        MuscleGroup.CHEST,
+    )
+    safe_focus_accessories = [
+        candidate(f"trap row {index}", MovementPattern.HORIZONTAL_PULL, MuscleGroup.TRAPS)
+        for index in range(RULESET.minimum_exercises_per_session)
+    ]
+
+    sessions = build_sessions(
+        request,
+        split,
+        plan_weekly_volume(request, split, RULESET),
+        tuple((globally_matching_but_wrong_target, *safe_focus_accessories)),
+        RULESET,
+    )
+
+    assert len(sessions[0].exercises) == RULESET.minimum_exercises_per_session
+    assert globally_matching_but_wrong_target not in sessions[0].exercises
+    assert "RECOVERY_APPLIED_REQUIRED_SLOT_RELAXATION" in sessions[0].reason_codes
+    assert "SLOT_SEMANTIC_MISMATCH" in sessions[0].reason_codes
+
+
+def test_required_slot_uses_valid_suboptimal_candidate_before_relaxing() -> None:
+    request = normalized()
+    split = SplitPlan(
+        split_type=SplitType.BODY_PART_ROTATION,
+        day_focuses=("shoulders_traps",),
+        weekdays=(1,),
+        score=0,
+        reason_codes=(),
+    )
+    suboptimal_press = candidate(
+        "compound chest press with shoulder target",
+        MovementPattern.VERTICAL_PUSH,
+        MuscleGroup.CHEST,
+        secondary_muscles=(MuscleGroup.SHOULDERS,),
+    )
+    accessories = [
+        candidate(f"shoulder trap row {index}", MovementPattern.HORIZONTAL_PULL, MuscleGroup.TRAPS)
+        for index in range(RULESET.minimum_exercises_per_session)
+    ]
+
+    sessions = build_sessions(
+        request,
+        split,
+        plan_weekly_volume(request, split, RULESET),
+        tuple((suboptimal_press, *accessories)),
+        RULESET,
+    )
+
+    assert suboptimal_press in sessions[0].exercises
+    assert "VALID_BUT_SUBOPTIMAL_SEMANTICS" in sessions[0].selection_reasons[suboptimal_press.id]
+    assert "RECOVERY_APPLIED_REQUIRED_SLOT_RELAXATION" not in sessions[0].reason_codes
 
 
 def test_body_part_rotation_places_chest_and_direct_triceps_in_one_session() -> None:

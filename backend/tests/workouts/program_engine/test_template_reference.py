@@ -149,7 +149,11 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
                 1,
                 "Upper A",
                 upper_focus,
-                (slot("Push Up", upper_focus), slot("Bodyweight Row", upper_focus), slot("Incline Push Up", upper_focus)),
+                (
+                    slot("Push Up", upper_focus),
+                    slot("Bodyweight Row", upper_focus),
+                    slot("Incline Push Up", upper_focus),
+                ),
             ),
             TemplateReferenceDay(
                 2,
@@ -161,7 +165,11 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
                 3,
                 "Upper B",
                 upper_focus,
-                (slot("Dumbbell Press", upper_focus), slot("Dumbbell Row", upper_focus), slot("Decline Push Up", upper_focus)),
+                (
+                    slot("Dumbbell Press", upper_focus),
+                    slot("Dumbbell Row", upper_focus),
+                    slot("Decline Push Up", upper_focus),
+                ),
             ),
             TemplateReferenceDay(
                 4,

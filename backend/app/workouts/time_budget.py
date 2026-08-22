@@ -24,7 +24,6 @@ class WorkoutGenerationPolicy:
     allowed_rir: tuple[int, ...] = (1, 2, 3, 4)
     set_execution_seconds: int = 45
     transition_seconds_per_exercise: int = 90
-    model_duration_tolerance_minutes: int = 10
 
     @classmethod
     def for_session_duration(

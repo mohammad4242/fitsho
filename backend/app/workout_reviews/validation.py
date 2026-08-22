@@ -12,6 +12,7 @@ from app.workout_reviews.enums import WorkoutReviewErrorCode
 from app.workout_reviews.repository import get_exercises
 from app.workout_reviews.schemas import WorkoutReviewDraftUpdate
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
+from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.schemas import CandidateSet, WorkoutExerciseCandidate
 from app.workouts.time_budget import (
     ExerciseTiming,
@@ -115,20 +116,12 @@ class WorkoutReviewDraftValidator:
         raw_session_duration = source.profile_snapshot.get("session_duration_minutes", 45)
         session_duration = raw_session_duration if isinstance(raw_session_duration, int) else 45
         policy = WorkoutGenerationPolicy.for_session_duration(session_duration)
+        duration_policy = get_session_duration_policy(session_duration)
         source_sets = [item.sets for day in source.days for item in day.exercises]
         source_max_exercises = max((len(day.exercises) for day in source.days), default=1)
         policy = replace(
             policy,
-            session_duration_minutes=max(
-                session_duration + 5,
-                max(
-                    (
-                        day.estimated_duration_minutes + policy.model_duration_tolerance_minutes
-                        for day in source.days
-                    ),
-                    default=0,
-                ),
-            ),
+            session_duration_minutes=duration_policy.maximum_minutes,
             maximum_exercises_per_day=max(
                 policy.maximum_exercises_per_day,
                 source_max_exercises,

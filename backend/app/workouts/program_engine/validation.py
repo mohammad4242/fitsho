@@ -16,7 +16,7 @@ from app.workouts.program_engine.schemas import (
     ValidationReport,
     WorkoutProgram,
 )
-from app.workouts.program_engine.session_builder import _slots_for_focus
+from app.workouts.program_engine.session_builder import slots_for_focus
 from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     focus_scope,
@@ -39,7 +39,7 @@ def validate_program(
     direct_session_frequency: Counter[str] = Counter()
     volume_ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
     priority_muscles = set(request.priority_muscles)
-    duration_policy = get_session_duration_policy(request.session_duration_minutes, ruleset)
+    duration_policy = get_session_duration_policy(request.session_duration_minutes)
     if isinstance(volume_ranges, dict):
         priority_muscles.update(
             MuscleGroup(muscle)
@@ -80,7 +80,7 @@ def validate_program(
         for item in day.exercises:
             semantic_patterns, semantic_muscles = focus_scope(day.focus)
             if not day.focus.startswith("template_reference"):
-                slots = _slots_for_focus(day.focus)
+                slots = slots_for_focus(day.focus)
                 semantic_patterns = semantic_patterns | frozenset(
                     pattern for slot in slots for pattern in slot.patterns
                 )

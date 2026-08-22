@@ -32,7 +32,7 @@ def add_cardio(
     options = _safe_cardio(request, exercises, ruleset)
     if not options or not days:
         return days
-    duration_policy = get_session_duration_policy(request.source.session_duration_minutes, ruleset)
+    duration_policy = get_session_duration_policy(request.source.session_duration_minutes)
     modality = min(options, key=lambda item: (_cardio_rank(request, item, ruleset), str(item.id)))
     target_days = (
         ruleset.fat_loss_cardio_days

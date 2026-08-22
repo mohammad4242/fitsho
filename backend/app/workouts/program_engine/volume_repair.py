@@ -2,6 +2,7 @@ from collections import Counter
 from dataclasses import replace
 
 from app.exercises.enums import MuscleGroup
+from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
@@ -279,6 +280,9 @@ def _select_set_redistribution(
     request: NormalizedProgramRequest,
     ruleset: ProgramRuleset,
 ) -> tuple[int, int, int] | None:
+    duration_policy = get_session_duration_policy(
+        request.source.session_duration_minutes,
+    )
     direct = _direct_sets(days)
     options: list[tuple[int, int, int, int, str, str]] = []
     for day_index, exercises in enumerate(days):
@@ -346,9 +350,7 @@ def _select_set_redistribution(
                 duration = ruleset.general_warmup_minutes + sum(
                     item.estimated_minutes for item in simulated[day_index]
                 )
-                if duration > (
-                    request.source.session_duration_minutes + ruleset.duration_tolerance_minutes
-                ):
+                if duration > duration_policy.maximum_minutes:
                     continue
                 options.append(
                     (
@@ -381,6 +383,9 @@ def _select_exercise_addition(
         return None
     selected_ids = {item.exercise_id for day in days for item in day}
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
+    duration_policy = get_session_duration_policy(
+        request.source.session_duration_minutes,
+    )
     day_contexts = tuple(
         replace(original, exercises=tuple(exercises))
         for original, exercises in zip(originals, days, strict=True)
@@ -436,9 +441,7 @@ def _select_exercise_addition(
                     + estimated
                     + (original.cardio.duration_minutes if original.cardio else 0)
                 )
-                if duration > (
-                    request.source.session_duration_minutes + ruleset.duration_tolerance_minutes
-                ):
+                if duration > duration_policy.maximum_minutes:
                     continue
                 role_repeated = any(
                     item.primary_muscle is muscle
@@ -589,6 +592,9 @@ def _select_addition_candidate(
     ruleset: ProgramRuleset,
 ) -> tuple[int, int, ProgrammedExercise, str] | None:
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
+    duration_policy = get_session_duration_policy(
+        request.source.session_duration_minutes,
+    )
     candidates = []
     hard_maximums = {muscle.value: target.maximum_hard for muscle, target in targets.items()}
     for day_index, exercises in enumerate(days):
@@ -623,9 +629,16 @@ def _select_addition_candidate(
                     ruleset,
                 ),
             )
-            if _day_duration(
-                exercises, exercise, updated, cardio_minutes_by_day[day_index], ruleset
-            ) > (request.source.session_duration_minutes + ruleset.duration_tolerance_minutes):
+            if (
+                _day_duration(
+                    exercises,
+                    exercise,
+                    updated,
+                    cardio_minutes_by_day[day_index],
+                    ruleset,
+                )
+                > duration_policy.maximum_minutes
+            ):
                 continue
             simulated = [list(day_exercises) for day_exercises in days]
             simulated[day_index][exercise_index] = updated

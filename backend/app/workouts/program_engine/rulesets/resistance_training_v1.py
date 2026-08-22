@@ -25,7 +25,6 @@ class ProgramRuleset:
     early_intermediate_training_age_months: int = 18
     intermediate_training_age_months: int = 48
     minimum_consistent_weeks_for_experience: int = 4
-    duration_tolerance_minutes: int = 5
     general_warmup_minutes: int = 5
     primary_set_credit: float = 1.0
     secondary_set_credit: float = 0.5

@@ -39,7 +39,7 @@ def repair_session_durations(
 ) -> tuple[tuple[WorkoutDay, ...], tuple[str, ...]]:
     """Repair real session estimates while preserving hard program constraints."""
 
-    policy = get_session_duration_policy(request.source.session_duration_minutes, ruleset)
+    policy = get_session_duration_policy(request.source.session_duration_minutes)
     repaired: list[WorkoutDay] = []
     reasons: list[str] = []
     for day_index, day in enumerate(days):

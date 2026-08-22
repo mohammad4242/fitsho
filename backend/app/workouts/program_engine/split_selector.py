@@ -1,6 +1,10 @@
-from dataclasses import replace
+from collections import Counter
+from dataclasses import dataclass, replace
 
+from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
+from app.workouts.program_engine.body_analysis import body_analysis_priority_muscles
 from app.workouts.program_engine.enums import (
+    CompatibilityLevel,
     Goal,
     PhysicalJobDemand,
     RecoveryRating,
@@ -10,10 +14,54 @@ from app.workouts.program_engine.enums import (
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
+    ExerciseCandidate,
     NormalizedProgramRequest,
     SplitCandidate,
     SplitPlan,
 )
+from app.workouts.program_engine.session_builder import slots_for_focus
+from app.workouts.program_engine.slot_compatibility import (
+    evaluate_candidate_slot_compatibility,
+    focus_scope,
+)
+
+_DYNAMIC_FOCUSES = (
+    "upper",
+    "lower",
+    "push",
+    "pull",
+    "legs",
+    "chest_triceps",
+    "back_biceps",
+    "shoulders_traps",
+    "quadriceps_calves",
+    "posterior_chain_core",
+    "full_body",
+    "full_body_b",
+    "full_body_c",
+    "full_body_d",
+)
+
+
+@dataclass(frozen=True)
+class _FocusAvailability:
+    focus: str
+    candidate_count: int
+    preferred_slots: int
+    suboptimal_slots: int
+    relaxed_slots: int
+    required_slots: int
+    patterns: frozenset[MovementPattern]
+    muscles: frozenset[MuscleGroup]
+    compound_count: int
+    priority_count: int
+
+    @property
+    def is_feasible(self) -> bool:
+        return (
+            self.preferred_slots + self.suboptimal_slots + self.relaxed_slots
+            == self.required_slots
+        )
 
 
 def select_split(request: NormalizedProgramRequest, ruleset: ProgramRuleset) -> SplitPlan:
@@ -52,6 +100,247 @@ def rank_split_candidates(
             reasons.append("SPLIT_REDUCED_FOR_RECOVERY")
         ranked.append(replace(candidate, reason_codes=tuple(dict.fromkeys(reasons))))
     return tuple(ranked)
+
+
+def rank_availability_aware_fallbacks(
+    request: NormalizedProgramRequest,
+    exercises: tuple[ExerciseCandidate, ...],
+    ruleset: ProgramRuleset,
+    *,
+    weekdays: tuple[int, ...],
+    excluded_layouts: frozenset[tuple[str, ...]] = frozenset(),
+    limit: int = 12,
+) -> tuple[SplitPlan, ...]:
+    """Rank exact-day layouts that the current safe candidate pool can fill."""
+
+    requested_days = request.resistance_training_days
+    if requested_days < 1 or len(weekdays) != requested_days or limit <= 0:
+        return ()
+    target_capacity = max(
+        ruleset.minimum_exercises_per_session,
+        min(
+            ruleset.max_exercises_per_session,
+            (request.source.session_duration_minutes - ruleset.general_warmup_minutes)
+            // ruleset.minutes_per_exercise_slot,
+        ),
+    )
+    priorities = request.source.priority_muscles | body_analysis_priority_muscles(
+        request,
+        ruleset,
+    )
+    availability = tuple(
+        item
+        for focus in _DYNAMIC_FOCUSES
+        if (
+            item := _focus_availability(
+                focus,
+                exercises,
+                priorities,
+            )
+        ).is_feasible
+        and item.candidate_count >= max(1, ruleset.minimum_exercises_per_session - 2)
+    )
+    if not availability:
+        return ()
+
+    beam: list[tuple[str, ...]] = [()]
+    beam_width = max(limit * 24, 96)
+    for _position in range(requested_days):
+        expanded: list[tuple[str, ...]] = []
+        for partial in beam:
+            for item in availability:
+                if partial and partial[-1] == item.focus:
+                    continue
+                candidate = (*partial, item.focus)
+                if _has_short_gap_overlap(candidate, weekdays, availability, final=False):
+                    continue
+                expanded.append(candidate)
+        beam = sorted(
+            set(expanded),
+            key=lambda layout: _dynamic_layout_sort_key(
+                layout,
+                availability,
+                request,
+                target_capacity,
+            ),
+        )[:beam_width]
+        if not beam:
+            return ()
+
+    excluded_signatures = {_layout_signature(layout) for layout in excluded_layouts}
+    layouts = [
+        layout
+        for layout in beam
+        if _layout_signature(layout) not in excluded_signatures
+        and not _has_short_gap_overlap(layout, weekdays, availability, final=True)
+    ]
+    ranked = sorted(
+        layouts,
+        key=lambda layout: _dynamic_layout_sort_key(
+            layout,
+            availability,
+            request,
+            target_capacity,
+        ),
+    )[:limit]
+    return tuple(
+        SplitPlan(
+            split_type=SplitType.DYNAMIC_FALLBACK,
+            day_focuses=layout,
+            weekdays=weekdays,
+            score=-1000 - index,
+            reason_codes=(
+                "DYNAMIC_EXACT_N_FALLBACK",
+                "DYNAMIC_LAYOUT_RANKED_FROM_ELIGIBLE_POOL",
+                "DYNAMIC_LAYOUT_RECOVERY_SPACING_SCREENED",
+                "DYNAMIC_LAYOUT_DURATION_CAPACITY_SCREENED",
+            ),
+        )
+        for index, layout in enumerate(ranked)
+    )
+
+
+def _layout_signature(layout: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple("lower" if focus == "legs" else focus for focus in layout)
+
+
+def _focus_availability(
+    focus: str,
+    exercises: tuple[ExerciseCandidate, ...],
+    priorities: frozenset[MuscleGroup],
+) -> _FocusAvailability:
+    focus_patterns, focus_muscles = focus_scope(focus)
+    compatible = tuple(
+        item
+        for item in exercises
+        if evaluate_candidate_slot_compatibility(
+            item,
+            allowed_patterns=focus_patterns,
+            target_muscles=focus_muscles,
+            day_focus=focus,
+            allow_full_body=focus.startswith("full_body"),
+        ).compatible
+    )
+    preferred = 0
+    suboptimal = 0
+    relaxed = 0
+    required_slots = tuple(slot for slot in slots_for_focus(focus) if slot.required)
+    for slot in required_slots:
+        levels = tuple(
+            evaluate_candidate_slot_compatibility(
+                item,
+                allowed_patterns=slot.patterns,
+                target_muscles=(
+                    frozenset({slot.target_muscle}) if slot.target_muscle is not None else None
+                ),
+                day_focus=focus,
+                allow_full_body=focus.startswith("full_body"),
+            ).level
+            for item in exercises
+        )
+        if CompatibilityLevel.PREFERRED in levels:
+            preferred += 1
+        elif CompatibilityLevel.VALID_BUT_SUBOPTIMAL in levels:
+            suboptimal += 1
+        elif slot.target_muscle is not None and any(
+            item.movement_pattern in slot.patterns for item in exercises
+        ):
+            relaxed += 1
+    return _FocusAvailability(
+        focus=focus,
+        candidate_count=len(compatible),
+        preferred_slots=preferred,
+        suboptimal_slots=suboptimal,
+        relaxed_slots=relaxed,
+        required_slots=len(required_slots),
+        patterns=frozenset(item.movement_pattern for item in compatible),
+        muscles=frozenset(
+            item.primary_muscle for item in compatible if item.primary_muscle is not None
+        ),
+        compound_count=sum(item.exercise_type is ExerciseType.COMPOUND for item in compatible),
+        priority_count=sum(item.primary_muscle in priorities for item in compatible),
+    )
+
+
+def _has_short_gap_overlap(
+    layout: tuple[str, ...],
+    weekdays: tuple[int, ...],
+    availability: tuple[_FocusAvailability, ...],
+    *,
+    final: bool,
+) -> bool:
+    by_focus = {item.focus: item for item in availability}
+    for index in range(1, len(layout)):
+        if weekdays[index] - weekdays[index - 1] >= 2:
+            continue
+        if by_focus[layout[index - 1]].muscles.intersection(by_focus[layout[index]].muscles):
+            return True
+    if final and len(layout) > 1 and weekdays[0] + 7 - weekdays[-1] < 2:
+        return bool(by_focus[layout[-1]].muscles.intersection(by_focus[layout[0]].muscles))
+    return False
+
+
+def _dynamic_layout_sort_key(
+    layout: tuple[str, ...],
+    availability: tuple[_FocusAvailability, ...],
+    request: NormalizedProgramRequest,
+    target_capacity: int,
+) -> tuple[object, ...]:
+    by_focus = {item.focus: item for item in availability}
+    selected = tuple(by_focus[focus] for focus in layout)
+    counts = Counter(layout)
+    covered_patterns = frozenset(pattern for item in selected for pattern in item.patterns)
+    covered_muscles = frozenset(muscle for item in selected for muscle in item.muscles)
+    required_pattern_groups = (
+        frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH}),
+        frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL}),
+        frozenset({MovementPattern.SQUAT, MovementPattern.LUNGE, MovementPattern.KNEE_EXTENSION}),
+        frozenset({MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION}),
+        frozenset(
+            {
+                MovementPattern.CORE_ANTI_EXTENSION,
+                MovementPattern.CORE_ANTI_ROTATION,
+                MovementPattern.CORE_ANTI_LATERAL_FLEXION,
+            }
+        ),
+    )
+    missing_pattern_groups = sum(
+        not covered_patterns.intersection(group) for group in required_pattern_groups
+    )
+    missing_priorities = len(request.source.priority_muscles - covered_muscles)
+    duration_shortfall = sum(max(0, target_capacity - item.candidate_count) for item in selected)
+    suboptimal_slots = sum(item.suboptimal_slots for item in selected)
+    relaxed_slots = sum(item.relaxed_slots for item in selected)
+    if request.primary_goal is Goal.STRENGTH:
+        goal_fit = sum(item.compound_count == 0 for item in selected)
+    elif request.primary_goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN}:
+        goal_fit = -len(covered_muscles)
+    else:
+        goal_fit = -len(covered_patterns)
+    experience_fit = (
+        len(counts)
+        if request.training_status is TrainingStatus.NOVICE
+        else -len(counts)
+        if request.training_status is TrainingStatus.ADVANCED
+        else 0
+    )
+    priority_opportunities = sum(item.priority_count for item in selected)
+    repetition = sum(max(0, count - 1) ** 2 for count in counts.values())
+    broad_focuses = sum(focus.startswith("full_body") for focus in layout)
+    return (
+        missing_pattern_groups,
+        missing_priorities,
+        goal_fit,
+        experience_fit,
+        duration_shortfall,
+        relaxed_slots,
+        suboptimal_slots,
+        -priority_opportunities,
+        repetition,
+        broad_focuses,
+        -len(counts),
+        layout,
+    )
 
 
 def generate_split_candidates(days: int) -> tuple[SplitCandidate, ...]:

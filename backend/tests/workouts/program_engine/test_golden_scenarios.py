@@ -58,7 +58,7 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
     if source.available_training_days == 5:
         assert result.program.split.split_type in FIVE_DAY_SPLIT_TYPES
     assert result.program.validation_report.is_valid
-    policy = get_session_duration_policy(source.session_duration_minutes, RULESET)
+    policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
         policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
         for day in result.program.weekly_schedule

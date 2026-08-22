@@ -20,7 +20,7 @@ from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 def test_session_duration_policy_has_exact_product_bounds(
     requested: int, minimum: int, maximum: int
 ) -> None:
-    policy = get_session_duration_policy(requested, RULESET)
+    policy = get_session_duration_policy(requested)
 
     assert (policy.minimum_minutes, policy.maximum_minutes) == (minimum, maximum)
 
@@ -33,11 +33,28 @@ def test_generate_program_keeps_every_session_inside_duration_target(requested: 
 
     assert result.is_success, result.errors
     assert result.program is not None
-    policy = get_session_duration_policy(requested, RULESET)
+    policy = get_session_duration_policy(requested)
     assert all(
         policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
         for day in result.program.weekly_schedule
     )
+
+
+def test_advanced_strength_program_supports_120_minute_session_policy() -> None:
+    source = request(
+        session_duration_minutes=120,
+        available_training_days=1,
+        primary_goal="strength",
+        training_experience="advanced",
+        training_age_months=72,
+    )
+
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert result.is_success, result.errors
+    assert result.program is not None
+    policy = get_session_duration_policy(120)
+    assert policy.contains(result.program.weekly_schedule[0].estimated_duration_minutes)
 
 
 def test_underfilled_session_is_repaired_with_real_estimates() -> None:

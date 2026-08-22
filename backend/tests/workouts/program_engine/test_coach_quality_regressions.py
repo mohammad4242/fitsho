@@ -60,7 +60,6 @@ def test_required_muscle_without_any_safe_coverage_is_structured_unsatisfied() -
             assert "HARD_INCOMPATIBLE" not in ex.reason_codes
 
 
-
 def test_safe_layout_recovery_omits_hard_blocked_required_pattern() -> None:
     source = request(
         age=46,
@@ -96,7 +95,12 @@ def test_safe_layout_recovery_omits_hard_blocked_required_pattern() -> None:
         plan_weekly_volume(normalized, split, RULESET),
         eligibility.eligible,
         RULESET,
-        relaxable_required_pattern_groups=(KNEE_PATTERNS,),
+        rejected_slot_candidates=tuple(
+            (candidate, rejected.reason_codes)
+            for candidate in catalog
+            for rejected in eligibility.rejected
+            if rejected.exercise_id == candidate.id
+        ),
     )
 
     assert len(sessions) == 4

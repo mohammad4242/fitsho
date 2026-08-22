@@ -258,6 +258,15 @@ def build_template_sessions(
                     candidate,
                     eligible,
                     limit=ruleset.substitution_limit,
+                    allowed_patterns=frozenset({slot.movement_pattern}),
+                    target_muscles=(
+                        frozenset(slot.target_muscles)
+                        if slot.target_muscles
+                        else frozenset({candidate.primary_muscle})
+                        if candidate.primary_muscle is not None
+                        else None
+                    ),
+                    day_focus=f"template_reference_{index}",
                 )
             )
             resolutions.append(

@@ -1,3 +1,5 @@
+from collections import Counter
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -11,6 +13,7 @@ from app.exercises.enums import (
 )
 from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.engine import generate_program
+from app.workouts.program_engine.prescription import estimate_exercise_minutes
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -19,7 +22,10 @@ from app.workouts.program_engine.schemas import (
     WeeklyVolumePlan,
     WorkoutDay,
 )
-from app.workouts.program_engine.volume_repair import repair_weekly_volume
+from app.workouts.program_engine.volume_repair import (
+    _select_addition_candidate,
+    repair_weekly_volume,
+)
 from tests.workouts.program_engine.golden_fixtures import full_catalog, golden_scenarios
 from tests.workouts.program_engine.test_selection_sessions import normalized
 
@@ -186,7 +192,7 @@ def test_generate_program_preserves_volume_and_duration_constraints_without_set_
     assert result.program is not None, result.errors
     assert all(item.sets <= 5 for day in result.program.weekly_schedule for item in day.exercises)
     policy = get_session_duration_policy(
-        int(result.program.user_profile_snapshot["session_duration_minutes"]), RULESET
+        int(result.program.user_profile_snapshot["session_duration_minutes"])
     )
     assert all(
         policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
@@ -203,3 +209,41 @@ def test_generate_program_preserves_volume_and_duration_constraints_without_set_
         for muscle, value in metrics["weekly_direct_sets_by_muscle"].items()
         if muscle in metrics["volume_ranges_by_muscle"]
     )
+
+
+def test_volume_repair_accepts_valid_increment_between_plus_five_and_plus_ten() -> None:
+    source = normalized(session_duration_minutes=60)
+    target = replace(
+        _programmed("Target", MuscleGroup.CHEST, 2),
+        estimated_minutes=estimate_exercise_minutes(2, 90, 0, RULESET),
+    )
+    fillers = tuple(
+        replace(
+            _programmed(f"Filler {index}", MuscleGroup.BACK, 4),
+            estimated_minutes=8,
+            counts_toward_volume=False,
+        )
+        for index in range(6)
+    ) + (
+        replace(
+            _programmed("Filler final", MuscleGroup.BACK, 3),
+            rest_seconds=120,
+            estimated_minutes=estimate_exercise_minutes(3, 120, 0, RULESET),
+            counts_toward_volume=False,
+        ),
+    )
+    volume_target = _volume_target(MuscleGroup.CHEST).targets[0]
+
+    selected = _select_addition_candidate(
+        [[target, *fillers]],
+        {MuscleGroup.CHEST},
+        set(),
+        Counter({MuscleGroup.CHEST.value: 2}),
+        {MuscleGroup.CHEST: volume_target},
+        (0,),
+        source,
+        RULESET,
+    )
+
+    assert selected is not None
+    assert selected[:2] == (0, 0)
