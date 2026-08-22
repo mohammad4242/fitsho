@@ -12,14 +12,55 @@ from app.exercises.enums import (
 )
 from app.exercises.models import Exercise
 from app.exercises.service import seed_exercises
-from app.profile.enums import ExperienceLevel
+from app.profile.enums import ExperienceLevel, FitnessGoal
+from app.profile.training_compatibility import (
+    ResistanceTrainingDayStatus,
+    resistance_training_day_status,
+)
 from app.training_templates.models import TrainingProgramTemplate, TrainingProgramTemplateSlot
 from app.training_templates.seed_data import (
+    SOURCE_NAME,
+    SOURCE_URL,
     TRAINING_PROGRAM_TEMPLATE_SEEDS,
     TemplateDaySeed,
     TemplateSlotSeed,
 )
 from app.training_templates.service import seed_training_program_templates
+
+EXPECTED_RETIRED_REDUNDANT_TEMPLATE_SLUGS = frozenset(
+    {
+        "two-day-full-body-fat-loss-beginner",
+        "two-day-full-body-general-fitness-beginner",
+        "three-day-full-body-fat-loss-beginner",
+        "three-day-full-body-general-fitness-beginner",
+        "five-day-ppl-fat-loss-intermediate",
+        "six-day-ppl-fat-loss-advanced",
+    }
+)
+EXPECTED_RETIRED_UNSUPPORTED_TEMPLATE_SLUGS = frozenset(
+    {
+        "two-day-full-body-superset",
+        "five-day-beginner-body-part-foundation",
+    }
+)
+EXPECTED_STRUCTURAL_RECLASSIFIED_TEMPLATE_SLUGS = frozenset(
+    {
+        "two-day-full-body-strength-beginner",
+        "three-day-full-body-strength-beginner",
+        "three-day-full-body-strength-intermediate",
+        "four-day-upper-lower-strength-intermediate",
+        "four-day-upper-lower-strength-advanced",
+        "five-day-strength-intermediate",
+        "five-day-strength-advanced",
+        "six-day-push-pull-legs-strength",
+        "three-day-full-body-fat-loss-intermediate",
+        "four-day-upper-lower-fat-loss-intermediate",
+        "four-day-upper-lower-fat-loss-advanced",
+        "five-day-ppl-fat-loss-advanced",
+        "three-day-full-body-general-fitness-intermediate",
+        "four-day-upper-lower-general-fitness-intermediate",
+    }
+)
 
 
 def test_seed_adds_current_template_library_for_every_supported_training_frequency(
@@ -29,7 +70,7 @@ def test_seed_adds_current_template_library_for_every_supported_training_frequen
 
     result = seed_training_program_templates(db)
 
-    assert result.templates == 55
+    assert result.templates == 47
     templates = list(db.scalars(select(TrainingProgramTemplate)))
     assert {template.days_per_week for template in templates} == {2, 3, 4, 5, 6}
     for days_per_week in range(2, 7):
@@ -70,6 +111,53 @@ def test_active_library_offers_two_through_six_days_and_only_full_body_two_day_t
             MovementPattern.KNEE_EXTENSION,
         }, template.slug
         assert patterns & {MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION}, template.slug
+
+
+def test_audited_library_contains_structural_variants_not_goal_duplicates() -> None:
+    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 47
+    seed_slugs = {template.slug for template in TRAINING_PROGRAM_TEMPLATE_SEEDS}
+
+    assert not seed_slugs.intersection(EXPECTED_RETIRED_REDUNDANT_TEMPLATE_SLUGS)
+    assert not seed_slugs.intersection(EXPECTED_RETIRED_UNSUPPORTED_TEMPLATE_SLUGS)
+    assert EXPECTED_STRUCTURAL_RECLASSIFIED_TEMPLATE_SLUGS.issubset(seed_slugs)
+    assert all(
+        template.fitness_goal is FitnessGoal.BUILD_MUSCLE
+        for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
+    )
+    assert all(
+        not {"strength", "fat_loss", "general_fitness"}.intersection(template.focus_tags)
+        for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
+    )
+
+
+def test_audited_library_keeps_unique_goal_era_structures() -> None:
+    seed_slugs = {template.slug for template in TRAINING_PROGRAM_TEMPLATE_SEEDS}
+
+    assert {
+        "three-day-full-body-strength-intermediate",
+        "four-day-upper-lower-strength-advanced",
+        "four-day-upper-lower-fat-loss-intermediate",
+        "five-day-ppl-fat-loss-advanced",
+        "three-day-full-body-general-fitness-intermediate",
+        "four-day-upper-lower-general-fitness-intermediate",
+    }.issubset(seed_slugs)
+
+
+def test_active_seeded_library_excludes_unsupported_days_and_levels(db: Session) -> None:
+    seed_exercises(db)
+    seed_training_program_templates(db)
+
+    active_templates = list(
+        db.scalars(
+            select(TrainingProgramTemplate).where(TrainingProgramTemplate.is_active.is_(True))
+        )
+    )
+
+    assert all(
+        resistance_training_day_status(template.training_level, template.days_per_week)
+        is not ResistanceTrainingDayStatus.UNSUPPORTED
+        for template in active_templates
+    )
 
 
 def test_every_template_session_contains_between_five_and_nine_exercises() -> None:
@@ -139,15 +227,15 @@ def test_seed_expands_four_and_five_day_reference_library_across_levels(db: Sess
     result = seed_training_program_templates(db)
 
     templates = list(db.scalars(select(TrainingProgramTemplate)))
-    assert result.templates == 55
+    assert result.templates == 47
     for days_per_week in (4, 5):
         bucket = [template for template in templates if template.days_per_week == days_per_week]
-        assert len(bucket) == {4: 15, 5: 14}[days_per_week]
+        assert len(bucket) == {4: 15, 5: 12}[days_per_week]
         assert {template.training_level for template in bucket} == {
             ExperienceLevel.BEGINNER,
             ExperienceLevel.INTERMEDIATE,
             ExperienceLevel.ADVANCED,
-        }
+        } - ({ExperienceLevel.BEGINNER} if days_per_week == 5 else set())
         tags = {tag for template in bucket for tag in template.focus_tags}
         assert {"chest_priority", "back_priority"}.issubset(tags)
 
@@ -280,7 +368,7 @@ def test_seed_can_be_rerun_without_duplicate_template_days(db: Session) -> None:
 
     result = seed_training_program_templates(db)
 
-    assert result.templates == 55
+    assert result.templates == 47
     assert (
         db.scalar(
             select(TrainingProgramTemplate).where(
@@ -289,6 +377,52 @@ def test_seed_can_be_rerun_without_duplicate_template_days(db: Session) -> None:
         )
         is not None
     )
+
+
+def test_reseed_deactivates_obsolete_fitsho_templates_but_keeps_custom_templates(
+    db: Session,
+) -> None:
+    seed_exercises(db)
+
+    obsolete = TrainingProgramTemplate(
+        slug="two-day-full-body-general-fitness-beginner",
+        name_en="Obsolete Fitsho Template",
+        name_fa="قالب قدیمی فیتشو",
+        description_en="Obsolete seeded template.",
+        description_fa="قالب بذر قدیمی.",
+        days_per_week=2,
+        training_level=ExperienceLevel.BEGINNER,
+        fitness_goal=FitnessGoal.BUILD_MUSCLE,
+        focus_tags=["full_body"],
+        intensity_methods=["standard"],
+        programming_rationale=[],
+        source_name=SOURCE_NAME,
+        source_url=SOURCE_URL,
+        is_active=True,
+    )
+    custom = TrainingProgramTemplate(
+        slug="admin-custom-template",
+        name_en="Admin Custom Template",
+        name_fa="قالب سفارشی ادمین",
+        description_en="Custom template.",
+        description_fa="قالب سفارشی.",
+        days_per_week=2,
+        training_level=ExperienceLevel.BEGINNER,
+        fitness_goal=FitnessGoal.BUILD_MUSCLE,
+        focus_tags=["full_body"],
+        intensity_methods=["standard"],
+        programming_rationale=[],
+        source_name="Fitsho admin library",
+        source_url="https://fitsho.local/admin-library",
+        is_active=True,
+    )
+    db.add_all((obsolete, custom))
+    db.commit()
+
+    seed_training_program_templates(db)
+
+    assert db.get(TrainingProgramTemplate, obsolete.id).is_active is False
+    assert db.get(TrainingProgramTemplate, custom.id).is_active is True
 
 
 def test_seed_persists_template_programming_reasons(db: Session) -> None:

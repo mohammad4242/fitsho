@@ -55,7 +55,16 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
             )
         )
     )
-    templates_by_slug = {template.slug: template for template in existing_templates}
+    templates_by_slug: dict[str, TrainingProgramTemplate] = {
+        template.slug: template for template in existing_templates
+    }
+    seeded_slugs = {seed.slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS}
+    for existing_template in existing_templates:
+        if (
+            _is_fitsho_seed_managed(existing_template)
+            and existing_template.slug not in seeded_slugs
+        ):
+            existing_template.is_active = False
 
     for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS:
         template = templates_by_slug.get(seed.slug)
@@ -133,6 +142,10 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
         linked_slots=linked_slots,
         placeholder_slots=placeholder_slots,
     )
+
+
+def _is_fitsho_seed_managed(template: TrainingProgramTemplate) -> bool:
+    return template.source_name == SOURCE_NAME and template.source_url == SOURCE_URL
 
 
 def _exercise_id_for_slot(

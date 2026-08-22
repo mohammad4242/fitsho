@@ -69,6 +69,58 @@ Level = ExperienceLevel
 SOURCE_NAME = "Fitsho synthesis: Stronger By Science · Jeff Nippard · RP Strength"
 SOURCE_URL = "https://www.strongerbyscience.com/exercise-order-video/"
 
+# Phase 4 structural-library audit. These legacy entries are either exact
+# Goal-era duplicates or belong to unsupported Days x ExperienceLevel cells.
+RETIRED_REDUNDANT_TEMPLATE_SLUGS = frozenset(
+    {
+        "two-day-full-body-fat-loss-beginner",
+        "two-day-full-body-general-fitness-beginner",
+        "three-day-full-body-fat-loss-beginner",
+        "three-day-full-body-general-fitness-beginner",
+        "five-day-ppl-fat-loss-intermediate",
+        "six-day-ppl-fat-loss-advanced",
+    }
+)
+RETIRED_UNSUPPORTED_TEMPLATE_SLUGS = frozenset(
+    {
+        "two-day-full-body-superset",
+        "five-day-beginner-body-part-foundation",
+    }
+)
+STRUCTURAL_RECLASSIFIED_TEMPLATE_SLUGS = frozenset(
+    {
+        "two-day-full-body-strength-beginner",
+        "three-day-full-body-strength-beginner",
+        "three-day-full-body-strength-intermediate",
+        "four-day-upper-lower-strength-intermediate",
+        "four-day-upper-lower-strength-advanced",
+        "five-day-strength-intermediate",
+        "five-day-strength-advanced",
+        "six-day-push-pull-legs-strength",
+        "three-day-full-body-fat-loss-intermediate",
+        "four-day-upper-lower-fat-loss-intermediate",
+        "four-day-upper-lower-fat-loss-advanced",
+        "five-day-ppl-fat-loss-advanced",
+        "three-day-full-body-general-fitness-intermediate",
+        "four-day-upper-lower-general-fitness-intermediate",
+    }
+)
+
+
+def _reclassify_goal_template(template: TrainingProgramTemplateSeed) -> TrainingProgramTemplateSeed:
+    if template.fitness_goal is FitnessGoal.BUILD_MUSCLE:
+        return template
+    structural_tags = tuple(
+        "balanced" if tag in {"fat_loss", "general_fitness"} else tag
+        for tag in template.focus_tags
+        if tag != "strength"
+    )
+    return replace(
+        template,
+        fitness_goal=FitnessGoal.BUILD_MUSCLE,
+        focus_tags=structural_tags,
+    )
+
 CATALOG_SLUG_ALIASES: dict[str, tuple[str, ...]] = {
     "barbell-bench-press": ("fedb-0025-barbell-bench-press",),
     "barbell-back-squat": ("fedb-1435-barbell-back-squat",),
@@ -852,8 +904,10 @@ def _template(
 
 
 TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple(
-    _evidence_informed_template_order(
-        _fit_template_session_exercise_count(_specialized_template_movement_floors(template))
+    _reclassify_goal_template(
+        _evidence_informed_template_order(
+            _fit_template_session_exercise_count(_specialized_template_movement_floors(template))
+        )
     )
     for template in (
         _template(
@@ -4048,5 +4102,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             fitness_goal=FitnessGoal.IMPROVE_FITNESS,
         ),
     )
+    if template.slug not in (
+        RETIRED_REDUNDANT_TEMPLATE_SLUGS | RETIRED_UNSUPPORTED_TEMPLATE_SLUGS
+    )
 )
-
