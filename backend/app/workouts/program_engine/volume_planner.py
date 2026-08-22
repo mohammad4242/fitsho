@@ -58,6 +58,7 @@ def plan_weekly_volume(
     base = min(max(ruleset.goal_base_sets[request.primary_goal], minimum), maximum)
     reasons: list[str] = []
     common_constraint_reasons: list[str] = []
+    recovery_capacity_constrained = False
     recovery_signals = sum(
         (
             source.sleep_quality is RecoveryRating.POOR,
@@ -67,6 +68,7 @@ def plan_weekly_volume(
         )
     )
     if recovery_signals:
+        recovery_capacity_constrained = True
         base = max(
             minimum,
             base - ruleset.poor_recovery_set_reduction * recovery_signals,
@@ -78,6 +80,7 @@ def plan_weekly_volume(
         reasons.append("VOLUME_REDUCED_FOR_TIME_LIMIT")
         common_constraint_reasons.append("VOLUME_REDUCED_FOR_TIME_LIMIT")
     if source.age >= ruleset.older_adult_modifier_age:
+        recovery_capacity_constrained = True
         base = max(minimum, base - ruleset.contextual_volume_reduction_sets)
         reasons.append("VOLUME_REDUCED_FOR_RECOVERY")
         common_constraint_reasons.append("VOLUME_REDUCED_FOR_RECOVERY")
@@ -173,7 +176,7 @@ def plan_weekly_volume(
                 reasons.append("VOLUME_CAPPED_FOR_SPLIT_FREQUENCY")
                 constraint_reasons.append("VOLUME_CAPPED_FOR_SPLIT_FREQUENCY")
             safe_maximum = min(safe_maximum, split_maximum)
-        if common_constraint_reasons:
+        if recovery_capacity_constrained:
             safe_maximum = min(safe_maximum, sets)
         acceptable_minimum = max(
             min(muscle_minimum, sets),

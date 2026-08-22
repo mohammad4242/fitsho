@@ -24,6 +24,7 @@ from app.workouts.program_engine.schemas import (
 from app.workouts.program_engine.session_builder import exercise_fits_focus
 from app.workouts.program_engine.session_targets import english_session_title
 from app.workouts.program_engine.strength_programming import classify_strength_role
+from app.workouts.program_engine.template_sessions import template_removal_rank
 
 
 def repair_weekly_volume(
@@ -122,8 +123,14 @@ def repair_weekly_volume(
             affected_muscles = {exercise.primary_muscle.value} | {
                 muscle.value for muscle in exercise.secondary_muscles
             }
-            if same_muscle_exposures > 1 or affected_muscles.intersection(
-                hard_weekly_excessive
+            hard_removal_required = bool(
+                affected_muscles.intersection(hard_weekly_excessive)
+                or (day_index, exercise.primary_muscle) in per_session_excessive
+                or (day_index, exercise_index) in per_exercise_excessive
+            )
+            if (same_muscle_exposures > 1 or hard_removal_required) and (
+                len(repaired[day_index]) > ruleset.minimum_exercises_per_session
+                or hard_removal_required
             ):
                 repaired[day_index].pop(exercise_index)
                 reasons.append("VOLUME_REPAIR_REMOVED_REDUNDANT_EXERCISE")
@@ -616,11 +623,23 @@ def _select_reduction_candidate(
                 muscle.value for muscle in exercise.secondary_muscles
             }
             is_template_core = "TEMPLATE_ADAPTATION_PRIORITY:core" in exercise.reason_codes
+            is_required_slot = any(
+                code.startswith("REQUIRED_") for code in exercise.reason_codes
+            )
+            hard_constraint = bool(
+                affected.intersection(hard_weekly_excessive)
+                or (day_index, exercise.primary_muscle) in per_session_excessive
+                or (day_index, exercise_index) in per_exercise_excessive
+            )
             if (
-                is_template_core
-                and not affected.intersection(hard_weekly_excessive)
-                and (day_index, exercise.primary_muscle) not in per_session_excessive
-                and (day_index, exercise_index) not in per_exercise_excessive
+                (is_template_core or is_required_slot)
+                and exercise.sets <= ruleset.minimum_working_sets
+                and not hard_constraint
+            ):
+                continue
+            if (
+                (is_template_core or is_required_slot)
+                and not hard_constraint
             ):
                 continue
             if (day_index, exercise_index) not in per_exercise_excessive and (
@@ -662,6 +681,13 @@ def _select_reduction_candidate(
     return min(
         candidates,
         key=lambda candidate: (
+            0
+            if ({candidate[2].primary_muscle.value} | {
+                muscle.value for muscle in candidate[2].secondary_muscles
+            }).intersection(hard_weekly_excessive)
+            else 1,
+            template_removal_rank(candidate[2]),
+            any(code.startswith("REQUIRED_") for code in candidate[2].reason_codes),
             priority_policy.preservation_rank(candidate[2].primary_muscle),
             -sum(
                 item.sets

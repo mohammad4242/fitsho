@@ -121,7 +121,7 @@ def test_regression_short_sessions_cover_hinge_and_core_across_the_week() -> Non
     assert MovementPattern.CORE_ANTI_EXTENSION in patterns
 
 
-def test_regression_short_upper_lower_keeps_required_trunk_work() -> None:
+def test_regression_short_upper_lower_keeps_required_trunk_work_before_cardio() -> None:
     result = generate_program(
         request(
             available_training_days=4,
@@ -141,7 +141,7 @@ def test_regression_short_upper_lower_keeps_required_trunk_work() -> None:
         for day in result.program.weekly_schedule
         for item in day.exercises
     )
-    assert any(day.cardio is not None for day in result.program.weekly_schedule)
+    assert all(day.cardio is None for day in result.program.weekly_schedule)
     assert all(
         day.estimated_duration_minutes <= get_session_duration_policy(25).maximum_minutes
         for day in result.program.weekly_schedule

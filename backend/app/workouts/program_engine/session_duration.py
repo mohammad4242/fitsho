@@ -1,7 +1,7 @@
 from collections import Counter
 from dataclasses import replace
 
-from app.exercises.enums import ExerciseLabel, MuscleGroup
+from app.exercises.enums import ExerciseLabel, ExerciseType, MuscleGroup
 from app.workouts.program_engine.duration_policy import (
     SessionDurationPolicy,
     get_session_duration_policy,
@@ -27,7 +27,10 @@ from app.workouts.program_engine.schemas import (
 )
 from app.workouts.program_engine.session_builder import exercise_fits_focus
 from app.workouts.program_engine.session_targets import english_session_title
-from app.workouts.program_engine.strength_programming import classify_strength_role
+from app.workouts.program_engine.strength_programming import (
+    StrengthExerciseRole,
+    classify_strength_role,
+)
 from app.workouts.program_engine.template_sessions import template_removal_rank
 
 
@@ -47,7 +50,10 @@ def repair_session_durations(
     for day_index, day in enumerate(days):
         current = _rebuild_day(day, day.exercises, ruleset)
         other_days = tuple(repaired) + days[day_index + 1 :]
-        if current.estimated_duration_minutes < policy.minimum_minutes:
+        if (
+            current.estimated_duration_minutes < policy.minimum_minutes
+            or len(current.exercises) < ruleset.minimum_exercises_per_session
+        ):
             reasons.append("SESSION_DURATION_UNDERFILLED")
             current = _repair_underfill(
                 current,
@@ -92,14 +98,21 @@ def _repair_underfill(
     volume: WeeklyVolumePlan | None,
 ) -> WorkoutDay:
     exercises = list(day.exercises)
-    while day.estimated_duration_minutes < policy.minimum_minutes:
-        increment = _select_set_increment(
-            exercises,
-            request,
-            policy,
-            ruleset,
-            other_days=other_days,
-            volume=volume,
+    while (
+        day.estimated_duration_minutes < policy.minimum_minutes
+        or len(exercises) < ruleset.minimum_exercises_per_session
+    ):
+        increment = (
+            None
+            if len(exercises) < ruleset.minimum_exercises_per_session
+            else _select_set_increment(
+                exercises,
+                request,
+                policy,
+                ruleset,
+                other_days=other_days,
+                volume=volume,
+            )
         )
         if increment is not None:
             index, updated = increment
@@ -117,7 +130,12 @@ def _repair_underfill(
             volume=volume,
         )
         if addition is None:
-            rest_increment = _select_rest_increment(exercises, policy, ruleset)
+            rest_increment = _select_rest_increment(
+                exercises,
+                request,
+                policy,
+                ruleset,
+            )
             if rest_increment is None:
                 break
             index, updated = rest_increment
@@ -277,6 +295,7 @@ def _select_exercise_addition(
             + estimated
             + (day.cardio.duration_minutes if day.cardio else 0)
             > policy.maximum_minutes
+            and len(exercises) >= ruleset.minimum_exercises_per_session
         ):
             continue
         repeated = any(
@@ -322,16 +341,40 @@ def _select_exercise_addition(
 
 def _select_rest_increment(
     exercises: list[ProgrammedExercise],
+    request: NormalizedProgramRequest,
     policy: SessionDurationPolicy,
     ruleset: ProgramRuleset,
 ) -> tuple[int, ProgrammedExercise] | None:
     options: list[tuple[int, int, str, int, ProgrammedExercise]] = []
     for index, exercise in enumerate(exercises):
-        if exercise.rest_seconds >= ruleset.maximum_duration_repair_rest_seconds:
+        prescribed_rest = prescription_for(
+            request.primary_goal,
+            exercise.exercise_type,
+            request.training_status,
+            ruleset,
+            prescription_mode=exercise.prescription_mode,
+            duration_min_seconds=exercise.duration_min_seconds,
+            duration_max_seconds=exercise.duration_max_seconds,
+            strength_role=(
+                _programmed_strength_role(exercise)
+                if request.primary_goal is Goal.STRENGTH
+                else None
+            ),
+        ).rest_seconds
+        useful_rest_ceiling = prescribed_rest + (
+            ruleset.duration_repair_rest_increment_seconds
+            if exercise.exercise_type is ExerciseType.COMPOUND
+            else 0
+        )
+        useful_rest_ceiling = min(
+            useful_rest_ceiling,
+            ruleset.maximum_duration_repair_rest_seconds,
+        )
+        if exercise.rest_seconds >= useful_rest_ceiling:
             continue
         rest_seconds = min(
             exercise.rest_seconds + ruleset.duration_repair_rest_increment_seconds,
-            ruleset.maximum_duration_repair_rest_seconds,
+            useful_rest_ceiling,
         )
         updated = replace(
             exercise,
@@ -373,6 +416,14 @@ def _select_rest_increment(
     return selected[3], selected[4]
 
 
+def _programmed_strength_role(exercise: ProgrammedExercise) -> StrengthExerciseRole:
+    if "STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes:
+        return StrengthExerciseRole.PRIMARY_STRENGTH
+    if "STRENGTH_SECONDARY_COMPOUND" in exercise.reason_codes:
+        return StrengthExerciseRole.SECONDARY_COMPOUND
+    return StrengthExerciseRole.ACCESSORY
+
+
 def _duration_shortfall_is_hard_constrained(
     request: NormalizedProgramRequest,
     volume: WeeklyVolumePlan,
@@ -411,6 +462,7 @@ def _repair_overfill(
             for index, item in enumerate(exercises)
             if item.sets > ruleset.minimum_working_sets
             and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
+            and template_removal_rank(item) < 3
         ]
         if options:
             index, item = min(
@@ -433,7 +485,17 @@ def _repair_overfill(
             and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
         ]
         if not removable:
-            break
+            rest_reduction = _select_rest_reduction_for_overfill(
+                exercises,
+                priority_policy,
+                ruleset,
+            )
+            if rest_reduction is None:
+                break
+            index, updated = rest_reduction
+            exercises[index] = updated
+            day = _rebuild_day(day, tuple(exercises), ruleset)
+            continue
         index, _ = min(
             removable,
             key=lambda pair: (
@@ -446,6 +508,67 @@ def _repair_overfill(
         exercises.pop(index)
         day = _rebuild_day(day, tuple(exercises), ruleset)
     return day
+
+
+def _select_rest_reduction_for_overfill(
+    exercises: list[ProgrammedExercise],
+    priority_policy: PriorityAllocationPolicy,
+    ruleset: ProgramRuleset,
+) -> tuple[int, ProgrammedExercise] | None:
+    options: list[tuple[int, int, int, str, int, ProgrammedExercise]] = []
+    for index, exercise in enumerate(exercises):
+        minimum_rest = _duration_repair_minimum_rest(exercise, ruleset)
+        if exercise.rest_seconds <= minimum_rest:
+            continue
+        rest_seconds = max(
+            minimum_rest,
+            exercise.rest_seconds - ruleset.duration_repair_rest_increment_seconds,
+        )
+        updated = replace(
+            exercise,
+            rest_seconds=rest_seconds,
+            estimated_minutes=estimate_exercise_minutes(
+                exercise.sets,
+                rest_seconds,
+                exercise.warmup_sets,
+                ruleset,
+            ),
+            reason_codes=exercise.reason_codes
+            + ("ACCESSORY_REST_REDUCED_FOR_DURATION",),
+        )
+        options.append(
+            (
+                _duration_preservation_rank(exercise, priority_policy),
+                exercise.exercise_type is not ExerciseType.ISOLATION,
+                -exercise.rest_seconds,
+                str(exercise.exercise_id),
+                index,
+                updated,
+            )
+        )
+    if not options:
+        return None
+    selected = min(options)
+    return selected[4], selected[5]
+
+
+def _duration_repair_minimum_rest(
+    exercise: ProgrammedExercise,
+    ruleset: ProgramRuleset,
+) -> int:
+    if "STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes:
+        return ruleset.prescription_rules["strength_compound"].rest_seconds
+    reductions = exercise.reason_codes.count("ACCESSORY_REST_REDUCED_FOR_DURATION")
+    if reductions >= 2 or (
+        reductions >= 1
+        and exercise.warmup_sets > 0
+        and exercise.exercise_type is ExerciseType.COMPOUND
+    ):
+        return exercise.rest_seconds
+    return max(
+        ruleset.minimum_rest_seconds,
+        exercise.rest_seconds - ruleset.duration_repair_rest_increment_seconds,
+    )
 
 
 def _duration_preservation_rank(
@@ -563,7 +686,7 @@ def _within_weekly_hard_volume(
         return True
     return all(
         effective.effective_sets_by_muscle.get(target.muscle.value, 0)
-        <= target.acceptable_maximum
+        <= target.maximum_hard
         for target in volume.targets
     )
 

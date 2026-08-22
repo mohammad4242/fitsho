@@ -237,12 +237,14 @@ def test_duration_repair_reduces_template_accessory_before_core() -> None:
     core = replace(
         original.exercises[0],
         sets=4,
+        rest_seconds=300,
         estimated_minutes=25,
         reason_codes=("TEMPLATE_ADAPTATION_PRIORITY:core",),
     )
     accessory = replace(
         original.exercises[1],
         sets=4,
+        rest_seconds=300,
         estimated_minutes=15,
         reason_codes=("TEMPLATE_ADAPTATION_PRIORITY:accessory",),
     )
