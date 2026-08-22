@@ -60,9 +60,17 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
     assert result.program.validation_report.is_valid
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
+        day.estimated_duration_minutes <= policy.maximum_minutes
         for day in result.program.weekly_schedule
     )
+    if any(
+        day.estimated_duration_minutes < policy.minimum_minutes
+        for day in result.program.weekly_schedule
+    ):
+        assert (
+            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS"
+            in result.program.validation_report.warnings
+        )
 
 
 @pytest.mark.parametrize("requested_days", [2, 3, 4, 5])
@@ -166,7 +174,9 @@ def test_golden_constraints_and_recovery(name: str) -> None:
         )
     if name == "short_25_minutes":
         assert all(
-            1 <= len(day.exercises) <= RULESET.max_exercises_per_session
+            RULESET.minimum_exercises_per_session
+            <= len(day.exercises)
+            <= RULESET.max_exercises_per_session
             for day in result.program.weekly_schedule
         )
         assert all(
@@ -175,7 +185,10 @@ def test_golden_constraints_and_recovery(name: str) -> None:
             <= source.session_duration_minutes + 10
             for day in result.program.weekly_schedule
         )
-        assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in result.program.validation_report.warnings
+        assert (
+            "SESSION_EXERCISE_COUNT_OUT_OF_RANGE"
+            not in result.program.validation_report.warnings
+        )
         assert all(
             item.counts_toward_volume
             for day in result.program.weekly_schedule

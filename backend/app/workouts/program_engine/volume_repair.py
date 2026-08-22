@@ -637,11 +637,6 @@ def _select_reduction_candidate(
                 and not hard_constraint
             ):
                 continue
-            if (
-                (is_template_core or is_required_slot)
-                and not hard_constraint
-            ):
-                continue
             if (day_index, exercise_index) not in per_exercise_excessive and (
                 not affected.intersection(weekly_excessive)
                 and (

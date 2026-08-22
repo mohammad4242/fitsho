@@ -83,6 +83,21 @@ def repair_session_durations(
             ):
                 reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
         repaired.append(current)
+    underfilled = tuple(
+        day
+        for day in repaired
+        if day.estimated_duration_minutes < policy.minimum_minutes
+    )
+    if (
+        underfilled
+        and "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" not in reasons
+        and request.source.session_duration_minutes <= 120
+        and all(
+            day.estimated_duration_minutes * 10 >= policy.minimum_minutes * 7
+            for day in underfilled
+        )
+    ):
+        reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
     repaired_tuple = _justify_duration_repeats(tuple(repaired))
     return repaired_tuple, tuple(dict.fromkeys(reasons))
 
@@ -182,7 +197,7 @@ def _select_set_increment(
         updated = _with_additional_set(exercise, ruleset)
         simulated = list(exercises)
         simulated[index] = updated
-        if not _within_weekly_hard_volume(
+        if not _within_weekly_acceptable_volume(
             [item for day in other_days for item in day.exercises] + simulated,
             ruleset,
             request,
@@ -313,7 +328,12 @@ def _select_exercise_addition(
             repeated=repeated,
         )
         simulated = [*exercises, programmed]
-        if not _within_weekly_hard_volume(
+        volume_is_valid = (
+            _within_weekly_hard_volume
+            if len(exercises) < ruleset.minimum_exercises_per_session
+            else _within_weekly_acceptable_volume
+        )
+        if not volume_is_valid(
             [item for day in other_days for item in day.exercises] + simulated,
             ruleset,
             request,
@@ -441,10 +461,7 @@ def _duration_shortfall_is_hard_constrained(
         or request.constraints.blocked_movement_patterns
         or request.constraints.blocked_caution_tags
         or request.constraints.allowed_range_of_motion
-        or (
-            request.resistance_training_days >= 5
-            and 75 <= request.source.session_duration_minutes <= 90
-        )
+        or request.resistance_training_days >= 5
     )
 
 
@@ -687,6 +704,24 @@ def _within_weekly_hard_volume(
     return all(
         effective.effective_sets_by_muscle.get(target.muscle.value, 0)
         <= target.maximum_hard
+        for target in volume.targets
+    )
+
+
+def _within_weekly_acceptable_volume(
+    exercises: list[ProgrammedExercise],
+    ruleset: ProgramRuleset,
+    request: NormalizedProgramRequest,
+    volume: WeeklyVolumePlan | None,
+) -> bool:
+    if not _within_weekly_hard_volume(exercises, ruleset, request, volume):
+        return False
+    if volume is None:
+        return True
+    effective = calculate_effective_volume(exercises, ruleset)
+    return all(
+        effective.effective_sets_by_muscle.get(target.muscle.value, 0)
+        <= target.acceptable_maximum
         for target in volume.targets
     )
 

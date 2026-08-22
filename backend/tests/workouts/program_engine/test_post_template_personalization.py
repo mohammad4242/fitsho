@@ -19,9 +19,12 @@ from app.workouts.program_engine.schemas import (
     WeeklyVolumePlan,
 )
 from app.workouts.program_engine.session_duration import repair_session_durations
+from app.workouts.program_engine.split_selector import select_split
 from app.workouts.program_engine.template_sessions import build_template_sessions
+from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
 from tests.workouts.program_engine.test_template_reference import (
+    _four_day_reference,
     _upper_lower_reference,
     template_request,
 )
@@ -305,4 +308,81 @@ def test_same_template_strength_and_hypertrophy_have_role_specific_prescriptions
         for day in strength.program.weekly_schedule
         for item in day.exercises
         if item.exercise_type.value == "isolation"
+    )
+
+
+def test_same_template_gives_explicit_chest_priority_more_final_direct_volume() -> None:
+    template = _four_day_reference()
+    common = {
+        "available_training_days": 4,
+        "primary_goal": "build_muscle",
+        "training_experience": "intermediate",
+        "training_age_months": 24,
+        "session_duration_minutes": 60,
+    }
+    balanced = generate_program(
+        template_request(**common),
+        full_catalog(),
+        RULESET,
+        reference_templates=(template,),
+    )
+    prioritized = generate_program(
+        template_request(**common, priority_muscles=[MuscleGroup.CHEST]),
+        full_catalog(),
+        RULESET,
+        reference_templates=(template,),
+    )
+
+    assert balanced.program is not None, balanced.errors
+    assert prioritized.program is not None, prioritized.errors
+    assert balanced.program.aggregate_metrics["reference_template"] == template.slug
+    assert prioritized.program.aggregate_metrics["reference_template"] == template.slug
+    balanced_chest = balanced.program.aggregate_metrics["weekly_direct_sets_by_muscle"][
+        MuscleGroup.CHEST.value
+    ]
+    priority_chest = prioritized.program.aggregate_metrics["weekly_direct_sets_by_muscle"][
+        MuscleGroup.CHEST.value
+    ]
+    assert priority_chest > balanced_chest
+
+
+def test_explicit_chest_priority_dominates_conflicting_body_analysis_lag() -> None:
+    source = request(
+        primary_goal="build_muscle",
+        training_experience="intermediate",
+        training_age_months=24,
+        available_training_days=4,
+        session_duration_minutes=60,
+        priority_muscles=[MuscleGroup.CHEST],
+        body_analysis_influence=_body_analysis_priorities(),
+    )
+
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert result.program is not None, result.errors
+    ranges = result.program.aggregate_metrics["volume_ranges_by_muscle"]
+    direct = result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
+    assert ranges[MuscleGroup.CHEST.value]["preferred_weekly_target"] > ranges[
+        MuscleGroup.GLUTES.value
+    ]["preferred_weekly_target"]
+    assert direct[MuscleGroup.CHEST.value] > direct[MuscleGroup.GLUTES.value]
+
+
+def test_clear_body_lag_has_stronger_volume_target_than_mild_lag() -> None:
+    normalized = normalize_request(
+        request(
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            available_training_days=4,
+            session_duration_minutes=60,
+            body_analysis_influence=_body_analysis_priorities(),
+        ),
+        RULESET,
+    )
+
+    plan = plan_weekly_volume(normalized, select_split(normalized, RULESET), RULESET)
+
+    assert plan.direct_sets_for(MuscleGroup.GLUTES) > plan.direct_sets_for(
+        MuscleGroup.BICEPS
     )
