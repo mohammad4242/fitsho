@@ -141,18 +141,25 @@ def test_strength_prescription_is_role_aware_and_level_aware() -> None:
     )
     accessory = prescription_for(
         Goal.STRENGTH,
-        ExerciseType.ISOLATION,
+        ExerciseType.COMPOUND,
         TrainingStatus.ADVANCED,
         RULESET,
         strength_role=StrengthExerciseRole.ACCESSORY,
     )
     high_fatigue_accessory = prescription_for(
         Goal.STRENGTH,
-        ExerciseType.ISOLATION,
+        ExerciseType.COMPOUND,
         TrainingStatus.ADVANCED,
         RULESET,
         strength_role=StrengthExerciseRole.ACCESSORY,
         fatigue_cost=RULESET.strength_high_fatigue_cost,
+    )
+    isolation_accessory = prescription_for(
+        Goal.STRENGTH,
+        ExerciseType.ISOLATION,
+        TrainingStatus.ADVANCED,
+        RULESET,
+        strength_role=StrengthExerciseRole.ACCESSORY,
     )
     beginner_primary = prescription_for(
         Goal.STRENGTH,
@@ -166,6 +173,7 @@ def test_strength_prescription_is_role_aware_and_level_aware() -> None:
     assert advanced_primary.rest_seconds > advanced_secondary.rest_seconds > accessory.rest_seconds
     assert beginner_primary.rep_min >= advanced_primary.rep_min
     assert high_fatigue_accessory.rest_seconds > accessory.rest_seconds
+    assert isolation_accessory.rest_seconds == 90
 
 
 @pytest.mark.parametrize("blocked_by", ["equipment", "caution"])

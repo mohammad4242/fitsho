@@ -59,8 +59,7 @@ class _FocusAvailability:
     @property
     def is_feasible(self) -> bool:
         return (
-            self.preferred_slots + self.suboptimal_slots + self.relaxed_slots
-            == self.required_slots
+            self.preferred_slots + self.suboptimal_slots + self.relaxed_slots == self.required_slots
         )
 
 
