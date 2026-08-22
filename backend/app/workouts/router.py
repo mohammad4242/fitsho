@@ -238,7 +238,7 @@ def to_plan_response(
         safety_status=plan.safety_status,
         assumptions=plan.assumptions,
         warnings=plan.warnings,
-        validation_report=plan.validation_report,
+        validation_report=_public_validation_report(plan.validation_report),
         aggregate_metrics=plan.aggregate_metrics,
         progression_policy=plan.progression_policy,
         body_analysis_provenance=plan.body_analysis_provenance,
@@ -246,6 +246,10 @@ def to_plan_response(
         ai_coach_program_explanation_fa=plan.ai_coach_program_explanation_fa,
         coach_review=_coach_review_response(plan, db),
     )
+
+
+def _public_validation_report(report: dict[str, object]) -> dict[str, object]:
+    return {key: value for key, value in report.items() if key != "decision_trace"}
 
 
 def _coach_review_response(

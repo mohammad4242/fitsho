@@ -152,12 +152,17 @@ def test_member_workout_response_hides_internal_decision_trace(
             "candidates": [{"slug": "private-template", "score": {"total": 100}}],
         }
     ]
+    plan.validation_report = {
+        "errors": [],
+        "decision_trace": plan.decision_trace,
+    }
     db.commit()
 
     response = client.get(f"/api/v1/workout-plans/{plan.id}")
 
     assert response.status_code == 200
     assert "decision_trace" not in response.json()
+    assert "decision_trace" not in response.json()["validation_report"]
     assert "private-template" not in response.text
 
 
