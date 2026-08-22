@@ -137,7 +137,11 @@ def generate_program(
     if reference is not None:
         try:
             reference_build = build_template_sessions(
-                normalized, reference, eligibility.eligible, ruleset
+                normalized,
+                reference,
+                eligibility.eligible,
+                ruleset,
+                source_catalog=tuple(exercise_catalog),
             )
             reference_result = _reference_program(
                 request,

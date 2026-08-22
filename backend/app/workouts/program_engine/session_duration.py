@@ -27,6 +27,7 @@ from app.workouts.program_engine.schemas import (
 from app.workouts.program_engine.session_builder import exercise_fits_focus
 from app.workouts.program_engine.session_targets import english_session_title
 from app.workouts.program_engine.strength_programming import classify_strength_role
+from app.workouts.program_engine.template_sessions import template_removal_rank
 
 
 def repair_session_durations(
@@ -401,6 +402,7 @@ def _repair_overfill(
             index, item = min(
                 options,
                 key=lambda pair: (
+                    template_removal_rank(pair[1]),
                     "SESSION_SIZE_ACCESSORY" not in pair[1].reason_codes,
                     pair[1].sets,
                     -pair[1].estimated_minutes,
@@ -422,6 +424,7 @@ def _repair_overfill(
         index, _ = min(
             removable,
             key=lambda pair: (
+                template_removal_rank(pair[1]),
                 "SESSION_SIZE_ACCESSORY" not in pair[1].reason_codes,
                 -pair[1].estimated_minutes,
                 str(pair[1].exercise_id),
