@@ -123,7 +123,6 @@ class PriorityAllocationPolicy:
             for index, day in enumerate(days)
             if any(
                 getattr(item, "primary_muscle", None) is muscle
-                and getattr(item, "counts_toward_volume", False)
                 for item in _day_exercises(day)
             )
         ]

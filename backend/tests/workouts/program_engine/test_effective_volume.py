@@ -1,3 +1,4 @@
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -115,3 +116,19 @@ def test_effective_volume_uses_ruleset_credit_values() -> None:
 
     assert volume.effective_sets_by_muscle[MuscleGroup.CHEST.value] == pytest.approx(4.0)
     assert volume.effective_sets_by_muscle[MuscleGroup.TRICEPS.value] == pytest.approx(1.0)
+
+
+def test_real_programmed_work_cannot_be_hidden_from_volume_accounting() -> None:
+    exercise = replace(
+        programmed_exercise(MuscleGroup.CHEST, (MuscleGroup.TRICEPS,), 4),
+        counts_toward_volume=False,
+    )
+
+    volume = calculate_effective_volume((exercise,), RULESET)
+
+    assert volume.direct_sets_by_muscle == {MuscleGroup.CHEST.value: 4}
+    assert volume.secondary_sets_by_muscle == {MuscleGroup.TRICEPS.value: 2.0}
+    assert volume.effective_sets_by_muscle == {
+        MuscleGroup.CHEST.value: 4.0,
+        MuscleGroup.TRICEPS.value: 2.0,
+    }

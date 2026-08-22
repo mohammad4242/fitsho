@@ -255,6 +255,44 @@ def test_volume_target_keeps_effective_target_and_direct_minimum_separate() -> N
     assert target.minimum_direct_sets == target.minimum_soft
 
 
+def test_volume_target_exposes_clamped_preferred_flexible_range() -> None:
+    source = request(
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+    )
+    normalized = normalize_request(source, RULESET)
+    volume = plan_weekly_volume(normalized, select_split(normalized, RULESET), RULESET)
+
+    target = next(item for item in volume.targets if item.muscle is MuscleGroup.CHEST)
+
+    assert target.preferred_target == 9
+    assert target.acceptable_minimum == 8
+    assert target.acceptable_maximum == 11
+    assert target.acceptable_minimum <= target.preferred_target <= target.acceptable_maximum
+
+
+def test_previous_volume_cap_clamps_flexible_maximum() -> None:
+    source = request(
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        recent_training_history={
+            "previous_weekly_effective_sets_by_muscle": {MuscleGroup.CHEST: 6},
+            "previous_volume_confidence": 1.0,
+            "previous_volume_source": "observed_effective",
+        },
+    )
+    normalized = normalize_request(source, RULESET)
+    volume = plan_weekly_volume(normalized, select_split(normalized, RULESET), RULESET)
+
+    target = next(item for item in volume.targets if item.muscle is MuscleGroup.CHEST)
+
+    assert target.preferred_target == 8
+    assert target.acceptable_maximum == 8
+    assert "VOLUME_CAPPED_FOR_PREVIOUS_EFFECTIVE_VOLUME" in target.constraint_reason_codes
+
+
 def programmed_volume_exercise(
     primary: MuscleGroup,
     secondary: tuple[MuscleGroup, ...],
@@ -388,8 +426,8 @@ def test_volume_repair_reduces_effective_secondary_cap() -> None:
 
     repaired, reasons = repair_weekly_volume((day,), normalized, volume, RULESET)
 
-    assert repaired[0].exercises[0].sets == 3
-    assert "VOLUME_REPAIR_REDUCED_SET" in reasons
+    assert not repaired[0].exercises
+    assert "VOLUME_REPAIR_REMOVED_REDUNDANT_EXERCISE" in reasons
 
 
 def test_validator_rejects_hard_weekly_volume_excess() -> None:
@@ -409,6 +447,53 @@ def test_validator_rejects_hard_weekly_volume_excess() -> None:
     report = validate_program(invalid, source, RULESET)
 
     assert "WEEKLY_MUSCLE_VOLUME_EXCEEDED" in report.errors
+
+
+def test_validator_rejects_legacy_hidden_volume_flag_and_still_counts_sets() -> None:
+    source = request()
+    result = generate_program(source, catalog(), RULESET)
+    assert result.program is not None
+    day = result.program.weekly_schedule[0]
+    hidden = replace(day.exercises[0], counts_toward_volume=False)
+    invalid = replace(
+        result.program,
+        weekly_schedule=(replace(day, exercises=(hidden, *day.exercises[1:])),),
+    )
+
+    report = validate_program(invalid, source, RULESET)
+
+    assert "RESISTANCE_WORK_EXCLUDED_FROM_VOLUME" in report.errors
+    assert hidden.primary_muscle is not None
+    assert (
+        report.metrics["weekly_direct_sets_by_muscle"][hidden.primary_muscle.value]
+        >= hidden.sets
+    )
+
+
+def test_validator_rejects_core_work_outside_three_or_four_sets() -> None:
+    source = request()
+    result = generate_program(source, full_catalog(), RULESET)
+    assert result.program is not None
+    day = next(
+        day
+        for day in result.program.weekly_schedule
+        if any(item.exercise_type is ExerciseType.CORE for item in day.exercises)
+    )
+    core = next(item for item in day.exercises if item.exercise_type is ExerciseType.CORE)
+    invalid_day = replace(
+        day,
+        exercises=tuple(replace(item, sets=2) if item is core else item for item in day.exercises),
+    )
+    invalid = replace(
+        result.program,
+        weekly_schedule=tuple(
+            invalid_day if item is day else item for item in result.program.weekly_schedule
+        ),
+    )
+
+    report = validate_program(invalid, source, RULESET)
+
+    assert "INVALID_EXERCISE_PRESCRIPTION" in report.errors
 
 
 def test_validator_uses_effective_target_without_hiding_direct_work_requirement() -> None:

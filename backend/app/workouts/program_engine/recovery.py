@@ -10,7 +10,7 @@ def direct_muscles(day: WorkoutDay) -> frozenset[MuscleGroup]:
     return frozenset(
         item.primary_muscle
         for item in day.exercises
-        if item.primary_muscle is not None and item.counts_toward_volume
+        if item.primary_muscle is not None
     )
 
 

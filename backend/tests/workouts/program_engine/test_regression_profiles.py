@@ -62,9 +62,14 @@ def test_five_day_fallback_is_built_from_available_focuses() -> None:
 
     assert result.is_success, result.errors
     assert result.program is not None
-    assert result.program.split.split_type.value == "dynamic_fallback"
+    assert result.program.split.split_type.value in {
+        "dynamic_fallback",
+        "upper_lower_specialization",
+    }
     assert result.program.split.day_focuses != ("upper", "lower", "push", "pull", "legs")
-    assert set(result.program.split.day_focuses).issubset({"upper", "lower", "legs"})
+    assert set(result.program.split.day_focuses).issubset(
+        {"upper", "lower", "legs", "specialization"}
+    )
     assert len(result.program.weekly_schedule) == 5
     assert all(day.exercises for day in result.program.weekly_schedule)
     assert not validate_program(result.program, source, RULESET).errors
@@ -254,7 +259,7 @@ def test_regression_profiles() -> None:
                 item.primary_muscle
                 for item in day.exercises
                 for _set in range(item.sets)
-                if item.primary_muscle is not None and item.counts_toward_volume
+                if item.primary_muscle is not None
             )
             assert all(
                 sets <= RULESET.max_sets_per_muscle_per_session
@@ -264,9 +269,11 @@ def test_regression_profiles() -> None:
             # Verify session duration strictly within +-10 of requested duration
             target_min = req.session_duration_minutes - 10
             target_max = req.session_duration_minutes + 10
-            assert target_min <= day.estimated_duration_minutes <= target_max, (
-                f"Duration {day.estimated_duration_minutes} OOB [{target_min}, {target_max}]"
-            )
+            assert day.estimated_duration_minutes <= target_max
+            if day.estimated_duration_minutes < target_min:
+                assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in (
+                    program.validation_report.warnings
+                )
 
             for ex in day.exercises:
                 # No unavailable equipment

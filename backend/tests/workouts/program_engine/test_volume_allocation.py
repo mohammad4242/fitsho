@@ -222,7 +222,6 @@ def test_volume_repair_accepts_valid_increment_between_plus_five_and_plus_ten() 
         replace(
             _programmed(f"Filler {index}", MuscleGroup.BACK, 4),
             estimated_minutes=8,
-            counts_toward_volume=False,
         )
         for index in range(6)
     ) + (
@@ -230,7 +229,6 @@ def test_volume_repair_accepts_valid_increment_between_plus_five_and_plus_ten() 
             _programmed("Filler final", MuscleGroup.BACK, 3),
             rest_seconds=120,
             estimated_minutes=estimate_exercise_minutes(3, 120, 0, RULESET),
-            counts_toward_volume=False,
         ),
     )
     volume_target = _volume_target(MuscleGroup.CHEST).targets[0]

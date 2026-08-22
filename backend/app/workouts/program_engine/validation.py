@@ -40,6 +40,22 @@ def validate_program(
     volume_ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
     priority_muscles = set(request.priority_muscles)
     duration_policy = get_session_duration_policy(request.session_duration_minutes)
+    trace_reason_codes = {
+        code
+        for entry in program.decision_trace
+        for key in ("reason_codes", "reasons")
+        for code in _sequence_metric(entry.get(key))
+        if isinstance(code, str)
+    }
+    volume_feasibility_constrained = bool(
+        trace_reason_codes.intersection(
+            {
+                "VOLUME_REPAIR_SOFT_TARGET_REDUCED",
+                "VOLUME_REPAIR_HARD_MINIMUM_UNSATISFIED",
+                "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+            }
+        )
+    )
     if isinstance(volume_ranges, dict):
         priority_muscles.update(
             MuscleGroup(muscle)
@@ -54,14 +70,14 @@ def validate_program(
             {
                 item.primary_muscle
                 for item in day.exercises
-                if item.primary_muscle is not None and item.counts_toward_volume
+                if item.primary_muscle is not None
             }
         )
     for day in program.weekly_schedule:
         exercise_count = len(day.exercises)
         if exercise_count < ruleset.minimum_exercises_per_session:
             shortfall = ruleset.minimum_exercises_per_session - exercise_count
-            if shortfall <= 2:
+            if shortfall <= 2 or volume_feasibility_constrained:
                 # Thin catalogs (bodyweight-only, heavy caution filtering) may not have enough
                 # exercises to fill every session to minimum; demote to warning.
                 warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
@@ -70,8 +86,11 @@ def validate_program(
         elif exercise_count > ruleset.max_exercises_per_session:
             errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
         if day.estimated_duration_minutes < duration_policy.minimum_minutes:
-            errors.append("SESSION_DURATION_UNDER_TARGET")
-            errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
+            if "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in trace_reason_codes:
+                warnings.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
+            else:
+                errors.append("SESSION_DURATION_UNDER_TARGET")
+                errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
         if day.estimated_duration_minutes > duration_policy.maximum_minutes:
             errors.append("SESSION_DURATION_EXCEEDED")
             errors.append("SESSION_DURATION_OVER_TARGET")
@@ -117,9 +136,12 @@ def validate_program(
                 errors.append("UNAVAILABLE_EQUIPMENT_SELECTED")
             if item.sets < 1:
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
+            if not item.counts_toward_volume:
+                errors.append("RESISTANCE_WORK_EXCLUDED_FROM_VOLUME")
             if item.exercise_type in {
                 ExerciseType.COMPOUND,
                 ExerciseType.ISOLATION,
+                ExerciseType.CORE,
             } and item.sets not in {3, 4}:
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
             if (
@@ -164,7 +186,7 @@ def validate_program(
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
             if not item.reason_codes:
                 warnings.append("MISSING_SELECTION_REASON")
-            if item.primary_muscle is not None and item.counts_toward_volume:
+            if item.primary_muscle is not None:
                 key = item.primary_muscle.value
                 direct_sets[key] += item.sets
                 per_session[key] += item.sets
@@ -283,16 +305,27 @@ def validate_program(
             )
             if actual_effective > effective_maximum_hard:
                 errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
-            if actual_effective > _int_metric(
-                range_values.get("effective_maximum_soft", range_values.get("maximum_soft")),
-                effective_maximum_hard,
-            ):
-                warnings.append("SOFT_WEEKLY_VOLUME_EXCEEDED")
-            if actual_effective < _int_metric(
-                range_values.get("effective_target_sets", range_values.get("target_sets")),
+            acceptable_minimum = _float_metric(
+                range_values.get("acceptable_minimum", range_values.get("minimum_soft")),
                 0,
-            ):
-                warnings.append("EFFECTIVE_VOLUME_BELOW_SOFT_TARGET")
+            )
+            acceptable_maximum = _float_metric(
+                range_values.get(
+                    "acceptable_maximum",
+                    range_values.get("effective_maximum_soft", range_values.get("maximum_soft")),
+                ),
+                effective_maximum_hard,
+            )
+            status = range_values.get("status")
+            if actual_effective > acceptable_maximum:
+                warnings.append("SOFT_WEEKLY_VOLUME_EXCEEDED")
+            if actual_effective < acceptable_minimum:
+                warnings.append("EFFECTIVE_VOLUME_BELOW_ACCEPTABLE_RANGE")
+            if not acceptable_minimum <= actual_effective <= acceptable_maximum:
+                if status == "constrained":
+                    warnings.append("WEEKLY_VOLUME_CONSTRAINED")
+                elif actual_effective <= effective_maximum_hard:
+                    errors.append("WEEKLY_VOLUME_OUTSIDE_ACCEPTABLE_RANGE")
             minimum_effective = _int_metric(
                 range_values.get("minimum_effective_sets", range_values.get("minimum_soft")),
                 0,
@@ -324,7 +357,14 @@ def validate_program(
         if any(value > maximum for value in effective_sets.values()):
             errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
     if isinstance(planned, dict) and any(
-        effective_sets.get(str(muscle), 0) < int(target) for muscle, target in planned.items()
+        effective_sets.get(str(muscle), 0)
+        < _float_metric(
+            ranges.get(str(muscle), {}).get("acceptable_minimum", target)
+            if isinstance(ranges, dict) and isinstance(ranges.get(str(muscle)), dict)
+            else target,
+            int(target),
+        )
+        for muscle, target in planned.items()
     ):
         warnings.append("PLANNED_SOFT_VOLUME_REDUCED_DURING_SESSION_FIT")
     return ValidationReport(
@@ -354,6 +394,12 @@ def validate_program(
 def _int_metric(value: object, fallback: int) -> int:
     if isinstance(value, (int, float, str)):
         return int(value)
+    return fallback
+
+
+def _float_metric(value: object, fallback: float) -> float:
+    if isinstance(value, (int, float, str)):
+        return float(value)
     return fallback
 
 

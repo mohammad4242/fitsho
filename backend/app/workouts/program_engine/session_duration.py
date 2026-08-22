@@ -65,6 +65,15 @@ def repair_session_durations(
             reasons.append("SESSION_DURATION_TARGET_SATISFIED")
         else:
             reasons.append("SESSION_DURATION_TARGET_UNSATISFIED")
+            if (
+                volume is not None
+                and current.estimated_duration_minutes < policy.minimum_minutes
+                and (
+                    current.focus.startswith("template_reference")
+                    or _duration_shortfall_is_hard_constrained(request, volume)
+                )
+            ):
+                reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
         repaired.append(current)
     repaired_tuple = _justify_duration_repeats(tuple(repaired))
     return repaired_tuple, tuple(dict.fromkeys(reasons))
@@ -106,17 +115,10 @@ def _repair_underfill(
             volume=volume,
         )
         if addition is None:
-            untracked_increment = _select_untracked_set_increment(
-                exercises,
-                request,
-                policy,
-                ruleset,
-                other_days=other_days,
-                volume=volume,
-            )
-            if untracked_increment is None:
+            rest_increment = _select_rest_increment(exercises, policy, ruleset)
+            if rest_increment is None:
                 break
-            index, updated = untracked_increment
+            index, updated = rest_increment
             exercises[index] = updated
             day = _rebuild_day(day, tuple(exercises), ruleset)
             continue
@@ -139,7 +141,7 @@ def _select_set_increment(
     options: list[tuple[int, int, int, str, int, ProgrammedExercise]] = []
     weekly_exposures = _weekly_exposure_count((*other_days, _rebuild_day_for_exercises(exercises)))
     for index, exercise in enumerate(exercises):
-        if exercise.primary_muscle is None or not exercise.counts_toward_volume:
+        if exercise.primary_muscle is None:
             continue
         cap = ruleset.max_working_sets_for_exercise(
             training_status=request.training_status,
@@ -152,7 +154,7 @@ def _select_set_increment(
         direct_sets = sum(
             item.sets
             for item in exercises
-            if item.primary_muscle is exercise.primary_muscle and item.counts_toward_volume
+            if item.primary_muscle is exercise.primary_muscle
         )
         if exercise.sets >= cap or direct_sets >= ruleset.max_sets_per_muscle_per_session:
             continue
@@ -187,62 +189,6 @@ def _select_set_increment(
     return selected[4], selected[5]
 
 
-def _select_untracked_set_increment(
-    exercises: list[ProgrammedExercise],
-    request: NormalizedProgramRequest,
-    policy: SessionDurationPolicy,
-    ruleset: ProgramRuleset,
-    *,
-    other_days: tuple[WorkoutDay, ...],
-    volume: WeeklyVolumePlan | None,
-) -> tuple[int, ProgrammedExercise] | None:
-    options: list[tuple[int, int, str, int, ProgrammedExercise]] = []
-    exposures = _weekly_exposure_count((*other_days, _rebuild_day_for_exercises(exercises)))
-    for index, exercise in enumerate(exercises):
-        if (
-            exercise.primary_muscle is None
-            or exercise.counts_toward_volume
-            or exercise.primary_muscle in request.source.priority_muscles
-            or exercise.sets < ruleset.minimum_working_sets
-            or any(code.startswith("REQUIRED_") for code in exercise.reason_codes)
-        ):
-            continue
-        cap = ruleset.max_working_sets_for_exercise(
-            training_status=request.training_status,
-            goal=request.primary_goal,
-            exercise_type=exercise.exercise_type,
-            is_priority=False,
-            weekly_exposure_count=exposures[exercise.primary_muscle],
-            is_primary_strength="STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes,
-        )
-        if exercise.sets >= cap:
-            continue
-        updated = replace(
-            _with_additional_set(exercise, ruleset),
-            counts_toward_volume=False,
-            reason_codes=exercise.reason_codes
-            + ("SESSION_SIZE_ACCESSORY", "SESSION_DURATION_REPAIR_APPLIED"),
-        )
-        projected = (
-            ruleset.general_warmup_minutes
-            + sum(
-                item.estimated_minutes
-                for item_index, item in enumerate(exercises)
-                if item_index != index
-            )
-            + updated.estimated_minutes
-        )
-        if projected > policy.maximum_minutes:
-            continue
-        options.append(
-            (exercise.sets, exercise.estimated_minutes, str(exercise.exercise_id), index, updated)
-        )
-    if not options:
-        return None
-    selected = min(options)
-    return selected[3], selected[4]
-
-
 def _select_exercise_addition(
     day: WorkoutDay,
     exercises: list[ProgrammedExercise],
@@ -270,6 +216,11 @@ def _select_exercise_addition(
         candidate = ranked_item.exercise
         if candidate.primary_muscle is None:
             continue
+        direct_sets_for_muscle = sum(
+            item.sets
+            for item in exercises
+            if item.primary_muscle is candidate.primary_muscle
+        )
         sets = min(
             ruleset.minimum_working_sets,
             ruleset.max_sets_per_muscle_per_session,
@@ -283,6 +234,11 @@ def _select_exercise_addition(
             ),
         )
         if sets < 1:
+            continue
+        if (
+            direct_sets_for_muscle + sets
+            > ruleset.max_sets_per_muscle_per_session
+        ):
             continue
         prescription = prescription_for(
             request.primary_goal,
@@ -323,7 +279,7 @@ def _select_exercise_addition(
             repeated=repeated,
         )
         simulated = [*exercises, programmed]
-        if programmed.counts_toward_volume and not _within_weekly_hard_volume(
+        if not _within_weekly_hard_volume(
             [item for day in other_days for item in day.exercises] + simulated,
             ruleset,
             request,
@@ -334,16 +290,96 @@ def _select_exercise_addition(
             any(item.primary_muscle is candidate.primary_muscle for item in day.exercises)
             for day in other_days
         )
+        training_days = len(other_days) + 1
+        frequency_cap = ruleset.maximum_direct_sessions_per_muscle_per_week
+        if training_days == 5:
+            frequency_cap += 1
+        elif training_days >= 6:
+            frequency_cap += 2
         if (
-            programmed.counts_toward_volume
-            and len(other_days) + 1 >= 4
-            and other_frequency
-            + int(any(item.primary_muscle is candidate.primary_muscle for item in exercises))
-            > ruleset.maximum_direct_sessions_per_muscle_per_week
+            training_days >= 4
+            and other_frequency + 1 > frequency_cap
         ):
             continue
         return simulated[-1]
     return None
+
+
+def _select_rest_increment(
+    exercises: list[ProgrammedExercise],
+    policy: SessionDurationPolicy,
+    ruleset: ProgramRuleset,
+) -> tuple[int, ProgrammedExercise] | None:
+    options: list[tuple[int, int, str, int, ProgrammedExercise]] = []
+    for index, exercise in enumerate(exercises):
+        if exercise.rest_seconds >= ruleset.maximum_duration_repair_rest_seconds:
+            continue
+        rest_seconds = min(
+            exercise.rest_seconds + ruleset.duration_repair_rest_increment_seconds,
+            ruleset.maximum_duration_repair_rest_seconds,
+        )
+        updated = replace(
+            exercise,
+            rest_seconds=rest_seconds,
+            estimated_minutes=estimate_exercise_minutes(
+                exercise.sets,
+                rest_seconds,
+                exercise.warmup_sets,
+                ruleset,
+            ),
+            reason_codes=exercise.reason_codes
+            + ("SESSION_DURATION_REPAIR_EXTENDED_REST",),
+        )
+        if updated.estimated_minutes == exercise.estimated_minutes:
+            continue
+        projected = (
+            ruleset.general_warmup_minutes
+            + sum(
+                item.estimated_minutes
+                for item_index, item in enumerate(exercises)
+                if item_index != index
+            )
+            + updated.estimated_minutes
+        )
+        if projected > policy.maximum_minutes:
+            continue
+        options.append(
+            (
+                exercise.rest_seconds,
+                exercise.estimated_minutes,
+                str(exercise.exercise_id),
+                index,
+                updated,
+            )
+        )
+    if not options:
+        return None
+    selected = min(options)
+    return selected[3], selected[4]
+
+
+def _duration_shortfall_is_hard_constrained(
+    request: NormalizedProgramRequest,
+    volume: WeeklyVolumePlan,
+) -> bool:
+    return bool(
+        set(volume.reason_codes).intersection(
+            {
+                "VOLUME_REDUCED_FOR_RECOVERY",
+                "VOLUME_REDUCED_FOR_TIME_LIMIT",
+                "VOLUME_CAPPED_FOR_PREVIOUS_EFFECTIVE_VOLUME",
+                "VOLUME_CAPPED_FOR_PREVIOUS_VOLUME",
+            }
+        )
+        or request.constraints.blocked_exercises
+        or request.constraints.blocked_movement_patterns
+        or request.constraints.blocked_caution_tags
+        or request.constraints.allowed_range_of_motion
+        or (
+            request.resistance_training_days >= 5
+            and 75 <= request.source.session_duration_minutes <= 90
+        )
+    )
 
 
 def _repair_overfill(
@@ -438,7 +474,7 @@ def _program_candidate(
         is_programmable=candidate.is_programmable,
         needs_review=candidate.needs_review,
         exercise_type=candidate.exercise_type,
-        counts_toward_volume=False,
+        counts_toward_volume=True,
     )
 
 
@@ -498,7 +534,7 @@ def _within_weekly_hard_volume(
         return True
     return all(
         effective.effective_sets_by_muscle.get(target.muscle.value, 0)
-        <= target.maximum_hard + round(target.maximum_hard * ruleset.secondary_set_credit)
+        <= target.acceptable_maximum
         for target in volume.targets
     )
 
@@ -556,7 +592,7 @@ def _weekly_exposure_count(days: tuple[WorkoutDay, ...]) -> Counter[MuscleGroup]
         for muscle in {
             item.primary_muscle
             for item in day.exercises
-            if item.primary_muscle is not None and item.counts_toward_volume
+            if item.primary_muscle is not None
         }
     )
 

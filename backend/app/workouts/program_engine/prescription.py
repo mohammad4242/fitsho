@@ -85,7 +85,7 @@ def prescribe_sessions(
                 else None
             )
             primary_muscle = exercise.primary_muscle
-            counts_toward_volume = True
+            session_size_accessory = False
             if primary_muscle in allocations:
                 _ = next(allocations[primary_muscle])
 
@@ -95,7 +95,6 @@ def prescribe_sessions(
                     for day in days
                     for ex in day.exercises
                     if ex.primary_muscle == primary_muscle
-                    and getattr(ex, "counts_toward_volume", True)
                 ) + direct_session_sets.get(primary_muscle, 0)
 
                 if primary_muscle in targets:
@@ -104,7 +103,8 @@ def prescribe_sessions(
                     target = 99999  # Effectively unlimited — no volume cap
 
                 if current_weekly_sets >= target:
-                    sets = 0  # Will trigger counts_toward_volume = False below
+                    sets = ruleset.minimum_working_sets
+                    session_size_accessory = True
                 else:
                     sets = ruleset.minimum_working_sets
             else:
@@ -112,19 +112,13 @@ def prescribe_sessions(
                     ruleset.max_sets_per_muscle_per_session,
                     ruleset.default_untracked_muscle_sets,
                 )
-            if sets == 0:
-                sets = ruleset.default_untracked_muscle_sets
-                counts_toward_volume = False
-            if primary_muscle is not None and counts_toward_volume:
+            if primary_muscle is not None:
                 remaining_direct_sets = (
                     ruleset.max_sets_per_muscle_per_session - direct_session_sets[primary_muscle]
                 )
-                if remaining_direct_sets < ruleset.minimum_working_sets:
-                    sets = ruleset.default_untracked_muscle_sets
-                    counts_toward_volume = False
-                else:
+                if remaining_direct_sets >= ruleset.minimum_working_sets:
                     sets = min(sets, remaining_direct_sets)
-                    direct_session_sets[primary_muscle] += sets
+                direct_session_sets[primary_muscle] += sets
             cap = ruleset.max_working_sets_for_exercise(
                 training_status=request.training_status,
                 goal=request.primary_goal,
@@ -189,11 +183,15 @@ def prescribe_sessions(
                         draft.selection_reasons[exercise.id]
                         + (strength_role.reason_codes if strength_role is not None else ())
                         + (("VOLUME_SET_CAP_APPLIED",) if cap_applied else ())
-                        + (("SESSION_SIZE_ACCESSORY",) if not counts_toward_volume else ())
+                        + (
+                            ("SESSION_SIZE_ACCESSORY",)
+                            if session_size_accessory
+                            else ()
+                        )
                     ),
                     substitution_exercise_ids=draft.substitutions[exercise.id],
                     warmup_sets=warmup_sets,
-                    counts_toward_volume=counts_toward_volume,
+                    counts_toward_volume=True,
                     movement_pattern=exercise.movement_pattern,
                     primary_muscle=exercise.primary_muscle,
                     secondary_muscles=exercise.secondary_muscles,

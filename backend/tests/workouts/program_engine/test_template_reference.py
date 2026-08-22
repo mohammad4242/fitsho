@@ -253,7 +253,7 @@ def test_template_uses_shared_volume_and_prescription_rules() -> None:
     assert any(entry["stage"] == "volume_repair" for entry in result.program.decision_trace)
 
 
-def test_same_template_personalizes_weekly_volume_for_different_priority_muscles() -> None:
+def test_same_template_personalizes_weekly_volume_targets_for_different_priorities() -> None:
     template, catalog = _upper_lower_reference()
 
     chest_result = generate_program(
@@ -287,8 +287,27 @@ def test_same_template_personalizes_weekly_volume_for_different_priority_muscles
     assert back_result.program is not None, back_result.errors
     chest_volume = chest_result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
     back_volume = back_result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
-    assert chest_volume["chest"] > back_volume["chest"]
-    assert back_volume["back"] > chest_volume["back"]
+    chest_ranges = chest_result.program.aggregate_metrics["volume_ranges_by_muscle"]
+    back_ranges = back_result.program.aggregate_metrics["volume_ranges_by_muscle"]
+    assert (
+        chest_ranges["chest"]["preferred_weekly_target"]
+        > back_ranges["chest"]["preferred_weekly_target"]
+    )
+    assert (
+        back_ranges["back"]["preferred_weekly_target"]
+        > chest_ranges["back"]["preferred_weekly_target"]
+    )
+    assert chest_volume["chest"] >= chest_ranges["chest"]["acceptable_minimum"]
+    assert back_volume["back"] >= back_ranges["back"]["acceptable_minimum"]
+    for result in (chest_result, back_result):
+        ranges = result.program.aggregate_metrics["volume_ranges_by_muscle"]
+        assert all(
+            values["acceptable_minimum"]
+            <= values["actual_effective_volume"]
+            <= values["acceptable_maximum"]
+            or values["status"] == "constrained"
+            for values in ranges.values()
+        )
     for day_index in (0, 2):
         expected_core_ids = {slot.exercise_id for slot in template.days[day_index].slots}
         actual_core = chest_result.program.weekly_schedule[day_index].exercises[:3]

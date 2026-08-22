@@ -10,6 +10,7 @@ from app.workouts.program_engine.prescription import estimate_exercise_minutes
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.session_duration import repair_session_durations
 from app.workouts.program_engine.validation import validate_program
+from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
@@ -95,6 +96,45 @@ def test_underfilled_session_is_repaired_with_real_estimates() -> None:
 
     assert repaired[0].estimated_duration_minutes >= 80
     assert "SESSION_DURATION_REPAIR_APPLIED" in reasons
+
+
+def test_duration_repair_cannot_add_hidden_or_per_session_volume() -> None:
+    source = request(session_duration_minutes=60, available_training_days=1)
+    normalized = normalize_request(source, RULESET)
+    result = generate_program(source, full_catalog(), RULESET)
+    assert result.program is not None
+    chest = next(
+        item
+        for item in result.program.weekly_schedule[0].exercises
+        if item.primary_muscle is not None and item.primary_muscle.value == "chest"
+    )
+    exercises = (replace(chest, sets=3), replace(chest, exercise_id=full_catalog()[1].id, sets=3))
+    day = replace(
+        result.program.weekly_schedule[0],
+        exercises=exercises,
+        estimated_duration_minutes=RULESET.general_warmup_minutes
+        + sum(item.estimated_minutes for item in exercises),
+    )
+    volume = plan_weekly_volume(normalized, result.program.split, RULESET)
+    chest_candidates = tuple(
+        item for item in full_catalog() if item.primary_muscle is chest.primary_muscle
+    )
+
+    repaired, _ = repair_session_durations(
+        (day,),
+        normalized,
+        chest_candidates,
+        RULESET,
+        volume=volume,
+    )
+
+    repaired_chest = tuple(
+        item
+        for item in repaired[0].exercises
+        if item.primary_muscle is chest.primary_muscle
+    )
+    assert sum(item.sets for item in repaired_chest) <= RULESET.max_sets_per_muscle_per_session
+    assert all(item.counts_toward_volume for item in repaired[0].exercises)
 
 
 def test_overfilled_session_is_repaired_without_fake_duration() -> None:

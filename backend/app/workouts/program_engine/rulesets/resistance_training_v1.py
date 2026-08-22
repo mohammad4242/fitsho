@@ -163,6 +163,7 @@ class ProgramRuleset:
     short_session_minutes: int = 30
     older_adult_modifier_age: int = 60
     contextual_volume_reduction_sets: int = 1
+    weekly_volume_target_flexibility_sets: int = 2
     minimum_working_sets: int = 3
     novice_target_rir: int = 3
     experienced_target_rir: int = 2
@@ -173,6 +174,8 @@ class ProgramRuleset:
     exercise_transition_minutes: int = 1
     minimum_exercise_estimate_minutes: int = 3
     minimum_rest_seconds: int = 30
+    maximum_duration_repair_rest_seconds: int = 300
+    duration_repair_rest_increment_seconds: int = 30
     maximum_target_rir: int = 5
     cardio_start_minutes: int = 10
     minimum_cardio_minutes: int = 5

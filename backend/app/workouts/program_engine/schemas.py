@@ -305,11 +305,24 @@ class VolumeTarget:
     minimum_effective_sets: int = 0
     minimum_coverage_required: bool = False
     direct_minimum_required: bool = False
+    constraint_reason_codes: tuple[str, ...] = ()
 
     @property
     def direct_sets(self) -> int:
         """Compatibility alias for the planned direct-set target."""
         return self.target_sets
+
+    @property
+    def preferred_target(self) -> int:
+        return self.target_sets
+
+    @property
+    def acceptable_minimum(self) -> int:
+        return min(self.minimum_soft, self.acceptable_maximum)
+
+    @property
+    def acceptable_maximum(self) -> int:
+        return min(self.maximum_soft, self.maximum_hard)
 
 
 @dataclass(frozen=True)

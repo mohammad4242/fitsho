@@ -53,7 +53,7 @@ def direct_target_muscles(
     return target_muscles_from_values(
         item.primary_muscle
         for item in exercises
-        if item.counts_toward_volume and item.primary_muscle is not None
+        if item.primary_muscle is not None
     )
 
 

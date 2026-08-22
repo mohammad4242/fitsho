@@ -31,6 +31,7 @@ from app.workouts.program_engine.schemas import (
     SplitPlan,
     TemplateReference,
     ValidationReport,
+    VolumeTarget,
     WeeklyVolumePlan,
     WorkoutDay,
     WorkoutProgram,
@@ -400,6 +401,9 @@ def _program_for_split(
         request=normalized,
         relaxed_required_pattern_groups=relaxed_groups,
         relaxed_required_slots=relaxed_slots,
+        repair_reason_codes=tuple(
+            dict.fromkeys((*repair_reasons, *duration_repair_reasons))
+        ),
     )
     body_trace = body_analysis_trace(normalized, ruleset)
     session_reasons = tuple(
@@ -586,6 +590,9 @@ def _reference_program(
         ruleset,
         request=normalized,
         reference_template=reference.slug,
+        repair_reason_codes=tuple(
+            dict.fromkeys((*repair_reasons, *duration_repair_reasons))
+        ),
     )
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises), ruleset
@@ -655,7 +662,11 @@ def _reference_program(
         for muscle in sorted(priority_muscles, key=lambda item: item.value)
         if direct[muscle.value] < volume.minimum_direct_sets_for(muscle)
         or effective_volume.effective_sets_by_muscle.get(muscle.value, 0)
-        < volume.effective_target_for(muscle)
+        < next(
+            target.acceptable_minimum
+            for target in volume.targets
+            if target.muscle is muscle
+        )
     )
     if unmet_priorities:
         errors = tuple(
@@ -743,6 +754,7 @@ def _volume_metrics(
     reference_template: str | None = None,
     relaxed_required_pattern_groups: tuple[tuple[MovementPattern, ...], ...] = (),
     relaxed_required_slots: tuple[tuple[tuple[MovementPattern, ...], MuscleGroup | None], ...] = (),
+    repair_reason_codes: tuple[str, ...] = (),
 ) -> dict[str, object]:
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises), ruleset
@@ -754,21 +766,13 @@ def _volume_metrics(
             target.muscle.value: target.direct_sets for target in volume.targets
         },
         "volume_ranges_by_muscle": {
-            target.muscle.value: {
-                "minimum_soft": target.minimum_soft,
-                "target_sets": target.target_sets,
-                "maximum_soft": target.maximum_soft,
-                "maximum_hard": target.maximum_hard,
-                "effective_maximum_soft": target.maximum_soft
-                + round(target.maximum_soft * ruleset.secondary_set_credit),
-                "effective_maximum_hard": target.maximum_hard
-                + round(target.maximum_hard * ruleset.secondary_set_credit),
-                "effective_target_sets": target.effective_target_sets,
-                "minimum_direct_sets": target.minimum_direct_sets,
-                "minimum_effective_sets": target.minimum_effective_sets,
-                "minimum_coverage_required": target.minimum_coverage_required,
-                "direct_minimum_required": target.direct_minimum_required,
-            }
+            target.muscle.value: _volume_range_metric(
+                target,
+                direct.get(target.muscle.value, 0),
+                effective_volume.effective_sets_by_muscle.get(target.muscle.value, 0.0),
+                days,
+                repair_reason_codes,
+            )
             for target in volume.targets
         },
         "weekly_direct_sets_by_muscle": complete_tracked_metrics(dict(direct)),
@@ -851,8 +855,85 @@ def _volume_metrics(
                 )
         if target_values:
             metrics["unavailable_muscle_coverage"] = tuple(sorted(target_values))
+            ranges = metrics["volume_ranges_by_muscle"]
+            if isinstance(ranges, dict):
+                for muscle in target_values:
+                    values = ranges.get(muscle)
+                    if not isinstance(values, dict):
+                        continue
+                    values["status"] = "constrained"
+                    values["constraint_reason_codes"] = tuple(
+                        dict.fromkeys(
+                            (
+                                *_string_sequence(values.get("constraint_reason_codes")),
+                                "VOLUME_CONSTRAINED_BY_SAFETY_OR_EQUIPMENT",
+                            )
+                        )
+                    )
 
     return metrics
+
+
+def _volume_range_metric(
+    target: VolumeTarget,
+    actual_direct: int,
+    actual_effective: float,
+    days: tuple[WorkoutDay, ...],
+    repair_reason_codes: tuple[str, ...],
+) -> dict[str, object]:
+    constraint_reasons = list(target.constraint_reason_codes)
+    inside_range = target.acceptable_minimum <= actual_effective <= target.acceptable_maximum
+    if not inside_range and set(repair_reason_codes).intersection(
+        {
+            "VOLUME_REPAIR_SOFT_TARGET_REDUCED",
+            "VOLUME_REPAIR_HARD_MINIMUM_UNSATISFIED",
+        }
+    ):
+        constraint_reasons.append("VOLUME_CONSTRAINED_BY_SESSION_FEASIBILITY")
+    if not inside_range and any(
+        "TEMPLATE_ADAPTATION_PRIORITY:core" in item.reason_codes
+        and (
+            item.primary_muscle is target.muscle
+            or target.muscle in item.secondary_muscles
+        )
+        for day in days
+        for item in day.exercises
+    ):
+        constraint_reasons.append("VOLUME_CONSTRAINED_BY_TEMPLATE_STRUCTURE")
+    if actual_effective == target.preferred_target:
+        status = "exact_target"
+    elif inside_range:
+        status = "within_flexible_range"
+    elif constraint_reasons:
+        status = "constrained"
+    else:
+        status = "outside_acceptable_range"
+    return {
+        "preferred_weekly_target": target.preferred_target,
+        "acceptable_minimum": target.acceptable_minimum,
+        "acceptable_maximum": target.acceptable_maximum,
+        "actual_direct_volume": actual_direct,
+        "actual_effective_volume": actual_effective,
+        "status": status,
+        "constraint_reason_codes": tuple(dict.fromkeys(constraint_reasons)),
+        "minimum_soft": target.minimum_soft,
+        "target_sets": target.target_sets,
+        "maximum_soft": target.maximum_soft,
+        "maximum_hard": target.maximum_hard,
+        "effective_maximum_soft": target.acceptable_maximum,
+        "effective_maximum_hard": target.maximum_hard,
+        "effective_target_sets": target.effective_target_sets,
+        "minimum_direct_sets": target.minimum_direct_sets,
+        "minimum_effective_sets": target.minimum_effective_sets,
+        "minimum_coverage_required": target.minimum_coverage_required,
+        "direct_minimum_required": target.direct_minimum_required,
+    }
+
+
+def _string_sequence(value: object) -> tuple[str, ...]:
+    if not isinstance(value, (tuple, list, set, frozenset)):
+        return ()
+    return tuple(item for item in value if isinstance(item, str))
 
 
 def _priority_metrics(
@@ -868,7 +949,7 @@ def _priority_metrics(
             day.day_index
             for day in days
             if any(
-                item.primary_muscle is muscle and item.counts_toward_volume
+                item.primary_muscle is muscle
                 for item in day.exercises
             )
         )

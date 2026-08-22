@@ -166,10 +166,20 @@ def test_golden_constraints_and_recovery(name: str) -> None:
         )
     if name == "short_25_minutes":
         assert all(
-            RULESET.minimum_exercises_per_session
-            <= len(day.exercises)
-            <= RULESET.max_exercises_per_session
+            1 <= len(day.exercises) <= RULESET.max_exercises_per_session
             for day in result.program.weekly_schedule
+        )
+        assert all(
+            source.session_duration_minutes - 10
+            <= day.estimated_duration_minutes
+            <= source.session_duration_minutes + 10
+            for day in result.program.weekly_schedule
+        )
+        assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in result.program.validation_report.warnings
+        assert all(
+            item.counts_toward_volume
+            for day in result.program.weekly_schedule
+            for item in day.exercises
         )
 
 

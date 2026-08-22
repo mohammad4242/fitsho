@@ -23,8 +23,6 @@ def calculate_effective_volume(
     effective: defaultdict[str, float] = defaultdict(float)
 
     for exercise in exercises:
-        if not exercise.counts_toward_volume:
-            continue
         credited_muscles: set[str] = set()
         if exercise.primary_muscle is not None:
             primary = exercise.primary_muscle.value

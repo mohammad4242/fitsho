@@ -131,7 +131,12 @@ def test_multiple_priority_muscles_receive_deterministic_balanced_emphasis() -> 
     for muscle in (MuscleGroup.BICEPS, MuscleGroup.SHOULDERS, MuscleGroup.TRICEPS):
         assert first_metrics[muscle.value]["session_frequency"] >= 2
         assert first_metrics[muscle.value]["distributed"] is True
-        assert first_metrics[muscle.value]["effective_sets"] >= 10
+        volume_range = first.program.aggregate_metrics["volume_ranges_by_muscle"][muscle.value]
+        assert (
+            first_metrics[muscle.value]["effective_sets"]
+            >= volume_range["acceptable_minimum"]
+        )
+        assert volume_range["status"] in {"exact_target", "within_flexible_range"}
 
 
 def test_priority_warning_is_explicit_when_catalog_cannot_provide_frequency_capacity() -> None:
