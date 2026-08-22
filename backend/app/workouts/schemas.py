@@ -228,7 +228,6 @@ class WorkoutPlanResponse(BaseModel):
     validation_report: dict[str, object] = Field(default_factory=dict)
     aggregate_metrics: dict[str, object] = Field(default_factory=dict)
     progression_policy: dict[str, object] = Field(default_factory=dict)
-    decision_trace: list[dict[str, object]] = Field(default_factory=list)
     body_analysis_provenance: dict[str, object] = Field(default_factory=dict)
     ai_coach_template_slug: str | None = None
     ai_coach_program_explanation_fa: str | None = None

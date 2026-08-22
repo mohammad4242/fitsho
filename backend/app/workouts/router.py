@@ -241,7 +241,6 @@ def to_plan_response(
         validation_report=plan.validation_report,
         aggregate_metrics=plan.aggregate_metrics,
         progression_policy=plan.progression_policy,
-        decision_trace=plan.decision_trace,
         body_analysis_provenance=plan.body_analysis_provenance,
         ai_coach_template_slug=plan.ai_coach_template_slug,
         ai_coach_program_explanation_fa=plan.ai_coach_program_explanation_fa,

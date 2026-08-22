@@ -95,6 +95,26 @@ class WorkoutReviewAthleteSummary(BaseModel):
     previous_approved_plan_id: UUID | None = None
 
 
+class CoachTemplateSelectionScoreResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    priority: int
+    body_analysis: int
+    goal: int
+    sex: int
+    fallback: int
+    total: int
+
+
+class CoachTemplateSelectionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    selected_template: str
+    explanation_fa: str
+    explanation_en: str
+    score: CoachTemplateSelectionScoreResponse
+
+
 class WorkoutReviewQueueItemResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -119,6 +139,7 @@ class WorkoutReviewDetailResponse(WorkoutReviewQueueItemResponse):
     exercise_options: list[WorkoutReviewExerciseOption]
     athlete_summary: WorkoutReviewAthleteSummary
     fitsho_recommendation: CycleAdaptationDecision
+    template_selection: CoachTemplateSelectionResponse | None = None
 
 
 class WorkoutReviewAccessResponse(BaseModel):

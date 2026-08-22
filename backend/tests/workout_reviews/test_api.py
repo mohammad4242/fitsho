@@ -138,6 +138,29 @@ def test_member_cannot_read_coach_queue(client: TestClient) -> None:
     assert response.json()["detail"]["code"] == "COACH_ROLE_REQUIRED"
 
 
+def test_member_workout_response_hides_internal_decision_trace(
+    client: TestClient,
+    db: Session,
+) -> None:
+    member_id = _register(client, f"private-trace-{uuid4()}@example.com")
+    assert client.post("/api/v1/profile", headers=ORIGIN, json=PROFILE).status_code == 201
+    plan = _plan(db, member_id)
+    plan.decision_trace = [
+        {
+            "stage": "template_selection",
+            "selected": "private-template",
+            "candidates": [{"slug": "private-template", "score": {"total": 100}}],
+        }
+    ]
+    db.commit()
+
+    response = client.get(f"/api/v1/workout-plans/{plan.id}")
+
+    assert response.status_code == 200
+    assert "decision_trace" not in response.json()
+    assert "private-template" not in response.text
+
+
 def test_coach_lists_and_claims_pending_review(client: TestClient, db: Session) -> None:
     member_id = _register(client, f"queue-member-{uuid4()}@example.com")
     review = ensure_pending_review(db, _plan(db, member_id))
@@ -160,6 +183,67 @@ def test_coach_lists_and_claims_pending_review(client: TestClient, db: Session) 
     assert claimed.status_code == 200
     assert claimed.json()["status"] == "claimed"
     assert claimed.json()["draft_revision"] == 1
+
+
+def test_coach_detail_projects_selected_template_without_full_trace(
+    client: TestClient,
+    db: Session,
+) -> None:
+    member_id = _register(client, f"template-member-{uuid4()}@example.com")
+    plan = _plan(db, member_id)
+    plan.decision_trace = [
+        {
+            "stage": "template_selection",
+            "requested_days": 4,
+            "experience_level": "intermediate",
+            "templates_considered": 2,
+            "hard_rejections": [],
+            "candidates": [
+                {
+                    "slug": "four-day-strength",
+                    "score": {
+                        "priority": 100,
+                        "body_analysis": 0,
+                        "goal": 25,
+                        "sex": 0,
+                        "fallback": 0,
+                        "total": 125,
+                    },
+                    "reason_codes": [
+                        "EXPLICIT_PRIORITY_EXACT_MATCH",
+                        "GOAL_STRENGTH_BIAS_MATCH",
+                    ],
+                }
+            ],
+            "selected": "four-day-strength",
+            "tie_break": None,
+        }
+    ]
+    review = ensure_pending_review(db, plan)
+    db.commit()
+    coach_id = _switch_user(client, f"template-coach-{uuid4()}@example.com")
+    db.add(UserSpecialistRole(user_id=coach_id, role=SpecialistRole.COACH))
+    db.commit()
+
+    response = client.get(f"/api/v1/coach/workout-reviews/{review.id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "decision_trace" not in payload["source_plan"]
+    assert payload["template_selection"] == {
+        "selected_template": "four-day-strength",
+        "explanation_fa": payload["template_selection"]["explanation_fa"],
+        "explanation_en": payload["template_selection"]["explanation_en"],
+        "score": {
+            "priority": 100,
+            "body_analysis": 0,
+            "goal": 25,
+            "sex": 0,
+            "fallback": 0,
+            "total": 125,
+        },
+    }
+    assert "اولویت عضلانی صریح" in payload["template_selection"]["explanation_fa"]
 
 
 def test_coach_review_detail_includes_safe_athlete_summary(

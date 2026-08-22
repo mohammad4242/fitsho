@@ -31,6 +31,7 @@ from app.workout_reviews.summary import (
     build_fitsho_recommendation,
     build_review_athlete_summary,
 )
+from app.workout_reviews.template_selection import build_coach_template_selection
 from app.workout_reviews.validation import DraftValidationError
 from app.workouts.router import to_plan_response
 
@@ -216,6 +217,7 @@ def _detail_response(db: Session, review: WorkoutPlanReview) -> WorkoutReviewDet
         exercise_options=options,
         athlete_summary=build_review_athlete_summary(db, review),
         fitsho_recommendation=build_fitsho_recommendation(db, review),
+        template_selection=build_coach_template_selection(review.source_plan.decision_trace),
     )
 
 
