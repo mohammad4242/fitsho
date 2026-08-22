@@ -148,6 +148,24 @@ PRIORITY_TAG_BY_MUSCLE: dict[MuscleGroup, TemplateFocusTag] = {
     MuscleGroup.HAMSTRINGS: TemplateFocusTag.HAMSTRINGS_PRIORITY,
 }
 
+REGIONAL_PRIORITY_TAG_BY_MUSCLE: dict[MuscleGroup, TemplateFocusTag] = {
+    MuscleGroup.CHEST: TemplateFocusTag.UPPER_PRIORITY,
+    MuscleGroup.BACK: TemplateFocusTag.UPPER_PRIORITY,
+    MuscleGroup.SHOULDERS: TemplateFocusTag.UPPER_PRIORITY,
+    MuscleGroup.BICEPS: TemplateFocusTag.UPPER_PRIORITY,
+    MuscleGroup.TRICEPS: TemplateFocusTag.UPPER_PRIORITY,
+    MuscleGroup.TRAPS: TemplateFocusTag.UPPER_PRIORITY,
+    MuscleGroup.FOREARMS: TemplateFocusTag.UPPER_PRIORITY,
+    MuscleGroup.NECK: TemplateFocusTag.UPPER_PRIORITY,
+    MuscleGroup.GLUTES: TemplateFocusTag.LOWER_PRIORITY,
+    MuscleGroup.QUADRICEPS: TemplateFocusTag.LOWER_PRIORITY,
+    MuscleGroup.HAMSTRINGS: TemplateFocusTag.LOWER_PRIORITY,
+    MuscleGroup.ADDUCTORS: TemplateFocusTag.LOWER_PRIORITY,
+    MuscleGroup.ABDUCTORS: TemplateFocusTag.LOWER_PRIORITY,
+    MuscleGroup.LEGS: TemplateFocusTag.LOWER_PRIORITY,
+    MuscleGroup.CALVES: TemplateFocusTag.LOWER_PRIORITY,
+}
+
 MUSCLES_BY_PRIORITY_TAG: dict[TemplateFocusTag, frozenset[MuscleGroup]] = {
     TemplateFocusTag.CHEST_PRIORITY: frozenset({MuscleGroup.CHEST}),
     TemplateFocusTag.BACK_PRIORITY: frozenset({MuscleGroup.BACK}),
@@ -398,6 +416,16 @@ def priority_tags_for_muscles(
 ) -> frozenset[TemplateFocusTag]:
     return frozenset(
         tag for muscle in muscles if (tag := priority_tag_for_muscle(muscle)) is not None
+    )
+
+
+def regional_priority_tags_for_muscles(
+    muscles: Iterable[MuscleGroup],
+) -> frozenset[TemplateFocusTag]:
+    return frozenset(
+        tag
+        for muscle in muscles
+        if (tag := REGIONAL_PRIORITY_TAG_BY_MUSCLE.get(muscle)) is not None
     )
 
 

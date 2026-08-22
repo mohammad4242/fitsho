@@ -16,7 +16,7 @@ class PrescriptionRule:
 
 @dataclass(frozen=True)
 class ProgramRuleset:
-    version: str = "resistance_training_v2"
+    version: str = "resistance_training_v3"
     engine_version: str = "program_engine_v1"
     max_resistance_days: int = 6
     days_per_week: int = 7
@@ -103,8 +103,6 @@ class ProgramRuleset:
     body_analysis_minimum_confidence: float = 0.7
     body_analysis_mild_lag_bonus_sets: int = 1
     body_analysis_clear_lag_bonus_sets: int = 2
-    body_analysis_mild_lag_template_boost: int = 20
-    body_analysis_clear_lag_template_boost: int = 35
     poor_recovery_set_reduction: int = 2
     max_previous_volume_increase: float = 0.2
     adaptation_min_adherence_for_progression: float = 0.8

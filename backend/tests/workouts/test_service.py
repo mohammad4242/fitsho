@@ -718,7 +718,7 @@ def test_generation_persists_valid_snapshot_for_pending_review(db: Session) -> N
     assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
     assert result.plan.activated_at is None
     assert result.plan.engine_version == "program_engine_v1"
-    assert result.plan.ruleset_version == "resistance_training_v2"
+    assert result.plan.ruleset_version == "resistance_training_v3"
     assert result.plan.validation_report["errors"] == []
     assert result.plan.exercise_catalog_snapshot["hash"] == result.plan.candidate_set_hash
     assert result.plan.generation_records[0].status is WorkoutGenerationStatus.SUCCEEDED

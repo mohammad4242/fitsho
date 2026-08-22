@@ -1,14 +1,5 @@
 from uuid import UUID
 
-from app.training_templates.tags import (
-    TemplateFocusTag,
-    has_template_tag,
-    priority_tag_for_muscle,
-    priority_tags_for_muscles,
-)
-from app.workouts.program_engine.body_analysis import (
-    eligible_body_analysis_priorities,
-)
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -16,6 +7,23 @@ from app.workouts.program_engine.schemas import (
     TemplateReference,
 )
 from app.workouts.program_engine.slot_compatibility import evaluate_candidate_slot_compatibility
+from app.workouts.program_engine.template_scoring import (
+    TemplateScore,
+    score_template_reference,
+)
+
+
+def rank_template_references(
+    request: NormalizedProgramRequest,
+    eligible: tuple[ExerciseCandidate, ...],
+    templates: tuple[TemplateReference, ...],
+    ruleset: ProgramRuleset,
+) -> tuple[tuple[TemplateReference, TemplateScore], ...]:
+    scored = tuple(
+        (template, score_template_reference(request, template, ruleset))
+        for template in eligible_template_references(request, eligible, templates)
+    )
+    return tuple(sorted(scored, key=lambda item: (item[1].total, item[0].slug), reverse=True))
 
 
 def select_template_reference(
@@ -24,13 +32,10 @@ def select_template_reference(
     templates: tuple[TemplateReference, ...],
     ruleset: ProgramRuleset,
 ) -> TemplateReference | None:
-    scored = [
-        (template, _score(request, template, ruleset))
-        for template in eligible_template_references(request, eligible, templates)
-    ]
-    if not scored:
+    ranked = rank_template_references(request, eligible, templates, ruleset)
+    if not ranked:
         return None
-    return max(scored, key=lambda item: (item[1], item[0].slug))[0]
+    return ranked[0][0]
 
 
 def eligible_template_references(
@@ -56,27 +61,6 @@ def eligible_template_references(
 
 def _template_level(request: NormalizedProgramRequest) -> str:
     return request.source.training_experience.value
-
-
-def _score(
-    request: NormalizedProgramRequest,
-    template: TemplateReference,
-    ruleset: ProgramRuleset,
-) -> int:
-    priority_tags = priority_tags_for_muscles(request.source.priority_muscles)
-    score = 100 + 35 * len(priority_tags.intersection(template.focus_tags))
-    for priority in eligible_body_analysis_priorities(request, ruleset):
-        priority_tag = priority_tag_for_muscle(priority.muscle)
-        if priority_tag is None or not has_template_tag(template.focus_tags, priority_tag):
-            continue
-        score += (
-            ruleset.body_analysis_clear_lag_template_boost
-            if priority.classification == "clear_lag"
-            else ruleset.body_analysis_mild_lag_template_boost
-        )
-    if has_template_tag(template.focus_tags, TemplateFocusTag.BALANCED) and not priority_tags:
-        score += 10
-    return score
 
 
 def _core_slots_are_resolvable(
