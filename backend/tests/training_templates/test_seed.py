@@ -22,12 +22,14 @@ from app.training_templates.seed_data import (
 from app.training_templates.service import seed_training_program_templates
 
 
-def test_seed_adds_five_templates_for_every_supported_training_frequency(db: Session) -> None:
+def test_seed_adds_current_template_library_for_every_supported_training_frequency(
+    db: Session,
+) -> None:
     seed_exercises(db)
 
     result = seed_training_program_templates(db)
 
-    assert result.templates == 35
+    assert result.templates == 55
     templates = list(db.scalars(select(TrainingProgramTemplate)))
     assert {template.days_per_week for template in templates} == {2, 3, 4, 5, 6}
     for days_per_week in range(2, 7):
@@ -57,20 +59,17 @@ def test_active_library_offers_two_through_six_days_and_only_full_body_two_day_t
         template for template in TRAINING_PROGRAM_TEMPLATE_SEEDS if template.days_per_week == 2
     ]
     for template in two_day_seeds:
-        for day in template.days:
-            patterns = {slot.movement_pattern for slot in day.slots}
-            assert MovementPattern.HORIZONTAL_PUSH in patterns, template.slug
-            assert patterns & {MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL}, (
-                template.slug
-            )
-            assert patterns & {
-                MovementPattern.SQUAT,
-                MovementPattern.LUNGE,
-                MovementPattern.KNEE_EXTENSION,
-            }, template.slug
-            assert patterns & {MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION}, (
-                template.slug
-            )
+        patterns = {slot.movement_pattern for day in template.days for slot in day.slots}
+        assert MovementPattern.HORIZONTAL_PUSH in patterns, template.slug
+        assert patterns & {MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL}, (
+            template.slug
+        )
+        assert patterns & {
+            MovementPattern.SQUAT,
+            MovementPattern.LUNGE,
+            MovementPattern.KNEE_EXTENSION,
+        }, template.slug
+        assert patterns & {MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION}, template.slug
 
 
 def test_every_template_session_contains_between_five_and_nine_exercises() -> None:
@@ -91,10 +90,7 @@ def test_every_template_includes_five_bilingual_programming_reasons() -> None:
 def test_template_sessions_place_main_work_before_isolation_and_intensity_methods_last() -> None:
     for template in TRAINING_PROGRAM_TEMPLATE_SEEDS:
         for day in template.days:
-            ordering = [
-                _slot_ordering_key(slot)
-                for slot in day.slots
-            ]
+            ordering = [_slot_ordering_key(slot) for slot in day.slots]
             assert ordering == sorted(ordering), f"{template.slug}: {day.title_en}"
 
 
@@ -143,10 +139,10 @@ def test_seed_expands_four_and_five_day_reference_library_across_levels(db: Sess
     result = seed_training_program_templates(db)
 
     templates = list(db.scalars(select(TrainingProgramTemplate)))
-    assert result.templates == 35
+    assert result.templates == 55
     for days_per_week in (4, 5):
         bucket = [template for template in templates if template.days_per_week == days_per_week]
-        assert len(bucket) == 10
+        assert len(bucket) == {4: 15, 5: 14}[days_per_week]
         assert {template.training_level for template in bucket} == {
             ExperienceLevel.BEGINNER,
             ExperienceLevel.INTERMEDIATE,
@@ -284,7 +280,7 @@ def test_seed_can_be_rerun_without_duplicate_template_days(db: Session) -> None:
 
     result = seed_training_program_templates(db)
 
-    assert result.templates == 35
+    assert result.templates == 55
     assert (
         db.scalar(
             select(TrainingProgramTemplate).where(

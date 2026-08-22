@@ -227,6 +227,18 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
         entry["stage"] == "template_reference" and entry["selected"] == template.slug
         for entry in result.program.decision_trace
     )
+    assert [entry["stage"] for entry in result.program.decision_trace] == [
+        "normalization",
+        "safety",
+        "eligibility",
+        "template_reference",
+        "template_adaptation",
+        "day_count_invariant",
+        "volume",
+        "volume_repair",
+        "session_duration",
+        "final_construction",
+    ]
 
 
 def test_template_uses_shared_volume_and_prescription_rules() -> None:
