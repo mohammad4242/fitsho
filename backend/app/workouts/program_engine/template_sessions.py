@@ -119,7 +119,11 @@ def build_template_sessions(
                     used,
                     reserved,
                     ruleset,
-                    original=source_by_id.get(slot.exercise_id),
+                    original=(
+                        source_by_id.get(slot.exercise_id)
+                        if slot.exercise_id is not None
+                        else None
+                    ),
                 )
             if candidate is None:
                 if slot.adaptation_priority == "core":

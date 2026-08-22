@@ -550,8 +550,11 @@ def _select_rest_reduction_for_overfill(
                 exercise.warmup_sets,
                 ruleset,
             ),
-            reason_codes=exercise.reason_codes
-            + ("ACCESSORY_REST_REDUCED_FOR_DURATION",),
+            reason_codes=tuple(
+                dict.fromkeys(
+                    exercise.reason_codes + ("ACCESSORY_REST_REDUCED_FOR_DURATION",)
+                )
+            ),
         )
         options.append(
             (
@@ -575,17 +578,23 @@ def _duration_repair_minimum_rest(
 ) -> int:
     if "STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes:
         return ruleset.prescription_rules["strength_compound"].rest_seconds
-    reductions = exercise.reason_codes.count("ACCESSORY_REST_REDUCED_FOR_DURATION")
-    if reductions >= 2 or (
-        reductions >= 1
-        and exercise.warmup_sets > 0
-        and exercise.exercise_type is ExerciseType.COMPOUND
-    ):
-        return exercise.rest_seconds
-    return max(
-        ruleset.minimum_rest_seconds,
-        exercise.rest_seconds - ruleset.duration_repair_rest_increment_seconds,
-    )
+    if "STRENGTH_SECONDARY_COMPOUND" in exercise.reason_codes:
+        return ruleset.prescription_rules["strength_secondary_compound"].rest_seconds
+    if "STRENGTH_ROLE_ACCESSORY_TYPE" in exercise.reason_codes:
+        key = (
+            "hypertrophy_isolation"
+            if exercise.exercise_type is ExerciseType.ISOLATION
+            else "strength_accessory"
+        )
+        return ruleset.prescription_rules[key].rest_seconds
+    if exercise.warmup_sets > 0 and exercise.exercise_type is ExerciseType.COMPOUND:
+        return (
+            ruleset.minimum_rest_seconds
+            + 2 * ruleset.duration_repair_rest_increment_seconds
+        )
+    if exercise.exercise_type is ExerciseType.ISOLATION:
+        return ruleset.minimum_rest_seconds
+    return ruleset.minimum_rest_seconds + ruleset.duration_repair_rest_increment_seconds
 
 
 def _duration_preservation_rank(
@@ -764,7 +773,12 @@ def _justify_duration_repeats(days: tuple[WorkoutDay, ...]) -> tuple[WorkoutDay,
             if item.exercise_id in duration_repaired_ids and item.exercise_id in seen:
                 item = replace(
                     item,
-                    reason_codes=item.reason_codes + ("CORE_MOVEMENT_REPEATED_FOR_PROGRESSION",),
+                    reason_codes=tuple(
+                        dict.fromkeys(
+                            item.reason_codes
+                            + ("CORE_MOVEMENT_REPEATED_FOR_PROGRESSION",)
+                        )
+                    ),
                 )
             seen.add(item.exercise_id)
             exercises.append(item)

@@ -309,6 +309,11 @@ def test_same_template_strength_and_hypertrophy_have_role_specific_prescriptions
         for item in day.exercises
         if item.exercise_type.value == "isolation"
     )
+    assert all(
+        len(item.reason_codes) == len(set(item.reason_codes))
+        for day in strength.program.weekly_schedule
+        for item in day.exercises
+    )
 
 
 def test_same_template_gives_explicit_chest_priority_more_final_direct_volume() -> None:

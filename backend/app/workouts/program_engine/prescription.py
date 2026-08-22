@@ -168,14 +168,16 @@ def prescribe_sessions(
                     target_rir=prescription.target_rir,
                     rest_seconds=rest,
                     estimated_minutes=estimate_exercise_minutes(sets, rest, warmup_sets, ruleset),
-                    reason_codes=(
-                        draft.selection_reasons[exercise.id]
-                        + (strength_role.reason_codes if strength_role is not None else ())
-                        + (("VOLUME_SET_CAP_APPLIED",) if cap_applied else ())
-                        + (
-                            ("SESSION_SIZE_ACCESSORY",)
-                            if session_size_accessory
-                            else ()
+                    reason_codes=tuple(
+                        dict.fromkeys(
+                            draft.selection_reasons[exercise.id]
+                            + (strength_role.reason_codes if strength_role is not None else ())
+                            + (("VOLUME_SET_CAP_APPLIED",) if cap_applied else ())
+                            + (
+                                ("SESSION_SIZE_ACCESSORY",)
+                                if session_size_accessory
+                                else ()
+                            )
                         )
                     ),
                     substitution_exercise_ids=draft.substitutions[exercise.id],

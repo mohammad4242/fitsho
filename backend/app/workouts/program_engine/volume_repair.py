@@ -677,9 +677,7 @@ def _select_reduction_candidate(
         candidates,
         key=lambda candidate: (
             0
-            if ({candidate[2].primary_muscle.value} | {
-                muscle.value for muscle in candidate[2].secondary_muscles
-            }).intersection(hard_weekly_excessive)
+            if _affected_muscle_values(candidate[2]).intersection(hard_weekly_excessive)
             else 1,
             template_removal_rank(candidate[2]),
             any(code.startswith("REQUIRED_") for code in candidate[2].reason_codes),
@@ -695,6 +693,13 @@ def _select_reduction_candidate(
             str(candidate[2].exercise_id),
         ),
     )
+
+
+def _affected_muscle_values(exercise: ProgrammedExercise) -> set[str]:
+    values = {muscle.value for muscle in exercise.secondary_muscles}
+    if exercise.primary_muscle is not None:
+        values.add(exercise.primary_muscle.value)
+    return values
 
 
 def _select_addition_candidate(
