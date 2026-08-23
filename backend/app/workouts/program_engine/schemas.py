@@ -38,6 +38,7 @@ from app.workouts.program_engine.enums import (
     StabilityDemand,
     TrainingExperience,
     TrainingStatus,
+    ValidationStatus,
 )
 
 GOAL_ALIASES: dict[str, Goal] = {
@@ -494,6 +495,19 @@ class ValidationReport:
     assumptions: tuple[str, ...]
     metrics: dict[str, object]
     decision_trace: tuple[dict[str, object], ...]
+    status: ValidationStatus = field(init=False)
+
+    def __post_init__(self) -> None:
+        status = (
+            ValidationStatus.INVALID
+            if self.errors
+            else (
+                ValidationStatus.VALID_WITH_CONSTRAINTS
+                if self.warnings
+                else ValidationStatus.VALID
+            )
+        )
+        object.__setattr__(self, "status", status)
 
     @property
     def is_valid(self) -> bool:

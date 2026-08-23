@@ -75,6 +75,12 @@ class SafetyStatus(StrEnum):
     STOP_AND_REFER = "stop_and_refer"
 
 
+class ValidationStatus(StrEnum):
+    VALID = "VALID"
+    VALID_WITH_CONSTRAINTS = "VALID_WITH_CONSTRAINTS"
+    INVALID = "INVALID"
+
+
 class RedFlag(StrEnum):
     CHEST_PAIN = "chest_pain"
     SYNCOPE = "unexplained_syncope"

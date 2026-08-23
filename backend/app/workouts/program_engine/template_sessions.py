@@ -472,6 +472,18 @@ def template_resolution_trace(
     days: tuple[WorkoutDay, ...],
 ) -> dict[str, object]:
     programmed = {(day.day_index, item.exercise_id): item for day in days for item in day.exercises}
+    template_slots = tuple(item for item in build.resolutions if item.is_template_slot)
+    retained_template_slots = tuple(
+        item
+        for item in template_slots
+        if (item.day_index, item.selected_exercise_id) in programmed
+    )
+    core_slots = tuple(item for item in template_slots if item.adaptation_priority == "core")
+    retained_core_slots = tuple(
+        item
+        for item in core_slots
+        if (item.day_index, item.selected_exercise_id) in programmed
+    )
     preserved = tuple(
         str(item.selected_exercise_id)
         for item in build.resolutions
@@ -489,6 +501,7 @@ def template_resolution_trace(
         if item.is_template_slot
         and item.requested_exercise_id is not None
         and not item.preserved_exactly
+        and (item.day_index, item.selected_exercise_id) in programmed
     )
     prescription_changes = tuple(
         {
@@ -521,6 +534,10 @@ def template_resolution_trace(
         "preserved_exercise_ids": preserved,
         "substitutions": substitutions,
         "prescription_changes": prescription_changes,
+        "template_slot_count": len(template_slots),
+        "retained_template_slot_count": len(retained_template_slots),
+        "core_slot_count": len(core_slots),
+        "retained_core_slot_count": len(retained_core_slots),
         "reason_codes": build.reason_codes,
     }
 

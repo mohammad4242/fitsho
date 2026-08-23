@@ -2,7 +2,7 @@ from dataclasses import replace
 
 from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
-from app.workouts.program_engine.enums import RecoveryRating
+from app.workouts.program_engine.enums import RecoveryRating, ValidationStatus
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -245,7 +245,14 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
         "volume_repair",
         "session_duration",
         "final_construction",
+        "coach_quality",
     ]
+    quality = result.program.decision_trace[-1]["metrics"]
+    assert quality["template_preservation"] == {
+        "satisfied": 6.0,
+        "total": 6.0,
+        "percentage": 100.0,
+    }
     selection_trace = result.program.decision_trace[0]
     assert selection_trace["selected"] == template.slug
     assert selection_trace["candidates"] == (
@@ -262,6 +269,28 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
             "reason_codes": (),
         },
     )
+
+
+def test_template_priority_soft_shortfall_is_valid_with_constraints() -> None:
+    result = generate_program(
+        template_request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=35,
+            priority_muscles=[MuscleGroup.QUADRICEPS],
+        ),
+        full_catalog(),
+        RULESET,
+        reference_templates=(_four_day_reference(),),
+    )
+
+    assert result.program is not None, result.errors
+    metric = result.program.aggregate_metrics["volume_ranges_by_muscle"]["quadriceps"]
+    assert metric["actual_effective_volume"] < metric["acceptable_minimum"]
+    assert result.program.validation_report.status is ValidationStatus.VALID_WITH_CONSTRAINTS
+    assert result.program.validation_report.is_valid
 
 
 def test_template_uses_shared_volume_and_prescription_rules() -> None:
@@ -489,6 +518,8 @@ def test_unsafe_template_exercise_is_substituted_and_trace_is_auditable() -> Non
         for item in adaptation_trace["substitutions"]
     )
     assert adaptation_trace["prescription_changes"]
+    quality = result.program.decision_trace[-1]["metrics"]
+    assert quality["substitution_count"] >= 1
 
 
 def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> None:

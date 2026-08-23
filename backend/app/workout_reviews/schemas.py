@@ -10,6 +10,7 @@ from app.athlete_state.schemas import AthleteState
 from app.exercises.enums import PrescriptionMode
 from app.workout_reviews.enums import WorkoutReviewStatus
 from app.workouts.program_engine.adaptation_policy import CycleAdaptationDecision
+from app.workouts.program_engine.enums import ValidationStatus
 
 
 class WorkoutReviewExerciseDraft(BaseModel):
@@ -115,6 +116,28 @@ class CoachTemplateSelectionResponse(BaseModel):
     score: CoachTemplateSelectionScoreResponse
 
 
+class CoachQualityRatioResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    satisfied: float = Field(ge=0)
+    total: float = Field(ge=0)
+    percentage: float | None = Field(default=None, ge=0, le=100)
+
+
+class CoachQualityMetricsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    template_preservation: CoachQualityRatioResponse
+    priority_target_satisfaction: CoachQualityRatioResponse
+    body_analysis_target_satisfaction: CoachQualityRatioResponse
+    volume_fit: CoachQualityRatioResponse
+    duration_fit: CoachQualityRatioResponse
+    recovery_fit: CoachQualityRatioResponse
+    substitution_count: int = Field(ge=0)
+    constraint_count: int = Field(ge=0)
+    hard_validation_status: ValidationStatus
+
+
 class WorkoutReviewQueueItemResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -140,6 +163,7 @@ class WorkoutReviewDetailResponse(WorkoutReviewQueueItemResponse):
     athlete_summary: WorkoutReviewAthleteSummary
     fitsho_recommendation: CycleAdaptationDecision
     template_selection: CoachTemplateSelectionResponse | None = None
+    coach_quality_metrics: CoachQualityMetricsResponse | None = None
 
 
 class WorkoutReviewAccessResponse(BaseModel):

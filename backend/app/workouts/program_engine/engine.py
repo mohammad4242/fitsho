@@ -10,11 +10,11 @@ from app.profile.training_compatibility import (
 )
 from app.workouts.program_engine.body_analysis import (
     applicable_body_analysis_influence,
-    body_analysis_priority_muscles,
     body_analysis_provenance,
     body_analysis_trace,
 )
 from app.workouts.program_engine.cardio import add_cardio, cardio_reserve_minutes
+from app.workouts.program_engine.coach_quality import build_coach_quality_metrics
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
     complete_tracked_metrics,
@@ -566,12 +566,14 @@ def _program_for_split(
             rejected_candidates=rejected,
             decision_trace=trace,
         )
+    quality_metrics = build_coach_quality_metrics(program, request, report, ruleset)
     final_trace = trace + (
         {
             "stage": "final_construction",
             "status": "succeeded",
             "reason_codes": ("FINAL_CONSTRUCTION_SUCCEEDED",),
         },
+        {"stage": "coach_quality", "metrics": quality_metrics},
     )
     report = replace(report, decision_trace=final_trace)
     program = replace(
@@ -715,19 +717,17 @@ def _reference_program(
             rejected_candidates=rejected,
             decision_trace=trace,
         )
-    priority_muscles = normalized.source.priority_muscles | body_analysis_priority_muscles(
-        normalized, ruleset
-    )
-    unmet_priorities = tuple(
+    targets_by_muscle = {target.muscle: target for target in volume.targets}
+    unmet_priority_hard_minimums = tuple(
         muscle
-        for muscle in sorted(priority_muscles, key=lambda item: item.value)
-        if direct[muscle.value] < volume.minimum_direct_sets_for(muscle)
-        or effective_volume.effective_sets_by_muscle.get(muscle.value, 0)
-        < next(target.acceptable_minimum for target in volume.targets if target.muscle is muscle)
+        for muscle in sorted(normalized.source.priority_muscles, key=lambda item: item.value)
+        if targets_by_muscle[muscle].direct_minimum_required
+        and direct[muscle.value] < targets_by_muscle[muscle].minimum_direct_sets
     )
-    if unmet_priorities:
+    if unmet_priority_hard_minimums:
         errors = tuple(
-            f"TEMPLATE_PRIORITY_VOLUME_UNSATISFIED:{muscle.value}" for muscle in unmet_priorities
+            f"TEMPLATE_PRIORITY_HARD_MINIMUM_UNSATISFIED:{muscle.value}"
+            for muscle in unmet_priority_hard_minimums
         )
         return ProgramGenerationResult(
             program=None,
@@ -770,12 +770,14 @@ def _reference_program(
             rejected_candidates=rejected,
             decision_trace=trace,
         )
+    quality_metrics = build_coach_quality_metrics(program, request, report, ruleset)
     final_trace = trace + (
         {
             "stage": "final_construction",
             "status": "succeeded",
             "reason_codes": ("FINAL_CONSTRUCTION_SUCCEEDED",),
         },
+        {"stage": "coach_quality", "metrics": quality_metrics},
     )
     report = replace(report, decision_trace=final_trace)
     return ProgramGenerationResult(
