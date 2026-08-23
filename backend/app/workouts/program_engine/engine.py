@@ -137,7 +137,11 @@ def generate_program(
     if reference is not None:
         try:
             reference_build = build_template_sessions(
-                normalized, reference, eligibility.eligible, ruleset
+                normalized,
+                reference,
+                eligibility.eligible,
+                ruleset,
+                source_catalog=tuple(exercise_catalog),
             )
             reference_result = _reference_program(
                 request,
@@ -1022,7 +1026,10 @@ def _priority_metrics(
         effective_target = volume.effective_target_for(muscle)
         target_available = target > 0 or effective_target > 0
         direct_satisfied = target_available and direct >= volume.minimum_direct_sets_for(muscle)
-        effective_satisfied = target_available and effective >= effective_target
+        acceptable_minimum = next(
+            item.acceptable_minimum for item in volume.targets if item.muscle is muscle
+        )
+        effective_satisfied = target_available and effective >= acceptable_minimum
         frequency_satisfied = len(session_indexes) >= policy.preferred_frequency
         status = (
             "satisfied"
@@ -1037,7 +1044,11 @@ def _priority_metrics(
         if frequency_satisfied and policy.preferred_frequency > 1:
             reason_codes.append("PRIORITY_FREQUENCY_INCREASED")
         else:
-            reason_codes.append("PRIORITY_TARGET_CONSTRAINED")
+            reason_codes.append(
+                "PRIORITY_TARGET_CONSTRAINED"
+                if policy.is_explicit(muscle)
+                else "BODY_ANALYSIS_TARGET_CONSTRAINED"
+            )
         metrics[muscle.value] = {
             "direct_sets": direct,
             "effective_sets": effective,

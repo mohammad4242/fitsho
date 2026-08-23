@@ -24,6 +24,7 @@ from app.workouts.program_engine.schemas import (
 from app.workouts.program_engine.session_builder import exercise_fits_focus
 from app.workouts.program_engine.session_targets import english_session_title
 from app.workouts.program_engine.strength_programming import classify_strength_role
+from app.workouts.program_engine.template_sessions import template_removal_rank
 
 
 def repair_weekly_volume(
@@ -122,8 +123,14 @@ def repair_weekly_volume(
             affected_muscles = {exercise.primary_muscle.value} | {
                 muscle.value for muscle in exercise.secondary_muscles
             }
-            if same_muscle_exposures > 1 or affected_muscles.intersection(
-                hard_weekly_excessive
+            hard_removal_required = bool(
+                affected_muscles.intersection(hard_weekly_excessive)
+                or (day_index, exercise.primary_muscle) in per_session_excessive
+                or (day_index, exercise_index) in per_exercise_excessive
+            )
+            if (same_muscle_exposures > 1 or hard_removal_required) and (
+                len(repaired[day_index]) > ruleset.minimum_exercises_per_session
+                or hard_removal_required
             ):
                 repaired[day_index].pop(exercise_index)
                 reasons.append("VOLUME_REPAIR_REMOVED_REDUNDANT_EXERCISE")
@@ -296,6 +303,7 @@ def _select_set_redistribution(
     duration_policy = get_session_duration_policy(
         request.source.session_duration_minutes,
     )
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     direct = _direct_sets(days)
     options: list[tuple[int, int, int, int, str, str]] = []
     for day_index, exercises in enumerate(days):
@@ -317,6 +325,10 @@ def _select_set_redistribution(
                 ):
                     continue
                 donor_target = targets.get(donor_muscle)
+                if priority_policy.preservation_rank(
+                    donor_muscle
+                ) > priority_policy.preservation_rank(recipient_muscle):
+                    continue
                 if (
                     donor_target is not None
                     and donor_target.direct_minimum_required
@@ -365,7 +377,7 @@ def _select_set_redistribution(
                     continue
                 options.append(
                     (
-                        donor_muscle in request.source.priority_muscles,
+                        priority_policy.preservation_rank(donor_muscle),
                         day_index,
                         recipient_index,
                         donor_index,
@@ -596,6 +608,7 @@ def _select_reduction_candidate(
     per_exercise_excessive: set[tuple[int, int]],
     hard_weekly_excessive: set[str],
 ) -> tuple[int, int, ProgrammedExercise] | None:
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     priority_over_target = {
         muscle.value
         for muscle, target in targets.items()
@@ -610,11 +623,18 @@ def _select_reduction_candidate(
                 muscle.value for muscle in exercise.secondary_muscles
             }
             is_template_core = "TEMPLATE_ADAPTATION_PRIORITY:core" in exercise.reason_codes
+            is_required_slot = any(
+                code.startswith("REQUIRED_") for code in exercise.reason_codes
+            )
+            hard_constraint = bool(
+                affected.intersection(hard_weekly_excessive)
+                or (day_index, exercise.primary_muscle) in per_session_excessive
+                or (day_index, exercise_index) in per_exercise_excessive
+            )
             if (
-                is_template_core
-                and not affected.intersection(hard_weekly_excessive)
-                and (day_index, exercise.primary_muscle) not in per_session_excessive
-                and (day_index, exercise_index) not in per_exercise_excessive
+                (is_template_core or is_required_slot)
+                and exercise.sets <= ruleset.minimum_working_sets
+                and not hard_constraint
             ):
                 continue
             if (day_index, exercise_index) not in per_exercise_excessive and (
@@ -656,7 +676,12 @@ def _select_reduction_candidate(
     return min(
         candidates,
         key=lambda candidate: (
-            candidate[2].primary_muscle in request.source.priority_muscles,
+            0
+            if _affected_muscle_values(candidate[2]).intersection(hard_weekly_excessive)
+            else 1,
+            template_removal_rank(candidate[2]),
+            any(code.startswith("REQUIRED_") for code in candidate[2].reason_codes),
+            priority_policy.preservation_rank(candidate[2].primary_muscle),
             -sum(
                 item.sets
                 for item in days[candidate[0]]
@@ -668,6 +693,13 @@ def _select_reduction_candidate(
             str(candidate[2].exercise_id),
         ),
     )
+
+
+def _affected_muscle_values(exercise: ProgrammedExercise) -> set[str]:
+    values = {muscle.value for muscle in exercise.secondary_muscles}
+    if exercise.primary_muscle is not None:
+        values.add(exercise.primary_muscle.value)
+    return values
 
 
 def _select_addition_candidate(

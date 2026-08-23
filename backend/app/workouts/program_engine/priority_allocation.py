@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.exercises.enums import MuscleGroup
-from app.workouts.program_engine.body_analysis import body_analysis_priority_muscles
+from app.workouts.program_engine.body_analysis import eligible_body_analysis_priorities
 from app.workouts.program_engine.enums import (
     Goal,
     PhysicalJobDemand,
@@ -21,6 +21,9 @@ class PriorityAllocationPolicy:
     """Deterministic frequency and placement policy for requested priorities."""
 
     priorities: tuple[MuscleGroup, ...]
+    explicit_priorities: tuple[MuscleGroup, ...]
+    clear_lag_priorities: tuple[MuscleGroup, ...]
+    mild_lag_priorities: tuple[MuscleGroup, ...]
     preferred_frequency: int
     recovery_limited: bool
     minimum_recovery_gap_days: int
@@ -31,12 +34,35 @@ class PriorityAllocationPolicy:
         request: NormalizedProgramRequest,
         ruleset: ProgramRuleset,
     ) -> PriorityAllocationPolicy:
-        priorities = tuple(
+        explicit_priorities = tuple(
+            sorted(request.source.priority_muscles, key=lambda muscle: muscle.value)
+        )
+        body_priorities = tuple(
             sorted(
-                request.source.priority_muscles | body_analysis_priority_muscles(request, ruleset),
-                key=lambda muscle: muscle.value,
+                (
+                    priority
+                    for priority in eligible_body_analysis_priorities(request, ruleset)
+                    if priority.muscle not in request.source.priority_muscles
+                ),
+                key=lambda priority: (
+                    priority.classification != "clear_lag",
+                    -priority.severity,
+                    -priority.confidence,
+                    priority.muscle.value,
+                ),
             )
         )
+        clear_lag_priorities = tuple(
+            priority.muscle
+            for priority in body_priorities
+            if priority.classification == "clear_lag"
+        )
+        mild_lag_priorities = tuple(
+            priority.muscle
+            for priority in body_priorities
+            if priority.classification == "mild_lag"
+        )
+        priorities = explicit_priorities + clear_lag_priorities + mild_lag_priorities
         available_days = min(request.resistance_training_days, ruleset.max_resistance_days)
         recovery_limited = _recovery_is_limited(request)
         exposure_capacity = min(
@@ -59,10 +85,37 @@ class PriorityAllocationPolicy:
             preferred_frequency = exposure_capacity
         return cls(
             priorities=priorities,
+            explicit_priorities=explicit_priorities,
+            clear_lag_priorities=clear_lag_priorities,
+            mild_lag_priorities=mild_lag_priorities,
             preferred_frequency=preferred_frequency,
             recovery_limited=recovery_limited,
             minimum_recovery_gap_days=ruleset.minimum_recovery_gap_days,
         )
+
+    def precedence_key(self, muscle: MuscleGroup | None) -> tuple[int, int, str]:
+        if muscle is None:
+            return (3, 0, "")
+        for tier, priorities in enumerate(
+            (
+                self.explicit_priorities,
+                self.clear_lag_priorities,
+                self.mild_lag_priorities,
+            )
+        ):
+            if muscle in priorities:
+                return (tier, priorities.index(muscle), muscle.value)
+        return (3, 0, muscle.value)
+
+    def preservation_rank(self, muscle: MuscleGroup | None) -> int:
+        tier = self.precedence_key(muscle)[0]
+        return {0: 3, 1: 2, 2: 1}.get(tier, 0)
+
+    def is_explicit(self, muscle: MuscleGroup | None) -> bool:
+        return muscle in self.explicit_priorities
+
+    def is_body_analysis(self, muscle: MuscleGroup | None) -> bool:
+        return muscle in self.clear_lag_priorities or muscle in self.mild_lag_priorities
 
     def split_adjustment(
         self, focuses: tuple[str, ...], ruleset: ProgramRuleset

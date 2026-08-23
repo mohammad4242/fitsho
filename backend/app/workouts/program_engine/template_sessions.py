@@ -64,8 +64,14 @@ def build_template_sessions(
     template: TemplateReference,
     eligible: tuple[ExerciseCandidate, ...],
     ruleset: ProgramRuleset,
+    *,
+    source_catalog: tuple[ExerciseCandidate, ...] | None = None,
 ) -> TemplateSessionBuild:
     eligible_by_id = {candidate.id: candidate for candidate in eligible}
+    source_by_id = {
+        candidate.id: candidate
+        for candidate in (source_catalog if source_catalog is not None else eligible)
+    }
     used: Counter[object] = Counter()
     reserved: Counter[UUID] = Counter(
         slot.exercise_id
@@ -105,15 +111,19 @@ def build_template_sessions(
                 and all(selected_candidate.id != candidate.id for selected_candidate, _ in selected)
             )
             if candidate is None or (used[candidate.id] and not repeated_explicit_slot):
-                candidate = next(
-                    (
-                        item
-                        for item in eligible
-                        if not used[item.id]
-                        and not reserved[item.id]
-                        and _template_slot_is_compatible(item, slot, index)
+                candidate = _rank_template_slot_candidates(
+                    request,
+                    slot,
+                    index,
+                    eligible,
+                    used,
+                    reserved,
+                    ruleset,
+                    original=(
+                        source_by_id.get(slot.exercise_id)
+                        if slot.exercise_id is not None
+                        else None
                     ),
-                    None,
                 )
             if candidate is None:
                 if slot.adaptation_priority == "core":
@@ -303,6 +313,61 @@ def build_template_sessions(
         resolutions=tuple(resolutions),
         reason_codes=tuple(dict.fromkeys(build_reasons)),
     )
+
+
+def template_adaptation_priority(exercise: object) -> str | None:
+    reason_codes = getattr(exercise, "reason_codes", ())
+    for code in reason_codes:
+        if isinstance(code, str) and code.startswith("TEMPLATE_ADAPTATION_PRIORITY:"):
+            return code.partition(":")[2]
+    return None
+
+
+def template_removal_rank(exercise: object) -> int:
+    return {
+        "optional": 0,
+        "accessory": 1,
+        None: 2,
+        "core": 3,
+    }.get(template_adaptation_priority(exercise), 2)
+
+
+def _rank_template_slot_candidates(
+    request: NormalizedProgramRequest,
+    slot: TemplateReferenceSlot,
+    day_index: int,
+    eligible: tuple[ExerciseCandidate, ...],
+    used: Counter[object],
+    reserved: Counter[UUID],
+    ruleset: ProgramRuleset,
+    *,
+    original: ExerciseCandidate | None,
+) -> ExerciseCandidate | None:
+    options = tuple(
+        item
+        for item in eligible
+        if not used[item.id]
+        and not reserved[item.id]
+        and _template_slot_is_compatible(item, slot, day_index)
+    )
+    if not options:
+        return None
+    target_muscles = frozenset(slot.target_muscles)
+    if original is not None:
+        replacements = rank_replacement_exercises(
+            request,
+            original,
+            options,
+            limit=len(options),
+            allowed_patterns=frozenset({slot.movement_pattern}),
+            target_muscles=target_muscles,
+            day_focus=f"template_reference_{day_index}",
+        )
+        if replacements:
+            return replacements[0]
+    needed_muscle = slot.target_muscles[0] if len(slot.target_muscles) == 1 else None
+    ranked = rank_exercises(request, options, ruleset, needed_muscle=needed_muscle)
+    return ranked[0].exercise if ranked else None
 
 
 def _template_role_is_excessive(

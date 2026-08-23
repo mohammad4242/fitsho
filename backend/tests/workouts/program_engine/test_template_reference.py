@@ -395,8 +395,8 @@ def test_template_volume_uses_recovery_history_and_short_session_prescription() 
         "chest"
     ]
     assert constrained_sets < baseline_sets
-    assert constrained.program.weekly_schedule[0].exercises[0].rest_seconds == (
-        RULESET.minimum_rest_seconds
+    assert constrained.program.weekly_schedule[0].exercises[0].rest_seconds >= (
+        RULESET.prescription_rules["hypertrophy_compound"].rest_seconds
     )
     assert constrained.program.aggregate_metrics["previous_volume_baseline"]["source"] == (
         "prescribed_plan"

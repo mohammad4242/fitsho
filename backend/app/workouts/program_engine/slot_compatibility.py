@@ -156,7 +156,10 @@ def _scope_for_focus(
             | KNEE_PATTERNS
             | HINGE_PATTERNS
             | CORE_PATTERNS
-            | LOWER_ACCESSORY_PATTERNS,
+            | LOWER_ACCESSORY_PATTERNS
+            | SHOULDER_PATTERNS
+            | ARM_PATTERNS
+            | frozenset({MovementPattern.SHRUG}),
             None,
         )
     if focus.startswith("upper"):

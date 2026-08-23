@@ -136,7 +136,15 @@ def test_multiple_priority_muscles_receive_deterministic_balanced_emphasis() -> 
             first_metrics[muscle.value]["effective_sets"]
             >= volume_range["acceptable_minimum"]
         )
-        assert volume_range["status"] in {"exact_target", "within_flexible_range"}
+        assert volume_range["status"] in {
+            "exact_target",
+            "within_flexible_range",
+            "constrained",
+        }
+        assert (
+            first_metrics[muscle.value]["effective_sets"]
+            <= volume_range["effective_maximum_hard"]
+        )
 
 
 def test_priority_warning_is_explicit_when_catalog_cannot_provide_frequency_capacity() -> None:
