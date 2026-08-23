@@ -248,7 +248,9 @@ class DigikalaPublicProvider(_RateLimitedProvider):
             match = _PRODUCT_ID_PATTERN.search(locator)
             product_id = match.group("id") if match else locator
             try:
-                response = await self._get(f"https://api.digikala.com/v2/product/{product_id}/")
+                response = await self._get(
+                    f"https://api.digikala.com/v2/product/{product_id}/"
+                )
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code in {404, 410}:
                     continue
@@ -421,7 +423,9 @@ class TapsiShopProvider(_RateLimitedProvider):
     async def _ensure_guest_session(self) -> None:
         if self._access_token and self._session_id:
             return
-        csrf_response = await self._client.get("https://tapsi.shop/api/auth/v4/csrf", timeout=20)
+        csrf_response = await self._client.get(
+            "https://tapsi.shop/api/auth/v4/csrf", timeout=20
+        )
         csrf_response.raise_for_status()
         csrf_token = csrf_response.json().get("csrfToken")
         if not isinstance(csrf_token, str) or not csrf_token:
@@ -478,7 +482,9 @@ class TapsiShopProvider(_RateLimitedProvider):
         if response.status_code in {401, 403} and retry_session:
             self._access_token = None
             self._session_id = None
-            return await self._request(method, path, json_data=json_data, retry_session=False)
+            return await self._request(
+                method, path, json_data=json_data, retry_session=False
+            )
         response.raise_for_status()
         return response
 

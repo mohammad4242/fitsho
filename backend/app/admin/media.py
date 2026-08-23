@@ -121,7 +121,9 @@ def _write_temporary(
             while chunk := upload.file.read(settings.media_read_chunk_bytes):
                 total += len(chunk)
                 if total > byte_limit:
-                    raise MediaValidationError(f"Media file exceeds the {byte_limit} bytes limit")
+                    raise MediaValidationError(
+                        f"Media file exceeds the {byte_limit} bytes limit"
+                    )
                 temporary.write(chunk)
         if total == 0:
             raise MediaValidationError("Media file cannot be empty")

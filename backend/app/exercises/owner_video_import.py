@@ -193,7 +193,9 @@ class OwnerVideoImporter:
                 if analysis.decision == "create_new"
                 else None
             )
-            match_id = exact_match_id or resolve_existing_match(analysis, catalogue, self._settings)
+            match_id = exact_match_id or resolve_existing_match(
+                analysis, catalogue, self._settings
+            )
             review_reasons = self._review_reasons(analysis, match_id)
             needs_review = bool(review_reasons)
 

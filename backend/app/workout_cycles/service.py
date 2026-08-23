@@ -502,10 +502,9 @@ def get_cycle_exercise_feedback_suggestions(
         first = prescribed_replacements[0]
         persistent_state = WorkoutCycleExerciseFeedbackPersistentStateResponse(
             preference_types=sorted(
-                (
-                    preference.preference_type
-                    for preference in preferences_by_exercise.get(first.original_exercise_id, [])
-                ),
+                (preference.preference_type for preference in preferences_by_exercise.get(
+                    first.original_exercise_id, []
+                )),
                 key=lambda preference_type: preference_type.value,
             ),
             safety_signal_types=sorted(
@@ -649,16 +648,13 @@ def _ensure_exercise_preference(
             db.add(preference)
             db.flush()
     except IntegrityError:
-        if (
-            db.scalar(
-                select(WorkoutExercisePreference).where(
-                    WorkoutExercisePreference.user_id == replacement.user_id,
-                    WorkoutExercisePreference.exercise_id == replacement.original_exercise_id,
-                    WorkoutExercisePreference.preference_type == preference_type,
-                )
+        if db.scalar(
+            select(WorkoutExercisePreference).where(
+                WorkoutExercisePreference.user_id == replacement.user_id,
+                WorkoutExercisePreference.exercise_id == replacement.original_exercise_id,
+                WorkoutExercisePreference.preference_type == preference_type,
             )
-            is None
-        ):
+        ) is None:
             raise
 
 
@@ -697,22 +693,19 @@ def _ensure_safety_signal(
             db.add(signal)
             db.flush()
     except IntegrityError:
-        if (
-            db.scalar(
-                select(WorkoutExerciseSafetySignal).where(
-                    WorkoutExerciseSafetySignal.user_id == replacement.user_id,
-                    WorkoutExerciseSafetySignal.cycle_id == replacement.cycle_id,
-                    WorkoutExerciseSafetySignal.workout_plan_exercise_id
-                    == replacement.workout_plan_exercise_id,
-                    WorkoutExerciseSafetySignal.replacement_exercise_id
-                    == replacement.replacement_exercise_id,
-                    WorkoutExerciseSafetySignal.week_number == replacement.week_number,
-                    WorkoutExerciseSafetySignal.signal_type
-                    == WorkoutExerciseSafetySignalType.PAIN_OR_DISCOMFORT,
-                )
+        if db.scalar(
+            select(WorkoutExerciseSafetySignal).where(
+                WorkoutExerciseSafetySignal.user_id == replacement.user_id,
+                WorkoutExerciseSafetySignal.cycle_id == replacement.cycle_id,
+                WorkoutExerciseSafetySignal.workout_plan_exercise_id
+                == replacement.workout_plan_exercise_id,
+                WorkoutExerciseSafetySignal.replacement_exercise_id
+                == replacement.replacement_exercise_id,
+                WorkoutExerciseSafetySignal.week_number == replacement.week_number,
+                WorkoutExerciseSafetySignal.signal_type
+                == WorkoutExerciseSafetySignalType.PAIN_OR_DISCOMFORT,
             )
-            is None
-        ):
+        ) is None:
             raise
 
 
@@ -1020,7 +1013,11 @@ def get_cycle_feedback_body_progress_context(
 
     comparison = feedback.body_progress_comparison
     comparison_response = None
-    if comparison is not None and comparison.user_id == user_id and comparison.cycle_id == cycle.id:
+    if (
+        comparison is not None
+        and comparison.user_id == user_id
+        and comparison.cycle_id == cycle.id
+    ):
         comparison_response = WorkoutCycleBodyProgressComparisonResponse(
             id=comparison.id,
             cycle_id=comparison.cycle_id,

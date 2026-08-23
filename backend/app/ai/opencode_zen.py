@@ -281,7 +281,9 @@ class OpenCodeZenWorkoutPlanProvider:
             }
         if self._api_kind is ZenApiKind.GEMINI:
             return {
-                "contents": [{"role": "user", "parts": [{"text": "Reply only: OK"}]}],
+                "contents": [
+                    {"role": "user", "parts": [{"text": "Reply only: OK"}]}
+                ],
                 "generationConfig": {"maxOutputTokens": 1},
             }
         return {

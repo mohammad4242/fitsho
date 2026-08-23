@@ -145,8 +145,12 @@ def nutrient_targets_for_calories(calories: Decimal) -> NutrientTargets:
             maximum=calories * Decimal("0.10") / Decimal("4"),
         ),
         added_sugar=TargetBand(unit="g"),
-        saturated_fat=TargetBand(unit="g", maximum=calories * Decimal("0.10") / Decimal("9")),
-        trans_fat=TargetBand(unit="g", maximum=calories * Decimal("0.01") / Decimal("9")),
+        saturated_fat=TargetBand(
+            unit="g", maximum=calories * Decimal("0.10") / Decimal("9")
+        ),
+        trans_fat=TargetBand(
+            unit="g", maximum=calories * Decimal("0.01") / Decimal("9")
+        ),
         sodium=TargetBand(unit="mg", preferred=Decimal("1500"), maximum=Decimal("2300")),
     )
 
@@ -234,7 +238,9 @@ def _map_band(band: TargetBand, operation: Callable[[Decimal], Decimal]) -> Targ
     )
 
 
-def _daily_exercise_energy(weight_kg: Decimal, exercise: StructuredExercise | None) -> Decimal:
+def _daily_exercise_energy(
+    weight_kg: Decimal, exercise: StructuredExercise | None
+) -> Decimal:
     if exercise is None:
         return ZERO
     net_met = max(exercise.met_value - ONE, ZERO)
@@ -249,7 +255,9 @@ def _daily_exercise_energy(weight_kg: Decimal, exercise: StructuredExercise | No
     return weekly / Decimal("7")
 
 
-def _goal_calorie_band(inputs: ScientificInputs, bmr: TargetBand, tdee: TargetBand) -> TargetBand:
+def _goal_calorie_band(
+    inputs: ScientificInputs, bmr: TargetBand, tdee: TargetBand
+) -> TargetBand:
     exercise_type = (
         inputs.structured_exercise.exercise_type if inputs.structured_exercise is not None else None
     )

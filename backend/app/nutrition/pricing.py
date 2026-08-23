@@ -121,11 +121,7 @@ def normalize_observation(observation: PriceObservation) -> NormalizedPriceQuote
     currency_multiplier = Decimal("0.1") if observation.currency == "IRR" else Decimal("1")
 
     def normalize(value: Decimal | None) -> Decimal | None:
-        return (
-            None
-            if value is None
-            else value * currency_multiplier * multiplier / observation.package_quantity
-        )
+        return None if value is None else value * currency_multiplier * multiplier / observation.package_quantity
 
     return NormalizedPriceQuote(
         normalized_normal_price=normalize(observation.normal_price),
@@ -210,17 +206,11 @@ def decide_reference_price(
         ) / accepted_median
         if source_spread > policy.maximum_source_spread_fraction:
             reasons.append(PriceReviewReason.SOURCE_DISAGREEMENT)
-    if (
-        previous_reference
-        and abs(result.reference_price - previous_reference) / previous_reference
-        > policy.maximum_jump_fraction
-    ):
+    if previous_reference and abs(result.reference_price - previous_reference) / previous_reference > policy.maximum_jump_fraction:
         reasons.append(PriceReviewReason.PRICE_JUMP)
     accepted = not reasons
     return ReferencePriceDecision(
-        reference_price=result.reference_price
-        if accepted or previous_reference is None
-        else previous_reference,
+        reference_price=result.reference_price if accepted or previous_reference is None else previous_reference,
         accepted=accepted,
         sample_count=len(result.accepted_values),
         review_reasons=tuple(reasons),

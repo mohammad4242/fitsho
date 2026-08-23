@@ -70,7 +70,11 @@ def manifest_entry_for_exercise(exercise: Exercise) -> FocusManifestEntry:
         exercise_type=exercise.exercise_type,
         instructions_en=exercise.instructions_en,
     )
-    if primary_muscle is not None and FOCUSES_BY_MUSCLE[primary_muscle] and classification is None:
+    if (
+        primary_muscle is not None
+        and FOCUSES_BY_MUSCLE[primary_muscle]
+        and classification is None
+    ):
         raise UnresolvedMuscleFocusError(
             f"{stable_exercise_key(exercise)}: unresolved focus for {exercise.name_en}"
         )
@@ -84,9 +88,7 @@ def manifest_entry_for_exercise(exercise: Exercise) -> FocusManifestEntry:
         basis=(
             classification.basis
             if classification is not None
-            else "primary_muscle:null"
-            if primary_muscle is None
-            else "focus:not_applicable"
+            else "primary_muscle:null" if primary_muscle is None else "focus:not_applicable"
         ),
     )
 

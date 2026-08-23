@@ -16,10 +16,8 @@ from app.exercises import models as exercise_models  # noqa: F401
 from app.nutrition import models as nutrition_models  # noqa: F401
 from app.profile import models as profile_models  # noqa: F401
 from app.training_templates import models as training_template_models  # noqa: F401
-from app.workout_cycles import (
-    body_progress_models as workout_cycle_body_progress_models,  # noqa: F401
-)
 from app.workout_cycles import models as workout_cycle_models  # noqa: F401
+from app.workout_cycles import body_progress_models as workout_cycle_body_progress_models  # noqa: F401
 from app.workout_reviews import models as workout_review_models  # noqa: F401
 from app.workouts import models as workout_models  # noqa: F401
 

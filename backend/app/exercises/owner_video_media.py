@@ -268,7 +268,8 @@ def prepare_owner_video(
         )
 
     frame_paths = tuple(
-        work_directory / f"frame-{index:02d}.jpg" for index in range(1, len(FRAME_POSITIONS) + 1)
+        work_directory / f"frame-{index:02d}.jpg"
+        for index in range(1, len(FRAME_POSITIONS) + 1)
     )
     for frame_path, position in zip(frame_paths, FRAME_POSITIONS, strict=True):
         if not _frame_is_valid(frame_path):
@@ -294,7 +295,11 @@ def publish_owner_video(
     settings: Settings,
     runner: CommandRunner = subprocess.run,
 ) -> PublishedOwnerVideo:
-    relative_path = Path("owner-video") / prepared.source_id[:2] / f"{prepared.source_id}.mp4"
+    relative_path = (
+        Path("owner-video")
+        / prepared.source_id[:2]
+        / f"{prepared.source_id}.mp4"
+    )
     destination = settings.media_root / relative_path
     public_path = f"{settings.media_public_path.rstrip('/')}/{relative_path.as_posix()}"
     if destination.is_file():

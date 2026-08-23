@@ -84,7 +84,9 @@ def ensure_template_catalog_placeholders(
 ) -> None:
     slot_items = tuple(slots)
     candidate_slugs = {
-        candidate_slug for slot in slot_items for candidate_slug in slot.catalog_slug_hints
+        candidate_slug
+        for slot in slot_items
+        for candidate_slug in slot.catalog_slug_hints
     }
     existing = {
         exercise.slug: exercise

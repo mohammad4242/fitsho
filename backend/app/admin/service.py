@@ -84,15 +84,11 @@ def _sync_media_assets(
 ) -> None:
     resolved = _validate_media_assets(list(exercise.media_assets), payload_assets, stored_assets)
     if exercise.media_assets:
-        temporary_base = (
-            max(
-                [asset.sort_order for asset in exercise.media_assets]
-                + [asset.sort_order for asset in payload_assets]
-                + [0]
-            )
-            + len(exercise.media_assets)
-            + 1
-        )
+        temporary_base = max(
+            [asset.sort_order for asset in exercise.media_assets]
+            + [asset.sort_order for asset in payload_assets]
+            + [0]
+        ) + len(exercise.media_assets) + 1
         for index, existing_asset in enumerate(exercise.media_assets):
             existing_asset.sort_order = temporary_base + index
         exercise_db = object_session(exercise)
@@ -412,7 +408,9 @@ def delete_admin_exercise(db: Session, exercise_id: UUID) -> list[str] | None:
         return None
 
     media_paths = [exercise.media_path, *(asset.media_path for asset in exercise.media_assets)]
-    db.execute(delete(WorkoutPlanExercise).where(WorkoutPlanExercise.exercise_id == exercise_id))
+    db.execute(
+        delete(WorkoutPlanExercise).where(WorkoutPlanExercise.exercise_id == exercise_id)
+    )
     db.delete(exercise)
     try:
         db.commit()

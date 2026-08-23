@@ -859,7 +859,9 @@ def _repair_prepared_recipe_budget(
             candidate_average = {
                 code: value / Decimal("7") for code, value in candidate_totals.items()
             }
-            invalid_nutrition = _validate_nutritional_feasibility(inputs, candidate_average, policy)
+            invalid_nutrition = _validate_nutritional_feasibility(
+                inputs, candidate_average, policy
+            )
             if _upper_limit_exceeded(inputs, candidate_average) or invalid_nutrition:
                 continue
             mutable_days = candidate_days

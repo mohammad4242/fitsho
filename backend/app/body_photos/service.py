@@ -113,16 +113,12 @@ class BodyPhotoService:
         *,
         cycle_id: UUID | None = None,
     ) -> BodyPhotoSession:
-        if (
-            cycle_id is not None
-            and self._db.scalar(
-                select(WorkoutCycle).where(
-                    WorkoutCycle.id == cycle_id,
-                    WorkoutCycle.user_id == user_id,
-                )
+        if cycle_id is not None and self._db.scalar(
+            select(WorkoutCycle).where(
+                WorkoutCycle.id == cycle_id,
+                WorkoutCycle.user_id == user_id,
             )
-            is None
-        ):
+        ) is None:
             raise BodyPhotoSessionCycleNotFoundError
         session = BodyPhotoSession(user_id=user_id, cycle_id=cycle_id, purpose=purpose)
         self._db.add(session)
