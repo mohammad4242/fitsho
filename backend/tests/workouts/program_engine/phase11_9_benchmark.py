@@ -538,12 +538,12 @@ def _duration_counts_for_record(record: Mapping[str, object]) -> dict[str, int]:
         total = cast(int, day["estimated_duration_minutes"])
         cardio_dict = cast(Mapping[str, object] | None, day.get("cardio"))
         cardio_mins = int(cardio_dict.get("duration_minutes", 0)) if cardio_dict else 0  # type: ignore
-        workout = policy.workout_minutes(total, RULESET.general_warmup_minutes, cardio_mins)
+        workout = max(0, total - RULESET.general_warmup_minutes - cardio_mins)
         counts["sessions"] += 1
         counts["absolute_deviation"] += abs(workout - requested)
         if workout < policy.minimum_minutes:
             counts["under"] += 1
-        elif workout > policy.tolerance_maximum_minutes:
+        elif workout > policy.maximum_minutes:
             counts["over"] += 1
         else:
             counts["within"] += 1

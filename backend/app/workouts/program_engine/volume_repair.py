@@ -49,7 +49,6 @@ def repair_weekly_volume(
     ruleset: ProgramRuleset,
     *,
     candidates: tuple[ExerciseCandidate, ...] = (),
-    cardio_reserve_minutes: int = 0,
     allow_soft_exercise_additions: bool = True,
     preserve_template_core_structure: bool = False,
 ) -> tuple[tuple[WorkoutDay, ...], tuple[str, ...]]:
@@ -258,12 +257,6 @@ def repair_weekly_volume(
             hard_effective_under if repairing_hard_minimum else effective_under,
             direct,
             targets,
-            tuple(
-                day.cardio.duration_minutes
-                if day.cardio
-                else (0 if repairing_hard_minimum else cardio_reserve_minutes)
-                for day in days
-            ),
             request,
             ruleset,
             use_hard_maximums=repairing_hard_minimum,
@@ -276,7 +269,6 @@ def repair_weekly_volume(
                     effective_under,
                     direct,
                     targets,
-                    tuple(day.cardio.duration_minutes if day.cardio else 0 for day in days),
                     request,
                     ruleset,
                     use_hard_maximums=False,
@@ -535,7 +527,6 @@ def _select_exercise_addition(
                     ruleset.general_warmup_minutes
                     + sum(item.estimated_minutes for item in day)
                     + estimated
-                    + (original.cardio.duration_minutes if original.cardio else 0)
                 )
                 if duration > duration_policy.maximum_total_minutes(ruleset.general_warmup_minutes):
                     continue
@@ -822,7 +813,6 @@ def _select_addition_candidate(
     effective_under: set[MuscleGroup],
     weekly_direct: Counter[str],
     targets: dict[MuscleGroup, VolumeTarget],
-    cardio_minutes_by_day: tuple[int, ...],
     request: NormalizedProgramRequest,
     ruleset: ProgramRuleset,
     *,
@@ -882,7 +872,6 @@ def _select_addition_candidate(
                 exercises,
                 exercise,
                 updated,
-                cardio_minutes_by_day[day_index],
                 ruleset,
             ) > duration_policy.maximum_total_minutes(ruleset.general_warmup_minutes):
                 continue
@@ -1057,9 +1046,8 @@ def _day_duration(
     original_exercises: list[ProgrammedExercise],
     original: ProgrammedExercise,
     updated: ProgrammedExercise,
-    cardio_minutes: int,
     ruleset: ProgramRuleset,
 ) -> int:
     total = sum(item.estimated_minutes for item in original_exercises)
     total += updated.estimated_minutes - original.estimated_minutes
-    return ruleset.general_warmup_minutes + total + cardio_minutes
+    return ruleset.general_warmup_minutes + total

@@ -15,13 +15,16 @@ from app.workouts.program_engine.body_analysis import (
     body_analysis_trace,
     eligible_body_analysis_priorities,
 )
-from app.workouts.program_engine.cardio import add_cardio, cardio_reserve_minutes
+from app.workouts.program_engine.cardio import add_cardio
 from app.workouts.program_engine.coach_quality import build_coach_quality_metrics
 from app.workouts.program_engine.duration_capacity import (
     SessionCapacity,
     build_session_capacity,
 )
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    get_session_duration_policy,
+    calculate_resistance_minutes,
+)
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
     complete_tracked_metrics,
@@ -106,12 +109,10 @@ def generate_program(
             safety_status=safety.status,
         )
     eligibility = filter_eligible_exercises(normalized, exercise_catalog)
-    reserve = cardio_reserve_minutes(normalized, eligibility.cardio_eligible, ruleset)
     session_capacity = build_session_capacity(
         normalized,
         eligibility.eligible,
         ruleset,
-        cardio_reserve_minutes=reserve,
     )
     template_selection = select_template_reference_result(
         normalized,
@@ -168,7 +169,6 @@ def generate_program(
                 reference_build,
                 ruleset,
                 previous_volume=previous_volume,
-                cardio_reserve=reserve,
                 session_capacity=session_capacity,
                 template_selection_trace=template_rejection_trace,
             )
@@ -280,7 +280,6 @@ def generate_program(
             split,
             ruleset,
             previous_volume=previous_volume,
-            cardio_reserve=reserve,
             session_capacity=session_capacity,
             rejected_splits=tuple(rejected_splits),
             template_rejection_trace=template_rejection_trace,
@@ -322,7 +321,6 @@ def generate_program(
             fallback_split,
             ruleset,
             previous_volume=previous_volume,
-            cardio_reserve=reserve,
             session_capacity=session_capacity,
             rejected_splits=tuple(rejected_splits),
             template_rejection_trace=template_rejection_trace,
@@ -484,7 +482,6 @@ def _program_for_split(
     ruleset: ProgramRuleset,
     *,
     previous_volume: PreviousVolumeBaseline,
-    cardio_reserve: int,
     session_capacity: SessionCapacity,
     rejected_splits: tuple[dict[str, object], ...],
     template_rejection_trace: tuple[dict[str, object], ...],
@@ -534,8 +531,6 @@ def _program_for_split(
         drafts,
         volume,
         ruleset,
-        cardio_reserve_minutes=cardio_reserve,
-        planned_cardio_sessions=session_capacity.planned_cardio_sessions,
     )
     days, repair_reasons = repair_weekly_volume(
         days,
@@ -543,7 +538,6 @@ def _program_for_split(
         volume,
         ruleset,
         candidates=eligible,
-        cardio_reserve_minutes=cardio_reserve,
     )
     days = add_cardio(normalized, days, cardio_eligible, ruleset)
     days_before_duration_repair = days
@@ -748,7 +742,6 @@ def _reference_program(
     ruleset: ProgramRuleset,
     *,
     previous_volume: PreviousVolumeBaseline,
-    cardio_reserve: int,
     session_capacity: SessionCapacity,
     template_selection_trace: tuple[dict[str, object], ...],
 ) -> ProgramGenerationResult:
@@ -765,18 +758,13 @@ def _reference_program(
         ruleset,
         previous_volume=previous_volume,
         direct_exposure_counts=build.direct_exposure_counts(),
-        session_capacity=replace(
-            session_capacity,
-            planned_cardio_sessions=len(split.day_focuses),
-        ),
+        session_capacity=session_capacity,
     )
     days = prescribe_sessions(
         normalized,
         build.drafts,
         volume,
         ruleset,
-        cardio_reserve_minutes=cardio_reserve,
-        planned_cardio_sessions=session_capacity.planned_cardio_sessions,
     )
     days = apply_template_intent(days, build, ruleset)
     days, repair_reasons = repair_weekly_volume(
@@ -785,7 +773,6 @@ def _reference_program(
         volume,
         ruleset,
         candidates=eligible,
-        cardio_reserve_minutes=cardio_reserve,
         allow_soft_exercise_additions=False,
         preserve_template_core_structure=True,
     )
@@ -1003,15 +990,11 @@ def _duration_capacity_trace(capacity: SessionCapacity) -> dict[str, object]:
         "target_total_minutes": capacity.target_total_minutes,
         "minimum_workout_minutes": capacity.minimum_workout_minutes,
         "maximum_workout_minutes": capacity.maximum_workout_minutes,
-        "cardio_reserve_minutes": capacity.cardio_reserve_minutes,
         "resistance_work_budget_minutes": capacity.resistance_work_budget_minutes,
         "minimum_resistance_work_minutes": capacity.minimum_resistance_work_minutes,
         "maximum_resistance_work_minutes": capacity.maximum_resistance_work_minutes,
         "expected_exercise_count_capacity": capacity.expected_exercise_count_capacity,
         "expected_working_set_capacity": capacity.expected_working_set_capacity,
-        "planned_cardio_sessions": capacity.planned_cardio_sessions,
-        "unreserved_exercise_count_capacity": capacity.unreserved_exercise_count_capacity,
-        "unreserved_working_set_capacity": capacity.unreserved_working_set_capacity,
         "reason_codes": ("DURATION_CAPACITY_PLANNED_BEFORE_CONSTRUCTION",),
     }
 
@@ -1090,16 +1073,12 @@ def _coach_quality_metrics(
     resistance_budget = request.session_duration_minutes
     # resistance_time_budget_fit: did every session stay within the resistance budget (+tolerance)?
     session_resistance_minutes = [
-        day.estimated_duration_minutes - ruleset.general_warmup_minutes
+        calculate_resistance_minutes(day, ruleset.general_warmup_minutes)
         for day in program.weekly_schedule
     ]
-    overrun_minutes = [
-        max(0, m - duration_policy.maximum_minutes) for m in session_resistance_minutes
-    ]
-    resistance_time_budget_fit = all(m <= duration_policy.maximum_minutes for m in session_resistance_minutes)
-    utilization = [
-        round(m / max(1, resistance_budget), 3) for m in session_resistance_minutes
-    ]
+    overrun_minutes = [max(0, m - resistance_budget) for m in session_resistance_minutes]
+    resistance_time_budget_fit = all(m <= resistance_budget for m in session_resistance_minutes)
+    utilization = [round(m / max(1, resistance_budget), 3) for m in session_resistance_minutes]
     duration_fit = (
         "fit"
         if resistance_time_budget_fit

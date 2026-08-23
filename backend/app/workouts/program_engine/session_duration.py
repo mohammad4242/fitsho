@@ -4,7 +4,6 @@ from dataclasses import replace
 from app.exercises.enums import ExerciseLabel, ExerciseType, MuscleGroup
 from app.workouts.program_engine.duration_capacity import (
     SessionCapacity,
-    capacity_for_session,
 )
 from app.workouts.program_engine.duration_policy import (
     SessionDurationPolicy,
@@ -59,19 +58,10 @@ def repair_session_durations(
 
     policy = get_session_duration_policy(request.source.session_duration_minutes)
     resistance_budget = request.source.session_duration_minutes  # pure resistance budget
-    pass
     repaired: list[WorkoutDay] = []
     reasons: list[str] = []
     for day_index, day in enumerate(days):
-        day_capacity = (
-            capacity_for_session(
-                session_capacity,
-                # cardio no longer reduces resistance capacity; always unreserved
-                cardio_reserved=False,
-            )
-            if session_capacity is not None
-            else None
-        )
+        day_capacity = session_capacity
         # -------------------------------------------------------------------
         # Minimum exercises policy:
         #   30-min budget  → allow 3-4 when 5 cannot fit, floor = 3
@@ -177,7 +167,6 @@ def repair_session_durations(
     return repaired_tuple, tuple(dict.fromkeys(reasons))
 
 
-
 def _repair_underfill(
     day: WorkoutDay,
     request: NormalizedProgramRequest,
@@ -231,8 +220,6 @@ def _repair_underfill(
         # Cannot add more work without violating constraints — stop.
         break
     return day
-
-
 
 
 # _select_rest_extension_for_underfill intentionally removed.

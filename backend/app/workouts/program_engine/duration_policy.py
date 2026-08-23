@@ -1,5 +1,16 @@
 from dataclasses import dataclass
 
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.workouts.schemas import WorkoutDay
+
+
+def calculate_resistance_minutes(day: "Any", general_warmup_minutes: int) -> int:
+    cardio_minutes = day.cardio.duration_minutes if day.cardio else 0
+    return max(0, day.estimated_duration_minutes - general_warmup_minutes - cardio_minutes)
+
+
 SESSION_DURATION_TOLERANCE_MINUTES = 10
 CORE_PRESERVATION_EXTENSION_MINUTES = 20
 

@@ -153,7 +153,7 @@ class ProgramGenerationRequest(BaseModel):
     current_activity_level: ActivityLevel = ActivityLevel.MODERATE
     available_training_days: Annotated[int, Field(ge=1, le=7)]
     preferred_weekdays: tuple[int, ...] = ()
-    session_duration_minutes: int = Field(ge=30, le=120)
+    session_duration_minutes: int = Field(ge=30)
     available_equipment: frozenset[Equipment]
     training_location: TrainingLocation
     preferred_exercises: frozenset[UUID] = frozenset()

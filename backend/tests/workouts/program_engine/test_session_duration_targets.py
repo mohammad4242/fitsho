@@ -163,7 +163,13 @@ def test_core_preservation_extension_is_a_valid_user_facing_warning() -> None:
     assert result.program is not None, result.errors
     day = replace(
         result.program.weekly_schedule[0],
-        estimated_duration_minutes=80,
+        estimated_duration_minutes=80
+        + (
+            result.program.weekly_schedule[0].cardio.duration_minutes
+            if result.program.weekly_schedule[0].cardio
+            else 0
+        )
+        + RULESET.general_warmup_minutes,
     )
     trace = result.program.decision_trace + (
         {
@@ -185,7 +191,13 @@ def test_core_preservation_cannot_extend_beyond_plus_twenty() -> None:
     assert result.program is not None, result.errors
     day = replace(
         result.program.weekly_schedule[0],
-        estimated_duration_minutes=86,
+        estimated_duration_minutes=86
+        + (
+            result.program.weekly_schedule[0].cardio.duration_minutes
+            if result.program.weekly_schedule[0].cardio
+            else 0
+        )
+        + RULESET.general_warmup_minutes,
     )
     trace = result.program.decision_trace + (
         {
@@ -230,7 +242,10 @@ def test_advanced_strength_program_classifies_a_hard_constrained_120_minute_sess
     assert result.is_success, result.errors
     assert result.program is not None
     policy = get_session_duration_policy(120)
-    resistance_minutes = result.program.weekly_schedule[0].estimated_duration_minutes - RULESET.general_warmup_minutes
+    resistance_minutes = (
+        result.program.weekly_schedule[0].estimated_duration_minutes
+        - RULESET.general_warmup_minutes
+    )
     # If the session finishes under the *minimum* budget and doesn't meet minimum sets/exercises,
     # it might be constrained. But under budget itself is no longer a violation.
     # The check below relies on the trace reason codes for verification if it was indeed constrained.
@@ -240,7 +255,9 @@ def test_advanced_strength_program_classifies_a_hard_constrained_120_minute_sess
             for item in result.program.decision_trace
             if item.get("stage") == "session_duration"
         )
-        if "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in duration_trace.get("reason_codes", ()):
+        if "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in duration_trace.get(
+            "reason_codes", ()
+        ):
             assert True
         else:
             # Underfill is acceptable now
@@ -276,7 +293,9 @@ def test_underfilled_session_is_repaired_with_real_estimates() -> None:
         + sum(item.estimated_minutes for item in reduced_exercises)
         + cardio_mins,
     )
-    assert underfilled.estimated_duration_minutes < 80 + RULESET.general_warmup_minutes + cardio_mins
+    assert (
+        underfilled.estimated_duration_minutes < 80 + RULESET.general_warmup_minutes + cardio_mins
+    )
 
     repaired, reasons = repair_session_durations(
         (underfilled,),
@@ -387,7 +406,7 @@ def test_unsupported_target_fails_explicitly_instead_of_returning_short_session(
 
     with pytest.raises(ValidationError) as exc_info:
         request(session_duration_minutes=180, available_training_days=1)
-    
+
     assert "not an official supported value" in str(exc_info.value)
 
 

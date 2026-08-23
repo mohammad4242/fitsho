@@ -1,7 +1,10 @@
 from collections import Counter
 
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup, PrescriptionMode
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    get_session_duration_policy,
+    calculate_resistance_minutes,
+)
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
     complete_tracked_metrics,
@@ -59,9 +62,7 @@ def validate_program(
             }
         )
     )
-    duration_planned_reduced_count = (
-        "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in trace_reason_codes
-    )
+    duration_planned_reduced_count = "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in trace_reason_codes
     duration_feasibility_constrained = bool(
         trace_reason_codes.intersection(
             {
@@ -123,10 +124,7 @@ def validate_program(
         # Being under budget is only an error when the program is incomplete.
         # Over budget always requires justification.
         # ------------------------------------------------------------------
-        workout_duration = duration_policy.workout_minutes(
-            day.estimated_duration_minutes,
-            ruleset.general_warmup_minutes,
-        )
+        workout_duration = calculate_resistance_minutes(day, ruleset.general_warmup_minutes)
         if workout_duration < duration_policy.minimum_minutes:
             # Under-budget: only a hard error when exercise count also fails
             if exercise_count < effective_floor:

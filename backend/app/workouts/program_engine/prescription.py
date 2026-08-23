@@ -37,9 +37,6 @@ def prescribe_sessions(
     drafts: tuple[SessionDraft, ...],
     volume: WeeklyVolumePlan,
     ruleset: ProgramRuleset,
-    *,
-    cardio_reserve_minutes: int,
-    planned_cardio_sessions: int | None = None,
 ) -> tuple[WorkoutDay, ...]:
     appearances = Counter(
         item.primary_muscle
@@ -66,7 +63,6 @@ def prescribe_sessions(
         if volume.direct_sets_for(muscle) > 0
     }
     days: list[WorkoutDay] = []
-    pass
     for day_index, draft in enumerate(drafts):
         exercise_count = max(1, len(draft.exercises))
         # available = full resistance budget; cardio is scheduled outside/after.
@@ -235,7 +231,6 @@ def prescription_for(
     exercise_type: ExerciseType,
     status: TrainingStatus,
     ruleset: ProgramRuleset,
-    *,
     prescription_mode: PrescriptionMode = PrescriptionMode.REPS,
     duration_min_seconds: int | None = None,
     duration_max_seconds: int | None = None,

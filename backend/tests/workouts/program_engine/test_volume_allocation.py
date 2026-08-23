@@ -11,7 +11,10 @@ from app.exercises.enums import (
     MovementPattern,
     MuscleGroup,
 )
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    get_session_duration_policy,
+    calculate_resistance_minutes,
+)
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.prescription import estimate_exercise_minutes
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -427,10 +430,13 @@ def test_generate_program_preserves_volume_and_duration_constraints_without_set_
         int(result.program.user_profile_snapshot["session_duration_minutes"])
     )
     if not all(
-        policy.contains_total(
-            day.estimated_duration_minutes,
-            RULESET.general_warmup_minutes,
-            day.cardio.duration_minutes if day.cardio else 0,
+        policy.contains(
+            max(
+                0,
+                day.estimated_duration_minutes
+                - RULESET.general_warmup_minutes
+                - (day.cardio.duration_minutes if day.cardio else 0),
+            )
         )
         for day in result.program.weekly_schedule
     ):
@@ -482,7 +488,6 @@ def test_volume_repair_accepts_valid_increment_between_plus_five_and_plus_ten() 
         set(),
         Counter({MuscleGroup.CHEST.value: 2}),
         {MuscleGroup.CHEST: volume_target},
-        (0,),
         source,
         RULESET,
     )
@@ -504,7 +509,6 @@ def test_volume_repair_handles_secondary_target_for_untracked_primary() -> None:
         {MuscleGroup.CHEST},
         Counter(),
         {MuscleGroup.CHEST: chest_target},
-        (0,),
         normalized(),
         RULESET,
     )

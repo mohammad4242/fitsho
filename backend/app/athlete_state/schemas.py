@@ -6,6 +6,7 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.profile.schemas import SessionDurationMinutes
 
 from app.body_analysis.enums import BodyArea
 from app.exercises.enums import MuscleGroup
@@ -129,9 +130,9 @@ class AthleteStateScheduleContext(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     current_training_days_per_week: int | None = Field(default=None, ge=2, le=6)
-    current_session_duration_minutes: int | None = Field(default=None, ge=30, le=120)
+    current_session_duration_minutes: SessionDurationMinutes | None = None
     next_training_days: int | None = Field(default=None, ge=2, le=6)
-    next_session_duration_minutes: int | None = Field(default=None, ge=30, le=120)
+    next_session_duration_minutes: SessionDurationMinutes | None = None
     training_location: TrainingLocation | None = None
     home_training_setup: HomeTrainingSetup | None = None
     source_feedback_id: UUID | None = None

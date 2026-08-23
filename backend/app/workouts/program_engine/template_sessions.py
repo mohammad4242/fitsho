@@ -112,6 +112,9 @@ def build_template_sessions(
             )
         )
         capacity = max(1, capacity)
+        short_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
+        if not short_session:
+            capacity = max(capacity, ruleset.minimum_exercises_per_session)
         planned_minimum = min(ruleset.minimum_exercises_per_session, capacity)
         if planned_minimum < ruleset.minimum_exercises_per_session:
             build_reasons.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
@@ -185,9 +188,7 @@ def build_template_sessions(
                 else:
                     deliberate_redundancies.add(candidate.id)
                     build_reasons.append("DELIBERATE_REDUNDANCY_FOR_TEMPLATE_STRUCTURE")
-            selected_muscles = {
-                item.primary_muscle for item, _selected_slot in selected
-            }
+            selected_muscles = {item.primary_muscle for item, _selected_slot in selected}
             if (
                 slot.adaptation_priority == "optional"
                 and candidate.primary_muscle is not None
@@ -271,11 +272,7 @@ def build_template_sessions(
                 if candidate.primary_muscle is not None
             }
         )
-        if (
-            not planned_minimum
-            <= len(selected)
-            <= (ruleset.max_exercises_per_session)
-        ):
+        if not planned_minimum <= len(selected) <= (ruleset.max_exercises_per_session):
             raise TemplateConstructionError(
                 "TEMPLATE_SESSION_EXERCISE_COUNT_UNSATISFIED",
                 f"TEMPLATE_DAY:{index}",

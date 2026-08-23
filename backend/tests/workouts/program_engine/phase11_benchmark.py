@@ -38,7 +38,10 @@ from app.profile.enums import (
 )
 from app.profile.service import ProfileSnapshot
 from app.training_templates.engine_reference import load_template_references
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    get_session_duration_policy,
+    calculate_resistance_minutes,
+)
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     BalanceAbility,
@@ -363,7 +366,9 @@ def profile_to_request(
             previous_volume_source="prescribed_plan" if profile.previous_volume_sets else "none",
             recovery_problems=profile.recent_recovery_problems,
         )
-    overrides = ProgramGenerationOverrides(**override_values) if override_values else None
+    overrides = (
+        ProgramGenerationOverrides.model_construct(**override_values) if override_values else None
+    )
     mapper = object.__new__(WorkoutGenerationService)
     request = WorkoutGenerationService._to_program_request(
         mapper,

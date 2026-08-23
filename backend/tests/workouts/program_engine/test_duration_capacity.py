@@ -48,18 +48,14 @@ def test_capacity_preserves_workout_warmup_and_cardio_semantics() -> None:
         _normalized(Goal.FAT_LOSS, 45),
         tuple(full_catalog()),
         RULESET,
-        cardio_reserve_minutes=10,
     )
 
     assert capacity.requested_workout_minutes == 45
     assert capacity.target_total_minutes == 45 + RULESET.general_warmup_minutes
-    # cardio_reserve_minutes is stored as informational metadata only
-    assert capacity.cardio_reserve_minutes == 10
     # Phase 11.9: resistance budget = full session_duration_minutes (cardio is additive, not deducted)
     assert capacity.resistance_work_budget_minutes == 45
     assert capacity.minimum_resistance_work_minutes == 45 - 10  # tolerance-based min
     assert capacity.maximum_resistance_work_minutes == 45 + 10  # tolerance-based max
-
 
 
 def test_candidate_cost_reuses_goal_specific_prescription_and_warmup() -> None:
@@ -91,8 +87,7 @@ def test_candidate_cost_reuses_goal_specific_prescription_and_warmup() -> None:
     assert strength.minutes > hypertrophy.minutes > endurance.minutes
     assert strength.rest_seconds == RULESET.prescription_rules["strength_compound"].rest_seconds
     assert (
-        hypertrophy.rest_seconds
-        == RULESET.prescription_rules["hypertrophy_compound"].rest_seconds
+        hypertrophy.rest_seconds == RULESET.prescription_rules["hypertrophy_compound"].rest_seconds
     )
     assert endurance.rest_seconds == RULESET.prescription_rules["muscular_endurance"].rest_seconds
     assert strength.warmup_sets == RULESET.strength_compound_warmup_sets
@@ -107,36 +102,29 @@ def test_expected_exercise_and_set_capacity_changes_with_goal_and_time() -> None
         _normalized(Goal.STRENGTH, 30),
         catalog,
         RULESET,
-        cardio_reserve_minutes=0,
     )
     hypertrophy_30 = module.build_session_capacity(
         _normalized(Goal.HYPERTROPHY, 30),
         catalog,
         RULESET,
-        cardio_reserve_minutes=0,
     )
     hypertrophy_60 = module.build_session_capacity(
         _normalized(Goal.HYPERTROPHY, 60),
         catalog,
         RULESET,
-        cardio_reserve_minutes=0,
     )
 
     assert (
         strength_30.expected_exercise_count_capacity
         <= hypertrophy_30.expected_exercise_count_capacity
     )
-    assert (
-        strength_30.expected_working_set_capacity
-        <= hypertrophy_30.expected_working_set_capacity
-    )
+    assert strength_30.expected_working_set_capacity <= hypertrophy_30.expected_working_set_capacity
     assert (
         hypertrophy_60.expected_exercise_count_capacity
         > hypertrophy_30.expected_exercise_count_capacity
     )
     assert (
-        hypertrophy_60.expected_working_set_capacity
-        > hypertrophy_30.expected_working_set_capacity
+        hypertrophy_60.expected_working_set_capacity > hypertrophy_30.expected_working_set_capacity
     )
 
 
@@ -146,7 +134,6 @@ def test_assessment_trims_optional_work_but_rejects_impossible_required_work() -
         _normalized(Goal.HYPERTROPHY, 30),
         tuple(full_catalog()),
         RULESET,
-        cardio_reserve_minutes=0,
     )
 
     tight = module.assess_session_capacity(
@@ -185,10 +172,8 @@ def test_engine_plans_cardio_reserve_before_template_or_split_selection() -> Non
         item for item in result.program.decision_trace if item.get("stage") == "duration_capacity"
     )
     assert capacity_trace["requested_workout_minutes"] == 30
-    assert capacity_trace["cardio_reserve_minutes"] == RULESET.cardio_start_minutes
     # Phase 11.9: cardio does NOT reduce resistance budget
     assert capacity_trace["resistance_work_budget_minutes"] == 30
-
 
 
 def test_normal_split_ranking_uses_capacity_and_is_candidate_order_independent() -> None:
@@ -198,7 +183,6 @@ def test_normal_split_ranking_uses_capacity_and_is_candidate_order_independent()
         normalized,
         catalog,
         RULESET,
-        cardio_reserve_minutes=0,
     )
 
     first = rank_split_candidates(
@@ -215,9 +199,7 @@ def test_normal_split_ranking_uses_capacity_and_is_candidate_order_independent()
     )
 
     assert first == second
-    assert any(
-        reason.startswith("SPLIT_DURATION_CAPACITY_") for reason in first[0].reason_codes
-    )
+    assert any(reason.startswith("SPLIT_DURATION_CAPACITY_") for reason in first[0].reason_codes)
 
 
 def test_dynamic_fallback_uses_capacity_and_is_candidate_order_independent() -> None:
@@ -227,7 +209,6 @@ def test_dynamic_fallback_uses_capacity_and_is_candidate_order_independent() -> 
         normalized,
         catalog,
         RULESET,
-        cardio_reserve_minutes=0,
     )
     weekdays = RULESET.default_weekdays[normalized.resistance_training_days]
 
@@ -278,13 +259,11 @@ def test_weekly_volume_targets_are_allocated_from_real_time_capacity() -> None:
         short_request,
         catalog,
         RULESET,
-        cardio_reserve_minutes=0,
     )
     long_capacity = _module().build_session_capacity(
         long_request,
         catalog,
         RULESET,
-        cardio_reserve_minutes=0,
     )
     short_split = rank_split_candidates(
         short_request,
@@ -356,8 +335,7 @@ def test_thirty_minute_strength_program_uses_intentional_reduced_exercise_count(
         if "STRENGTH_PRIMARY_COMPOUND" in item.reason_codes
     )
     assert (
-        primary.rest_seconds
-        >= RULESET.prescription_rules["strength_compound"].minimum_rest_seconds
+        primary.rest_seconds >= RULESET.prescription_rules["strength_compound"].minimum_rest_seconds
     )
     assert primary.warmup_sets == RULESET.strength_compound_warmup_sets
 
