@@ -347,20 +347,21 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
     }
     selection_trace = result.program.decision_trace[0]
     assert selection_trace["selected"] == template.slug
-    assert selection_trace["candidates"] == (
-        {
-            "slug": template.slug,
-            "score": {
-                "priority": 0,
-                "body_analysis": 0,
-                "goal": 0,
-                "sex": 0,
-                "fallback": 0,
-                "total": 0,
-            },
-            "reason_codes": (),
-        },
-    )
+    assert len(selection_trace["candidates"]) == 1
+    candidate_trace = selection_trace["candidates"][0]
+    assert candidate_trace["rank"] == 1
+    assert candidate_trace["slug"] == template.slug
+    assert candidate_trace["score"] == {
+        "priority": 0,
+        "body_analysis": 0,
+        "goal": 0,
+        "sex": 0,
+        "fallback": 0,
+        "total": 0,
+    }
+    assert candidate_trace["feasibility"]["resolvable_slots"] == 6
+    assert candidate_trace["feasibility"]["unresolved_non_core_slots"] == 0
+    assert candidate_trace["reason_codes"] == ()
 
 
 def test_template_priority_soft_shortfall_is_valid_with_constraints() -> None:
@@ -551,6 +552,11 @@ def test_template_volume_uses_recovery_history_and_short_session_prescription() 
     constrained_target = constrained.program.aggregate_metrics["planned_direct_sets_by_muscle"][
         "chest"
     ]
+    baseline_sets = baseline.program.aggregate_metrics["weekly_direct_sets_by_muscle"]["chest"]
+    constrained_sets = constrained.program.aggregate_metrics["weekly_direct_sets_by_muscle"][
+        "chest"
+    ]
+    assert constrained_sets < baseline_sets
     assert constrained_target < baseline_target
     assert "VOLUME_CAPPED_FOR_PREVIOUS_VOLUME" in next(
         entry["reasons"]

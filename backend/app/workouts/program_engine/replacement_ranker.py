@@ -65,7 +65,6 @@ def rank_replacement_exercises(
 
     eligible = filter_eligible_exercises(request, tuple(candidates)).eligible
     disliked = request.source.disliked_exercises
-    preferred = request.source.preferred_exercises
     semantic_scope = allowed_patterns or frozenset({target.movement_pattern})
     semantic_targets = target_muscles or (
         frozenset({target.primary_muscle}) if target.primary_muscle is not None else None
@@ -91,7 +90,6 @@ def rank_replacement_exercises(
             item[0],
             compatibility=item[1],
             disliked=disliked,
-            preferred=preferred,
         ),
     )
     return tuple(candidate for candidate, _compatibility in ranked[:limit])
@@ -133,7 +131,6 @@ def _replacement_sort_key(
     *,
     compatibility: SlotCompatibility,
     disliked: frozenset[UUID],
-    preferred: frozenset[UUID],
 ) -> tuple[object, ...]:
     target_secondary = set(target.secondary_muscles)
     candidate_secondary = set(candidate.secondary_muscles)
@@ -178,7 +175,5 @@ def _replacement_sort_key(
         abs(target.setup_cost - candidate.setup_cost),
         candidate.fatigue_cost,
         candidate.setup_cost,
-        candidate.id in disliked,
-        candidate.id not in preferred,
         str(candidate.id),
     )

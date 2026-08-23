@@ -60,7 +60,7 @@ class PriorityAllocationPolicy:
         mild_lag_priorities = tuple(
             priority.muscle for priority in body_priorities if priority.classification == "mild_lag"
         )
-        priorities = explicit_priorities + clear_lag_priorities + mild_lag_priorities
+        priorities = tuple(explicit_priorities + clear_lag_priorities + mild_lag_priorities)
         available_days = min(request.resistance_training_days, ruleset.max_resistance_days)
         recovery_limited = _recovery_is_limited(request)
         exposure_capacity = min(
@@ -95,11 +95,7 @@ class PriorityAllocationPolicy:
         if muscle is None:
             return (3, 0, "")
         for tier, priorities in enumerate(
-            (
-                self.explicit_priorities,
-                self.clear_lag_priorities,
-                self.mild_lag_priorities,
-            )
+            (self.explicit_priorities, self.clear_lag_priorities, self.mild_lag_priorities)
         ):
             if muscle in priorities:
                 return (tier, priorities.index(muscle), muscle.value)
@@ -107,6 +103,10 @@ class PriorityAllocationPolicy:
 
     def preservation_rank(self, muscle: MuscleGroup | None) -> int:
         tier = self.precedence_key(muscle)[0]
+        # tier 0 = explicit priority → rank 3
+        # tier 1 = clear_lag body analysis → rank 2
+        # tier 2 = mild_lag body analysis → rank 1
+        # tier 3 = unconstrained → rank 0
         return {0: 3, 1: 2, 2: 1}.get(tier, 0)
 
     def is_explicit(self, muscle: MuscleGroup | None) -> bool:

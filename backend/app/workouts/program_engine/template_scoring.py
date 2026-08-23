@@ -24,6 +24,11 @@ class TemplateScoringPolicy:
     strength_bias_affinity: int = 25
     compound_focus_affinity: int = 10
     balanced_goal_affinity: int = 10
+    # Hypertrophy / muscle-gain favour direct-stimulus layouts
+    hypertrophy_specialization_affinity: int = 15
+    hypertrophy_body_part_rotation_affinity: int = 10
+    # Fat-loss and muscular-endurance favour compound-retention layouts
+    fat_loss_compound_affinity: int = 10
     goal_cap: int = 25
     female_glute_affinity: int = 20
     female_lower_affinity: int = 10
@@ -166,6 +171,42 @@ def _goal_score(
         reasons = (
             *(("GOAL_STRENGTH_BIAS_MATCH",) if TemplateFocusTag.STRENGTH_BIAS in tags else ()),
             *(("GOAL_COMPOUND_FOCUS_MATCH",) if TemplateFocusTag.COMPOUND_FOCUS in tags else ()),
+        )
+    elif goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN}:
+        # Favour layouts that provide direct, dedicated muscle stimulus.
+        # BODY_PART_ROTATION and SPECIALIZATION give individual muscles more
+        # concentrated exposure — appropriate for hypertrophy/muscle-gain.
+        # MUSCLE_GAIN shares this affinity explicitly (not as an accidental fallthrough).
+        affinities = (
+            policy.hypertrophy_specialization_affinity
+            if TemplateFocusTag.SPECIALIZATION in tags
+            else 0,
+            policy.hypertrophy_body_part_rotation_affinity
+            if TemplateFocusTag.BODY_PART_ROTATION in tags
+            else 0,
+        )
+        reasons = (
+            *(
+                ("GOAL_HYPERTROPHY_SPECIALIZATION_MATCH",)
+                if TemplateFocusTag.SPECIALIZATION in tags
+                else ()
+            ),
+            *(
+                ("GOAL_HYPERTROPHY_BODY_PART_ROTATION_MATCH",)
+                if TemplateFocusTag.BODY_PART_ROTATION in tags
+                else ()
+            ),
+        )
+    elif goal in {Goal.FAT_LOSS, Goal.MUSCULAR_ENDURANCE}:
+        # Resistance work for fat-loss and muscular-endurance should still preserve
+        # muscle.  Compound-focus layouts retain more muscle mass with lower systemic
+        # fatigue budget.  Muscular-endurance gets the same bias because compound
+        # movements drive total-body endurance adaptations efficiently.
+        affinities = (
+            policy.fat_loss_compound_affinity if TemplateFocusTag.COMPOUND_FOCUS in tags else 0,
+        )
+        reasons = (
+            ("GOAL_FAT_LOSS_COMPOUND_MATCH",) if TemplateFocusTag.COMPOUND_FOCUS in tags else ()
         )
     elif goal in {Goal.GENERAL_FITNESS, Goal.BODY_RECOMPOSITION}:
         affinities = (policy.balanced_goal_affinity if TemplateFocusTag.BALANCED in tags else 0,)
