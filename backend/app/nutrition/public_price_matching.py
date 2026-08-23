@@ -132,9 +132,7 @@ def match_candidate(
         for term in _FOOD_SPECIFIC_REJECT_TERMS.get(normalize_food_alias(food.name_fa), set())
     ):
         return CandidateMatch(False, Decimal("0"), None, "IRRELEVANT_PRODUCT")
-    required_terms = _FOOD_SPECIFIC_REQUIRED_TERMS.get(
-        normalize_food_alias(food.name_fa), set()
-    )
+    required_terms = _FOOD_SPECIFIC_REQUIRED_TERMS.get(normalize_food_alias(food.name_fa), set())
     if required_terms and not all(term in normalized_title for term in required_terms):
         return CandidateMatch(False, Decimal("0"), None, "AMBIGUOUS_MATCH")
     aliases = tuple(dict.fromkeys((food.name_fa, *food.aliases)))

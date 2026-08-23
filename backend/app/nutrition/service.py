@@ -372,9 +372,7 @@ def _food_items(
         for value in catalogue_names:
             candidates.setdefault(normalize_food_alias(value), set()).add(food.id)
     resolved_food_ids = {
-        key: next(iter(food_ids))
-        for key, food_ids in candidates.items()
-        if len(food_ids) == 1
+        key: next(iter(food_ids)) for key, food_ids in candidates.items() if len(food_ids) == 1
     }
     string_collections = {
         FoodItemKind.FAVOURITE: payload.favourite_foods,

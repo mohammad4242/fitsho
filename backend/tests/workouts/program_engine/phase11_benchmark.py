@@ -437,9 +437,7 @@ def _template_stats(result: ProgramGenerationResult) -> dict[str, object]:
     selection = _trace_entry(result, "template_selection") or {}
     selected = selection.get("selected")
     entries = result.program.decision_trace if result.program is not None else result.decision_trace
-    attempts = tuple(
-        entry for entry in entries if entry.get("stage") == "template_attempt"
-    )
+    attempts = tuple(entry for entry in entries if entry.get("stage") == "template_attempt")
     reference = (
         result.program.aggregate_metrics.get("reference_template")
         if result.program is not None
@@ -520,17 +518,13 @@ def _template_stats(result: ProgramGenerationResult) -> dict[str, object]:
         "attempt_depth": len(attempts) if attempts else int(attempted),
         "successful_attempt_depth": successful_attempt_depth,
         "recovered_with_alternative": bool(
-            succeeded
-            and successful_attempt_depth is not None
-            and successful_attempt_depth > 1
+            succeeded and successful_attempt_depth is not None and successful_attempt_depth > 1
         ),
         "alternatives_exhausted": alternatives_exhausted,
         "reason_codes": tuple(dict.fromkeys(reasons)),
         "rejection_categories": tuple(dict.fromkeys(rejection_categories)),
         "attempt_reason_codes": tuple(dict.fromkeys(attempt_reasons)),
-        "attempt_rejection_categories": tuple(
-            dict.fromkeys(attempt_rejection_categories)
-        ),
+        "attempt_rejection_categories": tuple(dict.fromkeys(attempt_rejection_categories)),
         "selected_score_breakdown": selected_score,
         "successful_score_breakdown": successful_score,
         "score_breakdown": candidates,
@@ -1052,9 +1046,7 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
         for category in cast(Sequence[str], item["rejection_categories"])
     )
     attempt_reason_codes = Counter(
-        code
-        for item in template
-        for code in cast(Sequence[str], item["attempt_reason_codes"])
+        code for item in template for code in cast(Sequence[str], item["attempt_reason_codes"])
     )
     attempt_rejection_categories = Counter(
         category

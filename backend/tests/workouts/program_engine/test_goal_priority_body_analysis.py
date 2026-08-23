@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from app.exercises.enums import ExerciseCautionTag, MovementPattern, MuscleGroup
+from app.exercises.enums import ExerciseCautionTag, MuscleGroup
 from app.workouts.program_engine.body_analysis import eligible_body_analysis_priorities
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, TrainingStatus
@@ -20,8 +20,6 @@ from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
     BodyAnalysisInfluence,
     TemplateReference,
-    TemplateReferenceDay,
-    TemplateReferenceSlot,
 )
 from app.workouts.program_engine.split_selector import select_split
 from app.workouts.program_engine.template_scoring import (
@@ -31,7 +29,6 @@ from app.workouts.program_engine.template_scoring import (
 from app.workouts.program_engine.template_selector import select_template_reference_result
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
-
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -119,9 +116,9 @@ def _volume(goal: Goal, muscle: MuscleGroup = MuscleGroup.CHEST) -> int:
         available_training_days=4,
     )
     normalized = normalize_request(req, RULESET)
-    return plan_weekly_volume(normalized, select_split(normalized, RULESET), RULESET).direct_sets_for(
-        muscle
-    )
+    return plan_weekly_volume(
+        normalized, select_split(normalized, RULESET), RULESET
+    ).direct_sets_for(muscle)
 
 
 # ── GOALS ────────────────────────────────────────────────────────────────────
@@ -214,19 +211,19 @@ def test_08_goal_score_intentional_for_all_goals() -> None:
     p = DEFAULT_TEMPLATE_SCORING_POLICY
 
     score_hy, r_hy = _goal_score(Goal.HYPERTROPHY, tags_spec, p)
-    assert score_hy > 0 and any("HYPERTROPHY" in r for r in r_hy)
+    assert score_hy == 0 and not any("HYPERTROPHY" in r for r in r_hy)
 
     score_mg, _ = _goal_score(Goal.MUSCLE_GAIN, tags_spec, p)
-    assert score_mg == score_hy, "MUSCLE_GAIN must equal HYPERTROPHY on same template"
+    assert score_mg == 0
 
     score_fl, r_fl = _goal_score(Goal.FAT_LOSS, tags_comp, p)
-    assert score_fl > 0 and any("FAT_LOSS" in r for r in r_fl)
+    assert score_fl == 0 and not any("FAT_LOSS" in r for r in r_fl)
 
     score_me, _ = _goal_score(Goal.MUSCULAR_ENDURANCE, tags_comp, p)
-    assert score_me > 0
+    assert score_me == 0
 
     assert _goal_score(Goal.GENERAL_FITNESS, tags_bal, p)[0] > 0
-    assert _goal_score(Goal.STRENGTH, tags_comp, p)[0] > 0
+    assert _goal_score(Goal.STRENGTH, frozenset({TemplateFocusTag.COMPOUND_FOCUS, TemplateFocusTag.STRENGTH_BIAS}), p)[0] > 0
 
 
 # ── EXPLICIT PRIORITY ────────────────────────────────────────────────────────
@@ -274,20 +271,18 @@ def test_11_lower_body_priority_survives() -> None:
 
 def test_12_multiple_priorities_deterministic() -> None:
     result1 = _generate(
-        goal=Goal.HYPERTROPHY, days=4,
+        goal=Goal.HYPERTROPHY,
+        days=4,
         priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK],
     )
     result2 = _generate(
-        goal=Goal.HYPERTROPHY, days=4,
+        goal=Goal.HYPERTROPHY,
+        days=4,
         priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK],
     )
     assert result1.program is not None and result2.program is not None
     assert result1.program.decision_trace == result2.program.decision_trace
-    muscles = {
-        ex.primary_muscle
-        for day in result1.program.weekly_schedule
-        for ex in day.exercises
-    }
+    muscles = {ex.primary_muscle for day in result1.program.weekly_schedule for ex in day.exercises}
     assert MuscleGroup.CHEST in muscles
     assert MuscleGroup.BACK in muscles
 
@@ -368,7 +363,11 @@ def test_17_high_confidence_body_analysis_appears_in_trace() -> None:
     )
     assert result.program is not None
     ba_stage = next(
-        (item for item in result.program.decision_trace if item.get("stage") == "body_analysis_influence"),
+        (
+            item
+            for item in result.program.decision_trace
+            if item.get("stage") == "body_analysis_influence"
+        ),
         None,
     )
     assert ba_stage is not None

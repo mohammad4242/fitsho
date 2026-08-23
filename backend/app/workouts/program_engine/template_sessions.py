@@ -358,7 +358,7 @@ def adaptation_preservation_rank(exercise: object, muscle_policy: object) -> int
     primary_muscle = getattr(exercise, "primary_muscle", None)
     preservation_rank = getattr(muscle_policy, "preservation_rank", None)
     muscle_rank = preservation_rank(primary_muscle) if callable(preservation_rank) else 0
-    
+
     # Explicit user priority (rank 3) trumps template core
     if isinstance(muscle_rank, int) and muscle_rank >= 3:
         return 70
@@ -366,7 +366,7 @@ def adaptation_preservation_rank(exercise: object, muscle_policy: object) -> int
     template_priority = template_adaptation_priority(exercise)
     if template_priority == "core":
         return 60
-    
+
     if isinstance(muscle_rank, int) and muscle_rank > 0:
         return 50 + muscle_rank
     if template_priority == "accessory":

@@ -201,9 +201,7 @@ def select_template_reference_result(
                 tied_slugs=tuple(item.template.slug for item in tied),
                 selected=selected.template.slug,
                 selected_by=(
-                    "slug_descending"
-                    if feasibility_tied
-                    else "feasibility_then_slug_descending"
+                    "slug_descending" if feasibility_tied else "feasibility_then_slug_descending"
                 ),
             )
     rejected_items: list[HardRejectedTemplate] = []

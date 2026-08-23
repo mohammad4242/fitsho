@@ -68,9 +68,7 @@ def lab_storage_path(root: Path, key: str) -> Path:
     return path
 
 
-def _normalize(
-    content: bytes, content_type: str | None, max_pixels: int
-) -> tuple[bytes, str, str]:
+def _normalize(content: bytes, content_type: str | None, max_pixels: int) -> tuple[bytes, str, str]:
     if (
         content_type == "application/pdf"
         and content.startswith(b"%PDF-")
@@ -556,9 +554,7 @@ def transition_lab_request(
 ) -> dict[str, object]:
     require_physician(db, physician_id)
     row = db.scalar(
-        select(NutritionLabRequest)
-        .where(NutritionLabRequest.id == request_id)
-        .with_for_update()
+        select(NutritionLabRequest).where(NutritionLabRequest.id == request_id).with_for_update()
     )
     if row is None:
         raise ClinicalError("LAB_REQUEST_NOT_FOUND")

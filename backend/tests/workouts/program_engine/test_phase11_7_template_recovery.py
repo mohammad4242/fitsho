@@ -85,8 +85,7 @@ def test_top_ranked_template_failure_recovers_with_second_without_dynamic_fallba
         "succeeded",
     ]
     assert not any(
-        entry.get("stage") == "construction_recovery"
-        for entry in result.program.decision_trace
+        entry.get("stage") == "construction_recovery" for entry in result.program.decision_trace
     )
 
 
@@ -126,8 +125,8 @@ def test_multiple_ranked_templates_fail_before_later_template_succeeds() -> None
     )
     assert all(
         not any(
-                item.get("stage") in {"template_selection", "template_attempt"}
-                for item in rejection.get("decision_trace", ())
+            item.get("stage") in {"template_selection", "template_attempt"}
+            for item in rejection.get("decision_trace", ())
         )
         for rejection in rejections
     )
@@ -157,8 +156,7 @@ def test_all_template_candidates_are_exhausted_before_dynamic_fallback() -> None
     assert exhausted["attempted_count"] == 2
     assert exhausted["reason_codes"] == ("TEMPLATE_ALTERNATIVES_EXHAUSTED",)
     assert any(
-        entry.get("stage") == "construction_recovery"
-        for entry in result.program.decision_trace
+        entry.get("stage") == "construction_recovery" for entry in result.program.decision_trace
     )
 
 
@@ -174,9 +172,7 @@ def test_template_retry_order_and_trace_are_deterministic() -> None:
     )
     source = _recovery_request()
 
-    first = generate_program(
-        source, full_catalog(), RULESET, reference_templates=templates
-    )
+    first = generate_program(source, full_catalog(), RULESET, reference_templates=templates)
     second = generate_program(
         source,
         tuple(reversed(full_catalog())),
@@ -286,12 +282,8 @@ def test_equal_scores_prefer_more_feasible_template_deterministically() -> None:
     exact = candidate("a-exact", exact_candidate.id)
     substitution = candidate("z-substitution", None)
 
-    first = select_template_reference_result(
-        normalized, catalog, (substitution, exact), RULESET
-    )
-    second = select_template_reference_result(
-        normalized, catalog, (exact, substitution), RULESET
-    )
+    first = select_template_reference_result(normalized, catalog, (substitution, exact), RULESET)
+    second = select_template_reference_result(normalized, catalog, (exact, substitution), RULESET)
 
     assert first == second
     assert [item.template.slug for item in first.candidates] == ["a-exact", "z-substitution"]

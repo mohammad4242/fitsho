@@ -51,9 +51,7 @@ def direct_target_muscles(
 ) -> tuple[MuscleGroup, ...]:
     """Return ordered primary muscles only; secondary recruitment is never a title target."""
     return target_muscles_from_values(
-        item.primary_muscle
-        for item in exercises
-        if item.primary_muscle is not None
+        item.primary_muscle for item in exercises if item.primary_muscle is not None
     )
 
 

@@ -232,12 +232,16 @@ def update_profile(
 
     supplied_fields = payload.model_dump(exclude_unset=True)
     cycle_id = supplied_fields.pop("cycle_id", None)
-    if cycle_id is not None and db.scalar(
-        select(WorkoutCycle).where(
-            WorkoutCycle.id == cycle_id,
-            WorkoutCycle.user_id == user_id,
+    if (
+        cycle_id is not None
+        and db.scalar(
+            select(WorkoutCycle).where(
+                WorkoutCycle.id == cycle_id,
+                WorkoutCycle.user_id == user_id,
+            )
         )
-    ) is None:
+        is None
+    ):
         raise ProfileCycleNotFoundError
     supplied_cautions = supplied_fields.pop("training_cautions", None)
     if "preferred_weekdays" in supplied_fields:

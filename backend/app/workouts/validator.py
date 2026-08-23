@@ -383,7 +383,7 @@ class WorkoutPlanValidator:
 
     @staticmethod
     def _can_fill_strength_slot(candidate: WorkoutExerciseCandidate) -> bool:
-        return (
-            ExerciseLabel.CARDIO not in candidate.labels
-            and candidate.exercise_type in {ExerciseType.COMPOUND, ExerciseType.ISOLATION}
-        )
+        return ExerciseLabel.CARDIO not in candidate.labels and candidate.exercise_type in {
+            ExerciseType.COMPOUND,
+            ExerciseType.ISOLATION,
+        }

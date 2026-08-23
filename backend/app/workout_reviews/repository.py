@@ -44,9 +44,7 @@ def get_review(db: Session, review_id: UUID) -> WorkoutPlanReview | None:
 
 def get_review_for_update(db: Session, review_id: UUID) -> WorkoutPlanReview | None:
     review = db.scalar(
-        select(WorkoutPlanReview)
-        .where(WorkoutPlanReview.id == review_id)
-        .with_for_update()
+        select(WorkoutPlanReview).where(WorkoutPlanReview.id == review_id).with_for_update()
     )
     if review is None:
         return None
@@ -82,9 +80,7 @@ def list_reviews(
     coach_id: UUID,
     now: datetime,
 ) -> list[WorkoutPlanReview]:
-    statement = select(WorkoutPlanReview).options(
-        selectinload(WorkoutPlanReview.source_plan)
-    )
+    statement = select(WorkoutPlanReview).options(selectinload(WorkoutPlanReview.source_plan))
     if view is WorkoutReviewQueueView.PENDING:
         statement = statement.where(
             (WorkoutPlanReview.status == WorkoutReviewStatus.PENDING)

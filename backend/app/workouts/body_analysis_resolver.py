@@ -67,9 +67,7 @@ class WorkoutBodyAnalysisResolver:
                 continue
             visited_sessions.add(analysis.session_id)
             try:
-                effective = self._analysis_service.effective_result(
-                    analysis.session_id, user_id
-                )
+                effective = self._analysis_service.effective_result(analysis.session_id, user_id)
             except BodyAnalysisNotFoundError:
                 continue
             effective_analysis = self._db.get(BodyAnalysis, effective.analysis_id)
@@ -118,11 +116,7 @@ def to_body_analysis_influence(
                 ),
             )
             priorities[muscle] = stronger.model_copy(
-                update={
-                    "emphasis": tuple(
-                        sorted(set(previous.emphasis).union(candidate.emphasis))
-                    )
-                }
+                update={"emphasis": tuple(sorted(set(previous.emphasis).union(candidate.emphasis)))}
             )
     provenance = result.provenance
     return BodyAnalysisInfluence(

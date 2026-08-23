@@ -87,6 +87,5 @@ def test_training_age_changes_training_status_not_template_level() -> None:
     assert normalized.source.training_experience is TrainingExperience.INTERMEDIATE
     assert normalized.training_status is TrainingStatus.NOVICE
     assert (
-        ExperienceLevel(normalized.source.training_experience.value)
-        is ExperienceLevel.INTERMEDIATE
+        ExperienceLevel(normalized.source.training_experience.value) is ExperienceLevel.INTERMEDIATE
     )

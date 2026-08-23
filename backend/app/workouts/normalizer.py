@@ -13,9 +13,7 @@ def normalize_workout_plan(
 
     def order_rank(exercise_id: UUID) -> int:
         candidate = candidate_by_id.get(exercise_id)
-        is_compound = (
-            candidate is not None and candidate.exercise_type is ExerciseType.COMPOUND
-        )
+        is_compound = candidate is not None and candidate.exercise_type is ExerciseType.COMPOUND
         return 0 if is_compound else 1
 
     return plan.model_copy(

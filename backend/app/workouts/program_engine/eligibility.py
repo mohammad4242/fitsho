@@ -80,9 +80,9 @@ def filter_eligible_exercises(
         if not effective_required_equipment(exercise.equipment, exercise.movement_pattern).issubset(
             constraints.available_equipment
         ):
-            reasons.append("EXERCISE_REJECTED_MISSING_EQUIPMENT"); print(f"REJECTED EQ {exercise.name}")
+            reasons.append("EXERCISE_REJECTED_MISSING_EQUIPMENT")
         if _DIFFICULTY_RANK[exercise.difficulty] > _STATUS_DIFFICULTY[request.training_status]:
-            reasons.append("EXERCISE_REJECTED_SKILL_TOO_HIGH"); print(f"REJECTED SKILL {exercise.name} req={request.training_status} ex={exercise.difficulty}")
+            reasons.append("EXERCISE_REJECTED_SKILL_TOO_HIGH")
         if caution_tags.intersection(constraints.blocked_caution_tags):
             reasons.append("EXERCISE_REJECTED_BLOCKED_CAUTION_TAG")
         if _IMPACT_RANK[exercise.impact_level] > _IMPACT_RANK[constraints.impact_limit]:

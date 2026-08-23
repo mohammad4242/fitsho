@@ -65,7 +65,6 @@ def prescribe_sessions(
         if volume.direct_sets_for(muscle) > 0
     }
     days: list[WorkoutDay] = []
-    compact_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
     for draft in drafts:
         exercise_count = max(1, len(draft.exercises))
         available = max(
@@ -78,7 +77,17 @@ def prescribe_sessions(
         )
         programmed: list[ProgrammedExercise] = []
         direct_session_sets: Counter[object] = Counter()
-        for exercise in draft.exercises:
+        ordered_exercises = (
+            sorted(
+                draft.exercises,
+                key=lambda exercise: ruleset.strength_role_order[
+                    classify_strength_role(exercise, request, ruleset).role.value
+                ],
+            )
+            if request.primary_goal is Goal.STRENGTH
+            else draft.exercises
+        )
+        for exercise in ordered_exercises:
             strength_role = (
                 classify_strength_role(exercise, request, ruleset)
                 if request.primary_goal is Goal.STRENGTH
@@ -87,26 +96,9 @@ def prescribe_sessions(
             primary_muscle = exercise.primary_muscle
             session_size_accessory = False
             if primary_muscle in allocations:
-                _ = next(allocations[primary_muscle])
-
-                # Check how many tracked sets we have accumulated globally
-                current_weekly_sets = sum(
-                    ex.sets
-                    for day in days
-                    for ex in day.exercises
-                    if ex.primary_muscle == primary_muscle
-                ) + direct_session_sets.get(primary_muscle, 0)
-
-                if primary_muscle in targets:
-                    target = targets[primary_muscle].target_sets
-                else:
-                    target = 99999  # Effectively unlimited — no volume cap
-
-                if current_weekly_sets >= target:
-                    sets = ruleset.minimum_working_sets
-                    session_size_accessory = True
-                else:
-                    sets = ruleset.minimum_working_sets
+                allocated_sets = next(allocations[primary_muscle])
+                sets = max(ruleset.minimum_working_sets, allocated_sets)
+                session_size_accessory = allocated_sets < ruleset.minimum_working_sets
             else:
                 sets = min(
                     ruleset.max_sets_per_muscle_per_session,
@@ -146,14 +138,8 @@ def prescribe_sessions(
                 fatigue_cost=exercise.fatigue_cost,
             )
             rest = prescription.rest_seconds
-            if compact_session:
-                rest = ruleset.minimum_rest_seconds
             warmup_sets = 0
-            if (
-                not compact_session
-                and not programmed
-                and exercise.exercise_type is ExerciseType.COMPOUND
-            ):
+            if not programmed and exercise.exercise_type is ExerciseType.COMPOUND:
                 warmup_sets = (
                     ruleset.strength_compound_warmup_sets
                     if request.primary_goal is Goal.STRENGTH
@@ -261,14 +247,7 @@ def prescription_for(
             key = "strength_isolation"
             role = StrengthExerciseRole.ACCESSORY
         else:
-            if strength_role is None:
-                role = (
-                    StrengthExerciseRole.SECONDARY_COMPOUND
-                    if fatigue_cost < ruleset.strength_high_fatigue_cost
-                    else StrengthExerciseRole.PRIMARY_STRENGTH
-                )
-            else:
-                role = strength_role
+            role = strength_role or StrengthExerciseRole.SECONDARY_COMPOUND
             key = {
                 StrengthExerciseRole.PRIMARY_STRENGTH: "strength_compound",
                 StrengthExerciseRole.SECONDARY_COMPOUND: "strength_secondary_compound",

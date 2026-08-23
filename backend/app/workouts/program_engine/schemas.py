@@ -515,9 +515,7 @@ class ValidationReport:
             ValidationStatus.INVALID
             if self.errors
             else (
-                ValidationStatus.VALID_WITH_CONSTRAINTS
-                if self.warnings
-                else ValidationStatus.VALID
+                ValidationStatus.VALID_WITH_CONSTRAINTS if self.warnings else ValidationStatus.VALID
             )
         )
         object.__setattr__(self, "status", status)

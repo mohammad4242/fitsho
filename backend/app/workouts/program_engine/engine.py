@@ -177,9 +177,7 @@ def generate_program(
                 "feasibility": ranking.feasibility.decision_trace(),
                 "rejection_category": rejection_category,
                 "reason_codes": reference_result.errors,
-                "decision_trace": reference_result.decision_trace[
-                    len(template_rejection_trace) :
-                ],
+                "decision_trace": reference_result.decision_trace[len(template_rejection_trace) :],
             }
             template_rejection_trace += (
                 rejection,

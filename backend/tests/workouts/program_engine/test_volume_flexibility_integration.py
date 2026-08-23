@@ -109,18 +109,14 @@ def test_successful_programs_use_honest_flexible_volume(overrides: dict[str, obj
         for item in day.exercises:
             if item.primary_muscle is not None:
                 per_session[item.primary_muscle] += item.sets
-        assert all(
-            sets <= RULESET.max_sets_per_muscle_per_session
-            for sets in per_session.values()
-        )
+        assert all(sets <= RULESET.max_sets_per_muscle_per_session for sets in per_session.values())
 
     for muscle, values in metrics["volume_ranges_by_muscle"].items():
         assert values["preferred_weekly_target"] == values["target_sets"]
         assert values["acceptable_minimum"] <= values["acceptable_maximum"]
         assert values["actual_direct_volume"] == metrics["weekly_direct_sets_by_muscle"][muscle]
         assert (
-            values["actual_effective_volume"]
-            == metrics["weekly_effective_sets_by_muscle"][muscle]
+            values["actual_effective_volume"] == metrics["weekly_effective_sets_by_muscle"][muscle]
         )
         assert values["actual_effective_volume"] <= values["effective_maximum_hard"]
         assert values["status"] in {

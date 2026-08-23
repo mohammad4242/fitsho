@@ -65,10 +65,14 @@ def refine_primary_muscle(
     if primary_muscle is not MuscleGroup.ABS:
         return primary_muscle
     name = normalize_focus_text(name_en)
-    if movement_pattern in {
-        MovementPattern.CORE_ANTI_ROTATION,
-        MovementPattern.CORE_ANTI_LATERAL_FLEXION,
-    } or name in CORE_OBLIQUE_NAMES:
+    if (
+        movement_pattern
+        in {
+            MovementPattern.CORE_ANTI_ROTATION,
+            MovementPattern.CORE_ANTI_LATERAL_FLEXION,
+        }
+        or name in CORE_OBLIQUE_NAMES
+    ):
         return MuscleGroup.OBLIQUES
     return primary_muscle
 

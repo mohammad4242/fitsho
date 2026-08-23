@@ -38,11 +38,7 @@ from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog
 
 
 def _direct_muscles(day: WorkoutDay) -> set[MuscleGroup]:
-    return {
-        item.primary_muscle
-        for item in day.exercises
-        if item.primary_muscle is not None
-    }
+    return {item.primary_muscle for item in day.exercises if item.primary_muscle is not None}
 
 
 def test_required_muscle_without_any_safe_coverage_is_structured_unsatisfied() -> None:
