@@ -26,6 +26,139 @@ def test_session_duration_policy_has_exact_product_bounds(
     assert (policy.minimum_minutes, policy.maximum_minutes) == (minimum, maximum)
 
 
+def test_general_warmup_is_outside_the_requested_workout_duration() -> None:
+    source = request(session_duration_minutes=60, available_training_days=1)
+    result = generate_program(source, full_catalog(), RULESET)
+    assert result.program is not None, result.errors
+    day = result.program.weekly_schedule[0]
+    normal_upper_total = source.session_duration_minutes + 10 + RULESET.general_warmup_minutes
+    program = replace(
+        result.program,
+        weekly_schedule=(replace(day, estimated_duration_minutes=normal_upper_total),),
+    )
+
+    report = validate_program(program, source, RULESET)
+
+    assert "SESSION_DURATION_EXCEEDED" not in report.errors
+    assert "SESSION_DURATION_OVER_TARGET" not in report.errors
+
+
+def test_optional_template_work_is_removed_before_core_for_duration() -> None:
+    source = request(session_duration_minutes=60, available_training_days=1)
+    normalized = normalize_request(source, RULESET)
+    test_ruleset = replace(RULESET, minimum_exercises_per_session=2)
+    result = generate_program(source, full_catalog(), RULESET)
+    assert result.program is not None, result.errors
+    day = result.program.weekly_schedule[0]
+    base = day.exercises[:3]
+    assert len(base) == 3
+    exercises = tuple(
+        replace(
+            item,
+            sets=RULESET.minimum_working_sets,
+            rest_seconds=RULESET.minimum_rest_seconds,
+            estimated_minutes=30,
+            reason_codes=(
+                "TEMPLATE_ADAPTATION_PRIORITY:optional"
+                if index == len(base) - 1
+                else "TEMPLATE_ADAPTATION_PRIORITY:core",
+            ),
+        )
+        for index, item in enumerate(base)
+    )
+    overfilled = replace(
+        day,
+        focus="template_reference_1",
+        exercises=exercises,
+        cardio=None,
+        estimated_duration_minutes=RULESET.general_warmup_minutes
+        + sum(item.estimated_minutes for item in exercises),
+    )
+
+    repaired, _ = repair_session_durations((overfilled,), normalized, (), test_ruleset)
+
+    assert exercises[-1].exercise_id not in {item.exercise_id for item in repaired[0].exercises}
+    assert {item.exercise_id for item in exercises[:-1]}.issubset(
+        {item.exercise_id for item in repaired[0].exercises}
+    )
+
+
+def test_core_preservation_can_extend_workout_to_plus_twenty_with_reason() -> None:
+    source = request(session_duration_minutes=60, available_training_days=1)
+    normalized = normalize_request(source, RULESET)
+    result = generate_program(source, full_catalog(), RULESET)
+    assert result.program is not None, result.errors
+    day = result.program.weekly_schedule[0]
+    base = day.exercises[: RULESET.minimum_exercises_per_session]
+    exercises = tuple(
+        replace(
+            item,
+            sets=RULESET.minimum_working_sets,
+            rest_seconds=RULESET.minimum_rest_seconds,
+            estimated_minutes=15,
+            reason_codes=("TEMPLATE_ADAPTATION_PRIORITY:core",),
+        )
+        for item in base
+    )
+    overfilled = replace(
+        day,
+        focus="template_reference_1",
+        exercises=exercises,
+        cardio=None,
+        estimated_duration_minutes=RULESET.general_warmup_minutes
+        + sum(item.estimated_minutes for item in exercises),
+    )
+
+    repaired, reasons = repair_session_durations((overfilled,), normalized, (), RULESET)
+
+    assert repaired[0].exercises == exercises
+    assert repaired[0].estimated_duration_minutes == 80
+    assert "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE" in reasons
+
+
+def test_core_preservation_extension_is_a_valid_user_facing_warning() -> None:
+    source = request(session_duration_minutes=60, available_training_days=1)
+    result = generate_program(source, full_catalog(), RULESET)
+    assert result.program is not None, result.errors
+    day = replace(
+        result.program.weekly_schedule[0],
+        estimated_duration_minutes=80,
+    )
+    trace = result.program.decision_trace + (
+        {
+            "stage": "session_duration",
+            "reason_codes": ("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE",),
+        },
+    )
+    program = replace(result.program, weekly_schedule=(day,), decision_trace=trace)
+
+    report = validate_program(program, source, RULESET)
+
+    assert "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE" in report.warnings
+    assert "SESSION_DURATION_EXCEEDED" not in report.errors
+
+
+def test_core_preservation_cannot_extend_beyond_plus_twenty() -> None:
+    source = request(session_duration_minutes=60, available_training_days=1)
+    result = generate_program(source, full_catalog(), RULESET)
+    assert result.program is not None, result.errors
+    day = replace(
+        result.program.weekly_schedule[0],
+        estimated_duration_minutes=86,
+    )
+    trace = result.program.decision_trace + (
+        {
+            "stage": "session_duration",
+            "reason_codes": ("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE",),
+        },
+    )
+    program = replace(result.program, weekly_schedule=(day,), decision_trace=trace)
+
+    report = validate_program(program, source, RULESET)
+
+    assert "SESSION_DURATION_EXCEEDED" in report.errors
+
+
 @pytest.mark.parametrize("requested", [30, 45, 60, 75, 90])
 def test_generate_program_keeps_every_session_inside_duration_target(requested: int) -> None:
     source = request(session_duration_minutes=requested, available_training_days=1)
@@ -36,7 +169,7 @@ def test_generate_program_keeps_every_session_inside_duration_target(requested: 
     assert result.program is not None
     policy = get_session_duration_policy(requested)
     assert all(
-        policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
+        policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)
         for day in result.program.weekly_schedule
     )
 
@@ -55,7 +188,10 @@ def test_advanced_strength_program_supports_120_minute_session_policy() -> None:
     assert result.is_success, result.errors
     assert result.program is not None
     policy = get_session_duration_policy(120)
-    assert policy.contains(result.program.weekly_schedule[0].estimated_duration_minutes)
+    assert policy.contains_total(
+        result.program.weekly_schedule[0].estimated_duration_minutes,
+        RULESET.general_warmup_minutes,
+    )
 
 
 def test_underfilled_session_is_repaired_with_real_estimates() -> None:
@@ -85,7 +221,7 @@ def test_underfilled_session_is_repaired_with_real_estimates() -> None:
         estimated_duration_minutes=RULESET.general_warmup_minutes
         + sum(item.estimated_minutes for item in reduced_exercises),
     )
-    assert underfilled.estimated_duration_minutes < 80
+    assert underfilled.estimated_duration_minutes < 80 + RULESET.general_warmup_minutes
 
     repaired, reasons = repair_session_durations(
         (underfilled,),
@@ -94,7 +230,7 @@ def test_underfilled_session_is_repaired_with_real_estimates() -> None:
         RULESET,
     )
 
-    assert repaired[0].estimated_duration_minutes >= 80
+    assert repaired[0].estimated_duration_minutes >= 80 + RULESET.general_warmup_minutes
     assert "SESSION_DURATION_REPAIR_APPLIED" in reasons
 
 
@@ -129,9 +265,7 @@ def test_duration_repair_cannot_add_hidden_or_per_session_volume() -> None:
     )
 
     repaired_chest = tuple(
-        item
-        for item in repaired[0].exercises
-        if item.primary_muscle is chest.primary_muscle
+        item for item in repaired[0].exercises if item.primary_muscle is chest.primary_muscle
     )
     assert sum(item.sets for item in repaired_chest) <= RULESET.max_sets_per_muscle_per_session
     assert all(item.counts_toward_volume for item in repaired[0].exercises)
@@ -185,8 +319,8 @@ def test_overfilled_session_is_repaired_without_fake_duration() -> None:
         RULESET,
     )
 
-    assert repaired[0].estimated_duration_minutes <= 55
-    assert repaired[0].estimated_duration_minutes >= 35
+    assert repaired[0].estimated_duration_minutes <= 55 + RULESET.general_warmup_minutes
+    assert repaired[0].estimated_duration_minutes >= 35 + RULESET.general_warmup_minutes
     assert "SESSION_DURATION_REPAIR_APPLIED" in reasons
 
 

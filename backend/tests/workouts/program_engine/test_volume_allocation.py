@@ -196,7 +196,7 @@ def test_generate_program_preserves_volume_and_duration_constraints_without_set_
         int(result.program.user_profile_snapshot["session_duration_minutes"])
     )
     assert all(
-        policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
+        policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)
         for day in result.program.weekly_schedule
     )
     metrics = result.program.aggregate_metrics

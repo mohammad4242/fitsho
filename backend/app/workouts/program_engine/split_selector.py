@@ -119,8 +119,7 @@ def rank_availability_aware_fallbacks(
         ruleset.minimum_exercises_per_session,
         min(
             ruleset.max_exercises_per_session,
-            (request.source.session_duration_minutes - ruleset.general_warmup_minutes)
-            // ruleset.minutes_per_exercise_slot,
+            request.source.session_duration_minutes // ruleset.minutes_per_exercise_slot,
         ),
     )
     priorities = request.source.priority_muscles | body_analysis_priority_muscles(

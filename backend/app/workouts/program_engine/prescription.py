@@ -67,9 +67,7 @@ def prescribe_sessions(
         exercise_count = max(1, len(draft.exercises))
         available = max(
             ruleset.minimum_session_work_minutes,
-            request.source.session_duration_minutes
-            - ruleset.general_warmup_minutes
-            - cardio_reserve_minutes,
+            request.source.session_duration_minutes - cardio_reserve_minutes,
         )
         per_exercise_budget = max(
             ruleset.minimum_exercise_budget_minutes,
@@ -139,10 +137,7 @@ def prescribe_sessions(
             )
             rest = prescription.rest_seconds
             warmup_sets = 0
-            if (
-                not programmed
-                and exercise.exercise_type is ExerciseType.COMPOUND
-            ):
+            if not programmed and exercise.exercise_type is ExerciseType.COMPOUND:
                 warmup_sets = (
                     ruleset.strength_compound_warmup_sets
                     if request.primary_goal is Goal.STRENGTH
@@ -173,11 +168,7 @@ def prescribe_sessions(
                             draft.selection_reasons[exercise.id]
                             + (strength_role.reason_codes if strength_role is not None else ())
                             + (("VOLUME_SET_CAP_APPLIED",) if cap_applied else ())
-                            + (
-                                ("SESSION_SIZE_ACCESSORY",)
-                                if session_size_accessory
-                                else ()
-                            )
+                            + (("SESSION_SIZE_ACCESSORY",) if session_size_accessory else ())
                         )
                     ),
                     substitution_exercise_ids=draft.substitutions[exercise.id],

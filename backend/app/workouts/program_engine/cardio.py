@@ -44,7 +44,8 @@ def add_cardio(
     for day in days:
         available_cardio_minutes = min(
             ruleset.cardio_start_minutes,
-            duration_policy.maximum_minutes - day.estimated_duration_minutes,
+            duration_policy.maximum_total_minutes(ruleset.general_warmup_minutes)
+            - day.estimated_duration_minutes,
         )
         eligible_day = (
             day.focus not in {"lower", "legs"} or len(days) == 1

@@ -143,6 +143,7 @@ export type WorkoutPlan = {
   plan_duration_weeks: 4 | 6 | 8;
   is_stale: boolean;
   days: WorkoutDay[];
+  warnings?: string[];
   body_analysis_provenance?: Record<string, unknown>;
   ai_coach_template_slug?: string | null;
   ai_coach_program_explanation_fa?: string | null;

@@ -396,7 +396,7 @@ def test_template_volume_uses_recovery_history_and_short_session_prescription() 
     ]
     assert constrained_sets < baseline_sets
     assert constrained.program.weekly_schedule[0].exercises[0].rest_seconds >= (
-        RULESET.prescription_rules["hypertrophy_compound"].rest_seconds
+        RULESET.minimum_rest_seconds + RULESET.duration_repair_rest_increment_seconds
     )
     assert constrained.program.aggregate_metrics["previous_volume_baseline"]["source"] == (
         "prescribed_plan"
@@ -567,7 +567,8 @@ def test_template_generation_is_deterministic_and_strictly_valid() -> None:
     assert first.program == second.program
     assert first.program.validation_report.is_valid
     assert all(
-        day.estimated_duration_minutes <= source.session_duration_minutes + 10
+        day.estimated_duration_minutes - RULESET.general_warmup_minutes
+        <= source.session_duration_minutes + 10
         for day in first.program.weekly_schedule
     )
     primary_by_id = {candidate.id: candidate.primary_muscle for candidate in catalog}

@@ -238,6 +238,17 @@ it("uses the compact English generation labels", async () => {
   }
 });
 
+it("translates the core-preservation duration warning for members", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue({
+    ...plan,
+    warnings: ["SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE"],
+  });
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByText("برای حفظ اثربخشی برنامه، لطفاً زمان تمرین خود را کمی افزایش دهید.")).toBeInTheDocument();
+});
+
 it("places the locked end-of-cycle feedback between PDF and Body Analysis tools", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue(plan);
 

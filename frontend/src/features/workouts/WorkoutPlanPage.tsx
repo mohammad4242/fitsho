@@ -265,6 +265,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
             <div className="workout-plan-statuses">
               {reused && <p className="workout-reused" role="status">{t("workoutPlan.reused")}</p>}
               {plan.is_stale && <p className="workout-stale" role="status">{t("workoutPlan.stale")}</p>}
+              {plan.warnings?.includes("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE") && <p className="workout-body-analysis-warning" role="alert">{t("workoutPlan.corePreservationDurationWarning")}</p>}
               {plan.body_analysis_provenance?.provisional === true && <p className="workout-body-analysis-warning" role="alert">{t("workoutPlan.provisionalBodyAnalysisWarning")}</p>}
               {generationError && <StatusPanel role="alert" message={t(generationError === "cooldown" ? "workoutPlan.generateCooldown" : "workoutPlan.generateError")} action={generationError === "failed" ? t("common.retry") : undefined} onAction={generationError === "failed" ? generate : undefined} />}
             </div>
@@ -273,6 +274,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         {pendingPlan !== null && (
           <section className="workout-pending-plan" aria-labelledby="workout-pending-plan-title">
             <PendingReviewNotice executable />
+            {pendingPlan.warnings?.includes("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE") && <p className="workout-body-analysis-warning" role="alert">{t("workoutPlan.corePreservationDurationWarning")}</p>}
             <div className="workout-schedule__heading">
               <div>
                 <p className="eyebrow eyebrow--accent">{l("نسخه جدید", "New version")}</p>

@@ -50,7 +50,7 @@ def test_regression_thirty_minute_session_keeps_the_exercise_count_floor() -> No
     )
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
+        policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)
         for day in result.program.weekly_schedule
     )
 
@@ -121,7 +121,7 @@ def test_regression_short_sessions_cover_hinge_and_core_across_the_week() -> Non
     assert MovementPattern.CORE_ANTI_EXTENSION in patterns
 
 
-def test_regression_short_upper_lower_keeps_required_trunk_work_before_cardio() -> None:
+def test_regression_short_upper_lower_keeps_required_trunk_work_with_cardio() -> None:
     result = generate_program(
         request(
             available_training_days=4,
@@ -141,8 +141,12 @@ def test_regression_short_upper_lower_keeps_required_trunk_work_before_cardio() 
         for day in result.program.weekly_schedule
         for item in day.exercises
     )
-    assert all(day.cardio is None for day in result.program.weekly_schedule)
     assert all(
-        day.estimated_duration_minutes <= get_session_duration_policy(25).maximum_minutes
+        day.cardio is None or "CARDIO_SCHEDULED_AFTER_RESISTANCE" in day.cardio.reason_codes
+        for day in result.program.weekly_schedule
+    )
+    assert all(
+        day.estimated_duration_minutes
+        <= get_session_duration_policy(25).maximum_total_minutes(RULESET.general_warmup_minutes)
         for day in result.program.weekly_schedule
     )

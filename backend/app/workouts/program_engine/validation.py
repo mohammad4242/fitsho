@@ -67,11 +67,7 @@ def validate_program(
     weekly_exposures: Counter[MuscleGroup] = Counter()
     for day in program.weekly_schedule:
         weekly_exposures.update(
-            {
-                item.primary_muscle
-                for item in day.exercises
-                if item.primary_muscle is not None
-            }
+            {item.primary_muscle for item in day.exercises if item.primary_muscle is not None}
         )
     for day in program.weekly_schedule:
         exercise_count = len(day.exercises)
@@ -85,16 +81,27 @@ def validate_program(
                 errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
         elif exercise_count > ruleset.max_exercises_per_session:
             errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-        if day.estimated_duration_minutes < duration_policy.minimum_minutes:
+        workout_duration = duration_policy.workout_minutes(
+            day.estimated_duration_minutes,
+            ruleset.general_warmup_minutes,
+        )
+        if workout_duration < duration_policy.minimum_minutes:
             if "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in trace_reason_codes:
                 warnings.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
             else:
                 errors.append("SESSION_DURATION_UNDER_TARGET")
                 errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
-        if day.estimated_duration_minutes > duration_policy.maximum_minutes:
-            errors.append("SESSION_DURATION_EXCEEDED")
-            errors.append("SESSION_DURATION_OVER_TARGET")
-            errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
+        if workout_duration > duration_policy.maximum_minutes:
+            core_extension_is_valid = (
+                "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE" in trace_reason_codes
+                and workout_duration <= duration_policy.core_preservation_maximum_minutes
+            )
+            if core_extension_is_valid:
+                warnings.append("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE")
+            else:
+                errors.append("SESSION_DURATION_EXCEEDED")
+                errors.append("SESSION_DURATION_OVER_TARGET")
+                errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
         per_session: Counter[str] = Counter()
         for item in day.exercises:
             semantic_patterns, semantic_muscles = focus_scope(day.focus)

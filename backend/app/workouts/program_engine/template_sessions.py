@@ -90,8 +90,7 @@ def build_template_sessions(
         ruleset.minimum_exercises_per_session,
         min(
             ruleset.max_exercises_per_session,
-            (request.source.session_duration_minutes - ruleset.general_warmup_minutes)
-            // ruleset.minutes_per_exercise_slot,
+            request.source.session_duration_minutes // ruleset.minutes_per_exercise_slot,
         ),
     )
     for index, reference_day in enumerate(template.days, start=1):
@@ -120,9 +119,7 @@ def build_template_sessions(
                     reserved,
                     ruleset,
                     original=(
-                        source_by_id.get(slot.exercise_id)
-                        if slot.exercise_id is not None
-                        else None
+                        source_by_id.get(slot.exercise_id) if slot.exercise_id is not None else None
                     ),
                 )
             if candidate is None:
@@ -330,6 +327,24 @@ def template_removal_rank(exercise: object) -> int:
         None: 2,
         "core": 3,
     }.get(template_adaptation_priority(exercise), 2)
+
+
+def adaptation_preservation_rank(exercise: object, muscle_policy: object) -> int:
+    """Rank work by product hierarchy; larger values are preserved longer."""
+
+    template_priority = template_adaptation_priority(exercise)
+    if template_priority == "core":
+        return 60
+    primary_muscle = getattr(exercise, "primary_muscle", None)
+    preservation_rank = getattr(muscle_policy, "preservation_rank", None)
+    muscle_rank = preservation_rank(primary_muscle) if callable(preservation_rank) else 0
+    if isinstance(muscle_rank, int) and muscle_rank > 0:
+        return 50 + muscle_rank
+    if template_priority == "accessory":
+        return 20
+    if template_priority == "optional":
+        return 0
+    return 10
 
 
 def _rank_template_slot_candidates(
