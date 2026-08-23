@@ -10,6 +10,7 @@ from app.profile.training_compatibility import (
 )
 from app.workouts.program_engine.body_analysis import (
     applicable_body_analysis_influence,
+    body_analysis_priority_muscles,
     body_analysis_provenance,
     body_analysis_trace,
     eligible_body_analysis_priorities,
@@ -716,6 +717,9 @@ def _reference_program(
             rejected_candidates=rejected,
             decision_trace=trace,
         )
+    priority_muscles = normalized.source.priority_muscles | body_analysis_priority_muscles(
+        normalized, ruleset
+    )
     targets_by_muscle = {target.muscle: target for target in volume.targets}
     unmet_priority_errors: list[str] = []
     for muscle in sorted(priority_muscles, key=lambda item: item.value):

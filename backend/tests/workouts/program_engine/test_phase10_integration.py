@@ -516,12 +516,12 @@ def test_phase10_duration_repair_does_not_change_template_scoring(duration: int)
     selection = program.decision_trace[0]
 
     assert selection["selected"] == "balanced-structure"
+    duration_trace = next(
+        entry for entry in program.decision_trace if entry["stage"] == "session_duration"
+    )
     assert all(
-        policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
-        or "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS"
-        in next(entry for entry in program.decision_trace if entry["stage"] == "session_duration")[
-            "reason_codes"
-        ]
+        policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)
+        or "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in duration_trace["reason_codes"]
         for day in program.weekly_schedule
     )
 
