@@ -381,7 +381,7 @@ def _select_rest_increment(
 ) -> tuple[int, ProgrammedExercise] | None:
     options: list[tuple[int, int, str, int, ProgrammedExercise]] = []
     for index, exercise in enumerate(exercises):
-        prescribed_rest = prescription_for(
+        prescription = prescription_for(
             request.primary_goal,
             exercise.exercise_type,
             request.training_status,
@@ -394,16 +394,8 @@ def _select_rest_increment(
                 if request.primary_goal is Goal.STRENGTH
                 else None
             ),
-        ).rest_seconds
-        useful_rest_ceiling = prescribed_rest + (
-            ruleset.duration_repair_rest_increment_seconds
-            if exercise.exercise_type is ExerciseType.COMPOUND
-            else 0
         )
-        useful_rest_ceiling = min(
-            useful_rest_ceiling,
-            ruleset.maximum_duration_repair_rest_seconds,
-        )
+        useful_rest_ceiling = prescription.maximum_rest_seconds
         if exercise.rest_seconds >= useful_rest_ceiling:
             continue
         rest_seconds = min(
@@ -545,6 +537,7 @@ def _repair_overfill(
         if not removable:
             rest_reduction = _select_rest_reduction_for_overfill(
                 exercises,
+                request,
                 priority_policy,
                 ruleset,
             )
@@ -570,12 +563,13 @@ def _repair_overfill(
 
 def _select_rest_reduction_for_overfill(
     exercises: list[ProgrammedExercise],
+    request: NormalizedProgramRequest,
     priority_policy: PriorityAllocationPolicy,
     ruleset: ProgramRuleset,
 ) -> tuple[int, ProgrammedExercise] | None:
     options: list[tuple[int, int, int, str, int, ProgrammedExercise]] = []
     for index, exercise in enumerate(exercises):
-        minimum_rest = _duration_repair_minimum_rest(exercise, ruleset)
+        minimum_rest = _duration_repair_minimum_rest(exercise, request, ruleset)
         if exercise.rest_seconds <= minimum_rest:
             continue
         rest_seconds = max(
@@ -613,24 +607,21 @@ def _select_rest_reduction_for_overfill(
 
 def _duration_repair_minimum_rest(
     exercise: ProgrammedExercise,
+    request: NormalizedProgramRequest,
     ruleset: ProgramRuleset,
 ) -> int:
-    if "STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes:
-        return ruleset.prescription_rules["strength_compound"].rest_seconds
-    if "STRENGTH_SECONDARY_COMPOUND" in exercise.reason_codes:
-        return ruleset.prescription_rules["strength_secondary_compound"].rest_seconds
-    if "STRENGTH_ROLE_ACCESSORY_TYPE" in exercise.reason_codes:
-        key = (
-            "hypertrophy_isolation"
-            if exercise.exercise_type is ExerciseType.ISOLATION
-            else "strength_accessory"
-        )
-        return ruleset.prescription_rules[key].rest_seconds
-    if exercise.warmup_sets > 0 and exercise.exercise_type is ExerciseType.COMPOUND:
-        return ruleset.minimum_rest_seconds + 2 * ruleset.duration_repair_rest_increment_seconds
-    if exercise.exercise_type is ExerciseType.ISOLATION:
-        return ruleset.minimum_rest_seconds
-    return ruleset.minimum_rest_seconds + ruleset.duration_repair_rest_increment_seconds
+    return prescription_for(
+        request.primary_goal,
+        exercise.exercise_type,
+        request.training_status,
+        ruleset,
+        prescription_mode=exercise.prescription_mode,
+        duration_min_seconds=exercise.duration_min_seconds,
+        duration_max_seconds=exercise.duration_max_seconds,
+        strength_role=(
+            _programmed_strength_role(exercise) if request.primary_goal is Goal.STRENGTH else None
+        ),
+    ).minimum_rest_seconds
 
 
 def _program_candidate(

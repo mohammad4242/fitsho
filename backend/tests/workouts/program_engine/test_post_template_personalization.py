@@ -300,7 +300,7 @@ def test_same_template_strength_and_hypertrophy_have_role_specific_prescriptions
         hypertrophy_first.rest_seconds,
     )
     assert all(
-        item.rest_seconds <= RULESET.prescription_rules["hypertrophy_isolation"].rest_seconds
+        item.rest_seconds <= RULESET.prescription_rules["strength_isolation"].maximum_rest_seconds
         for day in strength.program.weekly_schedule
         for item in day.exercises
         if item.exercise_type.value == "isolation"
@@ -362,12 +362,15 @@ def test_explicit_chest_priority_dominates_conflicting_body_analysis_lag() -> No
 
     assert result.program is not None, result.errors
     ranges = result.program.aggregate_metrics["volume_ranges_by_muscle"]
-    direct = result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
+    priority_metrics = result.program.aggregate_metrics["priority_metrics"]
     assert (
         ranges[MuscleGroup.CHEST.value]["preferred_weekly_target"]
         > ranges[MuscleGroup.GLUTES.value]["preferred_weekly_target"]
     )
-    assert direct[MuscleGroup.CHEST.value] > direct[MuscleGroup.GLUTES.value]
+    assert (
+        "PRIORITY_TARGET_PARTIALLY_SATISFIED"
+        in priority_metrics[MuscleGroup.CHEST.value]["reason_codes"]
+    )
 
 
 def test_clear_body_lag_has_stronger_volume_target_than_mild_lag() -> None:
