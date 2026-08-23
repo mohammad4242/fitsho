@@ -43,6 +43,45 @@ def test_general_warmup_is_outside_the_requested_workout_duration() -> None:
     assert "SESSION_DURATION_OVER_TARGET" not in report.errors
 
 
+def test_high_quality_fifty_two_minute_workout_satisfies_sixty_minute_request() -> None:
+    source = request(session_duration_minutes=60, available_training_days=1)
+    result = generate_program(source, full_catalog(), RULESET)
+    assert result.program is not None, result.errors
+    day = result.program.weekly_schedule[0]
+    program = replace(
+        result.program,
+        weekly_schedule=(
+            replace(day, estimated_duration_minutes=52 + RULESET.general_warmup_minutes),
+        ),
+    )
+
+    report = validate_program(program, source, RULESET)
+
+    assert "SESSION_DURATION_UNDER_TARGET" not in report.errors
+    assert "SESSION_DURATION_TARGET_UNSATISFIED" not in report.errors
+
+
+def test_useful_workload_limit_does_not_force_artificial_rest() -> None:
+    source = request(
+        session_duration_minutes=75,
+        available_training_days=3,
+        training_experience="beginner",
+        training_age_months=3,
+        primary_goal="muscle_gain",
+        priority_muscles=["chest", "back"],
+    )
+
+    result = generate_program(source, full_catalog(), RULESET, reference_templates=())
+
+    assert result.program is not None, result.errors
+    assert "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD" in result.program.warnings
+    assert all(
+        "SESSION_DURATION_REPAIR_EXTENDED_REST" not in exercise.reason_codes
+        for day in result.program.weekly_schedule
+        for exercise in day.exercises
+    )
+
+
 def test_optional_template_work_is_removed_before_core_for_duration() -> None:
     source = request(session_duration_minutes=60, available_training_days=1)
     normalized = normalize_request(source, RULESET)

@@ -14,6 +14,7 @@ export type WorkoutPlanExercise = {
   rest_seconds: number;
   rir: number | null;
   estimated_minutes: number;
+  superset_group?: string | null;
   notes_en: string | null;
   notes_fa: string | null;
   exercise: ExerciseSummary;

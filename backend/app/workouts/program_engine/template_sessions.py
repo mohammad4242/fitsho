@@ -25,6 +25,7 @@ class TemplateSlotResolution:
     selected_exercise_id: UUID
     adaptation_priority: str
     intensity_method: str
+    superset_group: str | None
     original_prescription: tuple[int, int, int, int, int]
     is_template_slot: bool
 
@@ -283,6 +284,7 @@ def build_template_sessions(
                     selected_exercise_id=candidate.id,
                     adaptation_priority=slot.adaptation_priority,
                     intensity_method=slot.intensity_method,
+                    superset_group=slot.superset_group,
                     original_prescription=(
                         slot.sets,
                         slot.rep_min,
@@ -458,6 +460,7 @@ def apply_template_intent(
                         if resolution.intensity_method == "standard"
                         else resolution.intensity_method
                     ),
+                    superset_group=resolution.superset_group,
                 )
             )
         personalized.append(replace(day, title=title, exercises=tuple(exercises)))

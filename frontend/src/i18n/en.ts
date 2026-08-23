@@ -1156,7 +1156,7 @@ const en = {
       emptyBody: "Fitsho will use your saved preferences and eligible exercises.",
       generate: "Generate plan", generating: "Generating plan…", update: "Refresh plan", reused: "Your current plan still matches your current conditions.", stale: "This plan no longer matches your current conditions or selected duration. Generate the next plan when you are ready.", generateError: "Generation did not finish. Your current plan is still available; try again.", generateCooldown: "Please try again in a few minutes.",
       corePreservationDurationWarning: "To preserve the program's effectiveness, please allow a little more workout time.",
-      weekly: "Weekly schedule", scheduleTitle: "Your training days", sessionMinutes: "{{count}} minutes", sets: "Sets", reps: "Reps", durationTarget: "Duration", rest: "Rest", seconds: "s", rir: "RIR", detail: "View exercise details", alternatives: "View alternatives",
+      weekly: "Weekly schedule", scheduleTitle: "Your training days", sessionMinutes: "{{count}} minutes", sets: "Sets", reps: "Reps", durationTarget: "Duration", rest: "Rest", seconds: "s", rir: "RIR", detail: "View exercise details", alternatives: "View alternatives", superset: "Superset", supersetInstruction: "Perform this exercise immediately with the next exercise, then rest.",
       weeklyCheckIn: {
         eyebrow: "Weekly pulse",
         title: "Weekly check-in",

@@ -21,6 +21,7 @@ from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     focus_scope,
 )
+from app.workouts.program_engine.supersets import superset_structure_errors
 
 
 def validate_program(
@@ -53,6 +54,15 @@ def validate_program(
                 "VOLUME_REPAIR_SOFT_TARGET_REDUCED",
                 "VOLUME_REPAIR_HARD_MINIMUM_UNSATISFIED",
                 "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+                "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
+            }
+        )
+    )
+    duration_feasibility_constrained = bool(
+        trace_reason_codes.intersection(
+            {
+                "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+                "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
             }
         )
     )
@@ -71,6 +81,7 @@ def validate_program(
         )
     for day in program.weekly_schedule:
         exercise_count = len(day.exercises)
+        errors.extend(superset_structure_errors(day.exercises))
         if exercise_count < ruleset.minimum_exercises_per_session:
             shortfall = ruleset.minimum_exercises_per_session - exercise_count
             if shortfall <= 2 or volume_feasibility_constrained:
@@ -86,8 +97,15 @@ def validate_program(
             ruleset.general_warmup_minutes,
         )
         if workout_duration < duration_policy.minimum_minutes:
-            if "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in trace_reason_codes:
-                warnings.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
+            if duration_feasibility_constrained:
+                warnings.extend(
+                    code
+                    for code in (
+                        "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+                        "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
+                    )
+                    if code in trace_reason_codes
+                )
             else:
                 errors.append("SESSION_DURATION_UNDER_TARGET")
                 errors.append("SESSION_DURATION_TARGET_UNSATISFIED")

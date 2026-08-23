@@ -288,6 +288,40 @@ def test_template_uses_shared_volume_and_prescription_rules() -> None:
     assert any(entry["stage"] == "volume_repair" for entry in result.program.decision_trace)
 
 
+def test_safe_template_superset_group_reaches_programmed_exercises() -> None:
+    template, catalog = _upper_lower_reference()
+    grouped_slots = tuple(
+        replace(slot, adaptation_priority="accessory", superset_group="upper-a")
+        if index < 2
+        else slot
+        for index, slot in enumerate(template.days[0].slots)
+    )
+    grouped_template = replace(
+        template,
+        days=(replace(template.days[0], slots=grouped_slots), *template.days[1:]),
+    )
+
+    result = generate_program(
+        template_request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=90,
+        ),
+        catalog,
+        RULESET,
+        reference_templates=(grouped_template,),
+    )
+
+    assert result.program is not None, result.errors
+    grouped = tuple(
+        item for item in result.program.weekly_schedule[0].exercises if item.superset_group
+    )
+    assert len(grouped) == 2
+    assert {item.superset_group for item in grouped} == {"upper-a"}
+
+
 def test_same_template_personalizes_weekly_volume_targets_for_different_priorities() -> None:
     template, catalog = _upper_lower_reference()
 

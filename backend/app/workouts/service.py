@@ -896,6 +896,7 @@ class WorkoutGenerationService:
                         rest_seconds=item.rest_seconds,
                         rir=item.target_rir,
                         estimated_minutes=item.estimated_minutes,
+                        superset_group=item.superset_group,
                         notes_en=item.notes,
                         notes_fa=None,
                         exercise_snapshot=snapshots[str(item.exercise_id)],

@@ -437,8 +437,11 @@ class ProgrammedExercise:
     exercise_type: ExerciseType = ExerciseType.OTHER
     duration_min_seconds: int | None = None
     duration_max_seconds: int | None = None
+    superset_group: str | None = None
 
     def __post_init__(self) -> None:
+        if self.superset_group is not None and not 1 <= len(self.superset_group) <= 32:
+            raise ValueError("superset_group must contain 1 to 32 characters")
         if self.prescription_mode is PrescriptionMode.REPS:
             if (
                 self.rep_min is None

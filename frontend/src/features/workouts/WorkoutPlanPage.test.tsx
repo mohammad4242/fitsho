@@ -467,6 +467,53 @@ it("renders the selected duration, exercise media, and exercise detail link", as
   expect(screen.queryByRole("link", { name: "شنا سوئدی" })).not.toBeInTheDocument();
 });
 
+it("shows a clear instruction for adjacent superset exercises", async () => {
+  const first = { ...plan.days[0]!.exercises[0]!, superset_group: "pair-a" };
+  const second = {
+    ...first,
+    id: "018f0000-0000-7000-8000-000000000012",
+    order_index: 2,
+    alternatives: [],
+    exercise: {
+      ...first.exercise,
+      id: "018f0000-0000-7000-8000-000000000004",
+      slug: "dumbbell-row",
+      name_en: "Dumbbell Row",
+      name_fa: "زیربغل دمبل",
+      primary_muscle: "back" as const,
+    },
+  };
+  api.getActiveWorkoutPlan.mockResolvedValue({
+    ...plan,
+    days: [{ ...plan.days[0]!, exercises: [first, second] }],
+  });
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(
+    await screen.findByText("این حرکت را بلافاصله با حرکت بعدی اجرا کن؛ سپس استراحت کن."),
+  ).toBeInTheDocument();
+  expect(screen.getAllByText("سوپرست")).toHaveLength(2);
+});
+
+it("renders an incomplete superset group as straight sets", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue({
+    ...plan,
+    days: [{
+      ...plan.days[0]!,
+      exercises: [{ ...plan.days[0]!.exercises[0]!, superset_group: "incomplete" }],
+    }],
+  });
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByText("پرس سینه دمبل")).toBeInTheDocument();
+  expect(screen.queryByText("سوپرست")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("این حرکت را بلافاصله با حرکت بعدی اجرا کن؛ سپس استراحت کن."),
+  ).not.toBeInTheDocument();
+});
+
 it("asks for a reason, then shows only prescribed alternatives and scope before submitting", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue(plan);
   const user = userEvent.setup();

@@ -31,6 +31,10 @@ from app.workouts.program_engine.strength_programming import (
     StrengthExerciseRole,
     classify_strength_role,
 )
+from app.workouts.program_engine.supersets import (
+    apply_duration_pressure_superset,
+    apply_template_supersets,
+)
 from app.workouts.program_engine.template_sessions import (
     adaptation_preservation_rank,
     template_removal_rank,
@@ -51,7 +55,9 @@ def repair_session_durations(
     repaired: list[WorkoutDay] = []
     reasons: list[str] = []
     for day_index, day in enumerate(days):
-        current = _rebuild_day(day, day.exercises, ruleset)
+        template_adjusted, template_superset_reasons = apply_template_supersets(day.exercises)
+        reasons.extend(template_superset_reasons)
+        current = _rebuild_day(day, template_adjusted, ruleset)
         other_days = tuple(repaired) + days[day_index + 1 :]
         if (
             current.estimated_duration_minutes
@@ -72,7 +78,8 @@ def repair_session_durations(
             ruleset.general_warmup_minutes
         ):
             reasons.append("SESSION_DURATION_OVERFILLED")
-            current = _repair_overfill(current, request, policy, ruleset)
+            current, overfill_reasons = _repair_overfill(current, request, policy, ruleset)
+            reasons.extend(overfill_reasons)
         extended_for_core = (
             current.estimated_duration_minutes
             > policy.maximum_total_minutes(ruleset.general_warmup_minutes)
@@ -97,12 +104,13 @@ def repair_session_durations(
                 volume is not None
                 and current.estimated_duration_minutes
                 < policy.minimum_total_minutes(ruleset.general_warmup_minutes)
-                and (
-                    current.focus.startswith("template_reference")
-                    or _duration_shortfall_is_hard_constrained(request, volume)
-                )
             ):
-                reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
+                if current.focus.startswith(
+                    "template_reference"
+                ) or _duration_shortfall_is_hard_constrained(request, volume):
+                    reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
+                elif request.source.session_duration_minutes <= 120:
+                    reasons.append("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD")
         repaired.append(current)
     underfilled = tuple(
         day
@@ -169,18 +177,7 @@ def _repair_underfill(
             volume=volume,
         )
         if addition is None:
-            rest_increment = _select_rest_increment(
-                exercises,
-                request,
-                policy,
-                ruleset,
-            )
-            if rest_increment is None:
-                break
-            index, updated = rest_increment
-            exercises[index] = updated
-            day = _rebuild_day(day, tuple(exercises), ruleset)
-            continue
+            break
         exercises.append(addition)
         day = _rebuild_day(day, tuple(exercises), ruleset)
     return day
@@ -373,74 +370,6 @@ def _select_exercise_addition(
     return None
 
 
-def _select_rest_increment(
-    exercises: list[ProgrammedExercise],
-    request: NormalizedProgramRequest,
-    policy: SessionDurationPolicy,
-    ruleset: ProgramRuleset,
-) -> tuple[int, ProgrammedExercise] | None:
-    options: list[tuple[int, int, str, int, ProgrammedExercise]] = []
-    for index, exercise in enumerate(exercises):
-        prescription = prescription_for(
-            request.primary_goal,
-            exercise.exercise_type,
-            request.training_status,
-            ruleset,
-            prescription_mode=exercise.prescription_mode,
-            duration_min_seconds=exercise.duration_min_seconds,
-            duration_max_seconds=exercise.duration_max_seconds,
-            strength_role=(
-                _programmed_strength_role(exercise)
-                if request.primary_goal is Goal.STRENGTH
-                else None
-            ),
-        )
-        useful_rest_ceiling = prescription.maximum_rest_seconds
-        if exercise.rest_seconds >= useful_rest_ceiling:
-            continue
-        rest_seconds = min(
-            exercise.rest_seconds + ruleset.duration_repair_rest_increment_seconds,
-            useful_rest_ceiling,
-        )
-        updated = replace(
-            exercise,
-            rest_seconds=rest_seconds,
-            estimated_minutes=estimate_exercise_minutes(
-                exercise.sets,
-                rest_seconds,
-                exercise.warmup_sets,
-                ruleset,
-            ),
-            reason_codes=exercise.reason_codes + ("SESSION_DURATION_REPAIR_EXTENDED_REST",),
-        )
-        if updated.estimated_minutes == exercise.estimated_minutes:
-            continue
-        projected = (
-            ruleset.general_warmup_minutes
-            + sum(
-                item.estimated_minutes
-                for item_index, item in enumerate(exercises)
-                if item_index != index
-            )
-            + updated.estimated_minutes
-        )
-        if projected > policy.maximum_total_minutes(ruleset.general_warmup_minutes):
-            continue
-        options.append(
-            (
-                exercise.rest_seconds,
-                exercise.estimated_minutes,
-                str(exercise.exercise_id),
-                index,
-                updated,
-            )
-        )
-    if not options:
-        return None
-    selected = min(options)
-    return selected[3], selected[4]
-
-
 def _programmed_strength_role(exercise: ProgrammedExercise) -> StrengthExerciseRole:
     if "STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes:
         return StrengthExerciseRole.PRIMARY_STRENGTH
@@ -476,8 +405,9 @@ def _repair_overfill(
     request: NormalizedProgramRequest,
     policy: SessionDurationPolicy,
     ruleset: ProgramRuleset,
-) -> WorkoutDay:
+) -> tuple[WorkoutDay, tuple[str, ...]]:
     exercises = list(day.exercises)
+    reasons: list[str] = []
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     while day.estimated_duration_minutes > policy.maximum_total_minutes(
         ruleset.general_warmup_minutes
@@ -512,6 +442,7 @@ def _repair_overfill(
             if item.sets > ruleset.minimum_working_sets
             and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
             and template_removal_rank(item) < 3
+            and priority_policy.preservation_rank(item.primary_muscle) == 0
         ]
         if options:
             index, item = min(
@@ -533,8 +464,17 @@ def _repair_overfill(
             if len(exercises) > ruleset.minimum_exercises_per_session
             and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
             and template_removal_rank(item) < 3
+            and priority_policy.preservation_rank(item.primary_muscle) == 0
         ]
         if not removable:
+            supersetted, superset_reasons = apply_duration_pressure_superset(
+                tuple(exercises), request, ruleset
+            )
+            if superset_reasons:
+                exercises = list(supersetted)
+                reasons.extend(superset_reasons)
+                day = _rebuild_day(day, tuple(exercises), ruleset)
+                continue
             rest_reduction = _select_rest_reduction_for_overfill(
                 exercises,
                 request,
@@ -558,7 +498,7 @@ def _repair_overfill(
         )
         exercises.pop(index)
         day = _rebuild_day(day, tuple(exercises), ruleset)
-    return day
+    return day, tuple(dict.fromkeys(reasons))
 
 
 def _select_rest_reduction_for_overfill(
@@ -579,11 +519,11 @@ def _select_rest_reduction_for_overfill(
         updated = replace(
             exercise,
             rest_seconds=rest_seconds,
-            estimated_minutes=estimate_exercise_minutes(
-                exercise.sets,
-                rest_seconds,
-                exercise.warmup_sets,
-                ruleset,
+            estimated_minutes=_estimate_preserving_time_saving(
+                exercise,
+                sets=exercise.sets,
+                rest_seconds=rest_seconds,
+                ruleset=ruleset,
             ),
             reason_codes=tuple(
                 dict.fromkeys(exercise.reason_codes + ("ACCESSORY_REST_REDUCED_FOR_DURATION",))
@@ -677,8 +617,11 @@ def _with_additional_set(
     return replace(
         exercise,
         sets=sets,
-        estimated_minutes=estimate_exercise_minutes(
-            sets, exercise.rest_seconds, exercise.warmup_sets, ruleset
+        estimated_minutes=_estimate_preserving_time_saving(
+            exercise,
+            sets=sets,
+            rest_seconds=exercise.rest_seconds,
+            ruleset=ruleset,
         ),
         reason_codes=exercise.reason_codes + ("SESSION_DURATION_REPAIR_APPLIED",),
     )
@@ -689,8 +632,11 @@ def _with_fewer_sets(exercise: ProgrammedExercise, ruleset: ProgramRuleset) -> P
     return replace(
         exercise,
         sets=sets,
-        estimated_minutes=estimate_exercise_minutes(
-            sets, exercise.rest_seconds, exercise.warmup_sets, ruleset
+        estimated_minutes=_estimate_preserving_time_saving(
+            exercise,
+            sets=sets,
+            rest_seconds=exercise.rest_seconds,
+            ruleset=ruleset,
         ),
         reason_codes=exercise.reason_codes + ("SESSION_DURATION_REPAIR_APPLIED",),
     )
@@ -710,6 +656,33 @@ def _candidate_is_safe(candidate: ExerciseCandidate, request: NormalizedProgramR
             request.constraints.available_equipment
         )
     )
+
+
+def _estimate_preserving_time_saving(
+    exercise: ProgrammedExercise,
+    *,
+    sets: int,
+    rest_seconds: int,
+    ruleset: ProgramRuleset,
+) -> int:
+    straight_before = estimate_exercise_minutes(
+        exercise.sets,
+        exercise.rest_seconds,
+        exercise.warmup_sets,
+        ruleset,
+    )
+    existing_saving = (
+        max(0, straight_before - exercise.estimated_minutes)
+        if "SAFE_SUPERSET_DURATION_SAVING" in exercise.reason_codes
+        else 0
+    )
+    straight_after = estimate_exercise_minutes(
+        sets,
+        rest_seconds,
+        exercise.warmup_sets,
+        ruleset,
+    )
+    return max(1, straight_after - existing_saving)
 
 
 def _within_weekly_hard_volume(

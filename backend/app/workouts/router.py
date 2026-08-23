@@ -215,6 +215,7 @@ def to_plan_response(
                         rest_seconds=item.rest_seconds,
                         rir=item.rir,
                         estimated_minutes=item.estimated_minutes,
+                        superset_group=item.superset_group,
                         notes_en=item.notes_en,
                         notes_fa=item.notes_fa,
                         exercise=to_snapshot_or_live_summary(item.exercise_snapshot, item.exercise),

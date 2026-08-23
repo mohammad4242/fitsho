@@ -105,11 +105,29 @@ def test_html_formats_duration_prescription_without_repetition_range() -> None:
     assert "۸ تا ۱۲ تکرار" not in html
 
 
+def test_html_explains_visible_superset_pairs() -> None:
+    plan = _plan_response()
+    first = plan.days[0].exercises[0]
+    first.superset_group = "pair-a"
+    second = first.model_copy(deep=True, update={"order_index": 2})
+    second.exercise.name_fa = "قایقی سیم‌کش"
+    plan.days[0].exercises.append(second)
+
+    html = build_workout_plan_html(plan)
+
+    assert html.count("سوپرست") == 2
+    assert html.count("این حرکت را بلافاصله با حرکت بعدی اجرا کن؛ سپس استراحت کن.") == 1
+
+
 def test_html_uses_vazirmatn_and_numbers_exercises_per_day() -> None:
     plan = _plan_response()
-    second_exercise = plan.days[0].exercises[0].model_copy(
-        deep=True,
-        update={"order_index": 2},
+    second_exercise = (
+        plan.days[0]
+        .exercises[0]
+        .model_copy(
+            deep=True,
+            update={"order_index": 2},
+        )
     )
     second_exercise.exercise.name_fa = "قایقی سیم‌کش"
     plan.days[0].exercises.append(second_exercise)
