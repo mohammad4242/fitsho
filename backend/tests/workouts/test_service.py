@@ -263,7 +263,7 @@ def test_domain_candidate_uses_legacy_fallback_only_for_missing_metadata(db: Ses
     assert candidate.fatigue_cost == 3
     assert candidate.setup_cost == 1
     assert candidate.laterality is Laterality.BILATERAL
-    assert candidate.substitution_group == MovementPattern.SQUAT.value
+    assert candidate.substitution_group is None
     assert candidate.range_of_motion_profile == frozenset()
 
 

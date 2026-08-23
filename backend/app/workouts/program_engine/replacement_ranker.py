@@ -146,7 +146,16 @@ def _replacement_sort_key(
     )
     same_laterality = candidate.laterality is target.laterality
     same_pattern = candidate.movement_pattern is target.movement_pattern
+    same_type = candidate.exercise_type is target.exercise_type
     secondary_overlap = len(target_secondary.intersection(candidate_secondary))
+    rom_distance = len(
+        target.range_of_motion_profile.symmetric_difference(candidate.range_of_motion_profile)
+    )
+    skill_distance = abs(_SKILL_RANK[target.skill_demand] - _SKILL_RANK[candidate.skill_demand])
+    stability_distance = abs(
+        _STABILITY_RANK[target.stability_demand]
+        - _STABILITY_RANK[candidate.stability_demand]
+    )
     risk_score = (
         _IMPACT_RANK[candidate.impact_level]
         + _LOAD_RANK[candidate.axial_loading_level]
@@ -154,16 +163,22 @@ def _replacement_sort_key(
         + _SKILL_RANK[candidate.skill_demand]
     )
     return (
-        compatibility.level is not CompatibilityLevel.PREFERRED,
-        candidate.id in disliked,
         not same_group,
+        compatibility.level is not CompatibilityLevel.PREFERRED,
         not same_primary,
-        -secondary_overlap,
-        risk_score,
         not same_pattern,
+        not same_type,
+        -secondary_overlap,
         not same_laterality,
+        rom_distance,
+        skill_distance,
+        stability_distance,
+        risk_score,
+        abs(target.fatigue_cost - candidate.fatigue_cost),
+        abs(target.setup_cost - candidate.setup_cost),
         candidate.fatigue_cost,
         candidate.setup_cost,
+        candidate.id in disliked,
         candidate.id not in preferred,
         str(candidate.id),
     )
