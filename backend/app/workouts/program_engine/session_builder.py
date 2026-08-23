@@ -5,6 +5,11 @@ from uuid import UUID
 
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.body_analysis import body_analysis_priority_muscles
+from app.workouts.program_engine.cardio import planned_cardio_day_indexes
+from app.workouts.program_engine.duration_capacity import (
+    SessionCapacity,
+    capacity_for_session,
+)
 from app.workouts.program_engine.enums import CompatibilityLevel, Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
@@ -84,6 +89,7 @@ def build_sessions(
     ruleset: ProgramRuleset,
     *,
     rejected_slot_candidates: tuple[tuple[ExerciseCandidate, tuple[str, ...]], ...] = (),
+    session_capacity: SessionCapacity | None = None,
 ) -> tuple[SessionDraft, ...]:
     effective_priorities = request.source.priority_muscles | body_analysis_priority_muscles(
         request, ruleset
@@ -92,16 +98,42 @@ def build_sessions(
     usage: Counter[UUID] = Counter()
     sessions: list[SessionDraft] = []
     short_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
+    cardio_day_indexes = (
+        planned_cardio_day_indexes(
+            split.day_focuses,
+            session_capacity.planned_cardio_sessions,
+            priority_muscles=request.source.priority_muscles,
+        )
+        if session_capacity is not None
+        else frozenset()
+    )
     for index, planned_focus in enumerate(split.day_focuses):
         focus = _resolve_focus(planned_focus, request, volume, ruleset)
-        capacity = max(
-            ruleset.minimum_exercises_per_session,
-            min(
-                ruleset.max_exercises_per_session,
-                request.source.session_duration_minutes // ruleset.minutes_per_exercise_slot,
-            ),
-        )
         slots = slots_for_focus(focus)
+        required_slot_count = sum(slot.required for slot in slots)
+        day_capacity = (
+            capacity_for_session(session_capacity, cardio_reserved=index in cardio_day_indexes)
+            if session_capacity is not None
+            else None
+        )
+        capacity = (
+            max(
+                required_slot_count,
+                min(
+                    ruleset.max_exercises_per_session,
+                    day_capacity.expected_exercise_count_capacity,
+                ),
+            )
+            if day_capacity is not None
+            else max(
+                ruleset.minimum_exercises_per_session,
+                min(
+                    ruleset.max_exercises_per_session,
+                    request.source.session_duration_minutes // ruleset.minutes_per_exercise_slot,
+                ),
+            )
+        )
+        capacity = max(1, capacity)
         ordered_slots = tuple(slot for slot in slots if slot.required) + tuple(
             slot for slot in slots if not slot.required
         )
@@ -109,6 +141,8 @@ def build_sessions(
         selected_slots: dict[UUID, SlotSpec] = {}
         reasons: dict[UUID, tuple[str, ...]] = {}
         session_reasons: tuple[str, ...] = ()
+        if capacity < ruleset.minimum_exercises_per_session:
+            session_reasons = ("DURATION_PLANNED_REDUCED_EXERCISE_COUNT",)
         this_session_relaxed_groups: list[tuple[MovementPattern, ...]] = []
         this_session_relaxed_targets: list[MuscleGroup | None] = []
         for slot in ordered_slots:
@@ -229,11 +263,14 @@ def build_sessions(
             if not options:
                 session_reasons = session_reasons + (
                     "SESSION_MINIMUM_UNSATISFIED_AFTER_SUPPLEMENTS",
+                    "INSUFFICIENT_ELIGIBLE_EXERCISES",
                 )
                 break
             selected = min(
                 rank_exercises(request, options, ruleset, compatibility_levels=comp_levels),
                 key=lambda item: (
+                    item.exercise.primary_muscle
+                    not in priority_policy.explicit_priorities,
                     _role_repeated(item.exercise, chosen),
                     usage[item.exercise.id],
                     -item.score,

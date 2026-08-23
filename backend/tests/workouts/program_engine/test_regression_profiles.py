@@ -68,7 +68,15 @@ def test_five_day_fallback_is_built_from_available_focuses() -> None:
     }
     assert result.program.split.day_focuses != ("upper", "lower", "push", "pull", "legs")
     assert set(result.program.split.day_focuses).issubset(
-        {"upper", "lower", "legs", "specialization"}
+        {
+            "upper",
+            "lower",
+            "legs",
+            "specialization",
+            "pull",
+            "back_biceps",
+            "posterior_chain_core",
+        }
     )
     assert len(result.program.weekly_schedule) == 5
     assert all(day.exercises for day in result.program.weekly_schedule)

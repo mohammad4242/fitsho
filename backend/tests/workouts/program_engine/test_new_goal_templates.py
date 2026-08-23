@@ -82,7 +82,7 @@ def test_new_goals_use_template_path(
     assert template_stage["goal_used_for_exclusion"] is False
 
 
-def test_strength_isolation_rest_is_short(db: Session) -> None:
+def test_strength_rest_quality_survives_duration_trimming(db: Session) -> None:
     print("REQUEST EQ:", request(available_equipment=list(Equipment)).available_equipment)
     seed_training_program_templates(db)
     req = request(
@@ -136,4 +136,22 @@ def test_strength_isolation_rest_is_short(db: Session) -> None:
                     f"Isolation {ex.exercise_name} got {ex.rest_seconds}s rest!"
                 )
 
-    assert has_isolation, "Expected at least one isolation exercise to verify rest times"
+    primary_compounds = [
+        exercise
+        for day in result.program.weekly_schedule
+        for exercise in day.exercises
+        if "STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes
+    ]
+    assert primary_compounds
+    assert all(
+        exercise.rest_seconds
+        >= RULESET.prescription_rules["strength_compound"].minimum_rest_seconds
+        for exercise in primary_compounds
+    )
+    if not has_isolation:
+        adaptation = next(
+            entry
+            for entry in result.program.decision_trace
+            if entry["stage"] == "template_adaptation"
+        )
+        assert "TEMPLATE_ACCESSORY_TRIMMED_FOR_TIME_LIMIT" in adaptation["reason_codes"]

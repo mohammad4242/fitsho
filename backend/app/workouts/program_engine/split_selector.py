@@ -3,6 +3,15 @@ from dataclasses import dataclass, replace
 
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
 from app.workouts.program_engine.body_analysis import body_analysis_priority_muscles
+from app.workouts.program_engine.duration_capacity import (
+    CapacityFeasibility,
+    PlannedWorkCost,
+    SessionCapacity,
+    SessionCapacityAssessment,
+    assess_session_capacity,
+    build_session_capacity,
+    estimate_candidate_cost,
+)
 from app.workouts.program_engine.enums import (
     CompatibilityLevel,
     Goal,
@@ -54,6 +63,9 @@ class _FocusAvailability:
     muscles: frozenset[MuscleGroup]
     compound_count: int
     priority_count: int
+    duration_status: CapacityFeasibility
+    required_work_minutes: int
+    optional_work_likely_trimmed: int
 
     @property
     def is_feasible(self) -> bool:
@@ -69,6 +81,9 @@ def select_split(request: NormalizedProgramRequest, ruleset: ProgramRuleset) -> 
 def rank_split_candidates(
     request: NormalizedProgramRequest,
     ruleset: ProgramRuleset,
+    *,
+    exercises: tuple[ExerciseCandidate, ...] = (),
+    session_capacity: SessionCapacity | None = None,
 ) -> tuple[SplitPlan, ...]:
     available_days = min(request.resistance_training_days, ruleset.max_resistance_days)
     recovery_limited = _recovery_is_limited(request)
@@ -82,7 +97,14 @@ def rank_split_candidates(
         preferred_days = min(preferred_days, ruleset.maximum_novice_recovery_days)
 
     candidates = generate_split_candidates(available_days)
-    scored = score_split_candidates(request, candidates, ruleset, preferred_days)
+    scored = score_split_candidates(
+        request,
+        candidates,
+        ruleset,
+        preferred_days,
+        exercises=exercises,
+        session_capacity=session_capacity,
+    )
     ranked: list[SplitPlan] = []
     for candidate in scored:
         reasons = list(candidate.reason_codes)
@@ -102,19 +124,20 @@ def rank_availability_aware_fallbacks(
     weekdays: tuple[int, ...],
     excluded_layouts: frozenset[tuple[str, ...]] = frozenset(),
     limit: int = 12,
+    session_capacity: SessionCapacity | None = None,
 ) -> tuple[SplitPlan, ...]:
     """Rank exact-day layouts that the current safe candidate pool can fill."""
 
     requested_days = request.resistance_training_days
     if requested_days < 1 or len(weekdays) != requested_days or limit <= 0:
         return ()
-    target_capacity = max(
-        ruleset.minimum_exercises_per_session,
-        min(
-            ruleset.max_exercises_per_session,
-            request.source.session_duration_minutes // ruleset.minutes_per_exercise_slot,
-        ),
+    capacity = session_capacity or build_session_capacity(
+        request,
+        exercises,
+        ruleset,
+        cardio_reserve_minutes=0,
     )
+    target_capacity = max(1, capacity.expected_exercise_count_capacity)
     priorities = request.source.priority_muscles | body_analysis_priority_muscles(
         request,
         ruleset,
@@ -127,9 +150,13 @@ def rank_availability_aware_fallbacks(
                 focus,
                 exercises,
                 priorities,
+                request,
+                ruleset,
+                capacity,
             )
         ).is_feasible
-        and item.candidate_count >= max(1, ruleset.minimum_exercises_per_session - 2)
+        and item.candidate_count
+        >= max(1, min(ruleset.minimum_exercises_per_session, target_capacity) - 2)
     )
     if not availability:
         return ()
@@ -199,6 +226,9 @@ def _focus_availability(
     focus: str,
     exercises: tuple[ExerciseCandidate, ...],
     priorities: frozenset[MuscleGroup],
+    request: NormalizedProgramRequest,
+    ruleset: ProgramRuleset,
+    session_capacity: SessionCapacity,
 ) -> _FocusAvailability:
     focus_patterns, focus_muscles = focus_scope(focus)
     compatible = tuple(
@@ -237,6 +267,13 @@ def _focus_availability(
             item.movement_pattern in slot.patterns for item in exercises
         ):
             relaxed += 1
+    duration = _focus_duration_assessment(
+        request,
+        focus,
+        exercises,
+        ruleset,
+        session_capacity,
+    )
     return _FocusAvailability(
         focus=focus,
         candidate_count=len(compatible),
@@ -250,6 +287,9 @@ def _focus_availability(
         ),
         compound_count=sum(item.exercise_type is ExerciseType.COMPOUND for item in compatible),
         priority_count=sum(item.primary_muscle in priorities for item in compatible),
+        duration_status=duration.status,
+        required_work_minutes=duration.required_work_cost_minutes,
+        optional_work_likely_trimmed=duration.optional_work_likely_trimmed,
     )
 
 
@@ -300,6 +340,13 @@ def _dynamic_layout_sort_key(
     )
     missing_priorities = len(request.source.priority_muscles - covered_muscles)
     duration_shortfall = sum(max(0, target_capacity - item.candidate_count) for item in selected)
+    duration_infeasible = sum(
+        item.duration_status is CapacityFeasibility.PROVABLY_INFEASIBLE for item in selected
+    )
+    duration_tight = sum(
+        item.duration_status is CapacityFeasibility.FEASIBLE_BUT_TIGHT for item in selected
+    )
+    duration_optional_trim = sum(item.optional_work_likely_trimmed for item in selected)
     suboptimal_slots = sum(item.suboptimal_slots for item in selected)
     relaxed_slots = sum(item.relaxed_slots for item in selected)
     if request.primary_goal is Goal.STRENGTH:
@@ -321,9 +368,12 @@ def _dynamic_layout_sort_key(
     return (
         missing_pattern_groups,
         missing_priorities,
+        duration_infeasible,
+        duration_shortfall,
+        duration_tight,
+        duration_optional_trim,
         goal_fit,
         experience_fit,
-        duration_shortfall,
         relaxed_slots,
         suboptimal_slots,
         -priority_opportunities,
@@ -417,9 +467,24 @@ def score_split_candidates(
     candidates: tuple[SplitCandidate, ...],
     ruleset: ProgramRuleset,
     preferred_days: int | None = None,
+    *,
+    exercises: tuple[ExerciseCandidate, ...] = (),
+    session_capacity: SessionCapacity | None = None,
 ) -> tuple[SplitPlan, ...]:
     weights = ruleset.split_weights
-    scored: list[tuple[SplitPlan, int]] = []
+    capacity = (
+        session_capacity
+        if exercises and session_capacity is not None
+        else build_session_capacity(
+            request,
+            exercises,
+            ruleset,
+            cardio_reserve_minutes=0,
+        )
+        if exercises
+        else None
+    )
+    scored: list[tuple[SplitPlan, int, tuple[int, int, int, int]]] = []
     recovery_limited = _recovery_is_limited(request)
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     goal_specific = request.primary_goal in {
@@ -537,6 +602,36 @@ def score_split_candidates(
             sorted(request.source.preferred_weekdays[: len(candidate.day_focuses)])
         ):
             reasons.append("SPLIT_PREFERRED_DAYS_ADJUSTED_FOR_RECOVERY")
+        duration_key = (0, 0, 0, 0)
+        if capacity is not None:
+            assessments = tuple(
+                _focus_duration_assessment(
+                    request,
+                    _capacity_focus(focus, request, ruleset),
+                    exercises,
+                    ruleset,
+                    capacity,
+                )
+                for focus in candidate.day_focuses
+            )
+            infeasible_days = sum(
+                item.status is CapacityFeasibility.PROVABLY_INFEASIBLE
+                for item in assessments
+            )
+            tight_days = sum(
+                item.status is CapacityFeasibility.FEASIBLE_BUT_TIGHT for item in assessments
+            )
+            optional_trim = sum(item.optional_work_likely_trimmed for item in assessments)
+            required_minutes = sum(item.required_work_cost_minutes for item in assessments)
+            duration_key = (infeasible_days, tight_days, optional_trim, required_minutes)
+            status = (
+                "INFEASIBLE"
+                if infeasible_days
+                else "TIGHT"
+                if tight_days
+                else "COMFORTABLE"
+            )
+            reasons.append(f"SPLIT_DURATION_CAPACITY_{status}")
         scored.append(
             (
                 SplitPlan(
@@ -547,10 +642,107 @@ def score_split_candidates(
                     reason_codes=tuple(dict.fromkeys(reasons)),
                 ),
                 complexity,
+                duration_key,
             )
         )
-    scored.sort(key=lambda item: (-item[0].score, item[1], item[0].split_type.value))
+    scored.sort(
+        key=lambda item: (
+            item[2][0],
+            -item[0].score,
+            *item[2][1:],
+            item[1],
+            item[0].split_type.value,
+        )
+    )
     return tuple(item[0] for item in scored)
+
+
+def _capacity_focus(
+    focus: str,
+    request: NormalizedProgramRequest,
+    ruleset: ProgramRuleset,
+) -> str:
+    if focus != "specialization":
+        return focus
+    priorities = request.source.priority_muscles | body_analysis_priority_muscles(
+        request,
+        ruleset,
+    )
+    for muscle_groups, specialized_focus in (
+        ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
+        ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),
+        ((MuscleGroup.SHOULDERS, MuscleGroup.TRAPS), "shoulders_traps"),
+        ((MuscleGroup.QUADRICEPS, MuscleGroup.CALVES), "quadriceps_calves"),
+        ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.ABS), "posterior_chain_core"),
+    ):
+        if priorities.intersection(muscle_groups):
+            return specialized_focus
+    return "chest_triceps"
+
+
+def _focus_duration_assessment(
+    request: NormalizedProgramRequest,
+    focus: str,
+    exercises: tuple[ExerciseCandidate, ...],
+    ruleset: ProgramRuleset,
+    session_capacity: SessionCapacity,
+) -> SessionCapacityAssessment:
+    required: list[PlannedWorkCost] = []
+    optional: list[PlannedWorkCost] = []
+    used_ids: set[object] = set()
+    first_compound_pending = True
+    for slot in slots_for_focus(focus):
+        compatible = tuple(
+            item
+            for item in exercises
+            if item.id not in used_ids
+            and evaluate_candidate_slot_compatibility(
+                item,
+                allowed_patterns=slot.patterns,
+                target_muscles=(
+                    frozenset({slot.target_muscle})
+                    if slot.target_muscle is not None
+                    else None
+                ),
+                day_focus=focus,
+                allow_full_body=focus.startswith("full_body"),
+            ).compatible
+        )
+        candidate = min(
+            compatible,
+            key=lambda item: (
+                estimate_candidate_cost(request, item, ruleset).minutes,
+                str(item.id),
+            ),
+            default=None,
+        )
+        if candidate is None:
+            if slot.required:
+                required.append(
+                    PlannedWorkCost(
+                        minutes=session_capacity.maximum_resistance_work_minutes + 1,
+                        working_sets=0,
+                        exercise_count=0,
+                    )
+                )
+            continue
+        first_compound = first_compound_pending and candidate.exercise_type is ExerciseType.COMPOUND
+        cost = estimate_candidate_cost(
+            request,
+            candidate,
+            ruleset,
+            is_first_compound=first_compound,
+        )
+        if first_compound:
+            first_compound_pending = False
+        used_ids.add(candidate.id)
+        planned = PlannedWorkCost(minutes=cost.minutes, working_sets=cost.working_sets)
+        (required if slot.required else optional).append(planned)
+    return assess_session_capacity(
+        session_capacity,
+        required_work=tuple(required),
+        optional_work=tuple(optional),
+    )
 
 
 def _recovery_is_limited(request: NormalizedProgramRequest) -> bool:

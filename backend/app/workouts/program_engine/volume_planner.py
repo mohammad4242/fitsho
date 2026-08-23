@@ -1,11 +1,13 @@
 import math
 from collections import Counter
+from dataclasses import replace
 
 from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.body_analysis import (
     eligible_body_analysis_priorities,
 )
-from app.workouts.program_engine.enums import SplitType
+from app.workouts.program_engine.duration_capacity import SessionCapacity
+from app.workouts.program_engine.enums import Goal, SplitType
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -33,6 +35,7 @@ MAJOR_MUSCLES = (
     MuscleGroup.ABS,
     MuscleGroup.CALVES,
 )
+EXPECTED_COMPOUND_SECONDARY_MUSCLES = 2
 # Calves remain a soft accessory target unless the user prioritizes them.
 MINIMUM_COVERAGE_MUSCLES = frozenset(MAJOR_MUSCLES) - {MuscleGroup.CALVES}
 SECONDARY_MUSCLES = (
@@ -51,6 +54,7 @@ def plan_weekly_volume(
     *,
     previous_volume: PreviousVolumeBaseline | None = None,
     direct_exposure_counts: Counter[MuscleGroup] | None = None,
+    session_capacity: SessionCapacity | None = None,
 ) -> WeeklyVolumePlan:
     source = request.source
     minimum = ruleset.minimum_sets[request.training_status]
@@ -261,7 +265,126 @@ def plan_weekly_volume(
                 constraint_reason_codes=tuple(dict.fromkeys(constraint_reasons)),
             )
         )
-    return WeeklyVolumePlan(targets=tuple(targets), reason_codes=tuple(dict.fromkeys(reasons)))
+    plan = WeeklyVolumePlan(
+        targets=tuple(targets),
+        reason_codes=tuple(dict.fromkeys(reasons)),
+    )
+    if session_capacity is None:
+        return plan
+    return _limit_volume_to_duration_capacity(
+        plan,
+        request,
+        split,
+        ruleset,
+        session_capacity,
+        baseline_sets,
+        {muscle: item.classification for muscle, item in body_priorities.items()},
+    )
+
+
+def _limit_volume_to_duration_capacity(
+    plan: WeeklyVolumePlan,
+    request: NormalizedProgramRequest,
+    split: SplitPlan,
+    ruleset: ProgramRuleset,
+    session_capacity: SessionCapacity,
+    baseline_sets: dict[MuscleGroup, int],
+    body_classifications: dict[MuscleGroup, str],
+) -> WeeklyVolumePlan:
+    cardio_sessions = min(
+        len(split.day_focuses),
+        session_capacity.planned_cardio_sessions,
+    )
+    weekly_working_set_capacity = (
+        session_capacity.expected_working_set_capacity * cardio_sessions
+        + session_capacity.unreserved_working_set_capacity
+        * (len(split.day_focuses) - cardio_sessions)
+    )
+    secondary_credit_slots = (
+        EXPECTED_COMPOUND_SECONDARY_MUSCLES
+        if request.primary_goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN, Goal.STRENGTH}
+        else 1
+    )
+    effective_capacity = math.floor(
+        weekly_working_set_capacity
+        * (1 + secondary_credit_slots * ruleset.secondary_set_credit)
+    )
+    floors = {
+        target.muscle: min(
+            target.target_sets,
+            max(
+                target.minimum_direct_sets if target.direct_minimum_required else 0,
+                target.minimum_effective_sets,
+            ),
+        )
+        for target in plan.targets
+    }
+    budget = max(effective_capacity, sum(floors.values()))
+    total_preferred = sum(target.target_sets for target in plan.targets)
+    if budget >= total_preferred:
+        return plan
+
+    units: list[tuple[int, str, int, MuscleGroup]] = []
+    for target in plan.targets:
+        muscle = target.muscle
+        baseline = min(baseline_sets[muscle], target.target_sets)
+        classification = body_classifications.get(muscle)
+        for set_number in range(floors[muscle] + 1, target.target_sets + 1):
+            if muscle in request.source.priority_muscles:
+                rank = 900
+            elif set_number <= baseline and muscle in MAJOR_MUSCLES:
+                rank = 600
+            elif classification == "clear_lag":
+                rank = 500
+            elif classification == "mild_lag":
+                rank = 400
+            elif set_number <= baseline:
+                rank = 200
+            else:
+                rank = 100
+            units.append((-rank, muscle.value, set_number, muscle))
+    allocated = Counter(floors)
+    for _rank, _muscle_name, _set_number, muscle in sorted(units)[
+        : max(0, budget - sum(floors.values()))
+    ]:
+        allocated[muscle] += 1
+
+    targets: list[VolumeTarget] = []
+    for target in plan.targets:
+        preferred = allocated[target.muscle]
+        if preferred >= target.target_sets:
+            targets.append(target)
+            continue
+        flexibility = VOLUME_POLICY.flexibility_sets(preferred) if preferred else 0
+        minimum_soft = max(floors[target.muscle], preferred - flexibility)
+        maximum_soft = min(
+            target.maximum_hard,
+            target.maximum_soft,
+            preferred + flexibility,
+        )
+        targets.append(
+            replace(
+                target,
+                minimum_soft=minimum_soft,
+                target_sets=preferred,
+                maximum_soft=max(minimum_soft, maximum_soft),
+                fractional_sets=round(preferred * ruleset.secondary_set_credit, 1),
+                effective_target_sets=preferred,
+                minimum_direct_sets=min(target.minimum_direct_sets, preferred),
+                minimum_effective_sets=min(target.minimum_effective_sets, preferred),
+                constraint_reason_codes=tuple(
+                    dict.fromkeys(
+                        (*target.constraint_reason_codes, "DURATION_CAPACITY_LIMITED_VOLUME")
+                    )
+                ),
+            )
+        )
+    return WeeklyVolumePlan(
+        targets=tuple(targets),
+        reason_codes=tuple(
+            dict.fromkeys((*plan.reason_codes, "VOLUME_REDUCED_FOR_DURATION_CAPACITY"))
+        ),
+    )
 
 
 def _positive_history_supports_soft_cap_override(

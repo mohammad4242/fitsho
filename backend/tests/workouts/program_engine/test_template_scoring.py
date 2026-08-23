@@ -3,9 +3,14 @@ from uuid import uuid4
 
 import pytest
 
-from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
+from app.exercises.enums import Equipment, ExerciseType, MovementPattern, MuscleGroup
 from app.training_templates.tags import TemplateFocusTag
+from app.workouts.program_engine.duration_capacity import (
+    CapacityFeasibility,
+    build_session_capacity,
+)
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
+from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, TrainingExperience
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -20,6 +25,7 @@ from app.workouts.program_engine.template_selector import (
     eligible_template_references,
     rank_template_references,
     select_template_reference,
+    select_template_reference_result,
 )
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
 
@@ -38,6 +44,53 @@ def _template(
         focus_tags=focus_tags,
         intensity_methods=("standard",),
         days=(),
+    )
+
+
+def _duration_template(
+    slug: str,
+    *,
+    core_slots: int,
+    optional_slots: int,
+) -> TemplateReference:
+    candidates = tuple(
+        item
+        for item in full_catalog()
+        if item.exercise_type is ExerciseType.COMPOUND and item.primary_muscle is not None
+    )[: core_slots + optional_slots]
+    slots = tuple(
+        TemplateReferenceSlot(
+            exercise_id=candidate.id,
+            exercise_slug_hint=f"{slug}-{index}",
+            target_muscles=(candidate.primary_muscle,),
+            movement_pattern=candidate.movement_pattern,
+            intensity_method="standard",
+            adaptation_priority="core" if index < core_slots else "optional",
+            superset_group=None,
+            sets=3,
+            rep_min=5,
+            rep_max=10,
+            target_rir=2,
+            rest_seconds=120,
+        )
+        for index, candidate in enumerate(candidates)
+    )
+    return TemplateReference(
+        slug=slug,
+        days_per_week=4,
+        training_level="intermediate",
+        fitness_goal="build_muscle",
+        focus_tags=(TemplateFocusTag.BALANCED,),
+        intensity_methods=("standard",),
+        days=tuple(
+            TemplateReferenceDay(
+                day_number=day_number,
+                title=f"{slug}-{day_number}",
+                focus=tuple(dict.fromkeys(item.primary_muscle for item in candidates)),
+                slots=slots,
+            )
+            for day_number in range(1, 5)
+        ),
     )
 
 
@@ -289,6 +342,120 @@ def test_session_duration_and_hard_constraint_inputs_do_not_participate_in_score
     )
 
     assert _score(baseline, template) == _score(changed, template)
+
+
+def test_duration_feasible_template_ranks_above_optional_overloaded_template() -> None:
+    normalized = _normalized(primary_goal=Goal.STRENGTH, session_duration_minutes=30)
+    catalog = tuple(full_catalog())
+    capacity = build_session_capacity(
+        normalized,
+        catalog,
+        RULESET,
+        cardio_reserve_minutes=0,
+    )
+    tight = _duration_template("z-tight", core_slots=2, optional_slots=3)
+    feasible = _duration_template("a-feasible", core_slots=2, optional_slots=0)
+
+    first = rank_template_references(
+        normalized,
+        catalog,
+        (tight, feasible),
+        RULESET,
+        session_capacity=capacity,
+    )
+    second = rank_template_references(
+        normalized,
+        catalog,
+        (feasible, tight),
+        RULESET,
+        session_capacity=capacity,
+    )
+
+    assert first == second
+    assert tuple(item.template.slug for item in first) == ("a-feasible", "z-tight")
+    assert first[0].feasibility.duration_status is CapacityFeasibility.COMFORTABLY_FEASIBLE
+    assert first[1].feasibility.duration_status is CapacityFeasibility.FEASIBLE_BUT_TIGHT
+    assert first[1].feasibility.optional_slots_likely_trimmed > 0
+
+
+def test_optional_duration_overage_is_not_a_hard_template_rejection() -> None:
+    normalized = _normalized(primary_goal=Goal.STRENGTH, session_duration_minutes=30)
+    catalog = tuple(full_catalog())
+    capacity = build_session_capacity(
+        normalized,
+        catalog,
+        RULESET,
+        cardio_reserve_minutes=0,
+    )
+    tight = _duration_template("tight", core_slots=2, optional_slots=3)
+
+    result = select_template_reference_result(
+        normalized,
+        catalog,
+        (tight,),
+        RULESET,
+        session_capacity=capacity,
+    )
+
+    assert tuple(item.template.slug for item in result.candidates) == (tight.slug,)
+    assert result.hard_rejections == ()
+
+
+def test_provably_impossible_template_core_duration_is_hard_rejected() -> None:
+    normalized = _normalized(primary_goal=Goal.STRENGTH, session_duration_minutes=30)
+    catalog = tuple(full_catalog())
+    capacity = build_session_capacity(
+        normalized,
+        catalog,
+        RULESET,
+        cardio_reserve_minutes=0,
+    )
+    impossible = _duration_template("impossible", core_slots=6, optional_slots=0)
+
+    result = select_template_reference_result(
+        normalized,
+        catalog,
+        (impossible,),
+        RULESET,
+        session_capacity=capacity,
+    )
+
+    assert result.candidates == ()
+    assert result.hard_rejections[0].reason_codes == (
+        "REQUIRED_CORE_DURATION_INFEASIBLE",
+    )
+
+
+def test_final_program_trace_preserves_proven_duration_core_rejection() -> None:
+    impossible = _duration_template("impossible-final", core_slots=6, optional_slots=0)
+    source = request(
+        primary_goal=Goal.STRENGTH,
+        session_duration_minutes=30,
+        available_training_days=4,
+        training_experience="intermediate",
+        training_age_months=24,
+    )
+
+    result = generate_program(
+        source,
+        full_catalog(),
+        RULESET,
+        reference_templates=(impossible,),
+    )
+
+    assert result.program is not None, result.errors
+    assert result.program.aggregate_metrics.get("reference_template") is None
+    selection = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "template_selection"
+    )
+    assert selection["hard_rejections"] == (
+        {
+            "slug": impossible.slug,
+            "reason_codes": ("REQUIRED_CORE_DURATION_INFEASIBLE",),
+        },
+    )
 
 
 def test_ranking_is_repeatable_and_uses_stable_slug_tie_break() -> None:

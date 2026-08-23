@@ -1,6 +1,16 @@
 from dataclasses import dataclass, replace
 from uuid import UUID
 
+from app.exercises.enums import ExerciseType
+from app.workouts.program_engine.duration_capacity import (
+    CapacityFeasibility,
+    PlannedWorkCost,
+    SessionCapacity,
+    SessionCapacityAssessment,
+    assess_session_capacity,
+    build_session_capacity,
+    estimate_candidate_cost,
+)
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -54,6 +64,13 @@ class TemplateFeasibility:
     hard_priority_slots_covered: int
     hard_priority_muscles_eligible: int
     hard_priority_muscles_requested: int
+    duration_status: CapacityFeasibility
+    required_work_minutes: int
+    complete_work_minutes: int
+    duration_over_budget_days: int
+    optional_slots_likely_trimmed: int
+    expected_exercise_count_capacity: int
+    expected_working_set_capacity: int
 
     @property
     def coverage_ratio(self) -> int:
@@ -66,6 +83,11 @@ class TemplateFeasibility:
     @property
     def sort_key(self) -> tuple[int, ...]:
         return (
+            {
+                CapacityFeasibility.COMFORTABLY_FEASIBLE: 2,
+                CapacityFeasibility.FEASIBLE_BUT_TIGHT: 1,
+                CapacityFeasibility.PROVABLY_INFEASIBLE: 0,
+            }[self.duration_status],
             self.coverage_ratio,
             self.hard_priority_slots_covered,
             self.hard_priority_muscles_eligible,
@@ -73,6 +95,8 @@ class TemplateFeasibility:
             -self.unresolved_non_core_slots,
             -self.difficult_slots,
             -self.substitution_slots,
+            -self.duration_over_budget_days,
+            -self.optional_slots_likely_trimmed,
         )
 
     def decision_trace(self) -> dict[str, object]:
@@ -89,6 +113,13 @@ class TemplateFeasibility:
             "hard_priority_slots_covered": self.hard_priority_slots_covered,
             "hard_priority_muscles_eligible": self.hard_priority_muscles_eligible,
             "hard_priority_muscles_requested": self.hard_priority_muscles_requested,
+            "duration_status": self.duration_status.value,
+            "required_work_minutes": self.required_work_minutes,
+            "complete_work_minutes": self.complete_work_minutes,
+            "duration_over_budget_days": self.duration_over_budget_days,
+            "optional_slots_likely_trimmed": self.optional_slots_likely_trimmed,
+            "expected_exercise_count_capacity": self.expected_exercise_count_capacity,
+            "expected_working_set_capacity": self.expected_working_set_capacity,
         }
 
 
@@ -156,15 +187,29 @@ def rank_template_references(
     eligible: tuple[ExerciseCandidate, ...],
     templates: tuple[TemplateReference, ...],
     ruleset: ProgramRuleset,
+    *,
+    session_capacity: SessionCapacity | None = None,
 ) -> tuple[TemplateRankingResult, ...]:
+    capacity = session_capacity or build_session_capacity(
+        request,
+        eligible,
+        ruleset,
+        cardio_reserve_minutes=0,
+    )
     scored = tuple(
         TemplateRankingResult(
             template,
             result.score,
             result.reason_codes,
-            _template_feasibility(request, eligible, template),
+            _template_feasibility(request, eligible, template, ruleset, capacity),
         )
-        for template in eligible_template_references(request, eligible, templates)
+        for template in eligible_template_references(
+            request,
+            eligible,
+            templates,
+            ruleset=ruleset,
+            session_capacity=capacity,
+        )
         for result in (score_template_reference_result(request, template, ruleset),)
     )
     ranked = tuple(
@@ -186,8 +231,22 @@ def select_template_reference_result(
     eligible: tuple[ExerciseCandidate, ...],
     templates: tuple[TemplateReference, ...],
     ruleset: ProgramRuleset,
+    *,
+    session_capacity: SessionCapacity | None = None,
 ) -> TemplateSelectionResult:
-    ranked = rank_template_references(request, eligible, templates, ruleset)
+    capacity = session_capacity or build_session_capacity(
+        request,
+        eligible,
+        ruleset,
+        cardio_reserve_minutes=0,
+    )
+    ranked = rank_template_references(
+        request,
+        eligible,
+        templates,
+        ruleset,
+        session_capacity=capacity,
+    )
     selected = ranked[0] if ranked else None
     tie_break: TemplateTieBreak | None = None
     if selected is not None:
@@ -206,7 +265,13 @@ def select_template_reference_result(
             )
     rejected_items: list[HardRejectedTemplate] = []
     for template in templates:
-        reason_codes = _hard_rejection_reason_codes(request, eligible, template)
+        reason_codes = _hard_rejection_reason_codes(
+            request,
+            eligible,
+            template,
+            ruleset=ruleset,
+            session_capacity=capacity,
+        )
         if reason_codes:
             rejected_items.append(HardRejectedTemplate(template.slug, reason_codes))
     rejected = tuple(sorted(rejected_items, key=lambda item: item.slug))
@@ -226,8 +291,16 @@ def select_template_reference(
     eligible: tuple[ExerciseCandidate, ...],
     templates: tuple[TemplateReference, ...],
     ruleset: ProgramRuleset,
+    *,
+    session_capacity: SessionCapacity | None = None,
 ) -> TemplateReference | None:
-    result = select_template_reference_result(request, eligible, templates, ruleset)
+    result = select_template_reference_result(
+        request,
+        eligible,
+        templates,
+        ruleset,
+        session_capacity=session_capacity,
+    )
     return result.selected.template if result.selected is not None else None
 
 
@@ -235,6 +308,9 @@ def eligible_template_references(
     request: NormalizedProgramRequest,
     eligible: tuple[ExerciseCandidate, ...],
     templates: tuple[TemplateReference, ...],
+    *,
+    ruleset: ProgramRuleset | None = None,
+    session_capacity: SessionCapacity | None = None,
 ) -> tuple[TemplateReference, ...]:
     """Return templates that pass structural hard eligibility.
 
@@ -245,7 +321,14 @@ def eligible_template_references(
     return tuple(
         template
         for template in templates
-        if not _hard_rejection_reason_codes(request, eligible, template, level=level)
+        if not _hard_rejection_reason_codes(
+            request,
+            eligible,
+            template,
+            level=level,
+            ruleset=ruleset,
+            session_capacity=session_capacity,
+        )
     )
 
 
@@ -255,6 +338,8 @@ def _hard_rejection_reason_codes(
     template: TemplateReference,
     *,
     level: str | None = None,
+    ruleset: ProgramRuleset | None = None,
+    session_capacity: SessionCapacity | None = None,
 ) -> tuple[str, ...]:
     reasons: list[str] = []
     if template.days_per_week != request.resistance_training_days:
@@ -267,6 +352,22 @@ def _hard_rejection_reason_codes(
         {candidate.id for candidate in eligible},
     ):
         reasons.append("CORE_SLOT_UNRESOLVABLE")
+    if ruleset is not None:
+        capacity = session_capacity or build_session_capacity(
+            request,
+            eligible,
+            ruleset,
+            cardio_reserve_minutes=0,
+        )
+        duration = _template_duration_assessment(
+            request,
+            eligible,
+            template,
+            ruleset,
+            capacity,
+        )
+        if duration.status is CapacityFeasibility.PROVABLY_INFEASIBLE:
+            reasons.append("REQUIRED_CORE_DURATION_INFEASIBLE")
     return tuple(reasons)
 
 
@@ -313,6 +414,8 @@ def _template_feasibility(
     request: NormalizedProgramRequest,
     eligible: tuple[ExerciseCandidate, ...],
     template: TemplateReference,
+    ruleset: ProgramRuleset,
+    session_capacity: SessionCapacity,
 ) -> TemplateFeasibility:
     eligible_by_id = {candidate.id: candidate for candidate in eligible}
     hard_priorities = request.source.priority_muscles
@@ -360,6 +463,17 @@ def _template_feasibility(
         any(candidate.primary_muscle is muscle for candidate in eligible)
         for muscle in hard_priorities
     )
+    duration_assessments = tuple(
+        _template_day_duration_assessment(
+            request,
+            eligible,
+            day,
+            ruleset,
+            session_capacity,
+        )
+        for day in template.days
+    )
+    duration_status = _combined_duration_status(duration_assessments)
     return TemplateFeasibility(
         total_slots=total_slots,
         core_slots=core_slots,
@@ -371,4 +485,160 @@ def _template_feasibility(
         hard_priority_slots_covered=hard_priority_slots_covered,
         hard_priority_muscles_eligible=hard_priority_muscles_eligible,
         hard_priority_muscles_requested=len(hard_priorities),
+        duration_status=duration_status,
+        required_work_minutes=sum(
+            assessment.required_work_cost_minutes for assessment in duration_assessments
+        ),
+        complete_work_minutes=sum(
+            assessment.complete_work_cost_minutes for assessment in duration_assessments
+        ),
+        duration_over_budget_days=sum(
+            assessment.status is not CapacityFeasibility.COMFORTABLY_FEASIBLE
+            for assessment in duration_assessments
+        ),
+        optional_slots_likely_trimmed=sum(
+            assessment.optional_work_likely_trimmed for assessment in duration_assessments
+        ),
+        expected_exercise_count_capacity=session_capacity.expected_exercise_count_capacity,
+        expected_working_set_capacity=session_capacity.expected_working_set_capacity,
     )
+
+
+def _template_duration_assessment(
+    request: NormalizedProgramRequest,
+    eligible: tuple[ExerciseCandidate, ...],
+    template: TemplateReference,
+    ruleset: ProgramRuleset,
+    session_capacity: SessionCapacity,
+) -> SessionCapacityAssessment:
+    assessments = tuple(
+        _template_day_duration_assessment(
+            request,
+            eligible,
+            day,
+            ruleset,
+            session_capacity,
+        )
+        for day in template.days
+    )
+    if not assessments:
+        return assess_session_capacity(
+            session_capacity,
+            required_work=(),
+            optional_work=(),
+        )
+    required = tuple(
+        PlannedWorkCost(
+            minutes=assessment.required_work_cost_minutes,
+            working_sets=assessment.required_working_sets,
+            exercise_count=assessment.required_exercise_count,
+        )
+        for assessment in assessments
+        if assessment.status is CapacityFeasibility.PROVABLY_INFEASIBLE
+    )
+    if required:
+        return max(
+            (
+                assessment
+                for assessment in assessments
+                if assessment.status is CapacityFeasibility.PROVABLY_INFEASIBLE
+            ),
+            key=lambda assessment: assessment.required_work_cost_minutes,
+        )
+    return max(
+        assessments,
+        key=lambda assessment: (
+            assessment.status is CapacityFeasibility.FEASIBLE_BUT_TIGHT,
+            assessment.complete_work_cost_minutes,
+        ),
+    )
+
+
+def _template_day_duration_assessment(
+    request: NormalizedProgramRequest,
+    eligible: tuple[ExerciseCandidate, ...],
+    day: object,
+    ruleset: ProgramRuleset,
+    session_capacity: SessionCapacity,
+) -> SessionCapacityAssessment:
+    slots = getattr(day, "slots", ())
+    eligible_by_id = {candidate.id: candidate for candidate in eligible}
+    used_ids: set[UUID] = set()
+    required: list[PlannedWorkCost] = []
+    optional: list[PlannedWorkCost] = []
+    first_compound_pending = True
+    for slot in slots:
+        compatible = tuple(
+            candidate
+            for candidate in eligible
+            if evaluate_candidate_slot_compatibility(
+                candidate,
+                allowed_patterns=template_slot_allowed_patterns(
+                    slot.movement_pattern, slot.target_muscles
+                ),
+                target_muscles=frozenset(slot.target_muscles),
+                day_focus=f"template_reference_{getattr(day, 'day_number', 0)}",
+            ).compatible
+        )
+        exact = eligible_by_id.get(slot.exercise_id) if slot.exercise_id is not None else None
+        if exact not in compatible:
+            exact = None
+        candidate = exact or min(
+            (item for item in compatible if item.id not in used_ids),
+            key=lambda item: (
+                estimate_candidate_cost(request, item, ruleset, sets=slot.sets).minutes,
+                str(item.id),
+            ),
+            default=None,
+        )
+        if candidate is None:
+            candidate = min(
+                compatible,
+                key=lambda item: (
+                    estimate_candidate_cost(request, item, ruleset, sets=slot.sets).minutes,
+                    str(item.id),
+                ),
+                default=None,
+            )
+        if candidate is None:
+            continue
+        first_compound = first_compound_pending and candidate.exercise_type is ExerciseType.COMPOUND
+        cost = estimate_candidate_cost(
+            request,
+            candidate,
+            ruleset,
+            sets=slot.sets,
+            is_first_compound=first_compound,
+        )
+        if first_compound:
+            first_compound_pending = False
+        used_ids.add(candidate.id)
+        planned = PlannedWorkCost(
+            minutes=cost.minutes,
+            working_sets=cost.working_sets,
+        )
+        if slot.adaptation_priority == "core":
+            required.append(planned)
+        else:
+            optional.append(planned)
+    return assess_session_capacity(
+        session_capacity,
+        required_work=tuple(required),
+        optional_work=tuple(optional),
+    )
+
+
+def _combined_duration_status(
+    assessments: tuple[SessionCapacityAssessment, ...],
+) -> CapacityFeasibility:
+    if any(
+        assessment.status is CapacityFeasibility.PROVABLY_INFEASIBLE
+        for assessment in assessments
+    ):
+        return CapacityFeasibility.PROVABLY_INFEASIBLE
+    if any(
+        assessment.status is CapacityFeasibility.FEASIBLE_BUT_TIGHT
+        for assessment in assessments
+    ):
+        return CapacityFeasibility.FEASIBLE_BUT_TIGHT
+    return CapacityFeasibility.COMFORTABLY_FEASIBLE

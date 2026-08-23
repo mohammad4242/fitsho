@@ -17,6 +17,10 @@ from app.workouts.program_engine.body_analysis import (
 )
 from app.workouts.program_engine.cardio import add_cardio, cardio_reserve_minutes
 from app.workouts.program_engine.coach_quality import build_coach_quality_metrics
+from app.workouts.program_engine.duration_capacity import (
+    SessionCapacity,
+    build_session_capacity,
+)
 from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
@@ -102,11 +106,19 @@ def generate_program(
             safety_status=safety.status,
         )
     eligibility = filter_eligible_exercises(normalized, exercise_catalog)
+    reserve = cardio_reserve_minutes(normalized, eligibility.cardio_eligible, ruleset)
+    session_capacity = build_session_capacity(
+        normalized,
+        eligibility.eligible,
+        ruleset,
+        cardio_reserve_minutes=reserve,
+    )
     template_selection = select_template_reference_result(
         normalized,
         eligibility.eligible,
         reference_templates,
         ruleset,
+        session_capacity=session_capacity,
     )
     template_selection_trace = (template_selection.decision_trace(),)
     if not eligibility.eligible:
@@ -127,7 +139,6 @@ def generate_program(
             decision_trace=template_selection_trace,
         )
     previous_volume = derive_previous_volume_baseline(normalized.source.recent_training_history)
-    reserve = cardio_reserve_minutes(normalized, eligibility.cardio_eligible, ruleset)
     rejected_by_id = {item.exercise_id: item.reason_codes for item in eligibility.rejected}
     rejected_slot_candidates = tuple(
         (candidate, rejected_by_id[candidate.id])
@@ -139,7 +150,11 @@ def generate_program(
         reference = ranking.template
         try:
             reference_build = build_template_sessions(
-                normalized, reference, eligibility.eligible, ruleset
+                normalized,
+                reference,
+                eligibility.eligible,
+                ruleset,
+                session_capacity=session_capacity,
             )
             reference_result = _reference_program(
                 request,
@@ -154,6 +169,7 @@ def generate_program(
                 ruleset,
                 previous_volume=previous_volume,
                 cardio_reserve=reserve,
+                session_capacity=session_capacity,
                 template_selection_trace=template_rejection_trace,
             )
             if reference_result.is_success:
@@ -227,7 +243,12 @@ def generate_program(
             },
         )
     requested_days = normalized.resistance_training_days
-    ranked_splits = rank_split_candidates(normalized, ruleset)
+    ranked_splits = rank_split_candidates(
+        normalized,
+        ruleset,
+        exercises=eligibility.eligible,
+        session_capacity=session_capacity,
+    )
     exact_day_splits = tuple(
         candidate for candidate in ranked_splits if len(candidate.day_focuses) == requested_days
     )
@@ -260,6 +281,7 @@ def generate_program(
             ruleset,
             previous_volume=previous_volume,
             cardio_reserve=reserve,
+            session_capacity=session_capacity,
             rejected_splits=tuple(rejected_splits),
             template_rejection_trace=template_rejection_trace,
             rejected_slot_candidates=rejected_slot_candidates,
@@ -286,6 +308,7 @@ def generate_program(
         ruleset,
         weekdays=weekdays_fallback,
         excluded_layouts=frozenset(candidate.day_focuses for candidate in exact_day_splits),
+        session_capacity=session_capacity,
     )
     for fallback_split in dynamic_splits:
         result = _program_for_split(
@@ -300,6 +323,7 @@ def generate_program(
             ruleset,
             previous_volume=previous_volume,
             cardio_reserve=reserve,
+            session_capacity=session_capacity,
             rejected_splits=tuple(rejected_splits),
             template_rejection_trace=template_rejection_trace,
             rejected_slot_candidates=rejected_slot_candidates,
@@ -461,11 +485,18 @@ def _program_for_split(
     *,
     previous_volume: PreviousVolumeBaseline,
     cardio_reserve: int,
+    session_capacity: SessionCapacity,
     rejected_splits: tuple[dict[str, object], ...],
     template_rejection_trace: tuple[dict[str, object], ...],
     rejected_slot_candidates: tuple[tuple[ExerciseCandidate, tuple[str, ...]], ...],
 ) -> ProgramGenerationResult:
-    volume = plan_weekly_volume(normalized, split, ruleset, previous_volume=previous_volume)
+    volume = plan_weekly_volume(
+        normalized,
+        split,
+        ruleset,
+        previous_volume=previous_volume,
+        session_capacity=session_capacity,
+    )
     try:
         drafts = build_sessions(
             normalized,
@@ -474,6 +505,7 @@ def _program_for_split(
             eligible,
             ruleset,
             rejected_slot_candidates=rejected_slot_candidates,
+            session_capacity=session_capacity,
         )
     except SessionConstructionError as exc:
         construction_trace: tuple[dict[str, object], ...] = template_rejection_trace + (
@@ -503,6 +535,7 @@ def _program_for_split(
         volume,
         ruleset,
         cardio_reserve_minutes=cardio_reserve,
+        planned_cardio_sessions=session_capacity.planned_cardio_sessions,
     )
     days, repair_reasons = repair_weekly_volume(
         days,
@@ -513,8 +546,14 @@ def _program_for_split(
         cardio_reserve_minutes=cardio_reserve,
     )
     days = add_cardio(normalized, days, cardio_eligible, ruleset)
+    days_before_duration_repair = days
     days, duration_repair_reasons = repair_session_durations(
-        days, normalized, eligible, ruleset, volume=volume
+        days,
+        normalized,
+        eligible,
+        ruleset,
+        volume=volume,
+        session_capacity=session_capacity,
     )
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
     day_count_errors = _day_count_errors(
@@ -591,6 +630,7 @@ def _program_for_split(
             "eligible_count": len(eligible),
             "rejected_count": len(rejected),
         },
+        _duration_capacity_trace(session_capacity),
         *((body_trace,) if body_trace is not None else ()),
         {
             "stage": "construction_recovery",
@@ -623,15 +663,12 @@ def _program_for_split(
             "weekly_direct_sets": dict(direct),
             "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
         },
-        {
-            "stage": "session_duration",
-            "status": (
-                "repaired"
-                if "SESSION_DURATION_REPAIR_APPLIED" in duration_repair_reasons
-                else "validated"
-            ),
-            "reason_codes": duration_repair_reasons,
-        },
+        _duration_repair_trace(
+            session_capacity,
+            days_before_duration_repair,
+            days,
+            duration_repair_reasons,
+        ),
     )
     empty_report = ValidationReport(
         errors=(),
@@ -712,6 +749,7 @@ def _reference_program(
     *,
     previous_volume: PreviousVolumeBaseline,
     cardio_reserve: int,
+    session_capacity: SessionCapacity,
     template_selection_trace: tuple[dict[str, object], ...],
 ) -> ProgramGenerationResult:
     split = SplitPlan(
@@ -727,6 +765,10 @@ def _reference_program(
         ruleset,
         previous_volume=previous_volume,
         direct_exposure_counts=build.direct_exposure_counts(),
+        session_capacity=replace(
+            session_capacity,
+            planned_cardio_sessions=len(split.day_focuses),
+        ),
     )
     days = prescribe_sessions(
         normalized,
@@ -734,6 +776,7 @@ def _reference_program(
         volume,
         ruleset,
         cardio_reserve_minutes=cardio_reserve,
+        planned_cardio_sessions=session_capacity.planned_cardio_sessions,
     )
     days = apply_template_intent(days, build, ruleset)
     days, repair_reasons = repair_weekly_volume(
@@ -747,6 +790,7 @@ def _reference_program(
         preserve_template_core_structure=True,
     )
     days = add_cardio(normalized, days, cardio_eligible, ruleset)
+    days_before_duration_repair = days
     days, duration_repair_reasons = repair_session_durations(
         days,
         normalized,
@@ -754,6 +798,7 @@ def _reference_program(
         ruleset,
         volume=volume,
         prefer_acceptable_volume_for_minimum_fill=True,
+        session_capacity=session_capacity,
     )
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
     metrics = _volume_metrics(
@@ -789,6 +834,7 @@ def _reference_program(
             "eligible_count": len(eligible),
             "rejected_count": len(rejected),
         },
+        _duration_capacity_trace(session_capacity),
         *((body_trace,) if body_trace is not None else ()),
         {
             "stage": "template_reference",
@@ -812,15 +858,12 @@ def _reference_program(
             "weekly_direct_sets": dict(direct),
             "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
         },
-        {
-            "stage": "session_duration",
-            "status": (
-                "repaired"
-                if "SESSION_DURATION_REPAIR_APPLIED" in duration_repair_reasons
-                else "validated"
-            ),
-            "reason_codes": duration_repair_reasons,
-        },
+        _duration_repair_trace(
+            session_capacity,
+            days_before_duration_repair,
+            days,
+            duration_repair_reasons,
+        ),
     )
     if day_count_errors:
         return ProgramGenerationResult(
@@ -953,6 +996,68 @@ def _attach_coach_quality_metrics(
     return replace(program, aggregate_metrics=aggregate_metrics), report
 
 
+def _duration_capacity_trace(capacity: SessionCapacity) -> dict[str, object]:
+    return {
+        "stage": "duration_capacity",
+        "requested_workout_minutes": capacity.requested_workout_minutes,
+        "target_total_minutes": capacity.target_total_minutes,
+        "minimum_workout_minutes": capacity.minimum_workout_minutes,
+        "maximum_workout_minutes": capacity.maximum_workout_minutes,
+        "cardio_reserve_minutes": capacity.cardio_reserve_minutes,
+        "resistance_work_budget_minutes": capacity.resistance_work_budget_minutes,
+        "minimum_resistance_work_minutes": capacity.minimum_resistance_work_minutes,
+        "maximum_resistance_work_minutes": capacity.maximum_resistance_work_minutes,
+        "expected_exercise_count_capacity": capacity.expected_exercise_count_capacity,
+        "expected_working_set_capacity": capacity.expected_working_set_capacity,
+        "planned_cardio_sessions": capacity.planned_cardio_sessions,
+        "unreserved_exercise_count_capacity": capacity.unreserved_exercise_count_capacity,
+        "unreserved_working_set_capacity": capacity.unreserved_working_set_capacity,
+        "reason_codes": ("DURATION_CAPACITY_PLANNED_BEFORE_CONSTRUCTION",),
+    }
+
+
+def _duration_repair_trace(
+    capacity: SessionCapacity,
+    before: tuple[WorkoutDay, ...],
+    after: tuple[WorkoutDay, ...],
+    reason_codes: tuple[str, ...],
+) -> dict[str, object]:
+    repair_applied = "SESSION_DURATION_REPAIR_APPLIED" in reason_codes
+    duration_deltas = tuple(
+        abs(updated.estimated_duration_minutes - original.estimated_duration_minutes)
+        for original, updated in zip(before, after, strict=True)
+    )
+    exercise_deltas = tuple(
+        abs(len(updated.exercises) - len(original.exercises))
+        for original, updated in zip(before, after, strict=True)
+    )
+    if not repair_applied:
+        classification = "not_needed"
+    elif max(duration_deltas, default=0) <= 10 and max(exercise_deltas, default=0) <= 1:
+        classification = "minor"
+    else:
+        classification = "major"
+    unavoidable_constraints = tuple(
+        code for code in reason_codes if "CONSTRAINED" in code or "EXTENDED" in code
+    )
+    return {
+        "stage": "session_duration",
+        "status": "repaired" if repair_applied else "validated",
+        "planned_resistance_work_budget_minutes": capacity.resistance_work_budget_minutes,
+        "planned_exercise_capacity": capacity.expected_exercise_count_capacity,
+        "planned_set_capacity": capacity.expected_working_set_capacity,
+        "estimated_duration_before_late_repair": tuple(
+            day.estimated_duration_minutes for day in before
+        ),
+        "estimated_duration_after_late_repair": tuple(
+            day.estimated_duration_minutes for day in after
+        ),
+        "repair_classification": classification,
+        "unavoidable_duration_constraints": unavoidable_constraints,
+        "reason_codes": reason_codes,
+    }
+
+
 def _coach_quality_metrics(
     program: WorkoutProgram,
     request: ProgramGenerationRequest,
@@ -985,7 +1090,10 @@ def _coach_quality_metrics(
     duration_fit = (
         "fit"
         if all(
-            duration_policy.contains(day.estimated_duration_minutes)
+            duration_policy.contains_total(
+                day.estimated_duration_minutes,
+                ruleset.general_warmup_minutes,
+            )
             for day in program.weekly_schedule
         )
         else "constrained"

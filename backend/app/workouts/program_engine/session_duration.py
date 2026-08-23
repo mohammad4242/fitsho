@@ -2,6 +2,11 @@ from collections import Counter
 from dataclasses import replace
 
 from app.exercises.enums import ExerciseLabel, ExerciseType, MuscleGroup
+from app.workouts.program_engine.cardio import planned_cardio_day_indexes
+from app.workouts.program_engine.duration_capacity import (
+    SessionCapacity,
+    capacity_for_session,
+)
 from app.workouts.program_engine.duration_policy import (
     SessionDurationPolicy,
     get_session_duration_policy,
@@ -49,13 +54,39 @@ def repair_session_durations(
     *,
     volume: WeeklyVolumePlan | None = None,
     prefer_acceptable_volume_for_minimum_fill: bool = False,
+    session_capacity: SessionCapacity | None = None,
 ) -> tuple[tuple[WorkoutDay, ...], tuple[str, ...]]:
     """Repair real session estimates while preserving hard program constraints."""
 
     policy = get_session_duration_policy(request.source.session_duration_minutes)
+    cardio_day_indexes = (
+        planned_cardio_day_indexes(
+            tuple(day.focus for day in days),
+            session_capacity.planned_cardio_sessions,
+            priority_muscles=request.source.priority_muscles,
+        )
+        if session_capacity is not None
+        else frozenset()
+    )
     repaired: list[WorkoutDay] = []
     reasons: list[str] = []
     for day_index, day in enumerate(days):
+        day_capacity = (
+            capacity_for_session(
+                session_capacity,
+                cardio_reserved=day_index in cardio_day_indexes,
+            )
+            if session_capacity is not None
+            else None
+        )
+        planned_minimum_exercises = (
+            min(
+                ruleset.minimum_exercises_per_session,
+                max(1, day_capacity.expected_exercise_count_capacity),
+            )
+            if day_capacity is not None
+            else ruleset.minimum_exercises_per_session
+        )
         template_adjusted, template_superset_reasons = apply_template_supersets(day.exercises)
         reasons.extend(template_superset_reasons)
         current = _rebuild_day(day, template_adjusted, ruleset)
@@ -63,7 +94,7 @@ def repair_session_durations(
         if (
             current.estimated_duration_minutes
             < policy.minimum_total_minutes(ruleset.general_warmup_minutes)
-            or len(current.exercises) < ruleset.minimum_exercises_per_session
+            or len(current.exercises) < planned_minimum_exercises
         ):
             reasons.append("SESSION_DURATION_UNDERFILLED")
             current = _repair_underfill(
@@ -77,12 +108,19 @@ def repair_session_durations(
                 prefer_acceptable_volume_for_minimum_fill=(
                     prefer_acceptable_volume_for_minimum_fill
                 ),
+                minimum_exercises=planned_minimum_exercises,
             )
         if current.estimated_duration_minutes > policy.maximum_total_minutes(
             ruleset.general_warmup_minutes
         ):
             reasons.append("SESSION_DURATION_OVERFILLED")
-            current, overfill_reasons = _repair_overfill(current, request, policy, ruleset)
+            current, overfill_reasons = _repair_overfill(
+                current,
+                request,
+                policy,
+                ruleset,
+                minimum_exercises=planned_minimum_exercises,
+            )
             reasons.extend(overfill_reasons)
         extended_for_core = (
             current.estimated_duration_minutes
@@ -147,16 +185,17 @@ def _repair_underfill(
     other_days: tuple[WorkoutDay, ...],
     volume: WeeklyVolumePlan | None,
     prefer_acceptable_volume_for_minimum_fill: bool,
+    minimum_exercises: int,
 ) -> WorkoutDay:
     exercises = list(day.exercises)
     while (
         day.estimated_duration_minutes
         < policy.minimum_total_minutes(ruleset.general_warmup_minutes)
-        or len(exercises) < ruleset.minimum_exercises_per_session
+        or len(exercises) < minimum_exercises
     ):
         increment = (
             None
-            if len(exercises) < ruleset.minimum_exercises_per_session
+            if len(exercises) < minimum_exercises
             else _select_set_increment(
                 exercises,
                 request,
@@ -181,6 +220,7 @@ def _repair_underfill(
             other_days=other_days,
             volume=volume,
             prefer_acceptable_volume_for_minimum_fill=(prefer_acceptable_volume_for_minimum_fill),
+            minimum_exercises=minimum_exercises,
         )
         if addition is None:
             rest_extension = (
@@ -191,7 +231,7 @@ def _repair_underfill(
                     ruleset,
                     cardio_minutes=day.cardio.duration_minutes if day.cardio else 0,
                 )
-                if len(exercises) >= ruleset.minimum_exercises_per_session
+                if len(exercises) >= minimum_exercises
                 else None
             )
             if rest_extension is None:
@@ -310,8 +350,11 @@ def _select_set_increment(
         updated = _with_additional_set(exercise, ruleset)
         simulated = list(exercises)
         simulated[index] = updated
-        if not _within_weekly_acceptable_volume(
-            [item for day in other_days for item in day.exercises] + simulated,
+        weekly_before = [item for day in other_days for item in day.exercises] + exercises
+        weekly_after = [item for day in other_days for item in day.exercises] + simulated
+        if not _acceptable_volume_change(
+            weekly_before,
+            weekly_after,
             ruleset,
             request,
             volume,
@@ -351,6 +394,7 @@ def _select_exercise_addition(
     other_days: tuple[WorkoutDay, ...],
     volume: WeeklyVolumePlan | None,
     prefer_acceptable_volume_for_minimum_fill: bool,
+    minimum_exercises: int,
 ) -> ProgrammedExercise | None:
     if len(exercises) >= ruleset.max_exercises_per_session:
         return None
@@ -420,7 +464,7 @@ def _select_exercise_addition(
             + estimated
             + (day.cardio.duration_minutes if day.cardio else 0)
             > policy.maximum_total_minutes(ruleset.general_warmup_minutes)
-            and len(exercises) >= ruleset.minimum_exercises_per_session
+            and len(exercises) >= minimum_exercises
         ):
             continue
         repeated = any(
@@ -453,11 +497,12 @@ def _select_exercise_addition(
         weekly_exercises = [item for day in other_days for item in day.exercises] + simulated
         if (
             not prefer_acceptable_volume_for_minimum_fill
-            and len(exercises) < ruleset.minimum_exercises_per_session
+            and len(exercises) < minimum_exercises
             and _within_weekly_hard_volume(weekly_exercises, ruleset, request, volume)
         ):
             return simulated[-1]
-        if _within_weekly_acceptable_volume(
+        if _acceptable_volume_change(
+            [item for day in other_days for item in day.exercises] + exercises,
             weekly_exercises,
             ruleset,
             request,
@@ -466,7 +511,7 @@ def _select_exercise_addition(
             return simulated[-1]
         if (
             hard_volume_fallback is None
-            and len(exercises) < ruleset.minimum_exercises_per_session
+            and len(exercises) < minimum_exercises
             and _within_weekly_hard_volume(weekly_exercises, ruleset, request, volume)
         ):
             hard_volume_fallback = simulated[-1]
@@ -508,6 +553,8 @@ def _repair_overfill(
     request: NormalizedProgramRequest,
     policy: SessionDurationPolicy,
     ruleset: ProgramRuleset,
+    *,
+    minimum_exercises: int,
 ) -> tuple[WorkoutDay, tuple[str, ...]]:
     exercises = list(day.exercises)
     reasons: list[str] = []
@@ -518,7 +565,7 @@ def _repair_overfill(
         low_value_removable = [
             (index, item)
             for index, item in enumerate(exercises)
-            if len(exercises) > ruleset.minimum_exercises_per_session
+            if len(exercises) > minimum_exercises
             and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
             and template_removal_rank(item) < 3
             and priority_policy.preservation_rank(item.primary_muscle) == 0
@@ -564,7 +611,7 @@ def _repair_overfill(
         removable = [
             (index, item)
             for index, item in enumerate(exercises)
-            if len(exercises) > ruleset.minimum_exercises_per_session
+            if len(exercises) > minimum_exercises
             and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
             and template_removal_rank(item) < 3
             and priority_policy.preservation_rank(item.primary_muscle) == 0
@@ -819,6 +866,28 @@ def _within_weekly_acceptable_volume(
     effective = calculate_effective_volume(exercises, ruleset)
     return all(
         effective.effective_sets_by_muscle.get(target.muscle.value, 0) <= target.acceptable_maximum
+        for target in volume.targets
+    )
+
+
+def _acceptable_volume_change(
+    before: list[ProgrammedExercise],
+    after: list[ProgrammedExercise],
+    ruleset: ProgramRuleset,
+    request: NormalizedProgramRequest,
+    volume: WeeklyVolumePlan | None,
+) -> bool:
+    if not _within_weekly_hard_volume(after, ruleset, request, volume):
+        return False
+    if volume is None:
+        return True
+    before_effective = calculate_effective_volume(before, ruleset)
+    after_effective = calculate_effective_volume(after, ruleset)
+    return all(
+        after_effective.effective_sets_by_muscle.get(target.muscle.value, 0)
+        <= target.acceptable_maximum
+        or after_effective.effective_sets_by_muscle.get(target.muscle.value, 0)
+        <= before_effective.effective_sets_by_muscle.get(target.muscle.value, 0)
         for target in volume.targets
     )
 

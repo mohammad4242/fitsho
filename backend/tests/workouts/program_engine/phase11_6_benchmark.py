@@ -32,6 +32,7 @@ from app.profile.enums import (
     TrainingLocation,
 )
 from app.training_templates.engine_reference import load_template_references
+from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     BalanceAbility,
@@ -429,7 +430,145 @@ def _aggregate(
         if records
         else 0.0
     )
+    aggregate["duration_diagnostics"] = _duration_diagnostics(records)
     return aggregate
+
+
+def _duration_diagnostics(
+    records: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    sessions = 0
+    within = 0
+    under = 0
+    over = 0
+    absolute_deviation = 0
+    constrained_programs = 0
+    repaired_programs = 0
+    major_repair_programs = 0
+    proven_template_rejections = 0
+    grouped: dict[str, dict[str, list[Mapping[str, object]]]] = {
+        dimension: defaultdict(list)
+        for dimension in ("requested_duration", "primary_goal", "experience_level", "days", "path")
+    }
+    successful_records: list[Mapping[str, object]] = []
+    for record in records:
+        final_program = record.get("final_program")
+        if not isinstance(final_program, Mapping):
+            continue
+        successful_records.append(record)
+        input_data = cast(Mapping[str, object], record["input"])
+        keys = {
+            "requested_duration": str(input_data["duration_minutes"]),
+            "primary_goal": str(input_data["goal"]),
+            "experience_level": str(input_data["experience_level"]),
+            "days": str(input_data["resistance_days"]),
+            "path": str(record["construction_path"]),
+        }
+        for dimension, key in keys.items():
+            grouped[dimension][key].append(record)
+        trace = cast(Sequence[Mapping[str, object]], final_program.get("trace", ()))
+        duration_entry = next(
+            (entry for entry in trace if entry.get("stage") == "session_duration"),
+            {},
+        )
+        repair_classification = duration_entry.get("repair_classification")
+        if repair_classification in {"minor", "major"}:
+            repaired_programs += 1
+        if repair_classification == "major":
+            major_repair_programs += 1
+        warnings = cast(
+            Sequence[str],
+            cast(Mapping[str, object], final_program.get("validation", {})).get("warnings", ()),
+        )
+        if any("SESSION_DURATION_CONSTRAINED" in warning for warning in warnings):
+            constrained_programs += 1
+        for entry in trace:
+            if entry.get("stage") != "template_selection":
+                continue
+            for rejection in cast(Sequence[Mapping[str, object]], entry.get("hard_rejections", ())):
+                if "REQUIRED_CORE_DURATION_INFEASIBLE" in cast(
+                    Sequence[str], rejection.get("reason_codes", ())
+                ):
+                    proven_template_rejections += 1
+    for record in successful_records:
+        counts = _duration_counts_for_record(record)
+        sessions += counts["sessions"]
+        within += counts["within"]
+        under += counts["under"]
+        over += counts["over"]
+        absolute_deviation += counts["absolute_deviation"]
+    return {
+        "programs": len(successful_records),
+        "sessions": sessions,
+        "within_target_count": within,
+        "under_target_count": under,
+        "over_target_count": over,
+        "duration_fit_percentage": round(within / sessions * 100, 2) if sessions else None,
+        "constrained_duration_count": constrained_programs,
+        "average_absolute_deviation_minutes": round(absolute_deviation / sessions, 2)
+        if sessions
+        else None,
+        "late_duration_repair_percentage": round(
+            repaired_programs / len(successful_records) * 100, 2
+        )
+        if successful_records
+        else None,
+        "major_late_repair_percentage": round(
+            major_repair_programs / len(successful_records) * 100, 2
+        )
+        if successful_records
+        else None,
+        "proven_duration_template_rejections": proven_template_rejections,
+        "breakdowns": {
+            dimension: {
+                key: _duration_group_metrics(items)
+                for key, items in sorted(values.items())
+            }
+            for dimension, values in grouped.items()
+        },
+    }
+
+
+def _duration_counts_for_record(record: Mapping[str, object]) -> dict[str, int]:
+    input_data = cast(Mapping[str, object], record["input"])
+    final_program = cast(Mapping[str, object], record["final_program"])
+    requested = cast(int, input_data["duration_minutes"])
+    policy = get_session_duration_policy(requested)
+    counts = {"sessions": 0, "within": 0, "under": 0, "over": 0, "absolute_deviation": 0}
+    for day in cast(Sequence[Mapping[str, object]], final_program.get("days", ())):
+        total = cast(int, day["estimated_duration_minutes"])
+        workout = policy.workout_minutes(total, RULESET.general_warmup_minutes)
+        counts["sessions"] += 1
+        counts["absolute_deviation"] += abs(workout - requested)
+        if workout < policy.minimum_minutes:
+            counts["under"] += 1
+        elif workout > policy.maximum_minutes:
+            counts["over"] += 1
+        else:
+            counts["within"] += 1
+    return counts
+
+
+def _duration_group_metrics(records: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    totals = Counter[str]()
+    for record in records:
+        totals.update(_duration_counts_for_record(record))
+    sessions = totals["sessions"]
+    return {
+        "programs": len(records),
+        "sessions": sessions,
+        "within_target_count": totals["within"],
+        "under_target_count": totals["under"],
+        "over_target_count": totals["over"],
+        "duration_fit_percentage": round(totals["within"] / sessions * 100, 2)
+        if sessions
+        else None,
+        "average_absolute_deviation_minutes": round(
+            totals["absolute_deviation"] / sessions, 2
+        )
+        if sessions
+        else None,
+    }
 
 
 def _csv_rows(records: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
@@ -478,6 +617,7 @@ def _write_summary(payload: Mapping[str, object], output_dir: Path) -> None:
     categories = cast(Mapping[str, int], aggregate["category_counts"])
     fallback = cast(Mapping[str, object], aggregate["fallback"])
     quality = cast(Mapping[str, object], aggregate["quality"])
+    duration = cast(Mapping[str, object], aggregate["duration_diagnostics"])
     coverage = cast(Mapping[str, object], payload["template_coverage"])
     catalog = cast(Mapping[str, object], payload["catalog"])
     roots = cast(Mapping[str, object], payload["failure_root_causes"])
@@ -554,6 +694,26 @@ def _write_summary(payload: Mapping[str, object], output_dir: Path) -> None:
             )
     lines.extend(
         [
+            "",
+            "## Duration-first diagnostics",
+            "",
+            (
+                f"- Within/under/over: {duration['within_target_count']}/"
+                f"{duration['under_target_count']}/{duration['over_target_count']}"
+            ),
+            f"- Session duration fit: {duration['duration_fit_percentage']}%",
+            (
+                "- Average absolute deviation: "
+                f"{duration['average_absolute_deviation_minutes']} minutes"
+            ),
+            f"- Constrained programs: {duration['constrained_duration_count']}",
+            f"- Late repair: {duration['late_duration_repair_percentage']}%",
+            f"- Major late repair: {duration['major_late_repair_percentage']}%",
+            (
+                "- Proven duration template rejections: "
+                f"{duration['proven_duration_template_rejections']}"
+            ),
+            f"- Breakdowns: {duration['breakdowns']}",
             "",
             "## Template coverage",
             "",

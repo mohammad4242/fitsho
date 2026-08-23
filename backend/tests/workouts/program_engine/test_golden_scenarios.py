@@ -194,7 +194,7 @@ def test_golden_constraints_and_recovery(name: str) -> None:
             for day in result.program.weekly_schedule
         )
         if not exercise_count_satisfied:
-            assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in result.program.warnings
+            assert "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in result.program.warnings
         assert all(
             source.session_duration_minutes - 10
             <= day.estimated_duration_minutes - RULESET.general_warmup_minutes

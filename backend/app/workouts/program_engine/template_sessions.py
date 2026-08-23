@@ -3,6 +3,7 @@ from dataclasses import dataclass, replace
 from uuid import UUID
 
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
+from app.workouts.program_engine.duration_capacity import SessionCapacity
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.prescription import estimate_exercise_minutes
 from app.workouts.program_engine.replacement_ranker import rank_replacement_exercises
@@ -69,6 +70,8 @@ def build_template_sessions(
     template: TemplateReference,
     eligible: tuple[ExerciseCandidate, ...],
     ruleset: ProgramRuleset,
+    *,
+    session_capacity: SessionCapacity | None = None,
 ) -> TemplateSessionBuild:
     eligible_by_id = {candidate.id: candidate for candidate in eligible}
     used: Counter[object] = Counter()
@@ -85,15 +88,33 @@ def build_template_sessions(
     deliberate_redundancies: set[UUID] = set()
     repeated_core_substitutions: set[tuple[int, UUID]] = set()
     preserved_template_occurrences: Counter[UUID] = Counter()
+    weekly_direct_sessions: Counter[MuscleGroup] = Counter()
     weekly_patterns: set[MovementPattern] = set()
-    capacity = max(
-        ruleset.minimum_exercises_per_session,
-        min(
-            ruleset.max_exercises_per_session,
-            request.source.session_duration_minutes // ruleset.minutes_per_exercise_slot,
-        ),
-    )
     for index, reference_day in enumerate(template.days, start=1):
+        required_slot_count = sum(
+            slot.adaptation_priority == "core" for slot in reference_day.slots
+        )
+        capacity = (
+            max(
+                required_slot_count,
+                min(
+                    ruleset.max_exercises_per_session,
+                    session_capacity.expected_exercise_count_capacity,
+                ),
+            )
+            if session_capacity is not None
+            else max(
+                ruleset.minimum_exercises_per_session,
+                min(
+                    ruleset.max_exercises_per_session,
+                    request.source.session_duration_minutes // ruleset.minutes_per_exercise_slot,
+                ),
+            )
+        )
+        capacity = max(1, capacity)
+        planned_minimum = min(ruleset.minimum_exercises_per_session, capacity)
+        if planned_minimum < ruleset.minimum_exercises_per_session:
+            build_reasons.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
         selected: list[tuple[ExerciseCandidate, TemplateReferenceSlot]] = []
         for slot in reference_day.slots:
             if slot.exercise_id is not None:
@@ -164,6 +185,18 @@ def build_template_sessions(
                 else:
                     deliberate_redundancies.add(candidate.id)
                     build_reasons.append("DELIBERATE_REDUNDANCY_FOR_TEMPLATE_STRUCTURE")
+            selected_muscles = {
+                item.primary_muscle for item, _selected_slot in selected
+            }
+            if (
+                slot.adaptation_priority == "optional"
+                and candidate.primary_muscle is not None
+                and candidate.primary_muscle not in selected_muscles
+                and weekly_direct_sessions[candidate.primary_muscle]
+                >= _template_direct_frequency_cap(len(template.days), ruleset)
+            ):
+                build_reasons.append("TEMPLATE_OPTIONAL_SLOT_OMITTED_FOR_RECOVERY")
+                continue
             selected.append((candidate, slot))
             used[candidate.id] += 1
             weekly_patterns.add(candidate.movement_pattern)
@@ -210,7 +243,7 @@ def build_template_sessions(
             eligible,
             used,
             reserved,
-            ruleset.minimum_exercises_per_session,
+            planned_minimum,
             ruleset,
         )
         while len(selected) > capacity:
@@ -231,8 +264,15 @@ def build_template_sessions(
             removed, _ = selected.pop(removable)
             used[removed.id] -= 1
             build_reasons.append("TEMPLATE_ACCESSORY_TRIMMED_FOR_TIME_LIMIT")
+        weekly_direct_sessions.update(
+            {
+                candidate.primary_muscle
+                for candidate, _slot in selected
+                if candidate.primary_muscle is not None
+            }
+        )
         if (
-            not ruleset.minimum_exercises_per_session
+            not planned_minimum
             <= len(selected)
             <= (ruleset.max_exercises_per_session)
         ):
@@ -666,3 +706,12 @@ def _template_slot_is_compatible(
         target_muscles=frozenset(slot.target_muscles),
         day_focus=f"template_reference_{day_index}",
     ).compatible
+
+
+def _template_direct_frequency_cap(
+    training_days: int,
+    ruleset: ProgramRuleset,
+) -> int:
+    if training_days <= 4:
+        return ruleset.maximum_direct_sessions_per_muscle_per_week
+    return ruleset.maximum_direct_sessions_per_muscle_per_week + (training_days - 4)

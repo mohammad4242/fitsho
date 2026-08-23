@@ -2,6 +2,7 @@ from collections import Counter
 
 import tests.workouts.program_engine.phase11_benchmark as phase11
 from tests.workouts.program_engine.phase11_6_benchmark import (
+    _duration_diagnostics,
     holdout_profiles,
     input_fingerprint,
     negative_profiles,
@@ -60,3 +61,53 @@ def test_phase11_6_negative_profiles_keep_unsupported_matrix_rejections() -> Non
         ("intermediate", 7),
         ("advanced", 2),
     }
+
+
+def test_phase11_6_duration_diagnostics_use_workout_minutes_and_repair_trace() -> None:
+    records = [
+        {
+            "input": {
+                "duration_minutes": 30,
+                "goal": "strength",
+                "experience_level": "intermediate",
+                "resistance_days": 2,
+            },
+            "construction_path": "TEMPLATE",
+            "final_program": {
+                "days": (
+                    {"estimated_duration_minutes": 35},
+                    {"estimated_duration_minutes": 50},
+                ),
+                "validation": {"warnings": ("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",)},
+                "trace": (
+                    {
+                        "stage": "session_duration",
+                        "repair_classification": "minor",
+                    },
+                    {
+                        "stage": "template_selection",
+                        "hard_rejections": (
+                            {
+                                "reason_codes": (
+                                    "REQUIRED_CORE_DURATION_INFEASIBLE",
+                                )
+                            },
+                        ),
+                    },
+                ),
+            },
+        }
+    ]
+
+    diagnostics = _duration_diagnostics(records)
+
+    assert diagnostics["sessions"] == 2
+    assert diagnostics["within_target_count"] == 1
+    assert diagnostics["over_target_count"] == 1
+    assert diagnostics["average_absolute_deviation_minutes"] == 7.5
+    assert diagnostics["late_duration_repair_percentage"] == 100.0
+    assert diagnostics["major_late_repair_percentage"] == 0.0
+    assert diagnostics["proven_duration_template_rejections"] == 1
+    assert diagnostics["breakdowns"]["requested_duration"]["30"][
+        "duration_fit_percentage"
+    ] == 50.0

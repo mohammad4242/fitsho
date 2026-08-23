@@ -1,4 +1,4 @@
-from app.exercises.enums import ExerciseLabel
+from app.exercises.enums import ExerciseLabel, MuscleGroup
 from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.enums import (
     CardioIntensity,
@@ -13,6 +13,28 @@ from app.workouts.program_engine.schemas import (
     NormalizedProgramRequest,
     WorkoutDay,
 )
+from app.workouts.program_engine.slot_compatibility import focus_scope
+
+
+def planned_cardio_day_indexes(
+    focuses: tuple[str, ...],
+    planned_sessions: int,
+    *,
+    priority_muscles: frozenset[MuscleGroup] = frozenset(),
+) -> frozenset[int]:
+    eligible = tuple(
+        index
+        for index, focus in enumerate(focuses)
+        if focus not in {"lower", "legs"} or len(focuses) == 1
+    )
+    ranked = sorted(
+        eligible,
+        key=lambda index: (
+            _focus_contains_priority(focuses[index], priority_muscles),
+            index,
+        ),
+    )
+    return frozenset(ranked[:planned_sessions])
 
 
 def cardio_reserve_minutes(
@@ -39,19 +61,23 @@ def add_cardio(
         if request.primary_goal in {Goal.FAT_LOSS, Goal.BODY_RECOMPOSITION}
         else ruleset.maintenance_cardio_days
     )
+    planned_indexes = planned_cardio_day_indexes(
+        tuple(day.focus for day in days),
+        target_days,
+        priority_muscles=request.source.priority_muscles,
+    )
     updated: list[WorkoutDay] = []
-    assigned = 0
-    for day in days:
+    for day_position, day in enumerate(days):
         available_cardio_minutes = min(
             ruleset.cardio_start_minutes,
             duration_policy.maximum_total_minutes(ruleset.general_warmup_minutes)
             - day.estimated_duration_minutes,
         )
-        eligible_day = (
+        eligible_day = day_position in planned_indexes and (
             day.focus not in {"lower", "legs"} or len(days) == 1
         ) and available_cardio_minutes >= ruleset.minimum_cardio_minutes
         cardio = None
-        if eligible_day and assigned < target_days:
+        if eligible_day:
             cardio = CardioPrescription(
                 modality_exercise_id=modality.id,
                 modality_name=modality.name,
@@ -66,7 +92,6 @@ def add_cardio(
                     "CARDIO_SCHEDULED_AFTER_RESISTANCE",
                 ),
             )
-            assigned += 1
         updated.append(
             WorkoutDay(
                 day_index=day.day_index,
@@ -80,6 +105,16 @@ def add_cardio(
             )
         )
     return tuple(updated)
+
+
+def _focus_contains_priority(
+    focus: str,
+    priority_muscles: frozenset[MuscleGroup],
+) -> bool:
+    if not priority_muscles:
+        return False
+    _patterns, focus_muscles = focus_scope(focus)
+    return focus_muscles is not None and bool(focus_muscles.intersection(priority_muscles))
 
 
 def _safe_cardio(

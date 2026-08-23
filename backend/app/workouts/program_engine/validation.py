@@ -55,8 +55,12 @@ def validate_program(
                 "VOLUME_REPAIR_HARD_MINIMUM_UNSATISFIED",
                 "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
                 "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
+                "VOLUME_REDUCED_FOR_DURATION_CAPACITY",
             }
         )
+    )
+    duration_planned_reduced_count = (
+        "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in trace_reason_codes
     )
     duration_feasibility_constrained = bool(
         trace_reason_codes.intersection(
@@ -83,10 +87,22 @@ def validate_program(
         exercise_count = len(day.exercises)
         errors.extend(superset_structure_errors(day.exercises))
         if exercise_count < ruleset.minimum_exercises_per_session:
-            shortfall = ruleset.minimum_exercises_per_session - exercise_count
-            if shortfall <= 2 or volume_feasibility_constrained:
-                # Thin catalogs (bodyweight-only, heavy caution filtering) may not have enough
-                # exercises to fill every session to minimum; demote to warning.
+            if (
+                duration_planned_reduced_count
+                and "INSUFFICIENT_ELIGIBLE_EXERCISES" not in trace_reason_codes
+            ):
+                warnings.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
+            elif (
+                duration_planned_reduced_count
+                and "DYNAMIC_EXACT_N_FALLBACK" in trace_reason_codes
+                and "INSUFFICIENT_ELIGIBLE_EXERCISES" in trace_reason_codes
+            ):
+                warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
+                warnings.append("INSUFFICIENT_ELIGIBLE_EXERCISES")
+            elif duration_planned_reduced_count:
+                errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
+                errors.append("INSUFFICIENT_ELIGIBLE_EXERCISES")
+            elif volume_feasibility_constrained:
                 warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
             else:
                 errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
@@ -298,10 +314,16 @@ def validate_program(
                 for item in day.exercises
                 if item.exercise_id == exercise_id
             ]
-            if not all(
-                "CORE_MOVEMENT_REPEATED_FOR_PROGRESSION" in item.reason_codes
-                for item in occurrences[1:]
-            ):
+            justified_repeats = sum(
+                bool(
+                    {
+                        "CORE_MOVEMENT_REPEATED_FOR_PROGRESSION",
+                        "PRIORITY_EXERCISE_REPEATED_FOR_HARD_MINIMUM",
+                    }.intersection(item.reason_codes)
+                )
+                for item in occurrences
+            )
+            if justified_repeats < count - 1:
                 errors.append("UNJUSTIFIED_DUPLICATE_EXERCISE")
     planned = program.aggregate_metrics.get("planned_direct_sets_by_muscle", {})
     ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
