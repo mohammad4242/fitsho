@@ -29,6 +29,7 @@ from app.workouts.program_engine.volume_planner import (
     TRACKED_MUSCLES,
     plan_weekly_volume,
 )
+from app.workouts.program_engine.volume_policy import VOLUME_POLICY
 
 
 def normalized(**overrides: object) -> NormalizedProgramRequest:
@@ -586,7 +587,7 @@ def test_secondary_targets_follow_goal_and_training_status_caps(
     )
     expected = min(
         max(
-            RULESET.secondary_muscle_goal_base_sets[goal],
+            VOLUME_POLICY.preferred_target(MuscleGroup.TRICEPS, request.training_status, goal),
             RULESET.secondary_muscle_minimum_sets[request.training_status],
         ),
         RULESET.secondary_muscle_maximum_sets[request.training_status],
@@ -641,8 +642,13 @@ def test_poor_recovery_reduces_volume_without_falling_below_novice_floor() -> No
         stress_level=RecoveryRating.POOR,
     )
     plan = plan_weekly_volume(request, select_split(request, RULESET), RULESET)
+    baseline = normalized(primary_goal=Goal.HYPERTROPHY)
+    baseline_plan = plan_weekly_volume(baseline, select_split(baseline, RULESET), RULESET)
 
-    assert plan.direct_sets_for(MuscleGroup.CHEST) == RULESET.minimum_sets[request.training_status]
+    assert plan.direct_sets_for(MuscleGroup.CHEST) >= RULESET.minimum_sets[request.training_status]
+    assert plan.direct_sets_for(MuscleGroup.CHEST) < baseline_plan.direct_sets_for(
+        MuscleGroup.CHEST
+    )
     assert "VOLUME_REDUCED_FOR_RECOVERY" in plan.reason_codes
 
 

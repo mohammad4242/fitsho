@@ -390,11 +390,16 @@ def test_template_volume_uses_recovery_history_and_short_session_prescription() 
 
     assert baseline.program is not None, baseline.errors
     assert constrained.program is not None, constrained.errors
-    baseline_sets = baseline.program.aggregate_metrics["weekly_direct_sets_by_muscle"]["chest"]
-    constrained_sets = constrained.program.aggregate_metrics["weekly_direct_sets_by_muscle"][
+    baseline_target = baseline.program.aggregate_metrics["planned_direct_sets_by_muscle"]["chest"]
+    constrained_target = constrained.program.aggregate_metrics["planned_direct_sets_by_muscle"][
         "chest"
     ]
-    assert constrained_sets < baseline_sets
+    assert constrained_target < baseline_target
+    assert "VOLUME_CAPPED_FOR_PREVIOUS_VOLUME" in next(
+        entry["reasons"]
+        for entry in constrained.program.decision_trace
+        if entry["stage"] == "volume"
+    )
     assert constrained.program.weekly_schedule[0].exercises[0].rest_seconds >= (
         RULESET.minimum_rest_seconds + RULESET.duration_repair_rest_increment_seconds
     )

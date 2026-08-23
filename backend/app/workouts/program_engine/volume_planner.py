@@ -22,6 +22,7 @@ from app.workouts.program_engine.volume_history import (
     PreviousVolumeBaseline,
     derive_previous_volume_baseline,
 )
+from app.workouts.program_engine.volume_policy import VOLUME_POLICY
 
 MAJOR_MUSCLES = (
     MuscleGroup.CHEST,
@@ -55,10 +56,10 @@ def plan_weekly_volume(
     source = request.source
     minimum = ruleset.minimum_sets[request.training_status]
     maximum = ruleset.maximum_sets[request.training_status]
-    base = min(max(ruleset.goal_base_sets[request.primary_goal], minimum), maximum)
+    secondary_minimum = ruleset.secondary_muscle_minimum_sets[request.training_status]
+    secondary_maximum = ruleset.secondary_muscle_maximum_sets[request.training_status]
     reasons: list[str] = []
     common_constraint_reasons: list[str] = []
-    recovery_capacity_constrained = False
     recovery_signals = sum(
         (
             source.sleep_quality is RecoveryRating.POOR,
@@ -67,43 +68,18 @@ def plan_weekly_volume(
             source.recent_training_history.recovery_problems,
         )
     )
-    if recovery_signals:
-        recovery_capacity_constrained = True
-        base = max(
-            minimum,
-            base - ruleset.poor_recovery_set_reduction * recovery_signals,
+    recovery_burden = VOLUME_POLICY.recovery_burden(recovery_signals)
+    if recovery_burden.reason_code is not None:
+        reasons.extend(("VOLUME_REDUCED_FOR_RECOVERY", recovery_burden.reason_code))
+        common_constraint_reasons.extend(
+            ("VOLUME_REDUCED_FOR_RECOVERY", recovery_burden.reason_code)
         )
-        reasons.append("VOLUME_REDUCED_FOR_RECOVERY")
-        common_constraint_reasons.append("VOLUME_REDUCED_FOR_RECOVERY")
     if source.session_duration_minutes <= ruleset.short_session_minutes:
-        base = max(minimum, base - ruleset.contextual_volume_reduction_sets)
         reasons.append("VOLUME_REDUCED_FOR_TIME_LIMIT")
         common_constraint_reasons.append("VOLUME_REDUCED_FOR_TIME_LIMIT")
     if source.age >= ruleset.older_adult_modifier_age:
-        recovery_capacity_constrained = True
-        base = max(minimum, base - ruleset.contextual_volume_reduction_sets)
         reasons.append("VOLUME_REDUCED_FOR_RECOVERY")
         common_constraint_reasons.append("VOLUME_REDUCED_FOR_RECOVERY")
-
-    secondary_minimum = ruleset.secondary_muscle_minimum_sets[request.training_status]
-    secondary_maximum = ruleset.secondary_muscle_maximum_sets[request.training_status]
-    secondary_base = min(
-        max(ruleset.secondary_muscle_goal_base_sets[request.primary_goal], secondary_minimum),
-        secondary_maximum,
-    )
-    if recovery_signals:
-        secondary_base = max(
-            secondary_minimum,
-            secondary_base - ruleset.poor_recovery_set_reduction * recovery_signals,
-        )
-    if source.session_duration_minutes <= ruleset.short_session_minutes:
-        secondary_base = max(
-            secondary_minimum, secondary_base - ruleset.contextual_volume_reduction_sets
-        )
-    if source.age >= ruleset.older_adult_modifier_age:
-        secondary_base = max(
-            secondary_minimum, secondary_base - ruleset.contextual_volume_reduction_sets
-        )
 
     targets: list[VolumeTarget] = []
     body_priorities = {
@@ -111,10 +87,22 @@ def plan_weekly_volume(
     }
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     effective_priorities = frozenset(priority_policy.priorities)
-    baseline_sets = {
-        muscle: secondary_base if muscle in SECONDARY_MUSCLES else base
-        for muscle in TRACKED_MUSCLES
-    }
+    baseline_sets: dict[MuscleGroup, int] = {}
+    for muscle in TRACKED_MUSCLES:
+        is_secondary = muscle in SECONDARY_MUSCLES
+        muscle_minimum = secondary_minimum if is_secondary else minimum
+        muscle_maximum = secondary_maximum if is_secondary else maximum
+        target = VOLUME_POLICY.preferred_target(
+            muscle,
+            request.training_status,
+            request.primary_goal,
+        )
+        target -= recovery_burden.reduction_sets
+        if source.session_duration_minutes <= ruleset.short_session_minutes:
+            target -= ruleset.contextual_volume_reduction_sets
+        if source.age >= ruleset.older_adult_modifier_age:
+            target -= ruleset.contextual_volume_reduction_sets
+        baseline_sets[muscle] = min(max(target, muscle_minimum), muscle_maximum)
     if source.priority_muscles:
         baseline_sets = {
             muscle: (
@@ -148,6 +136,11 @@ def plan_weekly_volume(
     previous_volume = previous_volume or derive_previous_volume_baseline(
         source.recent_training_history
     )
+    positive_history_support = _positive_history_supports_soft_cap_override(
+        request,
+        previous_volume,
+        ruleset,
+    )
     reasons.extend(previous_volume.reason_codes)
     for muscle in TRACKED_MUSCLES:
         constraint_reasons = list(common_constraint_reasons)
@@ -155,6 +148,7 @@ def plan_weekly_volume(
         muscle_minimum = secondary_minimum if is_secondary else minimum
         muscle_maximum = secondary_maximum if is_secondary else maximum
         safe_maximum = muscle_maximum
+        acceptable_ceiling = muscle_maximum
         sets = baseline_sets[muscle]
         if muscle in source.priority_muscles:
             bonus = priority_bonuses[muscle]
@@ -185,12 +179,22 @@ def plan_weekly_volume(
                 if previous_effective is not None
                 else "VOLUME_CAPPED_FOR_PREVIOUS_VOLUME"
             )
-            if sets > increase_limit:
+            if sets > increase_limit and positive_history_support:
+                sets = min(
+                    sets,
+                    increase_limit + VOLUME_POLICY.supported_previous_volume_override_sets,
+                )
+                acceptable_ceiling = min(acceptable_ceiling, sets)
+                reasons.append("PREVIOUS_VOLUME_SOFT_CAP_OVERRIDDEN_WITH_POSITIVE_HISTORY")
+                constraint_reasons.append(
+                    "PREVIOUS_VOLUME_SOFT_CAP_OVERRIDDEN_WITH_POSITIVE_HISTORY"
+                )
+            elif sets > increase_limit:
                 sets = increase_limit
-            if increase_limit < muscle_maximum:
+                acceptable_ceiling = min(acceptable_ceiling, increase_limit)
+            if increase_limit < muscle_maximum and not positive_history_support:
                 reasons.append(reason)
                 constraint_reasons.append(reason)
-            safe_maximum = min(safe_maximum, increase_limit)
         if split.split_type is SplitType.BODY_PART_ROTATION and direct_exposures[muscle] > 0:
             feasible_exposures = max(
                 direct_exposures[muscle],
@@ -203,15 +207,23 @@ def plan_weekly_volume(
                 reasons.append("VOLUME_CAPPED_FOR_SPLIT_FREQUENCY")
                 constraint_reasons.append("VOLUME_CAPPED_FOR_SPLIT_FREQUENCY")
             safe_maximum = min(safe_maximum, split_maximum)
-        if recovery_capacity_constrained:
-            safe_maximum = min(safe_maximum, sets)
+            acceptable_ceiling = min(acceptable_ceiling, split_maximum)
+        if recovery_burden.reduction_sets or source.age >= ruleset.older_adult_modifier_age:
+            acceptable_ceiling = min(acceptable_ceiling, sets)
+        flexibility = VOLUME_POLICY.flexibility_sets(sets)
+        minimum_useful = VOLUME_POLICY.minimum_useful_target(
+            muscle,
+            request.training_status,
+        )
         acceptable_minimum = max(
             min(muscle_minimum, sets),
-            sets - ruleset.weekly_volume_target_flexibility_sets,
+            min(minimum_useful, sets),
+            sets - flexibility,
         )
         acceptable_maximum = min(
             safe_maximum,
-            sets + ruleset.weekly_volume_target_flexibility_sets,
+            acceptable_ceiling,
+            sets + flexibility,
         )
         # Secondary muscles (biceps, triceps, traps, forearms) as priorities in 1-2 day
         # full-body programs cannot realistically satisfy a direct-only minimum — compounds
@@ -258,6 +270,21 @@ def plan_weekly_volume(
             )
         )
     return WeeklyVolumePlan(targets=tuple(targets), reason_codes=tuple(dict.fromkeys(reasons)))
+
+
+def _positive_history_supports_soft_cap_override(
+    request: NormalizedProgramRequest,
+    previous_volume: PreviousVolumeBaseline,
+    ruleset: ProgramRuleset,
+) -> bool:
+    history = request.source.recent_training_history
+    performance_trend = (history.performance_trend or "").strip().lower()
+    return (
+        previous_volume.confidence >= ruleset.adaptation_min_volume_confidence_for_progression
+        and history.completed_session_ratio >= ruleset.adaptation_min_adherence_for_progression
+        and not history.recovery_problems
+        and performance_trend in {"stable", "improving"}
+    )
 
 
 def _direct_exposure_counts(
