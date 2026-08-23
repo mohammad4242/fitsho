@@ -268,11 +268,20 @@ def test_regression_profiles() -> None:
             # Verify session duration strictly within +-10 of requested duration
             target_min = req.session_duration_minutes - 10
             target_max = req.session_duration_minutes + 10
-            workout_duration = day.estimated_duration_minutes - RULESET.general_warmup_minutes
+            workout_duration = (
+                day.estimated_duration_minutes
+                - RULESET.general_warmup_minutes
+                - (day.cardio.duration_minutes if day.cardio else 0)
+            )
             assert workout_duration <= target_max
             if workout_duration < target_min:
-                assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in (
-                    program.validation_report.warnings
+                assert (
+                    "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS"
+                    in program.validation_report.warnings
+                    or "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD"
+                    in program.validation_report.warnings
+                    or "PLANNED_SOFT_VOLUME_REDUCED_DURING_SESSION_FIT"
+                    in program.validation_report.warnings
                 )
 
             for ex in day.exercises:

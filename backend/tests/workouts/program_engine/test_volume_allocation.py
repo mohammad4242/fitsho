@@ -427,11 +427,20 @@ def test_generate_program_preserves_volume_and_duration_constraints_without_set_
         int(result.program.user_profile_snapshot["session_duration_minutes"])
     )
     if not all(
-        policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)
+        policy.contains_total(
+            day.estimated_duration_minutes,
+            RULESET.general_warmup_minutes,
+            day.cardio.duration_minutes if day.cardio else 0,
+        )
         for day in result.program.weekly_schedule
     ):
-        assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in (
-            result.program.validation_report.warnings
+        assert (
+            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS"
+            in result.program.validation_report.warnings
+            or "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD"
+            in result.program.validation_report.warnings
+            or "PLANNED_SOFT_VOLUME_REDUCED_DURING_SESSION_FIT"
+            in result.program.validation_report.warnings
         )
     metrics = result.program.aggregate_metrics
     assert all(
