@@ -7,7 +7,10 @@ from app.workouts.program_engine.schemas import (
     NormalizedProgramRequest,
     TemplateReference,
 )
-from app.workouts.program_engine.slot_compatibility import evaluate_candidate_slot_compatibility
+from app.workouts.program_engine.slot_compatibility import (
+    evaluate_candidate_slot_compatibility,
+    template_slot_allowed_patterns,
+)
 from app.workouts.program_engine.template_scoring import (
     TemplateScore,
     score_template_reference_result,
@@ -70,6 +73,16 @@ class TemplateSelectionResult:
     tie_break: TemplateTieBreak | None
 
     def decision_trace(self) -> dict[str, object]:
+        rejection_category = None
+        if self.selected is None:
+            has_days_level_candidate = any(
+                "DAYS_MISMATCH" not in item.reason_codes
+                and "EXPERIENCE_LEVEL_MISMATCH" not in item.reason_codes
+                for item in self.hard_rejections
+            )
+            rejection_category = (
+                "CORE_SLOT_UNRESOLVED" if has_days_level_candidate else "NO_DAYS_LEVEL_CANDIDATE"
+            )
         return {
             "stage": "template_selection",
             "requested_days": self.requested_days,
@@ -78,6 +91,7 @@ class TemplateSelectionResult:
             "hard_rejections": tuple(item.decision_trace() for item in self.hard_rejections),
             "candidates": tuple(item.decision_trace() for item in self.candidates),
             "selected": self.selected.template.slug if self.selected is not None else None,
+            "rejection_category": rejection_category,
             "tie_break": self.tie_break.decision_trace() if self.tie_break is not None else None,
         }
 
@@ -198,7 +212,9 @@ def _core_slots_are_resolvable(
                 requested = next(item for item in eligible if item.id == slot.exercise_id)
                 if evaluate_candidate_slot_compatibility(
                     requested,
-                    allowed_patterns=frozenset({slot.movement_pattern}),
+                    allowed_patterns=template_slot_allowed_patterns(
+                        slot.movement_pattern, slot.target_muscles
+                    ),
                     target_muscles=frozenset(slot.target_muscles),
                     day_focus=f"template_reference_{day.day_number}",
                 ).compatible:
@@ -206,7 +222,9 @@ def _core_slots_are_resolvable(
             if not any(
                 evaluate_candidate_slot_compatibility(
                     candidate,
-                    allowed_patterns=frozenset({slot.movement_pattern}),
+                    allowed_patterns=template_slot_allowed_patterns(
+                        slot.movement_pattern, slot.target_muscles
+                    ),
                     target_muscles=frozenset(slot.target_muscles),
                     day_focus=f"template_reference_{day.day_number}",
                 ).compatible

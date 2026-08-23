@@ -3,6 +3,7 @@ from collections import Counter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.admin.schemas import AdminTrainingTemplateSlotWrite
 from app.exercises.enums import (
     MediaType,
     MovementPattern,
@@ -17,7 +18,11 @@ from app.profile.training_compatibility import (
     ResistanceTrainingDayStatus,
     resistance_training_day_status,
 )
-from app.training_templates.models import TrainingProgramTemplate, TrainingProgramTemplateSlot
+from app.training_templates.models import (
+    TrainingProgramTemplate,
+    TrainingProgramTemplateSlot,
+    TrainingTemplateSlotPriority,
+)
 from app.training_templates.seed_data import (
     SOURCE_NAME,
     SOURCE_URL,
@@ -70,7 +75,7 @@ def test_seed_adds_current_template_library_for_every_supported_training_frequen
 
     result = seed_training_program_templates(db)
 
-    assert result.templates == 47
+    assert result.templates == 50
     templates = list(db.scalars(select(TrainingProgramTemplate)))
     assert {template.days_per_week for template in templates} == {2, 3, 4, 5, 6}
     for days_per_week in range(2, 7):
@@ -114,7 +119,7 @@ def test_active_library_offers_two_through_six_days_and_only_full_body_two_day_t
 
 
 def test_audited_library_contains_structural_variants_not_goal_duplicates() -> None:
-    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 47
+    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 50
     seed_slugs = {template.slug for template in TRAINING_PROGRAM_TEMPLATE_SEEDS}
 
     assert not seed_slugs.intersection(EXPECTED_RETIRED_REDUNDANT_TEMPLATE_SLUGS)
@@ -227,17 +232,104 @@ def test_seed_expands_four_and_five_day_reference_library_across_levels(db: Sess
     result = seed_training_program_templates(db)
 
     templates = list(db.scalars(select(TrainingProgramTemplate)))
-    assert result.templates == 47
+    assert result.templates == 50
     for days_per_week in (4, 5):
         bucket = [template for template in templates if template.days_per_week == days_per_week]
-        assert len(bucket) == {4: 15, 5: 12}[days_per_week]
+        assert len(bucket) == {4: 16, 5: 12}[days_per_week]
         assert {template.training_level for template in bucket} == {
+            ExperienceLevel.FIRST_MONTH,
             ExperienceLevel.BEGINNER,
             ExperienceLevel.INTERMEDIATE,
             ExperienceLevel.ADVANCED,
-        } - ({ExperienceLevel.BEGINNER} if days_per_week == 5 else set())
+        } - (
+            {ExperienceLevel.FIRST_MONTH, ExperienceLevel.BEGINNER} if days_per_week == 5 else set()
+        )
         tags = {tag for template in bucket for tag in template.focus_tags}
         assert {"chest_priority", "back_priority"}.issubset(tags)
+
+
+def test_first_month_has_only_conservative_two_three_and_four_day_structures() -> None:
+    templates = tuple(
+        template
+        for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
+        if template.training_level is ExperienceLevel.FIRST_MONTH
+    )
+
+    assert {template.days_per_week for template in templates} == {2, 3, 4}
+    assert len(templates) == 3
+    assert all(
+        template.intensity_methods == ("standard",)
+        or tuple(method.value for method in template.intensity_methods) == ("standard",)
+        for template in templates
+    )
+    assert all(5 <= len(day.slots) <= 6 for template in templates for day in template.days)
+    assert all("specialization" not in template.focus_tags for template in templates)
+
+
+def test_template_slot_default_is_accessory_and_seed_priorities_are_intentional() -> None:
+    default_slot = TemplateSlotSeed(
+        exercise_slug_hint="test-slot",
+        catalog_slug_hints=("test-slot",),
+        target_muscles=(MuscleGroup.BICEPS,),
+        movement_pattern=MovementPattern.ELBOW_FLEXION,
+    )
+
+    assert default_slot.adaptation_priority.value == "accessory"
+    assert all(
+        any(slot.adaptation_priority.value == "core" for slot in day.slots)
+        for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
+        for day in template.days
+    )
+
+
+def test_new_persisted_and_admin_slots_default_to_accessory() -> None:
+    column = TrainingProgramTemplateSlot.__table__.c.adaptation_priority
+    payload = AdminTrainingTemplateSlotWrite(
+        exercise_id="11111111-1111-1111-1111-111111111111",
+        target_muscles=[MuscleGroup.BICEPS],
+        movement_pattern=MovementPattern.ELBOW_FLEXION,
+        sets=3,
+        rep_min=8,
+        rep_max=12,
+        target_rir=2,
+        rest_seconds=60,
+    )
+
+    assert column.default is not None
+    assert column.default.arg is TrainingTemplateSlotPriority.ACCESSORY
+    assert column.server_default is not None
+    assert str(column.server_default.arg) == "accessory"
+    assert payload.adaptation_priority is TrainingTemplateSlotPriority.ACCESSORY
+
+
+def test_mixed_sessions_do_not_make_every_direct_muscle_slot_core() -> None:
+    template = next(
+        item
+        for item in TRAINING_PROGRAM_TEMPLATE_SEEDS
+        if item.slug == "two-day-first-month-full-body"
+    )
+    second_day = template.days[1]
+    priorities = {slot.exercise_slug_hint: slot.adaptation_priority for slot in second_day.slots}
+
+    assert priorities["romanian-deadlift"] is TrainingTemplateSlotPriority.CORE
+    assert priorities["incline-dumbbell-bench-press"] is TrainingTemplateSlotPriority.CORE
+    assert priorities["lat-pulldown"] is TrainingTemplateSlotPriority.ACCESSORY
+    assert priorities["dead-bug"] is TrainingTemplateSlotPriority.ACCESSORY
+    assert all(
+        slot.adaptation_priority.value != "core"
+        for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
+        if "specialization" not in template.focus_tags
+        for day in template.days
+        for slot in day.slots
+        if slot.exercise_slug_hint
+        in {
+            "dumbbell-curl",
+            "hammer-curl",
+            "standing-calf-raise",
+            "dumbbell-lateral-raise",
+        }
+        and not set(slot.target_muscles).intersection(day.direct_target_muscles)
+    )
 
 
 def test_specialized_body_part_templates_meet_direct_movement_floors() -> None:
@@ -368,7 +460,7 @@ def test_seed_can_be_rerun_without_duplicate_template_days(db: Session) -> None:
 
     result = seed_training_program_templates(db)
 
-    assert result.templates == 47
+    assert result.templates == 50
     assert (
         db.scalar(
             select(TrainingProgramTemplate).where(

@@ -28,7 +28,7 @@ class TemplateSlotSeed:
     target_rir: int = 2
     rest_seconds: int = 90
     intensity_method: TrainingTemplateMethod = TrainingTemplateMethod.STANDARD
-    adaptation_priority: TrainingTemplateSlotPriority = TrainingTemplateSlotPriority.CORE
+    adaptation_priority: TrainingTemplateSlotPriority = TrainingTemplateSlotPriority.ACCESSORY
     superset_group: str | None = None
 
 
@@ -155,7 +155,7 @@ def _slot(
     rir: int = 2,
     rest: int = 90,
     method: TrainingTemplateMethod = Method.STANDARD,
-    priority: TrainingTemplateSlotPriority = Priority.CORE,
+    priority: TrainingTemplateSlotPriority = Priority.ACCESSORY,
     superset_group: str | None = None,
 ) -> TemplateSlotSeed:
     return TemplateSlotSeed(
@@ -566,6 +566,143 @@ def _fit_template_day_exercise_count(day: TemplateDaySeed) -> TemplateDaySeed:
     return replace(day, slots=tuple(slots))
 
 
+_OPTIONAL_SLOT_PATTERNS = frozenset(
+    {
+        P.CALF_RAISE,
+        P.ELBOW_EXTENSION,
+        P.ELBOW_FLEXION,
+        P.KNEE_EXTENSION,
+        P.KNEE_FLEXION,
+        P.SHOULDER_ABDUCTION,
+        P.SHRUG,
+    }
+)
+_STRUCTURAL_COMPOUND_PATTERNS = frozenset(
+    {
+        P.HIP_EXTENSION,
+        P.HIP_HINGE,
+        P.HORIZONTAL_PULL,
+        P.HORIZONTAL_PUSH,
+        P.LUNGE,
+        P.SQUAT,
+        P.VERTICAL_PULL,
+        P.VERTICAL_PUSH,
+    }
+)
+_UPPER_STRUCTURE_MUSCLES = frozenset({M.CHEST, M.BACK, M.SHOULDERS})
+_LOWER_STRUCTURE_MUSCLES = frozenset({M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES})
+
+
+def _assign_structural_slot_priorities(
+    template: TrainingProgramTemplateSeed,
+) -> TrainingProgramTemplateSeed:
+    return replace(
+        template,
+        days=tuple(
+            _assign_day_slot_priorities(
+                day,
+                compound_focus=Tag.COMPOUND_FOCUS in template.focus_tags,
+            )
+            for day in template.days
+        ),
+    )
+
+
+def _assign_day_slot_priorities(
+    day: TemplateDaySeed,
+    *,
+    compound_focus: bool,
+) -> TemplateDaySeed:
+    core_indexes: set[int] = set()
+    direct_targets = frozenset(day.direct_target_muscles)
+    has_upper = bool(direct_targets & _UPPER_STRUCTURE_MUSCLES)
+    has_lower = bool(direct_targets & _LOWER_STRUCTURE_MUSCLES)
+    if has_upper and has_lower:
+        upper_index = _first_structural_slot(
+            day,
+            frozenset({P.HORIZONTAL_PUSH, P.VERTICAL_PUSH}),
+        )
+        if upper_index is None:
+            upper_index = _first_structural_slot(
+                day, frozenset({P.HORIZONTAL_PULL, P.VERTICAL_PULL})
+            )
+        lower_index = _first_structural_slot(day, frozenset({P.SQUAT, P.LUNGE}))
+        if lower_index is None:
+            lower_index = _first_structural_slot(day, frozenset({P.HIP_HINGE, P.HIP_EXTENSION}))
+        core_indexes.update(index for index in (upper_index, lower_index) if index is not None)
+    elif has_upper:
+        core_indexes.update(
+            index
+            for index in (
+                _first_structural_slot(day, frozenset({P.HORIZONTAL_PUSH, P.VERTICAL_PUSH})),
+                _first_structural_slot(day, frozenset({P.HORIZONTAL_PULL, P.VERTICAL_PULL})),
+            )
+            if index is not None
+        )
+    elif has_lower:
+        core_indexes.update(
+            index
+            for index in (
+                _first_structural_slot(day, frozenset({P.SQUAT, P.LUNGE})),
+                _first_structural_slot(day, frozenset({P.HIP_HINGE, P.HIP_EXTENSION})),
+            )
+            if index is not None
+        )
+    if compound_focus:
+        compound_indexes = (
+            index
+            for index, slot in enumerate(day.slots)
+            if slot.movement_pattern in _STRUCTURAL_COMPOUND_PATTERNS
+            and slot.superset_group is None
+            and slot.intensity_method is Method.STANDARD
+        )
+        for index in compound_indexes:
+            core_indexes.add(index)
+            if (
+                sum(
+                    day.slots[core_index].movement_pattern in _STRUCTURAL_COMPOUND_PATTERNS
+                    for core_index in core_indexes
+                )
+                >= 2
+            ):
+                break
+    if not core_indexes and day.slots:
+        core_indexes.add(0)
+
+    slots = tuple(
+        replace(
+            slot,
+            adaptation_priority=(
+                Priority.CORE
+                if index in core_indexes
+                else Priority.ACCESSORY
+                if slot.superset_group is not None
+                else Priority.OPTIONAL
+                if slot.movement_pattern in _OPTIONAL_SLOT_PATTERNS
+                else Priority.ACCESSORY
+            ),
+        )
+        for index, slot in enumerate(day.slots)
+    )
+    return replace(day, slots=slots)
+
+
+def _first_structural_slot(
+    day: TemplateDaySeed,
+    patterns: frozenset[MovementPattern],
+) -> int | None:
+    return next(
+        (
+            index
+            for index, slot in enumerate(day.slots)
+            if slot.movement_pattern in patterns
+            and slot.superset_group is None
+            and slot.intensity_method is Method.STANDARD
+        ),
+        None,
+    )
+
+
 def _direct_movement_minimums(day: TemplateDaySeed) -> dict[tuple[MuscleGroup, ...], int]:
     minimums: dict[tuple[MuscleGroup, ...], int] = {}
     for label, muscles in _SPECIALIZED_LARGE_TARGETS:
@@ -916,15 +1053,144 @@ def _validate_template_tags(
 
 TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple(
     _validate_template_tags(
-    _reclassify_goal_template(
-        _evidence_informed_template_order(
+        _assign_structural_slot_priorities(
+            _reclassify_goal_template(
+                _evidence_informed_template_order(
                 _fit_template_session_exercise_count(
                     _specialized_template_movement_floors(template)
                 )
             )
         )
     )
+    )
     for template in (
+        _template(
+            "two-day-first-month-full-body",
+            "Two-Day First Month Full Body",
+            "تمام‌بدن دو روزه ماه اول",
+            "Two conservative full-body sessions for learning stable movement patterns.",
+            "دو جلسه محافظه‌کارانه تمام‌بدن برای یادگیری الگوهای حرکتی پایدار.",
+            2,
+            Level.FIRST_MONTH,
+            (Tag.FULL_BODY, Tag.BALANCED),
+            (Method.STANDARD,),
+            _day(
+                "Full Body A",
+                "تمام‌بدن A",
+                (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES, M.ABS),
+                CHEST,
+                BACK_ROW,
+                SQUAT,
+                GLUTE_BRIDGE,
+                CORE,
+            ),
+            _day(
+                "Full Body B",
+                "تمام‌بدن B",
+                (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES, M.SHOULDERS),
+                INCLINE_CHEST,
+                LAT_PULLDOWN,
+                RDL,
+                LATERAL_RAISE,
+                CORE,
+            ),
+        ),
+        _template(
+            "three-day-first-month-full-body",
+            "Three-Day First Month Full Body",
+            "تمام‌بدن سه روزه ماه اول",
+            (
+                "Three low-complexity sessions that repeat foundational patterns "
+                "with modest variation."
+            ),
+            "سه جلسه کم‌پیچیدگی با تکرار الگوهای پایه و تنوع محدود.",
+            3,
+            Level.FIRST_MONTH,
+            (Tag.FULL_BODY, Tag.BALANCED),
+            (Method.STANDARD,),
+            _day(
+                "Full Body A",
+                "تمام‌بدن A",
+                (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
+                CHEST,
+                BACK_ROW,
+                SQUAT,
+                GLUTE_BRIDGE,
+                CORE,
+            ),
+            _day(
+                "Full Body B",
+                "تمام‌بدن B",
+                (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
+                INCLINE_CHEST,
+                LAT_PULLDOWN,
+                RDL,
+                GLUTE_BRIDGE,
+                CORE,
+            ),
+            _day(
+                "Full Body C",
+                "تمام‌بدن C",
+                (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS),
+                CHEST,
+                BACK_ROW,
+                LUNGE,
+                LEG_CURL,
+                LATERAL_RAISE,
+                CORE,
+            ),
+        ),
+        _template(
+            "four-day-first-month-upper-lower",
+            "Four-Day First Month Upper Lower",
+            "بالاتنه پایین‌تنه چهار روزه ماه اول",
+            "Short upper/lower practice sessions with conservative structural variety.",
+            "جلسات کوتاه بالاتنه و پایین‌تنه با تنوع ساختاری محافظه‌کارانه.",
+            4,
+            Level.FIRST_MONTH,
+            (Tag.UPPER_LOWER, Tag.BALANCED),
+            (Method.STANDARD,),
+            _day(
+                "Upper A",
+                "بالاتنه A",
+                (M.CHEST, M.BACK, M.SHOULDERS),
+                CHEST,
+                BACK_ROW,
+                LATERAL_RAISE,
+                BICEPS,
+                TRICEPS,
+            ),
+            _day(
+                "Lower A",
+                "پایین‌تنه A",
+                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
+                SQUAT,
+                RDL,
+                GLUTE_BRIDGE,
+                CALF,
+                CORE,
+            ),
+            _day(
+                "Upper B",
+                "بالاتنه B",
+                (M.CHEST, M.BACK, M.SHOULDERS),
+                INCLINE_CHEST,
+                LAT_PULLDOWN,
+                SHOULDER_PRESS,
+                BICEPS,
+                TRICEPS,
+            ),
+            _day(
+                "Lower B",
+                "پایین‌تنه B",
+                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
+                LUNGE,
+                RDL,
+                LEG_CURL,
+                CALF,
+                CORE,
+            ),
+        ),
         _template(
             "two-day-full-body-foundation",
             "Two-Day Full Body Foundation",

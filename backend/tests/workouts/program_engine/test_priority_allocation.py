@@ -262,7 +262,7 @@ def test_multiple_priority_muscles_receive_deterministic_balanced_emphasis() -> 
         )
 
 
-def test_priority_warning_is_explicit_when_catalog_cannot_provide_frequency_capacity() -> None:
+def test_priority_is_satisfied_when_catalog_can_provide_frequency_capacity() -> None:
     result = generate_program(
         request(
             primary_goal=Goal.MUSCLE_GAIN,
@@ -278,10 +278,9 @@ def test_priority_warning_is_explicit_when_catalog_cannot_provide_frequency_capa
 
     assert result.program is not None, result.errors
     metrics = result.program.aggregate_metrics["priority_metrics"][MuscleGroup.GLUTES.value]
-    assert metrics["status"] == "partial"
-    assert metrics["session_frequency"] < metrics["preferred_frequency"]
-    assert "PRIORITY_TARGET_CONSTRAINED" in metrics["reason_codes"]
-    assert "PRIORITY_TARGET_PARTIALLY_SATISFIED" in result.program.warnings
+    assert metrics["status"] == "satisfied"
+    assert metrics["session_frequency"] >= metrics["preferred_frequency"]
+    assert "PRIORITY_FREQUENCY_INCREASED" in metrics["reason_codes"]
 
 
 def test_priority_does_not_override_existing_hard_constraints() -> None:

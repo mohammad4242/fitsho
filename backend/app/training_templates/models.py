@@ -190,8 +190,8 @@ class TrainingProgramTemplateSlot(Base):
             name="ck_training_program_template_slots_priority_values",
         ),
         nullable=False,
-        default=TrainingTemplateSlotPriority.CORE,
-        server_default=TrainingTemplateSlotPriority.CORE.value,
+        default=TrainingTemplateSlotPriority.ACCESSORY,
+        server_default=TrainingTemplateSlotPriority.ACCESSORY.value,
     )
     superset_group: Mapped[str | None] = mapped_column(String(32), nullable=True)
     sets: Mapped[int] = mapped_column(Integer, nullable=False)

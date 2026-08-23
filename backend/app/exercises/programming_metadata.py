@@ -94,6 +94,10 @@ def _name_tokens(exercise: Exercise) -> str:
 
 def _infer_body_position(exercise: Exercise) -> BodyPosition | None:
     name = _name_tokens(exercise)
+    if "push up" in name:
+        return BodyPosition.SUPPORTED
+    if "bridge" in name:
+        return BodyPosition.LYING
     if any(token in name for token in ("seated", "sitting", "chair")):
         return BodyPosition.SEATED
     if any(token in name for token in ("lying", "floor", "supine", "prone", "plank")):

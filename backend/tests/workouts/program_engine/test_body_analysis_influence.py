@@ -160,6 +160,25 @@ def test_clear_lag_volume_boost_stays_inside_hard_ruleset_limit() -> None:
     assert "VOLUME_INCREASED_FOR_BODY_ANALYSIS" in plan.reason_codes
 
 
+def test_explicit_priority_keeps_hard_minimum_precedence_over_body_analysis() -> None:
+    source = request(
+        primary_goal="build_muscle",
+        training_experience="intermediate",
+        training_age_months=24,
+        available_training_days=4,
+        session_duration_minutes=45,
+        priority_muscles=[MuscleGroup.CHEST],
+        body_analysis_influence=influence(MuscleGroup.GLUTES, source="fully_reviewed"),
+    )
+    normalized = normalize_request(source, RULESET)
+
+    plan = plan_weekly_volume(normalized, select_split(normalized, RULESET), RULESET)
+    targets = {target.muscle: target for target in plan.targets}
+
+    assert targets[MuscleGroup.CHEST].direct_minimum_required is True
+    assert targets[MuscleGroup.GLUTES].direct_minimum_required is False
+
+
 def test_reference_template_path_scores_body_analysis_emphasis_tags() -> None:
     normalized = normalized_with(influence(MuscleGroup.SHOULDERS))
     templates = (
@@ -284,9 +303,13 @@ def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> Non
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics.get("reference_template") is None
+    assert result.program.aggregate_metrics.get("reference_template") == oversized.slug
     assert all(
         values["maximum_hard"] <= RULESET.maximum_sets[result.program.training_status]
+        for values in result.program.aggregate_metrics["volume_ranges_by_muscle"].values()
+    )
+    assert all(
+        values["actual_effective_volume"] <= values["effective_maximum_hard"]
         for values in result.program.aggregate_metrics["volume_ranges_by_muscle"].values()
     )
 

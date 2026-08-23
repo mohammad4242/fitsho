@@ -224,14 +224,15 @@ def plan_weekly_volume(
         has_dedicated_exposure = (
             split.split_type is SplitType.BODY_PART_ROTATION and direct_exposures[muscle] > 0
         )
-        direct_min_required = muscle in effective_priorities and (
+        is_explicit_priority = muscle in source.priority_muscles
+        direct_min_required = is_explicit_priority and (
             muscle not in SECONDARY_MUSCLES or has_dedicated_exposure or len(split.day_focuses) >= 3
         )
         # For secondary muscles without a dedicated session, coverage via compound secondary
         # stimulation is sufficient — don't enforce a hard coverage requirement.
         secondary_without_session = muscle in SECONDARY_MUSCLES and not has_dedicated_exposure
         coverage_required = muscle in MINIMUM_COVERAGE_MUSCLES or (
-            muscle in effective_priorities and not secondary_without_session
+            is_explicit_priority and not secondary_without_session
         )
         # Use the soft coverage minimum (not the full muscle_minimum) for secondary muscles
         # without dedicated sessions so that compound secondary stimulation can satisfy it.
@@ -240,7 +241,7 @@ def plan_weekly_volume(
             if secondary_without_session and muscle in effective_priorities
             else (
                 muscle_minimum
-                if muscle in effective_priorities
+                if is_explicit_priority
                 else ruleset.minimum_coverage_sets[request.training_status]
             )
         )

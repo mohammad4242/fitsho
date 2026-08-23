@@ -6,6 +6,7 @@ from app.exercises.service import seed_exercises
 from app.training_templates.engine_reference import load_template_references
 from app.training_templates.models import TrainingProgramTemplate
 from app.training_templates.service import seed_training_program_templates
+from app.workouts.program_engine.enums import SplitType
 
 
 def test_engine_references_preserve_linked_slot_and_adaptation_metadata(db: Session) -> None:
@@ -41,3 +42,25 @@ def test_engine_reference_rejects_noncanonical_persisted_focus_tags(db: Session)
 
     with pytest.raises(ValueError, match="Unknown template focus tag"):
         load_template_references(db)
+
+
+@pytest.mark.parametrize(
+    ("slug", "expected"),
+    (
+        ("two-day-full-body-foundation", SplitType.FULL_BODY),
+        ("four-day-upper-lower-strength-intermediate", SplitType.UPPER_LOWER),
+        ("three-day-push-pull-legs", SplitType.PUSH_PULL_LEGS),
+        ("four-day-classic-body-part", SplitType.BODY_PART_ROTATION),
+    ),
+)
+def test_engine_reference_preserves_canonical_split_identity(
+    db: Session,
+    slug: str,
+    expected: SplitType,
+) -> None:
+    seed_exercises(db)
+    seed_training_program_templates(db)
+
+    reference = next(item for item in load_template_references(db) if item.slug == slug)
+
+    assert reference.split_type is expected

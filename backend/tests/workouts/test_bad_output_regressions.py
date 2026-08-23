@@ -56,7 +56,7 @@ def test_regression_thirty_minute_session_reports_traceable_constrained_workload
         entry for entry in result.program.decision_trace if entry["stage"] == "volume_repair"
     )
     assert "VOLUME_REPAIR_SOFT_TARGET_REDUCED" in volume_repair["reasons"]
-    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in result.program.warnings
+    assert "PLANNED_SOFT_VOLUME_REDUCED_DURING_SESSION_FIT" in result.program.warnings
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
         policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)

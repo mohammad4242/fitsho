@@ -39,6 +39,28 @@ ARM_PATTERNS = frozenset({MovementPattern.ELBOW_FLEXION, MovementPattern.ELBOW_E
 LOWER_ACCESSORY_PATTERNS = frozenset({MovementPattern.KNEE_FLEXION, MovementPattern.CALF_RAISE})
 
 
+def template_slot_allowed_patterns(
+    pattern: MovementPattern,
+    target_muscles: tuple[MuscleGroup, ...],
+) -> frozenset[MovementPattern]:
+    targets = frozenset(target_muscles)
+    if pattern in PULL_PATTERNS and MuscleGroup.BACK in targets:
+        return PULL_PATTERNS
+    if pattern in HINGE_PATTERNS | frozenset({MovementPattern.KNEE_FLEXION}) and targets & {
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+    }:
+        return HINGE_PATTERNS | frozenset({MovementPattern.KNEE_FLEXION})
+    if (
+        pattern in {MovementPattern.SQUAT, MovementPattern.LUNGE}
+        and MuscleGroup.QUADRICEPS in targets
+    ):
+        return frozenset({MovementPattern.SQUAT, MovementPattern.LUNGE})
+    if pattern in CORE_PATTERNS and MuscleGroup.ABS in targets:
+        return CORE_PATTERNS
+    return frozenset({pattern})
+
+
 @dataclass(frozen=True)
 class SlotCompatibility:
     level: CompatibilityLevel

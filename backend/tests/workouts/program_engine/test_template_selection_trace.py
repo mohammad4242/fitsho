@@ -219,6 +219,42 @@ def test_hard_rejections_never_receive_template_scores() -> None:
     assert all("score" not in item for item in trace["hard_rejections"])
 
 
+def test_unresolvable_core_has_a_concrete_rejection_category() -> None:
+    template = replace(
+        _template("unresolvable"),
+        days=(
+            TemplateReferenceDay(
+                day_number=1,
+                title="Missing core",
+                focus=(MuscleGroup.CHEST,),
+                slots=(
+                    TemplateReferenceSlot(
+                        exercise_id=None,
+                        exercise_slug_hint="missing",
+                        target_muscles=(MuscleGroup.CHEST,),
+                        movement_pattern=MovementPattern.SHOULDER_EXTERNAL_ROTATION,
+                        intensity_method="standard",
+                        adaptation_priority="core",
+                        superset_group=None,
+                        sets=3,
+                        rep_min=8,
+                        rep_max=12,
+                        target_rir=2,
+                        rest_seconds=90,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    trace = select_template_reference_result(
+        _normalized(), (), (template,), RULESET
+    ).decision_trace()
+
+    assert trace["selected"] is None
+    assert trace["rejection_category"] == "CORE_SLOT_UNRESOLVED"
+
+
 def test_equal_scores_record_deterministic_slug_tie_break() -> None:
     normalized = _normalized()
     templates = (_template("a-template"), _template("z-template"))

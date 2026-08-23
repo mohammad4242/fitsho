@@ -441,23 +441,32 @@ def _template_stats(result: ProgramGenerationResult) -> dict[str, object]:
         if result.program is not None
         else None
     )
-    attempted = _number(selection.get("templates_considered", 0)) > 0
+    attempted = isinstance(selected, str)
     succeeded = isinstance(reference, str)
     reasons: list[str] = []
+    rejection_categories: list[str] = []
     if attempted and not succeeded:
-        for entry in result.decision_trace:
+        entries = (
+            result.program.decision_trace if result.program is not None else result.decision_trace
+        )
+        for entry in entries:
             if entry.get("stage") == "template_reference":
                 reasons.extend(_string_values(entry.get("reason_codes")))
+                category = entry.get("rejection_category")
+                if isinstance(category, str):
+                    rejection_categories.append(category)
         if not reasons:
-            reasons.append("TEMPLATE_REFERENCE_REJECTED")
+            rejection_categories.append("ADAPTATION_EXHAUSTED")
     if not attempted:
         reasons.extend(
             code
             for item in _mapping_sequence(selection.get("hard_rejections", ()))
             for code in _string_values(item.get("reason_codes"))
         )
-        if not reasons:
-            reasons.append("NO_TEMPLATE_CANDIDATE")
+        category = selection.get("rejection_category")
+        rejection_categories.append(
+            category if isinstance(category, str) else "NO_DAYS_LEVEL_CANDIDATE"
+        )
     dynamic = result.program is not None and reference is None
     candidates = _mapping_sequence(selection.get("candidates", ()))
     selected_score = next(
@@ -467,11 +476,12 @@ def _template_stats(result: ProgramGenerationResult) -> dict[str, object]:
     return {
         "attempted": attempted,
         "succeeded": succeeded,
-        "fallback_activated": attempted and not succeeded,
+        "fallback_activated": dynamic,
         "fallback_succeeded": dynamic and result.is_success,
         "selected_template": selected,
         "template_path": reference,
         "reason_codes": tuple(dict.fromkeys(reasons)),
+        "rejection_categories": tuple(dict.fromkeys(rejection_categories)),
         "selected_score_breakdown": selected_score,
         "score_breakdown": candidates,
     }
@@ -524,11 +534,16 @@ def _audit_program(
     if len(program.weekly_schedule) != profile.resistance_days:
         issue("DAY_COUNT_MISMATCH", "engine_bug", str(len(program.weekly_schedule)))
     metrics = program.aggregate_metrics
-    effective_volume = cast(
-        Mapping[str, object], metrics.get("weekly_effective_sets_by_muscle", {})
+    ranges = metrics.get("volume_ranges_by_muscle", {})
+    missing_major_coverage = _missing_major_muscle_coverage(
+        ranges if isinstance(ranges, Mapping) else {}
     )
-    if not all(_number(effective_volume.get(muscle.value, 0)) >= 2.0 for muscle in MAJOR_MUSCLES):
-        issue("MISSING_MAJOR_MUSCLE_COVERAGE", "quality", "major muscle coverage")
+    if missing_major_coverage:
+        issue(
+            "MISSING_MAJOR_MUSCLE_COVERAGE",
+            "quality",
+            ",".join(missing_major_coverage),
+        )
     if not recovery_spacing_is_valid(program.weekly_schedule, RULESET):
         issue("RECOVERY_SPACING_INVALID", "quality", "direct/exposure overlap")
 
@@ -554,24 +569,31 @@ def _audit_program(
         for muscle in profile.priority_muscles:
             metric = priority_metrics.get(muscle.value, {})
             if isinstance(metric, Mapping) and metric.get("status") != "satisfied":
-                issue("EXPLICIT_PRIORITY_PARTIAL", "quality", muscle.value)
+                volume_range = ranges.get(muscle.value, {}) if isinstance(ranges, Mapping) else {}
+                severity = (
+                    "constraint"
+                    if isinstance(volume_range, Mapping)
+                    and _hard_priority_minimum_is_met(volume_range)
+                    else "quality"
+                )
+                issue("EXPLICIT_PRIORITY_PARTIAL", severity, muscle.value)
         for muscle, _classification in profile.body_analysis_priorities:
             metric = priority_metrics.get(muscle.value, {})
             if isinstance(metric, Mapping) and metric.get("status") != "satisfied":
-                issue("BODY_ANALYSIS_PRIORITY_PARTIAL", "quality", muscle.value)
-    ranges = metrics.get("volume_ranges_by_muscle", {})
+                reason_codes = set(_string_values(metric.get("reason_codes")))
+                severity = (
+                    "constraint"
+                    if profile.priority_muscles or "PRIORITY_TARGET_CONSTRAINED" in reason_codes
+                    else "quality"
+                )
+                issue("BODY_ANALYSIS_PRIORITY_PARTIAL", severity, muscle.value)
     if isinstance(ranges, Mapping):
         for muscle, values in ranges.items():
             if isinstance(values, Mapping) and values.get("status") == "outside_acceptable_range":
                 issue("VOLUME_OUTSIDE_ACCEPTABLE_RANGE", "quality", str(muscle))
 
-    by_signature = Counter(
-        (item.primary_muscle, item.movement_pattern)
-        for day in program.weekly_schedule
-        for item in day.exercises
-    )
-    if any(count >= 4 for count in by_signature.values()):
-        issue("REDUNDANT_NEAR_IDENTICAL_MOVEMENTS", "quality", "weekly repetition")
+    if _has_redundant_near_identical_movements(program.weekly_schedule):
+        issue("REDUNDANT_NEAR_IDENTICAL_MOVEMENTS", "quality", "same-session duplication")
     if any(
         sum(item.exercise_id == candidate_id for item in day.exercises) > 2
         for day in program.weekly_schedule
@@ -583,6 +605,52 @@ def _audit_program(
         if day.cardio is not None and day.cardio.intensity.value == "vigorous":
             issue("CARDIO_INTENSITY_TOO_HIGH", "quality", day.cardio.modality_name)
     return tuple(issues)
+
+
+def _hard_priority_minimum_is_met(volume_range: Mapping[str, object]) -> bool:
+    effective_met = _number(volume_range.get("actual_effective_volume")) >= _number(
+        volume_range.get("minimum_effective_sets")
+    )
+    if not bool(volume_range.get("direct_minimum_required")):
+        return effective_met
+    return effective_met and _number(volume_range.get("actual_direct_volume")) >= _number(
+        volume_range.get("minimum_direct_sets")
+    )
+
+
+def _missing_major_muscle_coverage(
+    volume_ranges: Mapping[str, object],
+) -> tuple[str, ...]:
+    missing: list[str] = []
+    for muscle in sorted(MAJOR_MUSCLES, key=lambda item: item.value):
+        values = volume_ranges.get(muscle.value)
+        if not isinstance(values, Mapping) or not bool(values.get("minimum_coverage_required")):
+            continue
+        if _number(values.get("actual_effective_volume")) < _number(
+            values.get("minimum_effective_sets")
+        ):
+            missing.append(muscle.value)
+    return tuple(missing)
+
+
+def _has_redundant_near_identical_movements(days: Sequence[object]) -> bool:
+    for day in days:
+        exercises = tuple(getattr(day, "exercises", ()))
+        exercise_ids = [getattr(item, "exercise_id", None) for item in exercises]
+        if len(exercise_ids) != len(set(exercise_ids)):
+            return True
+        signatures = Counter(
+            (
+                getattr(item, "primary_muscle", None),
+                getattr(item, "movement_pattern", None),
+                getattr(item, "exercise_type", None),
+                frozenset(getattr(item, "equipment", ())),
+            )
+            for item in exercises
+        )
+        if any(count >= 3 for count in signatures.values()):
+            return True
+    return False
 
 
 def _audit_quality_metrics(
@@ -651,12 +719,20 @@ def _category(
         return "UNSATISFIED"
     if any(item.get("severity") == "engine_bug" for item in issues):
         return "ENGINE_BUG"
-    if issues:
+    if any(item.get("severity") == "quality" for item in issues):
         return "QUALITY_ISSUE"
-    if bool(template.get("fallback_succeeded")):
-        return "FALLBACK_SUCCESS"
     warnings = result.program.validation_report.warnings
-    return "PASS_WITH_CONSTRAINTS" if warnings else "PASS"
+    constrained = warnings or any(item.get("severity") == "constraint" for item in issues)
+    return "PASS_WITH_CONSTRAINTS" if constrained else "PASS"
+
+
+def _construction_path(
+    result: ProgramGenerationResult,
+    template: Mapping[str, object],
+) -> str:
+    if result.program is None:
+        return "NONE"
+    return "TEMPLATE" if bool(template.get("succeeded")) else "FALLBACK"
 
 
 def _case_record(
@@ -752,6 +828,8 @@ def _case_record(
         "quality_trace": _jsonable(quality_trace.get("metrics", {}) if quality_trace else {}),
         "quality_audit": _jsonable(audit_quality),
         "audit_findings": _jsonable(issues),
+        "quality_outcome": _category(result, template, issues),
+        "construction_path": _construction_path(result, template),
         "category": _category(result, template, issues),
         "determinism": {
             "fingerprints": determinism_fingerprints,
@@ -790,6 +868,7 @@ def _quality_rate(
 ) -> dict[str, object]:
     applicable = 0
     satisfied = 0
+    outcomes: Counter[str] = Counter()
     for record in records:
         quality = cast(Mapping[str, object], record[source])
         value = quality.get(key)
@@ -797,10 +876,12 @@ def _quality_rate(
             continue
         applicable += 1
         satisfied += _quality_satisfied(value, accepted)
+        outcomes[str(value)] += 1
     return {
         "satisfied": satisfied,
         "applicable": applicable,
         "rate": round(satisfied / applicable, 4) if applicable else 0.0,
+        "outcomes": dict(sorted(outcomes.items())),
     }
 
 
@@ -819,11 +900,19 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
         if item["fallback_activated"]
         for code in cast(Sequence[str], item["reason_codes"])
     )
+    rejection_categories = Counter(
+        category
+        for item in template
+        if item["fallback_activated"]
+        for category in cast(Sequence[str], item["rejection_categories"])
+    )
     findings = Counter(
         str(finding["code"])
         for item in records
         for finding in cast(Sequence[Mapping[str, object]], item["audit_findings"])
     )
+    feasible = total - unsatisfied
+    quality_passes = categories["PASS"] + categories["PASS_WITH_CONSTRAINTS"]
     breakdowns: dict[str, dict[str, dict[str, int]]] = defaultdict(dict)
     for dimension in ("experience_level", "days", "goal", "duration", "equipment", "limitations"):
         grouped: dict[str, Counter[str]] = defaultdict(Counter)
@@ -867,6 +956,15 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
         "category_percentages": {
             key: round(value / total * 100, 2) for key, value in sorted(categories.items())
         },
+        "quality_pass_rate": round(quality_passes / feasible, 4) if feasible else 0.0,
+        "feasible_profiles": feasible,
+        "engine_bugs": categories["ENGINE_BUG"],
+        "safety_violations": sum(
+            findings[code]
+            for code in ("LIMITATION_VIOLATION_PATTERN", "LIMITATION_VIOLATION_CAUTION")
+        ),
+        "equipment_violations": findings["UNAVAILABLE_EQUIPMENT"],
+        "redundancy_findings": findings["REDUNDANT_NEAR_IDENTICAL_MOVEMENTS"],
         "fallback": {
             "template_path_attempts": template_attempts,
             "template_path_successes": template_successes,
@@ -884,6 +982,7 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
             if total
             else 0.0,
             "reason_codes": dict(sorted(reason_codes.items())),
+            "rejection_categories": dict(sorted(rejection_categories.items())),
         },
         "quality": {
             "validation_success_rate": round(validation_success / total, 4) if total else 0.0,
@@ -978,18 +1077,16 @@ def run_benchmark(
     reference_hash = service._template_reference_hash(references)
     records: list[dict[str, object]] = []
     profiles = benchmark_profiles()
-    for index, profile in enumerate(profiles):
+    for profile in profiles:
         request = profile_to_request(profile)
         case_catalog = catalog_by_sex[profile.sex]
         request = apply_catalog_constraints(request, profile, case_catalog)
         result = generate_program(request, case_catalog, RULESET, reference_templates=references)
-        fingerprints: tuple[str, ...] = ()
-        if index % 5 == 0:
-            repeated = [
-                generate_program(request, case_catalog, RULESET, reference_templates=references)
-                for _ in range(max(1, determinism_repeats))
-            ]
-            fingerprints = tuple(canonical_fingerprint(item) for item in repeated)
+        repeated = [
+            generate_program(request, case_catalog, RULESET, reference_templates=references)
+            for _ in range(max(1, determinism_repeats))
+        ]
+        fingerprints = tuple(canonical_fingerprint(item) for item in repeated)
         records.append(_case_record(profile, request, result, case_catalog, fingerprints))
 
     negative_cases: list[dict[str, object]] = []
@@ -1021,7 +1118,17 @@ def run_benchmark(
         "supported_matrix": SUPPORTED_MATRIX,
         "aggregate": _aggregate(records, len(NEGATIVE_PROFILES)),
         "determinism": {
-            "representative_cases": sum(1 for index in range(len(records)) if index % 5 == 0),
+            "cases": len(records),
+            "rate": round(
+                sum(
+                    bool(cast(Mapping[str, object], record["determinism"])["identical"])
+                    for record in records
+                )
+                / len(records),
+                4,
+            )
+            if records
+            else 0.0,
             "mismatches": [
                 record["input"]
                 for record in records

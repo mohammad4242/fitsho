@@ -195,6 +195,7 @@ def test_dynamic_fallback_retains_the_template_selection_rejection_trace() -> No
     assert selection_trace["hard_rejections"] == (
         {"slug": "wrong-days", "reason_codes": ("DAYS_MISMATCH",)},
     )
+    assert selection_trace["rejection_category"] == "NO_DAYS_LEVEL_CANDIDATE"
 
 
 def test_first_month_and_beginner_select_distinct_template_levels() -> None:

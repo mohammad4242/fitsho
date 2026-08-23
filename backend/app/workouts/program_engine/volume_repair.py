@@ -1,7 +1,8 @@
+import math
 from collections import Counter
 from dataclasses import replace
 
-from app.exercises.enums import MuscleGroup
+from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
 from app.workouts.program_engine.enums import Goal
@@ -26,6 +27,20 @@ from app.workouts.program_engine.session_targets import english_session_title
 from app.workouts.program_engine.strength_programming import classify_strength_role
 from app.workouts.program_engine.template_sessions import adaptation_preservation_rank
 
+_HARD_MOVEMENT_PATTERN_GROUPS = (
+    frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH}),
+    frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL}),
+    frozenset({MovementPattern.SQUAT, MovementPattern.LUNGE, MovementPattern.KNEE_EXTENSION}),
+    frozenset({MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION}),
+    frozenset(
+        {
+            MovementPattern.CORE_ANTI_EXTENSION,
+            MovementPattern.CORE_ANTI_ROTATION,
+            MovementPattern.CORE_ANTI_LATERAL_FLEXION,
+        }
+    ),
+)
+
 
 def repair_weekly_volume(
     days: tuple[WorkoutDay, ...],
@@ -36,6 +51,7 @@ def repair_weekly_volume(
     candidates: tuple[ExerciseCandidate, ...] = (),
     cardio_reserve_minutes: int = 0,
     allow_soft_exercise_additions: bool = True,
+    preserve_template_core_structure: bool = False,
 ) -> tuple[tuple[WorkoutDay, ...], tuple[str, ...]]:
     """Keep effective volume inside targets and hard caps before validation.
 
@@ -82,6 +98,7 @@ def repair_weekly_volume(
             ruleset,
             per_exercise_excessive,
             hard_weekly_excessive,
+            preserve_template_core_structure,
         )
         if reduction is not None:
             day_index, exercise_index, exercise = reduction
@@ -130,6 +147,7 @@ def repair_weekly_volume(
             )
             if (same_muscle_exposures > 1 or hard_removal_required) and (
                 len(repaired[day_index]) > ruleset.minimum_exercises_per_session
+                or preserve_template_core_structure
                 or hard_removal_required
             ):
                 repaired[day_index].pop(exercise_index)
@@ -203,6 +221,7 @@ def repair_weekly_volume(
             request,
             targets,
             ruleset,
+            use_hard_maximums=repairing_hard_minimum,
         )
         if (
             exercise_addition is None
@@ -218,6 +237,7 @@ def repair_weekly_volume(
                 request,
                 targets,
                 ruleset,
+                use_hard_maximums=False,
             )
         if exercise_addition is not None:
             day_index, programmed = exercise_addition
@@ -246,6 +266,7 @@ def repair_weekly_volume(
             ),
             request,
             ruleset,
+            use_hard_maximums=repairing_hard_minimum,
         )
         if addition is None:
             if repairing_hard_minimum:
@@ -258,6 +279,7 @@ def repair_weekly_volume(
                     tuple(day.cardio.duration_minutes if day.cardio else 0 for day in days),
                     request,
                     ruleset,
+                    use_hard_maximums=False,
                 )
                 if soft_addition is not None:
                     day_index, exercise_index, exercise, reason = soft_addition
@@ -406,6 +428,8 @@ def _select_exercise_addition(
     request: NormalizedProgramRequest,
     targets: dict[MuscleGroup, VolumeTarget],
     ruleset: ProgramRuleset,
+    *,
+    use_hard_maximums: bool,
 ) -> tuple[int, ProgrammedExercise] | None:
     needed = direct_under | effective_under
     if not needed or not candidates:
@@ -423,7 +447,9 @@ def _select_exercise_addition(
     options: list[tuple[tuple[object, ...], int, ProgrammedExercise]] = []
     current_effective = calculate_effective_volume(
         (item for items in days for item in items), ruleset
-    ).effective_sets_by_muscle
+    )
+    current_effective_sets = current_effective.effective_sets_by_muscle
+    current_direct_sets = current_effective.direct_sets_by_muscle
     for muscle in sorted(
         needed,
         key=lambda item: (priority_order.get(item, len(priority_order)), item.value),
@@ -433,14 +459,25 @@ def _select_exercise_addition(
             for candidate in candidates
             if candidate.primary_muscle is muscle and candidate.id not in selected_ids
         )
+        if (
+            not muscle_candidates
+            and use_hard_maximums
+            and muscle in direct_under
+            and muscle in priority_policy.explicit_priorities
+        ):
+            muscle_candidates = tuple(
+                candidate for candidate in candidates if candidate.primary_muscle is muscle
+            )
         for ranked in rank_exercises(request, muscle_candidates, ruleset, needed_muscle=muscle):
             candidate = ranked.exercise
+            repeated_exercise = candidate.id in selected_ids
             required_sets = (
-                targets[muscle].minimum_direct_sets
+                targets[muscle].minimum_direct_sets - current_direct_sets.get(muscle.value, 0)
                 if muscle in direct_under
                 else targets[muscle].minimum_effective_sets
+                - current_effective_sets.get(muscle.value, 0)
             )
-            sets = max(ruleset.minimum_working_sets, required_sets)
+            sets = max(ruleset.minimum_working_sets, math.ceil(required_sets))
             sets = min(sets, ruleset.max_sets_per_muscle_per_session)
             sets = min(sets, _candidate_set_cap(candidate, days, request, targets, ruleset))
             prescription = prescription_for(
@@ -462,14 +499,33 @@ def _select_exercise_addition(
             for day_index, (day, original) in enumerate(zip(days, originals, strict=True)):
                 if len(day) >= ruleset.max_exercises_per_session:
                     continue
+                if any(item.exercise_id == candidate.id for item in day):
+                    continue
                 if not exercise_fits_focus(candidate, original.focus) and not (
-                    original.focus.startswith("template_reference")
+                    (
+                        original.focus.startswith("template_reference")
+                        or (use_hard_maximums and muscle in priority_policy.explicit_priorities)
+                    )
                     and muscle in priority_policy.priorities
                 ):
                     continue
                 direct_by_session = _direct_sets([day])
-                if direct_by_session[muscle] + sets > ruleset.max_sets_per_muscle_per_session:
-                    continue
+                session_overage = (
+                    direct_by_session[muscle] + sets - ruleset.max_sets_per_muscle_per_session
+                )
+                if session_overage > 0:
+                    reducible_same_muscle = sum(
+                        max(0, item.sets - ruleset.minimum_working_sets)
+                        for item in day
+                        if item.primary_muscle is muscle
+                    )
+                    if (
+                        not use_hard_maximums
+                        or session_overage > reducible_same_muscle
+                        or direct_by_session[muscle] + sets - session_overage
+                        < targets[muscle].minimum_direct_sets
+                    ):
+                        continue
                 current_frequency = _weekly_exposure_count(days, muscle)
                 adds_exposure = not any(item.primary_muscle is muscle for item in day)
                 frequency_cap = _direct_frequency_cap(len(days), ruleset)
@@ -494,6 +550,8 @@ def _select_exercise_addition(
                 ]
                 if role_repeated:
                     reasons.append("DELIBERATE_REDUNDANCY_FOR_MINIMUM_COVERAGE")
+                if repeated_exercise:
+                    reasons.append("PRIORITY_EXERCISE_REPEATED_FOR_HARD_MINIMUM")
                 substitutions = tuple(
                     item.id
                     for item in rank_replacement_exercises(
@@ -538,12 +596,24 @@ def _select_exercise_addition(
                     (item for items in simulated for item in items),
                     ruleset,
                 )
-                if any(
-                    simulated_volume.effective_sets_by_muscle.get(target_muscle.value, 0)
-                    > target.acceptable_maximum
-                    and simulated_volume.effective_sets_by_muscle.get(target_muscle.value, 0)
-                    > current_effective.get(target_muscle.value, 0)
+                violations = tuple(
+                    (target_muscle, target, simulated_sets)
                     for target_muscle, target in targets.items()
+                    if (
+                        simulated_sets := simulated_volume.effective_sets_by_muscle.get(
+                            target_muscle.value, 0
+                        )
+                    )
+                    > (target.maximum_hard if use_hard_maximums else target.acceptable_maximum)
+                    and simulated_sets > current_effective_sets.get(target_muscle.value, 0)
+                )
+                if violations and not _repairable_direct_priority_overage(
+                    violations,
+                    candidate,
+                    day,
+                    simulated_volume.direct_sets_by_muscle,
+                    direct_under,
+                    ruleset,
                 ):
                     continue
                 options.append(
@@ -573,6 +643,32 @@ def _select_exercise_addition(
         return None
     selected = min(options, key=lambda item: item[0])
     return selected[1], selected[2]
+
+
+def _repairable_direct_priority_overage(
+    violations: tuple[tuple[MuscleGroup, VolumeTarget, float], ...],
+    candidate: ExerciseCandidate,
+    day: list[ProgrammedExercise],
+    simulated_direct_sets: dict[str, int],
+    direct_under: set[MuscleGroup],
+    ruleset: ProgramRuleset,
+) -> bool:
+    if len(violations) != 1 or candidate.primary_muscle not in direct_under:
+        return False
+    muscle, target, simulated_effective = violations[0]
+    if muscle is not candidate.primary_muscle:
+        return False
+    direct_overage = simulated_direct_sets.get(muscle.value, 0) - target.minimum_direct_sets
+    reducible_existing_sets = sum(
+        max(0, item.sets - ruleset.minimum_working_sets)
+        for item in day
+        if item.primary_muscle is muscle
+    )
+    return (
+        direct_overage > 0
+        and direct_overage <= reducible_existing_sets
+        and simulated_effective - direct_overage <= target.maximum_hard
+    )
 
 
 def _maximum_for(
@@ -613,6 +709,7 @@ def _select_reduction_candidate(
     ruleset: ProgramRuleset,
     per_exercise_excessive: set[tuple[int, int]],
     hard_weekly_excessive: set[str],
+    preserve_template_core_structure: bool,
 ) -> tuple[int, int, ProgrammedExercise] | None:
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     priority_over_target = {
@@ -670,6 +767,12 @@ def _select_reduction_candidate(
                 and not affected.intersection(hard_weekly_excessive)
             ):
                 continue
+            if (
+                exercise.sets <= ruleset.minimum_working_sets
+                and preserve_template_core_structure
+                and _is_last_hard_movement_role(exercise, days)
+            ):
+                continue
             candidates.append((day_index, exercise_index, exercise))
     if not candidates:
         return None
@@ -700,6 +803,19 @@ def _affected_muscle_values(exercise: ProgrammedExercise) -> set[str]:
     return values
 
 
+def _is_last_hard_movement_role(
+    exercise: ProgrammedExercise,
+    days: list[list[ProgrammedExercise]],
+) -> bool:
+    relevant_groups = tuple(
+        group for group in _HARD_MOVEMENT_PATTERN_GROUPS if exercise.movement_pattern in group
+    )
+    return any(
+        sum(item.movement_pattern in group for day in days for item in day) <= 1
+        for group in relevant_groups
+    )
+
+
 def _select_addition_candidate(
     days: list[list[ProgrammedExercise]],
     direct_under: set[MuscleGroup],
@@ -709,13 +825,18 @@ def _select_addition_candidate(
     cardio_minutes_by_day: tuple[int, ...],
     request: NormalizedProgramRequest,
     ruleset: ProgramRuleset,
+    *,
+    use_hard_maximums: bool = False,
 ) -> tuple[int, int, ProgrammedExercise, str] | None:
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     duration_policy = get_session_duration_policy(
         request.source.session_duration_minutes,
     )
     candidates = []
-    hard_maximums = {muscle.value: target.acceptable_maximum for muscle, target in targets.items()}
+    maximums = {
+        muscle.value: (target.maximum_hard if use_hard_maximums else target.acceptable_maximum)
+        for muscle, target in targets.items()
+    }
     current_effective = calculate_effective_volume(
         (item for items in days for item in items), ruleset
     ).effective_sets_by_muscle
@@ -775,7 +896,7 @@ def _select_addition_candidate(
                 simulated_volume.effective_sets_by_muscle.get(muscle, 0) > maximum
                 and simulated_volume.effective_sets_by_muscle.get(muscle, 0)
                 > current_effective.get(muscle, 0)
-                for muscle, maximum in hard_maximums.items()
+                for muscle, maximum in maximums.items()
             ):
                 continue
             reason = (

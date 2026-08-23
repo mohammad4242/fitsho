@@ -403,6 +403,19 @@ class TemplateReference:
     intensity_methods: tuple[str, ...]
     days: tuple[TemplateReferenceDay, ...]
 
+    @property
+    def split_type(self) -> SplitType:
+        structures = frozenset(self.focus_tags)
+        if TemplateFocusTag.PUSH_PULL_LEGS in structures:
+            if TemplateFocusTag.UPPER_LOWER in structures:
+                return SplitType.PUSH_PULL_LEGS_UPPER_LOWER
+            return SplitType.PUSH_PULL_LEGS
+        if TemplateFocusTag.UPPER_LOWER in structures:
+            return SplitType.UPPER_LOWER
+        if TemplateFocusTag.FULL_BODY in structures:
+            return SplitType.FULL_BODY
+        return SplitType.BODY_PART_ROTATION
+
 
 @dataclass(frozen=True)
 class ProgrammedExercise:

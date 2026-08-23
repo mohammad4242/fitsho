@@ -1,8 +1,9 @@
 from dataclasses import replace
 
 from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
-from app.workouts.program_engine.engine import generate_program
+from app.workouts.program_engine.engine import _template_rejection_category, generate_program
 from app.workouts.program_engine.enums import RecoveryRating, ValidationStatus
+from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -11,6 +12,7 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceDay,
     TemplateReferenceSlot,
 )
+from app.workouts.program_engine.template_sessions import build_template_sessions
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
 
 
@@ -120,7 +122,12 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
         MuscleGroup.ABS,
     )
 
-    def slot(name: str, focus: tuple[MuscleGroup, ...]) -> TemplateReferenceSlot:
+    def slot(
+        name: str,
+        focus: tuple[MuscleGroup, ...],
+        *,
+        priority: str = "core",
+    ) -> TemplateReferenceSlot:
         candidate = by_name[name]
         return TemplateReferenceSlot(
             exercise_id=candidate.id,
@@ -128,7 +135,7 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
             target_muscles=focus,
             movement_pattern=candidate.movement_pattern,
             intensity_method="rest_pause" if name == "Dumbbell Press" else "standard",
-            adaptation_priority="core",
+            adaptation_priority=priority,
             superset_group=None,
             sets=4,
             rep_min=8,
@@ -152,7 +159,7 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
                 (
                     slot("Push Up", upper_focus),
                     slot("Bodyweight Row", upper_focus),
-                    slot("Incline Push Up", upper_focus),
+                    slot("Incline Push Up", upper_focus, priority="accessory"),
                 ),
             ),
             TemplateReferenceDay(
@@ -168,7 +175,7 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
                 (
                     slot("Dumbbell Press", upper_focus),
                     slot("Dumbbell Row", upper_focus),
-                    slot("Decline Push Up", upper_focus),
+                    slot("Decline Push Up", upper_focus, priority="accessory"),
                 ),
             ),
             TemplateReferenceDay(
@@ -180,6 +187,90 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
         ),
     )
     return template, catalog
+
+
+def test_safe_core_substitution_can_repeat_across_sessions_deterministically() -> None:
+    by_name = {candidate.name: candidate for candidate in full_catalog()}
+    catalog = [
+        by_name[name]
+        for name in (
+            "Bodyweight Hinge",
+            "Push Up",
+            "Bodyweight Row",
+            "Bodyweight Squat",
+            "Calf Raise",
+            "Incline Push Up",
+            "Dumbbell Row",
+            "Wall Knee Extension",
+            "Plank",
+        )
+    ]
+    hinge = by_name["Bodyweight Hinge"]
+
+    def slot(candidate: ExerciseCandidate, *, priority: str = "core") -> TemplateReferenceSlot:
+        return TemplateReferenceSlot(
+            exercise_id=None if candidate is hinge else candidate.id,
+            exercise_slug_hint=candidate.name,
+            target_muscles=(candidate.primary_muscle,) if candidate.primary_muscle else (),
+            movement_pattern=candidate.movement_pattern,
+            intensity_method="standard",
+            adaptation_priority=priority,
+            superset_group=None,
+            sets=3,
+            rep_min=8,
+            rep_max=12,
+            target_rir=2,
+            rest_seconds=60,
+        )
+
+    reference = TemplateReference(
+        slug="two-day-shared-hinge-substitution",
+        days_per_week=2,
+        training_level="beginner",
+        fitness_goal="general_fitness",
+        focus_tags=("full_body", "balanced"),
+        intensity_methods=("standard",),
+        days=(
+            TemplateReferenceDay(
+                1,
+                "A",
+                (),
+                (
+                    slot(hinge, priority="core"),
+                    slot(by_name["Push Up"]),
+                    slot(by_name["Bodyweight Row"]),
+                    slot(by_name["Bodyweight Squat"]),
+                    slot(by_name["Calf Raise"]),
+                ),
+            ),
+            TemplateReferenceDay(
+                2,
+                "B",
+                (),
+                (
+                    slot(hinge, priority="core"),
+                    slot(by_name["Incline Push Up"]),
+                    slot(by_name["Dumbbell Row"]),
+                    slot(by_name["Wall Knee Extension"]),
+                    slot(by_name["Plank"]),
+                ),
+            ),
+        ),
+    )
+    normalized = normalize_request(
+        template_request(
+            available_training_days=2,
+            training_experience="beginner",
+            training_age_months=6,
+        ),
+        RULESET,
+    )
+
+    first = build_template_sessions(normalized, reference, tuple(catalog), RULESET)
+    second = build_template_sessions(normalized, reference, tuple(reversed(catalog)), RULESET)
+
+    assert [draft.exercises[0].id for draft in first.drafts] == [hinge.id, hinge.id]
+    assert [draft.exercises[0].id for draft in second.drafts] == [hinge.id, hinge.id]
 
 
 def _repeated_core_reference() -> tuple[TemplateReference, list[ExerciseCandidate]]:
@@ -272,23 +363,25 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
 
 
 def test_template_priority_soft_shortfall_is_valid_with_constraints() -> None:
+    reference, catalog = _upper_lower_reference()
     result = generate_program(
         template_request(
             available_training_days=4,
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=35,
-            priority_muscles=[MuscleGroup.QUADRICEPS],
+            session_duration_minutes=30,
+            priority_muscles=[MuscleGroup.CHEST],
         ),
-        full_catalog(),
+        catalog,
         RULESET,
-        reference_templates=(_four_day_reference(),),
+        reference_templates=(reference,),
     )
 
     assert result.program is not None, result.errors
-    metric = result.program.aggregate_metrics["volume_ranges_by_muscle"]["quadriceps"]
-    assert metric["actual_effective_volume"] < metric["acceptable_minimum"]
+    assert result.program.aggregate_metrics["reference_template"] == reference.slug
+    metric = result.program.aggregate_metrics["volume_ranges_by_muscle"]["chest"]
+    assert metric["actual_effective_volume"] < metric["preferred_weekly_target"]
     assert result.program.validation_report.status is ValidationStatus.VALID_WITH_CONSTRAINTS
     assert result.program.validation_report.is_valid
 
@@ -557,6 +650,22 @@ def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> N
     assert rejection["selected"] == unadaptable.slug
     assert rejection["reason_codes"]
     assert "INITIAL_TEMPLATE_REJECTED_UNFILLABLE" in rejection["reason_codes"]
+    assert rejection["rejection_category"] == "ADAPTATION_EXHAUSTED"
+
+
+def test_template_rejection_categories_are_specific_and_stable() -> None:
+    assert (
+        _template_rejection_category(("TEMPLATE_PRIORITY_HARD_MINIMUM_UNSATISFIED:glutes",))
+        == "HARD_PRIORITY_MINIMUM_FAILURE"
+    )
+    assert (
+        _template_rejection_category(("RECOVERY_SPACING_INVALID",))
+        == "DURATION_RECOVERY_HARD_IMPOSSIBILITY"
+    )
+    assert (
+        _template_rejection_category(("REQUIRED_MOVEMENT_PATTERN_MISSING",)) == "VALIDATION_FAILURE"
+    )
+    assert _template_rejection_category(("UNKNOWN_ADAPTATION_FAILURE",)) == "ADAPTATION_EXHAUSTED"
 
 
 def test_unadaptable_five_day_template_recovers_without_dropping_days() -> None:

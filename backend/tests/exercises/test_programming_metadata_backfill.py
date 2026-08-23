@@ -18,7 +18,13 @@ from app.exercises.programming_metadata import (
     infer_exercise_demands,
     infer_programming_metadata,
 )
-from app.workouts.program_engine.enums import BodyPosition, ImpactLimit, LoadLimit, SkillDemand
+from app.workouts.program_engine.enums import (
+    BodyPosition,
+    ImpactLimit,
+    LoadLimit,
+    SkillDemand,
+    StabilityDemand,
+)
 
 
 def make_exercise(slug: str) -> Exercise:
@@ -84,6 +90,44 @@ def test_backfill_never_overwrites_explicit_metadata(db: Session) -> None:
     assert stored.fatigue_cost == 5
     assert stored.axial_loading_level is LoadLimit.NONE
     assert stored.substitution_group == "coach_curated_squat"
+
+
+def test_bodyweight_push_up_is_supported_low_stability_unless_explicitly_cautioned() -> None:
+    exercise = make_exercise("supported-push-up")
+    exercise.name_en = "Incline Push-Up"
+    exercise.primary_muscle = MuscleGroup.CHEST
+    exercise.movement_pattern = MovementPattern.HORIZONTAL_PUSH
+    exercise.equipment_items.append(ExerciseEquipment(equipment=Equipment.BODYWEIGHT))
+
+    demands = infer_exercise_demands(exercise)
+    metadata = infer_programming_metadata(exercise)
+
+    assert demands.body_position is BodyPosition.SUPPORTED
+    assert demands.stability_demand is StabilityDemand.LOW
+    assert metadata["body_position"] is BodyPosition.SUPPORTED
+    assert metadata["stability_demand"] is StabilityDemand.LOW
+
+    exercise.caution_tag_items.append(
+        ExerciseCautionTagItem(caution_tag=ExerciseCautionTag.BALANCE_DEMAND)
+    )
+
+    assert infer_exercise_demands(exercise).stability_demand is StabilityDemand.HIGH
+
+
+def test_floor_bridge_is_lying_low_stability() -> None:
+    exercise = make_exercise("supported-glute-bridge")
+    exercise.name_en = "Glute Bridge"
+    exercise.primary_muscle = MuscleGroup.GLUTES
+    exercise.movement_pattern = MovementPattern.HIP_EXTENSION
+    exercise.equipment_items.append(ExerciseEquipment(equipment=Equipment.BODYWEIGHT))
+
+    demands = infer_exercise_demands(exercise)
+    metadata = infer_programming_metadata(exercise)
+
+    assert demands.body_position is BodyPosition.LYING
+    assert demands.stability_demand is StabilityDemand.LOW
+    assert metadata["body_position"] is BodyPosition.LYING
+    assert metadata["stability_demand"] is StabilityDemand.LOW
 
 
 def test_backfill_repairs_legacy_movement_pattern_substitution_group(db: Session) -> None:

@@ -391,6 +391,92 @@ def test_full_body_session_covers_required_patterns_and_priority_is_first() -> N
     )
 
 
+def test_required_trunk_slot_preserves_canonical_abs_coverage() -> None:
+    oblique_id = uuid4()
+    request = normalized(preferred_exercises=[oblique_id])
+    catalog = [
+        candidate("push", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+        candidate("row", MovementPattern.HORIZONTAL_PULL, MuscleGroup.BACK),
+        candidate("squat", MovementPattern.SQUAT, MuscleGroup.QUADRICEPS),
+        candidate("hinge", MovementPattern.HIP_HINGE, MuscleGroup.HAMSTRINGS),
+        candidate(
+            "front plank",
+            MovementPattern.CORE_ANTI_EXTENSION,
+            MuscleGroup.ABS,
+            exercise_type=ExerciseType.CORE,
+        ),
+        candidate(
+            "side plank",
+            MovementPattern.CORE_ANTI_LATERAL_FLEXION,
+            MuscleGroup.OBLIQUES,
+            id=oblique_id,
+            exercise_type=ExerciseType.CORE,
+        ),
+    ]
+    eligibility = filter_eligible_exercises(request, catalog)
+    split = select_split(request, RULESET)
+
+    sessions = build_sessions(
+        request,
+        split,
+        plan_weekly_volume(request, split, RULESET),
+        eligibility.eligible,
+        RULESET,
+    )
+
+    assert any(item.primary_muscle is MuscleGroup.ABS for item in sessions[0].exercises)
+
+
+def test_explicit_glute_priority_owns_repeated_shared_hinge_slots() -> None:
+    request = normalized(
+        available_training_days=4,
+        priority_muscles=[MuscleGroup.GLUTES],
+    )
+    catalog = [
+        candidate("push", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+        candidate("row", MovementPattern.HORIZONTAL_PULL, MuscleGroup.BACK),
+        candidate("squat", MovementPattern.SQUAT, MuscleGroup.QUADRICEPS),
+        candidate("hamstring hinge", MovementPattern.HIP_HINGE, MuscleGroup.HAMSTRINGS),
+        candidate(
+            "glute bridge",
+            MovementPattern.HIP_EXTENSION,
+            MuscleGroup.GLUTES,
+            exercise_type=ExerciseType.ISOLATION,
+        ),
+        candidate(
+            "plank",
+            MovementPattern.CORE_ANTI_EXTENSION,
+            MuscleGroup.ABS,
+            exercise_type=ExerciseType.CORE,
+        ),
+        candidate("leg curl", MovementPattern.KNEE_FLEXION, MuscleGroup.HAMSTRINGS),
+        candidate("calf raise", MovementPattern.CALF_RAISE, MuscleGroup.CALVES),
+    ]
+    eligibility = filter_eligible_exercises(request, catalog)
+    split = SplitPlan(
+        SplitType.UPPER_LOWER,
+        ("upper", "lower", "upper", "lower"),
+        (0, 1, 3, 4),
+        1,
+        (),
+    )
+
+    sessions = build_sessions(
+        request,
+        split,
+        plan_weekly_volume(request, split, RULESET),
+        eligibility.eligible,
+        RULESET,
+    )
+
+    lower_sessions = tuple(session for session in sessions if session.focus == "lower")
+
+    assert all(
+        any(item.primary_muscle is MuscleGroup.GLUTES for item in session.exercises)
+        for session in lower_sessions
+    )
+
+
 def test_specialization_session_resolves_to_the_athletes_priority_muscle() -> None:
     request = normalized(
         available_training_days=5,

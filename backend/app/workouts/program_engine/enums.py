@@ -103,6 +103,7 @@ class SplitType(StrEnum):
     UPPER_LOWER_FULL = "upper_lower_full"
     UPPER_LOWER = "upper_lower"
     UPPER_LOWER_SPECIALIZATION = "upper_lower_specialization"
+    PUSH_PULL_LEGS = "push_pull_legs"
     PUSH_PULL_LEGS_UPPER_LOWER = "push_pull_legs_upper_lower"
     PUSH_PULL_LEGS_X2 = "push_pull_legs_x2"
     UPPER_LOWER_X3 = "upper_lower_x3"

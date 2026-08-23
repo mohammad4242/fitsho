@@ -2,8 +2,9 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from uuid import UUID
 
-from app.exercises.enums import MovementPattern, MuscleGroup
+from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
 from app.workouts.program_engine.exercise_ranker import rank_exercises
+from app.workouts.program_engine.prescription import estimate_exercise_minutes
 from app.workouts.program_engine.replacement_ranker import rank_replacement_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -15,7 +16,10 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceSlot,
     WorkoutDay,
 )
-from app.workouts.program_engine.slot_compatibility import evaluate_candidate_slot_compatibility
+from app.workouts.program_engine.slot_compatibility import (
+    evaluate_candidate_slot_compatibility,
+    template_slot_allowed_patterns,
+)
 
 
 @dataclass(frozen=True)
@@ -65,14 +69,8 @@ def build_template_sessions(
     template: TemplateReference,
     eligible: tuple[ExerciseCandidate, ...],
     ruleset: ProgramRuleset,
-    *,
-    source_catalog: tuple[ExerciseCandidate, ...] | None = None,
 ) -> TemplateSessionBuild:
     eligible_by_id = {candidate.id: candidate for candidate in eligible}
-    source_by_id = {
-        candidate.id: candidate
-        for candidate in (source_catalog if source_catalog is not None else eligible)
-    }
     used: Counter[object] = Counter()
     reserved: Counter[UUID] = Counter(
         slot.exercise_id
@@ -85,6 +83,7 @@ def build_template_sessions(
     build_reasons: list[str] = []
     complementary_replacements: set[UUID] = set()
     deliberate_redundancies: set[UUID] = set()
+    repeated_core_substitutions: set[tuple[int, UUID]] = set()
     preserved_template_occurrences: Counter[UUID] = Counter()
     weekly_patterns: set[MovementPattern] = set()
     capacity = max(
@@ -111,27 +110,43 @@ def build_template_sessions(
                 and all(selected_candidate.id != candidate.id for selected_candidate, _ in selected)
             )
             if candidate is None or (used[candidate.id] and not repeated_explicit_slot):
-                candidate = _rank_template_slot_candidates(
-                    request,
-                    slot,
-                    index,
-                    eligible,
-                    used,
-                    reserved,
-                    ruleset,
-                    original=(
-                        source_by_id.get(slot.exercise_id) if slot.exercise_id is not None else None
+                candidate = min(
+                    (
+                        item
+                        for item in eligible
+                        if not used[item.id]
+                        and not reserved[item.id]
+                        and _template_slot_is_compatible(item, slot, index)
                     ),
+                    key=lambda item: str(item.id),
+                    default=None,
                 )
             if candidate is None:
                 if slot.adaptation_priority == "core":
-                    raise TemplateConstructionError(
-                        "TEMPLATE_CORE_SLOT_UNRESOLVABLE",
-                        f"TEMPLATE_DAY:{index}",
-                        f"TEMPLATE_PATTERN:{slot.movement_pattern.value}",
+                    candidate = min(
+                        (
+                            item
+                            for item in eligible
+                            if all(
+                                selected_candidate.id != item.id
+                                for selected_candidate, _ in selected
+                            )
+                            and _template_slot_is_compatible(item, slot, index)
+                        ),
+                        key=lambda item: (used[item.id], str(item.id)),
+                        default=None,
                     )
-                build_reasons.append("TEMPLATE_OPTIONAL_SLOT_OMITTED_UNAVAILABLE")
-                continue
+                    if candidate is None:
+                        raise TemplateConstructionError(
+                            "TEMPLATE_CORE_SLOT_UNRESOLVABLE",
+                            f"TEMPLATE_DAY:{index}",
+                            f"TEMPLATE_PATTERN:{slot.movement_pattern.value}",
+                        )
+                    repeated_core_substitutions.add((index, candidate.id))
+                    build_reasons.append("TEMPLATE_CORE_SUBSTITUTION_REPEATED_FOR_PROGRESSION")
+                else:
+                    build_reasons.append("TEMPLATE_OPTIONAL_SLOT_OMITTED_UNAVAILABLE")
+                    continue
             if _template_role_is_excessive(candidate, selected):
                 complementary = _complementary_template_candidate(
                     request,
@@ -255,7 +270,11 @@ def build_template_sessions(
                     if candidate.id in deliberate_redundancies
                     else ()
                 ),
-                *(("CORE_MOVEMENT_REPEATED_FOR_PROGRESSION",) if intentional_repeat else ()),
+                *(
+                    ("CORE_MOVEMENT_REPEATED_FOR_PROGRESSION",)
+                    if intentional_repeat or (index, candidate.id) in repeated_core_substitutions
+                    else ()
+                ),
             )
             if preserved and is_template_slot:
                 preserved_template_occurrences[candidate.id] += 1
@@ -266,7 +285,9 @@ def build_template_sessions(
                     candidate,
                     eligible,
                     limit=ruleset.substitution_limit,
-                    allowed_patterns=frozenset({slot.movement_pattern}),
+                    allowed_patterns=template_slot_allowed_patterns(
+                        slot.movement_pattern, slot.target_muscles
+                    ),
                     target_muscles=(
                         frozenset(slot.target_muscles)
                         if slot.target_muscles
@@ -376,7 +397,9 @@ def _rank_template_slot_candidates(
             original,
             options,
             limit=len(options),
-            allowed_patterns=frozenset({slot.movement_pattern}),
+            allowed_patterns=template_slot_allowed_patterns(
+                slot.movement_pattern, slot.target_muscles
+            ),
             target_muscles=target_muscles,
             day_focus=f"template_reference_{day_index}",
         )
@@ -435,6 +458,7 @@ def _complementary_template_candidate(
 def apply_template_intent(
     days: tuple[WorkoutDay, ...],
     build: TemplateSessionBuild,
+    ruleset: ProgramRuleset,
 ) -> tuple[WorkoutDay, ...]:
     resolutions = {(item.day_index, item.selected_exercise_id): item for item in build.resolutions}
     personalized: list[WorkoutDay] = []
@@ -442,19 +466,40 @@ def apply_template_intent(
         exercises = []
         for exercise in day.exercises:
             resolution = resolutions[(day.day_index, exercise.exercise_id)]
+            rest_seconds = exercise.rest_seconds
+            if (
+                resolution.adaptation_priority == "core"
+                and exercise.exercise_type is ExerciseType.COMPOUND
+            ):
+                rest_seconds = max(
+                    rest_seconds,
+                    ruleset.minimum_rest_seconds + ruleset.duration_repair_rest_increment_seconds,
+                )
             prescription = (
                 exercise.sets,
                 exercise.rep_min,
                 exercise.rep_max,
                 exercise.target_rir,
-                exercise.rest_seconds,
+                rest_seconds,
             )
             changed = prescription != resolution.original_prescription
             exercises.append(
                 replace(
                     exercise,
+                    rest_seconds=rest_seconds,
+                    estimated_minutes=estimate_exercise_minutes(
+                        exercise.sets,
+                        rest_seconds,
+                        exercise.warmup_sets,
+                        ruleset,
+                    ),
                     reason_codes=exercise.reason_codes
-                    + (("TEMPLATE_PRESCRIPTION_PERSONALIZED",) if changed else ()),
+                    + (("TEMPLATE_PRESCRIPTION_PERSONALIZED",) if changed else ())
+                    + (
+                        ("TEMPLATE_CORE_REST_FLOOR_PRESERVED",)
+                        if rest_seconds > exercise.rest_seconds
+                        else ()
+                    ),
                     notes=(
                         None
                         if resolution.intensity_method == "standard"
@@ -474,15 +519,11 @@ def template_resolution_trace(
     programmed = {(day.day_index, item.exercise_id): item for day in days for item in day.exercises}
     template_slots = tuple(item for item in build.resolutions if item.is_template_slot)
     retained_template_slots = tuple(
-        item
-        for item in template_slots
-        if (item.day_index, item.selected_exercise_id) in programmed
+        item for item in template_slots if (item.day_index, item.selected_exercise_id) in programmed
     )
     core_slots = tuple(item for item in template_slots if item.adaptation_priority == "core")
     retained_core_slots = tuple(
-        item
-        for item in core_slots
-        if (item.day_index, item.selected_exercise_id) in programmed
+        item for item in core_slots if (item.day_index, item.selected_exercise_id) in programmed
     )
     preserved = tuple(
         str(item.selected_exercise_id)
@@ -615,7 +656,7 @@ def _template_slot_is_compatible(
 ) -> bool:
     return evaluate_candidate_slot_compatibility(
         candidate,
-        allowed_patterns=frozenset({slot.movement_pattern}),
+        allowed_patterns=template_slot_allowed_patterns(slot.movement_pattern, slot.target_muscles),
         target_muscles=frozenset(slot.target_muscles),
         day_focus=f"template_reference_{day_index}",
     ).compatible

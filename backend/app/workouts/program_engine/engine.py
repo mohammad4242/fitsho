@@ -23,7 +23,7 @@ from app.workouts.program_engine.effective_volume import (
     complete_tracked_metrics,
 )
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
-from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
+from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import prescribe_sessions
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
@@ -168,6 +168,7 @@ def generate_program(
                         "core_slots_resolvable",
                     ),
                     "goal_used_for_exclusion": False,
+                    "rejection_category": _template_rejection_category(reference_result.errors),
                     "reason_codes": reference_result.errors,
                     "decision_trace": reference_result.decision_trace,
                 },
@@ -184,6 +185,7 @@ def generate_program(
                         "core_slots_resolvable",
                     ),
                     "goal_used_for_exclusion": False,
+                    "rejection_category": _template_rejection_category(exc.reason_codes),
                     "reason_codes": (
                         "INITIAL_TEMPLATE_REJECTED_UNFILLABLE",
                         *exc.reason_codes,
@@ -301,6 +303,30 @@ def generate_program(
             },
         ),
     )
+
+
+def _template_rejection_category(reason_codes: tuple[str, ...]) -> str:
+    joined = " ".join(reason_codes)
+    if any(marker in joined for marker in ("CORE_SLOT", "REQUIRED_CORE")):
+        return "CORE_SLOT_UNRESOLVED"
+    if any(marker in joined for marker in ("SAFETY", "EQUIPMENT", "NO_ELIGIBLE")):
+        return "SAFETY_EQUIPMENT_INCOMPATIBILITY"
+    if "PRIORITY_HARD_MINIMUM" in joined:
+        return "HARD_PRIORITY_MINIMUM_FAILURE"
+    if any(marker in joined for marker in ("DURATION", "RECOVERY")):
+        return "DURATION_RECOVERY_HARD_IMPOSSIBILITY"
+    if any(
+        marker in joined
+        for marker in (
+            "VALIDATION",
+            "REQUIRED_MOVEMENT",
+            "WEEKLY_MUSCLE_VOLUME",
+            "PER_SESSION_MUSCLE_VOLUME",
+            "REQUESTED_TRAINING_DAYS",
+        )
+    ):
+        return "VALIDATION_FAILURE"
+    return "ADAPTATION_EXHAUSTED"
 
 
 def _training_day_error(
@@ -607,7 +633,7 @@ def _reference_program(
     template_selection_trace: tuple[dict[str, object], ...],
 ) -> ProgramGenerationResult:
     split = SplitPlan(
-        split_type=SplitType.BODY_PART_ROTATION,
+        split_type=reference.split_type,
         day_focuses=tuple(draft.focus for draft in build.drafts),
         weekdays=tuple(draft.weekday for draft in build.drafts if draft.weekday is not None),
         score=100,
@@ -627,7 +653,7 @@ def _reference_program(
         ruleset,
         cardio_reserve_minutes=cardio_reserve,
     )
-    days = apply_template_intent(days, build)
+    days = apply_template_intent(days, build, ruleset)
     days, repair_reasons = repair_weekly_volume(
         days,
         normalized,
@@ -636,10 +662,16 @@ def _reference_program(
         candidates=eligible,
         cardio_reserve_minutes=cardio_reserve,
         allow_soft_exercise_additions=False,
+        preserve_template_core_structure=True,
     )
     days = add_cardio(normalized, days, cardio_eligible, ruleset)
     days, duration_repair_reasons = repair_session_durations(
-        days, normalized, eligible, ruleset, volume=volume
+        days,
+        normalized,
+        eligible,
+        ruleset,
+        volume=volume,
+        prefer_acceptable_volume_for_minimum_fill=True,
     )
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
     metrics = _volume_metrics(
@@ -717,24 +749,17 @@ def _reference_program(
             rejected_candidates=rejected,
             decision_trace=trace,
         )
-    priority_muscles = normalized.source.priority_muscles | body_analysis_priority_muscles(
-        normalized, ruleset
-    )
+    explicit_priority_muscles = normalized.source.priority_muscles
+    body_priority_muscles = body_analysis_priority_muscles(normalized, ruleset)
     targets_by_muscle = {target.muscle: target for target in volume.targets}
     unmet_priority_errors: list[str] = []
-    for muscle in sorted(priority_muscles, key=lambda item: item.value):
+    for muscle in sorted(explicit_priority_muscles, key=lambda item: item.value):
         target = targets_by_muscle[muscle]
         direct_value = direct[muscle.value]
-        effective_value = effective_volume.effective_sets_by_muscle.get(muscle.value, 0)
         if target.direct_minimum_required and direct_value < target.minimum_direct_sets:
             unmet_priority_errors.append(
                 f"TEMPLATE_PRIORITY_HARD_MINIMUM_UNSATISFIED:{muscle.value}"
             )
-        elif (
-            direct_value < volume.minimum_direct_sets_for(muscle)
-            or effective_value < target.acceptable_minimum
-        ):
-            unmet_priority_errors.append(f"TEMPLATE_PRIORITY_VOLUME_UNSATISFIED:{muscle.value}")
     if unmet_priority_errors:
         errors = tuple(unmet_priority_errors)
         return ProgramGenerationResult(
@@ -744,6 +769,27 @@ def _reference_program(
             safety_status=safety_status,
             rejected_candidates=rejected,
             decision_trace=trace,
+        )
+    soft_priority_shortfalls = tuple(
+        f"TEMPLATE_PRIORITY_PREFERRED_TARGET_PARTIAL:{muscle.value}"
+        for muscle in sorted(
+            explicit_priority_muscles | body_priority_muscles,
+            key=lambda item: item.value,
+        )
+        if (target := targets_by_muscle[muscle])
+        and (
+            direct[muscle.value] < target.target_sets
+            or effective_volume.effective_sets_by_muscle.get(muscle.value, 0)
+            < target.effective_target_sets
+        )
+    )
+    if soft_priority_shortfalls:
+        trace += (
+            {
+                "stage": "template_priority_adaptation",
+                "status": "constrained",
+                "reason_codes": soft_priority_shortfalls,
+            },
         )
     program = WorkoutProgram(
         user_profile_snapshot=request.model_dump(mode="json"),
@@ -1131,11 +1177,8 @@ def _priority_metrics(
         target = volume.direct_sets_for(muscle)
         effective_target = volume.effective_target_for(muscle)
         target_available = target > 0 or effective_target > 0
-        direct_satisfied = target_available and direct >= volume.minimum_direct_sets_for(muscle)
-        acceptable_minimum = next(
-            item.acceptable_minimum for item in volume.targets if item.muscle is muscle
-        )
-        effective_satisfied = target_available and effective >= acceptable_minimum
+        direct_satisfied = target_available and direct >= target
+        effective_satisfied = target_available and effective >= effective_target
         useful_frequency = policy.useful_frequency(target, ruleset)
         frequency_satisfied = len(session_indexes) >= useful_frequency
         status = (

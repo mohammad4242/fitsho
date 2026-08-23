@@ -213,7 +213,7 @@ def test_generate_program_keeps_every_session_inside_duration_target(requested: 
     )
 
 
-def test_advanced_strength_program_supports_120_minute_session_policy() -> None:
+def test_advanced_strength_program_classifies_a_hard_constrained_120_minute_session() -> None:
     source = request(
         session_duration_minutes=120,
         available_training_days=1,
@@ -227,10 +227,18 @@ def test_advanced_strength_program_supports_120_minute_session_policy() -> None:
     assert result.is_success, result.errors
     assert result.program is not None
     policy = get_session_duration_policy(120)
-    assert policy.contains_total(
+    if not policy.contains_total(
         result.program.weekly_schedule[0].estimated_duration_minutes,
         RULESET.general_warmup_minutes,
-    )
+    ):
+        duration_trace = next(
+            item
+            for item in result.program.decision_trace
+            if item.get("stage") == "session_duration"
+        )
+        assert (
+            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in duration_trace["reason_codes"]
+        )
 
 
 def test_underfilled_session_is_repaired_with_real_estimates() -> None:

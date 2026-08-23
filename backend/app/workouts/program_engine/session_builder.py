@@ -7,6 +7,7 @@ from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.body_analysis import body_analysis_priority_muscles
 from app.workouts.program_engine.enums import CompatibilityLevel, Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
+from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.replacement_ranker import rank_replacement_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -87,6 +88,7 @@ def build_sessions(
     effective_priorities = request.source.priority_muscles | body_analysis_priority_muscles(
         request, ruleset
     )
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     usage: Counter[UUID] = Counter()
     sessions: list[SessionDraft] = []
     short_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
@@ -173,8 +175,21 @@ def build_sessions(
                 else:
                     continue
             needed_muscle = slot.target_muscle
-            if needed_muscle is None and slot.patterns == HINGE_PATTERNS:
-                needed_muscle = MuscleGroup.HAMSTRINGS
+            if needed_muscle is None:
+                needed_muscle = next(
+                    (
+                        muscle
+                        for muscle in priority_policy.explicit_priorities
+                        if any(item.primary_muscle is muscle for item in options)
+                    ),
+                    (
+                        MuscleGroup.HAMSTRINGS
+                        if slot.patterns == HINGE_PATTERNS
+                        else MuscleGroup.ABS
+                        if slot.patterns == CORE_PATTERNS
+                        else None
+                    ),
+                )
             ranked = rank_exercises(
                 request,
                 options,
@@ -186,6 +201,7 @@ def build_sessions(
                 ranked,
                 key=lambda item: (
                     _role_repeated(item.exercise, chosen),
+                    item.exercise.primary_muscle not in priority_policy.explicit_priorities,
                     usage[item.exercise.id],
                     -item.score,
                     len(item.exercise.secondary_muscles) if short_session else 0,

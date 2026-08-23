@@ -272,7 +272,7 @@ class AdminTrainingTemplateSlotWrite(BaseModel):
     target_muscles: list[MuscleGroup] = Field(min_length=1)
     movement_pattern: MovementPattern
     intensity_method: TrainingTemplateMethod = TrainingTemplateMethod.STANDARD
-    adaptation_priority: TrainingTemplateSlotPriority = TrainingTemplateSlotPriority.CORE
+    adaptation_priority: TrainingTemplateSlotPriority = TrainingTemplateSlotPriority.ACCESSORY
     superset_group: Annotated[
         str | None,
         StringConstraints(strip_whitespace=True, min_length=1, max_length=32),

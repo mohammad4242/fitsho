@@ -15,9 +15,31 @@ from app.workouts.program_engine.schemas import (
 from app.workouts.program_engine.session_builder import exercise_fits_focus
 from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
+    template_slot_allowed_patterns,
 )
 from app.workouts.program_engine.template_sessions import build_template_sessions
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
+
+
+def test_template_slots_allow_only_safe_same_role_pattern_families() -> None:
+    assert template_slot_allowed_patterns(
+        MovementPattern.VERTICAL_PULL,
+        (MuscleGroup.BACK,),
+    ) == frozenset({MovementPattern.VERTICAL_PULL, MovementPattern.HORIZONTAL_PULL})
+    assert template_slot_allowed_patterns(
+        MovementPattern.HIP_HINGE,
+        (MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES),
+    ) == frozenset(
+        {
+            MovementPattern.HIP_HINGE,
+            MovementPattern.HIP_EXTENSION,
+            MovementPattern.KNEE_FLEXION,
+        }
+    )
+    assert template_slot_allowed_patterns(
+        MovementPattern.HORIZONTAL_PUSH,
+        (MuscleGroup.CHEST,),
+    ) == frozenset({MovementPattern.HORIZONTAL_PUSH})
 
 
 def test_full_body_candidate_cannot_fill_specialized_lower_focus() -> None:

@@ -37,6 +37,7 @@ def _programmed(
     *,
     exercise_type: ExerciseType = ExerciseType.COMPOUND,
     pattern: MovementPattern = MovementPattern.HORIZONTAL_PUSH,
+    secondary_muscles: tuple[MuscleGroup, ...] = (),
 ) -> ProgrammedExercise:
     return ProgrammedExercise(
         exercise_id=uuid4(),
@@ -51,6 +52,7 @@ def _programmed(
         reason_codes=("TEST",),
         movement_pattern=pattern,
         primary_muscle=muscle,
+        secondary_muscles=secondary_muscles,
         exercise_type=exercise_type,
     )
 
@@ -181,6 +183,235 @@ def test_priority_muscle_keeps_extra_volume_without_set_dumping() -> None:
     direct = result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
     assert direct[MuscleGroup.SHOULDERS.value] > direct[MuscleGroup.CHEST.value]
     assert all(item.sets <= 4 for day in result.program.weekly_schedule for item in day.exercises)
+
+
+def test_hard_priority_minimum_can_use_headroom_above_soft_effective_maximum() -> None:
+    glute = _programmed(
+        "Glute Bridge",
+        MuscleGroup.GLUTES,
+        3,
+        pattern=MovementPattern.HIP_EXTENSION,
+    )
+    hamstring = _programmed(
+        "Leg Curl",
+        MuscleGroup.HAMSTRINGS,
+        3,
+        pattern=MovementPattern.KNEE_FLEXION,
+        secondary_muscles=(MuscleGroup.GLUTES,),
+    )
+    second_hamstring = replace(
+        hamstring,
+        exercise_id=uuid4(),
+        exercise_name="Romanian Deadlift",
+        movement_pattern=MovementPattern.HIP_HINGE,
+    )
+    volume = WeeklyVolumePlan(
+        targets=(
+            VolumeTarget(
+                muscle=MuscleGroup.GLUTES,
+                minimum_soft=4,
+                target_sets=5,
+                maximum_soft=5,
+                maximum_hard=8,
+                fractional_sets=0,
+                effective_target_sets=5,
+                minimum_direct_sets=4,
+                minimum_effective_sets=4,
+                minimum_coverage_required=True,
+                direct_minimum_required=True,
+            ),
+        ),
+        reason_codes=(),
+    )
+
+    days, _reasons = repair_weekly_volume(
+        (_day(1, (glute, hamstring, second_hamstring), focus="lower"),),
+        normalized(priority_muscles=[MuscleGroup.GLUTES]),
+        volume,
+        RULESET,
+        preserve_template_core_structure=True,
+    )
+
+    repaired_glute = next(
+        item for item in days[0].exercises if item.primary_muscle is MuscleGroup.GLUTES
+    )
+    assert repaired_glute.sets == 4
+
+
+def test_hard_priority_minimum_adds_second_exercise_then_rebalances_sets() -> None:
+    bridge = _programmed(
+        "Glute Bridge",
+        MuscleGroup.GLUTES,
+        4,
+        pattern=MovementPattern.HIP_EXTENSION,
+    )
+    second_glute = replace(
+        _candidate("Hip Thrust", MuscleGroup.GLUTES),
+        movement_pattern=MovementPattern.HIP_EXTENSION,
+    )
+    volume = WeeklyVolumePlan(
+        targets=(
+            VolumeTarget(
+                muscle=MuscleGroup.GLUTES,
+                minimum_soft=6,
+                target_sets=6,
+                maximum_soft=6,
+                maximum_hard=6,
+                fractional_sets=0,
+                effective_target_sets=6,
+                minimum_direct_sets=6,
+                minimum_effective_sets=6,
+                minimum_coverage_required=True,
+                direct_minimum_required=True,
+            ),
+        ),
+        reason_codes=(),
+    )
+
+    days, _reasons = repair_weekly_volume(
+        (_day(1, (bridge,), focus="lower"),),
+        normalized(priority_muscles=[MuscleGroup.GLUTES]),
+        volume,
+        RULESET,
+        candidates=(second_glute,),
+    )
+
+    assert (
+        sum(item.sets for item in days[0].exercises if item.primary_muscle is MuscleGroup.GLUTES)
+        == 6
+    )
+
+
+def test_hard_priority_minimum_reuses_the_only_safe_exercise_across_sessions() -> None:
+    bridge = _programmed(
+        "Glute Bridge",
+        MuscleGroup.GLUTES,
+        3,
+        pattern=MovementPattern.HIP_EXTENSION,
+    )
+    bridge_candidate = replace(
+        _candidate("Glute Bridge", MuscleGroup.GLUTES),
+        id=bridge.exercise_id,
+        movement_pattern=MovementPattern.HIP_EXTENSION,
+    )
+    volume = WeeklyVolumePlan(
+        targets=(
+            VolumeTarget(
+                muscle=MuscleGroup.GLUTES,
+                minimum_soft=4,
+                target_sets=6,
+                maximum_soft=6,
+                maximum_hard=6,
+                fractional_sets=0,
+                effective_target_sets=6,
+                minimum_direct_sets=4,
+                minimum_effective_sets=4,
+                minimum_coverage_required=True,
+                direct_minimum_required=True,
+            ),
+        ),
+        reason_codes=(),
+    )
+
+    days, _reasons = repair_weekly_volume(
+        (
+            _day(1, (), focus="upper"),
+            _day(2, (bridge,), focus="lower"),
+        ),
+        normalized(priority_muscles=[MuscleGroup.GLUTES], available_training_days=2),
+        volume,
+        RULESET,
+        candidates=(bridge_candidate,),
+    )
+
+    repeated = [
+        item for day in days for item in day.exercises if item.exercise_id == bridge.exercise_id
+    ]
+    assert len(repeated) == 2
+    assert "PRIORITY_EXERCISE_REPEATED_FOR_HARD_MINIMUM" in repeated[0].reason_codes
+
+
+def test_reference_repair_adds_hard_major_coverage_outside_original_focus() -> None:
+    press = _programmed("Push-Up", MuscleGroup.CHEST, 3)
+    abs_candidate = replace(
+        _candidate("Dead Bug", MuscleGroup.ABS),
+        movement_pattern=MovementPattern.CORE_ANTI_EXTENSION,
+        exercise_type=ExerciseType.CORE,
+    )
+    volume = WeeklyVolumePlan(
+        targets=(
+            VolumeTarget(
+                muscle=MuscleGroup.ABS,
+                minimum_soft=1,
+                target_sets=1,
+                maximum_soft=4,
+                maximum_hard=6,
+                fractional_sets=0,
+                effective_target_sets=1,
+                minimum_direct_sets=1,
+                minimum_effective_sets=1,
+                minimum_coverage_required=True,
+            ),
+        ),
+        reason_codes=(),
+    )
+
+    days, _reasons = repair_weekly_volume(
+        (_day(1, (press,), focus="template_reference:test:upper"),),
+        normalized(),
+        volume,
+        RULESET,
+        candidates=(abs_candidate,),
+    )
+
+    assert any(item.primary_muscle is MuscleGroup.ABS for item in days[0].exercises)
+
+
+def test_volume_repair_preserves_last_hard_movement_role_while_reducing_secondary_excess() -> None:
+    hinge = replace(
+        _programmed(
+            "Romanian Deadlift",
+            MuscleGroup.HAMSTRINGS,
+            3,
+            pattern=MovementPattern.HIP_HINGE,
+            secondary_muscles=(MuscleGroup.GLUTES,),
+        ),
+        order=2,
+        reason_codes=("TEMPLATE_ADAPTATION_PRIORITY:core",),
+    )
+    leg_curl = _programmed(
+        "Leg Curl",
+        MuscleGroup.HAMSTRINGS,
+        3,
+        pattern=MovementPattern.KNEE_FLEXION,
+        secondary_muscles=(MuscleGroup.GLUTES,),
+    )
+    volume = WeeklyVolumePlan(
+        targets=(
+            VolumeTarget(
+                muscle=MuscleGroup.GLUTES,
+                minimum_soft=0,
+                target_sets=2,
+                maximum_soft=2,
+                maximum_hard=2,
+                fractional_sets=0,
+                effective_target_sets=2,
+                minimum_direct_sets=0,
+                minimum_effective_sets=0,
+            ),
+        ),
+        reason_codes=(),
+    )
+
+    days, _reasons = repair_weekly_volume(
+        (_day(1, (hinge, leg_curl), focus="lower"),),
+        normalized(),
+        volume,
+        RULESET,
+        preserve_template_core_structure=True,
+    )
+
+    assert [item.movement_pattern for item in days[0].exercises] == [MovementPattern.HIP_HINGE]
 
 
 def test_generate_program_preserves_volume_and_duration_constraints_without_set_dump() -> None:
