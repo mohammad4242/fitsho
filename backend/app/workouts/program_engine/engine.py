@@ -51,7 +51,10 @@ from app.workouts.program_engine.split_selector import (
     rank_availability_aware_fallbacks,
     rank_split_candidates,
 )
-from app.workouts.program_engine.template_selector import select_template_reference_result
+from app.workouts.program_engine.template_selector import (
+    TemplateRankingResult,
+    select_template_reference_result,
+)
 from app.workouts.program_engine.template_sessions import (
     TemplateConstructionError,
     TemplateSessionBuild,
@@ -132,10 +135,8 @@ def generate_program(
         if candidate.id in rejected_by_id
     )
     template_rejection_trace: tuple[dict[str, object], ...] = template_selection_trace
-    reference = (
-        template_selection.selected.template if template_selection.selected is not None else None
-    )
-    if reference is not None:
+    for ranking in template_selection.candidates:
+        reference = ranking.template
         try:
             reference_build = build_template_sessions(
                 normalized, reference, eligibility.eligible, ruleset
@@ -153,45 +154,80 @@ def generate_program(
                 ruleset,
                 previous_volume=previous_volume,
                 cardio_reserve=reserve,
-                template_selection_trace=template_selection_trace,
+                template_selection_trace=template_rejection_trace,
             )
             if reference_result.is_success:
-                return reference_result
-            template_rejection_trace = template_selection_trace + (
-                {
-                    "stage": "template_reference",
-                    "selected": reference.slug,
-                    "status": "rejected",
-                    "hard_eligibility": (
-                        "days",
-                        "training_level",
-                        "core_slots_resolvable",
-                    ),
-                    "goal_used_for_exclusion": False,
-                    "rejection_category": _template_rejection_category(reference_result.errors),
-                    "reason_codes": reference_result.errors,
-                    "decision_trace": reference_result.decision_trace,
-                },
+                return _append_successful_template_attempt(
+                    reference_result,
+                    _template_attempt_trace(ranking, status="succeeded"),
+                )
+            rejection_category = _template_rejection_category(reference_result.errors)
+            rejection = {
+                "stage": "template_reference",
+                "rank": ranking.rank,
+                "selected": reference.slug,
+                "status": "rejected",
+                "hard_eligibility": (
+                    "days",
+                    "training_level",
+                    "core_slots_resolvable",
+                ),
+                "goal_used_for_exclusion": False,
+                "score": ranking.decision_trace()["score"],
+                "feasibility": ranking.feasibility.decision_trace(),
+                "rejection_category": rejection_category,
+                "reason_codes": reference_result.errors,
+                "decision_trace": reference_result.decision_trace[
+                    len(template_rejection_trace) :
+                ],
+            }
+            template_rejection_trace += (
+                rejection,
+                _template_attempt_trace(
+                    ranking,
+                    status="rejected",
+                    rejection_category=rejection_category,
+                    reason_codes=reference_result.errors,
+                ),
             )
         except TemplateConstructionError as exc:
-            template_rejection_trace = template_selection_trace + (
-                {
-                    "stage": "template_reference",
-                    "selected": reference.slug,
-                    "status": "rejected",
-                    "hard_eligibility": (
-                        "days",
-                        "training_level",
-                        "core_slots_resolvable",
-                    ),
-                    "goal_used_for_exclusion": False,
-                    "rejection_category": _template_rejection_category(exc.reason_codes),
-                    "reason_codes": (
-                        "INITIAL_TEMPLATE_REJECTED_UNFILLABLE",
-                        *exc.reason_codes,
-                    ),
-                },
+            reason_codes = ("INITIAL_TEMPLATE_REJECTED_UNFILLABLE", *exc.reason_codes)
+            rejection_category = _template_rejection_category(reason_codes)
+            rejection = {
+                "stage": "template_reference",
+                "rank": ranking.rank,
+                "selected": reference.slug,
+                "status": "rejected",
+                "hard_eligibility": (
+                    "days",
+                    "training_level",
+                    "core_slots_resolvable",
+                ),
+                "goal_used_for_exclusion": False,
+                "score": ranking.decision_trace()["score"],
+                "feasibility": ranking.feasibility.decision_trace(),
+                "rejection_category": rejection_category,
+                "reason_codes": reason_codes,
+            }
+            template_rejection_trace += (
+                rejection,
+                _template_attempt_trace(
+                    ranking,
+                    status="rejected",
+                    rejection_category=rejection_category,
+                    reason_codes=reason_codes,
+                ),
             )
+    if template_selection.candidates:
+        template_rejection_trace += (
+            {
+                "stage": "template_recovery",
+                "status": "exhausted",
+                "attempted_count": len(template_selection.candidates),
+                "candidate_count": len(template_selection.candidates),
+                "reason_codes": ("TEMPLATE_ALTERNATIVES_EXHAUSTED",),
+            },
+        )
     requested_days = normalized.resistance_training_days
     ranked_splits = rank_split_candidates(normalized, ruleset)
     exact_day_splits = tuple(
@@ -327,6 +363,54 @@ def _template_rejection_category(reason_codes: tuple[str, ...]) -> str:
     ):
         return "VALIDATION_FAILURE"
     return "ADAPTATION_EXHAUSTED"
+
+
+def _template_attempt_trace(
+    ranking: TemplateRankingResult,
+    *,
+    status: str,
+    rejection_category: str | None = None,
+    reason_codes: tuple[str, ...] = ("TEMPLATE_ATTEMPT_SUCCEEDED",),
+) -> dict[str, object]:
+    return {
+        "stage": "template_attempt",
+        "rank": ranking.rank,
+        "slug": ranking.template.slug,
+        "score": ranking.decision_trace()["score"],
+        "feasibility": ranking.feasibility.decision_trace(),
+        "scoring_reason_codes": ranking.reason_codes,
+        "status": status,
+        "rejection_category": rejection_category,
+        "reason_codes": reason_codes,
+    }
+
+
+def _append_successful_template_attempt(
+    result: ProgramGenerationResult,
+    attempt_trace: dict[str, object],
+) -> ProgramGenerationResult:
+    if result.program is None:
+        return result
+    coach_index = next(
+        (
+            index
+            for index, entry in enumerate(result.program.decision_trace)
+            if entry.get("stage") == "final_construction"
+        ),
+        len(result.program.decision_trace),
+    )
+    final_trace = (
+        result.program.decision_trace[:coach_index]
+        + (attempt_trace,)
+        + result.program.decision_trace[coach_index:]
+    )
+    report = replace(result.program.validation_report, decision_trace=final_trace)
+    program = replace(
+        result.program,
+        validation_report=report,
+        decision_trace=final_trace,
+    )
+    return replace(result, program=program, decision_trace=final_trace)
 
 
 def _training_day_error(

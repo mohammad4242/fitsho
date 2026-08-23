@@ -436,19 +436,40 @@ def _number(value: object) -> float:
 def _template_stats(result: ProgramGenerationResult) -> dict[str, object]:
     selection = _trace_entry(result, "template_selection") or {}
     selected = selection.get("selected")
+    entries = result.program.decision_trace if result.program is not None else result.decision_trace
+    attempts = tuple(
+        entry for entry in entries if entry.get("stage") == "template_attempt"
+    )
     reference = (
         result.program.aggregate_metrics.get("reference_template")
         if result.program is not None
         else None
     )
-    attempted = isinstance(selected, str)
+    attempted = bool(attempts) or isinstance(selected, str)
     succeeded = isinstance(reference, str)
     reasons: list[str] = []
     rejection_categories: list[str] = []
-    if attempted and not succeeded:
-        entries = (
-            result.program.decision_trace if result.program is not None else result.decision_trace
-        )
+    attempt_reasons: list[str] = []
+    attempt_rejection_categories: list[str] = []
+    if attempts:
+        for entry in attempts:
+            if entry.get("status") != "rejected":
+                continue
+            attempt_reasons.extend(_string_values(entry.get("reason_codes")))
+            category = entry.get("rejection_category")
+            if isinstance(category, str):
+                attempt_rejection_categories.append(category)
+        if attempted and not succeeded:
+            first_rejection = next(
+                (entry for entry in attempts if entry.get("status") == "rejected"),
+                None,
+            )
+            if first_rejection is not None:
+                reasons.extend(_string_values(first_rejection.get("reason_codes")))
+                category = first_rejection.get("rejection_category")
+                if isinstance(category, str):
+                    rejection_categories.append(category)
+    elif attempted and not succeeded:
         for entry in entries:
             if entry.get("stage") == "template_reference":
                 reasons.extend(_string_values(entry.get("reason_codes")))
@@ -473,16 +494,45 @@ def _template_stats(result: ProgramGenerationResult) -> dict[str, object]:
         (item.get("score") for item in candidates if item.get("slug") == selected),
         None,
     )
+    successful_score = next(
+        (item.get("score") for item in candidates if item.get("slug") == reference),
+        None,
+    )
+    successful_attempt = next(
+        (item for item in attempts if item.get("status") == "succeeded"),
+        None,
+    )
+    successful_rank = successful_attempt.get("rank") if successful_attempt is not None else None
+    successful_attempt_depth = successful_rank if isinstance(successful_rank, int) else None
+    alternatives_exhausted = any(
+        entry.get("stage") == "template_recovery" and entry.get("status") == "exhausted"
+        for entry in entries
+    )
     return {
         "attempted": attempted,
         "succeeded": succeeded,
         "fallback_activated": dynamic,
         "fallback_succeeded": dynamic and result.is_success,
         "selected_template": selected,
+        "successful_template": reference,
         "template_path": reference,
+        "attempted_templates": attempts,
+        "attempt_depth": len(attempts) if attempts else int(attempted),
+        "successful_attempt_depth": successful_attempt_depth,
+        "recovered_with_alternative": bool(
+            succeeded
+            and successful_attempt_depth is not None
+            and successful_attempt_depth > 1
+        ),
+        "alternatives_exhausted": alternatives_exhausted,
         "reason_codes": tuple(dict.fromkeys(reasons)),
         "rejection_categories": tuple(dict.fromkeys(rejection_categories)),
+        "attempt_reason_codes": tuple(dict.fromkeys(attempt_reasons)),
+        "attempt_rejection_categories": tuple(
+            dict.fromkeys(attempt_rejection_categories)
+        ),
         "selected_score_breakdown": selected_score,
+        "successful_score_breakdown": successful_score,
         "score_breakdown": candidates,
     }
 
@@ -664,16 +714,7 @@ def _audit_quality_metrics(
     ranges = cast(
         Mapping[str, object], program.aggregate_metrics.get("volume_ranges_by_muscle", {})
     )
-    statuses = {
-        str(values.get("status")) for values in ranges.values() if isinstance(values, Mapping)
-    }
-    volume_fit = (
-        "fit"
-        if statuses and statuses.issubset({"exact_target", "within_flexible_range"})
-        else "constrained"
-        if "constrained" in statuses
-        else "failed"
-    )
+    volume_fit = _strict_volume_fit(ranges)
     policy = get_session_duration_policy(request.session_duration_minutes)
     duration_trace = _trace_entry(result, "session_duration") or {}
     duration_reasons = set(_string_values(duration_trace.get("reason_codes")))
@@ -705,8 +746,52 @@ def _audit_quality_metrics(
         "priority_target_satisfaction": quality.get("priority_target_satisfaction"),
         "body_analysis_target_satisfaction": quality.get("body_analysis_target_satisfaction"),
         "volume_fit": volume_fit,
+        "muscle_level_volume_fit": _muscle_level_volume_fit(ranges),
         "duration_fit": duration_fit,
         "recovery_fit": quality.get("recovery_fit"),
+    }
+
+
+def _strict_volume_fit(volume_ranges: Mapping[str, object]) -> str:
+    """Preserve the Phase 11 whole-program, all-or-nothing volume metric."""
+
+    statuses = {
+        str(values.get("status"))
+        for values in volume_ranges.values()
+        if isinstance(values, Mapping)
+    }
+    return (
+        "fit"
+        if statuses and statuses.issubset({"exact_target", "within_flexible_range"})
+        else "constrained"
+        if "constrained" in statuses
+        else "failed"
+    )
+
+
+def _muscle_level_volume_fit(volume_ranges: Mapping[str, object]) -> dict[str, object]:
+    tracked = 0
+    within = 0
+    constrained = 0
+    outside = 0
+    for values in volume_ranges.values():
+        if not isinstance(values, Mapping):
+            continue
+        tracked += 1
+        status = values.get("status")
+        if status in {"exact_target", "within_flexible_range"}:
+            within += 1
+        elif status == "constrained":
+            constrained += 1
+        else:
+            outside += 1
+    return {
+        "tracked_muscles": tracked,
+        "within_target_or_flexible_range": within,
+        "constrained": constrained,
+        "outside_target": outside,
+        "constrained_or_outside_target": constrained + outside,
+        "percentage": round(within / tracked * 100, 2) if tracked else None,
     }
 
 
@@ -885,9 +970,69 @@ def _quality_rate(
     }
 
 
+def _template_attempt_metrics(
+    template_stats: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    attempt_depths = Counter(
+        str(int(_number(item.get("attempt_depth")))) for item in template_stats
+    )
+    successful_depths = Counter(
+        str(int(depth))
+        for item in template_stats
+        for depth in (_number(item.get("successful_attempt_depth")),)
+        if depth > 0
+    )
+    return {
+        "total_template_attempts": sum(
+            int(_number(item.get("attempt_depth"))) for item in template_stats
+        ),
+        "attempt_depth_distribution": dict(sorted(attempt_depths.items())),
+        "successful_attempt_depth_distribution": dict(sorted(successful_depths.items())),
+        "recovered_with_alternative": sum(
+            bool(item.get("recovered_with_alternative")) for item in template_stats
+        ),
+        "alternatives_exhausted": sum(
+            bool(item.get("alternatives_exhausted")) for item in template_stats
+        ),
+    }
+
+
+def _aggregate_muscle_level_volume_fit(
+    records: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    programs = 0
+    tracked = 0
+    within = 0
+    constrained = 0
+    outside = 0
+    for record in records:
+        quality = cast(Mapping[str, object], record.get("quality_audit", {}))
+        metric = quality.get("muscle_level_volume_fit")
+        if not isinstance(metric, Mapping):
+            continue
+        program_tracked = int(_number(metric.get("tracked_muscles")))
+        if program_tracked <= 0:
+            continue
+        programs += 1
+        tracked += program_tracked
+        within += int(_number(metric.get("within_target_or_flexible_range")))
+        constrained += int(_number(metric.get("constrained")))
+        outside += int(_number(metric.get("outside_target")))
+    return {
+        "programs": programs,
+        "tracked_muscles": tracked,
+        "within_target_or_flexible_range": within,
+        "constrained": constrained,
+        "outside_target": outside,
+        "constrained_or_outside_target": constrained + outside,
+        "percentage": round(within / tracked * 100, 2) if tracked else None,
+    }
+
+
 def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> dict[str, object]:
     categories = Counter(str(item["category"]) for item in records)
     template = [cast(Mapping[str, object], item["template"]) for item in records]
+    template_attempts_metrics = _template_attempt_metrics(template)
     total = len(records)
     template_attempts = sum(bool(item["attempted"]) for item in template)
     template_successes = sum(bool(item["succeeded"]) for item in template)
@@ -905,6 +1050,16 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
         for item in template
         if item["fallback_activated"]
         for category in cast(Sequence[str], item["rejection_categories"])
+    )
+    attempt_reason_codes = Counter(
+        code
+        for item in template
+        for code in cast(Sequence[str], item["attempt_reason_codes"])
+    )
+    attempt_rejection_categories = Counter(
+        category
+        for item in template
+        for category in cast(Sequence[str], item["attempt_rejection_categories"])
     )
     findings = Counter(
         str(finding["code"])
@@ -942,6 +1097,7 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
         "volume_fit": _quality_rate(
             records, "volume_fit", frozenset({"fit"}), source="quality_audit"
         ),
+        "muscle_level_volume_fit": _aggregate_muscle_level_volume_fit(records),
         "duration_fit": _quality_rate(
             records, "duration_fit", frozenset({"fit"}), source="quality_audit"
         ),
@@ -983,6 +1139,11 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
             else 0.0,
             "reason_codes": dict(sorted(reason_codes.items())),
             "rejection_categories": dict(sorted(rejection_categories.items())),
+            "template_attempt_reason_codes": dict(sorted(attempt_reason_codes.items())),
+            "template_attempt_rejection_categories": dict(
+                sorted(attempt_rejection_categories.items())
+            ),
+            **template_attempts_metrics,
         },
         "quality": {
             "validation_success_rate": round(validation_success / total, 4) if total else 0.0,
@@ -1032,10 +1193,18 @@ def _summary_markdown(payload: Mapping[str, object]) -> str:
             "",
             "- Template attempts/successes: "
             f"{fallback['template_path_attempts']}/{fallback['template_path_successes']}",
+            f"- Total ranked template attempts: {fallback['total_template_attempts']}",
+            f"- Attempt-depth distribution: {fallback['attempt_depth_distribution']}",
+            "- Successful attempt-depth distribution: "
+            f"{fallback['successful_attempt_depth_distribution']}",
+            f"- Recovered with alternative: {fallback['recovered_with_alternative']}",
+            f"- Alternatives exhausted: {fallback['alternatives_exhausted']}",
             "- Activations/successes: "
             f"{fallback['fallback_activations']}/{fallback['fallback_successes']}",
             f"- Overall generation success rate: {fallback['overall_generation_success_rate']}",
             f"- Reasons: {fallback['reason_codes']}",
+            "- All attempt rejection categories: "
+            f"{fallback['template_attempt_rejection_categories']}",
             "",
             "## Quality metrics",
             "",
@@ -1044,7 +1213,20 @@ def _summary_markdown(payload: Mapping[str, object]) -> str:
     quality = cast(Mapping[str, object], aggregate["quality"])
     lines.append(f"- Validation success rate: {quality['validation_success_rate']}")
     for name, metric in cast(Mapping[str, Mapping[str, object]], quality["metrics"]).items():
-        lines.append(f"- {name}: {metric['satisfied']}/{metric['applicable']} ({metric['rate']})")
+        if name == "muscle_level_volume_fit":
+            lines.append(
+                "- muscle_level_volume_fit: "
+                f"{metric['within_target_or_flexible_range']}/{metric['tracked_muscles']} "
+                f"({metric['percentage']}%)"
+            )
+            lines.append(
+                "- muscle_level_volume_constrained_or_outside: "
+                f"{metric['constrained_or_outside_target']}"
+            )
+        else:
+            lines.append(
+                f"- {name}: {metric['satisfied']}/{metric['applicable']} ({metric['rate']})"
+            )
     lines.extend(["", "## Top audit findings", ""])
     for finding, count in cast(Sequence[Sequence[object]], quality["top_findings"])[:10]:
         lines.append(f"- {finding}: {count}")

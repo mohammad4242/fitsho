@@ -294,6 +294,7 @@ def _template_coverage(
     references: Sequence[Any], records: Sequence[Mapping[str, object]]
 ) -> dict[str, object]:
     selected: Counter[str] = Counter()
+    successful: Counter[str] = Counter()
     considered: Counter[str] = Counter()
     rejected: Counter[str] = Counter()
     rejected_by_template: dict[str, Counter[str]] = defaultdict(Counter)
@@ -308,12 +309,15 @@ def _template_coverage(
         input_data = cast(Mapping[str, object], record["input"])
         template = cast(Mapping[str, object], record["template"])
         selected_slug = template.get("selected_template")
+        successful_slug = template.get("successful_template")
         if isinstance(selected_slug, str):
             selected[selected_slug] += 1
             selected_by_cell[
                 f"{input_data['experience_level']}:{input_data['resistance_days']}"
             ] += 1
             selected_by_focus_tag.update(tags_by_slug.get(selected_slug, ()))
+        if isinstance(successful_slug, str):
+            successful[successful_slug] += 1
         for candidate in cast(Sequence[Mapping[str, object]], template.get("score_breakdown", ())):
             slug = candidate.get("slug")
             if isinstance(slug, str):
@@ -334,8 +338,11 @@ def _template_coverage(
     return {
         "active_template_count": len(references),
         "selected_at_least_once": sorted(selected),
+        "successful_at_least_once": sorted(successful),
         "never_selected": never_selected,
+        "never_successful": sorted(set(family_by_slug) - set(successful)),
         "selection_count_per_template": dict(sorted(selected.items())),
+        "success_count_per_template": dict(sorted(successful.items())),
         "considered_count_per_template": dict(sorted(considered.items())),
         "rejection_by_template": {
             slug: dict(sorted(categories.items()))
@@ -392,7 +399,7 @@ def _aggregate(
             recovery = "physical_job"
         recovery_groups[recovery][str(record["quality_outcome"])] += 1
         template = cast(Mapping[str, object], record["template"])
-        slug = template.get("selected_template")
+        slug = template.get("successful_template")
         family = "FALLBACK"
         if isinstance(slug, str):
             ref = next((item for item in references if item.slug == slug), None)
@@ -451,6 +458,8 @@ def _csv_rows(records: Sequence[Mapping[str, object]]) -> list[dict[str, object]
                 "quality_outcome": record["quality_outcome"],
                 "construction_path": record["construction_path"],
                 "selected_template": template.get("selected_template"),
+                "successful_template": template.get("successful_template"),
+                "template_attempt_depth": template.get("attempt_depth"),
                 "template_succeeded": template.get("succeeded"),
                 "fallback_reasons": ",".join(cast(Sequence[str], template.get("reason_codes", ()))),
                 "success": result["success"],
@@ -507,17 +516,42 @@ def _write_summary(payload: Mapping[str, object], output_dir: Path) -> None:
             f"- Template attempts/successes: "
             f"{fallback['template_path_attempts']}/{fallback['template_path_successes']}"
         ),
+        f"- Total ranked template attempts: {fallback['total_template_attempts']}",
+        f"- Attempt-depth distribution: {fallback['attempt_depth_distribution']}",
+        (
+            "- Successful attempt-depth distribution: "
+            f"{fallback['successful_attempt_depth_distribution']}"
+        ),
+        f"- Recovered with alternative: {fallback['recovered_with_alternative']}",
+        f"- Alternatives exhausted: {fallback['alternatives_exhausted']}",
         (
             f"- Fallback activations/successes: "
             f"{fallback['fallback_activations']}/{fallback['fallback_successes']}"
         ),
         f"- Fallback reasons: {fallback['reason_codes']}",
+        (
+            "- All attempt rejection categories: "
+            f"{fallback['template_attempt_rejection_categories']}"
+        ),
         "",
         "## Required quality metrics",
         "",
     ]
     for name, metric in cast(Mapping[str, Mapping[str, object]], quality["metrics"]).items():
-        lines.append(f"- {name}: {metric['satisfied']}/{metric['applicable']} ({metric['rate']})")
+        if name == "muscle_level_volume_fit":
+            lines.append(
+                "- muscle_level_volume_fit: "
+                f"{metric['within_target_or_flexible_range']}/{metric['tracked_muscles']} "
+                f"({metric['percentage']}%)"
+            )
+            lines.append(
+                "- muscle_level_volume_constrained_or_outside: "
+                f"{metric['constrained_or_outside_target']}"
+            )
+        else:
+            lines.append(
+                f"- {name}: {metric['satisfied']}/{metric['applicable']} ({metric['rate']})"
+            )
     lines.extend(
         [
             "",
@@ -525,6 +559,11 @@ def _write_summary(payload: Mapping[str, object], output_dir: Path) -> None:
             "",
             (
                 f"- Selected: {len(cast(Sequence[str], coverage['selected_at_least_once']))}/"
+                f"{coverage['active_template_count']}"
+            ),
+            (
+                "- Successful: "
+                f"{len(cast(Sequence[str], coverage['successful_at_least_once']))}/"
                 f"{coverage['active_template_count']}"
             ),
             f"- Never selected: {coverage['never_selected']}",

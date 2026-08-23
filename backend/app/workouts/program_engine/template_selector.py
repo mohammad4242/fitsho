@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import UUID
 
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
@@ -22,9 +22,12 @@ class TemplateRankingResult:
     template: TemplateReference
     score: TemplateScore
     reason_codes: tuple[str, ...]
+    feasibility: "TemplateFeasibility"
+    rank: int = 0
 
     def decision_trace(self) -> dict[str, object]:
         return {
+            "rank": self.rank,
             "slug": self.template.slug,
             "score": {
                 "priority": self.score.priority_score,
@@ -34,7 +37,58 @@ class TemplateRankingResult:
                 "fallback": self.score.fallback_score,
                 "total": self.score.total,
             },
+            "feasibility": self.feasibility.decision_trace(),
             "reason_codes": self.reason_codes,
+        }
+
+
+@dataclass(frozen=True)
+class TemplateFeasibility:
+    total_slots: int
+    core_slots: int
+    resolvable_slots: int
+    exact_slot_matches: int
+    substitution_slots: int
+    difficult_slots: int
+    unresolved_non_core_slots: int
+    hard_priority_slots_covered: int
+    hard_priority_muscles_eligible: int
+    hard_priority_muscles_requested: int
+
+    @property
+    def coverage_ratio(self) -> int:
+        return round(self.resolvable_slots / self.total_slots * 1000) if self.total_slots else 0
+
+    @property
+    def exact_match_ratio(self) -> int:
+        return round(self.exact_slot_matches / self.total_slots * 1000) if self.total_slots else 0
+
+    @property
+    def sort_key(self) -> tuple[int, ...]:
+        return (
+            self.coverage_ratio,
+            self.hard_priority_slots_covered,
+            self.hard_priority_muscles_eligible,
+            self.exact_match_ratio,
+            -self.unresolved_non_core_slots,
+            -self.difficult_slots,
+            -self.substitution_slots,
+        )
+
+    def decision_trace(self) -> dict[str, object]:
+        return {
+            "total_slots": self.total_slots,
+            "core_slots": self.core_slots,
+            "resolvable_slots": self.resolvable_slots,
+            "coverage_percentage": round(self.coverage_ratio / 10, 1),
+            "exact_slot_matches": self.exact_slot_matches,
+            "exact_match_percentage": round(self.exact_match_ratio / 10, 1),
+            "substitution_slots": self.substitution_slots,
+            "difficult_slots": self.difficult_slots,
+            "unresolved_non_core_slots": self.unresolved_non_core_slots,
+            "hard_priority_slots_covered": self.hard_priority_slots_covered,
+            "hard_priority_muscles_eligible": self.hard_priority_muscles_eligible,
+            "hard_priority_muscles_requested": self.hard_priority_muscles_requested,
         }
 
 
@@ -52,12 +106,13 @@ class TemplateTieBreak:
     score: int
     tied_slugs: tuple[str, ...]
     selected: str
+    selected_by: str = "slug_descending"
 
     def decision_trace(self) -> dict[str, object]:
         return {
             "score": self.score,
             "tied_slugs": self.tied_slugs,
-            "selected_by": "slug_descending",
+            "selected_by": self.selected_by,
             "selected": self.selected,
         }
 
@@ -103,13 +158,27 @@ def rank_template_references(
     ruleset: ProgramRuleset,
 ) -> tuple[TemplateRankingResult, ...]:
     scored = tuple(
-        TemplateRankingResult(template, result.score, result.reason_codes)
+        TemplateRankingResult(
+            template,
+            result.score,
+            result.reason_codes,
+            _template_feasibility(request, eligible, template),
+        )
         for template in eligible_template_references(request, eligible, templates)
         for result in (score_template_reference_result(request, template, ruleset),)
     )
-    return tuple(
-        sorted(scored, key=lambda item: (item.score.total, item.template.slug), reverse=True)
+    ranked = tuple(
+        sorted(
+            scored,
+            key=lambda item: (
+                item.score.total,
+                item.feasibility.sort_key,
+                item.template.slug,
+            ),
+            reverse=True,
+        )
     )
+    return tuple(replace(item, rank=index) for index, item in enumerate(ranked, start=1))
 
 
 def select_template_reference_result(
@@ -124,10 +193,18 @@ def select_template_reference_result(
     if selected is not None:
         tied = tuple(item for item in ranked if item.score.total == selected.score.total)
         if len(tied) > 1:
+            feasibility_tied = all(
+                item.feasibility.sort_key == selected.feasibility.sort_key for item in tied
+            )
             tie_break = TemplateTieBreak(
                 score=selected.score.total,
                 tied_slugs=tuple(item.template.slug for item in tied),
                 selected=selected.template.slug,
+                selected_by=(
+                    "slug_descending"
+                    if feasibility_tied
+                    else "feasibility_then_slug_descending"
+                ),
             )
     rejected_items: list[HardRejectedTemplate] = []
     for template in templates:
@@ -232,3 +309,68 @@ def _core_slots_are_resolvable(
             ):
                 return False
     return True
+
+
+def _template_feasibility(
+    request: NormalizedProgramRequest,
+    eligible: tuple[ExerciseCandidate, ...],
+    template: TemplateReference,
+) -> TemplateFeasibility:
+    eligible_by_id = {candidate.id: candidate for candidate in eligible}
+    hard_priorities = request.source.priority_muscles
+    total_slots = 0
+    core_slots = 0
+    resolvable_slots = 0
+    exact_slot_matches = 0
+    substitution_slots = 0
+    difficult_slots = 0
+    unresolved_non_core_slots = 0
+    hard_priority_slots_covered = 0
+    for day in template.days:
+        for slot in day.slots:
+            total_slots += 1
+            core_slots += slot.adaptation_priority == "core"
+            compatible = tuple(
+                candidate
+                for candidate in eligible
+                if evaluate_candidate_slot_compatibility(
+                    candidate,
+                    allowed_patterns=template_slot_allowed_patterns(
+                        slot.movement_pattern, slot.target_muscles
+                    ),
+                    target_muscles=frozenset(slot.target_muscles),
+                    day_focus=f"template_reference_{day.day_number}",
+                ).compatible
+            )
+            exact = eligible_by_id.get(slot.exercise_id) if slot.exercise_id is not None else None
+            exact_is_compatible = exact is not None and exact in compatible
+            if compatible:
+                resolvable_slots += 1
+                if exact_is_compatible:
+                    exact_slot_matches += 1
+                else:
+                    substitution_slots += 1
+                if len(compatible) == 1:
+                    difficult_slots += 1
+                if hard_priorities and any(
+                    candidate.primary_muscle in hard_priorities for candidate in compatible
+                ):
+                    hard_priority_slots_covered += 1
+            elif slot.adaptation_priority != "core":
+                unresolved_non_core_slots += 1
+    hard_priority_muscles_eligible = sum(
+        any(candidate.primary_muscle is muscle for candidate in eligible)
+        for muscle in hard_priorities
+    )
+    return TemplateFeasibility(
+        total_slots=total_slots,
+        core_slots=core_slots,
+        resolvable_slots=resolvable_slots,
+        exact_slot_matches=exact_slot_matches,
+        substitution_slots=substitution_slots,
+        difficult_slots=difficult_slots,
+        unresolved_non_core_slots=unresolved_non_core_slots,
+        hard_priority_slots_covered=hard_priority_slots_covered,
+        hard_priority_muscles_eligible=hard_priority_muscles_eligible,
+        hard_priority_muscles_requested=len(hard_priorities),
+    )

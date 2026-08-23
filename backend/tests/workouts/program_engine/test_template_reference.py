@@ -335,6 +335,7 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
         "volume",
         "volume_repair",
         "session_duration",
+        "template_attempt",
         "final_construction",
         "coach_quality",
     ]
