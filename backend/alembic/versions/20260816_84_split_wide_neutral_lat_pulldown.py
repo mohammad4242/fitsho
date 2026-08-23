@@ -181,7 +181,14 @@ def split_target_exercise(bind: sa.Connection) -> None:
         source_id = variation["source_id"]
         asset = assets_by_source_id[source_id]
         exercise_id = uuid4()
-        values = {column: parent[column] for column in exercise_columns}
+        values = {
+            column: (
+                sa.null()
+                if parent[column] is None and isinstance(exercises.c[column].type, sa.JSON)
+                else parent[column]
+            )
+            for column in exercise_columns
+        }
         values.update(
             {
                 "id": exercise_id,

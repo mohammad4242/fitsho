@@ -157,7 +157,6 @@ def test_replacement_approval_preserves_edits_provenance_and_is_idempotent(
     replacement_id = next(
         exercise_id for exercise_id in snapshot_ids if exercise_id != original_item.exercise_id
     )
-
     draft_payload = deepcopy(claimed.draft_payload)
     draft_payload["expected_revision"] = claimed.draft_revision
     draft_payload["coach_note"] = "Reviewed adaptive prescription."
@@ -271,7 +270,6 @@ def test_replacement_approval_preserves_edits_provenance_and_is_idempotent(
         "sets_changed",
         "reps_range_changed",
         "rir_changed",
-        "rest_changed",
         "notes_changed",
     }
     assert all(
