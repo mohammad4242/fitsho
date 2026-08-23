@@ -13,8 +13,10 @@ from app.workouts.program_engine.body_analysis import (
     body_analysis_priority_muscles,
     body_analysis_provenance,
     body_analysis_trace,
+    eligible_body_analysis_priorities,
 )
 from app.workouts.program_engine.cardio import add_cardio, cardio_reserve_minutes
+from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
     complete_tracked_metrics,
@@ -25,7 +27,7 @@ from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import prescribe_sessions
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.progression import deload_policy, double_progression_policy
-from app.workouts.program_engine.recovery import repair_recovery_weekdays
+from app.workouts.program_engine.recovery import recovery_spacing_is_valid, repair_recovery_weekdays
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.safety import screen_safety
 from app.workouts.program_engine.schemas import (
@@ -130,18 +132,12 @@ def generate_program(
     )
     template_rejection_trace: tuple[dict[str, object], ...] = template_selection_trace
     reference = (
-        template_selection.selected.template
-        if template_selection.selected is not None
-        else None
+        template_selection.selected.template if template_selection.selected is not None else None
     )
     if reference is not None:
         try:
             reference_build = build_template_sessions(
-                normalized,
-                reference,
-                eligibility.eligible,
-                ruleset,
-                source_catalog=tuple(exercise_catalog),
+                normalized, reference, eligibility.eligible, ruleset
             )
             reference_result = _reference_program(
                 request,
@@ -461,9 +457,7 @@ def _program_for_split(
         request=normalized,
         relaxed_required_pattern_groups=relaxed_groups,
         relaxed_required_slots=relaxed_slots,
-        repair_reason_codes=tuple(
-            dict.fromkeys((*repair_reasons, *duration_repair_reasons))
-        ),
+        repair_reason_codes=tuple(dict.fromkeys((*repair_reasons, *duration_repair_reasons))),
     )
     body_trace = body_analysis_trace(normalized, ruleset)
     session_reasons = tuple(
@@ -570,6 +564,7 @@ def _program_for_split(
             rejected_candidates=rejected,
             decision_trace=trace,
         )
+    program, report = _attach_coach_quality_metrics(program, request, normalized, report, ruleset)
     final_trace = trace + (
         {
             "stage": "final_construction",
@@ -651,9 +646,7 @@ def _reference_program(
         ruleset,
         request=normalized,
         reference_template=reference.slug,
-        repair_reason_codes=tuple(
-            dict.fromkeys((*repair_reasons, *duration_repair_reasons))
-        ),
+        repair_reason_codes=tuple(dict.fromkeys((*repair_reasons, *duration_repair_reasons))),
     )
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises), ruleset
@@ -729,11 +722,7 @@ def _reference_program(
         for muscle in sorted(priority_muscles, key=lambda item: item.value)
         if direct[muscle.value] < volume.minimum_direct_sets_for(muscle)
         or effective_volume.effective_sets_by_muscle.get(muscle.value, 0)
-        < next(
-            target.acceptable_minimum
-            for target in volume.targets
-            if target.muscle is muscle
-        )
+        < next(target.acceptable_minimum for target in volume.targets if target.muscle is muscle)
     )
     if unmet_priorities:
         errors = tuple(
@@ -780,6 +769,7 @@ def _reference_program(
             rejected_candidates=rejected,
             decision_trace=trace,
         )
+    program, report = _attach_coach_quality_metrics(program, request, normalized, report, ruleset)
     final_trace = trace + (
         {
             "stage": "final_construction",
@@ -809,6 +799,115 @@ def _day_count_errors(actual: int, expected: int, *, stage: str) -> tuple[str, .
         f"REQUESTED_TRAINING_DAYS_MISMATCH:expected={expected}:actual={actual}",
         f"DAY_COUNT_INVARIANT_FAILED:{stage}",
     )
+
+
+def _attach_coach_quality_metrics(
+    program: WorkoutProgram,
+    request: ProgramGenerationRequest,
+    normalized: NormalizedProgramRequest,
+    report: ValidationReport,
+    ruleset: ProgramRuleset,
+) -> tuple[WorkoutProgram, ValidationReport]:
+    quality = _coach_quality_metrics(program, request, normalized, report, ruleset)
+    aggregate_metrics = {**program.aggregate_metrics, "coach_quality": quality}
+    report = replace(report, metrics={**report.metrics, "coach_quality": quality})
+    return replace(program, aggregate_metrics=aggregate_metrics), report
+
+
+def _coach_quality_metrics(
+    program: WorkoutProgram,
+    request: ProgramGenerationRequest,
+    normalized: NormalizedProgramRequest,
+    report: ValidationReport,
+    ruleset: ProgramRuleset,
+) -> dict[str, object]:
+    trace_reason_codes = {
+        code
+        for entry in program.decision_trace
+        for key in ("reason_codes", "reasons")
+        for code in _string_sequence(entry.get(key))
+    }
+    ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
+    hard_volume_exceeded = isinstance(ranges, dict) and any(
+        isinstance(values, dict)
+        and float(values.get("actual_effective_volume", 0))
+        > float(values.get("effective_maximum_hard", ruleset.maximum_sets[program.training_status]))
+        for values in ranges.values()
+    )
+    volume_fit = (
+        "failed"
+        if hard_volume_exceeded or "WEEKLY_MUSCLE_VOLUME_EXCEEDED" in report.errors
+        else "constrained"
+        if "WEEKLY_VOLUME_CONSTRAINED" in report.warnings
+        or "VOLUME_REPAIR_SOFT_TARGET_REDUCED" in trace_reason_codes
+        else "fit"
+    )
+    duration_policy = get_session_duration_policy(request.session_duration_minutes)
+    duration_fit = (
+        "fit"
+        if all(
+            duration_policy.contains(day.estimated_duration_minutes)
+            for day in program.weekly_schedule
+        )
+        else "constrained"
+        if "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in trace_reason_codes
+        else "failed"
+    )
+    recovery_fit = (
+        "fit" if recovery_spacing_is_valid(program.weekly_schedule, ruleset) else "failed"
+    )
+    priority_metrics_raw = program.aggregate_metrics.get("priority_metrics", {})
+    priority_metrics = priority_metrics_raw if isinstance(priority_metrics_raw, dict) else {}
+    explicit_priorities = tuple(request.priority_muscles)
+    body_priorities = tuple(
+        item.muscle for item in eligible_body_analysis_priorities(normalized, ruleset)
+    )
+
+    def satisfaction(muscles: tuple[MuscleGroup, ...]) -> str:
+        statuses: list[str] = []
+        for muscle in muscles:
+            metric = priority_metrics.get(muscle.value, {})
+            if not isinstance(metric, dict):
+                continue
+            status = metric.get("status")
+            if status in {"satisfied", "partial"}:
+                statuses.append(status)
+        if not statuses:
+            return "not_applicable"
+        return "satisfied" if all(status == "satisfied" for status in statuses) else "partial"
+
+    constraint_codes = {
+        code
+        for code in trace_reason_codes
+        if any(marker in code for marker in ("CONSTRAIN", "CAP", "LIMIT", "UNSATISFIED", "REPAIR"))
+    }
+    substitution_count = sum(
+        "TEMPLATE_SAFE_SUBSTITUTION" in item.reason_codes
+        for day in program.weekly_schedule
+        for item in day.exercises
+    )
+    has_template = isinstance(program.aggregate_metrics.get("reference_template"), str)
+    template_preservation = (
+        "preserved"
+        if has_template
+        and any(
+            any(code.startswith("TEMPLATE_") for code in item.reason_codes)
+            for day in program.weekly_schedule
+            for item in day.exercises
+        )
+        else "not_applicable"
+    )
+    return {
+        "template_preservation": template_preservation,
+        "priority_target_satisfaction": satisfaction(explicit_priorities),
+        "body_analysis_target_satisfaction": satisfaction(body_priorities),
+        "volume_fit": volume_fit,
+        "duration_fit": duration_fit,
+        "recovery_fit": recovery_fit,
+        "substitution_count": substitution_count,
+        "constraint_count": len(constraint_codes),
+        "hard_validation_status": "passed" if report.is_valid else "failed",
+    }
 
 
 def _volume_metrics(
@@ -959,10 +1058,7 @@ def _volume_range_metric(
         constraint_reasons.append("VOLUME_CONSTRAINED_BY_SESSION_FEASIBILITY")
     if not inside_range and any(
         "TEMPLATE_ADAPTATION_PRIORITY:core" in item.reason_codes
-        and (
-            item.primary_muscle is target.muscle
-            or target.muscle in item.secondary_muscles
-        )
+        and (item.primary_muscle is target.muscle or target.muscle in item.secondary_muscles)
         for day in days
         for item in day.exercises
     ):
@@ -1015,10 +1111,7 @@ def _priority_metrics(
         session_indexes = tuple(
             day.day_index
             for day in days
-            if any(
-                item.primary_muscle is muscle
-                for item in day.exercises
-            )
+            if any(item.primary_muscle is muscle for item in day.exercises)
         )
         direct = direct_sets.get(muscle.value, 0)
         effective = effective_sets.get(muscle.value, 0.0)
@@ -1026,10 +1119,7 @@ def _priority_metrics(
         effective_target = volume.effective_target_for(muscle)
         target_available = target > 0 or effective_target > 0
         direct_satisfied = target_available and direct >= volume.minimum_direct_sets_for(muscle)
-        acceptable_minimum = next(
-            item.acceptable_minimum for item in volume.targets if item.muscle is muscle
-        )
-        effective_satisfied = target_available and effective >= acceptable_minimum
+        effective_satisfied = target_available and effective >= effective_target
         frequency_satisfied = len(session_indexes) >= policy.preferred_frequency
         status = (
             "satisfied"
@@ -1044,11 +1134,7 @@ def _priority_metrics(
         if frequency_satisfied and policy.preferred_frequency > 1:
             reason_codes.append("PRIORITY_FREQUENCY_INCREASED")
         else:
-            reason_codes.append(
-                "PRIORITY_TARGET_CONSTRAINED"
-                if policy.is_explicit(muscle)
-                else "BODY_ANALYSIS_TARGET_CONSTRAINED"
-            )
+            reason_codes.append("PRIORITY_TARGET_CONSTRAINED")
         metrics[muscle.value] = {
             "direct_sets": direct,
             "effective_sets": effective,

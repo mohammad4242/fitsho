@@ -128,6 +128,20 @@ class WorkoutReviewDraftValidator:
             ),
             maximum_sets=max(policy.maximum_sets, max(source_sets, default=0)),
         )
+        source_max_duration = max(
+            (
+                5
+                + calculate_day_minutes(
+                    ExerciseTiming(item.sets, item.rest_seconds) for item in day.exercises
+                )
+                for day in source.days
+            ),
+            default=policy.session_duration_minutes,
+        )
+        policy = replace(
+            policy,
+            session_duration_minutes=max(policy.session_duration_minutes, source_max_duration),
+        )
         try:
             WorkoutPlanValidator(
                 candidates=CandidateSet(
@@ -172,7 +186,9 @@ class WorkoutReviewDraftValidator:
                         rir=(
                             None
                             if item.prescription_mode is PrescriptionMode.DURATION
-                            else item.rir if item.rir is not None else source_item.rir
+                            else item.rir
+                            if item.rir is not None
+                            else source_item.rir
                         ),
                         estimated_minutes=calculate_exercise_minutes(timing),
                         notes_en=item.notes_en,

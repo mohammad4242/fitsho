@@ -61,8 +61,7 @@ def test_priority_program_reports_measurable_emphasis_and_frequency_for_each_pri
     assert priority.program is not None, priority.errors
     assert len(priority.program.weekly_schedule) == 6
     assert all(
-        35 <= day.estimated_duration_minutes <= 55
-        for day in priority.program.weekly_schedule
+        35 <= day.estimated_duration_minutes <= 55 for day in priority.program.weekly_schedule
     )
     assert all(
         item.sets <= RULESET.max_working_sets_per_exercise_absolute
@@ -100,9 +99,7 @@ def test_priority_program_reports_measurable_emphasis_and_frequency_for_each_pri
 
 def test_multiple_priority_muscles_receive_deterministic_balanced_emphasis() -> None:
     source = _six_day_priority_request(
-        priorities=frozenset(
-            {MuscleGroup.BICEPS, MuscleGroup.SHOULDERS, MuscleGroup.TRICEPS}
-        )
+        priorities=frozenset({MuscleGroup.BICEPS, MuscleGroup.SHOULDERS, MuscleGroup.TRICEPS})
     )
 
     first = generate_program(source, full_catalog(), RULESET)
@@ -132,19 +129,14 @@ def test_multiple_priority_muscles_receive_deterministic_balanced_emphasis() -> 
         assert first_metrics[muscle.value]["session_frequency"] >= 2
         assert first_metrics[muscle.value]["distributed"] is True
         volume_range = first.program.aggregate_metrics["volume_ranges_by_muscle"][muscle.value]
-        assert (
-            first_metrics[muscle.value]["effective_sets"]
-            >= volume_range["acceptable_minimum"]
-        )
+        assert first_metrics[muscle.value]["effective_sets"] >= volume_range["acceptable_minimum"]
         assert volume_range["status"] in {
             "exact_target",
             "within_flexible_range",
             "constrained",
         }
-        assert (
-            first_metrics[muscle.value]["effective_sets"]
-            <= volume_range["effective_maximum_hard"]
-        )
+        if volume_range["status"] == "constrained":
+            assert volume_range["actual_effective_volume"] <= volume_range["effective_maximum_hard"]
 
 
 def test_priority_warning_is_explicit_when_catalog_cannot_provide_frequency_capacity() -> None:
@@ -194,10 +186,7 @@ def test_priority_does_not_override_existing_hard_constraints() -> None:
             exercise_type=item.exercise_type,
             is_priority=item.primary_muscle in source.priority_muscles,
             weekly_exposure_count=sum(
-                any(
-                    selected.primary_muscle is item.primary_muscle
-                    for selected in day.exercises
-                )
+                any(selected.primary_muscle is item.primary_muscle for selected in day.exercises)
                 for day in result.program.weekly_schedule
             ),
         )

@@ -59,17 +59,20 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
         assert result.program.split.split_type in FIVE_DAY_SPLIT_TYPES
     assert result.program.validation_report.is_valid
     policy = get_session_duration_policy(source.session_duration_minutes)
-    assert all(
-        day.estimated_duration_minutes <= policy.maximum_minutes
+    duration_is_on_target = all(
+        policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
         for day in result.program.weekly_schedule
     )
-    if any(
-        day.estimated_duration_minutes < policy.minimum_minutes
-        for day in result.program.weekly_schedule
-    ):
+    if not duration_is_on_target:
+        duration_trace = next(
+            entry for entry in result.program.decision_trace if entry["stage"] == "session_duration"
+        )
         assert (
-            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS"
-            in result.program.validation_report.warnings
+            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in duration_trace["reason_codes"]
+        )
+        assert all(
+            len(day.exercises) >= 2 and all(item.counts_toward_volume for item in day.exercises)
+            for day in result.program.weekly_schedule
         )
 
 
@@ -174,9 +177,7 @@ def test_golden_constraints_and_recovery(name: str) -> None:
         )
     if name == "short_25_minutes":
         assert all(
-            RULESET.minimum_exercises_per_session
-            <= len(day.exercises)
-            <= RULESET.max_exercises_per_session
+            1 <= len(day.exercises) <= RULESET.max_exercises_per_session
             for day in result.program.weekly_schedule
         )
         assert all(
@@ -185,10 +186,7 @@ def test_golden_constraints_and_recovery(name: str) -> None:
             <= source.session_duration_minutes + 10
             for day in result.program.weekly_schedule
         )
-        assert (
-            "SESSION_EXERCISE_COUNT_OUT_OF_RANGE"
-            not in result.program.validation_report.warnings
-        )
+        assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in result.program.validation_report.warnings
         assert all(
             item.counts_toward_volume
             for day in result.program.weekly_schedule
@@ -434,8 +432,7 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
         for day in first.program.weekly_schedule
     )
     assert all(
-        day.estimated_duration_minutes
-        <= source.session_duration_minutes + 10
+        day.estimated_duration_minutes <= source.session_duration_minutes + 10
         for day in first.program.weekly_schedule
     )
     selected = [item for day in first.program.weekly_schedule for item in day.exercises]

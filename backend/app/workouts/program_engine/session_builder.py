@@ -89,6 +89,7 @@ def build_sessions(
     )
     usage: Counter[UUID] = Counter()
     sessions: list[SessionDraft] = []
+    short_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
     for index, planned_focus in enumerate(split.day_focuses):
         focus = _resolve_focus(planned_focus, request, volume, ruleset)
         capacity = max(
@@ -172,11 +173,14 @@ def build_sessions(
                     )
                 else:
                     continue
+            needed_muscle = slot.target_muscle
+            if needed_muscle is None and slot.patterns == HINGE_PATTERNS:
+                needed_muscle = MuscleGroup.HAMSTRINGS
             ranked = rank_exercises(
                 request,
                 options,
                 ruleset,
-                needed_muscle=slot.target_muscle,
+                needed_muscle=needed_muscle,
                 compatibility_levels=comp_levels,
             )
             selected = min(
@@ -185,6 +189,7 @@ def build_sessions(
                     _role_repeated(item.exercise, chosen),
                     usage[item.exercise.id],
                     -item.score,
+                    len(item.exercise.secondary_muscles) if short_session else 0,
                     str(item.exercise.id),
                 ),
             )
