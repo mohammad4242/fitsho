@@ -601,6 +601,132 @@ def test_replacement_ranking_excludes_unavailable_and_unsafe_candidates() -> Non
     assert ranked == ()
 
 
+def test_exact_curated_replacement_wins_before_user_dislike() -> None:
+    exact_id = uuid4()
+    request = normalized(disliked_exercises=[exact_id])
+    target = candidate(
+        "target incline press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        substitution_group="horizontal_press_incline",
+    )
+    exact = candidate(
+        "disliked exact incline press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        id=exact_id,
+        substitution_group="horizontal_press_incline",
+    )
+    metadata_fallback = candidate(
+        "preferred flat press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        substitution_group="horizontal_press_flat",
+    )
+
+    ranked = rank_replacement_exercises(request, target, (metadata_fallback, exact))
+
+    assert ranked[0] is exact
+
+
+def test_unsafe_preferred_exact_group_never_beats_safe_metadata_fallback() -> None:
+    unsafe_id = uuid4()
+    request = normalized(
+        preferred_exercises=[unsafe_id],
+        blocked_exercises=[unsafe_id],
+    )
+    target = candidate(
+        "target press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        substitution_group="horizontal_press_flat",
+    )
+    unsafe_exact = candidate(
+        "unsafe exact press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        id=unsafe_id,
+        substitution_group="horizontal_press_flat",
+    )
+    safe_fallback = candidate(
+        "safe fallback press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        substitution_group=None,
+    )
+
+    ranked = rank_replacement_exercises(request, target, (unsafe_exact, safe_fallback))
+
+    assert ranked == (safe_fallback,)
+
+
+def test_metadata_fallback_preserves_movement_role_without_curated_group() -> None:
+    request = normalized()
+    target = candidate(
+        "romanian deadlift",
+        MovementPattern.HIP_HINGE,
+        MuscleGroup.HAMSTRINGS,
+        substitution_group=None,
+    )
+    valid_hinge = candidate(
+        "dumbbell romanian deadlift",
+        MovementPattern.HIP_HINGE,
+        MuscleGroup.HAMSTRINGS,
+        substitution_group=None,
+    )
+    wrong_role = candidate(
+        "lying leg curl",
+        MovementPattern.KNEE_FLEXION,
+        MuscleGroup.HAMSTRINGS,
+        substitution_group="knee_flexion_leg_curl",
+    )
+
+    ranked = rank_replacement_exercises(request, target, (wrong_role, valid_hinge))
+
+    assert ranked == (valid_hinge,)
+
+
+def test_range_of_motion_similarity_precedes_skill_and_stability_tie_breaks() -> None:
+    request = normalized(
+        training_experience="advanced",
+        training_age_months=72,
+        balance_requirement=BalanceAbility.HIGH,
+    )
+    target = candidate(
+        "target squat",
+        MovementPattern.SQUAT,
+        MuscleGroup.QUADRICEPS,
+        substitution_group=None,
+        range_of_motion_profile=frozenset({"deep_knee_flexion"}),
+    )
+    same_rom = candidate(
+        "same rom squat",
+        MovementPattern.SQUAT,
+        MuscleGroup.QUADRICEPS,
+        substitution_group=None,
+        range_of_motion_profile=frozenset({"deep_knee_flexion"}),
+        stability_demand=StabilityDemand.HIGH,
+        skill_demand=SkillDemand.HIGH,
+    )
+    lower_demand_wrong_rom = candidate(
+        "shortened squat",
+        MovementPattern.SQUAT,
+        MuscleGroup.QUADRICEPS,
+        substitution_group=None,
+        range_of_motion_profile=frozenset({"shortened"}),
+        stability_demand=StabilityDemand.LOW,
+        skill_demand=SkillDemand.LOW,
+    )
+
+    ranked = rank_replacement_exercises(
+        request,
+        target,
+        (lower_demand_wrong_rom, same_rom),
+    )
+
+    assert ranked[0] is same_rom
+
+
 def test_lower_risk_compatible_replacement_outranks_riskier_candidate() -> None:
     request = normalized(
         impact_limit=ImpactLimit.HIGH,
@@ -639,7 +765,7 @@ def test_lower_risk_compatible_replacement_outranks_riskier_candidate() -> None:
     assert ranked[0] is lower_risk
 
 
-def test_persistent_dislike_is_deprioritized_and_safe_fallback_is_deterministic() -> None:
+def test_dislike_applies_after_semantic_fit_and_order_remains_deterministic() -> None:
     disliked_id = uuid4()
     request = normalized(disliked_exercises=[disliked_id])
     target = candidate(
@@ -665,7 +791,7 @@ def test_persistent_dislike_is_deprioritized_and_safe_fallback_is_deterministic(
     forward = rank_replacement_exercises(request, target, (disliked_family, safe_fallback))
     reverse = rank_replacement_exercises(request, target, (safe_fallback, disliked_family))
 
-    assert forward[0] is safe_fallback
+    assert forward[0] is disliked_family
     assert tuple(item.id for item in forward) == tuple(item.id for item in reverse)
 
 

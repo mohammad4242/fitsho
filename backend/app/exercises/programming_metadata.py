@@ -15,6 +15,11 @@ from app.exercises.enums import (
     MovementPattern,
 )
 from app.exercises.models import Exercise
+from app.exercises.substitution_groups import (
+    LEGACY_BROAD_SUBSTITUTION_GROUPS,
+    curated_substitution_group,
+    effective_substitution_group,
+)
 from app.workouts.program_engine.enums import (
     BodyPosition,
     ImpactLimit,
@@ -255,8 +260,14 @@ def infer_programming_metadata(exercise: Exercise) -> dict[str, object]:
     if laterality is not None:
         metadata["laterality"] = laterality
 
-    if exercise.movement_pattern is not MovementPattern.OTHER:
-        metadata["substitution_group"] = exercise.movement_pattern.value
+    substitution_group = curated_substitution_group(
+        name_en=exercise.name_en,
+        movement_pattern=exercise.movement_pattern,
+        primary_muscle=exercise.primary_muscle,
+        exercise_type=exercise.exercise_type,
+    )
+    if substitution_group is not None:
+        metadata["substitution_group"] = substitution_group
 
     range_of_motion_profile = _infer_range_of_motion_profile(exercise)
     if range_of_motion_profile is not None:
@@ -292,6 +303,16 @@ def backfill_programming_metadata(
                 for field_name, value in inferred.items()
                 if getattr(exercise, field_name) is None
             }
+            if exercise.substitution_group in LEGACY_BROAD_SUBSTITUTION_GROUPS:
+                repaired_group = effective_substitution_group(
+                    name_en=exercise.name_en,
+                    movement_pattern=exercise.movement_pattern,
+                    primary_muscle=exercise.primary_muscle,
+                    exercise_type=exercise.exercise_type,
+                    persisted_group=exercise.substitution_group,
+                )
+                if repaired_group != exercise.substitution_group:
+                    changes["substitution_group"] = repaired_group
             if not changes:
                 skipped += 1
                 continue

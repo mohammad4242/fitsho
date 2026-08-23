@@ -3,11 +3,125 @@ from app.profile.enums import TrainingLocation
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, SplitType, TrainingExperience
 from app.workouts.program_engine.normalization import normalize_request
+from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-from app.workouts.program_engine.schemas import ProgramGenerationRequest
-from app.workouts.program_engine.split_selector import rank_split_candidates
+from app.workouts.program_engine.schemas import BodyAnalysisInfluence, ProgramGenerationRequest
+from app.workouts.program_engine.split_selector import rank_split_candidates, select_split
+from app.workouts.program_engine.volume_planner import plan_weekly_volume
 
 from .golden_fixtures import ADVANCED_HISTORY, full_catalog, request
+
+
+def _body_lags(*items: tuple[MuscleGroup, str]) -> BodyAnalysisInfluence:
+    return BodyAnalysisInfluence.model_validate(
+        {
+            "analysis_id": "10000000-0000-0000-0000-000000000001",
+            "result_version_id": "10000000-0000-0000-0000-000000000002",
+            "analysis_revision": 1,
+            "schema_version": "1.0",
+            "source": "coach_reviewed",
+            "overall_confidence": 0.95,
+            "priorities": [
+                {
+                    "muscle": muscle,
+                    "classification": classification,
+                    "confidence": 0.9,
+                    "severity": 0.8 if classification == "clear_lag" else 0.4,
+                    "emphasis": [muscle.value],
+                }
+                for muscle, classification in items
+            ],
+        }
+    )
+
+
+def _planned_targets(priorities: frozenset[MuscleGroup]) -> dict[MuscleGroup, int]:
+    source = request(priority_muscles=priorities)
+    normalized = normalize_request(source, RULESET)
+    plan = plan_weekly_volume(normalized, select_split(normalized, RULESET), RULESET)
+    return {target.muscle: target.target_sets for target in plan.targets}
+
+
+def test_priority_precedence_is_explicit_then_clear_then_mild() -> None:
+    source = request(
+        priority_muscles=[MuscleGroup.CHEST],
+        body_analysis_influence=_body_lags(
+            (MuscleGroup.BACK, "clear_lag"),
+            (MuscleGroup.SHOULDERS, "mild_lag"),
+        ),
+    )
+    policy = PriorityAllocationPolicy.for_request(normalize_request(source, RULESET), RULESET)
+
+    assert policy.precedence_key(MuscleGroup.CHEST)[0] == 0
+    assert policy.precedence_key(MuscleGroup.BACK)[0] == 1
+    assert policy.precedence_key(MuscleGroup.SHOULDERS)[0] == 2
+
+
+def test_same_muscle_priority_and_body_analysis_do_not_double_stack() -> None:
+    explicit = request(priority_muscles=[MuscleGroup.CHEST])
+    supported = explicit.model_copy(
+        update={"body_analysis_influence": _body_lags((MuscleGroup.CHEST, "clear_lag"))}
+    )
+    explicit_normalized = normalize_request(explicit, RULESET)
+    supported_normalized = normalize_request(supported, RULESET)
+
+    explicit_plan = plan_weekly_volume(
+        explicit_normalized,
+        select_split(explicit_normalized, RULESET),
+        RULESET,
+    )
+    supported_plan = plan_weekly_volume(
+        supported_normalized,
+        select_split(supported_normalized, RULESET),
+        RULESET,
+    )
+
+    assert supported_plan.direct_sets_for(MuscleGroup.CHEST) == explicit_plan.direct_sets_for(
+        MuscleGroup.CHEST
+    )
+    assert "BODY_ANALYSIS_SUPPORTS_EXPLICIT_PRIORITY" in supported_plan.reason_codes
+
+
+def test_multiple_priorities_share_the_capped_emphasis_budget() -> None:
+    baseline = _planned_targets(frozenset())
+    requested = (
+        frozenset({MuscleGroup.CHEST}),
+        frozenset({MuscleGroup.CHEST, MuscleGroup.BACK}),
+        frozenset({MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS}),
+        frozenset(
+            {
+                MuscleGroup.CHEST,
+                MuscleGroup.BACK,
+                MuscleGroup.SHOULDERS,
+                MuscleGroup.BICEPS,
+                MuscleGroup.TRICEPS,
+            }
+        ),
+    )
+    expected_budgets = (2, 2, 3, 4)
+
+    for priorities, expected_budget in zip(requested, expected_budgets, strict=True):
+        targets = _planned_targets(priorities)
+        allocated = sum(targets[muscle] - baseline[muscle] for muscle in priorities)
+        assert allocated == expected_budget
+
+
+def test_priority_frequency_is_only_increased_when_volume_needs_distribution() -> None:
+    normalized = normalize_request(
+        request(
+            available_training_days=6,
+            primary_goal=Goal.MUSCLE_GAIN,
+            training_experience=TrainingExperience.ADVANCED,
+            training_age_months=72,
+            priority_muscles=[MuscleGroup.CHEST],
+            recent_training_history=ADVANCED_HISTORY,
+        ),
+        RULESET,
+    )
+    policy = PriorityAllocationPolicy.for_request(normalized, RULESET)
+
+    assert policy.useful_frequency(5, RULESET) == 1
+    assert policy.useful_frequency(9, RULESET) == 2
 
 
 def _six_day_priority_request(*, priorities: frozenset[MuscleGroup]) -> ProgramGenerationRequest:
@@ -60,9 +174,15 @@ def test_priority_program_reports_measurable_emphasis_and_frequency_for_each_pri
     assert baseline.program is not None, baseline.errors
     assert priority.program is not None, priority.errors
     assert len(priority.program.weekly_schedule) == 6
-    assert all(
-        35 <= day.estimated_duration_minutes <= 55 for day in priority.program.weekly_schedule
+    workout_durations = tuple(
+        day.estimated_duration_minutes - RULESET.general_warmup_minutes
+        for day in priority.program.weekly_schedule
     )
+    assert all(duration <= 55 for duration in workout_durations)
+    if any(duration < 35 for duration in workout_durations):
+        assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in (
+            priority.program.validation_report.warnings
+        )
     assert all(
         item.sets <= RULESET.max_working_sets_per_exercise_absolute
         for day in priority.program.weekly_schedule
@@ -137,6 +257,9 @@ def test_multiple_priority_muscles_receive_deterministic_balanced_emphasis() -> 
         }
         if volume_range["status"] == "constrained":
             assert volume_range["actual_effective_volume"] <= volume_range["effective_maximum_hard"]
+        assert (
+            first_metrics[muscle.value]["effective_sets"] <= volume_range["effective_maximum_hard"]
+        )
 
 
 def test_priority_warning_is_explicit_when_catalog_cannot_provide_frequency_capacity() -> None:

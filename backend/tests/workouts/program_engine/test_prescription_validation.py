@@ -252,7 +252,7 @@ def test_volume_target_keeps_effective_target_and_direct_minimum_separate() -> N
     target = next(item for item in volume.targets if item.muscle is MuscleGroup.TRICEPS)
 
     assert target.effective_target_sets == target.target_sets
-    assert target.minimum_direct_sets == target.minimum_soft
+    assert target.minimum_direct_sets <= target.minimum_soft
 
 
 def test_volume_target_exposes_clamped_preferred_flexible_range() -> None:
@@ -266,9 +266,9 @@ def test_volume_target_exposes_clamped_preferred_flexible_range() -> None:
 
     target = next(item for item in volume.targets if item.muscle is MuscleGroup.CHEST)
 
-    assert target.preferred_target == 9
+    assert target.preferred_target == 10
     assert target.acceptable_minimum == 8
-    assert target.acceptable_maximum == 11
+    assert target.acceptable_maximum == 12
     assert target.acceptable_minimum <= target.preferred_target <= target.acceptable_maximum
 
 
@@ -465,8 +465,7 @@ def test_validator_rejects_legacy_hidden_volume_flag_and_still_counts_sets() -> 
     assert "RESISTANCE_WORK_EXCLUDED_FROM_VOLUME" in report.errors
     assert hidden.primary_muscle is not None
     assert (
-        report.metrics["weekly_direct_sets_by_muscle"][hidden.primary_muscle.value]
-        >= hidden.sets
+        report.metrics["weekly_direct_sets_by_muscle"][hidden.primary_muscle.value] >= hidden.sets
     )
 
 

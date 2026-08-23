@@ -173,7 +173,7 @@ def test_strength_prescription_is_role_aware_and_level_aware() -> None:
     assert advanced_primary.rest_seconds > advanced_secondary.rest_seconds > accessory.rest_seconds
     assert beginner_primary.rep_min >= advanced_primary.rep_min
     assert high_fatigue_accessory.rest_seconds > accessory.rest_seconds
-    assert isolation_accessory.rest_seconds == 90
+    assert isolation_accessory.rest_seconds == 75
 
 
 @pytest.mark.parametrize("blocked_by", ["equipment", "caution"])

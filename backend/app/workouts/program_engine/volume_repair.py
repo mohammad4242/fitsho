@@ -24,6 +24,7 @@ from app.workouts.program_engine.schemas import (
 from app.workouts.program_engine.session_builder import exercise_fits_focus
 from app.workouts.program_engine.session_targets import english_session_title
 from app.workouts.program_engine.strength_programming import classify_strength_role
+from app.workouts.program_engine.template_sessions import adaptation_preservation_rank
 
 
 def repair_weekly_volume(
@@ -378,7 +379,7 @@ def _select_set_redistribution(
                 duration = ruleset.general_warmup_minutes + sum(
                     item.estimated_minutes for item in simulated[day_index]
                 )
-                if duration > duration_policy.maximum_minutes:
+                if duration > duration_policy.maximum_total_minutes(ruleset.general_warmup_minutes):
                     continue
                 options.append(
                     (
@@ -480,7 +481,7 @@ def _select_exercise_addition(
                     + estimated
                     + (original.cardio.duration_minutes if original.cardio else 0)
                 )
-                if duration > duration_policy.maximum_minutes:
+                if duration > duration_policy.maximum_total_minutes(ruleset.general_warmup_minutes):
                     continue
                 role_repeated = any(
                     item.primary_muscle is muscle
@@ -550,7 +551,15 @@ def _select_exercise_addition(
                         (
                             0 if muscle in direct_under else 1,
                             0 if muscle in priority_policy.priorities else 1,
-                            *priority_policy.day_priority_key(day_contexts, muscle, day_index),
+                            *priority_policy.day_priority_key(
+                                day_contexts,
+                                muscle,
+                                day_index,
+                                preferred_frequency=priority_policy.useful_frequency(
+                                    targets[muscle].target_sets,
+                                    ruleset,
+                                ),
+                            ),
                             direct_by_session[muscle],
                             -ranked.score,
                             1 if role_repeated else 0,
@@ -668,6 +677,7 @@ def _select_reduction_candidate(
         candidates,
         key=lambda candidate: (
             0 if _affected_muscle_values(candidate[2]).intersection(hard_weekly_excessive) else 1,
+            adaptation_preservation_rank(candidate[2], priority_policy),
             any(code.startswith("REQUIRED_") for code in candidate[2].reason_codes),
             priority_policy.preservation_rank(candidate[2].primary_muscle),
             -sum(
@@ -741,16 +751,13 @@ def _select_addition_candidate(
                     ruleset,
                 ),
             )
-            if (
-                _day_duration(
-                    exercises,
-                    exercise,
-                    updated,
-                    cardio_minutes_by_day[day_index],
-                    ruleset,
-                )
-                > duration_policy.maximum_minutes
-            ):
+            if _day_duration(
+                exercises,
+                exercise,
+                updated,
+                cardio_minutes_by_day[day_index],
+                ruleset,
+            ) > duration_policy.maximum_total_minutes(ruleset.general_warmup_minutes):
                 continue
             simulated = [list(day_exercises) for day_exercises in days]
             simulated[day_index][exercise_index] = updated
@@ -776,7 +783,15 @@ def _select_addition_candidate(
                         0 if direct_needs else 1,
                         0 if primary in effective_under else 1,
                         0 if primary in priority_policy.priorities else 1,
-                        *priority_policy.day_priority_key(days, primary, day_index),
+                        *priority_policy.day_priority_key(
+                            days,
+                            primary,
+                            day_index,
+                            preferred_frequency=priority_policy.useful_frequency(
+                                targets[primary].target_sets,
+                                ruleset,
+                            ),
+                        ),
                         direct_by_session[primary],
                         day_index,
                         exercise_index,

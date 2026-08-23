@@ -28,6 +28,8 @@ class ExercisePrescription:
     duration_max_seconds: int | None
     target_rir: int | None
     rest_seconds: int
+    minimum_rest_seconds: int
+    maximum_rest_seconds: int
 
 
 def prescribe_sessions(
@@ -67,9 +69,7 @@ def prescribe_sessions(
         exercise_count = max(1, len(draft.exercises))
         available = max(
             ruleset.minimum_session_work_minutes,
-            request.source.session_duration_minutes
-            - ruleset.general_warmup_minutes
-            - cardio_reserve_minutes,
+            request.source.session_duration_minutes - cardio_reserve_minutes,
         )
         per_exercise_budget = max(
             ruleset.minimum_exercise_budget_minutes,
@@ -139,10 +139,7 @@ def prescribe_sessions(
             )
             rest = prescription.rest_seconds
             warmup_sets = 0
-            if (
-                not programmed
-                and exercise.exercise_type is ExerciseType.COMPOUND
-            ):
+            if not programmed and exercise.exercise_type is ExerciseType.COMPOUND:
                 warmup_sets = (
                     ruleset.strength_compound_warmup_sets
                     if request.primary_goal is Goal.STRENGTH
@@ -173,11 +170,7 @@ def prescribe_sessions(
                             draft.selection_reasons[exercise.id]
                             + (strength_role.reason_codes if strength_role is not None else ())
                             + (("VOLUME_SET_CAP_APPLIED",) if cap_applied else ())
-                            + (
-                                ("SESSION_SIZE_ACCESSORY",)
-                                if session_size_accessory
-                                else ()
-                            )
+                            + (("SESSION_SIZE_ACCESSORY",) if session_size_accessory else ())
                         )
                     ),
                     substitution_exercise_ids=draft.substitutions[exercise.id],
@@ -246,13 +239,13 @@ def prescription_for(
     strength_role: StrengthExerciseRole | None = None,
     fatigue_cost: int = 2,
 ) -> ExercisePrescription:
-    novice = status is TrainingStatus.NOVICE
-    rir = ruleset.novice_target_rir if novice else ruleset.experienced_target_rir
     role: StrengthExerciseRole | None = None
-    if goal is Goal.STRENGTH:
+    if exercise_type is ExerciseType.CORE:
+        key = "core"
+    elif goal is Goal.STRENGTH:
         if exercise_type is ExerciseType.ISOLATION:
-            key = "hypertrophy_isolation"
-            role = None
+            key = "strength_isolation"
+            role = StrengthExerciseRole.ACCESSORY
         else:
             role = strength_role or StrengthExerciseRole.SECONDARY_COMPOUND
             key = {
@@ -268,25 +261,30 @@ def prescription_for(
         )
     elif goal is Goal.MUSCULAR_ENDURANCE:
         key = "muscular_endurance"
-        rir = ruleset.novice_target_rir
     elif goal in {Goal.FAT_LOSS, Goal.BODY_RECOMPOSITION}:
-        key = "fat_loss"
+        key = (
+            "fat_loss_isolation" if exercise_type is ExerciseType.ISOLATION else "fat_loss_compound"
+        )
     else:
-        key = "general_fitness"
+        key = (
+            "general_fitness_isolation"
+            if exercise_type is ExerciseType.ISOLATION
+            else "general_fitness_compound"
+        )
     rule = ruleset.prescription_rules[key]
+    rir = ruleset.target_rir_rules[key][status]
     rep_min = rule.rep_min
     rep_max = rule.rep_max
     rest_seconds = rule.rest_seconds
     if goal is Goal.STRENGTH and role is not None:
-        role_key = role.value
-        if novice:
-            rep_min = max(rep_min, ruleset.strength_beginner_rep_minimums[role_key])
-            rep_max = max(rep_max, ruleset.strength_beginner_rep_maximums[role_key])
         if (
             role is not StrengthExerciseRole.PRIMARY_STRENGTH
             and fatigue_cost >= ruleset.strength_high_fatigue_cost
         ):
-            rest_seconds += ruleset.strength_high_fatigue_rest_bonus_seconds
+            rest_seconds = min(
+                rule.maximum_rest_seconds,
+                rest_seconds + ruleset.strength_high_fatigue_rest_bonus_seconds,
+            )
     if prescription_mode is PrescriptionMode.REPS:
         return ExercisePrescription(
             mode=PrescriptionMode.REPS,
@@ -296,6 +294,8 @@ def prescription_for(
             duration_max_seconds=None,
             target_rir=rir,
             rest_seconds=rest_seconds,
+            minimum_rest_seconds=rule.minimum_rest_seconds,
+            maximum_rest_seconds=rule.maximum_rest_seconds,
         )
     if prescription_mode is PrescriptionMode.DURATION:
         if (
@@ -312,6 +312,8 @@ def prescription_for(
             duration_max_seconds=duration_max_seconds,
             target_rir=None,
             rest_seconds=rest_seconds,
+            minimum_rest_seconds=rule.minimum_rest_seconds,
+            maximum_rest_seconds=rule.maximum_rest_seconds,
         )
     raise ValueError(f"unsupported prescription mode: {prescription_mode}")
 

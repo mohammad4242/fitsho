@@ -59,7 +59,8 @@ def test_regression_thirty_minute_session_reports_traceable_constrained_workload
     assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in result.program.warnings
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.contains(day.estimated_duration_minutes) for day in result.program.weekly_schedule
+        policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)
+        for day in result.program.weekly_schedule
     )
 
 
@@ -128,8 +129,7 @@ def test_regression_short_sessions_cover_hinge_and_core_across_the_week() -> Non
     assert MovementPattern.HIP_HINGE in patterns
     assert MovementPattern.CORE_ANTI_EXTENSION in patterns
 
-
-def test_regression_short_upper_lower_keeps_required_trunk_work() -> None:
+def test_regression_short_upper_lower_keeps_required_trunk_work_with_cardio() -> None:
     result = generate_program(
         request(
             available_training_days=4,
@@ -151,6 +151,11 @@ def test_regression_short_upper_lower_keeps_required_trunk_work() -> None:
     )
     assert any(day.cardio is not None for day in result.program.weekly_schedule)
     assert all(
-        day.estimated_duration_minutes <= get_session_duration_policy(25).maximum_minutes
+        day.cardio is None or "CARDIO_SCHEDULED_AFTER_RESISTANCE" in day.cardio.reason_codes
+        for day in result.program.weekly_schedule
+    )
+    assert all(
+        day.estimated_duration_minutes
+        <= get_session_duration_policy(25).maximum_total_minutes(RULESET.general_warmup_minutes)
         for day in result.program.weekly_schedule
     )

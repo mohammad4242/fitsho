@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.body_analysis import eligible_body_analysis_priorities
 from app.workouts.program_engine.enums import (
     Goal,
-    PhysicalJobDemand,
-    RecoveryRating,
     TrainingStatus,
 )
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import NormalizedProgramRequest
 from app.workouts.program_engine.slot_compatibility import focus_scope
+from app.workouts.program_engine.volume_policy import recovery_burden_for_request
 
 
 @dataclass(frozen=True)
@@ -58,9 +58,7 @@ class PriorityAllocationPolicy:
             if priority.classification == "clear_lag"
         )
         mild_lag_priorities = tuple(
-            priority.muscle
-            for priority in body_priorities
-            if priority.classification == "mild_lag"
+            priority.muscle for priority in body_priorities if priority.classification == "mild_lag"
         )
         priorities = explicit_priorities + clear_lag_priorities + mild_lag_priorities
         available_days = min(request.resistance_training_days, ruleset.max_resistance_days)
@@ -117,6 +115,40 @@ class PriorityAllocationPolicy:
     def is_body_analysis(self, muscle: MuscleGroup | None) -> bool:
         return muscle in self.clear_lag_priorities or muscle in self.mild_lag_priorities
 
+    def volume_bonuses(
+        self,
+        baseline_sets: Mapping[MuscleGroup, int],
+        maximum_sets: Mapping[MuscleGroup, int],
+        ruleset: ProgramRuleset,
+    ) -> dict[MuscleGroup, int]:
+        bonuses = {muscle: 0 for muscle in self.explicit_priorities}
+        remaining = ruleset.priority_emphasis_budget(len(self.explicit_priorities))
+        while remaining > 0:
+            eligible = tuple(
+                muscle
+                for muscle in self.explicit_priorities
+                if baseline_sets[muscle] + bonuses[muscle] < maximum_sets[muscle]
+            )
+            if not eligible:
+                break
+            selected = min(
+                eligible,
+                key=lambda muscle: (
+                    -(maximum_sets[muscle] - baseline_sets[muscle] - bonuses[muscle]),
+                    bonuses[muscle],
+                    muscle.value,
+                ),
+            )
+            bonuses[selected] += 1
+            remaining -= 1
+        return bonuses
+
+    def useful_frequency(self, target_sets: int, ruleset: ProgramRuleset) -> int:
+        if self.preferred_frequency <= 1:
+            return self.preferred_frequency
+        required = max(1, math.ceil(target_sets / ruleset.max_sets_per_muscle_per_session))
+        return min(self.preferred_frequency, required)
+
     def split_adjustment(
         self, focuses: tuple[str, ...], ruleset: ProgramRuleset
     ) -> tuple[int, tuple[str, ...]]:
@@ -167,21 +199,23 @@ class PriorityAllocationPolicy:
         days: Sequence[object],
         muscle: MuscleGroup,
         day_index: int,
+        *,
+        preferred_frequency: int | None = None,
     ) -> tuple[int, int, int, int]:
         """Prefer new, well-spaced exposures until the desired frequency is met."""
-        if muscle not in self.priorities or self.preferred_frequency <= 0:
+        target_frequency = (
+            self.preferred_frequency if preferred_frequency is None else preferred_frequency
+        )
+        if muscle not in self.priorities or target_frequency <= 0:
             return (1, 0, 0, day_index)
         exposure_indexes = [
             index
             for index, day in enumerate(days)
-            if any(
-                getattr(item, "primary_muscle", None) is muscle
-                for item in _day_exercises(day)
-            )
+            if any(getattr(item, "primary_muscle", None) is muscle for item in _day_exercises(day))
         ]
         has_exposure = day_index in exposure_indexes
         spacing_valid = self._spacing_is_valid(days, muscle, day_index, exposure_indexes)
-        if len(exposure_indexes) < self.preferred_frequency:
+        if len(exposure_indexes) < target_frequency:
             return (
                 0 if not has_exposure else 1,
                 0 if spacing_valid else 1,
@@ -228,10 +262,4 @@ def _day_weekday(day: object) -> int | None:
 
 
 def _recovery_is_limited(request: NormalizedProgramRequest) -> bool:
-    source = request.source
-    return (
-        source.sleep_quality is RecoveryRating.POOR
-        or source.stress_level is RecoveryRating.POOR
-        or source.physical_job_demand is PhysicalJobDemand.HIGH
-        or source.recent_training_history.recovery_problems
-    )
+    return recovery_burden_for_request(request).level != "normal"

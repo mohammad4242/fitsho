@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -61,7 +62,7 @@ def test_backfill_populates_supported_missing_metadata_and_reports_changes(db: S
     assert stored.fatigue_cost == 3
     assert stored.setup_cost == 1
     assert stored.axial_loading_level is None
-    assert stored.substitution_group == "squat"
+    assert stored.substitution_group == "squat_free_weight"
     assert stored.range_of_motion_profile == ["deep_knee_flexion"]
 
 
@@ -70,6 +71,7 @@ def test_backfill_never_overwrites_explicit_metadata(db: Session) -> None:
     exercise.body_position = BodyPosition.SUPPORTED
     exercise.fatigue_cost = 5
     exercise.axial_loading_level = LoadLimit.NONE
+    exercise.substitution_group = "coach_curated_squat"
     db.add(exercise)
     db.flush()
 
@@ -81,7 +83,197 @@ def test_backfill_never_overwrites_explicit_metadata(db: Session) -> None:
     assert stored.body_position is BodyPosition.SUPPORTED
     assert stored.fatigue_cost == 5
     assert stored.axial_loading_level is LoadLimit.NONE
-    assert stored.substitution_group == "squat"
+    assert stored.substitution_group == "coach_curated_squat"
+
+
+def test_backfill_repairs_legacy_movement_pattern_substitution_group(db: Session) -> None:
+    exercise = make_exercise("backfill-legacy-substitution-group")
+    exercise.name_en = "Dumbbell Goblet Squat"
+    exercise.substitution_group = MovementPattern.SQUAT.value
+    db.add(exercise)
+    db.flush()
+
+    report = backfill_programming_metadata(db)
+    db.expire_all()
+    stored = db.scalar(
+        select(Exercise).where(Exercise.slug == "backfill-legacy-substitution-group")
+    )
+
+    assert stored is not None
+    assert stored.substitution_group == "squat_free_weight"
+    assert report.field_updates["substitution_group"] == 1
+
+
+def test_curated_groups_separate_structurally_distinct_same_region_movements() -> None:
+    flat_press = make_exercise("flat-press")
+    flat_press.name_en = "Dumbbell Bench Press"
+    flat_press.primary_muscle = MuscleGroup.CHEST
+    flat_press.movement_pattern = MovementPattern.HORIZONTAL_PUSH
+    incline_press = make_exercise("incline-press")
+    incline_press.name_en = "Dumbbell Incline Bench Press"
+    incline_press.primary_muscle = MuscleGroup.CHEST
+    incline_press.movement_pattern = MovementPattern.HORIZONTAL_PUSH
+    romanian_deadlift = make_exercise("romanian-deadlift")
+    romanian_deadlift.name_en = "Dumbbell Romanian Deadlift"
+    romanian_deadlift.primary_muscle = MuscleGroup.HAMSTRINGS
+    romanian_deadlift.movement_pattern = MovementPattern.HIP_HINGE
+    leg_curl = make_exercise("leg-curl")
+    leg_curl.name_en = "Dumbbell Lying Leg Curl"
+    leg_curl.primary_muscle = MuscleGroup.HAMSTRINGS
+    leg_curl.movement_pattern = MovementPattern.KNEE_FLEXION
+    leg_curl.exercise_type = ExerciseType.ISOLATION
+
+    groups = {
+        item.name_en: infer_programming_metadata(item)["substitution_group"]
+        for item in (flat_press, incline_press, romanian_deadlift, leg_curl)
+    }
+
+    assert groups == {
+        "Dumbbell Bench Press": "horizontal_press_flat",
+        "Dumbbell Incline Bench Press": "horizontal_press_incline",
+        "Dumbbell Romanian Deadlift": "hip_hinge_romanian_deadlift",
+        "Dumbbell Lying Leg Curl": "knee_flexion_leg_curl",
+    }
+
+
+@pytest.mark.parametrize(
+    ("name", "pattern", "muscle", "exercise_type", "expected"),
+    [
+        (
+            "Barbell Incline Bench Press",
+            MovementPattern.HORIZONTAL_PUSH,
+            MuscleGroup.CHEST,
+            ExerciseType.COMPOUND,
+            "horizontal_press_incline",
+        ),
+        (
+            "Barbell Bent-Over Row",
+            MovementPattern.HORIZONTAL_PULL,
+            MuscleGroup.BACK,
+            ExerciseType.COMPOUND,
+            "horizontal_pull_row_unsupported",
+        ),
+        (
+            "Seated Cable Row",
+            MovementPattern.HORIZONTAL_PULL,
+            MuscleGroup.BACK,
+            ExerciseType.COMPOUND,
+            "horizontal_pull_row_supported",
+        ),
+        (
+            "Lat Pulldown",
+            MovementPattern.VERTICAL_PULL,
+            MuscleGroup.BACK,
+            ExerciseType.COMPOUND,
+            "vertical_pull_pulldown",
+        ),
+        (
+            "Pull-Up (Wide Grip)",
+            MovementPattern.VERTICAL_PULL,
+            MuscleGroup.BACK,
+            ExerciseType.COMPOUND,
+            "vertical_pull_bodyweight",
+        ),
+        (
+            "Seated Dumbbell Shoulder Press",
+            MovementPattern.VERTICAL_PUSH,
+            MuscleGroup.SHOULDERS,
+            ExerciseType.COMPOUND,
+            "vertical_press_shoulder",
+        ),
+        (
+            "Hack Squat",
+            MovementPattern.SQUAT,
+            MuscleGroup.QUADRICEPS,
+            ExerciseType.COMPOUND,
+            "squat_supported_machine",
+        ),
+        (
+            "Lever Horizontal Leg Press",
+            MovementPattern.KNEE_EXTENSION,
+            MuscleGroup.QUADRICEPS,
+            ExerciseType.ISOLATION,
+            "leg_press_knee_dominant",
+        ),
+        (
+            "Barbell Hip Thrust",
+            MovementPattern.HIP_EXTENSION,
+            MuscleGroup.GLUTES,
+            ExerciseType.COMPOUND,
+            "hip_extension_bridge",
+        ),
+        (
+            "Lever Seated Leg Curl",
+            MovementPattern.KNEE_FLEXION,
+            MuscleGroup.HAMSTRINGS,
+            ExerciseType.ISOLATION,
+            "knee_flexion_leg_curl",
+        ),
+        (
+            "Lever Leg Extension",
+            MovementPattern.KNEE_EXTENSION,
+            MuscleGroup.QUADRICEPS,
+            ExerciseType.ISOLATION,
+            "knee_extension",
+        ),
+        (
+            "Dumbbell Cross Body Hammer Curl",
+            MovementPattern.ELBOW_FLEXION,
+            MuscleGroup.BICEPS,
+            ExerciseType.ISOLATION,
+            "elbow_flexion_neutral",
+        ),
+        (
+            "Cable Rope Overhead Triceps Extension",
+            MovementPattern.ELBOW_EXTENSION,
+            MuscleGroup.TRICEPS,
+            ExerciseType.ISOLATION,
+            "elbow_extension_overhead",
+        ),
+        (
+            "Dumbbell Lateral Raise",
+            MovementPattern.SHOULDER_ABDUCTION,
+            MuscleGroup.SHOULDERS,
+            ExerciseType.ISOLATION,
+            "shoulder_raise_lateral",
+        ),
+        (
+            "Dumbbell Seated Calf Raise",
+            MovementPattern.CALF_RAISE,
+            MuscleGroup.CALVES,
+            ExerciseType.ISOLATION,
+            "calf_raise_seated",
+        ),
+        (
+            "Pallof Press",
+            MovementPattern.CORE_ANTI_ROTATION,
+            MuscleGroup.OBLIQUES,
+            ExerciseType.CORE,
+            "core_anti_rotation",
+        ),
+        (
+            "Dumbbell Kickback",
+            MovementPattern.HIP_EXTENSION,
+            MuscleGroup.TRICEPS,
+            ExerciseType.COMPOUND,
+            None,
+        ),
+    ],
+)
+def test_catalog_curated_substitution_group_audit(
+    name: str,
+    pattern: MovementPattern,
+    muscle: MuscleGroup,
+    exercise_type: ExerciseType,
+    expected: str | None,
+) -> None:
+    exercise = make_exercise("catalog-substitution-audit")
+    exercise.name_en = name
+    exercise.movement_pattern = pattern
+    exercise.primary_muscle = muscle
+    exercise.exercise_type = exercise_type
+
+    assert infer_programming_metadata(exercise).get("substitution_group") == expected
 
 
 def test_backfill_is_idempotent(db: Session) -> None:

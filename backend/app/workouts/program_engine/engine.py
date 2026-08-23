@@ -10,12 +10,12 @@ from app.profile.training_compatibility import (
 )
 from app.workouts.program_engine.body_analysis import (
     applicable_body_analysis_influence,
-    body_analysis_priority_muscles,
     body_analysis_provenance,
     body_analysis_trace,
     eligible_body_analysis_priorities,
 )
 from app.workouts.program_engine.cardio import add_cardio, cardio_reserve_minutes
+from app.workouts.program_engine.coach_quality import build_coach_quality_metrics
 from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
@@ -565,12 +565,14 @@ def _program_for_split(
             decision_trace=trace,
         )
     program, report = _attach_coach_quality_metrics(program, request, normalized, report, ruleset)
+    quality_metrics = build_coach_quality_metrics(program, request, report, ruleset)
     final_trace = trace + (
         {
             "stage": "final_construction",
             "status": "succeeded",
             "reason_codes": ("FINAL_CONSTRUCTION_SUCCEEDED",),
         },
+        {"stage": "coach_quality", "metrics": quality_metrics},
     )
     report = replace(report, decision_trace=final_trace)
     program = replace(
@@ -714,20 +716,23 @@ def _reference_program(
             rejected_candidates=rejected,
             decision_trace=trace,
         )
-    priority_muscles = normalized.source.priority_muscles | body_analysis_priority_muscles(
-        normalized, ruleset
-    )
-    unmet_priorities = tuple(
-        muscle
-        for muscle in sorted(priority_muscles, key=lambda item: item.value)
-        if direct[muscle.value] < volume.minimum_direct_sets_for(muscle)
-        or effective_volume.effective_sets_by_muscle.get(muscle.value, 0)
-        < next(target.acceptable_minimum for target in volume.targets if target.muscle is muscle)
-    )
-    if unmet_priorities:
-        errors = tuple(
-            f"TEMPLATE_PRIORITY_VOLUME_UNSATISFIED:{muscle.value}" for muscle in unmet_priorities
-        )
+    targets_by_muscle = {target.muscle: target for target in volume.targets}
+    unmet_priority_errors: list[str] = []
+    for muscle in sorted(priority_muscles, key=lambda item: item.value):
+        target = targets_by_muscle[muscle]
+        direct_value = direct[muscle.value]
+        effective_value = effective_volume.effective_sets_by_muscle.get(muscle.value, 0)
+        if target.direct_minimum_required and direct_value < target.minimum_direct_sets:
+            unmet_priority_errors.append(
+                f"TEMPLATE_PRIORITY_HARD_MINIMUM_UNSATISFIED:{muscle.value}"
+            )
+        elif (
+            direct_value < volume.minimum_direct_sets_for(muscle)
+            or effective_value < target.acceptable_minimum
+        ):
+            unmet_priority_errors.append(f"TEMPLATE_PRIORITY_VOLUME_UNSATISFIED:{muscle.value}")
+    if unmet_priority_errors:
+        errors = tuple(unmet_priority_errors)
         return ProgramGenerationResult(
             program=None,
             error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
@@ -770,12 +775,14 @@ def _reference_program(
             decision_trace=trace,
         )
     program, report = _attach_coach_quality_metrics(program, request, normalized, report, ruleset)
+    quality_metrics = build_coach_quality_metrics(program, request, report, ruleset)
     final_trace = trace + (
         {
             "stage": "final_construction",
             "status": "succeeded",
             "reason_codes": ("FINAL_CONSTRUCTION_SUCCEEDED",),
         },
+        {"stage": "coach_quality", "metrics": quality_metrics},
     )
     report = replace(report, decision_trace=final_trace)
     return ProgramGenerationResult(
@@ -972,6 +979,7 @@ def _volume_metrics(
             effective_volume.direct_sets_by_muscle,
             effective_volume.effective_sets_by_muscle,
             priority_policy,
+            ruleset,
         ),
     }
     if reference_template is not None:
@@ -1105,6 +1113,7 @@ def _priority_metrics(
     direct_sets: dict[str, int],
     effective_sets: dict[str, float],
     policy: PriorityAllocationPolicy,
+    ruleset: ProgramRuleset,
 ) -> dict[str, dict[str, object]]:
     metrics: dict[str, dict[str, object]] = {}
     for muscle in policy.priorities:
@@ -1119,8 +1128,12 @@ def _priority_metrics(
         effective_target = volume.effective_target_for(muscle)
         target_available = target > 0 or effective_target > 0
         direct_satisfied = target_available and direct >= volume.minimum_direct_sets_for(muscle)
-        effective_satisfied = target_available and effective >= effective_target
-        frequency_satisfied = len(session_indexes) >= policy.preferred_frequency
+        acceptable_minimum = next(
+            item.acceptable_minimum for item in volume.targets if item.muscle is muscle
+        )
+        effective_satisfied = target_available and effective >= acceptable_minimum
+        useful_frequency = policy.useful_frequency(target, ruleset)
+        frequency_satisfied = len(session_indexes) >= useful_frequency
         status = (
             "satisfied"
             if direct_satisfied and effective_satisfied and frequency_satisfied
@@ -1131,7 +1144,7 @@ def _priority_metrics(
             reason_codes.append("PRIORITY_VOLUME_INCREASED")
         else:
             reason_codes.append("PRIORITY_TARGET_PARTIALLY_SATISFIED")
-        if frequency_satisfied and policy.preferred_frequency > 1:
+        if frequency_satisfied and useful_frequency > 1:
             reason_codes.append("PRIORITY_FREQUENCY_INCREASED")
         else:
             reason_codes.append("PRIORITY_TARGET_CONSTRAINED")
@@ -1140,7 +1153,7 @@ def _priority_metrics(
             "effective_sets": effective,
             "target_sets": target,
             "effective_target_sets": effective_target,
-            "preferred_frequency": policy.preferred_frequency,
+            "preferred_frequency": useful_frequency,
             "session_frequency": len(session_indexes),
             "session_indexes": session_indexes,
             "distributed": frequency_satisfied,

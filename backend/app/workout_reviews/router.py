@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth.cookies import require_trusted_origin
 from app.exercises.enums import ExerciseContentType
 from app.profile.models import UserProfile
+from app.workout_reviews.coach_quality import build_coach_quality_projection
 from app.workout_reviews.dependencies import (
     CoachUser,
     DatabaseSession,
@@ -218,6 +219,7 @@ def _detail_response(db: Session, review: WorkoutPlanReview) -> WorkoutReviewDet
         athlete_summary=build_review_athlete_summary(db, review),
         fitsho_recommendation=build_fitsho_recommendation(db, review),
         template_selection=build_coach_template_selection(review.source_plan.decision_trace),
+        coach_quality_metrics=build_coach_quality_projection(review.source_plan.decision_trace),
     )
 
 

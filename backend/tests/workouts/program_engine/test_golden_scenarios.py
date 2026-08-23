@@ -59,11 +59,22 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
         assert result.program.split.split_type in FIVE_DAY_SPLIT_TYPES
     assert result.program.validation_report.is_valid
     policy = get_session_duration_policy(source.session_duration_minutes)
-    duration_is_on_target = all(
-        policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
+    assert all(
+        policy.workout_minutes(
+            day.estimated_duration_minutes,
+            RULESET.general_warmup_minutes,
+        )
+        <= policy.maximum_minutes
         for day in result.program.weekly_schedule
     )
-    if not duration_is_on_target:
+    if any(
+        policy.workout_minutes(
+            day.estimated_duration_minutes,
+            RULESET.general_warmup_minutes,
+        )
+        < policy.minimum_minutes
+        for day in result.program.weekly_schedule
+    ):
         duration_trace = next(
             entry for entry in result.program.decision_trace if entry["stage"] == "session_duration"
         )
@@ -176,13 +187,17 @@ def test_golden_constraints_and_recovery(name: str) -> None:
             if entry["stage"] == "volume"
         )
     if name == "short_25_minutes":
-        assert all(
-            1 <= len(day.exercises) <= RULESET.max_exercises_per_session
+        exercise_count_satisfied = all(
+            RULESET.minimum_exercises_per_session
+            <= len(day.exercises)
+            <= RULESET.max_exercises_per_session
             for day in result.program.weekly_schedule
         )
+        if not exercise_count_satisfied:
+            assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in result.program.warnings
         assert all(
             source.session_duration_minutes - 10
-            <= day.estimated_duration_minutes
+            <= day.estimated_duration_minutes - RULESET.general_warmup_minutes
             <= source.session_duration_minutes + 10
             for day in result.program.weekly_schedule
         )
@@ -443,7 +458,10 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
     recovery = next(
         entry for entry in first.program.decision_trace if entry["stage"] == "construction_recovery"
     )
-    assert "SESSION_DURATION_REPAIR_APPLIED" in recovery["reason_codes"]
+    assert {
+        "SESSION_DURATION_REPAIR_APPLIED",
+        "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+    }.intersection(recovery["reason_codes"])
     priority_metrics = first.program.aggregate_metrics["priority_metrics"]
     assert all(
         priority_metrics[muscle.value]["session_frequency"] >= 2

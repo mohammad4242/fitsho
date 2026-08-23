@@ -25,6 +25,7 @@ class TemplateSlotResolution:
     selected_exercise_id: UUID
     adaptation_priority: str
     intensity_method: str
+    superset_group: str | None
     original_prescription: tuple[int, int, int, int, int]
     is_template_slot: bool
 
@@ -90,8 +91,7 @@ def build_template_sessions(
         ruleset.minimum_exercises_per_session,
         min(
             ruleset.max_exercises_per_session,
-            (request.source.session_duration_minutes - ruleset.general_warmup_minutes)
-            // ruleset.minutes_per_exercise_slot,
+            request.source.session_duration_minutes // ruleset.minutes_per_exercise_slot,
         ),
     )
     for index, reference_day in enumerate(template.days, start=1):
@@ -120,9 +120,7 @@ def build_template_sessions(
                     reserved,
                     ruleset,
                     original=(
-                        source_by_id.get(slot.exercise_id)
-                        if slot.exercise_id is not None
-                        else None
+                        source_by_id.get(slot.exercise_id) if slot.exercise_id is not None else None
                     ),
                 )
             if candidate is None:
@@ -286,6 +284,7 @@ def build_template_sessions(
                     selected_exercise_id=candidate.id,
                     adaptation_priority=slot.adaptation_priority,
                     intensity_method=slot.intensity_method,
+                    superset_group=slot.superset_group,
                     original_prescription=(
                         slot.sets,
                         slot.rep_min,
@@ -330,6 +329,24 @@ def template_removal_rank(exercise: object) -> int:
         None: 2,
         "core": 3,
     }.get(template_adaptation_priority(exercise), 2)
+
+
+def adaptation_preservation_rank(exercise: object, muscle_policy: object) -> int:
+    """Rank work by product hierarchy; larger values are preserved longer."""
+
+    template_priority = template_adaptation_priority(exercise)
+    if template_priority == "core":
+        return 60
+    primary_muscle = getattr(exercise, "primary_muscle", None)
+    preservation_rank = getattr(muscle_policy, "preservation_rank", None)
+    muscle_rank = preservation_rank(primary_muscle) if callable(preservation_rank) else 0
+    if isinstance(muscle_rank, int) and muscle_rank > 0:
+        return 50 + muscle_rank
+    if template_priority == "accessory":
+        return 20
+    if template_priority == "optional":
+        return 0
+    return 10
 
 
 def _rank_template_slot_candidates(
@@ -443,6 +460,7 @@ def apply_template_intent(
                         if resolution.intensity_method == "standard"
                         else resolution.intensity_method
                     ),
+                    superset_group=resolution.superset_group,
                 )
             )
         personalized.append(replace(day, title=title, exercises=tuple(exercises)))
@@ -454,6 +472,18 @@ def template_resolution_trace(
     days: tuple[WorkoutDay, ...],
 ) -> dict[str, object]:
     programmed = {(day.day_index, item.exercise_id): item for day in days for item in day.exercises}
+    template_slots = tuple(item for item in build.resolutions if item.is_template_slot)
+    retained_template_slots = tuple(
+        item
+        for item in template_slots
+        if (item.day_index, item.selected_exercise_id) in programmed
+    )
+    core_slots = tuple(item for item in template_slots if item.adaptation_priority == "core")
+    retained_core_slots = tuple(
+        item
+        for item in core_slots
+        if (item.day_index, item.selected_exercise_id) in programmed
+    )
     preserved = tuple(
         str(item.selected_exercise_id)
         for item in build.resolutions
@@ -471,6 +501,7 @@ def template_resolution_trace(
         if item.is_template_slot
         and item.requested_exercise_id is not None
         and not item.preserved_exactly
+        and (item.day_index, item.selected_exercise_id) in programmed
     )
     prescription_changes = tuple(
         {
@@ -503,6 +534,10 @@ def template_resolution_trace(
         "preserved_exercise_ids": preserved,
         "substitutions": substitutions,
         "prescription_changes": prescription_changes,
+        "template_slot_count": len(template_slots),
+        "retained_template_slot_count": len(retained_template_slots),
+        "core_slot_count": len(core_slots),
+        "retained_core_slot_count": len(retained_core_slots),
         "reason_codes": build.reason_codes,
     }
 

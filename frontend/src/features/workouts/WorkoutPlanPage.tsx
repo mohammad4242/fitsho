@@ -265,6 +265,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
             <div className="workout-plan-statuses">
               {reused && <p className="workout-reused" role="status">{t("workoutPlan.reused")}</p>}
               {plan.is_stale && <p className="workout-stale" role="status">{t("workoutPlan.stale")}</p>}
+              {plan.warnings?.includes("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE") && <p className="workout-body-analysis-warning" role="alert">{t("workoutPlan.corePreservationDurationWarning")}</p>}
               {plan.body_analysis_provenance?.provisional === true && <p className="workout-body-analysis-warning" role="alert">{t("workoutPlan.provisionalBodyAnalysisWarning")}</p>}
               {generationError && <StatusPanel role="alert" message={t(generationError === "cooldown" ? "workoutPlan.generateCooldown" : "workoutPlan.generateError")} action={generationError === "failed" ? t("common.retry") : undefined} onAction={generationError === "failed" ? generate : undefined} />}
             </div>
@@ -273,6 +274,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         {pendingPlan !== null && (
           <section className="workout-pending-plan" aria-labelledby="workout-pending-plan-title">
             <PendingReviewNotice executable />
+            {pendingPlan.warnings?.includes("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE") && <p className="workout-body-analysis-warning" role="alert">{t("workoutPlan.corePreservationDurationWarning")}</p>}
             <div className="workout-schedule__heading">
               <div>
                 <p className="eyebrow eyebrow--accent">{l("نسخه جدید", "New version")}</p>
@@ -397,36 +399,54 @@ function WorkoutDays({ plan, isEnglish, titleId, interactive }: { plan: WorkoutP
             </aside>
           )}
           <ol>
-            {day.exercises.map((item) => (
-              <li className="workout-exercise" key={item.order_index}>
-                <ExerciseMedia
-                  path={item.exercise.media_path}
-                  name={isEnglish ? item.exercise.name_en : item.exercise.name_fa}
-                  mediaType={item.exercise.media_type}
-                />
-                <div className="workout-exercise__content">
-                  <h4>{isEnglish ? item.exercise.name_en : item.exercise.name_fa}</h4>
-                  <dl>
-                    <div><dt>{t("workoutPlan.sets")}</dt><dd>{item.sets}</dd></div>
-                    <div><dt>{item.prescription_mode === "duration" ? t("workoutPlan.durationTarget") : t("workoutPlan.reps")}</dt><dd>{formatPrescriptionTarget(item, isEnglish ? "en" : "fa")}</dd></div>
-                    <div><dt>{t("workoutPlan.rest")}</dt><dd>{item.rest_seconds}{t("workoutPlan.seconds")}</dd></div>
-                    {item.rir !== null && <div><dt>{t("workoutPlan.rir")}</dt><dd>{item.rir}</dd></div>}
-                  </dl>
-                  {(isEnglish ? item.notes_en : item.notes_fa) !== null && (
-                    <p>{isEnglish ? item.notes_en : item.notes_fa}</p>
-                  )}
-                  <Link to={`/exercises/${item.exercise.slug}`}>{t("workoutPlan.detail")}</Link>
-                  {item.alternatives.length > 0 && (
-                    <details className="workout-alternatives">
-                      <summary>{t("workoutPlan.alternatives")}</summary>
-                      {interactive
-                        ? <WorkoutExerciseReplacementFlow item={item} isEnglish={isEnglish} />
-                        : <AlternativeLinks item={item} isEnglish={isEnglish} />}
-                    </details>
-                  )}
-                </div>
-              </li>
-            ))}
+            {day.exercises.map((item, itemIndex) => {
+              const groupIndices = item.superset_group
+                ? day.exercises.flatMap((candidate, index) => (
+                  candidate.superset_group === item.superset_group ? [index] : []
+                ))
+                : [];
+              const isSuperset = groupIndices.length === 2
+                && groupIndices[1] === groupIndices[0]! + 1;
+              const isSupersetStart = isSuperset && itemIndex === groupIndices[0];
+              return (
+                <li className={`workout-exercise${isSuperset ? " workout-exercise--superset" : ""}`} key={item.order_index}>
+                  <ExerciseMedia
+                    path={item.exercise.media_path}
+                    name={isEnglish ? item.exercise.name_en : item.exercise.name_fa}
+                    mediaType={item.exercise.media_type}
+                  />
+                  <div className="workout-exercise__content">
+                    <div className="workout-exercise__heading">
+                      <h4>{isEnglish ? item.exercise.name_en : item.exercise.name_fa}</h4>
+                      {isSuperset && <span>{t("workoutPlan.superset")}</span>}
+                    </div>
+                    {isSupersetStart && (
+                      <p className="workout-exercise__superset-instruction">
+                        {t("workoutPlan.supersetInstruction")}
+                      </p>
+                    )}
+                    <dl>
+                      <div><dt>{t("workoutPlan.sets")}</dt><dd>{item.sets}</dd></div>
+                      <div><dt>{item.prescription_mode === "duration" ? t("workoutPlan.durationTarget") : t("workoutPlan.reps")}</dt><dd>{formatPrescriptionTarget(item, isEnglish ? "en" : "fa")}</dd></div>
+                      <div><dt>{t("workoutPlan.rest")}</dt><dd>{item.rest_seconds}{t("workoutPlan.seconds")}</dd></div>
+                      {item.rir !== null && <div><dt>{t("workoutPlan.rir")}</dt><dd>{item.rir}</dd></div>}
+                    </dl>
+                    {(isEnglish ? item.notes_en : item.notes_fa) !== null && (
+                      <p>{isEnglish ? item.notes_en : item.notes_fa}</p>
+                    )}
+                    <Link to={`/exercises/${item.exercise.slug}`}>{t("workoutPlan.detail")}</Link>
+                    {item.alternatives.length > 0 && (
+                      <details className="workout-alternatives">
+                        <summary>{t("workoutPlan.alternatives")}</summary>
+                        {interactive
+                          ? <WorkoutExerciseReplacementFlow item={item} isEnglish={isEnglish} />
+                          : <AlternativeLinks item={item} isEnglish={isEnglish} />}
+                      </details>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         </details>
       ))}

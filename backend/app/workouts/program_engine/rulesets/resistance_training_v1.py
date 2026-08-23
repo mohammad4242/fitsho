@@ -12,6 +12,8 @@ class PrescriptionRule:
     rep_min: int
     rep_max: int
     rest_seconds: int
+    minimum_rest_seconds: int
+    maximum_rest_seconds: int
 
 
 @dataclass(frozen=True)
@@ -21,6 +23,11 @@ class ProgramRuleset:
     max_resistance_days: int = 6
     days_per_week: int = 7
     minimum_recovery_gap_days: int = 2
+    recovery_light_max_direct_sets: int = 2
+    recovery_high_direct_sets: int = 5
+    recovery_moderate_effective_sets: float = 3.0
+    recovery_high_effective_sets: float = 6.0
+    recovery_light_gap_days: int = 1
     novice_training_age_months: int = 6
     early_intermediate_training_age_months: int = 18
     intermediate_training_age_months: int = 48
@@ -100,6 +107,7 @@ class ProgramRuleset:
         }
     )
     priority_muscle_bonus_sets: int = 2
+    priority_emphasis_budgets: tuple[int, int, int, int] = (2, 2, 3, 4)
     body_analysis_minimum_confidence: float = 0.7
     body_analysis_mild_lag_bonus_sets: int = 1
     body_analysis_clear_lag_bonus_sets: int = 2
@@ -172,7 +180,6 @@ class ProgramRuleset:
     exercise_transition_minutes: int = 1
     minimum_exercise_estimate_minutes: int = 3
     minimum_rest_seconds: int = 30
-    maximum_duration_repair_rest_seconds: int = 300
     duration_repair_rest_increment_seconds: int = 30
     maximum_target_rir: int = 5
     cardio_start_minutes: int = 10
@@ -180,6 +187,12 @@ class ProgramRuleset:
     fat_loss_cardio_days: int = 2
     maintenance_cardio_days: int = 1
     double_progression_qualifying_sessions: int = 2
+
+    def priority_emphasis_budget(self, priority_count: int) -> int:
+        if priority_count <= 0:
+            return 0
+        index = min(priority_count, len(self.priority_emphasis_budgets)) - 1
+        return self.priority_emphasis_budgets[index]
 
     def max_working_sets_for_exercise(
         self,
@@ -294,14 +307,81 @@ class ProgramRuleset:
     )
     prescription_rules: dict[str, PrescriptionRule] = field(
         default_factory=lambda: {
-            "strength_compound": PrescriptionRule(3, 6, 180),
-            "strength_secondary_compound": PrescriptionRule(5, 10, 150),
-            "strength_accessory": PrescriptionRule(6, 12, 120),
-            "hypertrophy_compound": PrescriptionRule(6, 12, 120),
-            "hypertrophy_isolation": PrescriptionRule(10, 20, 90),
-            "muscular_endurance": PrescriptionRule(12, 25, 60),
-            "fat_loss": PrescriptionRule(8, 15, 90),
-            "general_fitness": PrescriptionRule(6, 15, 90),
+            "strength_compound": PrescriptionRule(3, 6, 180, 150, 180),
+            "strength_secondary_compound": PrescriptionRule(5, 10, 135, 120, 150),
+            "strength_accessory": PrescriptionRule(6, 12, 90, 75, 120),
+            "strength_isolation": PrescriptionRule(8, 15, 75, 75, 120),
+            "hypertrophy_compound": PrescriptionRule(6, 12, 120, 90, 150),
+            "hypertrophy_isolation": PrescriptionRule(10, 20, 75, 60, 90),
+            "core": PrescriptionRule(8, 20, 60, 45, 90),
+            "muscular_endurance": PrescriptionRule(12, 25, 60, 45, 60),
+            "fat_loss_compound": PrescriptionRule(8, 15, 90, 60, 120),
+            "fat_loss_isolation": PrescriptionRule(10, 20, 75, 60, 90),
+            "general_fitness_compound": PrescriptionRule(6, 15, 90, 60, 120),
+            "general_fitness_isolation": PrescriptionRule(10, 20, 75, 60, 90),
+            "fat_loss": PrescriptionRule(8, 15, 90, 60, 120),
+            "general_fitness": PrescriptionRule(6, 15, 90, 60, 120),
+        }
+    )
+    target_rir_rules: dict[str, dict[TrainingStatus, int]] = field(
+        default_factory=lambda: {
+            "strength_compound": {
+                TrainingStatus.NOVICE: 3,
+                TrainingStatus.EARLY_INTERMEDIATE: 2,
+                TrainingStatus.INTERMEDIATE: 2,
+                TrainingStatus.ADVANCED: 2,
+            },
+            "strength_secondary_compound": {status: 2 for status in TrainingStatus},
+            "strength_accessory": {
+                TrainingStatus.NOVICE: 2,
+                TrainingStatus.EARLY_INTERMEDIATE: 1,
+                TrainingStatus.INTERMEDIATE: 1,
+                TrainingStatus.ADVANCED: 1,
+            },
+            "strength_isolation": {
+                TrainingStatus.NOVICE: 2,
+                TrainingStatus.EARLY_INTERMEDIATE: 1,
+                TrainingStatus.INTERMEDIATE: 1,
+                TrainingStatus.ADVANCED: 1,
+            },
+            "hypertrophy_compound": {
+                TrainingStatus.NOVICE: 3,
+                TrainingStatus.EARLY_INTERMEDIATE: 2,
+                TrainingStatus.INTERMEDIATE: 2,
+                TrainingStatus.ADVANCED: 1,
+            },
+            "hypertrophy_isolation": {
+                TrainingStatus.NOVICE: 2,
+                TrainingStatus.EARLY_INTERMEDIATE: 1,
+                TrainingStatus.INTERMEDIATE: 1,
+                TrainingStatus.ADVANCED: 1,
+            },
+            "core": {
+                TrainingStatus.NOVICE: 3,
+                TrainingStatus.EARLY_INTERMEDIATE: 2,
+                TrainingStatus.INTERMEDIATE: 2,
+                TrainingStatus.ADVANCED: 2,
+            },
+            "muscular_endurance": {
+                TrainingStatus.NOVICE: 3,
+                TrainingStatus.EARLY_INTERMEDIATE: 2,
+                TrainingStatus.INTERMEDIATE: 2,
+                TrainingStatus.ADVANCED: 2,
+            },
+            "fat_loss_compound": {
+                TrainingStatus.NOVICE: 3,
+                TrainingStatus.EARLY_INTERMEDIATE: 2,
+                TrainingStatus.INTERMEDIATE: 2,
+                TrainingStatus.ADVANCED: 2,
+            },
+            "fat_loss_isolation": {status: 2 for status in TrainingStatus},
+            "general_fitness_compound": {
+                TrainingStatus.NOVICE: 3,
+                TrainingStatus.EARLY_INTERMEDIATE: 2,
+                TrainingStatus.INTERMEDIATE: 2,
+                TrainingStatus.ADVANCED: 2,
+            },
+            "general_fitness_isolation": {status: 2 for status in TrainingStatus},
         }
     )
     strength_beginner_rep_minimums: dict[str, int] = field(

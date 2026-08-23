@@ -96,8 +96,7 @@ def build_sessions(
             ruleset.minimum_exercises_per_session,
             min(
                 ruleset.max_exercises_per_session,
-                (request.source.session_duration_minutes - ruleset.general_warmup_minutes)
-                // ruleset.minutes_per_exercise_slot,
+                request.source.session_duration_minutes // ruleset.minutes_per_exercise_slot,
             ),
         )
         slots = slots_for_focus(focus)

@@ -44,6 +44,7 @@ from app.exercises.models import (
     ExerciseSecondaryMuscle,
 )
 from app.exercises.prescription_metadata import prescription_metadata_for_identifier
+from app.exercises.substitution_groups import curated_substitution_group
 
 BODY_REGION_MAP: dict[str, BodyRegion] = {
     "back": BodyRegion.UPPER_BODY,
@@ -956,6 +957,12 @@ class FreeExerciseDbImporter:
         exercise.difficulty = candidate.difficulty
         exercise.movement_pattern = candidate.programming_metadata.movement_pattern
         exercise.exercise_type = candidate.programming_metadata.exercise_type
+        exercise.substitution_group = curated_substitution_group(
+            name_en=candidate.name_en,
+            movement_pattern=candidate.programming_metadata.movement_pattern,
+            primary_muscle=candidate.primary_muscle,
+            exercise_type=candidate.programming_metadata.exercise_type,
+        )
         prescription = prescription_metadata_for_identifier(SOURCE_NAME, candidate.source_id)
         exercise.prescription_mode = prescription.mode
         exercise.duration_min_seconds = prescription.duration_min_seconds

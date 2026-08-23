@@ -29,6 +29,7 @@ from app.workouts.program_engine.volume_planner import (
     TRACKED_MUSCLES,
     plan_weekly_volume,
 )
+from app.workouts.program_engine.volume_policy import VOLUME_POLICY
 
 
 def normalized(**overrides: object) -> NormalizedProgramRequest:
@@ -171,7 +172,7 @@ def test_advanced_user_with_seven_available_days_records_resistance_cap() -> Non
     assert "RESISTANCE_DAYS_CAPPED_AT_RULESET_MAXIMUM" in split.reason_codes
 
 
-def test_novice_with_poor_recovery_does_not_receive_high_frequency_split() -> None:
+def test_novice_with_poor_recovery_preserves_requested_sessions() -> None:
     split = select_split(
         normalized(
             available_training_days=6,
@@ -182,11 +183,12 @@ def test_novice_with_poor_recovery_does_not_receive_high_frequency_split() -> No
         RULESET,
     )
 
-    assert len(split.day_focuses) <= 3
-    assert "SPLIT_REDUCED_FOR_RECOVERY" in split.reason_codes
+    assert len(split.day_focuses) == 6
+    assert split.weekdays == RULESET.default_weekdays[6]
+    assert "SPLIT_REDUCED_FOR_RECOVERY" not in split.reason_codes
 
 
-def test_poor_recovery_user_can_receive_fewer_sessions_than_available() -> None:
+def test_poor_recovery_user_keeps_valid_requested_day_count() -> None:
     split = select_split(
         normalized(
             available_training_days=6,
@@ -195,8 +197,8 @@ def test_poor_recovery_user_can_receive_fewer_sessions_than_available() -> None:
         RULESET,
     )
 
-    assert len(split.day_focuses) < 6
-    assert "SPLIT_SELECTED_FOR_APPROPRIATE_SESSION_COUNT" in split.reason_codes
+    assert len(split.day_focuses) == 6
+    assert "SPLIT_SELECTED_FOR_APPROPRIATE_SESSION_COUNT" not in split.reason_codes
 
 
 def test_intermediate_four_day_hypertrophy_uses_a_valid_scored_candidate() -> None:
@@ -586,7 +588,7 @@ def test_secondary_targets_follow_goal_and_training_status_caps(
     )
     expected = min(
         max(
-            RULESET.secondary_muscle_goal_base_sets[goal],
+            VOLUME_POLICY.preferred_target(MuscleGroup.TRICEPS, request.training_status, goal),
             RULESET.secondary_muscle_minimum_sets[request.training_status],
         ),
         RULESET.secondary_muscle_maximum_sets[request.training_status],
@@ -641,8 +643,13 @@ def test_poor_recovery_reduces_volume_without_falling_below_novice_floor() -> No
         stress_level=RecoveryRating.POOR,
     )
     plan = plan_weekly_volume(request, select_split(request, RULESET), RULESET)
+    baseline = normalized(primary_goal=Goal.HYPERTROPHY)
+    baseline_plan = plan_weekly_volume(baseline, select_split(baseline, RULESET), RULESET)
 
-    assert plan.direct_sets_for(MuscleGroup.CHEST) == RULESET.minimum_sets[request.training_status]
+    assert plan.direct_sets_for(MuscleGroup.CHEST) >= RULESET.minimum_sets[request.training_status]
+    assert plan.direct_sets_for(MuscleGroup.CHEST) < baseline_plan.direct_sets_for(
+        MuscleGroup.CHEST
+    )
     assert "VOLUME_REDUCED_FOR_RECOVERY" in plan.reason_codes
 
 

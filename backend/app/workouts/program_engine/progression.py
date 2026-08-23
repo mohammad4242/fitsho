@@ -14,6 +14,7 @@ def double_progression_policy(ruleset: ProgramRuleset = RULESET) -> dict[str, ob
         "lower_body_load_increase_percent": ruleset.lower_body_load_increase_percent,
         "use_smallest_available_increment": True,
         "increase_volume_and_load_together": False,
+        "runtime_workout_log_adaptation": False,
         "regression_actions": (
             "reduce_load",
             "remove_one_low_priority_set",
@@ -26,7 +27,13 @@ def double_progression_policy(ruleset: ProgramRuleset = RULESET) -> dict[str, ob
 
 def deload_policy(ruleset: ProgramRuleset = RULESET) -> dict[str, object]:
     return {
+        "mode": "hybrid",
+        "reactive_is_primary": True,
         "trigger_requires_multiple_signals": True,
+        "planned_checkpoint_eligible": True,
+        "planned_checkpoint_requires_long_or_high_fatigue_block": True,
+        "planned_checkpoint_is_automatic": False,
+        "mandatory_schedule_weeks": None,
         "volume_reduction_percent": ruleset.deload_volume_reduction_percent,
         "load_reduction_percent": ruleset.deload_load_reduction_percent,
         "maintain_main_movement_patterns": True,

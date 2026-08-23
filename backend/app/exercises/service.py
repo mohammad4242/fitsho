@@ -20,6 +20,7 @@ from app.exercises.models import (
 )
 from app.exercises.schemas import ExerciseFilters
 from app.exercises.seed_data import ALTERNATIVE_SEEDS, EXERCISE_SEEDS, ExerciseSeed
+from app.exercises.substitution_groups import curated_substitution_group
 
 SEED_ID_NAMESPACE = "https://fitsho.local/exercises/"
 
@@ -115,6 +116,12 @@ def _apply_seed_fields(exercise: Exercise, seed: ExerciseSeed) -> None:
     exercise.difficulty = seed.difficulty
     exercise.movement_pattern = seed.movement_pattern
     exercise.exercise_type = seed.exercise_type
+    exercise.substitution_group = curated_substitution_group(
+        name_en=seed.name_en,
+        movement_pattern=seed.movement_pattern,
+        primary_muscle=seed.primary_muscle,
+        exercise_type=seed.exercise_type,
+    )
     exercise.prescription_mode = seed.prescription_mode
     exercise.duration_min_seconds = seed.duration_min_seconds
     exercise.duration_max_seconds = seed.duration_max_seconds

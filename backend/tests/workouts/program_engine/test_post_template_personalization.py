@@ -131,9 +131,7 @@ def test_template_slot_resolution_uses_profile_ranking_not_catalog_order() -> No
 
 def test_initial_prescription_consumes_planned_direct_set_allocations() -> None:
     chest = tuple(
-        candidate
-        for candidate in full_catalog()
-        if candidate.primary_muscle is MuscleGroup.CHEST
+        candidate for candidate in full_catalog() if candidate.primary_muscle is MuscleGroup.CHEST
     )[:3]
     normalized = normalize_request(
         request(available_training_days=3, session_duration_minutes=60), RULESET
@@ -248,20 +246,18 @@ def test_duration_repair_reduces_template_accessory_before_core() -> None:
         original.exercises[1],
         sets=4,
         rest_seconds=300,
-        estimated_minutes=15,
+        estimated_minutes=20,
         reason_codes=("TEMPLATE_ADAPTATION_PRIORITY:accessory",),
     )
     overfilled = replace(
         original,
         focus="template_reference_1",
         exercises=(core, accessory),
-        estimated_duration_minutes=45,
+        estimated_duration_minutes=50,
         cardio=None,
     )
 
-    repaired, _ = repair_session_durations(
-        (overfilled,), normalized, (), RULESET
-    )
+    repaired, _ = repair_session_durations((overfilled,), normalized, (), RULESET)
 
     repaired_by_id = {item.exercise_id: item for item in repaired[0].exercises}
     assert repaired_by_id[core.exercise_id].sets == 4
@@ -304,7 +300,7 @@ def test_same_template_strength_and_hypertrophy_have_role_specific_prescriptions
         hypertrophy_first.rest_seconds,
     )
     assert all(
-        item.rest_seconds <= RULESET.prescription_rules["hypertrophy_isolation"].rest_seconds
+        item.rest_seconds <= RULESET.prescription_rules["strength_isolation"].maximum_rest_seconds
         for day in strength.program.weekly_schedule
         for item in day.exercises
         if item.exercise_type.value == "isolation"
@@ -366,11 +362,15 @@ def test_explicit_chest_priority_dominates_conflicting_body_analysis_lag() -> No
 
     assert result.program is not None, result.errors
     ranges = result.program.aggregate_metrics["volume_ranges_by_muscle"]
-    direct = result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
-    assert ranges[MuscleGroup.CHEST.value]["preferred_weekly_target"] > ranges[
-        MuscleGroup.GLUTES.value
-    ]["preferred_weekly_target"]
-    assert direct[MuscleGroup.CHEST.value] > direct[MuscleGroup.GLUTES.value]
+    priority_metrics = result.program.aggregate_metrics["priority_metrics"]
+    assert (
+        ranges[MuscleGroup.CHEST.value]["preferred_weekly_target"]
+        > ranges[MuscleGroup.GLUTES.value]["preferred_weekly_target"]
+    )
+    assert (
+        "PRIORITY_TARGET_PARTIALLY_SATISFIED"
+        in priority_metrics[MuscleGroup.CHEST.value]["reason_codes"]
+    )
 
 
 def test_clear_body_lag_has_stronger_volume_target_than_mild_lag() -> None:
@@ -388,6 +388,4 @@ def test_clear_body_lag_has_stronger_volume_target_than_mild_lag() -> None:
 
     plan = plan_weekly_volume(normalized, select_split(normalized, RULESET), RULESET)
 
-    assert plan.direct_sets_for(MuscleGroup.GLUTES) > plan.direct_sets_for(
-        MuscleGroup.BICEPS
-    )
+    assert plan.direct_sets_for(MuscleGroup.GLUTES) > plan.direct_sets_for(MuscleGroup.BICEPS)

@@ -38,6 +38,7 @@ from app.workouts.program_engine.enums import (
     StabilityDemand,
     TrainingExperience,
     TrainingStatus,
+    ValidationStatus,
 )
 
 GOAL_ALIASES: dict[str, Goal] = {
@@ -437,8 +438,11 @@ class ProgrammedExercise:
     exercise_type: ExerciseType = ExerciseType.OTHER
     duration_min_seconds: int | None = None
     duration_max_seconds: int | None = None
+    superset_group: str | None = None
 
     def __post_init__(self) -> None:
+        if self.superset_group is not None and not 1 <= len(self.superset_group) <= 32:
+            raise ValueError("superset_group must contain 1 to 32 characters")
         if self.prescription_mode is PrescriptionMode.REPS:
             if (
                 self.rep_min is None
@@ -491,6 +495,19 @@ class ValidationReport:
     assumptions: tuple[str, ...]
     metrics: dict[str, object]
     decision_trace: tuple[dict[str, object], ...]
+    status: ValidationStatus = field(init=False)
+
+    def __post_init__(self) -> None:
+        status = (
+            ValidationStatus.INVALID
+            if self.errors
+            else (
+                ValidationStatus.VALID_WITH_CONSTRAINTS
+                if self.warnings
+                else ValidationStatus.VALID
+            )
+        )
+        object.__setattr__(self, "status", status)
 
     @property
     def is_valid(self) -> bool:

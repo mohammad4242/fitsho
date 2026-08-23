@@ -56,6 +56,10 @@
 .workout-exercise + .workout-exercise { border-top: 1px solid var(--fitsho-line); }
 .workout-exercise > img, .workout-exercise > video { width: 4.75rem; height: 4.25rem; object-fit: cover; border-radius: .65rem; background: var(--fitsho-surface-raised); }
 .workout-exercise h4 { margin: 0; font-size: .9rem; }
+.workout-exercise--superset { border-inline-start: .18rem solid var(--fitsho-aqua); }
+.workout-exercise__heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.workout-exercise__heading > span { padding: .16rem .42rem; border-radius: 99rem; color: var(--fitsho-aqua); background: rgb(80 223 206 / 9%); font-size: .6rem; font-weight: 900; }
+.workout-exercise__superset-instruction { padding: .35rem .45rem; border-radius: .5rem; color: var(--fitsho-ink) !important; background: rgb(80 223 206 / 7%); line-height: 1.55; }
 .workout-exercise dl { display: flex; flex-wrap: wrap; gap: .25rem .7rem; margin: .3rem 0; }
 .workout-exercise dl div { display: flex; gap: .2rem; }
 .workout-exercise dt { color: var(--fitsho-muted); font-size: .65rem; }

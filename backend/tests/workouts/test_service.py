@@ -263,7 +263,7 @@ def test_domain_candidate_uses_legacy_fallback_only_for_missing_metadata(db: Ses
     assert candidate.fatigue_cost == 3
     assert candidate.setup_cost == 1
     assert candidate.laterality is Laterality.BILATERAL
-    assert candidate.substitution_group == MovementPattern.SQUAT.value
+    assert candidate.substitution_group is None
     assert candidate.range_of_motion_profile == frozenset()
 
 
@@ -724,9 +724,9 @@ def test_generation_persists_valid_snapshot_for_pending_review(db: Session) -> N
     assert result.plan.generation_records[0].status is WorkoutGenerationStatus.SUCCEEDED
     assert review.status is WorkoutReviewStatus.PENDING
     assert result.plan.days[0].title_en == (
-        "Day 1: Chest + Back + Quadriceps + Hamstrings + Calves"
+        "Day 1: Chest + Back + Quadriceps + Hamstrings + Calves + Abs"
     )
-    assert result.plan.days[0].title_fa == "روز 1: سینه + زیربغل + چهارسر + پشت پا + ساق"
+    assert result.plan.days[0].title_fa == "روز 1: سینه + زیربغل + چهارسر + پشت پا + ساق + شکم"
 
 
 def test_generation_keeps_existing_active_plan_when_new_plan_is_pending_review(

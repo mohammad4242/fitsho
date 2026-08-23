@@ -29,6 +29,7 @@ from app.exercises.enums import (
 )
 from app.exercises.models import Exercise
 from app.exercises.programming_metadata import infer_exercise_demands
+from app.exercises.substitution_groups import effective_substitution_group
 from app.profile.enums import ExperienceLevel, HomeTrainingSetup, Sex, TrainingLocation
 from app.profile.service import ProfileSnapshot, get_profile
 from app.profile.training_compatibility import (
@@ -134,7 +135,6 @@ class _LegacyExerciseProgrammingMetadata:
     fatigue_cost: int
     setup_cost: int
     laterality: Laterality
-    substitution_group: str
     range_of_motion_profile: frozenset[str]
 
 
@@ -896,6 +896,7 @@ class WorkoutGenerationService:
                         rest_seconds=item.rest_seconds,
                         rir=item.target_rir,
                         estimated_minutes=item.estimated_minutes,
+                        superset_group=item.superset_group,
                         notes_en=item.notes,
                         notes_fa=None,
                         exercise_snapshot=snapshots[str(item.exercise_id)],
@@ -1069,10 +1070,12 @@ class WorkoutGenerationService:
                 exercise.laterality if exercise.laterality is not None else legacy.laterality
             ),
             range_of_motion_profile=range_of_motion_profile,
-            substitution_group=(
-                exercise.substitution_group
-                if exercise.substitution_group is not None
-                else legacy.substitution_group
+            substitution_group=effective_substitution_group(
+                name_en=exercise.name_en,
+                movement_pattern=exercise.movement_pattern,
+                primary_muscle=exercise.primary_muscle,
+                exercise_type=exercise.exercise_type,
+                persisted_group=exercise.substitution_group,
             ),
             display_snapshot={
                 "id": str(exercise.id),
@@ -1118,7 +1121,6 @@ class WorkoutGenerationService:
             fatigue_cost=demands.fatigue_cost,
             setup_cost=demands.setup_cost,
             laterality=Laterality.BILATERAL,
-            substitution_group=exercise.movement_pattern.value,
             range_of_motion_profile=(
                 frozenset({"deep_knee_flexion"})
                 if ExerciseCautionTag.DEEP_KNEE_FLEXION in caution_tags

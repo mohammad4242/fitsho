@@ -142,6 +142,7 @@ class WorkoutPlanExerciseResponse(BaseModel):
     rest_seconds: int
     rir: int | None
     estimated_minutes: int
+    superset_group: str | None = Field(default=None, min_length=1, max_length=32)
     notes_en: str | None
     notes_fa: str | None
     exercise: ExerciseSummary

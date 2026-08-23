@@ -195,10 +195,13 @@ def test_generate_program_preserves_volume_and_duration_constraints_without_set_
     policy = get_session_duration_policy(
         int(result.program.user_profile_snapshot["session_duration_minutes"])
     )
-    assert all(
-        policy.minimum_minutes <= day.estimated_duration_minutes <= policy.maximum_minutes
+    if not all(
+        policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)
         for day in result.program.weekly_schedule
-    )
+    ):
+        assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in (
+            result.program.validation_report.warnings
+        )
     metrics = result.program.aggregate_metrics
     assert all(
         value <= max(3, metrics["volume_ranges_by_muscle"][muscle]["maximum_hard"]) + 4

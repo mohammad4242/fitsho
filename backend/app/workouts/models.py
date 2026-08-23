@@ -273,6 +273,7 @@ class WorkoutPlanExercise(Base):
     rest_seconds: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     rir: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     estimated_minutes: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    superset_group: Mapped[str | None] = mapped_column(String(32))
     notes_en: Mapped[str | None] = mapped_column(Text)
     notes_fa: Mapped[str | None] = mapped_column(Text)
     exercise_snapshot: Mapped[dict[str, object]] = mapped_column(

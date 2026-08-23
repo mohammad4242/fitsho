@@ -2,7 +2,7 @@ from dataclasses import replace
 
 from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
-from app.workouts.program_engine.enums import RecoveryRating
+from app.workouts.program_engine.enums import RecoveryRating, ValidationStatus
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -245,7 +245,14 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
         "volume_repair",
         "session_duration",
         "final_construction",
+        "coach_quality",
     ]
+    quality = result.program.decision_trace[-1]["metrics"]
+    assert quality["template_preservation"] == {
+        "satisfied": 6.0,
+        "total": 6.0,
+        "percentage": 100.0,
+    }
     selection_trace = result.program.decision_trace[0]
     assert selection_trace["selected"] == template.slug
     assert selection_trace["candidates"] == (
@@ -262,6 +269,28 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
             "reason_codes": (),
         },
     )
+
+
+def test_template_priority_soft_shortfall_is_valid_with_constraints() -> None:
+    result = generate_program(
+        template_request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=35,
+            priority_muscles=[MuscleGroup.QUADRICEPS],
+        ),
+        full_catalog(),
+        RULESET,
+        reference_templates=(_four_day_reference(),),
+    )
+
+    assert result.program is not None, result.errors
+    metric = result.program.aggregate_metrics["volume_ranges_by_muscle"]["quadriceps"]
+    assert metric["actual_effective_volume"] < metric["acceptable_minimum"]
+    assert result.program.validation_report.status is ValidationStatus.VALID_WITH_CONSTRAINTS
+    assert result.program.validation_report.is_valid
 
 
 def test_template_uses_shared_volume_and_prescription_rules() -> None:
@@ -286,6 +315,40 @@ def test_template_uses_shared_volume_and_prescription_rules() -> None:
     )
     assert any(entry["stage"] == "volume" for entry in result.program.decision_trace)
     assert any(entry["stage"] == "volume_repair" for entry in result.program.decision_trace)
+
+
+def test_safe_template_superset_group_reaches_programmed_exercises() -> None:
+    template, catalog = _upper_lower_reference()
+    grouped_slots = tuple(
+        replace(slot, adaptation_priority="accessory", superset_group="upper-a")
+        if index < 2
+        else slot
+        for index, slot in enumerate(template.days[0].slots)
+    )
+    grouped_template = replace(
+        template,
+        days=(replace(template.days[0], slots=grouped_slots), *template.days[1:]),
+    )
+
+    result = generate_program(
+        template_request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=90,
+        ),
+        catalog,
+        RULESET,
+        reference_templates=(grouped_template,),
+    )
+
+    assert result.program is not None, result.errors
+    grouped = tuple(
+        item for item in result.program.weekly_schedule[0].exercises if item.superset_group
+    )
+    assert len(grouped) == 2
+    assert {item.superset_group for item in grouped} == {"upper-a"}
 
 
 def test_same_template_personalizes_weekly_volume_targets_for_different_priorities() -> None:
@@ -390,13 +453,18 @@ def test_template_volume_uses_recovery_history_and_short_session_prescription() 
 
     assert baseline.program is not None, baseline.errors
     assert constrained.program is not None, constrained.errors
-    baseline_sets = baseline.program.aggregate_metrics["weekly_direct_sets_by_muscle"]["chest"]
-    constrained_sets = constrained.program.aggregate_metrics["weekly_direct_sets_by_muscle"][
+    baseline_target = baseline.program.aggregate_metrics["planned_direct_sets_by_muscle"]["chest"]
+    constrained_target = constrained.program.aggregate_metrics["planned_direct_sets_by_muscle"][
         "chest"
     ]
-    assert constrained_sets < baseline_sets
+    assert constrained_target < baseline_target
+    assert "VOLUME_CAPPED_FOR_PREVIOUS_VOLUME" in next(
+        entry["reasons"]
+        for entry in constrained.program.decision_trace
+        if entry["stage"] == "volume"
+    )
     assert constrained.program.weekly_schedule[0].exercises[0].rest_seconds >= (
-        RULESET.prescription_rules["hypertrophy_compound"].rest_seconds
+        RULESET.minimum_rest_seconds + RULESET.duration_repair_rest_increment_seconds
     )
     assert constrained.program.aggregate_metrics["previous_volume_baseline"]["source"] == (
         "prescribed_plan"
@@ -450,6 +518,8 @@ def test_unsafe_template_exercise_is_substituted_and_trace_is_auditable() -> Non
         for item in adaptation_trace["substitutions"]
     )
     assert adaptation_trace["prescription_changes"]
+    quality = result.program.decision_trace[-1]["metrics"]
+    assert quality["substitution_count"] >= 1
 
 
 def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> None:
@@ -567,7 +637,8 @@ def test_template_generation_is_deterministic_and_strictly_valid() -> None:
     assert first.program == second.program
     assert first.program.validation_report.is_valid
     assert all(
-        day.estimated_duration_minutes <= source.session_duration_minutes + 10
+        day.estimated_duration_minutes - RULESET.general_warmup_minutes
+        <= source.session_duration_minutes + 10
         for day in first.program.weekly_schedule
     )
     primary_by_id = {candidate.id: candidate.primary_muscle for candidate in catalog}

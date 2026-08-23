@@ -428,6 +428,7 @@ def test_deterministic_plan_response_derives_titles_from_direct_targets(
                 rest_seconds=90,
                 rir=2,
                 estimated_minutes=8,
+                superset_group="pair-a",
             ),
             WorkoutPlanExercise(
                 workout_day=day,
@@ -439,6 +440,7 @@ def test_deterministic_plan_response_derives_titles_from_direct_targets(
                 rest_seconds=60,
                 rir=2,
                 estimated_minutes=6,
+                superset_group="pair-a",
             ),
         ]
     )
@@ -447,6 +449,10 @@ def test_deterministic_plan_response_derives_titles_from_direct_targets(
     response = client.get(f"/api/v1/workout-plans/{plan.id}")
 
     assert response.status_code == 200
+    assert [item["superset_group"] for item in response.json()["days"][0]["exercises"]] == [
+        "pair-a",
+        "pair-a",
+    ]
     assert response.json()["days"][0]["title_en"] == "Day 1: Chest + Triceps"
     assert response.json()["days"][0]["title_fa"] == "روز 1: سینه + پشت بازو"
 

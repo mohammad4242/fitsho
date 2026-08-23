@@ -150,7 +150,11 @@ def test_member_workout_response_hides_internal_decision_trace(
             "stage": "template_selection",
             "selected": "private-template",
             "candidates": [{"slug": "private-template", "score": {"total": 100}}],
-        }
+        },
+        {
+            "stage": "coach_quality",
+            "metrics": {"template_preservation": {"satisfied": 3, "total": 4, "percentage": 75.0}},
+        },
     ]
     plan.validation_report = {
         "errors": [],
@@ -164,6 +168,7 @@ def test_member_workout_response_hides_internal_decision_trace(
     assert "decision_trace" not in response.json()
     assert "decision_trace" not in response.json()["validation_report"]
     assert "private-template" not in response.text
+    assert "template_preservation" not in response.text
 
 
 def test_coach_lists_and_claims_pending_review(client: TestClient, db: Session) -> None:
@@ -222,7 +227,29 @@ def test_coach_detail_projects_selected_template_without_full_trace(
             ],
             "selected": "four-day-strength",
             "tie_break": None,
-        }
+        },
+        {
+            "stage": "coach_quality",
+            "metrics": {
+                "template_preservation": {"satisfied": 4, "total": 4, "percentage": 100.0},
+                "priority_target_satisfaction": {
+                    "satisfied": 8,
+                    "total": 10,
+                    "percentage": 80.0,
+                },
+                "body_analysis_target_satisfaction": {
+                    "satisfied": 0,
+                    "total": 0,
+                    "percentage": None,
+                },
+                "volume_fit": {"satisfied": 10, "total": 12, "percentage": 83.3},
+                "duration_fit": {"satisfied": 4, "total": 4, "percentage": 100.0},
+                "recovery_fit": {"satisfied": 1, "total": 1, "percentage": 100.0},
+                "substitution_count": 1,
+                "constraint_count": 2,
+                "hard_validation_status": "VALID_WITH_CONSTRAINTS",
+            },
+        },
     ]
     review = ensure_pending_review(db, plan)
     db.commit()
@@ -249,6 +276,12 @@ def test_coach_detail_projects_selected_template_without_full_trace(
         },
     }
     assert "اولویت عضلانی صریح" in payload["template_selection"]["explanation_fa"]
+    assert payload["coach_quality_metrics"]["template_preservation"] == {
+        "satisfied": 4.0,
+        "total": 4.0,
+        "percentage": 100.0,
+    }
+    assert payload["coach_quality_metrics"]["hard_validation_status"] == ("VALID_WITH_CONSTRAINTS")
 
 
 def test_coach_review_detail_includes_safe_athlete_summary(

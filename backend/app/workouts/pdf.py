@@ -49,6 +49,16 @@ h1 { color: #087d6c; font-size: 24pt; margin-bottom: 2mm; }
 }
 .exercise-arrow { color: #087d6c; display: inline-block; margin-left: 2mm; }
 .exercise h3 { font-size: 12pt; margin-bottom: 1mm; }
+.superset-label {
+  background: #eef8f5;
+  border-radius: 99mm;
+  color: #087d6c;
+  display: inline-block;
+  font-size: 9pt;
+  margin-right: 2mm;
+  padding: 0 2mm;
+}
+.superset-instruction { color: #354b46; font-size: 9.5pt; margin-bottom: 1mm; }
 .prescription { color: #087d6c; font-weight: bold; margin-bottom: 1mm; }
 .instruction { color: #354b46; margin-bottom: 1mm; }
 .label { color: #647772; font-weight: bold; }
@@ -63,27 +73,41 @@ def _paragraph(label: str, value: str | None, *, class_name: str = "note") -> st
     if value is None or not value.strip():
         return ""
     return (
-        f'<p class="{class_name}"><span class="label">{escape(label)}:</span> '
-        f"{escape(value)}</p>"
+        f'<p class="{class_name}"><span class="label">{escape(label)}:</span> {escape(value)}</p>'
     )
 
 
 def _render_day(day: WorkoutDayResponse) -> str:
-    exercises = "".join(
-        _render_exercise(
-            position=position,
-            name=item.exercise.name_fa,
-            sets=item.sets,
-            prescription_mode=item.prescription_mode,
-            reps_min=item.reps_min,
-            reps_max=item.reps_max,
-            duration_min_seconds=item.duration_min_seconds,
-            duration_max_seconds=item.duration_max_seconds,
-            rest_seconds=item.rest_seconds,
-            notes=item.notes_fa or item.notes_en,
+    superset_indices: set[int] = set()
+    superset_starts: set[int] = set()
+    grouped: dict[str, list[int]] = {}
+    for index, item in enumerate(day.exercises):
+        if item.superset_group is not None:
+            grouped.setdefault(item.superset_group, []).append(index)
+    for indices in grouped.values():
+        if len(indices) == 2 and indices[1] == indices[0] + 1:
+            superset_indices.update(indices)
+            superset_starts.add(indices[0])
+    rendered_exercises = []
+    for position, item in enumerate(day.exercises, start=1):
+        index = position - 1
+        rendered_exercises.append(
+            _render_exercise(
+                position=position,
+                name=item.exercise.name_fa,
+                sets=item.sets,
+                prescription_mode=item.prescription_mode,
+                reps_min=item.reps_min,
+                reps_max=item.reps_max,
+                duration_min_seconds=item.duration_min_seconds,
+                duration_max_seconds=item.duration_max_seconds,
+                rest_seconds=item.rest_seconds,
+                notes=item.notes_fa or item.notes_en,
+                is_superset=index in superset_indices,
+                starts_superset=index in superset_starts,
+            )
         )
-        for position, item in enumerate(day.exercises, start=1)
-    )
+    exercises = "".join(rendered_exercises)
     explanation = _paragraph("توضیحات جلسه", day.ai_coach_explanation_fa)
     return (
         '<section class="day">'
@@ -116,27 +140,31 @@ def _render_exercise(
     duration_max_seconds: int | None,
     rest_seconds: int,
     notes: str | None,
+    is_superset: bool,
+    starts_superset: bool,
 ) -> str:
     if prescription_mode is PrescriptionMode.REPS:
         assert reps_min is not None and reps_max is not None
         target = f"{_fa_number(reps_min)} تا {_fa_number(reps_max)} تکرار"
     else:
         assert duration_min_seconds is not None and duration_max_seconds is not None
-        target = (
-            f"{_fa_number(duration_min_seconds)} تا "
-            f"{_fa_number(duration_max_seconds)} ثانیه"
-        )
-    prescription = (
-        f"{_fa_number(sets)} ست · {target} · "
-        f"{_fa_number(rest_seconds)} ثانیه استراحت"
-    )
+        target = f"{_fa_number(duration_min_seconds)} تا {_fa_number(duration_max_seconds)} ثانیه"
+    prescription = f"{_fa_number(sets)} ست · {target} · {_fa_number(rest_seconds)} ثانیه استراحت"
     note = _paragraph("یادداشت", notes, class_name="instruction")
+    superset_label = ' <span class="superset-label">سوپرست</span>' if is_superset else ""
+    superset_instruction = (
+        '<p class="superset-instruction">'
+        "این حرکت را بلافاصله با حرکت بعدی اجرا کن؛ سپس استراحت کن."
+        "</p>"
+        if starts_superset
+        else ""
+    )
     return (
         '<article class="exercise">'
         f'<h3><span class="exercise-number" dir="ltr">{_fa_number(position)}</span> '
         '<span class="exercise-arrow">←</span> '
-        f"{escape(name)}</h3>"
-        f'<p class="prescription">{prescription}</p>{note}'
+        f"{escape(name)}{superset_label}</h3>"
+        f'{superset_instruction}<p class="prescription">{prescription}</p>{note}'
         "</article>"
     )
 
