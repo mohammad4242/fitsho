@@ -100,6 +100,7 @@ class ProgramRuleset:
         }
     )
     priority_muscle_bonus_sets: int = 2
+    priority_emphasis_budgets: tuple[int, int, int, int] = (2, 2, 3, 4)
     body_analysis_minimum_confidence: float = 0.7
     body_analysis_mild_lag_bonus_sets: int = 1
     body_analysis_clear_lag_bonus_sets: int = 2
@@ -180,6 +181,12 @@ class ProgramRuleset:
     fat_loss_cardio_days: int = 2
     maintenance_cardio_days: int = 1
     double_progression_qualifying_sessions: int = 2
+
+    def priority_emphasis_budget(self, priority_count: int) -> int:
+        if priority_count <= 0:
+            return 0
+        index = min(priority_count, len(self.priority_emphasis_budgets)) - 1
+        return self.priority_emphasis_budgets[index]
 
     def max_working_sets_for_exercise(
         self,

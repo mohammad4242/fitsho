@@ -130,9 +130,7 @@ def generate_program(
     )
     template_rejection_trace: tuple[dict[str, object], ...] = template_selection_trace
     reference = (
-        template_selection.selected.template
-        if template_selection.selected is not None
-        else None
+        template_selection.selected.template if template_selection.selected is not None else None
     )
     if reference is not None:
         try:
@@ -461,9 +459,7 @@ def _program_for_split(
         request=normalized,
         relaxed_required_pattern_groups=relaxed_groups,
         relaxed_required_slots=relaxed_slots,
-        repair_reason_codes=tuple(
-            dict.fromkeys((*repair_reasons, *duration_repair_reasons))
-        ),
+        repair_reason_codes=tuple(dict.fromkeys((*repair_reasons, *duration_repair_reasons))),
     )
     body_trace = body_analysis_trace(normalized, ruleset)
     session_reasons = tuple(
@@ -651,9 +647,7 @@ def _reference_program(
         ruleset,
         request=normalized,
         reference_template=reference.slug,
-        repair_reason_codes=tuple(
-            dict.fromkeys((*repair_reasons, *duration_repair_reasons))
-        ),
+        repair_reason_codes=tuple(dict.fromkeys((*repair_reasons, *duration_repair_reasons))),
     )
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises), ruleset
@@ -729,11 +723,7 @@ def _reference_program(
         for muscle in sorted(priority_muscles, key=lambda item: item.value)
         if direct[muscle.value] < volume.minimum_direct_sets_for(muscle)
         or effective_volume.effective_sets_by_muscle.get(muscle.value, 0)
-        < next(
-            target.acceptable_minimum
-            for target in volume.targets
-            if target.muscle is muscle
-        )
+        < next(target.acceptable_minimum for target in volume.targets if target.muscle is muscle)
     )
     if unmet_priorities:
         errors = tuple(
@@ -873,6 +863,7 @@ def _volume_metrics(
             effective_volume.direct_sets_by_muscle,
             effective_volume.effective_sets_by_muscle,
             priority_policy,
+            ruleset,
         ),
     }
     if reference_template is not None:
@@ -959,10 +950,7 @@ def _volume_range_metric(
         constraint_reasons.append("VOLUME_CONSTRAINED_BY_SESSION_FEASIBILITY")
     if not inside_range and any(
         "TEMPLATE_ADAPTATION_PRIORITY:core" in item.reason_codes
-        and (
-            item.primary_muscle is target.muscle
-            or target.muscle in item.secondary_muscles
-        )
+        and (item.primary_muscle is target.muscle or target.muscle in item.secondary_muscles)
         for day in days
         for item in day.exercises
     ):
@@ -1009,16 +997,14 @@ def _priority_metrics(
     direct_sets: dict[str, int],
     effective_sets: dict[str, float],
     policy: PriorityAllocationPolicy,
+    ruleset: ProgramRuleset,
 ) -> dict[str, dict[str, object]]:
     metrics: dict[str, dict[str, object]] = {}
     for muscle in policy.priorities:
         session_indexes = tuple(
             day.day_index
             for day in days
-            if any(
-                item.primary_muscle is muscle
-                for item in day.exercises
-            )
+            if any(item.primary_muscle is muscle for item in day.exercises)
         )
         direct = direct_sets.get(muscle.value, 0)
         effective = effective_sets.get(muscle.value, 0.0)
@@ -1030,7 +1016,8 @@ def _priority_metrics(
             item.acceptable_minimum for item in volume.targets if item.muscle is muscle
         )
         effective_satisfied = target_available and effective >= acceptable_minimum
-        frequency_satisfied = len(session_indexes) >= policy.preferred_frequency
+        useful_frequency = policy.useful_frequency(target, ruleset)
+        frequency_satisfied = len(session_indexes) >= useful_frequency
         status = (
             "satisfied"
             if direct_satisfied and effective_satisfied and frequency_satisfied
@@ -1041,7 +1028,7 @@ def _priority_metrics(
             reason_codes.append("PRIORITY_VOLUME_INCREASED")
         else:
             reason_codes.append("PRIORITY_TARGET_PARTIALLY_SATISFIED")
-        if frequency_satisfied and policy.preferred_frequency > 1:
+        if frequency_satisfied and useful_frequency > 1:
             reason_codes.append("PRIORITY_FREQUENCY_INCREASED")
         else:
             reason_codes.append(
@@ -1054,7 +1041,7 @@ def _priority_metrics(
             "effective_sets": effective,
             "target_sets": target,
             "effective_target_sets": effective_target,
-            "preferred_frequency": policy.preferred_frequency,
+            "preferred_frequency": useful_frequency,
             "session_frequency": len(session_indexes),
             "session_indexes": session_indexes,
             "distributed": frequency_satisfied,

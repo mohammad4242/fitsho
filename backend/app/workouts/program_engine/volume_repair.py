@@ -545,7 +545,15 @@ def _select_exercise_addition(
                         (
                             0 if muscle in direct_under else 1,
                             0 if muscle in priority_policy.priorities else 1,
-                            *priority_policy.day_priority_key(day_contexts, muscle, day_index),
+                            *priority_policy.day_priority_key(
+                                day_contexts,
+                                muscle,
+                                day_index,
+                                preferred_frequency=priority_policy.useful_frequency(
+                                    targets[muscle].target_sets,
+                                    ruleset,
+                                ),
+                            ),
                             direct_by_session[muscle],
                             -ranked.score,
                             1 if role_repeated else 0,
@@ -769,7 +777,15 @@ def _select_addition_candidate(
                         0 if direct_needs else 1,
                         0 if primary in effective_under else 1,
                         0 if primary in priority_policy.priorities else 1,
-                        *priority_policy.day_priority_key(days, primary, day_index),
+                        *priority_policy.day_priority_key(
+                            days,
+                            primary,
+                            day_index,
+                            preferred_frequency=priority_policy.useful_frequency(
+                                targets[primary].target_sets,
+                                ruleset,
+                            ),
+                        ),
                         direct_by_session[primary],
                         day_index,
                         exercise_index,

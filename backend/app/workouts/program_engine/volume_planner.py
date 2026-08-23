@@ -111,6 +111,35 @@ def plan_weekly_volume(
     }
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     effective_priorities = frozenset(priority_policy.priorities)
+    baseline_sets = {
+        muscle: secondary_base if muscle in SECONDARY_MUSCLES else base
+        for muscle in TRACKED_MUSCLES
+    }
+    if source.priority_muscles:
+        baseline_sets = {
+            muscle: (
+                sets
+                if muscle in source.priority_muscles
+                else max(
+                    secondary_minimum if muscle in SECONDARY_MUSCLES else minimum,
+                    sets - ruleset.contextual_volume_reduction_sets,
+                )
+            )
+            for muscle, sets in baseline_sets.items()
+        }
+    hard_maximums = {
+        muscle: secondary_maximum if muscle in SECONDARY_MUSCLES else maximum
+        for muscle in TRACKED_MUSCLES
+    }
+    priority_bonuses = priority_policy.volume_bonuses(
+        baseline_sets,
+        hard_maximums,
+        ruleset,
+    )
+    if len(priority_policy.explicit_priorities) > 1:
+        reasons.append("PRIORITY_EMPHASIS_BUDGET_SHARED")
+    if len(priority_policy.explicit_priorities) > len(ruleset.priority_emphasis_budgets):
+        reasons.append("PRIORITY_EMPHASIS_BUDGET_CAPPED")
     direct_exposures = (
         direct_exposure_counts
         if direct_exposure_counts is not None
@@ -126,15 +155,17 @@ def plan_weekly_volume(
         muscle_minimum = secondary_minimum if is_secondary else minimum
         muscle_maximum = secondary_maximum if is_secondary else maximum
         safe_maximum = muscle_maximum
-        sets = secondary_base if is_secondary else base
-        if source.priority_muscles and muscle not in source.priority_muscles:
-            sets = max(muscle_minimum, sets - ruleset.contextual_volume_reduction_sets)
+        sets = baseline_sets[muscle]
         if muscle in source.priority_muscles:
-            sets = min(muscle_maximum, sets + ruleset.priority_muscle_bonus_sets)
-            reasons.append("VOLUME_INCREASED_FOR_PRIORITY_MUSCLE")
-            reasons.append("PRIORITY_VOLUME_INCREASED")
+            bonus = priority_bonuses[muscle]
+            sets = min(muscle_maximum, sets + bonus)
+            if bonus:
+                reasons.append("VOLUME_INCREASED_FOR_PRIORITY_MUSCLE")
+                reasons.append("PRIORITY_VOLUME_INCREASED")
         body_priority = body_priorities.get(muscle)
-        if body_priority is not None:
+        if body_priority is not None and muscle in source.priority_muscles:
+            reasons.append("BODY_ANALYSIS_SUPPORTS_EXPLICIT_PRIORITY")
+        elif body_priority is not None:
             bonus = (
                 ruleset.body_analysis_clear_lag_bonus_sets
                 if body_priority.classification == "clear_lag"
@@ -163,11 +194,7 @@ def plan_weekly_volume(
         if split.split_type is SplitType.BODY_PART_ROTATION and direct_exposures[muscle] > 0:
             feasible_exposures = max(
                 direct_exposures[muscle],
-                (
-                    priority_policy.preferred_frequency
-                    if muscle in effective_priorities
-                    else 0
-                ),
+                (priority_policy.preferred_frequency if muscle in effective_priorities else 0),
             )
             split_maximum = ruleset.max_sets_per_muscle_per_session * feasible_exposures
             if sets > split_maximum:
