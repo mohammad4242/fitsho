@@ -724,9 +724,9 @@ def test_generation_persists_valid_snapshot_for_pending_review(db: Session) -> N
     assert result.plan.generation_records[0].status is WorkoutGenerationStatus.SUCCEEDED
     assert review.status is WorkoutReviewStatus.PENDING
     assert result.plan.days[0].title_en == (
-        "Day 1: Chest + Back + Quadriceps + Hamstrings + Calves"
+        "Day 1: Chest + Back + Quadriceps + Hamstrings + Calves + Abs"
     )
-    assert result.plan.days[0].title_fa == "روز 1: سینه + زیربغل + چهارسر + پشت پا + ساق"
+    assert result.plan.days[0].title_fa == "روز 1: سینه + زیربغل + چهارسر + پشت پا + ساق + شکم"
 
 
 def test_generation_keeps_existing_active_plan_when_new_plan_is_pending_review(
