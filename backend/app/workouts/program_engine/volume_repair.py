@@ -741,6 +741,12 @@ def _select_addition_candidate(
                 continue
             if exercise.sets >= _exercise_set_cap(exercise, days, request, targets, ruleset):
                 continue
+            frequency_target = primary_target or next(
+                (targets[muscle] for muscle in affected if muscle in targets),
+                None,
+            )
+            if frequency_target is None:
+                continue
             updated = replace(
                 exercise,
                 sets=exercise.sets + 1,
@@ -788,7 +794,7 @@ def _select_addition_candidate(
                             primary,
                             day_index,
                             preferred_frequency=priority_policy.useful_frequency(
-                                targets[primary].target_sets,
+                                frequency_target.target_sets,
                                 ruleset,
                             ),
                         ),

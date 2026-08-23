@@ -249,3 +249,25 @@ def test_volume_repair_accepts_valid_increment_between_plus_five_and_plus_ten() 
 
     assert selected is not None
     assert selected[:2] == (0, 0)
+
+
+def test_volume_repair_handles_secondary_target_for_untracked_primary() -> None:
+    oblique_exercise = replace(
+        _programmed("Oblique Crunch", MuscleGroup.OBLIQUES, 2),
+        secondary_muscles=(MuscleGroup.CHEST,),
+    )
+    chest_target = _volume_target(MuscleGroup.CHEST).targets[0]
+
+    selected = _select_addition_candidate(
+        [[oblique_exercise]],
+        set(),
+        {MuscleGroup.CHEST},
+        Counter(),
+        {MuscleGroup.CHEST: chest_target},
+        (0,),
+        normalized(),
+        RULESET,
+    )
+
+    assert selected is not None
+    assert selected[:2] == (0, 0)
