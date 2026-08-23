@@ -5,11 +5,7 @@ from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.body_analysis import (
     eligible_body_analysis_priorities,
 )
-from app.workouts.program_engine.enums import (
-    PhysicalJobDemand,
-    RecoveryRating,
-    SplitType,
-)
+from app.workouts.program_engine.enums import SplitType
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -22,7 +18,10 @@ from app.workouts.program_engine.volume_history import (
     PreviousVolumeBaseline,
     derive_previous_volume_baseline,
 )
-from app.workouts.program_engine.volume_policy import VOLUME_POLICY
+from app.workouts.program_engine.volume_policy import (
+    VOLUME_POLICY,
+    recovery_burden_for_request,
+)
 
 MAJOR_MUSCLES = (
     MuscleGroup.CHEST,
@@ -60,15 +59,7 @@ def plan_weekly_volume(
     secondary_maximum = ruleset.secondary_muscle_maximum_sets[request.training_status]
     reasons: list[str] = []
     common_constraint_reasons: list[str] = []
-    recovery_signals = sum(
-        (
-            source.sleep_quality is RecoveryRating.POOR,
-            source.stress_level is RecoveryRating.POOR,
-            source.physical_job_demand is PhysicalJobDemand.HIGH,
-            source.recent_training_history.recovery_problems,
-        )
-    )
-    recovery_burden = VOLUME_POLICY.recovery_burden(recovery_signals)
+    recovery_burden = recovery_burden_for_request(request)
     if recovery_burden.reason_code is not None:
         reasons.extend(("VOLUME_REDUCED_FOR_RECOVERY", recovery_burden.reason_code))
         common_constraint_reasons.extend(

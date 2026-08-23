@@ -6,7 +6,13 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from app.exercises.enums import MuscleGroup
-from app.workouts.program_engine.enums import Goal, TrainingStatus
+from app.workouts.program_engine.enums import (
+    Goal,
+    PhysicalJobDemand,
+    RecoveryRating,
+    TrainingStatus,
+)
+from app.workouts.program_engine.schemas import NormalizedProgramRequest
 
 
 @dataclass(frozen=True)
@@ -112,3 +118,16 @@ VOLUME_POLICY = VolumePolicy(
         }
     ),
 )
+
+
+def recovery_burden_for_request(request: NormalizedProgramRequest) -> RecoveryBurden:
+    source = request.source
+    signal_count = sum(
+        (
+            source.sleep_quality is RecoveryRating.POOR,
+            source.stress_level is RecoveryRating.POOR,
+            source.physical_job_demand is PhysicalJobDemand.HIGH,
+            source.recent_training_history.recovery_problems,
+        )
+    )
+    return VOLUME_POLICY.recovery_burden(signal_count)

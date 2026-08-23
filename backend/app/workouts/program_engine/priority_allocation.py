@@ -8,13 +8,12 @@ from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.body_analysis import eligible_body_analysis_priorities
 from app.workouts.program_engine.enums import (
     Goal,
-    PhysicalJobDemand,
-    RecoveryRating,
     TrainingStatus,
 )
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import NormalizedProgramRequest
 from app.workouts.program_engine.slot_compatibility import focus_scope
+from app.workouts.program_engine.volume_policy import recovery_burden_for_request
 
 
 @dataclass(frozen=True)
@@ -263,10 +262,4 @@ def _day_weekday(day: object) -> int | None:
 
 
 def _recovery_is_limited(request: NormalizedProgramRequest) -> bool:
-    source = request.source
-    return (
-        source.sleep_quality is RecoveryRating.POOR
-        or source.stress_level is RecoveryRating.POOR
-        or source.physical_job_demand is PhysicalJobDemand.HIGH
-        or source.recent_training_history.recovery_problems
-    )
+    return recovery_burden_for_request(request).level != "normal"

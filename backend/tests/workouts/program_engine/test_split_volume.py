@@ -172,7 +172,7 @@ def test_advanced_user_with_seven_available_days_records_resistance_cap() -> Non
     assert "RESISTANCE_DAYS_CAPPED_AT_RULESET_MAXIMUM" in split.reason_codes
 
 
-def test_novice_with_poor_recovery_does_not_receive_high_frequency_split() -> None:
+def test_novice_with_poor_recovery_preserves_requested_sessions() -> None:
     split = select_split(
         normalized(
             available_training_days=6,
@@ -183,11 +183,12 @@ def test_novice_with_poor_recovery_does_not_receive_high_frequency_split() -> No
         RULESET,
     )
 
-    assert len(split.day_focuses) <= 3
-    assert "SPLIT_REDUCED_FOR_RECOVERY" in split.reason_codes
+    assert len(split.day_focuses) == 6
+    assert split.weekdays == RULESET.default_weekdays[6]
+    assert "SPLIT_REDUCED_FOR_RECOVERY" not in split.reason_codes
 
 
-def test_poor_recovery_user_can_receive_fewer_sessions_than_available() -> None:
+def test_poor_recovery_user_keeps_valid_requested_day_count() -> None:
     split = select_split(
         normalized(
             available_training_days=6,
@@ -196,8 +197,8 @@ def test_poor_recovery_user_can_receive_fewer_sessions_than_available() -> None:
         RULESET,
     )
 
-    assert len(split.day_focuses) < 6
-    assert "SPLIT_SELECTED_FOR_APPROPRIATE_SESSION_COUNT" in split.reason_codes
+    assert len(split.day_focuses) == 6
+    assert "SPLIT_SELECTED_FOR_APPROPRIATE_SESSION_COUNT" not in split.reason_codes
 
 
 def test_intermediate_four_day_hypertrophy_uses_a_valid_scored_candidate() -> None:

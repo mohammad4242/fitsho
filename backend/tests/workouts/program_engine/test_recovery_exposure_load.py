@@ -1,0 +1,140 @@
+from uuid import uuid4
+
+from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
+from app.workouts.program_engine.enums import RecoveryRating, SplitType
+from app.workouts.program_engine.normalization import normalize_request
+from app.workouts.program_engine.recovery import (
+    ExposureLoad,
+    classify_muscle_exposures,
+    recovery_spacing_is_valid,
+    repair_recovery_weekdays,
+)
+from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+from app.workouts.program_engine.schemas import ProgrammedExercise, SplitPlan, WorkoutDay
+from app.workouts.program_engine.split_selector import rank_split_candidates
+from tests.workouts.program_engine.golden_fixtures import request
+
+
+def _exercise(
+    *,
+    sets: int,
+    reason_codes: tuple[str, ...] = ("TEST",),
+) -> ProgrammedExercise:
+    return ProgrammedExercise(
+        exercise_id=uuid4(),
+        exercise_name="Cable Curl",
+        order=1,
+        sets=sets,
+        rep_min=10,
+        rep_max=15,
+        target_rir=2,
+        rest_seconds=75,
+        estimated_minutes=5,
+        reason_codes=reason_codes,
+        movement_pattern=MovementPattern.ELBOW_FLEXION,
+        primary_muscle=MuscleGroup.BICEPS,
+        exercise_type=ExerciseType.ISOLATION,
+    )
+
+
+def _day(*, weekday: int, exercise: ProgrammedExercise) -> WorkoutDay:
+    return WorkoutDay(
+        day_index=weekday + 1,
+        weekday=weekday,
+        title="Arms",
+        focus="upper",
+        estimated_duration_minutes=30,
+        exercises=(exercise,),
+    )
+
+
+def test_exposure_classification_uses_load_and_primary_strength_role() -> None:
+    light = _day(weekday=0, exercise=_exercise(sets=2))
+    moderate = _day(weekday=0, exercise=_exercise(sets=3))
+    high = _day(
+        weekday=0,
+        exercise=_exercise(sets=3, reason_codes=("STRENGTH_PRIMARY_COMPOUND",)),
+    )
+
+    assert classify_muscle_exposures(light, RULESET)[MuscleGroup.BICEPS] is ExposureLoad.LIGHT
+    assert classify_muscle_exposures(moderate, RULESET)[MuscleGroup.BICEPS] is ExposureLoad.MODERATE
+    assert classify_muscle_exposures(high, RULESET)[MuscleGroup.BICEPS] is ExposureLoad.HIGH
+
+
+def test_light_accessory_exposures_can_be_consecutive() -> None:
+    days = (
+        _day(weekday=0, exercise=_exercise(sets=2)),
+        _day(weekday=1, exercise=_exercise(sets=2)),
+    )
+
+    assert recovery_spacing_is_valid(days, RULESET)
+
+
+def test_moderate_exposure_relaxes_only_against_light_follow_up() -> None:
+    moderate_then_light = (
+        _day(weekday=0, exercise=_exercise(sets=3)),
+        _day(weekday=1, exercise=_exercise(sets=2)),
+    )
+    two_moderate = (
+        _day(weekday=0, exercise=_exercise(sets=3)),
+        _day(weekday=1, exercise=_exercise(sets=3)),
+    )
+
+    assert recovery_spacing_is_valid(moderate_then_light, RULESET)
+    assert not recovery_spacing_is_valid(two_moderate, RULESET)
+
+
+def test_high_exposure_requires_two_day_calendar_spacing() -> None:
+    high = _exercise(sets=3, reason_codes=("STRENGTH_PRIMARY_COMPOUND",))
+
+    assert not recovery_spacing_is_valid(
+        (_day(weekday=0, exercise=high), _day(weekday=1, exercise=_exercise(sets=2))),
+        RULESET,
+    )
+    assert recovery_spacing_is_valid(
+        (_day(weekday=0, exercise=high), _day(weekday=2, exercise=_exercise(sets=2))),
+        RULESET,
+    )
+
+
+def test_recovery_repair_rearranges_days_without_removing_a_session() -> None:
+    days = (
+        _day(
+            weekday=0,
+            exercise=_exercise(sets=3, reason_codes=("STRENGTH_PRIMARY_COMPOUND",)),
+        ),
+        _day(weekday=1, exercise=_exercise(sets=3)),
+    )
+    split = SplitPlan(
+        split_type=SplitType.UPPER_LOWER,
+        day_focuses=("upper", "upper"),
+        weekdays=(0, 1),
+        score=1,
+        reason_codes=(),
+    )
+
+    repaired_split, repaired_days, reasons = repair_recovery_weekdays(split, days, RULESET)
+
+    assert len(repaired_days) == len(days) == 2
+    assert {day.exercises[0].exercise_id for day in repaired_days} == {
+        day.exercises[0].exercise_id for day in days
+    }
+    assert recovery_spacing_is_valid(repaired_days, RULESET)
+    assert repaired_split.weekdays == tuple(day.weekday for day in repaired_days)
+    assert "RECOVERY_WEEKDAYS_REARRANGED_FOR_EXPOSURE_LOAD" in reasons
+
+
+def test_poor_recovery_ranking_preserves_requested_resistance_day_count() -> None:
+    normalized = normalize_request(
+        request(
+            available_training_days=6,
+            sleep_quality=RecoveryRating.POOR,
+        ),
+        RULESET,
+    )
+
+    ranked = rank_split_candidates(normalized, RULESET)
+
+    assert ranked
+    assert all(len(split.day_focuses) == 6 for split in ranked)
+    assert all("SPLIT_REDUCED_FOR_RECOVERY" not in split.reason_codes for split in ranked)

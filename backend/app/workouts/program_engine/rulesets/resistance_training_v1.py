@@ -23,6 +23,11 @@ class ProgramRuleset:
     max_resistance_days: int = 6
     days_per_week: int = 7
     minimum_recovery_gap_days: int = 2
+    recovery_light_max_direct_sets: int = 2
+    recovery_high_direct_sets: int = 5
+    recovery_moderate_effective_sets: float = 3.0
+    recovery_high_effective_sets: float = 6.0
+    recovery_light_gap_days: int = 1
     novice_training_age_months: int = 6
     early_intermediate_training_age_months: int = 18
     intermediate_training_age_months: int = 48

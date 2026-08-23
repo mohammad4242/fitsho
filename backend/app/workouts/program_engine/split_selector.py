@@ -6,8 +6,6 @@ from app.workouts.program_engine.body_analysis import body_analysis_priority_mus
 from app.workouts.program_engine.enums import (
     CompatibilityLevel,
     Goal,
-    PhysicalJobDemand,
-    RecoveryRating,
     SplitType,
     TrainingStatus,
 )
@@ -24,6 +22,7 @@ from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     focus_scope,
 )
+from app.workouts.program_engine.volume_policy import recovery_burden_for_request
 
 _DYNAMIC_FOCUSES = (
     "upper",
@@ -82,11 +81,7 @@ def rank_split_candidates(
     if request.training_status is TrainingStatus.NOVICE and recovery_limited:
         preferred_days = min(preferred_days, ruleset.maximum_novice_recovery_days)
 
-    candidates = tuple(
-        candidate
-        for days in range(1, available_days + 1)
-        for candidate in generate_split_candidates(days)
-    )
+    candidates = generate_split_candidates(available_days)
     scored = score_split_candidates(request, candidates, ruleset, preferred_days)
     ranked: list[SplitPlan] = []
     for candidate in scored:
@@ -95,8 +90,6 @@ def rank_split_candidates(
             reasons.append("RESISTANCE_DAYS_CAPPED_AT_RULESET_MAXIMUM")
         if len(candidate.day_focuses) < request.source.available_training_days:
             reasons.append("SPLIT_SELECTED_FOR_APPROPRIATE_SESSION_COUNT")
-        if recovery_limited and len(candidate.day_focuses) < available_days:
-            reasons.append("SPLIT_REDUCED_FOR_RECOVERY")
         ranked.append(replace(candidate, reason_codes=tuple(dict.fromkeys(reasons))))
     return tuple(ranked)
 
@@ -561,13 +554,7 @@ def score_split_candidates(
 
 
 def _recovery_is_limited(request: NormalizedProgramRequest) -> bool:
-    source = request.source
-    return (
-        source.sleep_quality is RecoveryRating.POOR
-        or source.stress_level is RecoveryRating.POOR
-        or source.physical_job_demand is PhysicalJobDemand.HIGH
-        or source.recent_training_history.recovery_problems
-    )
+    return recovery_burden_for_request(request).level != "normal"
 
 
 def _select_weekdays(
