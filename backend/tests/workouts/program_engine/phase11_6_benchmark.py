@@ -400,6 +400,10 @@ def _aggregate(
         family_groups[family][str(record["quality_outcome"])] += 1
     aggregate["failure_breakdowns"] = {
         **dimensions,
+        "limitations": {
+            key: dict(sorted(value.items()))
+            for key, value in sorted(grouped["limitations"].items())
+        },
         "recovery_state": {
             key: dict(sorted(value.items())) for key, value in sorted(recovery_groups.items())
         },
