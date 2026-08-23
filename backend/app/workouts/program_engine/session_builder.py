@@ -134,6 +134,11 @@ def build_sessions(
             )
         )
         capacity = max(1, capacity)
+        
+        # Phase 11.9: duration alone NEVER reduces capacity below 5 for 45+ min sessions.
+        if not short_session:
+            capacity = max(capacity, ruleset.minimum_exercises_per_session)
+
         ordered_slots = tuple(slot for slot in slots if slot.required) + tuple(
             slot for slot in slots if not slot.required
         )
@@ -142,6 +147,7 @@ def build_sessions(
         reasons: dict[UUID, tuple[str, ...]] = {}
         session_reasons: tuple[str, ...] = ()
         if capacity < ruleset.minimum_exercises_per_session:
+            # This can now only happen when short_session is True
             session_reasons = ("DURATION_PLANNED_REDUCED_EXERCISE_COUNT",)
         this_session_relaxed_groups: list[tuple[MovementPattern, ...]] = []
         this_session_relaxed_targets: list[MuscleGroup | None] = []

@@ -78,9 +78,10 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
         duration_trace = next(
             entry for entry in result.program.decision_trace if entry["stage"] == "session_duration"
         )
-        assert (
-            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in duration_trace["reason_codes"]
-        )
+        assert {
+            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+            "SESSION_DURATION_TARGET_SATISFIED",
+        }.intersection(duration_trace["reason_codes"])
         assert all(
             len(day.exercises) >= 2 and all(item.counts_toward_volume for item in day.exercises)
             for day in result.program.weekly_schedule
@@ -462,6 +463,7 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
     assert {
         "SESSION_DURATION_REPAIR_APPLIED",
         "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+        "SESSION_DURATION_TARGET_SATISFIED"
     }.intersection(recovery["reason_codes"])
     priority_metrics = first.program.aggregate_metrics["priority_metrics"]
     assert all(

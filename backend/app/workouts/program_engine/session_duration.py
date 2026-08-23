@@ -2,7 +2,6 @@ from collections import Counter
 from dataclasses import replace
 
 from app.exercises.enums import ExerciseLabel, ExerciseType, MuscleGroup
-from app.workouts.program_engine.cardio import planned_cardio_day_indexes
 from app.workouts.program_engine.duration_capacity import (
     SessionCapacity,
     capacity_for_session,
@@ -59,43 +58,47 @@ def repair_session_durations(
     """Repair real session estimates while preserving hard program constraints."""
 
     policy = get_session_duration_policy(request.source.session_duration_minutes)
-    cardio_day_indexes = (
-        planned_cardio_day_indexes(
-            tuple(day.focus for day in days),
-            session_capacity.planned_cardio_sessions,
-            priority_muscles=request.source.priority_muscles,
-        )
-        if session_capacity is not None
-        else frozenset()
-    )
+    resistance_budget = request.source.session_duration_minutes  # pure resistance budget
+    pass
     repaired: list[WorkoutDay] = []
     reasons: list[str] = []
     for day_index, day in enumerate(days):
         day_capacity = (
             capacity_for_session(
                 session_capacity,
-                cardio_reserved=day_index in cardio_day_indexes,
+                # cardio no longer reduces resistance capacity; always unreserved
+                cardio_reserved=False,
             )
             if session_capacity is not None
             else None
         )
-        planned_minimum_exercises = (
-            min(
-                ruleset.minimum_exercises_per_session,
-                max(1, day_capacity.expected_exercise_count_capacity),
+        # -------------------------------------------------------------------
+        # Minimum exercises policy:
+        #   30-min budget  → allow 3-4 when 5 cannot fit, floor = 3
+        #   45+ min budget → minimum 5 (duration alone never lowers this)
+        # -------------------------------------------------------------------
+        if resistance_budget <= 30:
+            # For 30-min sessions, let capacity decide the floor (3–5)
+            capacity_floor = (
+                max(3, min(5, day_capacity.expected_exercise_count_capacity))
+                if day_capacity is not None
+                else ruleset.minimum_exercises_per_session
             )
-            if day_capacity is not None
-            else ruleset.minimum_exercises_per_session
-        )
+            planned_minimum_exercises = capacity_floor
+        else:
+            # 45+ min: duration alone MUST NOT reduce below 5
+            planned_minimum_exercises = ruleset.minimum_exercises_per_session
+
         template_adjusted, template_superset_reasons = apply_template_supersets(day.exercises)
         reasons.extend(template_superset_reasons)
         current = _rebuild_day(day, template_adjusted, ruleset)
         other_days = tuple(repaired) + days[day_index + 1 :]
-        if (
-            current.estimated_duration_minutes
-            < policy.minimum_total_minutes(ruleset.general_warmup_minutes)
-            or len(current.exercises) < planned_minimum_exercises
-        ):
+
+        # ------------------------------------------------------------------
+        # Underfill = exercise count below floor ONLY.
+        # Being below the time budget is NOT a defect by itself.
+        # ------------------------------------------------------------------
+        if len(current.exercises) < planned_minimum_exercises:
             reasons.append("SESSION_DURATION_UNDERFILLED")
             current = _repair_underfill(
                 current,
@@ -110,9 +113,14 @@ def repair_session_durations(
                 ),
                 minimum_exercises=planned_minimum_exercises,
             )
-        if current.estimated_duration_minutes > policy.maximum_total_minutes(
-            ruleset.general_warmup_minutes
-        ):
+
+        # ------------------------------------------------------------------
+        # Overfill = resistance-only portion exceeds budget + tolerance.
+        # (estimated_duration_minutes = warmup + resistance sets;
+        #  cardio is added later by add_cardio and is not counted here)
+        # ------------------------------------------------------------------
+        resistance_minutes = current.estimated_duration_minutes - ruleset.general_warmup_minutes
+        if resistance_minutes > policy.maximum_minutes:
             reasons.append("SESSION_DURATION_OVERFILLED")
             current, overfill_reasons = _repair_overfill(
                 current,
@@ -122,57 +130,52 @@ def repair_session_durations(
                 minimum_exercises=planned_minimum_exercises,
             )
             reasons.extend(overfill_reasons)
+
+        # ------------------------------------------------------------------
+        # Core-extension allowance
+        # ------------------------------------------------------------------
+        resistance_after = current.estimated_duration_minutes - ruleset.general_warmup_minutes
         extended_for_core = (
-            current.estimated_duration_minutes
-            > policy.maximum_total_minutes(ruleset.general_warmup_minutes)
-            and current.estimated_duration_minutes
-            <= policy.core_preservation_maximum_total_minutes(ruleset.general_warmup_minutes)
+            resistance_after > policy.maximum_minutes
+            and resistance_after <= policy.core_preservation_maximum_minutes
             and any(template_removal_rank(item) == 3 for item in current.exercises)
         )
-        if policy.contains_total(
-            current.estimated_duration_minutes,
-            ruleset.general_warmup_minutes,
-        ):
+
+        # ------------------------------------------------------------------
+        # Classify outcome
+        # ------------------------------------------------------------------
+        if resistance_after <= policy.maximum_minutes:
             if current.estimated_duration_minutes != day.estimated_duration_minutes:
                 reasons.append("SESSION_DURATION_REPAIR_APPLIED")
-            reasons.append("SESSION_DURATION_TARGET_SATISFIED")
+            if resistance_after >= policy.minimum_minutes:
+                reasons.append("SESSION_DURATION_TARGET_SATISFIED")
+            else:
+                # Under budget — only a quality issue if program is actually incomplete.
+                # Complete programs finishing under budget are acceptable.
+                if len(current.exercises) < planned_minimum_exercises:
+                    reasons.append("SESSION_DURATION_TARGET_UNSATISFIED")
+                    if volume is not None and _duration_shortfall_is_hard_constrained(
+                        request, volume
+                    ):
+                        reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
+                    else:
+                        reasons.append("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD")
+                else:
+                    # Enough exercises; program just finishes under budget.
+                    # This is fine — duration is a budget, not a fill target.
+                    reasons.append("SESSION_DURATION_TARGET_SATISFIED")
         elif extended_for_core:
             if current.estimated_duration_minutes != day.estimated_duration_minutes:
                 reasons.append("SESSION_DURATION_REPAIR_APPLIED")
             reasons.append("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE")
         else:
             reasons.append("SESSION_DURATION_TARGET_UNSATISFIED")
-            if (
-                volume is not None
-                and current.estimated_duration_minutes
-                < policy.minimum_total_minutes(ruleset.general_warmup_minutes)
-            ):
-                if current.focus.startswith(
-                    "template_reference"
-                ) or _duration_shortfall_is_hard_constrained(request, volume):
-                    reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
-                elif request.source.session_duration_minutes <= 120:
-                    reasons.append("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD")
+
         repaired.append(current)
-    underfilled = tuple(
-        day
-        for day in repaired
-        if day.estimated_duration_minutes
-        < policy.minimum_total_minutes(ruleset.general_warmup_minutes)
-    )
-    if (
-        underfilled
-        and "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" not in reasons
-        and request.source.session_duration_minutes <= 120
-        and all(
-            day.estimated_duration_minutes * 10
-            >= policy.minimum_total_minutes(ruleset.general_warmup_minutes) * 7
-            for day in underfilled
-        )
-    ):
-        reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
+
     repaired_tuple = _justify_duration_repeats(tuple(repaired))
     return repaired_tuple, tuple(dict.fromkeys(reasons))
+
 
 
 def _repair_underfill(
@@ -187,29 +190,14 @@ def _repair_underfill(
     prefer_acceptable_volume_for_minimum_fill: bool,
     minimum_exercises: int,
 ) -> WorkoutDay:
+    """Add exercises (or sets) until exercise-count floor is satisfied.
+
+    Rest is NEVER inflated merely to fill unused time — duration is a budget,
+    not a fill target.  We stop as soon as the exercise-count floor is met.
+    """
     exercises = list(day.exercises)
-    while (
-        day.estimated_duration_minutes
-        < policy.minimum_total_minutes(ruleset.general_warmup_minutes)
-        or len(exercises) < minimum_exercises
-    ):
-        increment = (
-            None
-            if len(exercises) < minimum_exercises
-            else _select_set_increment(
-                exercises,
-                request,
-                policy,
-                ruleset,
-                other_days=other_days,
-                volume=volume,
-            )
-        )
-        if increment is not None:
-            index, updated = increment
-            exercises[index] = updated
-            day = _rebuild_day(day, tuple(exercises), ruleset)
-            continue
+    while len(exercises) < minimum_exercises:
+        # Prefer adding an exercise first, then a set increment as fallback.
         addition = _select_exercise_addition(
             day,
             exercises,
@@ -222,99 +210,34 @@ def _repair_underfill(
             prefer_acceptable_volume_for_minimum_fill=(prefer_acceptable_volume_for_minimum_fill),
             minimum_exercises=minimum_exercises,
         )
-        if addition is None:
-            rest_extension = (
-                _select_rest_extension_for_underfill(
-                    exercises,
-                    request,
-                    policy,
-                    ruleset,
-                    cardio_minutes=day.cardio.duration_minutes if day.cardio else 0,
-                )
-                if len(exercises) >= minimum_exercises
-                else None
-            )
-            if rest_extension is None:
-                break
-            index, updated = rest_extension
+        if addition is not None:
+            exercises.append(addition)
+            day = _rebuild_day(day, tuple(exercises), ruleset)
+            continue
+        # No suitable exercise found — also try a set increment.
+        increment = _select_set_increment(
+            exercises,
+            request,
+            policy,
+            ruleset,
+            other_days=other_days,
+            volume=volume,
+        )
+        if increment is not None:
+            index, updated = increment
             exercises[index] = updated
             day = _rebuild_day(day, tuple(exercises), ruleset)
             continue
-        exercises.append(addition)
-        day = _rebuild_day(day, tuple(exercises), ruleset)
+        # Cannot add more work without violating constraints — stop.
+        break
     return day
 
 
-def _select_rest_extension_for_underfill(
-    exercises: list[ProgrammedExercise],
-    request: NormalizedProgramRequest,
-    policy: SessionDurationPolicy,
-    ruleset: ProgramRuleset,
-    *,
-    cardio_minutes: int,
-) -> tuple[int, ProgrammedExercise] | None:
-    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
-    options: list[tuple[tuple[object, ...], int, ProgrammedExercise]] = []
-    for index, exercise in enumerate(exercises):
-        prescription = prescription_for(
-            request.primary_goal,
-            exercise.exercise_type,
-            request.training_status,
-            ruleset,
-            prescription_mode=exercise.prescription_mode,
-            duration_min_seconds=exercise.duration_min_seconds,
-            duration_max_seconds=exercise.duration_max_seconds,
-            strength_role=(
-                _programmed_strength_role(exercise)
-                if request.primary_goal is Goal.STRENGTH
-                else None
-            ),
-        )
-        if exercise.rest_seconds >= prescription.maximum_rest_seconds:
-            continue
-        rest_seconds = min(
-            prescription.maximum_rest_seconds,
-            exercise.rest_seconds + ruleset.duration_repair_rest_increment_seconds,
-        )
-        updated = replace(
-            exercise,
-            rest_seconds=rest_seconds,
-            estimated_minutes=estimate_exercise_minutes(
-                exercise.sets,
-                rest_seconds,
-                exercise.warmup_sets,
-                ruleset,
-            ),
-            reason_codes=tuple(
-                dict.fromkeys(exercise.reason_codes + ("REST_EXTENDED_FOR_SAFE_DURATION_TARGET",))
-            ),
-        )
-        projected = (
-            ruleset.general_warmup_minutes
-            + sum(
-                item.estimated_minutes if item is not exercise else updated.estimated_minutes
-                for item in exercises
-            )
-            + cardio_minutes
-        )
-        if projected > policy.maximum_total_minutes(ruleset.general_warmup_minutes):
-            continue
-        options.append(
-            (
-                (
-                    -adaptation_preservation_rank(exercise, priority_policy),
-                    *priority_policy.precedence_key(exercise.primary_muscle),
-                    exercise.order,
-                    str(exercise.exercise_id),
-                ),
-                index,
-                updated,
-            )
-        )
-    if not options:
-        return None
-    selected = min(options)
-    return selected[1], selected[2]
+
+
+# _select_rest_extension_for_underfill intentionally removed.
+# Inflating rest merely to fill unused session time is prohibited:
+# session_duration_minutes is a BUDGET, not a fill target.
 
 
 def _select_set_increment(

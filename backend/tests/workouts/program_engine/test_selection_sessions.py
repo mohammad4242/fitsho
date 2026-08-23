@@ -580,7 +580,7 @@ def test_each_six_day_candidate_builds_six_sessions(split_type: SplitType) -> No
 
 
 def test_short_session_keeps_the_minimum_exercise_count() -> None:
-    request = normalized(session_duration_minutes=25)
+    request = normalized(session_duration_minutes=30)
     eligible = filter_eligible_exercises(request, _full_body_catalog()).eligible
     split = select_split(request, RULESET)
     volume = plan_weekly_volume(request, split, RULESET)

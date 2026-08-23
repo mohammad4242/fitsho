@@ -3,7 +3,6 @@ from collections import Counter
 from dataclasses import dataclass
 
 from app.exercises.enums import ExerciseType, PrescriptionMode
-from app.workouts.program_engine.cardio import planned_cardio_day_indexes
 from app.workouts.program_engine.enums import Goal, TrainingStatus
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -67,19 +66,13 @@ def prescribe_sessions(
         if volume.direct_sets_for(muscle) > 0
     }
     days: list[WorkoutDay] = []
-    cardio_day_indexes = frozenset(range(len(drafts)))
-    if planned_cardio_sessions is not None:
-        cardio_day_indexes = planned_cardio_day_indexes(
-            tuple(draft.focus for draft in drafts),
-            planned_cardio_sessions,
-            priority_muscles=request.source.priority_muscles,
-        )
+    pass
     for day_index, draft in enumerate(drafts):
         exercise_count = max(1, len(draft.exercises))
+        # available = full resistance budget; cardio is scheduled outside/after.
         available = max(
             ruleset.minimum_session_work_minutes,
-            request.source.session_duration_minutes
-            - (cardio_reserve_minutes if day_index in cardio_day_indexes else 0),
+            request.source.session_duration_minutes,
         )
         per_exercise_budget = max(
             ruleset.minimum_exercise_budget_minutes,

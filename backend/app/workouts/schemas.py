@@ -266,7 +266,7 @@ class ProgramGenerationOverrides(BaseModel):
         ge=SUPPORTED_RESISTANCE_TRAINING_DAYS[0],
         le=SUPPORTED_RESISTANCE_TRAINING_DAYS[-1],
     )
-    session_duration_minutes: int | None = Field(default=None, ge=20, le=180)
+    session_duration_minutes: int | None = Field(default=None, ge=30, le=120)
     training_age_months: int | None = Field(default=None, ge=0, le=900)
     current_activity_level: ActivityLevel | None = None
     preferred_weekdays: tuple[int, ...] | None = None

@@ -3,6 +3,28 @@ from dataclasses import dataclass
 SESSION_DURATION_TOLERANCE_MINUTES = 10
 CORE_PRESERVATION_EXTENSION_MINUTES = 20
 
+# Official supported resistance-session durations.
+# `session_duration_minutes` means: available time for the resistance-training
+# portion of the session — it does NOT include general warm-up, cardio, or
+# general cooldown.
+OFFICIAL_SESSION_DURATIONS: tuple[int, ...] = (30, 45, 60, 75, 90, 120)
+
+
+def is_official_session_duration(minutes: int) -> bool:
+    """Return True if *minutes* is an officially supported resistance-session duration."""
+    return minutes in OFFICIAL_SESSION_DURATIONS
+
+
+def validate_session_duration(minutes: int) -> int:
+    """Return *minutes* unchanged, or raise ValueError for unsupported values."""
+    if not is_official_session_duration(minutes):
+        supported = ", ".join(str(v) for v in OFFICIAL_SESSION_DURATIONS)
+        raise ValueError(
+            f"session_duration_minutes={minutes} is not an official supported value. "
+            f"Supported values: {supported}"
+        )
+    return minutes
+
 
 @dataclass(frozen=True)
 class SessionDurationPolicy:

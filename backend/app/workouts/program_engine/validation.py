@@ -83,48 +83,66 @@ def validate_program(
         weekly_exposures.update(
             {item.primary_muscle for item in day.exercises if item.primary_muscle is not None}
         )
+    short_session = request.session_duration_minutes <= 30
     for day in program.weekly_schedule:
         exercise_count = len(day.exercises)
         errors.extend(superset_structure_errors(day.exercises))
-        if exercise_count < ruleset.minimum_exercises_per_session:
-            if (
-                duration_planned_reduced_count
-                and "INSUFFICIENT_ELIGIBLE_EXERCISES" not in trace_reason_codes
-            ):
-                warnings.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
-            elif (
-                duration_planned_reduced_count
-                and "DYNAMIC_EXACT_N_FALLBACK" in trace_reason_codes
-                and "INSUFFICIENT_ELIGIBLE_EXERCISES" in trace_reason_codes
-            ):
+
+        # ------------------------------------------------------------------
+        # Exercise count validation (Phase 11.9 semantics)
+        # 30-min: floor = 3 (allowed 3-4 when 5 doesn't fit)
+        # 45+min: floor = 5; DURATION_PLANNED_REDUCED_EXERCISE_COUNT forbidden
+        # ------------------------------------------------------------------
+        effective_floor = 3 if short_session else ruleset.minimum_exercises_per_session
+        if exercise_count < effective_floor:
+            # Below absolute hard floor — always an error
+            if volume_feasibility_constrained or duration_feasibility_constrained:
                 warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-                warnings.append("INSUFFICIENT_ELIGIBLE_EXERCISES")
-            elif duration_planned_reduced_count:
+            else:
                 errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-                errors.append("INSUFFICIENT_ELIGIBLE_EXERCISES")
+        elif exercise_count < ruleset.minimum_exercises_per_session:
+            if short_session:
+                # 30-min: 3-4 exercises is acceptable when proven necessary
+                if duration_planned_reduced_count:
+                    warnings.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
+                else:
+                    warnings.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
+            elif duration_planned_reduced_count:
+                # 45+min: duration alone MUST NOT reduce below 5 — this is a hard error
+                errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
+                errors.append("DURATION_REDUCTION_VIOLATED_MINIMUM_EXERCISE_FLOOR")
             elif volume_feasibility_constrained:
                 warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
             else:
                 errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
         elif exercise_count > ruleset.max_exercises_per_session:
             errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
+
+        # ------------------------------------------------------------------
+        # Duration validation (Phase 11.9 semantics):
+        # Being under budget is only an error when the program is incomplete.
+        # Over budget always requires justification.
+        # ------------------------------------------------------------------
         workout_duration = duration_policy.workout_minutes(
             day.estimated_duration_minutes,
             ruleset.general_warmup_minutes,
         )
         if workout_duration < duration_policy.minimum_minutes:
-            if duration_feasibility_constrained:
-                warnings.extend(
-                    code
-                    for code in (
-                        "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
-                        "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
+            # Under-budget: only a hard error when exercise count also fails
+            if exercise_count < effective_floor:
+                if duration_feasibility_constrained:
+                    warnings.extend(
+                        code
+                        for code in (
+                            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+                            "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
+                        )
+                        if code in trace_reason_codes
                     )
-                    if code in trace_reason_codes
-                )
-            else:
-                errors.append("SESSION_DURATION_UNDER_TARGET")
-                errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
+                else:
+                    errors.append("SESSION_DURATION_UNDER_TARGET")
+                    errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
+            # else: program finishes under budget with enough exercises — acceptable
         if workout_duration > duration_policy.maximum_minutes:
             core_extension_is_valid = (
                 "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE" in trace_reason_codes
@@ -136,6 +154,7 @@ def validate_program(
                 errors.append("SESSION_DURATION_EXCEEDED")
                 errors.append("SESSION_DURATION_OVER_TARGET")
                 errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
+
         per_session: Counter[str] = Counter()
         for item in day.exercises:
             semantic_patterns, semantic_muscles = focus_scope(day.focus)

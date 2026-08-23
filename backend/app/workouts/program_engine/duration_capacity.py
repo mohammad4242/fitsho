@@ -140,18 +140,23 @@ def build_session_capacity(
     *,
     cardio_reserve_minutes: int,
 ) -> SessionCapacity:
+    """Build session capacity where `resistance_work_budget_minutes` equals the
+    full ``session_duration_minutes``.  Cardio is scheduled *outside* and after
+    the resistance block; it does NOT reduce the resistance budget."""
     if cardio_reserve_minutes < 0:
         raise ValueError("cardio reserve must be non-negative")
     duration_policy = get_session_duration_policy(request.source.session_duration_minutes)
-    reserve = min(cardio_reserve_minutes, duration_policy.requested_minutes)
-    resistance_budget = max(0, duration_policy.requested_minutes - reserve)
-    minimum_resistance = max(0, duration_policy.minimum_minutes - reserve)
-    maximum_resistance = max(0, duration_policy.maximum_minutes - reserve)
+    # Resistance budget = full requested minutes.  Cardio is additive.
+    resistance_budget = duration_policy.requested_minutes
+    minimum_resistance = duration_policy.minimum_minutes
+    maximum_resistance = duration_policy.maximum_minutes
     representative = _representative_candidate(request, candidates, ruleset)
     if representative is None:
         exercise_capacity = 0
         working_set_capacity = 0
         representative_minutes = 0
+        first_cost = None
+        later_cost = None
     else:
         first_cost = estimate_candidate_cost(
             request,
@@ -176,42 +181,23 @@ def build_session_capacity(
             later_cost,
         )
         representative_minutes = later_cost.minutes
-    unreserved_budget = duration_policy.requested_minutes
-    unreserved_minimum = duration_policy.minimum_minutes
-    unreserved_maximum = duration_policy.maximum_minutes
-    if representative is None:
-        unreserved_exercise_capacity = 0
-        unreserved_set_capacity = 0
-    else:
-        unreserved_exercise_capacity = _exercise_capacity(
-            unreserved_budget,
-            first_cost.minutes,
-            later_cost.minutes,
-            ruleset.max_exercises_per_session,
-        )
-        unreserved_set_capacity = _working_set_capacity(
-            request,
-            representative,
-            ruleset,
-            unreserved_budget,
-            unreserved_exercise_capacity,
-            first_cost,
-            later_cost,
-        )
+    # Unreserved fields now equal the main fields (they're the same —
+    # no cardio deduction), kept for backward API compatibility.
     target_cardio_sessions = (
         ruleset.fat_loss_cardio_days
         if request.primary_goal in {Goal.FAT_LOSS, Goal.BODY_RECOMPOSITION}
         else ruleset.maintenance_cardio_days
     )
+    # cardio sessions scheduled only when a cardio reserve is indicated
     planned_cardio_sessions = (
-        min(request.resistance_training_days, target_cardio_sessions) if reserve else 0
+        min(request.resistance_training_days, target_cardio_sessions) if cardio_reserve_minutes else 0
     )
     return SessionCapacity(
         requested_workout_minutes=duration_policy.requested_minutes,
         target_total_minutes=duration_policy.requested_minutes + ruleset.general_warmup_minutes,
         minimum_workout_minutes=duration_policy.minimum_minutes,
         maximum_workout_minutes=duration_policy.maximum_minutes,
-        cardio_reserve_minutes=reserve,
+        cardio_reserve_minutes=cardio_reserve_minutes,  # informational only
         resistance_work_budget_minutes=resistance_budget,
         minimum_resistance_work_minutes=minimum_resistance,
         maximum_resistance_work_minutes=maximum_resistance,
@@ -219,12 +205,14 @@ def build_session_capacity(
         expected_working_set_capacity=working_set_capacity,
         representative_exercise_minutes=representative_minutes,
         planned_cardio_sessions=planned_cardio_sessions,
-        unreserved_resistance_work_budget_minutes=unreserved_budget,
-        unreserved_minimum_resistance_work_minutes=unreserved_minimum,
-        unreserved_maximum_resistance_work_minutes=unreserved_maximum,
-        unreserved_exercise_count_capacity=unreserved_exercise_capacity,
-        unreserved_working_set_capacity=unreserved_set_capacity,
+        # unreserved fields = same as main fields (no cardio deduction)
+        unreserved_resistance_work_budget_minutes=resistance_budget,
+        unreserved_minimum_resistance_work_minutes=minimum_resistance,
+        unreserved_maximum_resistance_work_minutes=maximum_resistance,
+        unreserved_exercise_count_capacity=exercise_capacity,
+        unreserved_working_set_capacity=working_set_capacity,
     )
+
 
 
 def capacity_for_session(

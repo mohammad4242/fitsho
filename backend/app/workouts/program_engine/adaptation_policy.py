@@ -167,7 +167,7 @@ class CycleAdaptationProgramSnapshot(BaseModel):
     weekly_effective_sets_by_muscle: dict[MuscleGroup, float] = Field(default_factory=dict)
     priority_muscles: tuple[MuscleGroup, ...] = ()
     training_days: int | None = Field(default=None, ge=1, le=7)
-    session_duration_minutes: int | None = Field(default=None, ge=20, le=180)
+    session_duration_minutes: int | None = Field(default=None, ge=30, le=120)
     disliked_exercises: tuple[UUID, ...] = ()
     unavailable_exercises: tuple[UUID, ...] = ()
     blocked_exercises: tuple[UUID, ...] = ()

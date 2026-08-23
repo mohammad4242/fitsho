@@ -1087,19 +1087,44 @@ def _coach_quality_metrics(
         else "fit"
     )
     duration_policy = get_session_duration_policy(request.session_duration_minutes)
+    resistance_budget = request.session_duration_minutes
+    # resistance_time_budget_fit: did every session stay within the resistance budget (+tolerance)?
+    session_resistance_minutes = [
+        day.estimated_duration_minutes - ruleset.general_warmup_minutes
+        for day in program.weekly_schedule
+    ]
+    overrun_minutes = [
+        max(0, m - duration_policy.maximum_minutes) for m in session_resistance_minutes
+    ]
+    resistance_time_budget_fit = all(m <= duration_policy.maximum_minutes for m in session_resistance_minutes)
+    utilization = [
+        round(m / max(1, resistance_budget), 3) for m in session_resistance_minutes
+    ]
     duration_fit = (
         "fit"
-        if all(
-            duration_policy.contains_total(
-                day.estimated_duration_minutes,
-                ruleset.general_warmup_minutes,
-            )
-            for day in program.weekly_schedule
-        )
+        if resistance_time_budget_fit
         else "constrained"
         if "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in trace_reason_codes
         else "failed"
     )
+    duration_constrained_quality = bool(
+        trace_reason_codes.intersection(
+            {
+                "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+                "DURATION_REDUCTION_VIOLATED_MINIMUM_EXERCISE_FLOOR",
+            }
+        )
+    )
+    late_repair_class = "not_needed"
+    if "SESSION_DURATION_REPAIR_APPLIED" in trace_reason_codes:
+        # classify based on the repair trace
+        duration_trace = next(
+            (e for e in program.decision_trace if e.get("stage") == "session_duration"),
+            {},
+        )
+        rc = duration_trace.get("repair_classification", "minor")
+        late_repair_class = rc if isinstance(rc, str) else "minor"
+
     recovery_fit = (
         "fit" if recovery_spacing_is_valid(program.weekly_schedule, ruleset) else "failed"
     )
@@ -1154,6 +1179,12 @@ def _coach_quality_metrics(
         "substitution_count": substitution_count,
         "constraint_count": len(constraint_codes),
         "hard_validation_status": "passed" if report.is_valid else "failed",
+        # Phase 11.9 duration metrics
+        "resistance_time_budget_fit": resistance_time_budget_fit,
+        "resistance_time_utilization": utilization,
+        "resistance_time_overrun_minutes": overrun_minutes,
+        "duration_constrained_quality": duration_constrained_quality,
+        "late_duration_repair_class": late_repair_class,
     }
 
 

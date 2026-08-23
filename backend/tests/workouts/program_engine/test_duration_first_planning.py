@@ -68,11 +68,11 @@ def test_final_program_duration_matrix_is_valid(goal: Goal, duration: int) -> No
 
     assert program.validation_report.is_valid
     assert len(program.weekly_schedule) == 3
-    duration_fit = all(
-        policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)
+    resistance_time_budget_fit = all(
+        day.estimated_duration_minutes - RULESET.general_warmup_minutes <= policy.maximum_minutes
         for day in program.weekly_schedule
     )
-    assert duration_fit or "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD" in program.warnings
+    assert resistance_time_budget_fit or "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD" in program.warnings
     assert all(
         item.sets <= RULESET.max_working_sets_per_exercise_absolute
         for day in program.weekly_schedule
@@ -91,9 +91,8 @@ def test_fat_loss_reserves_cardio_before_resistance_construction() -> None:
         if entry["stage"] == "duration_capacity"
     )
     assert capacity["cardio_reserve_minutes"] == RULESET.cardio_start_minutes
-    assert capacity["resistance_work_budget_minutes"] == (
-        source.session_duration_minutes - RULESET.cardio_start_minutes
-    )
+    # Phase 11.9: Cardio no longer reduces the resistance budget.
+    assert capacity["resistance_work_budget_minutes"] == source.session_duration_minutes
     assert any(day.cardio is not None for day in result.program.weekly_schedule)
 
 

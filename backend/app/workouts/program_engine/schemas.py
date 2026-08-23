@@ -18,6 +18,7 @@ from app.exercises.enums import (
 )
 from app.profile.enums import TrainingLocation
 from app.training_templates.tags import TemplateFocusTag
+from app.workouts.program_engine.duration_policy import validate_session_duration
 from app.workouts.program_engine.enums import (
     ActivityLevel,
     BalanceAbility,
@@ -152,7 +153,7 @@ class ProgramGenerationRequest(BaseModel):
     current_activity_level: ActivityLevel = ActivityLevel.MODERATE
     available_training_days: Annotated[int, Field(ge=1, le=7)]
     preferred_weekdays: tuple[int, ...] = ()
-    session_duration_minutes: Annotated[int, Field(ge=20, le=180)]
+    session_duration_minutes: int = Field(ge=30, le=120)
     available_equipment: frozenset[Equipment]
     training_location: TrainingLocation
     preferred_exercises: frozenset[UUID] = frozenset()
@@ -180,6 +181,11 @@ class ProgramGenerationRequest(BaseModel):
     known_strength_data: dict[UUID, float] = Field(default_factory=dict)
     program_duration_weeks: Annotated[int, Field(ge=2, le=52)] = 4
     seed_optional: int | None = None
+
+    @field_validator("session_duration_minutes")
+    @classmethod
+    def validate_official_session_duration(cls, value: int) -> int:
+        return validate_session_duration(value)
 
     @field_validator("primary_goal", "secondary_goal_optional", mode="before")
     @classmethod

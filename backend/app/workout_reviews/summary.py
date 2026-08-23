@@ -141,7 +141,7 @@ def _plan_snapshot(
             maximum=7,
         ),
         session_duration_minutes=_bounded_int(
-            profile.get("session_duration_minutes"), minimum=20, maximum=180
+            profile.get("session_duration_minutes"), minimum=30, maximum=120
         ),
         disliked_exercises=_uuid_values(profile.get("disliked_exercises")),
         unavailable_exercises=_uuid_values(profile.get("unavailable_exercises")),

@@ -275,7 +275,7 @@ def test_difference_summary_is_complete_deterministic_and_has_no_noisy_entries(d
         cycle_id=materialized.cycles[0].id,
         weekly_effective_sets_by_muscle={MuscleGroup.CHEST: 1.0},
         training_days=1,
-        session_duration_minutes=20,
+        session_duration_minutes=30,
     )
     proposed = _program_snapshot(result.program)
     traced = decision.with_program_comparison(previous, proposed)

@@ -53,10 +53,13 @@ def test_capacity_preserves_workout_warmup_and_cardio_semantics() -> None:
 
     assert capacity.requested_workout_minutes == 45
     assert capacity.target_total_minutes == 45 + RULESET.general_warmup_minutes
+    # cardio_reserve_minutes is stored as informational metadata only
     assert capacity.cardio_reserve_minutes == 10
-    assert capacity.resistance_work_budget_minutes == 35
-    assert capacity.minimum_resistance_work_minutes == 25
-    assert capacity.maximum_resistance_work_minutes == 45
+    # Phase 11.9: resistance budget = full session_duration_minutes (cardio is additive, not deducted)
+    assert capacity.resistance_work_budget_minutes == 45
+    assert capacity.minimum_resistance_work_minutes == 45 - 10  # tolerance-based min
+    assert capacity.maximum_resistance_work_minutes == 45 + 10  # tolerance-based max
+
 
 
 def test_candidate_cost_reuses_goal_specific_prescription_and_warmup() -> None:
@@ -183,7 +186,9 @@ def test_engine_plans_cardio_reserve_before_template_or_split_selection() -> Non
     )
     assert capacity_trace["requested_workout_minutes"] == 30
     assert capacity_trace["cardio_reserve_minutes"] == RULESET.cardio_start_minutes
-    assert capacity_trace["resistance_work_budget_minutes"] == 20
+    # Phase 11.9: cardio does NOT reduce resistance budget
+    assert capacity_trace["resistance_work_budget_minutes"] == 30
+
 
 
 def test_normal_split_ranking_uses_capacity_and_is_candidate_order_independent() -> None:
@@ -372,9 +377,9 @@ def test_duration_trace_reports_planned_budget_and_late_repair_size() -> None:
     trace = next(
         item for item in result.program.decision_trace if item.get("stage") == "session_duration"
     )
-    assert trace["planned_resistance_work_budget_minutes"] == (
-        source.session_duration_minutes - RULESET.cardio_start_minutes
-    )
+    # Phase 11.9: resistance budget = full session_duration_minutes (cardio is additive)
+    assert trace["planned_resistance_work_budget_minutes"] == source.session_duration_minutes
+
     assert trace["planned_exercise_capacity"] >= RULESET.minimum_exercises_per_session
     assert trace["planned_set_capacity"] > 0
     assert len(trace["estimated_duration_before_late_repair"]) == 3
