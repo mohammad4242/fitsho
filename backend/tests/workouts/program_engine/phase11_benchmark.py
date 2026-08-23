@@ -651,10 +651,10 @@ def _category(
         return "UNSATISFIED"
     if any(item.get("severity") == "engine_bug" for item in issues):
         return "ENGINE_BUG"
-    if bool(template.get("fallback_succeeded")):
-        return "FALLBACK_SUCCESS"
     if issues:
         return "QUALITY_ISSUE"
+    if bool(template.get("fallback_succeeded")):
+        return "FALLBACK_SUCCESS"
     warnings = result.program.validation_report.warnings
     return "PASS_WITH_CONSTRAINTS" if warnings else "PASS"
 
