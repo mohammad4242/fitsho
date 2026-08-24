@@ -1000,46 +1000,14 @@ def _intensity_guidance(
     )
 
 
-def _derive_structure_focus(title_en: str) -> str:
-    title = title_en.lower()
-    if "full body" in title:
-        return "full_body"
-    if "upper" in title:
-        return "upper"
-    if "lower" in title or "squat" in title:
-        return "lower"
-    if "push" in title or "bench" in title or "press" in title:
-        return "push"
-    if "pull" in title:
-        return "pull"
-    if "chest + triceps" in title or title == "chest":
-        return "chest_triceps"
-    if (
-        "back + biceps" in title
-        or "back width" in title
-        or "back thickness" in title
-        or title == "back"
-        or "back + arms" in title
-    ):
-        return "back_biceps"
-    if "shoulders + traps" in title or "shoulders" in title:
-        return "shoulders_traps"
-    if "quadriceps" in title or "quads" in title or "legs" in title:
-        return "quadriceps_calves"
-    if "posterior" in title or "hamstrings" in title or "glutes" in title or "deadlift" in title:
-        return "posterior_chain_core"
-    if "chest" in title:
-        return "chest_triceps"
-    return "other"
-
-
 def _day(
     title_en: str,
     title_fa: str,
+    structure_focus: str,
     muscles: tuple[MuscleGroup, ...],
     *slots: TemplateSlotSeed,
 ) -> TemplateDaySeed:
-    return TemplateDaySeed(title_en, title_fa, _derive_structure_focus(title_en), muscles, slots)
+    return TemplateDaySeed(title_en, title_fa, structure_focus, muscles, slots)
 
 
 def _template(
@@ -1111,6 +1079,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES, M.ABS),
                 CHEST,
                 BACK_ROW,
@@ -1121,6 +1090,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES, M.SHOULDERS),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -1145,6 +1115,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
                 CHEST,
                 BACK_ROW,
@@ -1155,6 +1126,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -1165,6 +1137,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body C",
                 "تمام‌بدن C",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS),
                 CHEST,
                 BACK_ROW,
@@ -1187,6 +1160,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper A",
                 "بالاتنه A",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
                 CHEST,
                 BACK_ROW,
@@ -1197,6 +1171,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower A",
                 "پایین‌تنه A",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
                 SQUAT,
                 RDL,
@@ -1207,6 +1182,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper B",
                 "بالاتنه B",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -1217,6 +1193,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower B",
                 "پایین‌تنه B",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
                 LUNGE,
                 RDL,
@@ -1238,6 +1215,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
                 CHEST,
                 BACK_ROW,
@@ -1247,6 +1225,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -1268,6 +1247,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 BARBELL_BACK_SQUAT,
                 BARBELL_BENCH,
@@ -1277,6 +1257,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 LEG_PRESS,
                 INCLINE_CHEST,
@@ -1299,6 +1280,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 BARBELL_BACK_SQUAT,
                 BARBELL_BENCH,
@@ -1309,6 +1291,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 LEG_PRESS,
                 INCLINE_CHEST,
@@ -1331,6 +1314,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 BARBELL_BACK_SQUAT,
                 BARBELL_BENCH,
@@ -1341,6 +1325,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 LEG_PRESS,
                 INCLINE_CHEST,
@@ -1364,6 +1349,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 BARBELL_BACK_SQUAT,
                 BARBELL_BENCH,
@@ -1380,6 +1366,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 LEG_PRESS,
                 INCLINE_CHEST,
@@ -1407,6 +1394,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS),
                 CHEST,
                 BACK_ROW,
@@ -1416,6 +1404,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.SHOULDERS, M.HAMSTRINGS, M.GLUTES),
                 SHOULDER_PRESS,
                 LAT_PULLDOWN,
@@ -1425,6 +1414,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body C",
                 "تمام‌بدن C",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -1446,6 +1436,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Push",
                 "پوش",
+                "push",
                 (M.CHEST, M.SHOULDERS, M.TRICEPS),
                 CHEST,
                 SHOULDER_PRESS,
@@ -1455,6 +1446,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Pull",
                 "پول",
+                "pull",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -1465,6 +1457,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
                 SQUAT,
                 RDL,
@@ -1485,6 +1478,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Quads",
                 "سینه + چهارسر",
+                "other",
                 (M.CHEST, M.QUADRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -1494,6 +1488,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Hamstrings",
                 "زیربغل + همسترینگ",
+                "posterior_chain_core",
                 (M.BACK, M.HAMSTRINGS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -1504,6 +1499,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Shoulders",
                 "سینه + سرشانه",
+                "upper",
                 (M.CHEST, M.SHOULDERS),
                 CABLE_FLY,
                 CHEST,
@@ -1525,6 +1521,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Quads",
                 "زیربغل + چهارسر",
+                "other",
                 (M.BACK, M.QUADRICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -1534,6 +1531,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Hamstrings",
                 "سینه + همسترینگ",
+                "posterior_chain_core",
                 (M.CHEST, M.HAMSTRINGS),
                 CHEST,
                 INCLINE_CHEST,
@@ -1543,6 +1541,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Arms",
                 "زیربغل + بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 CABLE_PULLDOWN,
                 BACK_ROW,
@@ -1564,6 +1563,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.QUADRICEPS),
                 CHEST,
                 SQUAT,
@@ -1578,6 +1578,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.BACK, M.HAMSTRINGS),
                 BACK_ROW,
                 RDL,
@@ -1592,6 +1593,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body C",
                 "تمام‌بدن C",
+                "full_body",
                 (M.SHOULDERS, M.GLUTES),
                 SHOULDER_PRESS,
                 GLUTE_BRIDGE,
@@ -1618,6 +1620,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -1628,6 +1631,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -1638,6 +1642,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
                 LEG_PRESS,
                 RDL,
@@ -1648,6 +1653,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Traps",
                 "سرشانه + کول",
+                "shoulders_traps",
                 (M.SHOULDERS, M.TRAPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -1669,6 +1675,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -1678,6 +1685,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -1687,6 +1695,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
                 LEG_PRESS,
                 RDL,
@@ -1696,6 +1705,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Shoulders",
                 "سینه + سرشانه",
+                "upper",
                 (M.CHEST, M.SHOULDERS),
                 CABLE_FLY,
                 CHEST,
@@ -1716,6 +1726,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -1725,16 +1736,27 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
                 CABLE_PULLDOWN,
                 BICEPS,
             ),
-            _day("Legs", "پا", (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES), SQUAT, RDL, LEG_CURL, CALF),
+            _day(
+                "Legs",
+                "پا",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
+                SQUAT,
+                RDL,
+                LEG_CURL,
+                CALF,
+            ),
             _day(
                 "Back + Shoulders",
                 "زیربغل + سرشانه",
+                "upper",
                 (M.BACK, M.SHOULDERS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -1756,6 +1778,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Back",
                 "سینه + زیربغل",
+                "upper",
                 (M.CHEST, M.BACK),
                 CHEST,
                 BACK_ROW,
@@ -1765,6 +1788,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Quadriceps + Calves",
                 "چهارسر + ساق",
+                "quadriceps_calves",
                 (M.QUADRICEPS, M.CALVES),
                 LEG_PRESS,
                 SQUAT,
@@ -1774,6 +1798,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Arms",
                 "سرشانه + بازو",
+                "shoulders_traps",
                 (M.SHOULDERS, M.BICEPS, M.TRICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -1783,6 +1808,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Hamstrings + Glutes",
                 "همسترینگ + باسن",
+                "posterior_chain_core",
                 (M.HAMSTRINGS, M.GLUTES),
                 RDL,
                 LEG_CURL,
@@ -1803,6 +1829,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper Compound",
                 "بالاتنه چندمفصلی",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
                 CHEST,
                 BACK_ROW,
@@ -1812,6 +1839,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower Compound",
                 "پایین‌تنه چندمفصلی",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 LEG_PRESS,
                 RDL,
@@ -1821,6 +1849,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper Hypertrophy",
                 "هایپرتروفی بالاتنه",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS, M.ARMS if False else M.BICEPS),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -1831,6 +1860,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower Hypertrophy",
                 "هایپرتروفی پایین‌تنه",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
                 SQUAT,
                 LEG_EXTENSION,
@@ -1849,11 +1879,14 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             Level.INTERMEDIATE,
             (Tag.BODY_PART_ROTATION, Tag.BALANCED),
             (Method.STANDARD,),
-            _day("Chest", "سینه", (M.CHEST,), CHEST, INCLINE_CHEST, CABLE_FLY),
-            _day("Back", "زیربغل", (M.BACK,), BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN),
+            _day("Chest", "سینه", "chest_triceps", (M.CHEST,), CHEST, INCLINE_CHEST, CABLE_FLY),
+            _day(
+                "Back", "زیربغل", "back_biceps", (M.BACK,), BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN
+            ),
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
                 LEG_PRESS,
                 RDL,
@@ -1864,13 +1897,23 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Traps",
                 "سرشانه + کول",
+                "shoulders_traps",
                 (M.SHOULDERS, M.TRAPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
                 REAR_DELT,
                 SHRUG,
             ),
-            _day("Arms", "بازو", (M.BICEPS, M.TRICEPS), BICEPS, HAMMER_CURL, TRICEPS, PUSH_DOWN),
+            _day(
+                "Arms",
+                "بازو",
+                "other",
+                (M.BICEPS, M.TRICEPS),
+                BICEPS,
+                HAMMER_CURL,
+                TRICEPS,
+                PUSH_DOWN,
+            ),
         ),
         _template(
             "five-day-ppl-upper-lower",
@@ -1882,12 +1925,29 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             Level.INTERMEDIATE,
             (Tag.PUSH_PULL_LEGS, Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
             (Method.STANDARD,),
-            _day("Push", "پوش", (M.CHEST, M.SHOULDERS, M.TRICEPS), CHEST, SHOULDER_PRESS, TRICEPS),
-            _day("Pull", "پول", (M.BACK, M.BICEPS), BACK_ROW, LAT_PULLDOWN, BICEPS),
-            _day("Legs", "پا", (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES), SQUAT, RDL, CALF),
+            _day(
+                "Push",
+                "پوش",
+                "push",
+                (M.CHEST, M.SHOULDERS, M.TRICEPS),
+                CHEST,
+                SHOULDER_PRESS,
+                TRICEPS,
+            ),
+            _day("Pull", "پول", "pull", (M.BACK, M.BICEPS), BACK_ROW, LAT_PULLDOWN, BICEPS),
+            _day(
+                "Legs",
+                "پا",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
+                SQUAT,
+                RDL,
+                CALF,
+            ),
             _day(
                 "Upper",
                 "بالاتنه",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
                 INCLINE_CHEST,
                 CABLE_PULLDOWN,
@@ -1897,6 +1957,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower",
                 "پایین‌تنه",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 LEG_PRESS,
                 LEG_EXTENSION,
@@ -1918,6 +1979,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -1927,6 +1989,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -1935,6 +1998,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 LEG_PRESS,
                 RDL,
@@ -1944,6 +2008,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Shoulders",
                 "سینه + سرشانه",
+                "upper",
                 (M.CHEST, M.SHOULDERS),
                 CHEST,
                 CABLE_FLY,
@@ -1953,6 +2018,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Arms + Calves",
                 "بازو + ساق",
+                "other",
                 (M.BICEPS, M.TRICEPS, M.CALVES),
                 HAMMER_CURL,
                 PUSH_DOWN,
@@ -1973,6 +2039,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -1982,6 +2049,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -1991,6 +2059,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 SQUAT,
                 RDL,
@@ -2000,6 +2069,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Rear Delts",
                 "زیربغل + پشت سرشانه",
+                "upper",
                 (M.BACK, M.SHOULDERS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2009,6 +2079,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Arms",
                 "سرشانه + بازو",
+                "shoulders_traps",
                 (M.SHOULDERS, M.BICEPS, M.TRICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2034,6 +2105,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -2042,6 +2114,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2050,6 +2123,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Quadriceps + Calves",
                 "چهارسر + ساق",
+                "quadriceps_calves",
                 (M.QUADRICEPS, M.CALVES),
                 LEG_PRESS,
                 LEG_EXTENSION,
@@ -2058,6 +2132,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Hamstrings + Glutes",
                 "همسترینگ + باسن",
+                "posterior_chain_core",
                 (M.HAMSTRINGS, M.GLUTES),
                 RDL,
                 LEG_CURL,
@@ -2067,6 +2142,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Rear Delts",
                 "سرشانه + پشت سرشانه",
+                "shoulders_traps",
                 (M.SHOULDERS,),
                 SHOULDER_PRESS,
                 _slot(
@@ -2092,6 +2168,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -2102,6 +2179,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2112,6 +2190,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
                 SQUAT,
                 RDL,
@@ -2122,6 +2201,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Traps",
                 "سرشانه + کول",
+                "shoulders_traps",
                 (M.SHOULDERS, M.TRAPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2144,6 +2224,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -2156,6 +2237,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2168,6 +2250,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
                 LEG_PRESS,
                 RDL,
@@ -2179,6 +2262,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Traps",
                 "سرشانه + کول",
+                "shoulders_traps",
                 (M.SHOULDERS, M.TRAPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2202,6 +2286,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -2214,6 +2299,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2226,6 +2312,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
                 SQUAT,
                 RDL,
@@ -2236,6 +2323,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Arms + Delts",
                 "بازو + سرشانه",
+                "other",
                 (M.BICEPS, M.TRICEPS, M.SHOULDERS),
                 CABLE_CURL,
                 PREACHER_CURL,
@@ -2260,6 +2348,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -2283,6 +2372,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2295,6 +2385,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
                 HACK_SQUAT,
                 RDL,
@@ -2306,6 +2397,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Traps",
                 "سرشانه + کول",
+                "shoulders_traps",
                 (M.SHOULDERS, M.TRAPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2335,6 +2427,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -2347,6 +2440,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2360,6 +2454,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Quadriceps + Calves",
                 "چهارسر + ساق",
+                "quadriceps_calves",
                 (M.QUADRICEPS, M.CALVES),
                 HACK_SQUAT,
                 LEG_PRESS,
@@ -2392,6 +2487,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Hamstrings + Glutes",
                 "همسترینگ + باسن",
+                "posterior_chain_core",
                 (M.HAMSTRINGS, M.GLUTES),
                 RDL,
                 LEG_CURL,
@@ -2416,6 +2512,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -2426,6 +2523,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2436,6 +2534,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
                 SQUAT,
                 RDL,
@@ -2446,6 +2545,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Traps",
                 "سرشانه + کول",
+                "shoulders_traps",
                 (M.SHOULDERS, M.TRAPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2455,6 +2555,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Arms + Core",
                 "بازو + شکم",
+                "other",
                 (M.BICEPS, M.TRICEPS, M.ABS),
                 BICEPS,
                 TRICEPS,
@@ -2477,6 +2578,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -2489,6 +2591,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2501,6 +2604,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
                 LEG_PRESS,
                 RDL,
@@ -2511,6 +2615,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Traps",
                 "سرشانه + کول",
+                "shoulders_traps",
                 (M.SHOULDERS, M.TRAPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2522,6 +2627,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Arms",
                 "بازو",
+                "other",
                 (M.BICEPS, M.TRICEPS),
                 CABLE_CURL,
                 PREACHER_CURL,
@@ -2545,6 +2651,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -2557,6 +2664,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2569,6 +2677,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Quadriceps + Calves",
                 "چهارسر + ساق",
+                "quadriceps_calves",
                 (M.QUADRICEPS, M.CALVES),
                 HACK_SQUAT,
                 LEG_PRESS,
@@ -2580,6 +2689,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Hamstrings + Glutes",
                 "همسترینگ + باسن",
+                "posterior_chain_core",
                 (M.HAMSTRINGS, M.GLUTES),
                 RDL,
                 LEG_CURL,
@@ -2590,6 +2700,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Arms",
                 "سرشانه + بازو",
+                "shoulders_traps",
                 (M.SHOULDERS, M.BICEPS, M.TRICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2614,6 +2725,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest",
                 "سینه",
+                "chest_triceps",
                 (M.CHEST,),
                 CHEST,
                 INCLINE_CHEST,
@@ -2624,6 +2736,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back",
                 "زیربغل",
+                "back_biceps",
                 (M.BACK,),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2634,6 +2747,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Quadriceps + Calves",
                 "چهارسر + ساق",
+                "quadriceps_calves",
                 (M.QUADRICEPS, M.CALVES),
                 HACK_SQUAT,
                 LEG_PRESS,
@@ -2645,6 +2759,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Hamstrings + Glutes",
                 "همسترینگ + باسن",
+                "posterior_chain_core",
                 (M.HAMSTRINGS, M.GLUTES),
                 RDL,
                 LEG_CURL,
@@ -2655,6 +2770,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Arms + Delts",
                 "بازو + سرشانه",
+                "other",
                 (M.BICEPS, M.TRICEPS, M.SHOULDERS),
                 BICEPS,
                 HAMMER_CURL,
@@ -2705,6 +2821,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -2717,6 +2834,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2730,6 +2848,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Quadriceps + Calves",
                 "چهارسر + ساق",
+                "quadriceps_calves",
                 (M.QUADRICEPS, M.CALVES),
                 HACK_SQUAT,
                 LEG_PRESS,
@@ -2770,6 +2889,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Hamstrings + Glutes",
                 "همسترینگ + باسن",
+                "posterior_chain_core",
                 (M.HAMSTRINGS, M.GLUTES),
                 RDL,
                 LEG_CURL,
@@ -2782,6 +2902,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Arms",
                 "سرشانه + بازو",
+                "shoulders_traps",
                 (M.SHOULDERS, M.BICEPS, M.TRICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2804,22 +2925,34 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
             (Method.STANDARD,),
             _day(
-                "Push A", "پوش A", (M.CHEST, M.SHOULDERS, M.TRICEPS), CHEST, SHOULDER_PRESS, TRICEPS
+                "Push A",
+                "پوش A",
+                "push",
+                (M.CHEST, M.SHOULDERS, M.TRICEPS),
+                CHEST,
+                SHOULDER_PRESS,
+                TRICEPS,
             ),
-            _day("Pull A", "پول A", (M.BACK, M.BICEPS), BACK_ROW, LAT_PULLDOWN, BICEPS),
-            _day("Legs A", "پا A", (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES), SQUAT, RDL, CALF),
+            _day("Pull A", "پول A", "pull", (M.BACK, M.BICEPS), BACK_ROW, LAT_PULLDOWN, BICEPS),
+            _day(
+                "Legs A", "پا A", "lower", (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES), SQUAT, RDL, CALF
+            ),
             _day(
                 "Push B",
                 "پوش B",
+                "push",
                 (M.CHEST, M.SHOULDERS, M.TRICEPS),
                 INCLINE_CHEST,
                 LATERAL_RAISE,
                 PUSH_DOWN,
             ),
-            _day("Pull B", "پول B", (M.BACK, M.BICEPS), CABLE_PULLDOWN, BACK_ROW, HAMMER_CURL),
+            _day(
+                "Pull B", "پول B", "pull", (M.BACK, M.BICEPS), CABLE_PULLDOWN, BACK_ROW, HAMMER_CURL
+            ),
             _day(
                 "Legs B",
                 "پا B",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 LEG_PRESS,
                 LEG_EXTENSION,
@@ -2841,6 +2974,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Push Chest",
                 "پوش سینه",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -2850,6 +2984,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Pull Width",
                 "پول عرض پشت",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 LAT_PULLDOWN,
                 CABLE_PULLDOWN,
@@ -2858,6 +2993,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs Quadriceps",
                 "پا چهارسر",
+                "quadriceps_calves",
                 (M.QUADRICEPS, M.CALVES),
                 LEG_PRESS,
                 SQUAT,
@@ -2867,6 +3003,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Push Shoulders",
                 "پوش سرشانه",
+                "shoulders_traps",
                 (M.SHOULDERS, M.TRICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2876,6 +3013,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Pull Thickness",
                 "پول ضخامت پشت",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2884,6 +3022,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs Posterior",
                 "پا زنجیرهٔ خلفی",
+                "posterior_chain_core",
                 (M.HAMSTRINGS, M.GLUTES),
                 RDL,
                 LEG_CURL,
@@ -2902,11 +3041,14 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             Level.ADVANCED,
             (Tag.BODY_PART_ROTATION, Tag.BALANCED),
             (Method.STANDARD,),
-            _day("Chest", "سینه", (M.CHEST,), CHEST, INCLINE_CHEST, CABLE_FLY),
-            _day("Back", "زیربغل", (M.BACK,), BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN),
+            _day("Chest", "سینه", "chest_triceps", (M.CHEST,), CHEST, INCLINE_CHEST, CABLE_FLY),
+            _day(
+                "Back", "زیربغل", "back_biceps", (M.BACK,), BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN
+            ),
             _day(
                 "Quadriceps + Calves",
                 "چهارسر + ساق",
+                "quadriceps_calves",
                 (M.QUADRICEPS, M.CALVES),
                 LEG_PRESS,
                 LEG_EXTENSION,
@@ -2915,16 +3057,27 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Traps",
                 "سرشانه + کول",
+                "shoulders_traps",
                 (M.SHOULDERS, M.TRAPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
                 REAR_DELT,
                 SHRUG,
             ),
-            _day("Arms", "بازو", (M.BICEPS, M.TRICEPS), BICEPS, HAMMER_CURL, TRICEPS, PUSH_DOWN),
+            _day(
+                "Arms",
+                "بازو",
+                "other",
+                (M.BICEPS, M.TRICEPS),
+                BICEPS,
+                HAMMER_CURL,
+                TRICEPS,
+                PUSH_DOWN,
+            ),
             _day(
                 "Hamstrings + Glutes",
                 "همسترینگ + باسن",
+                "posterior_chain_core",
                 (M.HAMSTRINGS, M.GLUTES),
                 RDL,
                 LEG_CURL,
@@ -2943,10 +3096,19 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             Level.ADVANCED,
             (Tag.BODY_PART_ROTATION, Tag.CHEST_PRIORITY, Tag.SPECIALIZATION),
             (Method.STANDARD,),
-            _day("Chest Heavy", "سینه سنگین", (M.CHEST,), CHEST, INCLINE_CHEST, CABLE_FLY),
+            _day(
+                "Chest Heavy",
+                "سینه سنگین",
+                "chest_triceps",
+                (M.CHEST,),
+                CHEST,
+                INCLINE_CHEST,
+                CABLE_FLY,
+            ),
             _day(
                 "Back + Biceps",
                 "زیربغل + جلو بازو",
+                "back_biceps",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -2955,16 +3117,26 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 LEG_PRESS,
                 RDL,
                 LEG_EXTENSION,
                 LEG_CURL,
             ),
-            _day("Chest Volume", "سینه حجمی", (M.CHEST,), INCLINE_CHEST, CABLE_FLY, CHEST),
+            _day(
+                "Chest Volume",
+                "سینه حجمی",
+                "chest_triceps",
+                (M.CHEST,),
+                INCLINE_CHEST,
+                CABLE_FLY,
+                CHEST,
+            ),
             _day(
                 "Shoulders + Triceps",
                 "سرشانه + پشت بازو",
+                "shoulders_traps",
                 (M.SHOULDERS, M.TRICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2973,6 +3145,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Calves + Core",
                 "ساق + میان‌تنه",
+                "other",
                 (M.CALVES, M.ABS),
                 CALF,
                 SEATED_CALF_RAISE,
@@ -2991,10 +3164,19 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             Level.ADVANCED,
             (Tag.BODY_PART_ROTATION, Tag.BACK_PRIORITY, Tag.SPECIALIZATION),
             (Method.STANDARD,),
-            _day("Back Width", "عرض زیربغل", (M.BACK,), LAT_PULLDOWN, CABLE_PULLDOWN, BACK_ROW),
+            _day(
+                "Back Width",
+                "عرض زیربغل",
+                "back_biceps",
+                (M.BACK,),
+                LAT_PULLDOWN,
+                CABLE_PULLDOWN,
+                BACK_ROW,
+            ),
             _day(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 CHEST,
                 INCLINE_CHEST,
@@ -3003,6 +3185,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 SQUAT,
                 RDL,
@@ -3010,11 +3193,18 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
                 LEG_CURL,
             ),
             _day(
-                "Back Thickness", "ضخامت زیربغل", (M.BACK,), BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN
+                "Back Thickness",
+                "ضخامت زیربغل",
+                "back_biceps",
+                (M.BACK,),
+                BACK_ROW,
+                LAT_PULLDOWN,
+                CABLE_PULLDOWN,
             ),
             _day(
                 "Shoulders + Biceps",
                 "سرشانه + جلو بازو",
+                "shoulders_traps",
                 (M.SHOULDERS, M.BICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -3023,6 +3213,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Calves + Core",
                 "ساق + میان‌تنه",
+                "other",
                 (M.CALVES, M.ABS),
                 CALF,
                 SEATED_CALF_RAISE,
@@ -3046,6 +3237,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.QUADRICEPS, M.CHEST, M.BACK),
                 _slot(
                     "barbell-back-squat",
@@ -3076,6 +3268,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.HAMSTRINGS, M.CHEST, M.BACK),
                 _slot(
                     "goblet-squat",
@@ -3127,6 +3320,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.QUADRICEPS, M.CHEST, M.BACK),
                 _slot(
                     "barbell-back-squat",
@@ -3157,6 +3351,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.QUADRICEPS, M.SHOULDERS, M.BACK),
                 _slot(
                     "barbell-back-squat",
@@ -3194,6 +3389,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body C",
                 "تمام‌بدن C",
+                "full_body",
                 (M.QUADRICEPS, M.CHEST, M.BACK),
                 _slot(
                     "barbell-back-squat",
@@ -3238,6 +3434,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.QUADRICEPS, M.CHEST, M.BACK),
                 _slot(
                     "barbell-back-squat",
@@ -3269,6 +3466,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.HAMSTRINGS, M.SHOULDERS, M.BACK),
                 _slot(
                     "romanian-deadlift",
@@ -3300,6 +3498,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body C",
                 "تمام‌بدن C",
+                "full_body",
                 (M.QUADRICEPS, M.CHEST, M.BACK),
                 _slot(
                     "barbell-back-squat",
@@ -3344,6 +3543,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower Power",
                 "قدرت پایین‌تنه",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 _slot(
                     "barbell-back-squat",
@@ -3367,6 +3567,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper Power",
                 "قدرت بالاتنه",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
                 _slot(
                     "barbell-bench-press",
@@ -3397,6 +3598,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower Hypertrophy",
                 "هایپرتروفی پایین‌تنه",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 LEG_PRESS,
                 _slot(
@@ -3414,6 +3616,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper Hypertrophy",
                 "هایپرتروفی بالاتنه",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
                 _slot(
                     "incline-dumbbell-bench-press",
@@ -3444,6 +3647,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower Power",
                 "قدرت پایین‌تنه",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 _slot(
                     "barbell-back-squat",
@@ -3468,6 +3672,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper Power",
                 "قدرت بالاتنه",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
                 _slot(
                     "barbell-bench-press",
@@ -3498,6 +3703,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower Volume",
                 "حجم پایین‌تنه",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 _slot(
                     "barbell-back-squat",
@@ -3521,6 +3727,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper Volume",
                 "حجم بالاتنه",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
                 _slot(
                     "incline-dumbbell-bench-press",
@@ -3553,6 +3760,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Squat Day",
                 "روز اسکوات",
+                "quadriceps_calves",
                 (M.QUADRICEPS, M.GLUTES),
                 _slot(
                     "barbell-back-squat",
@@ -3570,6 +3778,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Bench Day",
                 "روز پرس",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS),
                 _slot(
                     "barbell-bench-press",
@@ -3587,6 +3796,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Deadlift Day",
                 "روز ددلیفت",
+                "posterior_chain_core",
                 (M.HAMSTRINGS, M.BACK, M.GLUTES),
                 _slot(
                     "romanian-deadlift",
@@ -3603,6 +3813,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Overhead Press Day",
                 "روز پرس سرشانه",
+                "shoulders_traps",
                 (M.SHOULDERS, M.TRICEPS),
                 _slot(
                     "smith-machine-shoulder-press",
@@ -3620,6 +3831,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper Accessory",
                 "لوازم جانبی بالاتنه",
+                "upper",
                 (M.BACK, M.BICEPS, M.CHEST),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -3643,6 +3855,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Squat — Heavy",
                 "اسکوات سنگین",
+                "quadriceps_calves",
                 (M.QUADRICEPS, M.GLUTES),
                 _slot(
                     "barbell-back-squat",
@@ -3659,6 +3872,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Bench — Heavy",
                 "پرس سنگین",
+                "chest_triceps",
                 (M.CHEST, M.TRICEPS, M.SHOULDERS),
                 _slot(
                     "barbell-bench-press",
@@ -3675,6 +3889,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Deadlift — Heavy",
                 "ددلیفت سنگین",
+                "posterior_chain_core",
                 (M.HAMSTRINGS, M.BACK, M.GLUTES),
                 _slot(
                     "romanian-deadlift",
@@ -3691,6 +3906,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Press + Pull Accessory",
                 "لوازم پرس + کشش",
+                "upper",
                 (M.SHOULDERS, M.BACK, M.BICEPS),
                 _slot(
                     "smith-machine-shoulder-press",
@@ -3708,6 +3924,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Leg Accessory + Core",
                 "لوازم پا + میان‌تنه",
+                "other",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.ABS),
                 LEG_PRESS,
                 LEG_CURL,
@@ -3731,6 +3948,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Push — Heavy",
                 "پوش سنگین",
+                "push",
                 (M.CHEST, M.SHOULDERS, M.TRICEPS),
                 _slot(
                     "barbell-bench-press",
@@ -3754,6 +3972,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Pull — Heavy",
                 "پول سنگین",
+                "pull",
                 (M.BACK, M.BICEPS),
                 _slot(
                     "barbell-bent-over-row",
@@ -3770,6 +3989,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs — Heavy",
                 "پا سنگین",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 _slot(
                     "barbell-back-squat",
@@ -3792,6 +4012,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Push — Volume",
                 "پوش حجم",
+                "push",
                 (M.CHEST, M.SHOULDERS, M.TRICEPS),
                 INCLINE_CHEST,
                 CABLE_FLY,
@@ -3802,6 +4023,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Pull — Volume",
                 "پول حجم",
+                "pull",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 CABLE_PULLDOWN,
@@ -3811,6 +4033,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs — Volume",
                 "پا حجم",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
                 LEG_PRESS,
                 LEG_EXTENSION,
@@ -3835,6 +4058,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
                 CHEST,
                 BACK_ROW,
@@ -3845,6 +4069,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -3868,6 +4093,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
                 CHEST,
                 BACK_ROW,
@@ -3878,6 +4104,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -3887,6 +4114,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body C",
                 "تمام‌بدن C",
+                "full_body",
                 (M.SHOULDERS, M.BACK, M.QUADRICEPS, M.ABS),
                 SHOULDER_PRESS,
                 BACK_ROW,
@@ -3911,6 +4139,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
                 CHEST,
                 BACK_ROW,
@@ -3921,6 +4150,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -3931,6 +4161,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body C",
                 "تمام‌بدن C",
+                "full_body",
                 (M.SHOULDERS, M.BACK, M.QUADRICEPS, M.ABS),
                 SHOULDER_PRESS,
                 BACK_ROW,
@@ -3955,6 +4186,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper A",
                 "بالاتنه A",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
                 CHEST,
                 BACK_ROW,
@@ -3965,6 +4197,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower A",
                 "پایین‌تنه A",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 SQUAT,
                 RDL,
@@ -3974,6 +4207,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper B",
                 "بالاتنه B",
+                "upper",
                 (M.CHEST, M.BACK, M.BICEPS, M.TRICEPS),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -3983,6 +4217,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower B",
                 "پایین‌تنه B",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
                 LEG_PRESS,
                 LUNGE,
@@ -4007,6 +4242,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper A",
                 "بالاتنه A",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
                 BARBELL_BENCH,
                 BACK_ROW,
@@ -4017,6 +4253,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower A",
                 "پایین‌تنه A",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 SQUAT,
                 BARBELL_STRAIGHT_LEG_DEADLIFT,
@@ -4027,6 +4264,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper B",
                 "بالاتنه B",
+                "upper",
                 (M.CHEST, M.BACK, M.BICEPS, M.TRICEPS),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -4037,6 +4275,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower B",
                 "پایین‌تنه B",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
                 LEG_PRESS,
                 RDL,
@@ -4060,6 +4299,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Push",
                 "پوش",
+                "push",
                 (M.CHEST, M.SHOULDERS, M.TRICEPS),
                 CHEST,
                 SHOULDER_PRESS,
@@ -4069,6 +4309,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Pull",
                 "پول",
+                "pull",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -4078,6 +4319,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
                 SQUAT,
                 RDL,
@@ -4088,6 +4330,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper A",
                 "بالاتنه A",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
                 INCLINE_CHEST,
                 BACK_ROW,
@@ -4096,6 +4339,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper B",
                 "بالاتنه B",
+                "upper",
                 (M.BACK, M.BICEPS, M.TRICEPS),
                 LAT_PULLDOWN,
                 CABLE_FLY,
@@ -4118,6 +4362,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Push",
                 "پوش",
+                "push",
                 (M.CHEST, M.SHOULDERS, M.TRICEPS),
                 BARBELL_BENCH,
                 INCLINE_CHEST,
@@ -4128,6 +4373,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Pull",
                 "پول",
+                "pull",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -4138,6 +4384,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs",
                 "پا",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
                 SQUAT,
                 BARBELL_STRAIGHT_LEG_DEADLIFT,
@@ -4148,6 +4395,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS),
                 INCLINE_CHEST,
                 BACK_ROW,
@@ -4157,6 +4405,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.HAMSTRINGS, M.BACK, M.TRICEPS, M.ABS),
                 RDL,
                 LAT_PULLDOWN,
@@ -4180,6 +4429,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Push A",
                 "پوش A",
+                "push",
                 (M.CHEST, M.SHOULDERS, M.TRICEPS),
                 BARBELL_BENCH,
                 SHOULDER_PRESS,
@@ -4189,6 +4439,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Pull A",
                 "پول A",
+                "pull",
                 (M.BACK, M.BICEPS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -4198,6 +4449,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs A",
                 "پا A",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
                 SQUAT,
                 RDL,
@@ -4207,6 +4459,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Push B",
                 "پوش B",
+                "push",
                 (M.CHEST, M.SHOULDERS, M.TRICEPS),
                 INCLINE_CHEST,
                 CABLE_FLY,
@@ -4216,6 +4469,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Pull B",
                 "پول B",
+                "pull",
                 (M.BACK, M.BICEPS),
                 CABLE_PULLDOWN,
                 BACK_ROW,
@@ -4225,6 +4479,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Legs B",
                 "پا B",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
                 LEG_PRESS,
                 LEG_CURL,
@@ -4249,6 +4504,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
                 CHEST,
                 BACK_ROW,
@@ -4259,6 +4515,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -4283,6 +4540,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
                 CHEST,
                 BACK_ROW,
@@ -4293,6 +4551,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -4302,6 +4561,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body C",
                 "تمام‌بدن C",
+                "full_body",
                 (M.SHOULDERS, M.BACK, M.QUADRICEPS, M.ABS),
                 SHOULDER_PRESS,
                 BACK_ROW,
@@ -4325,6 +4585,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body A",
                 "تمام‌بدن A",
+                "full_body",
                 (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
                 CHEST,
                 BACK_ROW,
@@ -4335,6 +4596,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body B",
                 "تمام‌بدن B",
+                "full_body",
                 (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -4345,6 +4607,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Full Body C",
                 "تمام‌بدن C",
+                "full_body",
                 (M.SHOULDERS, M.BACK, M.QUADRICEPS, M.ABS),
                 SHOULDER_PRESS,
                 BACK_ROW,
@@ -4369,6 +4632,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper A",
                 "بالاتنه A",
+                "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
                 CHEST,
                 BACK_ROW,
@@ -4379,6 +4643,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower A",
                 "پایین‌تنه A",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
                 SQUAT,
                 RDL,
@@ -4388,6 +4653,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Upper B",
                 "بالاتنه B",
+                "upper",
                 (M.CHEST, M.BACK, M.BICEPS, M.TRICEPS),
                 INCLINE_CHEST,
                 LAT_PULLDOWN,
@@ -4397,6 +4663,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Lower B",
                 "پایین‌تنه B",
+                "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
                 LEG_PRESS,
                 LUNGE,
