@@ -16,9 +16,7 @@ _TYPE_CONSTRAINT = "ck_exercise_media_assets_role_media_type"
 
 
 def upgrade() -> None:
-    op.execute(
-        sa.text("DELETE FROM exercise_media_assets WHERE role = 'thumbnail'")
-    )
+    op.execute(sa.text("DELETE FROM exercise_media_assets WHERE role = 'thumbnail'"))
     op.drop_constraint(_TYPE_CONSTRAINT, "exercise_media_assets", type_="check")
     op.drop_constraint(_ROLE_CONSTRAINT, "exercise_media_assets", type_="check")
     op.create_check_constraint(

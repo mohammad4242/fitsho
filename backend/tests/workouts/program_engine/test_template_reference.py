@@ -403,9 +403,11 @@ def test_template_priority_stays_inside_flexible_range_with_duration_planning() 
     assert result.program is not None, result.errors
     assert result.program.aggregate_metrics["reference_template"] == reference.slug
     metric = result.program.aggregate_metrics["volume_ranges_by_muscle"]["chest"]
-    assert metric["acceptable_minimum"] <= metric["actual_effective_volume"] <= metric[
-        "acceptable_maximum"
-    ]
+    assert (
+        metric["acceptable_minimum"]
+        <= metric["actual_effective_volume"]
+        <= metric["acceptable_maximum"]
+    )
     assert result.program.validation_report.status is ValidationStatus.VALID_WITH_CONSTRAINTS
     assert result.program.validation_report.is_valid
 
@@ -760,9 +762,7 @@ def test_final_program_prefers_duration_feasible_template_regardless_of_input_or
     assert first.program == second.program
     assert first.program.aggregate_metrics["reference_template"] == feasible.slug
     selection = next(
-        entry
-        for entry in first.program.decision_trace
-        if entry["stage"] == "template_selection"
+        entry for entry in first.program.decision_trace if entry["stage"] == "template_selection"
     )
     assert tuple(item["slug"] for item in selection["candidates"]) == (
         feasible.slug,
@@ -790,9 +790,7 @@ def test_final_program_trims_duration_optional_slots_without_rejecting_template(
     assert result.program is not None, result.errors
     assert result.program.aggregate_metrics["reference_template"] == overloaded.slug
     adaptation = next(
-        entry
-        for entry in result.program.decision_trace
-        if entry["stage"] == "template_adaptation"
+        entry for entry in result.program.decision_trace if entry["stage"] == "template_adaptation"
     )
     assert adaptation["retained_core_slot_count"] == adaptation["core_slot_count"]
     assert "TEMPLATE_ACCESSORY_TRIMMED_FOR_TIME_LIMIT" in adaptation["reason_codes"]
@@ -845,7 +843,11 @@ def test_template_generation_is_deterministic_and_strictly_valid() -> None:
     assert first.program == second.program
     assert first.program.validation_report.is_valid
     assert all(
-        day.estimated_duration_minutes - RULESET.general_warmup_minutes
+        (
+            day.estimated_duration_minutes
+            - RULESET.general_warmup_minutes
+            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0)
+        )
         <= source.session_duration_minutes + 10
         for day in first.program.weekly_schedule
     )

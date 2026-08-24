@@ -66,9 +66,7 @@ def test_merges_owner_video_duplicate_into_existing_card(db: Session) -> None:
 
     report = merge_duplicate_exercises(db, apply=True)
 
-    stored = db.scalars(
-        select(Exercise).where(Exercise.name_en == "Barbell Bench Press")
-    ).all()
+    stored = db.scalars(select(Exercise).where(Exercise.name_en == "Barbell Bench Press")).all()
     db.refresh(canonical, ["media_assets"])
     assert report.merged_exercises == 1
     assert len(stored) == 1

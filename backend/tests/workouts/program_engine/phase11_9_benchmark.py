@@ -437,11 +437,14 @@ def _aggregate(
 def _duration_diagnostics(
     records: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
-    sessions = 0
-    within = 0
-    under = 0
-    over = 0
-    absolute_deviation = 0
+    sessions = 0.0
+    budget_fit = 0.0
+    overrun = 0.0
+    util = 0.0
+    legacy_within = 0.0
+    legacy_under = 0.0
+    legacy_over = 0.0
+    legacy_abs_dev = 0.0
     constrained_programs = 0
     repaired_programs = 0
     major_repair_programs = 0
@@ -493,19 +496,27 @@ def _duration_diagnostics(
     for record in successful_records:
         counts = _duration_counts_for_record(record)
         sessions += counts["sessions"]
-        within += counts["within"]
-        under += counts["under"]
-        over += counts["over"]
-        absolute_deviation += counts["absolute_deviation"]
+        budget_fit += counts["budget_fit"]
+        overrun += counts["overrun_minutes"]
+        util += counts["utilization_sum"]
+        legacy_within += counts["legacy_within"]
+        legacy_under += counts["legacy_under"]
+        legacy_over += counts["legacy_over"]
+        legacy_abs_dev += counts["legacy_absolute_deviation"]
+
     return {
         "programs": len(successful_records),
         "sessions": sessions,
-        "within_target_count": within,
-        "under_target_count": under,
-        "over_target_count": over,
-        "duration_fit_percentage": round(within / sessions * 100, 2) if sessions else None,
-        "constrained_duration_count": constrained_programs,
-        "average_absolute_deviation_minutes": round(absolute_deviation / sessions, 2)
+        "budget_fit_percentage": round(budget_fit / sessions * 100, 2) if sessions else None,
+        "average_overrun_minutes": round(overrun / sessions, 2) if sessions else None,
+        "average_utilization_percentage": round((util / sessions) * 100, 2) if sessions else None,
+        "legacy_within_target_count": legacy_within,
+        "legacy_under_target_count": legacy_under,
+        "legacy_over_target_count": legacy_over,
+        "legacy_duration_fit_percentage": round(legacy_within / sessions * 100, 2)
+        if sessions
+        else None,
+        "legacy_average_absolute_deviation_minutes": round(legacy_abs_dev / sessions, 2)
         if sessions
         else None,
         "late_duration_repair_percentage": round(
@@ -528,25 +539,40 @@ def _duration_diagnostics(
     }
 
 
-def _duration_counts_for_record(record: Mapping[str, object]) -> dict[str, int]:
+def _duration_counts_for_record(record: Mapping[str, object]) -> dict[str, float]:
     input_data = cast(Mapping[str, object], record["input"])
     final_program = cast(Mapping[str, object], record["final_program"])
     requested = cast(int, input_data["duration_minutes"])
     policy = get_session_duration_policy(requested)
-    counts = {"sessions": 0, "within": 0, "under": 0, "over": 0, "absolute_deviation": 0}
+    counts = {
+        "sessions": 0,
+        "budget_fit": 0.0,
+        "overrun_minutes": 0.0,
+        "utilization_sum": 0.0,
+        "legacy_within": 0.0,
+        "legacy_under": 0.0,
+        "legacy_over": 0.0,
+        "legacy_absolute_deviation": 0.0,
+    }
     for day in cast(Sequence[Mapping[str, object]], final_program.get("days", ())):
         total = cast(int, day["estimated_duration_minutes"])
         cardio_dict = cast(Mapping[str, object] | None, day.get("cardio"))
         cardio_mins = int(cardio_dict.get("duration_minutes", 0)) if cardio_dict else 0  # type: ignore
         workout = max(0, total - RULESET.general_warmup_minutes - cardio_mins)
         counts["sessions"] += 1
-        counts["absolute_deviation"] += abs(workout - requested)
+        if workout <= requested:
+            counts["budget_fit"] += 1
+        counts["overrun_minutes"] += max(0, workout - requested)
+        counts["utilization_sum"] += workout / requested if requested else 0
+
+        counts["legacy_absolute_deviation"] += abs(workout - requested)
         if workout < policy.minimum_minutes:
-            counts["under"] += 1
+            counts["legacy_under"] += 1
         elif workout > policy.maximum_minutes:
-            counts["over"] += 1
+            counts["legacy_over"] += 1
         else:
-            counts["within"] += 1
+            counts["legacy_within"] += 1
+
     return counts
 
 
@@ -558,13 +584,21 @@ def _duration_group_metrics(records: Sequence[Mapping[str, object]]) -> dict[str
     return {
         "programs": len(records),
         "sessions": sessions,
-        "within_target_count": totals["within"],
-        "under_target_count": totals["under"],
-        "over_target_count": totals["over"],
-        "duration_fit_percentage": round(totals["within"] / sessions * 100, 2)
+        "budget_fit_percentage": round(totals["budget_fit"] / sessions * 100, 2)
         if sessions
         else None,
-        "average_absolute_deviation_minutes": round(totals["absolute_deviation"] / sessions, 2)
+        "average_overrun_minutes": round(totals["overrun_minutes"] / sessions, 2)
+        if sessions
+        else None,
+        "average_utilization_percentage": round((totals["utilization_sum"] / sessions) * 100, 2)
+        if sessions
+        else None,
+        "legacy_duration_fit_percentage": round(totals["legacy_within"] / sessions * 100, 2)
+        if sessions
+        else None,
+        "legacy_average_absolute_deviation_minutes": round(
+            totals["legacy_absolute_deviation"] / sessions, 2
+        )
         if sessions
         else None,
     }
@@ -696,16 +730,19 @@ def _write_summary(payload: Mapping[str, object], output_dir: Path) -> None:
             "",
             "## Duration-first diagnostics",
             "",
+            (f"- Budget fit: {duration['budget_fit_percentage']}%"),
+            (f"- Average overrun: {duration['average_overrun_minutes']} minutes"),
+            (f"- Average utilization: {duration['average_utilization_percentage']}%"),
             (
-                f"- Within/under/over: {duration['within_target_count']}/"
-                f"{duration['under_target_count']}/{duration['over_target_count']}"
+                f"- Legacy within/under/over: {duration['legacy_within_target_count']}/"
+                f"{duration['legacy_under_target_count']}/{duration['legacy_over_target_count']}"
             ),
-            f"- Session duration fit: {duration['duration_fit_percentage']}%",
+            f"- Legacy duration fit: {duration['legacy_duration_fit_percentage']}%",
             (
-                "- Average absolute deviation: "
-                f"{duration['average_absolute_deviation_minutes']} minutes"
+                "- Legacy average absolute deviation: "
+                f"{duration['legacy_average_absolute_deviation_minutes']} minutes"
             ),
-            f"- Constrained programs: {duration['constrained_duration_count']}",
+            f"- Constrained programs: {duration['legacy_constrained_duration_count']}",
             f"- Late repair: {duration['late_duration_repair_percentage']}%",
             f"- Major late repair: {duration['major_late_repair_percentage']}%",
             (

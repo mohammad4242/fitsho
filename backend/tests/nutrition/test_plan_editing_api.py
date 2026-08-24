@@ -193,10 +193,13 @@ def test_physician_quantity_edit_rebinds_review_to_new_revision(
         for item in client.get("/api/v1/nutrition/physician/reviews").json()
         if item["plan_id"] == plan["id"]
     )
-    assert client.post(
-        f"/api/v1/nutrition/physician/reviews/{review['review_id']}/claim",
-        headers=ORIGIN,
-    ).status_code == 200
+    assert (
+        client.post(
+            f"/api/v1/nutrition/physician/reviews/{review['review_id']}/claim",
+            headers=ORIGIN,
+        ).status_code
+        == 200
+    )
     meal = plan["days"][0]["meals"][0]
     food = meal["foods"][0]
 

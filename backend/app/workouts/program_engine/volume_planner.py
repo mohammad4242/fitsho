@@ -291,14 +291,8 @@ def _limit_volume_to_duration_capacity(
     baseline_sets: dict[MuscleGroup, int],
     body_classifications: dict[MuscleGroup, str],
 ) -> WeeklyVolumePlan:
-    cardio_sessions = min(
-        len(split.day_focuses),
-        session_capacity.planned_cardio_sessions,
-    )
-    weekly_working_set_capacity = (
-        session_capacity.expected_working_set_capacity * cardio_sessions
-        + session_capacity.unreserved_working_set_capacity
-        * (len(split.day_focuses) - cardio_sessions)
+    weekly_working_set_capacity = session_capacity.expected_working_set_capacity * len(
+        split.day_focuses
     )
     secondary_credit_slots = (
         EXPECTED_COMPOUND_SECONDARY_MUSCLES
@@ -306,8 +300,7 @@ def _limit_volume_to_duration_capacity(
         else 1
     )
     effective_capacity = math.floor(
-        weekly_working_set_capacity
-        * (1 + secondary_credit_slots * ruleset.secondary_set_credit)
+        weekly_working_set_capacity * (1 + secondary_credit_slots * ruleset.secondary_set_credit)
     )
     floors = {
         target.muscle: min(

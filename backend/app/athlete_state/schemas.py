@@ -6,11 +6,11 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
-from app.profile.schemas import SessionDurationMinutes
 
 from app.body_analysis.enums import BodyArea
 from app.exercises.enums import MuscleGroup
 from app.profile.enums import HomeTrainingSetup, TrainingLocation
+from app.profile.schemas import SessionDurationMinutes
 from app.workout_cycles.enums import (
     WorkoutCycleWeeklyCheckInDifficulty,
     WorkoutCycleWeeklyCheckInRecovery,

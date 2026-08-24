@@ -61,9 +61,10 @@ def test_official_matrix_is_explicit_and_queryable(
     experience_level: ExperienceLevel,
     expected: tuple[ResistanceTrainingDayStatus, ...],
 ) -> None:
-    assert tuple(
-        resistance_training_day_status(experience_level, days) for days in range(2, 7)
-    ) == expected
+    assert (
+        tuple(resistance_training_day_status(experience_level, days) for days in range(2, 7))
+        == expected
+    )
 
 
 @pytest.mark.parametrize(
@@ -106,9 +107,7 @@ def test_profile_create_accepts_every_supported_matrix_cell(
 
 def test_profile_update_validates_a_pair_when_both_fields_are_supplied() -> None:
     with pytest.raises(ValidationError, match="resistance-training days"):
-        ProfileUpdate.model_validate(
-            {"experience_level": "advanced", "training_days_per_week": 2}
-        )
+        ProfileUpdate.model_validate({"experience_level": "advanced", "training_days_per_week": 2})
 
     update = ProfileUpdate.model_validate(
         {"experience_level": "first_month", "training_days_per_week": 4}

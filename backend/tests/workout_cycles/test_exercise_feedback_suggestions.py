@@ -33,9 +33,7 @@ def test_repeated_persistent_replacements_create_grouped_suggestion(
         "reason": "dislike",
         "scope": "persistent",
     }
-    first = client.post(
-        "/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload
-    )
+    first = client.post("/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload)
     second = client.post(
         "/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload
     )
@@ -83,9 +81,7 @@ def test_temporary_replacements_do_not_create_permanent_suggestions(
     )
     assert response.status_code == 201
 
-    suggestions = client.get(
-        f"/api/v1/workout-cycles/{cycle.id}/exercise-feedback-suggestions"
-    )
+    suggestions = client.get(f"/api/v1/workout-cycles/{cycle.id}/exercise-feedback-suggestions")
 
     assert suggestions.status_code == 200
     assert suggestions.json()["suggestions"] == []
@@ -145,9 +141,7 @@ def test_existing_persistent_state_is_reflected_in_suggestion(
     )
     assert response.status_code == 201
 
-    suggestions = client.get(
-        f"/api/v1/workout-cycles/{cycle.id}/exercise-feedback-suggestions"
-    )
+    suggestions = client.get(f"/api/v1/workout-cycles/{cycle.id}/exercise-feedback-suggestions")
 
     assert suggestions.status_code == 200
     suggestion = suggestions.json()["suggestions"][0]
@@ -177,9 +171,7 @@ def test_persistent_uncomfortable_maps_to_negative_preference_suggestion(
     )
     assert response.status_code == 201
 
-    suggestions = client.get(
-        f"/api/v1/workout-cycles/{cycle.id}/exercise-feedback-suggestions"
-    )
+    suggestions = client.get(f"/api/v1/workout-cycles/{cycle.id}/exercise-feedback-suggestions")
 
     assert suggestions.status_code == 200
     assert suggestions.json()["suggestions"][0]["suggestion_kind"] == (
@@ -263,7 +255,7 @@ def _replacement_for_test(
     prescribed_id: UUID,
     original_id: UUID,
     replacement_id: UUID,
-)-> WorkoutExerciseReplacement:
+) -> WorkoutExerciseReplacement:
     return WorkoutExerciseReplacement(
         user_id=user_id,
         cycle_id=cycle_id,

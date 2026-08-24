@@ -125,10 +125,10 @@ def test_admin_saves_encrypted_masked_credential_and_audits_without_secret(
             "timeout_seconds": 45,
             "minimum_confidence": 0.72,
             "max_cost_per_request": "0.15",
-                "routing_restrictions": [
-                    "deny_provider_data_collection",
-                    "zero_data_retention",
-                ],
+            "routing_restrictions": [
+                "deny_provider_data_collection",
+                "zero_data_retention",
+            ],
         },
     )
 

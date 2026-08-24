@@ -44,24 +44,33 @@ def test_exact_source_target_wins_over_name_hint() -> None:
 
 
 def test_explicit_chest_angles_classify_by_mechanics() -> None:
-    assert classify(
-        MuscleGroup.CHEST,
-        target="pectorals",
-        name="Dumbbell Incline Bench Press",
-        movement=MovementPattern.HORIZONTAL_PUSH,
-    ).focus is MuscleFocus.UPPER_CHEST
-    assert classify(
-        MuscleGroup.CHEST,
-        target="pectorals",
-        name="Barbell Bench Press",
-        movement=MovementPattern.HORIZONTAL_PUSH,
-    ).focus is MuscleFocus.MID_CHEST
-    assert classify(
-        MuscleGroup.CHEST,
-        target="pectorals",
-        name="Decline Dumbbell Bench Press",
-        movement=MovementPattern.HORIZONTAL_PUSH,
-    ).focus is MuscleFocus.LOWER_CHEST
+    assert (
+        classify(
+            MuscleGroup.CHEST,
+            target="pectorals",
+            name="Dumbbell Incline Bench Press",
+            movement=MovementPattern.HORIZONTAL_PUSH,
+        ).focus
+        is MuscleFocus.UPPER_CHEST
+    )
+    assert (
+        classify(
+            MuscleGroup.CHEST,
+            target="pectorals",
+            name="Barbell Bench Press",
+            movement=MovementPattern.HORIZONTAL_PUSH,
+        ).focus
+        is MuscleFocus.MID_CHEST
+    )
+    assert (
+        classify(
+            MuscleGroup.CHEST,
+            target="pectorals",
+            name="Decline Dumbbell Bench Press",
+            movement=MovementPattern.HORIZONTAL_PUSH,
+        ).focus
+        is MuscleFocus.LOWER_CHEST
+    )
 
 
 def test_shoulder_raise_and_press_mechanics_are_specific() -> None:
@@ -103,13 +112,16 @@ def test_core_rotation_records_move_from_abs_to_obliques() -> None:
 
 
 def test_unresolved_mechanics_return_none_instead_of_general() -> None:
-    assert classify(
-        MuscleGroup.CHEST,
-        target="pectorals",
-        name="Unknown press",
-        movement=MovementPattern.OTHER,
-        exercise_type=ExerciseType.OTHER,
-    ) is None
+    assert (
+        classify(
+            MuscleGroup.CHEST,
+            target="pectorals",
+            name="Unknown press",
+            movement=MovementPattern.OTHER,
+            exercise_type=ExerciseType.OTHER,
+        )
+        is None
+    )
 
 
 def test_reviewed_press_and_extension_variants_have_specific_focuses() -> None:
@@ -177,20 +189,26 @@ def test_reviewed_press_and_extension_variants_have_specific_focuses() -> None:
 
 
 def test_quadriceps_does_not_receive_a_focus_subcategory() -> None:
-    assert classify(
-        MuscleGroup.QUADRICEPS,
-        target="quadriceps",
-        name="Leg Extension",
-        movement=MovementPattern.KNEE_EXTENSION,
-        exercise_type=ExerciseType.ISOLATION,
-    ) is None
+    assert (
+        classify(
+            MuscleGroup.QUADRICEPS,
+            target="quadriceps",
+            name="Leg Extension",
+            movement=MovementPattern.KNEE_EXTENSION,
+            exercise_type=ExerciseType.ISOLATION,
+        )
+        is None
+    )
 
 
 def test_adductors_do_not_receive_a_focus_subcategory() -> None:
-    assert classify(
-        MuscleGroup.ADDUCTORS,
-        target="adductors",
-        name="Seated Hip Adduction",
-        movement=MovementPattern.HIP_ADDUCTION,
-        exercise_type=ExerciseType.ISOLATION,
-    ) is None
+    assert (
+        classify(
+            MuscleGroup.ADDUCTORS,
+            target="adductors",
+            name="Seated Hip Adduction",
+            movement=MovementPattern.HIP_ADDUCTION,
+            exercise_type=ExerciseType.ISOLATION,
+        )
+        is None
+    )

@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import get_args
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -30,6 +31,7 @@ from app.profile.enums import (
     TrainingLocation,
     WorkoutGenerationMethod,
 )
+from app.profile.schemas import SessionDurationMinutes
 
 
 class UserProfile(Base):
@@ -53,7 +55,7 @@ class UserProfile(Base):
             name="ck_user_profiles_limitations_length",
         ),
         CheckConstraint(
-            "session_duration_minutes IN (30, 45, 60, 75, 90, 120)",
+            f"session_duration_minutes IN ({', '.join(map(str, get_args(SessionDurationMinutes)))})",
             name="ck_user_profiles_session_duration_values",
         ),
         CheckConstraint(
@@ -71,9 +73,14 @@ class UserProfile(Base):
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
     product_mode: Mapped[ProductMode] = mapped_column(
-        Enum(ProductMode, native_enum=False, create_constraint=True, validate_strings=True,
-             values_callable=lambda members: [member.value for member in members],
-             name="ck_user_profiles_product_mode_values"),
+        Enum(
+            ProductMode,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=lambda members: [member.value for member in members],
+            name="ck_user_profiles_product_mode_values",
+        ),
         default=ProductMode.TRAINING,
         nullable=False,
     )

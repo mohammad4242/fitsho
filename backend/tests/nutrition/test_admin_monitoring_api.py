@@ -61,9 +61,7 @@ def test_admin_can_trigger_manual_price_update_without_live_credentials(
         ).status_code
         == 201
     )
-    assert (
-        client.post("/api/v1/nutrition/admin/prices/refresh", headers=ORIGIN).status_code == 403
-    )
+    assert client.post("/api/v1/nutrition/admin/prices/refresh", headers=ORIGIN).status_code == 403
     user = db.scalar(select(User).where(User.email == "price-admin@example.com"))
     assert user is not None
     user.is_admin = True

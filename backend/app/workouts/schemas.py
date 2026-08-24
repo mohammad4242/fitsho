@@ -27,8 +27,8 @@ from app.profile.enums import (
     TrainingCaution,
     TrainingLocation,
 )
-from app.profile.training_compatibility import SUPPORTED_RESISTANCE_TRAINING_DAYS
 from app.profile.schemas import SessionDurationMinutes
+from app.profile.training_compatibility import SUPPORTED_RESISTANCE_TRAINING_DAYS
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.program_engine.enums import (
     ActivityLevel,

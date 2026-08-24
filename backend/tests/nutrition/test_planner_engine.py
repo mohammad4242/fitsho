@@ -153,16 +153,12 @@ def test_prepared_recipe_optimizer_changes_raw_inputs_but_returns_cooked_dish() 
     assert Decimal(high_protein_inputs[beef_id]) >= Decimal(economical_inputs[beef_id])
     assert Decimal("80") <= Decimal(economical_inputs[beef_id]) <= Decimal("140")
     assert Decimal("40") <= Decimal(economical_inputs[peas_id]) <= Decimal("70")
-    economical_ratio = Decimal(economical_inputs[beef_id]) / Decimal(
-        economical_inputs[peas_id]
-    )
+    economical_ratio = Decimal(economical_inputs[beef_id]) / Decimal(economical_inputs[peas_id])
     assert Decimal("1.5") <= economical_ratio <= Decimal("3")
     assert Decimal(high_protein_inputs[beef_id]) / Decimal(high_protein_inputs[peas_id]) <= 3
     assert high_protein.recipe_snapshot["calculation_version"] == "prepared-recipe-v1"
     assert high_protein.recipe_snapshot["verification_status"] == "draft"
-    assert high_protein.recipe_snapshot["provenance"] == {
-        "source_name": "Internal recipe source"
-    }
+    assert high_protein.recipe_snapshot["provenance"] == {"source_name": "Internal recipe source"}
     assert high_protein.recipe_snapshot["data_gaps"] == [
         {"message_fa": "شکاف داخلی", "message_en": "Internal gap"}
     ]
@@ -302,10 +298,7 @@ def test_weekly_budget_repairs_prepared_recipes_to_cheaper_valid_variants() -> N
     assert result.outcome is GenerationOutcome.SUCCESS
     assert result.weekly_cost_irr <= Decimal(inputs.weekly_budget_irr)
     recipes = [
-        meal.foods[0]
-        for day_result in result.days
-        for meal in day_result.meals
-        if meal.foods
+        meal.foods[0] for day_result in result.days for meal in day_result.meals if meal.foods
     ]
     assert all(recipe_food.item_kind == "prepared_recipe" for recipe_food in recipes)
     for recipe_food in recipes:

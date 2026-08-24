@@ -327,9 +327,7 @@ def upgrade() -> None:
                 ),
                 "source_reference": source_url,
                 "source_date": (
-                    date(2019, 3, 5)
-                    if source_id == "nasem-sodium-potassium-2019"
-                    else None
+                    date(2019, 3, 5) if source_id == "nasem-sodium-potassium-2019" else None
                 ),
                 "access_date": ACCESS_DATE,
                 "source_id": source_id,
@@ -367,7 +365,16 @@ def upgrade() -> None:
         ("vitamin_b12", "rda", "2.4", "mcg", 18, None, "all", "nih-ods-vitamin_b12"),
         ("folate", "rda", "400", "mcg_dfe", 18, None, "all", "nih-ods-folate"),
         ("sodium", "ai", "1500", "mg", 18, None, "all", "nasem-sodium-potassium-2019"),
-        ("sodium", "cdrr", "2300", "mg", 18, None, "all", "nasem-sodium-potassium-2019",),
+        (
+            "sodium",
+            "cdrr",
+            "2300",
+            "mg",
+            18,
+            None,
+            "all",
+            "nasem-sodium-potassium-2019",
+        ),
     ]
     for item in core:
         add(*item)

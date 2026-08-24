@@ -87,9 +87,7 @@ def upgrade() -> None:
         sa.Column(
             "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
         ),
-        sa.ForeignKeyConstraint(
-            ["user_id"], ["nutrition_profiles.user_id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["user_id"], ["nutrition_profiles.user_id"], ondelete="CASCADE"),
         sa.CheckConstraint(
             "(trains = false AND exercise_type IS NULL AND days_per_week IS NULL "
             "AND minutes_per_session IS NULL AND intensity IS NULL) OR "
@@ -134,9 +132,7 @@ def upgrade() -> None:
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
         ),
-        sa.ForeignKeyConstraint(
-            ["user_id"], ["nutrition_profiles.user_id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["user_id"], ["nutrition_profiles.user_id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
             ["safety_decision_id"], ["nutrition_safety_decisions.id"], ondelete="RESTRICT"
         ),
@@ -188,9 +184,7 @@ def upgrade() -> None:
         sa.Column("applicable_population", sa.String(length=200), nullable=False),
         sa.Column("rounding_rule", sa.String(length=100), nullable=False),
         sa.Column("explanation_codes", sa.JSON(), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["estimate_id"], ["nutrition_estimates.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["estimate_id"], ["nutrition_estimates.id"], ondelete="CASCADE"),
         sa.CheckConstraint(
             f"metric IN ({metrics})",
             name="ck_nutrition_estimate_targets_metric_values",

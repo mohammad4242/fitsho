@@ -175,7 +175,11 @@ def test_priority_program_reports_measurable_emphasis_and_frequency_for_each_pri
     assert priority.program is not None, priority.errors
     assert len(priority.program.weekly_schedule) == 6
     workout_durations = tuple(
-        day.estimated_duration_minutes - RULESET.general_warmup_minutes
+        (
+            day.estimated_duration_minutes
+            - RULESET.general_warmup_minutes
+            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0)
+        )
         for day in priority.program.weekly_schedule
     )
     assert all(duration <= 55 for duration in workout_durations)

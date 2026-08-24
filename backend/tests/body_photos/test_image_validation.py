@@ -23,9 +23,13 @@ def _jpeg(
 
 
 def _upload(content: bytes, content_type: str = "image/jpeg") -> UploadFile:
-    return UploadFile(filename="headless.jpg", file=BytesIO(content), headers={
-        "content-type": content_type,
-    })
+    return UploadFile(
+        filename="headless.jpg",
+        file=BytesIO(content),
+        headers={
+            "content-type": content_type,
+        },
+    )
 
 
 def test_accepts_standardized_headless_photo_without_crop_evidence() -> None:

@@ -292,10 +292,13 @@ def test_assigned_physician_can_list_and_review_member_labs(
         for item in client.get("/api/v1/nutrition/physician/reviews").json()
         if item["plan_id"] == plan["id"]
     )
-    assert client.post(
-        f"/api/v1/nutrition/physician/reviews/{review['review_id']}/claim",
-        headers=ORIGIN,
-    ).status_code == 200
+    assert (
+        client.post(
+            f"/api/v1/nutrition/physician/reviews/{review['review_id']}/claim",
+            headers=ORIGIN,
+        ).status_code
+        == 200
+    )
 
     listed = client.get(f"/api/v1/nutrition/physician/plans/{plan['id']}/labs")
     reviewed = client.put(

@@ -354,12 +354,15 @@ def test_database_failure_rolls_back_rows_and_removes_newly_published_media(
         )
         == 1
     )
-    assert db.scalar(
-        select(ExerciseMediaAsset).where(
-            ExerciseMediaAsset.source == "owner-video",
-            ExerciseMediaAsset.source_id == source_id,
+    assert (
+        db.scalar(
+            select(ExerciseMediaAsset).where(
+                ExerciseMediaAsset.source == "owner-video",
+                ExerciseMediaAsset.source_id == source_id,
+            )
         )
-    ) is None
+        is None
+    )
     accepted = settings.media_root / "owner-video" / source_id[:2] / f"{source_id}.mp4"
     assert not accepted.exists()
 
@@ -396,18 +399,24 @@ def test_failed_video_does_not_stop_the_next_video(
     assert first is not None
     assert first.needs_review is True
     assert first.is_programmable is False
-    assert db.scalar(
-        select(ExerciseMediaAsset).where(
-            ExerciseMediaAsset.source == "owner-video",
-            ExerciseMediaAsset.source_id == first_id,
+    assert (
+        db.scalar(
+            select(ExerciseMediaAsset).where(
+                ExerciseMediaAsset.source == "owner-video",
+                ExerciseMediaAsset.source_id == first_id,
+            )
         )
-    ) is not None
-    assert db.scalar(
-        select(Exercise).where(
-            Exercise.source == "owner-video",
-            Exercise.source_id == second_id,
+        is not None
+    )
+    assert (
+        db.scalar(
+            select(Exercise).where(
+                Exercise.source == "owner-video",
+                Exercise.source_id == second_id,
+            )
         )
-    ) is not None
+        is not None
+    )
 
 
 def test_dry_run_limit_reports_all_files_without_database_or_media_writes(

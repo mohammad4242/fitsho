@@ -69,7 +69,12 @@ def test_final_program_duration_matrix_is_valid(goal: Goal, duration: int) -> No
     assert program.validation_report.is_valid
     assert len(program.weekly_schedule) == 3
     resistance_time_budget_fit = all(
-        day.estimated_duration_minutes - RULESET.general_warmup_minutes <= policy.maximum_minutes
+        (
+            day.estimated_duration_minutes
+            - RULESET.general_warmup_minutes
+            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0)
+        )
+        <= policy.maximum_minutes
         for day in program.weekly_schedule
     )
     assert (

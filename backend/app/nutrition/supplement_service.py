@@ -370,9 +370,7 @@ def update_order(
     if plan is None or supplement is None or supplement.verification_status != "verified":
         raise SupplementError("VERIFIED_SUPPLEMENT_OR_PLAN_NOT_FOUND")
     daily_units = Decimal(str(payload["daily_units"]))
-    exposure = _safety_check(
-        db, plan, supplement, daily_units, excluding_order_id=row.id
-    )
+    exposure = _safety_check(db, plan, supplement, daily_units, excluding_order_id=row.id)
     starts_on = cast(date | None, payload.get("starts_on")) or row.starts_on or date.today()
     duration_days = int(str(payload["duration_days"]))
     row.supplement_id = supplement.id

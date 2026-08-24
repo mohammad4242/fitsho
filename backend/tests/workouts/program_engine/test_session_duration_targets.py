@@ -223,7 +223,12 @@ def test_generate_program_keeps_every_session_inside_duration_target(requested: 
     policy = get_session_duration_policy(requested)
     # Phase 11.9: Target is satisfied as long as resistance budget is not exceeded
     assert all(
-        day.estimated_duration_minutes - RULESET.general_warmup_minutes <= policy.maximum_minutes
+        (
+            day.estimated_duration_minutes
+            - RULESET.general_warmup_minutes
+            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0)
+        )
+        <= policy.maximum_minutes
         for day in result.program.weekly_schedule
     )
 
@@ -407,7 +412,8 @@ def test_unsupported_target_fails_explicitly_instead_of_returning_short_session(
     with pytest.raises(ValidationError) as exc_info:
         request(session_duration_minutes=180, available_training_days=1)
 
-    assert "not an official supported value" in str(exc_info.value)
+    assert "Input should be" in str(exc_info.value)
+    assert "30, 45" in str(exc_info.value)
 
 
 def test_final_validator_rejects_underfilled_session() -> None:

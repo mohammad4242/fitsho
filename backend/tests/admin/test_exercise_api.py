@@ -194,9 +194,7 @@ def test_delete_requires_trusted_origin(
     assert response.json() == {"detail": "Untrusted request origin"}
 
 
-def test_admin_deletes_an_exercise_used_in_a_workout_plan(
-    client: TestClient, db: Session
-) -> None:
+def test_admin_deletes_an_exercise_used_in_a_workout_plan(client: TestClient, db: Session) -> None:
     admin = make_current_user_admin(client, db)
     created = post_exercise(client, exercise_payload())
     assert created.status_code == 201
@@ -241,9 +239,10 @@ def test_admin_deletes_an_exercise_used_in_a_workout_plan(
     assert response.status_code == 204
     assert db.get(Exercise, exercise.id) is None
     assert db.get(WorkoutPlan, plan.id) is not None
-    assert db.scalar(
-        select(WorkoutPlanExercise).where(WorkoutPlanExercise.exercise_id == exercise.id)
-    ) is None
+    assert (
+        db.scalar(select(WorkoutPlanExercise).where(WorkoutPlanExercise.exercise_id == exercise.id))
+        is None
+    )
 
 
 def test_admin_list_includes_inactive_exercises(
@@ -809,9 +808,7 @@ def test_admin_can_create_new_taxonomy_muscle_groups(
 
     assert response.status_code == 201
     assert response.json()["primary_muscle"] == primary_muscle
-    assert response.json()["muscle_focus"] == (
-        "lower_back" if slug == "back-extension" else None
-    )
+    assert response.json()["muscle_focus"] == ("lower_back" if slug == "back-extension" else None)
 
 
 def test_create_rejects_browser_supplied_media_path(

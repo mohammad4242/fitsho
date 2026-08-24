@@ -36,11 +36,7 @@ def build_coach_template_selection(
     ):
         return None
     candidate = next(
-        (
-            item
-            for item in candidates
-            if isinstance(item, dict) and item.get("slug") == selected
-        ),
+        (item for item in candidates if isinstance(item, dict) and item.get("slug") == selected),
         None,
     )
     if candidate is None:
@@ -84,13 +80,7 @@ def _score(value: object) -> CoachTemplateSelectionScoreResponse | None:
     if total is None or any(component is None for component in components):
         return None
     priority, body_analysis, goal, sex, fallback = components
-    if (
-        priority is None
-        or body_analysis is None
-        or goal is None
-        or sex is None
-        or fallback is None
-    ):
+    if priority is None or body_analysis is None or goal is None or sex is None or fallback is None:
         return None
     if total != priority + body_analysis + goal + sex + fallback:
         return None

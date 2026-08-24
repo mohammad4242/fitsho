@@ -58,9 +58,7 @@ def upgrade() -> None:
         sa.Column(
             "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
         ),
-        sa.CheckConstraint(
-            "attempt_count >= 0", name="ck_body_analyses_attempt_count_nonnegative"
-        ),
+        sa.CheckConstraint("attempt_count >= 0", name="ck_body_analyses_attempt_count_nonnegative"),
         sa.CheckConstraint(
             "input_tokens IS NULL OR input_tokens >= 0",
             name="ck_body_analyses_input_tokens_nonnegative",
@@ -70,8 +68,7 @@ def upgrade() -> None:
             name="ck_body_analyses_output_tokens_nonnegative",
         ),
         sa.CheckConstraint(
-            "overall_confidence IS NULL OR "
-            "(overall_confidence >= 0 AND overall_confidence <= 1)",
+            "overall_confidence IS NULL OR (overall_confidence >= 0 AND overall_confidence <= 1)",
             name="ck_body_analyses_overall_confidence_range",
         ),
         sa.CheckConstraint("revision > 0", name="ck_body_analyses_revision_positive"),
@@ -82,9 +79,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["replaces_analysis_id"], ["body_analyses.id"], ondelete="SET NULL"
         ),
-        sa.ForeignKeyConstraint(
-            ["session_id"], ["body_photo_sessions.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["session_id"], ["body_photo_sessions.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("session_id", "revision", name="uq_body_analyses_session_revision"),
     )

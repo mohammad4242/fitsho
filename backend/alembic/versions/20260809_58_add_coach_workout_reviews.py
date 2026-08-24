@@ -39,9 +39,7 @@ def upgrade() -> None:
         sa.Column("draft_payload", sa.JSON(), nullable=True),
         sa.Column("draft_revision", sa.Integer(), server_default="1", nullable=False),
         sa.Column("approved_plan_id", sa.Uuid(), nullable=True),
-        sa.Column(
-            "approved_at", sa.DateTime(timezone=True), nullable=True
-        ),
+        sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
         ),
@@ -67,18 +65,12 @@ def upgrade() -> None:
             "lease_expires_at IS NULL OR lease_expires_at > lease_acquired_at",
             name="ck_workout_plan_reviews_lease_range",
         ),
-        sa.ForeignKeyConstraint(
-            ["approved_plan_id"], ["workout_plans.id"], ondelete="SET NULL"
-        ),
-        sa.ForeignKeyConstraint(
-            ["claimed_by_user_id"], ["users.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["approved_plan_id"], ["workout_plans.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["claimed_by_user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["source_plan_id"], ["workout_plans.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "approved_plan_id", name="uq_workout_plan_reviews_approved_plan_id"
-        ),
+        sa.UniqueConstraint("approved_plan_id", name="uq_workout_plan_reviews_approved_plan_id"),
         sa.UniqueConstraint("source_plan_id", name="uq_workout_plan_reviews_source_plan_id"),
     )
     op.create_index(
@@ -86,18 +78,12 @@ def upgrade() -> None:
         "workout_plan_reviews",
         ["claimed_by_user_id"],
     )
-    op.create_index(
-        "ix_workout_plan_reviews_status", "workout_plan_reviews", ["status"]
-    )
-    op.create_index(
-        "ix_workout_plan_reviews_user_id", "workout_plan_reviews", ["user_id"]
-    )
+    op.create_index("ix_workout_plan_reviews_status", "workout_plan_reviews", ["status"])
+    op.create_index("ix_workout_plan_reviews_user_id", "workout_plan_reviews", ["user_id"])
 
 
 def downgrade() -> None:
     op.drop_index("ix_workout_plan_reviews_user_id", table_name="workout_plan_reviews")
     op.drop_index("ix_workout_plan_reviews_status", table_name="workout_plan_reviews")
-    op.drop_index(
-        "ix_workout_plan_reviews_claimed_by_user_id", table_name="workout_plan_reviews"
-    )
+    op.drop_index("ix_workout_plan_reviews_claimed_by_user_id", table_name="workout_plan_reviews")
     op.drop_table("workout_plan_reviews")

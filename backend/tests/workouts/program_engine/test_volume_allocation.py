@@ -11,10 +11,9 @@ from app.exercises.enums import (
     MovementPattern,
     MuscleGroup,
 )
-from app.workouts.program_engine.duration_policy import (
-    get_session_duration_policy,
-    calculate_resistance_minutes,
-)
+from app.workouts.program_engine.duration_policy import get_session_duration_policy
+
+
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.prescription import estimate_exercise_minutes
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET

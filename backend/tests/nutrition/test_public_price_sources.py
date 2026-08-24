@@ -95,14 +95,11 @@ def test_matching_rejects_seed_snacks_and_pet_food_false_positives() -> None:
         )
 
     watermelon = CanonicalFoodIdentity("watermelon", "هندوانه", "fruit", ("هندوانه",))
-    white_fish = CanonicalFoodIdentity(
-        "white-fish", "ماهی سفید", "protein", ("ماهی سفید",)
-    )
+    white_fish = CanonicalFoodIdentity("white-fish", "ماهی سفید", "protein", ("ماهی سفید",))
 
     assert match_candidate(watermelon, candidate("تخمه هندوانه 500 گرم")).accepted is False
     assert (
-        match_candidate(white_fish, candidate("غذای گربه پوچ ماهی سفید 85 گرم")).accepted
-        is False
+        match_candidate(white_fish, candidate("غذای گربه پوچ ماهی سفید 85 گرم")).accepted is False
     )
     false_matches = (
         ("سیب", "fruit", "سرکه سیب طبیعی 1 لیتر"),

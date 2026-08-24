@@ -66,9 +66,7 @@ def test_older_adult_met_uses_the_older_compendium_baseline() -> None:
         met_baseline_kcal_per_kg_hour=Decimal("0.810"),
     )
 
-    result = scientific.calculate_targets(
-        make_inputs(age=65, structured_exercise=exercise)
-    )
+    result = scientific.calculate_targets(make_inputs(age=65, structured_exercise=exercise))
 
     assert result.exercise_energy.preferred == Decimal("80.19")
 

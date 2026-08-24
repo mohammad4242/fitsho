@@ -419,9 +419,9 @@ def test_public_price_provider_registry_is_seeded_disabled_until_live_probe(db) 
     ]
     assert all(provider.enabled is False for provider in providers)
     assert all(provider.minimum_sources == 3 for provider in providers)
-    assert next(provider for provider in providers if provider.code == "tapsi_shop").parser_version == (
-        "tapsi-guest-v1"
-    )
+    assert next(
+        provider for provider in providers if provider.code == "tapsi_shop"
+    ).parser_version == ("tapsi-guest-v1")
 
 
 def test_first_public_run_discovers_mappings_and_accepts_three_source_mean(db) -> None:

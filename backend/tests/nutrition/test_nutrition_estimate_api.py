@@ -81,30 +81,42 @@ def create_nutrition_member(
     safety: dict[str, object] | None = None,
 ) -> None:
     register(client, email)
-    assert client.post(
-        "/api/v1/profile/mode", headers=ORIGIN, json={"product_mode": "nutrition"}
-    ).status_code == 201
-    assert client.put(
-        "/api/v1/profile/shared",
-        headers=ORIGIN,
-        json={
-            "display_name": "سارا",
-            "birth_date": adult_birth_date(),
-            "sex": "female",
-            "height_cm": 165,
-            "current_weight_kg": 62.5,
-            "fitness_goal": goal,
-        },
-    ).status_code == 200
-    assert client.put(
-        "/api/v1/nutrition/safety",
-        headers=ORIGIN,
-        json=safety or safety_payload(),
-    ).status_code == 200
+    assert (
+        client.post(
+            "/api/v1/profile/mode", headers=ORIGIN, json={"product_mode": "nutrition"}
+        ).status_code
+        == 201
+    )
+    assert (
+        client.put(
+            "/api/v1/profile/shared",
+            headers=ORIGIN,
+            json={
+                "display_name": "سارا",
+                "birth_date": adult_birth_date(),
+                "sex": "female",
+                "height_cm": 165,
+                "current_weight_kg": 62.5,
+                "fitness_goal": goal,
+            },
+        ).status_code
+        == 200
+    )
+    assert (
+        client.put(
+            "/api/v1/nutrition/safety",
+            headers=ORIGIN,
+            json=safety or safety_payload(),
+        ).status_code
+        == 200
+    )
     if safety is None:
-        assert client.put(
-            "/api/v1/nutrition/profile", headers=ORIGIN, json=nutrition_payload()
-        ).status_code == 200
+        assert (
+            client.put(
+                "/api/v1/nutrition/profile", headers=ORIGIN, json=nutrition_payload()
+            ).status_code
+            == 200
+        )
 
 
 def test_nutrition_only_no_training_creates_an_idempotent_estimate(
@@ -163,9 +175,12 @@ def test_nutrition_only_training_requires_complete_details(client: TestClient) -
 
 def test_combined_mode_reuses_training_profile_for_exercise(client: TestClient) -> None:
     register(client, "estimate-both@example.com")
-    assert client.post(
-        "/api/v1/profile/mode", headers=ORIGIN, json={"product_mode": "both"}
-    ).status_code == 201
+    assert (
+        client.post(
+            "/api/v1/profile/mode", headers=ORIGIN, json={"product_mode": "both"}
+        ).status_code
+        == 201
+    )
     profile = {
         "display_name": "محمد",
         "birth_date": adult_birth_date(),
@@ -185,12 +200,16 @@ def test_combined_mode_reuses_training_profile_for_exercise(client: TestClient) 
         "physical_limitations": None,
     }
     assert client.post("/api/v1/profile", headers=ORIGIN, json=profile).status_code == 201
-    assert client.put(
-        "/api/v1/nutrition/safety", headers=ORIGIN, json=safety_payload()
-    ).status_code == 200
-    assert client.put(
-        "/api/v1/nutrition/profile", headers=ORIGIN, json=nutrition_payload()
-    ).status_code == 200
+    assert (
+        client.put("/api/v1/nutrition/safety", headers=ORIGIN, json=safety_payload()).status_code
+        == 200
+    )
+    assert (
+        client.put(
+            "/api/v1/nutrition/profile", headers=ORIGIN, json=nutrition_payload()
+        ).status_code
+        == 200
+    )
 
     resolved = client.get("/api/v1/nutrition/structured-exercise")
     estimate = client.post("/api/v1/nutrition/estimates", headers=ORIGIN)
@@ -215,11 +234,14 @@ def test_no_training_muscle_goal_returns_reselection_error(client: TestClient) -
         "estimate-invalid-goal@example.com",
         goal="build_muscle",
     )
-    assert client.put(
-        "/api/v1/nutrition/structured-exercise",
-        headers=ORIGIN,
-        json={"trains": False},
-    ).status_code == 200
+    assert (
+        client.put(
+            "/api/v1/nutrition/structured-exercise",
+            headers=ORIGIN,
+            json={"trains": False},
+        ).status_code
+        == 200
+    )
 
     response = client.post("/api/v1/nutrition/estimates", headers=ORIGIN)
 
@@ -248,7 +270,8 @@ def test_estimate_mutations_require_authentication_and_trusted_origin(
     assert client.post("/api/v1/nutrition/estimates", headers=ORIGIN).status_code == 401
     create_nutrition_member(client, "estimate-origin@example.com")
 
-    assert client.put(
-        "/api/v1/nutrition/structured-exercise", json={"trains": False}
-    ).status_code == 403
+    assert (
+        client.put("/api/v1/nutrition/structured-exercise", json={"trains": False}).status_code
+        == 403
+    )
     assert client.post("/api/v1/nutrition/estimates").status_code == 403

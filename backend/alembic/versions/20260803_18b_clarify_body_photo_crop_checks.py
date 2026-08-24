@@ -63,9 +63,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DELETE FROM body_photo_storage_cleanups WHERE reason = 'failed_upload_rollback'"
-    )
+    op.execute("DELETE FROM body_photo_storage_cleanups WHERE reason = 'failed_upload_rollback'")
     op.drop_constraint(
         "ck_body_photo_storage_cleanups_reason_values",
         "body_photo_storage_cleanups",

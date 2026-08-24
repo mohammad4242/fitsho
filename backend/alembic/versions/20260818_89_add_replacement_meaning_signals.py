@@ -95,12 +95,8 @@ def upgrade() -> None:
             ["workout_plan_exercises.id"],
             ondelete="RESTRICT",
         ),
-        sa.ForeignKeyConstraint(
-            ["original_exercise_id"], ["exercises.id"], ondelete="RESTRICT"
-        ),
-        sa.ForeignKeyConstraint(
-            ["replacement_exercise_id"], ["exercises.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["original_exercise_id"], ["exercises.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["replacement_exercise_id"], ["exercises.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
             ["source_replacement_id"],
             ["workout_exercise_replacements.id"],

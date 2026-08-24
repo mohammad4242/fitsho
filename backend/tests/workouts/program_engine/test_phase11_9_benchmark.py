@@ -1,4 +1,3 @@
-from typing import cast
 from collections import Counter
 
 import tests.workouts.program_engine.phase11_benchmark as phase11
@@ -99,12 +98,17 @@ def test_phase11_9_duration_diagnostics_use_workout_minutes_and_repair_trace() -
     diagnostics = _duration_diagnostics(records)
 
     assert diagnostics["sessions"] == 2
-    assert diagnostics["within_target_count"] == 1
-    assert diagnostics["over_target_count"] == 1
-    assert diagnostics["average_absolute_deviation_minutes"] == 7.5
+    assert diagnostics["legacy_within_target_count"] == 1
+    assert diagnostics["legacy_over_target_count"] == 1
+    assert diagnostics["legacy_average_absolute_deviation_minutes"] == 7.5
+    assert diagnostics["budget_fit_percentage"] == 50.0
+    assert diagnostics["average_overrun_minutes"] == 7.5
     assert diagnostics["late_duration_repair_percentage"] == 100.0
     assert diagnostics["major_late_repair_percentage"] == 0.0
     assert diagnostics["proven_duration_template_rejections"] == 1
-    assert diagnostics["breakdowns"]["requested_duration"]["30"][  # type: ignore
-        "duration_fit_percentage"
-    ] == 50.0
+    assert (
+        diagnostics["breakdowns"]["requested_duration"]["30"][  # type: ignore
+            "legacy_duration_fit_percentage"
+        ]
+        == 50.0
+    )

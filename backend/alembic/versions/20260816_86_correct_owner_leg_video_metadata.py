@@ -204,13 +204,17 @@ def upgrade() -> None:
     rows_by_source_id = {}
     missing_source_ids = []
     for source_id in CORRECTIONS:
-        row = connection.execute(
-            sa.text(
-                "SELECT id, source_metadata_en FROM exercises "
-                "WHERE source = 'owner-video' AND source_id = :source_id"
-            ),
-            {"source_id": source_id},
-        ).mappings().first()
+        row = (
+            connection.execute(
+                sa.text(
+                    "SELECT id, source_metadata_en FROM exercises "
+                    "WHERE source = 'owner-video' AND source_id = :source_id"
+                ),
+                {"source_id": source_id},
+            )
+            .mappings()
+            .first()
+        )
         if row is None:
             missing_source_ids.append(source_id)
             continue
@@ -299,13 +303,17 @@ def upgrade() -> None:
 def downgrade() -> None:
     connection = op.get_bind()
     for source_id in CORRECTIONS:
-        row = connection.execute(
-            sa.text(
-                "SELECT id FROM exercises "
-                "WHERE source = 'owner-video' AND source_id = :source_id"
-            ),
-            {"source_id": source_id},
-        ).mappings().first()
+        row = (
+            connection.execute(
+                sa.text(
+                    "SELECT id FROM exercises "
+                    "WHERE source = 'owner-video' AND source_id = :source_id"
+                ),
+                {"source_id": source_id},
+            )
+            .mappings()
+            .first()
+        )
         if row is None:
             continue
         connection.execute(

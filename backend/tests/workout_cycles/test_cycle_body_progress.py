@@ -60,9 +60,7 @@ def test_measurement_cannot_attach_to_another_users_cycle(
     user_id = _register(client, f"cycle-measurement-owner-{uuid4()}@example.com")
     _create_profile(client)
     other = _user(db)
-    _plan, _prescribed, other_cycle, _original, _safe, _unsafe = _plan_with_cycle(
-        db, other.id
-    )
+    _plan, _prescribed, other_cycle, _original, _safe, _unsafe = _plan_with_cycle(db, other.id)
     assert other_cycle is not None
 
     response = client.patch(
@@ -104,9 +102,7 @@ def test_photo_session_cannot_attach_to_another_users_cycle(
 ) -> None:
     _register(client, f"cycle-photo-owner-{uuid4()}@example.com")
     other = _user(db)
-    _plan, _prescribed, other_cycle, _original, _safe, _unsafe = _plan_with_cycle(
-        db, other.id
-    )
+    _plan, _prescribed, other_cycle, _original, _safe, _unsafe = _plan_with_cycle(db, other.id)
     assert other_cycle is not None
 
     response = client.post(

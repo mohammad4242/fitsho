@@ -43,9 +43,7 @@ def test_lab_download_requires_short_lived_actor_bound_grant(
     document_id = uploaded.json()["id"]
 
     assert client.get(f"/api/v1/nutrition/labs/{document_id}/file").status_code == 403
-    grant = client.post(
-        f"/api/v1/nutrition/labs/{document_id}/access-grant", headers=ORIGIN
-    )
+    grant = client.post(f"/api/v1/nutrition/labs/{document_id}/access-grant", headers=ORIGIN)
     assert grant.status_code == 200
     access_url = grant.json()["access_url"]
     assert grant.json()["expires_in_seconds"] <= 300
@@ -110,9 +108,7 @@ def test_lab_upload_rejects_active_pdf_content(client: TestClient) -> None:
     assert response.json()["detail"]["code"] == "INVALID_LAB_DOCUMENT"
 
 
-def test_lab_upload_rate_limit_is_database_backed(
-    client: TestClient, test_settings
-) -> None:  # type: ignore[no-untyped-def]
+def test_lab_upload_rate_limit_is_database_backed(client: TestClient, test_settings) -> None:  # type: ignore[no-untyped-def]
     test_settings.nutrition_lab_upload_rate_limit = 1
     _register(client, "limited-lab@example.com")
     first = client.post(

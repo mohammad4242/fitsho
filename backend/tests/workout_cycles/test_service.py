@@ -87,9 +87,7 @@ def make_plan(db: Session, user_id: UUID, *, duration_weeks: int = 4) -> Workout
 
 
 @pytest.mark.parametrize("duration_weeks", [4, 6, 8])
-def test_start_cycle_accepts_supported_plan_durations(
-    db: Session, duration_weeks: int
-) -> None:
+def test_start_cycle_accepts_supported_plan_durations(db: Session, duration_weeks: int) -> None:
     user = make_user(db, f"duration-{duration_weeks}@example.com")
     plan = make_plan(db, user.id, duration_weeks=duration_weeks)
 
@@ -499,11 +497,14 @@ def test_start_cycle_is_concurrency_idempotent_with_two_database_sessions() -> N
 
         assert cycle_ids[0] == cycle_ids[1]
         with Session(engine) as check_db:
-            assert check_db.scalar(
-                select(func.count()).select_from(WorkoutCycle).where(
-                    WorkoutCycle.workout_plan_id == plan_id
+            assert (
+                check_db.scalar(
+                    select(func.count())
+                    .select_from(WorkoutCycle)
+                    .where(WorkoutCycle.workout_plan_id == plan_id)
                 )
-            ) == 1
+                == 1
+            )
     finally:
         event.remove(engine, "before_cursor_execute", synchronize_cycle_inserts)
         with Session(engine) as cleanup_db:
@@ -568,11 +569,14 @@ def test_cycle_completion_is_concurrency_safe_with_optional_feedback() -> None:
             cycle = check_db.get(WorkoutCycle, cycle_id)
             assert cycle is not None
             assert cycle.status is WorkoutCycleStatus.COMPLETED
-            assert check_db.scalar(
-                select(func.count()).select_from(WorkoutCycleFeedback).where(
-                    WorkoutCycleFeedback.cycle_id == cycle_id
+            assert (
+                check_db.scalar(
+                    select(func.count())
+                    .select_from(WorkoutCycleFeedback)
+                    .where(WorkoutCycleFeedback.cycle_id == cycle_id)
                 )
-            ) == 1
+                == 1
+            )
     finally:
         event.remove(engine, "before_cursor_execute", synchronize_locked_cycle_read)
         with Session(engine) as cleanup_db:

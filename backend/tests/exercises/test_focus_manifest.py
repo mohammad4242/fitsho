@@ -81,9 +81,7 @@ def test_checked_in_manifest_covers_the_reviewed_live_catalogue() -> None:
         if item.primary_muscle is MuscleGroup.ADDUCTORS
     )
     assert all(
-        item.primary_muscle is not None
-        for item in FOCUS_MANIFEST.values()
-        if item.muscle_focus
+        item.primary_muscle is not None for item in FOCUS_MANIFEST.values() if item.muscle_focus
     )
 
 

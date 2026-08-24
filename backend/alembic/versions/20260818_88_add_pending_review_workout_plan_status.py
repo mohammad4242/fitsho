@@ -33,9 +33,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "UPDATE workout_plans SET status = 'generating' WHERE status = 'pending_review'"
-    )
+    op.execute("UPDATE workout_plans SET status = 'generating' WHERE status = 'pending_review'")
     op.drop_constraint(_STATUS_CONSTRAINT, "workout_plans", type_="check")
     op.alter_column(
         "workout_plans",

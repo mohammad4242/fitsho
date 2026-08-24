@@ -22,8 +22,8 @@ from app.workouts.program_engine.duration_capacity import (
     build_session_capacity,
 )
 from app.workouts.program_engine.duration_policy import (
-    get_session_duration_policy,
     calculate_resistance_minutes,
+    get_session_duration_policy,
 )
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,

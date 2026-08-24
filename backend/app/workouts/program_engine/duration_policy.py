@@ -1,14 +1,13 @@
 from dataclasses import dataclass
-
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from app.workouts.schemas import WorkoutDay
+    pass
 
 
 def calculate_resistance_minutes(day: "Any", general_warmup_minutes: int) -> int:
     cardio_minutes = day.cardio.duration_minutes if day.cardio else 0
-    return max(0, day.estimated_duration_minutes - general_warmup_minutes - cardio_minutes)
+    return int(max(0, day.estimated_duration_minutes - general_warmup_minutes - cardio_minutes))
 
 
 SESSION_DURATION_TOLERANCE_MINUTES = 10
@@ -18,7 +17,11 @@ CORE_PRESERVATION_EXTENSION_MINUTES = 20
 # `session_duration_minutes` means: available time for the resistance-training
 # portion of the session — it does NOT include general warm-up, cardio, or
 # general cooldown.
-OFFICIAL_SESSION_DURATIONS: tuple[int, ...] = (30, 45, 60, 75, 90, 120)
+from typing import get_args
+
+from app.profile.schemas import SessionDurationMinutes
+
+OFFICIAL_SESSION_DURATIONS: tuple[int, ...] = get_args(SessionDurationMinutes)
 
 
 def is_official_session_duration(minutes: int) -> bool:

@@ -220,8 +220,8 @@ def test_list_returns_active_exercises_with_pagination_metadata(
         "muscle_focus",
         "secondary_muscles",
         "equipment",
-            "difficulty",
-            "labels",
+        "difficulty",
+        "labels",
         "media_path",
         "media_type",
         "content_type",
@@ -251,9 +251,7 @@ def test_list_can_return_only_guides_for_a_selected_muscle(
     assert default_response.status_code == 200
     assert all(item["content_type"] == "exercise" for item in default_response.json()["items"])
     assert guide_response.status_code == 200
-    assert [item["slug"] for item in guide_response.json()["items"]] == [
-        "dumbbell-bench-press"
-    ]
+    assert [item["slug"] for item in guide_response.json()["items"]] == ["dumbbell-bench-press"]
     assert guide_response.json()["items"][0]["content_type"] == "guide"
 
 

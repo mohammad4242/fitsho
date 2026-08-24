@@ -124,9 +124,7 @@ def _active_plan(
         candidate_set_hash="b" * 64,
         generation_method="ai",
         exercise_catalog_snapshot={
-            "exercises": {
-                str(exercise.id): _candidate_snapshot(exercise) for exercise in exercises
-            }
+            "exercises": {str(exercise.id): _candidate_snapshot(exercise) for exercise in exercises}
         },
     )
     day = WorkoutDay(
@@ -260,9 +258,7 @@ def test_athlete_summary_preserves_distinct_signals_and_provenance() -> None:
     assert response.athlete_state.replacement_context[0].source_replacement_ids == (
         replacement_source_id,
     )
-    assert response.athlete_state.safety_context[0].source_safety_signal_ids == (
-        safety_source_id,
-    )
+    assert response.athlete_state.safety_context[0].source_safety_signal_ids == (safety_source_id,)
     assert response.athlete_state.provenance.preference_ids == (preference_source_id,)
 
 
@@ -307,14 +303,10 @@ def test_fitsho_recommendation_reuses_adaptation_difference_reasons(db: Session)
     recommendation = build_fitsho_recommendation(db, review, state=state)
 
     volume = next(
-        item
-        for item in recommendation.difference_summary
-        if item.change.value == "muscle_volume"
+        item for item in recommendation.difference_summary if item.change.value == "muscle_volume"
     )
     priority = next(
-        item
-        for item in recommendation.difference_summary
-        if item.change.value == "priority_muscle"
+        item for item in recommendation.difference_summary if item.change.value == "priority_muscle"
     )
     assert recommendation.overall_action.value == "increase"
     assert volume.previous == 10.0
@@ -322,11 +314,14 @@ def test_fitsho_recommendation_reuses_adaptation_difference_reasons(db: Session)
     assert "LAGGING_MUSCLE_SUPPORTED_CONSERVATIVELY" in volume.reason_codes
     assert priority.previous is False
     assert priority.next is True
-    assert recommendation.to_snapshot_json() == build_fitsho_recommendation(
-        db,
-        review,
-        state=state,
-    ).to_snapshot_json()
+    assert (
+        recommendation.to_snapshot_json()
+        == build_fitsho_recommendation(
+            db,
+            review,
+            state=state,
+        ).to_snapshot_json()
+    )
 
 
 def test_fitsho_recommendation_keeps_safety_and_preference_decisions_distinct(
@@ -660,9 +655,10 @@ def test_approval_activates_pending_plan_without_creating_review_loop(db: Sessio
         status=WorkoutPlanStatus.PENDING_REVIEW,
     )
     review = ensure_pending_review(db, source)
-    assert db.scalars(
-        select(WorkoutCycle).where(WorkoutCycle.workout_plan_id == source.id)
-    ).all() == []
+    assert (
+        db.scalars(select(WorkoutCycle).where(WorkoutCycle.workout_plan_id == source.id)).all()
+        == []
+    )
     service = WorkoutReviewService(db, clock=Clock())
     service.claim(review.id, coach.id)
     raw_payload = deepcopy(review.draft_payload)
@@ -700,9 +696,7 @@ def test_approval_activates_pending_plan_without_creating_review_loop(db: Sessio
     assert review.status is WorkoutReviewStatus.APPROVED
     assert review.approved_plan_id == approved.id
     assert (
-        db.query(WorkoutPlanReview)
-        .filter(WorkoutPlanReview.source_plan_id == approved.id)
-        .count()
+        db.query(WorkoutPlanReview).filter(WorkoutPlanReview.source_plan_id == approved.id).count()
         == 0
     )
 

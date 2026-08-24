@@ -61,7 +61,8 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
         policy.workout_minutes(
-            day.estimated_duration_minutes - (day.cardio.duration_minutes if getattr(day, 'cardio', None) else 0),
+            day.estimated_duration_minutes
+            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0),
             RULESET.general_warmup_minutes,
         )
         <= policy.maximum_minutes
@@ -69,7 +70,8 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
     )
     if any(
         policy.workout_minutes(
-            day.estimated_duration_minutes - (day.cardio.duration_minutes if getattr(day, 'cardio', None) else 0),
+            day.estimated_duration_minutes
+            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0),
             RULESET.general_warmup_minutes,
         )
         < policy.minimum_minutes
@@ -198,7 +200,11 @@ def test_golden_constraints_and_recovery(name: str) -> None:
             assert "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in result.program.warnings
         assert all(
             source.session_duration_minutes - 10
-            <= (day.estimated_duration_minutes - RULESET.general_warmup_minutes - (day.cardio.duration_minutes if getattr(day, 'cardio', None) else 0))
+            <= (
+                day.estimated_duration_minutes
+                - RULESET.general_warmup_minutes
+                - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0)
+            )
             <= source.session_duration_minutes + 10
             for day in result.program.weekly_schedule
         )

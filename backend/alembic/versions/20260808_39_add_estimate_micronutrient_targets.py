@@ -30,9 +30,7 @@ def upgrade() -> None:
         sa.Column("applicable_population", sa.String(length=200), nullable=False),
         sa.Column("confidence", sa.String(length=16), nullable=False),
         sa.Column("explanation_codes", sa.JSON(), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["estimate_id"], ["nutrition_estimates.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["estimate_id"], ["nutrition_estimates.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("estimate_id", "nutrient_code"),
         sa.UniqueConstraint(
             "estimate_id", "nutrient_code", name="uq_nutrition_estimate_micro_nutrient"

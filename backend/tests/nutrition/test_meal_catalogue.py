@@ -114,9 +114,11 @@ def test_seed_creates_exact_complete_bounded_meal_catalogue_idempotently(db: Ses
         "LU08": (Decimal("335"), Decimal("485.75"), Decimal("1.45")),
         "LU11": (Decimal("370"), Decimal("740"), Decimal("2.00")),
     }
-    for code, (reference_input, cooked_yield, yield_factor) in (
-        expected_prepared_recipe_yields.items()
-    ):
+    for code, (
+        reference_input,
+        cooked_yield,
+        yield_factor,
+    ) in expected_prepared_recipe_yields.items():
         meal = next(item for item in seeded if item.code == code)
         assert meal.prepared_recipe is not None
         revision = meal.prepared_recipe.revisions[-1]

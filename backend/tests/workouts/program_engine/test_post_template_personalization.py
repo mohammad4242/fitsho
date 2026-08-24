@@ -168,7 +168,6 @@ def test_initial_prescription_consumes_planned_direct_set_allocations() -> None:
         drafts,
         volume,
         RULESET,
-        cardio_reserve_minutes=0,
     )
 
     assert [day.exercises[0].sets for day in days] == [4, 3, 3]
@@ -216,7 +215,6 @@ def test_compact_strength_session_preserves_primary_compound_rest() -> None:
         (draft,),
         volume,
         RULESET,
-        cardio_reserve_minutes=0,
     )[0]
 
     assert (

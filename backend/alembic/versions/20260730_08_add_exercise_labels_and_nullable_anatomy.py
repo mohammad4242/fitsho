@@ -18,8 +18,21 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 MUSCLE_GROUPS = (
-    "chest", "back", "shoulders", "biceps", "triceps", "traps", "forearms", "neck",
-    "glutes", "quadriceps", "hamstrings", "adductors", "calves", "abs", "obliques",
+    "chest",
+    "back",
+    "shoulders",
+    "biceps",
+    "triceps",
+    "traps",
+    "forearms",
+    "neck",
+    "glutes",
+    "quadriceps",
+    "hamstrings",
+    "adductors",
+    "calves",
+    "abs",
+    "obliques",
     "lower_back",
 )
 PREVIOUS_MUSCLE_GROUPS = tuple(

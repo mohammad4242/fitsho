@@ -194,7 +194,6 @@ def rank_template_references(
         request,
         eligible,
         ruleset,
-        cardio_reserve_minutes=0,
     )
     scored = tuple(
         TemplateRankingResult(
@@ -238,7 +237,6 @@ def select_template_reference_result(
         request,
         eligible,
         ruleset,
-        cardio_reserve_minutes=0,
     )
     ranked = rank_template_references(
         request,
@@ -357,7 +355,6 @@ def _hard_rejection_reason_codes(
             request,
             eligible,
             ruleset,
-            cardio_reserve_minutes=0,
         )
         duration = _template_duration_assessment(
             request,
@@ -632,13 +629,11 @@ def _combined_duration_status(
     assessments: tuple[SessionCapacityAssessment, ...],
 ) -> CapacityFeasibility:
     if any(
-        assessment.status is CapacityFeasibility.PROVABLY_INFEASIBLE
-        for assessment in assessments
+        assessment.status is CapacityFeasibility.PROVABLY_INFEASIBLE for assessment in assessments
     ):
         return CapacityFeasibility.PROVABLY_INFEASIBLE
     if any(
-        assessment.status is CapacityFeasibility.FEASIBLE_BUT_TIGHT
-        for assessment in assessments
+        assessment.status is CapacityFeasibility.FEASIBLE_BUT_TIGHT for assessment in assessments
     ):
         return CapacityFeasibility.FEASIBLE_BUT_TIGHT
     return CapacityFeasibility.COMFORTABLY_FEASIBLE

@@ -118,9 +118,7 @@ def test_profile_update_validates_preferred_weekday_count_when_supplied() -> Non
     ).preferred_weekdays == (0, 2, 4)
 
     with pytest.raises(ValidationError, match="Preferred weekdays"):
-        ProfileUpdate.model_validate(
-            {"training_days_per_week": 2, "preferred_weekdays": [0, 2, 4]}
-        )
+        ProfileUpdate.model_validate({"training_days_per_week": 2, "preferred_weekdays": [0, 2, 4]})
 
 
 def test_profile_update_accepts_and_bounds_training_age() -> None:

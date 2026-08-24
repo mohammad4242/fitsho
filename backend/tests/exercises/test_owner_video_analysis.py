@@ -116,9 +116,7 @@ def test_match_requires_catalogue_identity_name_taxonomy_and_equipment(
     wrong_equipment = OwnerVideoAnalysis.model_validate(
         valid_analysis_payload(equipment=["dumbbell"])
     )
-    uncertain = OwnerVideoAnalysis.model_validate(
-        valid_analysis_payload(match_confidence=0.50)
-    )
+    uncertain = OwnerVideoAnalysis.model_validate(valid_analysis_payload(match_confidence=0.50))
 
     assert resolve_existing_match(accepted, catalogue, test_settings) == EXERCISE_ID
     assert resolve_existing_match(wrong_name, catalogue, test_settings) is None

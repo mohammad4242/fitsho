@@ -48,12 +48,8 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["end_session_id"], ["body_photo_sessions.id"], ondelete="SET NULL"
         ),
-        sa.ForeignKeyConstraint(
-            ["start_analysis_id"], ["body_analyses.id"], ondelete="SET NULL"
-        ),
-        sa.ForeignKeyConstraint(
-            ["end_analysis_id"], ["body_analyses.id"], ondelete="SET NULL"
-        ),
+        sa.ForeignKeyConstraint(["start_analysis_id"], ["body_analyses.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["end_analysis_id"], ["body_analyses.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(
             ["start_result_version_id"],
             ["body_analysis_result_versions.id"],

@@ -65,8 +65,7 @@ def upgrade() -> None:
     unresolved_slugs = list(unresolved)
     if unresolved_slugs:
         raise RuntimeError(
-            "Exercise muscle-focus migration has unresolved records: "
-            + ", ".join(unresolved_slugs)
+            "Exercise muscle-focus migration has unresolved records: " + ", ".join(unresolved_slugs)
         )
 
     op.create_check_constraint(

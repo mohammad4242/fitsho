@@ -5,10 +5,7 @@ from sqlalchemy import inspect
 
 
 def _load_migration():
-    path = (
-        Path(__file__).parents[2]
-        / "alembic/versions/20260821_103_add_prescription_modes.py"
-    )
+    path = Path(__file__).parents[2] / "alembic/versions/20260821_103_add_prescription_modes.py"
     spec = spec_from_file_location("prescription_mode_migration", path)
     assert spec is not None and spec.loader is not None
     module = module_from_spec(spec)
@@ -39,8 +36,7 @@ def test_prescription_migration_has_canonical_ids_and_mode_aware_constraints(db)
     }.issubset(plan_columns)
 
     exercise_checks = {
-        item["name"]: item["sqltext"] or ""
-        for item in inspector.get_check_constraints("exercises")
+        item["name"]: item["sqltext"] or "" for item in inspector.get_check_constraints("exercises")
     }
     plan_checks = {
         item["name"]: item["sqltext"] or ""

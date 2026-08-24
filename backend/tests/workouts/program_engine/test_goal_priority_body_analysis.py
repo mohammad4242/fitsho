@@ -223,7 +223,14 @@ def test_08_goal_score_intentional_for_all_goals() -> None:
     assert score_me == 0
 
     assert _goal_score(Goal.GENERAL_FITNESS, tags_bal, p)[0] > 0
-    assert _goal_score(Goal.STRENGTH, frozenset({TemplateFocusTag.COMPOUND_FOCUS, TemplateFocusTag.STRENGTH_BIAS}), p)[0] > 0
+    assert (
+        _goal_score(
+            Goal.STRENGTH,
+            frozenset({TemplateFocusTag.COMPOUND_FOCUS, TemplateFocusTag.STRENGTH_BIAS}),
+            p,
+        )[0]
+        > 0
+    )
 
 
 # ── EXPLICIT PRIORITY ────────────────────────────────────────────────────────

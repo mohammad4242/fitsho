@@ -521,8 +521,7 @@ def _duration_diagnostics(
         "proven_duration_template_rejections": proven_template_rejections,
         "breakdowns": {
             dimension: {
-                key: _duration_group_metrics(items)
-                for key, items in sorted(values.items())
+                key: _duration_group_metrics(items) for key, items in sorted(values.items())
             }
             for dimension, values in grouped.items()
         },
@@ -563,9 +562,7 @@ def _duration_group_metrics(records: Sequence[Mapping[str, object]]) -> dict[str
         "duration_fit_percentage": round(totals["within"] / sessions * 100, 2)
         if sessions
         else None,
-        "average_absolute_deviation_minutes": round(
-            totals["absolute_deviation"] / sessions, 2
-        )
+        "average_absolute_deviation_minutes": round(totals["absolute_deviation"] / sessions, 2)
         if sessions
         else None,
     }

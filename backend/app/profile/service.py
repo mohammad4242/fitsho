@@ -232,12 +232,16 @@ def update_profile(
 
     supplied_fields = payload.model_dump(exclude_unset=True)
     cycle_id = supplied_fields.pop("cycle_id", None)
-    if cycle_id is not None and db.scalar(
-        select(WorkoutCycle).where(
-            WorkoutCycle.id == cycle_id,
-            WorkoutCycle.user_id == user_id,
+    if (
+        cycle_id is not None
+        and db.scalar(
+            select(WorkoutCycle).where(
+                WorkoutCycle.id == cycle_id,
+                WorkoutCycle.user_id == user_id,
+            )
         )
-    ) is None:
+        is None
+    ):
         raise ProfileCycleNotFoundError
     supplied_cautions = supplied_fields.pop("training_cautions", None)
     if "preferred_weekdays" in supplied_fields:
@@ -272,9 +276,7 @@ def update_profile(
     final_training_days = supplied_fields.get(
         "training_days_per_week", profile.training_days_per_week
     )
-    final_experience_level = supplied_fields.get(
-        "experience_level", profile.experience_level
-    )
+    final_experience_level = supplied_fields.get("experience_level", profile.experience_level)
     if final_experience_level is not None and final_training_days is not None:
         require_supported_resistance_training_days(final_experience_level, final_training_days)
     final_weekdays = supplied_fields.get("preferred_weekdays", profile.preferred_weekdays)
@@ -370,9 +372,7 @@ def apply_profile_update_without_commit(
     final_training_days = supplied_fields.get(
         "training_days_per_week", profile.training_days_per_week
     )
-    final_experience_level = supplied_fields.get(
-        "experience_level", profile.experience_level
-    )
+    final_experience_level = supplied_fields.get("experience_level", profile.experience_level)
     if final_experience_level is not None and final_training_days is not None:
         require_supported_resistance_training_days(final_experience_level, final_training_days)
     final_weekdays = supplied_fields.get("preferred_weekdays", profile.preferred_weekdays)

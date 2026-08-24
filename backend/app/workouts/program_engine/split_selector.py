@@ -135,7 +135,6 @@ def rank_availability_aware_fallbacks(
         request,
         exercises,
         ruleset,
-        cardio_reserve_minutes=0,
     )
     target_capacity = max(1, capacity.expected_exercise_count_capacity)
     priorities = request.source.priority_muscles | body_analysis_priority_muscles(
@@ -479,7 +478,6 @@ def score_split_candidates(
             request,
             exercises,
             ruleset,
-            cardio_reserve_minutes=0,
         )
         if exercises
         else None
@@ -615,8 +613,7 @@ def score_split_candidates(
                 for focus in candidate.day_focuses
             )
             infeasible_days = sum(
-                item.status is CapacityFeasibility.PROVABLY_INFEASIBLE
-                for item in assessments
+                item.status is CapacityFeasibility.PROVABLY_INFEASIBLE for item in assessments
             )
             tight_days = sum(
                 item.status is CapacityFeasibility.FEASIBLE_BUT_TIGHT for item in assessments
@@ -624,13 +621,7 @@ def score_split_candidates(
             optional_trim = sum(item.optional_work_likely_trimmed for item in assessments)
             required_minutes = sum(item.required_work_cost_minutes for item in assessments)
             duration_key = (infeasible_days, tight_days, optional_trim, required_minutes)
-            status = (
-                "INFEASIBLE"
-                if infeasible_days
-                else "TIGHT"
-                if tight_days
-                else "COMFORTABLE"
-            )
+            status = "INFEASIBLE" if infeasible_days else "TIGHT" if tight_days else "COMFORTABLE"
             reasons.append(f"SPLIT_DURATION_CAPACITY_{status}")
         scored.append(
             (
@@ -700,9 +691,7 @@ def _focus_duration_assessment(
                 item,
                 allowed_patterns=slot.patterns,
                 target_muscles=(
-                    frozenset({slot.target_muscle})
-                    if slot.target_muscle is not None
-                    else None
+                    frozenset({slot.target_muscle}) if slot.target_muscle is not None else None
                 ),
                 day_focus=focus,
                 allow_full_body=focus.startswith("full_body"),

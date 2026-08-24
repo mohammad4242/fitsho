@@ -127,9 +127,12 @@ def test_phase119_full_matrix_semantics(goal, duration):
     # 2. No overrun
     policy = get_session_duration_policy(duration)
     assert all(
-        (day.estimated_duration_minutes - RULESET.general_warmup_minutes
-            - (day.cardio.duration_minutes if getattr(day, 'cardio', None) else 0))
-            <= policy.maximum_minutes
+        (
+            day.estimated_duration_minutes
+            - RULESET.general_warmup_minutes
+            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0)
+        )
+        <= policy.maximum_minutes
         for day in res.program.weekly_schedule
     )
 
@@ -137,8 +140,10 @@ def test_phase119_full_matrix_semantics(goal, duration):
     effective_floor = 3 if duration <= 30 else RULESET.minimum_exercises_per_session
     assert all(len(day.exercises) >= effective_floor for day in res.program.weekly_schedule)
 
+
 def test_phase119_cardio_ordering_and_coach_quality_fit():
     from app.workouts.program_engine.engine import generate_program
+
     # Generate a program that might have cardio
     source = request(
         primary_goal=Goal.FAT_LOSS,
@@ -148,35 +153,38 @@ def test_phase119_cardio_ordering_and_coach_quality_fit():
     )
     res = generate_program(source, full_catalog(), RULESET)
     assert res.is_success
-    
+
     # Check that cardio is present
     has_cardio = any(day.cardio is not None for day in res.program.weekly_schedule)
     assert has_cardio
-    
+
     # Check that coach_quality duration_fit is identical to engine's budget fit semantics
     engine_metrics = res.program.aggregate_metrics.get("coach_quality", {})
     budget_fit = engine_metrics.get("resistance_time_budget_fit")
-    
+
     from app.workouts.program_engine.coach_quality import build_coach_quality_metrics
+
     cq = build_coach_quality_metrics(res.program, source, res.program.validation_report, RULESET)
-    
+
     # If the engine says it fits the strict budget, the coach quality metric must be 100% satisfied
     if budget_fit:
         assert cq["duration_fit"]["percentage"] == 100.0
     else:
         # Otherwise, the days that exceeded 60 won't be counted
         assert cq["duration_fit"]["percentage"] < 100.0
-        
+
     # Cardio must not affect the duration_fit
     # If we artificially strip cardio, coach quality duration fit should be identical
     from dataclasses import replace
+
     days_no_cardio = tuple(replace(day, cardio=None) for day in res.program.weekly_schedule)
     program_no_cardio = replace(res.program, weekly_schedule=days_no_cardio)
     cq_no_cardio = build_coach_quality_metrics(
         program_no_cardio, source, res.program.validation_report, RULESET
     )
-    
+
     assert cq["duration_fit"] == cq_no_cardio["duration_fit"]
+
 
 def test_phase119_coach_quality_strict_semantics():
     from dataclasses import replace
@@ -186,9 +194,10 @@ def test_phase119_coach_quality_strict_semantics():
     # Mock a program
     source = request(session_duration_minutes=60)
     from app.workouts.program_engine.engine import generate_program
+
     res = generate_program(source, full_catalog(), RULESET)
     program = res.program
-    
+
     # 60 requested / 68 resistance = not fit
     day_over = replace(
         program.weekly_schedule[0],
@@ -212,7 +221,7 @@ def test_phase119_coach_quality_strict_semantics():
 
 def test_phase119_cardio_additive():
     from app.workouts.program_engine.engine import generate_program
-    
+
     # A long session (120 mins) that would normally squeeze cardio out if they were coupled
     source = request(
         primary_goal=Goal.FAT_LOSS,
@@ -222,12 +231,13 @@ def test_phase119_cardio_additive():
     )
     res = generate_program(source, full_catalog(), RULESET)
     assert res.is_success
-    
+
     # Check that cardio is present and uses EXACTLY the configured start minutes
     days_with_cardio = [d for d in res.program.weekly_schedule if d.cardio is not None]
     assert days_with_cardio, "Expected cardio to be prescribed"
     for day in days_with_cardio:
         assert day.cardio.duration_minutes == RULESET.cardio_start_minutes
+
 
 def test_phase119_underfill_does_not_inflate_sets():
     import uuid
@@ -237,9 +247,10 @@ def test_phase119_underfill_does_not_inflate_sets():
     from app.workouts.program_engine.normalization import normalize_request
     from app.workouts.program_engine.schemas import ProgrammedExercise, WorkoutDay
     from app.workouts.program_engine.session_duration import _repair_underfill
+
     raw_source = request(session_duration_minutes=60)
     source = normalize_request(raw_source, RULESET)
-    
+
     day = WorkoutDay(
         day_index=0,
         weekday=0,
@@ -265,7 +276,7 @@ def test_phase119_underfill_does_not_inflate_sets():
         ),
         cardio=None,
     )
-    
+
     policy = get_session_duration_policy(60)
     repaired_day = _repair_underfill(
         day,
@@ -278,6 +289,6 @@ def test_phase119_underfill_does_not_inflate_sets():
         prefer_acceptable_volume_for_minimum_fill=False,
         minimum_exercises=5,
     )
-    
+
     assert len(repaired_day.exercises) == 1
     assert repaired_day.exercises[0].sets == 3

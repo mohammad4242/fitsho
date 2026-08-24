@@ -98,9 +98,7 @@ def test_food_image_upload_rejects_non_image_media(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("subdirectory", ["../food-catalogue", "nested/food", "food\\image"])
-def test_food_image_upload_rejects_unsafe_subdirectory(
-    tmp_path: Path, subdirectory: str
-) -> None:
+def test_food_image_upload_rejects_unsafe_subdirectory(tmp_path: Path, subdirectory: str) -> None:
     with pytest.raises(MediaValidationError, match="directory"):
         media.store_image_upload(
             upload("food.png", PNG_BYTES, "image/png"),

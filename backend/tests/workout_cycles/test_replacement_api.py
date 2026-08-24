@@ -321,12 +321,20 @@ def test_non_durable_reasons_create_history_without_durable_state(
     )
 
     assert response.status_code == 201
-    assert db.scalar(
-        select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
-    ) is None
-    assert db.scalar(
-        select(WorkoutExerciseSafetySignal).where(WorkoutExerciseSafetySignal.user_id == user_id)
-    ) is None
+    assert (
+        db.scalar(
+            select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
+        )
+        is None
+    )
+    assert (
+        db.scalar(
+            select(WorkoutExerciseSafetySignal).where(
+                WorkoutExerciseSafetySignal.user_id == user_id
+            )
+        )
+        is None
+    )
 
 
 def test_persistent_equipment_unavailable_creates_durable_context_with_provenance(
@@ -381,9 +389,14 @@ def test_persistent_uncomfortable_and_dislike_create_negative_preferences(
     )
     assert preference is not None
     assert preference.preference_type is preference_type
-    assert db.scalar(
-        select(WorkoutExerciseSafetySignal).where(WorkoutExerciseSafetySignal.user_id == user_id)
-    ) is None
+    assert (
+        db.scalar(
+            select(WorkoutExerciseSafetySignal).where(
+                WorkoutExerciseSafetySignal.user_id == user_id
+            )
+        )
+        is None
+    )
 
 
 def test_pain_replacement_creates_structured_safety_signal_not_negative_preference(
@@ -412,9 +425,12 @@ def test_pain_replacement_creates_structured_safety_signal_not_negative_preferen
     assert signal.replacement_exercise_id == safe.id
     assert signal.week_number == 2
     assert signal.source_replacement_id == UUID(response.json()["id"])
-    assert db.scalar(
-        select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
-    ) is None
+    assert (
+        db.scalar(
+            select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
+        )
+        is None
+    )
 
 
 @pytest.mark.parametrize("reason", ["equipment_unavailable", "uncomfortable", "dislike"])
@@ -433,9 +449,12 @@ def test_this_time_replacement_creates_no_persistent_preference(
     )
 
     assert response.status_code == 201
-    assert db.scalar(
-        select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
-    ) is None
+    assert (
+        db.scalar(
+            select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
+        )
+        is None
+    )
 
 
 def test_repeated_persistent_replacements_keep_one_preference_with_original_provenance(
@@ -446,25 +465,29 @@ def test_repeated_persistent_replacements_keep_one_preference_with_original_prov
     _plan, prescribed, _cycle, _original, safe, _unsafe = _plan_with_cycle(db, user_id)
     payload = _payload(prescribed, safe, reason="dislike", scope="persistent")
 
-    first = client.post(
-        "/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload
-    )
+    first = client.post("/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload)
     second = client.post(
         "/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload
     )
 
     assert first.status_code == 201
     assert second.status_code == 201
-    assert db.scalar(
-        select(func.count()).select_from(WorkoutExerciseReplacement).where(
-            WorkoutExerciseReplacement.user_id == user_id
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(WorkoutExerciseReplacement)
+            .where(WorkoutExerciseReplacement.user_id == user_id)
         )
-    ) == 2
-    assert db.scalar(
-        select(func.count()).select_from(WorkoutExercisePreference).where(
-            WorkoutExercisePreference.user_id == user_id
+        == 2
+    )
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(WorkoutExercisePreference)
+            .where(WorkoutExercisePreference.user_id == user_id)
         )
-    ) == 1
+        == 1
+    )
     preference = db.scalar(
         select(WorkoutExercisePreference).where(WorkoutExercisePreference.user_id == user_id)
     )
@@ -480,20 +503,21 @@ def test_repeated_pain_replacements_keep_one_safety_signal(
     _plan, prescribed, _cycle, _original, safe, _unsafe = _plan_with_cycle(db, user_id)
     payload = _payload(prescribed, safe, reason="pain_or_discomfort", scope="persistent")
 
-    first = client.post(
-        "/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload
-    )
+    first = client.post("/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload)
     second = client.post(
         "/api/v1/workout-cycles/current/replacements", headers=ORIGIN, json=payload
     )
 
     assert first.status_code == 201
     assert second.status_code == 201
-    assert db.scalar(
-        select(func.count()).select_from(WorkoutExerciseSafetySignal).where(
-            WorkoutExerciseSafetySignal.user_id == user_id
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(WorkoutExerciseSafetySignal)
+            .where(WorkoutExerciseSafetySignal.user_id == user_id)
         )
-    ) == 1
+        == 1
+    )
     signal = db.scalar(
         select(WorkoutExerciseSafetySignal).where(WorkoutExerciseSafetySignal.user_id == user_id)
     )

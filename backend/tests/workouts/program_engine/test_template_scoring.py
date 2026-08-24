@@ -351,7 +351,6 @@ def test_duration_feasible_template_ranks_above_optional_overloaded_template() -
         normalized,
         catalog,
         RULESET,
-        cardio_reserve_minutes=0,
     )
     tight = _duration_template("z-tight", core_slots=2, optional_slots=3)
     feasible = _duration_template("a-feasible", core_slots=2, optional_slots=0)
@@ -385,7 +384,6 @@ def test_optional_duration_overage_is_not_a_hard_template_rejection() -> None:
         normalized,
         catalog,
         RULESET,
-        cardio_reserve_minutes=0,
     )
     tight = _duration_template("tight", core_slots=2, optional_slots=3)
 
@@ -408,7 +406,6 @@ def test_provably_impossible_template_core_duration_is_hard_rejected() -> None:
         normalized,
         catalog,
         RULESET,
-        cardio_reserve_minutes=0,
     )
     impossible = _duration_template("impossible", core_slots=6, optional_slots=0)
 
@@ -421,9 +418,7 @@ def test_provably_impossible_template_core_duration_is_hard_rejected() -> None:
     )
 
     assert result.candidates == ()
-    assert result.hard_rejections[0].reason_codes == (
-        "REQUIRED_CORE_DURATION_INFEASIBLE",
-    )
+    assert result.hard_rejections[0].reason_codes == ("REQUIRED_CORE_DURATION_INFEASIBLE",)
 
 
 def test_final_program_trace_preserves_proven_duration_core_rejection() -> None:
@@ -446,9 +441,7 @@ def test_final_program_trace_preserves_proven_duration_core_rejection() -> None:
     assert result.program is not None, result.errors
     assert result.program.aggregate_metrics.get("reference_template") is None
     selection = next(
-        entry
-        for entry in result.program.decision_trace
-        if entry["stage"] == "template_selection"
+        entry for entry in result.program.decision_trace if entry["stage"] == "template_selection"
     )
     assert selection["hard_rejections"] == (
         {

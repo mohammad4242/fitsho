@@ -146,9 +146,7 @@ def test_planner_uses_active_override_without_mutating_automatic_reference(db) -
     candidates, snapshot, _manifest = _planner_foods(db)
 
     candidate = next(item for item in candidates if item.slug == "basmati-rice")
-    reference = next(
-        item for item in snapshot["references"] if item["food_id"] == str(rice.id)
-    )
+    reference = next(item for item in snapshot["references"] if item["food_id"] == str(rice.id))
     assert candidate.price_irr_per_gram == Decimal("6000")
     assert reference["source"] == "manual_override"
     assert reference["reference_id"] == str(override.id)

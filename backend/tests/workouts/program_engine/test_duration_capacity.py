@@ -325,7 +325,11 @@ def test_thirty_minute_strength_program_uses_intentional_reduced_exercise_count(
     assert "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in trace_reasons
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.contains_total(day.estimated_duration_minutes - (day.cardio.duration_minutes if getattr(day, 'cardio', None) else 0), RULESET.general_warmup_minutes)
+        policy.contains_total(
+            day.estimated_duration_minutes
+            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0),
+            RULESET.general_warmup_minutes,
+        )
         for day in result.program.weekly_schedule
     )
     primary = next(

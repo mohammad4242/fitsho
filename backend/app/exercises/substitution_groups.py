@@ -57,9 +57,7 @@ def curated_substitution_group(
             return "horizontal_pull_face_pull"
         if "upright row" in name:
             return "horizontal_pull_upright_row"
-        if primary_muscle is MuscleGroup.SHOULDERS or _contains(
-            name, "rear delt", "reverse fly"
-        ):
+        if primary_muscle is MuscleGroup.SHOULDERS or _contains(name, "rear delt", "reverse fly"):
             return "horizontal_pull_rear_delt"
         if primary_muscle is not MuscleGroup.BACK or "row" not in name:
             return None

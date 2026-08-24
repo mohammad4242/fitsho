@@ -50,9 +50,7 @@ def upgrade() -> None:
             name="ck_workout_cycles_completion_state",
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["workout_plan_id"], ["workout_plans.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["workout_plan_id"], ["workout_plans.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("workout_plan_id", name="uq_workout_cycles_workout_plan_id"),
     )

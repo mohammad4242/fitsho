@@ -59,10 +59,13 @@ def test_regression_thirty_minute_session_reports_traceable_constrained_workload
     assert "PLANNED_SOFT_VOLUME_REDUCED_DURING_SESSION_FIT" in result.program.warnings
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.contains_total(
-            day.estimated_duration_minutes,
-            RULESET.general_warmup_minutes,
-            day.cardio.duration_minutes if day.cardio else 0,
+        policy.contains(
+            max(
+                0,
+                day.estimated_duration_minutes
+                - RULESET.general_warmup_minutes
+                - (day.cardio.duration_minutes if day.cardio else 0),
+            )
         )
         for day in result.program.weekly_schedule
     )
@@ -146,8 +149,7 @@ def test_regression_short_upper_lower_keeps_required_trunk_work_with_cardio() ->
     )
     assert all(
         day.estimated_duration_minutes
-        <= get_session_duration_policy(30).tolerance_maximum_total_minutes(
-            RULESET.general_warmup_minutes, day.cardio.duration_minutes if day.cardio else 0
-        )
+        <= get_session_duration_policy(30).maximum_total_minutes(RULESET.general_warmup_minutes)
+        + (day.cardio.duration_minutes if day.cardio else 0)
         for day in result.program.weekly_schedule
     )

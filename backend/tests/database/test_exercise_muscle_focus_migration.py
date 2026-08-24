@@ -7,10 +7,7 @@ from app.exercises.taxonomy import is_compatible_muscle_focus
 
 
 def test_migration_revision_follows_current_head() -> None:
-    path = (
-        Path(__file__).parents[2]
-        / "alembic/versions/20260814_78_add_exercise_muscle_focus.py"
-    )
+    path = Path(__file__).parents[2] / "alembic/versions/20260814_78_add_exercise_muscle_focus.py"
     spec = spec_from_file_location("exercise_muscle_focus_migration", path)
     assert spec is not None and spec.loader is not None
     migration = module_from_spec(spec)

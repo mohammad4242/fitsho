@@ -41,9 +41,7 @@ def upgrade() -> None:
             "char_length(btrim(reason)) BETWEEN 5 AND 500",
             name="ck_nutrition_price_override_reason_length",
         ),
-        sa.ForeignKeyConstraint(
-            ["food_id"], ["nutrition_catalogue_foods.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["food_id"], ["nutrition_catalogue_foods.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
             ["expired_by_run_id"],

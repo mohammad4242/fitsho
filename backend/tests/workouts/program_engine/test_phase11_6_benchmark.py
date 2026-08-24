@@ -1,4 +1,3 @@
-from typing import cast
 from collections import Counter
 
 import tests.workouts.program_engine.phase11_benchmark as phase11
@@ -105,6 +104,24 @@ def test_phase11_6_duration_diagnostics_use_workout_minutes_and_repair_trace() -
     assert diagnostics["late_duration_repair_percentage"] == 100.0
     assert diagnostics["major_late_repair_percentage"] == 0.0
     assert diagnostics["proven_duration_template_rejections"] == 1
-    assert diagnostics["breakdowns"]["requested_duration"]["30"][  # type: ignore
-        "duration_fit_percentage"
-    ] == 50.0
+    assert (
+        diagnostics["breakdowns"]["requested_duration"]["30"][  # type: ignore
+            "duration_fit_percentage"
+        ]
+        == 50.0
+    )
+
+
+def test_phase11_6_generates_40_minute_legacy_case() -> None:
+    import tests.workouts.program_engine.phase11_benchmark as phase11
+    from app.workouts.program_engine.engine import generate_program
+    from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+    from tests.workouts.program_engine.golden_fixtures import full_catalog
+
+    profiles = holdout_profiles()
+    profile = next(p for p in profiles if p.duration_minutes == 40)
+    request = phase11.profile_to_request(profile)
+    assert request.session_duration_minutes == 40  # type: ignore
+
+    res = generate_program(request, full_catalog(), RULESET)
+    assert res.is_success

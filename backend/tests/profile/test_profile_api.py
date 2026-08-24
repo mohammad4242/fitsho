@@ -71,9 +71,7 @@ def test_create_profile_atomically_stores_profile_and_initial_weight(
     assert len(measurements) == 1
 
 
-def test_create_profile_persists_first_month_experience(
-    client: TestClient, db: Session
-) -> None:
+def test_create_profile_persists_first_month_experience(client: TestClient, db: Session) -> None:
     user_id = register(client, "first-month-profile@example.com")
 
     response = client.post(

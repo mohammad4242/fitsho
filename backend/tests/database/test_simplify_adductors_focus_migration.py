@@ -3,10 +3,7 @@ from pathlib import Path
 
 
 def test_migration_follows_current_taxonomy_revision() -> None:
-    path = (
-        Path(__file__).parents[2]
-        / "alembic/versions/20260816_82_simplify_adductors_focus.py"
-    )
+    path = Path(__file__).parents[2] / "alembic/versions/20260816_82_simplify_adductors_focus.py"
     spec = spec_from_file_location("simplify_adductors_focus_migration", path)
     assert spec is not None and spec.loader is not None
     migration = module_from_spec(spec)

@@ -63,10 +63,7 @@ def _previous_compatibility_sql() -> str:
 def upgrade() -> None:
     op.drop_constraint(_COMPATIBILITY_CONSTRAINT, "exercises", type_="check")
     op.execute(
-        sa.text(
-            "UPDATE exercises SET muscle_focus = NULL "
-            "WHERE primary_muscle = 'quadriceps'"
-        )
+        sa.text("UPDATE exercises SET muscle_focus = NULL WHERE primary_muscle = 'quadriceps'")
     )
     op.create_check_constraint(
         _COMPATIBILITY_CONSTRAINT,
