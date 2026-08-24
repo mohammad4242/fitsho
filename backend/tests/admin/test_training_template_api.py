@@ -151,6 +151,7 @@ def test_admin_update_replaces_removed_slots_and_keeps_catalog_exercise_link(
             {
                 "title_en": day["title_en"],
                 "title_fa": day["title_fa"],
+                "structure_focus": day["structure_focus"],
                 "direct_target_muscles": day["direct_target_muscles"],
                 "slots": [
                     _slot_payload(first_slot, display_name_fa="پرس سینه انتخابی") for _ in range(5)
@@ -291,6 +292,7 @@ def _day_payload(day_number: int, exercise_id: str) -> dict[str, object]:
     return {
         "title_en": f"Day {day_number}",
         "title_fa": f"روز {day_number}",
+        "structure_focus": "full_body",
         "direct_target_muscles": [
             "chest",
             "back",

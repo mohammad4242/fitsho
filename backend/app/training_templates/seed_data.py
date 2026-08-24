@@ -1488,7 +1488,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Back + Hamstrings",
                 "زیربغل + همسترینگ",
-                "posterior_chain_core",
+                "other",
                 (M.BACK, M.HAMSTRINGS),
                 BACK_ROW,
                 LAT_PULLDOWN,
@@ -1531,7 +1531,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Chest + Hamstrings",
                 "سینه + همسترینگ",
-                "posterior_chain_core",
+                "other",
                 (M.CHEST, M.HAMSTRINGS),
                 CHEST,
                 INCLINE_CHEST,
@@ -1798,7 +1798,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Arms",
                 "سرشانه + بازو",
-                "shoulders_traps",
+                "other",
                 (M.SHOULDERS, M.BICEPS, M.TRICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2079,7 +2079,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Arms",
                 "سرشانه + بازو",
-                "shoulders_traps",
+                "other",
                 (M.SHOULDERS, M.BICEPS, M.TRICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2700,7 +2700,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Arms",
                 "سرشانه + بازو",
-                "shoulders_traps",
+                "other",
                 (M.SHOULDERS, M.BICEPS, M.TRICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -2902,7 +2902,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Arms",
                 "سرشانه + بازو",
-                "shoulders_traps",
+                "other",
                 (M.SHOULDERS, M.BICEPS, M.TRICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -3003,7 +3003,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Push Shoulders",
                 "پوش سرشانه",
-                "shoulders_traps",
+                "push",
                 (M.SHOULDERS, M.TRICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -3136,7 +3136,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Triceps",
                 "سرشانه + پشت بازو",
-                "shoulders_traps",
+                "other",
                 (M.SHOULDERS, M.TRICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -3204,7 +3204,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Shoulders + Biceps",
                 "سرشانه + جلو بازو",
-                "shoulders_traps",
+                "other",
                 (M.SHOULDERS, M.BICEPS),
                 SHOULDER_PRESS,
                 LATERAL_RAISE,
@@ -3813,7 +3813,7 @@ TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple
             _day(
                 "Overhead Press Day",
                 "روز پرس سرشانه",
-                "shoulders_traps",
+                "other",
                 (M.SHOULDERS, M.TRICEPS),
                 _slot(
                     "smith-machine-shoulder-press",

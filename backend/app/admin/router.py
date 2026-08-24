@@ -86,6 +86,7 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
                 day_number=day.day_number,
                 title_en=day.title_en,
                 title_fa=day.title_fa,
+                structure_focus=day.structure_focus,
                 direct_target_muscles=day.direct_target_muscles,
                 slots=[
                     AdminTrainingTemplateSlot(
