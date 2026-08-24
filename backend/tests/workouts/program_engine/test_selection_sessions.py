@@ -8,6 +8,7 @@ from app.exercises.enums import (
     ExerciseCautionTag,
     ExerciseType,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
 )
 from app.profile.enums import TrainingLocation
@@ -917,15 +918,15 @@ def test_forward_curated_alternative_precedes_otherwise_better_role_match() -> N
     request = normalized()
     curated_id = uuid4()
     target = candidate(
-        "target isolation press",
+        "target press",
         MovementPattern.HORIZONTAL_PUSH,
         MuscleGroup.CHEST,
-        exercise_type=ExerciseType.ISOLATION,
+        exercise_type=ExerciseType.COMPOUND,
         id=uuid4(),
         curated_alternative_ids=(curated_id,),
     )
     curated = candidate(
-        "curated compound press",
+        "curated press",
         MovementPattern.HORIZONTAL_PUSH,
         MuscleGroup.CHEST,
         id=curated_id,
@@ -933,10 +934,10 @@ def test_forward_curated_alternative_precedes_otherwise_better_role_match() -> N
         substitution_group=None,
     )
     fallback = candidate(
-        "same role press",
+        "same-group press",
         MovementPattern.HORIZONTAL_PUSH,
         MuscleGroup.CHEST,
-        exercise_type=ExerciseType.ISOLATION,
+        exercise_type=ExerciseType.COMPOUND,
         substitution_group=target.substitution_group,
     )
 
@@ -947,18 +948,22 @@ def test_curated_alternative_direction_is_not_implied_in_reverse() -> None:
     request = normalized()
     alternative_id = uuid4()
     target_a = candidate(
-        "target isolation press",
+        "target a press",
         MovementPattern.HORIZONTAL_PUSH,
         MuscleGroup.CHEST,
-        exercise_type=ExerciseType.ISOLATION,
+        exercise_type=ExerciseType.COMPOUND,
+        muscle_focus=MuscleFocus.UPPER_CHEST,
+        substitution_group="target-a",
         id=uuid4(),
         curated_alternative_ids=(alternative_id,),
     )
     target_b = candidate(
-        "target compound press",
+        "target b press",
         MovementPattern.HORIZONTAL_PUSH,
         MuscleGroup.CHEST,
         exercise_type=ExerciseType.COMPOUND,
+        muscle_focus=MuscleFocus.UPPER_CHEST,
+        substitution_group="target-b",
         id=alternative_id,
         curated_alternative_ids=(),
     )
@@ -967,6 +972,8 @@ def test_curated_alternative_direction_is_not_implied_in_reverse() -> None:
         MovementPattern.HORIZONTAL_PUSH,
         MuscleGroup.CHEST,
         exercise_type=ExerciseType.COMPOUND,
+        muscle_focus=MuscleFocus.UPPER_CHEST,
+        substitution_group="target-b",
     )
 
     forward = rank_replacement_exercises(request, target_a, (reverse_fallback, target_b))
@@ -1018,9 +1025,10 @@ def test_curated_alternative_still_requires_eligibility_and_slot_compatibility()
         curated_alternative_ids=(blocked_id, unsafe_id, incompatible_id, unavailable_id),
     )
 
-    assert rank_replacement_exercises(
-        request, target, (blocked, unsafe, incompatible, unavailable)
-    ) == ()
+    assert (
+        rank_replacement_exercises(request, target, (blocked, unsafe, incompatible, unavailable))
+        == ()
+    )
 
 
 def test_missing_required_slot_rejects_session_before_supplements() -> None:

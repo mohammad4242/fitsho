@@ -6,7 +6,6 @@ from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
 from app.workouts.program_engine.duration_capacity import SessionCapacity
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.prescription import estimate_exercise_minutes
-from app.workouts.program_engine.replacement_ranker import rank_replacement_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -21,6 +20,11 @@ from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     template_slot_allowed_patterns,
 )
+from app.workouts.program_engine.substitution_engine import (
+    SubstitutionContext,
+    rank_substitutions,
+)
+from app.workouts.program_engine.substitution_policy import SubstitutionCause
 from app.workouts.program_engine.supplemental_policy import (
     is_supplemental_muscle,
     main_exercise_count,
@@ -316,24 +320,28 @@ def build_template_sessions(
             if preserved and is_template_slot:
                 preserved_template_occurrences[candidate.id] += 1
             substitutions[candidate.id] = tuple(
-                alternative.id
-                for alternative in rank_replacement_exercises(
+                option.exercise.id
+                for option in rank_substitutions(
                     request,
                     candidate,
-                    eligible,
+                    list(eligible),
+                    SubstitutionContext(
+                        cause=SubstitutionCause.DISPLAY_ALTERNATIVE,
+                        allowed_patterns=template_slot_allowed_patterns(
+                            slot.movement_pattern, slot.target_muscles
+                        ),
+                        target_muscles=(
+                            frozenset(slot.target_muscles)
+                            if slot.target_muscles
+                            else frozenset({candidate.primary_muscle})
+                            if candidate.primary_muscle is not None
+                            else None
+                        ),
+                        day_focus=f"template_reference_{index}",
+                    ),
+                    ruleset=ruleset,
                     limit=ruleset.substitution_limit,
-                    allowed_patterns=template_slot_allowed_patterns(
-                        slot.movement_pattern, slot.target_muscles
-                    ),
-                    target_muscles=(
-                        frozenset(slot.target_muscles)
-                        if slot.target_muscles
-                        else frozenset({candidate.primary_muscle})
-                        if candidate.primary_muscle is not None
-                        else None
-                    ),
-                    day_focus=f"template_reference_{index}",
-                )
+                ).options
             )
             resolutions.append(
                 TemplateSlotResolution(
@@ -437,19 +445,23 @@ def _rank_template_slot_candidates(
         return None
     target_muscles = frozenset(slot.target_muscles)
     if original is not None:
-        replacements = rank_replacement_exercises(
+        replacements = rank_substitutions(
             request,
             original,
-            options,
-            limit=len(options),
-            allowed_patterns=template_slot_allowed_patterns(
-                slot.movement_pattern, slot.target_muscles
+            list(options),
+            SubstitutionContext(
+                cause=SubstitutionCause.TEMPLATE_RECOVERY,
+                allowed_patterns=template_slot_allowed_patterns(
+                    slot.movement_pattern, slot.target_muscles
+                ),
+                target_muscles=target_muscles,
+                day_focus=f"template_reference_{day_index}",
             ),
-            target_muscles=target_muscles,
-            day_focus=f"template_reference_{day_index}",
+            ruleset=ruleset,
+            limit=len(options),
         )
-        if replacements:
-            return replacements[0]
+        if replacements.options:
+            return replacements.options[0].exercise
     needed_muscle = slot.target_muscles[0] if len(slot.target_muscles) == 1 else None
     ranked = rank_exercises(request, options, ruleset, needed_muscle=needed_muscle)
     return ranked[0].exercise if ranked else None

@@ -116,9 +116,7 @@ def rank_substitutions(
 
     target_role = ExerciseRoleSignature.from_candidate(target)
     target_muscles = context.target_muscles or (
-        frozenset({target.primary_muscle})
-        if target.primary_muscle is not None
-        else frozenset()
+        frozenset({target.primary_muscle}) if target.primary_muscle is not None else frozenset()
     )
     target_strength_role = context.strength_role or _strength_role(target, request, ruleset)
     policy_patterns = allowed_movement_patterns(
@@ -128,7 +126,9 @@ def rank_substitutions(
         strength_role=target_strength_role,
         cause=context.cause,
     )
-    slot_patterns = policy_patterns.intersection(context.allowed_patterns or policy_patterns)
+    slot_patterns = policy_patterns.intersection(
+        context.allowed_patterns or frozenset({target.movement_pattern})
+    )
     policy_context = SubstitutionPolicyContext(
         goal=request.primary_goal,
         cause=context.cause,
@@ -246,8 +246,7 @@ def _sort_key(
         and candidate.substitution_group == target.substitution_group
     )
     same_strength_role = (
-        target_strength_role is not None
-        and item.candidate_strength_role is target_strength_role
+        target_strength_role is not None and item.candidate_strength_role is target_strength_role
     )
     rom_distance = len(
         target.range_of_motion_profile.symmetric_difference(candidate.range_of_motion_profile)
@@ -283,9 +282,7 @@ def _cause_sort_key(
     cause: SubstitutionCause,
 ) -> tuple[int, ...]:
     if cause is SubstitutionCause.MISSING_EQUIPMENT:
-        target_equipment = effective_required_equipment(
-            target.equipment, target.movement_pattern
-        )
+        target_equipment = effective_required_equipment(target.equipment, target.movement_pattern)
         candidate_equipment = effective_required_equipment(
             candidate.equipment, candidate.movement_pattern
         )
@@ -328,10 +325,7 @@ def _reason_codes(
         reasons.append("SUBSTITUTION_EXACT_ROLE")
     if candidate.muscle_focus is target.muscle_focus:
         reasons.append("SUBSTITUTION_MUSCLE_FOCUS_PRESERVED")
-    if (
-        target_strength_role is not None
-        and candidate_strength_role is target_strength_role
-    ):
+    if target_strength_role is not None and candidate_strength_role is target_strength_role:
         reasons.append("SUBSTITUTION_STRENGTH_ROLE_PRESERVED")
     if cause is SubstitutionCause.MISSING_EQUIPMENT and candidate.equipment != target.equipment:
         reasons.append("SUBSTITUTION_EQUIPMENT_ADAPTED")

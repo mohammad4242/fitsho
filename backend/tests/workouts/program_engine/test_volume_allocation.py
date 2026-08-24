@@ -7,14 +7,14 @@ import pytest
 from app.exercises.enums import (
     Difficulty,
     Equipment,
+    ExerciseCautionTag,
     ExerciseType,
     MovementPattern,
     MuscleGroup,
 )
 from app.workouts.program_engine.duration_policy import get_session_duration_policy
-
-
 from app.workouts.program_engine.engine import generate_program
+from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.prescription import estimate_exercise_minutes
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
@@ -331,6 +331,70 @@ def test_hard_priority_minimum_reuses_the_only_safe_exercise_across_sessions() -
     ]
     assert len(repeated) == 2
     assert "PRIORITY_EXERCISE_REPEATED_FOR_HARD_MINIMUM" in repeated[0].reason_codes
+
+
+def test_volume_repair_substitutions_are_hard_safe_and_keep_strength_role_order() -> None:
+    target = replace(
+        _candidate("Dumbbell Press", MuscleGroup.CHEST),
+        equipment=frozenset({Equipment.DUMBBELL}),
+    )
+    primary_strength_alternative = replace(
+        _candidate("Dumbbell Press Alternative", MuscleGroup.CHEST),
+        equipment=frozenset({Equipment.DUMBBELL}),
+        fatigue_cost=5,
+    )
+    secondary_bodyweight_alternative = replace(
+        _candidate("Push-Up Alternative", MuscleGroup.CHEST),
+        fatigue_cost=1,
+    )
+    blocked_alternative = replace(
+        _candidate("Blocked Press", MuscleGroup.CHEST),
+        caution_tags=frozenset({ExerciseCautionTag.SHOULDER_INTERNAL_ROTATION}),
+    )
+    initial = _programmed("Existing Press", MuscleGroup.CHEST, 3)
+    volume = replace(
+        _volume_target(MuscleGroup.CHEST, target_sets=6).targets[0],
+        minimum_direct_sets=6,
+        minimum_effective_sets=6,
+        effective_target_sets=6,
+    )
+
+    days, _reasons = repair_weekly_volume(
+        (_day(1, (initial,), focus="upper"),),
+        normalized(
+            primary_goal=Goal.STRENGTH,
+            preferred_exercises=[target.id],
+            blocked_caution_tags=[ExerciseCautionTag.SHOULDER_INTERNAL_ROTATION],
+        ),
+        WeeklyVolumePlan(targets=(volume,), reason_codes=()),
+        RULESET,
+        candidates=(
+            target,
+            primary_strength_alternative,
+            secondary_bodyweight_alternative,
+            blocked_alternative,
+        ),
+    )
+
+    added = next(item for item in days[0].exercises if item.exercise_id == target.id)
+    assert added.substitution_exercise_ids == (
+        primary_strength_alternative.id,
+        secondary_bodyweight_alternative.id,
+    )
+    assert blocked_alternative.id not in added.substitution_exercise_ids
+    candidates_by_id = {
+        item.id: item
+        for item in (
+            primary_strength_alternative,
+            secondary_bodyweight_alternative,
+        )
+    }
+    assert all(
+        candidates_by_id[item_id].primary_muscle is target.primary_muscle
+        and candidates_by_id[item_id].movement_pattern is target.movement_pattern
+        and candidates_by_id[item_id].exercise_type is target.exercise_type
+        for item_id in added.substitution_exercise_ids
+    )
 
 
 def test_reference_repair_adds_hard_major_coverage_outside_original_focus() -> None:

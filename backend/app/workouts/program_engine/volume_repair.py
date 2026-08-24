@@ -12,7 +12,6 @@ from app.workouts.program_engine.prescription import (
     prescription_for,
 )
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
-from app.workouts.program_engine.replacement_ranker import rank_replacement_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -25,6 +24,11 @@ from app.workouts.program_engine.schemas import (
 from app.workouts.program_engine.session_builder import exercise_fits_focus
 from app.workouts.program_engine.session_targets import english_session_title
 from app.workouts.program_engine.strength_programming import classify_strength_role
+from app.workouts.program_engine.substitution_engine import (
+    SubstitutionContext,
+    rank_substitutions,
+)
+from app.workouts.program_engine.substitution_policy import SubstitutionCause
 from app.workouts.program_engine.template_sessions import adaptation_preservation_rank
 
 _HARD_MOVEMENT_PATTERN_GROUPS = (
@@ -543,15 +547,14 @@ def _select_exercise_addition(
                     reasons.append("DELIBERATE_REDUNDANCY_FOR_MINIMUM_COVERAGE")
                 if repeated_exercise:
                     reasons.append("PRIORITY_EXERCISE_REPEATED_FOR_HARD_MINIMUM")
-                substitutions = tuple(
-                    item.id
-                    for item in rank_replacement_exercises(
-                        request,
-                        candidate,
-                        candidates,
-                        limit=ruleset.substitution_limit,
-                    )
-                )
+                substitutions = rank_substitutions(
+                    request,
+                    candidate,
+                    list(candidates),
+                    SubstitutionContext(cause=SubstitutionCause.VOLUME_REPAIR),
+                    ruleset=ruleset,
+                    limit=ruleset.substitution_limit,
+                ).exercise_ids
                 programmed = ProgrammedExercise(
                     exercise_id=candidate.id,
                     exercise_name=candidate.name,

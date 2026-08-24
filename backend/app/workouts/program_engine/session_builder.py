@@ -8,7 +8,6 @@ from app.workouts.program_engine.duration_capacity import SessionCapacity
 from app.workouts.program_engine.enums import CompatibilityLevel, Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
-from app.workouts.program_engine.replacement_ranker import rank_replacement_exercises
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -23,6 +22,11 @@ from app.workouts.program_engine.slot_compatibility import (
     focus_scope,
 )
 from app.workouts.program_engine.strength_programming import classify_strength_role
+from app.workouts.program_engine.substitution_engine import (
+    SubstitutionContext,
+    rank_substitutions,
+)
+from app.workouts.program_engine.substitution_policy import SubstitutionCause
 from app.workouts.program_engine.supplemental_policy import (
     is_supplemental_muscle,
     main_exercise_count,
@@ -367,31 +371,36 @@ def build_sessions(
             item.id: ()
             if is_supplemental_muscle(item.primary_muscle)
             else tuple(
-                alternative.id
-                for alternative in rank_replacement_exercises(
+                option.exercise.id
+                for option in rank_substitutions(
                     request,
                     item,
-                    exercises,
-                    limit=ruleset.substitution_limit,
-                    allowed_patterns=(
-                        selected_slots[item.id].patterns
-                        if item.id in selected_slots
-                        else focus_scope(focus)[0]
+                    list(exercises),
+                    SubstitutionContext(
+                        cause=SubstitutionCause.DISPLAY_ALTERNATIVE,
+                        allowed_patterns=(
+                            selected_slots[item.id].patterns
+                            if item.id in selected_slots
+                            else focus_scope(focus)[0]
+                        ),
+                        target_muscles=frozenset(
+                            {
+                                (
+                                    selected_slots[item.id].target_muscle
+                                    if item.id in selected_slots
+                                    else None
+                                )
+                                or item.primary_muscle
+                            }
+                        )
+                        if item.primary_muscle is not None
+                        else None,
+                        day_focus=focus,
+                        allow_full_body=focus.startswith("full_body"),
                     ),
-                    target_muscles=frozenset(
-                        {
-                            (
-                                selected_slots[item.id].target_muscle
-                                if item.id in selected_slots
-                                else None
-                            )
-                            or item.primary_muscle
-                        }
-                    )
-                    if item.primary_muscle is not None
-                    else None,
-                    day_focus=focus,
-                )
+                    ruleset=ruleset,
+                    limit=ruleset.substitution_limit,
+                ).options
             )
             for item in chosen
         }

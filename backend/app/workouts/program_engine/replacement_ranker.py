@@ -1,48 +1,14 @@
-"""Deterministic ranking for safe exercise replacements."""
+"""Backward-compatible forwarding wrapper for the unified substitution engine."""
 
 from collections.abc import Iterable
-from uuid import UUID
 
 from app.exercises.enums import MovementPattern, MuscleGroup
-from app.workouts.program_engine.eligibility import filter_eligible_exercises
-from app.workouts.program_engine.enums import (
-    CompatibilityLevel,
-    ImpactLimit,
-    LoadLimit,
-    SkillDemand,
-    StabilityDemand,
+from app.workouts.program_engine.schemas import ExerciseCandidate, NormalizedProgramRequest
+from app.workouts.program_engine.substitution_engine import (
+    SubstitutionContext,
+    rank_substitutions,
 )
-from app.workouts.program_engine.schemas import (
-    ExerciseCandidate,
-    NormalizedProgramRequest,
-)
-from app.workouts.program_engine.slot_compatibility import (
-    SlotCompatibility,
-    evaluate_candidate_slot_compatibility,
-)
-from app.workouts.program_engine.substitution_policy import allowed_movement_patterns
-
-_IMPACT_RANK = {
-    ImpactLimit.LOW: 0,
-    ImpactLimit.MODERATE: 1,
-    ImpactLimit.HIGH: 2,
-}
-_LOAD_RANK = {
-    LoadLimit.NONE: 0,
-    LoadLimit.LOW: 1,
-    LoadLimit.MODERATE: 2,
-    LoadLimit.HIGH: 3,
-}
-_STABILITY_RANK = {
-    StabilityDemand.LOW: 0,
-    StabilityDemand.MODERATE: 1,
-    StabilityDemand.HIGH: 2,
-}
-_SKILL_RANK = {
-    SkillDemand.LOW: 0,
-    SkillDemand.MODERATE: 1,
-    SkillDemand.HIGH: 2,
-}
+from app.workouts.program_engine.substitution_policy import SubstitutionCause
 
 
 def rank_replacement_exercises(
@@ -55,138 +21,18 @@ def rank_replacement_exercises(
     target_muscles: frozenset[MuscleGroup] | None = None,
     day_focus: str | None = None,
 ) -> tuple[ExerciseCandidate, ...]:
-    """Return safe replacements ordered by semantic fit and deterministic tie-breaks.
-
-    Eligibility is intentionally applied before ranking, so blocked, unavailable, or
-    otherwise unsafe candidates cannot be surfaced by a strong semantic match.
-    """
-
-    if limit <= 0:
-        return ()
-
-    eligible = filter_eligible_exercises(request, tuple(candidates)).eligible
-    disliked = request.source.disliked_exercises
-    preferred = request.source.preferred_exercises
-    semantic_targets = target_muscles or (
-        frozenset({target.primary_muscle}) if target.primary_muscle is not None else None
-    )
-    policy_scope = allowed_movement_patterns(
-        target.movement_pattern,
-        semantic_targets or frozenset(),
-        goal=request.primary_goal,
-    )
-    semantic_scope = policy_scope.intersection(
-        allowed_patterns or frozenset({target.movement_pattern})
-    )
-    compatible = tuple(
-        (candidate, compatibility)
-        for candidate in eligible
-        if candidate.id != target.id
-        and (
-            compatibility := _replacement_compatibility(
-                target,
-                candidate,
-                allowed_patterns=semantic_scope,
-                target_muscles=semantic_targets,
-                day_focus=day_focus,
-            )
-        ).compatible
-    )
-    ranked = sorted(
-        compatible,
-        key=lambda item: _replacement_sort_key(
-            target,
-            item[0],
-            compatibility=item[1],
-            disliked=disliked,
-            preferred=preferred,
+    """Forward legacy callers to the only concrete substitution ranker."""
+    decision = rank_substitutions(
+        request,
+        target,
+        list(candidates),
+        SubstitutionContext(
+            cause=SubstitutionCause.DISPLAY_ALTERNATIVE,
+            allowed_patterns=allowed_patterns,
+            target_muscles=target_muscles,
+            day_focus=day_focus,
+            allow_full_body=bool(day_focus and day_focus.startswith("full_body")),
         ),
+        limit=limit,
     )
-    return tuple(candidate for candidate, _compatibility in ranked[:limit])
-
-
-def _replacement_compatibility(
-    target: ExerciseCandidate,
-    candidate: ExerciseCandidate,
-    *,
-    allowed_patterns: frozenset[MovementPattern],
-    target_muscles: frozenset[MuscleGroup] | None,
-    day_focus: str | None,
-) -> SlotCompatibility:
-    compatibility = evaluate_candidate_slot_compatibility(
-        candidate,
-        allowed_patterns=allowed_patterns,
-        target_muscles=target_muscles,
-        day_focus=day_focus,
-        allow_full_body=bool(day_focus and day_focus.startswith("full_body")),
-    )
-    if not compatibility.compatible:
-        return compatibility
-    if (
-        compatibility.level is CompatibilityLevel.PREFERRED
-        and candidate.movement_pattern is target.movement_pattern
-        and candidate.primary_muscle is target.primary_muscle
-        and candidate.exercise_type is target.exercise_type
-    ):
-        return compatibility
-    return SlotCompatibility(
-        CompatibilityLevel.VALID_BUT_SUBOPTIMAL,
-        tuple(dict.fromkeys((*compatibility.reason_codes, "REPLACEMENT_ROLE_SUBOPTIMAL"))),
-    )
-
-
-def _replacement_sort_key(
-    target: ExerciseCandidate,
-    candidate: ExerciseCandidate,
-    *,
-    compatibility: SlotCompatibility,
-    disliked: frozenset[UUID],
-    preferred: frozenset[UUID],
-) -> tuple[object, ...]:
-    target_secondary = set(target.secondary_muscles)
-    candidate_secondary = set(candidate.secondary_muscles)
-    same_group = (
-        target.substitution_group is not None
-        and candidate.substitution_group == target.substitution_group
-    )
-    same_primary = (
-        target.primary_muscle is not None and candidate.primary_muscle is target.primary_muscle
-    )
-    same_laterality = candidate.laterality is target.laterality
-    same_pattern = candidate.movement_pattern is target.movement_pattern
-    same_type = candidate.exercise_type is target.exercise_type
-    secondary_overlap = len(target_secondary.intersection(candidate_secondary))
-    rom_distance = len(
-        target.range_of_motion_profile.symmetric_difference(candidate.range_of_motion_profile)
-    )
-    skill_distance = abs(_SKILL_RANK[target.skill_demand] - _SKILL_RANK[candidate.skill_demand])
-    stability_distance = abs(
-        _STABILITY_RANK[target.stability_demand] - _STABILITY_RANK[candidate.stability_demand]
-    )
-    risk_score = (
-        _IMPACT_RANK[candidate.impact_level]
-        + _LOAD_RANK[candidate.axial_loading_level]
-        + _STABILITY_RANK[candidate.stability_demand]
-        + _SKILL_RANK[candidate.skill_demand]
-    )
-    return (
-        candidate.id not in target.curated_alternative_ids,
-        not same_group,
-        compatibility.level is not CompatibilityLevel.PREFERRED,
-        not same_primary,
-        not same_pattern,
-        not same_type,
-        -secondary_overlap,
-        not same_laterality,
-        rom_distance,
-        skill_distance,
-        stability_distance,
-        risk_score,
-        abs(target.fatigue_cost - candidate.fatigue_cost),
-        abs(target.setup_cost - candidate.setup_cost),
-        candidate.fatigue_cost,
-        candidate.setup_cost,
-        candidate.id in disliked,
-        candidate.id not in preferred,
-        str(candidate.id),
-    )
+    return tuple(option.exercise for option in decision.options)
