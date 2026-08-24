@@ -202,6 +202,7 @@ def prescribe_sessions(
                 estimated_duration_minutes=estimated,
                 exercises=tuple(programmed),
                 template_target_muscles=draft.template_target_muscles,
+                template_structure_focus=draft.template_structure_focus,
             )
         )
     return tuple(days)
