@@ -539,7 +539,6 @@ def _program_for_split(
         ruleset,
         candidates=eligible,
     )
-    days = add_cardio(normalized, days, cardio_eligible, ruleset)
     days_before_duration_repair = days
     days, duration_repair_reasons = repair_session_durations(
         days,
@@ -671,6 +670,7 @@ def _program_for_split(
         metrics=metrics,
         decision_trace=trace,
     )
+    days = add_cardio(normalized, days, cardio_eligible, ruleset)
     program = WorkoutProgram(
         user_profile_snapshot=request.model_dump(mode="json"),
         engine_version=ruleset.engine_version,
@@ -776,7 +776,6 @@ def _reference_program(
         allow_soft_exercise_additions=False,
         preserve_template_core_structure=True,
     )
-    days = add_cardio(normalized, days, cardio_eligible, ruleset)
     days_before_duration_repair = days
     days, duration_repair_reasons = repair_session_durations(
         days,
@@ -903,6 +902,7 @@ def _reference_program(
                 "reason_codes": soft_priority_shortfalls,
             },
         )
+    days = add_cardio(normalized, days, cardio_eligible, ruleset)
     program = WorkoutProgram(
         user_profile_snapshot=request.model_dump(mode="json"),
         engine_version=ruleset.engine_version,
