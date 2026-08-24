@@ -122,6 +122,8 @@ class BenchmarkProfile:
     previous_volume_sets: int | None = None
     blocked_exercise_tokens: tuple[str, ...] = ()
     physical_limitation_note: str | None = None
+    training_age_months: int | None = None
+    allowed_range_of_motion: frozenset[str] = frozenset()
 
 
 def _profile_id(experience: ExperienceLevel, days: int, variant: int) -> str:
@@ -138,106 +140,117 @@ def _variant_profile(experience: ExperienceLevel, days: int, variant: int) -> Be
         Goal.FAT_LOSS,
         Goal.GENERAL_FITNESS,
     )
-    goal = goals[variant]
-    if variant == 0:
-        return BenchmarkProfile(
-            _profile_id(experience, days, variant),
-            variant,
-            experience,
-            days,
-            goal if experience is not ExperienceLevel.FIRST_MONTH else Goal.GENERAL_FITNESS,
-            (),
-            (),
-            Sex.MALE,
-            60,
-            "full_gym",
-            TrainingLocation.GYM,
-            None,
-        )
-    if variant == 1:
-        return BenchmarkProfile(
-            _profile_id(experience, days, variant),
-            variant,
-            experience,
-            days,
-            goal,
-            (MuscleGroup.CHEST,),
-            (),
-            Sex.FEMALE,
-            45,
-            "limited_gym",
-            TrainingLocation.GYM,
-            None,
-            frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.BENCH}),
-            blocked_movement_patterns=(MovementPattern.VERTICAL_PUSH,),
-            physical_job_demand=PhysicalJobDemand.MODERATE,
-            blocked_exercise_tokens=("barbell", "cable", "machine"),
-        )
-    if variant == 2:
-        return BenchmarkProfile(
-            _profile_id(experience, days, variant),
-            variant,
-            experience,
-            days,
-            goal,
-            (MuscleGroup.GLUTES,),
-            ((MuscleGroup.HAMSTRINGS, "mild_lag"),),
-            Sex.FEMALE,
-            75,
-            "home_dumbbells",
-            TrainingLocation.HOME,
+    goal = goals[variant % len(goals)]
+    if experience is ExperienceLevel.FIRST_MONTH:
+        goal = Goal.GENERAL_FITNESS
+
+    locations = (TrainingLocation.GYM, TrainingLocation.HOME)
+    location = locations[variant % 2]
+
+    home_setups = (
+        ("home_bw", HomeTrainingSetup.BODYWEIGHT_ONLY, frozenset({Equipment.BODYWEIGHT})),
+        (
+            "home_db",
             HomeTrainingSetup.DUMBBELLS_AVAILABLE,
             frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL}),
-            blocked_caution_tags=(ExerciseCautionTag.OVERHEAD_POSITION,),
-            overhead_limit=LoadLimit.LOW,
-        )
-    if variant == 3:
-        return BenchmarkProfile(
-            _profile_id(experience, days, variant),
-            variant,
-            experience,
-            days,
-            goal,
-            (),
-            (),
-            None,
-            30,
-            "bands_bodyweight",
-            TrainingLocation.HOME,
+        ),
+        (
+            "home_band",
             HomeTrainingSetup.BODYWEIGHT_ONLY,
             frozenset({Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND}),
-            training_cautions=(TrainingCaution.KNEE,),
-            blocked_caution_tags=(ExerciseCautionTag.DEEP_KNEE_FLEXION,),
-            impact_limit=ImpactLimit.LOW,
-            balance_requirement=BalanceAbility.LIMITED,
-            sleep_quality=RecoveryRating.POOR,
-            stress_level=RecoveryRating.POOR,
-            recent_recovery_problems=True,
-            physical_limitation_note="Knee discomfort; avoid deep knee flexion and impact.",
-        )
-    duration = 120 if experience is ExperienceLevel.ADVANCED and days == 6 else 90
+        ),
+        (
+            "home_db_bench",
+            HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+            frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.BENCH}),
+        ),
+        (
+            "home_db_pullup",
+            HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+            frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.PULL_UP_BAR}),
+        ),
+        (
+            "home_band_pullup",
+            HomeTrainingSetup.BODYWEIGHT_ONLY,
+            frozenset({Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND, Equipment.PULL_UP_BAR}),
+        ),
+        (
+            "home_all",
+            HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+            frozenset(
+                {
+                    Equipment.BODYWEIGHT,
+                    Equipment.DUMBBELL,
+                    Equipment.RESISTANCE_BAND,
+                    Equipment.BENCH,
+                    Equipment.PULL_UP_BAR,
+                }
+            ),
+        ),
+    )
+    gym_setups = (
+        ("full_gym", None, None),
+        (
+            "limited_gym",
+            None,
+            frozenset(
+                {
+                    Equipment.BODYWEIGHT,
+                    Equipment.DUMBBELL,
+                    Equipment.BENCH,
+                    Equipment.BARBELL,
+                    Equipment.CABLE,
+                }
+            ),
+        ),
+    )
+
+    eq_override: frozenset[Equipment] | None
+    if location == TrainingLocation.HOME:
+        label, home_setup, eq_override = home_setups[variant % len(home_setups)]
+    else:
+        label, home_setup_raw, eq_override_raw = gym_setups[variant % len(gym_setups)]
+        home_setup = None
+        eq_override = eq_override_raw
+
+    training_ages = {
+        ExperienceLevel.FIRST_MONTH: (0, 1),
+        ExperienceLevel.BEGINNER: (2, 6, 12),
+        ExperienceLevel.INTERMEDIATE: (18, 24, 36, 48),
+        ExperienceLevel.ADVANCED: (60, 84, 120),
+    }
+    age_options = training_ages[experience]
+    training_age = age_options[variant % len(age_options)]
+
+    durations = (45, 60, 75, 90, 120)
+    duration = durations[variant % len(durations)]
+    sexes = (Sex.MALE, Sex.FEMALE, None)
+    sex = sexes[variant % len(sexes)]
+
+    rom_option = (variant // 5) % 3
+    if rom_option == 1:
+        allowed_rom = frozenset({"spinal_flexion"})
+    elif rom_option == 2:
+        allowed_rom = frozenset({"deep_knee_flexion"})
+    else:
+        allowed_rom = frozenset()
+
     return BenchmarkProfile(
-        _profile_id(experience, days, variant),
-        variant,
-        experience,
-        days,
-        goal,
-        (MuscleGroup.GLUTES, MuscleGroup.SHOULDERS),
-        ((MuscleGroup.HAMSTRINGS, "clear_lag"), (MuscleGroup.BACK, "mild_lag")),
-        None,
-        duration,
-        "full_gym_recovery_limited",
-        TrainingLocation.GYM,
-        None,
-        training_cautions=(TrainingCaution.LOWER_BACK,),
-        axial_load_limit=LoadLimit.LOW,
-        sleep_quality=RecoveryRating.AVERAGE,
-        stress_level=RecoveryRating.POOR,
-        physical_job_demand=PhysicalJobDemand.HIGH,
-        recent_recovery_problems=True,
-        previous_volume_sets=8,
-        blocked_exercise_tokens=("barbell deadlift", "good morning"),
-        physical_limitation_note="High physical workload; limit axial loading.",
+        profile_id=_profile_id(experience, days, variant),
+        variant=variant,
+        experience_level=experience,
+        resistance_days=days,
+        goal=goal,
+        priority_muscles=() if variant % 2 == 0 else (MuscleGroup.CHEST,),
+        body_analysis_priorities=(),
+        sex=sex,
+        duration_minutes=duration,
+        equipment_label=label,
+        training_location=location,
+        home_setup=home_setup,
+        available_equipment_override=eq_override,
+        training_age_months=training_age,
+        allowed_range_of_motion=allowed_rom,
     )
 
 
@@ -245,7 +258,7 @@ def benchmark_profiles() -> tuple[BenchmarkProfile, ...]:
     return tuple(
         _variant_profile(ExperienceLevel(experience), days, variant)
         for experience, days in SUPPORTED_MATRIX
-        for variant in range(5)
+        for variant in range(25)
     )
 
 
@@ -308,7 +321,9 @@ def profile_to_request(
         height_cm=175,
         fitness_goal=_PROFILE_GOALS[profile.goal],
         experience_level=profile.experience_level,
-        training_age_months={
+        training_age_months=profile.training_age_months
+        if profile.training_age_months is not None
+        else {
             ExperienceLevel.FIRST_MONTH: 0,
             ExperienceLevel.BEGINNER: 6,
             ExperienceLevel.INTERMEDIATE: 24,
@@ -338,6 +353,8 @@ def profile_to_request(
     override_values: dict[str, object] = {}
     if profile.available_equipment_override is not None:
         override_values["available_equipment"] = profile.available_equipment_override
+    if profile.allowed_range_of_motion:
+        override_values["allowed_range_of_motion"] = profile.allowed_range_of_motion
     if profile.blocked_movement_patterns:
         override_values["blocked_movement_patterns"] = frozenset(profile.blocked_movement_patterns)
     if profile.blocked_caution_tags:
@@ -1072,6 +1089,42 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
     )
     feasible = total - unsatisfied
     quality_passes = categories["PASS"] + categories["PASS_WITH_CONSTRAINTS"]
+    determinism = sum(
+        1 for r in records if cast(Mapping[str, object], r.get("determinism", {})).get("identical")
+    )
+    determinism_runs = sum(1 for r in records if r.get("determinism"))
+    substitutions_total = sum(
+        int(str(cast(Mapping[str, object], r.get("quality", {})).get("substitution_count", 0)))
+        for r in records
+    )
+    movement_family_fallbacks = sum(
+        1
+        for r in records
+        for f in cast(Sequence[Mapping[str, object]], r.get("audit_findings", []))
+        if f.get("code") == "substituted_movement_family"
+    )
+    equipment_violations = sum(
+        1
+        for r in records
+        for f in cast(Sequence[Mapping[str, object]], r.get("audit_findings", []))
+        if "equipment" in str(f.get("code")).lower()
+    )
+    safety_violations = sum(
+        1
+        for r in records
+        for f in cast(Sequence[Mapping[str, object]], r.get("audit_findings", []))
+        if "safety" in str(f.get("code")).lower()
+        or "caution" in str(f.get("code")).lower()
+        or "constraint" in str(f.get("code")).lower()
+        or "limit" in str(f.get("code")).lower()
+    )
+    redundancy_violations = sum(
+        1
+        for r in records
+        for f in cast(Sequence[Mapping[str, object]], r.get("audit_findings", []))
+        if "redundant" in str(f.get("code")).lower() or "redundancy" in str(f.get("code")).lower()
+    )
+
     breakdowns: dict[str, dict[str, dict[str, int]]] = defaultdict(dict)
     for dimension in ("experience_level", "days", "goal", "duration", "equipment", "limitations"):
         grouped: dict[str, Counter[str]] = defaultdict(Counter)
@@ -1153,6 +1206,13 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
             "validation_success_rate": round(validation_success / total, 4) if total else 0.0,
             "metrics": quality_rates,
             "top_findings": findings.most_common(),
+            "determinism_identical": determinism,
+            "determinism_runs": determinism_runs,
+            "substitutions_total": substitutions_total,
+            "movement_family_fallbacks": movement_family_fallbacks,
+            "equipment_violations_custom": equipment_violations,
+            "safety_violations_custom": safety_violations,
+            "redundancy_violations_custom": redundancy_violations,
         },
         "failure_breakdowns": {key: dict(value) for key, value in breakdowns.items()},
     }
@@ -1231,7 +1291,23 @@ def _summary_markdown(payload: Mapping[str, object]) -> str:
             lines.append(
                 f"- {name}: {metric['satisfied']}/{metric['applicable']} ({metric['rate']})"
             )
-    lines.extend(["", "## Top audit findings", ""])
+    lines.extend(
+        [
+            "",
+            "## Custom Audits",
+            "",
+            f"- Determinism (identical across repeats): "
+        f"{quality.get('determinism_identical', 0)}/{quality.get('determinism_runs', 0)}",
+            f"- Total Substitutions: {quality.get('substitutions_total', 0)}",
+            f"- Movement Family Fallbacks: {quality.get('movement_family_fallbacks', 0)}",
+            f"- Equipment Violations: {quality.get('equipment_violations', 0)}",
+            f"- Safety/Constraint Violations: {quality.get('safety_violations', 0)}",
+            f"- Redundancy Violations: {quality.get('redundancy_violations', 0)}",
+            "",
+            "## Top audit findings",
+            "",
+        ]
+    )
     for finding, count in cast(Sequence[Sequence[object]], quality["top_findings"])[:10]:
         lines.append(f"- {finding}: {count}")
     lines.extend(["", "## Failure breakdowns", ""])

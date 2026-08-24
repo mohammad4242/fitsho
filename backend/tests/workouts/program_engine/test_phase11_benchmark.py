@@ -27,9 +27,9 @@ def _successful_result(*, warnings: tuple[str, ...] = ()) -> SimpleNamespace:
 def test_phase11_population_covers_every_supported_cell_with_five_profiles() -> None:
     profiles = benchmark_profiles()
 
-    assert len(profiles) == 75
+    assert len(profiles) == 375
     assert Counter((item.experience_level.value, item.resistance_days) for item in profiles) == {
-        cell: 5 for cell in SUPPORTED_MATRIX
+        cell: 25 for cell in SUPPORTED_MATRIX
     }
     assert len({item.goal.value for item in profiles}) >= 5
     assert len({item.equipment_label for item in profiles}) >= 4
