@@ -81,8 +81,11 @@ def build_template_sessions(
     ruleset: ProgramRuleset,
     *,
     session_capacity: SessionCapacity | None = None,
+    exercise_catalog: list[ExerciseCandidate] | tuple[ExerciseCandidate, ...] | None = None,
 ) -> TemplateSessionBuild:
     eligible_by_id = {candidate.id: candidate for candidate in eligible}
+    catalog_source = eligible if exercise_catalog is None else exercise_catalog
+    catalog_by_id = {candidate.id: candidate for candidate in catalog_source}
     used: Counter[object] = Counter()
     reserved: Counter[UUID] = Counter(
         slot.exercise_id
@@ -131,6 +134,7 @@ def build_template_sessions(
         for slot in reference_day.slots:
             if slot.exercise_id is not None:
                 reserved[slot.exercise_id] -= 1
+            original = catalog_by_id.get(slot.exercise_id) if slot.exercise_id is not None else None
             candidate = (
                 eligible_by_id.get(slot.exercise_id) if slot.exercise_id is not None else None
             )
@@ -142,7 +146,8 @@ def build_template_sessions(
                 and bool(used[candidate.id])
                 and all(selected_candidate.id != candidate.id for selected_candidate, _ in selected)
             )
-            if candidate is None or (used[candidate.id] and not repeated_explicit_slot):
+            if slot.exercise_id is None:
+                # A structural slot without a referenced exercise is initial construction.
                 candidate = min(
                     (
                         item
@@ -154,21 +159,57 @@ def build_template_sessions(
                     key=lambda item: str(item.id),
                     default=None,
                 )
+            elif candidate is None or (used[candidate.id] and not repeated_explicit_slot):
+                candidate = (
+                    _rank_template_slot_candidates(
+                        request,
+                        slot,
+                        index,
+                        eligible,
+                        used,
+                        reserved,
+                        ruleset,
+                        original=original,
+                    )
+                    if original is not None
+                    else None
+                )
             if candidate is None:
                 if slot.adaptation_priority == "core":
-                    candidate = min(
-                        (
-                            item
-                            for item in eligible
-                            if all(
-                                selected_candidate.id != item.id
-                                for selected_candidate, _ in selected
+                    if slot.exercise_id is None:
+                        # Preserve existing construction fallback for reference-free core slots.
+                        candidate = min(
+                            (
+                                item
+                                for item in eligible
+                                if all(
+                                    selected_candidate.id != item.id
+                                    for selected_candidate, _ in selected
+                                )
+                                and _template_slot_is_compatible(item, slot, index)
+                            ),
+                            key=lambda item: (used[item.id], str(item.id)),
+                            default=None,
+                        )
+                    else:
+                        candidate = (
+                            _rank_template_slot_candidates(
+                                request,
+                                slot,
+                                index,
+                                eligible,
+                                used,
+                                reserved,
+                                ruleset,
+                                original=original,
+                                allow_reuse=True,
+                                selected_ids=frozenset(
+                                    item.id for item, _selected_slot in selected
+                                ),
                             )
-                            and _template_slot_is_compatible(item, slot, index)
-                        ),
-                        key=lambda item: (used[item.id], str(item.id)),
-                        default=None,
-                    )
+                            if original is not None
+                            else None
+                        )
                     if candidate is None:
                         raise TemplateConstructionError(
                             "TEMPLATE_CORE_SLOT_UNRESOLVABLE",
@@ -433,39 +474,35 @@ def _rank_template_slot_candidates(
     reserved: Counter[UUID],
     ruleset: ProgramRuleset,
     *,
-    original: ExerciseCandidate | None,
+    original: ExerciseCandidate,
+    allow_reuse: bool = False,
+    selected_ids: frozenset[UUID] = frozenset(),
 ) -> ExerciseCandidate | None:
     options = tuple(
         item
         for item in eligible
-        if not used[item.id]
-        and not reserved[item.id]
-        and _template_slot_is_compatible(item, slot, day_index)
+        if (allow_reuse or (not used[item.id] and not reserved[item.id]))
+        and item.id not in selected_ids
     )
     if not options:
         return None
     target_muscles = frozenset(slot.target_muscles)
-    if original is not None:
-        replacements = rank_substitutions(
-            request,
-            original,
-            list(options),
-            SubstitutionContext(
-                cause=SubstitutionCause.TEMPLATE_RECOVERY,
-                allowed_patterns=template_slot_allowed_patterns(
-                    slot.movement_pattern, slot.target_muscles
-                ),
-                target_muscles=target_muscles,
-                day_focus=f"template_reference_{day_index}",
+    replacements = rank_substitutions(
+        request,
+        original,
+        list(options),
+        SubstitutionContext(
+            cause=SubstitutionCause.TEMPLATE_RECOVERY,
+            allowed_patterns=template_slot_allowed_patterns(
+                slot.movement_pattern, slot.target_muscles
             ),
-            ruleset=ruleset,
-            limit=len(options),
-        )
-        if replacements.options:
-            return replacements.options[0].exercise
-    needed_muscle = slot.target_muscles[0] if len(slot.target_muscles) == 1 else None
-    ranked = rank_exercises(request, options, ruleset, needed_muscle=needed_muscle)
-    return ranked[0].exercise if ranked else None
+            target_muscles=target_muscles,
+            day_focus=f"template_reference_{day_index}",
+        ),
+        ruleset=ruleset,
+        limit=len(options),
+    )
+    return replacements.options[0].exercise if replacements.options else None
 
 
 def _template_role_is_excessive(

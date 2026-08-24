@@ -86,7 +86,8 @@ def test_template_slot_resolution_uses_profile_ranking_not_catalog_order() -> No
         preferred_exercises=[preferred.id],
     )
     normalized = normalize_request(source, RULESET)
-    eligible = filter_eligible_exercises(normalized, (fallback, preferred, original, core)).eligible
+    catalog = (fallback, preferred, original, core)
+    eligible = filter_eligible_exercises(normalized, catalog).eligible
     template = TemplateReference(
         slug="ranked-resolution",
         days_per_week=1,
@@ -124,6 +125,7 @@ def test_template_slot_resolution_uses_profile_ranking_not_catalog_order() -> No
         template,
         eligible,
         replace(RULESET, minimum_exercises_per_session=1),
+        exercise_catalog=catalog,
     )
 
     assert build.drafts[0].exercises[0].id == preferred.id

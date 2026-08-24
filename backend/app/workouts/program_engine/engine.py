@@ -160,6 +160,7 @@ def generate_program(
                 eligibility.eligible,
                 ruleset,
                 session_capacity=session_capacity,
+                exercise_catalog=exercise_catalog,
             )
             reference_result = _reference_program(
                 request,

@@ -360,7 +360,13 @@ def test_template_builder_keeps_simultaneous_constraint_replacements_safe() -> N
         intensity_methods=("standard",),
         days=(day,),
     )
-    build = build_template_sessions(source, template, eligible, RULESET)
+    build = build_template_sessions(
+        source,
+        template,
+        eligible,
+        RULESET,
+        exercise_catalog=catalog,
+    )
 
     _assert_builder_substitutions_are_safe(build.drafts, unsafe.id)
     assert all(target.id not in {item.id for item in draft.exercises} for draft in build.drafts)
