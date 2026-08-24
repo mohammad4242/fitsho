@@ -273,6 +273,7 @@ def build_template_sessions(
 
         reasons: dict[UUID, tuple[str, ...]] = {}
         substitutions: dict[UUID, tuple[UUID, ...]] = {}
+        substitution_decisions = []
         exercises: list[ExerciseCandidate] = []
         for candidate, slot in selected:
             exercises.append(candidate)
@@ -319,30 +320,29 @@ def build_template_sessions(
             )
             if preserved and is_template_slot:
                 preserved_template_occurrences[candidate.id] += 1
-            substitutions[candidate.id] = tuple(
-                option.exercise.id
-                for option in rank_substitutions(
-                    request,
-                    candidate,
-                    list(eligible),
-                    SubstitutionContext(
-                        cause=SubstitutionCause.DISPLAY_ALTERNATIVE,
-                        allowed_patterns=template_slot_allowed_patterns(
-                            slot.movement_pattern, slot.target_muscles
-                        ),
-                        target_muscles=(
-                            frozenset(slot.target_muscles)
-                            if slot.target_muscles
-                            else frozenset({candidate.primary_muscle})
-                            if candidate.primary_muscle is not None
-                            else None
-                        ),
-                        day_focus=f"template_reference_{index}",
+            decision = rank_substitutions(
+                request,
+                candidate,
+                list(eligible),
+                SubstitutionContext(
+                    cause=SubstitutionCause.DISPLAY_ALTERNATIVE,
+                    allowed_patterns=template_slot_allowed_patterns(
+                        slot.movement_pattern, slot.target_muscles
                     ),
-                    ruleset=ruleset,
-                    limit=ruleset.substitution_limit,
-                ).options
+                    target_muscles=(
+                        frozenset(slot.target_muscles)
+                        if slot.target_muscles
+                        else frozenset({candidate.primary_muscle})
+                        if candidate.primary_muscle is not None
+                        else None
+                    ),
+                    day_focus=f"template_reference_{index}",
+                ),
+                ruleset=ruleset,
+                limit=ruleset.substitution_limit,
             )
+            substitution_decisions.append(decision)
+            substitutions[candidate.id] = decision.exercise_ids
             resolutions.append(
                 TemplateSlotResolution(
                     day_index=index,
@@ -369,6 +369,7 @@ def build_template_sessions(
                 exercises=exercises,
                 selection_reasons=reasons,
                 substitutions=substitutions,
+                substitution_decisions=tuple(substitution_decisions),
                 reason_codes=tuple(dict.fromkeys(build_reasons)),
                 template_target_muscles=reference_day.focus,
                 template_structure_focus=reference_day.structure_focus,

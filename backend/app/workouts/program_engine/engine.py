@@ -58,6 +58,10 @@ from app.workouts.program_engine.split_selector import (
     rank_availability_aware_fallbacks,
     rank_split_candidates,
 )
+from app.workouts.program_engine.substitution_observability import (
+    aggregate_substitution_observability,
+    substitution_decision_summaries,
+)
 from app.workouts.program_engine.template_selector import (
     TemplateRankingResult,
     select_template_reference_result,
@@ -526,6 +530,9 @@ def _program_for_split(
             rejected_candidates=rejected,
             decision_trace=construction_trace,
         )
+    substitution_decisions = [
+        decision for draft in drafts for decision in draft.substitution_decisions
+    ]
     days = prescribe_sessions(
         normalized,
         drafts,
@@ -538,6 +545,7 @@ def _program_for_split(
         volume,
         ruleset,
         candidates=eligible,
+        substitution_decisions=substitution_decisions,
     )
     days_before_duration_repair = days
     days, duration_repair_reasons = repair_session_durations(
@@ -591,16 +599,20 @@ def _program_for_split(
             )
         )
     )
-    metrics = _volume_metrics(
-        days,
-        volume,
-        previous_volume,
-        ruleset,
-        request=normalized,
-        relaxed_required_pattern_groups=relaxed_groups,
-        relaxed_required_slots=relaxed_slots,
-        repair_reason_codes=tuple(dict.fromkeys((*repair_reasons, *duration_repair_reasons))),
-    )
+    substitution_metrics = aggregate_substitution_observability(substitution_decisions)
+    metrics = {
+        **_volume_metrics(
+            days,
+            volume,
+            previous_volume,
+            ruleset,
+            request=normalized,
+            relaxed_required_pattern_groups=relaxed_groups,
+            relaxed_required_slots=relaxed_slots,
+            repair_reason_codes=tuple(dict.fromkeys((*repair_reasons, *duration_repair_reasons))),
+        ),
+        **substitution_metrics,
+    }
     body_trace = body_analysis_trace(normalized, ruleset)
     session_reasons = tuple(
         dict.fromkeys(reason for draft in drafts for reason in draft.reason_codes)
@@ -667,6 +679,11 @@ def _program_for_split(
             "stage": "session_structure",
             "status": "finalized",
             "reason_codes": ("FINAL_SESSION_SEQUENCE_APPLIED",),
+        },
+        {
+            "stage": "substitution_observability",
+            "metrics": substitution_metrics,
+            "decisions": substitution_decision_summaries(substitution_decisions),
         },
     )
     empty_report = ValidationReport(
@@ -766,6 +783,9 @@ def _reference_program(
         direct_exposure_counts=build.direct_exposure_counts(),
         session_capacity=session_capacity,
     )
+    substitution_decisions = [
+        decision for draft in build.drafts for decision in draft.substitution_decisions
+    ]
     days = prescribe_sessions(
         normalized,
         build.drafts,
@@ -781,6 +801,7 @@ def _reference_program(
         candidates=eligible,
         allow_soft_exercise_additions=False,
         preserve_template_core_structure=True,
+        substitution_decisions=substitution_decisions,
     )
     days_before_duration_repair = days
     days, duration_repair_reasons = repair_session_durations(
@@ -794,15 +815,19 @@ def _reference_program(
     )
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
     days = finalize_session_structure(days, normalized, ruleset)
-    metrics = _volume_metrics(
-        days,
-        volume,
-        previous_volume,
-        ruleset,
-        request=normalized,
-        reference_template=reference.slug,
-        repair_reason_codes=tuple(dict.fromkeys((*repair_reasons, *duration_repair_reasons))),
-    )
+    substitution_metrics = aggregate_substitution_observability(substitution_decisions)
+    metrics = {
+        **_volume_metrics(
+            days,
+            volume,
+            previous_volume,
+            ruleset,
+            request=normalized,
+            reference_template=reference.slug,
+            repair_reason_codes=tuple(dict.fromkeys((*repair_reasons, *duration_repair_reasons))),
+        ),
+        **substitution_metrics,
+    }
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises), ruleset
     )
@@ -861,6 +886,11 @@ def _reference_program(
             "stage": "session_structure",
             "status": "finalized",
             "reason_codes": ("FINAL_SESSION_SEQUENCE_APPLIED",),
+        },
+        {
+            "stage": "substitution_observability",
+            "metrics": substitution_metrics,
+            "decisions": substitution_decision_summaries(substitution_decisions),
         },
     )
     if day_count_errors:

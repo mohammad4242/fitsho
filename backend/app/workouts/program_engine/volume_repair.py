@@ -26,6 +26,7 @@ from app.workouts.program_engine.session_targets import english_session_title
 from app.workouts.program_engine.strength_programming import classify_strength_role
 from app.workouts.program_engine.substitution_engine import (
     SubstitutionContext,
+    SubstitutionDecision,
     rank_substitutions,
 )
 from app.workouts.program_engine.substitution_policy import SubstitutionCause
@@ -55,6 +56,7 @@ def repair_weekly_volume(
     candidates: tuple[ExerciseCandidate, ...] = (),
     allow_soft_exercise_additions: bool = True,
     preserve_template_core_structure: bool = False,
+    substitution_decisions: list[SubstitutionDecision] | None = None,
 ) -> tuple[tuple[WorkoutDay, ...], tuple[str, ...]]:
     """Keep effective volume inside targets and hard caps before validation.
 
@@ -243,7 +245,9 @@ def repair_weekly_volume(
                 use_hard_maximums=False,
             )
         if exercise_addition is not None:
-            day_index, programmed = exercise_addition
+            day_index, programmed, substitution_decision = exercise_addition
+            if substitution_decisions is not None:
+                substitution_decisions.append(substitution_decision)
             if (
                 programmed.primary_muscle in priority_policy.priorities
                 and request.primary_goal is not Goal.STRENGTH
@@ -426,7 +430,7 @@ def _select_exercise_addition(
     ruleset: ProgramRuleset,
     *,
     use_hard_maximums: bool,
-) -> tuple[int, ProgrammedExercise] | None:
+) -> tuple[int, ProgrammedExercise, SubstitutionDecision] | None:
     needed = direct_under | effective_under
     if not needed or not candidates:
         return None
@@ -440,7 +444,7 @@ def _select_exercise_addition(
         for original, exercises in zip(originals, days, strict=True)
     )
     priority_order = {muscle: index for index, muscle in enumerate(priority_policy.priorities)}
-    options: list[tuple[tuple[object, ...], int, ProgrammedExercise]] = []
+    options: list[tuple[tuple[object, ...], int, ProgrammedExercise, SubstitutionDecision]] = []
     current_effective = calculate_effective_volume(
         (item for items in days for item in items), ruleset
     )
@@ -547,14 +551,15 @@ def _select_exercise_addition(
                     reasons.append("DELIBERATE_REDUNDANCY_FOR_MINIMUM_COVERAGE")
                 if repeated_exercise:
                     reasons.append("PRIORITY_EXERCISE_REPEATED_FOR_HARD_MINIMUM")
-                substitutions = rank_substitutions(
+                substitution_decision = rank_substitutions(
                     request,
                     candidate,
                     list(candidates),
                     SubstitutionContext(cause=SubstitutionCause.VOLUME_REPAIR),
                     ruleset=ruleset,
                     limit=ruleset.substitution_limit,
-                ).exercise_ids
+                )
+                substitutions = substitution_decision.exercise_ids
                 programmed = ProgrammedExercise(
                     exercise_id=candidate.id,
                     exercise_name=candidate.name,
@@ -631,12 +636,13 @@ def _select_exercise_addition(
                         ),
                         day_index,
                         programmed,
+                        substitution_decision,
                     )
                 )
     if not options:
         return None
     selected = min(options, key=lambda item: item[0])
-    return selected[1], selected[2]
+    return selected[1], selected[2], selected[3]
 
 
 def _repairable_direct_priority_overage(

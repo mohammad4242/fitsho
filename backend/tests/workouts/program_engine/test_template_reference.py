@@ -333,6 +333,16 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
 
     assert result.program is not None, result.errors
     assert result.program.aggregate_metrics["reference_template"] == template.slug
+    assert result.program.aggregate_metrics["substitution_requests"] > 0
+    substitution_trace = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "substitution_observability"
+    )
+    assert (
+        substitution_trace["metrics"]["substitution_requests"]
+        == (result.program.aggregate_metrics["substitution_requests"])
+    )
     template_trace = next(
         entry for entry in result.program.decision_trace if entry["stage"] == "template_reference"
     )
@@ -356,6 +366,7 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
         "volume_repair",
         "session_duration",
         "session_structure",
+        "substitution_observability",
         "template_attempt",
         "final_construction",
         "coach_quality",

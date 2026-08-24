@@ -24,6 +24,7 @@ from app.workouts.program_engine.schemas import (
     WeeklyVolumePlan,
     WorkoutDay,
 )
+from app.workouts.program_engine.substitution_engine import SubstitutionDecision
 from app.workouts.program_engine.volume_repair import (
     _select_addition_candidate,
     repair_weekly_volume,
@@ -359,6 +360,7 @@ def test_volume_repair_substitutions_are_hard_safe_and_keep_strength_role_order(
         effective_target_sets=6,
     )
 
+    substitution_decisions: list[SubstitutionDecision] = []
     days, _reasons = repair_weekly_volume(
         (_day(1, (initial,), focus="upper"),),
         normalized(
@@ -374,6 +376,7 @@ def test_volume_repair_substitutions_are_hard_safe_and_keep_strength_role_order(
             secondary_bodyweight_alternative,
             blocked_alternative,
         ),
+        substitution_decisions=substitution_decisions,
     )
 
     added = next(item for item in days[0].exercises if item.exercise_id == target.id)
@@ -382,6 +385,8 @@ def test_volume_repair_substitutions_are_hard_safe_and_keep_strength_role_order(
         secondary_bodyweight_alternative.id,
     )
     assert blocked_alternative.id not in added.substitution_exercise_ids
+    assert len(substitution_decisions) == 1
+    assert substitution_decisions[0].target_exercise_id == target.id
     candidates_by_id = {
         item.id: item
         for item in (

@@ -367,43 +367,43 @@ def build_sessions(
                 else "BODY_ANALYSIS_PRIORITY_PLACED_FIRST"
             )
             reasons[chosen[0].id] = reasons[chosen[0].id] + (placement_reason,)
-        substitutions = {
-            item.id: ()
-            if is_supplemental_muscle(item.primary_muscle)
-            else tuple(
-                option.exercise.id
-                for option in rank_substitutions(
-                    request,
-                    item,
-                    list(exercises),
-                    SubstitutionContext(
-                        cause=SubstitutionCause.DISPLAY_ALTERNATIVE,
-                        allowed_patterns=(
-                            selected_slots[item.id].patterns
-                            if item.id in selected_slots
-                            else focus_scope(focus)[0]
-                        ),
-                        target_muscles=frozenset(
-                            {
-                                (
-                                    selected_slots[item.id].target_muscle
-                                    if item.id in selected_slots
-                                    else None
-                                )
-                                or item.primary_muscle
-                            }
-                        )
-                        if item.primary_muscle is not None
-                        else None,
-                        day_focus=focus,
-                        allow_full_body=focus.startswith("full_body"),
+        substitutions: dict[UUID, tuple[UUID, ...]] = {}
+        substitution_decisions = []
+        for item in chosen:
+            if is_supplemental_muscle(item.primary_muscle):
+                substitutions[item.id] = ()
+                continue
+            decision = rank_substitutions(
+                request,
+                item,
+                list(exercises),
+                SubstitutionContext(
+                    cause=SubstitutionCause.DISPLAY_ALTERNATIVE,
+                    allowed_patterns=(
+                        selected_slots[item.id].patterns
+                        if item.id in selected_slots
+                        else focus_scope(focus)[0]
                     ),
-                    ruleset=ruleset,
-                    limit=ruleset.substitution_limit,
-                ).options
+                    target_muscles=frozenset(
+                        {
+                            (
+                                selected_slots[item.id].target_muscle
+                                if item.id in selected_slots
+                                else None
+                            )
+                            or item.primary_muscle
+                        }
+                    )
+                    if item.primary_muscle is not None
+                    else None,
+                    day_focus=focus,
+                    allow_full_body=focus.startswith("full_body"),
+                ),
+                ruleset=ruleset,
+                limit=ruleset.substitution_limit,
             )
-            for item in chosen
-        }
+            substitution_decisions.append(decision)
+            substitutions[item.id] = decision.exercise_ids
         if capacity < len(slots):
             session_reasons = session_reasons + ("SESSION_TRIMMED_FOR_TIME_LIMIT",)
         sessions.append(
@@ -414,6 +414,7 @@ def build_sessions(
                 exercises=chosen,
                 selection_reasons=reasons,
                 substitutions=substitutions,
+                substitution_decisions=tuple(substitution_decisions),
                 reason_codes=tuple(dict.fromkeys(session_reasons)),
                 relaxed_required_pattern_groups=tuple(dict.fromkeys(this_session_relaxed_groups)),
                 relaxed_required_target_muscles=tuple(this_session_relaxed_targets),

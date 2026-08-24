@@ -7,6 +7,7 @@ from app.exercises.enums import (
     MuscleFocus,
     MuscleGroup,
 )
+from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     BalanceAbility,
     BodyPosition,
@@ -21,9 +22,16 @@ from app.workouts.program_engine.substitution_engine import (
     SubstitutionContext,
     SubstitutionTier,
     rank_substitutions,
+    substitution_option_invariant_errors,
+)
+from app.workouts.program_engine.substitution_observability import (
+    SUBSTITUTION_METRIC_KEYS,
+    aggregate_substitution_observability,
+    merge_substitution_observability,
+    substitution_decision_summaries,
 )
 from app.workouts.program_engine.substitution_policy import SubstitutionCause
-from tests.workouts.program_engine.golden_fixtures import exercise, request
+from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
 
 
 def test_engine_classifies_and_orders_all_four_semantic_tiers() -> None:
@@ -92,9 +100,7 @@ def test_curated_knowledge_is_preference_only_after_hard_filters() -> None:
         curated_alternative_ids=(unsafe.id, safe.id),
     )
     decision = rank_substitutions(
-        normalize_request(
-            request(blocked_exercises=frozenset({unsafe.id}))
-        ),
+        normalize_request(request(blocked_exercises=frozenset({unsafe.id}))),
         target,
         (same_group, unsafe, safe),
         SubstitutionContext(cause=SubstitutionCause.SAFETY),
@@ -244,6 +250,166 @@ def test_incompatible_push_degradation_returns_explicit_no_replacement() -> None
 
     assert decision.options == ()
     assert decision.reason_codes == ("SUBSTITUTION_NO_VALID_REPLACEMENT",)
+
+
+def test_decision_observability_distinguishes_success_categories() -> None:
+    target = replace(
+        exercise("observed-target", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+        muscle_focus=MuscleFocus.UPPER_CHEST,
+        substitution_group="press",
+    )
+    exact = replace(
+        exercise("observed-exact", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+        muscle_focus=MuscleFocus.UPPER_CHEST,
+        substitution_group="press",
+    )
+    decision = rank_substitutions(
+        normalize_request(request()),
+        target,
+        (exact,),
+        SubstitutionContext(cause=SubstitutionCause.DISPLAY_ALTERNATIVE),
+        ruleset=RULESET,
+    )
+
+    metrics = decision.observability_metrics
+    assert metrics["substitution_requests"] == 1
+    assert metrics["substitution_successes"] == 1
+    assert metrics["substitution_exact_group"] == 1
+    assert metrics["substitution_exact_semantic_role"] == 1
+    assert metrics["substitution_muscle_focus_preserved"] == 1
+    assert decision.decision_trace_entry()["stage"] == "substitution"
+
+
+def test_observability_tracks_equipment_constraints_fallback_and_no_replacement() -> None:
+    target = exercise(
+        "observed-equipment-target", MovementPattern.HORIZONTAL_PULL, MuscleGroup.BACK
+    )
+    equipment_decision = rank_substitutions(
+        normalize_request(request(available_equipment=[Equipment.DUMBBELL])),
+        replace(target, equipment=frozenset({Equipment.BARBELL})),
+        (
+            replace(
+                target,
+                id=exercise("observed-db", target.movement_pattern, target.primary_muscle).id,
+                equipment=frozenset({Equipment.DUMBBELL}),
+            ),
+        ),
+        SubstitutionContext(cause=SubstitutionCause.MISSING_EQUIPMENT),
+        ruleset=RULESET,
+    )
+    constraint_decision = rank_substitutions(
+        normalize_request(request()),
+        target,
+        (
+            replace(
+                target,
+                id=exercise("observed-safe", target.movement_pattern, target.primary_muscle).id,
+            ),
+        ),
+        SubstitutionContext(cause=SubstitutionCause.SAFETY),
+        ruleset=RULESET,
+    )
+    no_replacement = rank_substitutions(
+        normalize_request(request()),
+        exercise("observed-no-replacement", MovementPattern.VERTICAL_PUSH, MuscleGroup.SHOULDERS),
+        (),
+        SubstitutionContext(cause=SubstitutionCause.SAFETY),
+        ruleset=RULESET,
+    )
+
+    assert equipment_decision.observability_metrics["substitution_equipment_triggered"] == 1
+    assert constraint_decision.observability_metrics["substitution_constraint_triggered"] == 1
+    assert no_replacement.observability_metrics["substitution_no_valid_replacement"] == 1
+    merged = merge_substitution_observability({}, equipment_decision)
+    assert merged["substitution_requests"] == 1
+    assert aggregate_substitution_observability((equipment_decision,))["substitution_requests"] == 1
+    assert substitution_decision_summaries((equipment_decision,))[0]["cause"] == (
+        SubstitutionCause.MISSING_EQUIPMENT.value
+    )
+
+
+def test_role_preserved_focus_degraded_is_observable_for_strength() -> None:
+    target = replace(
+        exercise("observed-strength-target", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+        muscle_focus=MuscleFocus.UPPER_CHEST,
+    )
+    candidate = replace(
+        exercise("observed-strength-candidate", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+        muscle_focus=MuscleFocus.MID_CHEST,
+    )
+    decision = rank_substitutions(
+        normalize_request(
+            request(
+                primary_goal=Goal.STRENGTH,
+                training_experience="advanced",
+                training_age_months=72,
+            )
+        ),
+        target,
+        (candidate,),
+        SubstitutionContext(cause=SubstitutionCause.DISPLAY_ALTERNATIVE),
+        ruleset=RULESET,
+    )
+
+    assert decision.options
+    assert decision.observability_metrics["substitution_role_preserved_focus_degraded"] == 1
+
+
+def test_surfaceability_validator_rejects_invalid_alternative_flags() -> None:
+    target = exercise(
+        "observed-validator-target", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST
+    )
+    invalid = replace(target, is_active=False, is_programmable=False, needs_review=True)
+    errors = substitution_option_invariant_errors(
+        normalize_request(request()),
+        target,
+        invalid,
+        SubstitutionContext(cause=SubstitutionCause.DISPLAY_ALTERNATIVE),
+        ruleset=RULESET,
+    )
+
+    assert {
+        "SUBSTITUTION_ALTERNATIVE_INACTIVE",
+        "SUBSTITUTION_ALTERNATIVE_NOT_PROGRAMMABLE",
+        "SUBSTITUTION_ALTERNATIVE_NEEDS_REVIEW",
+        "SUBSTITUTION_ALTERNATIVE_CONSTRAINT_INVALID",
+    }.issubset(errors)
+
+    unavailable_and_unrelated = exercise(
+        "observed-validator-unrelated",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+        equipment=frozenset({Equipment.BARBELL}),
+    )
+    semantic_errors = substitution_option_invariant_errors(
+        normalize_request(request(available_equipment=[Equipment.DUMBBELL])),
+        target,
+        unavailable_and_unrelated,
+        SubstitutionContext(cause=SubstitutionCause.DISPLAY_ALTERNATIVE),
+        ruleset=RULESET,
+    )
+    assert {
+        "SUBSTITUTION_ALTERNATIVE_EQUIPMENT_INVALID",
+        "SUBSTITUTION_ALTERNATIVE_CONSTRAINT_INVALID",
+        "SUBSTITUTION_ALTERNATIVE_POLICY_INCOMPATIBLE",
+        "SUBSTITUTION_ALTERNATIVE_SLOT_INCOMPATIBLE",
+    }.issubset(semantic_errors)
+
+
+def test_dynamic_program_attaches_substitution_metrics_and_trace() -> None:
+    result = generate_program(request(available_training_days=2), full_catalog(), RULESET)
+
+    assert result.program is not None, result.errors
+    metrics = result.program.aggregate_metrics
+    assert metrics["substitution_requests"] > 0
+    assert metrics["substitution_successes"] <= metrics["substitution_requests"]
+    trace = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "substitution_observability"
+    )
+    assert trace["metrics"] == {key: metrics[key] for key in SUBSTITUTION_METRIC_KEYS}
+    assert len(trace["decisions"]) == metrics["substitution_requests"]
 
 
 def test_overhead_limit_rejects_another_exact_overhead_candidate() -> None:

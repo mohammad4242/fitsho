@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -42,6 +42,9 @@ from app.workouts.program_engine.enums import (
     TrainingStatus,
     ValidationStatus,
 )
+
+if TYPE_CHECKING:
+    from app.workouts.program_engine.substitution_engine import SubstitutionDecision
 
 GOAL_ALIASES: dict[str, Goal] = {
     "weight_loss": Goal.FAT_LOSS,
@@ -507,6 +510,7 @@ class WorkoutDay:
     template_target_muscles: tuple[MuscleGroup, ...] = ()
     template_structure_focus: str = "full_body"
 
+
 @dataclass(frozen=True)
 class ValidationReport:
     errors: tuple[str, ...]
@@ -575,6 +579,7 @@ class SessionDraft:
     exercises: list[ExerciseCandidate] = field(default_factory=list)
     selection_reasons: dict[UUID, tuple[str, ...]] = field(default_factory=dict)
     substitutions: dict[UUID, tuple[UUID, ...]] = field(default_factory=dict)
+    substitution_decisions: tuple[SubstitutionDecision, ...] = ()
     reason_codes: tuple[str, ...] = ()
     relaxed_required_pattern_groups: tuple[tuple[MovementPattern, ...], ...] = ()
     relaxed_required_target_muscles: tuple[MuscleGroup | None, ...] = ()

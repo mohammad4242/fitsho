@@ -73,6 +73,21 @@ class SubstitutionDecision:
     def exercise_ids(self) -> tuple[UUID, ...]:
         return tuple(option.exercise.id for option in self.options)
 
+    @property
+    def observability_metrics(self) -> dict[str, int]:
+        from app.workouts.program_engine.substitution_observability import (
+            substitution_observability,
+        )
+
+        return substitution_observability(self)
+
+    def decision_trace_entry(self) -> dict[str, object]:
+        from app.workouts.program_engine.substitution_observability import (
+            substitution_trace_entry,
+        )
+
+        return substitution_trace_entry(self)
+
 
 @dataclass(frozen=True, slots=True)
 class _RankableOption:
@@ -192,6 +207,17 @@ def rank_substitutions(
         ),
     )
     options = tuple(item.option for item in ranked[:limit])
+    options = tuple(
+        option
+        for option in options
+        if not substitution_option_invariant_errors(
+            request,
+            target,
+            option.exercise,
+            context,
+            ruleset=ruleset,
+        )
+    )
     if not options:
         return _no_replacement(target, context)
     return SubstitutionDecision(
@@ -327,6 +353,8 @@ def _reason_codes(
         reasons.append("SUBSTITUTION_MUSCLE_FOCUS_PRESERVED")
     if target_strength_role is not None and candidate_strength_role is target_strength_role:
         reasons.append("SUBSTITUTION_STRENGTH_ROLE_PRESERVED")
+    if tier is SubstitutionTier.C:
+        reasons.append("SUBSTITUTION_ROLE_PRESERVED_FOCUS_DEGRADED")
     if cause is SubstitutionCause.MISSING_EQUIPMENT and candidate.equipment != target.equipment:
         reasons.append("SUBSTITUTION_EQUIPMENT_ADAPTED")
     if cause in {
@@ -364,3 +392,64 @@ def _no_replacement(
         options=(),
         reason_codes=("SUBSTITUTION_NO_VALID_REPLACEMENT",),
     )
+
+
+def substitution_option_invariant_errors(
+    request: NormalizedProgramRequest,
+    target: ExerciseCandidate,
+    candidate: ExerciseCandidate,
+    context: SubstitutionContext,
+    *,
+    ruleset: ProgramRuleset | None = None,
+) -> tuple[str, ...]:
+    """Validate every hard invariant required before surfacing an alternative."""
+    errors: list[str] = []
+    if not candidate.is_active:
+        errors.append("SUBSTITUTION_ALTERNATIVE_INACTIVE")
+    if not candidate.is_programmable:
+        errors.append("SUBSTITUTION_ALTERNATIVE_NOT_PROGRAMMABLE")
+    if candidate.needs_review:
+        errors.append("SUBSTITUTION_ALTERNATIVE_NEEDS_REVIEW")
+    if not effective_required_equipment(candidate.equipment, candidate.movement_pattern).issubset(
+        request.constraints.available_equipment
+    ):
+        errors.append("SUBSTITUTION_ALTERNATIVE_EQUIPMENT_INVALID")
+    if candidate not in filter_eligible_exercises(request, (candidate,)).eligible:
+        errors.append("SUBSTITUTION_ALTERNATIVE_CONSTRAINT_INVALID")
+    target_muscles = context.target_muscles or (
+        frozenset({target.primary_muscle}) if target.primary_muscle is not None else frozenset()
+    )
+    target_strength_role = context.strength_role or _strength_role(target, request, ruleset)
+    allowed_patterns = allowed_movement_patterns(
+        target.movement_pattern,
+        target_muscles,
+        goal=request.primary_goal,
+        strength_role=target_strength_role,
+        cause=context.cause,
+    )
+    slot_patterns = allowed_patterns.intersection(
+        context.allowed_patterns or frozenset({target.movement_pattern})
+    )
+    policy = evaluate_substitution_policy(
+        ExerciseRoleSignature.from_candidate(target),
+        ExerciseRoleSignature.from_candidate(candidate),
+        SubstitutionPolicyContext(
+            goal=request.primary_goal,
+            cause=context.cause,
+            target_muscles=target_muscles,
+            day_focus=context.day_focus,
+            strength_role=target_strength_role,
+        ),
+    )
+    if not policy.compatible:
+        errors.append("SUBSTITUTION_ALTERNATIVE_POLICY_INCOMPATIBLE")
+    slot = evaluate_candidate_slot_compatibility(
+        candidate,
+        allowed_patterns=slot_patterns,
+        target_muscles=target_muscles or None,
+        day_focus=context.day_focus,
+        allow_full_body=context.allow_full_body,
+    )
+    if not slot.compatible:
+        errors.append("SUBSTITUTION_ALTERNATIVE_SLOT_INCOMPATIBLE")
+    return tuple(errors)
