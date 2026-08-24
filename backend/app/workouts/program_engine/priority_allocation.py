@@ -13,6 +13,7 @@ from app.workouts.program_engine.enums import (
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import NormalizedProgramRequest
 from app.workouts.program_engine.slot_compatibility import focus_scope
+from app.workouts.program_engine.supplemental_policy import SUPPLEMENTAL_MUSCLES
 from app.workouts.program_engine.volume_policy import recovery_burden_for_request
 
 
@@ -24,6 +25,8 @@ class PriorityAllocationPolicy:
     explicit_priorities: tuple[MuscleGroup, ...]
     clear_lag_priorities: tuple[MuscleGroup, ...]
     mild_lag_priorities: tuple[MuscleGroup, ...]
+    supplemental_priorities: tuple[MuscleGroup, ...]
+    supplemental_body_priorities: tuple[MuscleGroup, ...]
     preferred_frequency: int
     recovery_limited: bool
     minimum_recovery_gap_days: int
@@ -34,7 +37,7 @@ class PriorityAllocationPolicy:
         request: NormalizedProgramRequest,
         ruleset: ProgramRuleset,
     ) -> PriorityAllocationPolicy:
-        explicit_priorities = tuple(
+        requested_priorities = tuple(
             sorted(request.source.priority_muscles, key=lambda muscle: muscle.value)
         )
         body_priorities = tuple(
@@ -52,13 +55,27 @@ class PriorityAllocationPolicy:
                 ),
             )
         )
+        explicit_priorities = tuple(
+            muscle for muscle in requested_priorities if muscle not in SUPPLEMENTAL_MUSCLES
+        )
+        supplemental_priorities = tuple(
+            muscle for muscle in requested_priorities if muscle in SUPPLEMENTAL_MUSCLES
+        )
         clear_lag_priorities = tuple(
             priority.muscle
             for priority in body_priorities
             if priority.classification == "clear_lag"
+            and priority.muscle not in SUPPLEMENTAL_MUSCLES
         )
         mild_lag_priorities = tuple(
-            priority.muscle for priority in body_priorities if priority.classification == "mild_lag"
+            priority.muscle
+            for priority in body_priorities
+            if priority.classification == "mild_lag" and priority.muscle not in SUPPLEMENTAL_MUSCLES
+        )
+        supplemental_body_priorities = tuple(
+            priority.muscle
+            for priority in body_priorities
+            if priority.muscle in SUPPLEMENTAL_MUSCLES
         )
         priorities = tuple(explicit_priorities + clear_lag_priorities + mild_lag_priorities)
         available_days = min(request.resistance_training_days, ruleset.max_resistance_days)
@@ -86,6 +103,8 @@ class PriorityAllocationPolicy:
             explicit_priorities=explicit_priorities,
             clear_lag_priorities=clear_lag_priorities,
             mild_lag_priorities=mild_lag_priorities,
+            supplemental_priorities=supplemental_priorities,
+            supplemental_body_priorities=supplemental_body_priorities,
             preferred_frequency=preferred_frequency,
             recovery_limited=recovery_limited,
             minimum_recovery_gap_days=ruleset.minimum_recovery_gap_days,
@@ -95,7 +114,11 @@ class PriorityAllocationPolicy:
         if muscle is None:
             return (3, 0, "")
         for tier, priorities in enumerate(
-            (self.explicit_priorities, self.clear_lag_priorities, self.mild_lag_priorities)
+            (
+                (*self.explicit_priorities, *self.supplemental_priorities),
+                (*self.clear_lag_priorities, *self.supplemental_body_priorities),
+                self.mild_lag_priorities,
+            )
         ):
             if muscle in priorities:
                 return (tier, priorities.index(muscle), muscle.value)
@@ -110,10 +133,14 @@ class PriorityAllocationPolicy:
         return {0: 3, 1: 2, 2: 1}.get(tier, 0)
 
     def is_explicit(self, muscle: MuscleGroup | None) -> bool:
-        return muscle in self.explicit_priorities
+        return muscle in self.explicit_priorities or muscle in self.supplemental_priorities
 
     def is_body_analysis(self, muscle: MuscleGroup | None) -> bool:
-        return muscle in self.clear_lag_priorities or muscle in self.mild_lag_priorities
+        return (
+            muscle in self.clear_lag_priorities
+            or muscle in self.mild_lag_priorities
+            or muscle in self.supplemental_body_priorities
+        )
 
     def volume_bonuses(
         self,

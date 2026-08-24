@@ -20,11 +20,13 @@ from app.workouts.program_engine.schemas import (
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_builder import slots_for_focus
+from app.workouts.program_engine.session_structure import session_structure_errors
 from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     focus_scope,
 )
 from app.workouts.program_engine.supersets import superset_structure_errors
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 
 
 def validate_program(
@@ -86,8 +88,9 @@ def validate_program(
         )
     short_session = request.session_duration_minutes <= 30
     for day in program.weekly_schedule:
-        exercise_count = len(day.exercises)
+        exercise_count = main_exercise_count(day.exercises)
         errors.extend(superset_structure_errors(day.exercises))
+        errors.extend(session_structure_errors(day, request.primary_goal))
 
         # ------------------------------------------------------------------
         # Exercise count validation (Phase 11.9 semantics)
@@ -116,7 +119,7 @@ def validate_program(
                 warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
             else:
                 errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-        elif exercise_count > ruleset.max_exercises_per_session:
+        elif len(day.exercises) > ruleset.max_exercises_per_session:
             errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
 
         # ------------------------------------------------------------------
@@ -313,11 +316,6 @@ def validate_program(
         {MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL},
         {MovementPattern.SQUAT, MovementPattern.LUNGE, MovementPattern.KNEE_EXTENSION},
         {MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION},
-        {
-            MovementPattern.CORE_ANTI_EXTENSION,
-            MovementPattern.CORE_ANTI_ROTATION,
-            MovementPattern.CORE_ANTI_LATERAL_FLEXION,
-        },
     ):
         if frozenset(pattern.value for pattern in group) in relaxed_pattern_groups:
             continue

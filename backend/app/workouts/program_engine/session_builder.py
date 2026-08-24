@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from app.exercises.enums import MovementPattern, MuscleGroup
-from app.workouts.program_engine.body_analysis import body_analysis_priority_muscles
 from app.workouts.program_engine.duration_capacity import SessionCapacity
 from app.workouts.program_engine.enums import CompatibilityLevel, Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
@@ -24,6 +23,12 @@ from app.workouts.program_engine.slot_compatibility import (
     focus_scope,
 )
 from app.workouts.program_engine.strength_programming import classify_strength_role
+from app.workouts.program_engine.supplemental_policy import (
+    is_supplemental_muscle,
+    main_exercise_count,
+    supplemental_muscle_fits_focus,
+    supplemental_reason_codes,
+)
 
 PUSH_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH})
 PULL_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL})
@@ -87,10 +92,8 @@ def build_sessions(
     rejected_slot_candidates: tuple[tuple[ExerciseCandidate, tuple[str, ...]], ...] = (),
     session_capacity: SessionCapacity | None = None,
 ) -> tuple[SessionDraft, ...]:
-    effective_priorities = request.source.priority_muscles | body_analysis_priority_muscles(
-        request, ruleset
-    )
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
+    effective_priorities = frozenset(priority_policy.priorities)
     usage: Counter[UUID] = Counter()
     sessions: list[SessionDraft] = []
     short_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
@@ -122,8 +125,9 @@ def build_sessions(
         if not short_session:
             capacity = max(capacity, ruleset.minimum_exercises_per_session)
 
-        ordered_slots = tuple(slot for slot in slots if slot.required) + tuple(
-            slot for slot in slots if not slot.required
+        main_slots = tuple(slot for slot in slots if not _slot_is_supplemental(slot))
+        ordered_slots = tuple(slot for slot in main_slots if slot.required) + tuple(
+            slot for slot in main_slots if not slot.required
         )
         chosen: list[ExerciseCandidate] = []
         selected_slots: dict[UUID, SlotSpec] = {}
@@ -134,8 +138,28 @@ def build_sessions(
             session_reasons = ("DURATION_PLANNED_REDUCED_EXERCISE_COUNT",)
         this_session_relaxed_groups: list[tuple[MovementPattern, ...]] = []
         this_session_relaxed_targets: list[MuscleGroup | None] = []
+        supplemental_options = _supplemental_options(
+            focus,
+            exercises,
+            chosen,
+            priority_policy,
+            usage,
+        )
+        planned_supplemental = bool(
+            supplemental_options
+            and any(
+                item.primary_muscle in priority_policy.supplemental_priorities
+                for item in supplemental_options
+            )
+        )
+        main_capacity = (
+            capacity - 1
+            if planned_supplemental
+            and capacity > min(capacity, ruleset.minimum_exercises_per_session)
+            else capacity
+        )
         for slot in ordered_slots:
-            if len(chosen) >= capacity:
+            if len(chosen) >= main_capacity:
                 if slot.required:
                     raise SessionConstructionError(index + 1, focus, slot)
                 break
@@ -145,6 +169,8 @@ def build_sessions(
             comp_levels = {}
             for item in exercises:
                 if item.id in chosen_ids:
+                    continue
+                if is_supplemental_muscle(item.primary_muscle):
                     continue
                 compatibility = evaluate_candidate_slot_compatibility(
                     item,
@@ -247,7 +273,7 @@ def build_sessions(
             reasons[selected.exercise.id] = tuple(selection_reasons)
             usage[selected.exercise.id] += 1
 
-        while len(chosen) < min(capacity, ruleset.minimum_exercises_per_session):
+        while main_exercise_count(chosen) < min(capacity, ruleset.minimum_exercises_per_session):
             options, comp_levels = _compatible_supplements(focus, exercises, chosen)
             if not options:
                 session_reasons = session_reasons + (
@@ -276,6 +302,43 @@ def build_sessions(
             usage[selected.exercise.id] += 1
             session_reasons = session_reasons + ("SESSION_SUPPLEMENTED_TO_MINIMUM",)
 
+        if len(chosen) < capacity and main_exercise_count(chosen) >= min(
+            capacity, ruleset.minimum_exercises_per_session
+        ):
+            supplemental_options = _supplemental_options(
+                focus,
+                exercises,
+                chosen,
+                priority_policy,
+                usage,
+            )
+            if supplemental_options:
+                selected_supplemental = min(
+                    supplemental_options,
+                    key=lambda item: (
+                        0
+                        if item.primary_muscle in priority_policy.supplemental_priorities
+                        else 1
+                        if item.primary_muscle in priority_policy.supplemental_body_priorities
+                        else 2,
+                        usage[item.id],
+                        str(item.id),
+                    ),
+                )
+                chosen.append(selected_supplemental)
+                supplemental_muscle = selected_supplemental.primary_muscle
+                assert supplemental_muscle is not None
+                planned = supplemental_muscle in priority_policy.supplemental_priorities
+                reasons[selected_supplemental.id] = supplemental_reason_codes(
+                    supplemental_muscle,
+                    planned=planned,
+                ) + (
+                    ("CORE_MOVEMENT_REPEATED_FOR_PROGRESSION",)
+                    if usage[selected_supplemental.id]
+                    else ()
+                )
+                usage[selected_supplemental.id] += 1
+
         if request.primary_goal is Goal.STRENGTH:
             chosen.sort(
                 key=lambda item: (
@@ -301,7 +364,9 @@ def build_sessions(
             )
             reasons[chosen[0].id] = reasons[chosen[0].id] + (placement_reason,)
         substitutions = {
-            item.id: tuple(
+            item.id: ()
+            if is_supplemental_muscle(item.primary_muscle)
+            else tuple(
                 alternative.id
                 for alternative in rank_replacement_exercises(
                     request,
@@ -359,6 +424,7 @@ def _safe_session_completion_is_possible(
     compatible_ids.update(
         item.id
         for item in exercises
+        if not is_supplemental_muscle(item.primary_muscle)
         if evaluate_exercise_focus_compatibility(item, focus).compatible
     )
     return len(compatible_ids) >= minimum_exercises
@@ -428,7 +494,7 @@ def _compatible_supplements(
     options = []
     levels: dict[UUID, CompatibilityLevel] = {}
     for item in exercises:
-        if item.id not in chosen_ids:
+        if item.id not in chosen_ids and not is_supplemental_muscle(item.primary_muscle):
             comp = evaluate_exercise_focus_compatibility(item, focus)
             if comp.compatible:
                 options.append(item)
@@ -474,7 +540,7 @@ def slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
     if focus == "full_body_b":
         return (
             SlotSpec(HINGE_PATTERNS, True),
-            SlotSpec(CORE_PATTERNS, True),
+            SlotSpec(CORE_PATTERNS, False),
             SlotSpec(PUSH_PATTERNS, True),
             SlotSpec(PULL_PATTERNS, False),
             SlotSpec(KNEE_PATTERNS, False),
@@ -491,7 +557,7 @@ def slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
         )
     if focus == "full_body_d":
         return (
-            SlotSpec(CORE_PATTERNS, True),
+            SlotSpec(CORE_PATTERNS, False),
             SlotSpec(PUSH_PATTERNS, True),
             SlotSpec(PULL_PATTERNS, True),
             SlotSpec(KNEE_PATTERNS, False),
@@ -536,7 +602,7 @@ def slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
         return (
             SlotSpec(KNEE_PATTERNS, True),
             SlotSpec(HINGE_PATTERNS, True),
-            SlotSpec(CORE_PATTERNS, True),
+            SlotSpec(CORE_PATTERNS, False),
             SlotSpec(frozenset({MovementPattern.CALF_RAISE}), False),
             SlotSpec(frozenset({MovementPattern.KNEE_FLEXION}), False),
             SlotSpec(frozenset({MovementPattern.KNEE_EXTENSION}), False),
@@ -610,13 +676,13 @@ def _resolve_focus(
 ) -> str:
     if focus != "specialization":
         return focus
-    priorities = request.source.priority_muscles | body_analysis_priority_muscles(request, ruleset)
+    priorities = frozenset(PriorityAllocationPolicy.for_request(request, ruleset).priorities)
     for muscle_group, specialized_focus in (
         ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
         ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),
         ((MuscleGroup.SHOULDERS, MuscleGroup.TRAPS), "shoulders_traps"),
         ((MuscleGroup.QUADRICEPS, MuscleGroup.CALVES), "quadriceps_calves"),
-        ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.ABS), "posterior_chain_core"),
+        ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES), "posterior_chain_core"),
     ):
         if priorities.intersection(muscle_group):
             return specialized_focus
@@ -627,7 +693,7 @@ def _resolve_focus(
         return "shoulders_traps"
     if highest_target in {MuscleGroup.QUADRICEPS, MuscleGroup.CALVES}:
         return "quadriceps_calves"
-    if highest_target in {MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.ABS}:
+    if highest_target in {MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES}:
         return "posterior_chain_core"
     return "chest_triceps"
 
@@ -638,3 +704,36 @@ def _order_rank(pattern: MovementPattern, ruleset: ProgramRuleset) -> int:
     if pattern in CORE_PATTERNS:
         return ruleset.exercise_order_rank["trunk"]
     return ruleset.exercise_order_rank["accessory"]
+
+
+def _slot_is_supplemental(slot: SlotSpec) -> bool:
+    return (
+        is_supplemental_muscle(slot.target_muscle)
+        or bool(slot.patterns)
+        and slot.patterns.issubset(CORE_PATTERNS)
+    )
+
+
+def _supplemental_options(
+    focus: str,
+    exercises: tuple[ExerciseCandidate, ...],
+    chosen: list[ExerciseCandidate],
+    policy: PriorityAllocationPolicy,
+    usage: Counter[UUID],
+) -> tuple[ExerciseCandidate, ...]:
+    chosen_ids = {item.id for item in chosen}
+    if any(is_supplemental_muscle(item.primary_muscle) for item in chosen):
+        return ()
+    return tuple(
+        item
+        for item in exercises
+        if item.id not in chosen_ids
+        and item.primary_muscle is not None
+        and is_supplemental_muscle(item.primary_muscle)
+        and (not usage[item.id] or item.primary_muscle in policy.supplemental_priorities)
+        and supplemental_muscle_fits_focus(item.primary_muscle, focus)
+        and (
+            item.primary_muscle is not MuscleGroup.NECK
+            or item.primary_muscle in policy.supplemental_priorities
+        )
+    )

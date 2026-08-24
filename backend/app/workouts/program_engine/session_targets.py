@@ -2,6 +2,7 @@ from collections.abc import Iterable
 
 from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.schemas import ProgrammedExercise
+from app.workouts.program_engine.supplemental_policy import is_supplemental_muscle
 
 ENGLISH_MUSCLE_NAMES: dict[MuscleGroup, str] = {
     MuscleGroup.CHEST: "Chest",
@@ -51,7 +52,9 @@ def direct_target_muscles(
 ) -> tuple[MuscleGroup, ...]:
     """Return ordered primary muscles only; secondary recruitment is never a title target."""
     return target_muscles_from_values(
-        item.primary_muscle for item in exercises if item.primary_muscle is not None
+        item.primary_muscle
+        for item in exercises
+        if item.primary_muscle is not None and not is_supplemental_muscle(item.primary_muscle)
     )
 
 

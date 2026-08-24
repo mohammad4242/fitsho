@@ -89,7 +89,6 @@ MAJOR_MUSCLES = frozenset(
         MuscleGroup.GLUTES,
         MuscleGroup.QUADRICEPS,
         MuscleGroup.HAMSTRINGS,
-        MuscleGroup.ABS,
     }
 )
 

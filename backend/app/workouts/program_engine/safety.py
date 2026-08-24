@@ -27,6 +27,10 @@ def effective_caution_tags(
         tags.add(ExerciseCautionTag.WRIST_LOADING)
     if exercise.movement_pattern is MovementPattern.SHRUG:
         tags.add(ExerciseCautionTag.NECK_LOADING)
+    if exercise.primary_muscle is MuscleGroup.NECK:
+        tags.add(ExerciseCautionTag.NECK_LOADING)
+    if exercise.primary_muscle is MuscleGroup.LOWER_BACK:
+        tags.add(ExerciseCautionTag.LOWER_BACK_LOADING)
     if (
         exercise.primary_muscle is MuscleGroup.SHOULDERS
         and exercise.movement_pattern is MovementPattern.HORIZONTAL_PULL

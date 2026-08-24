@@ -21,6 +21,11 @@ from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     template_slot_allowed_patterns,
 )
+from app.workouts.program_engine.supplemental_policy import (
+    is_supplemental_muscle,
+    main_exercise_count,
+    supplemental_reason_codes,
+)
 
 
 @dataclass(frozen=True)
@@ -87,9 +92,9 @@ def build_template_sessions(
     complementary_replacements: set[UUID] = set()
     deliberate_redundancies: set[UUID] = set()
     repeated_core_substitutions: set[tuple[int, UUID]] = set()
+    repeated_targeted_accessories: set[tuple[int, UUID]] = set()
     preserved_template_occurrences: Counter[UUID] = Counter()
     weekly_direct_sessions: Counter[MuscleGroup] = Counter()
-    weekly_patterns: set[MovementPattern] = set()
     for index, reference_day in enumerate(template.days, start=1):
         required_slot_count = sum(
             slot.adaptation_priority == "core" for slot in reference_day.slots
@@ -200,42 +205,6 @@ def build_template_sessions(
                 continue
             selected.append((candidate, slot))
             used[candidate.id] += 1
-            weekly_patterns.add(candidate.movement_pattern)
-
-        if index == len(template.days) and not weekly_patterns.intersection(
-            {
-                MovementPattern.CORE_ANTI_EXTENSION,
-                MovementPattern.CORE_ANTI_ROTATION,
-                MovementPattern.CORE_ANTI_LATERAL_FLEXION,
-            }
-        ):
-            core = next(
-                (
-                    candidate
-                    for candidate in eligible
-                    if not used[candidate.id]
-                    and not reserved[candidate.id]
-                    and candidate.primary_muscle is MuscleGroup.ABS
-                    and evaluate_candidate_slot_compatibility(
-                        candidate,
-                        allowed_patterns=frozenset(
-                            {
-                                MovementPattern.CORE_ANTI_EXTENSION,
-                                MovementPattern.CORE_ANTI_ROTATION,
-                                MovementPattern.CORE_ANTI_LATERAL_FLEXION,
-                            }
-                        ),
-                        target_muscles=frozenset({MuscleGroup.ABS}),
-                        day_focus=f"template_reference_{index}",
-                    ).compatible
-                ),
-                None,
-            )
-            if core is None:
-                raise TemplateConstructionError("TEMPLATE_REQUIRED_CORE_UNAVAILABLE")
-            selected.append((core, _engine_core_slot(core)))
-            used[core.id] += 1
-            build_reasons.append("TEMPLATE_REQUIRED_CORE_ADDED")
 
         _add_targeted_accessories(
             request,
@@ -246,17 +215,31 @@ def build_template_sessions(
             reserved,
             planned_minimum,
             ruleset,
+            repeated_targeted_accessories,
         )
-        while len(selected) > capacity:
+        while (
+            sum(is_supplemental_muscle(candidate.primary_muscle) for candidate, _slot in selected)
+            > 1
+            or len(selected) > capacity
+        ):
             removable = next(
                 (
                     position
-                    for priority in ("optional", "accessory")
                     for position in range(len(selected) - 1, -1, -1)
-                    if selected[position][1].adaptation_priority == priority
+                    if is_supplemental_muscle(selected[position][0].primary_muscle)
                 ),
                 None,
             )
+            if removable is None:
+                removable = next(
+                    (
+                        position
+                        for priority in ("optional", "accessory")
+                        for position in range(len(selected) - 1, -1, -1)
+                        if selected[position][1].adaptation_priority == priority
+                    ),
+                    None,
+                )
             if removable is None:
                 raise TemplateConstructionError(
                     "TEMPLATE_CORE_STRUCTURE_EXCEEDS_SESSION_CAPACITY",
@@ -264,7 +247,10 @@ def build_template_sessions(
                 )
             removed, _ = selected.pop(removable)
             used[removed.id] -= 1
-            build_reasons.append("TEMPLATE_ACCESSORY_TRIMMED_FOR_TIME_LIMIT")
+            if is_supplemental_muscle(removed.primary_muscle):
+                build_reasons.append("TEMPLATE_SUPPLEMENTAL_TRIMMED_FOR_CAPACITY")
+            else:
+                build_reasons.append("TEMPLATE_ACCESSORY_TRIMMED_FOR_TIME_LIMIT")
         weekly_direct_sessions.update(
             {
                 candidate.primary_muscle
@@ -272,7 +258,10 @@ def build_template_sessions(
                 if candidate.primary_muscle is not None
             }
         )
-        if not planned_minimum <= len(selected) <= (ruleset.max_exercises_per_session):
+        if (
+            not planned_minimum <= main_exercise_count(candidate for candidate, _slot in selected)
+            or len(selected) > ruleset.max_exercises_per_session
+        ):
             raise TemplateConstructionError(
                 "TEMPLATE_SESSION_EXERCISE_COUNT_UNSATISFIED",
                 f"TEMPLATE_DAY:{index}",
@@ -309,7 +298,18 @@ def build_template_sessions(
                 ),
                 *(
                     ("CORE_MOVEMENT_REPEATED_FOR_PROGRESSION",)
-                    if intentional_repeat or (index, candidate.id) in repeated_core_substitutions
+                    if intentional_repeat
+                    or (index, candidate.id) in repeated_core_substitutions
+                    or (index, candidate.id) in repeated_targeted_accessories
+                    else ()
+                ),
+                *(
+                    supplemental_reason_codes(
+                        candidate.primary_muscle,
+                        planned=candidate.primary_muscle in request.source.priority_muscles,
+                    )
+                    if candidate.primary_muscle is not None
+                    and is_supplemental_muscle(candidate.primary_muscle)
                     else ()
                 ),
             )
@@ -626,23 +626,6 @@ def template_resolution_trace(
     }
 
 
-def _engine_core_slot(core: ExerciseCandidate) -> TemplateReferenceSlot:
-    return TemplateReferenceSlot(
-        exercise_id=core.id,
-        exercise_slug_hint="engine-required-core",
-        target_muscles=(MuscleGroup.ABS,),
-        movement_pattern=core.movement_pattern,
-        intensity_method="standard",
-        adaptation_priority="accessory",
-        superset_group=None,
-        sets=3,
-        rep_min=8,
-        rep_max=12,
-        target_rir=2,
-        rest_seconds=45,
-    )
-
-
 def _add_targeted_accessories(
     request: NormalizedProgramRequest,
     selected: list[tuple[ExerciseCandidate, TemplateReferenceSlot]],
@@ -652,14 +635,16 @@ def _add_targeted_accessories(
     reserved: Counter[UUID],
     minimum_exercises: int,
     ruleset: ProgramRuleset,
+    repeated_targeted_accessories: set[tuple[int, UUID]],
 ) -> None:
     target_muscles = reference_day.focus
-    while len(selected) < minimum_exercises:
+    while main_exercise_count(candidate for candidate, _slot in selected) < minimum_exercises:
         options = [
             item
             for item in eligible
             if not used[item.id]
             and not reserved[item.id]
+            and not is_supplemental_muscle(item.primary_muscle)
             and evaluate_candidate_slot_compatibility(
                 item,
                 allowed_patterns=frozenset(MovementPattern) - {MovementPattern.OTHER},
@@ -668,8 +653,25 @@ def _add_targeted_accessories(
             ).compatible
         ]
         if not options:
-            return
+            selected_ids = {candidate.id for candidate, _slot in selected}
+            options = [
+                item
+                for item in eligible
+                if item.id not in selected_ids
+                and not reserved[item.id]
+                and not is_supplemental_muscle(item.primary_muscle)
+                and evaluate_candidate_slot_compatibility(
+                    item,
+                    allowed_patterns=frozenset(MovementPattern) - {MovementPattern.OTHER},
+                    target_muscles=frozenset(target_muscles),
+                    day_focus=f"template_reference_{reference_day.day_number}",
+                ).compatible
+            ]
+            if not options:
+                return
         candidate = rank_exercises(request, options, ruleset)[0].exercise
+        if used[candidate.id]:
+            repeated_targeted_accessories.add((reference_day.day_number, candidate.id))
         selected.append(
             (
                 candidate,

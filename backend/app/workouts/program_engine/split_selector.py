@@ -2,7 +2,6 @@ from collections import Counter
 from dataclasses import dataclass, replace
 
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
-from app.workouts.program_engine.body_analysis import body_analysis_priority_muscles
 from app.workouts.program_engine.duration_capacity import (
     CapacityFeasibility,
     PlannedWorkCost,
@@ -31,6 +30,7 @@ from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     focus_scope,
 )
+from app.workouts.program_engine.supplemental_policy import SUPPLEMENTAL_MUSCLES
 from app.workouts.program_engine.volume_policy import recovery_burden_for_request
 
 _DYNAMIC_FOCUSES = (
@@ -137,10 +137,7 @@ def rank_availability_aware_fallbacks(
         ruleset,
     )
     target_capacity = max(1, capacity.expected_exercise_count_capacity)
-    priorities = request.source.priority_muscles | body_analysis_priority_muscles(
-        request,
-        ruleset,
-    )
+    priorities = frozenset(PriorityAllocationPolicy.for_request(request, ruleset).priorities)
     availability = tuple(
         item
         for focus in _DYNAMIC_FOCUSES
@@ -337,7 +334,9 @@ def _dynamic_layout_sort_key(
     missing_pattern_groups = sum(
         not covered_patterns.intersection(group) for group in required_pattern_groups
     )
-    missing_priorities = len(request.source.priority_muscles - covered_muscles)
+    missing_priorities = len(
+        set(request.source.priority_muscles - SUPPLEMENTAL_MUSCLES) - covered_muscles
+    )
     duration_shortfall = sum(max(0, target_capacity - item.candidate_count) for item in selected)
     duration_infeasible = sum(
         item.duration_status is CapacityFeasibility.PROVABLY_INFEASIBLE for item in selected
@@ -531,7 +530,7 @@ def score_split_candidates(
             score += weights["goal_specificity"]
             reasons.append("SPLIT_SELECTED_FOR_GOAL_SPECIFICITY")
         if (
-            request.source.priority_muscles
+            priority_policy.explicit_priorities
             and candidate.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
         ):
             score += weights["priority_specialization"]
@@ -575,7 +574,7 @@ def score_split_candidates(
             score += ruleset.body_part_rotation_bonus
             reasons.append("SPLIT_SELECTED_FOR_SPECIALIZED_DIRECT_TARGETS")
         if (
-            request.source.priority_muscles
+            priority_policy.explicit_priorities
             and candidate.split_type is SplitType.BODY_PART_ROTATION
             and len(candidate.day_focuses) == 6
         ):
@@ -655,16 +654,13 @@ def _capacity_focus(
 ) -> str:
     if focus != "specialization":
         return focus
-    priorities = request.source.priority_muscles | body_analysis_priority_muscles(
-        request,
-        ruleset,
-    )
+    priorities = frozenset(PriorityAllocationPolicy.for_request(request, ruleset).priorities)
     for muscle_groups, specialized_focus in (
         ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
         ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),
         ((MuscleGroup.SHOULDERS, MuscleGroup.TRAPS), "shoulders_traps"),
         ((MuscleGroup.QUADRICEPS, MuscleGroup.CALVES), "quadriceps_calves"),
-        ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.ABS), "posterior_chain_core"),
+        ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES), "posterior_chain_core"),
     ):
         if priorities.intersection(muscle_groups):
             return specialized_focus

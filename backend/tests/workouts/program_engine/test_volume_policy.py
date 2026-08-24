@@ -76,15 +76,15 @@ def test_volume_flexibility_changes_with_personalized_target_size() -> None:
         training_age_months=72,
     )
 
-    novice_forearms = next(
-        target for target in novice.targets if target.muscle is MuscleGroup.FOREARMS
+    novice_triceps = next(
+        target for target in novice.targets if target.muscle is MuscleGroup.TRICEPS
     )
     intermediate_chest = next(
         target for target in intermediate.targets if target.muscle is MuscleGroup.CHEST
     )
     advanced_back = next(target for target in advanced.targets if target.muscle is MuscleGroup.BACK)
 
-    assert novice_forearms.maximum_soft - novice_forearms.target_sets == 1
+    assert novice_triceps.maximum_soft - novice_triceps.target_sets == 1
     assert intermediate_chest.target_sets - intermediate_chest.minimum_soft == 2
     assert advanced_back.target_sets - advanced_back.minimum_soft == 3
 

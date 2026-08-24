@@ -184,7 +184,7 @@ def test_session_title_lists_direct_targets_but_not_secondary_muscles() -> None:
 
     assert result.program is not None
     assert result.program.weekly_schedule[0].title == (
-        "Day 1: Chest + Back + Quadriceps + Hamstrings + Calves + Abs"
+        "Day 1: Chest + Back + Quadriceps + Hamstrings + Calves"
     )
     assert "Triceps" not in result.program.weekly_schedule[0].title
 
@@ -713,7 +713,7 @@ def test_validator_rejects_a_third_direct_weekly_muscle_exposure_for_four_day_pr
     assert report.metrics["direct_session_frequency_by_muscle"]["chest"] == 3
 
 
-def test_validator_rejects_program_without_trunk_pattern() -> None:
+def test_validator_accepts_program_without_optional_trunk_pattern() -> None:
     source = request()
     result = generate_program(source, catalog(), RULESET)
     assert result.program is not None
@@ -730,4 +730,4 @@ def test_validator_rejects_program_without_trunk_pattern() -> None:
 
     report = validate_program(invalid, source, RULESET)
 
-    assert "REQUIRED_MOVEMENT_PATTERN_MISSING" in report.errors
+    assert "REQUIRED_MOVEMENT_PATTERN_MISSING" not in report.errors

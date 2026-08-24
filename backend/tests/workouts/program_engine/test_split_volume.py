@@ -25,6 +25,7 @@ from app.workouts.program_engine.split_selector import (
     select_split,
 )
 from app.workouts.program_engine.volume_planner import (
+    PLANNED_MUSCLES,
     SECONDARY_MUSCLES,
     TRACKED_MUSCLES,
     plan_weekly_volume,
@@ -611,7 +612,8 @@ def test_volume_planner_tracks_all_muscles_and_priority_can_target_biceps() -> N
         RULESET,
     )
 
-    assert tuple(item.muscle for item in plan.targets) == TRACKED_MUSCLES
+    assert tuple(item.muscle for item in plan.targets) == PLANNED_MUSCLES
+    assert set(PLANNED_MUSCLES) < set(TRACKED_MUSCLES)
     assert priority_plan.direct_sets_for(MuscleGroup.BICEPS) > plan.direct_sets_for(
         MuscleGroup.BICEPS
     )

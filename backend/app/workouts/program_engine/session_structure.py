@@ -1,0 +1,274 @@
+from dataclasses import dataclass, replace
+
+from app.exercises.enums import ExerciseType, MuscleGroup
+from app.workouts.program_engine.enums import Goal
+from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
+from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
+from app.workouts.program_engine.schemas import (
+    NormalizedProgramRequest,
+    ProgrammedExercise,
+    WorkoutDay,
+)
+from app.workouts.program_engine.session_targets import english_session_title_for_targets
+from app.workouts.program_engine.supplemental_policy import (
+    SUPPLEMENTAL_MUSCLES,
+    is_supplemental_muscle,
+    main_exercise_count,
+    supplemental_reason_codes,
+)
+
+_STRICT_BLOCKS: dict[str, tuple[frozenset[MuscleGroup], ...]] = {
+    "chest_triceps": (
+        frozenset({MuscleGroup.CHEST}),
+        frozenset({MuscleGroup.SHOULDERS}),
+        frozenset({MuscleGroup.TRICEPS}),
+    ),
+    "back_biceps": (
+        frozenset({MuscleGroup.BACK}),
+        frozenset({MuscleGroup.SHOULDERS, MuscleGroup.TRAPS}),
+        frozenset({MuscleGroup.BICEPS}),
+    ),
+    "shoulders_traps": (
+        frozenset({MuscleGroup.SHOULDERS}),
+        frozenset({MuscleGroup.TRAPS}),
+    ),
+    "quadriceps_calves": (
+        frozenset({MuscleGroup.QUADRICEPS}),
+        frozenset({MuscleGroup.CALVES}),
+    ),
+    "posterior_chain_core": (frozenset({MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES}),),
+    "push": (
+        frozenset({MuscleGroup.CHEST, MuscleGroup.SHOULDERS}),
+        frozenset({MuscleGroup.TRICEPS}),
+    ),
+    "pull": (
+        frozenset({MuscleGroup.BACK, MuscleGroup.SHOULDERS, MuscleGroup.TRAPS}),
+        frozenset({MuscleGroup.BICEPS}),
+    ),
+}
+
+
+@dataclass(frozen=True)
+class _ExerciseUnit:
+    exercises: tuple[ProgrammedExercise, ...]
+
+    @property
+    def muscles(self) -> tuple[MuscleGroup, ...]:
+        return tuple(
+            item.primary_muscle for item in self.exercises if item.primary_muscle is not None
+        )
+
+    @property
+    def identifier(self) -> tuple[str, ...]:
+        return tuple(sorted(str(item.exercise_id) for item in self.exercises))
+
+    @property
+    def original_order(self) -> int:
+        return min(item.order for item in self.exercises)
+
+
+def finalize_session_structure(
+    days: tuple[WorkoutDay, ...],
+    request: NormalizedProgramRequest,
+    ruleset: ProgramRuleset,
+) -> tuple[WorkoutDay, ...]:
+    policy = PriorityAllocationPolicy.for_request(request, ruleset)
+    finalized: list[WorkoutDay] = []
+    for day in days:
+        block = _strict_block(day)
+        units = sorted(
+            _exercise_units(day.exercises),
+            key=lambda unit: _unit_sort_key(
+                unit,
+                block,
+                request.primary_goal,
+                policy,
+            ),
+        )
+        exercises = tuple(item for unit in units for item in unit.exercises)
+        exercises = tuple(
+            replace(item, order=index) for index, item in enumerate(exercises, start=1)
+        )
+        finalized.append(
+            replace(
+                day,
+                exercises=exercises,
+                title=main_session_title(day.day_index, exercises),
+            )
+        )
+    return tuple(finalized)
+
+
+def main_session_title(
+    day_index: int,
+    exercises: tuple[ProgrammedExercise, ...],
+) -> str:
+    targets = tuple(
+        dict.fromkeys(
+            item.primary_muscle
+            for item in exercises
+            if item.primary_muscle is not None and not is_supplemental_muscle(item.primary_muscle)
+        )
+    )
+    return english_session_title_for_targets(day_index, targets)
+
+
+def session_structure_errors(day: WorkoutDay, goal: Goal) -> tuple[str, ...]:
+    errors: list[str] = []
+    if tuple(item.order for item in day.exercises) != tuple(range(1, len(day.exercises) + 1)):
+        errors.append("SESSION_EXERCISE_ORDER_INVALID")
+
+    supplemental_seen = False
+    supplemental_count = 0
+    for item in day.exercises:
+        if is_supplemental_muscle(item.primary_muscle):
+            supplemental_seen = True
+            supplemental_count += 1
+        elif supplemental_seen:
+            errors.append("SUPPLEMENTAL_WORK_NOT_AT_SESSION_END")
+    if supplemental_count > 1:
+        errors.append("SUPPLEMENTAL_EXERCISE_LIMIT_EXCEEDED")
+
+    block = _strict_block(day)
+    units = _exercise_units(day.exercises)
+    previous_block = -1
+    phases_by_block: dict[int, int] = {}
+    previous_phase = -1
+    for unit in units:
+        if all(is_supplemental_muscle(muscle) for muscle in unit.muscles):
+            continue
+        phase = _role_phase(unit, goal)
+        if block is None:
+            if phase < previous_phase:
+                errors.append("EXERCISE_TYPE_SEQUENCE_INVALID")
+            previous_phase = max(previous_phase, phase)
+            continue
+        block_rank = _unit_block_rank(unit, block)
+        if block_rank < previous_block:
+            errors.append("STRICT_MUSCLE_BLOCK_ORDER_INVALID")
+        previous_block = max(previous_block, block_rank)
+        prior_phase = phases_by_block.get(block_rank, -1)
+        if phase < prior_phase:
+            errors.append("EXERCISE_TYPE_SEQUENCE_INVALID")
+        phases_by_block[block_rank] = max(prior_phase, phase)
+
+    if goal is Goal.STRENGTH:
+        main_units = tuple(
+            unit
+            for unit in units
+            if not all(is_supplemental_muscle(muscle) for muscle in unit.muscles)
+        )
+        if any(_contains_reason(unit, "STRENGTH_PRIMARY_COMPOUND") for unit in main_units) and (
+            not main_units or not _contains_reason(main_units[0], "STRENGTH_PRIMARY_COMPOUND")
+        ):
+            errors.append("STRENGTH_PRIMARY_NOT_FIRST")
+    return tuple(dict.fromkeys(errors))
+
+
+def _exercise_units(
+    exercises: tuple[ProgrammedExercise, ...],
+) -> tuple[_ExerciseUnit, ...]:
+    emitted: set[str] = set()
+    units: list[_ExerciseUnit] = []
+    for item in exercises:
+        group = item.superset_group
+        if group is None:
+            units.append(_ExerciseUnit((item,)))
+            continue
+        if group in emitted:
+            continue
+        emitted.add(group)
+        members = tuple(
+            sorted(
+                (member for member in exercises if member.superset_group == group),
+                key=lambda member: (member.order, str(member.exercise_id)),
+            )
+        )
+        units.append(_ExerciseUnit(members))
+    return tuple(units)
+
+
+def _unit_sort_key(
+    unit: _ExerciseUnit,
+    block: tuple[frozenset[MuscleGroup], ...] | None,
+    goal: Goal,
+    policy: PriorityAllocationPolicy,
+) -> tuple[object, ...]:
+    supplemental = all(is_supplemental_muscle(muscle) for muscle in unit.muscles)
+    main_muscles = tuple(muscle for muscle in unit.muscles if not is_supplemental_muscle(muscle))
+    priority = min(
+        (policy.precedence_key(muscle) for muscle in main_muscles),
+        default=(4, 0, ""),
+    )
+    if priority[0] >= 3:
+        priority = (3, 0, "")
+    return (
+        1 if supplemental else 0,
+        _unit_block_rank(unit, block) if block is not None else 0,
+        _role_phase(unit, goal),
+        priority,
+        unit.original_order,
+        unit.identifier,
+    )
+
+
+def _role_phase(unit: _ExerciseUnit, goal: Goal) -> int:
+    if goal is Goal.STRENGTH:
+        if _contains_reason(unit, "STRENGTH_PRIMARY_COMPOUND"):
+            return 0
+        if _contains_reason(unit, "STRENGTH_SECONDARY_COMPOUND") or any(
+            item.exercise_type is ExerciseType.COMPOUND for item in unit.exercises
+        ):
+            return 1
+        return 2
+    if any(item.exercise_type is ExerciseType.COMPOUND for item in unit.exercises):
+        return 0
+    return 1
+
+
+def _contains_reason(unit: _ExerciseUnit, reason: str) -> bool:
+    return any(reason in item.reason_codes for item in unit.exercises)
+
+
+def _unit_block_rank(
+    unit: _ExerciseUnit,
+    block: tuple[frozenset[MuscleGroup], ...] | None,
+) -> int:
+    if block is None:
+        return 0
+    ranks = tuple(
+        index
+        for muscle in unit.muscles
+        if not is_supplemental_muscle(muscle)
+        for index, muscles in enumerate(block)
+        if muscle in muscles
+    )
+    return min(ranks, default=len(block))
+
+
+def _strict_block(day: WorkoutDay) -> tuple[frozenset[MuscleGroup], ...] | None:
+    if day.focus in _STRICT_BLOCKS:
+        return _STRICT_BLOCKS[day.focus]
+    if not day.focus.startswith("template_reference"):
+        return None
+    normalized_title = day.title.lower()
+    for focus, markers in (
+        ("chest_triceps", ("chest", "triceps")),
+        ("back_biceps", ("back", "biceps")),
+        ("shoulders_traps", ("shoulder", "traps")),
+        ("quadriceps_calves", ("quadriceps", "calves")),
+        ("posterior_chain_core", ("posterior",)),
+    ):
+        if all(marker in normalized_title for marker in markers):
+            return _STRICT_BLOCKS[focus]
+    return None
+
+
+__all__ = [
+    "SUPPLEMENTAL_MUSCLES",
+    "finalize_session_structure",
+    "main_exercise_count",
+    "main_session_title",
+    "session_structure_errors",
+    "supplemental_reason_codes",
+]

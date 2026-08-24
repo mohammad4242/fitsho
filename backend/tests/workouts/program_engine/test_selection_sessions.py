@@ -391,7 +391,7 @@ def test_full_body_session_covers_required_patterns_and_priority_is_first() -> N
     )
 
 
-def test_required_trunk_slot_preserves_canonical_abs_coverage() -> None:
+def test_optional_trunk_work_is_not_forced_or_preference_selected() -> None:
     oblique_id = uuid4()
     request = normalized(preferred_exercises=[oblique_id])
     catalog = [
@@ -424,7 +424,13 @@ def test_required_trunk_slot_preserves_canonical_abs_coverage() -> None:
         RULESET,
     )
 
-    assert any(item.primary_muscle is MuscleGroup.ABS for item in sessions[0].exercises)
+    supplemental = tuple(
+        item
+        for item in sessions[0].exercises
+        if item.primary_muscle in {MuscleGroup.ABS, MuscleGroup.OBLIQUES}
+    )
+    assert len(supplemental) <= 1
+    assert not supplemental or supplemental[0].primary_muscle is MuscleGroup.ABS
 
 
 def test_explicit_glute_priority_owns_repeated_shared_hinge_slots() -> None:

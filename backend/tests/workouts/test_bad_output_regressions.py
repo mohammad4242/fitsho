@@ -56,7 +56,7 @@ def test_regression_thirty_minute_session_reports_traceable_constrained_workload
         entry for entry in result.program.decision_trace if entry["stage"] == "volume_repair"
     )
     assert "VOLUME_REPAIR_SOFT_TARGET_REDUCED" in volume_repair["reasons"]
-    assert "PLANNED_SOFT_VOLUME_REDUCED_DURING_SESSION_FIT" in result.program.warnings
+    assert "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in result.program.warnings
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
         policy.contains(
@@ -122,7 +122,7 @@ def test_regression_priority_muscle_is_early_and_gets_more_planned_volume() -> N
     assert planned[MuscleGroup.BACK.value] > planned[MuscleGroup.CHEST.value]
 
 
-def test_regression_short_upper_lower_keeps_required_trunk_work_with_cardio() -> None:
+def test_regression_short_upper_lower_keeps_main_work_with_additive_cardio() -> None:
     result = generate_program(
         request(
             available_training_days=4,
@@ -137,10 +137,9 @@ def test_regression_short_upper_lower_keeps_required_trunk_work_with_cardio() ->
     )
 
     assert result.program is not None, result.errors
-    assert any(
-        item.movement_pattern is MovementPattern.CORE_ANTI_EXTENSION
+    assert all(
+        any(item.primary_muscle is not MuscleGroup.ABS for item in day.exercises)
         for day in result.program.weekly_schedule
-        for item in day.exercises
     )
     assert any(day.cardio is not None for day in result.program.weekly_schedule)
     assert all(

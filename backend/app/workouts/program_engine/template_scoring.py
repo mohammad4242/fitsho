@@ -11,6 +11,7 @@ from app.workouts.program_engine.body_analysis import eligible_body_analysis_pri
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import NormalizedProgramRequest, TemplateReference
+from app.workouts.program_engine.supplemental_policy import SUPPLEMENTAL_MUSCLES
 
 
 @dataclass(frozen=True)
@@ -110,8 +111,11 @@ def _priority_score(
     tags: frozenset[TemplateFocusTag],
     policy: TemplateScoringPolicy,
 ) -> tuple[int, tuple[str, ...]]:
-    exact_matches = priority_tags_for_muscles(request.source.priority_muscles) & tags
-    regional_matches = regional_priority_tags_for_muscles(request.source.priority_muscles) & tags
+    main_priorities = tuple(
+        muscle for muscle in request.source.priority_muscles if muscle not in SUPPLEMENTAL_MUSCLES
+    )
+    exact_matches = priority_tags_for_muscles(main_priorities) & tags
+    regional_matches = regional_priority_tags_for_muscles(main_priorities) & tags
     score = min(
         policy.explicit_priority_cap,
         len(exact_matches) * policy.explicit_priority_exact
@@ -133,6 +137,8 @@ def _body_analysis_score(
     boost_by_tag: dict[TemplateFocusTag, int] = {}
     matched_classifications: set[str] = set()
     for priority in eligible_body_analysis_priorities(request, ruleset):
+        if priority.muscle in SUPPLEMENTAL_MUSCLES:
+            continue
         tag = priority_tag_for_muscle(priority.muscle)
         if tag is None or tag not in tags:
             continue

@@ -145,13 +145,18 @@ def _template(
             ),
             TemplateReferenceDay(
                 4,
-                "Core",
-                (MuscleGroup.ABS,),
+                "Shoulders + Traps",
+                (MuscleGroup.SHOULDERS, MuscleGroup.TRAPS),
                 (
-                    _slot(MovementPattern.CORE_ANTI_EXTENSION, (MuscleGroup.ABS,)),
+                    _slot(MovementPattern.VERTICAL_PUSH, (MuscleGroup.SHOULDERS,)),
                     _slot(
-                        MovementPattern.CORE_ANTI_ROTATION,
-                        (MuscleGroup.ABS,),
+                        MovementPattern.SHOULDER_ABDUCTION,
+                        (MuscleGroup.SHOULDERS,),
+                        adaptation_priority="accessory",
+                    ),
+                    _slot(
+                        MovementPattern.SHRUG,
+                        (MuscleGroup.TRAPS,),
                         adaptation_priority="accessory",
                     ),
                 ),
@@ -486,16 +491,8 @@ def test_phase10_goal_prescription_changes_without_changing_structure() -> None:
         for item in day.exercises
         if item.exercise_type.value == "isolation"
     )
-    core = next(
-        item
-        for day in programs[Goal.STRENGTH].weekly_schedule
-        for item in day.exercises
-        if item.exercise_type.value == "core"
-    )
     assert primary.rest_seconds > isolation.rest_seconds
-    assert primary.rest_seconds > core.rest_seconds
     assert isolation.rest_seconds < 180
-    assert core.rest_seconds < 180
 
 
 @pytest.mark.parametrize("duration", [30, 45, 60, 90])

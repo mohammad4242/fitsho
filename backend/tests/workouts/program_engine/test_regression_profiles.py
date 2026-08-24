@@ -23,6 +23,7 @@ from app.workouts.program_engine.split_selector import (
     generate_split_candidates,
     rank_availability_aware_fallbacks,
 )
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
@@ -265,8 +266,7 @@ def test_regression_profiles() -> None:
                 for sets in per_session_sets.values()
             )
 
-            # Verify session duration strictly within +-10 of requested duration
-            target_min = req.session_duration_minutes - 10
+            # Phase 11.9: completed useful work may finish below the target window.
             target_max = req.session_duration_minutes + 10
             workout_duration = (
                 day.estimated_duration_minutes
@@ -274,15 +274,15 @@ def test_regression_profiles() -> None:
                 - (day.cardio.duration_minutes if day.cardio else 0)
             )
             assert workout_duration <= target_max
-            if workout_duration < target_min:
-                assert (
-                    "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS"
-                    in program.validation_report.warnings
-                    or "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD"
-                    in program.validation_report.warnings
-                    or "PLANNED_SOFT_VOLUME_REDUCED_DURING_SESSION_FIT"
-                    in program.validation_report.warnings
-                )
+            exercise_floor = (
+                3
+                if req.session_duration_minutes <= RULESET.short_session_minutes
+                else RULESET.minimum_exercises_per_session
+            )
+            assert (
+                main_exercise_count(day.exercises) >= exercise_floor
+                or "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in program.validation_report.warnings
+            )
 
             for ex in day.exercises:
                 # No unavailable equipment

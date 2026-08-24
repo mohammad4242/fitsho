@@ -163,6 +163,34 @@ def test_regional_explicit_priority_beats_unrelated_alternative() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "muscle",
+    [
+        MuscleGroup.FOREARMS,
+        MuscleGroup.ABS,
+        MuscleGroup.OBLIQUES,
+        MuscleGroup.LOWER_BACK,
+        MuscleGroup.NECK,
+    ],
+)
+def test_supplemental_priority_does_not_drive_template_scoring(muscle: MuscleGroup) -> None:
+    normalized = _normalized(priority_muscles=[muscle])
+    upper = _template("upper", TemplateFocusTag.UPPER_PRIORITY)
+    lower = _template("lower", TemplateFocusTag.LOWER_PRIORITY)
+
+    assert _score(normalized, upper).priority_score == 0
+    assert _score(normalized, lower).priority_score == 0
+
+
+def test_supplemental_body_analysis_does_not_drive_template_scoring() -> None:
+    normalized = _normalized(
+        body_analysis_influence=_body_analysis((MuscleGroup.FOREARMS, "clear_lag")),
+    )
+    upper = _template("upper", TemplateFocusTag.UPPER_PRIORITY)
+
+    assert _score(normalized, upper).body_analysis_score == 0
+
+
 def test_explicit_priority_dominates_conflicting_body_analysis() -> None:
     normalized = _normalized(
         priority_muscles=[MuscleGroup.CHEST],

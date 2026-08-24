@@ -8,7 +8,7 @@ from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.validation import validate_program
-from app.workouts.program_engine.volume_planner import TRACKED_MUSCLES
+from app.workouts.program_engine.volume_planner import PLANNED_MUSCLES, TRACKED_MUSCLES
 from tests.workouts.program_engine.golden_fixtures import (
     exercise,
     full_catalog,
@@ -308,7 +308,7 @@ def test_final_validation_rejects_vertical_pull_without_pull_up_bar() -> None:
     assert "UNAVAILABLE_EQUIPMENT_SELECTED" in report.errors
 
 
-def test_priority_muscle_affects_volume_and_order() -> None:
+def test_priority_muscle_affects_volume_without_overriding_session_structure() -> None:
     source = golden_scenarios()["intermediate_5_days_shoulder_priority"]
     result = generate_program(source, full_catalog(), RULESET)
 
@@ -321,7 +321,10 @@ def test_priority_muscle_affects_volume_and_order() -> None:
         if any(item.primary_muscle is MuscleGroup.SHOULDERS for item in day.exercises)
     ]
     assert shoulder_days
-    assert all(day.exercises[0].primary_muscle is MuscleGroup.SHOULDERS for day in shoulder_days)
+    assert all(
+        tuple(item.order for item in day.exercises) == tuple(range(1, len(day.exercises) + 1))
+        for day in shoulder_days
+    )
 
 
 def test_aggregate_volume_metrics_expose_every_tracked_muscle() -> None:
@@ -332,7 +335,10 @@ def test_aggregate_volume_metrics_expose_every_tracked_muscle() -> None:
     planned = result.program.aggregate_metrics["planned_direct_sets_by_muscle"]
     weekly = result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
 
-    assert all(muscle.value in planned for muscle in TRACKED_MUSCLES)
+    assert all(muscle.value in planned for muscle in PLANNED_MUSCLES)
+    assert all(
+        muscle.value not in planned for muscle in set(TRACKED_MUSCLES) - set(PLANNED_MUSCLES)
+    )
     assert all(muscle.value in weekly for muscle in TRACKED_MUSCLES)
 
 

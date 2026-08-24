@@ -226,7 +226,7 @@ def test_template_substitution_rejects_semantically_incompatible_reference() -> 
         normalize_request(request(training_experience="advanced", training_age_months=72)),
         template,
         tuple([misleading, valid, *full_catalog()]),
-        RULESET,
+        replace(RULESET, minimum_exercises_per_session=1),
     )
 
     assert valid.id in {item.id for item in build.drafts[0].exercises}

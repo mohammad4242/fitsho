@@ -234,7 +234,7 @@ def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> Non
     chest = (MuscleGroup.CHEST,)
     back = (MuscleGroup.BACK,)
     legs = (MuscleGroup.QUADRICEPS, MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES)
-    core = (MuscleGroup.ABS,)
+    shoulders_traps = (MuscleGroup.SHOULDERS, MuscleGroup.TRAPS)
     oversized = TemplateReference(
         slug="oversized-chest-reference",
         days_per_week=4,
@@ -275,14 +275,14 @@ def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> Non
             ),
             TemplateReferenceDay(
                 4,
-                "Core",
-                core,
+                "Shoulders + Traps",
+                shoulders_traps,
                 (
-                    _template_slot(MovementPattern.CORE_ANTI_EXTENSION, core),
-                    _template_slot(MovementPattern.CORE_ANTI_ROTATION, core),
-                    _template_slot(MovementPattern.CORE_ANTI_LATERAL_FLEXION, core),
-                    _template_slot(MovementPattern.CORE_ANTI_EXTENSION, core),
-                    _template_slot(MovementPattern.CORE_ANTI_ROTATION, core),
+                    _template_slot(MovementPattern.VERTICAL_PUSH, shoulders_traps),
+                    _template_slot(MovementPattern.SHOULDER_ABDUCTION, shoulders_traps),
+                    _template_slot(MovementPattern.HORIZONTAL_PULL, shoulders_traps),
+                    _template_slot(MovementPattern.SHRUG, shoulders_traps),
+                    _template_slot(MovementPattern.SHRUG, shoulders_traps),
                 ),
             ),
         ),
@@ -303,7 +303,13 @@ def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> Non
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics.get("reference_template") == oversized.slug
+    assert result.program.aggregate_metrics.get("reference_template") is None
+    rejection = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "template_reference" and entry.get("status") == "rejected"
+    )
+    assert "MUSCLE_DIRECT_FREQUENCY_EXCEEDED" in rejection["reason_codes"]
     assert all(
         values["maximum_hard"] <= RULESET.maximum_sets[result.program.training_status]
         for values in result.program.aggregate_metrics["volume_ranges_by_muscle"].values()

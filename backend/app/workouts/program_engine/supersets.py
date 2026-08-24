@@ -6,6 +6,7 @@ from app.workouts.program_engine.enums import LoadLimit
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import NormalizedProgramRequest, ProgrammedExercise
+from app.workouts.program_engine.supplemental_policy import is_supplemental_muscle
 
 _LOWER_BODY_MUSCLES = frozenset(
     {
@@ -103,6 +104,10 @@ def apply_duration_pressure_superset(
     for first_index, first in enumerate(exercises):
         for second_index in range(first_index + 1, len(exercises)):
             second = exercises[second_index]
+            if is_supplemental_muscle(first.primary_muscle) or is_supplemental_muscle(
+                second.primary_muscle
+            ):
+                continue
             category = safe_superset_category(first, second)
             if category is None:
                 continue

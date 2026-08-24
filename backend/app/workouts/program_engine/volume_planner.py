@@ -16,6 +16,7 @@ from app.workouts.program_engine.schemas import (
     VolumeTarget,
     WeeklyVolumePlan,
 )
+from app.workouts.program_engine.supplemental_policy import SUPPLEMENTAL_MUSCLES
 from app.workouts.program_engine.volume_history import (
     PreviousVolumeBaseline,
     derive_previous_volume_baseline,
@@ -32,7 +33,6 @@ MAJOR_MUSCLES = (
     MuscleGroup.GLUTES,
     MuscleGroup.QUADRICEPS,
     MuscleGroup.HAMSTRINGS,
-    MuscleGroup.ABS,
     MuscleGroup.CALVES,
 )
 EXPECTED_COMPOUND_SECONDARY_MUSCLES = 2
@@ -42,9 +42,11 @@ SECONDARY_MUSCLES = (
     MuscleGroup.BICEPS,
     MuscleGroup.TRICEPS,
     MuscleGroup.TRAPS,
-    MuscleGroup.FOREARMS,
 )
-TRACKED_MUSCLES = MAJOR_MUSCLES + SECONDARY_MUSCLES
+PLANNED_MUSCLES = MAJOR_MUSCLES + SECONDARY_MUSCLES
+TRACKED_MUSCLES = PLANNED_MUSCLES + tuple(
+    sorted(SUPPLEMENTAL_MUSCLES, key=lambda muscle: muscle.value)
+)
 
 
 def plan_weekly_volume(
@@ -82,8 +84,9 @@ def plan_weekly_volume(
     }
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     effective_priorities = frozenset(priority_policy.priorities)
+    explicit_priorities = frozenset(priority_policy.explicit_priorities)
     baseline_sets: dict[MuscleGroup, int] = {}
-    for muscle in TRACKED_MUSCLES:
+    for muscle in PLANNED_MUSCLES:
         is_secondary = muscle in SECONDARY_MUSCLES
         muscle_minimum = secondary_minimum if is_secondary else minimum
         muscle_maximum = secondary_maximum if is_secondary else maximum
@@ -98,11 +101,11 @@ def plan_weekly_volume(
         if source.age >= ruleset.older_adult_modifier_age:
             target -= ruleset.contextual_volume_reduction_sets
         baseline_sets[muscle] = min(max(target, muscle_minimum), muscle_maximum)
-    if source.priority_muscles:
+    if explicit_priorities:
         baseline_sets = {
             muscle: (
                 sets
-                if muscle in source.priority_muscles
+                if muscle in explicit_priorities
                 else max(
                     secondary_minimum if muscle in SECONDARY_MUSCLES else minimum,
                     sets - ruleset.contextual_volume_reduction_sets,
@@ -112,7 +115,7 @@ def plan_weekly_volume(
         }
     hard_maximums = {
         muscle: secondary_maximum if muscle in SECONDARY_MUSCLES else maximum
-        for muscle in TRACKED_MUSCLES
+        for muscle in PLANNED_MUSCLES
     }
     priority_bonuses = priority_policy.volume_bonuses(
         baseline_sets,
@@ -137,7 +140,7 @@ def plan_weekly_volume(
         ruleset,
     )
     reasons.extend(previous_volume.reason_codes)
-    for muscle in TRACKED_MUSCLES:
+    for muscle in PLANNED_MUSCLES:
         constraint_reasons = list(common_constraint_reasons)
         is_secondary = muscle in SECONDARY_MUSCLES
         muscle_minimum = secondary_minimum if is_secondary else minimum
@@ -145,14 +148,14 @@ def plan_weekly_volume(
         safe_maximum = muscle_maximum
         acceptable_ceiling = muscle_maximum
         sets = baseline_sets[muscle]
-        if muscle in source.priority_muscles:
+        if muscle in explicit_priorities:
             bonus = priority_bonuses[muscle]
             sets = min(muscle_maximum, sets + bonus)
             if bonus:
                 reasons.append("VOLUME_INCREASED_FOR_PRIORITY_MUSCLE")
                 reasons.append("PRIORITY_VOLUME_INCREASED")
         body_priority = body_priorities.get(muscle)
-        if body_priority is not None and muscle in source.priority_muscles:
+        if body_priority is not None and muscle in explicit_priorities:
             reasons.append("BODY_ANALYSIS_SUPPORTS_EXPLICIT_PRIORITY")
         elif body_priority is not None:
             bonus = (
@@ -228,7 +231,7 @@ def plan_weekly_volume(
         has_dedicated_exposure = (
             split.split_type is SplitType.BODY_PART_ROTATION and direct_exposures[muscle] > 0
         )
-        is_explicit_priority = muscle in source.priority_muscles
+        is_explicit_priority = muscle in explicit_priorities
         direct_min_required = is_explicit_priority and (
             muscle not in SECONDARY_MUSCLES or has_dedicated_exposure or len(split.day_focuses) >= 3
         )
@@ -291,6 +294,7 @@ def _limit_volume_to_duration_capacity(
     baseline_sets: dict[MuscleGroup, int],
     body_classifications: dict[MuscleGroup, str],
 ) -> WeeklyVolumePlan:
+    explicit_priorities = request.source.priority_muscles - SUPPLEMENTAL_MUSCLES
     weekly_working_set_capacity = session_capacity.expected_working_set_capacity * len(
         split.day_focuses
     )
@@ -323,7 +327,7 @@ def _limit_volume_to_duration_capacity(
         baseline = min(baseline_sets[muscle], target.target_sets)
         classification = body_classifications.get(muscle)
         for set_number in range(floors[muscle] + 1, target.target_sets + 1):
-            if muscle in request.source.priority_muscles:
+            if muscle in explicit_priorities:
                 rank = 900
             elif set_number <= baseline and muscle in MAJOR_MUSCLES:
                 rank = 600
@@ -410,13 +414,11 @@ def _direct_exposure_counts(
             MuscleGroup.HAMSTRINGS,
             MuscleGroup.GLUTES,
             MuscleGroup.CALVES,
-            MuscleGroup.ABS,
         ),
         "quadriceps_calves": (MuscleGroup.QUADRICEPS, MuscleGroup.CALVES),
         "posterior_chain_core": (
             MuscleGroup.HAMSTRINGS,
             MuscleGroup.GLUTES,
-            MuscleGroup.ABS,
         ),
     }
     counts: Counter[MuscleGroup] = Counter()
@@ -433,7 +435,7 @@ def _specialization_focus(priorities: frozenset[MuscleGroup]) -> str:
         ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),
         ((MuscleGroup.SHOULDERS, MuscleGroup.TRAPS), "shoulders_traps"),
         ((MuscleGroup.QUADRICEPS, MuscleGroup.CALVES), "quadriceps_calves"),
-        ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.ABS), "posterior_chain_core"),
+        ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES), "posterior_chain_core"),
     ):
         if priorities.intersection(muscle_groups):
             return focus

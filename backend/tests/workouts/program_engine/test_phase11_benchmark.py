@@ -154,7 +154,7 @@ def test_major_coverage_uses_the_canonical_profile_minimum_not_two_sets() -> Non
     assert benchmark._missing_major_muscle_coverage(ranges) == ()
 
 
-def test_major_coverage_reports_a_real_canonical_minimum_miss() -> None:
+def test_supplemental_abs_absence_is_not_a_major_coverage_miss() -> None:
     ranges = {
         MuscleGroup.ABS.value: {
             "minimum_coverage_required": True,
@@ -163,4 +163,4 @@ def test_major_coverage_reports_a_real_canonical_minimum_miss() -> None:
         }
     }
 
-    assert benchmark._missing_major_muscle_coverage(ranges) == (MuscleGroup.ABS.value,)
+    assert benchmark._missing_major_muscle_coverage(ranges) == ()

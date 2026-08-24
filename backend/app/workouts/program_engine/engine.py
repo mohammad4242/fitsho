@@ -23,7 +23,6 @@ from app.workouts.program_engine.duration_capacity import (
 )
 from app.workouts.program_engine.duration_policy import (
     calculate_resistance_minutes,
-    get_session_duration_policy,
 )
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
@@ -54,6 +53,7 @@ from app.workouts.program_engine.schemas import (
 )
 from app.workouts.program_engine.session_builder import SessionConstructionError, build_sessions
 from app.workouts.program_engine.session_duration import repair_session_durations
+from app.workouts.program_engine.session_structure import finalize_session_structure
 from app.workouts.program_engine.split_selector import (
     rank_availability_aware_fallbacks,
     rank_split_candidates,
@@ -549,6 +549,7 @@ def _program_for_split(
         session_capacity=session_capacity,
     )
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
+    days = finalize_session_structure(days, normalized, ruleset)
     day_count_errors = _day_count_errors(
         len(days), normalized.resistance_training_days, stage="dynamic_construction"
     )
@@ -662,6 +663,11 @@ def _program_for_split(
             days,
             duration_repair_reasons,
         ),
+        {
+            "stage": "session_structure",
+            "status": "finalized",
+            "reason_codes": ("FINAL_SESSION_SEQUENCE_APPLIED",),
+        },
     )
     empty_report = ValidationReport(
         errors=(),
@@ -787,6 +793,7 @@ def _reference_program(
         session_capacity=session_capacity,
     )
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
+    days = finalize_session_structure(days, normalized, ruleset)
     metrics = _volume_metrics(
         days,
         volume,
@@ -850,6 +857,11 @@ def _reference_program(
             days,
             duration_repair_reasons,
         ),
+        {
+            "stage": "session_structure",
+            "status": "finalized",
+            "reason_codes": ("FINAL_SESSION_SEQUENCE_APPLIED",),
+        },
     )
     if day_count_errors:
         return ProgramGenerationResult(
@@ -865,7 +877,9 @@ def _reference_program(
     targets_by_muscle = {target.muscle: target for target in volume.targets}
     unmet_priority_errors: list[str] = []
     for muscle in sorted(explicit_priority_muscles, key=lambda item: item.value):
-        target = targets_by_muscle[muscle]
+        target = targets_by_muscle.get(muscle)
+        if target is None:
+            continue
         direct_value = direct[muscle.value]
         if target.direct_minimum_required and direct_value < target.minimum_direct_sets:
             unmet_priority_errors.append(
@@ -887,7 +901,7 @@ def _reference_program(
             explicit_priority_muscles | body_priority_muscles,
             key=lambda item: item.value,
         )
-        if (target := targets_by_muscle[muscle])
+        if (target := targets_by_muscle.get(muscle))
         and (
             direct[muscle.value] < target.target_sets
             or effective_volume.effective_sets_by_muscle.get(muscle.value, 0)
@@ -1069,7 +1083,6 @@ def _coach_quality_metrics(
         or "VOLUME_REPAIR_SOFT_TARGET_REDUCED" in trace_reason_codes
         else "fit"
     )
-    duration_policy = get_session_duration_policy(request.session_duration_minutes)
     resistance_budget = request.session_duration_minutes
     # resistance_time_budget_fit: did every session stay within the resistance budget (+tolerance)?
     session_resistance_minutes = [

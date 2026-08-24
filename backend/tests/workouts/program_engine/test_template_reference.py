@@ -103,7 +103,7 @@ def _four_day_reference() -> TemplateReference:
                         (MuscleGroup.QUADRICEPS, MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES),
                         MovementPattern.SQUAT,
                     ),
-                    ("Core", (MuscleGroup.ABS,), MovementPattern.CORE_ANTI_EXTENSION),
+                    ("Shoulders", (MuscleGroup.SHOULDERS,), MovementPattern.VERTICAL_PUSH),
                 ),
                 start=1,
             )
@@ -271,7 +271,7 @@ def test_safe_core_substitution_can_repeat_across_sessions_deterministically() -
                     slot(by_name["Incline Push Up"]),
                     slot(by_name["Dumbbell Row"]),
                     slot(by_name["Wall Knee Extension"]),
-                    slot(by_name["Plank"]),
+                    slot(by_name["Calf Raise"]),
                 ),
             ),
         ),
@@ -355,6 +355,7 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
         "volume",
         "volume_repair",
         "session_duration",
+        "session_structure",
         "template_attempt",
         "final_construction",
         "coach_quality",
@@ -527,9 +528,13 @@ def test_same_template_personalizes_weekly_volume_targets_for_different_prioriti
         )
     for day_index in (0, 2):
         expected_core_ids = {slot.exercise_id for slot in template.days[day_index].slots}
-        actual_core = chest_result.program.weekly_schedule[day_index].exercises[:3]
-        assert {exercise.exercise_id for exercise in actual_core} == expected_core_ids
-        assert all("TEMPLATE_REFERENCE_EXERCISE" in item.reason_codes for item in actual_core)
+        actual_template = tuple(
+            exercise
+            for exercise in chest_result.program.weekly_schedule[day_index].exercises
+            if exercise.exercise_id in expected_core_ids
+        )
+        assert {exercise.exercise_id for exercise in actual_template} == expected_core_ids
+        assert all("TEMPLATE_REFERENCE_EXERCISE" in item.reason_codes for item in actual_template)
 
 
 def test_template_volume_uses_recovery_history_and_short_session_prescription() -> None:
@@ -680,8 +685,8 @@ def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> N
     )
     assert rejection["selected"] == unadaptable.slug
     assert rejection["reason_codes"]
-    assert "INITIAL_TEMPLATE_REJECTED_UNFILLABLE" in rejection["reason_codes"]
-    assert rejection["rejection_category"] == "ADAPTATION_EXHAUSTED"
+    assert "MUSCLE_DIRECT_FREQUENCY_EXCEEDED" in rejection["reason_codes"]
+    assert rejection["rejection_category"] == "DURATION_RECOVERY_HARD_IMPOSSIBILITY"
 
 
 def test_template_rejection_categories_are_specific_and_stable() -> None:
@@ -821,7 +826,7 @@ def test_template_priority_volume_is_repaired_when_safe_capacity_exists() -> Non
     repair = next(
         entry for entry in result.program.decision_trace if entry["stage"] == "volume_repair"
     )
-    assert "VOLUME_REPAIR_ADDED_EXERCISE_FOR_MINIMUM_COVERAGE" in repair["reasons"]
+    assert "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM" in repair["reasons"]
 
 
 def test_template_generation_is_deterministic_and_strictly_valid() -> None:

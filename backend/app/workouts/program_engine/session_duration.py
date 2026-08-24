@@ -38,6 +38,10 @@ from app.workouts.program_engine.supersets import (
     apply_duration_pressure_superset,
     apply_template_supersets,
 )
+from app.workouts.program_engine.supplemental_policy import (
+    is_supplemental_muscle,
+    main_exercise_count,
+)
 from app.workouts.program_engine.template_sessions import (
     adaptation_preservation_rank,
     template_removal_rank,
@@ -88,7 +92,7 @@ def repair_session_durations(
         # Underfill = exercise count below floor ONLY.
         # Being below the time budget is NOT a defect by itself.
         # ------------------------------------------------------------------
-        if len(current.exercises) < planned_minimum_exercises:
+        if main_exercise_count(current.exercises) < planned_minimum_exercises:
             reasons.append("SESSION_DURATION_UNDERFILLED")
             current = _repair_underfill(
                 current,
@@ -142,7 +146,7 @@ def repair_session_durations(
             else:
                 # Under budget — only a quality issue if program is actually incomplete.
                 # Complete programs finishing under budget are acceptable.
-                if len(current.exercises) < planned_minimum_exercises:
+                if main_exercise_count(current.exercises) < planned_minimum_exercises:
                     reasons.append("SESSION_DURATION_TARGET_UNSATISFIED")
                     if volume is not None and _duration_shortfall_is_hard_constrained(
                         request, volume
@@ -185,7 +189,7 @@ def _repair_underfill(
     not a fill target.  We stop as soon as the exercise-count floor is met.
     """
     exercises = list(day.exercises)
-    while len(exercises) < minimum_exercises:
+    while main_exercise_count(exercises) < minimum_exercises:
         addition = _select_exercise_addition(
             day,
             exercises,
@@ -233,6 +237,7 @@ def _select_exercise_addition(
         item
         for item in candidates
         if item.id not in existing_ids
+        and not is_supplemental_muscle(item.primary_muscle)
         and exercise_fits_focus(item, day.focus)
         and _candidate_is_safe(item, request)
         and ExerciseLabel.CARDIO not in item.labels
@@ -294,7 +299,7 @@ def _select_exercise_addition(
             + estimated
             + (day.cardio.duration_minutes if day.cardio else 0)
             > policy.maximum_total_minutes(ruleset.general_warmup_minutes)
-            and len(exercises) >= minimum_exercises
+            and main_exercise_count(exercises) >= minimum_exercises
         ):
             continue
         repeated = any(
@@ -327,7 +332,7 @@ def _select_exercise_addition(
         weekly_exercises = [item for day in other_days for item in day.exercises] + simulated
         if (
             not prefer_acceptable_volume_for_minimum_fill
-            and len(exercises) < minimum_exercises
+            and main_exercise_count(exercises) < minimum_exercises
             and _within_weekly_hard_volume(weekly_exercises, ruleset, request, volume)
         ):
             return simulated[-1]
@@ -341,7 +346,7 @@ def _select_exercise_addition(
             return simulated[-1]
         if (
             hard_volume_fallback is None
-            and len(exercises) < minimum_exercises
+            and main_exercise_count(exercises) < minimum_exercises
             and _within_weekly_hard_volume(weekly_exercises, ruleset, request, volume)
         ):
             hard_volume_fallback = simulated[-1]
@@ -395,25 +400,32 @@ def _repair_overfill(
         low_value_removable = [
             (index, item)
             for index, item in enumerate(exercises)
-            if len(exercises) > minimum_exercises
-            and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
-            and template_removal_rank(item) < 3
-            and priority_policy.preservation_rank(item.primary_muscle) == 0
-            and (
-                template_removal_rank(item) in {0, 1}
-                or "SESSION_SIZE_ACCESSORY" in item.reason_codes
+            if is_supplemental_muscle(item.primary_muscle)
+            or (
+                _can_remove_for_floor(item, exercises, minimum_exercises)
+                and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
+                and template_removal_rank(item) < 3
+                and priority_policy.preservation_rank(item.primary_muscle) == 0
+                and (
+                    template_removal_rank(item) in {0, 1}
+                    or "SESSION_SIZE_ACCESSORY" in item.reason_codes
+                    or "OPTIONAL_SUPPLEMENTAL_WORK" in item.reason_codes
+                )
             )
         ]
         if low_value_removable:
-            index, _ = min(
+            index, removed = min(
                 low_value_removable,
                 key=lambda pair: (
+                    not is_supplemental_muscle(pair[1].primary_muscle),
                     adaptation_preservation_rank(pair[1], priority_policy),
                     -pair[1].estimated_minutes,
                     str(pair[1].exercise_id),
                 ),
             )
             exercises.pop(index)
+            if is_supplemental_muscle(removed.primary_muscle):
+                reasons.append("SUPPLEMENTAL_WORK_TRIMMED_FOR_DURATION")
             day = _rebuild_day(day, tuple(exercises), ruleset)
             continue
         options = [
@@ -441,7 +453,7 @@ def _repair_overfill(
         removable = [
             (index, item)
             for index, item in enumerate(exercises)
-            if len(exercises) > minimum_exercises
+            if _can_remove_for_floor(item, exercises, minimum_exercises)
             and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
             and template_removal_rank(item) < 3
             and priority_policy.preservation_rank(item.primary_muscle) == 0
@@ -479,6 +491,16 @@ def _repair_overfill(
         exercises.pop(index)
         day = _rebuild_day(day, tuple(exercises), ruleset)
     return day, tuple(dict.fromkeys(reasons))
+
+
+def _can_remove_for_floor(
+    exercise: ProgrammedExercise,
+    exercises: list[ProgrammedExercise],
+    minimum_exercises: int,
+) -> bool:
+    return is_supplemental_muscle(exercise.primary_muscle) or (
+        main_exercise_count(exercises) > minimum_exercises
+    )
 
 
 def _select_rest_reduction_for_overfill(
