@@ -391,6 +391,7 @@ class TemplateReferenceDay:
     title: str
     focus: tuple[MuscleGroup, ...]
     slots: tuple[TemplateReferenceSlot, ...]
+    structure_focus: str = "full_body"
     title_fa: str = ""
 
 
@@ -501,7 +502,7 @@ class WorkoutDay:
     exercises: tuple[ProgrammedExercise, ...]
     cardio: CardioPrescription | None = None
     template_target_muscles: tuple[MuscleGroup, ...] = ()
-
+    template_structure_focus: str = "full_body"
 
 @dataclass(frozen=True)
 class ValidationReport:
@@ -575,3 +576,4 @@ class SessionDraft:
     relaxed_required_pattern_groups: tuple[tuple[MovementPattern, ...], ...] = ()
     relaxed_required_target_muscles: tuple[MuscleGroup | None, ...] = ()
     template_target_muscles: tuple[MuscleGroup, ...] = ()
+    template_structure_focus: str = "full_body"

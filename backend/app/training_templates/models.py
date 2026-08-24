@@ -115,6 +115,7 @@ class TrainingProgramTemplateDay(Base):
     day_number: Mapped[int] = mapped_column(Integer, nullable=False)
     title_en: Mapped[str] = mapped_column(String(160), nullable=False)
     title_fa: Mapped[str] = mapped_column(String(160), nullable=False)
+    structure_focus: Mapped[str] = mapped_column(String(100), nullable=False, default="full_body", server_default="full_body")
     direct_target_muscles: Mapped[list[str]] = mapped_column(JSON, nullable=False)
 
     template: Mapped[TrainingProgramTemplate] = relationship(back_populates="days")

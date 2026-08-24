@@ -221,6 +221,7 @@ class AdminTrainingTemplateDay(BaseModel):
     day_number: int
     title_en: str
     title_fa: str
+    structure_focus: str
     direct_target_muscles: list[MuscleGroup]
     slots: list[AdminTrainingTemplateSlot]
 
@@ -295,6 +296,7 @@ class AdminTrainingTemplateDayWrite(BaseModel):
 
     title_en: Name
     title_fa: Name
+    structure_focus: Name
     direct_target_muscles: list[MuscleGroup] = Field(min_length=1)
     slots: list[AdminTrainingTemplateSlotWrite] = Field(min_length=5, max_length=9)
 

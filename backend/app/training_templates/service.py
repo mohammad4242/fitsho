@@ -107,6 +107,7 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
                 day_number=day_number,
                 title_en=day_seed.title_en,
                 title_fa=day_seed.title_fa,
+                structure_focus=day_seed.structure_focus,
                 direct_target_muscles=[muscle.value for muscle in day_seed.direct_target_muscles],
             )
             template.days.append(day)

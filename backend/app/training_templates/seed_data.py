@@ -36,6 +36,7 @@ class TemplateSlotSeed:
 class TemplateDaySeed:
     title_en: str
     title_fa: str
+    structure_focus: str
     direct_target_muscles: tuple[MuscleGroup, ...]
     slots: tuple[TemplateSlotSeed, ...]
 
@@ -999,13 +1000,46 @@ def _intensity_guidance(
     )
 
 
+def _derive_structure_focus(title_en: str) -> str:
+    title = title_en.lower()
+    if "full body" in title:
+        return "full_body"
+    if "upper" in title:
+        return "upper"
+    if "lower" in title or "squat" in title:
+        return "lower"
+    if "push" in title or "bench" in title or "press" in title:
+        return "push"
+    if "pull" in title:
+        return "pull"
+    if "chest + triceps" in title or title == "chest":
+        return "chest_triceps"
+    if (
+        "back + biceps" in title
+        or "back width" in title
+        or "back thickness" in title
+        or title == "back"
+        or "back + arms" in title
+    ):
+        return "back_biceps"
+    if "shoulders + traps" in title or "shoulders" in title:
+        return "shoulders_traps"
+    if "quadriceps" in title or "quads" in title or "legs" in title:
+        return "quadriceps_calves"
+    if "posterior" in title or "hamstrings" in title or "glutes" in title or "deadlift" in title:
+        return "posterior_chain_core"
+    if "chest" in title:
+        return "chest_triceps"
+    return "other"
+
+
 def _day(
     title_en: str,
     title_fa: str,
     muscles: tuple[MuscleGroup, ...],
     *slots: TemplateSlotSeed,
 ) -> TemplateDaySeed:
-    return TemplateDaySeed(title_en, title_fa, muscles, slots)
+    return TemplateDaySeed(title_en, title_fa, _derive_structure_focus(title_en), muscles, slots)
 
 
 def _template(

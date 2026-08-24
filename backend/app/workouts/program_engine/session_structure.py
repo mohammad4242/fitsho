@@ -279,21 +279,8 @@ def _strict_block(day: WorkoutDay) -> tuple[frozenset[MuscleGroup], ...] | None:
         return _STRICT_BLOCKS[day.focus]
     if not day.focus.startswith("template_reference"):
         return None
-    focus_muscles = set(day.template_target_muscles)
-    if {MuscleGroup.CHEST, MuscleGroup.TRICEPS}.issubset(focus_muscles):
-        return _STRICT_BLOCKS["chest_triceps"]
-    if {MuscleGroup.BACK, MuscleGroup.BICEPS}.issubset(focus_muscles):
-        return _STRICT_BLOCKS["back_biceps"]
-    if {MuscleGroup.SHOULDERS, MuscleGroup.TRAPS}.issubset(focus_muscles):
-        return _STRICT_BLOCKS["shoulders_traps"]
-    if {MuscleGroup.QUADRICEPS, MuscleGroup.CALVES}.issubset(focus_muscles):
-        return _STRICT_BLOCKS["quadriceps_calves"]
-    if {MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES}.issubset(focus_muscles) or {
-        MuscleGroup.HAMSTRINGS
-    }.issubset(focus_muscles):
-        # Fallback to HAMSTRINGS if GLUTES isn't listed but posterior is intended
-        # seed_data uses both (HAMSTRINGS, GLUTES) for Posterior
-        return _STRICT_BLOCKS["posterior_chain_core"]
+    if day.template_structure_focus in _STRICT_BLOCKS:
+        return _STRICT_BLOCKS[day.template_structure_focus]
     return None
 
 

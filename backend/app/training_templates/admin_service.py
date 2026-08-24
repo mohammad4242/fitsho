@@ -105,6 +105,7 @@ def _replace_template_content(
             day_number=day_number,
             title_en=day_payload.title_en,
             title_fa=day_payload.title_fa,
+            structure_focus=day_payload.structure_focus,
             direct_target_muscles=[muscle.value for muscle in day_payload.direct_target_muscles],
         )
         template.days.append(day)

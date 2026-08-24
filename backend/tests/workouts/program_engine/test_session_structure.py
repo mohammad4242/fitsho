@@ -75,6 +75,7 @@ def _day(
     *,
     title: str = "Test",
     template_target_muscles: tuple[MuscleGroup, ...] = (),
+    template_structure_focus: str = "full_body",
 ) -> WorkoutDay:
     return WorkoutDay(
         day_index=1,
@@ -84,6 +85,7 @@ def _day(
         estimated_duration_minutes=5 + sum(item.estimated_minutes for item in exercises),
         exercises=exercises,
         template_target_muscles=template_target_muscles,
+        template_structure_focus=template_structure_focus,
     )
 
 
@@ -133,6 +135,9 @@ def test_dynamic_and_template_chest_triceps_use_the_same_strict_block(
                 template_target_muscles=(MuscleGroup.CHEST, MuscleGroup.TRICEPS)
                 if focus.startswith("template_reference")
                 else (),
+                template_structure_focus="chest_triceps"
+                if focus.startswith("template_reference")
+                else "full_body",
             ),
         ),
         _normalized(priority_muscles=[MuscleGroup.TRICEPS]),
@@ -751,18 +756,8 @@ def test_warmup_recalculated_after_final_sequencing() -> None:
     assert finalized.estimated_duration_minutes > 0
 
 
-def test_template_muscle_blocks_must_not_use_title_text() -> None:
-    # Chest+Triceps template works regardless of title wording
-    # renamed/localized title does not change sequencing
-    # Full Body / Upper template containing words like "Chest" or "Triceps"
-    # is not falsely classified
-    chest = _programmed(
-        "Bench",
-        MuscleGroup.CHEST,
-        ExerciseType.COMPOUND,
-        pattern=MovementPattern.HORIZONTAL_PUSH,
-        order=2,
-    )
+def test_template_muscle_blocks_must_use_structure_focus() -> None:
+    # 1) explicit chest_triceps template gets chest_triceps strict block
     triceps = _programmed(
         "Extension",
         MuscleGroup.TRICEPS,
@@ -770,37 +765,88 @@ def test_template_muscle_blocks_must_not_use_title_text() -> None:
         pattern=MovementPattern.ELBOW_EXTENSION,
         order=1,
     )
+    chest = _programmed(
+        "Fly",
+        MuscleGroup.CHEST,
+        ExerciseType.ISOLATION,
+        pattern=MovementPattern.HORIZONTAL_PUSH,
+        order=2,
+    )
 
     normalized = _normalized()
     day = _day("template_reference_1", (triceps, chest))
-    day = replace(
-        day,
-        title="Weird Name with no matching words",
-        template_target_muscles=(MuscleGroup.CHEST, MuscleGroup.TRICEPS),
+    day_strict = replace(
+        day, template_structure_focus="chest_triceps", title="Weird Name with no matching words"
     )
 
-    # triceps is isolation and chest is compound, but strict block forces chest first
-    finalized = finalize_session_structure((day,), normalized, RULESET)[0]
-    assert finalized.exercises[0].exercise_name == "Bench"
+    # 4) renamed/localized titles do not affect behavior
+    # triceps is 1, chest is 2
+    # but chest_triceps block forces chest before triceps
+    finalized = finalize_session_structure((day_strict,), normalized, RULESET)[0]
+    assert finalized.exercises[0].exercise_name == "Fly"
     assert finalized.exercises[1].exercise_name == "Extension"
 
-    # false positive check: Full Body containing words like "Chest"
-    full_body_day = replace(
+    # 2) Full Body with CHEST + TRICEPS does NOT
+    day_full_body = replace(
         day,
-        title="Full Body with Chest",
-        template_target_muscles=(MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.QUADRICEPS),
+        template_structure_focus="full_body",
+        template_target_muscles=(MuscleGroup.CHEST, MuscleGroup.TRICEPS, MuscleGroup.QUADRICEPS),
+        title="Full Body",
     )
-    # If it falsely classified as chest_triceps block, chest would be strictly ordered
-    # but here it's full body, so strict block is None.
-    # With no strict block, compound (chest) goes before isolation (triceps) anyway,
-    # Let's change the exercises to both be isolation so that strict block would enforce
-    # order, but without strict block they keep original order.
-    triceps_iso = replace(triceps, order=1)
-    chest_iso = replace(chest, exercise_type=ExerciseType.ISOLATION, order=2)
-
-    full_body_day_iso = replace(full_body_day, exercises=(triceps_iso, chest_iso))
-    finalized_fb = finalize_session_structure((full_body_day_iso,), normalized, RULESET)[0]
-
-    # Since no strict block, they should preserve original order (triceps first)
+    finalized_fb = finalize_session_structure((day_full_body,), normalized, RULESET)[0]
+    # Without strict block, they maintain original order: triceps first, chest second
     assert finalized_fb.exercises[0].exercise_name == "Extension"
-    assert finalized_fb.exercises[1].exercise_name == "Bench"
+    assert finalized_fb.exercises[1].exercise_name == "Fly"
+
+    # 3) Full Body with HAMSTRINGS + GLUTES does NOT
+    hamstrings = _programmed(
+        "Leg Curl",
+        MuscleGroup.HAMSTRINGS,
+        ExerciseType.ISOLATION,
+        pattern=MovementPattern.KNEE_FLEXION,
+        order=2,
+    )
+    glutes = _programmed(
+        "Glute Bridge",
+        MuscleGroup.GLUTES,
+        ExerciseType.ISOLATION,
+        pattern=MovementPattern.HIP_EXTENSION,
+        order=1,
+    )
+    day_posterior = _day("template_reference_2", (glutes, hamstrings))
+    day_posterior_fb = replace(
+        day_posterior,
+        template_structure_focus="full_body",
+        template_target_muscles=(MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.CHEST),
+        title="Full Body Posterior",
+    )
+    finalized_fb_post = finalize_session_structure((day_posterior_fb,), normalized, RULESET)[0]
+    assert finalized_fb_post.exercises[0].exercise_name == "Glute Bridge"
+    assert finalized_fb_post.exercises[1].exercise_name == "Leg Curl"
+
+
+def test_dynamic_chest_triceps_behavior_remains_unchanged() -> None:
+    # 5) dynamic chest_triceps/back_biceps behavior remains unchanged
+    triceps = _programmed(
+        "Extension",
+        MuscleGroup.TRICEPS,
+        ExerciseType.ISOLATION,
+        pattern=MovementPattern.ELBOW_EXTENSION,
+        order=1,
+    )
+    chest = _programmed(
+        "Fly",
+        MuscleGroup.CHEST,
+        ExerciseType.ISOLATION,
+        pattern=MovementPattern.HORIZONTAL_PUSH,
+        order=2,
+    )
+
+    normalized = _normalized()
+    # dynamic uses day.focus == "chest_triceps"
+    day = _day("chest_triceps", (triceps, chest))
+    finalized = finalize_session_structure((day,), normalized, RULESET)[0]
+
+    # chest is forced before triceps
+    assert finalized.exercises[0].exercise_name == "Fly"
+    assert finalized.exercises[1].exercise_name == "Extension"
