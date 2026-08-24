@@ -654,6 +654,32 @@ def test_replacement_excludes_incompatible_candidate_despite_matching_substituti
     assert ranked == (same_pattern,)
 
 
+def test_generic_push_slot_does_not_create_cross_push_equivalence() -> None:
+    request = normalized()
+    target = candidate(
+        "target overhead press",
+        MovementPattern.VERTICAL_PUSH,
+        MuscleGroup.SHOULDERS,
+    )
+    horizontal = candidate(
+        "horizontal shoulder press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.SHOULDERS,
+    )
+
+    ranked = rank_replacement_exercises(
+        request,
+        target,
+        (horizontal,),
+        allowed_patterns=frozenset(
+            {MovementPattern.VERTICAL_PUSH, MovementPattern.HORIZONTAL_PUSH}
+        ),
+        target_muscles=frozenset({MuscleGroup.SHOULDERS}),
+    )
+
+    assert ranked == ()
+
+
 def test_replacement_ranking_excludes_unavailable_and_unsafe_candidates() -> None:
     blocked_id = uuid4()
     request = normalized(

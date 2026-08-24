@@ -5,6 +5,18 @@ from typing import Protocol
 
 from app.exercises.enums import ExerciseLabel, ExerciseType, MovementPattern, MuscleGroup
 from app.workouts.program_engine.enums import CompatibilityLevel
+from app.workouts.program_engine.substitution_policy import (
+    ARM_PATTERNS,
+    CORE_PATTERNS,
+    HINGE_PATTERNS,
+    KNEE_PATTERNS,
+    LOWER_ACCESSORY_PATTERNS,
+    PULL_PATTERNS,
+    PUSH_PATTERNS,
+    SHOULDER_PATTERNS,
+    SubstitutionCause,
+    allowed_movement_patterns,
+)
 
 
 class SemanticCandidate(Protocol):
@@ -21,44 +33,15 @@ class SemanticCandidate(Protocol):
     def exercise_type(self) -> ExerciseType: ...
 
 
-PUSH_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH})
-PULL_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL})
-KNEE_PATTERNS = frozenset(
-    {MovementPattern.SQUAT, MovementPattern.LUNGE, MovementPattern.KNEE_EXTENSION}
-)
-HINGE_PATTERNS = frozenset({MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION})
-CORE_PATTERNS = frozenset(
-    {
-        MovementPattern.CORE_ANTI_EXTENSION,
-        MovementPattern.CORE_ANTI_ROTATION,
-        MovementPattern.CORE_ANTI_LATERAL_FLEXION,
-    }
-)
-SHOULDER_PATTERNS = frozenset({MovementPattern.VERTICAL_PUSH, MovementPattern.SHOULDER_ABDUCTION})
-ARM_PATTERNS = frozenset({MovementPattern.ELBOW_FLEXION, MovementPattern.ELBOW_EXTENSION})
-LOWER_ACCESSORY_PATTERNS = frozenset({MovementPattern.KNEE_FLEXION, MovementPattern.CALF_RAISE})
-
-
 def template_slot_allowed_patterns(
     pattern: MovementPattern,
     target_muscles: tuple[MuscleGroup, ...],
 ) -> frozenset[MovementPattern]:
-    targets = frozenset(target_muscles)
-    if pattern in PULL_PATTERNS and MuscleGroup.BACK in targets:
-        return PULL_PATTERNS
-    if pattern in HINGE_PATTERNS | frozenset({MovementPattern.KNEE_FLEXION}) and targets & {
-        MuscleGroup.HAMSTRINGS,
-        MuscleGroup.GLUTES,
-    }:
-        return HINGE_PATTERNS | frozenset({MovementPattern.KNEE_FLEXION})
-    if (
-        pattern in {MovementPattern.SQUAT, MovementPattern.LUNGE}
-        and MuscleGroup.QUADRICEPS in targets
-    ):
-        return frozenset({MovementPattern.SQUAT, MovementPattern.LUNGE})
-    if pattern in CORE_PATTERNS and MuscleGroup.ABS in targets:
-        return CORE_PATTERNS
-    return frozenset({pattern})
+    return allowed_movement_patterns(
+        pattern,
+        target_muscles,
+        cause=SubstitutionCause.TEMPLATE_RECOVERY,
+    )
 
 
 @dataclass(frozen=True)

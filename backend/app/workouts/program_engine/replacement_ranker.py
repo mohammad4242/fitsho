@@ -20,6 +20,7 @@ from app.workouts.program_engine.slot_compatibility import (
     SlotCompatibility,
     evaluate_candidate_slot_compatibility,
 )
+from app.workouts.program_engine.substitution_policy import allowed_movement_patterns
 
 _IMPACT_RANK = {
     ImpactLimit.LOW: 0,
@@ -66,9 +67,16 @@ def rank_replacement_exercises(
     eligible = filter_eligible_exercises(request, tuple(candidates)).eligible
     disliked = request.source.disliked_exercises
     preferred = request.source.preferred_exercises
-    semantic_scope = allowed_patterns or frozenset({target.movement_pattern})
     semantic_targets = target_muscles or (
         frozenset({target.primary_muscle}) if target.primary_muscle is not None else None
+    )
+    policy_scope = allowed_movement_patterns(
+        target.movement_pattern,
+        semantic_targets or frozenset(),
+        goal=request.primary_goal,
+    )
+    semantic_scope = policy_scope.intersection(
+        allowed_patterns or frozenset({target.movement_pattern})
     )
     compatible = tuple(
         (candidate, compatibility)
