@@ -28,6 +28,7 @@ const validValues: ProfileFormValues = {
   priority_muscles: ["back", "glutes"],
   training_location: "gym",
   home_training_setup: "",
+  available_equipment: [],
   session_duration_minutes: "60",
   training_intensity: "moderate",
   physical_limitations: "",
@@ -55,6 +56,7 @@ const profile: Profile = {
   priority_muscles: ["back", "glutes"],
   training_location: "gym",
   home_training_setup: null,
+  available_equipment: [],
   session_duration_minutes: 60,
   training_intensity: "moderate",
   physical_limitations: null,
@@ -169,14 +171,14 @@ describe("profile validation", () => {
     ).toEqual({});
   });
 
-  it("requires a home setup only for home training and accepts supported durations", () => {
+  it("requires a non-empty home inventory and accepts supported durations", () => {
     expect(
       validateStep(
-        { ...validValues, training_location: "home", home_training_setup: "" },
+        { ...validValues, training_location: "home", available_equipment: [] },
         3,
         today,
       ),
-    ).toEqual({ home_training_setup: "required" });
+    ).toEqual({ available_equipment: "required" });
     expect(
       validateStep({ ...validValues, session_duration_minutes: "50" }, 3, today),
     ).toEqual({ session_duration_minutes: "sessionDurationInvalid" });
@@ -185,7 +187,7 @@ describe("profile validation", () => {
         {
           ...validValues,
           training_location: "home",
-          home_training_setup: "dumbbells_available",
+          available_equipment: ["bodyweight", "dumbbell", "bench"],
           session_duration_minutes: "90",
         },
         3,
@@ -242,6 +244,7 @@ describe("profile validation", () => {
       priority_muscles: ["back", "glutes"],
       training_location: "gym",
       home_training_setup: null,
+      available_equipment: null,
       session_duration_minutes: 60,
       training_intensity: "moderate",
       physical_limitations: null,
@@ -270,16 +273,43 @@ describe("profile validation", () => {
         {
           ...validValues,
           training_location: "home",
-          home_training_setup: "bodyweight_only",
+          available_equipment: ["bodyweight", "bench"],
           session_duration_minutes: "75",
         },
         profile,
       ),
     ).toEqual({
       training_location: "home",
-      home_training_setup: "bodyweight_only",
+      available_equipment: ["bodyweight", "bench"],
       session_duration_minutes: 75,
     });
+  });
+
+  it("derives the legacy home setup from canonical equipment", () => {
+    expect(
+      toProfileInput({
+        ...validValues,
+        training_location: "home",
+        available_equipment: ["dumbbell", "bodyweight", "dumbbell"],
+      }),
+    ).toMatchObject({
+      home_training_setup: "dumbbells_available",
+      available_equipment: ["bodyweight", "dumbbell"],
+    });
+    expect(
+      toProfileInput({
+        ...validValues,
+        training_location: "home",
+        available_equipment: ["bodyweight"],
+      }).home_training_setup,
+    ).toBe("bodyweight_only");
+    expect(
+      toProfileInput({
+        ...validValues,
+        training_location: "home",
+        available_equipment: ["bodyweight", "bench"],
+      }).home_training_setup,
+    ).toBeNull();
   });
 
   it("serializes training age changes", () => {

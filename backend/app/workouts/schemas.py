@@ -59,6 +59,7 @@ class WorkoutGenerationProfile:
     age: int | None = None
     sex: Sex | None = None
     height_cm: int | None = None
+    available_equipment: frozenset[Equipment] | None = None
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,7 @@ class GenerationSignatureContext:
     display_name: str | None = None
     age: int | None = None
     height_cm: int | None = None
+    available_equipment: frozenset[Equipment] | None = None
 
 
 class WorkoutPlanExerciseAlternativeResponse(BaseModel):

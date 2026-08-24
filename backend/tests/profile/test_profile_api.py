@@ -105,13 +105,17 @@ def test_profile_response_exposes_allowed_training_schedule_status(
 
 
 @pytest.mark.parametrize(
-    "home_training_setup",
-    ["bodyweight_only", "dumbbells_available"],
+    ("home_training_setup", "expected_equipment"),
+    [
+        ("bodyweight_only", ["bodyweight"]),
+        ("dumbbells_available", ["bodyweight", "dumbbell"]),
+    ],
 )
 def test_create_home_profile_stores_selected_setup(
     client: TestClient,
     db: Session,
     home_training_setup: str,
+    expected_equipment: list[str],
 ) -> None:
     user_id = register(client, f"{home_training_setup}@example.com")
     response = client.post(
@@ -126,6 +130,7 @@ def test_create_home_profile_stores_selected_setup(
 
     assert response.status_code == 201
     assert response.json()["home_training_setup"] == home_training_setup
+    assert response.json()["available_equipment"] == expected_equipment
     profile = db.get(UserProfile, user_id)
     assert profile is not None
     assert profile.home_training_setup is not None

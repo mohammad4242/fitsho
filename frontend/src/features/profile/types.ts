@@ -27,6 +27,18 @@ export type TrainingLocation = (typeof trainingLocations)[number];
 export const homeTrainingSetups = ["bodyweight_only", "dumbbells_available"] as const;
 export type HomeTrainingSetup = (typeof homeTrainingSetups)[number];
 
+export const availableEquipment = [
+  "bodyweight",
+  "dumbbell",
+  "barbell",
+  "cable",
+  "machine",
+  "resistance_band",
+  "bench",
+  "pull_up_bar",
+] as const;
+export type Equipment = (typeof availableEquipment)[number];
+
 export const sessionDurations = [30, 45, 60, 75, 90, 120] as const;
 export type SessionDurationMinutes = (typeof sessionDurations)[number];
 export const trainingCautions = ["lower_back", "knee", "shoulder", "neck", "wrist", "other"] as const;
@@ -94,6 +106,7 @@ export type ProfileInput = {
   priority_muscles?: MuscleGroup[] | null;
   training_location: TrainingLocation;
   home_training_setup: HomeTrainingSetup | null;
+  available_equipment?: Equipment[] | null;
   session_duration_minutes: SessionDurationMinutes;
   training_intensity?: TrainingIntensity | null;
   physical_limitations: string | null;
@@ -129,6 +142,7 @@ export type ProfileFormValues = {
   priority_muscles: MuscleGroup[];
   training_location: TrainingLocation | "";
   home_training_setup: HomeTrainingSetup | "";
+  available_equipment?: Equipment[];
   session_duration_minutes: string;
   training_intensity: TrainingIntensity | "";
   physical_limitations: string;
@@ -142,4 +156,5 @@ export type ProfileFormValue =
   | number[]
   | PreferredWeekday[]
   | MuscleGroup[]
+  | Equipment[]
   | null;

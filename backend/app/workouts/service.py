@@ -21,7 +21,6 @@ from app.ai.schemas import (
 )
 from app.body_analysis.providers import ProviderRoutingPreferences
 from app.exercises.enums import (
-    Equipment,
     ExerciseCautionTag,
     ExerciseContentType,
     MediaPresentation,
@@ -30,7 +29,7 @@ from app.exercises.enums import (
 from app.exercises.models import Exercise
 from app.exercises.programming_metadata import infer_exercise_demands
 from app.exercises.substitution_groups import effective_substitution_group
-from app.profile.enums import ExperienceLevel, HomeTrainingSetup, Sex, TrainingLocation
+from app.profile.enums import ExperienceLevel, Sex
 from app.profile.service import ProfileSnapshot, get_profile
 from app.profile.training_compatibility import (
     UnsupportedResistanceTrainingCombinationError,
@@ -71,7 +70,10 @@ from app.workouts.program_engine.enums import (
     StabilityDemand,
     TrainingExperience,
 )
-from app.workouts.program_engine.equipment import effective_required_equipment
+from app.workouts.program_engine.equipment import (
+    effective_required_equipment,
+    resolve_available_equipment,
+)
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET, ProgramRuleset
 from app.workouts.program_engine.schemas import (
     BodyAnalysisInfluence,
@@ -766,6 +768,14 @@ class WorkoutGenerationService:
             "training_days_per_week": profile.training_days_per_week,
             "session_duration_minutes": profile.session_duration_minutes,
             "training_location": profile.training_location.value,
+            "available_equipment": sorted(
+                item.value
+                for item in resolve_available_equipment(
+                    profile.training_location,
+                    profile.home_training_setup,
+                    profile.available_equipment,
+                )
+            ),
             "training_cautions": [item.value for item in profile.training_cautions],
             "physical_limitations": profile.physical_limitations,
             "body_analysis_priorities": (
@@ -805,6 +815,11 @@ class WorkoutGenerationService:
             age=self._age(profile.birth_date),
             sex=profile.sex,
             height_cm=profile.height_cm,
+            available_equipment=resolve_available_equipment(
+                profile.training_location,
+                profile.home_training_setup,
+                getattr(profile, "available_equipment", None),
+            ),
         )
 
     def _start_generation(self, user_id: UUID, candidate_count: int) -> WorkoutPlanGeneration:
@@ -928,9 +943,10 @@ class WorkoutGenerationService:
         assert profile.training_days_per_week is not None
         assert profile.session_duration_minutes is not None
         assert profile.plan_duration_weeks is not None
-        equipment = self._available_equipment(
+        equipment = resolve_available_equipment(
             profile.training_location,
             profile.home_training_setup,
+            getattr(profile, "available_equipment", None),
         )
         cautions = tuple(item.caution for item in profile.training_caution_items)
         blocked_caution_tags = caution_tags_for_training_cautions(cautions)
@@ -1188,17 +1204,6 @@ class WorkoutGenerationService:
         payload = _json_ready([asdict(reference) for reference in references])
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         return hashlib.sha256(encoded).hexdigest()
-
-    @staticmethod
-    def _available_equipment(
-        location: TrainingLocation,
-        setup: HomeTrainingSetup | None,
-    ) -> frozenset[Equipment]:
-        if location is TrainingLocation.GYM:
-            return frozenset(item for item in Equipment if item is not Equipment.OTHER)
-        if setup is HomeTrainingSetup.DUMBBELLS_AVAILABLE:
-            return frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL})
-        return frozenset({Equipment.BODYWEIGHT})
 
     def _mark_failure(
         self,

@@ -40,6 +40,7 @@ def test_prompt_builder_keeps_user_limitations_as_json_data() -> None:
         age=29,
         sex=Sex.MALE,
         height_cm=180,
+        available_equipment=frozenset({Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND}),
     )
     candidates = CandidateSet((candidate,), "candidate-hash", (TrainingCaution.OTHER,), 1)
 
@@ -51,6 +52,7 @@ def test_prompt_builder_keeps_user_limitations_as_json_data() -> None:
     request_profile = request.input_payload["profile"]
     assert isinstance(request_profile, dict)
     assert request_profile["physical_limitations_note"] == profile.physical_limitations
+    assert request_profile["available_equipment"] == ["bodyweight", "resistance_band"]
     allowed_exercises = request.input_payload["allowed_exercises"]
     assert isinstance(allowed_exercises, list)
     assert allowed_exercises == [

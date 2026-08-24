@@ -1,6 +1,7 @@
 from decimal import Decimal
 from typing import Any, cast
 
+from app.exercises.enums import Equipment
 from app.profile.enums import (
     ExperienceLevel,
     HomeTrainingSetup,
@@ -48,6 +49,9 @@ def test_relevant_conditions_and_candidate_set_change_generation_signature() -> 
     assert baseline != build_generation_signature(context(candidate_set_hash="b" * 64))
     assert baseline != build_generation_signature(context(current_weight_kg=Decimal("75.0")))
     assert baseline != build_generation_signature(context(sex=Sex.FEMALE))
+    assert baseline != build_generation_signature(
+        context(available_equipment=frozenset({Equipment.BODYWEIGHT}))
+    )
 
 
 def test_limitations_normalization_ignores_unicode_form_and_control_character_changes() -> None:

@@ -204,6 +204,33 @@ def test_patch_switching_to_gym_clears_home_training_setup(
     assert profile.home_training_setup is None
 
 
+def test_patch_persists_explicit_equipment_inventory(
+    client: TestClient,
+    db: Session,
+) -> None:
+    user_id = register(client, "profile-equipment@example.com")
+    create_profile(client)
+
+    response = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={
+            "home_training_setup": None,
+            "available_equipment": ["pull_up_bar", "bodyweight", "resistance_band"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["available_equipment"] == [
+        "bodyweight",
+        "pull_up_bar",
+        "resistance_band",
+    ]
+    profile = db.get(UserProfile, user_id)
+    assert profile is not None
+    assert profile.available_equipment == ["bodyweight", "pull_up_bar", "resistance_band"]
+
+
 def test_patch_switching_to_home_requires_setup(client: TestClient) -> None:
     register(client)
     create_profile(client)

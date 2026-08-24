@@ -106,6 +106,10 @@ def build_generation_signature(context: GenerationSignatureContext) -> str:
         "training_days_per_week": context.training_days_per_week,
         "training_location": _value(context.training_location),
         "home_training_setup": _value(context.home_training_setup),
+        "available_equipment": sorted(
+            _string_value(value)
+            for value in (context.available_equipment or frozenset())
+        ),
         "session_duration_minutes": context.session_duration_minutes,
         "plan_duration_weeks": context.plan_duration_weeks,
         "training_cautions": sorted(_string_value(value) for value in context.training_cautions),

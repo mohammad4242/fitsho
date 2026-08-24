@@ -214,6 +214,37 @@ def test_home_profile_requires_training_setup() -> None:
         ProfileCreate.model_validate(payload)
 
 
+def test_explicit_home_equipment_replaces_legacy_setup_and_is_canonicalized() -> None:
+    payload = {
+        **valid_payload(),
+        "training_location": "home",
+        "home_training_setup": None,
+        "available_equipment": ["resistance_band", "bodyweight", "bench"],
+    }
+
+    profile = ProfileCreate.model_validate(payload)
+
+    assert profile.available_equipment == ("bench", "bodyweight", "resistance_band")
+
+
+@pytest.mark.parametrize(
+    "available_equipment",
+    [[], ["bodyweight", "bodyweight"], ["other"], ["unknown"]],
+)
+def test_profile_rejects_invalid_explicit_equipment_inventory(
+    available_equipment: list[str],
+) -> None:
+    with pytest.raises(ValidationError):
+        ProfileCreate.model_validate(
+            {
+                **valid_payload(),
+                "training_location": "home",
+                "home_training_setup": None,
+                "available_equipment": available_equipment,
+            }
+        )
+
+
 def test_gym_profile_normalizes_home_training_setup_to_none() -> None:
     payload = {
         **valid_payload(),

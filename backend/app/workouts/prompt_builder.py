@@ -57,6 +57,9 @@ def build_workout_generation_model_request(
                 "training_days_per_week": profile.training_days_per_week,
                 "training_location": _value(profile.training_location),
                 "home_training_setup": _value(profile.home_training_setup),
+                "available_equipment": sorted(
+                    item.value for item in (profile.available_equipment or frozenset())
+                ),
                 "session_duration_minutes": profile.session_duration_minutes,
                 "plan_duration_weeks": profile.plan_duration_weeks,
                 "training_cautions": [_value(item) for item in profile.training_cautions],

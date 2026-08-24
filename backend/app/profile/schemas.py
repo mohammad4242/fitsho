@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
-from app.exercises.enums import MuscleGroup
+from app.exercises.enums import Equipment, MuscleGroup
 from app.profile.enums import (
     ExperienceLevel,
     FitnessGoal,
@@ -78,6 +78,7 @@ class ProfileCreate(BaseModel):
     priority_muscles: tuple[MuscleGroup, ...] | None = None
     training_location: TrainingLocation
     home_training_setup: HomeTrainingSetup | None = None
+    available_equipment: tuple[Equipment, ...] | None = None
     training_cautions: list[TrainingCaution] = Field(default_factory=list)
     plan_duration_weeks: PlanDurationWeeks = 4
     workout_generation_method: WorkoutGenerationMethod = WorkoutGenerationMethod.FITSHO_COACH
@@ -127,6 +128,17 @@ class ProfileCreate(BaseModel):
             raise ValueError("Priority muscles must be unique")
         return tuple(sorted(muscles, key=lambda muscle: muscle.value))
 
+    @field_validator("available_equipment")
+    @classmethod
+    def validate_available_equipment(
+        cls, equipment: tuple[Equipment, ...] | None
+    ) -> tuple[Equipment, ...] | None:
+        if equipment is None:
+            return None
+        if not equipment or len(equipment) != len(set(equipment)) or Equipment.OTHER in equipment:
+            raise ValueError("Available equipment must be non-empty, unique, and categorized")
+        return tuple(sorted(equipment, key=lambda item: item.value))
+
     @field_validator("birth_date")
     @classmethod
     def validate_age(cls, birth_date: date) -> date:
@@ -136,7 +148,7 @@ class ProfileCreate(BaseModel):
     def normalize_workout_setup(self) -> "ProfileCreate":
         if self.training_location == TrainingLocation.GYM:
             self.home_training_setup = None
-        elif self.home_training_setup is None:
+        elif self.home_training_setup is None and self.available_equipment is None:
             raise ValueError("Home training setup is required for home training")
         if (
             self.preferred_weekdays is not None
@@ -183,6 +195,7 @@ class ProfileUpdate(BaseModel):
     priority_muscles: tuple[MuscleGroup, ...] | None = None
     training_location: TrainingLocation | None = None
     home_training_setup: HomeTrainingSetup | None = None
+    available_equipment: tuple[Equipment, ...] | None = None
     training_cautions: list[TrainingCaution] | None = None
     plan_duration_weeks: PlanDurationWeeks | None = None
     workout_generation_method: WorkoutGenerationMethod | None = None
@@ -232,6 +245,17 @@ class ProfileUpdate(BaseModel):
             raise ValueError("Priority muscles must be unique")
         return tuple(sorted(muscles, key=lambda muscle: muscle.value))
 
+    @field_validator("available_equipment")
+    @classmethod
+    def validate_available_equipment(
+        cls, equipment: tuple[Equipment, ...] | None
+    ) -> tuple[Equipment, ...] | None:
+        if equipment is None:
+            return None
+        if not equipment or len(equipment) != len(set(equipment)) or Equipment.OTHER in equipment:
+            raise ValueError("Available equipment must be non-empty, unique, and categorized")
+        return tuple(sorted(equipment, key=lambda item: item.value))
+
     @field_validator("birth_date")
     @classmethod
     def validate_age(cls, birth_date: date | None) -> date | None:
@@ -248,6 +272,7 @@ class ProfileUpdate(BaseModel):
 
         required_fields = profile_fields_set - {
             "home_training_setup",
+            "available_equipment",
             "physical_limitations",
             "training_age_months",
             "preferred_weekdays",
@@ -260,7 +285,11 @@ class ProfileUpdate(BaseModel):
             raise ValueError("Profile fields cannot be null")
         if self.training_location == TrainingLocation.GYM:
             self.home_training_setup = None
-        elif self.training_location == TrainingLocation.HOME and self.home_training_setup is None:
+        elif (
+            self.training_location == TrainingLocation.HOME
+            and self.home_training_setup is None
+            and self.available_equipment is None
+        ):
             raise ValueError("Home training setup is required for home training")
         if (
             self.training_days_per_week is not None
@@ -299,6 +328,7 @@ class ProfileResponse(BaseModel):
     updated_at: datetime
     training_location: TrainingLocation
     home_training_setup: HomeTrainingSetup | None
+    available_equipment: tuple[Equipment, ...]
     training_cautions: list[TrainingCaution]
     plan_duration_weeks: PlanDurationWeeks
     workout_generation_method: WorkoutGenerationMethod

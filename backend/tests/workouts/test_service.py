@@ -128,6 +128,23 @@ def test_program_request_uses_persisted_profile_preferences(db: Session) -> None
     assert request.priority_muscles == frozenset({MuscleGroup.BACK})
 
 
+def test_program_request_uses_explicit_profile_equipment_inventory(db: Session) -> None:
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.available_equipment = [
+        Equipment.BODYWEIGHT.value,
+        Equipment.RESISTANCE_BAND.value,
+        Equipment.PULL_UP_BAR.value,
+    ]
+    db.flush()
+
+    request = _service(db)._to_program_request(get_profile(db, user.id), None)
+
+    assert request.available_equipment == frozenset(
+        {Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND, Equipment.PULL_UP_BAR}
+    )
+
+
 def test_program_request_preserves_first_month_experience_level(db: Session) -> None:
     user = _user_with_profile(db)
     profile = db.get(UserProfile, user.id)

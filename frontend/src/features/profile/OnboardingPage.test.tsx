@@ -71,6 +71,7 @@ const createdProfile: Profile = {
   training_days_per_week: 3,
   training_location: "gym",
   home_training_setup: null,
+  available_equipment: [],
   session_duration_minutes: 60,
   training_intensity: "moderate",
   physical_limitations: null,
@@ -297,10 +298,16 @@ it("shows home setup only for home training and clears it after switching to gym
     screen.queryByLabelText("برای تمرین در خانه چه امکاناتی داری؟"),
   ).not.toBeInTheDocument();
   await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "home");
-  await user.selectOptions(
-    screen.getByLabelText("برای تمرین در خانه چه امکاناتی داری؟"),
-    "dumbbells_available",
-  );
+  expect(screen.getByLabelText("وزن بدن")).toBeInTheDocument();
+  expect(screen.getByLabelText("دمبل")).toBeInTheDocument();
+  expect(screen.getByLabelText("هالتر")).toBeInTheDocument();
+  expect(screen.getByLabelText("دستگاه سیم‌کش")).toBeInTheDocument();
+  expect(screen.getByLabelText("دستگاه بدنسازی")).toBeInTheDocument();
+  expect(screen.getByLabelText("کش تمرینی")).toBeInTheDocument();
+  expect(screen.getByLabelText("نیمکت")).toBeInTheDocument();
+  expect(screen.getByLabelText("میله بارفیکس")).toBeInTheDocument();
+  await user.click(screen.getByLabelText("دمبل"));
+  await user.click(screen.getByLabelText("نیمکت"));
   await user.selectOptions(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"), "60");
   await user.selectOptions(screen.getByLabelText("شدت معمول تمرین"), "moderate");
   await user.click(screen.getByLabelText("ندارم"));
@@ -312,8 +319,29 @@ it("shows home setup only for home training and clears it after switching to gym
   await user.click(screen.getByRole("button", { name: "ساخت پروفایل" }));
   await waitFor(() => expect(profileContext.createProfile).toHaveBeenCalledOnce());
   expect(profileContext.createProfile).toHaveBeenCalledWith(
-    expect.objectContaining({ training_location: "gym", home_training_setup: null }),
+    expect.objectContaining({
+      training_location: "gym",
+      home_training_setup: null,
+      available_equipment: null,
+    }),
   );
+});
+
+it("requires at least one home equipment choice before creating a profile", async () => {
+  const user = userEvent.setup();
+  renderOnboarding();
+  await reachExperienceStep(user);
+  await user.selectOptions(screen.getByLabelText("سطح تجربه"), "beginner");
+  await user.type(screen.getByLabelText("روزهای تمرین در هفته"), "3");
+  await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "home");
+  await user.selectOptions(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"), "60");
+  await user.selectOptions(screen.getByLabelText("شدت معمول تمرین"), "moderate");
+  await user.click(screen.getByLabelText("ندارم"));
+
+  await user.click(screen.getByRole("button", { name: "ساخت پروفایل" }));
+
+  expect(screen.getByText("این فیلد الزامی است.")).toBeInTheDocument();
+  expect(profileContext.createProfile).not.toHaveBeenCalled();
 });
 
 it("returns to step two with entered values preserved", async () => {
@@ -378,6 +406,7 @@ it("submits one normalized typed profile payload", async () => {
     priority_muscles: null,
     training_location: "gym",
     home_training_setup: null,
+    available_equipment: null,
     session_duration_minutes: 60,
     training_intensity: "moderate",
     physical_limitations: "knee pain",

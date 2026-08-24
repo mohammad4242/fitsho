@@ -1,6 +1,8 @@
 import {
   sessionDurations,
   type ExperienceLevel,
+  availableEquipment,
+  type Equipment,
   type FitnessGoal,
   type HomeTrainingSetup,
   type Profile,
@@ -188,9 +190,11 @@ function validateStepThree(values: ProfileFormValues): ProfileValidationErrors {
   }
   if (
     values.training_location === "home" &&
-    values.home_training_setup === ""
+    (values.available_equipment === undefined
+      ? values.home_training_setup === ""
+      : values.available_equipment.length === 0)
   ) {
-    errors.home_training_setup = "required";
+    errors.available_equipment = "required";
   }
 
   const sessionDuration = values.session_duration_minutes.trim();
@@ -249,6 +253,13 @@ export function validateAll(
 }
 
 export function toProfileInput(values: ProfileFormValues): ProfileInput {
+  const normalizedEquipment = normalizeEquipment(values.available_equipment ?? []);
+  const homeEquipment = values.training_location === "home"
+    ? values.available_equipment === undefined
+      ? legacySetupEquipment(values.home_training_setup)
+      : normalizedEquipment
+    : null;
+  const homeTrainingSetup = deriveHomeTrainingSetup(homeEquipment);
   return {
     display_name: values.display_name.trim(),
     birth_date: values.birth_date.trim(),
@@ -278,9 +289,8 @@ export function toProfileInput(values: ProfileFormValues): ProfileInput {
       : null,
     training_location: values.training_location as TrainingLocation,
     home_training_setup:
-      values.training_location === "home"
-        ? (values.home_training_setup as HomeTrainingSetup)
-        : null,
+      homeTrainingSetup,
+    available_equipment: homeEquipment,
     session_duration_minutes: Number(
       values.session_duration_minutes,
     ) as SessionDurationMinutes,
@@ -311,6 +321,7 @@ export function profileToFormValues(profile: Profile): ProfileFormValues {
     priority_muscles: [...(profile.priority_muscles ?? [])].sort(),
     training_location: profile.training_location,
     home_training_setup: profile.home_training_setup ?? "",
+    available_equipment: [...(profile.available_equipment ?? [])],
     session_duration_minutes: String(profile.session_duration_minutes),
     training_intensity: profile.training_intensity ?? "",
     physical_limitations: profile.physical_limitations ?? "",
@@ -374,6 +385,11 @@ export function toProfilePatch(
   if (input.home_training_setup !== currentProfile.home_training_setup) {
     patch.home_training_setup = input.home_training_setup;
   }
+  const inputEquipmentKey = input.available_equipment?.join(",") ?? "";
+  const currentEquipmentKey = normalizeEquipment(currentProfile.available_equipment ?? []).join(",");
+  if (inputEquipmentKey !== currentEquipmentKey) {
+    patch.available_equipment = input.available_equipment;
+  }
   if (input.session_duration_minutes !== currentProfile.session_duration_minutes) {
     patch.session_duration_minutes = input.session_duration_minutes;
   }
@@ -390,4 +406,22 @@ export function toProfilePatch(
     patch.plan_duration_weeks = input.plan_duration_weeks;
   }
   return patch;
+}
+
+function normalizeEquipment(values: Equipment[]): Equipment[] {
+  const selected = new Set(values);
+  return availableEquipment.filter((equipment) => selected.has(equipment));
+}
+
+function legacySetupEquipment(setup: ProfileFormValues["home_training_setup"]): Equipment[] {
+  if (setup === "bodyweight_only") return ["bodyweight"];
+  if (setup === "dumbbells_available") return ["bodyweight", "dumbbell"];
+  return [];
+}
+
+function deriveHomeTrainingSetup(equipment: Equipment[] | null): HomeTrainingSetup | null {
+  if (equipment === null) return null;
+  if (equipment.length === 1 && equipment[0] === "bodyweight") return "bodyweight_only";
+  if (equipment.includes("dumbbell")) return "dumbbells_available";
+  return null;
 }

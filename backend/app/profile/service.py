@@ -134,6 +134,11 @@ def create_profile(
         "training_days_per_week": payload.training_days_per_week,
         "training_location": payload.training_location,
         "home_training_setup": payload.home_training_setup,
+        "available_equipment": (
+            [item.value for item in payload.available_equipment]
+            if payload.available_equipment is not None
+            else None
+        ),
         "session_duration_minutes": payload.session_duration_minutes,
         "training_intensity": payload.training_intensity,
         "physical_limitations": payload.physical_limitations,
@@ -248,10 +253,10 @@ def update_profile(
         supplied_fields["preferred_weekdays"] = (
             list(payload.preferred_weekdays) if payload.preferred_weekdays is not None else None
         )
-    if "priority_muscles" in supplied_fields:
-        supplied_fields["priority_muscles"] = (
-            [muscle.value for muscle in payload.priority_muscles]
-            if payload.priority_muscles is not None
+    if "available_equipment" in supplied_fields:
+        supplied_fields["available_equipment"] = (
+            [item.value for item in payload.available_equipment]
+            if payload.available_equipment is not None
             else None
         )
     supplied_weight = supplied_fields.pop("current_weight_kg", None)
@@ -268,9 +273,12 @@ def update_profile(
 
     final_location = supplied_fields.get("training_location", profile.training_location)
     final_home_setup = supplied_fields.get("home_training_setup", profile.home_training_setup)
+    final_equipment = supplied_fields.get("available_equipment", profile.available_equipment)
     if final_location == TrainingLocation.GYM:
         supplied_fields["home_training_setup"] = None
-    elif final_home_setup is None:
+        if "training_location" in supplied_fields and "available_equipment" not in supplied_fields:
+            supplied_fields["available_equipment"] = None
+    elif final_home_setup is None and final_equipment is None:
         raise InvalidWorkoutSetupError
 
     final_training_days = supplied_fields.get(
@@ -361,12 +369,31 @@ def apply_profile_update_without_commit(
         supplied_fields["preferred_weekdays"] = (
             list(payload.preferred_weekdays) if payload.preferred_weekdays is not None else None
         )
+    if "priority_muscles" in supplied_fields:
+        supplied_fields["priority_muscles"] = (
+            [muscle.value for muscle in payload.priority_muscles]
+            if payload.priority_muscles is not None
+            else None
+        )
+    if "available_equipment" in supplied_fields:
+        supplied_fields["available_equipment"] = (
+            [item.value for item in payload.available_equipment]
+            if payload.available_equipment is not None
+            else None
+        )
 
     final_location = supplied_fields.get("training_location", profile.training_location)
     final_home_setup = supplied_fields.get("home_training_setup", profile.home_training_setup)
+    final_equipment = supplied_fields.get("available_equipment", profile.available_equipment)
     if final_location == TrainingLocation.GYM:
         supplied_fields["home_training_setup"] = None
-    elif final_location == TrainingLocation.HOME and final_home_setup is None:
+        if "training_location" in supplied_fields and "available_equipment" not in supplied_fields:
+            supplied_fields["available_equipment"] = None
+    elif (
+        final_location == TrainingLocation.HOME
+        and final_home_setup is None
+        and final_equipment is None
+    ):
         raise InvalidWorkoutSetupError
 
     final_training_days = supplied_fields.get(

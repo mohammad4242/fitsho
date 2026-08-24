@@ -68,6 +68,7 @@ const savedProfile: Profile = {
   training_days_per_week: 3,
   training_location: "home",
   home_training_setup: "dumbbells_available",
+  available_equipment: ["bodyweight", "dumbbell", "bench"],
   session_duration_minutes: 75,
   training_intensity: "moderate",
   physical_limitations: "Knee pain",
@@ -205,9 +206,10 @@ it("renders every saved profile value in its editable profile page", async () =>
   expect(screen.getByLabelText("سطح تجربه")).toHaveValue("beginner");
   expect(screen.getByLabelText("روزهای تمرین در هفته")).toHaveValue(3);
   expect(screen.getByLabelText("کجا تمرین می‌کنی؟")).toHaveValue("home");
-  expect(
-    screen.getByLabelText("برای تمرین در خانه چه امکاناتی داری؟"),
-  ).toHaveValue("dumbbells_available");
+  expect(screen.getByRole("group", { name: "برای تمرین در خانه چه امکاناتی داری؟" })).toBeInTheDocument();
+  expect(screen.getByLabelText("وزن بدن")).toBeChecked();
+  expect(screen.getByLabelText("دمبل")).toBeChecked();
+  expect(screen.getByLabelText("نیمکت")).toBeChecked();
   expect(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟")).toHaveValue(
     "75",
   );
@@ -336,11 +338,52 @@ it("sends null when physical limitations are cleared", async () => {
   );
 });
 
+it("updates the canonical home equipment inventory and derived legacy setup", async () => {
+  context.updateProfile.mockResolvedValue({
+    ...savedProfile,
+    available_equipment: ["bodyweight", "dumbbell"],
+    home_training_setup: "dumbbells_available",
+  });
+  const user = userEvent.setup();
+  renderProfilePage();
+
+  await openTrainingPage(user);
+  await user.click(screen.getByLabelText("نیمکت"));
+  await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
+
+  await waitFor(() =>
+    expect(context.updateProfile).toHaveBeenCalledWith({
+      available_equipment: ["bodyweight", "dumbbell"],
+    }),
+  );
+});
+
+it("does not carry a gym inventory into home training", async () => {
+  context.profile = {
+    ...savedProfile,
+    training_location: "gym",
+    home_training_setup: null,
+    available_equipment: ["bodyweight", "dumbbell", "barbell", "cable", "machine"],
+  };
+  const user = userEvent.setup();
+  renderProfilePage();
+
+  await openTrainingPage(user);
+  await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "home");
+
+  expect(screen.getByLabelText("وزن بدن")).not.toBeChecked();
+  expect(screen.getByLabelText("دمبل")).not.toBeChecked();
+  await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
+  expect(screen.getByText("این فیلد الزامی است.")).toBeInTheDocument();
+  expect(context.updateProfile).not.toHaveBeenCalled();
+});
+
 it("clears home setup and serializes the workout preference edit", async () => {
   context.updateProfile.mockResolvedValue({
     ...savedProfile,
     training_location: "gym",
     home_training_setup: null,
+    available_equipment: null,
     session_duration_minutes: 90,
   });
   const user = userEvent.setup();
@@ -358,6 +401,7 @@ it("clears home setup and serializes the workout preference edit", async () => {
     expect(context.updateProfile).toHaveBeenCalledWith({
       training_location: "gym",
       home_training_setup: null,
+      available_equipment: null,
       session_duration_minutes: 90,
     }),
   );

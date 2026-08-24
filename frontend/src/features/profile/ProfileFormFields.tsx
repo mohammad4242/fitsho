@@ -7,7 +7,6 @@ import type {
 import {
   experienceLevels,
   fitnessGoals,
-  homeTrainingSetups,
   planDurations,
   sessionDurations,
   sexes,
@@ -15,8 +14,10 @@ import {
   trainingIntensities,
   muscleGroups,
   preferredWeekdays,
+  availableEquipment,
   type TrainingCaution,
   type MuscleGroup,
+  type Equipment,
   type ProfileFormValue,
   trainingLocations,
   type ProfileFormValues,
@@ -286,6 +287,16 @@ export function ExperienceFields({
     );
   }
 
+  function toggleEquipment(equipment: Equipment) {
+    const selected = values.available_equipment ?? [];
+    onChange(
+      "available_equipment",
+      selected.includes(equipment)
+        ? selected.filter((item) => item !== equipment)
+        : [...selected, equipment],
+    );
+  }
+
   return (
     <fieldset className="profile-fieldset" disabled={disabled}>
       <legend>{t("onboarding.steps.experience")}</legend>
@@ -433,39 +444,32 @@ export function ExperienceFields({
       </div>
 
       {values.training_location === "home" && (
-        <div className="profile-field">
-          <label htmlFor="profile-home-training-setup">
+        <fieldset
+          className="profile-field"
+          aria-describedby={describedBy("available_equipment", errors.available_equipment)}
+        >
+          <legend>
             {t("onboarding.fields.homeTrainingSetup")}
-          </label>
-          <select
-            id="profile-home-training-setup"
-            name="home_training_setup"
-            autoComplete="off"
-            required
-            value={values.home_training_setup}
-            aria-invalid={errors.home_training_setup !== undefined}
-            aria-describedby={describedBy(
-              "home_training_setup",
-              errors.home_training_setup,
-            )}
-            onChange={(event) =>
-              onChange("home_training_setup", event.target.value)
-            }
-          >
-            <option value="" disabled>
-              {t("onboarding.options.select")}
-            </option>
-            {homeTrainingSetups.map((setup) => (
-              <option key={setup} value={setup}>
-                {t(`onboarding.options.homeTrainingSetup.${setup}`)}
-              </option>
+          </legend>
+          <p className="profile-field__hint">{t("onboarding.hints.homeTrainingSetup")}</p>
+          <div className="profile-checkboxes">
+            {availableEquipment.map((equipment) => (
+              <label key={equipment}>
+                <input
+                  type="checkbox"
+                  name="available_equipment"
+                  checked={values.available_equipment?.includes(equipment) ?? false}
+                  onChange={() => toggleEquipment(equipment)}
+                />
+                {t(`onboarding.options.equipment.${equipment}`)}
+              </label>
             ))}
-          </select>
+          </div>
           <FieldError
-            field="home_training_setup"
-            error={errors.home_training_setup}
+            field="available_equipment"
+            error={errors.available_equipment}
           />
-        </div>
+        </fieldset>
       )}
 
       <div className="profile-field">

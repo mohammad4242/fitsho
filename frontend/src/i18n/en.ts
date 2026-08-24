@@ -218,6 +218,7 @@ const en = {
         preferredWeekdays: "Choose no more than your number of training days.",
         priorityMuscles: "Optionally choose areas to carry into future programs.",
         circumference: "Used for body-proportion analysis; measure at the widest point.",
+        homeTrainingSetup: "Select every piece of equipment you actually have at home.",
       },
       options: {
         select: "Select an option",
@@ -250,6 +251,16 @@ const en = {
         homeTrainingSetup: {
           bodyweight_only: "Bodyweight only",
           dumbbells_available: "I have dumbbells",
+        },
+        equipment: {
+          bodyweight: "Bodyweight",
+          dumbbell: "Dumbbell",
+          barbell: "Barbell",
+          cable: "Cable station",
+          machine: "Exercise machine",
+          resistance_band: "Resistance band",
+          bench: "Bench",
+          pull_up_bar: "Pull-up bar",
         },
         sessionDuration: {
           30: "30 minutes",

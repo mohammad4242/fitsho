@@ -55,7 +55,8 @@ class UserProfile(Base):
             name="ck_user_profiles_limitations_length",
         ),
         CheckConstraint(
-            f"session_duration_minutes IN ({', '.join(map(str, get_args(SessionDurationMinutes)))})",
+            "session_duration_minutes IN "
+            f"({', '.join(map(str, get_args(SessionDurationMinutes)))})",
             name="ck_user_profiles_session_duration_values",
         ),
         CheckConstraint(
@@ -63,7 +64,8 @@ class UserProfile(Base):
             name="ck_user_profiles_plan_duration_weeks_values",
         ),
         CheckConstraint(
-            "(training_location = 'home' AND home_training_setup IS NOT NULL) OR "
+            "(training_location = 'home' AND "
+            "(home_training_setup IS NOT NULL OR available_equipment IS NOT NULL)) OR "
             "(training_location = 'gym' AND home_training_setup IS NULL)",
             name="ck_user_profiles_training_setup_consistency",
         ),
@@ -146,6 +148,7 @@ class UserProfile(Base):
         ),
         nullable=True,
     )
+    available_equipment: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     session_duration_minutes: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     training_intensity: Mapped[TrainingIntensity | None] = mapped_column(
         Enum(

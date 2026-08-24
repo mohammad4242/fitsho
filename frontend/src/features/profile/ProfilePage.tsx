@@ -43,7 +43,7 @@ const trainingFields = new Set<keyof ProfilePatch>([
   "experience_level", "training_days_per_week", "training_location",
   "training_age_months",
   "preferred_weekdays", "priority_muscles",
-  "home_training_setup", "session_duration_minutes", "training_intensity", "physical_limitations",
+  "home_training_setup", "available_equipment", "session_duration_minutes", "training_intensity", "physical_limitations",
   "training_cautions", "plan_duration_weeks", "workout_generation_method",
 ]);
 
@@ -170,18 +170,21 @@ function ReadyProfilePage({
     field: keyof ProfileFormValues,
     value: ProfileFormValue,
   ) {
-    const clearsHomeSetup = field === "training_location" && value === "gym";
+    const changesTrainingLocation = field === "training_location";
     setValues((current) => ({
       ...current,
       [field]: value,
-      ...(clearsHomeSetup ? { home_training_setup: "" } : {}),
+      ...(changesTrainingLocation ? { home_training_setup: "", available_equipment: [] } : {}),
     }));
     setStatus("idle");
     setSaveError(false);
     setErrors((current) => {
       const next = { ...current };
       delete next[field];
-      if (clearsHomeSetup) delete next.home_training_setup;
+      if (changesTrainingLocation) {
+        delete next.home_training_setup;
+        delete next.available_equipment;
+      }
       return next;
     });
   }
@@ -461,6 +464,7 @@ function sharedToFormValues(profile: SharedProfile): ProfileFormValues {
     priority_muscles: [],
     training_location: "",
     home_training_setup: "",
+    available_equipment: [],
     session_duration_minutes: "",
     training_intensity: "",
     physical_limitations: "",

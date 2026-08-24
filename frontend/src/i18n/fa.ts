@@ -218,6 +218,7 @@ const fa = {
         preferredWeekdays: "حداکثر به اندازه تعداد روزهای تمرین انتخاب کن.",
         priorityMuscles: "در صورت تمایل، نواحی مهم برای برنامه‌های بعدی را انتخاب کن.",
         circumference: "برای تحلیل تناسب بدن؛ در پهن‌ترین بخش اندازه بگیر.",
+        homeTrainingSetup: "هر وسیله‌ای را که واقعاً در خانه داری انتخاب کن.",
       },
       options: {
         select: "انتخاب کن",
@@ -250,6 +251,16 @@ const fa = {
         homeTrainingSetup: {
           bodyweight_only: "فقط وزن بدن",
           dumbbells_available: "دمبل دارم",
+        },
+        equipment: {
+          bodyweight: "وزن بدن",
+          dumbbell: "دمبل",
+          barbell: "هالتر",
+          cable: "دستگاه سیم‌کش",
+          machine: "دستگاه بدنسازی",
+          resistance_band: "کش تمرینی",
+          bench: "نیمکت",
+          pull_up_bar: "میله بارفیکس",
         },
         sessionDuration: {
           30: "۳۰ دقیقه",

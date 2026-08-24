@@ -15,13 +15,11 @@ from app.exercises.enums import (
     MovementPattern,
 )
 from app.exercises.models import Exercise
-from app.profile.enums import (
-    ExperienceLevel,
-    HomeTrainingSetup,
-    TrainingCaution,
-    TrainingLocation,
+from app.profile.enums import ExperienceLevel, TrainingCaution
+from app.workouts.program_engine.equipment import (
+    effective_required_equipment,
+    resolve_available_equipment,
 )
-from app.workouts.program_engine.equipment import effective_required_equipment
 from app.workouts.schemas import CandidateSet, WorkoutExerciseCandidate, WorkoutGenerationProfile
 from app.workouts.signature import hash_candidate_set
 
@@ -56,9 +54,6 @@ _ALLOWED_DIFFICULTIES: dict[ExperienceLevel, frozenset[Difficulty]] = {
     ExperienceLevel.INTERMEDIATE: frozenset({Difficulty.BEGINNER, Difficulty.INTERMEDIATE}),
     ExperienceLevel.ADVANCED: frozenset(Difficulty),
 }
-_GYM_EQUIPMENT = frozenset(Equipment)
-
-
 class WorkoutCandidateSelector:
     def __init__(self, db: Session, *, maximum_candidates: int | None = 80) -> None:
         self._db = db
@@ -109,11 +104,11 @@ class WorkoutCandidateSelector:
 
     @staticmethod
     def _available_equipment(profile: WorkoutGenerationProfile) -> frozenset[Equipment]:
-        if profile.training_location is TrainingLocation.GYM:
-            return _GYM_EQUIPMENT
-        if profile.home_training_setup is HomeTrainingSetup.DUMBBELLS_AVAILABLE:
-            return frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL})
-        return frozenset({Equipment.BODYWEIGHT})
+        return resolve_available_equipment(
+            profile.training_location,
+            profile.home_training_setup,
+            profile.available_equipment,
+        )
 
     @staticmethod
     def _is_eligible(

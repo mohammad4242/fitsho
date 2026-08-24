@@ -43,6 +43,7 @@ const emptyValues: ProfileFormValues = {
   priority_muscles: [],
   training_location: "",
   home_training_setup: "",
+  available_equipment: [],
   session_duration_minutes: "",
   training_intensity: "",
   physical_limitations: "",
@@ -81,23 +82,24 @@ export function OnboardingPage() {
     field: keyof ProfileFormValues,
     value: ProfileFormValue,
   ) {
-    const clearsHomeSetup = field === "training_location" && value === "gym";
+    const changesTrainingLocation = field === "training_location";
     setValues((current) => ({
       ...current,
       [field]: value,
-      ...(clearsHomeSetup ? { home_training_setup: "" } : {}),
+      ...(changesTrainingLocation ? { home_training_setup: "", available_equipment: [] } : {}),
     }));
     setErrors((current) => {
       if (
         current[field] === undefined &&
-        (!clearsHomeSetup || current.home_training_setup === undefined)
+        (!changesTrainingLocation || current.home_training_setup === undefined)
       ) {
         return current;
       }
       const next = { ...current };
       delete next[field];
-      if (clearsHomeSetup) {
+      if (changesTrainingLocation) {
         delete next.home_training_setup;
+        delete next.available_equipment;
       }
       return next;
     });

@@ -33,6 +33,7 @@ def profile(
     setup: HomeTrainingSetup | None,
     experience: ExperienceLevel = ExperienceLevel.BEGINNER,
     cautions: tuple[TrainingCaution, ...] = (),
+    available_equipment: frozenset[Equipment] | None = None,
 ) -> WorkoutGenerationProfile:
     return WorkoutGenerationProfile(
         fitness_goal="build_muscle",
@@ -45,6 +46,7 @@ def profile(
         training_cautions=cautions,
         physical_limitations=None,
         current_weight_kg=76,
+        available_equipment=available_equipment,
     )
 
 
@@ -102,6 +104,28 @@ def test_dumbbell_home_requires_all_equipment(db: Session) -> None:
 
     assert result.ids == (curl.id,)
     assert bench_press.id not in result.ids
+
+
+def test_explicit_inventory_requires_complete_multi_equipment_subset(db: Session) -> None:
+    band = exercise(db, "band-row", equipment=(Equipment.RESISTANCE_BAND,))
+    dumbbell_bench = exercise(
+        db,
+        "explicit-dumbbell-bench",
+        equipment=(Equipment.DUMBBELL, Equipment.BENCH),
+    )
+
+    result = WorkoutCandidateSelector(db).select(
+        profile(
+            location=TrainingLocation.HOME,
+            setup=HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+            available_equipment=frozenset(
+                {Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND, Equipment.DUMBBELL}
+            ),
+        )
+    )
+
+    assert band.id in result.ids
+    assert dumbbell_bench.id not in result.ids
 
 
 def test_home_rejects_vertical_pull_with_incomplete_bodyweight_metadata(db: Session) -> None:
