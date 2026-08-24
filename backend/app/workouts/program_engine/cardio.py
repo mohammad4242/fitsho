@@ -1,5 +1,4 @@
 from app.exercises.enums import ExerciseLabel, MuscleGroup
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.enums import (
     CardioIntensity,
     Goal,
@@ -37,14 +36,6 @@ def planned_cardio_day_indexes(
     return frozenset(ranked[:planned_sessions])
 
 
-def cardio_reserve_minutes(
-    request: NormalizedProgramRequest,
-    exercises: tuple[ExerciseCandidate, ...],
-    ruleset: ProgramRuleset,
-) -> int:
-    return ruleset.cardio_start_minutes if _safe_cardio(request, exercises, ruleset) else 0
-
-
 def add_cardio(
     request: NormalizedProgramRequest,
     days: tuple[WorkoutDay, ...],
@@ -54,7 +45,6 @@ def add_cardio(
     options = _safe_cardio(request, exercises, ruleset)
     if not options or not days:
         return days
-    duration_policy = get_session_duration_policy(request.source.session_duration_minutes)
     modality = min(options, key=lambda item: (_cardio_rank(request, item, ruleset), str(item.id)))
     target_days = (
         ruleset.fat_loss_cardio_days
@@ -68,20 +58,15 @@ def add_cardio(
     )
     updated: list[WorkoutDay] = []
     for day_position, day in enumerate(days):
-        available_cardio_minutes = min(
-            ruleset.cardio_start_minutes,
-            duration_policy.maximum_total_minutes(ruleset.general_warmup_minutes)
-            - day.estimated_duration_minutes,
-        )
         eligible_day = day_position in planned_indexes and (
             day.focus not in {"lower", "legs"} or len(days) == 1
-        ) and available_cardio_minutes >= ruleset.minimum_cardio_minutes
+        )
         cardio = None
         if eligible_day:
             cardio = CardioPrescription(
                 modality_exercise_id=modality.id,
                 modality_name=modality.name,
-                duration_minutes=available_cardio_minutes,
+                duration_minutes=ruleset.cardio_start_minutes,
                 intensity=CardioIntensity.MODERATE,
                 reason_codes=(
                     (

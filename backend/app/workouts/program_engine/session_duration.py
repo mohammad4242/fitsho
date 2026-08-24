@@ -186,7 +186,6 @@ def _repair_underfill(
     """
     exercises = list(day.exercises)
     while len(exercises) < minimum_exercises:
-        # Prefer adding an exercise first, then a set increment as fallback.
         addition = _select_exercise_addition(
             day,
             exercises,
@@ -203,21 +202,8 @@ def _repair_underfill(
             exercises.append(addition)
             day = _rebuild_day(day, tuple(exercises), ruleset)
             continue
-        # No suitable exercise found — also try a set increment.
-        increment = _select_set_increment(
-            exercises,
-            request,
-            policy,
-            ruleset,
-            other_days=other_days,
-            volume=volume,
-        )
-        if increment is not None:
-            index, updated = increment
-            exercises[index] = updated
-            day = _rebuild_day(day, tuple(exercises), ruleset)
-            continue
-        # Cannot add more work without violating constraints — stop.
+        # Cannot add a safe, useful, compatible exercise — stop.
+        # Do NOT increase sets to substitute for missing exercise count.
         break
     return day
 
@@ -225,72 +211,6 @@ def _repair_underfill(
 # _select_rest_extension_for_underfill intentionally removed.
 # Inflating rest merely to fill unused session time is prohibited:
 # session_duration_minutes is a BUDGET, not a fill target.
-
-
-def _select_set_increment(
-    exercises: list[ProgrammedExercise],
-    request: NormalizedProgramRequest,
-    policy: SessionDurationPolicy,
-    ruleset: ProgramRuleset,
-    *,
-    other_days: tuple[WorkoutDay, ...],
-    volume: WeeklyVolumePlan | None,
-) -> tuple[int, ProgrammedExercise] | None:
-    if not exercises:
-        return None
-    options: list[tuple[tuple[object, ...], int, ProgrammedExercise]] = []
-    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
-    weekly_exposures = _weekly_exposure_count((*other_days, _rebuild_day_for_exercises(exercises)))
-    for index, exercise in enumerate(exercises):
-        if exercise.primary_muscle is None:
-            continue
-        cap = ruleset.max_working_sets_for_exercise(
-            training_status=request.training_status,
-            goal=request.primary_goal,
-            exercise_type=exercise.exercise_type,
-            is_priority=exercise.primary_muscle in priority_policy.priorities,
-            weekly_exposure_count=weekly_exposures[exercise.primary_muscle],
-            is_primary_strength="STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes,
-        )
-        direct_sets = sum(
-            item.sets for item in exercises if item.primary_muscle is exercise.primary_muscle
-        )
-        if exercise.sets >= cap or direct_sets >= ruleset.max_sets_per_muscle_per_session:
-            continue
-        updated = _with_additional_set(exercise, ruleset)
-        simulated = list(exercises)
-        simulated[index] = updated
-        weekly_before = [item for day in other_days for item in day.exercises] + exercises
-        weekly_after = [item for day in other_days for item in day.exercises] + simulated
-        if not _acceptable_volume_change(
-            weekly_before,
-            weekly_after,
-            ruleset,
-            request,
-            volume,
-        ):
-            continue
-        projected = ruleset.general_warmup_minutes + sum(
-            item.estimated_minutes for item in simulated
-        )
-        if projected > policy.maximum_total_minutes(ruleset.general_warmup_minutes):
-            continue
-        options.append(
-            (
-                (
-                    *priority_policy.precedence_key(exercise.primary_muscle),
-                    exercise.sets,
-                    direct_sets,
-                    str(exercise.exercise_id),
-                ),
-                index,
-                updated,
-            )
-        )
-    if not options:
-        return None
-    selected = min(options)
-    return selected[1], selected[2]
 
 
 def _select_exercise_addition(
