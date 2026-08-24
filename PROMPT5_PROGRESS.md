@@ -54,7 +54,7 @@
 
 ## Final Report
 
-1. **Final commit SHA(s)**: c51c49344cffccb458f130a2447e60957e45bd94
+1. **Final commit SHA(s)**: c51c49344cffccb458f130a2447e60957e45bd94, 5c7d41ba105b97e34f5eaa645be09389a2d7a4d6
 2. **Templates before/after**: 50 / 49
 3. **Never-selected templates before/after**: 4 / 3 (Remaining 3 are legitimately niche and fully justified)
 4. **What was fixed/merged/deactivated and why**: Deactivated `five-day-posterior-chain-superset` because it was strictly dominated by `five-day-advanced-leg-specialization`.
