@@ -1,3 +1,5 @@
+from sqlalchemy.orm import Session
+
 """Tests for template day structure_focus classification.
 
 Invariants:
@@ -9,10 +11,14 @@ Invariants:
   explicit in the seed, not inferred at runtime).
 """
 
-import pytest
+import importlib.util  # noqa: E402
+from unittest.mock import patch  # noqa: E402
 
-from app.exercises.enums import MuscleGroup as M
-from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS
+import pytest  # noqa: E402
+from sqlalchemy import text  # noqa: E402
+
+from app.exercises.enums import MuscleGroup as M  # noqa: E402
+from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -70,7 +76,7 @@ _ALL_DAYS = [
 # Invariant: every seeded day has a valid structure_focus
 # ---------------------------------------------------------------------------
 
-def test_all_seeded_days_have_valid_structure_focus():
+def test_all_seeded_days_have_valid_structure_focus() -> None:
     for slug, day_num, day in _ALL_DAYS:
         assert day.structure_focus in _VALID_FOCUSES, (
             f"Invalid structure_focus={day.structure_focus!r} "
@@ -82,7 +88,7 @@ def test_all_seeded_days_have_valid_structure_focus():
 # Invariant: strict structure_focus is only used when muscles are compatible
 # ---------------------------------------------------------------------------
 
-def test_strict_focus_muscles_always_compatible():
+def test_strict_focus_muscles_always_compatible() -> None:
     """
     For every day with a strict focus, the direct_target_muscles must be a
     subset of the allowed muscles for that block.
@@ -114,7 +120,7 @@ def test_strict_focus_muscles_always_compatible():
     ("Shoulders + Biceps", "other"),
     ("Overhead Press Day", "other"),
 ])
-def test_hybrid_days_are_other(title_fragment: str, expected_focus: str):
+def test_hybrid_days_are_other(title_fragment: str, expected_focus: str) -> None:
     """Hybrid sessions with unrelated major muscle groups must not be strict."""
     matched = [
         (slug, day_num, day)
@@ -135,7 +141,7 @@ def test_hybrid_days_are_other(title_fragment: str, expected_focus: str):
     ("Deadlift Day", "posterior_chain_core"),
     ("Deadlift — Heavy", "posterior_chain_core"),
 ])
-def test_true_posterior_days_are_posterior_chain_core(title_fragment: str, expected_focus: str):
+def test_true_posterior_days_are_posterior_chain_core(title_fragment: str, expected_focus: str) -> None:  # noqa: E501
     matched = [
         (slug, day_num, day)
         for slug, day_num, day in _ALL_DAYS
@@ -155,7 +161,7 @@ def test_true_posterior_days_are_posterior_chain_core(title_fragment: str, expec
     ("Squat Day", "quadriceps_calves"),
     ("Squat — Heavy", "quadriceps_calves"),
 ])
-def test_true_quad_calves_days_are_quadriceps_calves(title_fragment: str, expected_focus: str):
+def test_true_quad_calves_days_are_quadriceps_calves(title_fragment: str, expected_focus: str) -> None:  # noqa: E501
     matched = [
         (slug, day_num, day)
         for slug, day_num, day in _ALL_DAYS
@@ -169,7 +175,7 @@ def test_true_quad_calves_days_are_quadriceps_calves(title_fragment: str, expect
         )
 
 
-def test_generic_legs_days_with_all_three_lower_muscles_are_lower():
+def test_generic_legs_days_with_all_three_lower_muscles_are_lower() -> None:
     """Generic Legs (quad+ham+glute) must be 'lower', not a strict block."""
     for slug, day_num, day in _ALL_DAYS:
         title = day.title_en
@@ -182,7 +188,7 @@ def test_generic_legs_days_with_all_three_lower_muscles_are_lower():
                 )
 
 
-def test_full_body_days_are_full_body():
+def test_full_body_days_are_full_body() -> None:
     for slug, day_num, day in _ALL_DAYS:
         if "Full Body" in day.title_en:
             assert day.structure_focus == "full_body", (
@@ -190,7 +196,7 @@ def test_full_body_days_are_full_body():
             )
 
 
-def test_title_change_does_not_affect_structure_focus():
+def test_title_change_does_not_affect_structure_focus() -> None:
     """
     structure_focus is explicit in the seed — not derived from the title.
     Verify that changing the Persian title (localization) on the same day
@@ -213,7 +219,7 @@ def test_title_change_does_not_affect_structure_focus():
 # shoulders_traps must only apply when Traps is actually targeted
 # ---------------------------------------------------------------------------
 
-def test_shoulders_traps_only_when_traps_present():
+def test_shoulders_traps_only_when_traps_present() -> None:
     """
     'shoulders_traps' must only be used when TRAPS (or only SHOULDERS) is in
     the direct_target_muscles. Biceps and Triceps are not Traps.
@@ -233,7 +239,7 @@ def test_shoulders_traps_only_when_traps_present():
         )
 
 
-def test_posterior_chain_core_only_when_truly_posterior():
+def test_posterior_chain_core_only_when_truly_posterior() -> None:
     """
     'posterior_chain_core' must not be assigned when a non-posterior major
     muscle group (CHEST, BACK standalone) is the primary target.
@@ -249,12 +255,13 @@ def test_posterior_chain_core_only_when_truly_posterior():
             f"'posterior_chain_core' used but CHEST is a direct target"
         )
 
-def test_migration_mapping_exactly_matches_current_seeds():
+def test_migration_mapping_exactly_matches_current_seeds() -> None:
     import importlib.util
     spec = importlib.util.spec_from_file_location(
         "migration",
-        "alembic/versions/21c79457f43e_backfill_structure_focus_for_seeded_.py"
+        "alembic/versions/c0b1dd908291_reapply_structure_focus_exact_mapping.py"
     )
+    assert spec is not None and spec.loader is not None
     migration = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(migration)
 
@@ -267,3 +274,94 @@ def test_migration_mapping_exactly_matches_current_seeds():
 
     for key, expected_focus in current_seeded.items():
         assert migration._SEED_STRUCTURE_FOCUS[key] == expected_focus
+
+
+
+
+
+
+def test_new_migration_corrects_stuck_rows(db: Session) -> None:
+    conn = db.connection()
+
+    conn.execute(text("""
+        INSERT INTO training_program_templates (
+            id, slug, name_en, name_fa, description_en, description_fa,
+            days_per_week, training_level, fitness_goal, focus_tags,
+            intensity_methods, programming_rationale, source_name, source_url,
+            is_active
+        ) VALUES (
+            '00000000-0000-0000-0000-000000000002', 'four-day-first-month-upper-lower',
+            'x', 'x', 'x', 'x', 4, 'first_month', 'build_muscle', '["upper"]',
+            '["standard"]', '[]', 'x', 'x', true
+        )
+    """))
+    conn.execute(text("""
+        INSERT INTO training_program_template_days (
+            id, template_id, day_number, title_en, title_fa,
+            structure_focus, direct_target_muscles
+        ) VALUES (
+            '00000000-0000-0000-0000-000000000003',
+            '00000000-0000-0000-0000-000000000002',
+            1, 'x', 'x', 'full_body', '["chest"]'
+        )
+    """))
+
+    conn.execute(text("""
+        INSERT INTO training_program_templates (
+            id, slug, name_en, name_fa, description_en, description_fa,
+            days_per_week, training_level, fitness_goal, focus_tags,
+            intensity_methods, programming_rationale, source_name, source_url,
+            is_active
+        ) VALUES (
+            '00000000-0000-0000-0000-000000000004', 'custom-legacy-template',
+            'x', 'x', 'x', 'x', 2, 'beginner', 'build_muscle', '["full_body"]',
+            '["standard"]', '[]', 'x', 'x', true
+        )
+    """))
+    conn.execute(text("""
+        INSERT INTO training_program_template_days (
+            id, template_id, day_number, title_en, title_fa,
+            structure_focus, direct_target_muscles
+        ) VALUES (
+            '00000000-0000-0000-0000-000000000005',
+            '00000000-0000-0000-0000-000000000004',
+            1, 'x', 'x', 'full_body', '["chest"]'
+        )
+    """))
+
+    conn.execute(text("""
+        INSERT INTO training_program_template_days (
+            id, template_id, day_number, title_en, title_fa,
+            structure_focus, direct_target_muscles
+        ) VALUES (
+            '00000000-0000-0000-0000-000000000006',
+            '00000000-0000-0000-0000-000000000004',
+            2, 'x', 'x', 'push', '["chest"]'
+        )
+    """))
+
+    spec = importlib.util.spec_from_file_location(
+        "migration2",
+        "alembic/versions/c0b1dd908291_reapply_structure_focus_exact_mapping.py"
+    )
+    assert spec is not None and spec.loader is not None
+    migration2 = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration2)
+
+    with patch("alembic.op.get_bind", return_value=conn):
+        migration2.upgrade()
+
+    known = conn.execute(text(
+        "SELECT structure_focus FROM training_program_template_days WHERE id = '00000000-0000-0000-0000-000000000003'"  # noqa: E501
+    )).scalar()
+    assert known == "upper"
+
+    stuck = conn.execute(text(
+        "SELECT structure_focus FROM training_program_template_days WHERE id = '00000000-0000-0000-0000-000000000005'"  # noqa: E501
+    )).scalar()
+    assert stuck == "other"
+
+    valid = conn.execute(text(
+        "SELECT structure_focus FROM training_program_template_days WHERE id = '00000000-0000-0000-0000-000000000006'"  # noqa: E501
+    )).scalar()
+    assert valid == "push"
