@@ -887,6 +887,116 @@ def test_dislike_applies_after_semantic_fit_and_order_remains_deterministic() ->
     assert tuple(item.id for item in forward) == tuple(item.id for item in reverse)
 
 
+def test_forward_curated_alternative_precedes_otherwise_better_role_match() -> None:
+    request = normalized()
+    curated_id = uuid4()
+    target = candidate(
+        "target isolation press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        exercise_type=ExerciseType.ISOLATION,
+        id=uuid4(),
+        curated_alternative_ids=(curated_id,),
+    )
+    curated = candidate(
+        "curated compound press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        id=curated_id,
+        exercise_type=ExerciseType.COMPOUND,
+        substitution_group=None,
+    )
+    fallback = candidate(
+        "same role press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        exercise_type=ExerciseType.ISOLATION,
+        substitution_group=target.substitution_group,
+    )
+
+    assert rank_replacement_exercises(request, target, (fallback, curated))[0] is curated
+
+
+def test_curated_alternative_direction_is_not_implied_in_reverse() -> None:
+    request = normalized()
+    alternative_id = uuid4()
+    target_a = candidate(
+        "target isolation press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        exercise_type=ExerciseType.ISOLATION,
+        id=uuid4(),
+        curated_alternative_ids=(alternative_id,),
+    )
+    target_b = candidate(
+        "target compound press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        exercise_type=ExerciseType.COMPOUND,
+        id=alternative_id,
+        curated_alternative_ids=(),
+    )
+    reverse_fallback = candidate(
+        "reverse role press",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        exercise_type=ExerciseType.COMPOUND,
+    )
+
+    forward = rank_replacement_exercises(request, target_a, (reverse_fallback, target_b))
+    reverse = rank_replacement_exercises(request, target_b, (target_a, reverse_fallback))
+
+    assert forward[0] is target_b
+    assert reverse[0] is reverse_fallback
+
+
+def test_curated_alternative_still_requires_eligibility_and_slot_compatibility() -> None:
+    blocked_id = uuid4()
+    request = normalized(
+        blocked_exercises=[blocked_id],
+        blocked_caution_tags=[ExerciseCautionTag.WRIST_LOADING],
+    )
+    blocked = candidate(
+        "blocked curated push",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        id=blocked_id,
+    )
+    unsafe_id = uuid4()
+    unsafe = candidate(
+        "unsafe curated push",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        id=unsafe_id,
+        caution_tags=frozenset({ExerciseCautionTag.WRIST_LOADING}),
+    )
+    incompatible_id = uuid4()
+    incompatible = candidate(
+        "incompatible curated pull",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+        id=incompatible_id,
+    )
+    unavailable_id = uuid4()
+    unavailable = candidate(
+        "unavailable curated push",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        id=unavailable_id,
+        equipment=frozenset({Equipment.BARBELL}),
+    )
+    target = candidate(
+        "target push",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+        curated_alternative_ids=(blocked_id, unsafe_id, incompatible_id, unavailable_id),
+    )
+
+    assert rank_replacement_exercises(
+        request, target, (blocked, unsafe, incompatible, unavailable)
+    ) == ()
+
+
 def test_missing_required_slot_rejects_session_before_supplements() -> None:
     request = normalized()
     eligible = filter_eligible_exercises(

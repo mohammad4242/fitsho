@@ -1010,6 +1010,7 @@ class WorkoutGenerationService:
             .options(
                 selectinload(Exercise.secondary_muscles),
                 selectinload(Exercise.equipment_items),
+                selectinload(Exercise.alternatives),
                 selectinload(Exercise.caution_tag_items),
                 selectinload(Exercise.labels),
                 selectinload(Exercise.media_assets),
@@ -1093,6 +1094,9 @@ class WorkoutGenerationService:
                 primary_muscle=exercise.primary_muscle,
                 exercise_type=exercise.exercise_type,
                 persisted_group=exercise.substitution_group,
+            ),
+            curated_alternative_ids=tuple(
+                sorted(item.alternative_exercise_id for item in exercise.alternatives)
             ),
             display_snapshot={
                 "id": str(exercise.id),

@@ -25,6 +25,7 @@ from app.exercises.enums import (
 )
 from app.exercises.models import (
     Exercise,
+    ExerciseAlternative,
     ExerciseEquipment,
     ExerciseMediaAsset,
     ExerciseSecondaryMuscle,
@@ -305,6 +306,50 @@ def test_catalog_snapshot_keeps_programming_metadata_and_stable_collections(
 
     assert snapshot["body_position"] == "supported"
     assert snapshot["range_of_motion_profile"] == ["a_profile", "z_profile"]
+
+
+def test_catalog_loader_propagates_sorted_directional_curated_alternative_ids(
+    db: Session,
+) -> None:
+    source = _exercise(
+        db,
+        "catalog-curated-source",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+    )
+    first = _exercise(
+        db,
+        "catalog-curated-first",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+    )
+    second = _exercise(
+        db,
+        "catalog-curated-second",
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
+    )
+    db.add_all(
+        [
+            ExerciseAlternative(
+                exercise_id=source.id,
+                alternative_exercise_id=second.id,
+                reason_en="second",
+                reason_fa="دوم",
+            ),
+            ExerciseAlternative(
+                exercise_id=source.id,
+                alternative_exercise_id=first.id,
+                reason_en="first",
+                reason_fa="اول",
+            ),
+        ]
+    )
+    db.flush()
+
+    loaded = {item.id: item for item in _service(db)._load_catalog()}
+
+    assert loaded[source.id].curated_alternative_ids == tuple(sorted((first.id, second.id)))
 
 
 def _exercise(

@@ -162,6 +162,7 @@ def _replacement_sort_key(
         + _SKILL_RANK[candidate.skill_demand]
     )
     return (
+        candidate.id not in target.curated_alternative_ids,
         not same_group,
         compatibility.level is not CompatibilityLevel.PREFERRED,
         not same_primary,

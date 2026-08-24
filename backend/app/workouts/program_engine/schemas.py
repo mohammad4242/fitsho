@@ -256,6 +256,7 @@ class ExerciseCandidate:
     substitution_group: str | None = None
     progression_exercise_ids: tuple[UUID, ...] = ()
     regression_exercise_ids: tuple[UUID, ...] = ()
+    curated_alternative_ids: tuple[UUID, ...] = ()
     display_snapshot: dict[str, object] = field(default_factory=dict)
     prescription_mode: PrescriptionMode = PrescriptionMode.REPS
     duration_min_seconds: int | None = None
