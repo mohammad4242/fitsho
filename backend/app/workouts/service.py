@@ -1034,6 +1034,7 @@ class WorkoutGenerationService:
                 exercise.movement_pattern,
             ),
             difficulty=exercise.difficulty,
+            muscle_focus=exercise.muscle_focus,
             caution_tags=caution_tags,
             labels=frozenset(item.label for item in exercise.labels),
             is_active=exercise.is_active,

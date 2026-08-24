@@ -20,6 +20,7 @@ from app.exercises.enums import (
     MediaPresentation,
     MediaType,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
 )
 from app.exercises.models import (
@@ -214,10 +215,11 @@ def test_domain_candidate_uses_persisted_programming_metadata(db: Session) -> No
     exercise = _exercise(
         db,
         "persisted-programming-metadata",
-        MovementPattern.SQUAT,
-        MuscleGroup.QUADRICEPS,
+        MovementPattern.HORIZONTAL_PUSH,
+        MuscleGroup.CHEST,
     )
     exercise.body_position = BodyPosition.SEATED
+    exercise.muscle_focus = MuscleFocus.UPPER_CHEST
     exercise.stability_demand = StabilityDemand.LOW
     exercise.skill_demand = SkillDemand.LOW
     exercise.impact_level = ImpactLimit.HIGH
@@ -232,6 +234,7 @@ def test_domain_candidate_uses_persisted_programming_metadata(db: Session) -> No
     candidate = WorkoutGenerationService._domain_candidate(exercise)
 
     assert candidate.body_position is BodyPosition.SEATED
+    assert candidate.muscle_focus is MuscleFocus.UPPER_CHEST
     assert candidate.stability_demand is StabilityDemand.LOW
     assert candidate.skill_demand is SkillDemand.LOW
     assert candidate.impact_level is ImpactLimit.HIGH

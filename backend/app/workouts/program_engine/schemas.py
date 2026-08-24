@@ -13,6 +13,7 @@ from app.exercises.enums import (
     ExerciseLabel,
     ExerciseType,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
     PrescriptionMode,
 )
@@ -237,6 +238,7 @@ class ExerciseCandidate:
     exercise_type: ExerciseType
     equipment: frozenset[Equipment]
     difficulty: Difficulty
+    muscle_focus: MuscleFocus | None = None
     caution_tags: frozenset[ExerciseCautionTag] = frozenset()
     labels: frozenset[ExerciseLabel] = frozenset()
     is_active: bool = True
