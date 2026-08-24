@@ -75,7 +75,7 @@ def test_seed_adds_current_template_library_for_every_supported_training_frequen
 
     result = seed_training_program_templates(db)
 
-    assert result.templates == 50
+    assert result.templates == 49
     templates = list(db.scalars(select(TrainingProgramTemplate)))
     assert {template.days_per_week for template in templates} == {2, 3, 4, 5, 6}
     for days_per_week in range(2, 7):
@@ -119,7 +119,7 @@ def test_active_library_offers_two_through_six_days_and_only_full_body_two_day_t
 
 
 def test_audited_library_contains_structural_variants_not_goal_duplicates() -> None:
-    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 50
+    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 49
     seed_slugs = {template.slug for template in TRAINING_PROGRAM_TEMPLATE_SEEDS}
 
     assert not seed_slugs.intersection(EXPECTED_RETIRED_REDUNDANT_TEMPLATE_SLUGS)
@@ -232,10 +232,10 @@ def test_seed_expands_four_and_five_day_reference_library_across_levels(db: Sess
     result = seed_training_program_templates(db)
 
     templates = list(db.scalars(select(TrainingProgramTemplate)))
-    assert result.templates == 50
+    assert result.templates == 49
     for days_per_week in (4, 5):
         bucket = [template for template in templates if template.days_per_week == days_per_week]
-        assert len(bucket) == {4: 16, 5: 12}[days_per_week]
+        assert len(bucket) == {4: 16, 5: 11}[days_per_week]
         assert {template.training_level for template in bucket} == {
             ExperienceLevel.FIRST_MONTH,
             ExperienceLevel.BEGINNER,
@@ -460,7 +460,7 @@ def test_seed_can_be_rerun_without_duplicate_template_days(db: Session) -> None:
 
     result = seed_training_program_templates(db)
 
-    assert result.templates == 50
+    assert result.templates == 49
     assert (
         db.scalar(
             select(TrainingProgramTemplate).where(
