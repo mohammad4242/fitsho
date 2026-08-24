@@ -34,171 +34,153 @@ depends_on: str | Sequence[str] | None = None
 # Do NOT import mutable application code here — the mapping is self-contained.
 # ---------------------------------------------------------------------------
 _SEED_STRUCTURE_FOCUS: dict[tuple[str, int], str] = {
-    # ── FIRST-MONTH TEMPLATES ────────────────────────────────────────────────
-    ("two-day-first-month-full-body", 1): "full_body",    # Full Body A
-    ("two-day-first-month-full-body", 2): "full_body",    # Full Body B
-    ("three-day-first-month-full-body", 1): "full_body",  # Full Body A
-    ("three-day-first-month-full-body", 2): "full_body",  # Full Body B
-    ("three-day-first-month-full-body", 3): "full_body",  # Full Body C
-    ("four-day-first-month-upper-lower", 1): "upper",     # Upper A
-    ("four-day-first-month-upper-lower", 2): "lower",     # Lower A
-    ("four-day-first-month-upper-lower", 3): "upper",     # Upper B
-    ("four-day-first-month-upper-lower", 4): "lower",     # Lower B
-    # ── BEGINNER FULL-BODY ───────────────────────────────────────────────────
-    ("two-day-full-body-beginner", 1): "full_body",       # Full Body A
-    ("two-day-full-body-beginner", 2): "full_body",       # Full Body B
-    ("three-day-full-body-beginner", 1): "full_body",     # Full Body A
-    ("three-day-full-body-beginner", 2): "full_body",     # Full Body B
-    ("three-day-full-body-beginner", 3): "full_body",     # Full Body C
-    # ── INTERMEDIATE FULL-BODY ───────────────────────────────────────────────
-    ("three-day-full-body-intermediate", 1): "full_body", # Full Body A
-    ("three-day-full-body-intermediate", 2): "full_body", # Full Body B
-    ("three-day-full-body-intermediate", 3): "full_body", # Full Body C
-    # ── ADVANCED FULL-BODY ───────────────────────────────────────────────────
-    ("three-day-full-body-advanced", 1): "full_body",     # Full Body A
-    ("three-day-full-body-advanced", 2): "full_body",     # Full Body B
-    ("three-day-full-body-advanced", 3): "full_body",     # Full Body C
-    # ── UPPER / LOWER ────────────────────────────────────────────────────────
-    ("four-day-upper-lower-beginner", 1): "upper",        # Upper A
-    ("four-day-upper-lower-beginner", 2): "lower",        # Lower A
-    ("four-day-upper-lower-beginner", 3): "upper",        # Upper B
-    ("four-day-upper-lower-beginner", 4): "lower",        # Lower B
-    ("four-day-upper-lower-intermediate", 1): "upper",    # Upper A
-    ("four-day-upper-lower-intermediate", 2): "lower",    # Lower A
-    ("four-day-upper-lower-intermediate", 3): "upper",    # Upper B
-    ("four-day-upper-lower-intermediate", 4): "lower",    # Lower B
-    ("four-day-upper-lower-advanced", 1): "upper",        # Upper A
-    ("four-day-upper-lower-advanced", 2): "lower",        # Lower A
-    ("four-day-upper-lower-advanced", 3): "upper",        # Upper B
-    ("four-day-upper-lower-advanced", 4): "lower",        # Lower B
-    # ── PPL ──────────────────────────────────────────────────────────────────
-    ("three-day-ppl-beginner", 1): "push",                # Push
-    ("three-day-ppl-beginner", 2): "pull",                # Pull
-    ("three-day-ppl-beginner", 3): "lower",               # Legs
-    ("three-day-ppl-intermediate", 1): "push",            # Push
-    ("three-day-ppl-intermediate", 2): "pull",            # Pull
-    ("three-day-ppl-intermediate", 3): "lower",           # Legs
-    ("three-day-ppl-advanced", 1): "push",                # Push
-    ("three-day-ppl-advanced", 2): "pull",                # Pull
-    ("three-day-ppl-advanced", 3): "lower",               # Legs
-    # ── PRIORITY / ROTATION TEMPLATES ───────────────────────────────────────
-    ("three-day-chest-priority", 1): "other",             # Chest + Quads (hybrid)
-    ("three-day-chest-priority", 2): "other",             # Back + Hamstrings (hybrid)
-    ("three-day-chest-priority", 3): "upper",             # Chest + Shoulders
-    ("three-day-back-priority", 1): "other",              # Back + Quads (hybrid)
-    ("three-day-back-priority", 2): "other",              # Chest + Hamstrings (hybrid)
-    ("three-day-back-priority", 3): "back_biceps",        # Back + Arms
-    ("three-day-full-body-drop-set", 1): "full_body",     # Full Body A
-    ("three-day-full-body-drop-set", 2): "full_body",     # Full Body B
-    ("three-day-full-body-drop-set", 3): "full_body",     # Full Body C
-    # ── 4-DAY BODY PART ──────────────────────────────────────────────────────
-    ("four-day-body-part-beginner", 1): "chest_triceps",  # Chest + Triceps
-    ("four-day-body-part-beginner", 2): "back_biceps",    # Back + Biceps
-    ("four-day-body-part-beginner", 3): "lower",          # Legs
-    ("four-day-body-part-beginner", 4): "shoulders_traps",# Shoulders + Traps
-    ("four-day-body-part-intermediate", 1): "chest_triceps",
-    ("four-day-body-part-intermediate", 2): "back_biceps",
-    ("four-day-body-part-intermediate", 3): "lower",
-    ("four-day-body-part-intermediate", 4): "upper",      # Upper
-    ("four-day-body-part-advanced", 1): "chest_triceps",
-    ("four-day-body-part-advanced", 2): "back_biceps",
-    ("four-day-body-part-advanced", 3): "lower",
-    ("four-day-body-part-advanced", 4): "upper",
-    # ── 4-DAY ADVANCED POSTERIOR CHAIN ──────────────────────────────────────
-    ("four-day-advanced-posterior-chain", 1): "upper",          # Upper
-    ("four-day-advanced-posterior-chain-superset", 1): "upper", # Upper
-    ("four-day-phul", 1): "lower",                              # Lower Power
-    ("four-day-phul", 2): "upper",                              # Upper Power
-    ("four-day-phul", 3): "lower",                              # Lower Hypertrophy
-    ("four-day-phul", 4): "upper",                              # Upper Hypertrophy
-    # ── 5-DAY TEMPLATES ──────────────────────────────────────────────────────
-    ("five-day-body-part-intermediate", 1): "chest_triceps",
-    ("five-day-body-part-intermediate", 2): "back_biceps",
-    ("five-day-body-part-intermediate", 3): "lower",
-    ("five-day-body-part-intermediate", 4): "shoulders_traps",
-    ("five-day-body-part-intermediate", 5): "other",             # Arms
-    ("five-day-body-part-advanced", 1): "chest_triceps",
-    ("five-day-body-part-advanced", 2): "back_biceps",
-    ("five-day-body-part-advanced", 3): "lower",
-    ("five-day-body-part-advanced", 4): "shoulders_traps",
-    ("five-day-body-part-advanced", 5): "other",                 # Arms
-    ("five-day-ppl-intermediate", 1): "push",
-    ("five-day-ppl-intermediate", 2): "pull",
-    ("five-day-ppl-intermediate", 3): "lower",
-    ("five-day-ppl-intermediate", 4): "upper",
-    ("five-day-ppl-intermediate", 5): "other",
-    ("five-day-ppl-advanced", 1): "push",
-    ("five-day-ppl-advanced", 2): "pull",
-    ("five-day-ppl-advanced", 3): "lower",
-    ("five-day-ppl-advanced", 4): "upper",
-    ("five-day-ppl-advanced", 5): "other",
-    # ── PRIORITY ─────────────────────────────────────────────────────────────
-    ("five-day-shoulder-priority", 1): "chest_triceps",
-    ("five-day-shoulder-priority", 2): "back_biceps",
-    ("five-day-shoulder-priority", 3): "lower",
-    ("five-day-shoulder-priority", 4): "shoulders_traps",
-    ("five-day-shoulder-priority", 5): "other",                  # Arms
-    ("five-day-quad-priority", 1): "chest_triceps",
-    ("five-day-quad-priority", 2): "back_biceps",
-    ("five-day-quad-priority", 3): "quadriceps_calves",
-    ("five-day-quad-priority", 4): "posterior_chain_core",
-    ("five-day-quad-priority", 5): "other",                      # Shoulders + Arms (hybrid)
-    # ── SPECIALISATION ───────────────────────────────────────────────────────
-    ("five-day-advanced-arm-specialization", 1): "chest_triceps",
-    ("five-day-advanced-arm-specialization", 2): "back_biceps",
-    ("five-day-advanced-arm-specialization", 3): "quadriceps_calves",
-    ("five-day-advanced-arm-specialization", 4): "posterior_chain_core",
-    ("five-day-advanced-arm-specialization", 5): "other",        # Arms + Delts
-    ("five-day-advanced-leg-specialization", 1): "chest_triceps",
-    ("five-day-advanced-leg-specialization", 2): "back_biceps",
-    ("five-day-advanced-leg-specialization", 3): "quadriceps_calves",
-    ("five-day-advanced-leg-specialization", 4): "posterior_chain_core",
-    ("five-day-advanced-leg-specialization", 5): "other",        # Shoulders + Arms (hybrid)
-    # ── 5-DAY POSTERIOR CHAIN ────────────────────────────────────────────────
-    ("five-day-posterior-chain", 1): "chest_triceps",
-    ("five-day-posterior-chain", 2): "back_biceps",
-    ("five-day-posterior-chain", 3): "quadriceps_calves",
-    ("five-day-posterior-chain", 4): "posterior_chain_core",
-    ("five-day-posterior-chain", 5): "shoulders_traps",
+    ("two-day-first-month-full-body", 1): "full_body",
+    ("two-day-first-month-full-body", 2): "full_body",
+    ("three-day-first-month-full-body", 1): "full_body",
+    ("three-day-first-month-full-body", 2): "full_body",
+    ("three-day-first-month-full-body", 3): "full_body",
+    ("four-day-first-month-upper-lower", 1): "upper",
+    ("four-day-first-month-upper-lower", 2): "lower",
+    ("four-day-first-month-upper-lower", 3): "upper",
+    ("four-day-first-month-upper-lower", 4): "lower",
+    ("two-day-full-body-foundation", 1): "full_body",
+    ("two-day-full-body-foundation", 2): "full_body",
+    ("two-day-upper-lower-foundation", 1): "full_body",
+    ("two-day-upper-lower-foundation", 2): "full_body",
+    ("two-day-full-body-hypertrophy", 1): "full_body",
+    ("two-day-full-body-hypertrophy", 2): "full_body",
+    ("two-day-upper-lower-strength-hypertrophy", 1): "full_body",
+    ("two-day-upper-lower-strength-hypertrophy", 2): "full_body",
+    ("three-day-full-body-foundation", 1): "full_body",
+    ("three-day-full-body-foundation", 2): "full_body",
+    ("three-day-full-body-foundation", 3): "full_body",
+    ("three-day-push-pull-legs", 1): "push",
+    ("three-day-push-pull-legs", 2): "pull",
+    ("three-day-push-pull-legs", 3): "lower",
+    ("three-day-chest-priority", 1): "other",
+    ("three-day-chest-priority", 2): "other",
+    ("three-day-chest-priority", 3): "upper",
+    ("three-day-back-priority", 1): "other",
+    ("three-day-back-priority", 2): "other",
+    ("three-day-back-priority", 3): "back_biceps",
+    ("three-day-full-body-drop-set", 1): "full_body",
+    ("three-day-full-body-drop-set", 2): "full_body",
+    ("three-day-full-body-drop-set", 3): "full_body",
+    ("four-day-classic-body-part", 1): "chest_triceps",
+    ("four-day-classic-body-part", 2): "back_biceps",
+    ("four-day-classic-body-part", 3): "lower",
+    ("four-day-classic-body-part", 4): "shoulders_traps",
+    ("four-day-chest-priority", 1): "chest_triceps",
+    ("four-day-chest-priority", 2): "back_biceps",
+    ("four-day-chest-priority", 3): "lower",
+    ("four-day-chest-priority", 4): "upper",
+    ("four-day-back-priority", 1): "chest_triceps",
+    ("four-day-back-priority", 2): "back_biceps",
+    ("four-day-back-priority", 3): "lower",
+    ("four-day-back-priority", 4): "upper",
+    ("four-day-quad-hamstring-split", 1): "upper",
+    ("four-day-quad-hamstring-split", 2): "quadriceps_calves",
+    ("four-day-quad-hamstring-split", 3): "other",
+    ("four-day-quad-hamstring-split", 4): "posterior_chain_core",
+    ("four-day-phul", 1): "upper",
+    ("four-day-phul", 2): "lower",
+    ("four-day-phul", 3): "upper",
+    ("four-day-phul", 4): "lower",
+    ("five-day-classic-body-part", 1): "chest_triceps",
+    ("five-day-classic-body-part", 2): "back_biceps",
+    ("five-day-classic-body-part", 3): "lower",
+    ("five-day-classic-body-part", 4): "shoulders_traps",
+    ("five-day-classic-body-part", 5): "other",
+    ("five-day-ppl-upper-lower", 1): "push",
+    ("five-day-ppl-upper-lower", 2): "pull",
+    ("five-day-ppl-upper-lower", 3): "lower",
+    ("five-day-ppl-upper-lower", 4): "upper",
+    ("five-day-ppl-upper-lower", 5): "lower",
+    ("five-day-chest-specialization", 1): "chest_triceps",
+    ("five-day-chest-specialization", 2): "back_biceps",
+    ("five-day-chest-specialization", 3): "lower",
+    ("five-day-chest-specialization", 4): "upper",
+    ("five-day-chest-specialization", 5): "other",
+    ("five-day-back-specialization", 1): "chest_triceps",
+    ("five-day-back-specialization", 2): "back_biceps",
+    ("five-day-back-specialization", 3): "lower",
+    ("five-day-back-specialization", 4): "upper",
+    ("five-day-back-specialization", 5): "other",
     ("five-day-posterior-chain-superset", 1): "chest_triceps",
     ("five-day-posterior-chain-superset", 2): "back_biceps",
     ("five-day-posterior-chain-superset", 3): "quadriceps_calves",
     ("five-day-posterior-chain-superset", 4): "posterior_chain_core",
-    ("five-day-posterior-chain-superset", 5): "other",           # Shoulders + Arms (hybrid)
-    # ── 6-DAY PPL ────────────────────────────────────────────────────────────
+    ("five-day-posterior-chain-superset", 5): "shoulders_traps",
+    ("four-day-beginner-body-part-foundation", 1): "chest_triceps",
+    ("four-day-beginner-body-part-foundation", 2): "back_biceps",
+    ("four-day-beginner-body-part-foundation", 3): "lower",
+    ("four-day-beginner-body-part-foundation", 4): "shoulders_traps",
+    ("four-day-shoulder-priority", 1): "chest_triceps",
+    ("four-day-shoulder-priority", 2): "back_biceps",
+    ("four-day-shoulder-priority", 3): "lower",
+    ("four-day-shoulder-priority", 4): "shoulders_traps",
+    ("four-day-arms-priority", 1): "chest_triceps",
+    ("four-day-arms-priority", 2): "back_biceps",
+    ("four-day-arms-priority", 3): "lower",
+    ("four-day-arms-priority", 4): "other",
+    ("four-day-advanced-chest-specialization", 1): "chest_triceps",
+    ("four-day-advanced-chest-specialization", 2): "back_biceps",
+    ("four-day-advanced-chest-specialization", 3): "lower",
+    ("four-day-advanced-chest-specialization", 4): "shoulders_traps",
+    ("four-day-advanced-posterior-chain", 1): "chest_triceps",
+    ("four-day-advanced-posterior-chain", 2): "back_biceps",
+    ("four-day-advanced-posterior-chain", 3): "quadriceps_calves",
+    ("four-day-advanced-posterior-chain", 4): "posterior_chain_core",
+    ("five-day-shoulder-priority", 1): "chest_triceps",
+    ("five-day-shoulder-priority", 2): "back_biceps",
+    ("five-day-shoulder-priority", 3): "lower",
+    ("five-day-shoulder-priority", 4): "shoulders_traps",
+    ("five-day-shoulder-priority", 5): "other",
+    ("five-day-quad-priority", 1): "chest_triceps",
+    ("five-day-quad-priority", 2): "back_biceps",
+    ("five-day-quad-priority", 3): "quadriceps_calves",
+    ("five-day-quad-priority", 4): "posterior_chain_core",
+    ("five-day-quad-priority", 5): "other",
+    ("five-day-advanced-arm-specialization", 1): "chest_triceps",
+    ("five-day-advanced-arm-specialization", 2): "back_biceps",
+    ("five-day-advanced-arm-specialization", 3): "quadriceps_calves",
+    ("five-day-advanced-arm-specialization", 4): "posterior_chain_core",
+    ("five-day-advanced-arm-specialization", 5): "other",
+    ("five-day-advanced-leg-specialization", 1): "chest_triceps",
+    ("five-day-advanced-leg-specialization", 2): "back_biceps",
+    ("five-day-advanced-leg-specialization", 3): "quadriceps_calves",
+    ("five-day-advanced-leg-specialization", 4): "posterior_chain_core",
+    ("five-day-advanced-leg-specialization", 5): "other",
     ("six-day-ppl-twice", 1): "push",
     ("six-day-ppl-twice", 2): "pull",
     ("six-day-ppl-twice", 3): "lower",
     ("six-day-ppl-twice", 4): "push",
     ("six-day-ppl-twice", 5): "pull",
     ("six-day-ppl-twice", 6): "lower",
-    ("six-day-ppl-volume", 1): "chest_triceps",                  # Push Chest
-    ("six-day-ppl-volume", 2): "back_biceps",                    # Pull Width
-    ("six-day-ppl-volume", 3): "quadriceps_calves",              # Legs Quadriceps
-    ("six-day-ppl-volume", 4): "push",                           # Push Shoulders (push day)
-    ("six-day-ppl-volume", 5): "back_biceps",                    # Pull Thickness
-    ("six-day-ppl-volume", 6): "posterior_chain_core",           # Legs Posterior
-    # ── 6-DAY BODY PART ──────────────────────────────────────────────────────
+    ("six-day-ppl-volume", 1): "chest_triceps",
+    ("six-day-ppl-volume", 2): "back_biceps",
+    ("six-day-ppl-volume", 3): "quadriceps_calves",
+    ("six-day-ppl-volume", 4): "push",
+    ("six-day-ppl-volume", 5): "back_biceps",
+    ("six-day-ppl-volume", 6): "posterior_chain_core",
     ("six-day-chest-back-legs-shoulders-arms-legs", 1): "chest_triceps",
     ("six-day-chest-back-legs-shoulders-arms-legs", 2): "back_biceps",
     ("six-day-chest-back-legs-shoulders-arms-legs", 3): "quadriceps_calves",
     ("six-day-chest-back-legs-shoulders-arms-legs", 4): "shoulders_traps",
-    ("six-day-chest-back-legs-shoulders-arms-legs", 5): "other",  # Arms
+    ("six-day-chest-back-legs-shoulders-arms-legs", 5): "other",
     ("six-day-chest-back-legs-shoulders-arms-legs", 6): "posterior_chain_core",
-    # ── 6-DAY PRIORITY ───────────────────────────────────────────────────────
-    ("six-day-chest-priority", 1): "chest_triceps",              # Chest Heavy
-    ("six-day-chest-priority", 2): "back_biceps",                # Back + Biceps
-    ("six-day-chest-priority", 3): "lower",                      # Legs
-    ("six-day-chest-priority", 4): "chest_triceps",              # Chest Volume
-    ("six-day-chest-priority", 5): "other",                      # Shoulders + Triceps (hybrid)
-    ("six-day-chest-priority", 6): "other",                      # Calves + Core
-    ("six-day-back-priority", 1): "back_biceps",                 # Back Width
-    ("six-day-back-priority", 2): "chest_triceps",               # Chest + Triceps
-    ("six-day-back-priority", 3): "lower",                       # Legs
-    ("six-day-back-priority", 4): "back_biceps",                 # Back Thickness
-    ("six-day-back-priority", 5): "other",                       # Shoulders + Biceps (hybrid)
-    ("six-day-back-priority", 6): "other",                       # Calves + Core
-    # ── STRENGTH ─────────────────────────────────────────────────────────────
+    ("six-day-chest-priority", 1): "chest_triceps",
+    ("six-day-chest-priority", 2): "back_biceps",
+    ("six-day-chest-priority", 3): "lower",
+    ("six-day-chest-priority", 4): "chest_triceps",
+    ("six-day-chest-priority", 5): "other",
+    ("six-day-chest-priority", 6): "other",
+    ("six-day-back-priority", 1): "back_biceps",
+    ("six-day-back-priority", 2): "chest_triceps",
+    ("six-day-back-priority", 3): "lower",
+    ("six-day-back-priority", 4): "back_biceps",
+    ("six-day-back-priority", 5): "other",
+    ("six-day-back-priority", 6): "other",
     ("two-day-full-body-strength-beginner", 1): "full_body",
     ("two-day-full-body-strength-beginner", 2): "full_body",
     ("three-day-full-body-strength-beginner", 1): "full_body",
@@ -207,31 +189,30 @@ _SEED_STRUCTURE_FOCUS: dict[tuple[str, int], str] = {
     ("three-day-full-body-strength-intermediate", 1): "full_body",
     ("three-day-full-body-strength-intermediate", 2): "full_body",
     ("three-day-full-body-strength-intermediate", 3): "full_body",
-    ("four-day-upper-lower-strength-intermediate", 1): "lower",  # Lower Power
-    ("four-day-upper-lower-strength-intermediate", 2): "upper",  # Upper Power
-    ("four-day-upper-lower-strength-intermediate", 3): "lower",  # Lower Hypertrophy
-    ("four-day-upper-lower-strength-intermediate", 4): "upper",  # Upper Hypertrophy
-    ("four-day-upper-lower-strength-advanced", 1): "lower",      # Lower Power
-    ("four-day-upper-lower-strength-advanced", 2): "upper",      # Upper Power
-    ("four-day-upper-lower-strength-advanced", 3): "lower",      # Lower Volume
-    ("four-day-upper-lower-strength-advanced", 4): "upper",      # Upper Volume
-    ("five-day-strength-intermediate", 1): "quadriceps_calves",  # Squat Day
-    ("five-day-strength-intermediate", 2): "chest_triceps",      # Bench Day
-    ("five-day-strength-intermediate", 3): "posterior_chain_core", # Deadlift Day
-    ("five-day-strength-intermediate", 4): "other",              # Overhead Press Day
-    ("five-day-strength-intermediate", 5): "upper",              # Upper Accessory
-    ("five-day-strength-advanced", 1): "quadriceps_calves",      # Squat — Heavy
-    ("five-day-strength-advanced", 2): "chest_triceps",          # Bench — Heavy
-    ("five-day-strength-advanced", 3): "posterior_chain_core",   # Deadlift — Heavy
-    ("five-day-strength-advanced", 4): "upper",                  # Press + Pull Accessory
-    ("five-day-strength-advanced", 5): "other",                  # Leg Accessory + Core
-    ("six-day-push-pull-legs-strength", 1): "push",              # Push — Heavy
-    ("six-day-push-pull-legs-strength", 2): "pull",              # Pull — Heavy
-    ("six-day-push-pull-legs-strength", 3): "lower",             # Legs — Heavy
-    ("six-day-push-pull-legs-strength", 4): "push",              # Push — Volume
-    ("six-day-push-pull-legs-strength", 5): "pull",              # Pull — Volume
-    ("six-day-push-pull-legs-strength", 6): "lower",             # Legs — Volume
-    # ── FAT-LOSS / GENERAL FITNESS ───────────────────────────────────────────
+    ("four-day-upper-lower-strength-intermediate", 1): "lower",
+    ("four-day-upper-lower-strength-intermediate", 2): "upper",
+    ("four-day-upper-lower-strength-intermediate", 3): "lower",
+    ("four-day-upper-lower-strength-intermediate", 4): "upper",
+    ("four-day-upper-lower-strength-advanced", 1): "lower",
+    ("four-day-upper-lower-strength-advanced", 2): "upper",
+    ("four-day-upper-lower-strength-advanced", 3): "lower",
+    ("four-day-upper-lower-strength-advanced", 4): "upper",
+    ("five-day-strength-intermediate", 1): "quadriceps_calves",
+    ("five-day-strength-intermediate", 2): "chest_triceps",
+    ("five-day-strength-intermediate", 3): "posterior_chain_core",
+    ("five-day-strength-intermediate", 4): "other",
+    ("five-day-strength-intermediate", 5): "upper",
+    ("five-day-strength-advanced", 1): "quadriceps_calves",
+    ("five-day-strength-advanced", 2): "chest_triceps",
+    ("five-day-strength-advanced", 3): "posterior_chain_core",
+    ("five-day-strength-advanced", 4): "upper",
+    ("five-day-strength-advanced", 5): "other",
+    ("six-day-push-pull-legs-strength", 1): "push",
+    ("six-day-push-pull-legs-strength", 2): "pull",
+    ("six-day-push-pull-legs-strength", 3): "lower",
+    ("six-day-push-pull-legs-strength", 4): "push",
+    ("six-day-push-pull-legs-strength", 5): "pull",
+    ("six-day-push-pull-legs-strength", 6): "lower",
     ("three-day-full-body-fat-loss-intermediate", 1): "full_body",
     ("three-day-full-body-fat-loss-intermediate", 2): "full_body",
     ("three-day-full-body-fat-loss-intermediate", 3): "full_body",

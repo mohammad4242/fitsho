@@ -248,3 +248,22 @@ def test_posterior_chain_core_only_when_truly_posterior():
             f"{slug} day {day_num} ({day.title_en!r}): "
             f"'posterior_chain_core' used but CHEST is a direct target"
         )
+
+def test_migration_mapping_exactly_matches_current_seeds():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "migration",
+        "alembic/versions/21c79457f43e_backfill_structure_focus_for_seeded_.py"
+    )
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    current_seeded = {}
+    for template in TRAINING_PROGRAM_TEMPLATE_SEEDS:
+        for i, day in enumerate(template.days, start=1):
+            current_seeded[(template.slug, i)] = day.structure_focus
+
+    assert set(migration._SEED_STRUCTURE_FOCUS.keys()) == set(current_seeded.keys())
+
+    for key, expected_focus in current_seeded.items():
+        assert migration._SEED_STRUCTURE_FOCUS[key] == expected_focus
