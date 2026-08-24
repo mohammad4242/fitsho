@@ -500,6 +500,7 @@ class WorkoutDay:
     estimated_duration_minutes: int
     exercises: tuple[ProgrammedExercise, ...]
     cardio: CardioPrescription | None = None
+    template_target_muscles: tuple[MuscleGroup, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -573,3 +574,4 @@ class SessionDraft:
     reason_codes: tuple[str, ...] = ()
     relaxed_required_pattern_groups: tuple[tuple[MovementPattern, ...], ...] = ()
     relaxed_required_target_muscles: tuple[MuscleGroup | None, ...] = ()
+    template_target_muscles: tuple[MuscleGroup, ...] = ()

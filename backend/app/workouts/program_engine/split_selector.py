@@ -30,7 +30,10 @@ from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     focus_scope,
 )
-from app.workouts.program_engine.supplemental_policy import SUPPLEMENTAL_MUSCLES
+from app.workouts.program_engine.supplemental_policy import (
+    SUPPLEMENTAL_MUSCLES,
+    is_supplemental_muscle,
+)
 from app.workouts.program_engine.volume_policy import recovery_burden_for_request
 
 _DYNAMIC_FOCUSES = (
@@ -230,7 +233,8 @@ def _focus_availability(
     compatible = tuple(
         item
         for item in exercises
-        if evaluate_candidate_slot_compatibility(
+        if not is_supplemental_muscle(item.primary_muscle)
+        and evaluate_candidate_slot_compatibility(
             item,
             allowed_patterns=focus_patterns,
             target_muscles=focus_muscles,
@@ -323,13 +327,6 @@ def _dynamic_layout_sort_key(
         frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL}),
         frozenset({MovementPattern.SQUAT, MovementPattern.LUNGE, MovementPattern.KNEE_EXTENSION}),
         frozenset({MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION}),
-        frozenset(
-            {
-                MovementPattern.CORE_ANTI_EXTENSION,
-                MovementPattern.CORE_ANTI_ROTATION,
-                MovementPattern.CORE_ANTI_LATERAL_FLEXION,
-            }
-        ),
     )
     missing_pattern_groups = sum(
         not covered_patterns.intersection(group) for group in required_pattern_groups
@@ -683,6 +680,7 @@ def _focus_duration_assessment(
             item
             for item in exercises
             if item.id not in used_ids
+            and not is_supplemental_muscle(item.primary_muscle)
             and evaluate_candidate_slot_compatibility(
                 item,
                 allowed_patterns=slot.patterns,

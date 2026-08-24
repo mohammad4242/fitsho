@@ -2,6 +2,7 @@ from dataclasses import dataclass, replace
 
 from app.exercises.enums import ExerciseType, MuscleGroup
 from app.workouts.program_engine.enums import Goal
+from app.workouts.program_engine.prescription import estimate_exercise_minutes
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -85,15 +86,42 @@ def finalize_session_structure(
                 policy,
             ),
         )
-        exercises = tuple(item for unit in units for item in unit.exercises)
-        exercises = tuple(
-            replace(item, order=index) for index, item in enumerate(exercises, start=1)
+        flat_exercises = tuple(item for unit in units for item in unit.exercises)
+
+        compound_seen = False
+        recalculated: list[ProgrammedExercise] = []
+        for index, item in enumerate(flat_exercises, start=1):
+            warmup_sets = 0
+            if not compound_seen and item.exercise_type is ExerciseType.COMPOUND:
+                compound_seen = True
+                warmup_sets = (
+                    ruleset.strength_compound_warmup_sets
+                    if request.primary_goal is Goal.STRENGTH
+                    else ruleset.first_compound_warmup_sets
+                )
+            if item.warmup_sets != warmup_sets:
+                est_mins = estimate_exercise_minutes(
+                    item.sets, item.rest_seconds, warmup_sets, ruleset
+                )
+                recalculated.append(
+                    replace(item, order=index, warmup_sets=warmup_sets, estimated_minutes=est_mins)
+                )
+            else:
+                recalculated.append(replace(item, order=index))
+
+        exercises = tuple(recalculated)
+        estimated_duration = (
+            ruleset.general_warmup_minutes
+            + sum(item.estimated_minutes for item in exercises)
+            + (day.cardio.duration_minutes if day.cardio else 0)
         )
+
         finalized.append(
             replace(
                 day,
                 exercises=exercises,
                 title=main_session_title(day.day_index, exercises),
+                estimated_duration_minutes=estimated_duration,
             )
         )
     return tuple(finalized)
@@ -251,16 +279,21 @@ def _strict_block(day: WorkoutDay) -> tuple[frozenset[MuscleGroup], ...] | None:
         return _STRICT_BLOCKS[day.focus]
     if not day.focus.startswith("template_reference"):
         return None
-    normalized_title = day.title.lower()
-    for focus, markers in (
-        ("chest_triceps", ("chest", "triceps")),
-        ("back_biceps", ("back", "biceps")),
-        ("shoulders_traps", ("shoulder", "traps")),
-        ("quadriceps_calves", ("quadriceps", "calves")),
-        ("posterior_chain_core", ("posterior",)),
-    ):
-        if all(marker in normalized_title for marker in markers):
-            return _STRICT_BLOCKS[focus]
+    focus_muscles = set(day.template_target_muscles)
+    if {MuscleGroup.CHEST, MuscleGroup.TRICEPS}.issubset(focus_muscles):
+        return _STRICT_BLOCKS["chest_triceps"]
+    if {MuscleGroup.BACK, MuscleGroup.BICEPS}.issubset(focus_muscles):
+        return _STRICT_BLOCKS["back_biceps"]
+    if {MuscleGroup.SHOULDERS, MuscleGroup.TRAPS}.issubset(focus_muscles):
+        return _STRICT_BLOCKS["shoulders_traps"]
+    if {MuscleGroup.QUADRICEPS, MuscleGroup.CALVES}.issubset(focus_muscles):
+        return _STRICT_BLOCKS["quadriceps_calves"]
+    if {MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES}.issubset(focus_muscles) or {
+        MuscleGroup.HAMSTRINGS
+    }.issubset(focus_muscles):
+        # Fallback to HAMSTRINGS if GLUTES isn't listed but posterior is intended
+        # seed_data uses both (HAMSTRINGS, GLUTES) for Posterior
+        return _STRICT_BLOCKS["posterior_chain_core"]
     return None
 
 

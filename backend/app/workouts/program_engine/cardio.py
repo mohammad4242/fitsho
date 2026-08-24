@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from app.exercises.enums import ExerciseLabel, MuscleGroup
 from app.workouts.program_engine.enums import (
     CardioIntensity,
@@ -78,14 +80,10 @@ def add_cardio(
                 ),
             )
         updated.append(
-            WorkoutDay(
-                day_index=day.day_index,
-                weekday=day.weekday,
-                title=day.title,
-                focus=day.focus,
+            replace(
+                day,
                 estimated_duration_minutes=day.estimated_duration_minutes
                 + (cardio.duration_minutes if cardio else 0),
-                exercises=day.exercises,
                 cardio=cardio,
             )
         )

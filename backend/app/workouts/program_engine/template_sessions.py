@@ -362,6 +362,7 @@ def build_template_sessions(
                 selection_reasons=reasons,
                 substitutions=substitutions,
                 reason_codes=tuple(dict.fromkeys(build_reasons)),
+                template_target_muscles=reference_day.focus,
             )
         )
     return TemplateSessionBuild(

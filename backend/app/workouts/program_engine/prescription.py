@@ -63,7 +63,7 @@ def prescribe_sessions(
         if volume.direct_sets_for(muscle) > 0
     }
     days: list[WorkoutDay] = []
-    for day_index, draft in enumerate(drafts):
+    for _day_index, draft in enumerate(drafts):
         exercise_count = max(1, len(draft.exercises))
         # available = full resistance budget; cardio is scheduled outside/after.
         available = max(
@@ -201,6 +201,7 @@ def prescribe_sessions(
                 focus=draft.focus,
                 estimated_duration_minutes=estimated,
                 exercises=tuple(programmed),
+                template_target_muscles=draft.template_target_muscles,
             )
         )
     return tuple(days)
