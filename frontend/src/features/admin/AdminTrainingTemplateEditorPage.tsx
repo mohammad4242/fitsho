@@ -14,6 +14,7 @@ import {
   getAdminTrainingProgramTemplate,
   updateAdminTrainingProgramTemplate,
 } from "./api";
+import { AdminAccordionSection } from "./AdminAccordionSection";
 import type {
   AdminExercise,
   AdminTrainingProgramTemplate,
@@ -26,6 +27,7 @@ import type {
 import "./admin.css";
 
 type EditorState = "loading" | "ready" | "missing" | "error";
+type EditorSectionId = "identity" | "reasons" | "days";
 
 const levels: ExperienceLevel[] = ["first_month", "beginner", "intermediate", "advanced"];
 const methods: TrainingTemplateMethod[] = ["standard", "superset", "drop_set"];
@@ -40,6 +42,10 @@ export function AdminTrainingTemplateEditorPage() {
     emptyTemplate(defaultDays(searchParams.get("days")), defaultLevel(searchParams.get("level"))),
   );
   const [state, setState] = useState<EditorState>(templateId === undefined ? "ready" : "loading");
+  const [openSections, setOpenSections] = useState<Set<EditorSectionId>>(() =>
+    new Set<EditorSectionId>(templateId === undefined ? ["identity", "days"] : ["days"]),
+  );
+  const [expandedDays, setExpandedDays] = useState<Set<number>>(() => new Set<number>());
   const [pickerDay, setPickerDay] = useState<number | null>(null);
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [exerciseResults, setExerciseResults] = useState<AdminExercise[]>([]);
@@ -82,6 +88,24 @@ export function AdminTrainingTemplateEditorPage() {
     () => form.days.some((day) => day.slots.length < 5 || day.slots.length > 9),
     [form.days],
   );
+
+  function toggleSection(sectionId: EditorSectionId) {
+    setOpenSections((current) => {
+      const next = new Set(current);
+      if (next.has(sectionId)) next.delete(sectionId);
+      else next.add(sectionId);
+      return next;
+    });
+  }
+
+  function toggleDay(dayIndex: number) {
+    setExpandedDays((current) => {
+      const next = new Set(current);
+      if (next.has(dayIndex)) next.delete(dayIndex);
+      else next.add(dayIndex);
+      return next;
+    });
+  }
 
   function updateField<K extends keyof AdminTrainingProgramTemplateWrite>(
     key: K,
@@ -174,6 +198,7 @@ export function AdminTrainingTemplateEditorPage() {
         index === pickerDay ? { ...day, slots: [...day.slots, slot] } : day
       )),
     }));
+    setExpandedDays((current) => new Set([...current, pickerDay]));
     setPickerDay(null);
     setExerciseSearch("");
   }
@@ -237,8 +262,12 @@ export function AdminTrainingTemplateEditorPage() {
         {state === "ready" && (
           <form className="admin-template-editor" noValidate onSubmit={(event) => { event.preventDefault(); void save(); }}>
             {saveError !== null && <p className="admin-form-alert" role="alert">{saveError}</p>}
-            <section>
-              <h2>{t("admin.templateEditor.identity")}</h2>
+            <AdminAccordionSection
+              id="identity"
+              isOpen={openSections.has("identity")}
+              onToggle={() => toggleSection("identity")}
+              title={t("admin.templateEditor.identity")}
+            >
               <div className="admin-template-editor-grid">
                 <TextInput label={t("admin.templateEditor.nameFa")} value={form.name_fa} onChange={(value) => updateField("name_fa", value)} />
                 <TextInput label={t("admin.templateEditor.nameEn")} value={form.name_en} onChange={(value) => updateField("name_en", value)} />
@@ -274,10 +303,14 @@ export function AdminTrainingTemplateEditorPage() {
                 <TextInput label={t("admin.templateEditor.sourceName")} value={form.source_name} onChange={(value) => updateField("source_name", value)} />
                 <TextInput label={t("admin.templateEditor.sourceUrl")} value={form.source_url} onChange={(value) => updateField("source_url", value)} />
               </div>
-            </section>
+            </AdminAccordionSection>
 
-            <section>
-              <h2>{t("admin.templateEditor.programReasons")}</h2>
+            <AdminAccordionSection
+              id="program-reasons"
+              isOpen={openSections.has("reasons")}
+              onToggle={() => toggleSection("reasons")}
+              title={t("admin.templateEditor.programReasons")}
+            >
               <div className="admin-template-rationale-editor">
                 {form.programming_rationale.map((reason, index) => (
                   <div key={index}>
@@ -289,47 +322,90 @@ export function AdminTrainingTemplateEditorPage() {
                   </div>
                 ))}
               </div>
-            </section>
+            </AdminAccordionSection>
 
-            <section className="admin-template-editor-days">
-              <h2>{t("admin.templateEditor.trainingDays")}</h2>
-              {form.days.map((day, dayIndex) => (
-                <section className="admin-template-editor-day" key={dayIndex}>
-                  <header><span>{t("admin.templates.dayNumber", { number: dayIndex + 1 })}</span><small>{t("admin.templateEditor.slotCount", { count: day.slots.length })}</small></header>
-                  <div className="admin-template-editor-grid">
-                    <TextInput label={t("admin.templateEditor.dayNameFa")} value={day.title_fa} onChange={(value) => patchDay(dayIndex, { title_fa: value })} />
-                    <TextInput label={t("admin.templateEditor.dayNameEn")} value={day.title_en} onChange={(value) => patchDay(dayIndex, { title_en: value })} />
-                    <TextInput label={t("admin.templateEditor.structureFocus")} value={day.structure_focus} onChange={(value) => patchDay(dayIndex, { structure_focus: value })} />
-                    <TextInput label={t("admin.templateEditor.targetMuscles")} value={day.direct_target_muscles.join(", ")} onChange={(value) => patchDay(dayIndex, { direct_target_muscles: parseMuscles(value) })} />
-                  </div>
-                  <ol>
-                    {day.slots.map((slot, slotIndex) => (
-                      <li className="admin-template-editor-slot" key={`${slot.exercise_id}-${slotIndex}`}>
-                        <div className="admin-template-editor-slot__topline">
-                          <strong>{slot.display_name_fa ?? slot.display_name_en ?? t("admin.templateEditor.exercise")}</strong>
-                          <Link to={`/admin/exercises/${slot.exercise_id}/edit`}>{t("admin.templateEditor.exerciseDetails")}</Link>
-                          <button aria-label={t("admin.templateEditor.removeExerciseAria", { name: slot.display_name_fa ?? slot.display_name_en })} onClick={() => removeSlot(dayIndex, slotIndex)} type="button">{t("admin.templateEditor.removeExercise")}</button>
+            <AdminAccordionSection
+              id="training-days"
+              isOpen={openSections.has("days")}
+              onToggle={() => toggleSection("days")}
+              title={t("admin.templateEditor.trainingDays")}
+            >
+              <div className="admin-template-editor-days">
+                {form.days.map((day, dayIndex) => {
+                  const isDayExpanded = expandedDays.has(dayIndex);
+                  const dayPanelId = `admin-template-day-panel-${dayIndex}`;
+                  const dayName = (day.title_fa || day.title_en || "").trim() || t("admin.templates.dayNumber", { number: dayIndex + 1 });
+                  return (
+                    <section
+                      className="admin-template-editor-day"
+                      data-expanded={isDayExpanded}
+                      key={dayIndex}
+                    >
+                      <header className="admin-accordion-header">
+                        <button
+                          aria-controls={dayPanelId}
+                          aria-expanded={isDayExpanded}
+                          aria-label={t(`admin.templates.${isDayExpanded ? "collapseDayAria" : "expandDayAria"}`, {
+                            name: dayName,
+                            number: dayIndex + 1,
+                          })}
+                          className="admin-day-accordion-trigger admin-template-editor-day__trigger"
+                          onClick={() => toggleDay(dayIndex)}
+                          type="button"
+                        >
+                          <span className="admin-template-editor-day__meta">
+                            <span className="admin-template-editor-day__badge">
+                              {t("admin.templates.dayNumber", { number: dayIndex + 1 })}
+                            </span>
+                            <strong className="admin-template-editor-day__title">{dayName}</strong>
+                            <small className="admin-template-editor-day__count">
+                              {t("admin.templateEditor.slotCount", { count: day.slots.length })}
+                            </small>
+                          </span>
+                          <span aria-hidden="true" className="admin-accordion-chevron">⌄</span>
+                        </button>
+                      </header>
+
+                      {isDayExpanded && (
+                        <div className="admin-day-accordion-panel admin-template-editor-day__panel" id={dayPanelId}>
+                          <div className="admin-template-editor-grid">
+                            <TextInput label={t("admin.templateEditor.dayNameFa")} value={day.title_fa} onChange={(value) => patchDay(dayIndex, { title_fa: value })} />
+                            <TextInput label={t("admin.templateEditor.dayNameEn")} value={day.title_en} onChange={(value) => patchDay(dayIndex, { title_en: value })} />
+                            <TextInput label={t("admin.templateEditor.structureFocus")} value={day.structure_focus} onChange={(value) => patchDay(dayIndex, { structure_focus: value })} />
+                            <TextInput label={t("admin.templateEditor.targetMuscles")} value={day.direct_target_muscles.join(", ")} onChange={(value) => patchDay(dayIndex, { direct_target_muscles: parseMuscles(value) })} />
+                          </div>
+                          <ol>
+                            {day.slots.map((slot, slotIndex) => (
+                              <li className="admin-template-editor-slot" key={`${slot.exercise_id}-${slotIndex}`}>
+                                <div className="admin-template-editor-slot__topline">
+                                  <strong>{slot.display_name_fa ?? slot.display_name_en ?? t("admin.templateEditor.exercise")}</strong>
+                                  <Link to={`/admin/exercises/${slot.exercise_id}/edit`}>{t("admin.templateEditor.exerciseDetails")}</Link>
+                                  <button aria-label={t("admin.templateEditor.removeExerciseAria", { name: slot.display_name_fa ?? slot.display_name_en })} onClick={() => removeSlot(dayIndex, slotIndex)} type="button">{t("admin.templateEditor.removeExercise")}</button>
+                                </div>
+                                <div className="admin-template-editor-grid admin-template-editor-grid--slot">
+                                  <TextInput label={t("admin.templateEditor.displayNameFa")} value={slot.display_name_fa ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_fa: value || null })} />
+                                  <TextInput label={t("admin.templateEditor.displayNameEn")} value={slot.display_name_en ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_en: value || null })} />
+                                  <NumberInput label={t("admin.templateEditor.sets")} value={slot.sets} onChange={(value) => patchSlot(dayIndex, slotIndex, { sets: value })} />
+                                  <NumberInput label={t("admin.templateEditor.repMin")} value={slot.rep_min} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_min: value })} />
+                                  <NumberInput label={t("admin.templateEditor.repMax")} value={slot.rep_max} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_max: value })} />
+                                  <NumberInput label={t("admin.templateEditor.rir")} value={slot.target_rir} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_rir: value })} />
+                                  <NumberInput label={t("admin.templateEditor.rest")} value={slot.rest_seconds} onChange={(value) => patchSlot(dayIndex, slotIndex, { rest_seconds: value })} />
+                                  <label>{t("admin.templateEditor.method")}<select value={slot.intensity_method} onChange={(event) => patchSlot(dayIndex, slotIndex, { intensity_method: event.target.value as TrainingTemplateMethod })}>{methods.map((method) => <option key={method} value={method}>{t(`admin.templates.methods.${method}`)}</option>)}</select></label>
+                                  <label>{t("admin.templateEditor.priority")}<select value={slot.adaptation_priority} onChange={(event) => patchSlot(dayIndex, slotIndex, { adaptation_priority: event.target.value as TrainingTemplateSlotPriority })}>{priorities.map((priority) => <option key={priority} value={priority}>{t(`admin.templateEditor.priorities.${priority}`)}</option>)}</select></label>
+                                  <label>{t("admin.templateEditor.movementPattern")}<select value={slot.movement_pattern} onChange={(event) => patchSlot(dayIndex, slotIndex, { movement_pattern: event.target.value as AdminTrainingTemplateSlotWrite["movement_pattern"] })}>{movementPatterns.map((pattern) => <option key={pattern} value={pattern}>{t(`admin.programming.movementPattern.${pattern}`)}</option>)}</select></label>
+                                  <TextInput label={t("admin.templateEditor.slotMuscles")} value={slot.target_muscles.join(", ")} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_muscles: parseMuscles(value) })} />
+                                </div>
+                              </li>
+                            ))}
+                          </ol>
+                          <button className="admin-template-editor-add" onClick={() => setPickerDay(dayIndex)} type="button">{t("admin.templateEditor.addExercise")}</button>
                         </div>
-                        <div className="admin-template-editor-grid admin-template-editor-grid--slot">
-                          <TextInput label={t("admin.templateEditor.displayNameFa")} value={slot.display_name_fa ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_fa: value || null })} />
-                          <TextInput label={t("admin.templateEditor.displayNameEn")} value={slot.display_name_en ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_en: value || null })} />
-                          <NumberInput label={t("admin.templateEditor.sets")} value={slot.sets} onChange={(value) => patchSlot(dayIndex, slotIndex, { sets: value })} />
-                          <NumberInput label={t("admin.templateEditor.repMin")} value={slot.rep_min} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_min: value })} />
-                          <NumberInput label={t("admin.templateEditor.repMax")} value={slot.rep_max} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_max: value })} />
-                          <NumberInput label={t("admin.templateEditor.rir")} value={slot.target_rir} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_rir: value })} />
-                          <NumberInput label={t("admin.templateEditor.rest")} value={slot.rest_seconds} onChange={(value) => patchSlot(dayIndex, slotIndex, { rest_seconds: value })} />
-                          <label>{t("admin.templateEditor.method")}<select value={slot.intensity_method} onChange={(event) => patchSlot(dayIndex, slotIndex, { intensity_method: event.target.value as TrainingTemplateMethod })}>{methods.map((method) => <option key={method} value={method}>{t(`admin.templates.methods.${method}`)}</option>)}</select></label>
-                          <label>{t("admin.templateEditor.priority")}<select value={slot.adaptation_priority} onChange={(event) => patchSlot(dayIndex, slotIndex, { adaptation_priority: event.target.value as TrainingTemplateSlotPriority })}>{priorities.map((priority) => <option key={priority} value={priority}>{t(`admin.templateEditor.priorities.${priority}`)}</option>)}</select></label>
-                          <label>{t("admin.templateEditor.movementPattern")}<select value={slot.movement_pattern} onChange={(event) => patchSlot(dayIndex, slotIndex, { movement_pattern: event.target.value as AdminTrainingTemplateSlotWrite["movement_pattern"] })}>{movementPatterns.map((pattern) => <option key={pattern} value={pattern}>{t(`admin.programming.movementPattern.${pattern}`)}</option>)}</select></label>
-                          <TextInput label={t("admin.templateEditor.slotMuscles")} value={slot.target_muscles.join(", ")} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_muscles: parseMuscles(value) })} />
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                  <button className="admin-template-editor-add" onClick={() => setPickerDay(dayIndex)} type="button">{t("admin.templateEditor.addExercise")}</button>
-                </section>
-              ))}
-            </section>
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            </AdminAccordionSection>
 
             {pickerDay !== null && (
               <section className="admin-template-exercise-picker" aria-label={t("admin.templateEditor.exercisePicker")}>

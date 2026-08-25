@@ -34,6 +34,7 @@ beforeEach(() => {
 });
 
 it("creates a new program with shared content and multi-level eligibility", async () => {
+  const user = userEvent.setup();
   render(
     <MemoryRouter initialEntries={["/admin/training-program-templates/new?days=4&level=intermediate"]}>
       <Routes>
@@ -46,13 +47,19 @@ it("creates a new program with shared content and multi-level eligibility", asyn
   expect(screen.getByLabelText("تعداد روز تمرین")).toHaveValue("4");
   expect(screen.getByRole("checkbox", { name: "متوسط" })).toBeChecked();
   expect(screen.getByRole("checkbox", { name: "مبتدی" })).not.toBeChecked();
-  await userEvent.click(screen.getByRole("checkbox", { name: "مبتدی" }));
+  await user.click(screen.getByRole("checkbox", { name: "مبتدی" }));
   expect(screen.getByRole("checkbox", { name: "مبتدی" })).toBeChecked();
   expect(screen.getByLabelText("برچسب‌های تمرکز (با کاما جدا کن)")).toHaveValue(
     "full_body, balanced",
   );
-  expect(screen.getAllByText("روز 1")).toHaveLength(1);
-  expect(screen.getAllByRole("button", { name: "افزودن حرکت" })).toHaveLength(4);
+  expect(screen.getAllByText("روز 1")).toHaveLength(2);
+  expect(screen.getByRole("button", { name: "باز کردن روز 1: روز 1" })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("button", { name: "باز کردن روز 2: روز 2" })).toHaveAttribute("aria-expanded", "false");
+
+  // Expand Day 1 and verify its fields and action appear
+  await user.click(screen.getByRole("button", { name: "باز کردن روز 1: روز 1" }));
+  expect(screen.getByRole("button", { name: "بستن روز 1: روز 1" })).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("button", { name: "افزودن حرکت" })).toBeInTheDocument();
 });
 
 it("supports first month as eligibility without creating separate content", async () => {
@@ -65,10 +72,11 @@ it("supports first month as eligibility without creating separate content", asyn
   );
 
   expect(await screen.findByRole("checkbox", { name: "First Month" })).toBeChecked();
-  expect(screen.getAllByRole("button", { name: "افزودن حرکت" })).toHaveLength(2);
+  expect(screen.getByRole("button", { name: "باز کردن روز 1: روز 1" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "باز کردن روز 2: روز 2" })).toBeInTheDocument();
 });
 
-it("searches the exercise library, links a movement, and removes a slot", async () => {
+it("searches the exercise library, links a movement, and removes a slot inside accordion day", async () => {
   const user = userEvent.setup();
   render(
     <MemoryRouter initialEntries={["/admin/training-program-templates/new?days=2&level=beginner"]}>
@@ -79,13 +87,48 @@ it("searches the exercise library, links a movement, and removes a slot", async 
   );
 
   await screen.findByRole("heading", { name: "افزودن برنامه تمرینی" });
-  await user.click(screen.getAllByRole("button", { name: "افزودن حرکت" })[0]);
+  await user.click(screen.getByRole("button", { name: "باز کردن روز 1: روز 1" }));
+  await user.click(screen.getByRole("button", { name: "افزودن حرکت" }));
   await user.type(screen.getByPlaceholderText("جست‌وجو در کتابخانه حرکات"), "bench");
   await user.click(await screen.findByRole("button", { name: "انتخاب پرس سینه دمبل" }));
 
   expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "حذف پرس سینه دمبل" }));
   expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
+});
+
+it("toggles day accordions independently and preserves uncommitted edits across collapse", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={["/admin/training-program-templates/new?days=3&level=intermediate"]}>
+      <Routes>
+        <Route path="/admin/training-program-templates/new" element={<AdminTrainingTemplateEditorPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await screen.findByRole("heading", { name: "افزودن برنامه تمرینی" });
+
+  // Open Day 1 and edit its name and structure focus
+  await user.click(screen.getByRole("button", { name: "باز کردن روز 1: روز 1" }));
+  const day1NameInput = screen.getByLabelText("نام فارسی روز");
+  await user.clear(day1NameInput);
+  await user.type(day1NameInput, "سینه و پشت بازو");
+
+  // Open Day 2 independently
+  await user.click(screen.getByRole("button", { name: "باز کردن روز 2: روز 2" }));
+  expect(screen.getByRole("button", { name: "بستن روز 1: سینه و پشت بازو" })).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("button", { name: "بستن روز 2: روز 2" })).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("button", { name: "باز کردن روز 3: روز 3" })).toHaveAttribute("aria-expanded", "false");
+
+  // Collapse Day 1
+  await user.click(screen.getByRole("button", { name: "بستن روز 1: سینه و پشت بازو" }));
+  expect(screen.getByRole("button", { name: "باز کردن روز 1: سینه و پشت بازو" })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("button", { name: "بستن روز 2: روز 2" })).toHaveAttribute("aria-expanded", "true");
+
+  // Re-open Day 1 and verify the edited value is preserved
+  await user.click(screen.getByRole("button", { name: "باز کردن روز 1: سینه و پشت بازو" }));
+  expect(screen.getByDisplayValue("سینه و پشت بازو")).toBeInTheDocument();
 });
 
 it("deletes an existing shared template after confirmation", async () => {
