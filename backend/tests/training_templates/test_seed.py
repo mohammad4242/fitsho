@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.exercises.enums import ExerciseContentType
 from app.exercises.models import Exercise
 from app.profile.enums import ExperienceLevel, FitnessGoal
-from app.training_templates.models import TrainingProgramTemplate, TrainingProgramTemplateSlot
+from app.training_templates.models import (
+    TrainingProgramTemplate,
+    TrainingProgramTemplateDay,
+    TrainingProgramTemplateSlot,
+)
 from app.training_templates.seed_data import (
     CANONICAL_TEMPLATE_DEFINITIONS,
     LEGACY_SOURCE_NAME,
@@ -192,3 +196,76 @@ def test_seed_does_not_change_the_exercise_library_rows(db: Session) -> None:
     seed_training_program_templates(db)
 
     assert db.scalar(select(func.count()).select_from(Exercise)) == before
+
+
+def _seeded_template_with_content(db: Session, slug: str) -> TrainingProgramTemplate | None:
+    return db.scalar(
+        select(TrainingProgramTemplate)
+        .where(TrainingProgramTemplate.slug == slug)
+        .options(
+            selectinload(TrainingProgramTemplate.days).selectinload(
+                TrainingProgramTemplateDay.slots
+            )
+        )
+    )
+
+
+def test_normal_seed_preserves_admin_template_edit(db: Session) -> None:
+    seed_real_catalog_exercises(db)
+    seed_training_program_templates(db)
+    template = _seeded_template_with_content(db, "t01-2-day-full-body-ab")
+    assert template is not None
+    template.name_en = "Admin-owned edit"
+    template.days[0].slots[0].rep_max = 15
+    db.commit()
+
+    seed_training_program_templates(db)
+
+    refreshed = _seeded_template_with_content(db, template.slug)
+    assert refreshed is not None
+    assert refreshed.name_en == "Admin-owned edit"
+    assert refreshed.days[0].slots[0].rep_max == 15
+
+
+def test_normal_seed_preserves_admin_slot_removal(db: Session) -> None:
+    seed_real_catalog_exercises(db)
+    seed_training_program_templates(db)
+    template = _seeded_template_with_content(db, "t01-2-day-full-body-ab")
+    assert template is not None
+    original_count = len(template.days[0].slots)
+    template.days[0].slots.pop()
+    db.commit()
+
+    seed_training_program_templates(db)
+
+    refreshed = _seeded_template_with_content(db, template.slug)
+    assert refreshed is not None
+    assert len(refreshed.days[0].slots) == original_count - 1
+
+
+def test_normal_seed_does_not_recreate_physically_deleted_canonical_template(db: Session) -> None:
+    seed_real_catalog_exercises(db)
+    seed_training_program_templates(db)
+    template = _seeded_template_with_content(db, "t01-2-day-full-body-ab")
+    assert template is not None
+    db.delete(template)
+    db.commit()
+
+    seed_training_program_templates(db)
+
+    assert _seeded_template_with_content(db, "t01-2-day-full-body-ab") is None
+
+
+def test_normal_seed_preserves_disabled_canonical_template(db: Session) -> None:
+    seed_real_catalog_exercises(db)
+    seed_training_program_templates(db)
+    template = _seeded_template_with_content(db, "t01-2-day-full-body-ab")
+    assert template is not None
+    template.is_active = False
+    db.commit()
+
+    seed_training_program_templates(db)
+
+    refreshed = _seeded_template_with_content(db, template.slug)
+    assert refreshed is not None
+    assert refreshed.is_active is False

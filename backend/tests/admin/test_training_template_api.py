@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -301,6 +302,71 @@ def test_admin_rejects_template_slot_with_unknown_exercise(client: TestClient, d
     assert response.json()["detail"][0]["loc"] == ["body", "days"]
 
 
+@pytest.mark.parametrize("mutation", ["inactive", "non_programmable", "placeholder"])
+def test_admin_rejects_non_executable_template_exercises(
+    client: TestClient,
+    db: Session,
+    mutation: str,
+) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    exercise = db.scalar(select(Exercise).where(Exercise.slug == "fedb-0025-barbell-bench-press"))
+    assert exercise is not None
+    if mutation == "inactive":
+        exercise.is_active = False
+    elif mutation == "non_programmable":
+        exercise.is_programmable = False
+    else:
+        exercise.source = "fitsho_training_template"
+        exercise.source_id = f"test-placeholder-{exercise.id}"
+        exercise.is_programmable = False
+    db.commit()
+
+    response = client.post(
+        "/api/v1/admin/training-program-templates",
+        headers=ORIGIN,
+        json=_template_payload_for_catalog(db, str(exercise.id)),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "days"]
+
+
+def test_admin_rejects_semantically_incompatible_template_exercise(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    incompatible = db.scalar(
+        select(Exercise.id).where(Exercise.slug == "owner-e0c26a271aac-barbell-bent-over-row")
+    )
+    assert incompatible is not None
+    payload = _template_payload_for_catalog(db, str(incompatible))
+
+    response = client.post(
+        "/api/v1/admin/training-program-templates",
+        headers=ORIGIN,
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "days"]
+
+
+def test_admin_accepts_compatible_template_exercises(client: TestClient, db: Session) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+
+    response = client.post(
+        "/api/v1/admin/training-program-templates",
+        headers=ORIGIN,
+        json=_template_payload_for_catalog(db),
+    )
+
+    assert response.status_code == 201
+
+
 def test_admin_rejects_conflicting_canonical_template_tags(
     client: TestClient,
     db: Session,
@@ -375,6 +441,43 @@ def _rationale_payload() -> list[dict[str, str]]:
         }
         for number in range(1, 6)
     ]
+
+
+def _template_payload_for_catalog(db: Session, first_exercise_id: str | None = None) -> dict[str, object]:
+    slugs = (
+        "fedb-0025-barbell-bench-press",
+        "owner-e0c26a271aac-barbell-bent-over-row",
+        "fedb-0765-smith-seated-shoulder-press",
+        "fedb-0750-smith-chair-squat",
+        "fedb-0300-dumbbell-deadlift",
+    )
+    exercise_ids = [
+        str(db.scalar(select(Exercise.id).where(Exercise.slug == slug))) for slug in slugs
+    ]
+    assert all(exercise_id != "None" for exercise_id in exercise_ids)
+    if first_exercise_id is not None:
+        exercise_ids[0] = first_exercise_id
+    days = []
+    for day_number in range(1, 3):
+        day = _day_payload(day_number, exercise_ids[0])
+        for slot, exercise_id in zip(day["slots"], exercise_ids, strict=True):
+            slot["exercise_id"] = exercise_id
+        days.append(day)
+    return {
+        "name_en": "Focused Template Validation",
+        "name_fa": "اعتبارسنجی متمرکز قالب",
+        "description_en": "A focused template validation fixture.",
+        "description_fa": "تست متمرکز اعتبارسنجی قالب.",
+        "days_per_week": 2,
+        "supported_levels": ["beginner"],
+        "fitness_goal": "build_muscle",
+        "focus_tags": ["full_body", "balanced"],
+        "intensity_methods": ["standard"],
+        "programming_rationale": _rationale_payload(),
+        "source_name": "Fitsho admin library",
+        "source_url": "https://fitsho.local/admin-library",
+        "days": days,
+    }
 
 
 def _day_payload(day_number: int, exercise_id: str) -> dict[str, object]:
