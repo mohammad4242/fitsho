@@ -1,21 +1,19 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.exercises.enums import ExerciseContentType
 from app.exercises.models import Exercise
-from app.training_templates.catalog_placeholders import (
-    ensure_template_catalog_placeholders,
-    is_template_catalog_placeholder,
-)
 from app.training_templates.models import (
     TrainingProgramTemplate,
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
 )
 from app.training_templates.seed_data import (
+    LEGACY_SOURCE_NAME,
+    LEGACY_SOURCE_URL,
     SOURCE_NAME,
     SOURCE_URL,
     TRAINING_PROGRAM_TEMPLATE_SEEDS,
@@ -30,18 +28,22 @@ class TrainingTemplateSeedResult:
 
 
 def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
-    template_slots = tuple(
-        slot
-        for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        for day in template.days
-        for slot in day.slots
+    db.execute(
+        delete(TrainingProgramTemplate).where(
+            TrainingProgramTemplate.source_name == LEGACY_SOURCE_NAME,
+            TrainingProgramTemplate.source_url == LEGACY_SOURCE_URL,
+        )
     )
-    ensure_template_catalog_placeholders(db, template_slots)
     db.flush()
     exercises_by_slug = {
         exercise.slug: exercise
         for exercise in db.scalars(
-            select(Exercise).where(Exercise.content_type == ExerciseContentType.EXERCISE)
+            select(Exercise).where(
+                Exercise.content_type == ExerciseContentType.EXERCISE,
+                Exercise.is_active.is_(True),
+                Exercise.is_programmable.is_(True),
+                Exercise.source != "fitsho_training_template",
+            )
         )
     }
     linked_slots = 0
@@ -58,14 +60,6 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
     templates_by_slug: dict[str, TrainingProgramTemplate] = {
         template.slug: template for template in existing_templates
     }
-    seeded_slugs = {seed.slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS}
-    for existing_template in existing_templates:
-        if (
-            _is_fitsho_seed_managed(existing_template)
-            and existing_template.slug not in seeded_slugs
-        ):
-            existing_template.is_active = False
-
     for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS:
         template = templates_by_slug.get(seed.slug)
         if template is None:
@@ -113,10 +107,7 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
             template.days.append(day)
             for slot_order, slot_seed in enumerate(day_seed.slots, start=1):
                 exercise_id = _exercise_id_for_slot(slot_seed.catalog_slug_hints, exercises_by_slug)
-                if exercise_id is None:
-                    placeholder_slots += 1
-                else:
-                    linked_slots += 1
+                linked_slots += 1
                 day.slots.append(
                     TrainingProgramTemplateSlot(
                         slot_order=slot_order,
@@ -145,25 +136,18 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
     )
 
 
-def _is_fitsho_seed_managed(template: TrainingProgramTemplate) -> bool:
-    return template.source_name == SOURCE_NAME and template.source_url == SOURCE_URL
-
-
 def _exercise_id_for_slot(
     candidate_slugs: tuple[str, ...],
     exercises_by_slug: dict[str, Exercise],
 ) -> UUID | None:
-    candidates = [
-        exercises_by_slug[candidate_slug]
-        for candidate_slug in candidate_slugs
-        if candidate_slug in exercises_by_slug
-        and exercises_by_slug[candidate_slug].content_type is ExerciseContentType.EXERCISE
-    ]
-    selected = next(
-        (exercise for exercise in candidates if not is_template_catalog_placeholder(exercise)),
-        next(iter(candidates), None),
+    for candidate_slug in candidate_slugs:
+        exercise = exercises_by_slug.get(candidate_slug)
+        if exercise is not None and exercise.content_type is ExerciseContentType.EXERCISE:
+            return exercise.id
+    raise ValueError(
+        "Missing active programmable Exercise Library movement for template slot: "
+        + ", ".join(candidate_slugs)
     )
-    return selected.id if selected is not None else None
 
 
 def list_training_program_templates(

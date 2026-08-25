@@ -1,4 +1,9 @@
-from dataclasses import dataclass, replace
+# ruff: noqa: E501
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
 
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.profile.enums import ExperienceLevel, FitnessGoal
@@ -7,10 +12,6 @@ from app.training_templates.tags import (
     TemplateFocusTag,
     validate_focus_tags,
     validate_template_focus_tags,
-)
-from app.workouts.program_engine.rulesets.resistance_training_v1 import (
-    MAXIMUM_EXERCISES_PER_SESSION,
-    MINIMUM_EXERCISES_PER_SESSION,
 )
 
 
@@ -51,6 +52,7 @@ class TemplateProgrammingRationaleSeed:
 
 @dataclass(frozen=True)
 class TrainingProgramTemplateSeed:
+    canonical_slug: str
     slug: str
     name_en: str
     name_fa: str
@@ -66,811 +68,409 @@ class TrainingProgramTemplateSeed:
     is_active: bool = True
 
 
+@dataclass(frozen=True)
+class Movement:
+    key: str
+    slugs_by_level: Mapping[ExperienceLevel, str]
+    target_muscles: tuple[MuscleGroup, ...]
+    movement_pattern: MovementPattern
+
+
+@dataclass(frozen=True)
+class CanonicalTemplateDefinition:
+    canonical_slug: str
+    name_en: str
+    name_fa: str
+    description_en: str
+    description_fa: str
+    eligible_levels: tuple[ExperienceLevel, ...]
+    focus_tags: tuple[TemplateFocusTag, ...]
+    days: tuple[TemplateDaySeed, ...]
+    day_specs: tuple[tuple[tuple[Movement, str], ...], ...]
+    guidance_en: str
+    guidance_fa: str
+    order_en: str
+    order_fa: str
+    recovery_en: str
+    recovery_fa: str
+
+
 M = MuscleGroup
 P = MovementPattern
-Method = TrainingTemplateMethod
-Priority = TrainingTemplateSlotPriority
 Level = ExperienceLevel
 Tag = TemplateFocusTag
+Method = TrainingTemplateMethod
+Priority = TrainingTemplateSlotPriority
 
-SOURCE_NAME = "Fitsho synthesis: Stronger By Science · Jeff Nippard · RP Strength"
-SOURCE_URL = "https://www.strongerbyscience.com/exercise-order-video/"
+LEGACY_SOURCE_NAME = "Fitsho synthesis: Stronger By Science · Jeff Nippard · RP Strength"
+LEGACY_SOURCE_URL = "https://www.strongerbyscience.com/exercise-order-video/"
+SOURCE_NAME = "Fitsho canonical training template catalog"
+SOURCE_URL = "https://fitsho.local/training-template-catalog"
 
-# Phase 4 structural-library audit. These legacy entries are either exact
-# Goal-era duplicates or belong to unsupported Days x ExperienceLevel cells.
-RETIRED_REDUNDANT_TEMPLATE_SLUGS = frozenset(
-    {
-        "two-day-full-body-fat-loss-beginner",
-        "two-day-full-body-general-fitness-beginner",
-        "three-day-full-body-fat-loss-beginner",
-        "three-day-full-body-general-fitness-beginner",
-        "five-day-ppl-fat-loss-intermediate",
-        "six-day-ppl-fat-loss-advanced",
-    }
-)
-RETIRED_UNSUPPORTED_TEMPLATE_SLUGS = frozenset(
-    {
-        "two-day-full-body-superset",
-        "five-day-beginner-body-part-foundation",
-    }
-)
-STRUCTURAL_RECLASSIFIED_TEMPLATE_SLUGS = frozenset(
-    {
-        "two-day-full-body-strength-beginner",
-        "three-day-full-body-strength-beginner",
-        "three-day-full-body-strength-intermediate",
-        "four-day-upper-lower-strength-intermediate",
-        "four-day-upper-lower-strength-advanced",
-        "five-day-strength-intermediate",
-        "five-day-strength-advanced",
-        "six-day-push-pull-legs-strength",
-        "three-day-full-body-fat-loss-intermediate",
-        "four-day-upper-lower-fat-loss-intermediate",
-        "four-day-upper-lower-fat-loss-advanced",
-        "five-day-ppl-fat-loss-advanced",
-        "three-day-full-body-general-fitness-intermediate",
-        "four-day-upper-lower-general-fitness-intermediate",
-    }
+CANONICAL_TEMPLATE_SLUGS = (
+    "t01-2-day-full-body-ab",
+    "t02-3-day-upper-lower-full",
+    "t03-3-day-upper-lower-upper",
+    "t04-3-day-lower-upper-lower",
+    "t05-4-day-upper-lower-2x",
+    "t06-4-day-3-upper-1-lower",
+    "t07-4-day-3-lower-1-upper",
+    "t08-4-day-push-pull-quads-posterior",
+    "t09-5-day-ppl-upper-lower",
+    "t10-5-day-classic-body-part",
+    "t11-5-day-ppl-upper-lower-priority",
+    "t12-5-day-chest-specialization",
+    "t13-5-day-back-specialization",
+    "t14-5-day-leg-specialization",
+    "t15-6-day-ppl-2x",
+    "t16-6-day-advanced-body-part",
+    "t17-6-day-balanced-specialization",
 )
 
 
-def _reclassify_goal_template(template: TrainingProgramTemplateSeed) -> TrainingProgramTemplateSeed:
-    if template.fitness_goal is FitnessGoal.BUILD_MUSCLE:
-        return template
-    return replace(template, fitness_goal=FitnessGoal.BUILD_MUSCLE)
-
-
-CATALOG_SLUG_ALIASES: dict[str, tuple[str, ...]] = {
-    "barbell-bench-press": ("fedb-0025-barbell-bench-press",),
-    "barbell-back-squat": ("fedb-1435-barbell-back-squat",),
-    "barbell-straight-leg-deadlift": ("fedb-0116-barbell-straight-leg-deadlift",),
-    "dumbbell-bench-press": ("fedb-0025-barbell-bench-press",),
-    "incline-dumbbell-bench-press": ("fedb-0314-dumbbell-incline-bench-press",),
-    "cable-fly": ("fedb-1269-cable-standing-fly",),
-    "barbell-bent-over-row": ("fedb-0027-barbell-underhand-bent-over-row",),
-    "lat-pulldown": ("fedb-0974-cable-close-grip-lat-pulldown",),
-    "smith-machine-shoulder-press": ("fedb-0765-smith-seated-shoulder-press",),
-    "dumbbell-lateral-raise": ("fedb-0334-dumbbell-lateral-raise",),
-    "dumbbell-curl": ("fedb-0294-dumbbell-biceps-curl",),
-    "hammer-curl": ("fedb-0298-dumbbell-cross-body-hammer-curl",),
-    "cable-triceps-pushdown": ("fedb-1723-cable-triceps-pushdown",),
-    "goblet-squat": ("fedb-1760-dumbbell-goblet-squat",),
-    "leg-press": ("fedb-2611-lever-horizontal-leg-press",),
-    "leg-extension": ("fedb-0585-lever-leg-extension",),
-    "dumbbell-lunge": ("fedb-0336-dumbbell-lunge",),
-    "seated-leg-curl": ("fedb-0599-lever-seated-leg-curl",),
-    "glute-bridge": ("fedb-drv-hip-raise-bridge-glute-bridge",),
-    "standing-calf-raise": ("fedb-0417-dumbbell-standing-calf-raise",),
-}
-
-
-def _slot(
+def _movement(
+    key: str,
     slug: str,
     muscles: tuple[MuscleGroup, ...],
     pattern: MovementPattern,
     *,
-    placeholder_en: str | None = None,
-    placeholder_fa: str | None = None,
-    sets: int = 3,
-    reps: tuple[int, int] = (8, 12),
-    rir: int = 2,
-    rest: int = 90,
-    method: TrainingTemplateMethod = Method.STANDARD,
-    priority: TrainingTemplateSlotPriority = Priority.ACCESSORY,
-    superset_group: str | None = None,
-) -> TemplateSlotSeed:
-    return TemplateSlotSeed(
-        exercise_slug_hint=slug,
-        catalog_slug_hints=(slug, *CATALOG_SLUG_ALIASES.get(slug, ())),
+    first_month_slug: str | None = None,
+    beginner_slug: str | None = None,
+    intermediate_slug: str | None = None,
+    advanced_slug: str | None = None,
+) -> Movement:
+    return Movement(
+        key=key,
+        slugs_by_level={
+            Level.FIRST_MONTH: first_month_slug or slug,
+            Level.BEGINNER: beginner_slug or slug,
+            Level.INTERMEDIATE: intermediate_slug or slug,
+            Level.ADVANCED: advanced_slug or slug,
+        },
         target_muscles=muscles,
         movement_pattern=pattern,
-        placeholder_name_en=placeholder_en,
-        placeholder_name_fa=placeholder_fa,
-        sets=sets,
-        rep_min=reps[0],
-        rep_max=reps[1],
-        target_rir=rir,
-        rest_seconds=rest,
-        intensity_method=method,
-        adaptation_priority=priority,
-        superset_group=superset_group,
     )
 
 
-CHEST = _slot("dumbbell-bench-press", (M.CHEST,), P.HORIZONTAL_PUSH, sets=4)
-BARBELL_BENCH = _slot(
-    "barbell-bench-press",
-    (M.CHEST,),
-    P.HORIZONTAL_PUSH,
-    placeholder_en="Barbell Bench Press",
-    placeholder_fa="پرس سینه هالتر",
-    sets=4,
-    reps=(6, 10),
-    rest=120,
-)
-INCLINE_CHEST = _slot(
-    "incline-dumbbell-bench-press",
-    (M.CHEST,),
-    P.HORIZONTAL_PUSH,
-    placeholder_en="Incline Dumbbell Bench Press",
-    placeholder_fa="پرس سینه بالا سینه دمبل",
-)
-CABLE_FLY = _slot(
-    "cable-fly",
-    (M.CHEST,),
-    P.HORIZONTAL_PUSH,
-    placeholder_en="Cable Fly",
-    placeholder_fa="فلای کابل",
-    reps=(12, 15),
-    rest=60,
-)
-BACK_ROW = _slot("barbell-bent-over-row", (M.BACK,), P.HORIZONTAL_PULL, sets=4)
-LAT_PULLDOWN = _slot(
-    "lat-pulldown",
-    (M.BACK,),
-    P.VERTICAL_PULL,
-    placeholder_en="Lat Pulldown",
-    placeholder_fa="لت پول‌داون",
-)
-CABLE_PULLDOWN = _slot(
-    "cable-pullover",
-    (M.BACK,),
-    P.VERTICAL_PULL,
-    placeholder_en="Cable Pullover",
-    placeholder_fa="پلاور کابل",
-    reps=(12, 15),
-    rest=60,
-)
-SHOULDER_PRESS = _slot("smith-machine-shoulder-press", (M.SHOULDERS,), P.VERTICAL_PUSH)
-LATERAL_RAISE = _slot(
-    "dumbbell-lateral-raise", (M.SHOULDERS,), P.SHOULDER_ABDUCTION, reps=(12, 20), rest=60
-)
-REAR_DELT = _slot("rear-delt-fly", (M.SHOULDERS,), P.HORIZONTAL_PULL, reps=(12, 20), rest=60)
-SHRUG = _slot(
-    "dumbbell-shrug",
-    (M.TRAPS,),
-    P.SHRUG,
-    placeholder_en="Dumbbell Shrug",
-    placeholder_fa="شراگ دمبل",
-    reps=(10, 15),
-)
-BICEPS = _slot("dumbbell-curl", (M.BICEPS,), P.ELBOW_FLEXION, reps=(10, 15), rest=60)
-HAMMER_CURL = _slot("hammer-curl", (M.BICEPS,), P.ELBOW_FLEXION, reps=(10, 15), rest=60)
-TRICEPS = _slot(
-    "overhead-dumbbell-extension", (M.TRICEPS,), P.ELBOW_EXTENSION, reps=(10, 15), rest=60
-)
-PUSH_DOWN = _slot(
-    "cable-triceps-pushdown",
-    (M.TRICEPS,),
-    P.ELBOW_EXTENSION,
-    placeholder_en="Cable Triceps Pushdown",
-    placeholder_fa="پشت بازو سیم‌کش",
-    reps=(10, 15),
-    rest=60,
-)
-SQUAT = _slot("goblet-squat", (M.QUADRICEPS,), P.SQUAT, sets=4)
-BARBELL_BACK_SQUAT = _slot(
-    "barbell-back-squat",
+SQUAT = _movement(
+    "squat",
+    "fedb-1435-barbell-back-squat",
     (M.QUADRICEPS,),
     P.SQUAT,
-    placeholder_en="Barbell Back Squat",
-    placeholder_fa="اسکوات پشت هالتر",
-    sets=4,
-    reps=(6, 10),
-    rest=120,
+    first_month_slug="fedb-0750-smith-chair-squat",
+    beginner_slug="fedb-0750-smith-chair-squat",
+    advanced_slug="fedb-0042-barbell-front-squat",
 )
-LEG_PRESS = _slot("leg-press", (M.QUADRICEPS,), P.SQUAT, sets=4)
-LEG_EXTENSION = _slot("leg-extension", (M.QUADRICEPS,), P.KNEE_EXTENSION, reps=(12, 15), rest=60)
-LUNGE = _slot("dumbbell-lunge", (M.QUADRICEPS, M.GLUTES), P.LUNGE)
-RDL = _slot("romanian-deadlift", (M.HAMSTRINGS, M.GLUTES), P.HIP_HINGE, sets=4)
-BARBELL_STRAIGHT_LEG_DEADLIFT = _slot(
-    "barbell-straight-leg-deadlift",
+FRONT_SQUAT = _movement(
+    "front-squat",
+    "fedb-0042-barbell-front-squat",
+    (M.QUADRICEPS,),
+    P.SQUAT,
+    first_month_slug="fedb-0750-smith-chair-squat",
+    beginner_slug="fedb-0750-smith-chair-squat",
+    intermediate_slug="fedb-1435-barbell-back-squat",
+)
+LEG_PRESS = _movement(
+    "leg-press",
+    "fedb-2611-lever-horizontal-leg-press",
+    (M.QUADRICEPS,),
+    P.SQUAT,
+)
+LEG_EXTENSION = _movement(
+    "leg-extension",
+    "fedb-0585-lever-leg-extension",
+    (M.QUADRICEPS,),
+    P.KNEE_EXTENSION,
+)
+LUNGE = _movement("lunge", "fedb-0336-dumbbell-lunge", (M.QUADRICEPS, M.GLUTES), P.LUNGE)
+RDL = _movement(
+    "romanian-deadlift",
+    "fedb-0300-dumbbell-deadlift",
     (M.HAMSTRINGS, M.GLUTES),
     P.HIP_HINGE,
-    placeholder_en="Barbell Straight Leg Deadlift",
-    placeholder_fa="ددلیفت پا صاف هالتر",
-    sets=3,
-    reps=(8, 10),
-    rest=120,
 )
-LEG_CURL = _slot(
+SEATED_LEG_CURL = _movement(
     "seated-leg-curl",
+    "fedb-0599-lever-seated-leg-curl",
     (M.HAMSTRINGS,),
     P.KNEE_FLEXION,
-    placeholder_en="Seated Leg Curl",
-    placeholder_fa="پشت پا دستگاه نشسته",
-    reps=(10, 15),
 )
-GLUTE_BRIDGE = _slot("glute-bridge", (M.GLUTES,), P.HIP_EXTENSION)
-CALF = _slot("standing-calf-raise", (M.CALVES,), P.CALF_RAISE, reps=(10, 20), rest=60)
-CORE = _slot(
-    "dead-bug",
-    (M.ABS,),
-    P.CORE_ANTI_EXTENSION,
-    placeholder_en="Dead Bug",
-    placeholder_fa="ددباگ",
-    reps=(8, 12),
-    rest=45,
-)
-MACHINE_CHEST = _slot(
-    "machine-chest-press",
-    (M.CHEST,),
-    P.HORIZONTAL_PUSH,
-    placeholder_en="Machine Chest Press",
-    placeholder_fa="پرس سینه دستگاه",
-    sets=3,
-)
-PEC_DECK = _slot(
-    "pec-deck-fly",
-    (M.CHEST,),
-    P.HORIZONTAL_PUSH,
-    placeholder_en="Pec Deck Fly",
-    placeholder_fa="فلای پک‌دک",
-    reps=(12, 15),
-    rest=60,
-)
-CHEST_SUPPORTED_ROW = _slot(
-    "chest-supported-row",
-    (M.BACK,),
-    P.HORIZONTAL_PULL,
-    placeholder_en="Chest-Supported Row",
-    placeholder_fa="قایقی سینه‌تکیه‌گاه",
-)
-SINGLE_ARM_CABLE_ROW = _slot(
-    "single-arm-cable-row",
-    (M.BACK,),
-    P.HORIZONTAL_PULL,
-    placeholder_en="Single-Arm Cable Row",
-    placeholder_fa="قایقی تک‌دست سیم‌کش",
-)
-NEUTRAL_LAT_PULLDOWN = _slot(
-    "neutral-grip-lat-pulldown",
-    (M.BACK,),
-    P.VERTICAL_PULL,
-    placeholder_en="Neutral-Grip Lat Pulldown",
-    placeholder_fa="لت پول‌داون دست خنثی",
-)
-CABLE_LATERAL_RAISE = _slot(
-    "cable-lateral-raise",
-    (M.SHOULDERS,),
-    P.SHOULDER_ABDUCTION,
-    placeholder_en="Cable Lateral Raise",
-    placeholder_fa="نشر جانب سیم‌کش",
-    reps=(12, 20),
-    rest=60,
-)
-FACE_PULL = _slot(
-    "face-pull",
-    (M.SHOULDERS,),
-    P.HORIZONTAL_PULL,
-    placeholder_en="Face Pull",
-    placeholder_fa="فیس پول",
-    reps=(12, 20),
-    rest=60,
-)
-PREACHER_CURL = _slot(
-    "preacher-curl",
-    (M.BICEPS,),
-    P.ELBOW_FLEXION,
-    placeholder_en="Preacher Curl",
-    placeholder_fa="جلو بازو لاری",
-    reps=(10, 15),
-    rest=60,
-)
-CABLE_CURL = _slot(
-    "cable-curl",
-    (M.BICEPS,),
-    P.ELBOW_FLEXION,
-    placeholder_en="Cable Curl",
-    placeholder_fa="جلو بازو سیم‌کش",
-    reps=(12, 15),
-    rest=60,
-)
-SKULL_CRUSHER = _slot(
-    "skull-crusher",
-    (M.TRICEPS,),
-    P.ELBOW_EXTENSION,
-    placeholder_en="Skull Crusher",
-    placeholder_fa="پشت بازو خوابیده",
-    reps=(10, 15),
-    rest=60,
-)
-ROPE_OVERHEAD_EXTENSION = _slot(
-    "rope-overhead-extension",
-    (M.TRICEPS,),
-    P.ELBOW_EXTENSION,
-    placeholder_en="Rope Overhead Extension",
-    placeholder_fa="پشت بازو بالای سر طناب",
-    reps=(12, 15),
-    rest=60,
-)
-HACK_SQUAT = _slot(
-    "hack-squat",
-    (M.QUADRICEPS,),
-    P.SQUAT,
-    placeholder_en="Hack Squat",
-    placeholder_fa="هک اسکوات",
-    sets=4,
-)
-BULGARIAN_SPLIT_SQUAT = _slot(
-    "bulgarian-split-squat",
-    (M.QUADRICEPS, M.GLUTES),
-    P.LUNGE,
-    placeholder_en="Bulgarian Split Squat",
-    placeholder_fa="اسپلیت اسکوات بلغاری",
-)
-LYING_LEG_CURL = _slot(
+LYING_LEG_CURL = _movement(
     "lying-leg-curl",
+    "fedb-0586-lever-lying-leg-curl",
     (M.HAMSTRINGS,),
     P.KNEE_FLEXION,
-    placeholder_en="Lying Leg Curl",
-    placeholder_fa="پشت پا خوابیده",
-    reps=(10, 15),
 )
-HIP_THRUST = _slot(
-    "barbell-hip-thrust",
+GLUTE_BRIDGE = _movement(
+    "glute-bridge",
+    "fedb-0668-rear-decline-bridge",
     (M.GLUTES,),
     P.HIP_EXTENSION,
-    placeholder_en="Barbell Hip Thrust",
-    placeholder_fa="هیپ تراست هالتر",
-    sets=4,
 )
-BARBELL_SHRUG = _slot(
-    "barbell-shrug",
-    (M.TRAPS,),
-    P.SHRUG,
-    placeholder_en="Barbell Shrug",
-    placeholder_fa="شراگ هالتر",
-    reps=(10, 15),
-)
-SEATED_CALF_RAISE = _slot(
-    "seated-calf-raise",
+CALF_RAISE = _movement(
+    "calf-raise",
+    "fedb-0605-lever-standing-calf-raise",
     (M.CALVES,),
     P.CALF_RAISE,
-    placeholder_en="Seated Calf Raise",
-    placeholder_fa="ساق نشسته",
-    reps=(10, 20),
-    rest=60,
-)
-SIDE_PLANK = _slot(
-    "side-plank",
-    (M.ABS,),
-    P.CORE_ANTI_LATERAL_FLEXION,
-    placeholder_en="Side Plank",
-    placeholder_fa="پلانک بغل",
-    reps=(8, 12),
-    rest=45,
-)
-PALLOF_PRESS = _slot(
-    "pallof-press",
-    (M.ABS,),
-    P.CORE_ANTI_ROTATION,
-    placeholder_en="Pallof Press",
-    placeholder_fa="پالوف پرس",
-    reps=(10, 15),
-    rest=45,
 )
 
-_SPECIALIZED_LARGE_TARGETS: tuple[tuple[str, tuple[MuscleGroup, ...]], ...] = (
-    ("Chest", (M.CHEST,)),
-    ("Back", (M.BACK,)),
-    ("Shoulder", (M.SHOULDERS,)),
-    ("Delts", (M.SHOULDERS,)),
-    ("Quadriceps", (M.QUADRICEPS,)),
-    ("Hamstrings", (M.HAMSTRINGS,)),
-    ("Glutes", (M.GLUTES,)),
-    ("Legs", (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES)),
+FLAT_PRESS = _movement(
+    "flat-chest-press",
+    "fedb-0025-barbell-bench-press",
+    (M.CHEST,),
+    P.HORIZONTAL_PUSH,
+    first_month_slug="fedb-0577-lever-lying-chest-press",
+    beginner_slug="fedb-0577-lever-lying-chest-press",
 )
-_SPECIALIZED_SMALL_TARGETS: tuple[tuple[str, tuple[MuscleGroup, ...]], ...] = (
-    ("Arms", (M.BICEPS, M.TRICEPS)),
-    ("Biceps", (M.BICEPS,)),
-    ("Triceps", (M.TRICEPS,)),
-    ("Traps", (M.TRAPS,)),
-    ("Calves", (M.CALVES,)),
-    ("Core", (M.ABS,)),
+INCLINE_PRESS = _movement(
+    "incline-chest-press",
+    "fedb-0314-dumbbell-incline-bench-press",
+    (M.CHEST,),
+    P.HORIZONTAL_PUSH,
+    first_month_slug="fedb-1299-lever-incline-hammer-chest-press",
+    beginner_slug="fedb-1299-lever-incline-hammer-chest-press",
 )
-_MOVEMENT_FLOOR_SLOTS: dict[tuple[MuscleGroup, ...], tuple[TemplateSlotSeed, ...]] = {
-    (M.CHEST,): (CHEST, INCLINE_CHEST, MACHINE_CHEST, CABLE_FLY, PEC_DECK),
-    (M.BACK,): (BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN, CHEST_SUPPORTED_ROW, SINGLE_ARM_CABLE_ROW),
-    (M.SHOULDERS,): (SHOULDER_PRESS, LATERAL_RAISE, REAR_DELT, CABLE_LATERAL_RAISE, FACE_PULL),
-    (M.QUADRICEPS,): (SQUAT, LEG_PRESS, LEG_EXTENSION, HACK_SQUAT, BULGARIAN_SPLIT_SQUAT),
-    (M.HAMSTRINGS,): (RDL, LEG_CURL, LYING_LEG_CURL),
-    (M.GLUTES,): (GLUTE_BRIDGE, HIP_THRUST, LUNGE, BULGARIAN_SPLIT_SQUAT),
-    (M.BICEPS,): (BICEPS, HAMMER_CURL, PREACHER_CURL, CABLE_CURL),
-    (M.TRICEPS,): (TRICEPS, PUSH_DOWN, SKULL_CRUSHER, ROPE_OVERHEAD_EXTENSION),
-    (M.TRAPS,): (SHRUG, BARBELL_SHRUG),
-    (M.CALVES,): (CALF, SEATED_CALF_RAISE),
-    (M.ABS,): (CORE, SIDE_PLANK, PALLOF_PRESS),
-}
+CHEST_FLY = _movement(
+    "chest-fly",
+    "fedb-1269-cable-standing-fly",
+    (M.CHEST,),
+    P.HORIZONTAL_PUSH,
+)
+ROW = _movement(
+    "row",
+    "owner-e0c26a271aac-barbell-bent-over-row",
+    (M.BACK,),
+    P.HORIZONTAL_PULL,
+    first_month_slug="fedb-0581-lever-high-row",
+    beginner_slug="fedb-0581-lever-high-row",
+)
+SEATED_CABLE_ROW = _movement(
+    "seated-cable-row",
+    "owner-2a5de4dc7ba3-seated-cable-row",
+    (M.BACK,),
+    P.HORIZONTAL_PULL,
+)
+LAT_PULLDOWN = _movement(
+    "lat-pulldown",
+    "fedb-0974-cable-close-grip-lat-pulldown",
+    (M.BACK,),
+    P.VERTICAL_PULL,
+)
+STRAIGHT_ARM_PULLDOWN = _movement(
+    "straight-arm-pulldown",
+    "fedb-0238-cable-straight-arm-pulldown",
+    (M.BACK,),
+    P.VERTICAL_PULL,
+)
+
+SHOULDER_PRESS = _movement(
+    "shoulder-press",
+    "fedb-0553-military-press",
+    (M.SHOULDERS,),
+    P.VERTICAL_PUSH,
+    first_month_slug="fedb-0765-smith-seated-shoulder-press",
+    beginner_slug="fedb-0765-smith-seated-shoulder-press",
+    intermediate_slug="fedb-0289-seated-dumbbell-shoulder-press",
+)
+LATERAL_RAISE = _movement(
+    "lateral-raise",
+    "fedb-0178-cable-lateral-raise",
+    (M.SHOULDERS,),
+    P.SHOULDER_ABDUCTION,
+    first_month_slug="fedb-0584-lever-lateral-raise",
+    beginner_slug="fedb-0584-lever-lateral-raise",
+)
+REAR_DELT_FLY = _movement(
+    "rear-delt-fly",
+    "fedb-0602-lever-seated-reverse-fly",
+    (M.SHOULDERS,),
+    P.HORIZONTAL_PULL,
+)
+
+PREACHER_CURL = _movement(
+    "preacher-curl",
+    "fedb-0592-lever-preacher-curl",
+    (M.BICEPS,),
+    P.ELBOW_FLEXION,
+)
+DUMBBELL_CURL = _movement(
+    "dumbbell-curl",
+    "fedb-0285-seated-alternating-dumbbell-curl",
+    (M.BICEPS,),
+    P.ELBOW_FLEXION,
+)
+HAMMER_CURL = _movement(
+    "hammer-curl",
+    "fedb-0298-dumbbell-cross-body-hammer-curl",
+    (M.BICEPS,),
+    P.ELBOW_FLEXION,
+)
+BARBELL_CURL = _movement("barbell-curl", "fedb-0031-barbell-curl", (M.BICEPS,), P.ELBOW_FLEXION)
+TRICEPS_PUSHDOWN = _movement(
+    "triceps-pushdown",
+    "fedb-1723-cable-triceps-pushdown",
+    (M.TRICEPS,),
+    P.ELBOW_EXTENSION,
+)
+ROPE_TRICEPS_PUSHDOWN = _movement(
+    "rope-triceps-pushdown",
+    "fedb-0200-cable-rope-triceps-pushdown",
+    (M.TRICEPS,),
+    P.ELBOW_EXTENSION,
+)
+OVERHEAD_TRICEPS_EXTENSION = _movement(
+    "overhead-triceps-extension",
+    "fedb-0194-cable-rope-overhead-triceps-extension",
+    (M.TRICEPS,),
+    P.ELBOW_EXTENSION,
+)
+SHRUG = _movement("barbell-shrug", "fedb-0095-barbell-shrug", (M.TRAPS,), P.SHRUG)
+CRUNCH = _movement("crunch", "fedb-1452-lever-seated-crunch", (M.ABS,), P.SPINAL_FLEXION)
+FRONT_PLANK = _movement("front-plank", "fedb-0464-front-plank", (M.ABS,), P.CORE_ANTI_EXTENSION)
+SIDE_PLANK = _movement(
+    "side-plank", "fedb-0705-side-plank", (M.OBLIQUES,), P.CORE_ANTI_LATERAL_FLEXION
+)
 
 
-def _specialized_template_movement_floors(
-    template: TrainingProgramTemplateSeed,
-) -> TrainingProgramTemplateSeed:
-    if template.days_per_week < 4 or Tag.BODY_PART_ROTATION not in template.focus_tags:
-        return template
-    return replace(
-        template,
-        days=tuple(_specialized_day_movement_floors(day) for day in template.days),
-    )
-
-
-def _specialized_day_movement_floors(day: TemplateDaySeed) -> TemplateDaySeed:
-    minimums: dict[tuple[MuscleGroup, ...], int] = {}
-    for label, muscles in _SPECIALIZED_LARGE_TARGETS:
-        if label in day.title_en:
-            minimums[muscles] = max(minimums.get(muscles, 0), 3)
-    for label, muscles in _SPECIALIZED_SMALL_TARGETS:
-        if label not in day.title_en:
-            continue
-        if label == "Arms":
-            for muscle in muscles:
-                minimums[(muscle,)] = 2
-        else:
-            minimums[muscles] = max(minimums.get(muscles, 0), 2)
-
-    slots = list(day.slots)
-    for muscles, minimum in minimums.items():
-        existing = sum(bool(set(slot.target_muscles).intersection(muscles)) for slot in slots)
-        for candidate in _MOVEMENT_FLOOR_SLOTS.get(muscles, ()):
-            if existing >= minimum:
-                break
-            if any(slot.exercise_slug_hint == candidate.exercise_slug_hint for slot in slots):
-                continue
-            slots.append(candidate)
-            existing += 1
-    return replace(day, slots=tuple(slots))
-
-
-def _fit_template_session_exercise_count(
-    template: TrainingProgramTemplateSeed,
-) -> TrainingProgramTemplateSeed:
-    return replace(
-        template,
-        days=tuple(_fit_template_day_exercise_count(day) for day in template.days),
-    )
-
-
-def _fit_template_day_exercise_count(day: TemplateDaySeed) -> TemplateDaySeed:
-    slots = list(day.slots)
-    minimums = _direct_movement_minimums(day)
-    while len(slots) > MAXIMUM_EXERCISES_PER_SESSION:
-        removable = next(
-            (
-                index
-                for index in range(len(slots) - 1, -1, -1)
-                if _can_remove_slot(slots, index, minimums)
-            ),
-            None,
+def _prescription(level: ExperienceLevel, role: str) -> tuple[int, int, int, int, int]:
+    if role == "isolation":
+        return (
+            2 if level is not Level.INTERMEDIATE and level is not Level.ADVANCED else 3,
+            10,
+            15,
+            3 if level is Level.FIRST_MONTH else (2 if level is Level.BEGINNER else 1),
+            60,
         )
-        if removable is None:
-            raise ValueError(f"Template session cannot fit exercise limit: {day.title_en}")
-        slots.pop(removable)
-
-    candidates = tuple(
-        candidate
-        for muscle in day.direct_target_muscles
-        for candidate in _MOVEMENT_FLOOR_SLOTS.get((muscle,), ())
-    )
-    while len(slots) < MINIMUM_EXERCISES_PER_SESSION:
-        candidate = next(
-            (
-                item
-                for item in candidates
-                if all(slot.exercise_slug_hint != item.exercise_slug_hint for slot in slots)
-            ),
-            None,
+    if role == "core":
+        return (
+            2,
+            8,
+            15,
+            3 if level is Level.FIRST_MONTH else (2 if level is Level.BEGINNER else 1),
+            45,
         )
-        if candidate is None:
-            raise ValueError(f"Template session lacks eligible exercise variety: {day.title_en}")
-        slots.append(candidate)
-    return replace(day, slots=tuple(slots))
+    if level is Level.FIRST_MONTH:
+        return (2, 8, 12, 3, 90)
+    if level is Level.BEGINNER:
+        return (3, 8, 12, 2, 90)
+    if role == "primary":
+        return (4, 6, 10, 2 if level is Level.INTERMEDIATE else 1, 120)
+    return (3, 8, 12, 2 if level is Level.INTERMEDIATE else 1, 90)
 
 
-_OPTIONAL_SLOT_PATTERNS = frozenset(
-    {
-        P.CALF_RAISE,
-        P.ELBOW_EXTENSION,
-        P.ELBOW_FLEXION,
-        P.KNEE_EXTENSION,
-        P.KNEE_FLEXION,
-        P.SHOULDER_ABDUCTION,
-        P.SHRUG,
-    }
-)
-_STRUCTURAL_COMPOUND_PATTERNS = frozenset(
-    {
-        P.HIP_EXTENSION,
-        P.HIP_HINGE,
-        P.HORIZONTAL_PULL,
-        P.HORIZONTAL_PUSH,
-        P.LUNGE,
-        P.SQUAT,
-        P.VERTICAL_PULL,
-        P.VERTICAL_PUSH,
-    }
-)
-_UPPER_STRUCTURE_MUSCLES = frozenset({M.CHEST, M.BACK, M.SHOULDERS})
-_LOWER_STRUCTURE_MUSCLES = frozenset({M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES})
-
-
-def _assign_structural_slot_priorities(
-    template: TrainingProgramTemplateSeed,
-) -> TrainingProgramTemplateSeed:
-    return replace(
-        template,
-        days=tuple(
-            _assign_day_slot_priorities(
-                day,
-                compound_focus=Tag.COMPOUND_FOCUS in template.focus_tags,
-            )
-            for day in template.days
-        ),
+def _slot(movement: Movement, level: ExperienceLevel, role: str) -> TemplateSlotSeed:
+    sets, rep_min, rep_max, rir, rest = _prescription(level, role)
+    slug = movement.slugs_by_level[level]
+    return TemplateSlotSeed(
+        exercise_slug_hint=slug,
+        catalog_slug_hints=(slug,),
+        target_muscles=movement.target_muscles,
+        movement_pattern=movement.movement_pattern,
+        sets=sets,
+        rep_min=rep_min,
+        rep_max=rep_max,
+        target_rir=rir,
+        rest_seconds=rest,
+        intensity_method=Method.STANDARD,
+        adaptation_priority=Priority.CORE if role == "primary" else Priority.ACCESSORY,
     )
 
 
-def _assign_day_slot_priorities(
-    day: TemplateDaySeed,
-    *,
-    compound_focus: bool,
+def _primary(movement: Movement) -> tuple[Movement, str]:
+    return movement, "primary"
+
+
+def _secondary(movement: Movement) -> tuple[Movement, str]:
+    return movement, "secondary"
+
+
+def _isolation(movement: Movement) -> tuple[Movement, str]:
+    return movement, "isolation"
+
+
+def _core(movement: Movement) -> tuple[Movement, str]:
+    return movement, "core"
+
+
+def _day(
+    title_en: str,
+    title_fa: str,
+    structure_focus: str,
+    direct_target_muscles: tuple[MuscleGroup, ...],
+    *slot_specs: tuple[Movement, str],
 ) -> TemplateDaySeed:
-    core_indexes: set[int] = set()
-    direct_targets = frozenset(day.direct_target_muscles)
-    has_upper = bool(direct_targets & _UPPER_STRUCTURE_MUSCLES)
-    has_lower = bool(direct_targets & _LOWER_STRUCTURE_MUSCLES)
-    if has_upper and has_lower:
-        upper_index = _first_structural_slot(
-            day,
-            frozenset({P.HORIZONTAL_PUSH, P.VERTICAL_PUSH}),
-        )
-        if upper_index is None:
-            upper_index = _first_structural_slot(
-                day, frozenset({P.HORIZONTAL_PULL, P.VERTICAL_PULL})
+    return TemplateDaySeed(
+        title_en=title_en,
+        title_fa=title_fa,
+        structure_focus=structure_focus,
+        direct_target_muscles=direct_target_muscles,
+        slots=tuple(
+            TemplateSlotSeed(
+                exercise_slug_hint=movement.key,
+                catalog_slug_hints=(movement.key,),
+                target_muscles=movement.target_muscles,
+                movement_pattern=movement.movement_pattern,
             )
-        lower_index = _first_structural_slot(day, frozenset({P.SQUAT, P.LUNGE}))
-        if lower_index is None:
-            lower_index = _first_structural_slot(day, frozenset({P.HIP_HINGE, P.HIP_EXTENSION}))
-        core_indexes.update(index for index in (upper_index, lower_index) if index is not None)
-    elif has_upper:
-        core_indexes.update(
-            index
-            for index in (
-                _first_structural_slot(day, frozenset({P.HORIZONTAL_PUSH, P.VERTICAL_PUSH})),
-                _first_structural_slot(day, frozenset({P.HORIZONTAL_PULL, P.VERTICAL_PULL})),
-            )
-            if index is not None
-        )
-    elif has_lower:
-        core_indexes.update(
-            index
-            for index in (
-                _first_structural_slot(day, frozenset({P.SQUAT, P.LUNGE})),
-                _first_structural_slot(day, frozenset({P.HIP_HINGE, P.HIP_EXTENSION})),
-            )
-            if index is not None
-        )
-    if compound_focus:
-        compound_indexes = (
-            index
-            for index, slot in enumerate(day.slots)
-            if slot.movement_pattern in _STRUCTURAL_COMPOUND_PATTERNS
-            and slot.superset_group is None
-            and slot.intensity_method is Method.STANDARD
-        )
-        for index in compound_indexes:
-            core_indexes.add(index)
-            if (
-                sum(
-                    day.slots[core_index].movement_pattern in _STRUCTURAL_COMPOUND_PATTERNS
-                    for core_index in core_indexes
-                )
-                >= 2
-            ):
-                break
-    if not core_indexes and day.slots:
-        core_indexes.add(0)
-
-    slots = tuple(
-        replace(
-            slot,
-            adaptation_priority=(
-                Priority.CORE
-                if index in core_indexes
-                else Priority.ACCESSORY
-                if slot.superset_group is not None
-                else Priority.OPTIONAL
-                if slot.movement_pattern in _OPTIONAL_SLOT_PATTERNS
-                else Priority.ACCESSORY
-            ),
-        )
-        for index, slot in enumerate(day.slots)
-    )
-    return replace(day, slots=slots)
-
-
-def _first_structural_slot(
-    day: TemplateDaySeed,
-    patterns: frozenset[MovementPattern],
-) -> int | None:
-    return next(
-        (
-            index
-            for index, slot in enumerate(day.slots)
-            if slot.movement_pattern in patterns
-            and slot.superset_group is None
-            and slot.intensity_method is Method.STANDARD
+            for movement, _ in slot_specs
         ),
-        None,
     )
 
 
-def _direct_movement_minimums(day: TemplateDaySeed) -> dict[tuple[MuscleGroup, ...], int]:
-    minimums: dict[tuple[MuscleGroup, ...], int] = {}
-    for label, muscles in _SPECIALIZED_LARGE_TARGETS:
-        if label in day.title_en:
-            minimums[muscles] = 3
-    for label, muscles in _SPECIALIZED_SMALL_TARGETS:
-        if label in day.title_en:
-            if label == "Arms":
-                for muscle in muscles:
-                    minimums[(muscle,)] = 2
-            else:
-                minimums[muscles] = 2
-    return minimums
-
-
-def _can_remove_slot(
-    slots: list[TemplateSlotSeed],
-    index: int,
-    minimums: dict[tuple[MuscleGroup, ...], int],
-) -> bool:
-    remaining = slots[:index] + slots[index + 1 :]
-    return all(
-        sum(bool(set(slot.target_muscles).intersection(muscles)) for slot in remaining) >= minimum
-        for muscles, minimum in minimums.items()
+def _render_day(
+    day: TemplateDaySeed, level: ExperienceLevel, specs: tuple[tuple[Movement, str], ...]
+) -> TemplateDaySeed:
+    return TemplateDaySeed(
+        title_en=day.title_en,
+        title_fa=day.title_fa,
+        structure_focus=day.structure_focus,
+        direct_target_muscles=day.direct_target_muscles,
+        slots=tuple(_slot(movement, level, role) for movement, role in specs),
     )
 
 
-_MAIN_MOVEMENT_PATTERNS = frozenset(
-    {
-        P.SQUAT,
-        P.HIP_HINGE,
-        P.LUNGE,
-        P.HORIZONTAL_PUSH,
-        P.HORIZONTAL_PULL,
-        P.VERTICAL_PUSH,
-        P.VERTICAL_PULL,
-        P.HIP_EXTENSION,
-    }
-)
-_ISOLATION_SLOT_SLUGS = frozenset(
-    {
-        "cable-fly",
-        "pec-deck-fly",
-        "cable-pullover",
-        "rear-delt-fly",
-        "face-pull",
-    }
-)
-_DEFAULT_MOVEMENT_ORDER = {
-    P.SQUAT: 0,
-    P.HIP_HINGE: 1,
-    P.LUNGE: 2,
-    P.HORIZONTAL_PUSH: 3,
-    P.HORIZONTAL_PULL: 4,
-    P.VERTICAL_PULL: 5,
-    P.VERTICAL_PUSH: 6,
-    P.HIP_EXTENSION: 7,
-}
-_ISOLATION_MOVEMENT_ORDER = {
-    P.KNEE_EXTENSION: 0,
-    P.KNEE_FLEXION: 1,
-    P.SHOULDER_ABDUCTION: 2,
-    P.ELBOW_FLEXION: 3,
-    P.ELBOW_EXTENSION: 4,
-    P.SHRUG: 5,
-    P.CALF_RAISE: 6,
-    P.CORE_ANTI_EXTENSION: 7,
-    P.CORE_ANTI_ROTATION: 8,
-    P.CORE_ANTI_LATERAL_FLEXION: 9,
-}
-
-
-def _evidence_informed_template_order(
-    template: TrainingProgramTemplateSeed,
-) -> TrainingProgramTemplateSeed:
-    return replace(
-        template,
-        days=tuple(_evidence_informed_day_order(day) for day in template.days),
-    )
-
-
-def _evidence_informed_day_order(day: TemplateDaySeed) -> TemplateDaySeed:
-    focus_order = _day_focus_order(day.title_en)
-    ordered_slots = tuple(
-        slot
-        for _, slot in sorted(
-            enumerate(day.slots),
-            key=lambda item: _slot_ordering_key(item[1], focus_order, item[0]),
-        )
-    )
-    return replace(day, slots=ordered_slots)
-
-
-def _slot_ordering_key(
-    slot: TemplateSlotSeed,
-    focus_order: dict[MovementPattern, int],
-    original_index: int,
-) -> tuple[int, int, int, int]:
-    method_phase = 0 if slot.intensity_method is Method.STANDARD else 1
-    movement_phase = (
-        0
-        if slot.movement_pattern in _MAIN_MOVEMENT_PATTERNS
-        and slot.exercise_slug_hint not in _ISOLATION_SLOT_SLUGS
-        else 1
-    )
-    fallback_order = (
-        _DEFAULT_MOVEMENT_ORDER.get(slot.movement_pattern, 99)
-        if movement_phase == 0
-        else _ISOLATION_MOVEMENT_ORDER.get(slot.movement_pattern, 99)
-    )
+def _day_definition(
+    title_en: str,
+    title_fa: str,
+    structure_focus: str,
+    direct_target_muscles: tuple[MuscleGroup, ...],
+    *slot_specs: tuple[Movement, str],
+) -> tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]]:
     return (
-        method_phase,
-        movement_phase,
-        focus_order.get(slot.movement_pattern, fallback_order),
-        original_index,
+        _day(title_en, title_fa, structure_focus, direct_target_muscles, *slot_specs),
+        slot_specs,
     )
 
 
-def _day_focus_order(title_en: str) -> dict[MovementPattern, int]:
-    if "Width" in title_en:
-        return {P.VERTICAL_PULL: 0, P.HORIZONTAL_PULL: 1}
-    if "Thickness" in title_en:
-        return {P.HORIZONTAL_PULL: 0, P.VERTICAL_PULL: 1}
-    if "Chest" in title_en:
-        return {P.HORIZONTAL_PUSH: 0}
-    if "Back" in title_en:
-        return {P.HORIZONTAL_PULL: 0, P.VERTICAL_PULL: 1}
-    if "Quadriceps" in title_en or "Quads" in title_en:
-        return {P.SQUAT: 0, P.LUNGE: 1, P.KNEE_EXTENSION: 2}
-    if "Hamstrings" in title_en:
-        return {P.HIP_HINGE: 0, P.KNEE_FLEXION: 1, P.HIP_EXTENSION: 2}
-    if "Shoulders" in title_en or "Delts" in title_en:
-        return {P.VERTICAL_PUSH: 0, P.SHOULDER_ABDUCTION: 1}
-    return _DEFAULT_MOVEMENT_ORDER
-
-
-def _programming_rationale(
-    template: TrainingProgramTemplateSeed,
+def _rationale(
+    definition: CanonicalTemplateDefinition,
+    level: ExperienceLevel,
 ) -> tuple[TemplateProgrammingRationaleSeed, ...]:
-    focus_en, focus_fa = _priority_focus(template.focus_tags)
-    split_en, split_fa = _split_focus(template.focus_tags, template.days_per_week)
-    volume_en, volume_fa = _volume_guidance(template.training_level)
-    intensity_en, intensity_fa = _intensity_guidance(template.intensity_methods)
+    if level is Level.FIRST_MONTH:
+        volume_en = "Use 2 working sets, 8–12 repetitions for compounds and 10–15 for isolation, with RIR 3."
+        volume_fa = "برای حرکات ترکیبی ۲ ست ۸ تا ۱۲ تکرار و برای حرکات تک‌مفصلی ۱۰ تا ۱۵ تکرار با RIR ۳ اجرا کن."
+    elif level is Level.BEGINNER:
+        volume_en = "Use 3 sets for compound work and 2 sets for isolation, with 8–12 or 10–15 controlled repetitions and RIR 2."
+        volume_fa = (
+            "کار ترکیبی را با ۳ ست و کار تک‌مفصلی را با ۲ ست، با تکرار کنترل‌شده و RIR ۲ انجام بده."
+        )
+    elif level is Level.INTERMEDIATE:
+        volume_en = "Primary compounds use 4 sets of 6–10, secondary compounds 3 sets of 8–12, and isolation 3 sets of 10–15 at RIR 1–2."
+        volume_fa = "حرکت اصلی ترکیبی ۴ ست ۶ تا ۱۰، حرکت ترکیبی دوم ۳ ست ۸ تا ۱۲ و تک‌مفصلی ۳ ست ۱۰ تا ۱۵ با RIR ۱ تا ۲ دارد."
+    else:
+        volume_en = "Primary compounds use 4 sets of 6–10, secondary compounds 3 sets of 8–12, and isolation 3 sets of 10–15 at RIR 1."
+        volume_fa = "حرکت اصلی ترکیبی ۴ ست ۶ تا ۱۰، حرکت ترکیبی دوم ۳ ست ۸ تا ۱۲ و تک‌مفصلی ۳ ست ۱۰ تا ۱۵ با RIR ۱ دارد."
     return (
+        TemplateProgrammingRationaleSeed(
+            "Structure",
+            "ساختار",
+            definition.guidance_en,
+            definition.guidance_fa,
+        ),
         TemplateProgrammingRationaleSeed(
             "Exercise order",
             "ترتیب حرکات",
-            (
-                f"{focus_en} is placed before lower-priority work; "
-                "main multi-joint movements lead each session."
-            ),
-            (
-                f"{focus_fa} پیش از کار کم‌اولویت قرار می‌گیرد و هر جلسه با "
-                "حرکت‌های اصلی چندمفصلی شروع می‌شود."
-            ),
-        ),
-        TemplateProgrammingRationaleSeed(
-            "Main movements",
-            "حرکت‌های اصلی",
-            (
-                "The first movements use stable, repeatable loading; "
-                "complementary angles follow before isolation work."
-            ),
-            (
-                "حرکت‌های اول با بارگذاری پایدار و قابل‌پیگیری انتخاب شده‌اند؛ "
-                "زاویه‌های مکمل بعد از آن و حرکات تک‌مفصلی در ادامه می‌آیند."
-            ),
+            definition.order_en,
+            definition.order_fa,
         ),
         TemplateProgrammingRationaleSeed(
             "Working sets and reps",
@@ -879,3732 +479,1283 @@ def _programming_rationale(
             volume_fa,
         ),
         TemplateProgrammingRationaleSeed(
-            "Program focus",
-            "تمرکز برنامه",
-            split_en,
-            split_fa,
+            "Progression",
+            "پیشرفت",
+            "Progress through the top of the rep range before adding load; keep technique stable across all working sets.",
+            "ابتدا تا سقف دامنه تکرار پیش برو و سپس وزنه را اضافه کن؛ فرم را در تمام ست‌های کاری ثابت نگه دار.",
         ),
         TemplateProgrammingRationaleSeed(
-            "Fatigue and progression",
-            "مدیریت خستگی و پیشرفت",
-            intensity_en,
-            intensity_fa,
+            "Recovery and safety",
+            "ریکاوری و ایمنی",
+            definition.recovery_en,
+            definition.recovery_fa,
         ),
     )
 
 
-def _priority_focus(tags: tuple[TemplateFocusTag, ...]) -> tuple[str, str]:
-    priorities = {
-        Tag.CHEST_PRIORITY: ("Chest priority", "اولویت سینه"),
-        Tag.BACK_PRIORITY: ("Back priority", "اولویت زیربغل"),
-        Tag.SHOULDERS_PRIORITY: ("Shoulder priority", "اولویت سرشانه"),
-        Tag.QUAD_PRIORITY: ("Quadriceps priority", "اولویت چهارسر"),
-        Tag.LOWER_PRIORITY: ("Lower-body priority", "اولویت پا"),
-        Tag.ARMS_PRIORITY: ("Arm priority", "اولویت بازو"),
-        Tag.HAMSTRINGS_PRIORITY: ("Hamstrings priority", "اولویت همسترینگ"),
-        Tag.GLUTE_PRIORITY: ("Glute priority", "اولویت باسن"),
-        Tag.UPPER_PRIORITY: ("Upper-body priority", "اولویت بالاتنه"),
-    }
-    return next(
-        (priorities[tag] for tag in tags if tag in priorities),
-        ("The session target", "عضلهٔ هدف جلسه"),
-    )
-
-
-def _split_focus(tags: tuple[TemplateFocusTag, ...], days_per_week: int) -> tuple[str, str]:
-    if Tag.FULL_BODY in tags:
-        return (
-            (
-                f"Full-body exposure is distributed across {days_per_week} days "
-                "so practice and volume stay manageable."
-            ),
-            f"فشار تمام‌بدن در {days_per_week} روز پخش شده تا تمرین و حجم قابل‌مدیریت بماند.",
-        )
-    if Tag.PUSH_PULL_LEGS in tags:
-        return (
-            (
-                "Push, pull, and lower-body work are separated to limit overlap "
-                "and preserve performance."
-            ),
-            "پوش، پول و پا جدا شده‌اند تا هم‌پوشانی خستگی کم و کیفیت ست‌ها حفظ شود.",
-        )
-    if Tag.BODY_PART_ROTATION in tags:
-        return (
-            (
-                "Direct target-muscle days concentrate useful work while leaving "
-                "recovery before the next exposure."
-            ),
-            "روزهای عضلهٔ هدف، ست‌های مفید را متمرکز می‌کنند و تا نوبت بعدی فرصت ریکاوری می‌دهند.",
-        )
-    return (
-        "The weekly split balances direct target work with recovery between related sessions.",
-        "تقسیم هفتگی بین کار مستقیم عضلهٔ هدف و ریکاوری جلسات مرتبط تعادل ایجاد می‌کند.",
-    )
-
-
-def _volume_guidance(level: ExperienceLevel) -> tuple[str, str]:
-    if level is Level.BEGINNER:
-        return (
-            (
-                "Main movements use 3–4 quality working sets and controlled repetitions, "
-                "leaving room to learn technique and recover."
-            ),
-            (
-                "حرکت‌های اصلی ۳ تا ۴ ست کاری با تکرار کنترل‌شده دارند تا برای "
-                "یادگیری فرم و ریکاوری فضا بماند."
-            ),
-        )
-    if level is Level.INTERMEDIATE:
-        return (
-            (
-                "Main lifts use 3–4 working sets; isolation work uses moderate repetitions "
-                "to add volume without unnecessary joint stress."
-            ),
-            (
-                "حرکت‌های اصلی ۳ تا ۴ ست کاری دارند و حرکات تک‌مفصلی با تکرار متوسط "
-                "حجم می‌سازند، بدون فشار اضافه به مفصل‌ها."
-            ),
-        )
-    return (
-        (
-            "Main lifts retain 3–4 high-quality working sets; higher-repetition isolation "
-            "work adds targeted volume after the main work."
-        ),
-        (
-            "حرکت‌های اصلی ۳ تا ۴ ست باکیفیت دارند و تکرار بالاتر در حرکات تک‌مفصلی "
-            "پس از کار اصلی، حجم هدفمند اضافه می‌کند."
-        ),
-    )
-
-
-def _intensity_guidance(
-    methods: tuple[TrainingTemplateMethod, ...],
-) -> tuple[str, str]:
-    if Method.DROP_SET in methods or Method.SUPERSET in methods:
-        return (
-            (
-                "Supersets and drop sets are reserved for the end of a session, "
-                "after primary performance work is complete."
-            ),
-            "سوپرست و دراپ‌ست فقط پس از پایان کار اصلی و در انتهای جلسه قرار گرفته‌اند.",
-        )
-    return (
-        (
-            "Progress by adding repetitions or load with good form; accessory work stays "
-            "after the demanding movements to manage fatigue."
-        ),
-        (
-            "با حفظ فرم، تکرار یا وزنه را تدریجی بالا ببر؛ حرکات کمکی پس از حرکات پرفشار "
-            "قرار دارند تا خستگی مدیریت شود."
-        ),
-    )
-
-
-def _day(
-    title_en: str,
-    title_fa: str,
-    structure_focus: str,
-    muscles: tuple[MuscleGroup, ...],
-    *slots: TemplateSlotSeed,
-) -> TemplateDaySeed:
-    return TemplateDaySeed(title_en, title_fa, structure_focus, muscles, slots)
-
-
-def _template(
-    slug: str,
+def _definition(
+    canonical_slug: str,
     name_en: str,
     name_fa: str,
     description_en: str,
     description_fa: str,
-    days_per_week: int,
-    level: ExperienceLevel,
-    tags: tuple[TemplateFocusTag, ...],
-    methods: tuple[TrainingTemplateMethod, ...],
-    *days: TemplateDaySeed,
-    fitness_goal: FitnessGoal = FitnessGoal.BUILD_MUSCLE,
-    is_active: bool = True,
-) -> TrainingProgramTemplateSeed:
-    template = TrainingProgramTemplateSeed(
-        slug=slug,
+    eligible_levels: tuple[ExperienceLevel, ...],
+    focus_tags: tuple[TemplateFocusTag, ...],
+    days: tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...],
+    guidance_en: str,
+    guidance_fa: str,
+    order_en: str,
+    order_fa: str,
+    recovery_en: str,
+    recovery_fa: str,
+) -> CanonicalTemplateDefinition:
+    return CanonicalTemplateDefinition(
+        canonical_slug=canonical_slug,
         name_en=name_en,
         name_fa=name_fa,
         description_en=description_en,
         description_fa=description_fa,
-        days_per_week=days_per_week,
-        training_level=level,
-        fitness_goal=fitness_goal,
-        focus_tags=validate_focus_tags(tags),
-        intensity_methods=methods,
-        days=days,
-        programming_rationale=(),
-        is_active=is_active,
+        eligible_levels=eligible_levels,
+        focus_tags=validate_focus_tags(focus_tags),
+        days=tuple(day for day, _ in days),
+        day_specs=tuple(specs for _, specs in days),
+        guidance_en=guidance_en,
+        guidance_fa=guidance_fa,
+        order_en=order_en,
+        order_fa=order_fa,
+        recovery_en=recovery_en,
+        recovery_fa=recovery_fa,
     )
-    return replace(template, programming_rationale=_programming_rationale(template))
 
 
-def _validate_template_tags(
-    template: TrainingProgramTemplateSeed,
-) -> TrainingProgramTemplateSeed:
-    validate_template_focus_tags(
-        template.focus_tags,
-        intensity_methods=template.intensity_methods,
-        days=template.days,
-    )
-    return template
+ALL_LEVELS = (Level.FIRST_MONTH, Level.BEGINNER, Level.INTERMEDIATE, Level.ADVANCED)
+NO_FIRST_MONTH = (Level.BEGINNER, Level.INTERMEDIATE, Level.ADVANCED)
+INTERMEDIATE_ADVANCED = (Level.INTERMEDIATE, Level.ADVANCED)
 
 
-TRAINING_PROGRAM_TEMPLATE_SEEDS: tuple[TrainingProgramTemplateSeed, ...] = tuple(
-    _validate_template_tags(
-        _assign_structural_slot_priorities(
-            _reclassify_goal_template(
-                _evidence_informed_template_order(
-                    _fit_template_session_exercise_count(
-                        _specialized_template_movement_floors(template)
-                    )
-                )
-            )
-        )
-    )
-    for template in (
-        _template(
-            "two-day-first-month-full-body",
-            "Two-Day First Month Full Body",
-            "تمام‌بدن دو روزه ماه اول",
-            "Two conservative full-body sessions for learning stable movement patterns.",
-            "دو جلسه محافظه‌کارانه تمام‌بدن برای یادگیری الگوهای حرکتی پایدار.",
-            2,
-            Level.FIRST_MONTH,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
+_DEFINITIONS = (
+    _definition(
+        "t01-2-day-full-body-ab",
+        "2-Day Full Body A/B",
+        "تمام‌بدن دو روزه A/B",
+        "Two full-body sessions for users training twice weekly.",
+        "دو جلسه تمام‌بدن برای کاربرانی که هفته‌ای دو بار تمرین می‌کنند.",
+        (Level.FIRST_MONTH, Level.BEGINNER, Level.INTERMEDIATE),
+        (Tag.FULL_BODY,),
+        (
+            _day_definition(
                 "Full Body A",
                 "تمام‌بدن A",
                 "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES, M.ABS),
-                CHEST,
-                BACK_ROW,
-                SQUAT,
-                GLUTE_BRIDGE,
-                CORE,
+                (M.QUADRICEPS, M.HAMSTRINGS, M.CHEST, M.BACK, M.SHOULDERS),
+                _primary(SQUAT),
+                _secondary(SEATED_LEG_CURL),
+                _primary(FLAT_PRESS),
+                _primary(ROW),
+                _secondary(LAT_PULLDOWN),
+                _secondary(SHOULDER_PRESS),
             ),
-            _day(
+            _day_definition(
                 "Full Body B",
                 "تمام‌بدن B",
                 "full_body",
-                (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES, M.SHOULDERS),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                RDL,
-                LATERAL_RAISE,
-                CORE,
+                (M.QUADRICEPS, M.HAMSTRINGS, M.CHEST, M.BACK, M.SHOULDERS),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _primary(INCLINE_PRESS),
+                _primary(SEATED_CABLE_ROW),
+                _secondary(LAT_PULLDOWN),
+                _isolation(LATERAL_RAISE),
             ),
         ),
-        _template(
-            "three-day-first-month-full-body",
-            "Three-Day First Month Full Body",
-            "تمام‌بدن سه روزه ماه اول",
-            (
-                "Three low-complexity sessions that repeat foundational patterns "
-                "with modest variation."
-            ),
-            "سه جلسه کم‌پیچیدگی با تکرار الگوهای پایه و تنوع محدود.",
-            3,
-            Level.FIRST_MONTH,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
-                CHEST,
-                BACK_ROW,
-                SQUAT,
-                GLUTE_BRIDGE,
-                CORE,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                RDL,
-                GLUTE_BRIDGE,
-                CORE,
-            ),
-            _day(
-                "Full Body C",
-                "تمام‌بدن C",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS),
-                CHEST,
-                BACK_ROW,
-                LUNGE,
-                LEG_CURL,
-                LATERAL_RAISE,
-                CORE,
-            ),
-        ),
-        _template(
-            "four-day-first-month-upper-lower",
-            "Four-Day First Month Upper Lower",
-            "بالاتنه پایین‌تنه چهار روزه ماه اول",
-            "Short upper/lower practice sessions with conservative structural variety.",
-            "جلسات کوتاه بالاتنه و پایین‌تنه با تنوع ساختاری محافظه‌کارانه.",
-            4,
-            Level.FIRST_MONTH,
-            (Tag.UPPER_LOWER, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Upper A",
-                "بالاتنه A",
-                "upper",
-                (M.CHEST, M.BACK, M.SHOULDERS),
-                CHEST,
-                BACK_ROW,
-                LATERAL_RAISE,
-                BICEPS,
-                TRICEPS,
-            ),
-            _day(
-                "Lower A",
-                "پایین‌تنه A",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
-                SQUAT,
-                RDL,
-                GLUTE_BRIDGE,
-                CALF,
-                CORE,
-            ),
-            _day(
-                "Upper B",
-                "بالاتنه B",
-                "upper",
-                (M.CHEST, M.BACK, M.SHOULDERS),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                SHOULDER_PRESS,
-                BICEPS,
-                TRICEPS,
-            ),
-            _day(
-                "Lower B",
-                "پایین‌تنه B",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
-                LUNGE,
-                RDL,
-                LEG_CURL,
-                CALF,
-                CORE,
-            ),
-        ),
-        _template(
-            "two-day-full-body-foundation",
-            "Two-Day Full Body Foundation",
-            "پایه تمام‌بدن دو روزه",
-            "Alternating full-body sessions for a beginner building consistent movement practice.",
-            "جلسات تمام‌بدن چرخشی برای مبتدی که روی تکرار باکیفیت حرکات پایه تمرکز دارد.",
-            2,
-            Level.BEGINNER,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
-                CHEST,
-                BACK_ROW,
-                SQUAT,
-                GLUTE_BRIDGE,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                LEG_PRESS,
-                RDL,
-                CORE,
-            ),
-        ),
-        _template(
-            "two-day-upper-lower-foundation",
-            "Two-Day Full Body Barbell Foundation",
-            "پایه هالتر تمام‌بدن دو روزه",
-            "A full-body A/B plan built around fundamental barbell and cable movement patterns.",
-            "برنامهٔ A/B تمام‌بدن بر پایهٔ الگوهای اصلی هالتر و سیم‌کش.",
-            2,
-            Level.BEGINNER,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                BARBELL_BACK_SQUAT,
-                BARBELL_BENCH,
-                LAT_PULLDOWN,
-                GLUTE_BRIDGE,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                LEG_PRESS,
-                INCLINE_CHEST,
-                BACK_ROW,
-                BARBELL_STRAIGHT_LEG_DEADLIFT,
-                CORE,
-            ),
-        ),
-        _template(
-            "two-day-full-body-hypertrophy",
-            "Two-Day Full Body Hypertrophy",
-            "هایپرتروفی تمام‌بدن دو روزه",
-            "A higher-volume full-body A/B structure for an intermediate lifter "
-            "with two training days.",
-            "ساختار A/B تمام‌بدن با حجم بیشتر برای ورزشکار متوسط با دو روز تمرین.",
-            2,
-            Level.INTERMEDIATE,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                BARBELL_BACK_SQUAT,
-                BARBELL_BENCH,
-                BACK_ROW,
-                RDL,
-                LEG_EXTENSION,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                LEG_PRESS,
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                HIP_THRUST,
-                LEG_CURL,
-                CALF,
-            ),
-        ),
-        _template(
-            "two-day-upper-lower-strength-hypertrophy",
-            "Two-Day Full Body Compound Hypertrophy",
-            "هایپرتروفی چندمفصلی تمام‌بدن دو روزه",
-            "Compound-first full-body sessions that keep each major movement pattern in both days.",
-            "جلسات تمام‌بدن با اولویت حرکات چندمفصلی که الگوهای اصلی را در هر دو روز حفظ می‌کند.",
-            2,
-            Level.INTERMEDIATE,
-            (Tag.FULL_BODY, Tag.COMPOUND_FOCUS, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                BARBELL_BACK_SQUAT,
-                BARBELL_BENCH,
-                BACK_ROW,
-                BARBELL_STRAIGHT_LEG_DEADLIFT,
-                CORE,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                LEG_PRESS,
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                LUNGE,
-                HIP_THRUST,
-                CALF,
-            ),
-        ),
-        _template(
-            "two-day-full-body-superset",
-            "Two-Day Full Body Supersets",
-            "تمام‌بدن سوپرست دو روزه",
-            "Time-efficient antagonist pairings for an experienced trainee "
-            "with limited weekly access.",
-            "جفت‌کردن عضلات مخالف برای ورزشکار باتجربه با زمان محدود در هفته.",
-            2,
-            Level.ADVANCED,
-            (Tag.FULL_BODY,),
-            (Method.STANDARD, Method.SUPERSET),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                BARBELL_BACK_SQUAT,
-                BARBELL_BENCH,
-                BACK_ROW,
-                RDL,
-                _slot("dumbbell-curl", (M.BICEPS,), P.ELBOW_FLEXION, method=Method.SUPERSET),
-                _slot(
-                    "overhead-dumbbell-extension",
-                    (M.TRICEPS,),
-                    P.ELBOW_EXTENSION,
-                    method=Method.SUPERSET,
-                ),
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                LEG_PRESS,
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                GLUTE_BRIDGE,
-                _slot(
-                    "dumbbell-lateral-raise",
-                    (M.SHOULDERS,),
-                    P.SHOULDER_ABDUCTION,
-                    method=Method.SUPERSET,
-                ),
-                _slot("standing-calf-raise", (M.CALVES,), P.CALF_RAISE, method=Method.SUPERSET),
-            ),
-        ),
-        _template(
-            "three-day-full-body-foundation",
-            "Three-Day Full Body Foundation",
-            "پایه تمام‌بدن سه روزه",
-            "Three low-complexity full-body exposures for a new lifter.",
-            "سه مواجههٔ تمام‌بدن کم‌پیچیدگی برای ورزشکار تازه‌کار.",
-            3,
-            Level.BEGINNER,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS),
-                CHEST,
-                BACK_ROW,
-                SQUAT,
-                CORE,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.SHOULDERS, M.HAMSTRINGS, M.GLUTES),
-                SHOULDER_PRESS,
-                LAT_PULLDOWN,
-                RDL,
-                CALF,
-            ),
-            _day(
-                "Full Body C",
-                "تمام‌بدن C",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                LEG_PRESS,
-                GLUTE_BRIDGE,
-                BICEPS,
-            ),
-        ),
-        _template(
-            "three-day-push-pull-legs",
-            "Three-Day Push / Pull / Legs",
-            "پوش / پول / پا سه روزه",
-            "A classic three-day push, pull, and lower-body rotation.",
-            "چرخش کلاسیک سه‌روزهٔ پوش، پول و پایین‌تنه.",
-            3,
-            Level.INTERMEDIATE,
-            (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Push",
-                "پوش",
-                "push",
-                (M.CHEST, M.SHOULDERS, M.TRICEPS),
-                CHEST,
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                TRICEPS,
-            ),
-            _day(
-                "Pull",
-                "پول",
-                "pull",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CABLE_PULLDOWN,
-                BICEPS,
-                HAMMER_CURL,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-                SQUAT,
-                RDL,
-                LEG_EXTENSION,
-                CALF,
-            ),
-        ),
-        _template(
-            "three-day-chest-priority",
-            "Three-Day Chest Priority",
-            "تأکید سینه سه روزه",
-            "A full-body rotation that gives chest two direct priority exposures.",
-            "چرخش تمام‌بدن که به سینه دو مواجههٔ مستقیم با اولویت می‌دهد.",
-            3,
-            Level.INTERMEDIATE,
-            (Tag.FULL_BODY, Tag.CHEST_PRIORITY),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Quads",
-                "سینه + چهارسر",
-                "other",
-                (M.CHEST, M.QUADRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                LEG_PRESS,
-                LEG_EXTENSION,
-            ),
-            _day(
-                "Back + Hamstrings",
-                "زیربغل + همسترینگ",
-                "other",
-                (M.BACK, M.HAMSTRINGS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                RDL,
-                LEG_CURL,
-                BICEPS,
-            ),
-            _day(
-                "Chest + Shoulders",
-                "سینه + سرشانه",
-                "upper",
-                (M.CHEST, M.SHOULDERS),
-                CABLE_FLY,
-                CHEST,
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                TRICEPS,
-            ),
-        ),
-        _template(
-            "three-day-back-priority",
-            "Three-Day Back Priority",
-            "تأکید زیربغل سه روزه",
-            "A full-body rotation that gives back two direct priority exposures.",
-            "چرخش تمام‌بدن که به زیربغل دو مواجههٔ مستقیم با اولویت می‌دهد.",
-            3,
-            Level.INTERMEDIATE,
-            (Tag.FULL_BODY, Tag.BACK_PRIORITY),
-            (Method.STANDARD,),
-            _day(
-                "Back + Quads",
-                "زیربغل + چهارسر",
-                "other",
-                (M.BACK, M.QUADRICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                LEG_PRESS,
-                LEG_EXTENSION,
-            ),
-            _day(
-                "Chest + Hamstrings",
-                "سینه + همسترینگ",
-                "other",
-                (M.CHEST, M.HAMSTRINGS),
-                CHEST,
-                INCLINE_CHEST,
-                RDL,
-                LEG_CURL,
-            ),
-            _day(
-                "Back + Arms",
-                "زیربغل + بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                CABLE_PULLDOWN,
-                BACK_ROW,
-                BICEPS,
-                HAMMER_CURL,
-                TRICEPS,
-            ),
-        ),
-        _template(
-            "three-day-full-body-drop-set",
-            "Three-Day Full Body Drop Set",
-            "تمام‌بدن دراپ‌ست سه روزه",
-            "An advanced three-day structure that reserves drop sets for low-risk isolation work.",
-            "ساختار پیشرفتهٔ سه‌روزه که دراپ‌ست را برای حرکات ایزولهٔ کم‌ریسک نگه می‌دارد.",
-            3,
-            Level.ADVANCED,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD, Method.DROP_SET),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.QUADRICEPS),
-                CHEST,
-                SQUAT,
-                _slot(
-                    "leg-extension",
-                    (M.QUADRICEPS,),
-                    P.KNEE_EXTENSION,
-                    method=Method.DROP_SET,
-                    reps=(12, 15),
-                ),
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.BACK, M.HAMSTRINGS),
-                BACK_ROW,
-                RDL,
-                _slot(
-                    "cable-curl",
-                    (M.BICEPS,),
-                    P.ELBOW_FLEXION,
-                    method=Method.DROP_SET,
-                    reps=(12, 15),
-                ),
-            ),
-            _day(
-                "Full Body C",
-                "تمام‌بدن C",
-                "full_body",
-                (M.SHOULDERS, M.GLUTES),
-                SHOULDER_PRESS,
-                GLUTE_BRIDGE,
-                _slot(
-                    "dumbbell-lateral-raise",
-                    (M.SHOULDERS,),
-                    P.SHOULDER_ABDUCTION,
-                    method=Method.DROP_SET,
-                    reps=(12, 20),
-                ),
-            ),
-        ),
-        _template(
-            "four-day-classic-body-part",
-            "Four-Day Classic Body-Part Rotation",
-            "تفکیک کلاسیک چهار روزه",
-            "Direct-muscle pairing for lifters ready to separate upper-body targets "
-            "across four sessions.",
-            "جفت‌کردن عضلات هدف برای ورزشکاری که در چهار جلسه آمادهٔ تفکیک بالاتنه است.",
-            4,
-            Level.INTERMEDIATE,
-            (Tag.BODY_PART_ROTATION, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                CABLE_FLY,
-                TRICEPS,
-                PUSH_DOWN,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CABLE_PULLDOWN,
-                BICEPS,
-                HAMMER_CURL,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-                LEG_PRESS,
-                RDL,
-                LEG_EXTENSION,
-                LEG_CURL,
-                CALF,
-            ),
-            _day(
-                "Shoulders + Traps",
-                "سرشانه + کول",
-                "shoulders_traps",
-                (M.SHOULDERS, M.TRAPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                REAR_DELT,
-                SHRUG,
-            ),
-        ),
-        _template(
-            "four-day-chest-priority",
-            "Four-Day Chest Priority Rotation",
-            "تفکیک چهار روزه با تأکید سینه",
-            "A body-part rotation with two chest exposures while keeping arm work "
-            "directly assigned.",
-            "تفکیک عضلات با دو مواجههٔ سینه و حفظ تمرین مستقیم بازوها.",
-            4,
-            Level.INTERMEDIATE,
-            (Tag.BODY_PART_ROTATION, Tag.CHEST_PRIORITY),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                TRICEPS,
-                PUSH_DOWN,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                BICEPS,
-                HAMMER_CURL,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-                LEG_PRESS,
-                RDL,
-                LEG_EXTENSION,
-                CALF,
-            ),
-            _day(
-                "Chest + Shoulders",
-                "سینه + سرشانه",
-                "upper",
-                (M.CHEST, M.SHOULDERS),
-                CABLE_FLY,
-                CHEST,
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-            ),
-        ),
-        _template(
-            "four-day-back-priority",
-            "Four-Day Back Priority Rotation",
-            "تفکیک چهار روزه با تأکید زیربغل",
-            "A body-part rotation with two direct back exposures and separated biceps work.",
-            "تفکیک عضلات با دو مواجههٔ مستقیم زیربغل و جلو بازوی جداشده.",
-            4,
-            Level.INTERMEDIATE,
-            (Tag.BODY_PART_ROTATION, Tag.BACK_PRIORITY),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                TRICEPS,
-                PUSH_DOWN,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CABLE_PULLDOWN,
-                BICEPS,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                SQUAT,
-                RDL,
-                LEG_CURL,
-                CALF,
-            ),
-            _day(
-                "Back + Shoulders",
-                "زیربغل + سرشانه",
-                "upper",
-                (M.BACK, M.SHOULDERS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                LATERAL_RAISE,
-                REAR_DELT,
-            ),
-        ),
-        _template(
-            "four-day-quad-hamstring-split",
-            "Four-Day Quad / Hamstring Split",
-            "تفکیک چهار روزهٔ چهارسر / همسترینگ",
-            "An advanced upper/lower variant that separates knee-dominant and "
-            "posterior-chain work.",
-            "گونهٔ پیشرفتهٔ بالاتنه/پایین‌تنه که چهارسر و زنجیرهٔ خلفی را جدا می‌کند.",
-            4,
-            Level.ADVANCED,
-            (Tag.UPPER_LOWER, Tag.QUAD_PRIORITY),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Back",
-                "سینه + زیربغل",
-                "upper",
-                (M.CHEST, M.BACK),
-                CHEST,
-                BACK_ROW,
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-            ),
-            _day(
-                "Quadriceps + Calves",
-                "چهارسر + ساق",
-                "quadriceps_calves",
-                (M.QUADRICEPS, M.CALVES),
-                LEG_PRESS,
-                SQUAT,
-                LEG_EXTENSION,
-                CALF,
-            ),
-            _day(
-                "Shoulders + Arms",
-                "سرشانه + بازو",
-                "other",
-                (M.SHOULDERS, M.BICEPS, M.TRICEPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                BICEPS,
-                TRICEPS,
-            ),
-            _day(
-                "Hamstrings + Glutes",
-                "همسترینگ + باسن",
-                "posterior_chain_core",
-                (M.HAMSTRINGS, M.GLUTES),
-                RDL,
-                LEG_CURL,
-                GLUTE_BRIDGE,
-                LUNGE,
-            ),
-        ),
-        _template(
-            "four-day-phul",
-            "Four-Day Power Hypertrophy Upper / Lower",
-            "بالا / پایین قدرت و هایپرتروفی چهار روزه",
-            "A higher-skill four-day upper/lower pattern with compound and hypertrophy exposures.",
-            "الگوی بالاتنه/پایین‌تنهٔ چهارروزه با ترکیب حرکات پایه و هایپرتروفی.",
-            4,
-            Level.ADVANCED,
-            (Tag.UPPER_LOWER, Tag.COMPOUND_FOCUS, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Upper Compound",
-                "بالاتنه چندمفصلی",
-                "upper",
-                (M.CHEST, M.BACK, M.SHOULDERS),
-                CHEST,
-                BACK_ROW,
-                SHOULDER_PRESS,
-                BICEPS,
-            ),
-            _day(
-                "Lower Compound",
-                "پایین‌تنه چندمفصلی",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                LEG_PRESS,
-                RDL,
-                LUNGE,
-                CALF,
-            ),
-            _day(
-                "Upper Hypertrophy",
-                "هایپرتروفی بالاتنه",
-                "upper",
-                (M.CHEST, M.BACK, M.SHOULDERS, M.ARMS if False else M.BICEPS),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                LATERAL_RAISE,
-                BICEPS,
-                TRICEPS,
-            ),
-            _day(
-                "Lower Hypertrophy",
-                "هایپرتروفی پایین‌تنه",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-                SQUAT,
-                LEG_EXTENSION,
-                LEG_CURL,
-                GLUTE_BRIDGE,
-                CALF,
-            ),
-        ),
-        _template(
-            "five-day-classic-body-part",
-            "Five-Day Classic Body-Part Rotation",
-            "تفکیک کلاسیک پنج روزه",
-            "A conventional five-day rotation with one clear direct target group per session.",
-            "چرخش متعارف پنج‌روزه با گروه عضلانی هدف روشن در هر جلسه.",
-            5,
-            Level.INTERMEDIATE,
-            (Tag.BODY_PART_ROTATION, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day("Chest", "سینه", "chest_triceps", (M.CHEST,), CHEST, INCLINE_CHEST, CABLE_FLY),
-            _day(
-                "Back", "زیربغل", "back_biceps", (M.BACK,), BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-                LEG_PRESS,
-                RDL,
-                LEG_EXTENSION,
-                LEG_CURL,
-                CALF,
-            ),
-            _day(
-                "Shoulders + Traps",
-                "سرشانه + کول",
-                "shoulders_traps",
-                (M.SHOULDERS, M.TRAPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                REAR_DELT,
-                SHRUG,
-            ),
-            _day(
-                "Arms",
-                "بازو",
-                "other",
-                (M.BICEPS, M.TRICEPS),
-                BICEPS,
-                HAMMER_CURL,
-                TRICEPS,
-                PUSH_DOWN,
-            ),
-        ),
-        _template(
-            "five-day-ppl-upper-lower",
-            "Five-Day Push Pull Legs Upper Lower",
-            "پوش پول پا بالاتنه پایین‌تنه پنج روزه",
-            "A five-day hybrid that adds an upper/lower exposure after a push-pull-legs base.",
-            "ترکیب پنج‌روزه که بعد از پایهٔ پوش پول پا، یک مواجههٔ بالاتنه/پایین‌تنه اضافه می‌کند.",
-            5,
-            Level.INTERMEDIATE,
-            (Tag.PUSH_PULL_LEGS, Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
-            (Method.STANDARD,),
-            _day(
-                "Push",
-                "پوش",
-                "push",
-                (M.CHEST, M.SHOULDERS, M.TRICEPS),
-                CHEST,
-                SHOULDER_PRESS,
-                TRICEPS,
-            ),
-            _day("Pull", "پول", "pull", (M.BACK, M.BICEPS), BACK_ROW, LAT_PULLDOWN, BICEPS),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-                SQUAT,
-                RDL,
-                CALF,
-            ),
-            _day(
+        "Two full-body sessions for users training twice weekly. Finish the lower-body block before upper-body work and keep the session practical.",
+        "دو جلسه تمام‌بدن برای تمرین دو روز در هفته است. ابتدا بلوک پایین‌تنه را کامل کن، سپس سراغ بالاتنه برو و جلسه را عملی نگه دار.",
+        "Complete the lower-body block, then chest, back, and shoulders; each region remains contiguous.",
+        "بلوک پایین‌تنه را کامل کن و بعد به سینه، پشت و سرشانه برو؛ هر ناحیه پیوسته می‌ماند.",
+        "Keep several recovery days between sessions when possible and progress repetitions before load.",
+        "در صورت امکان بین دو جلسه چند روز برای ریکاوری بگذار و پیش از افزایش وزنه، تکرارها را پیش ببر.",
+    ),
+    _definition(
+        "t02-3-day-upper-lower-full",
+        "3-Day Upper / Lower / Full",
+        "بالاتنه / پایین‌تنه / تمام‌بدن سه روزه",
+        "A balanced three-day structure with a broad full-body exposure.",
+        "ساختار متعادل سه‌روزه با یک مواجهه گسترده تمام‌بدن.",
+        ALL_LEVELS,
+        (Tag.UPPER_LOWER,),
+        (
+            _day_definition(
                 "Upper",
                 "بالاتنه",
                 "upper",
                 (M.CHEST, M.BACK, M.SHOULDERS),
-                INCLINE_CHEST,
-                CABLE_PULLDOWN,
-                LATERAL_RAISE,
-                HAMMER_CURL,
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _primary(ROW),
+                _secondary(LAT_PULLDOWN),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
             ),
-            _day(
+            _day_definition(
+                "Lower",
+                "پایین‌تنه",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Full Body",
+                "تمام‌بدن",
+                "full_body",
+                (M.QUADRICEPS, M.HAMSTRINGS, M.CHEST, M.BACK, M.SHOULDERS),
+                _primary(LEG_PRESS),
+                _secondary(SEATED_LEG_CURL),
+                _primary(FLAT_PRESS),
+                _primary(SEATED_CABLE_ROW),
+                _secondary(LAT_PULLDOWN),
+                _isolation(LATERAL_RAISE),
+            ),
+        ),
+        "Use the full-body day as a broad third exposure without adding unnecessary arm work.",
+        "روز تمام‌بدن را به‌عنوان مواجهه سوم و گسترده اجرا کن و وقتی جلسه کامل است کار اضافه بازو نگذار.",
+        "Upper and lower days use contiguous regional blocks; the full-body day finishes lower body before upper body.",
+        "روزهای بالاتنه و پایین‌تنه بلوک‌های پیوسته دارند؛ روز تمام‌بدن ابتدا پایین‌تنه و سپس بالاتنه را کامل می‌کند.",
+        "Keep the third exposure compact and leave recovery between related sessions.",
+        "مواجهه سوم را فشرده نگه دار و بین جلسات مرتبط زمان ریکاوری بگذار.",
+    ),
+    _definition(
+        "t03-3-day-upper-lower-upper",
+        "3-Day Upper / Lower / Upper",
+        "بالاتنه / پایین‌تنه / بالاتنه سه روزه",
+        "An upper-priority three-day template with planned upper variation.",
+        "قالب سه‌روزه با اولویت بالاتنه و تنوع برنامه‌ریزی‌شده در دو جلسه بالاتنه.",
+        NO_FIRST_MONTH,
+        (Tag.UPPER_LOWER,),
+        (
+            _day_definition(
+                "Upper A",
+                "بالاتنه A",
+                "upper",
+                (M.CHEST, M.BACK, M.SHOULDERS, M.BICEPS, M.TRICEPS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _primary(ROW),
+                _secondary(LAT_PULLDOWN),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(DUMBBELL_CURL),
+                _isolation(TRICEPS_PUSHDOWN),
+            ),
+            _day_definition(
+                "Lower",
+                "پایین‌تنه",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Upper B",
+                "بالاتنه B",
+                "upper",
+                (M.CHEST, M.BACK, M.SHOULDERS, M.BICEPS, M.TRICEPS),
+                _primary(INCLINE_PRESS),
+                _secondary(FLAT_PRESS),
+                _primary(SEATED_CABLE_ROW),
+                _secondary(LAT_PULLDOWN),
+                _isolation(REAR_DELT_FLY),
+                _isolation(LATERAL_RAISE),
+                _isolation(HAMMER_CURL),
+                _isolation(OVERHEAD_TRICEPS_EXTENSION),
+            ),
+        ),
+        "Use only as an upper-priority catalog option and keep direct arm work after major upper-body muscles.",
+        "این گزینه فقط برای اولویت بالاتنه است و کار مستقیم بازو باید بعد از عضلات اصلی بالاتنه بیاید.",
+        "Presses lead chest, rows and pulldowns follow for back, then shoulders and arms; the two upper days vary angles deliberately.",
+        "پرس‌ها ابتدا سینه، سپس روئینگ و لت پشت، بعد سرشانه و بازو را می‌آورند؛ دو روز بالاتنه عمداً زاویه‌های متفاوت دارند.",
+        "Do not overload the single lower session; keep at least one recovery day before the next upper exposure when possible.",
+        "جلسه تنها پایین‌تنه را بیش‌ازحد سنگین نکن و در صورت امکان پیش از مواجهه بعدی بالاتنه یک روز ریکاوری بگذار.",
+    ),
+    _definition(
+        "t04-3-day-lower-upper-lower",
+        "3-Day Lower / Upper / Lower",
+        "پایین‌تنه / بالاتنه / پایین‌تنه سه روزه",
+        "A lower-priority three-day template with distinct lower sessions.",
+        "قالب سه‌روزه با اولویت پایین‌تنه و دو جلسه متفاوت پا.",
+        NO_FIRST_MONTH,
+        (Tag.UPPER_LOWER, Tag.LOWER_PRIORITY),
+        (
+            _day_definition(
+                "Lower A",
+                "پایین‌تنه A",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Upper",
+                "بالاتنه",
+                "upper",
+                (M.CHEST, M.BACK, M.SHOULDERS, M.BICEPS, M.TRICEPS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _primary(ROW),
+                _secondary(LAT_PULLDOWN),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(DUMBBELL_CURL),
+                _isolation(TRICEPS_PUSHDOWN),
+            ),
+            _day_definition(
+                "Lower B",
+                "پایین‌تنه B",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
+                _primary(LEG_PRESS),
+                _secondary(LUNGE),
+                _primary(RDL),
+                _secondary(LYING_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+        ),
+        "The two lower sessions use different emphasis and should not be identical.",
+        "دو جلسه پایین‌تنه تأکیدهای متفاوت دارند و نباید یکسان باشند.",
+        "Compounds lead each lower day, followed by leg curls, calves, and core; the upper day stays complete but compact.",
+        "حرکات ترکیبی هر روز پایین‌تنه اول می‌آیند و بعد پشت‌پا، ساق و مرکزی قرار می‌گیرد؛ روز بالاتنه کامل اما فشرده است.",
+        "Avoid making both lower days heavy for every lower-body muscle and keep recovery between them.",
+        "هر دو روز پایین‌تنه را برای همه عضلات سنگین نکن و بین آن‌ها زمان ریکاوری بگذار.",
+    ),
+    _definition(
+        "t05-4-day-upper-lower-2x",
+        "4-Day Upper / Lower ×2",
+        "بالاتنه / پایین‌تنه دو بار در هفته",
+        "The main balanced four-day structure with two exposures per region.",
+        "ساختار متعادل اصلی چهارروزه با دو مواجهه برای هر ناحیه.",
+        ALL_LEVELS,
+        (Tag.UPPER_LOWER,),
+        (
+            _day_definition(
+                "Upper A",
+                "بالاتنه A",
+                "upper",
+                (M.CHEST, M.BACK, M.SHOULDERS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _primary(ROW),
+                _secondary(LAT_PULLDOWN),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+            ),
+            _day_definition(
+                "Lower A",
+                "پایین‌تنه A",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Upper B",
+                "بالاتنه B",
+                "upper",
+                (M.CHEST, M.BACK, M.SHOULDERS),
+                _primary(INCLINE_PRESS),
+                _secondary(FLAT_PRESS),
+                _primary(SEATED_CABLE_ROW),
+                _secondary(LAT_PULLDOWN),
+                _isolation(REAR_DELT_FLY),
+                _isolation(LATERAL_RAISE),
+            ),
+            _day_definition(
+                "Lower B",
+                "پایین‌تنه B",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(FRONT_SQUAT),
+                _isolation(LEG_EXTENSION),
+                _primary(RDL),
+                _secondary(LYING_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+        ),
+        "Each region receives two weekly sessions with controlled A/B movement variation; machines remain valid at every level.",
+        "هر ناحیه دو جلسه در هفته دارد و تنوع حرکتی A/B کنترل‌شده است؛ دستگاه‌ها در همه سطوح معتبر می‌مانند.",
+        "Upper days group chest, back, and shoulders; lower days group squat or hinge work before isolation and core.",
+        "روزهای بالاتنه سینه، پشت و سرشانه را گروه‌بندی می‌کنند؛ روزهای پایین‌تنه اسکوات یا هینج را پیش از تک‌مفصلی و مرکزی می‌آورند.",
+        "Use recovery days between repeated regional exposures and do not add advanced intensity techniques by default.",
+        "بین مواجهه‌های تکراری ناحیه‌ای روز ریکاوری بگذار و به‌صورت پیش‌فرض تکنیک‌های شدت پیشرفته اضافه نکن.",
+    ),
+    _definition(
+        "t06-4-day-3-upper-1-lower",
+        "4-Day 3 Upper + 1 Lower",
+        "چهارروزه؛ سه بالاتنه و یک پایین‌تنه",
+        "An upper-priority catalog structure with one complete lower-body session.",
+        "ساختار چهارروزه با اولویت بالاتنه و یک جلسه کامل پایین‌تنه.",
+        NO_FIRST_MONTH,
+        (Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
+        (
+            _day_definition(
+                "Upper A: Chest + Back",
+                "بالاتنه A: سینه + پشت",
+                "upper",
+                (M.CHEST, M.BACK),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _primary(ROW),
+                _secondary(LAT_PULLDOWN),
+                _isolation(LATERAL_RAISE),
+                _isolation(TRICEPS_PUSHDOWN),
+            ),
+            _day_definition(
+                "Lower",
+                "پایین‌تنه",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Upper B: Shoulders + Arms",
+                "بالاتنه B: سرشانه + بازو",
+                "other",
+                (M.SHOULDERS, M.BICEPS, M.TRICEPS),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(REAR_DELT_FLY),
+                _isolation(DUMBBELL_CURL),
+                _isolation(HAMMER_CURL),
+                _isolation(TRICEPS_PUSHDOWN),
+                _isolation(OVERHEAD_TRICEPS_EXTENSION),
+            ),
+            _day_definition(
+                "Upper C: Chest + Back",
+                "بالاتنه C: سینه + پشت",
+                "upper",
+                (M.CHEST, M.BACK),
+                _primary(INCLINE_PRESS),
+                _secondary(FLAT_PRESS),
+                _primary(SEATED_CABLE_ROW),
+                _secondary(LAT_PULLDOWN),
+                _isolation(DUMBBELL_CURL),
+                _core(CRUNCH),
+            ),
+        ),
+        "Do not make all three upper days identical; the dedicated shoulders-and-arms day limits chest/back repetition.",
+        "هر سه روز بالاتنه نباید یکسان باشند؛ روز اختصاصی سرشانه و بازو تکرار سینه و پشت را کنترل می‌کند.",
+        "Chest and back lead the first and last upper days; shoulders and arms are placed after the complete lower session.",
+        "سینه و پشت روز اول و آخر بالاتنه را هدایت می‌کنند و سرشانه و بازو بعد از جلسه کامل پایین‌تنه قرار می‌گیرند.",
+        "Keep the single lower day complete but practical, and use planned variation without forced failure or drop sets.",
+        "روز تنها پایین‌تنه را کامل اما عملی نگه دار و از تنوع برنامه‌ریزی‌شده بدون شکست اجباری یا دراپ‌ست استفاده کن.",
+    ),
+    _definition(
+        "t07-4-day-3-lower-1-upper",
+        "4-Day 3 Lower + 1 Upper",
+        "چهارروزه؛ سه پایین‌تنه و یک بالاتنه",
+        "A lower-priority structure rotating quad, posterior, and quad-glute emphasis.",
+        "ساختار با اولویت پایین‌تنه که تأکید چهارسر، خلفی و چهارسر-باسن را می‌چرخاند.",
+        NO_FIRST_MONTH,
+        (Tag.UPPER_LOWER, Tag.LOWER_PRIORITY),
+        (
+            _day_definition(
+                "Lower A: Quad Bias",
+                "پایین‌تنه A: تأکید چهارسر",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Upper",
+                "بالاتنه",
+                "upper",
+                (M.CHEST, M.BACK, M.SHOULDERS, M.BICEPS, M.TRICEPS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _primary(ROW),
+                _secondary(LAT_PULLDOWN),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(DUMBBELL_CURL),
+                _isolation(TRICEPS_PUSHDOWN),
+            ),
+            _day_definition(
+                "Lower B: Posterior Bias",
+                "پایین‌تنه B: تأکید خلفی",
+                "posterior_chain_core",
+                (M.HAMSTRINGS, M.GLUTES),
+                _primary(RDL),
+                _secondary(LYING_LEG_CURL),
+                _primary(GLUTE_BRIDGE),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Lower C: Quad + Glute",
+                "پایین‌تنه C: چهارسر + باسن",
+                "lower",
+                (M.QUADRICEPS, M.GLUTES),
+                _primary(LEG_PRESS),
+                _isolation(LEG_EXTENSION),
+                _primary(GLUTE_BRIDGE),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+        ),
+        "Rotate quad, hamstring, and glute emphasis instead of making all three lower sessions heavy for every muscle.",
+        "تأکید چهارسر، همسترینگ و باسن را بچرخان و هر سه روز پایین‌تنه را برای همه عضلات سنگین نکن.",
+        "Lower compounds lead each emphasis block, then curls, extensions, calves, and core follow without scattering muscle work.",
+        "حرکات ترکیبی هر بلوک پایین‌تنه اول می‌آیند و بعد پشت‌پا، جلوپا، ساق و مرکزی بدون پراکندگی عضله قرار می‌گیرند.",
+        "Keep the upper day efficient and use recovery between the three distinct lower exposures.",
+        "روز بالاتنه را کارآمد نگه دار و بین سه مواجهه متفاوت پایین‌تنه ریکاوری کافی بگذار.",
+    ),
+    _definition(
+        "t08-4-day-push-pull-quads-posterior",
+        "4-Day Push / Pull / Quads / Posterior",
+        "پوش / پول / چهارسر / خلفی چهارروزه",
+        "An intermediate and advanced bodybuilding split with distinct quad and posterior days.",
+        "تقسیم بدنسازی متوسط و پیشرفته با روزهای جدا برای چهارسر و زنجیره خلفی.",
+        INTERMEDIATE_ADVANCED,
+        (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
+        (
+            _day_definition(
+                "Push",
+                "پوش",
+                "push",
+                (M.CHEST, M.SHOULDERS, M.TRICEPS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(TRICEPS_PUSHDOWN),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Pull",
+                "پول",
+                "pull",
+                (M.BACK, M.BICEPS, M.TRAPS),
+                _primary(ROW),
+                _primary(LAT_PULLDOWN),
+                _isolation(DUMBBELL_CURL),
+                _isolation(SHRUG),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Quads",
+                "چهارسر",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS, M.CALVES),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _isolation(LEG_EXTENSION),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Posterior",
+                "خلفی",
+                "posterior_chain_core",
+                (M.HAMSTRINGS, M.GLUTES),
+                _primary(RDL),
+                _secondary(LYING_LEG_CURL),
+                _primary(GLUTE_BRIDGE),
+                _secondary(LUNGE),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+        ),
+        "Push and pull stay compound-led while quad and posterior days retain distinct bodybuilding purposes.",
+        "روزهای پوش و پول با حرکات ترکیبی شروع می‌شوند و روزهای چهارسر و خلفی هدف جداگانه بدنسازی خود را حفظ می‌کنند.",
+        "Complete chest before shoulder isolation on push; complete horizontal and vertical pulling before biceps and traps.",
+        "در پوش ابتدا سینه و سپس تک‌مفصلی سرشانه را کامل کن؛ در پول کشش افقی و عمودی پیش از جلو بازو و کول انجام می‌شود.",
+        "Keep each session practical and separate the quad and posterior exposures with appropriate recovery.",
+        "هر جلسه را عملی نگه دار و مواجهه‌های چهارسر و خلفی را با ریکاوری مناسب جدا کن.",
+    ),
+    _definition(
+        "t09-5-day-ppl-upper-lower",
+        "5-Day PPL + Upper + Lower",
+        "پنج‌روزه PPL + بالاتنه + پایین‌تنه",
+        "A balanced five-day bodybuilding structure combining focused and broad exposures.",
+        "ساختار متعادل پنج‌روزه بدنسازی با ترکیب جلسات متمرکز و گسترده.",
+        INTERMEDIATE_ADVANCED,
+        (Tag.PUSH_PULL_LEGS, Tag.UPPER_LOWER),
+        (
+            _day_definition(
+                "Push",
+                "پوش",
+                "push",
+                (M.CHEST, M.SHOULDERS, M.TRICEPS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(TRICEPS_PUSHDOWN),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Pull",
+                "پول",
+                "pull",
+                (M.BACK, M.BICEPS, M.TRAPS),
+                _primary(ROW),
+                _primary(LAT_PULLDOWN),
+                _isolation(DUMBBELL_CURL),
+                _isolation(HAMMER_CURL),
+                _isolation(SHRUG),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Legs",
+                "پا",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Upper",
+                "بالاتنه",
+                "upper",
+                (M.CHEST, M.BACK, M.SHOULDERS, M.BICEPS, M.TRICEPS),
+                _primary(FLAT_PRESS),
+                _primary(SEATED_CABLE_ROW),
+                _secondary(LAT_PULLDOWN),
+                _isolation(LATERAL_RAISE),
+                _isolation(DUMBBELL_CURL),
+                _isolation(TRICEPS_PUSHDOWN),
+            ),
+            _day_definition(
                 "Lower",
                 "پایین‌تنه",
                 "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                LEG_PRESS,
-                LEG_EXTENSION,
-                LEG_CURL,
-                GLUTE_BRIDGE,
+                _primary(FRONT_SQUAT),
+                _secondary(LYING_LEG_CURL),
+                _primary(GLUTE_BRIDGE),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
             ),
         ),
-        _template(
-            "five-day-chest-specialization",
-            "Five-Day Chest Specialization",
-            "تخصصی سینه پنج روزه",
-            "Extra direct chest exposure placed early in two weekly sessions "
-            "for a chest priority block.",
-            "مواجههٔ مستقیم اضافهٔ سینه در ابتدای دو جلسهٔ هفتگی برای دورهٔ اولویت سینه.",
-            5,
-            Level.ADVANCED,
-            (Tag.BODY_PART_ROTATION, Tag.CHEST_PRIORITY, Tag.SPECIALIZATION),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                CABLE_FLY,
-                TRICEPS,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                BICEPS,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                LEG_PRESS,
-                RDL,
-                LEG_EXTENSION,
-                LEG_CURL,
-            ),
-            _day(
-                "Chest + Shoulders",
-                "سینه + سرشانه",
-                "upper",
-                (M.CHEST, M.SHOULDERS),
-                CHEST,
-                CABLE_FLY,
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-            ),
-            _day(
-                "Arms + Calves",
-                "بازو + ساق",
-                "other",
-                (M.BICEPS, M.TRICEPS, M.CALVES),
-                HAMMER_CURL,
-                PUSH_DOWN,
-                TRICEPS,
-                CALF,
-            ),
-        ),
-        _template(
-            "five-day-back-specialization",
-            "Five-Day Back Specialization",
-            "تخصصی زیربغل پنج روزه",
-            "Extra direct back exposure without moving biceps into every back session.",
-            "مواجههٔ مستقیم اضافهٔ زیربغل بدون قراردادن جلو بازو در تمام جلسات پشت.",
-            5,
-            Level.ADVANCED,
-            (Tag.BODY_PART_ROTATION, Tag.BACK_PRIORITY, Tag.SPECIALIZATION),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                TRICEPS,
-                PUSH_DOWN,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CABLE_PULLDOWN,
-                BICEPS,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                SQUAT,
-                RDL,
-                LEG_EXTENSION,
-                LEG_CURL,
-            ),
-            _day(
-                "Back + Rear Delts",
-                "زیربغل + پشت سرشانه",
-                "upper",
-                (M.BACK, M.SHOULDERS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                REAR_DELT,
-                CABLE_PULLDOWN,
-            ),
-            _day(
-                "Shoulders + Arms",
-                "سرشانه + بازو",
-                "other",
-                (M.SHOULDERS, M.BICEPS, M.TRICEPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                HAMMER_CURL,
-                PUSH_DOWN,
-            ),
-        ),
-        _template(
-            "four-day-beginner-body-part-foundation",
-            "Four-Day Beginner Body-Part Foundation",
-            "پایه تفکیک عضلات چهارروزه مبتدی",
-            "A conservative body-part introduction with three direct large-muscle slots "
-            "and two direct arm slots.",
-            "شروع محافظه‌کارانهٔ تفکیک عضلات با سه حرکت مستقیم عضلات بزرگ و دو حرکت مستقیم بازو.",
-            4,
-            Level.BEGINNER,
-            (Tag.BODY_PART_ROTATION, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                CABLE_FLY,
-                TRICEPS,
-                PUSH_DOWN,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CABLE_PULLDOWN,
-                BICEPS,
-                HAMMER_CURL,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-                SQUAT,
-                RDL,
-                LEG_EXTENSION,
-                LEG_CURL,
-                CALF,
-            ),
-            _day(
-                "Shoulders + Traps",
-                "سرشانه + کول",
-                "shoulders_traps",
-                (M.SHOULDERS, M.TRAPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                REAR_DELT,
-                SHRUG,
-                CORE,
-            ),
-        ),
-        _template(
-            "four-day-shoulder-priority",
-            "Four-Day Shoulder Priority Rotation",
-            "تفکیک چهارروزه با تأکید سرشانه",
-            "An intermediate rotation that gives all shoulder regions direct work while "
-            "retaining separated chest and back days.",
-            "تفکیک متوسط با تمرین مستقیم تمام بخش‌های سرشانه و حفظ روزهای جدا برای سینه و زیربغل.",
-            4,
-            Level.INTERMEDIATE,
-            (Tag.BODY_PART_ROTATION, Tag.SHOULDERS_PRIORITY),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                MACHINE_CHEST,
-                CABLE_FLY,
-                TRICEPS,
-                PUSH_DOWN,
-                SKULL_CRUSHER,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CHEST_SUPPORTED_ROW,
-                CABLE_PULLDOWN,
-                BICEPS,
-                HAMMER_CURL,
-                PREACHER_CURL,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-                LEG_PRESS,
-                RDL,
-                LEG_EXTENSION,
-                LEG_CURL,
-                LUNGE,
-                CALF,
-            ),
-            _day(
-                "Shoulders + Traps",
-                "سرشانه + کول",
-                "shoulders_traps",
-                (M.SHOULDERS, M.TRAPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                CABLE_LATERAL_RAISE,
-                REAR_DELT,
-                FACE_PULL,
-                SHRUG,
-            ),
-        ),
-        _template(
-            "four-day-arms-priority",
-            "Four-Day Arm Priority Rotation",
-            "تفکیک چهارروزه با تأکید بازو",
-            "An intermediate rotation that preserves body-part days and adds a direct "
-            "three-movement biceps and triceps focus.",
-            "تفکیک متوسط با حفظ روزهای عضلانی و یک تمرکز مستقیم سه‌حرکتی برای جلو بازو و پشت بازو.",
-            4,
-            Level.INTERMEDIATE,
-            (Tag.BODY_PART_ROTATION, Tag.ARMS_PRIORITY),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                MACHINE_CHEST,
-                CABLE_FLY,
-                TRICEPS,
-                PUSH_DOWN,
-                SKULL_CRUSHER,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CHEST_SUPPORTED_ROW,
-                CABLE_PULLDOWN,
-                BICEPS,
-                HAMMER_CURL,
-                PREACHER_CURL,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-                SQUAT,
-                RDL,
-                LEG_EXTENSION,
-                LEG_CURL,
-                CALF,
-            ),
-            _day(
-                "Arms + Delts",
-                "بازو + سرشانه",
-                "other",
-                (M.BICEPS, M.TRICEPS, M.SHOULDERS),
-                CABLE_CURL,
-                PREACHER_CURL,
-                HAMMER_CURL,
-                ROPE_OVERHEAD_EXTENSION,
-                PUSH_DOWN,
-                SKULL_CRUSHER,
-                LATERAL_RAISE,
-            ),
-        ),
-        _template(
-            "four-day-advanced-chest-specialization",
-            "Four-Day Advanced Chest Specialization",
-            "تخصصی سینه چهارروزه پیشرفته",
-            "A long-session advanced chest block with five direct chest movements and "
-            "three triceps movements.",
-            "دورهٔ پیشرفتهٔ سینه برای جلسات طولانی با پنج حرکت مستقیم سینه و سه حرکت پشت بازو.",
-            4,
-            Level.ADVANCED,
-            (Tag.BODY_PART_ROTATION, Tag.CHEST_PRIORITY, Tag.SPECIALIZATION),
-            (Method.STANDARD, Method.DROP_SET),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                MACHINE_CHEST,
-                CABLE_FLY,
-                PEC_DECK,
-                TRICEPS,
-                PUSH_DOWN,
-                _slot(
-                    "rope-overhead-extension",
-                    (M.TRICEPS,),
-                    P.ELBOW_EXTENSION,
-                    placeholder_en="Rope Overhead Extension",
-                    placeholder_fa="پشت بازو بالای سر طناب",
-                    reps=(12, 15),
-                    rest=60,
-                    method=Method.DROP_SET,
-                    priority=Priority.ACCESSORY,
-                ),
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CHEST_SUPPORTED_ROW,
-                SINGLE_ARM_CABLE_ROW,
-                BICEPS,
-                HAMMER_CURL,
-                PREACHER_CURL,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-                HACK_SQUAT,
-                RDL,
-                LEG_PRESS,
-                LEG_CURL,
-                HIP_THRUST,
-                CALF,
-            ),
-            _day(
-                "Shoulders + Traps",
-                "سرشانه + کول",
-                "shoulders_traps",
-                (M.SHOULDERS, M.TRAPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                CABLE_LATERAL_RAISE,
-                REAR_DELT,
-                FACE_PULL,
-                SHRUG,
-            ),
-        ),
-        _template(
-            "four-day-advanced-posterior-chain",
-            "Four-Day Advanced Posterior Chain",
-            "زنجیره خلفی پیشرفته چهارروزه",
-            "An advanced split that separates quadriceps and posterior-chain volume and "
-            "pairs compatible accessories as supersets.",
-            "تفکیک پیشرفته با جداسازی حجم چهارسر و زنجیرهٔ خلفی و سوپرست حرکات کمکی سازگار.",
-            4,
-            Level.ADVANCED,
-            (
-                Tag.BODY_PART_ROTATION,
-                Tag.SPECIALIZATION,
-                Tag.LOWER_PRIORITY,
-                Tag.HAMSTRINGS_PRIORITY,
-                Tag.GLUTE_PRIORITY,
-            ),
-            (Method.STANDARD, Method.SUPERSET),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                MACHINE_CHEST,
-                CABLE_FLY,
-                TRICEPS,
-                PUSH_DOWN,
-                SKULL_CRUSHER,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CHEST_SUPPORTED_ROW,
-                SINGLE_ARM_CABLE_ROW,
-                CABLE_PULLDOWN,
-                BICEPS,
-                HAMMER_CURL,
-                PREACHER_CURL,
-            ),
-            _day(
-                "Quadriceps + Calves",
-                "چهارسر + ساق",
-                "quadriceps_calves",
-                (M.QUADRICEPS, M.CALVES),
-                HACK_SQUAT,
-                LEG_PRESS,
-                SQUAT,
-                LEG_EXTENSION,
-                BULGARIAN_SPLIT_SQUAT,
-                _slot(
-                    "standing-calf-raise",
-                    (M.CALVES,),
-                    P.CALF_RAISE,
-                    reps=(10, 20),
-                    rest=60,
-                    method=Method.SUPERSET,
-                    priority=Priority.ACCESSORY,
-                    superset_group="quad-calf",
-                ),
-                _slot(
-                    "seated-calf-raise",
-                    (M.CALVES,),
-                    P.CALF_RAISE,
-                    placeholder_en="Seated Calf Raise",
-                    placeholder_fa="ساق نشسته",
-                    reps=(10, 20),
-                    rest=60,
-                    method=Method.SUPERSET,
-                    priority=Priority.ACCESSORY,
-                    superset_group="quad-calf",
-                ),
-            ),
-            _day(
-                "Hamstrings + Glutes",
-                "همسترینگ + باسن",
-                "posterior_chain_core",
-                (M.HAMSTRINGS, M.GLUTES),
-                RDL,
-                LEG_CURL,
-                LYING_LEG_CURL,
-                HIP_THRUST,
-                GLUTE_BRIDGE,
-                LUNGE,
-                CORE,
-            ),
-        ),
-        _template(
-            "five-day-beginner-body-part-foundation",
-            "Five-Day Beginner Body-Part Foundation",
-            "پایه تفکیک عضلات پنج‌روزه مبتدی",
-            "A beginner five-day rotation with conservative three-movement large-muscle "
-            "work and two-movement direct arm work.",
-            "چرخش پنج‌روزهٔ مبتدی با سه حرکت محافظه‌کارانه برای عضلات بزرگ و دو حرکت مستقیم بازو.",
-            5,
-            Level.BEGINNER,
-            (Tag.BODY_PART_ROTATION, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                CABLE_FLY,
-                TRICEPS,
-                PUSH_DOWN,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CABLE_PULLDOWN,
-                BICEPS,
-                HAMMER_CURL,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-                SQUAT,
-                RDL,
-                LEG_EXTENSION,
-                LEG_CURL,
-                CALF,
-            ),
-            _day(
-                "Shoulders + Traps",
-                "سرشانه + کول",
-                "shoulders_traps",
-                (M.SHOULDERS, M.TRAPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                REAR_DELT,
-                SHRUG,
-            ),
-            _day(
-                "Arms + Core",
-                "بازو + شکم",
-                "other",
-                (M.BICEPS, M.TRICEPS, M.ABS),
-                BICEPS,
-                TRICEPS,
-                HAMMER_CURL,
-                PUSH_DOWN,
-                CORE,
-            ),
-        ),
-        _template(
-            "five-day-shoulder-priority",
-            "Five-Day Shoulder Priority",
-            "تأکید سرشانه پنج‌روزه",
-            "An intermediate body-part rotation with a complete direct shoulder day and "
-            "separated chest and arm work.",
-            "چرخش متوسط با روز کامل سرشانه و تمرین جدا برای سینه و بازو.",
-            5,
-            Level.INTERMEDIATE,
-            (Tag.BODY_PART_ROTATION, Tag.SHOULDERS_PRIORITY),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                MACHINE_CHEST,
-                CABLE_FLY,
-                TRICEPS,
-                PUSH_DOWN,
-                SKULL_CRUSHER,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CHEST_SUPPORTED_ROW,
-                CABLE_PULLDOWN,
-                BICEPS,
-                HAMMER_CURL,
-                PREACHER_CURL,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
-                LEG_PRESS,
-                RDL,
-                LEG_EXTENSION,
-                LEG_CURL,
-                CALF,
-            ),
-            _day(
-                "Shoulders + Traps",
-                "سرشانه + کول",
-                "shoulders_traps",
-                (M.SHOULDERS, M.TRAPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                CABLE_LATERAL_RAISE,
-                REAR_DELT,
-                FACE_PULL,
-                SHRUG,
-            ),
-            _day(
-                "Arms",
-                "بازو",
-                "other",
-                (M.BICEPS, M.TRICEPS),
-                CABLE_CURL,
-                PREACHER_CURL,
-                HAMMER_CURL,
-                ROPE_OVERHEAD_EXTENSION,
-                PUSH_DOWN,
-                SKULL_CRUSHER,
-            ),
-        ),
-        _template(
-            "five-day-quad-priority",
-            "Five-Day Quadriceps Priority",
-            "تأکید چهارسر پنج‌روزه",
-            "An intermediate five-day rotation with a complete direct quadriceps day and "
-            "posterior-chain maintenance.",
-            "چرخش پنج‌روزهٔ متوسط با روز کامل چهارسر و نگهداری زنجیرهٔ خلفی.",
-            5,
-            Level.INTERMEDIATE,
-            (Tag.BODY_PART_ROTATION, Tag.QUAD_PRIORITY, Tag.LOWER_PRIORITY),
-            (Method.STANDARD,),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                MACHINE_CHEST,
-                CABLE_FLY,
-                TRICEPS,
-                PUSH_DOWN,
-                SKULL_CRUSHER,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CHEST_SUPPORTED_ROW,
-                CABLE_PULLDOWN,
-                BICEPS,
-                HAMMER_CURL,
-                PREACHER_CURL,
-            ),
-            _day(
-                "Quadriceps + Calves",
-                "چهارسر + ساق",
-                "quadriceps_calves",
-                (M.QUADRICEPS, M.CALVES),
-                HACK_SQUAT,
-                LEG_PRESS,
-                SQUAT,
-                LEG_EXTENSION,
-                BULGARIAN_SPLIT_SQUAT,
-                CALF,
-            ),
-            _day(
-                "Hamstrings + Glutes",
-                "همسترینگ + باسن",
-                "posterior_chain_core",
-                (M.HAMSTRINGS, M.GLUTES),
-                RDL,
-                LEG_CURL,
-                LYING_LEG_CURL,
-                HIP_THRUST,
-                GLUTE_BRIDGE,
-            ),
-            _day(
-                "Shoulders + Arms",
-                "سرشانه + بازو",
-                "other",
-                (M.SHOULDERS, M.BICEPS, M.TRICEPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                REAR_DELT,
-                CABLE_CURL,
-                ROPE_OVERHEAD_EXTENSION,
-                PUSH_DOWN,
-            ),
-        ),
-        _template(
-            "five-day-advanced-arm-specialization",
-            "Five-Day Advanced Arm Specialization",
-            "تخصصی بازو پنج‌روزه پیشرفته",
-            "An advanced high-volume arm block with three to four direct movements per "
-            "arm and isolated intensity techniques.",
-            "دورهٔ حجمی پیشرفتهٔ بازو با سه تا چهار حرکت مستقیم برای هر بازو و "
-            "تکنیک شدت روی حرکات ایزوله.",
-            5,
-            Level.ADVANCED,
-            (Tag.BODY_PART_ROTATION, Tag.ARMS_PRIORITY, Tag.SPECIALIZATION),
-            (Method.STANDARD, Method.DROP_SET),
-            _day(
+        "PPL provides focused sessions and Upper/Lower adds another broad exposure without redundant extra work.",
+        "PPL جلسات متمرکز می‌دهد و بالاتنه/پایین‌تنه یک مواجهه گسترده دیگر بدون کار اضافی تکراری اضافه می‌کند.",
+        "Push, pull, and legs remain coherent blocks; upper and lower days keep their regional order and compound-first sequence.",
+        "پوش، پول و پا بلوک‌های منسجم می‌مانند؛ روزهای بالاتنه و پایین‌تنه ترتیب ناحیه‌ای و ترکیبی-اول را حفظ می‌کنند.",
+        "Avoid redundant exercises and keep at least one recovery day before repeating a demanding region.",
+        "از حرکات تکراری غیرضروری پرهیز کن و پیش از تکرار ناحیه پرفشار دست‌کم یک روز ریکاوری بگذار.",
+    ),
+    _definition(
+        "t10-5-day-classic-body-part",
+        "5-Day Classic Body-Part",
+        "پنج‌روزه کلاسیک عضله‌ای",
+        "Classic body-part organization with controlled direct volume.",
+        "سازمان‌دهی کلاسیک عضله‌ای با حجم مستقیم کنترل‌شده.",
+        INTERMEDIATE_ADVANCED,
+        (Tag.BODY_PART_ROTATION, Tag.BALANCED),
+        (
+            _day_definition(
                 "Chest",
                 "سینه",
                 "chest_triceps",
-                (M.CHEST,),
-                CHEST,
-                INCLINE_CHEST,
-                MACHINE_CHEST,
-                CABLE_FLY,
-                PEC_DECK,
+                (M.CHEST, M.TRICEPS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _isolation(CHEST_FLY),
+                _isolation(TRICEPS_PUSHDOWN),
+                _core(CRUNCH),
             ),
-            _day(
+            _day_definition(
                 "Back",
-                "زیربغل",
-                "back_biceps",
-                (M.BACK,),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CHEST_SUPPORTED_ROW,
-                SINGLE_ARM_CABLE_ROW,
-                CABLE_PULLDOWN,
-            ),
-            _day(
-                "Quadriceps + Calves",
-                "چهارسر + ساق",
-                "quadriceps_calves",
-                (M.QUADRICEPS, M.CALVES),
-                HACK_SQUAT,
-                LEG_PRESS,
-                SQUAT,
-                LEG_EXTENSION,
-                BULGARIAN_SPLIT_SQUAT,
-                CALF,
-            ),
-            _day(
-                "Hamstrings + Glutes",
-                "همسترینگ + باسن",
-                "posterior_chain_core",
-                (M.HAMSTRINGS, M.GLUTES),
-                RDL,
-                LEG_CURL,
-                LYING_LEG_CURL,
-                HIP_THRUST,
-                GLUTE_BRIDGE,
-            ),
-            _day(
-                "Arms + Delts",
-                "بازو + سرشانه",
-                "other",
-                (M.BICEPS, M.TRICEPS, M.SHOULDERS),
-                BICEPS,
-                HAMMER_CURL,
-                PREACHER_CURL,
-                _slot(
-                    "cable-curl",
-                    (M.BICEPS,),
-                    P.ELBOW_FLEXION,
-                    reps=(12, 15),
-                    rest=60,
-                    method=Method.DROP_SET,
-                    priority=Priority.ACCESSORY,
-                ),
-                TRICEPS,
-                PUSH_DOWN,
-                SKULL_CRUSHER,
-                _slot(
-                    "rope-overhead-extension",
-                    (M.TRICEPS,),
-                    P.ELBOW_EXTENSION,
-                    placeholder_en="Rope Overhead Extension",
-                    placeholder_fa="پشت بازو بالای سر طناب",
-                    reps=(12, 15),
-                    rest=60,
-                    method=Method.DROP_SET,
-                    priority=Priority.ACCESSORY,
-                ),
-                LATERAL_RAISE,
-            ),
-        ),
-        _template(
-            "five-day-advanced-leg-specialization",
-            "Five-Day Advanced Leg Specialization",
-            "تخصصی پا پنج‌روزه پیشرفته",
-            "An advanced lower-body emphasis with separate quad and posterior-chain days "
-            "and accessory supersets.",
-            "تأکید پیشرفته بر پایین‌تنه با روزهای جدا برای چهارسر و زنجیرهٔ خلفی و سوپرست کمکی.",
-            5,
-            Level.ADVANCED,
-            (
-                Tag.BODY_PART_ROTATION,
-                Tag.LOWER_PRIORITY,
-                Tag.QUAD_PRIORITY,
-                Tag.HAMSTRINGS_PRIORITY,
-                Tag.GLUTE_PRIORITY,
-            ),
-            (Method.STANDARD, Method.SUPERSET, Method.DROP_SET),
-            _day(
-                "Chest + Triceps",
-                "سینه + پشت بازو",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                MACHINE_CHEST,
-                CABLE_FLY,
-                TRICEPS,
-                PUSH_DOWN,
-                SKULL_CRUSHER,
-            ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
+                "پشت",
                 "back_biceps",
                 (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CHEST_SUPPORTED_ROW,
-                SINGLE_ARM_CABLE_ROW,
-                CABLE_PULLDOWN,
-                BICEPS,
-                HAMMER_CURL,
-                PREACHER_CURL,
+                _primary(ROW),
+                _primary(LAT_PULLDOWN),
+                _secondary(SEATED_CABLE_ROW),
+                _isolation(DUMBBELL_CURL),
+                _core(CRUNCH),
             ),
-            _day(
-                "Quadriceps + Calves",
-                "چهارسر + ساق",
-                "quadriceps_calves",
-                (M.QUADRICEPS, M.CALVES),
-                HACK_SQUAT,
-                LEG_PRESS,
-                SQUAT,
-                LEG_EXTENSION,
-                _slot(
-                    "bulgarian-split-squat",
-                    (M.QUADRICEPS, M.GLUTES),
-                    P.LUNGE,
-                    placeholder_en="Bulgarian Split Squat",
-                    placeholder_fa="اسپلیت اسکوات بلغاری",
-                    method=Method.DROP_SET,
-                    priority=Priority.ACCESSORY,
-                ),
-                _slot(
-                    "standing-calf-raise",
-                    (M.CALVES,),
-                    P.CALF_RAISE,
-                    reps=(10, 20),
-                    rest=60,
-                    method=Method.SUPERSET,
-                    priority=Priority.ACCESSORY,
-                    superset_group="leg-calf",
-                ),
-                _slot(
-                    "seated-calf-raise",
-                    (M.CALVES,),
-                    P.CALF_RAISE,
-                    placeholder_en="Seated Calf Raise",
-                    placeholder_fa="ساق نشسته",
-                    reps=(10, 20),
-                    rest=60,
-                    method=Method.SUPERSET,
-                    priority=Priority.ACCESSORY,
-                    superset_group="leg-calf",
-                ),
-            ),
-            _day(
-                "Hamstrings + Glutes",
-                "همسترینگ + باسن",
-                "posterior_chain_core",
-                (M.HAMSTRINGS, M.GLUTES),
-                RDL,
-                LEG_CURL,
-                LYING_LEG_CURL,
-                HIP_THRUST,
-                GLUTE_BRIDGE,
-                LUNGE,
-                CORE,
-            ),
-            _day(
-                "Shoulders + Arms",
-                "سرشانه + بازو",
-                "other",
-                (M.SHOULDERS, M.BICEPS, M.TRICEPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                CABLE_LATERAL_RAISE,
-                REAR_DELT,
-                BICEPS,
-                PREACHER_CURL,
-                TRICEPS,
-                PUSH_DOWN,
-            ),
-        ),
-        _template(
-            "six-day-ppl-twice",
-            "Six-Day Push Pull Legs Twice",
-            "پوش پول پا دوبار در هفته",
-            "The conventional six-day PPL rotation with direct exposure repeated twice.",
-            "چرخش متعارف شش‌روزهٔ پوش پول پا با دو مواجههٔ مستقیم برای هر الگو.",
-            6,
-            Level.INTERMEDIATE,
-            (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Push A",
-                "پوش A",
-                "push",
-                (M.CHEST, M.SHOULDERS, M.TRICEPS),
-                CHEST,
-                SHOULDER_PRESS,
-                TRICEPS,
-            ),
-            _day("Pull A", "پول A", "pull", (M.BACK, M.BICEPS), BACK_ROW, LAT_PULLDOWN, BICEPS),
-            _day(
-                "Legs A", "پا A", "lower", (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES), SQUAT, RDL, CALF
-            ),
-            _day(
-                "Push B",
-                "پوش B",
-                "push",
-                (M.CHEST, M.SHOULDERS, M.TRICEPS),
-                INCLINE_CHEST,
-                LATERAL_RAISE,
-                PUSH_DOWN,
-            ),
-            _day(
-                "Pull B", "پول B", "pull", (M.BACK, M.BICEPS), CABLE_PULLDOWN, BACK_ROW, HAMMER_CURL
-            ),
-            _day(
-                "Legs B",
-                "پا B",
+            _day_definition(
+                "Legs",
+                "پا",
                 "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                LEG_PRESS,
-                LEG_EXTENSION,
-                LEG_CURL,
-                GLUTE_BRIDGE,
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
             ),
-        ),
-        _template(
-            "six-day-ppl-volume",
-            "Six-Day PPL Volume Rotation",
-            "چرخش حجمی پوش پول پا شش روزه",
-            "A higher-volume PPL rotation that spreads direct work across "
-            "two push, pull, and leg days.",
-            "چرخش حجمی پوش پول پا که کار مستقیم را در دو روز پوش، پول و پا پخش می‌کند.",
-            6,
-            Level.ADVANCED,
-            (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Push Chest",
-                "پوش سینه",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                CABLE_FLY,
-                TRICEPS,
-            ),
-            _day(
-                "Pull Width",
-                "پول عرض پشت",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                LAT_PULLDOWN,
-                CABLE_PULLDOWN,
-                BICEPS,
-            ),
-            _day(
-                "Legs Quadriceps",
-                "پا چهارسر",
-                "quadriceps_calves",
-                (M.QUADRICEPS, M.CALVES),
-                LEG_PRESS,
-                SQUAT,
-                LEG_EXTENSION,
-                CALF,
-            ),
-            _day(
-                "Push Shoulders",
-                "پوش سرشانه",
-                "push",
-                (M.SHOULDERS, M.TRICEPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                REAR_DELT,
-                PUSH_DOWN,
-            ),
-            _day(
-                "Pull Thickness",
-                "پول ضخامت پشت",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                HAMMER_CURL,
-            ),
-            _day(
-                "Legs Posterior",
-                "پا زنجیرهٔ خلفی",
-                "posterior_chain_core",
-                (M.HAMSTRINGS, M.GLUTES),
-                RDL,
-                LEG_CURL,
-                GLUTE_BRIDGE,
-                LUNGE,
-            ),
-        ),
-        _template(
-            "six-day-chest-back-legs-shoulders-arms-legs",
-            "Six-Day Body-Part Rotation",
-            "تفکیک عضلات شش روزه",
-            "A classic body-part rotation for advanced lifters who recover well "
-            "from frequent sessions.",
-            "تفکیک کلاسیک عضلات برای ورزشکار پیشرفته با ریکاوری مناسب از جلسات پرتعداد.",
-            6,
-            Level.ADVANCED,
-            (Tag.BODY_PART_ROTATION, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day("Chest", "سینه", "chest_triceps", (M.CHEST,), CHEST, INCLINE_CHEST, CABLE_FLY),
-            _day(
-                "Back", "زیربغل", "back_biceps", (M.BACK,), BACK_ROW, LAT_PULLDOWN, CABLE_PULLDOWN
-            ),
-            _day(
-                "Quadriceps + Calves",
-                "چهارسر + ساق",
-                "quadriceps_calves",
-                (M.QUADRICEPS, M.CALVES),
-                LEG_PRESS,
-                LEG_EXTENSION,
-                CALF,
-            ),
-            _day(
-                "Shoulders + Traps",
-                "سرشانه + کول",
+            _day_definition(
+                "Shoulders",
+                "سرشانه",
                 "shoulders_traps",
                 (M.SHOULDERS, M.TRAPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                REAR_DELT,
-                SHRUG,
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(REAR_DELT_FLY),
+                _isolation(SHRUG),
+                _core(CRUNCH),
             ),
-            _day(
+            _day_definition(
                 "Arms",
                 "بازو",
                 "other",
                 (M.BICEPS, M.TRICEPS),
-                BICEPS,
-                HAMMER_CURL,
-                TRICEPS,
-                PUSH_DOWN,
-            ),
-            _day(
-                "Hamstrings + Glutes",
-                "همسترینگ + باسن",
-                "posterior_chain_core",
-                (M.HAMSTRINGS, M.GLUTES),
-                RDL,
-                LEG_CURL,
-                GLUTE_BRIDGE,
-                LUNGE,
+                _isolation(BARBELL_CURL),
+                _isolation(HAMMER_CURL),
+                _isolation(TRICEPS_PUSHDOWN),
+                _isolation(OVERHEAD_TRICEPS_EXTENSION),
+                _core(CRUNCH),
             ),
         ),
-        _template(
-            "six-day-chest-priority",
-            "Six-Day Chest Priority",
-            "تأکید سینه شش روزه",
-            "A specialization block with two chest exposures and a separate "
-            "calves-and-core session.",
-            "دورهٔ تخصصی با دو مواجههٔ سینه و یک جلسهٔ جداگانهٔ ساق و میان‌تنه.",
-            6,
-            Level.ADVANCED,
-            (Tag.BODY_PART_ROTATION, Tag.CHEST_PRIORITY, Tag.SPECIALIZATION),
-            (Method.STANDARD,),
-            _day(
-                "Chest Heavy",
-                "سینه سنگین",
-                "chest_triceps",
-                (M.CHEST,),
-                CHEST,
-                INCLINE_CHEST,
-                CABLE_FLY,
+        "Major compounds lead dedicated days and direct arm work follows the larger-muscle training of the week.",
+        "حرکات ترکیبی اصلی در ابتدای روزهای اختصاصی می‌آیند و کار مستقیم بازو در هفته بعد از عضلات بزرگ‌تر قرار می‌گیرد.",
+        "Chest, back, and legs begin with multi-joint work; fly, curls, extensions, calves, and core stay after the main work.",
+        "سینه، پشت و پا با کار چندمفصلی شروع می‌شوند؛ فلای، جلو بازو، پشت بازو، ساق و مرکزی بعد از کار اصلی می‌آیند.",
+        "Keep direct volume controlled and do not require drop sets, rest-pause, or forced failure.",
+        "حجم مستقیم را کنترل کن و دراپ‌ست، رست‌پاز یا شکست اجباری را الزامی نکن.",
+    ),
+    _definition(
+        "t11-5-day-ppl-upper-lower-priority",
+        "5-Day PPL + Upper Priority + Lower Priority",
+        "پنج‌روزه PPL با اولویت بالاتنه و پایین‌تنه",
+        "A higher-volume five-day structure with meaningful second exposures.",
+        "ساختار پنج‌روزه با حجم بیشتر و مواجهه دوم معنادار.",
+        INTERMEDIATE_ADVANCED,
+        (Tag.PUSH_PULL_LEGS, Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
+        (
+            _day_definition(
+                "Push",
+                "پوش",
+                "push",
+                (M.CHEST, M.SHOULDERS, M.TRICEPS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(TRICEPS_PUSHDOWN),
+                _core(CRUNCH),
             ),
-            _day(
-                "Back + Biceps",
-                "زیربغل + جلو بازو",
-                "back_biceps",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                BICEPS,
+            _day_definition(
+                "Pull",
+                "پول",
+                "pull",
+                (M.BACK, M.BICEPS, M.TRAPS),
+                _primary(ROW),
+                _primary(LAT_PULLDOWN),
+                _isolation(DUMBBELL_CURL),
+                _isolation(HAMMER_CURL),
+                _isolation(SHRUG),
+                _core(CRUNCH),
             ),
-            _day(
+            _day_definition(
                 "Legs",
                 "پا",
                 "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                LEG_PRESS,
-                RDL,
-                LEG_EXTENSION,
-                LEG_CURL,
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
             ),
-            _day(
-                "Chest Volume",
-                "سینه حجمی",
-                "chest_triceps",
-                (M.CHEST,),
-                INCLINE_CHEST,
-                CABLE_FLY,
-                CHEST,
+            _day_definition(
+                "Upper Priority",
+                "اولویت بالاتنه",
+                "upper",
+                (M.CHEST, M.BACK, M.SHOULDERS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _primary(ROW),
+                _secondary(LAT_PULLDOWN),
+                _isolation(LATERAL_RAISE),
+                _core(CRUNCH),
             ),
-            _day(
-                "Shoulders + Triceps",
-                "سرشانه + پشت بازو",
-                "other",
-                (M.SHOULDERS, M.TRICEPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                TRICEPS,
-            ),
-            _day(
-                "Calves + Core",
-                "ساق + میان‌تنه",
-                "other",
-                (M.CALVES, M.ABS),
-                CALF,
-                SEATED_CALF_RAISE,
-                CORE,
-                SIDE_PLANK,
+            _day_definition(
+                "Lower Priority",
+                "اولویت پایین‌تنه",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
             ),
         ),
-        _template(
-            "six-day-back-priority",
-            "Six-Day Back Priority",
-            "تأکید زیربغل شش روزه",
-            "A specialization block with two back exposures and a separate "
-            "calves-and-core session.",
-            "دورهٔ تخصصی با دو مواجههٔ زیربغل و یک جلسهٔ جداگانهٔ ساق و میان‌تنه.",
-            6,
-            Level.ADVANCED,
-            (Tag.BODY_PART_ROTATION, Tag.BACK_PRIORITY, Tag.SPECIALIZATION),
-            (Method.STANDARD,),
-            _day(
-                "Back Width",
-                "عرض زیربغل",
-                "back_biceps",
-                (M.BACK,),
-                LAT_PULLDOWN,
-                CABLE_PULLDOWN,
-                BACK_ROW,
+        "Priority days are meaningful second exposures, not permission for excessive per-session volume.",
+        "روزهای اولویت، مواجهه دوم معنادار هستند و مجوز حجم بیش‌ازحد در هر جلسه نیستند.",
+        "Use compound-before-isolation ordering on every PPL and priority day, with no redundant extra exercise.",
+        "در هر روز PPL و اولویت، ترتیب ترکیبی پیش از تک‌مفصلی را حفظ کن و حرکت اضافی تکراری نگذار.",
+        "Use straightforward prescriptions and preserve recovery between the two lower exposures.",
+        "نسخه‌نویسی ساده را حفظ کن و بین دو مواجهه پایین‌تنه ریکاوری کافی بگذار.",
+    ),
+    _definition(
+        "t12-5-day-chest-specialization",
+        "5-Day Chest Specialization",
+        "پنج‌روزه تخصص سینه",
+        "A chest-priority option that keeps all other major regions trained.",
+        "گزینه با اولویت سینه که همه نواحی اصلی دیگر را نیز تمرین می‌دهد.",
+        INTERMEDIATE_ADVANCED,
+        (Tag.BODY_PART_ROTATION, Tag.CHEST_PRIORITY, Tag.SPECIALIZATION),
+        (
+            _day_definition(
+                "Chest + Triceps",
+                "سینه + پشت بازو",
+                "other",
+                (M.CHEST, M.TRICEPS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _isolation(CHEST_FLY),
+                _isolation(TRICEPS_PUSHDOWN),
+                _isolation(OVERHEAD_TRICEPS_EXTENSION),
+                _core(CRUNCH),
             ),
-            _day(
+            _day_definition(
+                "Back + Biceps",
+                "پشت + جلو بازو",
+                "back_biceps",
+                (M.BACK, M.BICEPS),
+                _primary(ROW),
+                _primary(LAT_PULLDOWN),
+                _isolation(DUMBBELL_CURL),
+                _isolation(HAMMER_CURL),
+                _isolation(REAR_DELT_FLY),
+            ),
+            _day_definition(
+                "Legs",
+                "پا",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Shoulders + Arms",
+                "سرشانه + بازو",
+                "other",
+                (M.SHOULDERS, M.BICEPS, M.TRICEPS),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(REAR_DELT_FLY),
+                _isolation(DUMBBELL_CURL),
+                _isolation(TRICEPS_PUSHDOWN),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Chest Priority",
+                "اولویت سینه",
+                "other",
+                (M.CHEST,),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _isolation(CHEST_FLY),
+                _core(CRUNCH),
+                _isolation(CALF_RAISE),
+            ),
+        ),
+        "Chest receives two direct weekly sessions; other regions remain trained without excessive direct chest volume.",
+        "سینه دو جلسه مستقیم هفتگی دارد و نواحی دیگر نیز بدون حجم مستقیم بیش‌ازحد سینه تمرین می‌شوند.",
+        "Finish both chest presses before fly work; place triceps after chest and keep the priority-day core and calf work last.",
+        "هر دو پرس سینه را پیش از فلای تمام کن؛ پشت بازو بعد از سینه و کار مرکزی و ساق روز اولویت در انتها باشد.",
+        "Use this only when chest priority is intended and keep the non-chest days recoverable.",
+        "این قالب را فقط با قصد اولویت سینه استفاده کن و روزهای غیرسینه را قابل‌ریکاوری نگه دار.",
+    ),
+    _definition(
+        "t13-5-day-back-specialization",
+        "5-Day Back Specialization",
+        "پنج‌روزه تخصص پشت",
+        "A back-priority option with horizontal and vertical pulling on both exposures.",
+        "گزینه با اولویت پشت و کشش افقی و عمودی در هر دو مواجهه.",
+        INTERMEDIATE_ADVANCED,
+        (Tag.BODY_PART_ROTATION, Tag.BACK_PRIORITY, Tag.SPECIALIZATION),
+        (
+            _day_definition(
+                "Back + Biceps",
+                "پشت + جلو بازو",
+                "back_biceps",
+                (M.BACK, M.BICEPS),
+                _primary(ROW),
+                _primary(LAT_PULLDOWN),
+                _secondary(SEATED_CABLE_ROW),
+                _isolation(DUMBBELL_CURL),
+                _isolation(HAMMER_CURL),
+                _core(CRUNCH),
+            ),
+            _day_definition(
                 "Chest + Triceps",
                 "سینه + پشت بازو",
                 "chest_triceps",
                 (M.CHEST, M.TRICEPS),
-                CHEST,
-                INCLINE_CHEST,
-                TRICEPS,
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _isolation(TRICEPS_PUSHDOWN),
+                _isolation(OVERHEAD_TRICEPS_EXTENSION),
+                _core(CRUNCH),
             ),
-            _day(
+            _day_definition(
                 "Legs",
                 "پا",
                 "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                SQUAT,
-                RDL,
-                LEG_EXTENSION,
-                LEG_CURL,
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
             ),
-            _day(
-                "Back Thickness",
-                "ضخامت زیربغل",
+            _day_definition(
+                "Shoulders + Arms",
+                "سرشانه + بازو",
+                "other",
+                (M.SHOULDERS, M.BICEPS, M.TRICEPS),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(REAR_DELT_FLY),
+                _isolation(DUMBBELL_CURL),
+                _isolation(TRICEPS_PUSHDOWN),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Back Priority",
+                "اولویت پشت",
                 "back_biceps",
                 (M.BACK,),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CABLE_PULLDOWN,
-            ),
-            _day(
-                "Shoulders + Biceps",
-                "سرشانه + جلو بازو",
-                "other",
-                (M.SHOULDERS, M.BICEPS),
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                BICEPS,
-            ),
-            _day(
-                "Calves + Core",
-                "ساق + میان‌تنه",
-                "other",
-                (M.CALVES, M.ABS),
-                CALF,
-                SEATED_CALF_RAISE,
-                CORE,
-                SIDE_PLANK,
+                _primary(ROW),
+                _primary(LAT_PULLDOWN),
+                _secondary(STRAIGHT_ARM_PULLDOWN),
+                _core(CRUNCH),
+                _isolation(CALF_RAISE),
             ),
         ),
-        # ── STRENGTH TEMPLATES ────────────────────────────────────────────────
-        _template(
-            "two-day-full-body-strength-beginner",
-            "Two-Day Full Body Strength",
-            "قدرت تمام‌بدن دو روزه",
-            "Alternating A/B full-body sessions built around barbell compound lifts for "
-            "a beginner developing foundational strength.",
-            "جلسات A/B متناوب با تمرکز بر حرکات مرکب هالتری برای مبتدی که قدرت پایه را "
-            "توسعه می‌دهد.",
-            2,
-            Level.BEGINNER,
-            (Tag.FULL_BODY, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.QUADRICEPS, M.CHEST, M.BACK),
-                _slot(
-                    "barbell-back-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=180,
-                ),
-                _slot(
-                    "barbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=180,
-                ),
-                _slot(
-                    "barbell-bent-over-row",
-                    (M.BACK,),
-                    P.HORIZONTAL_PULL,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=150,
-                ),
-                CORE,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.HAMSTRINGS, M.CHEST, M.BACK),
-                _slot(
-                    "goblet-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=3,
-                    reps=(6, 10),
-                    rest=150,
-                ),
-                _slot(
-                    "barbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=180,
-                ),
-                _slot(
-                    "lat-pulldown",
-                    (M.BACK,),
-                    P.VERTICAL_PULL,
-                    sets=3,
-                    reps=(6, 10),
-                    rest=120,
-                ),
-                _slot(
-                    "romanian-deadlift",
-                    (M.HAMSTRINGS, M.GLUTES),
-                    P.HIP_HINGE,
-                    sets=3,
-                    reps=(6, 10),
-                    rest=150,
-                ),
-            ),
-            fitness_goal=FitnessGoal.STRENGTH,
-        ),
-        _template(
-            "three-day-full-body-strength-beginner",
-            "Three-Day Full Body Strength",
-            "قدرت تمام‌بدن سه روزه",
-            "Three alternating full-body sessions centred on squat, press, and pull "
-            "patterns for a beginner building linear strength.",
-            "سه جلسهٔ متناوب تمام‌بدن بر پایهٔ الگوهای اسکوات، پرس و کشش برای مبتدی "
-            "که قدرت خطی می‌سازد.",
-            3,
-            Level.BEGINNER,
-            (Tag.FULL_BODY, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.QUADRICEPS, M.CHEST, M.BACK),
-                _slot(
-                    "barbell-back-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=180,
-                ),
-                _slot(
-                    "barbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=180,
-                ),
-                _slot(
-                    "barbell-bent-over-row",
-                    (M.BACK,),
-                    P.HORIZONTAL_PULL,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=150,
-                ),
-                CORE,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.QUADRICEPS, M.SHOULDERS, M.BACK),
-                _slot(
-                    "barbell-back-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=180,
-                ),
-                _slot(
-                    "smith-machine-shoulder-press",
-                    (M.SHOULDERS,),
-                    P.VERTICAL_PUSH,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=180,
-                ),
-                _slot(
-                    "lat-pulldown",
-                    (M.BACK,),
-                    P.VERTICAL_PULL,
-                    sets=3,
-                    reps=(6, 10),
-                    rest=120,
-                ),
-                _slot(
-                    "romanian-deadlift",
-                    (M.HAMSTRINGS, M.GLUTES),
-                    P.HIP_HINGE,
-                    sets=3,
-                    reps=(6, 10),
-                    rest=150,
-                ),
-            ),
-            _day(
-                "Full Body C",
-                "تمام‌بدن C",
-                "full_body",
-                (M.QUADRICEPS, M.CHEST, M.BACK),
-                _slot(
-                    "barbell-back-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=180,
-                ),
-                _slot(
-                    "barbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=180,
-                ),
-                _slot(
-                    "barbell-bent-over-row",
-                    (M.BACK,),
-                    P.HORIZONTAL_PULL,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=150,
-                ),
-                CORE,
-            ),
-            fitness_goal=FitnessGoal.STRENGTH,
-        ),
-        _template(
-            "three-day-full-body-strength-intermediate",
-            "Three-Day Full Body Strength",
-            "قدرت تمام‌بدن سه روزه - میانی",
-            "Three full-body sessions with heavy compound primaries and moderate-rep "
-            "accessories for an intermediate lifter.",
-            "سه جلسهٔ تمام‌بدن با حرکات مرکب سنگین اصلی و لوازم جانبی با تکرار متوسط "
-            "برای ورزشکار میانی.",
-            3,
-            Level.INTERMEDIATE,
-            (Tag.FULL_BODY, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.QUADRICEPS, M.CHEST, M.BACK),
-                _slot(
-                    "barbell-back-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=180,
-                ),
-                _slot(
-                    "barbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=180,
-                ),
-                _slot(
-                    "barbell-bent-over-row",
-                    (M.BACK,),
-                    P.HORIZONTAL_PULL,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=150,
-                ),
-                BICEPS,
-                CORE,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.HAMSTRINGS, M.SHOULDERS, M.BACK),
-                _slot(
-                    "romanian-deadlift",
-                    (M.HAMSTRINGS, M.GLUTES),
-                    P.HIP_HINGE,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=180,
-                ),
-                _slot(
-                    "smith-machine-shoulder-press",
-                    (M.SHOULDERS,),
-                    P.VERTICAL_PUSH,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=180,
-                ),
-                _slot(
-                    "lat-pulldown",
-                    (M.BACK,),
-                    P.VERTICAL_PULL,
-                    sets=3,
-                    reps=(6, 10),
-                    rest=120,
-                ),
-                TRICEPS,
-                LEG_EXTENSION,
-            ),
-            _day(
-                "Full Body C",
-                "تمام‌بدن C",
-                "full_body",
-                (M.QUADRICEPS, M.CHEST, M.BACK),
-                _slot(
-                    "barbell-back-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=180,
-                ),
-                _slot(
-                    "incline-dumbbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=3,
-                    reps=(6, 10),
-                    rest=150,
-                ),
-                _slot(
-                    "barbell-bent-over-row",
-                    (M.BACK,),
-                    P.HORIZONTAL_PULL,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=150,
-                ),
-                LATERAL_RAISE,
-                CORE,
-            ),
-            fitness_goal=FitnessGoal.STRENGTH,
-        ),
-        _template(
-            "four-day-upper-lower-strength-intermediate",
-            "Four-Day Upper/Lower Strength",
-            "قدرت بالاتنه/پایین‌تنه چهار روزه",
-            "Classic upper/lower split with dedicated power and strength days per body "
-            "region for an intermediate lifter.",
-            "تمرین کلاسیک بالاتنه/پایین‌تنه با روزهای اختصاصی قدرت برای ورزشکار میانی.",
-            4,
-            Level.INTERMEDIATE,
-            (Tag.UPPER_LOWER, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
-            (Method.STANDARD,),
-            _day(
-                "Lower Power",
-                "قدرت پایین‌تنه",
+        "Back receives two direct sessions with both horizontal and vertical pulling; biceps follow back work.",
+        "پشت دو جلسه مستقیم با کشش افقی و عمودی دارد و جلو بازو بعد از کار پشت قرار می‌گیرد.",
+        "Rows and pulldowns lead both back exposures; straight-arm pulldown stays accessory after compounds.",
+        "روئینگ و لت هر دو مواجهه پشت را هدایت می‌کنند و پلاور دست‌صاف بعد از حرکات ترکیبی کمکی می‌ماند.",
+        "Use this only for a true back-priority goal and keep the priority day compact.",
+        "این قالب را فقط برای هدف واقعی اولویت پشت استفاده کن و روز اولویت را فشرده نگه دار.",
+    ),
+    _definition(
+        "t14-5-day-leg-specialization",
+        "5-Day Leg Specialization",
+        "پنج‌روزه تخصص پا",
+        "A leg-priority option splitting quad and posterior-chain emphasis.",
+        "گزینه با اولویت پا که تأکید چهارسر و زنجیره خلفی را جدا می‌کند.",
+        INTERMEDIATE_ADVANCED,
+        (Tag.BODY_PART_ROTATION, Tag.LOWER_PRIORITY, Tag.HAMSTRINGS_PRIORITY),
+        (
+            _day_definition(
+                "Quads",
+                "چهارسر",
                 "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                _slot(
-                    "barbell-back-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=4,
-                    reps=(3, 6),
-                    rest=180,
-                ),
-                _slot(
-                    "romanian-deadlift",
-                    (M.HAMSTRINGS, M.GLUTES),
-                    P.HIP_HINGE,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=150,
-                ),
-                LEG_PRESS,
-                LEG_CURL,
+                (M.QUADRICEPS, M.HAMSTRINGS, M.CALVES),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _isolation(LEG_EXTENSION),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
             ),
-            _day(
-                "Upper Power",
-                "قدرت بالاتنه",
-                "upper",
-                (M.CHEST, M.BACK, M.SHOULDERS),
-                _slot(
-                    "barbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=4,
-                    reps=(3, 6),
-                    rest=180,
-                ),
-                _slot(
-                    "barbell-bent-over-row",
-                    (M.BACK,),
-                    P.HORIZONTAL_PULL,
-                    sets=4,
-                    reps=(3, 6),
-                    rest=180,
-                ),
-                _slot(
-                    "smith-machine-shoulder-press",
-                    (M.SHOULDERS,),
-                    P.VERTICAL_PUSH,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=150,
-                ),
-                LAT_PULLDOWN,
-            ),
-            _day(
-                "Lower Hypertrophy",
-                "هایپرتروفی پایین‌تنه",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                LEG_PRESS,
-                _slot(
-                    "romanian-deadlift",
-                    (M.HAMSTRINGS, M.GLUTES),
-                    P.HIP_HINGE,
-                    sets=3,
-                    reps=(8, 12),
-                    rest=120,
-                ),
-                LEG_EXTENSION,
-                LEG_CURL,
-                CALF,
-            ),
-            _day(
-                "Upper Hypertrophy",
-                "هایپرتروفی بالاتنه",
-                "upper",
-                (M.CHEST, M.BACK, M.SHOULDERS),
-                _slot(
-                    "incline-dumbbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=3,
-                    reps=(8, 12),
-                    rest=120,
-                ),
-                LAT_PULLDOWN,
-                LATERAL_RAISE,
-                BICEPS,
-                TRICEPS,
-            ),
-            fitness_goal=FitnessGoal.STRENGTH,
-        ),
-        _template(
-            "four-day-upper-lower-strength-advanced",
-            "Four-Day Upper/Lower Strength — Advanced",
-            "قدرت بالاتنه/پایین‌تنه چهار روزه - پیشرفته",
-            "Advanced power/hypertrophy split with heavy barbell primaries and targeted "
-            "accessory work.",
-            "تمرین قدرت/هایپرتروفی پیشرفته با حرکات مرکب هالتری سنگین و لوازم جانبی هدفمند.",
-            4,
-            Level.ADVANCED,
-            (Tag.UPPER_LOWER, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
-            (Method.STANDARD,),
-            _day(
-                "Lower Power",
-                "قدرت پایین‌تنه",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                _slot(
-                    "barbell-back-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=5,
-                    reps=(3, 5),
-                    rest=180,
-                ),
-                _slot(
-                    "romanian-deadlift",
-                    (M.HAMSTRINGS, M.GLUTES),
-                    P.HIP_HINGE,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=180,
-                ),
-                LEG_PRESS,
-                LEG_CURL,
-                CALF,
-            ),
-            _day(
-                "Upper Power",
-                "قدرت بالاتنه",
-                "upper",
-                (M.CHEST, M.BACK, M.SHOULDERS),
-                _slot(
-                    "barbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=5,
-                    reps=(3, 5),
-                    rest=180,
-                ),
-                _slot(
-                    "barbell-bent-over-row",
-                    (M.BACK,),
-                    P.HORIZONTAL_PULL,
-                    sets=5,
-                    reps=(3, 5),
-                    rest=180,
-                ),
-                _slot(
-                    "smith-machine-shoulder-press",
-                    (M.SHOULDERS,),
-                    P.VERTICAL_PUSH,
-                    sets=3,
-                    reps=(5, 8),
-                    rest=150,
-                ),
-                LAT_PULLDOWN,
-            ),
-            _day(
-                "Lower Volume",
-                "حجم پایین‌تنه",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                _slot(
-                    "barbell-back-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=4,
-                    reps=(6, 10),
-                    rest=150,
-                ),
-                _slot(
-                    "romanian-deadlift",
-                    (M.HAMSTRINGS, M.GLUTES),
-                    P.HIP_HINGE,
-                    sets=3,
-                    reps=(8, 12),
-                    rest=120,
-                ),
-                LEG_EXTENSION,
-                LEG_CURL,
-            ),
-            _day(
-                "Upper Volume",
-                "حجم بالاتنه",
-                "upper",
-                (M.CHEST, M.BACK, M.SHOULDERS),
-                _slot(
-                    "incline-dumbbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=4,
-                    reps=(6, 10),
-                    rest=120,
-                ),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                LATERAL_RAISE,
-                BICEPS,
-                TRICEPS,
-            ),
-            fitness_goal=FitnessGoal.STRENGTH,
-        ),
-        _template(
-            "five-day-strength-intermediate",
-            "Five-Day Strength Program",
-            "برنامهٔ قدرت پنج روزه - میانی",
-            "Five dedicated sessions with one primary compound per session and supporting "
-            "accessory work for an intermediate strength athlete.",
-            "پنج جلسهٔ اختصاصی با یک حرکت مرکب اصلی در هر جلسه و لوازم جانبی مکمل "
-            "برای ورزشکار قدرتی میانی.",
-            5,
-            Level.INTERMEDIATE,
-            (Tag.UPPER_LOWER, Tag.PUSH_PULL_LEGS, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
-            (Method.STANDARD,),
-            _day(
-                "Squat Day",
-                "روز اسکوات",
-                "quadriceps_calves",
-                (M.QUADRICEPS, M.GLUTES),
-                _slot(
-                    "barbell-back-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=180,
-                ),
-                LEG_PRESS,
-                LEG_EXTENSION,
-                LEG_CURL,
-                CORE,
-            ),
-            _day(
-                "Bench Day",
-                "روز پرس",
+            _day_definition(
+                "Chest",
+                "سینه",
                 "chest_triceps",
                 (M.CHEST, M.TRICEPS),
-                _slot(
-                    "barbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=180,
-                ),
-                INCLINE_CHEST,
-                TRICEPS,
-                PUSH_DOWN,
-                LATERAL_RAISE,
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _isolation(CHEST_FLY),
+                _isolation(TRICEPS_PUSHDOWN),
+                _core(CRUNCH),
             ),
-            _day(
-                "Deadlift Day",
-                "روز ددلیفت",
-                "posterior_chain_core",
-                (M.HAMSTRINGS, M.BACK, M.GLUTES),
-                _slot(
-                    "romanian-deadlift",
-                    (M.HAMSTRINGS, M.GLUTES),
-                    P.HIP_HINGE,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=180,
-                ),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                GLUTE_BRIDGE,
+            _day_definition(
+                "Back",
+                "پشت",
+                "back_biceps",
+                (M.BACK, M.BICEPS),
+                _primary(ROW),
+                _primary(LAT_PULLDOWN),
+                _secondary(SEATED_CABLE_ROW),
+                _isolation(DUMBBELL_CURL),
+                _core(CRUNCH),
             ),
-            _day(
-                "Overhead Press Day",
-                "روز پرس سرشانه",
+            _day_definition(
+                "Shoulders + Arms",
+                "سرشانه + بازو",
                 "other",
-                (M.SHOULDERS, M.TRICEPS),
-                _slot(
-                    "smith-machine-shoulder-press",
-                    (M.SHOULDERS,),
-                    P.VERTICAL_PUSH,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=180,
-                ),
-                LATERAL_RAISE,
-                REAR_DELT,
-                TRICEPS,
-                BICEPS,
+                (M.SHOULDERS, M.BICEPS, M.TRICEPS),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(REAR_DELT_FLY),
+                _isolation(DUMBBELL_CURL),
+                _isolation(TRICEPS_PUSHDOWN),
+                _core(CRUNCH),
             ),
-            _day(
-                "Upper Accessory",
-                "لوازم جانبی بالاتنه",
-                "upper",
-                (M.BACK, M.BICEPS, M.CHEST),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                CABLE_PULLDOWN,
-                BICEPS,
-                HAMMER_CURL,
-            ),
-            fitness_goal=FitnessGoal.STRENGTH,
-        ),
-        _template(
-            "five-day-strength-advanced",
-            "Five-Day Strength Program — Advanced",
-            "برنامهٔ قدرت پنج روزه - پیشرفته",
-            "Advanced five-day programme with maximal compound loading and targeted "
-            "accessory blocks.",
-            "برنامهٔ پنج روزهٔ پیشرفته با بارگذاری مرکب حداکثری و بلوک‌های جانبی هدفمند.",
-            5,
-            Level.ADVANCED,
-            (Tag.UPPER_LOWER, Tag.PUSH_PULL_LEGS, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
-            (Method.STANDARD,),
-            _day(
-                "Squat — Heavy",
-                "اسکوات سنگین",
-                "quadriceps_calves",
-                (M.QUADRICEPS, M.GLUTES),
-                _slot(
-                    "barbell-back-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=5,
-                    reps=(3, 5),
-                    rest=180,
-                ),
-                LEG_PRESS,
-                LEG_EXTENSION,
-                CALF,
-            ),
-            _day(
-                "Bench — Heavy",
-                "پرس سنگین",
-                "chest_triceps",
-                (M.CHEST, M.TRICEPS, M.SHOULDERS),
-                _slot(
-                    "barbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=5,
-                    reps=(3, 5),
-                    rest=180,
-                ),
-                INCLINE_CHEST,
-                PUSH_DOWN,
-                LATERAL_RAISE,
-            ),
-            _day(
-                "Deadlift — Heavy",
-                "ددلیفت سنگین",
+            _day_definition(
+                "Posterior Chain",
+                "زنجیره خلفی",
                 "posterior_chain_core",
-                (M.HAMSTRINGS, M.BACK, M.GLUTES),
-                _slot(
-                    "romanian-deadlift",
-                    (M.HAMSTRINGS, M.GLUTES),
-                    P.HIP_HINGE,
-                    sets=5,
-                    reps=(3, 5),
-                    rest=180,
-                ),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CORE,
+                (M.HAMSTRINGS, M.GLUTES),
+                _primary(RDL),
+                _secondary(LYING_LEG_CURL),
+                _primary(GLUTE_BRIDGE),
+                _secondary(LUNGE),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
             ),
-            _day(
-                "Press + Pull Accessory",
-                "لوازم پرس + کشش",
-                "upper",
-                (M.SHOULDERS, M.BACK, M.BICEPS),
-                _slot(
-                    "smith-machine-shoulder-press",
-                    (M.SHOULDERS,),
-                    P.VERTICAL_PUSH,
-                    sets=4,
-                    reps=(5, 8),
-                    rest=150,
-                ),
-                LAT_PULLDOWN,
-                REAR_DELT,
-                BICEPS,
-                TRICEPS,
-            ),
-            _day(
-                "Leg Accessory + Core",
-                "لوازم پا + میان‌تنه",
-                "other",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.ABS),
-                LEG_PRESS,
-                LEG_CURL,
-                LUNGE,
-                CORE,
-                SIDE_PLANK,
-            ),
-            fitness_goal=FitnessGoal.STRENGTH,
         ),
-        _template(
-            "six-day-push-pull-legs-strength",
-            "Six-Day PPL Strength",
-            "قدرت پوش‌پول‌لگ شش روزه",
-            "Six-day push/pull/legs rotation with weekly compound primaries for an "
-            "advanced strength athlete.",
-            "چرخش پوش/پول/لگ شش روزه با حرکات مرکب اصلی هفتگی برای ورزشکار قدرتی پیشرفته.",
-            6,
-            Level.ADVANCED,
-            (Tag.PUSH_PULL_LEGS, Tag.COMPOUND_FOCUS, Tag.STRENGTH_BIAS),
-            (Method.STANDARD,),
-            _day(
-                "Push — Heavy",
-                "پوش سنگین",
-                "push",
-                (M.CHEST, M.SHOULDERS, M.TRICEPS),
-                _slot(
-                    "barbell-bench-press",
-                    (M.CHEST,),
-                    P.HORIZONTAL_PUSH,
-                    sets=5,
-                    reps=(3, 5),
-                    rest=180,
-                ),
-                _slot(
-                    "smith-machine-shoulder-press",
-                    (M.SHOULDERS,),
-                    P.VERTICAL_PUSH,
-                    sets=4,
-                    reps=(5, 8),
-                    rest=150,
-                ),
-                TRICEPS,
-                LATERAL_RAISE,
-            ),
-            _day(
-                "Pull — Heavy",
-                "پول سنگین",
-                "pull",
-                (M.BACK, M.BICEPS),
-                _slot(
-                    "barbell-bent-over-row",
-                    (M.BACK,),
-                    P.HORIZONTAL_PULL,
-                    sets=5,
-                    reps=(3, 5),
-                    rest=180,
-                ),
-                LAT_PULLDOWN,
-                BICEPS,
-                REAR_DELT,
-            ),
-            _day(
-                "Legs — Heavy",
-                "پا سنگین",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                _slot(
-                    "barbell-back-squat",
-                    (M.QUADRICEPS,),
-                    P.SQUAT,
-                    sets=5,
-                    reps=(3, 5),
-                    rest=180,
-                ),
-                _slot(
-                    "romanian-deadlift",
-                    (M.HAMSTRINGS, M.GLUTES),
-                    P.HIP_HINGE,
-                    sets=4,
-                    reps=(4, 6),
-                    rest=150,
-                ),
-                CALF,
-            ),
-            _day(
-                "Push — Volume",
-                "پوش حجم",
-                "push",
-                (M.CHEST, M.SHOULDERS, M.TRICEPS),
-                INCLINE_CHEST,
-                CABLE_FLY,
-                LATERAL_RAISE,
-                PUSH_DOWN,
-                TRICEPS,
-            ),
-            _day(
-                "Pull — Volume",
-                "پول حجم",
-                "pull",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                CABLE_PULLDOWN,
-                HAMMER_CURL,
-                BICEPS,
-            ),
-            _day(
-                "Legs — Volume",
-                "پا حجم",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
-                LEG_PRESS,
-                LEG_EXTENSION,
-                LEG_CURL,
-                CORE,
-                SIDE_PLANK,
-            ),
-            fitness_goal=FitnessGoal.STRENGTH,
-        ),
-        # ── FAT LOSS TEMPLATES ────────────────────────────────────────────────
-        _template(
-            "two-day-full-body-fat-loss-beginner",
-            "Two-Day Full Body Fat Loss",
-            "چربی‌سوزی تمام‌بدن دو روزه",
-            "Two full-body resistance sessions per week to preserve muscle while in a "
-            "calorie deficit for a beginner.",
-            "دو جلسهٔ مقاومتی تمام‌بدن در هفته برای حفظ عضله در کمبود کالری برای مبتدی.",
-            2,
-            Level.BEGINNER,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
-                CHEST,
-                BACK_ROW,
-                SQUAT,
-                GLUTE_BRIDGE,
-                CORE,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                LUNGE,
-                RDL,
-                CORE,
-            ),
-            fitness_goal=FitnessGoal.FAT_LOSS,
-        ),
-        _template(
-            "three-day-full-body-fat-loss-beginner",
-            "Three-Day Full Body Fat Loss",
-            "چربی‌سوزی تمام‌بدن سه روزه",
-            "Three full-body sessions per week designed to maintain lean mass during a "
-            "fat loss phase for a beginner.",
-            "سه جلسهٔ تمام‌بدن در هفته برای حفظ توده‌ٔ عضلانی در فاز چربی‌سوزی برای مبتدی.",
-            3,
-            Level.BEGINNER,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
-                CHEST,
-                BACK_ROW,
-                SQUAT,
-                GLUTE_BRIDGE,
-                CORE,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                LUNGE,
-                RDL,
-            ),
-            _day(
-                "Full Body C",
-                "تمام‌بدن C",
-                "full_body",
-                (M.SHOULDERS, M.BACK, M.QUADRICEPS, M.ABS),
-                SHOULDER_PRESS,
-                BACK_ROW,
-                LEG_PRESS,
-                CORE,
-                SIDE_PLANK,
-            ),
-            fitness_goal=FitnessGoal.FAT_LOSS,
-        ),
-        _template(
-            "three-day-full-body-fat-loss-intermediate",
-            "Three-Day Full Body Fat Loss",
-            "چربی‌سوزی تمام‌بدن سه روزه - میانی",
-            "Three full-body sessions targeting major compound patterns with brief rest "
-            "for an intermediate lifter in a fat loss phase.",
-            "سه جلسهٔ تمام‌بدن با تمرکز بر الگوهای مرکب اصلی و استراحت کوتاه برای "
-            "ورزشکار میانی در فاز چربی‌سوزی.",
-            3,
-            Level.INTERMEDIATE,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
-                CHEST,
-                BACK_ROW,
-                SQUAT,
-                GLUTE_BRIDGE,
-                CORE,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                LUNGE,
-                RDL,
-                LATERAL_RAISE,
-            ),
-            _day(
-                "Full Body C",
-                "تمام‌بدن C",
-                "full_body",
-                (M.SHOULDERS, M.BACK, M.QUADRICEPS, M.ABS),
-                SHOULDER_PRESS,
-                BACK_ROW,
-                LEG_PRESS,
-                LEG_EXTENSION,
-                CORE,
-            ),
-            fitness_goal=FitnessGoal.FAT_LOSS,
-        ),
-        _template(
-            "four-day-upper-lower-fat-loss-intermediate",
-            "Four-Day Upper/Lower Fat Loss",
-            "چربی‌سوزی بالاتنه/پایین‌تنه چهار روزه",
-            "Upper/lower split with higher-rep, shorter-rest training to maximise "
-            "metabolic demand for an intermediate lifter in fat loss.",
-            "تمرین بالاتنه/پایین‌تنه با تکرار بالا و استراحت کوتاه برای افزایش مصرف "
-            "متابولیک ورزشکار میانی در فاز چربی‌سوزی.",
-            4,
-            Level.INTERMEDIATE,
-            (Tag.UPPER_LOWER, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Upper A",
-                "بالاتنه A",
-                "upper",
-                (M.CHEST, M.BACK, M.SHOULDERS),
-                CHEST,
-                BACK_ROW,
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                CORE,
-            ),
-            _day(
-                "Lower A",
-                "پایین‌تنه A",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                SQUAT,
-                RDL,
-                LEG_EXTENSION,
-                CALF,
-            ),
-            _day(
-                "Upper B",
-                "بالاتنه B",
-                "upper",
-                (M.CHEST, M.BACK, M.BICEPS, M.TRICEPS),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                BICEPS,
-                TRICEPS,
-            ),
-            _day(
-                "Lower B",
-                "پایین‌تنه B",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
-                LEG_PRESS,
-                LUNGE,
-                LEG_CURL,
-                CORE,
-                SIDE_PLANK,
-            ),
-            fitness_goal=FitnessGoal.FAT_LOSS,
-        ),
-        _template(
-            "four-day-upper-lower-fat-loss-advanced",
-            "Four-Day Upper/Lower Fat Loss — Advanced",
-            "چربی‌سوزی بالاتنه/پایین‌تنه چهار روزه - پیشرفته",
-            "Compound-focused upper/lower split with brief rest to maximise caloric "
-            "expenditure for an advanced lifter.",
-            "تمرین مرکب بالاتنه/پایین‌تنه با استراحت کوتاه برای افزایش کالری سوزی "
-            "ورزشکار پیشرفته در فاز چربی‌سوزی.",
-            4,
-            Level.ADVANCED,
-            (Tag.UPPER_LOWER, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Upper A",
-                "بالاتنه A",
-                "upper",
-                (M.CHEST, M.BACK, M.SHOULDERS),
-                BARBELL_BENCH,
-                BACK_ROW,
-                SHOULDER_PRESS,
-                LAT_PULLDOWN,
-                LATERAL_RAISE,
-            ),
-            _day(
-                "Lower A",
-                "پایین‌تنه A",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                SQUAT,
-                BARBELL_STRAIGHT_LEG_DEADLIFT,
-                LEG_EXTENSION,
-                LEG_CURL,
-                CALF,
-            ),
-            _day(
-                "Upper B",
-                "بالاتنه B",
-                "upper",
-                (M.CHEST, M.BACK, M.BICEPS, M.TRICEPS),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                CABLE_FLY,
-                BICEPS,
-                TRICEPS,
-            ),
-            _day(
-                "Lower B",
-                "پایین‌تنه B",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
-                LEG_PRESS,
-                RDL,
-                LUNGE,
-                CORE,
-                SIDE_PLANK,
-            ),
-            fitness_goal=FitnessGoal.FAT_LOSS,
-        ),
-        _template(
-            "five-day-ppl-fat-loss-intermediate",
-            "Five-Day PPL Fat Loss",
-            "چربی‌سوزی پوش‌پول‌لگ پنج روزه",
-            "Push/pull/legs split plus two extra upper sessions for maximum weekly "
-            "frequency and metabolic stimulus.",
-            "تمرین پوش/پول/لگ با دو جلسهٔ اضافی بالاتنه برای بیشترین تکرار هفتگی و محرک متابولیک.",
-            5,
-            Level.INTERMEDIATE,
-            (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Push",
-                "پوش",
-                "push",
-                (M.CHEST, M.SHOULDERS, M.TRICEPS),
-                CHEST,
-                SHOULDER_PRESS,
-                TRICEPS,
-                LATERAL_RAISE,
-            ),
-            _day(
-                "Pull",
-                "پول",
-                "pull",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                BICEPS,
-                REAR_DELT,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
-                SQUAT,
-                RDL,
-                LEG_EXTENSION,
-                CALF,
-                CORE,
-            ),
-            _day(
-                "Upper A",
-                "بالاتنه A",
-                "upper",
-                (M.CHEST, M.BACK, M.SHOULDERS),
-                INCLINE_CHEST,
-                BACK_ROW,
-                LATERAL_RAISE,
-            ),
-            _day(
-                "Upper B",
-                "بالاتنه B",
-                "upper",
-                (M.BACK, M.BICEPS, M.TRICEPS),
-                LAT_PULLDOWN,
-                CABLE_FLY,
-                HAMMER_CURL,
-                PUSH_DOWN,
-            ),
-            fitness_goal=FitnessGoal.FAT_LOSS,
-        ),
-        _template(
-            "five-day-ppl-fat-loss-advanced",
-            "Five-Day PPL Fat Loss — Advanced",
-            "چربی‌سوزی پوش‌پول‌لگ پنج روزه - پیشرفته",
-            "Advanced five-day push/pull/legs with two full-body finisher sessions for "
-            "maximum weekly caloric expenditure.",
-            "پنج روز پوش/پول/لگ پیشرفته با دو جلسهٔ تمام‌بدن برای حداکثر کالری‌سوزی هفتگی.",
-            5,
-            Level.ADVANCED,
-            (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Push",
-                "پوش",
-                "push",
-                (M.CHEST, M.SHOULDERS, M.TRICEPS),
-                BARBELL_BENCH,
-                INCLINE_CHEST,
-                SHOULDER_PRESS,
-                PUSH_DOWN,
-                LATERAL_RAISE,
-            ),
-            _day(
-                "Pull",
-                "پول",
-                "pull",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                CABLE_PULLDOWN,
-                BICEPS,
-                REAR_DELT,
-            ),
-            _day(
-                "Legs",
-                "پا",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
-                SQUAT,
-                BARBELL_STRAIGHT_LEG_DEADLIFT,
-                LEG_EXTENSION,
-                LEG_CURL,
-                CORE,
-            ),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS),
-                INCLINE_CHEST,
-                BACK_ROW,
-                LEG_PRESS,
-                LATERAL_RAISE,
-            ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.HAMSTRINGS, M.BACK, M.TRICEPS, M.ABS),
-                RDL,
-                LAT_PULLDOWN,
-                TRICEPS,
-                SIDE_PLANK,
-            ),
-            fitness_goal=FitnessGoal.FAT_LOSS,
-        ),
-        _template(
-            "six-day-ppl-fat-loss-advanced",
-            "Six-Day PPL Fat Loss — Advanced",
-            "چربی‌سوزی پوش‌پول‌لگ شش روزه - پیشرفته",
-            "Six-day PPL twice with brief rest to maximise weekly training volume and "
-            "metabolic stimulus during a fat loss phase.",
-            "پوش/پول/لگ دوبار در هفته با استراحت کوتاه برای افزایش حجم تمرین هفتگی "
-            "و محرک متابولیک در فاز چربی‌سوزی.",
-            6,
-            Level.ADVANCED,
-            (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
+        "Split quad and posterior emphasis; hamstrings receive both hinge and curl patterns without excessive specialization volume.",
+        "تأکید چهارسر و خلفی جداست؛ همسترینگ هم الگوی هینج و هم پشت‌پا را می‌گیرد، بدون حجم تخصصی افراطی.",
+        "Lower-body compounds lead the quad and posterior days; isolation follows the relevant compound block.",
+        "حرکات ترکیبی پایین‌تنه روزهای چهارسر و خلفی را هدایت می‌کنند و تک‌مفصلی بعد از بلوک ترکیبی مرتبط می‌آید.",
+        "Use only as a leg-priority catalog option and preserve recovery before repeating lower-body stress.",
+        "این قالب را فقط به‌عنوان گزینه اولویت پا استفاده کن و پیش از تکرار فشار پایین‌تنه ریکاوری را حفظ کن.",
+    ),
+    _definition(
+        "t15-6-day-ppl-2x",
+        "6-Day PPL ×2",
+        "PPL دو بار در هفته",
+        "Two planned push, pull, and legs rotations with purposeful A/B variation.",
+        "دو چرخه برنامه‌ریزی‌شده پوش، پول و پا با تنوع هدفمند A/B.",
+        INTERMEDIATE_ADVANCED,
+        (Tag.PUSH_PULL_LEGS,),
+        (
+            _day_definition(
                 "Push A",
                 "پوش A",
                 "push",
                 (M.CHEST, M.SHOULDERS, M.TRICEPS),
-                BARBELL_BENCH,
-                SHOULDER_PRESS,
-                TRICEPS,
-                LATERAL_RAISE,
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(TRICEPS_PUSHDOWN),
+                _core(CRUNCH),
             ),
-            _day(
+            _day_definition(
                 "Pull A",
                 "پول A",
                 "pull",
-                (M.BACK, M.BICEPS),
-                BACK_ROW,
-                LAT_PULLDOWN,
-                BICEPS,
-                REAR_DELT,
+                (M.BACK, M.BICEPS, M.TRAPS),
+                _primary(ROW),
+                _primary(LAT_PULLDOWN),
+                _isolation(DUMBBELL_CURL),
+                _isolation(HAMMER_CURL),
+                _isolation(SHRUG),
+                _core(CRUNCH),
             ),
-            _day(
+            _day_definition(
                 "Legs A",
                 "پا A",
                 "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
-                SQUAT,
-                RDL,
-                LEG_EXTENSION,
-                CORE,
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
             ),
-            _day(
+            _day_definition(
                 "Push B",
                 "پوش B",
                 "push",
                 (M.CHEST, M.SHOULDERS, M.TRICEPS),
-                INCLINE_CHEST,
-                CABLE_FLY,
-                LATERAL_RAISE,
-                PUSH_DOWN,
+                _primary(FLAT_PRESS),
+                _isolation(CHEST_FLY),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(OVERHEAD_TRICEPS_EXTENSION),
+                _core(CRUNCH),
             ),
-            _day(
+            _day_definition(
                 "Pull B",
                 "پول B",
                 "pull",
-                (M.BACK, M.BICEPS),
-                CABLE_PULLDOWN,
-                BACK_ROW,
-                HAMMER_CURL,
-                FACE_PULL,
+                (M.BACK, M.BICEPS, M.TRAPS),
+                _primary(SEATED_CABLE_ROW),
+                _primary(LAT_PULLDOWN),
+                _isolation(DUMBBELL_CURL),
+                _isolation(HAMMER_CURL),
+                _isolation(SHRUG),
+                _core(CRUNCH),
             ),
-            _day(
+            _day_definition(
                 "Legs B",
                 "پا B",
                 "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
-                LEG_PRESS,
-                LEG_CURL,
-                LUNGE,
-                CALF,
-                SIDE_PLANK,
+                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
+                _primary(RDL),
+                _secondary(LYING_LEG_CURL),
+                _primary(FRONT_SQUAT),
+                _primary(GLUTE_BRIDGE),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
             ),
-            fitness_goal=FitnessGoal.FAT_LOSS,
         ),
-        # ── GENERAL FITNESS / IMPROVE_FITNESS TEMPLATES ──────────────────────
-        _template(
-            "two-day-full-body-general-fitness-beginner",
-            "Two-Day Full Body General Fitness",
-            "آمادگی عمومی تمام‌بدن دو روزه",
-            "Two well-rounded full-body sessions per week for a beginner building "
-            "foundational fitness.",
-            "دو جلسهٔ جامع تمام‌بدن در هفته برای مبتدی که آمادگی جسمانی پایه را توسعه می‌دهد.",
-            2,
-            Level.BEGINNER,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
-                CHEST,
-                BACK_ROW,
-                SQUAT,
-                GLUTE_BRIDGE,
-                CORE,
+        "A/B variation is purposeful; Push B completes chest before shoulders and posterior work does not replace later compounds.",
+        "تنوع A/B هدفمند است؛ پوش B سینه را پیش از سرشانه کامل می‌کند و کار خلفی جای حرکات ترکیبی بعدی را نمی‌گیرد.",
+        "Each day follows push, pull, or lower-body blocks; chest finishes before shoulders on both push days.",
+        "هر روز بلوک پوش، پول یا پایین‌تنه خود را حفظ می‌کند؛ در هر دو روز پوش سینه پیش از سرشانه تمام می‌شود.",
+        "Six days require planned recovery and no mandatory advanced intensity techniques.",
+        "شش روز تمرین به ریکاوری برنامه‌ریزی‌شده نیاز دارد و تکنیک شدت پیشرفته الزامی نیست.",
+    ),
+    _definition(
+        "t16-6-day-advanced-body-part",
+        "6-Day Advanced Body-Part",
+        "شش‌روزه پیشرفته عضله‌ای",
+        "An advanced body-part option with a clear focus on every day.",
+        "گزینه پیشرفته عضله‌ای با تمرکز روشن در هر روز.",
+        (Level.ADVANCED,),
+        (Tag.BODY_PART_ROTATION, Tag.BALANCED),
+        (
+            _day_definition(
+                "Chest",
+                "سینه",
+                "chest_triceps",
+                (M.CHEST, M.TRICEPS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _isolation(CHEST_FLY),
+                _isolation(TRICEPS_PUSHDOWN),
+                _core(CRUNCH),
             ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                LUNGE,
-                RDL,
-                CORE,
+            _day_definition(
+                "Back",
+                "پشت",
+                "back_biceps",
+                (M.BACK, M.BICEPS),
+                _primary(ROW),
+                _primary(LAT_PULLDOWN),
+                _secondary(SEATED_CABLE_ROW),
+                _isolation(DUMBBELL_CURL),
+                _core(CRUNCH),
             ),
-            fitness_goal=FitnessGoal.IMPROVE_FITNESS,
+            _day_definition(
+                "Quads",
+                "چهارسر",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS, M.CALVES),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _isolation(LEG_EXTENSION),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+            ),
+            _day_definition(
+                "Shoulders",
+                "سرشانه",
+                "shoulders_traps",
+                (M.SHOULDERS, M.TRAPS),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(REAR_DELT_FLY),
+                _isolation(SHRUG),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Arms",
+                "بازو",
+                "other",
+                (M.BICEPS, M.TRICEPS),
+                _isolation(BARBELL_CURL),
+                _isolation(HAMMER_CURL),
+                _isolation(TRICEPS_PUSHDOWN),
+                _isolation(OVERHEAD_TRICEPS_EXTENSION),
+                _core(CRUNCH),
+            ),
+            _day_definition(
+                "Hamstrings + Glutes",
+                "همسترینگ + باسن",
+                "posterior_chain_core",
+                (M.HAMSTRINGS, M.GLUTES),
+                _primary(RDL),
+                _secondary(LYING_LEG_CURL),
+                _primary(GLUTE_BRIDGE),
+                _secondary(LUNGE),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
+            ),
         ),
-        _template(
-            "three-day-full-body-general-fitness-beginner",
-            "Three-Day Full Body General Fitness",
-            "آمادگی عمومی تمام‌بدن سه روزه",
-            "Three full-body sessions per week covering all major movement patterns for "
-            "a beginner building general fitness.",
-            "سه جلسهٔ تمام‌بدن در هفته با پوشش همهٔ الگوهای حرکتی اصلی برای مبتدی "
-            "که آمادگی عمومی می‌سازد.",
-            3,
-            Level.BEGINNER,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
-                CHEST,
-                BACK_ROW,
-                SQUAT,
-                GLUTE_BRIDGE,
-                CORE,
+        "Each day has a clear focus and uses appropriate modalities without automatically adding advanced intensity methods.",
+        "هر روز تمرکز روشن دارد و از وسایل مناسب استفاده می‌کند، بدون افزودن خودکار تکنیک‌های شدت پیشرفته.",
+        "Dedicated days place major compounds before isolation; arms, calves, and core remain after the main regional block.",
+        "روزهای اختصاصی حرکات ترکیبی اصلی را پیش از تک‌مفصلی می‌آورند؛ بازو، ساق و مرکزی بعد از بلوک اصلی ناحیه‌ای می‌آیند.",
+        "Use this advanced option only when six-day recovery is realistic and keep technique ahead of fatigue.",
+        "این گزینه پیشرفته را فقط وقتی استفاده کن که ریکاوری شش‌روزه واقع‌بینانه باشد و فرم بر خستگی مقدم بماند.",
+    ),
+    _definition(
+        "t17-6-day-balanced-specialization",
+        "6-Day Balanced Specialization",
+        "شش‌روزه تخصص متعادل",
+        "An advanced high-frequency option with clear second-exposure emphasis.",
+        "گزینه پیشرفته پرتکرار با تأکید روشن در مواجهه‌های دوم.",
+        (Level.ADVANCED,),
+        (Tag.PUSH_PULL_LEGS, Tag.CHEST_PRIORITY, Tag.BACK_PRIORITY, Tag.SPECIALIZATION),
+        (
+            _day_definition(
+                "Push",
+                "پوش",
+                "push",
+                (M.CHEST, M.SHOULDERS, M.TRICEPS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(TRICEPS_PUSHDOWN),
+                _core(CRUNCH),
             ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                LUNGE,
-                RDL,
+            _day_definition(
+                "Pull",
+                "پول",
+                "pull",
+                (M.BACK, M.BICEPS, M.TRAPS),
+                _primary(ROW),
+                _primary(LAT_PULLDOWN),
+                _isolation(DUMBBELL_CURL),
+                _isolation(HAMMER_CURL),
+                _isolation(SHRUG),
+                _core(CRUNCH),
             ),
-            _day(
-                "Full Body C",
-                "تمام‌بدن C",
-                "full_body",
-                (M.SHOULDERS, M.BACK, M.QUADRICEPS, M.ABS),
-                SHOULDER_PRESS,
-                BACK_ROW,
-                LEG_PRESS,
-                CORE,
-                SIDE_PLANK,
+            _day_definition(
+                "Legs",
+                "پا",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS),
+                _primary(SQUAT),
+                _primary(LEG_PRESS),
+                _primary(RDL),
+                _secondary(SEATED_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
             ),
-            fitness_goal=FitnessGoal.IMPROVE_FITNESS,
-        ),
-        _template(
-            "three-day-full-body-general-fitness-intermediate",
-            "Three-Day Full Body General Fitness",
-            "آمادگی عمومی تمام‌بدن سه روزه - میانی",
-            "Three full-body sessions per week for an intermediate lifter maintaining "
-            "or improving overall fitness.",
-            "سه جلسهٔ تمام‌بدن در هفته برای ورزشکار میانی که آمادگی کلی را حفظ یا بهبود می‌دهد.",
-            3,
-            Level.INTERMEDIATE,
-            (Tag.FULL_BODY, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Full Body A",
-                "تمام‌بدن A",
-                "full_body",
-                (M.CHEST, M.BACK, M.QUADRICEPS, M.GLUTES),
-                CHEST,
-                BACK_ROW,
-                SQUAT,
-                GLUTE_BRIDGE,
-                LATERAL_RAISE,
+            _day_definition(
+                "Chest Priority",
+                "اولویت سینه",
+                "other",
+                (M.CHEST, M.TRICEPS),
+                _primary(FLAT_PRESS),
+                _secondary(INCLINE_PRESS),
+                _isolation(CHEST_FLY),
+                _isolation(TRICEPS_PUSHDOWN),
+                _core(CRUNCH),
             ),
-            _day(
-                "Full Body B",
-                "تمام‌بدن B",
-                "full_body",
-                (M.CHEST, M.BACK, M.HAMSTRINGS, M.GLUTES),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                LUNGE,
-                RDL,
-                BICEPS,
+            _day_definition(
+                "Back + Delts Priority",
+                "اولویت پشت + دلت",
+                "other",
+                (M.BACK, M.SHOULDERS),
+                _primary(SEATED_CABLE_ROW),
+                _primary(LAT_PULLDOWN),
+                _secondary(STRAIGHT_ARM_PULLDOWN),
+                _primary(SHOULDER_PRESS),
+                _isolation(LATERAL_RAISE),
+                _isolation(REAR_DELT_FLY),
+                _core(CRUNCH),
             ),
-            _day(
-                "Full Body C",
-                "تمام‌بدن C",
-                "full_body",
-                (M.SHOULDERS, M.BACK, M.QUADRICEPS, M.ABS),
-                SHOULDER_PRESS,
-                BACK_ROW,
-                LEG_PRESS,
-                TRICEPS,
-                CORE,
-            ),
-            fitness_goal=FitnessGoal.IMPROVE_FITNESS,
-        ),
-        _template(
-            "four-day-upper-lower-general-fitness-intermediate",
-            "Four-Day Upper/Lower General Fitness",
-            "آمادگی عمومی بالاتنه/پایین‌تنه چهار روزه",
-            "Upper/lower split with balanced compound and isolation work for an "
-            "intermediate lifter focused on overall fitness.",
-            "تمرین بالاتنه/پایین‌تنه با کار مرکب و انزوایی متعادل برای ورزشکار میانی "
-            "با تمرکز بر آمادگی کلی.",
-            4,
-            Level.INTERMEDIATE,
-            (Tag.UPPER_LOWER, Tag.BALANCED),
-            (Method.STANDARD,),
-            _day(
-                "Upper A",
-                "بالاتنه A",
-                "upper",
-                (M.CHEST, M.BACK, M.SHOULDERS),
-                CHEST,
-                BACK_ROW,
-                SHOULDER_PRESS,
-                LATERAL_RAISE,
-                CORE,
-            ),
-            _day(
-                "Lower A",
-                "پایین‌تنه A",
+            _day_definition(
+                "Legs Priority",
+                "اولویت پا",
                 "lower",
                 (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES),
-                SQUAT,
-                RDL,
-                LEG_EXTENSION,
-                CALF,
+                _primary(FRONT_SQUAT),
+                _primary(LEG_PRESS),
+                _secondary(LUNGE),
+                _primary(RDL),
+                _secondary(LYING_LEG_CURL),
+                _isolation(CALF_RAISE),
+                _core(CRUNCH),
             ),
-            _day(
-                "Upper B",
-                "بالاتنه B",
-                "upper",
-                (M.CHEST, M.BACK, M.BICEPS, M.TRICEPS),
-                INCLINE_CHEST,
-                LAT_PULLDOWN,
-                BICEPS,
-                TRICEPS,
-            ),
-            _day(
-                "Lower B",
-                "پایین‌تنه B",
-                "lower",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.ABS),
-                LEG_PRESS,
-                LUNGE,
-                LEG_CURL,
-                CORE,
-            ),
-            fitness_goal=FitnessGoal.IMPROVE_FITNESS,
         ),
-    )
-    if template.slug not in (RETIRED_REDUNDANT_TEMPLATE_SLUGS | RETIRED_UNSUPPORTED_TEMPLATE_SLUGS)
+        "Second exposures have clear emphasis while chest, back, and lower-body volume stays controlled.",
+        "مواجهه‌های دوم تأکید روشن دارند و حجم سینه، پشت و پایین‌تنه کنترل‌شده باقی می‌ماند.",
+        "Finish chest before shoulders on push days, back before delts on the priority day, and lower-body blocks before accessories.",
+        "در روز پوش سینه را پیش از سرشانه، در روز اولویت پشت را پیش از دلت و در روز پا بلوک پایین‌تنه را پیش از کمکی‌ها تمام کن.",
+        "Use planned movement variation and only choose this six-day option when recovery is reliable.",
+        "تنوع حرکتی برنامه‌ریزی‌شده داشته باش و این گزینه شش‌روزه را فقط با ریکاوری قابل‌اعتماد انتخاب کن.",
+    ),
+)
+
+
+CANONICAL_TEMPLATE_DEFINITIONS = _DEFINITIONS
+
+
+def _expand_definition(
+    definition: CanonicalTemplateDefinition,
+) -> tuple[TrainingProgramTemplateSeed, ...]:
+    expanded: list[TrainingProgramTemplateSeed] = []
+    for level in definition.eligible_levels:
+        days = tuple(
+            _render_day(day, level, specs)
+            for day, specs in zip(
+                definition.days,
+                definition.day_specs,
+                strict=True,
+            )
+        )
+        seed_slug = f"{definition.canonical_slug}-{level.value.replace('_', '-')}"
+        seed = TrainingProgramTemplateSeed(
+            canonical_slug=definition.canonical_slug,
+            slug=seed_slug,
+            name_en=definition.name_en,
+            name_fa=definition.name_fa,
+            description_en=definition.description_en,
+            description_fa=definition.description_fa,
+            days_per_week=len(days),
+            training_level=level,
+            focus_tags=definition.focus_tags,
+            intensity_methods=(Method.STANDARD,),
+            days=days,
+            programming_rationale=_rationale(definition, level),
+            fitness_goal=FitnessGoal.BUILD_MUSCLE,
+        )
+        validate_template_focus_tags(
+            seed.focus_tags,
+            intensity_methods=seed.intensity_methods,
+            days=seed.days,
+        )
+        expanded.append(seed)
+    return tuple(expanded)
+
+
+TRAINING_PROGRAM_TEMPLATE_SEEDS = tuple(
+    seed for definition in CANONICAL_TEMPLATE_DEFINITIONS for seed in _expand_definition(definition)
 )

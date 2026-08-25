@@ -2,38 +2,38 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.exercises.service import seed_exercises
 from app.training_templates.engine_reference import load_template_references
 from app.training_templates.models import TrainingProgramTemplate
 from app.training_templates.service import seed_training_program_templates
 from app.workouts.program_engine.enums import SplitType
+from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
 
 
 def test_engine_references_preserve_linked_slot_and_adaptation_metadata(db: Session) -> None:
-    seed_exercises(db)
+    seed_real_catalog_exercises(db)
     seed_training_program_templates(db)
 
     reference = next(
         item
         for item in load_template_references(db)
-        if item.slug == "five-day-advanced-leg-specialization"
+        if item.slug == "t14-5-day-leg-specialization-intermediate"
     )
-    paired_slots = [
-        slot for day in reference.days for slot in day.slots if slot.superset_group == "leg-calf"
-    ]
 
     assert reference.days_per_week == 5
-    assert len(paired_slots) == 2
-    assert all(slot.adaptation_priority == "accessory" for slot in paired_slots)
-    assert all(slot.exercise_id is None or slot.exercise_id for slot in paired_slots)
+    assert all(slot.exercise_id is not None for day in reference.days for slot in day.slots)
+    assert all(
+        slot.adaptation_priority in {"core", "accessory"}
+        for day in reference.days
+        for slot in day.slots
+    )
 
 
 def test_engine_reference_rejects_noncanonical_persisted_focus_tags(db: Session) -> None:
-    seed_exercises(db)
+    seed_real_catalog_exercises(db)
     seed_training_program_templates(db)
     template = db.scalar(
         select(TrainingProgramTemplate).where(
-            TrainingProgramTemplate.slug == "four-day-classic-body-part"
+            TrainingProgramTemplate.slug == "t10-5-day-classic-body-part-intermediate"
         )
     )
     assert template is not None
@@ -47,10 +47,13 @@ def test_engine_reference_rejects_noncanonical_persisted_focus_tags(db: Session)
 @pytest.mark.parametrize(
     ("slug", "expected"),
     (
-        ("two-day-full-body-foundation", SplitType.FULL_BODY),
-        ("four-day-upper-lower-strength-intermediate", SplitType.UPPER_LOWER),
-        ("three-day-push-pull-legs", SplitType.PUSH_PULL_LEGS),
-        ("four-day-classic-body-part", SplitType.BODY_PART_ROTATION),
+        ("t01-2-day-full-body-ab-beginner", SplitType.FULL_BODY),
+        ("t05-4-day-upper-lower-2x-intermediate", SplitType.UPPER_LOWER),
+        (
+            "t09-5-day-ppl-upper-lower-intermediate",
+            SplitType.PUSH_PULL_LEGS_UPPER_LOWER,
+        ),
+        ("t10-5-day-classic-body-part-intermediate", SplitType.BODY_PART_ROTATION),
     ),
 )
 def test_engine_reference_preserves_canonical_split_identity(
@@ -58,7 +61,7 @@ def test_engine_reference_preserves_canonical_split_identity(
     slug: str,
     expected: SplitType,
 ) -> None:
-    seed_exercises(db)
+    seed_real_catalog_exercises(db)
     seed_training_program_templates(db)
 
     reference = next(item for item in load_template_references(db) if item.slug == slug)

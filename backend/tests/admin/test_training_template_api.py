@@ -7,6 +7,7 @@ from app.auth.models import User
 from app.exercises.models import Exercise
 from app.exercises.service import seed_exercises
 from app.training_templates.service import seed_training_program_templates
+from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -22,6 +23,7 @@ def _register(client: TestClient, email: str) -> None:
 
 def _seed_library(db: Session) -> None:
     seed_exercises(db)
+    seed_real_catalog_exercises(db)
     seed_training_program_templates(db)
 
 
@@ -52,29 +54,29 @@ def test_admin_lists_complete_four_day_template_details(client: TestClient, db: 
 
     assert response.status_code == 200
     templates = response.json()["items"]
-    assert len(templates) == 16
-    classic = next(item for item in templates if item["slug"] == "four-day-classic-body-part")
+    assert len(templates) == 12
+    classic = next(
+        item for item in templates if item["slug"] == "t05-4-day-upper-lower-2x-intermediate"
+    )
     assert classic["training_level"] == "intermediate"
-    assert "balanced" in classic["focus_tags"]
+    assert "upper_lower" in classic["focus_tags"]
     assert len(classic["programming_rationale"]) == 5
-    assert classic["programming_rationale"][0]["title_fa"] == "ترتیب حرکات"
+    assert classic["programming_rationale"][0]["title_fa"] == "ساختار"
     assert [day["title_fa"] for day in classic["days"]] == [
-        "سینه + پشت بازو",
-        "زیربغل + جلو بازو",
-        "پا",
-        "سرشانه + کول",
+        "بالاتنه A",
+        "پایین‌تنه A",
+        "بالاتنه B",
+        "پایین‌تنه B",
     ]
     first_slot = classic["days"][0]["slots"][0]
-    assert first_slot["exercise"]["slug"] == "dumbbell-bench-press"
-    placeholder = next(
-        slot
+    assert first_slot["exercise"]["slug"] == "fedb-0025-barbell-bench-press"
+    assert all(
+        slot["exercise"] is not None
+        and slot["placeholder_name_en"] is None
+        and slot["placeholder_name_fa"] is None
         for day in classic["days"]
         for slot in day["slots"]
-        if slot["exercise_slug_hint"] == "cable-pullover"
     )
-    assert placeholder["exercise"]["slug"] == "cable-pullover"
-    assert placeholder["exercise"]["needs_review"] is True
-    assert placeholder["placeholder_name_fa"] == "پلاور کابل"
 
 
 def test_training_template_library_has_no_public_endpoint(client: TestClient) -> None:

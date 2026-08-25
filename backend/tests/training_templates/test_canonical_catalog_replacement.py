@@ -174,17 +174,23 @@ def test_catalog_seed_removes_all_legacy_source_rows_but_preserves_custom_rows(d
 
     seed_training_program_templates(db)
 
-    assert db.scalar(
-        select(func.count())
-        .select_from(TrainingProgramTemplate)
-        .where(
-            TrainingProgramTemplate.source_name == LEGACY_SOURCE_NAME,
-            TrainingProgramTemplate.source_url == LEGACY_SOURCE_URL,
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(TrainingProgramTemplate)
+            .where(
+                TrainingProgramTemplate.source_name == LEGACY_SOURCE_NAME,
+                TrainingProgramTemplate.source_url == LEGACY_SOURCE_URL,
+            )
         )
-    ) == 0
-    assert db.scalar(
-        select(TrainingProgramTemplate).where(TrainingProgramTemplate.slug == custom.slug)
-    ) is not None
+        == 0
+    )
+    assert (
+        db.scalar(
+            select(TrainingProgramTemplate).where(TrainingProgramTemplate.slug == custom.slug)
+        )
+        is not None
+    )
 
 
 def test_catalog_seed_is_idempotent_and_replaces_owned_days_and_slots(db: Session) -> None:
@@ -216,17 +222,12 @@ def test_catalog_slots_are_linked_to_active_programmable_non_placeholder_exercis
 def test_catalog_days_guidance_and_prescriptions_match_document_contract() -> None:
     assert len({seed.canonical_slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS}) == 17
     assert all(
-        5 <= len(day.slots) <= 9
-        for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        for day in seed.days
+        5 <= len(day.slots) <= 9 for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS for day in seed.days
     )
     assert all(
         len(seed.programming_rationale) == 5
         and all(
-            reason.title_en
-            and reason.title_fa
-            and reason.detail_en
-            and reason.detail_fa
+            reason.title_en and reason.title_fa and reason.detail_en and reason.detail_fa
             for reason in seed.programming_rationale
         )
         for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS
