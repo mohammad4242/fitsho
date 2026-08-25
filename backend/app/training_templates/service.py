@@ -60,6 +60,14 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
     templates_by_slug: dict[str, TrainingProgramTemplate] = {
         template.slug: template for template in existing_templates
     }
+    seeded_slugs = {seed.slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS}
+    for existing_template in existing_templates:
+        if (
+            existing_template.source_name == SOURCE_NAME
+            and existing_template.source_url == SOURCE_URL
+            and existing_template.slug not in seeded_slugs
+        ):
+            existing_template.is_active = False
     for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS:
         template = templates_by_slug.get(seed.slug)
         if template is None:

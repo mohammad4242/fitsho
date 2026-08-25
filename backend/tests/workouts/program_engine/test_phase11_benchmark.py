@@ -19,6 +19,7 @@ from app.workouts.program_engine.duration_policy import OFFICIAL_SESSION_DURATIO
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import ProgramGenerationResult
+from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
 from tests.workouts.program_engine.golden_fixtures import full_catalog
 from tests.workouts.program_engine.phase11_benchmark import (
     NEGATIVE_PROFILES,
@@ -131,6 +132,7 @@ def test_phase11_population_covers_wrist_and_multiple_major_priorities() -> None
 
 def test_benchmark_template_setup_matches_the_exact_active_seed_library(db: Session) -> None:
     seed_exercises(db)
+    seed_real_catalog_exercises(db)
     references = benchmark._prepare_template_library(db)
     stale = db.scalar(
         select(TrainingProgramTemplate).where(
@@ -143,7 +145,7 @@ def test_benchmark_template_setup_matches_the_exact_active_seed_library(db: Sess
 
     references = benchmark._prepare_template_library(db)
 
-    assert len(references) == benchmark.EXPECTED_TEMPLATE_COUNT == 49
+    assert len(references) == benchmark.EXPECTED_TEMPLATE_COUNT
     assert tuple(sorted(item.slug for item in references)) == benchmark.EXPECTED_TEMPLATE_SLUGS
     assert db.get(TrainingProgramTemplate, stale.id).is_active is False
 
