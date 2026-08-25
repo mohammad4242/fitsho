@@ -1,195 +1,246 @@
+from __future__ import annotations
+
+import argparse
 import json
-from collections import defaultdict
+from collections import Counter
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+
+from tests.workouts.program_engine.phase11_benchmark import (
+    EXPECTED_PROFILE_COUNT,
+    EXPECTED_TEMPLATE_COUNT,
+    EXPECTED_TEMPLATE_SEED_HASH,
+    EXPECTED_TEMPLATE_SLUGS,
+    verify_closeout,
+)
 
 
-def format_report(benchmark_json_path: str, output_md_path: str) -> None:
-    with open(benchmark_json_path) as f:
-        data = json.load(f)
+def _mapping(value: object) -> Mapping[str, object]:
+    return value if isinstance(value, Mapping) else {}
 
-    records = data.get("profiles", [])
-    agg = data.get("aggregate", {})
-    quality = agg.get("quality", {})
-    fallback = agg.get("fallback", {})
 
-    total_profiles = agg.get("profiles_tested", 0)
-    cat_counts = agg.get("category_counts", {})
-    passes = cat_counts.get("PASS", 0)
-    pass_c = cat_counts.get("PASS_WITH_CONSTRAINTS", 0)
-    quality_issue = cat_counts.get("QUALITY_ISSUE", 0)
-    unsat = cat_counts.get("UNSATISFIED", 0)
-    bugs = cat_counts.get("ENGINE_BUG", 0)
+def _sequence(value: object) -> Sequence[object]:
+    return value if isinstance(value, (list, tuple)) else ()
 
-    # 1. Report ALL categories and their counts MUST sum exactly to total profiles.
-    assert passes + pass_c + quality_issue + unsat + bugs == total_profiles, (
-        f"Category sum != total profiles ({total_profiles})"
-    )
 
-    gen_success_rate = fallback.get("overall_generation_success_rate", 0)
-    determinism_runs = quality.get("determinism_runs", 0)
-    determinism_identical = quality.get("determinism_identical", 0)
+def _integer(value: object) -> int:
+    return int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
 
-    # determinism denominator == total profiles
-    # But wait, determinism runs is how many profiles had determinism.
-    # The prompt says: "determinism denominator == total profiles"
-    # Assert determinism.
 
-    assert determinism_runs == total_profiles, (
-        f"Determinism runs ({determinism_runs}) != total profiles ({total_profiles})"
-    )
+def _float(value: object) -> float:
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else 0.0
 
-    eq_v = quality.get("equipment_violations_custom", 0)
-    safe_v = quality.get("safety_violations_custom", 0)
-    red_v = quality.get("redundancy_violations_custom", 0)
 
-    sub_req = quality.get("substitutions_requests", 0)
-    sub_suc = quality.get("substitutions_total", 0)
-    sub_exact_grp = quality.get("substitutions_exact_group", 0)
-    sub_exact_role = quality.get("substitutions_exact_role", 0)
-    sub_fallback = quality.get("movement_family_fallbacks", 0)
-    sub_no_valid = quality.get("no_valid_replacements", 0)
-
-    tpl_successes = fallback.get("template_path_successes", 0)
-    fb_successes = fallback.get("fallback_successes", 0)
-
-    unsat_classifications = fallback.get("unsat_classifications", {})
-    unsat_sum = sum(unsat_classifications.values())
-    assert unsat_sum == unsat, f"UNSAT classifications sum ({unsat_sum}) != UNSAT count ({unsat})"
-
-    # Check conditions for READY
-    ready = True
-    blocking_reasons = []
-    if bugs > 0:
-        ready = False
-        blocking_reasons.append(f"ENGINE_BUG = {bugs} (> 0)")
-    if eq_v > 0:
-        ready = False
-        blocking_reasons.append(f"Equipment violations = {eq_v} (> 0)")
-    if safe_v > 0:
-        ready = False
-        blocking_reasons.append(f"Safety/constraint violations = {safe_v} (> 0)")
-    if determinism_identical < total_profiles:
-        ready = False
-        blocking_reasons.append(f"Determinism = {determinism_identical}/{total_profiles} (< 100%)")
-
-    # "no unexplained semantic substitution failure"
-
-    if unsat_classifications.get("engine bug", 0) > 0:
-        ready = False
-        blocking_reasons.append("UNSAT has engine bugs")
-    if unsat_classifications.get("quality issue", 0) > 0:
-        # Wait, if UNSAT has quality issue, is it a hard failure?
-        # "every UNSAT is individually justified as legitimate"
-        # The prompt says: "every UNSAT is individually justified as legitimate"
-        ready = False
-        blocking_reasons.append("UNSAT has unjustified failure (quality issue)")
-
-    # "no unexplained semantic substitution failure" implies bugs > 0 or safety_v > 0 will catch it.
-    # Let's just use what was there or what's stated.
-
-    # Group limitations
-    subgroups: dict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "success": 0})
+def _coverage(records: Sequence[Mapping[str, object]]) -> tuple[Counter[str], Counter[str]]:
+    limitations: Counter[str] = Counter()
+    priorities: Counter[str] = Counter()
     for record in records:
-        profile = record["input"]
-        success = record.get("category") in ("PASS", "PASS_WITH_CONSTRAINTS", "QUALITY_ISSUE")
-        # Wait, is QUALITY_ISSUE considered a success in subgroups? The old code said:
-        # success = record.get("category") in ("PASS", "PASS_WITH_CONSTRAINTS")
-        # I'll leave it as PASS and PASS_WITH_CONSTRAINTS for `success`.
+        profile = _mapping(record.get("input"))
+        if _sequence(profile.get("allowed_range_of_motion")):
+            limitations["ROM"] += 1
+        for field, label in (
+            ("impact_limit", "impact"),
+            ("axial_load_limit", "axial-load"),
+            ("overhead_limit", "overhead"),
+            ("balance_requirement", "balance"),
+        ):
+            if profile.get(field) is not None:
+                limitations[label] += 1
+        for caution in _sequence(profile.get("training_cautions")):
+            limitations[str(caution)] += 1
+        for muscle in _sequence(profile.get("priority_muscles")):
+            priorities[str(muscle)] += 1
+    return limitations, priorities
 
-        limitations = []
-        if profile.get("allowed_range_of_motion"):
-            limitations.append("ROM")
-        if profile.get("impact_limit"):
-            limitations.append("impact")
-        if profile.get("axial_load_limit"):
-            limitations.append("axial_load")
-        if profile.get("overhead_limit"):
-            limitations.append("overhead")
-        if profile.get("balance_requirement"):
-            limitations.append("balance")
-        if profile.get("training_cautions"):
-            limitations.append("training_cautions")
 
-        lim_str = ",".join(limitations) if len(limitations) < 2 else "combinations"
-        if not limitations:
-            lim_str = "none"
-
-        subgroups[lim_str]["total"] += 1
-        if success:
-            subgroups[lim_str]["success"] += 1
-
-    template_count = data.get("catalog", {}).get("template_count", 0)
-    template_slugs = agg.get("template_slugs", [])
+def render_report(
+    payload: Mapping[str, object],
+    *,
+    verification_summary: Sequence[str] = (),
+) -> str:
+    aggregate = _mapping(payload.get("aggregate"))
+    categories = _mapping(aggregate.get("category_counts"))
+    fallback = _mapping(aggregate.get("fallback"))
+    quality = _mapping(aggregate.get("quality"))
+    catalog = _mapping(payload.get("catalog"))
+    determinism = _mapping(payload.get("determinism"))
+    records = tuple(_mapping(item) for item in _sequence(payload.get("profiles")))
+    total = _integer(aggregate.get("profiles_tested"))
+    category_sum = sum(_integer(value) for value in categories.values())
+    unsat_count = _integer(categories.get("UNSATISFIED"))
+    unsat_classifications = _mapping(fallback.get("unsat_classifications"))
+    unsat_sum = sum(_integer(value) for value in unsat_classifications.values())
+    limitations, priorities = _coverage(records)
+    blockers = verify_closeout(payload)
+    verdict = "READY FOR PROMPT 6" if not blockers else "NOT READY FOR PROMPT 6"
+    generation_rate = _float(fallback.get("overall_generation_success_rate")) * 100
+    determinism_identical = _integer(quality.get("determinism_identical"))
+    determinism_cases = _integer(determinism.get("cases"))
+    equipment_violations = _integer(quality.get("equipment_violations_custom"))
+    safety_violations = _integer(quality.get("safety_violations_custom"))
+    redundancy_violations = _integer(quality.get("redundancy_violations_custom"))
 
     lines = [
-        "# Phase 11 Deterministic Benchmark Final Report",
+        "# Prompt 5 Final Closeout",
         "",
-        f"**Active Template Count**: {template_count}",
-        "**Template Slugs**:",
-        *(f"- {slug}" for slug in template_slugs),
+        "## Benchmark population",
         "",
-        f"- Total Profiles: {total_profiles}",
-        f"- PASS: {passes}",
-        f"- PASS_WITH_CONSTRAINTS: {pass_c}",
-        f"- QUALITY_ISSUE: {quality_issue}",
-        f"- UNSATISFIED: {unsat}",
-        f"- ENGINE_BUG: {bugs}",
-        f"- Generation Success Rate: {gen_success_rate * 100:.2f}%",
-        f"- Determinism: {determinism_identical}/{total_profiles}",
+        f"- Profiles: {total}",
+        f"- Canonical expected profiles: {EXPECTED_PROFILE_COUNT}",
+        f"- Supported matrix cells: {len(_sequence(payload.get('supported_matrix')))}/15",
+        f"- Generation rate: {generation_rate:.2f}%",
+        f"- Determinism: {determinism_identical}/{determinism_cases}",
         "",
-        "## Violations",
-        f"- Equipment Violations: {eq_v}",
-        f"- Safety/Constraint Violations: {safe_v}",
-        f"- Redundancy Violations: {red_v}",
+        "## Active template library",
         "",
-        "## Substitution Metrics",
-        f"- Requests: {sub_req}",
-        f"- Successes: {sub_suc}",
-        f"- Exact Group: {sub_exact_grp}",
-        f"- Exact Role: {sub_exact_role}",
-        f"- Family Fallback: {sub_fallback}",
-        f"- No Valid Replacement: {sub_no_valid}",
+        f"- Active templates: {_integer(catalog.get('template_count'))}",
+        f"- Expected active templates: {EXPECTED_TEMPLATE_COUNT}",
+        f"- Catalog hash: {catalog.get('catalog_hash', '')}",
+        f"- Template hash: {catalog.get('template_hash', '')}",
+        f"- Template seed hash: {catalog.get('template_seed_hash', '')}",
+        f"- Expected template seed hash: {EXPECTED_TEMPLATE_SEED_HASH}",
         "",
-        "## Paths",
-        f"- Template Successes: {tpl_successes}",
-        f"- Fallback Successes: {fb_successes}",
+        "Exact active slugs:",
         "",
-        "## Limitation Subgroup Results",
     ]
-
-    for key, stats in sorted(subgroups.items()):
-        rate = stats["success"] / stats["total"] * 100 if stats["total"] > 0 else 0
-        lines.append(f"- **{key}**: {stats['success']}/{stats['total']} ({rate:.1f}%)")
-
-    lines.append("")
-    lines.append("## UNSAT Classification")
-    for reason, count in sorted(unsat_classifications.items()):
-        lines.append(f"- {reason}: {count}")
-
-    # "consistency checks showing totals reconcile"
-    lines.append("")
-    lines.append("## Consistency Checks")
-    lines.append(
-        "- Category sum equals total: True"
+    lines.extend(
+        f"- {slug}" for slug in _sequence(catalog.get("template_slugs", EXPECTED_TEMPLATE_SLUGS))
     )
-    lines.append(f"- UNSAT classifications sum equals UNSAT count: {unsat_sum == unsat}")
+    lines.extend(["", "## Categories", ""])
+    for category in (
+        "PASS",
+        "PASS_WITH_CONSTRAINTS",
+        "QUALITY_ISSUE",
+        "UNSATISFIED",
+        "ENGINE_BUG",
+    ):
+        lines.append(f"- {category}: {_integer(categories.get(category))}")
 
-    lines.append("")
-    if template_count != 49:
-        ready = False
-        blocking_reasons.append(f"Template count is {template_count}, expected 49")
+    lines.extend(
+        [
+            "",
+            "## Hard acceptance metrics",
+            "",
+            f"- Equipment violations: {equipment_violations}",
+            f"- Safety/constraint hard violations: {safety_violations}",
+            f"- Redundancy violations: {redundancy_violations}",
+            "",
+            "## Quality-code audit",
+            "",
+        ]
+    )
+    quality_audit = _mapping(quality.get("quality_code_audit"))
+    if not quality_audit:
+        lines.append("- No final audit findings.")
+    for code, raw_values in sorted(quality_audit.items()):
+        values = _mapping(raw_values)
+        classifications = _mapping(values.get("classifications"))
+        classification_text = ", ".join(
+            f"{name}={_integer(count)}" for name, count in sorted(classifications.items())
+        )
+        lines.append(f"- {code}: {_integer(values.get('count'))} ({classification_text})")
+        lines.extend(f"  - {reason}" for reason in _sequence(values.get("explanations")))
 
-    lines.append("## Final Verdict")
-    if ready:
-        lines.append("READY FOR PROMPT 6")
-    else:
-        lines.append("NOT READY FOR PROMPT 6")
-        for reason in blocking_reasons:
-            lines.append(f"- {reason}")
+    semantic = _mapping(quality.get("semantic_substitution"))
+    lines.extend(["", "## Semantic substitution audit", ""])
+    for key in (
+        "successful_valid_substitutions",
+        "recovered_intermediate_attempts",
+        "legitimate_no_valid_replacements",
+        "final_semantic_degradations",
+        "explained_final_semantic_degradations",
+        "unexplained_final_semantic_failures",
+    ):
+        lines.append(f"- {key}: {_integer(semantic.get(key))}")
+    lines.extend(
+        [
+            f"- raw substitution requests: {_integer(quality.get('substitutions_requests'))}",
+            f"- raw substitution successes: {_integer(quality.get('substitutions_total'))}",
+            f"- exact group: {_integer(quality.get('substitutions_exact_group'))}",
+            f"- exact semantic role: {_integer(quality.get('substitutions_exact_role'))}",
+            f"- movement-family fallback: {_integer(quality.get('movement_family_fallbacks'))}",
+            f"- raw no-valid-replacement: {_integer(quality.get('no_valid_replacements'))}",
+            "",
+            "## Limitation and priority coverage",
+            "",
+        ]
+    )
+    lines.extend(f"- limitation {name}: {count}" for name, count in sorted(limitations.items()))
+    lines.extend(f"- priority {name}: {count}" for name, count in sorted(priorities.items()))
 
-    with open(output_md_path, "w") as f:
-        f.write("\n".join(lines))
+    lines.extend(["", "## Exact UNSAT classification", ""])
+    unsat_records = tuple(record for record in records if record.get("category") == "UNSATISFIED")
+    if not unsat_records:
+        lines.append("- None.")
+    for record in unsat_records:
+        profile = _mapping(record.get("input"))
+        classification = _mapping(record.get("unsat_classification"))
+        evidence = ", ".join(str(item) for item in _sequence(classification.get("evidence")))
+        lines.append(f"- {profile.get('profile_id')}: {classification.get('cause')} | {evidence}")
+
+    template_matches = (
+        _integer(catalog.get("template_count")) == EXPECTED_TEMPLATE_COUNT
+        and tuple(sorted(str(item) for item in _sequence(catalog.get("template_slugs"))))
+        == EXPECTED_TEMPLATE_SLUGS
+    )
+    lines.extend(
+        [
+            "",
+            "## Consistency checks",
+            "",
+            f"- Profile records equal aggregate: {len(records) == total}",
+            f"- Category totals equal profiles: {category_sum == total}",
+            f"- UNSAT classifications equal UNSAT: {unsat_sum == unsat_count}",
+            f"- Determinism denominator equals profiles: {determinism_cases == total}",
+            f"- Template count and slugs match seed intent: {template_matches}",
+            "",
+            "## Test verification",
+            "",
+        ]
+    )
+    lines.extend(f"- {item}" for item in verification_summary)
+    if not verification_summary:
+        lines.append("- Not recorded in this report generation run.")
+
+    lines.extend(["", "## Final verdict", "", verdict])
+    if blockers:
+        lines.extend(["", "Blockers:"])
+        lines.extend(f"- {blocker}" for blocker in blockers)
+    return "\n".join(lines) + "\n"
+
+
+def format_report(
+    benchmark_json_path: str | Path,
+    output_md_path: str | Path,
+    *,
+    verification_summary: Sequence[str] = (),
+) -> None:
+    payload = json.loads(Path(benchmark_json_path).read_text(encoding="utf-8"))
+    Path(output_md_path).write_text(
+        render_report(payload, verification_summary=verification_summary), encoding="utf-8"
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Render and verify the Prompt 5 closeout report")
+    parser.add_argument(
+        "--benchmark-json",
+        default="var/benchmarks/phase11/phase11-benchmark.json",
+    )
+    parser.add_argument("--output", default="../PROMPT5_PROGRESS.md")
+    parser.add_argument("--verification-result", action="append", default=[])
+    args = parser.parse_args(argv)
+    payload = json.loads(Path(args.benchmark_json).read_text(encoding="utf-8"))
+    blockers = verify_closeout(payload)
+    Path(args.output).write_text(
+        render_report(payload, verification_summary=tuple(args.verification_result)),
+        encoding="utf-8",
+    )
+    print("READY" if not blockers else "NOT READY")
+    for blocker in blockers:
+        print(f"- {blocker}")
+    return 0 if not blockers else 1
 
 
 if __name__ == "__main__":
-    format_report("var/benchmarks/phase11/phase11-benchmark.json", "../PROMPT5_PROGRESS.md")
-    print("Done")
+    raise SystemExit(main())

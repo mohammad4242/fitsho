@@ -38,6 +38,8 @@ from app.profile.enums import (
 )
 from app.profile.service import ProfileSnapshot
 from app.training_templates.engine_reference import load_template_references
+from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS
+from app.training_templates.service import seed_training_program_templates
 from app.workouts.program_engine.duration_policy import (
     OFFICIAL_SESSION_DURATIONS,
     get_session_duration_policy,
@@ -60,7 +62,9 @@ from app.workouts.program_engine.schemas import (
     ProgramGenerationRequest,
     ProgramGenerationResult,
     RecentTrainingHistory,
+    TemplateReference,
 )
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.schemas import ProgramGenerationOverrides
 from app.workouts.service import WorkoutGenerationService, WorkoutGenerationSettings
 
@@ -83,6 +87,18 @@ SUPPORTED_MATRIX: tuple[tuple[str, int], ...] = (
 )
 PROFILE_VARIANTS_PER_CELL = 25
 EXPECTED_PROFILE_COUNT = len(SUPPORTED_MATRIX) * PROFILE_VARIANTS_PER_CELL
+EXPECTED_TEMPLATE_SLUGS = tuple(
+    sorted(seed.slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS if seed.is_active)
+)
+EXPECTED_TEMPLATE_COUNT = len(EXPECTED_TEMPLATE_SLUGS)
+EXPECTED_TEMPLATE_SEED_HASH = hashlib.sha256(
+    json.dumps(
+        [asdict(seed) for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS],
+        default=str,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+).hexdigest()
 
 MAJOR_MUSCLES = frozenset(
     {
@@ -103,6 +119,18 @@ _PRIORITY_MUSCLES_BY_VARIANT: dict[int, tuple[MuscleGroup, ...]] = {
     9: (MuscleGroup.HAMSTRINGS,),
     11: (MuscleGroup.GLUTES,),
 }
+
+UNSAT_CAUSES = frozenset(
+    {
+        "legitimate catalog limitation",
+        "legitimate constraint limitation",
+        "quality failure",
+        "engine bug",
+    }
+)
+LEGITIMATE_UNSAT_CAUSES = frozenset(
+    {"legitimate catalog limitation", "legitimate constraint limitation"}
+)
 
 
 @dataclass(frozen=True)
@@ -473,6 +501,22 @@ def canonical_fingerprint(result: ProgramGenerationResult) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
+def _prepare_template_library(db: Session) -> tuple[TemplateReference, ...]:
+    """Reseed and fail if active templates differ from the production seed intent."""
+    seed_training_program_templates(db)
+    references = load_template_references(db)
+    actual_slugs = tuple(sorted(item.slug for item in references))
+    if actual_slugs != EXPECTED_TEMPLATE_SLUGS:
+        missing = sorted(set(EXPECTED_TEMPLATE_SLUGS) - set(actual_slugs))
+        unexpected = sorted(set(actual_slugs) - set(EXPECTED_TEMPLATE_SLUGS))
+        raise RuntimeError(
+            "active template library differs from production seed intent: "
+            f"expected={EXPECTED_TEMPLATE_COUNT} actual={len(references)} "
+            f"missing={missing} unexpected={unexpected}"
+        )
+    return references
+
+
 def _trace_entry(result: ProgramGenerationResult, stage: str) -> dict[str, object] | None:
     if result.program is not None:
         entries = result.program.decision_trace
@@ -595,6 +639,131 @@ def _string_values(value: object) -> tuple[str, ...]:
     return tuple(item for item in value if isinstance(item, str))
 
 
+def _duration_policy_failure(
+    *,
+    requested_minutes: int,
+    estimated_total_minutes: int,
+    main_exercises: int,
+    minimum_exercises: int,
+    reason_codes: Sequence[str],
+) -> str | None:
+    policy = get_session_duration_policy(requested_minutes)
+    workout_minutes = policy.workout_minutes(
+        estimated_total_minutes, RULESET.general_warmup_minutes
+    )
+    reasons = set(reason_codes)
+    if workout_minutes > policy.maximum_minutes:
+        core_extension = (
+            "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE" in reasons
+            and workout_minutes <= policy.core_preservation_maximum_minutes
+        )
+        return None if core_extension else "above_maximum"
+    if workout_minutes >= policy.minimum_minutes or main_exercises >= minimum_exercises:
+        return None
+    if reasons.intersection(
+        {
+            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+            "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
+        }
+    ):
+        return None
+    return "below_minimum_incomplete"
+
+
+def _classify_final_unsat(result: ProgramGenerationResult) -> dict[str, object]:
+    error_code = result.error_code.value if result.error_code is not None else "UNKNOWN"
+    errors = tuple(dict.fromkeys((error_code, *result.errors)))
+    error_set = set(errors)
+    if error_code == "NO_AVAILABLE_EQUIPMENT_MATCH" or "NO_ELIGIBLE_EXERCISES" in error_set:
+        cause = "legitimate catalog limitation"
+    elif error_set.intersection(
+        {
+            "VALIDATION_FAILURE",
+            "DAY_COUNT_INVARIANT_FAILED",
+            "REQUESTED_TRAINING_DAYS_MISMATCH",
+        }
+    ):
+        cause = "engine bug"
+    elif error_set.intersection(
+        {
+            "REQUIRED_SLOT_HARD_IMPOSSIBILITY",
+            "EXACT_DAY_SPLIT_ALTERNATIVES_EXHAUSTED",
+            "DURATION_RECOVERY_HARD_IMPOSSIBILITY",
+            "RECOVERY_SPACING_INVALID",
+            "SESSION_DURATION_EXCEEDED",
+        }
+    ):
+        cause = "legitimate constraint limitation"
+    elif "WEEKLY_VOLUME_OUTSIDE_ACCEPTABLE_RANGE" in error_set:
+        cause = "quality failure"
+    elif error_code in {"NO_SAFE_EXERCISE_FOR_PATTERN", "NO_EXERCISES_FOR_REQUIRED_MUSCLE"}:
+        cause = "legitimate catalog limitation"
+    else:
+        cause = "quality failure"
+    return {"cause": cause, "evidence": errors}
+
+
+def _semantic_substitution_audit(
+    result: ProgramGenerationResult,
+    template: Mapping[str, object],
+) -> dict[str, int]:
+    if result.program is None:
+        return {
+            "successful_valid_substitutions": 0,
+            "recovered_intermediate_attempts": 0,
+            "legitimate_no_valid_replacements": 0,
+            "final_semantic_degradations": 0,
+            "explained_final_semantic_degradations": 0,
+            "unexplained_final_semantic_failures": 0,
+        }
+    program = result.program
+    metrics = program.aggregate_metrics
+    trace = next(
+        (
+            entry
+            for entry in program.decision_trace
+            if entry.get("stage") == "substitution_observability"
+        ),
+        {},
+    )
+    decisions = _mapping_sequence(trace.get("decisions"))
+    no_valid_display = sum(
+        not _object_sequence(item.get("alternative_exercise_ids"))
+        and item.get("cause") == "display_alternative"
+        for item in decisions
+    )
+    no_valid_repair = sum(
+        not _object_sequence(item.get("alternative_exercise_ids"))
+        and item.get("cause") != "display_alternative"
+        for item in decisions
+    )
+    recovered_templates = 0
+    if bool(template.get("recovered_with_alternative")):
+        recovered_templates = sum(
+            item.get("status") == "rejected"
+            for item in _mapping_sequence(template.get("attempted_templates"))
+        )
+
+    semantic_warning = "SEMANTIC_SLOT_MISMATCH_SELECTED" in program.validation_report.warnings
+    relaxed_slots = _object_sequence(metrics.get("relaxed_required_slots"))
+    hard_incompatible = sum(
+        any("HARD_INCOMPATIBLE" in code for code in item.reason_codes)
+        for day in program.weekly_schedule
+        for item in day.exercises
+    )
+    final_degradations = int(semantic_warning) + hard_incompatible
+    explained_degradations = int(semantic_warning and bool(relaxed_slots))
+    unexplained = final_degradations - explained_degradations
+    return {
+        "successful_valid_substitutions": int(_number(metrics.get("substitution_successes"))),
+        "recovered_intermediate_attempts": recovered_templates + no_valid_repair,
+        "legitimate_no_valid_replacements": no_valid_display,
+        "final_semantic_degradations": final_degradations,
+        "explained_final_semantic_degradations": explained_degradations,
+        "unexplained_final_semantic_failures": unexplained,
+    }
+
+
 def _audit_program(
     profile: BenchmarkProfile,
     request: ProgramGenerationRequest,
@@ -606,8 +775,29 @@ def _audit_program(
     program = result.program
     issues: list[dict[str, object]] = []
 
-    def issue(code: str, severity: str, message: str) -> None:
-        issues.append({"code": code, "severity": severity, "message": message})
+    def issue(
+        code: str,
+        severity: str,
+        message: str,
+        *,
+        classification: str | None = None,
+        explanation: str | None = None,
+    ) -> None:
+        final_classification = classification or ("B" if severity == "constraint" else "A")
+        issues.append(
+            {
+                "code": code,
+                "severity": severity,
+                "message": message,
+                "classification": final_classification,
+                "classification_reason": explanation
+                or (
+                    "legitimate documented constraint or tradeoff"
+                    if final_classification == "B"
+                    else "proven final-program defect"
+                ),
+            }
+        )
 
     catalog_by_id = {item.id: item for item in catalog}
     for day in program.weekly_schedule:
@@ -637,34 +827,50 @@ def _audit_program(
         issue("DAY_COUNT_MISMATCH", "engine_bug", str(len(program.weekly_schedule)))
     metrics = program.aggregate_metrics
     ranges = metrics.get("volume_ranges_by_muscle", {})
-    missing_major_coverage = _missing_major_muscle_coverage(
-        ranges if isinstance(ranges, Mapping) else {}
-    )
+    range_mapping = ranges if isinstance(ranges, Mapping) else {}
+    missing_major_coverage = _missing_major_muscle_coverage(range_mapping)
     if missing_major_coverage:
+        constrained_coverage = all(
+            isinstance(values := range_mapping.get(muscle), Mapping)
+            and bool(_string_values(values.get("constraint_reason_codes")))
+            for muscle in missing_major_coverage
+        )
         issue(
             "MISSING_MAJOR_MUSCLE_COVERAGE",
             "quality",
             ",".join(missing_major_coverage),
+            classification="B" if constrained_coverage else "A",
+            explanation=(
+                "hard volume, session-feasibility, or catalog constraints "
+                "prevented minimum coverage"
+                if constrained_coverage
+                else "minimum major-muscle coverage is missing without a recorded constraint"
+            ),
         )
     if not recovery_spacing_is_valid(program.weekly_schedule, RULESET):
         issue("RECOVERY_SPACING_INVALID", "quality", "direct/exposure overlap")
 
-    policy = get_session_duration_policy(request.session_duration_minutes)
     duration_trace = _trace_entry(result, "session_duration") or {}
-    constrained_duration = bool(
-        set(_string_values(duration_trace.get("reason_codes")))
-        & {
-            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
-            "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
-            "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE",
-        }
-    )
+    duration_reasons = _string_values(duration_trace.get("reason_codes"))
     for day in program.weekly_schedule:
-        if not policy.contains_total(
-            day.estimated_duration_minutes, RULESET.general_warmup_minutes
-        ):
-            if not constrained_duration:
-                issue("DURATION_OUTSIDE_POLICY", "quality", str(day.day_index))
+        duration_failure = _duration_policy_failure(
+            requested_minutes=request.session_duration_minutes,
+            estimated_total_minutes=day.estimated_duration_minutes,
+            main_exercises=main_exercise_count(day.exercises),
+            minimum_exercises=(
+                3
+                if request.session_duration_minutes <= RULESET.short_session_minutes
+                else RULESET.minimum_exercises_per_session
+            ),
+            reason_codes=duration_reasons,
+        )
+        if duration_failure is not None:
+            issue(
+                "DURATION_OUTSIDE_POLICY",
+                "quality",
+                f"day={day.day_index}:{duration_failure}",
+                explanation="final resistance duration violates the canonical duration policy",
+            )
 
     priority_metrics = metrics.get("priority_metrics", {})
     if isinstance(priority_metrics, Mapping):
@@ -692,7 +898,18 @@ def _audit_program(
     if isinstance(ranges, Mapping):
         for muscle, values in ranges.items():
             if isinstance(values, Mapping) and values.get("status") == "outside_acceptable_range":
-                issue("VOLUME_OUTSIDE_ACCEPTABLE_RANGE", "quality", str(muscle))
+                constrained = bool(_string_values(values.get("constraint_reason_codes")))
+                issue(
+                    "VOLUME_OUTSIDE_ACCEPTABLE_RANGE",
+                    "quality",
+                    str(muscle),
+                    classification="B" if constrained else "A",
+                    explanation=(
+                        "recorded hard/session constraint prevented acceptable-range volume"
+                        if constrained
+                        else "volume is outside the acceptable range without a recorded constraint"
+                    ),
+                )
 
     if _has_redundant_near_identical_movements(program.weekly_schedule):
         issue("REDUNDANT_NEAR_IDENTICAL_MOVEMENTS", "quality", "same-session duplication")
@@ -940,6 +1157,10 @@ def _case_record(
             ),
             "priority_metrics": program.aggregate_metrics.get("priority_metrics", {}),
             "volume_ranges": program.aggregate_metrics.get("volume_ranges_by_muscle", {}),
+            "relaxed_required_pattern_groups": program.aggregate_metrics.get(
+                "relaxed_required_pattern_groups", ()
+            ),
+            "relaxed_required_slots": program.aggregate_metrics.get("relaxed_required_slots", ()),
             "substitution_metrics": {
                 "substitution_requests": program.aggregate_metrics.get("substitution_requests", 0),  # noqa: E501
                 "substitution_successes": program.aggregate_metrics.get(
@@ -967,6 +1188,8 @@ def _case_record(
             },
             "trace": program.decision_trace,
         }
+    category = _category(result, template, issues)
+    semantic_substitution = _semantic_substitution_audit(result, template)
     return {
         "input": _jsonable(asdict(profile)),
         "request": _jsonable(request),
@@ -982,9 +1205,13 @@ def _case_record(
         "quality_trace": _jsonable(quality_trace.get("metrics", {}) if quality_trace else {}),
         "quality_audit": _jsonable(audit_quality),
         "audit_findings": _jsonable(issues),
-        "quality_outcome": _category(result, template, issues),
+        "semantic_substitution": semantic_substitution,
+        "unsat_classification": (
+            _classify_final_unsat(result) if category == "UNSATISFIED" else None
+        ),
+        "quality_outcome": category,
         "construction_path": _construction_path(result, template),
-        "category": _category(result, template, issues),
+        "category": category,
         "determinism": {
             "fingerprints": determinism_fingerprints,
             "identical": len(set(determinism_fingerprints)) <= 1,
@@ -1113,24 +1340,8 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
     unsat_classifications: Counter[str] = Counter()
     for item in records:
         if str(item["category"]) == "UNSATISFIED":
-            template_info = cast(Mapping[str, object], item.get("template", {}))
-            rejections = set(cast(Sequence[str], template_info.get("rejection_categories", ())))
-
-            if "VALIDATION_FAILURE" in rejections:
-                unsat_classifications["engine bug"] += 1
-            elif "SAFETY_EQUIPMENT_INCOMPATIBILITY" in rejections:
-                unsat_classifications["legitimate catalog limitation"] += 1
-            elif rejections.intersection(
-                {
-                    "CORE_SLOT_UNRESOLVED",
-                    "HARD_PRIORITY_MINIMUM_FAILURE",
-                    "DURATION_RECOVERY_HARD_IMPOSSIBILITY",
-                    "NO_DAYS_LEVEL_CANDIDATE",
-                }
-            ):
-                unsat_classifications["legitimate constraint limitation"] += 1
-            else:
-                unsat_classifications["quality issue"] += 1
+            classification = _object_mapping(item.get("unsat_classification"))
+            unsat_classifications[str(classification.get("cause", "unclassified"))] += 1
     reason_codes = Counter(
         code
         for item in template
@@ -1156,6 +1367,36 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
         for item in records
         for finding in cast(Sequence[Mapping[str, object]], item["audit_findings"])
     )
+    finding_classifications: dict[str, Counter[str]] = defaultdict(Counter)
+    finding_reasons: dict[str, set[str]] = defaultdict(set)
+    for item in records:
+        for finding in cast(Sequence[Mapping[str, object]], item["audit_findings"]):
+            code = str(finding.get("code"))
+            finding_classifications[code][str(finding.get("classification"))] += 1
+            finding_reasons[code].add(str(finding.get("classification_reason")))
+    quality_code_audit = {
+        code: {
+            "count": count,
+            "classifications": dict(sorted(finding_classifications[code].items())),
+            "explanations": tuple(sorted(finding_reasons[code])),
+        }
+        for code, count in sorted(findings.items())
+    }
+    semantic_keys = (
+        "successful_valid_substitutions",
+        "recovered_intermediate_attempts",
+        "legitimate_no_valid_replacements",
+        "final_semantic_degradations",
+        "explained_final_semantic_degradations",
+        "unexplained_final_semantic_failures",
+    )
+    semantic_substitution = {
+        key: sum(
+            int(_number(_object_mapping(item.get("semantic_substitution")).get(key)))
+            for item in records
+        )
+        for key in semantic_keys
+    }
     feasible = total - unsatisfied
     quality_passes = categories["PASS"] + categories["PASS_WITH_CONSTRAINTS"]
     determinism = sum(
@@ -1367,6 +1608,8 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
             "equipment_violations_custom": equipment_violations,
             "safety_violations_custom": safety_violations,
             "redundancy_violations_custom": redundancy_violations,
+            "quality_code_audit": quality_code_audit,
+            "semantic_substitution": semantic_substitution,
         },
         "failure_breakdowns": {key: dict(value) for key, value in breakdowns.items()},
     }
@@ -1388,6 +1631,244 @@ def _service_for_benchmark(db: Session) -> WorkoutGenerationService:
             warmup_minutes=RULESET.general_warmup_minutes,
         ),
     )
+
+
+def _object_mapping(value: object) -> Mapping[str, object]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _object_sequence(value: object) -> Sequence[object]:
+    return value if isinstance(value, (tuple, list)) else ()
+
+
+def verify_closeout(payload: Mapping[str, object]) -> tuple[str, ...]:
+    """Return every Prompt 5 acceptance blocker; an empty tuple is READY."""
+    blockers: list[str] = []
+    catalog = _object_mapping(payload.get("catalog"))
+    aggregate = _object_mapping(payload.get("aggregate"))
+    fallback = _object_mapping(aggregate.get("fallback"))
+    quality = _object_mapping(aggregate.get("quality"))
+    determinism = _object_mapping(payload.get("determinism"))
+    records = tuple(_object_mapping(item) for item in _object_sequence(payload.get("profiles")))
+    total = int(_number(aggregate.get("profiles_tested")))
+
+    if total != EXPECTED_PROFILE_COUNT or len(records) != EXPECTED_PROFILE_COUNT:
+        blockers.append(
+            "Canonical profile count mismatch: "
+            f"aggregate={total} records={len(records)} expected={EXPECTED_PROFILE_COUNT}"
+        )
+    if not 300 <= total <= 500:
+        blockers.append(f"Profile count {total} is outside the required 300-500 range")
+
+    matrix = tuple(
+        tuple(_object_sequence(item)) for item in _object_sequence(payload.get("supported_matrix"))
+    )
+    if matrix != SUPPORTED_MATRIX:
+        blockers.append("Supported Experience x Days matrix differs from the canonical 15 cells")
+
+    inputs = tuple(_object_mapping(record.get("input")) for record in records)
+    cells = Counter(
+        (str(item.get("experience_level")), int(_number(item.get("resistance_days"))))
+        for item in inputs
+    )
+    expected_cells = Counter({cell: PROFILE_VARIANTS_PER_CELL for cell in SUPPORTED_MATRIX})
+    if cells != expected_cells:
+        blockers.append("Profile population does not cover every supported cell exactly")
+
+    durations = {int(_number(item.get("duration_minutes"))) for item in inputs}
+    if durations != set(OFFICIAL_SESSION_DURATIONS):
+        blockers.append("Profile population does not cover every official duration")
+    goals = {str(item.get("goal")) for item in inputs}
+    expected_goals = {
+        Goal.STRENGTH.value,
+        Goal.HYPERTROPHY.value,
+        Goal.BODY_RECOMPOSITION.value,
+        Goal.FAT_LOSS.value,
+        Goal.GENERAL_FITNESS.value,
+    }
+    if goals != expected_goals:
+        blockers.append("Profile population does not cover every benchmark goal")
+    equipment = {str(item.get("equipment_label")) for item in inputs}
+    locations = {str(item.get("training_location")) for item in inputs}
+    if "gym" not in locations or "home" not in locations or len(equipment) < 4:
+        blockers.append("Profile population lacks gym and diverse home equipment coverage")
+    training_ages = {int(_number(item.get("training_age_months"))) for item in inputs}
+    if len(training_ages) < 8:
+        blockers.append("Profile population lacks training-age variation")
+
+    coverage_fields = {
+        "ROM": any(_object_sequence(item.get("allowed_range_of_motion")) for item in inputs),
+        "impact": any(item.get("impact_limit") is not None for item in inputs),
+        "axial-load": any(item.get("axial_load_limit") is not None for item in inputs),
+        "overhead": any(item.get("overhead_limit") is not None for item in inputs),
+        "balance": any(item.get("balance_requirement") is not None for item in inputs),
+    }
+    cautions = {
+        str(caution)
+        for item in inputs
+        for caution in _object_sequence(item.get("training_cautions"))
+    }
+    for caution in ("lower_back", "shoulder", "knee", "wrist"):
+        coverage_fields[caution] = caution in cautions
+    missing_coverage = sorted(name for name, covered in coverage_fields.items() if not covered)
+    if missing_coverage:
+        blockers.append(f"Profile limitation coverage missing: {missing_coverage}")
+    priorities = {
+        str(muscle) for item in inputs for muscle in _object_sequence(item.get("priority_muscles"))
+    }
+    expected_priorities = {muscle.value for muscle in MAJOR_MUSCLES}
+    if not expected_priorities.issubset(priorities):
+        blockers.append("Profile population lacks multiple major priority-muscle coverage")
+
+    template_slugs = tuple(
+        sorted(str(slug) for slug in _object_sequence(catalog.get("template_slugs")))
+    )
+    if int(_number(catalog.get("template_count"))) != EXPECTED_TEMPLATE_COUNT:
+        blockers.append("Active template count differs from production seed intent")
+    if template_slugs != EXPECTED_TEMPLATE_SLUGS:
+        blockers.append("Active template slugs differ from production seed intent")
+    if catalog.get("template_seed_hash") != EXPECTED_TEMPLATE_SEED_HASH:
+        blockers.append("Template seed hash differs from production seed intent")
+    for key in ("catalog_hash", "template_hash"):
+        value = catalog.get(key)
+        if not isinstance(value, str) or len(value) != 64:
+            blockers.append(f"Catalog snapshot is missing a valid {key}")
+
+    categories = Counter(str(record.get("category")) for record in records)
+    category_names = (
+        "PASS",
+        "PASS_WITH_CONSTRAINTS",
+        "QUALITY_ISSUE",
+        "UNSATISFIED",
+        "ENGINE_BUG",
+    )
+    category_counts = _object_mapping(aggregate.get("category_counts"))
+    reported_categories = {key: int(_number(category_counts.get(key))) for key in category_names}
+    actual_categories = {key: categories[key] for key in category_names}
+    if sum(reported_categories.values()) != total or reported_categories != actual_categories:
+        blockers.append("Category totals do not reconcile with profile records")
+    if reported_categories["ENGINE_BUG"]:
+        blockers.append(f"ENGINE_BUG = {reported_categories['ENGINE_BUG']}")
+
+    hard_metrics = {
+        "equipment violations": max(
+            int(_number(aggregate.get("equipment_violations"))),
+            int(_number(quality.get("equipment_violations_custom"))),
+        ),
+        "safety/constraint hard violations": max(
+            int(_number(aggregate.get("safety_violations"))),
+            int(_number(quality.get("safety_violations_custom"))),
+        ),
+        "redundancy violations": max(
+            int(_number(aggregate.get("redundancy_findings"))),
+            int(_number(quality.get("redundancy_violations_custom"))),
+        ),
+    }
+    blockers.extend(f"{name} = {count}" for name, count in hard_metrics.items() if count)
+
+    determinism_cases = int(_number(determinism.get("cases")))
+    determinism_runs = int(_number(quality.get("determinism_runs")))
+    determinism_identical = int(_number(quality.get("determinism_identical")))
+    if determinism_cases != total or determinism_runs != total:
+        blockers.append(
+            "Determinism denominator does not equal total profiles: "
+            f"cases={determinism_cases} runs={determinism_runs} total={total}"
+        )
+    if (
+        float(_number(determinism.get("rate"))) != 1.0
+        or determinism_identical != total
+        or _object_sequence(determinism.get("mismatches"))
+    ):
+        blockers.append("Determinism is below 100%")
+
+    negative_cases = tuple(
+        _object_mapping(item) for item in _object_sequence(payload.get("negative_cases"))
+    )
+    if len(negative_cases) != len(NEGATIVE_PROFILES) or not all(
+        item.get("rejected_correctly") is True for item in negative_cases
+    ):
+        blockers.append("Unsupported negative profiles were not all rejected correctly")
+
+    unsat_records = tuple(record for record in records if record.get("category") == "UNSATISFIED")
+    unsat_causes: Counter[str] = Counter()
+    for record in unsat_records:
+        unsat_classification = _object_mapping(record.get("unsat_classification"))
+        cause = str(unsat_classification.get("cause", ""))
+        evidence = _object_sequence(unsat_classification.get("evidence"))
+        if cause not in UNSAT_CAUSES or not evidence:
+            blockers.append("Every UNSAT record must have one final cause and evidence")
+            continue
+        unsat_causes[cause] += 1
+        if cause not in LEGITIMATE_UNSAT_CAUSES:
+            blockers.append(f"UNSAT profile has non-legitimate final cause: {cause}")
+    reported_unsat = {
+        str(key): int(_number(value))
+        for key, value in _object_mapping(fallback.get("unsat_classifications")).items()
+    }
+    if (
+        sum(reported_unsat.values()) != len(unsat_records)
+        or reported_unsat != dict(sorted(unsat_causes.items()))
+        or int(_number(fallback.get("unsatisfied_generations"))) != len(unsat_records)
+    ):
+        blockers.append("UNSAT classifications do not reconcile exactly with UNSAT records")
+
+    finding_counts: Counter[str] = Counter()
+    finding_classifications: dict[str, Counter[str]] = defaultdict(Counter)
+    for record in records:
+        for raw_finding in _object_sequence(record.get("audit_findings")):
+            finding = _object_mapping(raw_finding)
+            code = str(finding.get("code", ""))
+            finding_classification = str(finding.get("classification", ""))
+            if not code or finding_classification not in {"A", "B", "C"}:
+                blockers.append("Every quality finding must have an A/B/C classification")
+                continue
+            finding_counts[code] += 1
+            finding_classifications[code][finding_classification] += 1
+            if finding_classification == "A":
+                blockers.append(f"Proven engine defect remains in quality findings: {code}")
+            if finding_classification == "C":
+                blockers.append(f"Benchmark false positive remains in final findings: {code}")
+    reported_quality_audit = _object_mapping(quality.get("quality_code_audit"))
+    expected_quality_audit = {
+        code: {
+            "count": count,
+            "classifications": dict(sorted(finding_classifications[code].items())),
+        }
+        for code, count in sorted(finding_counts.items())
+    }
+    normalized_quality_audit = {
+        str(code): {
+            "count": int(_number(_object_mapping(values).get("count"))),
+            "classifications": {
+                str(key): int(_number(value))
+                for key, value in _object_mapping(
+                    _object_mapping(values).get("classifications")
+                ).items()
+            },
+        }
+        for code, values in reported_quality_audit.items()
+    }
+    if normalized_quality_audit != expected_quality_audit:
+        blockers.append("Final quality-code audit does not reconcile with profile findings")
+
+    semantic = _object_mapping(quality.get("semantic_substitution"))
+    unexplained = int(_number(semantic.get("unexplained_final_semantic_failures")))
+    record_unexplained = sum(
+        int(
+            _number(
+                _object_mapping(record.get("semantic_substitution")).get(
+                    "unexplained_final_semantic_failures"
+                )
+            )
+        )
+        for record in records
+    )
+    if unexplained != record_unexplained:
+        blockers.append("Semantic substitution totals do not reconcile with profile records")
+    if unexplained:
+        blockers.append(f"Unexplained final semantic substitution failures = {unexplained}")
+
+    return tuple(dict.fromkeys(blockers))
 
 
 def _summary_markdown(payload: Mapping[str, object]) -> str:
@@ -1485,7 +1966,7 @@ def run_benchmark(
     determinism_repeats: int = 3,
 ) -> dict[str, object]:
     service = _service_for_benchmark(db)
-    references = load_template_references(db)
+    references = _prepare_template_library(db)
     catalog_by_sex = {sex: service._load_catalog(sex) for sex in (None, Sex.MALE, Sex.FEMALE)}
     catalog = catalog_by_sex[None]
     if len(catalog) < 100 or len(references) < 15:
@@ -1532,8 +2013,10 @@ def run_benchmark(
         "catalog": {
             "exercise_count": len(catalog),
             "template_count": len(references),
+            "template_slugs": tuple(sorted(item.slug for item in references)),
             "catalog_hash": catalog_hash,
             "template_hash": reference_hash,
+            "template_seed_hash": EXPECTED_TEMPLATE_SEED_HASH,
         },
         "supported_matrix": SUPPORTED_MATRIX,
         "aggregate": _aggregate(records, len(NEGATIVE_PROFILES)),
@@ -1557,6 +2040,11 @@ def run_benchmark(
         },
         "negative_cases": negative_cases,
         "profiles": records,
+    }
+    blockers = verify_closeout(payload)
+    payload["closeout"] = {
+        "verdict": "READY FOR PROMPT 6" if not blockers else "NOT READY FOR PROMPT 6",
+        "blockers": blockers,
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "phase11-benchmark.json").write_text(
@@ -1588,9 +2076,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         aggregate = cast(Mapping[str, object], payload["aggregate"])
         print(json.dumps(aggregate, indent=2, sort_keys=True))
+        closeout = cast(Mapping[str, object], payload["closeout"])
+        print(closeout["verdict"])
+        for blocker in cast(Sequence[str], closeout["blockers"]):
+            print(f"- {blocker}")
     finally:
         engine.dispose()
-    return 0
+    return 0 if not cast(Mapping[str, object], payload["closeout"])["blockers"] else 1
 
 
 if __name__ == "__main__":
