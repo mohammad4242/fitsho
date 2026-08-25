@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 import tests.workouts.program_engine.phase11_benchmark as benchmark
 from analyze_stage4 import render_report
-from app.exercises.enums import MuscleGroup
+from app.exercises.enums import ExerciseType, MuscleGroup
 from app.exercises.service import seed_exercises
 from app.profile.enums import TrainingCaution
 from app.training_templates.models import TrainingProgramTemplate
@@ -239,6 +239,7 @@ def test_complete_under_budget_session_is_not_a_duration_quality_issue() -> None
         benchmark._duration_policy_failure(
             requested_minutes=60,
             estimated_total_minutes=42,
+            cardio_minutes=0,
             main_exercises=5,
             minimum_exercises=5,
             reason_codes=("SESSION_DURATION_TARGET_SATISFIED",),
@@ -252,11 +253,26 @@ def test_unjustified_over_budget_session_is_a_duration_quality_issue() -> None:
         benchmark._duration_policy_failure(
             requested_minutes=60,
             estimated_total_minutes=90,
+            cardio_minutes=0,
             main_exercises=5,
             minimum_exercises=5,
             reason_codes=(),
         )
         == "above_maximum"
+    )
+
+
+def test_duration_audit_excludes_cardio_from_resistance_policy() -> None:
+    assert (
+        benchmark._duration_policy_failure(
+            requested_minutes=30,
+            estimated_total_minutes=54,
+            cardio_minutes=10,
+            main_exercises=4,
+            minimum_exercises=3,
+            reason_codes=("SESSION_DURATION_TARGET_SATISFIED",),
+        )
+        is None
     )
 
 
@@ -353,6 +369,32 @@ def test_semantic_warning_without_final_evidence_is_unexplained() -> None:
     )
 
     assert audit["unexplained_final_semantic_failures"] == 1
+
+
+def test_optional_supplemental_is_not_a_final_semantic_degradation() -> None:
+    supplemental = SimpleNamespace(
+        movement_pattern=benchmark.MovementPattern.SPINAL_FLEXION,
+        primary_muscle=MuscleGroup.ABS,
+        secondary_muscles=(),
+        exercise_type=ExerciseType.CORE,
+        labels=(),
+        reason_codes=("OPTIONAL_SUPPLEMENTAL_WORK", "SUPPLEMENTAL_MUSCLE:abs"),
+    )
+    result = SimpleNamespace(
+        program=SimpleNamespace(
+            aggregate_metrics={"substitution_successes": 0},
+            validation_report=SimpleNamespace(warnings=(), errors=()),
+            weekly_schedule=(SimpleNamespace(focus="full_body_a", exercises=(supplemental,)),),
+            decision_trace=(),
+        )
+    )
+
+    audit = benchmark._semantic_substitution_audit(
+        cast(ProgramGenerationResult, result), {"succeeded": False}
+    )
+
+    assert audit["final_semantic_degradations"] == 0
+    assert audit["unexplained_final_semantic_failures"] == 0
 
 
 def test_closeout_report_contains_the_authoritative_library_and_one_verdict() -> None:

@@ -501,13 +501,7 @@ def _select_exercise_addition(
                     continue
                 if any(item.exercise_id == candidate.id for item in day):
                     continue
-                if not exercise_fits_focus(candidate, original.focus) and not (
-                    (
-                        original.focus.startswith("template_reference")
-                        or (use_hard_maximums and muscle in priority_policy.explicit_priorities)
-                    )
-                    and muscle in priority_policy.priorities
-                ):
+                if not exercise_fits_focus(candidate, original.focus):
                     continue
                 direct_by_session = _direct_sets([day])
                 session_overage = (

@@ -285,7 +285,7 @@ def test_hard_priority_minimum_adds_second_exercise_then_rebalances_sets() -> No
     )
 
 
-def test_hard_priority_minimum_reuses_the_only_safe_exercise_across_sessions() -> None:
+def test_hard_priority_minimum_does_not_reuse_exercise_on_incompatible_day() -> None:
     bridge = _programmed(
         "Glute Bridge",
         MuscleGroup.GLUTES,
@@ -330,8 +330,45 @@ def test_hard_priority_minimum_reuses_the_only_safe_exercise_across_sessions() -
     repeated = [
         item for day in days for item in day.exercises if item.exercise_id == bridge.exercise_id
     ]
-    assert len(repeated) == 2
-    assert "PRIORITY_EXERCISE_REPEATED_FOR_HARD_MINIMUM" in repeated[0].reason_codes
+    assert len(repeated) == 1
+    assert all(item.primary_muscle is not MuscleGroup.GLUTES for item in days[0].exercises)
+
+
+def test_hard_priority_addition_prefers_a_compatible_day() -> None:
+    existing = _programmed("Push-Up", MuscleGroup.CHEST, 2)
+    addition = _candidate("Incline Push-Up", MuscleGroup.CHEST)
+    volume = WeeklyVolumePlan(
+        targets=(
+            VolumeTarget(
+                muscle=MuscleGroup.CHEST,
+                minimum_soft=4,
+                target_sets=4,
+                maximum_soft=6,
+                maximum_hard=6,
+                fractional_sets=0,
+                effective_target_sets=4,
+                minimum_direct_sets=4,
+                minimum_effective_sets=4,
+                minimum_coverage_required=True,
+                direct_minimum_required=True,
+            ),
+        ),
+        reason_codes=(),
+    )
+
+    days, _reasons = repair_weekly_volume(
+        (
+            _day(1, (), focus="back_biceps"),
+            _day(2, (existing,), focus="chest_triceps"),
+        ),
+        normalized(priority_muscles=[MuscleGroup.CHEST], available_training_days=2),
+        volume,
+        RULESET,
+        candidates=(addition,),
+    )
+
+    assert all(item.primary_muscle is not MuscleGroup.CHEST for item in days[0].exercises)
+    assert any(item.exercise_id == addition.id for item in days[1].exercises)
 
 
 def test_volume_repair_substitutions_are_hard_safe_and_keep_strength_role_order() -> None:

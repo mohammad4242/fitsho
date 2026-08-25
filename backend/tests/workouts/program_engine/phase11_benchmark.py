@@ -27,7 +27,12 @@ from sqlalchemy.orm import Session
 
 # Register the cross-module review mapper before SQLAlchemy configures workout models.
 import app.workout_reviews.models  # noqa: F401
-from app.exercises.enums import Equipment, ExerciseCautionTag, MovementPattern, MuscleGroup
+from app.exercises.enums import (
+    Equipment,
+    ExerciseCautionTag,
+    MovementPattern,
+    MuscleGroup,
+)
 from app.profile.enums import (
     ExperienceLevel,
     FitnessGoal,
@@ -44,6 +49,7 @@ from app.workouts.program_engine.duration_policy import (
     OFFICIAL_SESSION_DURATIONS,
     get_session_duration_policy,
 )
+from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     BalanceAbility,
@@ -53,6 +59,7 @@ from app.workouts.program_engine.enums import (
     PhysicalJobDemand,
     RecoveryRating,
 )
+from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.recovery import recovery_spacing_is_valid
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
@@ -63,6 +70,11 @@ from app.workouts.program_engine.schemas import (
     ProgramGenerationResult,
     RecentTrainingHistory,
     TemplateReference,
+)
+from app.workouts.program_engine.session_builder import slots_for_focus
+from app.workouts.program_engine.slot_compatibility import (
+    evaluate_candidate_slot_compatibility,
+    focus_scope,
 )
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.schemas import ProgramGenerationOverrides
@@ -643,13 +655,14 @@ def _duration_policy_failure(
     *,
     requested_minutes: int,
     estimated_total_minutes: int,
+    cardio_minutes: int,
     main_exercises: int,
     minimum_exercises: int,
     reason_codes: Sequence[str],
 ) -> str | None:
     policy = get_session_duration_policy(requested_minutes)
     workout_minutes = policy.workout_minutes(
-        estimated_total_minutes, RULESET.general_warmup_minutes
+        estimated_total_minutes - cardio_minutes, RULESET.general_warmup_minutes
     )
     reasons = set(reason_codes)
     if workout_minutes > policy.maximum_minutes:
@@ -746,13 +759,37 @@ def _semantic_substitution_audit(
 
     semantic_warning = "SEMANTIC_SLOT_MISMATCH_SELECTED" in program.validation_report.warnings
     relaxed_slots = _object_sequence(metrics.get("relaxed_required_slots"))
+    incompatible_final_exercises = 0
+    for day in program.weekly_schedule:
+        patterns, muscles = focus_scope(day.focus)
+        if not day.focus.startswith("template_reference"):
+            slots = slots_for_focus(day.focus)
+            patterns = patterns | frozenset(pattern for slot in slots for pattern in slot.patterns)
+            if muscles is not None:
+                muscles = muscles | frozenset(
+                    slot.target_muscle for slot in slots if slot.target_muscle is not None
+                )
+        incompatible_final_exercises += sum(
+            "OPTIONAL_SUPPLEMENTAL_WORK" not in item.reason_codes
+            and not evaluate_candidate_slot_compatibility(
+                item,
+                allowed_patterns=patterns,
+                target_muscles=muscles,
+                day_focus=day.focus,
+                allow_full_body=day.focus.startswith("full_body"),
+            ).compatible
+            for item in day.exercises
+        )
     hard_incompatible = sum(
         any("HARD_INCOMPATIBLE" in code for code in item.reason_codes)
         for day in program.weekly_schedule
         for item in day.exercises
     )
-    final_degradations = int(semantic_warning) + hard_incompatible
-    explained_degradations = int(semantic_warning and bool(relaxed_slots))
+    warning_without_final_evidence = int(semantic_warning and not incompatible_final_exercises)
+    final_degradations = (
+        incompatible_final_exercises + hard_incompatible + warning_without_final_evidence
+    )
+    explained_degradations = int(warning_without_final_evidence and bool(relaxed_slots))
     unexplained = final_degradations - explained_degradations
     return {
         "successful_valid_substitutions": int(_number(metrics.get("substitution_successes"))),
@@ -856,6 +893,7 @@ def _audit_program(
         duration_failure = _duration_policy_failure(
             requested_minutes=request.session_duration_minutes,
             estimated_total_minutes=day.estimated_duration_minutes,
+            cardio_minutes=day.cardio.duration_minutes if day.cardio else 0,
             main_exercises=main_exercise_count(day.exercises),
             minimum_exercises=(
                 3
@@ -873,18 +911,37 @@ def _audit_program(
             )
 
     priority_metrics = metrics.get("priority_metrics", {})
+    eligible_catalog = filter_eligible_exercises(
+        normalize_request(request, RULESET), tuple(catalog)
+    ).eligible
+    eligible_direct_options = Counter(item.primary_muscle for item in eligible_catalog)
     if isinstance(priority_metrics, Mapping):
         for muscle in profile.priority_muscles:
             metric = priority_metrics.get(muscle.value, {})
             if isinstance(metric, Mapping) and metric.get("status") != "satisfied":
                 volume_range = ranges.get(muscle.value, {}) if isinstance(ranges, Mapping) else {}
-                severity = (
-                    "constraint"
-                    if isinstance(volume_range, Mapping)
-                    and _hard_priority_minimum_is_met(volume_range)
-                    else "quality"
+                metric_reasons = set(_string_values(metric.get("reason_codes")))
+                hard_minimum_met = isinstance(volume_range, Mapping) and (
+                    _hard_priority_minimum_is_met(volume_range)
                 )
-                issue("EXPLICIT_PRIORITY_PARTIAL", severity, muscle.value)
+                catalog_limited = eligible_direct_options[muscle] <= 1
+                constrained = (
+                    hard_minimum_met
+                    or "PRIORITY_TARGET_CONSTRAINED" in metric_reasons
+                    or catalog_limited
+                )
+                issue(
+                    "EXPLICIT_PRIORITY_PARTIAL",
+                    "constraint" if constrained else "quality",
+                    muscle.value,
+                    classification="B" if constrained else "A",
+                    explanation=(
+                        "preferred priority target is partial because hard limits or the eligible "
+                        "direct catalog constrain further allocation"
+                        if constrained
+                        else "explicit priority target is partial without a recorded constraint"
+                    ),
+                )
         for muscle, _classification in profile.body_analysis_priorities:
             metric = priority_metrics.get(muscle.value, {})
             if isinstance(metric, Mapping) and metric.get("status") != "satisfied":

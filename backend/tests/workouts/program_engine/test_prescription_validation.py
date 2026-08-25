@@ -607,6 +607,26 @@ def test_every_successful_program_passes_independent_validator() -> None:
     assert result.program.validation_report.is_valid
 
 
+def test_optional_supplemental_does_not_trigger_day_focus_semantic_warning() -> None:
+    source = request(primary_goal=Goal.HYPERTROPHY)
+    result = generate_program(source, catalog(), RULESET)
+    assert result.program is not None
+    day = result.program.weekly_schedule[0]
+    supplemental = replace(
+        day.exercises[-1],
+        movement_pattern=MovementPattern.SPINAL_FLEXION,
+        primary_muscle=MuscleGroup.ABS,
+        secondary_muscles=(),
+        reason_codes=("OPTIONAL_SUPPLEMENTAL_WORK", "SUPPLEMENTAL_MUSCLE:abs"),
+    )
+    changed_day = replace(day, exercises=(*day.exercises[:-1], supplemental))
+    changed_program = replace(result.program, weekly_schedule=(changed_day,))
+
+    report = validate_program(changed_program, source, RULESET)
+
+    assert "SEMANTIC_SLOT_MISMATCH_SELECTED" not in report.warnings
+
+
 def test_validator_rejects_duration_overrun() -> None:
     source = request(session_duration_minutes=45)
     result = generate_program(source, catalog(), RULESET)
