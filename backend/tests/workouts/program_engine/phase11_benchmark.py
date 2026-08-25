@@ -209,7 +209,7 @@ def _variant_profile(experience: ExperienceLevel, days: int, variant: int) -> Be
     if location == TrainingLocation.HOME:
         label, home_setup, eq_override = home_setups[variant % len(home_setups)]
     else:
-        label, home_setup_raw, eq_override_raw = gym_setups[variant % len(gym_setups)]
+        label, _, eq_override_raw = gym_setups[variant % len(gym_setups)]
         home_setup = None
         eq_override = eq_override_raw
 
