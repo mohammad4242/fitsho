@@ -4,10 +4,12 @@ import {
   createAdminMeal,
   createAdminNutritionProgram,
   createAdminExercise,
+  deleteAdminTrainingProgramTemplate,
   getAdminAiGenerationFailures,
   getAdminAiModelTestRuns,
   getAdminAiModels,
   getAdminExercises,
+  getAdminTrainingProgramTemplates,
   getAdminMealCatalogue,
   getAdminNutritionPrograms,
   archiveAdminNutritionProgram,
@@ -168,6 +170,28 @@ it("lists admin exercises with focus and inactive filter support", async () => {
   expect(fetch).toHaveBeenCalledWith(
     "/api/v1/admin/exercises?primary_muscle=chest&muscle_focus=mid_chest&is_active=false&search=push+up",
     expect.objectContaining({ credentials: "include" }),
+  );
+});
+
+it("filters shared training templates by level and deletes by canonical id", async () => {
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(jsonResponse({ items: [] }))
+    .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+  await expect(getAdminTrainingProgramTemplates(2, "intermediate")).resolves.toEqual({
+    items: [],
+  });
+  await expect(deleteAdminTrainingProgramTemplate("template-17")).resolves.toBeUndefined();
+
+  expect(fetch).toHaveBeenNthCalledWith(
+    1,
+    "/api/v1/admin/training-program-templates?days_per_week=2&training_level=intermediate",
+    expect.objectContaining({ credentials: "include" }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    "/api/v1/admin/training-program-templates/template-17",
+    expect.objectContaining({ method: "DELETE" }),
   );
 });
 

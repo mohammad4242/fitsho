@@ -9,6 +9,7 @@ import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import {
   createAdminTrainingProgramTemplate,
+  deleteAdminTrainingProgramTemplate,
   getAdminExercises,
   getAdminTrainingProgramTemplate,
   updateAdminTrainingProgramTemplate,
@@ -43,6 +44,7 @@ export function AdminTrainingTemplateEditorPage() {
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [exerciseResults, setExerciseResults] = useState<AdminExercise[]>([]);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -94,6 +96,19 @@ export function AdminTrainingTemplateEditorPage() {
       days_per_week: daysPerWeek,
       days: resizeDays(current.days, daysPerWeek),
     }));
+  }
+
+  function toggleSupportedLevel(level: ExperienceLevel) {
+    setForm((current) => {
+      const selected = current.supported_levels.includes(level);
+      if (selected && current.supported_levels.length === 1) return current;
+      return {
+        ...current,
+        supported_levels: levels.filter((candidate) => (
+          candidate === level ? !selected : current.supported_levels.includes(candidate)
+        )),
+      };
+    });
   }
 
   function patchDay(dayIndex: number, patch: Partial<AdminTrainingTemplateDayWrite>) {
@@ -187,6 +202,22 @@ export function AdminTrainingTemplateEditorPage() {
     }
   }
 
+  async function removeTemplate() {
+    if (templateId === undefined || !window.confirm(t("admin.templateEditor.deleteConfirm"))) {
+      return;
+    }
+    setDeleting(true);
+    setSaveError(null);
+    try {
+      await deleteAdminTrainingProgramTemplate(templateId);
+      navigate("/admin/training-program-templates", { replace: true });
+    } catch {
+      setSaveError(t("admin.templateEditor.deleteError"));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="admin-page">
       <MemberHeaderMedia imageSrc={appTrainingAccent} className="member-page-background" />
@@ -218,11 +249,22 @@ export function AdminTrainingTemplateEditorPage() {
                     {[2, 3, 4, 5, 6].map((days) => <option key={days} value={days}>{t("admin.templates.days", { count: days })}</option>)}
                   </select>
                 </label>
-                <label>{t("admin.templateEditor.trainingLevel")}
-                  <select aria-label={t("admin.templateEditor.trainingLevel")} value={form.training_level} onChange={(event) => updateField("training_level", event.target.value as ExperienceLevel)}>
-                    {levels.map((level) => <option key={level} value={level}>{level === "first_month" ? t("admin.templates.firstMonth") : t(`catalog.difficulty.${level}`)}</option>)}
-                  </select>
-                </label>
+                <fieldset className="admin-template-level-selector">
+                  <legend>{t("admin.templateEditor.supportedLevels")}</legend>
+                  <p>{t("admin.templateEditor.supportedLevelsHint")}</p>
+                  <div className="admin-template-level-options">
+                    {levels.map((level) => (
+                      <label className="admin-template-level-option" key={level}>
+                        <input
+                          checked={form.supported_levels.includes(level)}
+                          onChange={() => toggleSupportedLevel(level)}
+                          type="checkbox"
+                        />
+                        <span>{level === "first_month" ? t("admin.templates.firstMonth") : t(`catalog.difficulty.${level}`)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
                 <label>{t("admin.templateEditor.goal")}
                   <select value={form.fitness_goal} onChange={(event) => updateField("fitness_goal", event.target.value as AdminTrainingProgramTemplateWrite["fitness_goal"])}>
                     {fitnessGoals.map((goal) => <option key={goal} value={goal}>{t(`onboarding.fitnessGoal.${goal}`)}</option>)}
@@ -257,6 +299,7 @@ export function AdminTrainingTemplateEditorPage() {
                   <div className="admin-template-editor-grid">
                     <TextInput label={t("admin.templateEditor.dayNameFa")} value={day.title_fa} onChange={(value) => patchDay(dayIndex, { title_fa: value })} />
                     <TextInput label={t("admin.templateEditor.dayNameEn")} value={day.title_en} onChange={(value) => patchDay(dayIndex, { title_en: value })} />
+                    <TextInput label={t("admin.templateEditor.structureFocus")} value={day.structure_focus} onChange={(value) => patchDay(dayIndex, { structure_focus: value })} />
                     <TextInput label={t("admin.templateEditor.targetMuscles")} value={day.direct_target_muscles.join(", ")} onChange={(value) => patchDay(dayIndex, { direct_target_muscles: parseMuscles(value) })} />
                   </div>
                   <ol>
@@ -298,7 +341,14 @@ export function AdminTrainingTemplateEditorPage() {
 
             <footer className="admin-template-editor-actions">
               <span>{slotCountProblems && t("admin.templateEditor.slotCountHint")}</span>
-              <button className="admin-primary-link" disabled={saving} type="submit">{saving ? t("admin.templateEditor.saving") : t("admin.templateEditor.save")}</button>
+              <div>
+                {templateId !== undefined && (
+                  <button className="admin-template-delete" disabled={deleting || saving} onClick={() => { void removeTemplate(); }} type="button">
+                    {deleting ? t("admin.templateEditor.deleting") : t("admin.templateEditor.delete")}
+                  </button>
+                )}
+                <button className="admin-primary-link" disabled={saving || deleting} type="submit">{saving ? t("admin.templateEditor.saving") : t("admin.templateEditor.save")}</button>
+              </div>
             </footer>
           </form>
         )}
@@ -335,7 +385,7 @@ function emptyTemplate(daysPerWeek: number, level: ExperienceLevel): AdminTraini
     description_en: "A new Fitsho training-program reference.",
     description_fa: "برنامه مرجع جدید فیتشو.",
     days_per_week: daysPerWeek,
-    training_level: level,
+    supported_levels: [level],
     fitness_goal: "build_muscle",
     focus_tags: ["full_body", "balanced"],
     intensity_methods: ["standard"],
@@ -347,7 +397,7 @@ function emptyTemplate(daysPerWeek: number, level: ExperienceLevel): AdminTraini
 }
 
 function emptyDay(dayNumber: number): AdminTrainingTemplateDayWrite {
-  return { title_en: `Day ${dayNumber}`, title_fa: `روز ${dayNumber}`, direct_target_muscles: ["chest"], slots: [] };
+  return { title_en: `Day ${dayNumber}`, title_fa: `روز ${dayNumber}`, structure_focus: "full_body", direct_target_muscles: ["chest"], slots: [] };
 }
 
 function resizeDays(days: AdminTrainingTemplateDayWrite[], target: number): AdminTrainingTemplateDayWrite[] {
@@ -360,6 +410,7 @@ function templateToForm(template: AdminTrainingProgramTemplate): AdminTrainingPr
     days: template.days.map((day) => ({
       title_en: day.title_en,
       title_fa: day.title_fa,
+      structure_focus: day.structure_focus,
       direct_target_muscles: day.direct_target_muscles,
       slots: day.slots.filter((slot) => slot.exercise !== null).map((slot) => ({
         exercise_id: slot.exercise!.id,

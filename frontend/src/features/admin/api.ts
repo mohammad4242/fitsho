@@ -41,6 +41,7 @@ import type {
   AdminPreparedRecipeWrite,
   PreparedRecipePreview,
 } from "./types";
+import type { ExperienceLevel } from "../profile/types";
 
 const adminExercisesPath = "/api/v1/admin/exercises";
 const adminAiModelsPath = "/api/v1/admin/ai-models";
@@ -152,9 +153,12 @@ export function getAdminAiModels(): Promise<AdminAiModelsResponse> {
 
 export function getAdminTrainingProgramTemplates(
   daysPerWeek: number,
+  trainingLevel: ExperienceLevel | "all" = "all",
 ): Promise<AdminTrainingProgramTemplatesResponse> {
+  const query = new URLSearchParams({ days_per_week: String(daysPerWeek) });
+  if (trainingLevel !== "all") query.set("training_level", trainingLevel);
   return request<AdminTrainingProgramTemplatesResponse>(
-    `${adminTrainingProgramTemplatesPath}?days_per_week=${daysPerWeek}`,
+    `${adminTrainingProgramTemplatesPath}?${query.toString()}`,
   );
 }
 
@@ -180,6 +184,12 @@ export function updateAdminTrainingProgramTemplate(
   return request<AdminTrainingProgramTemplate>(`${adminTrainingProgramTemplatesPath}/${templateId}`, {
     method: "PUT",
     body: JSON.stringify(input),
+  });
+}
+
+export function deleteAdminTrainingProgramTemplate(templateId: string): Promise<void> {
+  return request<void>(`${adminTrainingProgramTemplatesPath}/${templateId}`, {
+    method: "DELETE",
   });
 }
 

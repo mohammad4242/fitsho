@@ -22,7 +22,7 @@ const template = {
   description_en: "A direct target split.",
   description_fa: "تقسیم با عضلات هدف مستقیم.",
   days_per_week: 4,
-  training_level: "intermediate" as const,
+  supported_levels: ["beginner", "intermediate"] as const,
   fitness_goal: "build_muscle" as const,
   focus_tags: ["body_part_rotation", "balanced"],
   intensity_methods: ["standard" as const],
@@ -92,14 +92,14 @@ const templates = [
     id: "2",
     slug: "four-day-beginner-foundation",
     name_fa: "پایه چهارروزه مبتدی",
-    training_level: "beginner" as const,
+    supported_levels: ["first_month"] as const,
   },
   {
     ...template,
     id: "3",
     slug: "four-day-advanced-chest",
     name_fa: "تخصصی سینه چهارروزه پیشرفته",
-    training_level: "advanced" as const,
+    supported_levels: ["advanced"] as const,
   },
 ];
 
@@ -108,9 +108,17 @@ beforeEach(() => {
 });
 
 it("filters the library by day count and training level", async () => {
-  adminApi.getAdminTrainingProgramTemplates.mockImplementation((days: number) => (
-    days === 4 ? Promise.resolve({ items: templates }) : new Promise(() => {})
-  ));
+  adminApi.getAdminTrainingProgramTemplates.mockImplementation(
+    (days: number, level: string) => {
+      if (days !== 4) return new Promise(() => {});
+      if (level === "all") return Promise.resolve({ items: templates });
+      return Promise.resolve({
+        items: templates.filter((item) => (
+          item.supported_levels.some((supportedLevel) => supportedLevel === level)
+        )),
+      });
+    },
+  );
   const user = userEvent.setup();
   render(
     <MemoryRouter>
@@ -134,7 +142,19 @@ it("filters the library by day count and training level", async () => {
     "href",
     "/admin/training-program-templates/new?days=4&level=beginner",
   );
-  expect(adminApi.getAdminTrainingProgramTemplates).toHaveBeenCalledWith(4);
+  expect(adminApi.getAdminTrainingProgramTemplates).toHaveBeenCalledWith(4, "all");
+
+  await user.click(screen.getByRole("tab", { name: "متوسط" }));
+  const intermediateEditPath = screen.getByRole("link", {
+    name: "ویرایش برنامه: تفکیک کلاسیک چهار روزه",
+  }).getAttribute("href");
+  expect(adminApi.getAdminTrainingProgramTemplates).toHaveBeenCalledWith(4, "intermediate");
+
+  await user.click(screen.getByRole("tab", { name: "مبتدی" }));
+  expect(screen.getByRole("link", {
+    name: "ویرایش برنامه: تفکیک کلاسیک چهار روزه",
+  })).toHaveAttribute("href", intermediateEditPath);
+  expect(adminApi.getAdminTrainingProgramTemplates).toHaveBeenCalledWith(4, "beginner");
 
   await user.click(screen.getByRole("button", { name: "باز کردن برنامه: تفکیک کلاسیک چهار روزه" }));
 

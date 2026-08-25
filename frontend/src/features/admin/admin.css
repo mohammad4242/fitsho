@@ -233,3 +233,16 @@
 }
 @media (max-width: 760px) { .admin-template-card > header, .admin-template-card footer, .admin-template-day li { align-items: start; flex-direction: column; }.admin-template-day li > span { white-space: normal; } }
 @media (max-width: 760px) { .admin-program-accordion-trigger { align-items: start; }.admin-program-accordion-meta { align-items: end; flex-direction: column-reverse; }.admin-program-accordion-title { font-size: 1.2rem; }.admin-program-accordion-description { font-size: .88rem; }.admin-template-card { gap: .9rem; }.admin-template-card footer { gap: .6rem; }.admin-template-card footer span { overflow-wrap: anywhere; } }
+.admin-template-levels { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; }
+.admin-template-level-selector { grid-column: 1 / -1; margin: 0; padding: .85rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--mist-50); }
+.admin-template-level-selector legend { padding: 0 .35rem; color: var(--petrol-900); font-size: .84rem; font-weight: 900; }
+.admin-template-level-selector p { margin: 0 0 .7rem; color: var(--muted); font-size: .78rem; }
+.admin-template-level-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; }
+.admin-template-level-option { display: flex !important; grid-template-columns: none !important; align-items: center; gap: .5rem !important; min-height: 2.65rem; padding: .55rem .65rem; border: 1px solid rgb(22 91 84 / 16%); border-radius: .7rem; background: white; cursor: pointer; }
+.admin-template-level-option:has(input:checked) { border-color: var(--turquoise); background: rgb(56 183 165 / 12%); box-shadow: inset 0 0 0 1px rgb(56 183 165 / 18%); }
+.admin-template-level-option input { width: 1rem; height: 1rem; accent-color: var(--turquoise-dark); }
+.admin-template-level-option:focus-within { outline: 3px solid rgb(56 183 165 / 28%); }
+.admin-template-editor-actions > div { display: flex; align-items: center; gap: .65rem; }
+.admin-template-delete { border: 1px solid rgb(161 63 50 / 26%); border-radius: .65rem; background: rgb(161 63 50 / 9%); color: var(--danger); cursor: pointer; font: inherit; font-weight: 900; padding: .65rem .85rem; }
+.admin-template-delete:focus-visible { outline: 3px solid rgb(161 63 50 / 25%); }
+@media (max-width: 760px) { .admin-template-level-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }.admin-template-editor-actions > div { width: 100%; }.admin-template-editor-actions > div button { flex: 1; } }

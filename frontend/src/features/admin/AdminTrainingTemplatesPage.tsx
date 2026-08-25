@@ -22,16 +22,14 @@ export function AdminTrainingTemplatesPage() {
   const [expandedPrograms, setExpandedPrograms] = useState<Set<string>>(() => new Set());
   const [expandedDays, setExpandedDays] = useState<Set<string>>(() => new Set());
   const english = i18n.resolvedLanguage === "en";
-  const visibleTemplates = page?.items.filter(
-    (template) => trainingLevel === "all" || template.training_level === trainingLevel,
-  ) ?? [];
+  const visibleTemplates = page?.items ?? [];
   const newProgramLevel = trainingLevel === "all" ? "beginner" : trainingLevel;
   const newProgramPath = `/admin/training-program-templates/new?days=${daysPerWeek}&level=${newProgramLevel}`;
 
   useEffect(() => {
     let active = true;
     setState("loading");
-    void getAdminTrainingProgramTemplates(daysPerWeek)
+    void getAdminTrainingProgramTemplates(daysPerWeek, trainingLevel)
       .then((result) => {
         if (!active) return;
         setPage(result);
@@ -41,7 +39,7 @@ export function AdminTrainingTemplatesPage() {
         if (active) setState("error");
       });
     return () => { active = false; };
-  }, [daysPerWeek, retry]);
+  }, [daysPerWeek, retry, trainingLevel]);
 
   return (
     <div className="admin-page">
@@ -143,10 +141,14 @@ export function AdminTrainingTemplatesPage() {
                         <span className="admin-program-accordion-description">{english ? template.description_en : template.description_fa}</span>
                       </span>
                       <span className="admin-program-accordion-meta">
-                        <span className="admin-template-level">
-                          {template.training_level === "first_month"
-                            ? t("admin.templates.firstMonth")
-                            : t(`catalog.difficulty.${template.training_level}`)}
+                        <span className="admin-template-levels">
+                          {template.supported_levels.map((level) => (
+                            <span className="admin-template-level" key={level}>
+                              {level === "first_month"
+                                ? t("admin.templates.firstMonth")
+                                : t(`catalog.difficulty.${level}`)}
+                            </span>
+                          ))}
                         </span>
                         <span aria-hidden="true" className="admin-accordion-chevron">⌄</span>
                       </span>

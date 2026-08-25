@@ -372,6 +372,7 @@ export type AdminTrainingTemplateDay = {
   day_number: number;
   title_en: string;
   title_fa: string;
+  structure_focus: string;
   direct_target_muscles: MuscleGroup[];
   slots: AdminTrainingTemplateSlot[];
 };
@@ -391,7 +392,7 @@ export type AdminTrainingProgramTemplate = {
   description_en: string;
   description_fa: string;
   days_per_week: number;
-  training_level: ExperienceLevel;
+  supported_levels: ExperienceLevel[];
   fitness_goal: FitnessGoal;
   focus_tags: string[];
   intensity_methods: TrainingTemplateMethod[];
@@ -431,6 +432,7 @@ export type AdminTrainingTemplateSlotWrite = {
 export type AdminTrainingTemplateDayWrite = {
   title_en: string;
   title_fa: string;
+  structure_focus: string;
   direct_target_muscles: MuscleGroup[];
   slots: AdminTrainingTemplateSlotWrite[];
 };
@@ -441,7 +443,7 @@ export type AdminTrainingProgramTemplateWrite = {
   description_en: string;
   description_fa: string;
   days_per_week: number;
-  training_level: ExperienceLevel;
+  supported_levels: ExperienceLevel[];
   fitness_goal: FitnessGoal;
   focus_tags: string[];
   intensity_methods: TrainingTemplateMethod[];
