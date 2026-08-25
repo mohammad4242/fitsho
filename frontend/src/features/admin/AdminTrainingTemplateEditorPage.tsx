@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { muscleGroups, movementPatterns } from "../exercises/types";
+import { muscleGroups, movementPatterns, type MuscleGroup } from "../exercises/types";
 import { fitnessGoals, type ExperienceLevel } from "../profile/types";
 import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
@@ -10,11 +10,11 @@ import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import {
   createAdminTrainingProgramTemplate,
   deleteAdminTrainingProgramTemplate,
-  getAdminExercises,
   getAdminTrainingProgramTemplate,
   updateAdminTrainingProgramTemplate,
 } from "./api";
 import { AdminAccordionSection } from "./AdminAccordionSection";
+import { ExerciseLibraryPickerModal } from "./ExerciseLibraryPickerModal";
 import type {
   AdminExercise,
   AdminTrainingProgramTemplate,
@@ -28,6 +28,10 @@ import "./admin.css";
 
 type EditorState = "loading" | "ready" | "missing" | "error";
 type EditorSectionId = "identity" | "reasons" | "days";
+type PickerTarget = {
+  dayIndex: number;
+  slotIndex: number | null;
+};
 
 type AdminTrainingTemplateSlotForm = AdminTrainingTemplateSlotWrite & {
   exercise_name_fa?: string | null;
@@ -61,9 +65,7 @@ export function AdminTrainingTemplateEditorPage() {
   );
   const [expandedDays, setExpandedDays] = useState<Set<number>>(() => new Set<number>());
   const [expandedSlots, setExpandedSlots] = useState<Set<string>>(() => new Set<string>());
-  const [pickerDay, setPickerDay] = useState<number | null>(null);
-  const [exerciseSearch, setExerciseSearch] = useState("");
-  const [exerciseResults, setExerciseResults] = useState<AdminExercise[]>([]);
+  const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -82,22 +84,6 @@ export function AdminTrainingTemplateEditorPage() {
       });
     return () => { active = false; };
   }, [templateId]);
-
-  useEffect(() => {
-    if (pickerDay === null || exerciseSearch.trim().length < 2) {
-      setExerciseResults([]);
-      return;
-    }
-    let active = true;
-    void getAdminExercises({ search: exerciseSearch.trim(), is_active: true, page_size: 20 })
-      .then((result) => {
-        if (active) setExerciseResults(result.items);
-      })
-      .catch(() => {
-        if (active) setExerciseResults([]);
-      });
-    return () => { active = false; };
-  }, [exerciseSearch, pickerDay]);
 
   const slotCountProblems = useMemo(
     () => form.days.some((day) => day.slots.length < 5 || day.slots.length > 9),
@@ -207,41 +193,55 @@ export function AdminTrainingTemplateEditorPage() {
   }
 
   function selectExercise(exercise: AdminExercise) {
-    if (pickerDay === null) return;
-    const targetDayIndex = pickerDay;
-    const existingSlotCount = form.days[targetDayIndex]?.slots.length ?? 0;
-    const muscles = exercise.primary_muscle === null
+    if (pickerTarget === null) return;
+    const { dayIndex, slotIndex } = pickerTarget;
+    const muscles: MuscleGroup[] = exercise.primary_muscle === null
       ? exercise.secondary_muscles.slice(0, 1)
       : [exercise.primary_muscle, ...exercise.secondary_muscles];
-    const slot: AdminTrainingTemplateSlotForm = {
-      exercise_id: exercise.id,
-      exercise_name_fa: exercise.name_fa,
-      exercise_name_en: exercise.name_en,
-      exercise_slug: exercise.slug,
-      display_name_en: null,
-      display_name_fa: null,
-      target_muscles: muscles.length > 0 ? muscles : ["chest"],
-      movement_pattern: exercise.movement_pattern,
-      intensity_method: "standard",
-      adaptation_priority: "core",
-      superset_group: null,
-      sets: 3,
-      rep_min: 8,
-      rep_max: 12,
-      target_rir: 2,
-      rest_seconds: 90,
-    };
-    const newSlotKey = `${targetDayIndex}-${exercise.id}-${existingSlotCount}`;
-    setForm((current) => ({
-      ...current,
-      days: current.days.map((day, index) => (
-        index === targetDayIndex ? { ...day, slots: [...day.slots, slot] } : day
-      )),
-    }));
-    setExpandedDays((current) => new Set([...current, targetDayIndex]));
-    setExpandedSlots((current) => new Set([...current, newSlotKey]));
-    setPickerDay(null);
-    setExerciseSearch("");
+    const targetMuscles: MuscleGroup[] = muscles.length > 0 ? muscles : ["chest"];
+
+    if (slotIndex !== null) {
+      // Replace exercise in existing slot, retaining workout-specific settings
+      patchSlot(dayIndex, slotIndex, {
+        exercise_id: exercise.id,
+        exercise_name_fa: exercise.name_fa,
+        exercise_name_en: exercise.name_en,
+        exercise_slug: exercise.slug,
+        movement_pattern: exercise.movement_pattern,
+        target_muscles: targetMuscles,
+      });
+    } else {
+      // Add new slot to day
+      const existingSlotCount = form.days[dayIndex]?.slots.length ?? 0;
+      const slot: AdminTrainingTemplateSlotForm = {
+        exercise_id: exercise.id,
+        exercise_name_fa: exercise.name_fa,
+        exercise_name_en: exercise.name_en,
+        exercise_slug: exercise.slug,
+        display_name_en: null,
+        display_name_fa: null,
+        target_muscles: targetMuscles,
+        movement_pattern: exercise.movement_pattern,
+        intensity_method: "standard",
+        adaptation_priority: "core",
+        superset_group: null,
+        sets: 3,
+        rep_min: 8,
+        rep_max: 12,
+        target_rir: 2,
+        rest_seconds: 90,
+      };
+      const newSlotKey = `${dayIndex}-${existingSlotCount}`;
+      setForm((current) => ({
+        ...current,
+        days: current.days.map((day, index) => (
+          index === dayIndex ? { ...day, slots: [...day.slots, slot] } : day
+        )),
+      }));
+      setExpandedDays((current) => new Set([...current, dayIndex]));
+      setExpandedSlots((current) => new Set([...current, newSlotKey]));
+    }
+    setPickerTarget(null);
   }
 
   async function save() {
@@ -425,7 +425,7 @@ export function AdminTrainingTemplateEditorPage() {
                           </div>
                           <ol>
                             {day.slots.map((slot, slotIndex) => {
-                              const slotKey = `${dayIndex}-${slot.exercise_id}-${slotIndex}`;
+                              const slotKey = `${dayIndex}-${slotIndex}`;
                               const isSlotExpanded = expandedSlots.has(slotKey);
                               const slotPanelId = `admin-template-slot-panel-${dayIndex}-${slotIndex}`;
                               const baseNameFa = slot.exercise_name_fa?.trim() || "";
@@ -472,16 +472,25 @@ export function AdminTrainingTemplateEditorPage() {
                                   {isSlotExpanded && (
                                     <div className="admin-slot-accordion-panel admin-template-editor-slot__panel" id={slotPanelId}>
                                       <div className="admin-template-editor-slot__actions">
-                                        <Link to={`/admin/exercises/${slot.exercise_id}/edit`}>
-                                          {t("admin.templateEditor.exerciseDetails")} ↗
-                                        </Link>
                                         <button
-                                          aria-label={t("admin.templateEditor.removeExerciseAria", { name: slotName })}
-                                          onClick={() => removeSlot(dayIndex, slotIndex)}
+                                          className="admin-slot-choose-btn"
+                                          onClick={() => setPickerTarget({ dayIndex, slotIndex })}
                                           type="button"
                                         >
-                                          {t("admin.templateEditor.removeExercise")}
+                                          {t("admin.templateEditor.chooseFromLibrary")}
                                         </button>
+                                        <div className="admin-slot-actions-group">
+                                          <Link to={`/admin/exercises/${slot.exercise_id}/edit`}>
+                                            {t("admin.templateEditor.exerciseDetails")} ↗
+                                          </Link>
+                                          <button
+                                            aria-label={t("admin.templateEditor.removeExerciseAria", { name: slotName })}
+                                            onClick={() => removeSlot(dayIndex, slotIndex)}
+                                            type="button"
+                                          >
+                                            {t("admin.templateEditor.removeExercise")}
+                                          </button>
+                                        </div>
                                       </div>
                                       <div className="admin-template-editor-grid admin-template-editor-grid--slot">
                                         <TextInput
@@ -529,7 +538,7 @@ export function AdminTrainingTemplateEditorPage() {
                               );
                             })}
                           </ol>
-                          <button className="admin-template-editor-add" onClick={() => setPickerDay(dayIndex)} type="button">{t("admin.templateEditor.addExercise")}</button>
+                          <button className="admin-template-editor-add" onClick={() => setPickerTarget({ dayIndex, slotIndex: null })} type="button">{t("admin.templateEditor.addExercise")}</button>
                         </div>
                       )}
                     </section>
@@ -538,13 +547,11 @@ export function AdminTrainingTemplateEditorPage() {
               </div>
             </AdminAccordionSection>
 
-            {pickerDay !== null && (
-              <section className="admin-template-exercise-picker" aria-label={t("admin.templateEditor.exercisePicker")}>
-                <header><h2>{t("admin.templateEditor.exercisePicker")}</h2><button onClick={() => setPickerDay(null)} type="button">{t("admin.templateEditor.close")}</button></header>
-                <input autoFocus onChange={(event) => setExerciseSearch(event.target.value)} placeholder={t("admin.templateEditor.searchPlaceholder")} value={exerciseSearch} />
-                <div>{exerciseResults.map((exercise) => <button key={exercise.id} onClick={() => selectExercise(exercise)} type="button">{t("admin.templateEditor.selectExercise", { name: exercise.name_fa })}{exercise.needs_review ? ` · ${t("admin.templates.reviewMedia")}` : ""}</button>)}</div>
-              </section>
-            )}
+            <ExerciseLibraryPickerModal
+              isOpen={pickerTarget !== null}
+              onClose={() => setPickerTarget(null)}
+              onSelect={selectExercise}
+            />
 
             <footer className="admin-template-editor-actions">
               <span>{slotCountProblems && t("admin.templateEditor.slotCountHint")}</span>

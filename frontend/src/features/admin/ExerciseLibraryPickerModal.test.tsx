@@ -61,14 +61,6 @@ const mockBenchPress: AdminExercise = {
   instructions_fa: ["روی میز دراز بکشید", "وزنه‌ها را بالا ببرید", "با کنترل پایین بیاورید"],
   safety_notes_en: [],
   safety_notes_fa: [],
-  source: null,
-  source_id: null,
-  aliases_en: [],
-  short_description_en: null,
-  steps_en: [],
-  form_cues_en: [],
-  common_mistakes_en: [],
-  breathing_en: null,
   needs_review: false,
   is_active: true,
   is_programmable: true,
@@ -87,8 +79,8 @@ const mockBenchPress: AdminExercise = {
   media_source_url: null,
   media_license: null,
   media_attribution: null,
-  created_at: "2026-07-27T00:00:00Z" as unknown as Date,
-  updated_at: "2026-07-27T00:00:00Z" as unknown as Date,
+  created_at: "2026-07-27T00:00:00Z",
+  updated_at: "2026-07-27T00:00:00Z",
 };
 
 describe("ExerciseLibraryPickerModal", () => {

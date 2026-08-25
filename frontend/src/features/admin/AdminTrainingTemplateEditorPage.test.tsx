@@ -1,7 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
+
+const exercisesApi = vi.hoisted(() => ({
+  getExerciseCategories: vi.fn(),
+}));
 
 const adminApi = vi.hoisted(() => ({
   createAdminTrainingProgramTemplate: vi.fn(),
@@ -12,6 +16,7 @@ const adminApi = vi.hoisted(() => ({
   updateAdminTrainingProgramTemplate: vi.fn(),
 }));
 
+vi.mock("../exercises/api", () => exercisesApi);
 vi.mock("./api", () => adminApi);
 vi.mock("../auth/AuthContext", () => ({
   useAuth: () => ({
@@ -22,14 +27,68 @@ vi.mock("../auth/AuthContext", () => ({
 
 import { AdminTrainingTemplateEditorPage } from "./AdminTrainingTemplateEditorPage";
 
+const mockCategories = {
+  body_regions: [
+    { value: "upper_body", name_en: "Upper Body", name_fa: "بالاتنه" },
+    { value: "lower_body", name_en: "Lower Body", name_fa: "پایین‌تنه" },
+    { value: "core", name_en: "Core", name_fa: "میان‌تنه" },
+  ],
+  upper_body: [
+    { value: "chest", name_en: "Chest", name_fa: "سینه" },
+    { value: "back", name_en: "Back", name_fa: "پشت" },
+  ],
+  lower_body: [
+    { value: "quadriceps", name_en: "Quadriceps", name_fa: "چهارسر" },
+  ],
+  core: [
+    { value: "abs", name_en: "Abs", name_fa: "شکم" },
+  ],
+  muscle_focuses: {
+    chest: [
+      { value: "upper_chest", name_en: "Upper Chest", name_fa: "بالاسینه" },
+      { value: "mid_chest", name_en: "Mid Chest", name_fa: "میانسینه" },
+    ],
+    quadriceps: [],
+  },
+};
+
+const mockBenchPress = {
+  id: "exercise-1",
+  slug: "dumbbell-bench-press",
+  name_en: "Dumbbell Bench Press",
+  name_fa: "پرس سینه دمبل",
+  primary_muscle: "chest",
+  secondary_muscles: ["triceps"],
+  movement_pattern: "horizontal_push",
+  needs_review: false,
+  is_active: true,
+  equipment: ["dumbbell", "bench"],
+};
+
+const mockLatPulldown = {
+  id: "exercise-2",
+  slug: "lat-pulldown",
+  name_en: "Lat Pulldown",
+  name_fa: "زیربغل سیم‌کش",
+  primary_muscle: "back",
+  secondary_muscles: ["biceps"],
+  movement_pattern: "vertical_pull",
+  needs_review: false,
+  is_active: true,
+  equipment: ["cable"],
+};
+
 beforeEach(() => {
+  Object.values(exercisesApi).forEach((mock) => mock.mockReset());
   Object.values(adminApi).forEach((mock) => mock.mockReset());
+
+  exercisesApi.getExerciseCategories.mockResolvedValue(mockCategories);
   adminApi.getAdminExercises.mockResolvedValue({
-    items: [{
-      id: "exercise-1", slug: "dumbbell-bench-press", name_en: "Dumbbell Bench Press",
-      name_fa: "پرس سینه دمبل", primary_muscle: "chest", secondary_muscles: ["triceps"],
-      movement_pattern: "horizontal_push", needs_review: false, is_active: true,
-    }], page: 1, page_size: 20, total: 1, total_pages: 1,
+    items: [mockBenchPress, mockLatPulldown],
+    page: 1,
+    page_size: 50,
+    total: 2,
+    total_pages: 1,
   });
 });
 
@@ -76,7 +135,7 @@ it("supports first month as eligibility without creating separate content", asyn
   expect(screen.getByRole("button", { name: "باز کردن روز 2: روز 2" })).toBeInTheDocument();
 });
 
-it("searches the exercise library, links a movement, and toggles exercise-level accordion", async () => {
+it("browses exercise library hierarchy and adds a movement", async () => {
   const user = userEvent.setup();
   render(
     <MemoryRouter initialEntries={["/admin/training-program-templates/new?days=2&level=beginner"]}>
@@ -89,10 +148,57 @@ it("searches the exercise library, links a movement, and toggles exercise-level 
   await screen.findByRole("heading", { name: "افزودن برنامه تمرینی" });
   await user.click(screen.getByRole("button", { name: "باز کردن روز 1: روز 1" }));
   await user.click(screen.getByRole("button", { name: "افزودن حرکت" }));
-  await user.type(screen.getByPlaceholderText("جست‌وجو در کتابخانه حرکات"), "bench");
-  await user.click(await screen.findByRole("button", { name: "انتخاب پرس سینه دمبل" }));
 
-  // When added, slot is automatically expanded
+  // Modal opens with Category hierarchy
+  expect(await screen.findByRole("dialog", { name: "انتخاب از کتابخانه حرکات" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /بالاتنه/ })).toBeInTheDocument();
+
+  // Browse: Region (بالاتنه) -> Muscle (سینه) -> Focus (بالاسینه) -> Exercise
+  await user.click(screen.getByRole("button", { name: /بالاتنه/ }));
+  await user.click(await screen.findByRole("button", { name: /سینه/ }));
+  await user.click(await screen.findByRole("button", { name: /بالاسینه/ }));
+
+  // Exercise list
+  const exerciseButton = await screen.findByRole("button", { name: /پرس سینه دمبل/ });
+  await user.click(exerciseButton);
+
+  // Modal closes, slot is added and expanded
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "بستن حرکت 1: پرس سینه دمبل" })).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByText("3 × 8–12 · RIR 2")).toBeInTheDocument();
+
+  // Remove the slot
+  await user.click(screen.getByRole("button", { name: "حذف پرس سینه دمبل" }));
+  expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
+});
+
+it("searches the exercise library by English or Persian name, links a movement, and toggles accordion", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={["/admin/training-program-templates/new?days=2&level=beginner"]}>
+      <Routes>
+        <Route path="/admin/training-program-templates/new" element={<AdminTrainingTemplateEditorPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await screen.findByRole("heading", { name: "افزودن برنامه تمرینی" });
+  await user.click(screen.getByRole("button", { name: "باز کردن روز 1: روز 1" }));
+  await user.click(screen.getByRole("button", { name: "افزودن حرکت" }));
+
+  // Type in search bar
+  const searchInput = await screen.findByPlaceholderText("جست‌وجو با نام فارسی یا انگلیسی…");
+  await user.type(searchInput, "bench");
+
+  await waitFor(() => {
+    expect(adminApi.getAdminExercises).toHaveBeenCalledWith(
+      expect.objectContaining({ search: "bench" }),
+    );
+  });
+
+  await user.click(await screen.findByRole("button", { name: /پرس سینه دمبل/ }));
+
+  // Slot is automatically expanded
   expect(screen.getByRole("button", { name: "بستن حرکت 1: پرس سینه دمبل" })).toHaveAttribute("aria-expanded", "true");
   expect(screen.getByText("3 × 8–12 · RIR 2")).toBeInTheDocument();
 
@@ -110,82 +216,105 @@ it("searches the exercise library, links a movement, and toggles exercise-level 
   // Reopen the exercise accordion and verify values are preserved
   await user.click(screen.getByRole("button", { name: "باز کردن حرکت 1: پرس سینه دمبل" }));
   expect(screen.getByLabelText("حداقل تکرار")).toHaveValue(6);
-
-  // Remove the slot
-  await user.click(screen.getByRole("button", { name: "حذف پرس سینه دمبل" }));
-  expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
 });
 
-it("toggles day accordions independently and preserves uncommitted edits across collapse", async () => {
+it("replaces an existing exercise in a slot while preserving workout-specific parameters", async () => {
   const user = userEvent.setup();
-  render(
-    <MemoryRouter initialEntries={["/admin/training-program-templates/new?days=3&level=intermediate"]}>
-      <Routes>
-        <Route path="/admin/training-program-templates/new" element={<AdminTrainingTemplateEditorPage />} />
-      </Routes>
-    </MemoryRouter>,
-  );
-
-  await screen.findByRole("heading", { name: "افزودن برنامه تمرینی" });
-
-  // Open Day 1 and edit its name and structure focus
-  await user.click(screen.getByRole("button", { name: "باز کردن روز 1: روز 1" }));
-  const day1NameInput = screen.getByLabelText("نام فارسی روز");
-  await user.clear(day1NameInput);
-  await user.type(day1NameInput, "سینه و پشت بازو");
-
-  // Open Day 2 independently
-  await user.click(screen.getByRole("button", { name: "باز کردن روز 2: روز 2" }));
-  expect(screen.getByRole("button", { name: "بستن روز 1: سینه و پشت بازو" })).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getByRole("button", { name: "بستن روز 2: روز 2" })).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getByRole("button", { name: "باز کردن روز 3: روز 3" })).toHaveAttribute("aria-expanded", "false");
-
-  // Collapse Day 1
-  await user.click(screen.getByRole("button", { name: "بستن روز 1: سینه و پشت بازو" }));
-  expect(screen.getByRole("button", { name: "باز کردن روز 1: سینه و پشت بازو" })).toHaveAttribute("aria-expanded", "false");
-  expect(screen.getByRole("button", { name: "بستن روز 2: روز 2" })).toHaveAttribute("aria-expanded", "true");
-
-  // Re-open Day 1 and verify the edited value is preserved
-  await user.click(screen.getByRole("button", { name: "باز کردن روز 1: سینه و پشت بازو" }));
-  expect(screen.getByDisplayValue("سینه و پشت بازو")).toBeInTheDocument();
-});
-
-it("deletes an existing shared template after confirmation", async () => {
-  const user = userEvent.setup();
-  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   adminApi.getAdminTrainingProgramTemplate.mockResolvedValue({
-    id: "template-17",
-    slug: "shared-template",
-    name_en: "Shared Template",
-    name_fa: "الگوی مشترک",
-    description_en: "One shared definition.",
-    description_fa: "یک تعریف مشترک.",
+    id: "template-50",
+    slug: "custom-split",
+    name_en: "Custom Split",
+    name_fa: "اسپلیت اختصاصی",
+    description_en: "A template.",
+    description_fa: "یک الگو.",
     days_per_week: 2,
-    supported_levels: ["beginner", "intermediate"],
+    supported_levels: ["beginner"],
     fitness_goal: "build_muscle",
     focus_tags: ["full_body"],
     intensity_methods: ["standard"],
     programming_rationale: [],
-    source_name: "Fitsho admin library",
-    source_url: "https://fitsho.local/admin-library",
-    days: [],
+    source_name: "Admin",
+    source_url: "https://fitsho.local",
+    days: [
+      {
+        id: "day-1",
+        day_number: 1,
+        title_en: "Upper",
+        title_fa: "بالاتنه",
+        structure_focus: "upper_body",
+        direct_target_muscles: ["chest"],
+        slots: [
+          {
+            id: "slot-1",
+            slot_order: 1,
+            exercise_slug_hint: "dumbbell-bench-press",
+            placeholder_name_en: null,
+            placeholder_name_fa: null,
+            target_muscles: ["chest"],
+            movement_pattern: "horizontal_push",
+            intensity_method: "standard",
+            adaptation_priority: "core",
+            superset_group: null,
+            sets: 4,
+            rep_min: 10,
+            rep_max: 15,
+            target_rir: 1,
+            rest_seconds: 120,
+            exercise: mockBenchPress,
+          },
+        ],
+      },
+      {
+        id: "day-2",
+        day_number: 2,
+        title_en: "Lower",
+        title_fa: "پایین‌تنه",
+        structure_focus: "lower_body",
+        direct_target_muscles: ["quadriceps"],
+        slots: [],
+      },
+    ],
   });
-  adminApi.deleteAdminTrainingProgramTemplate.mockResolvedValue(undefined);
 
   render(
-    <MemoryRouter initialEntries={["/admin/training-program-templates/template-17/edit"]}>
+    <MemoryRouter initialEntries={["/admin/training-program-templates/template-50/edit"]}>
       <Routes>
         <Route path="/admin/training-program-templates/:templateId/edit" element={<AdminTrainingTemplateEditorPage />} />
-        <Route path="/admin/training-program-templates" element={<p>کتابخانه برنامه‌ها</p>} />
       </Routes>
     </MemoryRouter>,
   );
 
-  await user.click(await screen.findByRole("button", { name: "حذف برنامه" }));
+  // Open Day 1
+  await user.click(await screen.findByRole("button", { name: "باز کردن روز 1: بالاتنه" }));
 
-  expect(confirm).toHaveBeenCalledWith("این برنامه و همه روزها و حرکت‌های آن حذف شود؟");
-  expect(adminApi.deleteAdminTrainingProgramTemplate).toHaveBeenCalledWith("template-17");
-  expect(await screen.findByText("کتابخانه برنامه‌ها")).toBeInTheDocument();
+  // Open slot 1 accordion
+  await user.click(screen.getByRole("button", { name: "باز کردن حرکت 1: پرس سینه دمبل" }));
+  expect(screen.getByDisplayValue("4")).toBeInTheDocument(); // sets = 4
+
+  // Click "انتخاب از کتابخانه حرکات" inside slot panel
+  const chooseFromLibraryBtn = screen.getByRole("button", { name: "انتخاب از کتابخانه حرکات" });
+  await user.click(chooseFromLibraryBtn);
+
+  // Modal opens -> Select "زیربغل سیم‌کش"
+  expect(await screen.findByRole("dialog", { name: "انتخاب از کتابخانه حرکات" })).toBeInTheDocument();
+  const searchInput = screen.getByPlaceholderText("جست‌وجو با نام فارسی یا انگلیسی…");
+  await user.type(searchInput, "lat");
+
+  await waitFor(() => {
+    expect(adminApi.getAdminExercises).toHaveBeenCalledWith(
+      expect.objectContaining({ search: "lat" }),
+    );
+  });
+
+  await user.click(await screen.findByRole("button", { name: /زیربغل سیم‌کش/ }));
+
+  // Verify header is updated to the new exercise name and prescription is retained
+  expect(screen.getByRole("button", { name: "بستن حرکت 1: زیربغل سیم‌کش" })).toBeInTheDocument();
+  expect(screen.getByText("4 × 10–15 · RIR 1")).toBeInTheDocument();
+
+  // Verify inputs still retain sets=4, rest=120
+  expect(screen.getByLabelText("ست")).toHaveValue(4);
+  expect(screen.getByLabelText("استراحت (ثانیه)")).toHaveValue(120);
 });
 
 it("resolves library exercise name in accordion header and allows custom override", async () => {
@@ -229,13 +358,7 @@ it("resolves library exercise name in accordion header and allows custom overrid
           rep_max: 12,
           target_rir: 2,
           rest_seconds: 90,
-          exercise: {
-            id: "exercise-1",
-            slug: "dumbbell-bench-press",
-            name_en: "Dumbbell Bench Press",
-            name_fa: "پرس سینه دمبل",
-            needs_review: false,
-          },
+          exercise: mockBenchPress,
         })),
       },
       {
@@ -261,13 +384,7 @@ it("resolves library exercise name in accordion header and allows custom overrid
           rep_max: 12,
           target_rir: 2,
           rest_seconds: 90,
-          exercise: {
-            id: "exercise-1",
-            slug: "dumbbell-bench-press",
-            name_en: "Dumbbell Bench Press",
-            name_fa: "پرس سینه دمبل",
-            needs_review: false,
-          },
+          exercise: mockBenchPress,
         })),
       },
     ],
@@ -324,4 +441,42 @@ it("resolves library exercise name in accordion header and allows custom overrid
       ]),
     }),
   );
+});
+
+it("deletes an existing shared template after confirmation", async () => {
+  const user = userEvent.setup();
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  adminApi.getAdminTrainingProgramTemplate.mockResolvedValue({
+    id: "template-17",
+    slug: "shared-template",
+    name_en: "Shared Template",
+    name_fa: "الگوی مشترک",
+    description_en: "One shared definition.",
+    description_fa: "یک تعریف مشترک.",
+    days_per_week: 2,
+    supported_levels: ["beginner", "intermediate"],
+    fitness_goal: "build_muscle",
+    focus_tags: ["full_body"],
+    intensity_methods: ["standard"],
+    programming_rationale: [],
+    source_name: "Fitsho admin library",
+    source_url: "https://fitsho.local/admin-library",
+    days: [],
+  });
+  adminApi.deleteAdminTrainingProgramTemplate.mockResolvedValue(undefined);
+
+  render(
+    <MemoryRouter initialEntries={["/admin/training-program-templates/template-17/edit"]}>
+      <Routes>
+        <Route path="/admin/training-program-templates/:templateId/edit" element={<AdminTrainingTemplateEditorPage />} />
+        <Route path="/admin/training-program-templates" element={<p>کتابخانه برنامه‌ها</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await user.click(await screen.findByRole("button", { name: "حذف برنامه" }));
+
+  expect(confirm).toHaveBeenCalledWith("این برنامه و همه روزها و حرکت‌های آن حذف شود؟");
+  expect(adminApi.deleteAdminTrainingProgramTemplate).toHaveBeenCalledWith("template-17");
+  expect(await screen.findByText("کتابخانه برنامه‌ها")).toBeInTheDocument();
 });

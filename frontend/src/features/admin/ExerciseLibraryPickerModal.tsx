@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getExerciseCategories } from "../exercises/api";
+import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import type {
   BodyRegion,
   ExerciseCategories,
@@ -346,17 +347,16 @@ export function ExerciseLibraryPickerModal({
                   <h3 className="admin-picker-stage-title">
                     {t("admin.templateEditor.selectRegion", "۱. انتخاب ناحیه بدن")}
                   </h3>
-                  <div className="admin-picker-grid admin-picker-grid--regions">
+                  <div className="region-selector" role="group" aria-label={t("catalog.regionTitle")}>
                     {categories.body_regions.map((region) => (
-                      <button
-                        className="admin-picker-card"
+                      <PickerCategoryButton
+                        active={region.value === selectedRegion}
+                        category={region}
+                        isEnglish={isEn}
                         key={region.value}
+                        kind="region"
                         onClick={() => handleSelectRegion(region.value)}
-                        type="button"
-                      >
-                        <strong>{isEn ? region.name_en : region.name_fa}</strong>
-                        <small>{isEn ? region.name_fa : region.name_en}</small>
-                      </button>
+                      />
                     ))}
                   </div>
                 </div>
@@ -373,17 +373,17 @@ export function ExerciseLibraryPickerModal({
                       {t("admin.templateEditor.selectMuscle", "۲. انتخاب عضله")}
                     </h3>
                   </div>
-                  <div className="admin-picker-grid admin-picker-grid--muscles">
+                  <div className="muscle-selector" role="group" aria-label={t("catalog.muscleTitle")}>
                     {availableMuscles.map((muscle) => (
-                      <button
-                        className="admin-picker-card"
+                      <PickerCategoryButton
+                        active={muscle.value === selectedMuscle}
+                        category={muscle}
+                        compact={muscle.value === "forearms" || muscle.value === "neck"}
+                        isEnglish={isEn}
                         key={muscle.value}
+                        kind="muscle"
                         onClick={() => handleSelectMuscle(muscle.value)}
-                        type="button"
-                      >
-                        <strong>{isEn ? muscle.name_en : muscle.name_fa}</strong>
-                        <small>{isEn ? muscle.name_fa : muscle.name_en}</small>
-                      </button>
+                      />
                     ))}
                   </div>
                 </div>
@@ -400,25 +400,24 @@ export function ExerciseLibraryPickerModal({
                       {t("admin.templateEditor.selectFocus", "۳. انتخاب بخش یا تمرکز عضله")}
                     </h3>
                   </div>
-                  <div className="admin-picker-grid admin-picker-grid--focuses">
+                  <div className="focus-selector" role="group" aria-label={t("catalog.focusTitle")}>
                     <button
-                      className="admin-picker-card admin-picker-card--all"
+                      aria-pressed={selectedFocus === null}
+                      className={`focus-button${selectedFocus === null ? " is-active" : ""}`}
                       onClick={() => handleSelectFocus(null)}
                       type="button"
                     >
-                      <strong>{t("admin.templateEditor.allMuscleExercises", "همه حرکات این عضله")}</strong>
-                      <small>{isEn ? muscleObj?.name_en : muscleObj?.name_fa}</small>
+                      {t("admin.templateEditor.allMuscleExercises", "همه حرکات این عضله")}
                     </button>
                     {availableFocuses.map((focus) => (
-                      <button
-                        className="admin-picker-card"
+                      <PickerCategoryButton
+                        active={focus.value === selectedFocus}
+                        category={focus}
+                        isEnglish={isEn}
                         key={focus.value}
+                        kind="focus"
                         onClick={() => handleSelectFocus(focus.value)}
-                        type="button"
-                      >
-                        <strong>{isEn ? focus.name_en : focus.name_fa}</strong>
-                        <small>{isEn ? focus.name_fa : focus.name_en}</small>
-                      </button>
+                      />
                     ))}
                   </div>
                 </div>
@@ -465,6 +464,34 @@ export function ExerciseLibraryPickerModal({
   );
 }
 
+function PickerCategoryButton({
+  category,
+  active,
+  isEnglish,
+  onClick,
+  kind,
+  compact = false,
+}: {
+  category: { name_en: string; name_fa: string };
+  active: boolean;
+  isEnglish: boolean;
+  onClick: () => void;
+  kind: "region" | "muscle" | "focus";
+  compact?: boolean;
+}) {
+  return (
+    <button
+      aria-pressed={active}
+      className={`${kind}-button${compact ? " is-compact" : ""}${active ? " is-active" : ""}`}
+      onClick={onClick}
+      type="button"
+    >
+      <span dir={isEnglish ? "ltr" : "rtl"}>{isEnglish ? category.name_en : category.name_fa}</span>
+      <small dir={isEnglish ? "rtl" : "ltr"}>{isEnglish ? category.name_fa : category.name_en}</small>
+    </button>
+  );
+}
+
 function ExercisePickerItem({
   exercise,
   isEn,
@@ -485,6 +512,16 @@ function ExercisePickerItem({
       onClick={onSelect}
       type="button"
     >
+      <div className="admin-exercise-picker-item__media">
+        {exercise.media_path && (
+          <ExerciseMedia
+            ambient
+            mediaType={exercise.media_type}
+            name={primaryName}
+            path={exercise.media_path}
+          />
+        )}
+      </div>
       <div className="admin-exercise-picker-item__info">
         <strong className="admin-exercise-picker-item__name">{primaryName}</strong>
         <span className="admin-exercise-picker-item__alt">{secondaryName}</span>
