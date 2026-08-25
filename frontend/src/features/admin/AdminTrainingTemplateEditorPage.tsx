@@ -29,6 +29,20 @@ import "./admin.css";
 type EditorState = "loading" | "ready" | "missing" | "error";
 type EditorSectionId = "identity" | "reasons" | "days";
 
+type AdminTrainingTemplateSlotForm = AdminTrainingTemplateSlotWrite & {
+  exercise_name_fa?: string | null;
+  exercise_name_en?: string | null;
+  exercise_slug?: string | null;
+};
+
+type AdminTrainingTemplateDayForm = Omit<AdminTrainingTemplateDayWrite, "slots"> & {
+  slots: AdminTrainingTemplateSlotForm[];
+};
+
+type AdminTrainingProgramTemplateForm = Omit<AdminTrainingProgramTemplateWrite, "days"> & {
+  days: AdminTrainingTemplateDayForm[];
+};
+
 const levels: ExperienceLevel[] = ["first_month", "beginner", "intermediate", "advanced"];
 const methods: TrainingTemplateMethod[] = ["standard", "superset", "drop_set"];
 const priorities: TrainingTemplateSlotPriority[] = ["core", "accessory", "optional"];
@@ -38,7 +52,7 @@ export function AdminTrainingTemplateEditorPage() {
   const { templateId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [form, setForm] = useState<AdminTrainingProgramTemplateWrite>(() =>
+  const [form, setForm] = useState<AdminTrainingProgramTemplateForm>(() =>
     emptyTemplate(defaultDays(searchParams.get("days")), defaultLevel(searchParams.get("level"))),
   );
   const [state, setState] = useState<EditorState>(templateId === undefined ? "ready" : "loading");
@@ -117,9 +131,9 @@ export function AdminTrainingTemplateEditorPage() {
     });
   }
 
-  function updateField<K extends keyof AdminTrainingProgramTemplateWrite>(
+  function updateField<K extends keyof AdminTrainingProgramTemplateForm>(
     key: K,
-    value: AdminTrainingProgramTemplateWrite[K],
+    value: AdminTrainingProgramTemplateForm[K],
   ) {
     setForm((current) => ({ ...current, [key]: value }));
   }
@@ -145,7 +159,7 @@ export function AdminTrainingTemplateEditorPage() {
     });
   }
 
-  function patchDay(dayIndex: number, patch: Partial<AdminTrainingTemplateDayWrite>) {
+  function patchDay(dayIndex: number, patch: Partial<AdminTrainingTemplateDayForm>) {
     setForm((current) => ({
       ...current,
       days: current.days.map((day, index) => index === dayIndex ? { ...day, ...patch } : day),
@@ -155,7 +169,7 @@ export function AdminTrainingTemplateEditorPage() {
   function patchSlot(
     dayIndex: number,
     slotIndex: number,
-    patch: Partial<AdminTrainingTemplateSlotWrite>,
+    patch: Partial<AdminTrainingTemplateSlotForm>,
   ) {
     setForm((current) => ({
       ...current,
@@ -199,10 +213,13 @@ export function AdminTrainingTemplateEditorPage() {
     const muscles = exercise.primary_muscle === null
       ? exercise.secondary_muscles.slice(0, 1)
       : [exercise.primary_muscle, ...exercise.secondary_muscles];
-    const slot: AdminTrainingTemplateSlotWrite = {
+    const slot: AdminTrainingTemplateSlotForm = {
       exercise_id: exercise.id,
-      display_name_en: exercise.name_en,
-      display_name_fa: exercise.name_fa,
+      exercise_name_fa: exercise.name_fa,
+      exercise_name_en: exercise.name_en,
+      exercise_slug: exercise.slug,
+      display_name_en: null,
+      display_name_fa: null,
       target_muscles: muscles.length > 0 ? muscles : ["chest"],
       movement_pattern: exercise.movement_pattern,
       intensity_method: "standard",
@@ -234,11 +251,7 @@ export function AdminTrainingTemplateEditorPage() {
     }
     setSaving(true);
     setSaveError(null);
-    const payload: AdminTrainingProgramTemplateWrite = {
-      ...form,
-      focus_tags: form.focus_tags.filter(Boolean),
-      intensity_methods: uniqueMethods(form.days),
-    };
+    const payload = formToPayload(form);
     try {
       const saved = templateId === undefined
         ? await createAdminTrainingProgramTemplate(payload)
@@ -415,7 +428,16 @@ export function AdminTrainingTemplateEditorPage() {
                               const slotKey = `${dayIndex}-${slot.exercise_id}-${slotIndex}`;
                               const isSlotExpanded = expandedSlots.has(slotKey);
                               const slotPanelId = `admin-template-slot-panel-${dayIndex}-${slotIndex}`;
-                              const slotName = slot.display_name_fa || slot.display_name_en || t("admin.templateEditor.exercise");
+                              const baseNameFa = slot.exercise_name_fa?.trim() || "";
+                              const baseNameEn = slot.exercise_name_en?.trim() || "";
+                              const overrideFa = slot.display_name_fa?.trim() || "";
+                              const overrideEn = slot.display_name_en?.trim() || "";
+                              const slotName =
+                                overrideFa ||
+                                baseNameFa ||
+                                overrideEn ||
+                                baseNameEn ||
+                                t("admin.templates.dayNumber", { number: slotIndex + 1 });
                               const prescriptionSummary = `${slot.sets} × ${slot.rep_min}–${slot.rep_max} · RIR ${slot.target_rir}`;
 
                               return (
@@ -462,8 +484,20 @@ export function AdminTrainingTemplateEditorPage() {
                                         </button>
                                       </div>
                                       <div className="admin-template-editor-grid admin-template-editor-grid--slot">
-                                        <TextInput dir="rtl" label={t("admin.templateEditor.displayNameFa")} value={slot.display_name_fa ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_fa: value || null })} />
-                                        <TextInput dir="ltr" label={t("admin.templateEditor.displayNameEn")} value={slot.display_name_en ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_en: value || null })} />
+                                        <TextInput
+                                          dir="rtl"
+                                          label={t("admin.templateEditor.displayNameFa")}
+                                          placeholder={baseNameFa || undefined}
+                                          value={slot.display_name_fa ?? ""}
+                                          onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_fa: value || null })}
+                                        />
+                                        <TextInput
+                                          dir="ltr"
+                                          label={t("admin.templateEditor.displayNameEn")}
+                                          placeholder={baseNameEn || undefined}
+                                          value={slot.display_name_en ?? ""}
+                                          onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_en: value || null })}
+                                        />
                                         <NumberInput label={t("admin.templateEditor.sets")} value={slot.sets} onChange={(value) => patchSlot(dayIndex, slotIndex, { sets: value })} />
                                         <NumberInput label={t("admin.templateEditor.repMin")} value={slot.rep_min} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_min: value })} />
                                         <NumberInput label={t("admin.templateEditor.repMax")} value={slot.rep_max} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_max: value })} />
@@ -535,16 +569,18 @@ function TextInput({
   value,
   onChange,
   dir,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   dir?: "rtl" | "ltr" | "auto";
+  placeholder?: string;
 }) {
   return (
     <label className="admin-field">
       <span>{label}</span>
-      <input aria-label={label} dir={dir} onChange={(event) => onChange(event.target.value)} value={value} />
+      <input aria-label={label} dir={dir} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} value={value} />
     </label>
   );
 }
@@ -554,18 +590,20 @@ function TextArea({
   value,
   onChange,
   dir,
+  placeholder,
   rows = 3,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   dir?: "rtl" | "ltr" | "auto";
+  placeholder?: string;
   rows?: number;
 }) {
   return (
     <label className="admin-field">
       <span>{label}</span>
-      <textarea aria-label={label} dir={dir} onChange={(event) => onChange(event.target.value)} rows={rows} value={value} />
+      <textarea aria-label={label} dir={dir} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} rows={rows} value={value} />
     </label>
   );
 }
@@ -602,7 +640,7 @@ function defaultLevel(value: string | null): ExperienceLevel {
   return levels.includes(value as ExperienceLevel) ? value as ExperienceLevel : "beginner";
 }
 
-function emptyTemplate(daysPerWeek: number, level: ExperienceLevel): AdminTrainingProgramTemplateWrite {
+function emptyTemplate(daysPerWeek: number, level: ExperienceLevel): AdminTrainingProgramTemplateForm {
   return {
     name_en: "New Training Program",
     name_fa: "برنامه تمرینی جدید",
@@ -620,15 +658,15 @@ function emptyTemplate(daysPerWeek: number, level: ExperienceLevel): AdminTraini
   };
 }
 
-function emptyDay(dayNumber: number): AdminTrainingTemplateDayWrite {
+function emptyDay(dayNumber: number): AdminTrainingTemplateDayForm {
   return { title_en: `Day ${dayNumber}`, title_fa: `روز ${dayNumber}`, structure_focus: "full_body", direct_target_muscles: ["chest"], slots: [] };
 }
 
-function resizeDays(days: AdminTrainingTemplateDayWrite[], target: number): AdminTrainingTemplateDayWrite[] {
+function resizeDays(days: AdminTrainingTemplateDayForm[], target: number): AdminTrainingTemplateDayForm[] {
   return Array.from({ length: target }, (_, index) => days[index] ?? emptyDay(index + 1));
 }
 
-function templateToForm(template: AdminTrainingProgramTemplate): AdminTrainingProgramTemplateWrite {
+function templateToForm(template: AdminTrainingProgramTemplate): AdminTrainingProgramTemplateForm {
   return {
     ...template,
     days: template.days.map((day) => ({
@@ -638,8 +676,49 @@ function templateToForm(template: AdminTrainingProgramTemplate): AdminTrainingPr
       direct_target_muscles: day.direct_target_muscles,
       slots: day.slots.filter((slot) => slot.exercise !== null).map((slot) => ({
         exercise_id: slot.exercise!.id,
+        exercise_name_en: slot.exercise!.name_en,
+        exercise_name_fa: slot.exercise!.name_fa,
+        exercise_slug: slot.exercise!.slug,
         display_name_en: slot.placeholder_name_en,
         display_name_fa: slot.placeholder_name_fa,
+        target_muscles: slot.target_muscles,
+        movement_pattern: slot.movement_pattern,
+        intensity_method: slot.intensity_method,
+        adaptation_priority: slot.adaptation_priority,
+        superset_group: slot.superset_group,
+        sets: slot.sets,
+        rep_min: slot.rep_min,
+        rep_max: slot.rep_max,
+        target_rir: slot.target_rir,
+        rest_seconds: slot.rest_seconds,
+      })),
+    })),
+  };
+}
+
+function formToPayload(form: AdminTrainingProgramTemplateForm): AdminTrainingProgramTemplateWrite {
+  return {
+    name_en: form.name_en,
+    name_fa: form.name_fa,
+    description_en: form.description_en,
+    description_fa: form.description_fa,
+    days_per_week: form.days_per_week,
+    supported_levels: form.supported_levels,
+    fitness_goal: form.fitness_goal,
+    focus_tags: form.focus_tags.filter(Boolean),
+    intensity_methods: uniqueMethods(form.days),
+    programming_rationale: form.programming_rationale,
+    source_name: form.source_name,
+    source_url: form.source_url,
+    days: form.days.map((day) => ({
+      title_en: day.title_en,
+      title_fa: day.title_fa,
+      structure_focus: day.structure_focus,
+      direct_target_muscles: day.direct_target_muscles,
+      slots: day.slots.map((slot) => ({
+        exercise_id: slot.exercise_id,
+        display_name_en: slot.display_name_en?.trim() ? slot.display_name_en.trim() : null,
+        display_name_fa: slot.display_name_fa?.trim() ? slot.display_name_fa.trim() : null,
         target_muscles: slot.target_muscles,
         movement_pattern: slot.movement_pattern,
         intensity_method: slot.intensity_method,
@@ -664,14 +743,14 @@ function parseMuscles(value: string): AdminTrainingTemplateDayWrite["direct_targ
   return values.length > 0 ? values : ["chest"];
 }
 
-function uniqueMethods(days: AdminTrainingTemplateDayWrite[]): TrainingTemplateMethod[] {
+function uniqueMethods(days: AdminTrainingTemplateDayForm[]): TrainingTemplateMethod[] {
   return Array.from(new Set(days.flatMap((day) => day.slots.map((slot) => slot.intensity_method))));
 }
 
 function updateReason(
-  setForm: Dispatch<SetStateAction<AdminTrainingProgramTemplateWrite>>,
+  setForm: Dispatch<SetStateAction<AdminTrainingProgramTemplateForm>>,
   index: number,
-  key: keyof AdminTrainingProgramTemplateWrite["programming_rationale"][number],
+  key: keyof AdminTrainingProgramTemplateForm["programming_rationale"][number],
   value: string,
 ) {
   setForm((current) => ({

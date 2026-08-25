@@ -187,3 +187,141 @@ it("deletes an existing shared template after confirmation", async () => {
   expect(adminApi.deleteAdminTrainingProgramTemplate).toHaveBeenCalledWith("template-17");
   expect(await screen.findByText("کتابخانه برنامه‌ها")).toBeInTheDocument();
 });
+
+it("resolves library exercise name in accordion header and allows custom override", async () => {
+  const user = userEvent.setup();
+  adminApi.getAdminTrainingProgramTemplate.mockResolvedValue({
+    id: "template-22",
+    slug: "upper-lower",
+    name_en: "Upper Lower Program",
+    name_fa: "برنامه بالاتنه پایین‌تنه",
+    description_en: "Reference split.",
+    description_fa: "اسپلیت مرجع.",
+    days_per_week: 2,
+    supported_levels: ["intermediate"],
+    fitness_goal: "build_muscle",
+    focus_tags: ["upper_lower"],
+    intensity_methods: ["standard"],
+    programming_rationale: [],
+    source_name: "Fitsho admin library",
+    source_url: "https://fitsho.local/admin-library",
+    days: [
+      {
+        id: "day-1",
+        day_number: 1,
+        title_en: "Upper Body",
+        title_fa: "بالاتنه",
+        structure_focus: "upper_body",
+        direct_target_muscles: ["chest"],
+        slots: Array.from({ length: 5 }, (_, i) => ({
+          id: `slot-${i + 1}`,
+          slot_order: i + 1,
+          exercise_slug_hint: "dumbbell-bench-press",
+          placeholder_name_en: null,
+          placeholder_name_fa: null,
+          target_muscles: ["chest"],
+          movement_pattern: "horizontal_push",
+          intensity_method: "standard",
+          adaptation_priority: "core",
+          superset_group: null,
+          sets: 3,
+          rep_min: 8,
+          rep_max: 12,
+          target_rir: 2,
+          rest_seconds: 90,
+          exercise: {
+            id: "exercise-1",
+            slug: "dumbbell-bench-press",
+            name_en: "Dumbbell Bench Press",
+            name_fa: "پرس سینه دمبل",
+            needs_review: false,
+          },
+        })),
+      },
+      {
+        id: "day-2",
+        day_number: 2,
+        title_en: "Lower Body",
+        title_fa: "پایین‌تنه",
+        structure_focus: "lower_body",
+        direct_target_muscles: ["quadriceps"],
+        slots: Array.from({ length: 5 }, (_, i) => ({
+          id: `slot-2-${i + 1}`,
+          slot_order: i + 1,
+          exercise_slug_hint: "dumbbell-bench-press",
+          placeholder_name_en: null,
+          placeholder_name_fa: null,
+          target_muscles: ["quadriceps"],
+          movement_pattern: "squat",
+          intensity_method: "standard",
+          adaptation_priority: "core",
+          superset_group: null,
+          sets: 3,
+          rep_min: 8,
+          rep_max: 12,
+          target_rir: 2,
+          rest_seconds: 90,
+          exercise: {
+            id: "exercise-1",
+            slug: "dumbbell-bench-press",
+            name_en: "Dumbbell Bench Press",
+            name_fa: "پرس سینه دمبل",
+            needs_review: false,
+          },
+        })),
+      },
+    ],
+  });
+  adminApi.updateAdminTrainingProgramTemplate.mockResolvedValue({ id: "template-22" });
+
+  render(
+    <MemoryRouter initialEntries={["/admin/training-program-templates/template-22/edit"]}>
+      <Routes>
+        <Route path="/admin/training-program-templates/:templateId/edit" element={<AdminTrainingTemplateEditorPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  // Open Day 1
+  expect(await screen.findByRole("button", { name: "باز کردن روز 1: بالاتنه" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "باز کردن روز 1: بالاتنه" }));
+
+  // Verify that slot headers resolve the library exercise name "پرس سینه دمبل", NOT "حرکت 1"
+  expect(screen.getByRole("button", { name: "باز کردن حرکت 1: پرس سینه دمبل" })).toBeInTheDocument();
+
+  // Expand slot 1
+  await user.click(screen.getByRole("button", { name: "باز کردن حرکت 1: پرس سینه دمبل" }));
+
+  // Verify that display_name_fa input has placeholder showing the library name and value is empty
+  const displayNameFaInput = screen.getAllByLabelText("نام نمایشی فارسی")[0];
+  expect(displayNameFaInput).toHaveAttribute("placeholder", "پرس سینه دمبل");
+  expect(displayNameFaInput).toHaveValue("");
+
+  // Enter a custom override
+  await user.type(displayNameFaInput, "پرس سینه با دمبل سنگین");
+
+  // Verify header updates to custom override
+  expect(screen.getByRole("button", { name: "بستن حرکت 1: پرس سینه با دمبل سنگین" })).toBeInTheDocument();
+
+  // Save the template and verify payload sends the custom override for slot 1 and null for others
+  await user.click(screen.getByRole("button", { name: "ذخیره برنامه" }));
+  expect(adminApi.updateAdminTrainingProgramTemplate).toHaveBeenCalledWith(
+    "template-22",
+    expect.objectContaining({
+      days: expect.arrayContaining([
+        expect.objectContaining({
+          slots: expect.arrayContaining([
+            expect.objectContaining({
+              exercise_id: "exercise-1",
+              display_name_fa: "پرس سینه با دمبل سنگین",
+            }),
+            expect.objectContaining({
+              exercise_id: "exercise-1",
+              display_name_fa: null,
+            }),
+          ]),
+        }),
+      ]),
+    }),
+  );
+});
