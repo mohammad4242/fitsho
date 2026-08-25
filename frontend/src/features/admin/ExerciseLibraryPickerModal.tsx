@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { getExerciseCategories } from "../exercises/api";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
+import "../exercises/exercises.css";
 import type {
   BodyRegion,
   ExerciseCategories,
@@ -403,11 +404,16 @@ export function ExerciseLibraryPickerModal({
                   <div className="focus-selector" role="group" aria-label={t("catalog.focusTitle")}>
                     <button
                       aria-pressed={selectedFocus === null}
-                      className={`focus-button${selectedFocus === null ? " is-active" : ""}`}
+                      className={`focus-button admin-picker-cat-btn${selectedFocus === null ? " is-active" : ""}`}
                       onClick={() => handleSelectFocus(null)}
                       type="button"
                     >
-                      {t("admin.templateEditor.allMuscleExercises", "همه حرکات این عضله")}
+                      <span className="admin-picker-cat-name" dir={isEn ? "ltr" : "rtl"}>
+                        {t("admin.templateEditor.allMuscleExercises", "همه حرکات این عضله")}
+                      </span>
+                      <small className="admin-picker-cat-alt" dir={isEn ? "rtl" : "ltr"}>
+                        {isEn ? muscleObj?.name_en : muscleObj?.name_fa}
+                      </small>
                     </button>
                     {availableFocuses.map((focus) => (
                       <PickerCategoryButton
@@ -479,15 +485,22 @@ function PickerCategoryButton({
   kind: "region" | "muscle" | "focus";
   compact?: boolean;
 }) {
+  const primaryName = isEnglish ? category.name_en : category.name_fa;
+  const secondaryName = isEnglish ? category.name_fa : category.name_en;
+
   return (
     <button
       aria-pressed={active}
-      className={`${kind}-button${compact ? " is-compact" : ""}${active ? " is-active" : ""}`}
+      className={`${kind}-button admin-picker-cat-btn${compact ? " is-compact" : ""}${active ? " is-active" : ""}`}
       onClick={onClick}
       type="button"
     >
-      <span dir={isEnglish ? "ltr" : "rtl"}>{isEnglish ? category.name_en : category.name_fa}</span>
-      <small dir={isEnglish ? "rtl" : "ltr"}>{isEnglish ? category.name_fa : category.name_en}</small>
+      <span className="admin-picker-cat-name" dir={isEnglish ? "ltr" : "rtl"}>
+        {primaryName}
+      </span>
+      <small className="admin-picker-cat-alt" dir={isEnglish ? "rtl" : "ltr"}>
+        {secondaryName}
+      </small>
     </button>
   );
 }
@@ -523,8 +536,12 @@ function ExercisePickerItem({
         )}
       </div>
       <div className="admin-exercise-picker-item__info">
-        <strong className="admin-exercise-picker-item__name">{primaryName}</strong>
-        <span className="admin-exercise-picker-item__alt">{secondaryName}</span>
+        <strong className="admin-exercise-picker-item__name" dir={isEn ? "ltr" : "rtl"}>
+          {primaryName}
+        </strong>
+        <span className="admin-exercise-picker-item__alt" dir={isEn ? "rtl" : "ltr"}>
+          {secondaryName}
+        </span>
       </div>
       <div className="admin-exercise-picker-item__tags">
         {exercise.movement_pattern && (
