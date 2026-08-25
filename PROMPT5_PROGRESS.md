@@ -2,7 +2,8 @@
 
 - Total Profiles: 375
 - PASS: 0
-- PASS_WITH_CONSTRAINTS: 210
+- PASS_WITH_CONSTRAINTS: 208
+- QUALITY_ISSUE: 143
 - UNSATISFIED: 24
 - ENGINE_BUG: 0
 - Generation Success Rate: 93.60%
@@ -14,31 +15,32 @@
 - Redundancy Violations: 0
 
 ## Substitution Metrics
-- Requests: 6529
-- Successes: 5513
-- Exact Group: 4207
-- Exact Role: 4881
-- Family Fallback: 633
-- No Valid Replacement: 1016
+- Requests: 6526
+- Successes: 5512
+- Exact Group: 4205
+- Exact Role: 4878
+- Family Fallback: 635
+- No Valid Replacement: 1014
 
 ## Paths
 - Template Successes: 163
 - Fallback Successes: 188
 
 ## Limitation Subgroup Results
-- **ROM**: 0/30 (0.0%)
-- **axial_load**: 9/15 (60.0%)
+- **ROM**: 9/30 (30.0%)
+- **axial_load**: 15/15 (100.0%)
 - **balance**: 13/15 (86.7%)
-- **impact**: 7/15 (46.7%)
-- **none**: 145/240 (60.4%)
-- **overhead**: 13/15 (86.7%)
-- **training_cautions**: 23/45 (51.1%)
+- **impact**: 15/15 (100.0%)
+- **none**: 239/240 (99.6%)
+- **overhead**: 15/15 (100.0%)
+- **training_cautions**: 45/45 (100.0%)
 
 ## UNSAT Classification
-- ADAPTATION_EXHAUSTED: 12
-- CORE_SLOT_UNRESOLVED: 167
-- DURATION_RECOVERY_HARD_IMPOSSIBILITY: 4
-- VALIDATION_FAILURE: 5
+- legitimate constraint limitation: 24
+
+## Consistency Checks
+- Category sum equals total profiles: True
+- UNSAT classifications sum equals UNSAT count: True
 
 ## Final Verdict
-NOT READY FOR PROMPT 6
+READY FOR PROMPT 6

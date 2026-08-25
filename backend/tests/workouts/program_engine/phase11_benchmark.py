@@ -1087,6 +1087,8 @@ def _aggregate_muscle_level_volume_fit(
 
 def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> dict[str, object]:
     categories = Counter(str(item["category"]) for item in records)
+    for cat in ("PASS", "PASS_WITH_CONSTRAINTS", "QUALITY_ISSUE", "UNSATISFIED", "ENGINE_BUG"):
+        categories[cat] += 0
     template = [cast(Mapping[str, object], item["template"]) for item in records]
     template_attempts_metrics = _template_attempt_metrics(template)
     total = len(records)
@@ -1095,6 +1097,27 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
     fallback_activations = sum(bool(item["fallback_activated"]) for item in template)
     fallback_successes = sum(bool(item["fallback_succeeded"]) for item in template)
     unsatisfied = sum(str(item["category"]) == "UNSATISFIED" for item in records)
+    unsat_classifications: Counter[str] = Counter()
+    for item in records:
+        if str(item["category"]) == "UNSATISFIED":
+            template_info = cast(Mapping[str, object], item.get("template", {}))
+            rejections = set(cast(Sequence[str], template_info.get("rejection_categories", ())))
+
+            if "VALIDATION_FAILURE" in rejections:
+                unsat_classifications["engine bug"] += 1
+            elif "SAFETY_EQUIPMENT_INCOMPATIBILITY" in rejections:
+                unsat_classifications["legitimate catalog limitation"] += 1
+            elif rejections.intersection(
+                {
+                    "CORE_SLOT_UNRESOLVED",
+                    "HARD_PRIORITY_MINIMUM_FAILURE",
+                    "DURATION_RECOVERY_HARD_IMPOSSIBILITY",
+                    "NO_DAYS_LEVEL_CANDIDATE",
+                }
+            ):
+                unsat_classifications["legitimate constraint limitation"] += 1
+            else:
+                unsat_classifications["quality issue"] += 1
     reason_codes = Counter(
         code
         for item in template
@@ -1309,6 +1332,7 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
             else 0.0,
             "reason_codes": dict(sorted(reason_codes.items())),
             "rejection_categories": dict(sorted(rejection_categories.items())),
+            "unsat_classifications": dict(sorted(unsat_classifications.items())),
             "template_attempt_reason_codes": dict(sorted(attempt_reason_codes.items())),
             "template_attempt_rejection_categories": dict(
                 sorted(attempt_rejection_categories.items())
