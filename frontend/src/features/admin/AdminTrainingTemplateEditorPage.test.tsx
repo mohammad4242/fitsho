@@ -76,7 +76,7 @@ it("supports first month as eligibility without creating separate content", asyn
   expect(screen.getByRole("button", { name: "باز کردن روز 2: روز 2" })).toBeInTheDocument();
 });
 
-it("searches the exercise library, links a movement, and removes a slot inside accordion day", async () => {
+it("searches the exercise library, links a movement, and toggles exercise-level accordion", async () => {
   const user = userEvent.setup();
   render(
     <MemoryRouter initialEntries={["/admin/training-program-templates/new?days=2&level=beginner"]}>
@@ -92,7 +92,26 @@ it("searches the exercise library, links a movement, and removes a slot inside a
   await user.type(screen.getByPlaceholderText("جست‌وجو در کتابخانه حرکات"), "bench");
   await user.click(await screen.findByRole("button", { name: "انتخاب پرس سینه دمبل" }));
 
-  expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
+  // When added, slot is automatically expanded
+  expect(screen.getByRole("button", { name: "بستن حرکت 1: پرس سینه دمبل" })).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByText("3 × 8–12 · RIR 2")).toBeInTheDocument();
+
+  // Edit reps min and max inside expanded slot
+  const repMinInput = screen.getByLabelText("حداقل تکرار");
+  await user.clear(repMinInput);
+  await user.type(repMinInput, "6");
+
+  // Collapse the exercise accordion
+  await user.click(screen.getByRole("button", { name: "بستن حرکت 1: پرس سینه دمبل" }));
+  expect(screen.getByRole("button", { name: "باز کردن حرکت 1: پرس سینه دمبل" })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByText("3 × 6–12 · RIR 2")).toBeInTheDocument();
+  expect(screen.queryByLabelText("حداقل تکرار")).not.toBeInTheDocument();
+
+  // Reopen the exercise accordion and verify values are preserved
+  await user.click(screen.getByRole("button", { name: "باز کردن حرکت 1: پرس سینه دمبل" }));
+  expect(screen.getByLabelText("حداقل تکرار")).toHaveValue(6);
+
+  // Remove the slot
   await user.click(screen.getByRole("button", { name: "حذف پرس سینه دمبل" }));
   expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
 });

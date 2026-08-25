@@ -649,6 +649,8 @@ const fa = {
         collapseProgramAria: "بستن برنامه: {{name}}",
         expandDayAria: "باز کردن روز {{number}}: {{name}}",
         collapseDayAria: "بستن روز {{number}}: {{name}}",
+        expandSlotAria: "باز کردن حرکت {{number}}: {{name}}",
+        collapseSlotAria: "بستن حرکت {{number}}: {{name}}",
         placeholder: "جای‌خالی در کتابخانهٔ حرکات",
         exerciseDetail: "جزئیات",
         exerciseDetailAria: "جزئیات حرکت: {{name}}",

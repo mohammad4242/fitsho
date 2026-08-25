@@ -649,6 +649,8 @@ const en = {
         collapseProgramAria: "Collapse program: {{name}}",
         expandDayAria: "Expand day {{number}}: {{name}}",
         collapseDayAria: "Collapse day {{number}}: {{name}}",
+        expandSlotAria: "Expand exercise {{number}}: {{name}}",
+        collapseSlotAria: "Collapse exercise {{number}}: {{name}}",
         placeholder: "Missing from exercise library",
         exerciseDetail: "Details",
         exerciseDetailAria: "Exercise details: {{name}}",

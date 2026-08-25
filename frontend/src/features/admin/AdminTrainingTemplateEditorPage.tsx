@@ -46,6 +46,7 @@ export function AdminTrainingTemplateEditorPage() {
     new Set<EditorSectionId>(templateId === undefined ? ["identity", "days"] : ["days"]),
   );
   const [expandedDays, setExpandedDays] = useState<Set<number>>(() => new Set<number>());
+  const [expandedSlots, setExpandedSlots] = useState<Set<string>>(() => new Set<string>());
   const [pickerDay, setPickerDay] = useState<number | null>(null);
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [exerciseResults, setExerciseResults] = useState<AdminExercise[]>([]);
@@ -107,6 +108,15 @@ export function AdminTrainingTemplateEditorPage() {
     });
   }
 
+  function toggleSlot(slotKey: string) {
+    setExpandedSlots((current) => {
+      const next = new Set(current);
+      if (next.has(slotKey)) next.delete(slotKey);
+      else next.add(slotKey);
+      return next;
+    });
+  }
+
   function updateField<K extends keyof AdminTrainingProgramTemplateWrite>(
     key: K,
     value: AdminTrainingProgramTemplateWrite[K],
@@ -162,6 +172,7 @@ export function AdminTrainingTemplateEditorPage() {
   }
 
   function removeSlot(dayIndex: number, slotIndex: number) {
+    const slotKeyPrefix = `${dayIndex}-`;
     setForm((current) => ({
       ...current,
       days: current.days.map((day, index) => (
@@ -170,10 +181,21 @@ export function AdminTrainingTemplateEditorPage() {
           : day
       )),
     }));
+    setExpandedSlots((current) => {
+      const next = new Set<string>();
+      current.forEach((key) => {
+        if (!key.startsWith(slotKeyPrefix)) {
+          next.add(key);
+        }
+      });
+      return next;
+    });
   }
 
   function selectExercise(exercise: AdminExercise) {
     if (pickerDay === null) return;
+    const targetDayIndex = pickerDay;
+    const existingSlotCount = form.days[targetDayIndex]?.slots.length ?? 0;
     const muscles = exercise.primary_muscle === null
       ? exercise.secondary_muscles.slice(0, 1)
       : [exercise.primary_muscle, ...exercise.secondary_muscles];
@@ -192,13 +214,15 @@ export function AdminTrainingTemplateEditorPage() {
       target_rir: 2,
       rest_seconds: 90,
     };
+    const newSlotKey = `${targetDayIndex}-${exercise.id}-${existingSlotCount}`;
     setForm((current) => ({
       ...current,
       days: current.days.map((day, index) => (
-        index === pickerDay ? { ...day, slots: [...day.slots, slot] } : day
+        index === targetDayIndex ? { ...day, slots: [...day.slots, slot] } : day
       )),
     }));
-    setExpandedDays((current) => new Set([...current, pickerDay]));
+    setExpandedDays((current) => new Set([...current, targetDayIndex]));
+    setExpandedSlots((current) => new Set([...current, newSlotKey]));
     setPickerDay(null);
     setExerciseSearch("");
   }
@@ -387,43 +411,89 @@ export function AdminTrainingTemplateEditorPage() {
                             <TextInput dir="ltr" label={t("admin.templateEditor.targetMuscles")} value={day.direct_target_muscles.join(", ")} onChange={(value) => patchDay(dayIndex, { direct_target_muscles: parseMuscles(value) })} />
                           </div>
                           <ol>
-                            {day.slots.map((slot, slotIndex) => (
-                              <li className="admin-template-editor-slot" key={`${slot.exercise_id}-${slotIndex}`}>
-                                <div className="admin-template-editor-slot__topline">
-                                  <strong>{slot.display_name_fa ?? slot.display_name_en ?? t("admin.templateEditor.exercise")}</strong>
-                                  <Link to={`/admin/exercises/${slot.exercise_id}/edit`}>{t("admin.templateEditor.exerciseDetails")}</Link>
-                                  <button aria-label={t("admin.templateEditor.removeExerciseAria", { name: slot.display_name_fa ?? slot.display_name_en })} onClick={() => removeSlot(dayIndex, slotIndex)} type="button">{t("admin.templateEditor.removeExercise")}</button>
-                                </div>
-                                <div className="admin-template-editor-grid admin-template-editor-grid--slot">
-                                  <TextInput dir="rtl" label={t("admin.templateEditor.displayNameFa")} value={slot.display_name_fa ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_fa: value || null })} />
-                                  <TextInput dir="ltr" label={t("admin.templateEditor.displayNameEn")} value={slot.display_name_en ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_en: value || null })} />
-                                  <NumberInput label={t("admin.templateEditor.sets")} value={slot.sets} onChange={(value) => patchSlot(dayIndex, slotIndex, { sets: value })} />
-                                  <NumberInput label={t("admin.templateEditor.repMin")} value={slot.rep_min} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_min: value })} />
-                                  <NumberInput label={t("admin.templateEditor.repMax")} value={slot.rep_max} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_max: value })} />
-                                  <NumberInput label={t("admin.templateEditor.rir")} value={slot.target_rir} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_rir: value })} />
-                                  <NumberInput label={t("admin.templateEditor.rest")} value={slot.rest_seconds} onChange={(value) => patchSlot(dayIndex, slotIndex, { rest_seconds: value })} />
-                                  <label className="admin-field">
-                                    <span>{t("admin.templateEditor.method")}</span>
-                                    <select value={slot.intensity_method} onChange={(event) => patchSlot(dayIndex, slotIndex, { intensity_method: event.target.value as TrainingTemplateMethod })}>
-                                      {methods.map((method) => <option key={method} value={method}>{t(`admin.templates.methods.${method}`)}</option>)}
-                                    </select>
-                                  </label>
-                                  <label className="admin-field">
-                                    <span>{t("admin.templateEditor.priority")}</span>
-                                    <select value={slot.adaptation_priority} onChange={(event) => patchSlot(dayIndex, slotIndex, { adaptation_priority: event.target.value as TrainingTemplateSlotPriority })}>
-                                      {priorities.map((priority) => <option key={priority} value={priority}>{t(`admin.templateEditor.priorities.${priority}`)}</option>)}
-                                    </select>
-                                  </label>
-                                  <label className="admin-field">
-                                    <span>{t("admin.templateEditor.movementPattern")}</span>
-                                    <select value={slot.movement_pattern} onChange={(event) => patchSlot(dayIndex, slotIndex, { movement_pattern: event.target.value as AdminTrainingTemplateSlotWrite["movement_pattern"] })}>
-                                      {movementPatterns.map((pattern) => <option key={pattern} value={pattern}>{t(`admin.programming.movementPattern.${pattern}`)}</option>)}
-                                    </select>
-                                  </label>
-                                  <TextInput dir="ltr" label={t("admin.templateEditor.slotMuscles")} value={slot.target_muscles.join(", ")} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_muscles: parseMuscles(value) })} />
-                                </div>
-                              </li>
-                            ))}
+                            {day.slots.map((slot, slotIndex) => {
+                              const slotKey = `${dayIndex}-${slot.exercise_id}-${slotIndex}`;
+                              const isSlotExpanded = expandedSlots.has(slotKey);
+                              const slotPanelId = `admin-template-slot-panel-${dayIndex}-${slotIndex}`;
+                              const slotName = slot.display_name_fa || slot.display_name_en || t("admin.templateEditor.exercise");
+                              const prescriptionSummary = `${slot.sets} × ${slot.rep_min}–${slot.rep_max} · RIR ${slot.target_rir}`;
+
+                              return (
+                                <li
+                                  className="admin-template-editor-slot"
+                                  data-expanded={isSlotExpanded}
+                                  key={`${slot.exercise_id}-${slotIndex}`}
+                                >
+                                  <header className="admin-accordion-header">
+                                    <button
+                                      aria-controls={slotPanelId}
+                                      aria-expanded={isSlotExpanded}
+                                      aria-label={t(`admin.templates.${isSlotExpanded ? "collapseSlotAria" : "expandSlotAria"}`, {
+                                        name: slotName,
+                                        number: slotIndex + 1,
+                                      })}
+                                      className="admin-slot-accordion-trigger admin-template-editor-slot__trigger"
+                                      onClick={() => toggleSlot(slotKey)}
+                                      type="button"
+                                    >
+                                      <span className="admin-template-editor-slot__meta">
+                                        <span className="admin-template-editor-slot__index">{slotIndex + 1}</span>
+                                        <strong className="admin-template-editor-slot__title">{slotName}</strong>
+                                        <span className="admin-template-editor-slot__prescription" dir="ltr">
+                                          {prescriptionSummary}
+                                        </span>
+                                      </span>
+                                      <span aria-hidden="true" className="admin-accordion-chevron">⌄</span>
+                                    </button>
+                                  </header>
+
+                                  {isSlotExpanded && (
+                                    <div className="admin-slot-accordion-panel admin-template-editor-slot__panel" id={slotPanelId}>
+                                      <div className="admin-template-editor-slot__actions">
+                                        <Link to={`/admin/exercises/${slot.exercise_id}/edit`}>
+                                          {t("admin.templateEditor.exerciseDetails")} ↗
+                                        </Link>
+                                        <button
+                                          aria-label={t("admin.templateEditor.removeExerciseAria", { name: slotName })}
+                                          onClick={() => removeSlot(dayIndex, slotIndex)}
+                                          type="button"
+                                        >
+                                          {t("admin.templateEditor.removeExercise")}
+                                        </button>
+                                      </div>
+                                      <div className="admin-template-editor-grid admin-template-editor-grid--slot">
+                                        <TextInput dir="rtl" label={t("admin.templateEditor.displayNameFa")} value={slot.display_name_fa ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_fa: value || null })} />
+                                        <TextInput dir="ltr" label={t("admin.templateEditor.displayNameEn")} value={slot.display_name_en ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_en: value || null })} />
+                                        <NumberInput label={t("admin.templateEditor.sets")} value={slot.sets} onChange={(value) => patchSlot(dayIndex, slotIndex, { sets: value })} />
+                                        <NumberInput label={t("admin.templateEditor.repMin")} value={slot.rep_min} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_min: value })} />
+                                        <NumberInput label={t("admin.templateEditor.repMax")} value={slot.rep_max} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_max: value })} />
+                                        <NumberInput label={t("admin.templateEditor.rir")} value={slot.target_rir} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_rir: value })} />
+                                        <NumberInput label={t("admin.templateEditor.rest")} value={slot.rest_seconds} onChange={(value) => patchSlot(dayIndex, slotIndex, { rest_seconds: value })} />
+                                        <label className="admin-field">
+                                          <span>{t("admin.templateEditor.method")}</span>
+                                          <select value={slot.intensity_method} onChange={(event) => patchSlot(dayIndex, slotIndex, { intensity_method: event.target.value as TrainingTemplateMethod })}>
+                                            {methods.map((method) => <option key={method} value={method}>{t(`admin.templates.methods.${method}`)}</option>)}
+                                          </select>
+                                        </label>
+                                        <label className="admin-field">
+                                          <span>{t("admin.templateEditor.priority")}</span>
+                                          <select value={slot.adaptation_priority} onChange={(event) => patchSlot(dayIndex, slotIndex, { adaptation_priority: event.target.value as TrainingTemplateSlotPriority })}>
+                                            {priorities.map((priority) => <option key={priority} value={priority}>{t(`admin.templateEditor.priorities.${priority}`)}</option>)}
+                                          </select>
+                                        </label>
+                                        <label className="admin-field">
+                                          <span>{t("admin.templateEditor.movementPattern")}</span>
+                                          <select value={slot.movement_pattern} onChange={(event) => patchSlot(dayIndex, slotIndex, { movement_pattern: event.target.value as AdminTrainingTemplateSlotWrite["movement_pattern"] })}>
+                                            {movementPatterns.map((pattern) => <option key={pattern} value={pattern}>{t(`admin.programming.movementPattern.${pattern}`)}</option>)}
+                                          </select>
+                                        </label>
+                                        <TextInput dir="ltr" label={t("admin.templateEditor.slotMuscles")} value={slot.target_muscles.join(", ")} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_muscles: parseMuscles(value) })} />
+                                      </div>
+                                    </div>
+                                  )}
+                                </li>
+                              );
+                            })}
                           </ol>
                           <button className="admin-template-editor-add" onClick={() => setPickerDay(dayIndex)} type="button">{t("admin.templateEditor.addExercise")}</button>
                         </div>
