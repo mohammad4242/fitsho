@@ -273,7 +273,7 @@ def test_template_session_replaces_excess_redundancy_with_complementary_role() -
     template = TemplateReference(
         slug="redundant-chest-template",
         days_per_week=1,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=("chest_priority",),
         intensity_methods=("standard",),

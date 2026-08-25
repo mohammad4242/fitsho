@@ -34,7 +34,7 @@ def _empty_reference(slug: str, *focus_tags: str) -> TemplateReference:
     return TemplateReference(
         slug=slug,
         days_per_week=4,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=focus_tags,
         intensity_methods=("standard",),
@@ -241,7 +241,7 @@ def test_equal_scores_prefer_more_feasible_template_deterministically() -> None:
         return TemplateReference(
             slug=slug,
             days_per_week=4,
-            training_level="intermediate",
+            supported_levels=("intermediate",),
             fitness_goal="build_muscle",
             focus_tags=(TemplateFocusTag.BALANCED.value,),
             intensity_methods=("standard",),

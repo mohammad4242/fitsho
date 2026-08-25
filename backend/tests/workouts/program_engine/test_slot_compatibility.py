@@ -193,7 +193,7 @@ def test_template_substitution_rejects_semantically_incompatible_reference() -> 
     template = TemplateReference(
         slug="semantic-template",
         days_per_week=1,
-        training_level="advanced",
+        supported_levels=("advanced",),
         fitness_goal="build_muscle",
         focus_tags=("balanced",),
         intensity_methods=("standard",),
@@ -248,7 +248,7 @@ def test_template_substitution_ids_exclude_matching_group_with_incompatible_role
     template = TemplateReference(
         slug="semantic-substitution-template",
         days_per_week=1,
-        training_level="beginner",
+        supported_levels=("beginner",),
         fitness_goal="general_fitness",
         focus_tags=("balanced",),
         intensity_methods=("standard",),

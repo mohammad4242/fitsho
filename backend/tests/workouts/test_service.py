@@ -437,7 +437,7 @@ def _ai_template(slug: str, exercise_ids: tuple[object, ...]) -> TemplateReferen
     return TemplateReference(
         slug=slug,
         days_per_week=2,
-        training_level="beginner",
+        supported_levels=("beginner",),
         fitness_goal="build_muscle",
         focus_tags=("balanced",),
         intensity_methods=("standard",),

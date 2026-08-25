@@ -342,7 +342,7 @@ def _hard_rejection_reason_codes(
     reasons: list[str] = []
     if template.days_per_week != request.resistance_training_days:
         reasons.append("DAYS_MISMATCH")
-    if template.training_level != (level or _template_level(request)):
+    if (level or _template_level(request)) not in template.supported_levels:
         reasons.append("EXPERIENCE_LEVEL_MISMATCH")
     if not _core_slots_are_resolvable(
         template,

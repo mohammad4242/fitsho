@@ -4,7 +4,7 @@
 
 **Goal:** Consolidate the 41 level-specific catalog rows into 17 shared templates with multi-level eligibility, full Admin CRUD, and unchanged downstream personalization.
 
-**Architecture:** Persist one non-empty `supported_levels` JSON list on each `TrainingProgramTemplate`; days and slots remain shared children. Canonical seeding emits 17 rows. The repository adapter exposes one engine reference per supported level so established exact-level selection and personalization code remains stable.
+**Architecture:** Persist one non-empty `supported_levels` JSON list on each `TrainingProgramTemplate`; days and slots remain shared children. Canonical seeding emits 17 rows. The repository adapter exposes one engine reference per shared template and the selector checks supported-level membership before the established personalization pipeline.
 
 **Tech Stack:** Python 3.12, FastAPI, Pydantic, SQLAlchemy, Alembic, PostgreSQL, React 19, TypeScript, Vite, Vitest.
 
@@ -155,13 +155,13 @@ git push origin main
 - `list_training_program_templates(db, days_per_week=None, training_level=None)` filters level membership.
 - `delete_training_program_template(db, template_id) -> bool` hard-deletes one template.
 - Admin read/write schemas expose `supported_levels: list[ExperienceLevel]`.
-- `load_template_references(db)` returns one `TemplateReference` per supported level with shared content.
+- `load_template_references(db)` returns one `TemplateReference` per shared template.
 
 - [ ] **Step 1: Write failing API and adapter tests**
 
 Cover same canonical ID in beginner/intermediate filtered responses, multi-level create/update, empty
-and duplicate level rejection, hard delete with cascades, and engine references for every supported
-level. Include an Admin-created template in adapter selection coverage.
+and duplicate level rejection, hard delete with cascades, and one engine reference carrying all
+supported levels. Include an Admin-created template in adapter selection coverage.
 
 - [ ] **Step 2: Run tests to verify failure**
 
@@ -182,9 +182,9 @@ Keep template replacement atomic and retain current exercise and shape validatio
 
 - [ ] **Step 4: Implement engine compatibility adapter**
 
-Load each active shared template once, then emit one immutable reference per supported level. Keep
-the existing `TemplateReference.training_level` field so selectors need no safety-sensitive rewrite.
-Use the canonical slug for every reference so diagnostics identify the same template.
+Load each active shared template once and emit one immutable reference containing
+`supported_levels`. Update eligibility to require membership while retaining exact day matching and
+the rest of the safety-sensitive selection pipeline. Use the canonical slug in diagnostics.
 
 - [ ] **Step 5: Verify backend integration**
 

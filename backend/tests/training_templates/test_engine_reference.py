@@ -14,9 +14,7 @@ def test_engine_references_preserve_linked_slot_and_adaptation_metadata(db: Sess
     seed_training_program_templates(db)
 
     reference = next(
-        item
-        for item in load_template_references(db)
-        if item.slug == "t14-5-day-leg-specialization-intermediate"
+        item for item in load_template_references(db) if item.slug == "t14-5-day-leg-specialization"
     )
 
     assert reference.days_per_week == 5
@@ -33,7 +31,7 @@ def test_engine_reference_rejects_noncanonical_persisted_focus_tags(db: Session)
     seed_training_program_templates(db)
     template = db.scalar(
         select(TrainingProgramTemplate).where(
-            TrainingProgramTemplate.slug == "t10-5-day-classic-body-part-intermediate"
+            TrainingProgramTemplate.slug == "t10-5-day-classic-body-part"
         )
     )
     assert template is not None
@@ -47,13 +45,13 @@ def test_engine_reference_rejects_noncanonical_persisted_focus_tags(db: Session)
 @pytest.mark.parametrize(
     ("slug", "expected"),
     (
-        ("t01-2-day-full-body-ab-beginner", SplitType.FULL_BODY),
-        ("t05-4-day-upper-lower-2x-intermediate", SplitType.UPPER_LOWER),
+        ("t01-2-day-full-body-ab", SplitType.FULL_BODY),
+        ("t05-4-day-upper-lower-2x", SplitType.UPPER_LOWER),
         (
-            "t09-5-day-ppl-upper-lower-intermediate",
+            "t09-5-day-ppl-upper-lower",
             SplitType.PUSH_PULL_LEGS_UPPER_LOWER,
         ),
-        ("t10-5-day-classic-body-part-intermediate", SplitType.BODY_PART_ROTATION),
+        ("t10-5-day-classic-body-part", SplitType.BODY_PART_ROTATION),
     ),
 )
 def test_engine_reference_preserves_canonical_split_identity(

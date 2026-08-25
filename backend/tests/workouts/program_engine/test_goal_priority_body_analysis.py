@@ -467,7 +467,7 @@ def test_23_template_ranking_is_deterministic_regardless_of_input_order() -> Non
     t1 = TemplateReference(
         slug="aaa-template",
         days_per_week=4,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=("upper_lower", "balanced"),
         intensity_methods=("standard",),
@@ -476,7 +476,7 @@ def test_23_template_ranking_is_deterministic_regardless_of_input_order() -> Non
     t2 = TemplateReference(
         slug="zzz-template",
         days_per_week=4,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=("upper_lower", "strength_bias", "compound_focus"),
         intensity_methods=("standard",),

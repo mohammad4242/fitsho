@@ -1,6 +1,8 @@
 from dataclasses import replace
 
 from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
+from app.training_templates.engine_reference import load_template_references
+from app.training_templates.service import seed_training_program_templates
 from app.workouts.program_engine.engine import _template_rejection_category, generate_program
 from app.workouts.program_engine.enums import RecoveryRating, ValidationStatus
 from app.workouts.program_engine.normalization import normalize_request
@@ -13,6 +15,7 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceSlot,
 )
 from app.workouts.program_engine.template_sessions import build_template_sessions
+from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
 
 
@@ -24,11 +27,29 @@ def template_request(**overrides: object):
     return request(**values)
 
 
+def test_shared_template_loads_as_one_engine_reference_with_supported_levels(db) -> None:
+    seed_real_catalog_exercises(db)
+    seed_training_program_templates(db)
+
+    references = [
+        reference
+        for reference in load_template_references(db)
+        if reference.slug == "t01-2-day-full-body-ab"
+    ]
+
+    assert len(references) == 1
+    assert references[0].supported_levels == (
+        "first_month",
+        "beginner",
+        "intermediate",
+    )
+
+
 def _four_day_reference() -> TemplateReference:
     return TemplateReference(
         slug="four-day-chest-reference",
         days_per_week=4,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=("chest_priority",),
         intensity_methods=("standard",),
@@ -166,7 +187,7 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
     template = TemplateReference(
         slug="four-day-upper-lower-reference",
         days_per_week=4,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=("chest_priority", "back_priority"),
         intensity_methods=("standard", "rest_pause"),
@@ -245,7 +266,7 @@ def test_safe_core_substitution_can_repeat_across_sessions_deterministically() -
     reference = TemplateReference(
         slug="two-day-shared-hinge-substitution",
         days_per_week=2,
-        training_level="beginner",
+        supported_levels=("beginner",),
         fitness_goal="general_fitness",
         focus_tags=("full_body", "balanced"),
         intensity_methods=("standard",),
@@ -667,7 +688,7 @@ def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> N
     unadaptable = TemplateReference(
         slug="unadaptable-repeated-chest-reference",
         days_per_week=4,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=("balanced",),
         intensity_methods=("standard",),
@@ -721,7 +742,7 @@ def test_unadaptable_five_day_template_recovers_without_dropping_days() -> None:
         base,
         slug="unadaptable-five-day-reference",
         days_per_week=5,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         days=tuple(replace(base.days[0], day_number=day_number) for day_number in range(1, 6)),
     )
 

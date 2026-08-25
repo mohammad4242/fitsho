@@ -39,7 +39,7 @@ def _template(
     return TemplateReference(
         slug=slug,
         days_per_week=days_per_week,
-        training_level=training_level,
+        supported_levels=(training_level,),
         fitness_goal="build_muscle",
         focus_tags=focus_tags,
         intensity_methods=("standard",),
@@ -78,7 +78,7 @@ def _duration_template(
     return TemplateReference(
         slug=slug,
         days_per_week=4,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=(TemplateFocusTag.BALANCED,),
         intensity_methods=("standard",),

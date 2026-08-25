@@ -47,7 +47,7 @@ def _template(*slots: TemplateReferenceSlot) -> TemplateReference:
     return TemplateReference(
         slug="template-substitution-closeout",
         days_per_week=1,
-        training_level="beginner",
+        supported_levels=("beginner",),
         fitness_goal="general_fitness",
         focus_tags=("balanced",),
         intensity_methods=("rest_pause",),

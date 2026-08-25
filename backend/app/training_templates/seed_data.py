@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 
 from app.exercises.enums import MovementPattern, MuscleGroup
@@ -59,7 +58,7 @@ class TrainingProgramTemplateSeed:
     description_en: str
     description_fa: str
     days_per_week: int
-    training_level: ExperienceLevel
+    supported_levels: tuple[ExperienceLevel, ...]
     focus_tags: tuple[TemplateFocusTag, ...]
     intensity_methods: tuple[TrainingTemplateMethod, ...]
     days: tuple[TemplateDaySeed, ...]
@@ -71,7 +70,7 @@ class TrainingProgramTemplateSeed:
 @dataclass(frozen=True)
 class Movement:
     key: str
-    slugs_by_level: Mapping[ExperienceLevel, str]
+    exercise_slug: str
     target_muscles: tuple[MuscleGroup, ...]
     movement_pattern: MovementPattern
 
@@ -83,7 +82,7 @@ class CanonicalTemplateDefinition:
     name_fa: str
     description_en: str
     description_fa: str
-    eligible_levels: tuple[ExperienceLevel, ...]
+    supported_levels: tuple[ExperienceLevel, ...]
     focus_tags: tuple[TemplateFocusTag, ...]
     days: tuple[TemplateDaySeed, ...]
     day_specs: tuple[tuple[tuple[Movement, str], ...], ...]
@@ -133,20 +132,10 @@ def _movement(
     slug: str,
     muscles: tuple[MuscleGroup, ...],
     pattern: MovementPattern,
-    *,
-    first_month_slug: str | None = None,
-    beginner_slug: str | None = None,
-    intermediate_slug: str | None = None,
-    advanced_slug: str | None = None,
 ) -> Movement:
     return Movement(
         key=key,
-        slugs_by_level={
-            Level.FIRST_MONTH: first_month_slug or slug,
-            Level.BEGINNER: beginner_slug or slug,
-            Level.INTERMEDIATE: intermediate_slug or slug,
-            Level.ADVANCED: advanced_slug or slug,
-        },
+        exercise_slug=slug,
         target_muscles=muscles,
         movement_pattern=pattern,
     )
@@ -157,18 +146,12 @@ SQUAT = _movement(
     "fedb-1435-barbell-back-squat",
     (M.QUADRICEPS,),
     P.SQUAT,
-    first_month_slug="fedb-0750-smith-chair-squat",
-    beginner_slug="fedb-0750-smith-chair-squat",
-    advanced_slug="fedb-0042-barbell-front-squat",
 )
 FRONT_SQUAT = _movement(
     "front-squat",
     "fedb-0042-barbell-front-squat",
     (M.QUADRICEPS,),
     P.SQUAT,
-    first_month_slug="fedb-0750-smith-chair-squat",
-    beginner_slug="fedb-0750-smith-chair-squat",
-    intermediate_slug="fedb-1435-barbell-back-squat",
 )
 LEG_PRESS = _movement(
     "leg-press",
@@ -219,16 +202,12 @@ FLAT_PRESS = _movement(
     "fedb-0025-barbell-bench-press",
     (M.CHEST,),
     P.HORIZONTAL_PUSH,
-    first_month_slug="fedb-0577-lever-lying-chest-press",
-    beginner_slug="fedb-0577-lever-lying-chest-press",
 )
 INCLINE_PRESS = _movement(
     "incline-chest-press",
     "fedb-0314-dumbbell-incline-bench-press",
     (M.CHEST,),
     P.HORIZONTAL_PUSH,
-    first_month_slug="fedb-1299-lever-incline-hammer-chest-press",
-    beginner_slug="fedb-1299-lever-incline-hammer-chest-press",
 )
 CHEST_FLY = _movement(
     "chest-fly",
@@ -241,8 +220,6 @@ ROW = _movement(
     "owner-e0c26a271aac-barbell-bent-over-row",
     (M.BACK,),
     P.HORIZONTAL_PULL,
-    first_month_slug="fedb-0581-lever-high-row",
-    beginner_slug="fedb-0581-lever-high-row",
 )
 SEATED_CABLE_ROW = _movement(
     "seated-cable-row",
@@ -268,17 +245,12 @@ SHOULDER_PRESS = _movement(
     "fedb-0553-military-press",
     (M.SHOULDERS,),
     P.VERTICAL_PUSH,
-    first_month_slug="fedb-0765-smith-seated-shoulder-press",
-    beginner_slug="fedb-0765-smith-seated-shoulder-press",
-    intermediate_slug="fedb-0289-seated-dumbbell-shoulder-press",
 )
 LATERAL_RAISE = _movement(
     "lateral-raise",
     "fedb-0178-cable-lateral-raise",
     (M.SHOULDERS,),
     P.SHOULDER_ABDUCTION,
-    first_month_slug="fedb-0584-lever-lateral-raise",
-    beginner_slug="fedb-0584-lever-lateral-raise",
 )
 REAR_DELT_FLY = _movement(
     "rear-delt-fly",
@@ -332,47 +304,26 @@ SIDE_PLANK = _movement(
 )
 
 
-def _prescription(level: ExperienceLevel, role: str) -> tuple[int, int, int, int, int]:
-    if role == "isolation":
-        return (
-            2 if level is not Level.INTERMEDIATE and level is not Level.ADVANCED else 3,
-            10,
-            15,
-            3 if level is Level.FIRST_MONTH else (2 if level is Level.BEGINNER else 1),
-            60,
-        )
-    if role == "core":
-        return (
-            2,
-            8,
-            15,
-            3 if level is Level.FIRST_MONTH else (2 if level is Level.BEGINNER else 1),
-            45,
-        )
-    if level is Level.FIRST_MONTH:
-        return (2, 8, 12, 3, 90)
-    if level is Level.BEGINNER:
-        return (3, 8, 12, 2, 90)
-    if role == "primary":
-        return (4, 6, 10, 2 if level is Level.INTERMEDIATE else 1, 120)
-    return (3, 8, 12, 2 if level is Level.INTERMEDIATE else 1, 90)
-
-
-def _slot(movement: Movement, level: ExperienceLevel, role: str) -> TemplateSlotSeed:
-    sets, rep_min, rep_max, rir, rest = _prescription(level, role)
-    slug = movement.slugs_by_level[level]
+def _shared_slot(
+    movement: Movement,
+    canonical_slot: TemplateSlotSeed,
+    role: str,
+) -> TemplateSlotSeed:
     return TemplateSlotSeed(
-        exercise_slug_hint=slug,
-        catalog_slug_hints=(slug,),
+        exercise_slug_hint=movement.exercise_slug,
+        catalog_slug_hints=(movement.exercise_slug,),
         target_muscles=movement.target_muscles,
         movement_pattern=movement.movement_pattern,
-        sets=sets,
-        rep_min=rep_min,
-        rep_max=rep_max,
-        target_rir=rir,
-        rest_seconds=rest,
-        intensity_method=Method.STANDARD,
+        placeholder_name_en=canonical_slot.placeholder_name_en,
+        placeholder_name_fa=canonical_slot.placeholder_name_fa,
+        sets=canonical_slot.sets,
+        rep_min=canonical_slot.rep_min,
+        rep_max=canonical_slot.rep_max,
+        target_rir=canonical_slot.target_rir,
+        rest_seconds=canonical_slot.rest_seconds,
+        intensity_method=canonical_slot.intensity_method,
         adaptation_priority=Priority.CORE if role == "primary" else Priority.ACCESSORY,
+        superset_group=canonical_slot.superset_group,
     )
 
 
@@ -416,15 +367,19 @@ def _day(
     )
 
 
-def _render_day(
-    day: TemplateDaySeed, level: ExperienceLevel, specs: tuple[tuple[Movement, str], ...]
+def _render_shared_day(
+    day: TemplateDaySeed,
+    specs: tuple[tuple[Movement, str], ...],
 ) -> TemplateDaySeed:
     return TemplateDaySeed(
         title_en=day.title_en,
         title_fa=day.title_fa,
         structure_focus=day.structure_focus,
         direct_target_muscles=day.direct_target_muscles,
-        slots=tuple(_slot(movement, level, role) for movement, role in specs),
+        slots=tuple(
+            _shared_slot(movement, canonical_slot, role)
+            for canonical_slot, (movement, role) in zip(day.slots, specs, strict=True)
+        ),
     )
 
 
@@ -443,22 +398,15 @@ def _day_definition(
 
 def _rationale(
     definition: CanonicalTemplateDefinition,
-    level: ExperienceLevel,
 ) -> tuple[TemplateProgrammingRationaleSeed, ...]:
-    if level is Level.FIRST_MONTH:
-        volume_en = "Use 2 working sets, 8–12 repetitions for compounds and 10–15 for isolation, with RIR 3."
-        volume_fa = "برای حرکات ترکیبی ۲ ست ۸ تا ۱۲ تکرار و برای حرکات تک‌مفصلی ۱۰ تا ۱۵ تکرار با RIR ۳ اجرا کن."
-    elif level is Level.BEGINNER:
-        volume_en = "Use 3 sets for compound work and 2 sets for isolation, with 8–12 or 10–15 controlled repetitions and RIR 2."
-        volume_fa = (
-            "کار ترکیبی را با ۳ ست و کار تک‌مفصلی را با ۲ ست، با تکرار کنترل‌شده و RIR ۲ انجام بده."
-        )
-    elif level is Level.INTERMEDIATE:
-        volume_en = "Primary compounds use 4 sets of 6–10, secondary compounds 3 sets of 8–12, and isolation 3 sets of 10–15 at RIR 1–2."
-        volume_fa = "حرکت اصلی ترکیبی ۴ ست ۶ تا ۱۰، حرکت ترکیبی دوم ۳ ست ۸ تا ۱۲ و تک‌مفصلی ۳ ست ۱۰ تا ۱۵ با RIR ۱ تا ۲ دارد."
-    else:
-        volume_en = "Primary compounds use 4 sets of 6–10, secondary compounds 3 sets of 8–12, and isolation 3 sets of 10–15 at RIR 1."
-        volume_fa = "حرکت اصلی ترکیبی ۴ ست ۶ تا ۱۰، حرکت ترکیبی دوم ۳ ست ۸ تا ۱۲ و تک‌مفصلی ۳ ست ۱۰ تا ۱۵ با RIR ۱ دارد."
+    volume_en = (
+        "Use the shared sets, rep ranges, RIR, and rest shown for each slot; progress "
+        "repetitions before adding load."
+    )
+    volume_fa = (
+        "ست، دامنه تکرار، RIR و استراحت مشترک هر جایگاه را اجرا کن و پیش از افزایش "
+        "وزنه، تکرارها را پیش ببر."
+    )
     return (
         TemplateProgrammingRationaleSeed(
             "Structure",
@@ -499,7 +447,7 @@ def _definition(
     name_fa: str,
     description_en: str,
     description_fa: str,
-    eligible_levels: tuple[ExperienceLevel, ...],
+    supported_levels: tuple[ExperienceLevel, ...],
     focus_tags: tuple[TemplateFocusTag, ...],
     days: tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...],
     guidance_en: str,
@@ -515,7 +463,7 @@ def _definition(
         name_fa=name_fa,
         description_en=description_en,
         description_fa=description_fa,
-        eligible_levels=eligible_levels,
+        supported_levels=supported_levels,
         focus_tags=validate_focus_tags(focus_tags),
         days=tuple(day for day, _ in days),
         day_specs=tuple(specs for _, specs in days),
@@ -1718,44 +1666,40 @@ _DEFINITIONS = (
 CANONICAL_TEMPLATE_DEFINITIONS = _DEFINITIONS
 
 
-def _expand_definition(
+def _seed_from_definition(
     definition: CanonicalTemplateDefinition,
-) -> tuple[TrainingProgramTemplateSeed, ...]:
-    expanded: list[TrainingProgramTemplateSeed] = []
-    for level in definition.eligible_levels:
-        days = tuple(
-            _render_day(day, level, specs)
-            for day, specs in zip(
-                definition.days,
-                definition.day_specs,
-                strict=True,
-            )
+) -> TrainingProgramTemplateSeed:
+    days = tuple(
+        _render_shared_day(day, specs)
+        for day, specs in zip(
+            definition.days,
+            definition.day_specs,
+            strict=True,
         )
-        seed_slug = f"{definition.canonical_slug}-{level.value.replace('_', '-')}"
-        seed = TrainingProgramTemplateSeed(
-            canonical_slug=definition.canonical_slug,
-            slug=seed_slug,
-            name_en=definition.name_en,
-            name_fa=definition.name_fa,
-            description_en=definition.description_en,
-            description_fa=definition.description_fa,
-            days_per_week=len(days),
-            training_level=level,
-            focus_tags=definition.focus_tags,
-            intensity_methods=(Method.STANDARD,),
-            days=days,
-            programming_rationale=_rationale(definition, level),
-            fitness_goal=FitnessGoal.BUILD_MUSCLE,
-        )
-        validate_template_focus_tags(
-            seed.focus_tags,
-            intensity_methods=seed.intensity_methods,
-            days=seed.days,
-        )
-        expanded.append(seed)
-    return tuple(expanded)
+    )
+    seed = TrainingProgramTemplateSeed(
+        canonical_slug=definition.canonical_slug,
+        slug=definition.canonical_slug,
+        name_en=definition.name_en,
+        name_fa=definition.name_fa,
+        description_en=definition.description_en,
+        description_fa=definition.description_fa,
+        days_per_week=len(days),
+        supported_levels=definition.supported_levels,
+        focus_tags=definition.focus_tags,
+        intensity_methods=(Method.STANDARD,),
+        days=days,
+        programming_rationale=_rationale(definition),
+        fitness_goal=FitnessGoal.BUILD_MUSCLE,
+    )
+    validate_template_focus_tags(
+        seed.focus_tags,
+        intensity_methods=seed.intensity_methods,
+        days=seed.days,
+    )
+    return seed
 
 
 TRAINING_PROGRAM_TEMPLATE_SEEDS = tuple(
-    seed for definition in CANONICAL_TEMPLATE_DEFINITIONS for seed in _expand_definition(definition)
+    _seed_from_definition(definition) for definition in CANONICAL_TEMPLATE_DEFINITIONS
 )

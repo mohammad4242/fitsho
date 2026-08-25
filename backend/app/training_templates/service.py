@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.exercises.enums import ExerciseContentType
 from app.exercises.models import Exercise
+from app.profile.enums import ExperienceLevel
 from app.training_templates.models import (
     TrainingProgramTemplate,
     TrainingProgramTemplateDay,
@@ -82,7 +83,7 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
         template.description_en = seed.description_en
         template.description_fa = seed.description_fa
         template.days_per_week = seed.days_per_week
-        template.training_level = seed.training_level
+        template.supported_levels = [level.value for level in seed.supported_levels]
         template.fitness_goal = seed.fitness_goal
         template.focus_tags = [tag.value for tag in seed.focus_tags]
         template.intensity_methods = [method.value for method in seed.intensity_methods]
@@ -162,6 +163,7 @@ def list_training_program_templates(
     db: Session,
     *,
     days_per_week: int | None = None,
+    training_level: ExperienceLevel | None = None,
 ) -> list[TrainingProgramTemplate]:
     statement = (
         select(TrainingProgramTemplate)
@@ -173,10 +175,14 @@ def list_training_program_templates(
         )
         .order_by(
             TrainingProgramTemplate.days_per_week.asc(),
-            TrainingProgramTemplate.training_level.asc(),
             TrainingProgramTemplate.name_en.asc(),
         )
     )
     if days_per_week is not None:
         statement = statement.where(TrainingProgramTemplate.days_per_week == days_per_week)
-    return list(db.scalars(statement))
+    templates = list(db.scalars(statement))
+    if training_level is not None:
+        templates = [
+            template for template in templates if training_level.value in template.supported_levels
+        ]
+    return templates

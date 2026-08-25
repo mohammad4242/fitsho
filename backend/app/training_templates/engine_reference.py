@@ -26,7 +26,6 @@ def load_template_references(db: Session) -> tuple[TemplateReference, ...]:
         )
         .order_by(
             TrainingProgramTemplate.days_per_week,
-            TrainingProgramTemplate.training_level,
             TrainingProgramTemplate.slug,
         )
     )
@@ -37,7 +36,7 @@ def _reference(template: TrainingProgramTemplate) -> TemplateReference:
     return TemplateReference(
         slug=template.slug,
         days_per_week=template.days_per_week,
-        training_level=template.training_level.value,
+        supported_levels=tuple(template.supported_levels),
         fitness_goal=template.fitness_goal.value,
         focus_tags=validate_template_focus_tags(
             template.focus_tags,

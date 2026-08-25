@@ -1,11 +1,12 @@
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.exercises.models import Exercise
 from app.exercises.service import seed_exercises
+from app.training_templates.engine_reference import load_template_references
+from app.training_templates.models import TrainingProgramTemplate, TrainingProgramTemplateDay
 from app.training_templates.service import seed_training_program_templates
 from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
 
@@ -54,11 +55,14 @@ def test_admin_lists_complete_four_day_template_details(client: TestClient, db: 
 
     assert response.status_code == 200
     templates = response.json()["items"]
-    assert len(templates) == 12
-    classic = next(
-        item for item in templates if item["slug"] == "t05-4-day-upper-lower-2x-intermediate"
-    )
-    assert classic["training_level"] == "intermediate"
+    assert len(templates) == 4
+    classic = next(item for item in templates if item["slug"] == "t05-4-day-upper-lower-2x")
+    assert classic["supported_levels"] == [
+        "first_month",
+        "beginner",
+        "intermediate",
+        "advanced",
+    ]
     assert "upper_lower" in classic["focus_tags"]
     assert len(classic["programming_rationale"]) == 5
     assert classic["programming_rationale"][0]["title_fa"] == "ساختار"
@@ -85,11 +89,34 @@ def test_training_template_library_has_no_public_endpoint(client: TestClient) ->
     assert response.status_code == 404
 
 
-@pytest.mark.parametrize("training_level", ["intermediate", "first_month"])
-def test_admin_creates_a_complete_program_template_with_catalog_exercise(
+def test_admin_level_filters_return_the_same_canonical_template_id(
     client: TestClient,
     db: Session,
-    training_level: str,
+) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+
+    beginner = client.get(
+        "/api/v1/admin/training-program-templates?days_per_week=2&training_level=beginner"
+    )
+    intermediate = client.get(
+        "/api/v1/admin/training-program-templates?days_per_week=2&training_level=intermediate"
+    )
+
+    assert beginner.status_code == 200
+    assert intermediate.status_code == 200
+    beginner_t01 = next(
+        item for item in beginner.json()["items"] if item["slug"].startswith("t01-")
+    )
+    intermediate_t01 = next(
+        item for item in intermediate.json()["items"] if item["slug"].startswith("t01-")
+    )
+    assert beginner_t01["id"] == intermediate_t01["id"]
+
+
+def test_admin_creates_a_complete_multi_level_template_with_shared_content(
+    client: TestClient,
+    db: Session,
 ) -> None:
     _seed_library(db)
     _make_current_user_admin(client, db)
@@ -104,7 +131,7 @@ def test_admin_creates_a_complete_program_template_with_catalog_exercise(
             "description_en": "A configurable four-day reference program.",
             "description_fa": "برنامه مرجع چهارروزه قابل تنظیم.",
             "days_per_week": 4,
-            "training_level": training_level,
+            "supported_levels": ["first_month", "intermediate"],
             "fitness_goal": "build_muscle",
             "focus_tags": ["full_body", "balanced"],
             "intensity_methods": ["standard"],
@@ -118,10 +145,51 @@ def test_admin_creates_a_complete_program_template_with_catalog_exercise(
     assert response.status_code == 201
     created = response.json()
     assert created["slug"] == "admin-four-day-program"
-    assert created["training_level"] == training_level
+    assert created["supported_levels"] == ["first_month", "intermediate"]
     assert len(created["days"]) == 4
     assert len(created["days"][0]["slots"]) == 5
     assert created["days"][0]["slots"][0]["exercise"]["id"] == exercise_id
+    created_references = [
+        reference for reference in load_template_references(db) if reference.slug == created["slug"]
+    ]
+    assert len(created_references) == 1
+    assert set(created_references[0].supported_levels) == {
+        "first_month",
+        "intermediate",
+    }
+
+
+def test_admin_rejects_empty_or_duplicate_supported_levels(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    exercise_id = client.get("/api/v1/admin/exercises?search=bench").json()["items"][0]["id"]
+    base_payload = {
+        "name_en": "Invalid Supported Levels",
+        "name_fa": "سطوح پشتیبانی نامعتبر",
+        "description_en": "Supported levels must be non-empty and unique.",
+        "description_fa": "سطوح پشتیبانی باید غیرخالی و یکتا باشند.",
+        "days_per_week": 2,
+        "fitness_goal": "build_muscle",
+        "focus_tags": ["full_body", "balanced"],
+        "intensity_methods": ["standard"],
+        "programming_rationale": _rationale_payload(),
+        "source_name": "Fitsho admin library",
+        "source_url": "https://fitsho.local/admin-library",
+        "days": [_day_payload(day, exercise_id) for day in range(1, 3)],
+    }
+
+    for supported_levels in ([], ["beginner", "beginner"]):
+        response = client.post(
+            "/api/v1/admin/training-program-templates",
+            headers=ORIGIN,
+            json={**base_payload, "supported_levels": supported_levels},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"][0]["loc"] == ["body", "supported_levels"]
 
 
 def test_admin_update_replaces_removed_slots_and_keeps_catalog_exercise_link(
@@ -142,7 +210,7 @@ def test_admin_update_replaces_removed_slots_and_keeps_catalog_exercise_link(
         "description_en": template["description_en"],
         "description_fa": template["description_fa"],
         "days_per_week": template["days_per_week"],
-        "training_level": template["training_level"],
+        "supported_levels": ["beginner", "advanced"],
         "fitness_goal": template["fitness_goal"],
         "focus_tags": template["focus_tags"],
         "intensity_methods": template["intensity_methods"],
@@ -176,6 +244,32 @@ def test_admin_update_replaces_removed_slots_and_keeps_catalog_exercise_link(
     assert len(first_day["slots"]) == 5
     assert first_day["slots"][0]["placeholder_name_fa"] == "پرس سینه انتخابی"
     assert first_day["slots"][0]["exercise"]["id"] == first_slot["exercise"]["id"]
+    assert response.json()["supported_levels"] == ["beginner", "advanced"]
+
+
+def test_admin_deletes_template_and_owned_days(client: TestClient, db: Session) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    template = client.get("/api/v1/admin/training-program-templates?days_per_week=2").json()[
+        "items"
+    ][0]
+    template_id = template["id"]
+
+    response = client.delete(
+        f"/api/v1/admin/training-program-templates/{template_id}",
+        headers=ORIGIN,
+    )
+
+    assert response.status_code == 204
+    assert db.get(TrainingProgramTemplate, template_id) is None
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(TrainingProgramTemplateDay)
+            .where(TrainingProgramTemplateDay.template_id == template_id)
+        )
+        == 0
+    )
 
 
 def test_admin_rejects_template_slot_with_unknown_exercise(client: TestClient, db: Session) -> None:
@@ -187,7 +281,7 @@ def test_admin_rejects_template_slot_with_unknown_exercise(client: TestClient, d
         "description_en": "Invalid exercise test.",
         "description_fa": "آزمون حرکت نامعتبر.",
         "days_per_week": 2,
-        "training_level": "beginner",
+        "supported_levels": ["beginner"],
         "fitness_goal": "build_muscle",
         "focus_tags": ["full_body", "balanced"],
         "intensity_methods": ["standard"],
@@ -224,7 +318,7 @@ def test_admin_rejects_conflicting_canonical_template_tags(
             "description_en": "Conflicting canonical tag test.",
             "description_fa": "آزمون برچسب‌های متناقض.",
             "days_per_week": 2,
-            "training_level": "beginner",
+            "supported_levels": ["beginner"],
             "fitness_goal": "build_muscle",
             "focus_tags": ["full_body", "balanced", "chest_priority"],
             "intensity_methods": ["standard"],
@@ -256,7 +350,7 @@ def test_admin_rejects_guide_from_training_template_slots(client: TestClient, db
             "description_en": "Guide slot must be rejected.",
             "description_fa": "جایگاه راهنما باید رد شود.",
             "days_per_week": 2,
-            "training_level": "beginner",
+            "supported_levels": ["beginner"],
             "fitness_goal": "build_muscle",
             "focus_tags": ["full_body", "balanced"],
             "intensity_methods": ["standard"],

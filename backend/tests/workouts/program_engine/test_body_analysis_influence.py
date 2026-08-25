@@ -185,7 +185,7 @@ def test_reference_template_path_scores_body_analysis_emphasis_tags() -> None:
         TemplateReference(
             slug="z-classic",
             days_per_week=4,
-            training_level="intermediate",
+            supported_levels=("intermediate",),
             fitness_goal="build_muscle",
             focus_tags=("balanced",),
             intensity_methods=("standard",),
@@ -194,7 +194,7 @@ def test_reference_template_path_scores_body_analysis_emphasis_tags() -> None:
         TemplateReference(
             slug="a-shoulders",
             days_per_week=4,
-            training_level="intermediate",
+            supported_levels=("intermediate",),
             fitness_goal="build_muscle",
             focus_tags=("shoulders_priority",),
             intensity_methods=("standard",),
@@ -238,7 +238,7 @@ def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> Non
     oversized = TemplateReference(
         slug="oversized-chest-reference",
         days_per_week=4,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=("chest_priority",),
         intensity_methods=("standard",),

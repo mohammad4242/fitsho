@@ -1,4 +1,3 @@
-
 from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, TrainingExperience
@@ -14,7 +13,7 @@ def _chest_triceps_reference() -> TemplateReference:
     return TemplateReference(
         slug="test_chest_triceps_template",
         days_per_week=1,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=(),
         intensity_methods=("standard",),
@@ -104,7 +103,7 @@ def _back_biceps_reference() -> TemplateReference:
     return TemplateReference(
         slug="test_back_biceps_template",
         days_per_week=1,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=(),
         intensity_methods=("standard",),
@@ -155,7 +154,7 @@ def _full_body_reference() -> TemplateReference:
     return TemplateReference(
         slug="test_full_body_template",
         days_per_week=1,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=(),
         intensity_methods=("standard",),
@@ -194,7 +193,7 @@ def _upper_lower_reference() -> TemplateReference:
     return TemplateReference(
         slug="test_upper_lower_template",
         days_per_week=2,
-        training_level="intermediate",
+        supported_levels=("intermediate",),
         fitness_goal="build_muscle",
         focus_tags=(),
         intensity_methods=("standard",),

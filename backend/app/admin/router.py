@@ -8,6 +8,7 @@ from fastapi import (
     Form,
     HTTPException,
     Query,
+    Response,
     UploadFile,
     status,
 )
@@ -48,9 +49,11 @@ from app.auth.dependencies import AppSettings, DatabaseSession
 from app.exercises.enums import MediaPresentation, MediaRole, MediaType
 from app.exercises.models import Exercise
 from app.exercises.taxonomy import MUSCLES_BY_REGION, is_compatible_muscle_focus
+from app.profile.enums import ExperienceLevel
 from app.training_templates.admin_service import (
     TemplateWriteError,
     create_training_program_template,
+    delete_training_program_template,
     get_training_program_template,
     update_training_program_template,
 )
@@ -73,7 +76,7 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
         description_en=template.description_en,
         description_fa=template.description_fa,
         days_per_week=template.days_per_week,
-        training_level=template.training_level,
+        supported_levels=template.supported_levels,
         fitness_goal=template.fitness_goal,
         focus_tags=template.focus_tags,
         intensity_methods=template.intensity_methods,
@@ -132,8 +135,13 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
 def read_training_program_templates(
     db: DatabaseSession,
     days_per_week: Annotated[int | None, Query(ge=2, le=6)] = None,
+    training_level: ExperienceLevel | None = None,
 ) -> AdminTrainingProgramTemplatesResponse:
-    templates = list_training_program_templates(db, days_per_week=days_per_week)
+    templates = list_training_program_templates(
+        db,
+        days_per_week=days_per_week,
+        training_level=training_level,
+    )
     return AdminTrainingProgramTemplatesResponse(
         items=[_training_template_detail(template) for template in templates]
     )
@@ -192,6 +200,20 @@ def update_training_template(
             detail="Program template not found",
         )
     return _training_template_detail(template)
+
+
+@router.delete(
+    "/training-program-templates/{template_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def delete_training_template(template_id: UUID, db: DatabaseSession) -> Response:
+    if not delete_training_program_template(db, template_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Program template not found",
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _detail(exercise: Exercise) -> AdminExerciseDetail:

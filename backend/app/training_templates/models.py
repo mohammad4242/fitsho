@@ -19,7 +19,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
 from app.exercises.enums import MovementPattern
 from app.exercises.models import Exercise, enum_values
-from app.profile.enums import ExperienceLevel, FitnessGoal
+from app.profile.enums import FitnessGoal
 
 
 class TrainingTemplateMethod(StrEnum):
@@ -55,17 +55,7 @@ class TrainingProgramTemplate(Base):
     description_en: Mapped[str] = mapped_column(String(1000), nullable=False)
     description_fa: Mapped[str] = mapped_column(String(1000), nullable=False)
     days_per_week: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    training_level: Mapped[ExperienceLevel] = mapped_column(
-        Enum(
-            ExperienceLevel,
-            native_enum=False,
-            create_constraint=True,
-            validate_strings=True,
-            values_callable=enum_values,
-            name="ck_training_program_templates_training_level_values",
-        ),
-        nullable=False,
-    )
+    supported_levels: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     fitness_goal: Mapped[FitnessGoal] = mapped_column(
         Enum(
             FitnessGoal,
@@ -115,7 +105,9 @@ class TrainingProgramTemplateDay(Base):
     day_number: Mapped[int] = mapped_column(Integer, nullable=False)
     title_en: Mapped[str] = mapped_column(String(160), nullable=False)
     title_fa: Mapped[str] = mapped_column(String(160), nullable=False)
-    structure_focus: Mapped[str] = mapped_column(String(100), nullable=False, default="full_body", server_default="full_body")
+    structure_focus: Mapped[str] = mapped_column(
+        String(100), nullable=False, default="full_body", server_default="full_body"
+    )
     direct_target_muscles: Mapped[list[str]] = mapped_column(JSON, nullable=False)
 
     template: Mapped[TrainingProgramTemplate] = relationship(back_populates="days")

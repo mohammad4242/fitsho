@@ -82,10 +82,10 @@ The editor supports create, update, and confirmed delete.
 
 ## Program Engine
 
-The repository adapter expands each persisted shared template into one in-memory
-`TemplateReference` per supported level. Every reference carries the same canonical slug and the
-same shared days/slots. This keeps the established deterministic selector and personalization
-pipeline unchanged while replacing database duplication with an adapter-level compatibility view.
+The repository adapter emits one in-memory `TemplateReference` per persisted shared template. The
+reference carries `supported_levels` and the selector checks membership for the user's exact level.
+This preserves one canonical identity through persistence, selection, diagnostics, and downstream
+personalization.
 
 The selector still requires exact day count and exact user-level compatibility. It then applies all
 existing safety, equipment, duration, recovery, priority, substitution, and validation behavior.
@@ -101,4 +101,3 @@ Admin-created templates are loaded by the same active-template query and adapter
   normal selection.
 - Frontend: one card per template, supported-level controls, shared content editing, delete flow.
 - Regression: focused backend/frontend suites, backend Ruff and mypy, frontend lint and build.
-

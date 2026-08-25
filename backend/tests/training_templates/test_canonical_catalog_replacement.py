@@ -120,7 +120,7 @@ def _legacy_template(slug: str) -> TrainingProgramTemplate:
         description_en="Legacy catalog row.",
         description_fa="ردیف قدیمی کاتالوگ.",
         days_per_week=2,
-        training_level="beginner",
+        supported_levels=["beginner"],
         fitness_goal="build_muscle",
         focus_tags=["full_body"],
         intensity_methods=["standard"],
@@ -137,6 +137,15 @@ def test_catalog_defines_exactly_seventeen_canonical_structures() -> None:
     }
 
     assert canonical_slugs == EXPECTED_CANONICAL_SLUGS
+    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 17
+    assert {seed.slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS} == EXPECTED_CANONICAL_SLUGS
+    assert next(
+        seed for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS if seed.slug == "t01-2-day-full-body-ab"
+    ).supported_levels == (
+        "first_month",
+        "beginner",
+        "intermediate",
+    )
 
 
 def test_catalog_seed_requires_real_library_rows_and_creates_no_placeholders(db: Session) -> None:
@@ -160,7 +169,7 @@ def test_catalog_seed_removes_all_legacy_source_rows_but_preserves_custom_rows(d
         description_en="Custom template.",
         description_fa="قالب سفارشی.",
         days_per_week=2,
-        training_level="beginner",
+        supported_levels=["beginner"],
         fitness_goal="build_muscle",
         focus_tags=["full_body"],
         intensity_methods=["standard"],

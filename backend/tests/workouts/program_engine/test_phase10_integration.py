@@ -113,7 +113,7 @@ def _template(
     return TemplateReference(
         slug=slug,
         days_per_week=4,
-        training_level=level,
+        supported_levels=(level,),
         fitness_goal="build_muscle",
         focus_tags=tags,
         intensity_methods=("standard",),

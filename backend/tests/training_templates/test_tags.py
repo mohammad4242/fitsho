@@ -193,7 +193,7 @@ def test_structural_validator_rejects_a_false_primary_structure_claim() -> None:
     classic = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if template.slug == "t10-5-day-classic-body-part-intermediate"
+        if template.slug == "t10-5-day-classic-body-part"
     )
 
     with pytest.raises(ValueError, match="full_body lacks structural evidence"):
@@ -208,7 +208,7 @@ def test_structural_validator_rejects_an_incidental_muscle_priority_claim() -> N
     classic = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if template.slug == "t10-5-day-classic-body-part-intermediate"
+        if template.slug == "t10-5-day-classic-body-part"
     )
 
     with pytest.raises(ValueError, match="glute_priority lacks structural evidence"):
@@ -305,7 +305,7 @@ def test_seed_library_keeps_structural_emphasis_tags_without_user_mutation() -> 
     upper_priority = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if template.slug == "t11-5-day-ppl-upper-lower-priority-intermediate"
+        if template.slug == "t11-5-day-ppl-upper-lower-priority"
     )
     assert TemplateFocusTag.UPPER_PRIORITY in upper_priority.focus_tags
     assert TemplateFocusTag.PUSH_PULL_LEGS in upper_priority.focus_tags
@@ -314,7 +314,7 @@ def test_seed_library_keeps_structural_emphasis_tags_without_user_mutation() -> 
     lower_priority = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if template.slug == "t14-5-day-leg-specialization-intermediate"
+        if template.slug == "t14-5-day-leg-specialization"
     )
     assert TemplateFocusTag.LOWER_PRIORITY in lower_priority.focus_tags
     assert TemplateFocusTag.LOWER_PRIORITY in lower_priority.focus_tags

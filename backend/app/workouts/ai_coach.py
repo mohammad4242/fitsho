@@ -52,7 +52,7 @@ def select_ai_coach_candidates(
     for template in templates:
         if (
             template.days_per_week != profile.training_days_per_week
-            or template.training_level != profile.experience_level.value
+            or profile.experience_level.value not in template.supported_levels
             or template.fitness_goal != str(profile.fitness_goal)
         ):
             continue

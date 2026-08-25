@@ -91,7 +91,7 @@ def test_template_slot_resolution_uses_profile_ranking_not_catalog_order() -> No
     template = TemplateReference(
         slug="ranked-resolution",
         days_per_week=1,
-        training_level=source.training_experience.value,
+        supported_levels=(source.training_experience.value,),
         fitness_goal="build_muscle",
         focus_tags=("balanced",),
         intensity_methods=("standard",),

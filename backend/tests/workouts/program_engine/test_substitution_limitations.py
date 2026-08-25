@@ -354,7 +354,7 @@ def test_template_builder_keeps_simultaneous_constraint_replacements_safe() -> N
     template = TemplateReference(
         slug="safe-full-body",
         days_per_week=1,
-        training_level="beginner",
+        supported_levels=("beginner",),
         fitness_goal="general_fitness",
         focus_tags=(TemplateFocusTag.FULL_BODY,),
         intensity_methods=("standard",),

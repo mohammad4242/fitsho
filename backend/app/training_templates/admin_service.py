@@ -61,6 +61,15 @@ def update_training_program_template(
     return _get_template_or_raise(db, template.id)
 
 
+def delete_training_program_template(db: Session, template_id: UUID) -> bool:
+    template = db.get(TrainingProgramTemplate, template_id)
+    if template is None:
+        return False
+    db.delete(template)
+    db.commit()
+    return True
+
+
 def _validate_exercise_links(
     db: Session,
     payload: AdminTrainingProgramTemplateWrite,
@@ -92,7 +101,7 @@ def _replace_template_content(
     template.description_en = payload.description_en
     template.description_fa = payload.description_fa
     template.days_per_week = payload.days_per_week
-    template.training_level = payload.training_level
+    template.supported_levels = [level.value for level in payload.supported_levels]
     template.fitness_goal = payload.fitness_goal
     template.focus_tags = [tag.value for tag in payload.focus_tags]
     template.intensity_methods = [method.value for method in payload.intensity_methods]

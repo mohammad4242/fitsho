@@ -2,7 +2,14 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from app.exercises.enums import (
     BodyRegion,
@@ -241,7 +248,7 @@ class AdminTrainingProgramTemplate(BaseModel):
     description_en: str
     description_fa: str
     days_per_week: int
-    training_level: ExperienceLevel
+    supported_levels: list[ExperienceLevel]
     fitness_goal: FitnessGoal
     focus_tags: list[TemplateFocusTag]
     intensity_methods: list[TrainingTemplateMethod]
@@ -309,7 +316,7 @@ class AdminTrainingProgramTemplateWrite(BaseModel):
     description_en: TextItem
     description_fa: TextItem
     days_per_week: int = Field(ge=2, le=6)
-    training_level: ExperienceLevel
+    supported_levels: list[ExperienceLevel] = Field(min_length=1, max_length=4)
     fitness_goal: FitnessGoal
     focus_tags: list[TemplateFocusTag] = Field(min_length=1, max_length=12)
     intensity_methods: list[TrainingTemplateMethod] = Field(min_length=1, max_length=3)
@@ -320,6 +327,16 @@ class AdminTrainingProgramTemplateWrite(BaseModel):
     source_name: Name
     source_url: SourceUrl
     days: list[AdminTrainingTemplateDayWrite]
+
+    @field_validator("supported_levels")
+    @classmethod
+    def validate_supported_levels_are_unique(
+        cls,
+        supported_levels: list[ExperienceLevel],
+    ) -> list[ExperienceLevel]:
+        if len(supported_levels) != len(set(supported_levels)):
+            raise ValueError("Supported levels must be unique")
+        return supported_levels
 
     @model_validator(mode="after")
     def validate_program_shape(self) -> "AdminTrainingProgramTemplateWrite":

@@ -26,7 +26,7 @@ def _template(
     return TemplateReference(
         slug=slug,
         days_per_week=days_per_week,
-        training_level=training_level,
+        supported_levels=(training_level,),
         fitness_goal="build_muscle",
         focus_tags=focus_tags,
         intensity_methods=("standard",),
