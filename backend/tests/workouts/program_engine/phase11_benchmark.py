@@ -1909,19 +1909,41 @@ def verify_closeout(payload: Mapping[str, object]) -> tuple[str, ...]:
         blockers.append("Final quality-code audit does not reconcile with profile findings")
 
     semantic = _object_mapping(quality.get("semantic_substitution"))
-    unexplained = int(_number(semantic.get("unexplained_final_semantic_failures")))
-    record_unexplained = sum(
-        int(
-            _number(
-                _object_mapping(record.get("semantic_substitution")).get(
-                    "unexplained_final_semantic_failures"
-                )
-            )
-        )
-        for record in records
+    semantic_keys = (
+        "successful_valid_substitutions",
+        "recovered_intermediate_attempts",
+        "legitimate_no_valid_replacements",
+        "final_semantic_degradations",
+        "explained_final_semantic_degradations",
+        "unexplained_final_semantic_failures",
     )
-    if unexplained != record_unexplained:
+    reported_semantic = {key: int(_number(semantic.get(key))) for key in semantic_keys}
+    record_semantic = {
+        key: sum(
+            int(_number(_object_mapping(record.get("semantic_substitution")).get(key)))
+            for record in records
+        )
+        for key in semantic_keys
+    }
+    if reported_semantic != record_semantic:
         blockers.append("Semantic substitution totals do not reconcile with profile records")
+    substitution_requests = int(_number(quality.get("substitutions_requests")))
+    substitution_successes = int(_number(quality.get("substitutions_total")))
+    no_valid_replacements = int(_number(quality.get("no_valid_replacements")))
+    if substitution_requests != substitution_successes + no_valid_replacements:
+        blockers.append("Substitution request totals do not reconcile with success and no-valid")
+    legitimate_no_valid = reported_semantic["legitimate_no_valid_replacements"]
+    failed_intermediate_no_valid = no_valid_replacements - legitimate_no_valid
+    if failed_intermediate_no_valid < 0 or (
+        reported_semantic["recovered_intermediate_attempts"] < failed_intermediate_no_valid
+    ):
+        blockers.append("Semantic no-valid classifications do not reconcile")
+    if reported_semantic["final_semantic_degradations"] != (
+        reported_semantic["explained_final_semantic_degradations"]
+        + reported_semantic["unexplained_final_semantic_failures"]
+    ):
+        blockers.append("Final semantic degradation classifications do not reconcile")
+    unexplained = reported_semantic["unexplained_final_semantic_failures"]
     if unexplained:
         blockers.append(f"Unexplained final semantic substitution failures = {unexplained}")
 

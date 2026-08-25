@@ -79,6 +79,10 @@ def render_report(
     equipment_violations = _integer(quality.get("equipment_violations_custom"))
     safety_violations = _integer(quality.get("safety_violations_custom"))
     redundancy_violations = _integer(quality.get("redundancy_violations_custom"))
+    substitution_reconciles = _integer(quality.get("substitutions_requests")) == (
+        _integer(quality.get("substitutions_total"))
+        + _integer(quality.get("no_valid_replacements"))
+    )
 
     lines = [
         "# Prompt 5 Final Closeout",
@@ -142,6 +146,11 @@ def render_report(
         lines.extend(f"  - {reason}" for reason in _sequence(values.get("explanations")))
 
     semantic = _mapping(quality.get("semantic_substitution"))
+    raw_no_valid = _integer(quality.get("no_valid_replacements"))
+    legitimate_no_valid = _integer(semantic.get("legitimate_no_valid_replacements"))
+    failed_intermediate_no_valid = raw_no_valid - legitimate_no_valid
+    recovered_intermediate = _integer(semantic.get("recovered_intermediate_attempts"))
+    recovered_template_rejections = recovered_intermediate - failed_intermediate_no_valid
     lines.extend(["", "## Semantic substitution audit", ""])
     for key in (
         "successful_valid_substitutions",
@@ -159,7 +168,17 @@ def render_report(
             f"- exact group: {_integer(quality.get('substitutions_exact_group'))}",
             f"- exact semantic role: {_integer(quality.get('substitutions_exact_role'))}",
             f"- movement-family fallback: {_integer(quality.get('movement_family_fallbacks'))}",
-            f"- raw no-valid-replacement: {_integer(quality.get('no_valid_replacements'))}",
+            f"- raw no-valid-replacement: {raw_no_valid}",
+            (
+                "- no-valid partition: "
+                f"{legitimate_no_valid} legitimate display cases + "
+                f"{failed_intermediate_no_valid} failed repair attempts later recovered"
+            ),
+            (
+                "- recovered intermediate partition: "
+                f"{failed_intermediate_no_valid} repair attempts + "
+                f"{recovered_template_rejections} rejected template attempts"
+            ),
             "",
             "## Limitation and priority coverage",
             "",
@@ -193,6 +212,7 @@ def render_report(
             f"- UNSAT classifications equal UNSAT: {unsat_sum == unsat_count}",
             f"- Determinism denominator equals profiles: {determinism_cases == total}",
             f"- Template count and slugs match seed intent: {template_matches}",
+            f"- Substitution requests equal successes plus no-valid: {substitution_reconciles}",
             "",
             "## Test verification",
             "",

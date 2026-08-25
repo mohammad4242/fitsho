@@ -214,6 +214,27 @@ def test_unexplained_final_semantic_failure_blocks_ready() -> None:
     assert any("semantic" in item.lower() for item in benchmark.verify_closeout(payload))
 
 
+def test_substitution_request_totals_must_reconcile() -> None:
+    payload = _valid_closeout_payload()
+    aggregate = cast(dict[str, object], payload["aggregate"])
+    quality = cast(dict[str, object], aggregate["quality"])
+    quality["substitutions_requests"] = 1
+    quality["substitutions_total"] = 0
+    quality["no_valid_replacements"] = 0
+
+    assert any("request totals" in item.lower() for item in benchmark.verify_closeout(payload))
+
+
+def test_all_semantic_audit_totals_must_reconcile_with_records() -> None:
+    payload = _valid_closeout_payload()
+    aggregate = cast(dict[str, object], payload["aggregate"])
+    quality = cast(dict[str, object], aggregate["quality"])
+    semantic = cast(dict[str, int], quality["semantic_substitution"])
+    semantic["successful_valid_substitutions"] = 1
+
+    assert any("semantic" in item.lower() for item in benchmark.verify_closeout(payload))
+
+
 @pytest.mark.parametrize(
     ("section", "key"),
     (
