@@ -39,6 +39,7 @@ from app.profile.enums import (
 from app.profile.service import ProfileSnapshot
 from app.training_templates.engine_reference import load_template_references
 from app.workouts.program_engine.duration_policy import (
+    OFFICIAL_SESSION_DURATIONS,
     get_session_duration_policy,
 )
 from app.workouts.program_engine.engine import generate_program
@@ -80,6 +81,8 @@ SUPPORTED_MATRIX: tuple[tuple[str, int], ...] = (
     (ExperienceLevel.ADVANCED.value, 5),
     (ExperienceLevel.ADVANCED.value, 6),
 )
+PROFILE_VARIANTS_PER_CELL = 25
+EXPECTED_PROFILE_COUNT = len(SUPPORTED_MATRIX) * PROFILE_VARIANTS_PER_CELL
 
 MAJOR_MUSCLES = frozenset(
     {
@@ -91,6 +94,15 @@ MAJOR_MUSCLES = frozenset(
         MuscleGroup.HAMSTRINGS,
     }
 )
+
+_PRIORITY_MUSCLES_BY_VARIANT: dict[int, tuple[MuscleGroup, ...]] = {
+    1: (MuscleGroup.CHEST,),
+    3: (MuscleGroup.BACK,),
+    5: (MuscleGroup.SHOULDERS,),
+    7: (MuscleGroup.QUADRICEPS,),
+    9: (MuscleGroup.HAMSTRINGS,),
+    11: (MuscleGroup.GLUTES,),
+}
 
 
 @dataclass(frozen=True)
@@ -222,8 +234,7 @@ def _variant_profile(experience: ExperienceLevel, days: int, variant: int) -> Be
     age_options = training_ages[experience]
     training_age = age_options[variant % len(age_options)]
 
-    durations = (30, 45, 60, 75, 90, 120)
-    duration = durations[variant % len(durations)]
+    duration = OFFICIAL_SESSION_DURATIONS[variant % len(OFFICIAL_SESSION_DURATIONS)]
     sexes = (Sex.MALE, Sex.FEMALE, None)
     sex = sexes[variant % len(sexes)]
 
@@ -238,6 +249,8 @@ def _variant_profile(experience: ExperienceLevel, days: int, variant: int) -> Be
         training_cautions = (TrainingCaution.SHOULDER,)
     elif variant == 22:
         training_cautions = (TrainingCaution.KNEE,)
+    elif variant == 24:
+        training_cautions = (TrainingCaution.WRIST,)
 
     if variant == 23:
         allowed_rom = frozenset({"spinal_flexion"})
@@ -252,7 +265,7 @@ def _variant_profile(experience: ExperienceLevel, days: int, variant: int) -> Be
         experience_level=experience,
         resistance_days=days,
         goal=goal,
-        priority_muscles=() if variant % 2 == 0 else (MuscleGroup.CHEST,),
+        priority_muscles=_PRIORITY_MUSCLES_BY_VARIANT.get(variant, ()),
         body_analysis_priorities=(),
         sex=sex,
         duration_minutes=duration,
@@ -274,7 +287,7 @@ def benchmark_profiles() -> tuple[BenchmarkProfile, ...]:
     return tuple(
         _variant_profile(ExperienceLevel(experience), days, variant)
         for experience, days in SUPPORTED_MATRIX
-        for variant in range(25)
+        for variant in range(PROFILE_VARIANTS_PER_CELL)
     )
 
 

@@ -1,14 +1,16 @@
 from collections import Counter
 from types import SimpleNamespace
+from typing import cast
 from uuid import uuid4
 
 import tests.workouts.program_engine.phase11_benchmark as benchmark
 from app.exercises.enums import MuscleGroup
+from app.profile.enums import TrainingCaution
+from app.workouts.program_engine.duration_policy import OFFICIAL_SESSION_DURATIONS
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-from tests.workouts.program_engine.golden_fixtures import full_catalog
-from typing import cast
 from app.workouts.program_engine.schemas import ProgramGenerationResult
+from tests.workouts.program_engine.golden_fixtures import full_catalog
 from tests.workouts.program_engine.phase11_benchmark import (
     NEGATIVE_PROFILES,
     SUPPORTED_MATRIX,
@@ -26,16 +28,39 @@ def _successful_result(*, warnings: tuple[str, ...] = ()) -> SimpleNamespace:
     )
 
 
-def test_phase11_population_covers_every_supported_cell_with_five_profiles() -> None:
+def test_phase11_population_uses_the_canonical_profile_count() -> None:
     profiles = benchmark_profiles()
 
-    assert len(profiles) == 300
+    assert benchmark.PROFILE_VARIANTS_PER_CELL == 25
+    assert benchmark.EXPECTED_PROFILE_COUNT == 375
+    assert len(profiles) == benchmark.EXPECTED_PROFILE_COUNT
+
+
+def test_phase11_population_covers_every_supported_cell() -> None:
+    profiles = benchmark_profiles()
+
+    assert len(SUPPORTED_MATRIX) == 15
     assert Counter((item.experience_level.value, item.resistance_days) for item in profiles) == {
-        cell: 20 for cell in SUPPORTED_MATRIX
+        cell: benchmark.PROFILE_VARIANTS_PER_CELL for cell in SUPPORTED_MATRIX
     }
+
+
+def test_phase11_population_covers_goals_equipment_and_official_durations() -> None:
+    profiles = benchmark_profiles()
+
     assert len({item.goal.value for item in profiles}) >= 5
     assert len({item.equipment_label for item in profiles}) >= 4
-    assert len({item.duration_minutes for item in profiles}) >= 5
+    assert {item.duration_minutes for item in profiles} == set(OFFICIAL_SESSION_DURATIONS)
+
+
+def test_phase11_population_covers_wrist_and_multiple_major_priorities() -> None:
+    profiles = benchmark_profiles()
+
+    cautions = {caution for item in profiles for caution in item.training_cautions}
+    priorities = {muscle for item in profiles for muscle in item.priority_muscles}
+
+    assert TrainingCaution.WRIST in cautions
+    assert benchmark.MAJOR_MUSCLES.issubset(priorities)
 
 
 def test_phase11_negative_profiles_reject_unsupported_days() -> None:
@@ -60,9 +85,10 @@ def test_phase11_representative_output_has_an_identical_determinism_fingerprint(
 
 def test_fallback_construction_does_not_replace_quality_outcome() -> None:
     result = _successful_result()
+    program_result = cast(ProgramGenerationResult, result)
 
-    assert benchmark._category(cast(ProgramGenerationResult, result), {"fallback_succeeded": True}, ()) == "PASS"
-    assert benchmark._construction_path(cast(ProgramGenerationResult, result), {"succeeded": False}) == "FALLBACK"
+    assert benchmark._category(program_result, {"fallback_succeeded": True}, ()) == "PASS"
+    assert benchmark._construction_path(program_result, {"succeeded": False}) == "FALLBACK"
 
 
 def test_legitimate_constraint_finding_is_pass_with_constraints() -> None:
