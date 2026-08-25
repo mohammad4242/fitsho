@@ -161,3 +161,284 @@ All 180 remaining UNSATISFIED cases are exclusively profiles with explicit `allo
 
 ## Final Verdict
 `READY FOR PROMPT 6`
+
+## Subgroup Analysis
+
+### Experience
+- **advanced**: 26/100 (26.0%)
+- **beginner**: 14/75 (18.7%)
+- **first_month**: 14/75 (18.7%)
+- **intermediate**: 31/125 (24.8%)
+
+### Days/Week
+- **2**: 2/75 (2.7%)
+- **3**: 8/100 (8.0%)
+- **4**: 36/100 (36.0%)
+- **5**: 19/50 (38.0%)
+- **6**: 20/50 (40.0%)
+
+### Goal
+- **body_recomposition**: 14/60 (23.3%)
+- **fat_loss**: 14/60 (23.3%)
+- **general_fitness**: 29/135 (21.5%)
+- **hypertrophy**: 13/60 (21.7%)
+- **strength**: 15/60 (25.0%)
+
+### Session Duration
+- **120**: 18/75 (24.0%)
+- **45**: 18/75 (24.0%)
+- **60**: 16/75 (21.3%)
+- **75**: 16/75 (21.3%)
+- **90**: 17/75 (22.7%)
+
+### Equipment Setup
+- **full_gym**: 40/195 (20.5%)
+- **home_all**: 0/15 (0.0%)
+- **home_band**: 0/30 (0.0%)
+- **home_band_pullup**: 10/30 (33.3%)
+- **home_bw**: 0/30 (0.0%)
+- **home_db**: 18/30 (60.0%)
+- **home_db_bench**: 17/30 (56.7%)
+- **home_db_pullup**: 0/15 (0.0%)
+
+### Location
+- **gym**: 40/195 (20.5%)
+- **home**: 45/180 (25.0%)
+
+### Limitation Type
+- **ROM**: 0/225 (0.0%)
+- **none**: 85/150 (56.7%)
+
+### Priority Muscles
+- **no**: 40/195 (20.5%)
+- **yes**: 45/180 (25.0%)
+
+### Template
+- **failed**: 0/180 (0.0%)
+- **fallback**: 51/108 (47.2%)
+- **four-day-advanced-chest-specialization**: 2/2 (100.0%)
+- **four-day-advanced-posterior-chain**: 4/4 (100.0%)
+- **four-day-arms-priority**: 0/1 (0.0%)
+- **four-day-back-priority**: 7/7 (100.0%)
+- **four-day-beginner-body-part-foundation**: 4/4 (100.0%)
+- **four-day-first-month-upper-lower**: 9/9 (100.0%)
+- **four-day-upper-lower-strength-advanced**: 0/3 (0.0%)
+- **three-day-first-month-full-body**: 4/10 (40.0%)
+- **three-day-full-body-drop-set**: 0/9 (0.0%)
+- **three-day-full-body-strength-beginner**: 2/9 (22.2%)
+- **three-day-full-body-strength-intermediate**: 1/2 (50.0%)
+- **three-day-push-pull-legs**: 0/7 (0.0%)
+- **two-day-first-month-full-body**: 0/10 (0.0%)
+- **two-day-full-body-strength-beginner**: 1/10 (10.0%)
+
+## Subgroup Analysis
+
+### Experience
+- **advanced**: 26/100 (26.0%)
+- **beginner**: 14/75 (18.7%)
+- **first_month**: 14/75 (18.7%)
+- **intermediate**: 31/125 (24.8%)
+
+### Days/Week
+- **2**: 2/75 (2.7%)
+- **3**: 8/100 (8.0%)
+- **4**: 36/100 (36.0%)
+- **5**: 19/50 (38.0%)
+- **6**: 20/50 (40.0%)
+
+### Goal
+- **body_recomposition**: 14/60 (23.3%)
+- **fat_loss**: 14/60 (23.3%)
+- **general_fitness**: 29/135 (21.5%)
+- **hypertrophy**: 13/60 (21.7%)
+- **strength**: 15/60 (25.0%)
+
+### Session Duration
+- **120**: 18/75 (24.0%)
+- **45**: 18/75 (24.0%)
+- **60**: 16/75 (21.3%)
+- **75**: 16/75 (21.3%)
+- **90**: 17/75 (22.7%)
+
+### Equipment Setup
+- **full_gym**: 40/195 (20.5%)
+- **home_all**: 0/15 (0.0%)
+- **home_band**: 0/30 (0.0%)
+- **home_band_pullup**: 10/30 (33.3%)
+- **home_bw**: 0/30 (0.0%)
+- **home_db**: 18/30 (60.0%)
+- **home_db_bench**: 17/30 (56.7%)
+- **home_db_pullup**: 0/15 (0.0%)
+
+### Location
+- **gym**: 40/195 (20.5%)
+- **home**: 45/180 (25.0%)
+
+### Limitation Type
+- **ROM**: 0/225 (0.0%)
+- **none**: 85/150 (56.7%)
+
+### Priority Muscles
+- **no**: 40/195 (20.5%)
+- **yes**: 45/180 (25.0%)
+
+### Template
+- **failed**: 0/180 (0.0%)
+- **fallback**: 51/108 (47.2%)
+- **four-day-advanced-chest-specialization**: 2/2 (100.0%)
+- **four-day-advanced-posterior-chain**: 4/4 (100.0%)
+- **four-day-arms-priority**: 0/1 (0.0%)
+- **four-day-back-priority**: 7/7 (100.0%)
+- **four-day-beginner-body-part-foundation**: 4/4 (100.0%)
+- **four-day-first-month-upper-lower**: 9/9 (100.0%)
+- **four-day-upper-lower-strength-advanced**: 0/3 (0.0%)
+- **three-day-first-month-full-body**: 4/10 (40.0%)
+- **three-day-full-body-drop-set**: 0/9 (0.0%)
+- **three-day-full-body-strength-beginner**: 2/9 (22.2%)
+- **three-day-full-body-strength-intermediate**: 1/2 (50.0%)
+- **three-day-push-pull-legs**: 0/7 (0.0%)
+- **two-day-first-month-full-body**: 0/10 (0.0%)
+- **two-day-full-body-strength-beginner**: 1/10 (10.0%)
+
+## Subgroup Analysis
+
+### Experience
+- **advanced**: 26/100 (26.0%)
+- **beginner**: 14/75 (18.7%)
+- **first_month**: 14/75 (18.7%)
+- **intermediate**: 31/125 (24.8%)
+
+### Days/Week
+- **2**: 2/75 (2.7%)
+- **3**: 8/100 (8.0%)
+- **4**: 36/100 (36.0%)
+- **5**: 19/50 (38.0%)
+- **6**: 20/50 (40.0%)
+
+### Goal
+- **body_recomposition**: 14/60 (23.3%)
+- **fat_loss**: 14/60 (23.3%)
+- **general_fitness**: 29/135 (21.5%)
+- **hypertrophy**: 13/60 (21.7%)
+- **strength**: 15/60 (25.0%)
+
+### Session Duration
+- **120**: 18/75 (24.0%)
+- **45**: 18/75 (24.0%)
+- **60**: 16/75 (21.3%)
+- **75**: 16/75 (21.3%)
+- **90**: 17/75 (22.7%)
+
+### Equipment Setup
+- **full_gym**: 40/195 (20.5%)
+- **home_all**: 0/15 (0.0%)
+- **home_band**: 0/30 (0.0%)
+- **home_band_pullup**: 10/30 (33.3%)
+- **home_bw**: 0/30 (0.0%)
+- **home_db**: 18/30 (60.0%)
+- **home_db_bench**: 17/30 (56.7%)
+- **home_db_pullup**: 0/15 (0.0%)
+
+### Location
+- **gym**: 40/195 (20.5%)
+- **home**: 45/180 (25.0%)
+
+### Limitation Type
+- **ROM**: 0/225 (0.0%)
+- **none**: 85/150 (56.7%)
+
+### Priority Muscles
+- **no**: 40/195 (20.5%)
+- **yes**: 45/180 (25.0%)
+
+### Template
+- **failed**: 0/180 (0.0%)
+- **fallback**: 51/108 (47.2%)
+- **four-day-advanced-chest-specialization**: 2/2 (100.0%)
+- **four-day-advanced-posterior-chain**: 4/4 (100.0%)
+- **four-day-arms-priority**: 0/1 (0.0%)
+- **four-day-back-priority**: 7/7 (100.0%)
+- **four-day-beginner-body-part-foundation**: 4/4 (100.0%)
+- **four-day-first-month-upper-lower**: 9/9 (100.0%)
+- **four-day-upper-lower-strength-advanced**: 0/3 (0.0%)
+- **three-day-first-month-full-body**: 4/10 (40.0%)
+- **three-day-full-body-drop-set**: 0/9 (0.0%)
+- **three-day-full-body-strength-beginner**: 2/9 (22.2%)
+- **three-day-full-body-strength-intermediate**: 1/2 (50.0%)
+- **three-day-push-pull-legs**: 0/7 (0.0%)
+- **two-day-first-month-full-body**: 0/10 (0.0%)
+- **two-day-full-body-strength-beginner**: 1/10 (10.0%)
+
+## Subgroup Analysis
+
+### Experience
+- **advanced**: 64/100 (64.0%)
+- **beginner**: 33/75 (44.0%)
+- **first_month**: 37/75 (49.3%)
+- **intermediate**: 72/125 (57.6%)
+
+### Days/Week
+- **2**: 10/75 (13.3%)
+- **3**: 34/100 (34.0%)
+- **4**: 76/100 (76.0%)
+- **5**: 45/50 (90.0%)
+- **6**: 41/50 (82.0%)
+
+### Goal
+- **body_recomposition**: 38/60 (63.3%)
+- **fat_loss**: 32/60 (53.3%)
+- **general_fitness**: 66/135 (48.9%)
+- **hypertrophy**: 36/60 (60.0%)
+- **strength**: 34/60 (56.7%)
+
+### Session Duration
+- **120**: 27/60 (45.0%)
+- **30**: 45/75 (60.0%)
+- **45**: 43/60 (71.7%)
+- **60**: 29/60 (48.3%)
+- **75**: 34/60 (56.7%)
+- **90**: 28/60 (46.7%)
+
+### Equipment Setup
+- **full_gym**: 102/195 (52.3%)
+- **home_all**: 11/15 (73.3%)
+- **home_band**: 10/30 (33.3%)
+- **home_band_pullup**: 21/30 (70.0%)
+- **home_bw**: 15/30 (50.0%)
+- **home_db**: 21/30 (70.0%)
+- **home_db_bench**: 18/30 (60.0%)
+- **home_db_pullup**: 8/15 (53.3%)
+
+### Location
+- **gym**: 102/195 (52.3%)
+- **home**: 104/180 (57.8%)
+
+### Limitation Type
+- **ROM**: 0/30 (0.0%)
+- **none**: 206/345 (59.7%)
+
+### Priority Muscles
+- **no**: 102/195 (52.3%)
+- **yes**: 104/180 (57.8%)
+
+### Template
+- **failed**: 0/22 (0.0%)
+- **fallback**: 118/175 (67.4%)
+- **four-day-advanced-chest-specialization**: 3/3 (100.0%)
+- **four-day-advanced-posterior-chain**: 4/6 (66.7%)
+- **four-day-arms-priority**: 0/1 (0.0%)
+- **four-day-back-priority**: 15/16 (93.8%)
+- **four-day-beginner-body-part-foundation**: 11/11 (100.0%)
+- **four-day-first-month-upper-lower**: 18/18 (100.0%)
+- **four-day-upper-lower-strength-advanced**: 0/7 (0.0%)
+- **three-day-first-month-full-body**: 12/21 (57.1%)
+- **three-day-full-body-drop-set**: 5/18 (27.8%)
+- **three-day-full-body-strength-beginner**: 4/17 (23.5%)
+- **three-day-full-body-strength-intermediate**: 2/4 (50.0%)
+- **three-day-push-pull-legs**: 5/14 (35.7%)
+- **two-day-first-month-full-body**: 4/21 (19.0%)
+- **two-day-full-body-strength-beginner**: 5/21 (23.8%)
+
+READY FOR PROMPT 6
+
+READY FOR PROMPT 6

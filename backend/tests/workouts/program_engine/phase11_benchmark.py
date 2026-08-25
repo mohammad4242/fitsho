@@ -222,15 +222,14 @@ def _variant_profile(experience: ExperienceLevel, days: int, variant: int) -> Be
     age_options = training_ages[experience]
     training_age = age_options[variant % len(age_options)]
 
-    durations = (45, 60, 75, 90, 120)
+    durations = (30, 45, 60, 75, 90, 120)
     duration = durations[variant % len(durations)]
     sexes = (Sex.MALE, Sex.FEMALE, None)
     sex = sexes[variant % len(sexes)]
 
-    rom_option = (variant // 5) % 3
-    if rom_option == 1:
+    if variant == 23:
         allowed_rom = frozenset({"spinal_flexion"})
-    elif rom_option == 2:
+    elif variant == 24:
         allowed_rom = frozenset({"deep_knee_flexion"})
     else:
         allowed_rom = frozenset()
@@ -911,7 +910,24 @@ def _case_record(
             ),
             "priority_metrics": program.aggregate_metrics.get("priority_metrics", {}),
             "volume_ranges": program.aggregate_metrics.get("volume_ranges_by_muscle", {}),
-            "substitution_count": quality.get("substitution_count", 0),
+            "substitution_metrics": {
+                "substitution_requests": program.aggregate_metrics.get("substitution_requests", 0),  # noqa: E501
+                "substitution_successes": program.aggregate_metrics.get(
+                    "substitution_successes", 0
+                ),
+                "substitution_exact_group": program.aggregate_metrics.get(
+                    "substitution_exact_group", 0
+                ),
+                "substitution_exact_semantic_role": program.aggregate_metrics.get(
+                    "substitution_exact_semantic_role", 0
+                ),
+                "substitution_movement_family_fallback": program.aggregate_metrics.get(
+                    "substitution_movement_family_fallback", 0
+                ),
+                "substitution_no_valid_replacement": program.aggregate_metrics.get(
+                    "substitution_no_valid_replacement", 0
+                ),
+            },
             "constraint_count": quality.get("constraint_count", 0),
             "recovery_spacing_valid": recovery_spacing_is_valid(program.weekly_schedule, RULESET),
             "validation": {
@@ -1094,14 +1110,94 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
     )
     determinism_runs = sum(1 for r in records if r.get("determinism"))
     substitutions_total = sum(
-        int(str(cast(Mapping[str, object], r.get("quality", {})).get("substitution_count", 0)))
+        int(
+            _number(
+                cast(
+                    Mapping[str, object],
+                    cast(Mapping[str, object], r.get("final_program", {})).get(
+                        "substitution_metrics", {}
+                    ),
+                ).get("substitution_successes", 0)  # noqa: E501
+            )
+        )
+        if r.get("final_program")
+        else 0
+        for r in records
+    )
+    substitutions_requests = sum(
+        int(
+            _number(
+                cast(
+                    Mapping[str, object],
+                    cast(Mapping[str, object], r.get("final_program", {})).get(
+                        "substitution_metrics", {}
+                    ),
+                ).get("substitution_requests", 0)  # noqa: E501
+            )
+        )
+        if r.get("final_program")
+        else 0
+        for r in records
+    )
+    substitutions_exact_group = sum(
+        int(
+            _number(
+                cast(
+                    Mapping[str, object],
+                    cast(Mapping[str, object], r.get("final_program", {})).get(
+                        "substitution_metrics", {}
+                    ),
+                ).get("substitution_exact_group", 0)  # noqa: E501
+            )
+        )
+        if r.get("final_program")
+        else 0
+        for r in records
+    )
+    substitutions_exact_role = sum(
+        int(
+            _number(
+                cast(
+                    Mapping[str, object],
+                    cast(Mapping[str, object], r.get("final_program", {})).get(
+                        "substitution_metrics", {}
+                    ),
+                ).get("substitution_exact_semantic_role", 0)  # noqa: E501
+            )
+        )
+        if r.get("final_program")
+        else 0
+        for r in records
+    )
+    no_valid_replacements = sum(
+        int(
+            _number(
+                cast(
+                    Mapping[str, object],
+                    cast(Mapping[str, object], r.get("final_program", {})).get(
+                        "substitution_metrics", {}
+                    ),
+                ).get("substitution_no_valid_replacement", 0)  # noqa: E501
+            )
+        )
+        if r.get("final_program")
+        else 0
         for r in records
     )
     movement_family_fallbacks = sum(
-        1
+        int(
+            _number(
+                cast(
+                    Mapping[str, object],
+                    cast(Mapping[str, object], r.get("final_program", {})).get(
+                        "substitution_metrics", {}
+                    ),
+                ).get("substitution_movement_family_fallback", 0)  # noqa: E501
+            )
+        )
+        if r.get("final_program")
+        else 0
         for r in records
-        for f in cast(Sequence[Mapping[str, object]], r.get("audit_findings", []))
-        if f.get("code") == "substituted_movement_family"
     )
     equipment_violations = sum(
         1
@@ -1209,6 +1305,10 @@ def _aggregate(records: Sequence[Mapping[str, object]], negative_count: int) -> 
             "determinism_identical": determinism,
             "determinism_runs": determinism_runs,
             "substitutions_total": substitutions_total,
+            "substitutions_requests": substitutions_requests,
+            "substitutions_exact_group": substitutions_exact_group,
+            "substitutions_exact_role": substitutions_exact_role,
+            "no_valid_replacements": no_valid_replacements,
             "movement_family_fallbacks": movement_family_fallbacks,
             "equipment_violations_custom": equipment_violations,
             "safety_violations_custom": safety_violations,
@@ -1297,9 +1397,13 @@ def _summary_markdown(payload: Mapping[str, object]) -> str:
             "## Custom Audits",
             "",
             f"- Determinism (identical across repeats): "
-        f"{quality.get('determinism_identical', 0)}/{quality.get('determinism_runs', 0)}",
-            f"- Total Substitutions: {quality.get('substitutions_total', 0)}",
-            f"- Movement Family Fallbacks: {quality.get('movement_family_fallbacks', 0)}",
+            f"{quality.get('determinism_identical', 0)}/{quality.get('determinism_runs', 0)}",
+            f"- Substitution Requests: {quality.get('substitutions_requests', 0)}",
+            f"- Substitution Successes: {quality.get('substitutions_total', 0)}",
+            f"- Substitution Exact Group: {quality.get('substitutions_exact_group', 0)}",
+            f"- Substitution Exact Role: {quality.get('substitutions_exact_role', 0)}",
+            f"- Substitution Movement Family Fallback: {quality.get('movement_family_fallbacks', 0)}",  # noqa: E501
+            f"- Substitution No Valid Replacement: {quality.get('no_valid_replacements', 0)}",
             f"- Equipment Violations: {quality.get('equipment_violations', 0)}",
             f"- Safety/Constraint Violations: {quality.get('safety_violations', 0)}",
             f"- Redundancy Violations: {quality.get('redundancy_violations', 0)}",
@@ -1348,7 +1452,7 @@ def run_benchmark(
             generate_program(request, case_catalog, RULESET, reference_templates=references)
             for _ in range(max(1, determinism_repeats))
         ]
-        fingerprints = tuple(canonical_fingerprint(item) for item in repeated)
+        fingerprints = tuple(canonical_fingerprint(item) for item in [result] + repeated)
         records.append(_case_record(profile, request, result, case_catalog, fingerprints))
 
     negative_cases: list[dict[str, object]] = []

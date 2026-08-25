@@ -1,20 +1,21 @@
 import json
 from collections import defaultdict
-from pathlib import Path
+
 
 def analyze_subgroups(benchmark_json_path: str, output_md_path: str) -> None:
-    with open(benchmark_json_path, 'r') as f:
+    with open(benchmark_json_path) as f:
         data = json.load(f)
 
     records = data.get("profiles", [])
 
     # Subgroups:
-    # experience, days/week, goal, session duration, equipment setup, home vs gym, limitation type, priority-muscle state, template
-    subgroups: dict[str, dict[str, dict[str, int]]] = defaultdict(lambda: defaultdict(lambda: {"total": 0, "success": 0}))
+    # experience, days/week, goal, session duration, equipment setup, home vs gym, limitation type, priority-muscle state, template  # noqa: E501
+    subgroups: dict[str, dict[str, dict[str, int]]] = defaultdict(
+        lambda: defaultdict(lambda: {"total": 0, "success": 0})
+    )
 
     for record in records:
         profile = record["input"]
-        res = record["result"]
         success = record.get("category") in ("PASS", "PASS_WITH_CONSTRAINTS")
 
         experience = profile.get("experience_level")
@@ -26,11 +27,22 @@ def analyze_subgroups(benchmark_json_path: str, output_md_path: str) -> None:
 
         # limitations
         limitations = []
-        if profile.get("impact_limit"): limitations.append("impact")
-        if profile.get("axial_load_limit"): limitations.append("axial")
-        if profile.get("overhead_limit"): limitations.append("overhead")
-        if profile.get("balance_requirement"): limitations.append("balance")
-        limitations_str = ",".join(limitations) if limitations else "none"
+        if profile.get("allowed_range_of_motion"):
+            limitations.append("ROM")
+        if profile.get("impact_limit"):
+            limitations.append("impact")
+        if profile.get("axial_load_limit"):
+            limitations.append("axial_load")
+        if profile.get("overhead_limit"):
+            limitations.append("overhead")
+        if profile.get("balance_requirement"):
+            limitations.append("balance")
+        if profile.get("training_cautions"):
+            limitations.append("training_cautions")
+
+        limitations_str = ",".join(limitations) if len(limitations) < 2 else "combinations"
+        if not limitations:
+            limitations_str = "none"
 
         priority = "yes" if profile.get("priority_muscles") else "no"
 
@@ -42,7 +54,7 @@ def analyze_subgroups(benchmark_json_path: str, output_md_path: str) -> None:
         else:
             template = "failed"
 
-        def add(group: str, key: object) -> None:
+        def add(group: str, key: object, success: bool = success) -> None:
             key = str(key)
             subgroups[group][key]["total"] += 1
             if success:
@@ -66,9 +78,12 @@ def analyze_subgroups(benchmark_json_path: str, output_md_path: str) -> None:
             lines.append(f"- **{key}**: {stats['success']}/{stats['total']} ({rate:.1f}%)")
         lines.append("")
 
-    with open(output_md_path, 'a') as f:
+    with open(output_md_path, "a") as f:
         f.write("\n".join(lines))
 
+
 if __name__ == "__main__":
-    analyze_subgroups("backend/var/benchmarks/prompt5/phase11-benchmark.json", "PROMPT5_PROGRESS.md")
+    analyze_subgroups(
+        "var/benchmarks/phase11/phase11-benchmark.json", "../PROMPT5_PROGRESS.md"
+    )
     print("Done")
