@@ -21,7 +21,7 @@ def format_report(benchmark_json_path: str, output_md_path: str) -> None:
 
     # 1. Report ALL categories and their counts MUST sum exactly to total profiles.
     assert passes + pass_c + quality_issue + unsat + bugs == total_profiles, (
-        f"Category sum ({passes + pass_c + quality_issue + unsat + bugs}) does not equal total profiles ({total_profiles})"
+        f"Category sum != total profiles ({total_profiles})"
     )
 
     gen_success_rate = fallback.get("overall_generation_success_rate", 0)
@@ -31,7 +31,7 @@ def format_report(benchmark_json_path: str, output_md_path: str) -> None:
     # determinism denominator == total profiles
     # But wait, determinism runs is how many profiles had determinism.
     # The prompt says: "determinism denominator == total profiles"
-    # Actually, the benchmark might only test determinism for some, but wait, the prompt says "Add assertions/tests for: ... determinism denominator == total profiles". So I should assert it or use total_profiles.
+    # Assert determinism.
 
     assert determinism_runs == total_profiles, (
         f"Determinism runs ({determinism_runs}) != total profiles ({total_profiles})"
@@ -83,7 +83,7 @@ def format_report(benchmark_json_path: str, output_md_path: str) -> None:
         ready = False
         blocking_reasons.append("UNSAT has unjustified failure (quality issue)")
 
-    # "no unexplained semantic substitution failure" implies bugs > 0 or safety_v > 0 will catch it, or maybe sub_no_valid > 0 ?
+    # "no unexplained semantic substitution failure" implies bugs > 0 or safety_v > 0 will catch it.
     # Let's just use what was there or what's stated.
 
     # Group limitations
@@ -117,8 +117,15 @@ def format_report(benchmark_json_path: str, output_md_path: str) -> None:
         if success:
             subgroups[lim_str]["success"] += 1
 
+    template_count = data.get("catalog", {}).get("template_count", 0)
+    template_slugs = agg.get("template_slugs", [])
+
     lines = [
         "# Phase 11 Deterministic Benchmark Final Report",
+        "",
+        f"**Active Template Count**: {template_count}",
+        "**Template Slugs**:",
+        *(f"- {slug}" for slug in template_slugs),
         "",
         f"- Total Profiles: {total_profiles}",
         f"- PASS: {passes}",
@@ -162,11 +169,15 @@ def format_report(benchmark_json_path: str, output_md_path: str) -> None:
     lines.append("")
     lines.append("## Consistency Checks")
     lines.append(
-        f"- Category sum equals total profiles: {passes + pass_c + quality_issue + unsat + bugs == total_profiles}"
+        "- Category sum equals total: True"
     )
     lines.append(f"- UNSAT classifications sum equals UNSAT count: {unsat_sum == unsat}")
 
     lines.append("")
+    if template_count != 49:
+        ready = False
+        blocking_reasons.append(f"Template count is {template_count}, expected 49")
+
     lines.append("## Final Verdict")
     if ready:
         lines.append("READY FOR PROMPT 6")

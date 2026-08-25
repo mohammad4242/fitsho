@@ -1,9 +1,12 @@
 # Phase 11 Deterministic Benchmark Final Report
 
+**Active Template Count**: 49
+**Template Slugs**:
+
 - Total Profiles: 375
 - PASS: 0
-- PASS_WITH_CONSTRAINTS: 208
-- QUALITY_ISSUE: 143
+- PASS_WITH_CONSTRAINTS: 211
+- QUALITY_ISSUE: 140
 - UNSATISFIED: 24
 - ENGINE_BUG: 0
 - Generation Success Rate: 93.60%
@@ -15,16 +18,16 @@
 - Redundancy Violations: 0
 
 ## Substitution Metrics
-- Requests: 6526
-- Successes: 5512
-- Exact Group: 4205
-- Exact Role: 4878
-- Family Fallback: 635
-- No Valid Replacement: 1014
+- Requests: 6527
+- Successes: 5514
+- Exact Group: 4208
+- Exact Role: 4884
+- Family Fallback: 637
+- No Valid Replacement: 1013
 
 ## Paths
-- Template Successes: 163
-- Fallback Successes: 188
+- Template Successes: 162
+- Fallback Successes: 189
 
 ## Limitation Subgroup Results
 - **ROM**: 9/30 (30.0%)
@@ -39,7 +42,7 @@
 - legitimate constraint limitation: 24
 
 ## Consistency Checks
-- Category sum equals total profiles: True
+- Category sum equals total: True
 - UNSAT classifications sum equals UNSAT count: True
 
 ## Final Verdict

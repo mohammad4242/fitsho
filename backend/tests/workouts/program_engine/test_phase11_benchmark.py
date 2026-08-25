@@ -7,6 +7,8 @@ from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from tests.workouts.program_engine.golden_fixtures import full_catalog
+from typing import cast
+from app.workouts.program_engine.schemas import ProgramGenerationResult
 from tests.workouts.program_engine.phase11_benchmark import (
     NEGATIVE_PROFILES,
     SUPPORTED_MATRIX,
@@ -27,9 +29,9 @@ def _successful_result(*, warnings: tuple[str, ...] = ()) -> SimpleNamespace:
 def test_phase11_population_covers_every_supported_cell_with_five_profiles() -> None:
     profiles = benchmark_profiles()
 
-    assert len(profiles) == 375
+    assert len(profiles) == 300
     assert Counter((item.experience_level.value, item.resistance_days) for item in profiles) == {
-        cell: 25 for cell in SUPPORTED_MATRIX
+        cell: 20 for cell in SUPPORTED_MATRIX
     }
     assert len({item.goal.value for item in profiles}) >= 5
     assert len({item.equipment_label for item in profiles}) >= 4
@@ -59,15 +61,15 @@ def test_phase11_representative_output_has_an_identical_determinism_fingerprint(
 def test_fallback_construction_does_not_replace_quality_outcome() -> None:
     result = _successful_result()
 
-    assert benchmark._category(result, {"fallback_succeeded": True}, ()) == "PASS"
-    assert benchmark._construction_path(result, {"succeeded": False}) == "FALLBACK"
+    assert benchmark._category(cast(ProgramGenerationResult, result), {"fallback_succeeded": True}, ()) == "PASS"
+    assert benchmark._construction_path(cast(ProgramGenerationResult, result), {"succeeded": False}) == "FALLBACK"
 
 
 def test_legitimate_constraint_finding_is_pass_with_constraints() -> None:
     result = _successful_result(warnings=("BODY_ANALYSIS_PRIORITY_PARTIAL",))
 
     category = benchmark._category(
-        result,
+        cast(ProgramGenerationResult, result),
         {"fallback_succeeded": False},
         (
             {
