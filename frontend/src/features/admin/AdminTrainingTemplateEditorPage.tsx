@@ -269,11 +269,12 @@ export function AdminTrainingTemplateEditorPage() {
               title={t("admin.templateEditor.identity")}
             >
               <div className="admin-template-editor-grid">
-                <TextInput label={t("admin.templateEditor.nameFa")} value={form.name_fa} onChange={(value) => updateField("name_fa", value)} />
-                <TextInput label={t("admin.templateEditor.nameEn")} value={form.name_en} onChange={(value) => updateField("name_en", value)} />
-                <TextArea label={t("admin.templateEditor.descriptionFa")} value={form.description_fa} onChange={(value) => updateField("description_fa", value)} />
-                <TextArea label={t("admin.templateEditor.descriptionEn")} value={form.description_en} onChange={(value) => updateField("description_en", value)} />
-                <label>{t("admin.templateEditor.daysPerWeek")}
+                <TextInput dir="rtl" label={t("admin.templateEditor.nameFa")} value={form.name_fa} onChange={(value) => updateField("name_fa", value)} />
+                <TextInput dir="ltr" label={t("admin.templateEditor.nameEn")} value={form.name_en} onChange={(value) => updateField("name_en", value)} />
+                <TextArea dir="rtl" label={t("admin.templateEditor.descriptionFa")} value={form.description_fa} onChange={(value) => updateField("description_fa", value)} />
+                <TextArea dir="ltr" label={t("admin.templateEditor.descriptionEn")} value={form.description_en} onChange={(value) => updateField("description_en", value)} />
+                <label className="admin-field">
+                  <span>{t("admin.templateEditor.daysPerWeek")}</span>
                   <select aria-label={t("admin.templateEditor.daysPerWeek")} value={form.days_per_week} onChange={(event) => setDaysPerWeek(Number(event.target.value))}>
                     {[2, 3, 4, 5, 6].map((days) => <option key={days} value={days}>{t("admin.templates.days", { count: days })}</option>)}
                   </select>
@@ -294,14 +295,15 @@ export function AdminTrainingTemplateEditorPage() {
                     ))}
                   </div>
                 </fieldset>
-                <label>{t("admin.templateEditor.goal")}
+                <label className="admin-field">
+                  <span>{t("admin.templateEditor.goal")}</span>
                   <select value={form.fitness_goal} onChange={(event) => updateField("fitness_goal", event.target.value as AdminTrainingProgramTemplateWrite["fitness_goal"])}>
                     {fitnessGoals.map((goal) => <option key={goal} value={goal}>{t(`onboarding.fitnessGoal.${goal}`)}</option>)}
                   </select>
                 </label>
-                <TextInput label={t("admin.templateEditor.focusTags")} value={form.focus_tags.join(", ")} onChange={(value) => updateField("focus_tags", splitValues(value))} />
-                <TextInput label={t("admin.templateEditor.sourceName")} value={form.source_name} onChange={(value) => updateField("source_name", value)} />
-                <TextInput label={t("admin.templateEditor.sourceUrl")} value={form.source_url} onChange={(value) => updateField("source_url", value)} />
+                <TextInput dir="ltr" label={t("admin.templateEditor.focusTags")} value={form.focus_tags.join(", ")} onChange={(value) => updateField("focus_tags", splitValues(value))} />
+                <TextInput dir="auto" label={t("admin.templateEditor.sourceName")} value={form.source_name} onChange={(value) => updateField("source_name", value)} />
+                <TextInput dir="ltr" label={t("admin.templateEditor.sourceUrl")} value={form.source_url} onChange={(value) => updateField("source_url", value)} />
               </div>
             </AdminAccordionSection>
 
@@ -313,13 +315,23 @@ export function AdminTrainingTemplateEditorPage() {
             >
               <div className="admin-template-rationale-editor">
                 {form.programming_rationale.map((reason, index) => (
-                  <div key={index}>
-                    <strong>{t("admin.templateEditor.reasonNumber", { number: index + 1 })}</strong>
-                    <TextInput label={t("admin.templateEditor.reasonTitleFa")} value={reason.title_fa} onChange={(value) => updateReason(setForm, index, "title_fa", value)} />
-                    <TextArea label={t("admin.templateEditor.reasonDetailFa")} value={reason.detail_fa} onChange={(value) => updateReason(setForm, index, "detail_fa", value)} />
-                    <TextInput label={t("admin.templateEditor.reasonTitleEn")} value={reason.title_en} onChange={(value) => updateReason(setForm, index, "title_en", value)} />
-                    <TextArea label={t("admin.templateEditor.reasonDetailEn")} value={reason.detail_en} onChange={(value) => updateReason(setForm, index, "detail_en", value)} />
-                  </div>
+                  <article className="admin-template-reason-card" key={index}>
+                    <header className="admin-template-reason-card__header">
+                      <span className="admin-template-reason-card__badge">
+                        {t("admin.templateEditor.reasonNumber", { number: index + 1 })}
+                      </span>
+                    </header>
+                    <div className="admin-template-reason-card__body">
+                      <div className="admin-template-reason-card__group" dir="rtl">
+                        <TextInput dir="rtl" label={t("admin.templateEditor.reasonTitleFa")} value={reason.title_fa} onChange={(value) => updateReason(setForm, index, "title_fa", value)} />
+                        <TextArea dir="rtl" label={t("admin.templateEditor.reasonDetailFa")} value={reason.detail_fa} onChange={(value) => updateReason(setForm, index, "detail_fa", value)} />
+                      </div>
+                      <div className="admin-template-reason-card__group" dir="ltr">
+                        <TextInput dir="ltr" label={t("admin.templateEditor.reasonTitleEn")} value={reason.title_en} onChange={(value) => updateReason(setForm, index, "title_en", value)} />
+                        <TextArea dir="ltr" label={t("admin.templateEditor.reasonDetailEn")} value={reason.detail_en} onChange={(value) => updateReason(setForm, index, "detail_en", value)} />
+                      </div>
+                    </div>
+                  </article>
                 ))}
               </div>
             </AdminAccordionSection>
@@ -369,10 +381,10 @@ export function AdminTrainingTemplateEditorPage() {
                       {isDayExpanded && (
                         <div className="admin-day-accordion-panel admin-template-editor-day__panel" id={dayPanelId}>
                           <div className="admin-template-editor-grid">
-                            <TextInput label={t("admin.templateEditor.dayNameFa")} value={day.title_fa} onChange={(value) => patchDay(dayIndex, { title_fa: value })} />
-                            <TextInput label={t("admin.templateEditor.dayNameEn")} value={day.title_en} onChange={(value) => patchDay(dayIndex, { title_en: value })} />
-                            <TextInput label={t("admin.templateEditor.structureFocus")} value={day.structure_focus} onChange={(value) => patchDay(dayIndex, { structure_focus: value })} />
-                            <TextInput label={t("admin.templateEditor.targetMuscles")} value={day.direct_target_muscles.join(", ")} onChange={(value) => patchDay(dayIndex, { direct_target_muscles: parseMuscles(value) })} />
+                            <TextInput dir="rtl" label={t("admin.templateEditor.dayNameFa")} value={day.title_fa} onChange={(value) => patchDay(dayIndex, { title_fa: value })} />
+                            <TextInput dir="ltr" label={t("admin.templateEditor.dayNameEn")} value={day.title_en} onChange={(value) => patchDay(dayIndex, { title_en: value })} />
+                            <TextInput dir="ltr" label={t("admin.templateEditor.structureFocus")} value={day.structure_focus} onChange={(value) => patchDay(dayIndex, { structure_focus: value })} />
+                            <TextInput dir="ltr" label={t("admin.templateEditor.targetMuscles")} value={day.direct_target_muscles.join(", ")} onChange={(value) => patchDay(dayIndex, { direct_target_muscles: parseMuscles(value) })} />
                           </div>
                           <ol>
                             {day.slots.map((slot, slotIndex) => (
@@ -383,17 +395,32 @@ export function AdminTrainingTemplateEditorPage() {
                                   <button aria-label={t("admin.templateEditor.removeExerciseAria", { name: slot.display_name_fa ?? slot.display_name_en })} onClick={() => removeSlot(dayIndex, slotIndex)} type="button">{t("admin.templateEditor.removeExercise")}</button>
                                 </div>
                                 <div className="admin-template-editor-grid admin-template-editor-grid--slot">
-                                  <TextInput label={t("admin.templateEditor.displayNameFa")} value={slot.display_name_fa ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_fa: value || null })} />
-                                  <TextInput label={t("admin.templateEditor.displayNameEn")} value={slot.display_name_en ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_en: value || null })} />
+                                  <TextInput dir="rtl" label={t("admin.templateEditor.displayNameFa")} value={slot.display_name_fa ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_fa: value || null })} />
+                                  <TextInput dir="ltr" label={t("admin.templateEditor.displayNameEn")} value={slot.display_name_en ?? ""} onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_en: value || null })} />
                                   <NumberInput label={t("admin.templateEditor.sets")} value={slot.sets} onChange={(value) => patchSlot(dayIndex, slotIndex, { sets: value })} />
                                   <NumberInput label={t("admin.templateEditor.repMin")} value={slot.rep_min} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_min: value })} />
                                   <NumberInput label={t("admin.templateEditor.repMax")} value={slot.rep_max} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_max: value })} />
                                   <NumberInput label={t("admin.templateEditor.rir")} value={slot.target_rir} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_rir: value })} />
                                   <NumberInput label={t("admin.templateEditor.rest")} value={slot.rest_seconds} onChange={(value) => patchSlot(dayIndex, slotIndex, { rest_seconds: value })} />
-                                  <label>{t("admin.templateEditor.method")}<select value={slot.intensity_method} onChange={(event) => patchSlot(dayIndex, slotIndex, { intensity_method: event.target.value as TrainingTemplateMethod })}>{methods.map((method) => <option key={method} value={method}>{t(`admin.templates.methods.${method}`)}</option>)}</select></label>
-                                  <label>{t("admin.templateEditor.priority")}<select value={slot.adaptation_priority} onChange={(event) => patchSlot(dayIndex, slotIndex, { adaptation_priority: event.target.value as TrainingTemplateSlotPriority })}>{priorities.map((priority) => <option key={priority} value={priority}>{t(`admin.templateEditor.priorities.${priority}`)}</option>)}</select></label>
-                                  <label>{t("admin.templateEditor.movementPattern")}<select value={slot.movement_pattern} onChange={(event) => patchSlot(dayIndex, slotIndex, { movement_pattern: event.target.value as AdminTrainingTemplateSlotWrite["movement_pattern"] })}>{movementPatterns.map((pattern) => <option key={pattern} value={pattern}>{t(`admin.programming.movementPattern.${pattern}`)}</option>)}</select></label>
-                                  <TextInput label={t("admin.templateEditor.slotMuscles")} value={slot.target_muscles.join(", ")} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_muscles: parseMuscles(value) })} />
+                                  <label className="admin-field">
+                                    <span>{t("admin.templateEditor.method")}</span>
+                                    <select value={slot.intensity_method} onChange={(event) => patchSlot(dayIndex, slotIndex, { intensity_method: event.target.value as TrainingTemplateMethod })}>
+                                      {methods.map((method) => <option key={method} value={method}>{t(`admin.templates.methods.${method}`)}</option>)}
+                                    </select>
+                                  </label>
+                                  <label className="admin-field">
+                                    <span>{t("admin.templateEditor.priority")}</span>
+                                    <select value={slot.adaptation_priority} onChange={(event) => patchSlot(dayIndex, slotIndex, { adaptation_priority: event.target.value as TrainingTemplateSlotPriority })}>
+                                      {priorities.map((priority) => <option key={priority} value={priority}>{t(`admin.templateEditor.priorities.${priority}`)}</option>)}
+                                    </select>
+                                  </label>
+                                  <label className="admin-field">
+                                    <span>{t("admin.templateEditor.movementPattern")}</span>
+                                    <select value={slot.movement_pattern} onChange={(event) => patchSlot(dayIndex, slotIndex, { movement_pattern: event.target.value as AdminTrainingTemplateSlotWrite["movement_pattern"] })}>
+                                      {movementPatterns.map((pattern) => <option key={pattern} value={pattern}>{t(`admin.programming.movementPattern.${pattern}`)}</option>)}
+                                    </select>
+                                  </label>
+                                  <TextInput dir="ltr" label={t("admin.templateEditor.slotMuscles")} value={slot.target_muscles.join(", ")} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_muscles: parseMuscles(value) })} />
                                 </div>
                               </li>
                             ))}
@@ -433,16 +460,67 @@ export function AdminTrainingTemplateEditorPage() {
   );
 }
 
-function TextInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label>{label}<input aria-label={label} onChange={(event) => onChange(event.target.value)} value={value} /></label>;
+function TextInput({
+  label,
+  value,
+  onChange,
+  dir,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  dir?: "rtl" | "ltr" | "auto";
+}) {
+  return (
+    <label className="admin-field">
+      <span>{label}</span>
+      <input aria-label={label} dir={dir} onChange={(event) => onChange(event.target.value)} value={value} />
+    </label>
+  );
 }
 
-function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label>{label}<textarea aria-label={label} onChange={(event) => onChange(event.target.value)} value={value} /></label>;
+function TextArea({
+  label,
+  value,
+  onChange,
+  dir,
+  rows = 3,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  dir?: "rtl" | "ltr" | "auto";
+  rows?: number;
+}) {
+  return (
+    <label className="admin-field">
+      <span>{label}</span>
+      <textarea aria-label={label} dir={dir} onChange={(event) => onChange(event.target.value)} rows={rows} value={value} />
+    </label>
+  );
 }
 
-function NumberInput({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
-  return <label>{label}<input aria-label={label} min="0" onChange={(event) => onChange(Number(event.target.value))} type="number" value={value} /></label>;
+function NumberInput({
+  label,
+  value,
+  onChange,
+  min = 0,
+  max,
+  step = 1,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+}) {
+  return (
+    <label className="admin-field">
+      <span>{label}</span>
+      <input aria-label={label} dir="ltr" max={max} min={min} onChange={(event) => onChange(Number(event.target.value))} step={step} type="number" value={value} />
+    </label>
+  );
 }
 
 function defaultDays(value: string | null): number {
