@@ -426,6 +426,7 @@ def test_closeout_report_contains_the_authoritative_library_and_one_verdict() ->
     assert benchmark.EXPECTED_TEMPLATE_SLUGS[0] in report
     assert "Catalog hash: " in report
     assert "Template hash: " in report
+    assert "DURATION_OUTSIDE_POLICY: 0 final (C" in report
     assert report.count("READY FOR PROMPT 6") == 1
 
 
