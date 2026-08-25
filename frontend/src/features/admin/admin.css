@@ -166,6 +166,250 @@
 .admin-template-editor-actions { position: sticky; bottom: 1rem; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1.15rem; border: 1px solid rgb(22 91 84 / 18%); border-radius: 1.1rem; background: rgb(255 255 255 / 94%); backdrop-filter: blur(14px); box-shadow: 0 10px 30px rgb(10 31 30 / 12%); color: var(--danger); font-size: .84rem; font-weight: 800; }
 .admin-template-editor-actions .admin-primary-link { border: 0; cursor: pointer; }
 .admin-template-editor input:focus, .admin-template-editor textarea:focus, .admin-template-editor select:focus, .admin-template-exercise-picker input:focus { outline: 3px solid rgb(56 183 165 / 28%); border-color: var(--turquoise); }
+
+/* Exercise Library Picker Modal */
+.admin-exercise-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgb(10 31 30 / 65%);
+  backdrop-filter: blur(10px);
+  animation: admin-accordion-reveal .2s ease-out;
+}
+.admin-exercise-picker-dialog {
+  width: min(840px, 100%);
+  max-height: min(88vh, 780px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 1.5rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 28%);
+  overflow: hidden;
+}
+.admin-exercise-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--petrol-900);
+  color: white;
+}
+.admin-exercise-picker-header h2 {
+  margin: .15rem 0 0;
+  color: white;
+  font-size: 1.35rem;
+  font-weight: 850;
+}
+.admin-exercise-picker-close {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 15%);
+  color: white;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+.admin-exercise-picker-close:hover {
+  background: rgb(255 255 255 / 28%);
+}
+.admin-exercise-picker-search-bar {
+  padding: .9rem 1.5rem .6rem;
+  background: var(--mist-50);
+  border-bottom: 1px solid var(--line);
+}
+.admin-exercise-picker-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  flex-wrap: wrap;
+  padding: .6rem 1.5rem;
+  background: var(--mist-50);
+  border-bottom: 1px solid var(--line);
+  font-size: .84rem;
+}
+.admin-exercise-picker-breadcrumbs button {
+  border: 0;
+  background: transparent;
+  color: var(--turquoise-dark);
+  font-weight: 800;
+  padding: .2rem .35rem;
+  border-radius: .4rem;
+  cursor: pointer;
+  font-size: inherit;
+}
+.admin-exercise-picker-breadcrumbs button:hover {
+  background: rgb(56 183 165 / 12%);
+}
+.admin-exercise-picker-breadcrumbs button.is-current {
+  color: var(--petrol-900);
+  font-weight: 900;
+}
+.admin-breadcrumb-separator {
+  color: var(--muted);
+  font-size: .85rem;
+}
+.admin-breadcrumb-current {
+  color: var(--petrol-900);
+  font-weight: 900;
+}
+.admin-exercise-picker-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+.admin-picker-stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .85rem;
+}
+.admin-picker-stage-title {
+  margin: 0;
+  color: var(--petrol-900);
+  font-size: 1.05rem;
+  font-weight: 850;
+}
+.admin-picker-back-btn {
+  padding: .35rem .75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--petrol-900);
+  font-weight: 750;
+  font-size: .82rem;
+  cursor: pointer;
+}
+.admin-picker-back-btn:hover {
+  border-color: var(--turquoise);
+  background: rgb(56 183 165 / 8%);
+}
+.admin-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: .75rem;
+}
+.admin-picker-card {
+  display: grid;
+  gap: .25rem;
+  padding: .9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: .85rem;
+  background: var(--paper);
+  color: var(--petrol-900);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease, transform .15s ease;
+}
+.admin-picker-card:hover {
+  border-color: var(--turquoise);
+  background: rgb(56 183 165 / 6%);
+  transform: translateY(-1px);
+}
+.admin-picker-card strong {
+  font-size: .95rem;
+}
+.admin-picker-card small {
+  color: var(--muted);
+  font-size: .78rem;
+}
+.admin-picker-card--all {
+  border-color: var(--turquoise);
+  background: rgb(56 183 165 / 10%);
+}
+.admin-exercise-picker-list {
+  display: grid;
+  gap: .6rem;
+}
+.admin-exercise-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .85rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: .85rem;
+  background: var(--paper);
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+.admin-exercise-picker-item:hover {
+  border-color: var(--turquoise);
+  background: rgb(56 183 165 / 8%);
+}
+.admin-exercise-picker-item__info {
+  display: grid;
+  gap: .2rem;
+  min-width: 0;
+}
+.admin-exercise-picker-item__name {
+  color: var(--petrol-900);
+  font-size: .95rem;
+  font-weight: 850;
+}
+.admin-exercise-picker-item__alt {
+  color: var(--muted);
+  font-size: .8rem;
+}
+.admin-exercise-picker-item__tags {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-wrap: wrap;
+}
+.admin-badge {
+  display: inline-block;
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.admin-badge--pattern {
+  color: var(--petrol-900);
+  background: var(--mist-100);
+}
+.admin-badge--equipment {
+  color: var(--turquoise-dark);
+  background: rgb(56 183 165 / 12%);
+}
+.admin-badge--review {
+  color: var(--danger);
+  background: rgb(161 63 50 / 10%);
+}
+
+.admin-slot-choose-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem .95rem;
+  border: 1px solid var(--turquoise-dark);
+  border-radius: .65rem;
+  color: var(--petrol-900);
+  background: rgb(56 183 165 / 12%);
+  font-size: .85rem;
+  font-weight: 850;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+.admin-slot-choose-btn:hover {
+  background: rgb(56 183 165 / 22%);
+}
+
 @media (max-width: 760px) {
   .admin-template-editor-grid,
   .admin-template-reason-card__body,
@@ -196,6 +440,16 @@
     bottom: 1rem;
     max-height: 80vh;
     overflow-y: auto;
+  }
+  .admin-exercise-picker-dialog {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 1.2rem;
+  }
+  .admin-exercise-picker-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .5rem;
   }
 }
 .admin-template-rationale { padding-top: 1.15rem; border-top: 2px solid rgb(22 91 84 / 30%); }.admin-template-rationale h3 { margin: 0; color: var(--petrol-900); font-size: 1.12rem; }.admin-template-rationale ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .75rem; margin: .9rem 0 0; padding: 0; list-style: none; }.admin-template-rationale li { padding: .75rem .85rem; border: 1px solid rgb(22 91 84 / 12%); border-radius: .85rem; background: rgb(238 248 246 / 65%); }.admin-template-rationale strong { color: var(--petrol-900); font-size: .92rem; }.admin-template-rationale p { margin: .35rem 0 0; color: var(--muted); font-size: .83rem; line-height: 1.65; }
