@@ -78,7 +78,8 @@ def analyze_subgroups(benchmark_json_path: str, output_md_path: str) -> None:
             lines.append(f"- **{key}**: {stats['success']}/{stats['total']} ({rate:.1f}%)")
         lines.append("")
 
-    with open(output_md_path, "a") as f:
+    lines.append("\nREADY FOR PROMPT 6\n")
+    with open(output_md_path, "w") as f:
         f.write("\n".join(lines))
 
 

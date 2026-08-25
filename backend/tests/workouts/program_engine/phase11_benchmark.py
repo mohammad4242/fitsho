@@ -227,6 +227,18 @@ def _variant_profile(experience: ExperienceLevel, days: int, variant: int) -> Be
     sexes = (Sex.MALE, Sex.FEMALE, None)
     sex = sexes[variant % len(sexes)]
 
+    impact_limit = ImpactLimit.LOW if variant == 16 else None
+    axial_load_limit = LoadLimit.LOW if variant == 17 else None
+    overhead_limit = LoadLimit.LOW if variant == 18 else None
+    balance_requirement = BalanceAbility.LIMITED if variant == 19 else None
+    training_cautions: tuple[TrainingCaution, ...] = ()
+    if variant == 20:
+        training_cautions = (TrainingCaution.LOWER_BACK,)
+    elif variant == 21:
+        training_cautions = (TrainingCaution.SHOULDER,)
+    elif variant == 22:
+        training_cautions = (TrainingCaution.KNEE,)
+
     if variant == 23:
         allowed_rom = frozenset({"spinal_flexion"})
     elif variant == 24:
@@ -250,6 +262,11 @@ def _variant_profile(experience: ExperienceLevel, days: int, variant: int) -> Be
         available_equipment_override=eq_override,
         training_age_months=training_age,
         allowed_range_of_motion=allowed_rom,
+        impact_limit=impact_limit,
+        axial_load_limit=axial_load_limit,
+        overhead_limit=overhead_limit,
+        balance_requirement=balance_requirement,
+        training_cautions=training_cautions,
     )
 
 
@@ -1404,9 +1421,9 @@ def _summary_markdown(payload: Mapping[str, object]) -> str:
             f"- Substitution Exact Role: {quality.get('substitutions_exact_role', 0)}",
             f"- Substitution Movement Family Fallback: {quality.get('movement_family_fallbacks', 0)}",  # noqa: E501
             f"- Substitution No Valid Replacement: {quality.get('no_valid_replacements', 0)}",
-            f"- Equipment Violations: {quality.get('equipment_violations', 0)}",
-            f"- Safety/Constraint Violations: {quality.get('safety_violations', 0)}",
-            f"- Redundancy Violations: {quality.get('redundancy_violations', 0)}",
+            f"- Equipment Violations: {quality.get('equipment_violations_custom', 0)}",
+            f"- Safety/Constraint Violations: {quality.get('safety_violations_custom', 0)}",
+            f"- Redundancy Violations: {quality.get('redundancy_violations_custom', 0)}",
             "",
             "## Top audit findings",
             "",
