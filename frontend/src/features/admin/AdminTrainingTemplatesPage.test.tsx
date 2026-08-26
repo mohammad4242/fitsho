@@ -294,7 +294,13 @@ it("filters the library by day count and training level", async () => {
 
   expect(await screen.findByText("تفکیک کلاسیک")).toBeInTheDocument();
   expect(screen.queryByText("تفکیک کلاسیک چهار روزه")).not.toBeInTheDocument();
-  expect(within(screen.getAllByRole("article")[0]).getByText((content) => content.includes("روزه"))).toBeInTheDocument();
+  expect(within(screen.getAllByRole("article")[0]).queryAllByText((content) => content.includes("روزه"))).toHaveLength(0);
+  expect(screen.queryAllByText("تقسیم با عضلات هدف مستقیم.")).toHaveLength(0);
+  expect(screen.queryAllByText("تفکیک عضلات")).toHaveLength(0);
+  expect(screen.queryAllByText((content) => content.includes("مبنای ساختار"))).toHaveLength(0);
+  expect(screen.queryAllByText("منبع پژوهش")).toHaveLength(0);
+  expect(within(screen.getAllByRole("article")[0]).getByText("مبتدی")).toBeInTheDocument();
+  expect(within(screen.getAllByRole("article")[0]).getByText("متوسط")).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "متوسط" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "First Month" })).toBeInTheDocument();
   expect(screen.queryByText("سینه + پشت بازو")).not.toBeInTheDocument();
@@ -303,12 +309,14 @@ it("filters the library by day count and training level", async () => {
     "aria-expanded",
     "false",
   );
-  expect(screen.getAllByRole("link", { name: "ویرایش برنامه: تفکیک کلاسیک چهار روزه" })).toHaveLength(1);
+  expect(screen.queryAllByRole("link", { name: "ویرایش برنامه: تفکیک کلاسیک چهار روزه" })).toHaveLength(0);
   expect(screen.getByRole("link", { name: "افزودن برنامه جدید" })).toHaveAttribute(
     "href",
     "/admin/training-program-templates/new?days=4&level=beginner",
   );
   expect(adminApi.getAdminTrainingProgramTemplates).toHaveBeenCalledWith(4, "all");
+
+  await user.click(screen.getByRole("button", { name: "باز کردن برنامه: تفکیک کلاسیک چهار روزه" }));
 
   await user.click(screen.getByRole("tab", { name: "متوسط" }));
   const intermediateEditPath = screen.getByRole("link", {
@@ -322,8 +330,6 @@ it("filters the library by day count and training level", async () => {
   })).toHaveAttribute("href", intermediateEditPath);
   expect(adminApi.getAdminTrainingProgramTemplates).toHaveBeenCalledWith(4, "beginner");
 
-  await user.click(screen.getByRole("button", { name: "باز کردن برنامه: تفکیک کلاسیک چهار روزه" }));
-
   expect(screen.getByText("سینه + پشت بازو")).toBeInTheDocument();
   expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "باز کردن روز 1: سینه + پشت بازو" })).toHaveAttribute(
@@ -332,6 +338,11 @@ it("filters the library by day count and training level", async () => {
   );
   expect(screen.getByText("منطق برنامه")).toBeInTheDocument();
   expect(screen.getByText("ترتیب حرکات")).toBeInTheDocument();
+  expect(screen.getByText("تقسیم با عضلات هدف مستقیم.")).toBeInTheDocument();
+  expect(screen.getByText("تفکیک عضلات")).toBeInTheDocument();
+  expect(screen.getByText((content) => content.includes("مبنای ساختار"))).toBeInTheDocument();
+  expect(screen.getByText("منبع پژوهش")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "ویرایش برنامه: تفکیک کلاسیک چهار روزه" })).toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "باز کردن روز 1: سینه + پشت بازو" }));
 

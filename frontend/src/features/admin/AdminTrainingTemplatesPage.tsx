@@ -283,9 +283,7 @@ export function AdminTrainingTemplatesPage() {
                       type="button"
                     >
                       <span className="admin-program-accordion-copy">
-                        <span className="eyebrow">{t("admin.templates.days", { count: template.days_per_week })}</span>
                         <span className="admin-program-accordion-title">{displayName}</span>
-                        <span className="admin-program-accordion-description">{english ? template.description_en : template.description_fa}</span>
                       </span>
                       <span className="admin-program-accordion-meta">
                         <span className="admin-template-levels">
@@ -301,14 +299,15 @@ export function AdminTrainingTemplatesPage() {
                       </span>
                     </button>
                   </header>
-                  <div className="admin-template-tags" aria-label={t("admin.templates.labels")}>
-                    {template.focus_tags.map((tag) => <span key={tag}>{t(`admin.templates.tags.${tag}`)}</span>)}
-                    {template.intensity_methods.filter((method) => method !== "standard").map((method) => (
-                      <span key={method}>{t(`admin.templates.methods.${method}`)}</span>
-                    ))}
-                  </div>
                   {programExpanded && (
                     <div className="admin-program-accordion-panel" id={programPanelId}>
+                      <p className="admin-program-accordion-description">{english ? template.description_en : template.description_fa}</p>
+                      <div className="admin-template-tags" aria-label={t("admin.templates.labels")}>
+                        {template.focus_tags.map((tag) => <span key={tag}>{t(`admin.templates.tags.${tag}`)}</span>)}
+                        {template.intensity_methods.filter((method) => method !== "standard").map((method) => (
+                          <span key={method}>{t(`admin.templates.methods.${method}`)}</span>
+                        ))}
+                      </div>
                       <div className="admin-template-days">
                         {template.days.map((day) => {
                           const dayName = english ? day.title_en : day.title_fa;
@@ -392,18 +391,18 @@ export function AdminTrainingTemplatesPage() {
                           ))}
                         </ol>
                       </section>
+                      <footer>
+                        <Link
+                          aria-label={t("admin.templates.editProgramAria", { name })}
+                          to={`/admin/training-program-templates/${template.id}/edit`}
+                        >
+                          {t("admin.templates.editProgram")}
+                        </Link>
+                        <span>{t("admin.templates.source")}: {template.source_name}</span>
+                        <a href={template.source_url} rel="noreferrer" target="_blank">{t("admin.templates.reference")}</a>
+                      </footer>
                     </div>
                   )}
-                  <footer>
-                    <Link
-                      aria-label={t("admin.templates.editProgramAria", { name })}
-                      to={`/admin/training-program-templates/${template.id}/edit`}
-                    >
-                      {t("admin.templates.editProgram")}
-                    </Link>
-                    <span>{t("admin.templates.source")}: {template.source_name}</span>
-                    <a href={template.source_url} rel="noreferrer" target="_blank">{t("admin.templates.reference")}</a>
-                  </footer>
                 </article>
               );
             })}

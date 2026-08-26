@@ -113,7 +113,7 @@
 .admin-program-accordion-copy { display: grid; min-width: 0; gap: .3rem; }
 .admin-program-accordion-title { color: var(--petrol-900); font-size: 1.45rem; font-weight: 850; line-height: 1.35; }
 .admin-program-accordion-description { color: var(--muted); line-height: 1.7; }
-.admin-program-accordion-meta { display: flex; flex: 0 0 auto; align-items: center; gap: .7rem; }
+.admin-program-accordion-meta { display: flex; flex: 0 1 auto; align-items: center; gap: .7rem; min-width: 0; max-width: 100%; }
 .admin-accordion-chevron { display: grid; flex: 0 0 auto; width: 1.8rem; height: 1.8rem; place-items: center; border-radius: 50%; color: var(--turquoise-dark); background: rgb(56 183 165 / 12%); font-size: 1.35rem; font-weight: 900; line-height: 1; transition: transform .22s ease, background-color .22s ease; }
 [aria-expanded="true"] > * > .admin-accordion-chevron, [aria-expanded="true"] > .admin-accordion-chevron { transform: rotate(180deg); background: rgb(56 183 165 / 22%); }
 .admin-program-accordion-panel, .admin-day-accordion-panel { animation: admin-accordion-reveal .22s ease-out; }
@@ -765,7 +765,7 @@
 }
 @media (max-width: 760px) { .admin-template-card > header, .admin-template-card footer, .admin-template-day li { align-items: start; flex-direction: column; }.admin-template-day li > span { white-space: normal; } }
 @media (max-width: 760px) { .admin-program-accordion-trigger { align-items: start; }.admin-program-accordion-meta { align-items: end; flex-direction: column-reverse; }.admin-program-accordion-title { font-size: 1.2rem; }.admin-program-accordion-description { font-size: .88rem; }.admin-template-card { gap: .9rem; }.admin-template-card footer { gap: .6rem; }.admin-template-card footer span { overflow-wrap: anywhere; } }
-.admin-template-levels { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; }
+.admin-template-levels { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; min-width: 0; max-width: 100%; }
 .admin-template-level-selector { grid-column: 1 / -1; margin: 0; padding: .85rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--mist-50); }
 .admin-template-level-selector legend { padding: 0 .35rem; color: var(--petrol-900); font-size: .84rem; font-weight: 900; }
 .admin-template-level-selector p { margin: 0 0 .7rem; color: var(--muted); font-size: .78rem; }
