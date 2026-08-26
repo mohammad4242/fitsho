@@ -21,6 +21,23 @@ import "./admin.css";
 const trainingDays = [2, 3, 4, 5, 6] as const;
 const trainingLevels = ["all", "first_month", "beginner", "intermediate", "advanced"] as const;
 const structureFamilies: StructureFamily[] = ["upper_lower", "split"];
+const persianDayNumerals = ["", "", "۲", "۳", "۴", "۵", "۶"] as const;
+const persianDayWords = ["", "", "دو", "سه", "چهار", "پنج", "شش"] as const;
+const englishDayWords = ["", "", "two", "three", "four", "five", "six"] as const;
+
+function displayProgramTitle(title: string, daysPerWeek: number, english: boolean): string {
+  const dayToken = english
+    ? `(?:${daysPerWeek}|${englishDayWords[daysPerWeek] ?? ""})`
+    : `(?:${daysPerWeek}|${persianDayNumerals[daysPerWeek] ?? ""}|${persianDayWords[daysPerWeek] ?? ""})`;
+  const dayPhrase = english
+    ? `${dayToken}\\s*[-–—]?\\s*days?\\b`
+    : `${dayToken}(?:\\u200c|\\s)*روزه`;
+  const prefix = new RegExp(`^\\s*${dayPhrase}\\s*(?:[؛;:،,-]\\s*)?`, english ? "i" : "u");
+  const suffix = new RegExp(`\\s+${dayPhrase}\\s*$`, english ? "i" : "u");
+  const infix = new RegExp(`\\s+${dayPhrase}(?=\\s|$)`, english ? "i" : "u");
+  const displayed = title.replace(prefix, "").replace(suffix, "").replace(infix, "").trim();
+  return displayed || title;
+}
 
 export function AdminTrainingTemplatesPage() {
   const { i18n, t } = useTranslation();
@@ -236,6 +253,11 @@ export function AdminTrainingTemplatesPage() {
           <section className="admin-template-list" role="tabpanel" aria-labelledby={`template-tab-${daysPerWeek}`}>
             {visibleTemplates.map((template) => {
               const name = english ? template.name_en : template.name_fa;
+              const displayName = displayProgramTitle(
+                name,
+                template.days_per_week,
+                english,
+              );
               const programExpanded = expandedPrograms.has(template.id);
               const programPanelId = `training-program-${template.id}`;
               return (
@@ -262,7 +284,7 @@ export function AdminTrainingTemplatesPage() {
                     >
                       <span className="admin-program-accordion-copy">
                         <span className="eyebrow">{t("admin.templates.days", { count: template.days_per_week })}</span>
-                        <span className="admin-program-accordion-title">{name}</span>
+                        <span className="admin-program-accordion-title">{displayName}</span>
                         <span className="admin-program-accordion-description">{english ? template.description_en : template.description_fa}</span>
                       </span>
                       <span className="admin-program-accordion-meta">

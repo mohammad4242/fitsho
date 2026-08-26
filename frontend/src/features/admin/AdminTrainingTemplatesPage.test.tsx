@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -236,6 +236,41 @@ it("shows two- and three-day structures directly without family controls", async
   expect(screen.queryByRole("button", { name: "Split" })).not.toBeInTheDocument();
 });
 
+it("removes day-count wording from titles for every supported day count", async () => {
+  const cases = [
+    { days: 2, raw: "تمام‌بدن دو روزه A/B", display: "تمام‌بدن A/B" },
+    { days: 3, raw: "بالاتنه / پایین‌تنه / بالاتنه سه روزه", display: "بالاتنه / پایین‌تنه / بالاتنه" },
+    { days: 4, raw: "چهارروزه؛ سه پایین‌تنه و یک بالاتنه", display: "سه پایین‌تنه و یک بالاتنه" },
+    { days: 5, raw: "پنج‌روزه تخصص سینه", display: "تخصص سینه" },
+    { days: 6, raw: "شش‌روزه پیشرفته عضله‌ای", display: "پیشرفته عضله‌ای" },
+  ];
+  adminApi.getAdminTrainingProgramStructures.mockResolvedValue({ items: [] });
+  adminApi.getAdminTrainingProgramTemplates.mockImplementation((days: number) => {
+    const item = cases.find((candidate) => candidate.days === days);
+    return Promise.resolve({
+      items: item === undefined ? [] : [{
+        ...template,
+        id: `title-${days}`,
+        days_per_week: days,
+        name_fa: item.raw,
+        name_en: `${days}-Day Structure`,
+      }],
+    });
+  });
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <AdminTrainingTemplatesPage />
+    </MemoryRouter>,
+  );
+
+  for (const item of cases) {
+    await user.click(screen.getByRole("tab", { name: `${item.days} روزه` }));
+    expect(await screen.findByText(item.display)).toBeInTheDocument();
+    expect(screen.queryByText(item.raw)).not.toBeInTheDocument();
+  }
+});
+
 it("filters the library by day count and training level", async () => {
   adminApi.getAdminTrainingProgramTemplates.mockImplementation(
     (days: number, level: string) => {
@@ -257,7 +292,9 @@ it("filters the library by day count and training level", async () => {
 
   await user.click(screen.getByRole("tab", { name: "4 روزه" }));
 
-  expect(await screen.findByText("تفکیک کلاسیک چهار روزه")).toBeInTheDocument();
+  expect(await screen.findByText("تفکیک کلاسیک")).toBeInTheDocument();
+  expect(screen.queryByText("تفکیک کلاسیک چهار روزه")).not.toBeInTheDocument();
+  expect(within(screen.getAllByRole("article")[0]).getByText((content) => content.includes("روزه"))).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "متوسط" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "First Month" })).toBeInTheDocument();
   expect(screen.queryByText("سینه + پشت بازو")).not.toBeInTheDocument();
@@ -306,7 +343,7 @@ it("filters the library by day count and training level", async () => {
 
   await user.click(screen.getByRole("tab", { name: "پیشرفته" }));
 
-  expect(await screen.findByText("تخصصی سینه چهارروزه پیشرفته")).toBeInTheDocument();
+  expect(await screen.findByText("تخصصی سینه پیشرفته")).toBeInTheDocument();
   expect(screen.queryByText("تفکیک کلاسیک چهار روزه")).not.toBeInTheDocument();
 
   await user.click(screen.getByRole("tab", { name: "First Month" }));
