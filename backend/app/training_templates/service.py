@@ -9,6 +9,8 @@ from app.exercises.models import Exercise
 from app.profile.enums import ExperienceLevel
 from app.training_templates.catalog_invariants import validate_catalog_topology
 from app.training_templates.models import (
+    StructureFamily,
+    TrainingProgramStructure,
     TrainingProgramTemplate,
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
@@ -258,6 +260,7 @@ def list_training_program_templates(
     *,
     days_per_week: int | None = None,
     training_level: ExperienceLevel | None = None,
+    family: StructureFamily | None = None,
     structure_id: UUID | None = None,
 ) -> list[TrainingProgramTemplate]:
     statement = (
@@ -278,6 +281,11 @@ def list_training_program_templates(
     )
     if days_per_week is not None:
         statement = statement.where(TrainingProgramTemplate.days_per_week == days_per_week)
+    if family is not None:
+        statement = statement.join(
+            TrainingProgramStructure,
+            TrainingProgramTemplate.structure_id == TrainingProgramStructure.id,
+        ).where(TrainingProgramStructure.family == family)
     if structure_id is not None:
         statement = statement.where(TrainingProgramTemplate.structure_id == structure_id)
     templates = list(db.scalars(statement))

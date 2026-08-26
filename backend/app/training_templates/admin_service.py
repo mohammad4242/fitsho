@@ -21,6 +21,7 @@ from app.exercises.enums import (
 from app.exercises.models import Exercise
 from app.training_templates.catalog_placeholders import TEMPLATE_PLACEHOLDER_SOURCE
 from app.training_templates.models import (
+    StructureFamily,
     TrainingProgramStructure,
     TrainingProgramStructureDay,
     TrainingProgramTemplate,
@@ -52,6 +53,7 @@ def list_training_program_structures(
     db: Session,
     *,
     days_per_week: int | None = None,
+    family: StructureFamily | None = None,
     include_inactive: bool = False,
 ) -> list[TrainingProgramStructure]:
     stmt = select(TrainingProgramStructure).options(
@@ -59,6 +61,8 @@ def list_training_program_structures(
     )
     if days_per_week is not None:
         stmt = stmt.where(TrainingProgramStructure.days_per_week == days_per_week)
+    if family is not None:
+        stmt = stmt.where(TrainingProgramStructure.family == family)
     if not include_inactive:
         stmt = stmt.where(TrainingProgramStructure.is_active.is_(True))
     stmt = stmt.order_by(TrainingProgramStructure.days_per_week, TrainingProgramStructure.name_en)
@@ -86,6 +90,8 @@ def create_training_program_structure(
         name_en=payload.name_en,
         name_fa=payload.name_fa,
         days_per_week=payload.days_per_week,
+        family=payload.family,
+        split_type=payload.split_type,
         description_en=payload.description_en,
         description_fa=payload.description_fa,
         is_active=True,
@@ -106,10 +112,23 @@ def update_training_program_structure(
     if structure is None:
         return None
     _validate_structure_payload(payload)
+    if structure.days_per_week != payload.days_per_week:
+        reference_count = db.scalar(
+            select(func.count())
+            .select_from(TrainingProgramTemplate)
+            .where(TrainingProgramTemplate.structure_id == structure_id)
+        )
+        if reference_count and reference_count > 0:
+            raise StructureWriteError(
+                "Cannot change days_per_week for a structure referenced by "
+                f"{reference_count} template(s)."
+            )
     structure.slug = payload.slug
     structure.name_en = payload.name_en
     structure.name_fa = payload.name_fa
     structure.days_per_week = payload.days_per_week
+    structure.family = payload.family
+    structure.split_type = payload.split_type
     structure.description_en = payload.description_en
     structure.description_fa = payload.description_fa
     structure.structure_days.clear()

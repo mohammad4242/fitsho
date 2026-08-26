@@ -71,6 +71,7 @@ from app.training_templates.admin_service import (
     update_training_program_template_slot,
 )
 from app.training_templates.models import (
+    StructureFamily,
     TrainingProgramStructure,
     TrainingProgramTemplate,
 )
@@ -166,6 +167,8 @@ def _structure_detail(structure: TrainingProgramStructure) -> AdminTrainingProgr
         name_en=structure.name_en,
         name_fa=structure.name_fa,
         days_per_week=structure.days_per_week,
+        family=structure.family,
+        split_type=structure.split_type,
         description_en=structure.description_en,
         description_fa=structure.description_fa,
         is_active=structure.is_active,
@@ -194,11 +197,13 @@ def _structure_detail(structure: TrainingProgramStructure) -> AdminTrainingProgr
 def read_training_program_structures(
     db: DatabaseSession,
     days_per_week: Annotated[int | None, Query(ge=2, le=6)] = None,
+    family: StructureFamily | None = None,
     include_inactive: bool = False,
 ) -> AdminTrainingProgramStructuresResponse:
     structures = list_training_program_structures(
         db,
         days_per_week=days_per_week,
+        family=family,
         include_inactive=include_inactive,
     )
     return AdminTrainingProgramStructuresResponse(items=[_structure_detail(s) for s in structures])
@@ -314,12 +319,14 @@ def read_training_program_templates(
     db: DatabaseSession,
     days_per_week: Annotated[int | None, Query(ge=2, le=6)] = None,
     training_level: ExperienceLevel | None = None,
+    family: StructureFamily | None = None,
     structure_id: UUID | None = None,
 ) -> AdminTrainingProgramTemplatesResponse:
     templates = list_training_program_templates(
         db,
         days_per_week=days_per_week,
         training_level=training_level,
+        family=family,
         structure_id=structure_id,
     )
     return AdminTrainingProgramTemplatesResponse(

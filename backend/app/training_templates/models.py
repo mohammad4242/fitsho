@@ -22,6 +22,16 @@ from app.exercises.models import Exercise, enum_values
 from app.profile.enums import FitnessGoal
 
 
+class StructureFamily(StrEnum):
+    UPPER_LOWER = "upper_lower"
+    SPLIT = "split"
+
+
+class StructureSplitType(StrEnum):
+    PPL = "ppl"
+    BODY_PART = "body_part"
+
+
 class TrainingProgramStructure(Base):
     """Admin-manageable weekly training split skeleton.
 
@@ -40,6 +50,13 @@ class TrainingProgramStructure(Base):
             "slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'",
             name="ck_training_program_structures_slug_format",
         ),
+        CheckConstraint(
+            "(days_per_week BETWEEN 2 AND 3 AND family IS NULL AND split_type IS NULL) OR "
+            "(days_per_week BETWEEN 4 AND 6 AND "
+            "((family = 'upper_lower' AND split_type IS NULL) OR "
+            "(family = 'split' AND split_type IN ('ppl', 'body_part'))))",
+            name="ck_training_program_structures_family_classification",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -47,6 +64,28 @@ class TrainingProgramStructure(Base):
     name_en: Mapped[str] = mapped_column(String(160), nullable=False)
     name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
     days_per_week: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    family: Mapped[StructureFamily | None] = mapped_column(
+        Enum(
+            StructureFamily,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_training_program_structures_family_values",
+        ),
+        nullable=True,
+    )
+    split_type: Mapped[StructureSplitType | None] = mapped_column(
+        Enum(
+            StructureSplitType,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_training_program_structures_split_type_values",
+        ),
+        nullable=True,
+    )
     description_en: Mapped[str | None] = mapped_column(String(500), nullable=True)
     description_fa: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(

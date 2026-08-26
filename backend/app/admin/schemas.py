@@ -30,7 +30,12 @@ from app.exercises.schemas import ExerciseDetail
 from app.exercises.taxonomy import is_compatible_muscle_focus
 from app.profile.enums import ExperienceLevel, FitnessGoal
 from app.training_templates.catalog_invariants import validate_catalog_topology
-from app.training_templates.models import TrainingTemplateMethod, TrainingTemplateSlotPriority
+from app.training_templates.models import (
+    StructureFamily,
+    StructureSplitType,
+    TrainingTemplateMethod,
+    TrainingTemplateSlotPriority,
+)
 from app.training_templates.tags import TemplateFocusTag, validate_template_focus_tags
 from app.workouts.program_engine.enums import (
     BodyPosition,
@@ -258,6 +263,8 @@ class AdminTrainingProgramStructure(BaseModel):
     name_en: str
     name_fa: str
     days_per_week: int
+    family: StructureFamily | None
+    split_type: StructureSplitType | None
     description_en: str | None
     description_fa: str | None
     is_active: bool
@@ -320,6 +327,8 @@ class AdminTrainingProgramStructureWrite(BaseModel):
     name_en: Name
     name_fa: Name
     days_per_week: int = Field(ge=2, le=6)
+    family: StructureFamily | None = None
+    split_type: StructureSplitType | None = None
     description_en: Annotated[
         str | None,
         StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
@@ -329,6 +338,20 @@ class AdminTrainingProgramStructureWrite(BaseModel):
         StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
     ] = None
     days: list[AdminTrainingProgramStructureDayWrite] = Field(min_length=2, max_length=6)
+
+    @model_validator(mode="after")
+    def validate_classification(self) -> "AdminTrainingProgramStructureWrite":
+        if self.days_per_week <= 3:
+            if self.family is not None or self.split_type is not None:
+                raise ValueError("2- and 3-day structures cannot have a family or split type")
+            return self
+        if self.family is None:
+            raise ValueError("4- to 6-day structures require a family")
+        if self.family is StructureFamily.UPPER_LOWER and self.split_type is not None:
+            raise ValueError("Upper / Lower structures cannot have a split type")
+        if self.family is StructureFamily.SPLIT and self.split_type is None:
+            raise ValueError("Split structures require a split type")
+        return self
 
 
 class AdminTrainingTemplateSlotWrite(BaseModel):
