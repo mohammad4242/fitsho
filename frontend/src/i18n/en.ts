@@ -692,6 +692,7 @@ const en = {
         programLibrary: "Program library",
         loading: "Loading structures…",
         loadError: "The structure library could not be loaded.",
+        actionError: "The structure status could not be changed.",
         empty: "No structure is recorded for this filter.",
         list: "Structure list",
         active: "Active",

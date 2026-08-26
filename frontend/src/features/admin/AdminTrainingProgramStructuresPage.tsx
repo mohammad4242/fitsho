@@ -28,6 +28,8 @@ export function AdminTrainingProgramStructuresPage() {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [retry, setRetry] = useState(0);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const visibleFamilyFilters = daysPerWeek <= 3 ? ["all" as const] : familyFilters;
 
   useEffect(() => {
     let active = true;
@@ -57,11 +59,14 @@ export function AdminTrainingProgramStructuresPage() {
 
   async function toggleActive(structure: AdminTrainingProgramStructure) {
     setActionId(structure.id);
+    setActionError(null);
     try {
       const updated = structure.is_active
         ? await deactivateAdminTrainingProgramStructure(structure.id)
         : await activateAdminTrainingProgramStructure(structure.id);
       setStructures((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch {
+      setActionError(t("admin.structureLibrary.actionError"));
     } finally {
       setActionId(null);
     }
@@ -111,7 +116,7 @@ export function AdminTrainingProgramStructuresPage() {
           <div className="admin-template-filter-group">
             <span>{t("admin.structureLibrary.familyFilter")}</span>
             <div className="admin-template-tabs" role="tablist" aria-label={t("admin.structureLibrary.familyFilter")}>
-              {familyFilters.map((value) => (
+              {visibleFamilyFilters.map((value) => (
                 <button
                   aria-selected={value === family}
                   key={value}
@@ -133,6 +138,7 @@ export function AdminTrainingProgramStructuresPage() {
             <button type="button" onClick={() => setRetry((value) => value + 1)}>{t("common.retry")}</button>
           </div>
         )}
+        {actionError !== null && <p className="admin-status admin-status--error" role="alert">{actionError}</p>}
         {state === "ready" && structures.length === 0 && (
           <p className="admin-status">{t("admin.structureLibrary.empty")}</p>
         )}

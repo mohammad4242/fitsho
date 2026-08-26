@@ -173,13 +173,26 @@ export function getAdminTrainingProgramTemplates(
 
 export function getAdminTrainingProgramStructures(
   daysPerWeek?: number,
+  includeInactive?: boolean,
+): Promise<AdminTrainingProgramStructuresResponse>;
+export function getAdminTrainingProgramStructures(
+  daysPerWeek?: number,
   family?: StructureFamily,
+  includeInactive?: boolean,
+): Promise<AdminTrainingProgramStructuresResponse>;
+export function getAdminTrainingProgramStructures(
+  daysPerWeek?: number,
+  familyOrIncludeInactive?: StructureFamily | boolean,
   includeInactive: boolean = false,
 ): Promise<AdminTrainingProgramStructuresResponse> {
+  const family = typeof familyOrIncludeInactive === "string" ? familyOrIncludeInactive : undefined;
+  const shouldIncludeInactive = typeof familyOrIncludeInactive === "boolean"
+    ? familyOrIncludeInactive
+    : includeInactive;
   const query = new URLSearchParams();
   if (daysPerWeek) query.set("days_per_week", String(daysPerWeek));
   if (family) query.set("family", family);
-  if (includeInactive) query.set("include_inactive", "true");
+  if (shouldIncludeInactive) query.set("include_inactive", "true");
   return request<AdminTrainingProgramStructuresResponse>(
     `/api/v1/admin/training-program-structures?${query.toString()}`,
   );
