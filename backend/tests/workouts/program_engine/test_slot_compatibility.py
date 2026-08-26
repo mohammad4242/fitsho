@@ -64,6 +64,24 @@ def test_valid_lower_compound_remains_compatible_with_specialized_focus() -> Non
     assert exercise_fits_focus(candidate, "lower")
 
 
+def test_lower_compound_with_trap_stabilization_remains_specialized_lower() -> None:
+    candidate = exercise(
+        "dumbbell-rdl-with-trap-stabilization",
+        MovementPattern.HIP_HINGE,
+        MuscleGroup.HAMSTRINGS,
+        secondary=(MuscleGroup.GLUTES, MuscleGroup.TRAPS),
+    )
+
+    result = evaluate_candidate_slot_compatibility(
+        candidate,
+        allowed_patterns=frozenset({MovementPattern.HIP_HINGE}),
+        target_muscles=frozenset({MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES}),
+        day_focus="posterior_chain_core",
+    )
+
+    assert result.compatible
+
+
 def test_clean_and_press_metadata_is_not_inferred_as_knee_extension() -> None:
     metadata = classify_programming_metadata(
         name_en="Barbell Clean And Press",

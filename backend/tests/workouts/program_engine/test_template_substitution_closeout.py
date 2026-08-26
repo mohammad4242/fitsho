@@ -19,7 +19,11 @@ from app.workouts.program_engine.template_sessions import (
 )
 from tests.workouts.program_engine.golden_fixtures import exercise, request
 
-TEST_RULESET = replace(RULESET, minimum_exercises_per_session=1)
+TEST_RULESET = replace(
+    RULESET,
+    minimum_exercises_per_session=1,
+    preferred_main_exercises_per_session=1,
+)
 
 
 def _slot(

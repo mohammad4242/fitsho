@@ -196,7 +196,7 @@ def test_structural_validator_rejects_a_false_primary_structure_claim() -> None:
         if template.slug == "t10-5-day-classic-body-part"
     )
 
-    with pytest.raises(ValueError, match="full_body lacks structural evidence"):
+    with pytest.raises(ValueError, match="Pure full-body"):
         template_tags.validate_template_focus_tags(
             (TemplateFocusTag.FULL_BODY, TemplateFocusTag.BALANCED),
             intensity_methods=classic.intensity_methods,
@@ -253,6 +253,62 @@ def test_structural_validator_rejects_a_materially_unbalanced_week() -> None:
     )
 
 
+@pytest.mark.parametrize("day_count", (4, 5, 6))
+def test_structural_validator_rejects_pure_high_frequency_full_body(
+    day_count: int,
+) -> None:
+    mixed_day = SimpleNamespace(
+        direct_target_muscles=(MuscleGroup.CHEST, MuscleGroup.QUADRICEPS),
+        slots=(),
+    )
+
+    with pytest.raises(ValueError):
+        template_tags.validate_template_focus_tags(
+            (TemplateFocusTag.FULL_BODY,),
+            days=(mixed_day,) * day_count,
+        )
+
+
+@pytest.mark.parametrize("day_count", (4, 5, 6))
+def test_catalog_topology_rejects_full_body_with_non_structural_tags(
+    day_count: int,
+) -> None:
+    with pytest.raises(ValueError, match="Pure full-body"):
+        template_tags.validate_catalog_topology(
+            day_count,
+            (TemplateFocusTag.FULL_BODY, TemplateFocusTag.BALANCED),
+        )
+
+
+@pytest.mark.parametrize("day_count", (2, 3))
+def test_structural_validator_allows_lower_frequency_full_body(day_count: int) -> None:
+    mixed_day = SimpleNamespace(
+        direct_target_muscles=(MuscleGroup.CHEST, MuscleGroup.QUADRICEPS),
+        slots=(),
+    )
+
+    template_tags.validate_template_focus_tags(
+        (TemplateFocusTag.FULL_BODY,),
+        days=(mixed_day,) * day_count,
+    )
+
+
+def test_structural_validator_allows_valid_four_day_split() -> None:
+    upper = SimpleNamespace(
+        direct_target_muscles=(MuscleGroup.CHEST, MuscleGroup.BACK),
+        slots=(),
+    )
+    lower = SimpleNamespace(
+        direct_target_muscles=(MuscleGroup.QUADRICEPS, MuscleGroup.HAMSTRINGS),
+        slots=(),
+    )
+
+    template_tags.validate_template_focus_tags(
+        (TemplateFocusTag.UPPER_LOWER,),
+        days=(upper, lower, upper, lower),
+    )
+
+
 def test_priority_tags_have_structural_exposure_and_balanced_is_not_priority() -> None:
     for template in TRAINING_PROGRAM_TEMPLATE_SEEDS:
         priority_tags = set(template.focus_tags) & MUSCLE_PRIORITY_TAGS
@@ -272,11 +328,11 @@ def test_priority_tags_have_structural_exposure_and_balanced_is_not_priority() -
 
 
 def test_upper_and_lower_priority_tags_match_the_weekly_layout() -> None:
-    upper = next(
+    upper_templates = [
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
         if TemplateFocusTag.UPPER_PRIORITY in template.focus_tags
-    )
+    ]
     lower = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
@@ -295,9 +351,15 @@ def test_upper_and_lower_priority_tags_match_the_weekly_layout() -> None:
         MuscleGroup.GLUTES,
         MuscleGroup.CALVES,
     }
-    upper_days = sum(bool(set(day.direct_target_muscles) & upper_muscles) for day in upper.days)
+    upper_day_counts = [
+        sum(bool(set(day.direct_target_muscles) & upper_muscles) for day in template.days)
+        for template in upper_templates
+    ]
     lower_days = sum(bool(set(day.direct_target_muscles) & lower_muscles) for day in lower.days)
-    assert upper_days >= 3
+    assert all(
+        upper_days >= (2 if len(template.days) == 3 else 3)
+        for template, upper_days in zip(upper_templates, upper_day_counts, strict=True)
+    )
     assert lower_days >= 2
 
 

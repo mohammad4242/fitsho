@@ -142,26 +142,7 @@ def build_sessions(
             session_reasons = ("DURATION_PLANNED_REDUCED_EXERCISE_COUNT",)
         this_session_relaxed_groups: list[tuple[MovementPattern, ...]] = []
         this_session_relaxed_targets: list[MuscleGroup | None] = []
-        supplemental_options = _supplemental_options(
-            focus,
-            exercises,
-            chosen,
-            priority_policy,
-            usage,
-        )
-        planned_supplemental = bool(
-            supplemental_options
-            and any(
-                item.primary_muscle in priority_policy.supplemental_priorities
-                for item in supplemental_options
-            )
-        )
-        main_capacity = (
-            capacity - 1
-            if planned_supplemental
-            and capacity > min(capacity, ruleset.minimum_exercises_per_session)
-            else capacity
-        )
+        main_capacity = min(capacity, ruleset.preferred_main_exercises_per_session)
         for slot in ordered_slots:
             if len(chosen) >= main_capacity:
                 if slot.required:
@@ -277,8 +258,16 @@ def build_sessions(
             reasons[selected.exercise.id] = tuple(selection_reasons)
             usage[selected.exercise.id] += 1
 
-        while main_exercise_count(chosen) < min(capacity, ruleset.minimum_exercises_per_session):
-            options, comp_levels = _compatible_supplements(focus, exercises, chosen)
+        while main_exercise_count(chosen) < main_capacity:
+            options, comp_levels = _compatible_supplements(
+                focus,
+                exercises,
+                chosen,
+                allow_role_redundancy=(
+                    main_exercise_count(chosen) < ruleset.minimum_exercises_per_session
+                ),
+                role_limit=2 if main_capacity >= 7 else 1,
+            )
             if not options:
                 session_reasons = session_reasons + (
                     "SESSION_MINIMUM_UNSATISFIED_AFTER_SUPPLEMENTS",
@@ -306,8 +295,11 @@ def build_sessions(
             usage[selected.exercise.id] += 1
             session_reasons = session_reasons + ("SESSION_SUPPLEMENTED_TO_MINIMUM",)
 
-        if len(chosen) < capacity and main_exercise_count(chosen) >= min(
-            capacity, ruleset.minimum_exercises_per_session
+        supplemental_count = sum(
+            is_supplemental_muscle(item.primary_muscle) for item in chosen
+        )
+        while supplemental_count < 2 and main_exercise_count(chosen) >= min(
+            main_capacity, ruleset.minimum_exercises_per_session
         ):
             supplemental_options = _supplemental_options(
                 focus,
@@ -342,10 +334,16 @@ def build_sessions(
                     else ()
                 )
                 usage[selected_supplemental.id] += 1
+                supplemental_count += 1
+                if not planned:
+                    break
+            else:
+                break
 
         if request.primary_goal is Goal.STRENGTH:
             chosen.sort(
                 key=lambda item: (
+                    is_supplemental_muscle(item.primary_muscle),
                     ruleset.strength_role_order[
                         classify_strength_role(item, request, ruleset).role.value
                     ],
@@ -356,6 +354,7 @@ def build_sessions(
         else:
             chosen.sort(
                 key=lambda item: (
+                    is_supplemental_muscle(item.primary_muscle),
                     item.primary_muscle not in effective_priorities,
                     _order_rank(item.movement_pattern, ruleset),
                 )
@@ -499,12 +498,23 @@ def _compatible_supplements(
     focus: str,
     exercises: tuple[ExerciseCandidate, ...],
     chosen: list[ExerciseCandidate],
+    *,
+    allow_role_redundancy: bool,
+    role_limit: int,
 ) -> tuple[list[ExerciseCandidate], dict[UUID, CompatibilityLevel]]:
     chosen_ids = {item.id for item in chosen}
     options = []
     levels: dict[UUID, CompatibilityLevel] = {}
     for item in exercises:
-        if item.id not in chosen_ids and not is_supplemental_muscle(item.primary_muscle):
+        if (
+            item.id not in chosen_ids
+            and not is_supplemental_muscle(item.primary_muscle)
+            and (
+                allow_role_redundancy
+                or _role_occurrence_count(item, chosen)
+                < min(role_limit, _session_role_limit(item))
+            )
+        ):
             comp = evaluate_exercise_focus_compatibility(item, focus)
             if comp.compatible:
                 options.append(item)
@@ -538,6 +548,21 @@ def _role_repeated(
         and item.movement_pattern is exercise.movement_pattern
         for item in chosen
     )
+
+
+def _role_occurrence_count(
+    exercise: ExerciseCandidate,
+    chosen: list[ExerciseCandidate],
+) -> int:
+    return sum(
+        item.primary_muscle is exercise.primary_muscle
+        and item.movement_pattern is exercise.movement_pattern
+        for item in chosen
+    )
+
+
+def _session_role_limit(exercise: ExerciseCandidate) -> int:
+    return 1 if exercise.movement_pattern is MovementPattern.SHRUG else 2
 
 
 def _supplement_scope(
@@ -732,7 +757,7 @@ def _supplemental_options(
     usage: Counter[UUID],
 ) -> tuple[ExerciseCandidate, ...]:
     chosen_ids = {item.id for item in chosen}
-    if any(is_supplemental_muscle(item.primary_muscle) for item in chosen):
+    if sum(is_supplemental_muscle(item.primary_muscle) for item in chosen) >= 2:
         return ()
     return tuple(
         item

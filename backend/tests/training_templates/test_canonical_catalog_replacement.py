@@ -77,6 +77,7 @@ REAL_CATALOG_SLUGS = {
     "fedb-0285-seated-alternating-dumbbell-curl",
     "fedb-0298-dumbbell-cross-body-hammer-curl",
     "fedb-0031-barbell-curl",
+    "fedb-0229-cable-standing-inner-curl",
     "fedb-1723-cable-triceps-pushdown",
     "fedb-0200-cable-rope-triceps-pushdown",
     "fedb-0194-cable-rope-overhead-triceps-extension",

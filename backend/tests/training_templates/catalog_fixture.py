@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy.orm import Session
 
@@ -46,6 +47,7 @@ REAL_CATALOG_SLUGS = {
     "fedb-0285-seated-alternating-dumbbell-curl",
     "fedb-0298-dumbbell-cross-body-hammer-curl",
     "fedb-0031-barbell-curl",
+    "fedb-0229-cable-standing-inner-curl",
     "fedb-1723-cable-triceps-pushdown",
     "fedb-0200-cable-rope-triceps-pushdown",
     "fedb-0194-cable-rope-overhead-triceps-extension",
@@ -73,7 +75,7 @@ def _metadata(
             MovementPattern.ELBOW_EXTENSION,
             ExerciseType.ISOLATION,
         )
-    if "curl" in slug or "preacher" in slug:
+    if ("curl" in slug and "leg-curl" not in slug) or "preacher" in slug:
         return (
             MuscleGroup.BICEPS,
             MuscleFocus.GENERAL_BICEPS,
@@ -122,7 +124,14 @@ def _metadata(
             MovementPattern.HIP_EXTENSION,
             ExerciseType.COMPOUND,
         )
-    if "deadlift" in slug or "leg-curl" in slug:
+    if "leg-curl" in slug:
+        return (
+            MuscleGroup.HAMSTRINGS,
+            MuscleFocus.HAMSTRINGS_KNEE_FLEXION,
+            MovementPattern.KNEE_FLEXION,
+            ExerciseType.ISOLATION,
+        )
+    if "deadlift" in slug:
         return (
             MuscleGroup.HAMSTRINGS,
             MuscleFocus.HAMSTRINGS_HIP_EXTENSION,
@@ -159,7 +168,7 @@ def _metadata(
             MuscleGroup.CHEST,
             MuscleFocus.GENERAL_CHEST,
             MovementPattern.HORIZONTAL_PUSH,
-            ExerciseType.COMPOUND,
+            ExerciseType.ISOLATION if "fly" in slug else ExerciseType.COMPOUND,
         )
     raise AssertionError(f"No catalog fixture metadata for {slug}")
 
@@ -172,6 +181,7 @@ def seed_real_catalog_exercises(
         primary_muscle, muscle_focus, movement_pattern, exercise_type = _metadata(slug)
         db.add(
             Exercise(
+                id=uuid5(NAMESPACE_URL, f"https://fitsho.test/catalog/{slug}"),
                 slug=slug,
                 name_en=slug.replace("-", " ").title(),
                 name_fa="حرکت واقعی کتابخانه",

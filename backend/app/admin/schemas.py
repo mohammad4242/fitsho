@@ -29,6 +29,7 @@ from app.exercises.enums import (
 from app.exercises.schemas import ExerciseDetail
 from app.exercises.taxonomy import is_compatible_muscle_focus
 from app.profile.enums import ExperienceLevel, FitnessGoal
+from app.training_templates.catalog_invariants import validate_catalog_topology
 from app.training_templates.models import TrainingTemplateMethod, TrainingTemplateSlotPriority
 from app.training_templates.tags import TemplateFocusTag, validate_template_focus_tags
 from app.workouts.program_engine.enums import (
@@ -83,6 +84,7 @@ class AdminExerciseFilters(BaseModel):
         StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
     ] = None
     is_active: bool | None = None
+    is_programmable: bool | None = None
     needs_review: bool | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
@@ -351,4 +353,29 @@ class AdminTrainingProgramTemplateWrite(BaseModel):
             intensity_methods=self.intensity_methods,
             days=self.days,
         )
+        validate_catalog_topology(self.days_per_week, self.focus_tags)
+        slot_methods = {
+            slot.intensity_method for day in self.days for slot in day.slots
+        }
+        if set(self.intensity_methods) != slot_methods:
+            raise ValueError("Template intensity methods must match configured slot methods")
+        novice_levels = {ExperienceLevel.FIRST_MONTH, ExperienceLevel.BEGINNER}
+        if novice_levels.intersection(self.supported_levels) and slot_methods - {
+            TrainingTemplateMethod.STANDARD
+        }:
+            raise ValueError("First Month and Beginner templates cannot use advanced methods")
+        for day in self.days:
+            groups: dict[str, list[int]] = {}
+            for index, slot in enumerate(day.slots):
+                if slot.intensity_method is TrainingTemplateMethod.SUPERSET:
+                    if slot.superset_group is None:
+                        raise ValueError("Superset slots require a group")
+                    groups.setdefault(slot.superset_group, []).append(index)
+                elif slot.superset_group is not None:
+                    raise ValueError("Only superset slots may declare a superset group")
+            if any(
+                len(indices) != 2 or indices[1] != indices[0] + 1
+                for indices in groups.values()
+            ):
+                raise ValueError("Superset groups must contain one adjacent pair")
         return self

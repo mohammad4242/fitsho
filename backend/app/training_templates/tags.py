@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.exercises.enums import MovementPattern, MuscleGroup
+from app.training_templates.catalog_invariants import validate_catalog_topology
 
 
 class TemplateFocusTag(StrEnum):
@@ -266,6 +267,7 @@ def validate_template_focus_tags(
         raise ValueError(f"Intensity methods cannot be template focus tags: {', '.join(overlap)}")
     day_items = tuple(days)
     if day_items:
+        validate_catalog_topology(len(day_items), canonical)
         _validate_structural_evidence(frozenset(canonical), day_items)
     return canonical
 
@@ -323,8 +325,9 @@ def _validate_structural_evidence(
         bool(muscles & _LOWER_BODY_MUSCLES) and not bool(muscles & _UPPER_BODY_MUSCLES)
         for muscles in direct_muscles
     )
+    minimum_upper_days = 2 if len(days) == 3 else 3
     if TemplateFocusTag.UPPER_PRIORITY in tags and not (
-        upper_days >= 3 and upper_days > lower_days
+        upper_days >= minimum_upper_days and upper_days > lower_days
     ):
         raise ValueError("upper_priority lacks structural evidence")
     if TemplateFocusTag.LOWER_PRIORITY in tags and lower_days < 2:

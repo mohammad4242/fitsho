@@ -1,17 +1,31 @@
 import re
+from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.admin.schemas import AdminTrainingProgramTemplateWrite
-from app.exercises.enums import ExerciseContentType
+from app.exercises.enums import (
+    Equipment,
+    ExerciseContentType,
+    ExerciseType,
+    MovementPattern,
+    MuscleGroup,
+)
 from app.exercises.models import Exercise
+from app.training_templates.catalog_placeholders import TEMPLATE_PLACEHOLDER_SOURCE
 from app.training_templates.models import (
     TrainingProgramTemplate,
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
 )
+from app.workouts.program_engine.enums import LoadLimit
+from app.workouts.program_engine.slot_compatibility import (
+    evaluate_candidate_slot_compatibility,
+    template_slot_allowed_patterns,
+)
+from app.workouts.program_engine.supersets import safe_superset_category
 
 
 class TemplateWriteError(ValueError):
@@ -80,15 +94,100 @@ def _validate_exercise_links(
             select(Exercise).where(
                 Exercise.id.in_(exercise_ids),
                 Exercise.is_active.is_(True),
+                Exercise.is_programmable.is_(True),
                 Exercise.content_type == ExerciseContentType.EXERCISE,
+                or_(
+                    Exercise.source.is_(None),
+                    Exercise.source != TEMPLATE_PLACEHOLDER_SOURCE,
+                ),
+            )
+            .options(
+                selectinload(Exercise.secondary_muscles),
+                selectinload(Exercise.equipment_items),
             )
         )
     )
     active_exercise_ids = {exercise.id for exercise in exercises}
     if inactive_or_unknown := exercise_ids - active_exercise_ids:
         formatted_ids = ", ".join(sorted(str(item) for item in inactive_or_unknown))
-        raise TemplateWriteError(f"Selected exercise is missing or inactive: {formatted_ids}")
+        raise TemplateWriteError(
+            "Selected exercise must exist and be active, programmable, and non-placeholder: "
+            f"{formatted_ids}"
+        )
+    exercises_by_id = {exercise.id: exercise for exercise in exercises}
+    for day in payload.days:
+        superset_groups: dict[str, list[_AdminSupersetExercise]] = {}
+        for slot in day.slots:
+            exercise = exercises_by_id[slot.exercise_id]
+            compatibility = evaluate_candidate_slot_compatibility(
+                _ExerciseSemanticAdapter(exercise),
+                allowed_patterns=template_slot_allowed_patterns(
+                    slot.movement_pattern,
+                    tuple(slot.target_muscles),
+                ),
+                target_muscles=frozenset(slot.target_muscles),
+            )
+            if not compatibility.compatible:
+                raise TemplateWriteError(
+                    "Selected exercise is incompatible with the slot movement or target muscles: "
+                    f"{exercise.slug} ({exercise.id})"
+                )
+            if (
+                slot.intensity_method.value == "drop_set"
+                and exercise.exercise_type is not ExerciseType.ISOLATION
+            ):
+                raise TemplateWriteError(
+                    "Drop-set slots require a stable isolation exercise: "
+                    f"{exercise.slug} ({exercise.id})"
+                )
+            if slot.superset_group is not None:
+                superset_groups.setdefault(slot.superset_group, []).append(
+                    _AdminSupersetExercise.from_slot(exercise, slot.adaptation_priority.value)
+                )
+        for group, pair in superset_groups.items():
+            if len(pair) != 2 or safe_superset_category(pair[0], pair[1]) is None:
+                raise TemplateWriteError(f"Superset pair is unsafe: {group}")
     return {exercise.id: exercise.slug for exercise in exercises}
+
+
+@dataclass(frozen=True)
+class _AdminSupersetExercise:
+    exercise_id: UUID
+    primary_muscle: MuscleGroup | None
+    secondary_muscles: tuple[MuscleGroup, ...]
+    equipment: frozenset[Equipment]
+    exercise_type: ExerciseType
+    axial_loading_level: LoadLimit
+    reason_codes: tuple[str, ...]
+
+    @classmethod
+    def from_slot(cls, exercise: Exercise, adaptation_priority: str) -> "_AdminSupersetExercise":
+        equipment = frozenset(item.equipment for item in exercise.equipment_items)
+        axial_loading = exercise.axial_loading_level
+        if axial_loading is None:
+            axial_loading = (
+                LoadLimit.HIGH
+                if Equipment.BARBELL in equipment
+                and exercise.movement_pattern in {MovementPattern.SQUAT, MovementPattern.HIP_HINGE}
+                else LoadLimit.NONE
+            )
+        return cls(
+            exercise_id=exercise.id,
+            primary_muscle=exercise.primary_muscle,
+            secondary_muscles=tuple(item.muscle for item in exercise.secondary_muscles),
+            equipment=equipment,
+            exercise_type=exercise.exercise_type,
+            axial_loading_level=axial_loading,
+            reason_codes=(f"TEMPLATE_ADAPTATION_PRIORITY:{adaptation_priority}",),
+        )
+
+
+class _ExerciseSemanticAdapter:
+    def __init__(self, exercise: Exercise) -> None:
+        self.movement_pattern = exercise.movement_pattern
+        self.primary_muscle = exercise.primary_muscle
+        self.secondary_muscles = tuple(item.muscle for item in exercise.secondary_muscles)
+        self.exercise_type = exercise.exercise_type
 
 
 def _replace_template_content(

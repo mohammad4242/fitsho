@@ -648,7 +648,9 @@ def test_validator_rejects_session_exercise_counts_outside_the_ruleset(
     result = generate_program(source, catalog(), RULESET)
     assert result.program is not None
     day = result.program.weekly_schedule[0]
-    invalid_exercises = (day.exercises * exercise_count)[:exercise_count]
+    invalid_exercises = tuple(
+        replace(day.exercises[0], order=index + 1) for index in range(exercise_count)
+    )
     invalid_day = replace(day, exercises=invalid_exercises)
     invalid = replace(result.program, weekly_schedule=(invalid_day,))
 

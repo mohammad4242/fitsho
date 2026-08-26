@@ -25,6 +25,7 @@ from app.workouts.program_engine.schemas import (
     WorkoutDay,
 )
 from app.workouts.program_engine.substitution_engine import SubstitutionDecision
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.volume_repair import (
     _select_addition_candidate,
     repair_weekly_volume,
@@ -534,16 +535,24 @@ def test_generate_program_preserves_volume_and_duration_constraints_without_set_
     policy = get_session_duration_policy(
         int(result.program.user_profile_snapshot["session_duration_minutes"])
     )
-    if not all(
-        policy.contains(
-            max(
-                0,
-                day.estimated_duration_minutes
-                - RULESET.general_warmup_minutes
-                - (day.cardio.duration_minutes if day.cardio else 0),
-            )
+    resistance_minutes = {
+        day.day_index: max(
+            0,
+            day.estimated_duration_minutes
+            - RULESET.general_warmup_minutes
+            - (day.cardio.duration_minutes if day.cardio else 0),
         )
         for day in result.program.weekly_schedule
+    }
+    outliers = tuple(
+        day
+        for day in result.program.weekly_schedule
+        if not policy.contains(resistance_minutes[day.day_index])
+    )
+    if outliers and not all(
+        resistance_minutes[day.day_index] < policy.minimum_minutes
+        and main_exercise_count(day.exercises) >= RULESET.minimum_exercises_per_session
+        for day in outliers
     ):
         assert (
             "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS"

@@ -4,7 +4,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
-from app.exercises.models import Exercise
+from app.exercises.enums import Equipment
+from app.exercises.models import Exercise, ExerciseEquipment
 from app.exercises.service import seed_exercises
 from app.training_templates.engine_reference import load_template_references
 from app.training_templates.models import TrainingProgramTemplate, TrainingProgramTemplateDay
@@ -20,7 +21,7 @@ def _register(client: TestClient, email: str) -> None:
         headers=ORIGIN,
         json={"email": email, "password": "long password"},
     )
-    assert response.status_code == 201
+    assert response.status_code == 201, response.json()
 
 
 def _seed_library(db: Session) -> None:
@@ -54,7 +55,7 @@ def test_admin_lists_complete_four_day_template_details(client: TestClient, db: 
 
     response = client.get("/api/v1/admin/training-program-templates?days_per_week=4")
 
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     templates = response.json()["items"]
     assert len(templates) == 4
     classic = next(item for item in templates if item["slug"] == "t05-4-day-upper-lower-2x")
@@ -74,7 +75,7 @@ def test_admin_lists_complete_four_day_template_details(client: TestClient, db: 
         "پایین‌تنه B",
     ]
     first_slot = classic["days"][0]["slots"][0]
-    assert first_slot["exercise"]["slug"] == "fedb-0025-barbell-bench-press"
+    assert first_slot["exercise"]["slug"] == "fedb-0577-lever-lying-chest-press"
     assert all(
         slot["exercise"] is not None
         and slot["placeholder_name_en"] is None
@@ -121,35 +122,26 @@ def test_admin_creates_a_complete_multi_level_template_with_shared_content(
 ) -> None:
     _seed_library(db)
     _make_current_user_admin(client, db)
-    exercise_id = client.get("/api/v1/admin/exercises?search=bench").json()["items"][0]["id"]
+    payload = _template_payload_for_catalog(db)
 
     response = client.post(
         "/api/v1/admin/training-program-templates",
         headers=ORIGIN,
         json={
-            "name_en": "Admin Four Day Program",
-            "name_fa": "برنامه چهارروزه ادمین",
-            "description_en": "A configurable four-day reference program.",
-            "description_fa": "برنامه مرجع چهارروزه قابل تنظیم.",
-            "days_per_week": 4,
+            **payload,
+            "name_en": "Admin Shared Program",
+            "name_fa": "برنامه مشترک ادمین",
             "supported_levels": ["first_month", "intermediate"],
-            "fitness_goal": "build_muscle",
-            "focus_tags": ["full_body", "balanced"],
-            "intensity_methods": ["standard"],
-            "programming_rationale": _rationale_payload(),
-            "source_name": "Fitsho admin library",
-            "source_url": "https://fitsho.local/admin-library",
-            "days": [_day_payload(day, exercise_id) for day in range(1, 5)],
         },
     )
 
     assert response.status_code == 201
     created = response.json()
-    assert created["slug"] == "admin-four-day-program"
+    assert created["slug"] == "admin-shared-program"
     assert created["supported_levels"] == ["first_month", "intermediate"]
-    assert len(created["days"]) == 4
+    assert len(created["days"]) == 2
     assert len(created["days"][0]["slots"]) == 5
-    assert created["days"][0]["slots"][0]["exercise"]["id"] == exercise_id
+    assert created["days"][0]["slots"][0]["exercise"]["slug"] == "fedb-0025-barbell-bench-press"
     created_references = [
         reference for reference in load_template_references(db) if reference.slug == created["slug"]
     ]
@@ -225,7 +217,8 @@ def test_admin_update_replaces_removed_slots_and_keeps_catalog_exercise_link(
                 "structure_focus": day["structure_focus"],
                 "direct_target_muscles": day["direct_target_muscles"],
                 "slots": [
-                    _slot_payload(first_slot, display_name_fa="پرس سینه انتخابی") for _ in range(5)
+                    _slot_payload(slot, display_name_fa="پرس سینه انتخابی" if index == 0 else None)
+                    for index, slot in enumerate(day["slots"][:5])
                 ]
                 if day["day_number"] == 1
                 else [_slot_payload(slot) for slot in day["slots"][:5]],
@@ -240,7 +233,7 @@ def test_admin_update_replaces_removed_slots_and_keeps_catalog_exercise_link(
         json=payload,
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     first_day = response.json()["days"][0]
     assert len(first_day["slots"]) == 5
     assert first_day["slots"][0]["placeholder_name_fa"] == "پرس سینه انتخابی"
@@ -367,6 +360,97 @@ def test_admin_accepts_compatible_template_exercises(client: TestClient, db: Ses
     assert response.status_code == 201
 
 
+def test_admin_rejects_drop_set_on_compound_exercise(client: TestClient, db: Session) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    payload = _template_payload_for_catalog(db)
+    payload["supported_levels"] = ["advanced"]
+    payload["intensity_methods"] = ["standard", "drop_set"]
+    payload["days"][0]["slots"][0]["intensity_method"] = "drop_set"
+
+    response = client.post(
+        "/api/v1/admin/training-program-templates",
+        headers=ORIGIN,
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    assert "Drop-set slots require" in response.json()["detail"][0]["msg"]
+
+
+def test_admin_rejects_unsafe_superset_pair(client: TestClient, db: Session) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    payload = _template_payload_for_catalog(db)
+    payload["supported_levels"] = ["advanced"]
+    payload["intensity_methods"] = ["standard", "superset"]
+    for slot in payload["days"][0]["slots"][:2]:
+        slot["intensity_method"] = "superset"
+        slot["superset_group"] = "unsafe-compounds"
+
+    response = client.post(
+        "/api/v1/admin/training-program-templates",
+        headers=ORIGIN,
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    assert "Superset pair is unsafe" in response.json()["detail"][0]["msg"]
+
+
+def test_admin_accepts_safe_advanced_methods(client: TestClient, db: Session) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    payload = _template_payload_for_catalog(db)
+    payload["supported_levels"] = ["advanced"]
+    payload["intensity_methods"] = ["standard", "superset", "drop_set"]
+    curl_id = db.scalar(
+        select(Exercise.id).where(Exercise.slug == "fedb-0229-cable-standing-inner-curl")
+    )
+    pushdown_id = db.scalar(
+        select(Exercise.id).where(Exercise.slug == "fedb-1723-cable-triceps-pushdown")
+    )
+    lateral_raise_id = db.scalar(
+        select(Exercise.id).where(Exercise.slug == "fedb-0178-cable-lateral-raise")
+    )
+    assert curl_id is not None and pushdown_id is not None and lateral_raise_id is not None
+    for exercise_id in (curl_id, pushdown_id, lateral_raise_id):
+        db.add(ExerciseEquipment(exercise_id=exercise_id, equipment=Equipment.CABLE))
+    db.flush()
+    first, second, third = payload["days"][0]["slots"][:3]
+    first.update(
+        exercise_id=str(curl_id),
+        target_muscles=["biceps"],
+        movement_pattern="elbow_flexion",
+        intensity_method="superset",
+        adaptation_priority="accessory",
+        superset_group="arms-pair",
+    )
+    second.update(
+        exercise_id=str(pushdown_id),
+        target_muscles=["triceps"],
+        movement_pattern="elbow_extension",
+        intensity_method="superset",
+        adaptation_priority="accessory",
+        superset_group="arms-pair",
+    )
+    third.update(
+        exercise_id=str(lateral_raise_id),
+        target_muscles=["shoulders"],
+        movement_pattern="shoulder_abduction",
+        intensity_method="drop_set",
+        adaptation_priority="accessory",
+    )
+
+    response = client.post(
+        "/api/v1/admin/training-program-templates",
+        headers=ORIGIN,
+        json=payload,
+    )
+
+    assert response.status_code == 201, response.json()
+
+
 def test_admin_rejects_conflicting_canonical_template_tags(
     client: TestClient,
     db: Session,
@@ -443,7 +527,10 @@ def _rationale_payload() -> list[dict[str, str]]:
     ]
 
 
-def _template_payload_for_catalog(db: Session, first_exercise_id: str | None = None) -> dict[str, object]:
+def _template_payload_for_catalog(
+    db: Session,
+    first_exercise_id: str | None = None,
+) -> dict[str, object]:
     slugs = (
         "fedb-0025-barbell-bench-press",
         "owner-e0c26a271aac-barbell-bent-over-row",

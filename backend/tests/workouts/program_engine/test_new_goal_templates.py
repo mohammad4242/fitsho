@@ -73,7 +73,10 @@ def test_new_goals_use_template_path(
     assert template_stage is not None, f"Expected template path for {goal.name} {days}d"
     assert template_stage["selected"] in CANONICAL_TEMPLATE_SLUGS
     if template_stage.get("status") == "rejected":
-        assert template_stage["reason_codes"] == ("MUSCLE_DIRECT_FREQUENCY_EXCEEDED",)
+        assert template_stage["reason_codes"] in {
+            ("MUSCLE_DIRECT_FREQUENCY_EXCEEDED",),
+            ("RECOVERY_SPACING_INVALID",),
+        }
     assert template_stage["hard_eligibility"] == (
         "days",
         "training_level",

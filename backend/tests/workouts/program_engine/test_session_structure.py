@@ -35,6 +35,7 @@ from app.workouts.program_engine.session_structure import (
 )
 from app.workouts.program_engine.split_selector import select_split
 from app.workouts.program_engine.supersets import apply_duration_pressure_superset
+from app.workouts.program_engine.supplemental_policy import is_supplemental_muscle
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
@@ -635,6 +636,115 @@ def test_malformed_strict_block_and_supplemental_tail_are_rejected() -> None:
     assert "SUPPLEMENTAL_WORK_NOT_AT_SESSION_END" in session_structure_errors(
         _day("pull", (forearms, row)), Goal.HYPERTROPHY
     )
+
+
+@pytest.mark.parametrize("supplemental_count", (0, 1, 2))
+def test_zero_to_two_supplemental_exercises_are_valid_and_last(
+    supplemental_count: int,
+) -> None:
+    row = _programmed(
+        "Row",
+        MuscleGroup.BACK,
+        ExerciseType.COMPOUND,
+        pattern=MovementPattern.HORIZONTAL_PULL,
+        order=1,
+    )
+    supplemental = (
+        _programmed(
+            "Wrist Curl",
+            MuscleGroup.FOREARMS,
+            ExerciseType.ISOLATION,
+            pattern=MovementPattern.ELBOW_FLEXION,
+            order=2,
+        ),
+        _programmed(
+            "Ab Crunch",
+            MuscleGroup.ABS,
+            ExerciseType.CORE,
+            pattern=MovementPattern.CORE_ANTI_EXTENSION,
+            order=3,
+        ),
+    )
+    exercises = (row, *supplemental[:supplemental_count])
+
+    assert session_structure_errors(_day("pull", exercises), Goal.HYPERTROPHY) == ()
+    if supplemental_count:
+        assert all(
+            is_supplemental_muscle(item.primary_muscle)
+            for item in exercises[-supplemental_count:]
+        )
+
+
+def test_three_supplemental_exercises_are_invalid() -> None:
+    row = _programmed(
+        "Row",
+        MuscleGroup.BACK,
+        ExerciseType.COMPOUND,
+        pattern=MovementPattern.HORIZONTAL_PULL,
+        order=1,
+    )
+    exercises = (
+        row,
+        _programmed(
+            "Wrist Curl",
+            MuscleGroup.FOREARMS,
+            ExerciseType.ISOLATION,
+            pattern=MovementPattern.ELBOW_FLEXION,
+            order=2,
+        ),
+        _programmed(
+            "Ab Crunch",
+            MuscleGroup.ABS,
+            ExerciseType.CORE,
+            pattern=MovementPattern.CORE_ANTI_EXTENSION,
+            order=3,
+        ),
+        _programmed(
+            "Neck Curl",
+            MuscleGroup.NECK,
+            ExerciseType.ISOLATION,
+            pattern=MovementPattern.SHRUG,
+            order=4,
+        ),
+    )
+
+    assert "SUPPLEMENTAL_EXERCISE_LIMIT_EXCEEDED" in session_structure_errors(
+        _day("pull", exercises), Goal.HYPERTROPHY
+    )
+
+
+def test_eight_main_and_two_supplemental_report_eight_main_and_keep_tail() -> None:
+    main = tuple(
+        _programmed(
+            f"Main {index}",
+            MuscleGroup.BACK,
+            ExerciseType.COMPOUND,
+            pattern=MovementPattern.HORIZONTAL_PULL,
+            order=index,
+        )
+        for index in range(1, 9)
+    )
+    supplements = (
+        _programmed(
+            "Wrist Curl",
+            MuscleGroup.FOREARMS,
+            ExerciseType.ISOLATION,
+            pattern=MovementPattern.ELBOW_FLEXION,
+            order=9,
+        ),
+        _programmed(
+            "Ab Crunch",
+            MuscleGroup.ABS,
+            ExerciseType.CORE,
+            pattern=MovementPattern.CORE_ANTI_EXTENSION,
+            order=10,
+        ),
+    )
+    exercises = (*main, *supplements)
+
+    assert main_exercise_count(exercises) == 8
+    assert session_structure_errors(_day("full_body", exercises), Goal.HYPERTROPHY) == ()
+    assert all(is_supplemental_muscle(item.primary_muscle) for item in exercises[-2:])
 
 
 def test_validator_rejects_malformed_final_muscle_block() -> None:

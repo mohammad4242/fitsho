@@ -119,7 +119,7 @@ def validate_program(
                 warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
             else:
                 errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-        elif len(day.exercises) > ruleset.max_exercises_per_session:
+        elif exercise_count > ruleset.max_exercises_per_session:
             errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
 
         # ------------------------------------------------------------------

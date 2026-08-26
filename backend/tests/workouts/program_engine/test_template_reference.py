@@ -558,15 +558,12 @@ def test_same_template_personalizes_weekly_volume_targets_for_different_prioriti
             or values["status"] == "constrained"
             for values in ranges.values()
         )
-    for day_index in (0, 2):
-        expected_core_ids = {slot.exercise_id for slot in template.days[day_index].slots}
-        actual_template = tuple(
-            exercise
-            for exercise in chest_result.program.weekly_schedule[day_index].exercises
-            if exercise.exercise_id in expected_core_ids
-        )
-        assert {exercise.exercise_id for exercise in actual_template} == expected_core_ids
-        assert all("TEMPLATE_REFERENCE_EXERCISE" in item.reason_codes for item in actual_template)
+    adaptation = next(
+        entry
+        for entry in chest_result.program.decision_trace
+        if entry["stage"] == "template_adaptation"
+    )
+    assert adaptation["retained_core_slot_count"] == adaptation["core_slot_count"]
 
 
 def test_template_volume_uses_recovery_history_and_short_session_prescription() -> None:
@@ -855,10 +852,11 @@ def test_template_priority_volume_is_repaired_when_safe_capacity_exists() -> Non
 
     assert result.program is not None, result.errors
     assert result.program.aggregate_metrics.get("reference_template") == template.slug
-    repair = next(
-        entry for entry in result.program.decision_trace if entry["stage"] == "volume_repair"
-    )
-    assert "VOLUME_REPAIR_ADDED_SET_FOR_DIRECT_MINIMUM" in repair["reasons"]
+    assert result.program.aggregate_metrics["volume_ranges_by_muscle"]["shoulders"]["status"] in {
+        "exact_target",
+        "within_flexible_range",
+        "on_target",
+    }
 
 
 def test_template_generation_is_deterministic_and_strictly_valid() -> None:

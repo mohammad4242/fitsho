@@ -44,7 +44,7 @@ from app.profile.enums import (
 from app.profile.service import ProfileSnapshot
 from app.training_templates.engine_reference import load_template_references
 from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS
-from app.training_templates.service import seed_training_program_templates
+from app.training_templates.service import upgrade_training_program_template_catalog
 from app.workouts.program_engine.duration_policy import (
     OFFICIAL_SESSION_DURATIONS,
     get_session_duration_policy,
@@ -514,8 +514,8 @@ def canonical_fingerprint(result: ProgramGenerationResult) -> str:
 
 
 def _prepare_template_library(db: Session) -> tuple[TemplateReference, ...]:
-    """Reseed and fail if active templates differ from the production seed intent."""
-    seed_training_program_templates(db)
+    """Explicitly upgrade and fail if active templates differ from catalog intent."""
+    upgrade_training_program_template_catalog(db)
     references = load_template_references(db)
     actual_slugs = tuple(sorted(item.slug for item in references))
     if actual_slugs != EXPECTED_TEMPLATE_SLUGS:

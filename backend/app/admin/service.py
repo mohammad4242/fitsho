@@ -197,6 +197,8 @@ def list_admin_exercises(
         conditions.extend(normal_catalog_exclusion_conditions())
     if filters.is_active is not None:
         conditions.append(Exercise.is_active.is_(filters.is_active))
+    if filters.is_programmable is not None:
+        conditions.append(Exercise.is_programmable.is_(filters.is_programmable))
     if filters.needs_review is not None:
         conditions.append(Exercise.needs_review.is_(filters.needs_review))
     if filters.search is not None:

@@ -36,6 +36,7 @@ from app.workouts.program_engine.schemas import (
 )
 from app.workouts.program_engine.session_builder import SessionConstructionError, build_sessions
 from app.workouts.program_engine.split_selector import generate_split_candidates, select_split
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 
 
@@ -594,7 +595,7 @@ def test_short_session_keeps_the_minimum_exercise_count() -> None:
 
     sessions = build_sessions(request, split, volume, eligible, RULESET)
 
-    assert len(sessions[0].exercises) == RULESET.minimum_exercises_per_session
+    assert main_exercise_count(sessions[0].exercises) == RULESET.minimum_exercises_per_session
     assert "SESSION_TRIMMED_FOR_TIME_LIMIT" in sessions[0].reason_codes
 
 

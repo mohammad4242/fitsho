@@ -1,16 +1,18 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.exercises.enums import ExerciseContentType
 from app.exercises.models import Exercise
 from app.profile.enums import ExperienceLevel
+from app.training_templates.catalog_invariants import validate_catalog_topology
 from app.training_templates.models import (
     TrainingProgramTemplate,
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
+    TrainingTemplateCatalogState,
 )
 from app.training_templates.seed_data import (
     LEGACY_SOURCE_NAME,
@@ -18,6 +20,7 @@ from app.training_templates.seed_data import (
     SOURCE_NAME,
     SOURCE_URL,
     TRAINING_PROGRAM_TEMPLATE_SEEDS,
+    TrainingProgramTemplateSeed,
 )
 
 
@@ -28,7 +31,12 @@ class TrainingTemplateSeedResult:
     placeholder_slots: int
 
 
+_CATALOG_STATE_KEY = "canonical"
+_CATALOG_REVISION = 2
+
+
 def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
+    """Create the initial catalog once; normal reseeds preserve all Admin changes."""
     db.execute(
         delete(TrainingProgramTemplate).where(
             TrainingProgramTemplate.source_name == LEGACY_SOURCE_NAME,
@@ -36,6 +44,42 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
         )
     )
     db.flush()
+    if db.get(TrainingTemplateCatalogState, _CATALOG_STATE_KEY) is not None:
+        db.commit()
+        return _current_seed_result(db)
+
+    _sync_canonical_catalog(db, replace_existing=False)
+    db.add(
+        TrainingTemplateCatalogState(
+            key=_CATALOG_STATE_KEY,
+            catalog_revision=_CATALOG_REVISION,
+        )
+    )
+    db.commit()
+    return _current_seed_result(db)
+
+
+def upgrade_training_program_template_catalog(db: Session) -> TrainingTemplateSeedResult:
+    """Explicitly replace the managed catalog with the current approved revision."""
+    _sync_canonical_catalog(db, replace_existing=True)
+    state = db.get(TrainingTemplateCatalogState, _CATALOG_STATE_KEY)
+    if state is None:
+        db.add(
+            TrainingTemplateCatalogState(
+                key=_CATALOG_STATE_KEY,
+                catalog_revision=_CATALOG_REVISION,
+            )
+        )
+    else:
+        state.catalog_revision = _CATALOG_REVISION
+    db.commit()
+    return _current_seed_result(db)
+
+
+def _sync_canonical_catalog(db: Session, *, replace_existing: bool) -> None:
+    for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS:
+        validate_catalog_topology(seed.days_per_week, seed.focus_tags)
+
     exercises_by_slug = {
         exercise.slug: exercise
         for exercise in db.scalars(
@@ -43,12 +87,13 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
                 Exercise.content_type == ExerciseContentType.EXERCISE,
                 Exercise.is_active.is_(True),
                 Exercise.is_programmable.is_(True),
-                Exercise.source != "fitsho_training_template",
+                or_(
+                    Exercise.source.is_(None),
+                    Exercise.source != "fitsho_training_template",
+                ),
             )
         )
     }
-    linked_slots = 0
-    placeholder_slots = 0
     existing_templates = list(
         db.scalars(
             select(TrainingProgramTemplate).options(
@@ -62,84 +107,112 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
         template.slug: template for template in existing_templates
     }
     seeded_slugs = {seed.slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS}
-    for existing_template in existing_templates:
-        if (
-            existing_template.source_name == SOURCE_NAME
-            and existing_template.source_url == SOURCE_URL
-            and existing_template.slug not in seeded_slugs
-        ):
-            existing_template.is_active = False
+    if replace_existing:
+        db.execute(
+            delete(TrainingProgramTemplate).where(
+                TrainingProgramTemplate.source_name == SOURCE_NAME,
+                TrainingProgramTemplate.source_url == SOURCE_URL,
+                TrainingProgramTemplate.slug.not_in(seeded_slugs),
+            )
+        )
     for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS:
         template = templates_by_slug.get(seed.slug)
         if template is None:
             template = TrainingProgramTemplate(slug=seed.slug)
             db.add(template)
             templates_by_slug[seed.slug] = template
-        else:
+        elif replace_existing:
             template.days.clear()
+            db.flush()
+        else:
+            continue
 
-        template.name_en = seed.name_en
-        template.name_fa = seed.name_fa
-        template.description_en = seed.description_en
-        template.description_fa = seed.description_fa
-        template.days_per_week = seed.days_per_week
-        template.supported_levels = [level.value for level in seed.supported_levels]
-        template.fitness_goal = seed.fitness_goal
-        template.focus_tags = [tag.value for tag in seed.focus_tags]
-        template.intensity_methods = [method.value for method in seed.intensity_methods]
-        template.programming_rationale = [
-            {
-                "title_en": rationale.title_en,
-                "title_fa": rationale.title_fa,
-                "detail_en": rationale.detail_en,
-                "detail_fa": rationale.detail_fa,
-            }
-            for rationale in seed.programming_rationale
-        ]
-        template.source_name = SOURCE_NAME
-        template.source_url = SOURCE_URL
-        template.is_active = seed.is_active
+        _write_template(template, seed, exercises_by_slug)
 
     db.flush()
 
-    for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS:
-        template = templates_by_slug[seed.slug]
 
-        for day_number, day_seed in enumerate(seed.days, start=1):
-            day = TrainingProgramTemplateDay(
-                day_number=day_number,
-                title_en=day_seed.title_en,
-                title_fa=day_seed.title_fa,
-                structure_focus=day_seed.structure_focus,
-                direct_target_muscles=[muscle.value for muscle in day_seed.direct_target_muscles],
-            )
-            template.days.append(day)
-            for slot_order, slot_seed in enumerate(day_seed.slots, start=1):
-                exercise_id = _exercise_id_for_slot(slot_seed.catalog_slug_hints, exercises_by_slug)
-                linked_slots += 1
-                day.slots.append(
-                    TrainingProgramTemplateSlot(
-                        slot_order=slot_order,
-                        exercise_id=exercise_id,
-                        exercise_slug_hint=slot_seed.exercise_slug_hint,
-                        placeholder_name_en=slot_seed.placeholder_name_en,
-                        placeholder_name_fa=slot_seed.placeholder_name_fa,
-                        target_muscles=[muscle.value for muscle in slot_seed.target_muscles],
-                        movement_pattern=slot_seed.movement_pattern,
-                        intensity_method=slot_seed.intensity_method,
-                        adaptation_priority=slot_seed.adaptation_priority,
-                        superset_group=slot_seed.superset_group,
-                        sets=slot_seed.sets,
-                        rep_min=slot_seed.rep_min,
-                        rep_max=slot_seed.rep_max,
-                        target_rir=slot_seed.target_rir,
-                        rest_seconds=slot_seed.rest_seconds,
-                    )
+def _write_template(
+    template: TrainingProgramTemplate,
+    seed: TrainingProgramTemplateSeed,
+    exercises_by_slug: dict[str, Exercise],
+) -> None:
+    template.name_en = seed.name_en
+    template.name_fa = seed.name_fa
+    template.description_en = seed.description_en
+    template.description_fa = seed.description_fa
+    template.days_per_week = seed.days_per_week
+    template.supported_levels = [level.value for level in seed.supported_levels]
+    template.fitness_goal = seed.fitness_goal
+    template.focus_tags = [tag.value for tag in seed.focus_tags]
+    template.intensity_methods = [method.value for method in seed.intensity_methods]
+    template.programming_rationale = [
+        {
+            "title_en": rationale.title_en,
+            "title_fa": rationale.title_fa,
+            "detail_en": rationale.detail_en,
+            "detail_fa": rationale.detail_fa,
+        }
+        for rationale in seed.programming_rationale
+    ]
+    template.source_name = SOURCE_NAME
+    template.source_url = SOURCE_URL
+    template.is_active = seed.is_active
+    for day_number, day_seed in enumerate(seed.days, start=1):
+        day = TrainingProgramTemplateDay(
+            day_number=day_number,
+            title_en=day_seed.title_en,
+            title_fa=day_seed.title_fa,
+            structure_focus=day_seed.structure_focus,
+            direct_target_muscles=[muscle.value for muscle in day_seed.direct_target_muscles],
+        )
+        template.days.append(day)
+        for slot_order, slot_seed in enumerate(day_seed.slots, start=1):
+            exercise_id = _exercise_id_for_slot(slot_seed.catalog_slug_hints, exercises_by_slug)
+            day.slots.append(
+                TrainingProgramTemplateSlot(
+                    slot_order=slot_order,
+                    exercise_id=exercise_id,
+                    exercise_slug_hint=slot_seed.exercise_slug_hint,
+                    placeholder_name_en=slot_seed.placeholder_name_en,
+                    placeholder_name_fa=slot_seed.placeholder_name_fa,
+                    target_muscles=[muscle.value for muscle in slot_seed.target_muscles],
+                    movement_pattern=slot_seed.movement_pattern,
+                    intensity_method=slot_seed.intensity_method,
+                    adaptation_priority=slot_seed.adaptation_priority,
+                    superset_group=slot_seed.superset_group,
+                    sets=slot_seed.sets,
+                    rep_min=slot_seed.rep_min,
+                    rep_max=slot_seed.rep_max,
+                    target_rir=slot_seed.target_rir,
+                    rest_seconds=slot_seed.rest_seconds,
                 )
+            )
 
-    db.commit()
+def _current_seed_result(db: Session) -> TrainingTemplateSeedResult:
+    seeded_slugs = tuple(seed.slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS)
+    template_filter = TrainingProgramTemplate.slug.in_(seeded_slugs)
+    templates = (
+        db.scalar(
+            select(func.count()).select_from(TrainingProgramTemplate).where(template_filter)
+        )
+        or 0
+    )
+    slot_statement = (
+        select(func.count())
+        .select_from(TrainingProgramTemplateSlot)
+        .join(TrainingProgramTemplateDay)
+        .join(TrainingProgramTemplate)
+        .where(template_filter)
+    )
+    linked_slots = db.scalar(
+        slot_statement.where(TrainingProgramTemplateSlot.exercise_id.is_not(None))
+    ) or 0
+    placeholder_slots = db.scalar(
+        slot_statement.where(TrainingProgramTemplateSlot.exercise_id.is_(None))
+    ) or 0
     return TrainingTemplateSeedResult(
-        templates=len(TRAINING_PROGRAM_TEMPLATE_SEEDS),
+        templates=templates,
         linked_slots=linked_slots,
         placeholder_slots=placeholder_slots,
     )

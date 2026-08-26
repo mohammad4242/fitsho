@@ -151,6 +151,7 @@ export type AdminExerciseFilters = {
   exercise_type?: ExerciseType | "";
   labels?: ExerciseLabel[];
   is_active?: boolean | "";
+  is_programmable?: boolean | "";
   needs_review?: boolean | "";
   search?: string;
   page?: number;

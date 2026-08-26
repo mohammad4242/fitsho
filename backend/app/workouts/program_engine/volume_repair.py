@@ -30,6 +30,7 @@ from app.workouts.program_engine.substitution_engine import (
     rank_substitutions,
 )
 from app.workouts.program_engine.substitution_policy import SubstitutionCause
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.template_sessions import adaptation_preservation_rank
 
 _HARD_MOVEMENT_PATTERN_GROUPS = (
@@ -470,6 +471,11 @@ def _select_exercise_addition(
             )
         for ranked in rank_exercises(request, muscle_candidates, ruleset, needed_muscle=muscle):
             candidate = ranked.exercise
+            template_has_target_day = any(
+                candidate.primary_muscle in original.template_target_muscles
+                for original in originals
+                if original.focus.startswith("template_reference")
+            )
             repeated_exercise = candidate.id in selected_ids
             required_sets = (
                 targets[muscle].minimum_direct_sets - current_direct_sets.get(muscle.value, 0)
@@ -497,11 +503,22 @@ def _select_exercise_addition(
             )
             estimated = estimate_exercise_minutes(sets, prescription.rest_seconds, 0, ruleset)
             for day_index, (day, original) in enumerate(zip(days, originals, strict=True)):
-                if len(day) >= ruleset.max_exercises_per_session:
+                if main_exercise_count(day) >= ruleset.max_exercises_per_session:
                     continue
                 if any(item.exercise_id == candidate.id for item in day):
                     continue
-                if not exercise_fits_focus(candidate, original.focus):
+                if original.focus.startswith("template_reference"):
+                    if (
+                        template_has_target_day
+                        and candidate.primary_muscle not in original.template_target_muscles
+                        and not (
+                            use_hard_maximums
+                            and candidate.primary_muscle
+                            in priority_policy.explicit_priorities
+                        )
+                    ):
+                        continue
+                elif not exercise_fits_focus(candidate, original.focus):
                     continue
                 direct_by_session = _direct_sets([day])
                 session_overage = (

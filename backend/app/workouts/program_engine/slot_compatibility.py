@@ -123,14 +123,11 @@ def is_candidate_compatible_with_slot(
 
 
 def _looks_cross_region_compound(candidate: SemanticCandidate) -> bool:
-    upper = {
+    upper_prime_movers = {
         MuscleGroup.CHEST,
-        MuscleGroup.BACK,
         MuscleGroup.SHOULDERS,
         MuscleGroup.BICEPS,
         MuscleGroup.TRICEPS,
-        MuscleGroup.TRAPS,
-        MuscleGroup.FOREARMS,
     }
     lower = {
         MuscleGroup.GLUTES,
@@ -143,8 +140,14 @@ def _looks_cross_region_compound(candidate: SemanticCandidate) -> bool:
     }
     muscles = set(candidate.secondary_muscles)
     if candidate.primary_muscle in lower:
-        return candidate.exercise_type is ExerciseType.COMPOUND and bool(muscles & upper)
-    if candidate.primary_muscle in upper:
+        return candidate.exercise_type is ExerciseType.COMPOUND and bool(
+            muscles & upper_prime_movers
+        )
+    if candidate.primary_muscle in upper_prime_movers | {
+        MuscleGroup.BACK,
+        MuscleGroup.TRAPS,
+        MuscleGroup.FOREARMS,
+    }:
         return candidate.exercise_type is ExerciseType.COMPOUND and bool(muscles & lower)
     return False
 

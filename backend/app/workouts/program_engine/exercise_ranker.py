@@ -11,6 +11,7 @@ from app.workouts.program_engine.enums import (
     StabilityDemand,
     TrainingStatus,
 )
+from app.workouts.program_engine.level_palette import level_palette_score
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -104,6 +105,9 @@ def rank_exercises(
         if request.primary_goal in {Goal.HYPERTROPHY, Goal.MUSCLE_GAIN}:
             score += weights["goal_specificity"] - exercise.fatigue_cost
             reasons.append("HIGH_STIMULUS_LOW_FATIGUE")
+        palette = level_palette_score(request, exercise)
+        score += palette.adjustment
+        reasons.extend(palette.reason_codes)
         score += max(0, weights["time_efficiency"] - exercise.setup_cost)
         reasons.extend(("EQUIPMENT_MATCH", "TIME_EFFICIENT"))
 

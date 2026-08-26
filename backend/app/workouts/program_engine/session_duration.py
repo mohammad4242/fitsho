@@ -78,7 +78,13 @@ def repair_session_durations(
                 if day_capacity is not None
                 else ruleset.minimum_exercises_per_session
             )
-            planned_minimum_exercises = capacity_floor
+            planned_minimum_exercises = (
+                3
+                if prefer_acceptable_volume_for_minimum_fill
+                and volume is not None
+                and _duration_shortfall_is_hard_constrained(request, volume)
+                else capacity_floor
+            )
         else:
             # 45+ min: duration alone MUST NOT reduce below 5
             planned_minimum_exercises = ruleset.minimum_exercises_per_session
@@ -230,15 +236,22 @@ def _select_exercise_addition(
     prefer_acceptable_volume_for_minimum_fill: bool,
     minimum_exercises: int,
 ) -> ProgrammedExercise | None:
-    if len(exercises) >= ruleset.max_exercises_per_session:
+    if main_exercise_count(exercises) >= ruleset.max_exercises_per_session:
         return None
     existing_ids = {item.exercise_id for item in exercises}
+    template_muscles = frozenset(day.template_target_muscles).union(
+        item.primary_muscle for item in exercises if item.primary_muscle is not None
+    )
     options = tuple(
         item
         for item in candidates
         if item.id not in existing_ids
         and not is_supplemental_muscle(item.primary_muscle)
-        and exercise_fits_focus(item, day.focus)
+        and (
+            item.primary_muscle in template_muscles
+            if day.focus.startswith("template_reference") and template_muscles
+            else exercise_fits_focus(item, day.focus)
+        )
         and _candidate_is_safe(item, request)
         and ExerciseLabel.CARDIO not in item.labels
     )

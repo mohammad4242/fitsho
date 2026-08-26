@@ -116,12 +116,20 @@ export function ExerciseLibraryPickerModal({
     setExercisesLoading(true);
 
     const filters = isSearching
-      ? { search: debouncedSearch, is_active: true, page_size: 30 }
+      ? {
+          search: debouncedSearch,
+          content_type: "exercise" as const,
+          is_active: true,
+          is_programmable: true,
+          page_size: 30,
+        }
       : {
+          content_type: "exercise" as const,
           body_region: selectedRegion ?? undefined,
           primary_muscle: selectedMuscle ?? undefined,
           muscle_focus: selectedFocus ?? undefined,
           is_active: true,
+          is_programmable: true,
           page_size: 50,
         };
 

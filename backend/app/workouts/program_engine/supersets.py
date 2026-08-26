@@ -1,5 +1,7 @@
 from dataclasses import replace
 from math import ceil
+from typing import Protocol
+from uuid import UUID
 
 from app.exercises.enums import Equipment, ExerciseType, MuscleGroup
 from app.workouts.program_engine.enums import LoadLimit
@@ -26,6 +28,29 @@ _UPPER_BODY_MUSCLES = frozenset(
         MuscleGroup.FOREARMS,
     }
 )
+
+
+class SupersetExercise(Protocol):
+    @property
+    def exercise_id(self) -> UUID: ...
+
+    @property
+    def primary_muscle(self) -> MuscleGroup | None: ...
+
+    @property
+    def secondary_muscles(self) -> tuple[MuscleGroup, ...]: ...
+
+    @property
+    def equipment(self) -> frozenset[Equipment]: ...
+
+    @property
+    def exercise_type(self) -> ExerciseType: ...
+
+    @property
+    def axial_loading_level(self) -> LoadLimit: ...
+
+    @property
+    def reason_codes(self) -> tuple[str, ...]: ...
 
 
 def apply_template_supersets(
@@ -157,8 +182,8 @@ def apply_duration_pressure_superset(
 
 
 def safe_superset_category(
-    first: ProgrammedExercise,
-    second: ProgrammedExercise,
+    first: SupersetExercise,
+    second: SupersetExercise,
 ) -> int | None:
     if not _base_pair_is_safe(first, second):
         return None
@@ -203,7 +228,7 @@ def superset_structure_errors(
     return tuple(dict.fromkeys(errors))
 
 
-def _base_pair_is_safe(first: ProgrammedExercise, second: ProgrammedExercise) -> bool:
+def _base_pair_is_safe(first: SupersetExercise, second: SupersetExercise) -> bool:
     if first.exercise_id == second.exercise_id:
         return False
     if "STRENGTH_PRIMARY_COMPOUND" in first.reason_codes or (
@@ -221,18 +246,18 @@ def _base_pair_is_safe(first: ProgrammedExercise, second: ProgrammedExercise) ->
     return True
 
 
-def _both_isolation(first: ProgrammedExercise, second: ProgrammedExercise) -> bool:
+def _both_isolation(first: SupersetExercise, second: SupersetExercise) -> bool:
     return (
         first.exercise_type is ExerciseType.ISOLATION
         and second.exercise_type is ExerciseType.ISOLATION
     )
 
 
-def _both_accessory(first: ProgrammedExercise, second: ProgrammedExercise) -> bool:
+def _both_accessory(first: SupersetExercise, second: SupersetExercise) -> bool:
     return _is_accessory(first) and _is_accessory(second)
 
 
-def _is_accessory(exercise: ProgrammedExercise) -> bool:
+def _is_accessory(exercise: SupersetExercise) -> bool:
     return exercise.exercise_type is ExerciseType.ISOLATION or any(
         code
         in {
@@ -244,7 +269,7 @@ def _is_accessory(exercise: ProgrammedExercise) -> bool:
     )
 
 
-def _is_heavy_lower_compound(exercise: ProgrammedExercise) -> bool:
+def _is_heavy_lower_compound(exercise: SupersetExercise) -> bool:
     return (
         exercise.exercise_type is ExerciseType.COMPOUND
         and exercise.primary_muscle in _LOWER_BODY_MUSCLES
@@ -263,7 +288,7 @@ def _equipment_transition_is_safe(
     return bool(first_station.intersection(second_station))
 
 
-def _muscles_interfere(first: ProgrammedExercise, second: ProgrammedExercise) -> bool:
+def _muscles_interfere(first: SupersetExercise, second: SupersetExercise) -> bool:
     return bool(
         first.primary_muscle in second.secondary_muscles
         or second.primary_muscle in first.secondary_muscles

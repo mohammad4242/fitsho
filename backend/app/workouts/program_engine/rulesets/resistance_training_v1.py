@@ -5,6 +5,7 @@ from app.workouts.program_engine.enums import Goal, SplitType, TrainingStatus
 
 MINIMUM_EXERCISES_PER_SESSION = 5
 MAXIMUM_EXERCISES_PER_SESSION = 9
+PREFERRED_MAIN_EXERCISES_PER_SESSION = 8
 
 
 @dataclass(frozen=True)
@@ -148,6 +149,7 @@ class ProgramRuleset:
     maximum_direct_sessions_per_muscle_per_week: int = 2
     max_exercises_per_session: int = MAXIMUM_EXERCISES_PER_SESSION
     minimum_exercises_per_session: int = MINIMUM_EXERCISES_PER_SESSION
+    preferred_main_exercises_per_session: int = PREFERRED_MAIN_EXERCISES_PER_SESSION
     minutes_per_exercise_slot: int = 7
     minimum_session_work_minutes: int = 10
     minimum_exercise_budget_minutes: int = 3

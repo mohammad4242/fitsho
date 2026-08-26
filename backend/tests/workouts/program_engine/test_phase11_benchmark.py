@@ -147,7 +147,7 @@ def test_benchmark_template_setup_matches_the_exact_active_seed_library(db: Sess
 
     assert len(references) == benchmark.EXPECTED_TEMPLATE_COUNT
     assert tuple(sorted(item.slug for item in references)) == benchmark.EXPECTED_TEMPLATE_SLUGS
-    assert db.get(TrainingProgramTemplate, stale.id).is_active is False
+    assert db.get(TrainingProgramTemplate, stale.id) is None
 
 
 def test_closeout_verifier_accepts_a_fully_reconciled_payload() -> None:

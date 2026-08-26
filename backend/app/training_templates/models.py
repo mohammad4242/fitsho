@@ -34,6 +34,13 @@ class TrainingTemplateSlotPriority(StrEnum):
     OPTIONAL = "optional"
 
 
+class TrainingTemplateCatalogState(Base):
+    __tablename__ = "training_template_catalog_state"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    catalog_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class TrainingProgramTemplate(Base):
     __tablename__ = "training_program_templates"
     __table_args__ = (

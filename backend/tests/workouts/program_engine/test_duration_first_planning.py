@@ -8,6 +8,7 @@ from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import BodyAnalysisInfluence, WorkoutProgram
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
@@ -194,5 +195,6 @@ def test_long_session_does_not_exceed_useful_or_hard_volume_to_fill_time() -> No
         for values in ranges.values()
     )
     assert all(
-        len(day.exercises) <= RULESET.max_exercises_per_session for day in program.weekly_schedule
+        main_exercise_count(day.exercises) <= RULESET.max_exercises_per_session
+        for day in program.weekly_schedule
     )

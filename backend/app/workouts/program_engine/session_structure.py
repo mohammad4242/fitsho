@@ -154,7 +154,7 @@ def session_structure_errors(day: WorkoutDay, goal: Goal) -> tuple[str, ...]:
             supplemental_count += 1
         elif supplemental_seen:
             errors.append("SUPPLEMENTAL_WORK_NOT_AT_SESSION_END")
-    if supplemental_count > 1:
+    if supplemental_count > 2:
         errors.append("SUPPLEMENTAL_EXERCISE_LIMIT_EXCEEDED")
 
     block = _strict_block(day)

@@ -278,6 +278,12 @@ HAMMER_CURL = _movement(
     P.ELBOW_FLEXION,
 )
 BARBELL_CURL = _movement("barbell-curl", "fedb-0031-barbell-curl", (M.BICEPS,), P.ELBOW_FLEXION)
+CABLE_CURL = _movement(
+    "cable-curl",
+    "fedb-0229-cable-standing-inner-curl",
+    (M.BICEPS,),
+    P.ELBOW_FLEXION,
+)
 TRICEPS_PUSHDOWN = _movement(
     "triceps-pushdown",
     "fedb-1723-cable-triceps-pushdown",
@@ -303,12 +309,72 @@ SIDE_PLANK = _movement(
     "side-plank", "fedb-0705-side-plank", (M.OBLIQUES,), P.CORE_ANTI_LATERAL_FLEXION
 )
 
+# Shared structures that support First Month or Beginner use the reviewed,
+# supported anchors below.  Advanced-only templates keep the broader movement
+# pool declared above.
+_SAFE_FIRST_MONTH_MOVEMENTS = {
+    "squat": _movement("squat", "fedb-0750-smith-chair-squat", (M.QUADRICEPS,), P.SQUAT),
+    "front-squat": _movement(
+        "front-squat", "fedb-0750-smith-chair-squat", (M.QUADRICEPS,), P.SQUAT
+    ),
+    "leg-press": _movement(
+        "leg-press", "fedb-2611-lever-horizontal-leg-press", (M.QUADRICEPS,), P.SQUAT
+    ),
+    "romanian-deadlift": _movement(
+        "romanian-deadlift",
+        "fedb-0668-rear-decline-bridge",
+        (M.HAMSTRINGS, M.GLUTES),
+        P.HIP_EXTENSION,
+    ),
+    "flat-chest-press": _movement(
+        "flat-chest-press", "fedb-0577-lever-lying-chest-press", (M.CHEST,), P.HORIZONTAL_PUSH
+    ),
+    "incline-chest-press": _movement(
+        "incline-chest-press",
+        "fedb-1299-lever-incline-hammer-chest-press",
+        (M.CHEST,),
+        P.HORIZONTAL_PUSH,
+    ),
+    "chest-fly": _movement(
+        "chest-fly",
+        "fedb-drv-lever-pec-deck-fly-pec-deck-fly",
+        (M.CHEST,),
+        P.HORIZONTAL_PUSH,
+    ),
+    "row": _movement("row", "fedb-0581-lever-high-row", (M.BACK,), P.HORIZONTAL_PULL),
+    "seated-cable-row": _movement(
+        "seated-cable-row", "fedb-0581-lever-high-row", (M.BACK,), P.HORIZONTAL_PULL
+    ),
+    "shoulder-press": _movement(
+        "shoulder-press", "fedb-0765-smith-seated-shoulder-press", (M.SHOULDERS,), P.VERTICAL_PUSH
+    ),
+    "lateral-raise": _movement(
+        "lateral-raise", "fedb-0584-lever-lateral-raise", (M.SHOULDERS,), P.SHOULDER_ABDUCTION
+    ),
+    "dumbbell-curl": _movement(
+        "dumbbell-curl", "fedb-0592-lever-preacher-curl", (M.BICEPS,), P.ELBOW_FLEXION
+    ),
+    "hammer-curl": _movement(
+        "hammer-curl", "fedb-0592-lever-preacher-curl", (M.BICEPS,), P.ELBOW_FLEXION
+    ),
+    "overhead-triceps-extension": _movement(
+        "overhead-triceps-extension",
+        "fedb-1723-cable-triceps-pushdown",
+        (M.TRICEPS,),
+        P.ELBOW_EXTENSION,
+    ),
+}
+
 
 def _shared_slot(
     movement: Movement,
     canonical_slot: TemplateSlotSeed,
     role: str,
+    supported_levels: tuple[ExperienceLevel, ...],
 ) -> TemplateSlotSeed:
+    sets, rep_min, rep_max, target_rir, rest_seconds = _prescription_for_role(
+        role, supported_levels
+    )
     return TemplateSlotSeed(
         exercise_slug_hint=movement.exercise_slug,
         catalog_slug_hints=(movement.exercise_slug,),
@@ -316,15 +382,53 @@ def _shared_slot(
         movement_pattern=movement.movement_pattern,
         placeholder_name_en=canonical_slot.placeholder_name_en,
         placeholder_name_fa=canonical_slot.placeholder_name_fa,
-        sets=canonical_slot.sets,
-        rep_min=canonical_slot.rep_min,
-        rep_max=canonical_slot.rep_max,
-        target_rir=canonical_slot.target_rir,
-        rest_seconds=canonical_slot.rest_seconds,
+        sets=sets,
+        rep_min=rep_min,
+        rep_max=rep_max,
+        target_rir=target_rir,
+        rest_seconds=rest_seconds,
         intensity_method=canonical_slot.intensity_method,
-        adaptation_priority=Priority.CORE if role == "primary" else Priority.ACCESSORY,
+        adaptation_priority=(
+            Priority.CORE
+            if role == "primary"
+            else Priority.OPTIONAL
+            if role == "core"
+            else Priority.ACCESSORY
+        ),
         superset_group=canonical_slot.superset_group,
     )
+
+
+def _prescription_for_role(
+    role: str,
+    supported_levels: tuple[ExperienceLevel, ...],
+) -> tuple[int, int, int, int, int]:
+    """Return conservative role-specific prescription for the lowest level."""
+    if Level.FIRST_MONTH in supported_levels or Level.BEGINNER in supported_levels:
+        profiles = {
+            "primary": (2, 10, 15, 3, 120),
+            "secondary": (2, 10, 15, 3, 90),
+            "isolation": (2, 12, 15, 3, 60),
+            "core": (2, 12, 20, 3, 60),
+        }
+    elif Level.INTERMEDIATE in supported_levels:
+        profiles = {
+            "primary": (3, 6, 10, 2, 120),
+            "secondary": (3, 8, 12, 2, 90),
+            "isolation": (3, 10, 15, 2, 60),
+            "core": (2, 12, 20, 2, 60),
+        }
+    else:
+        profiles = {
+            "primary": (4, 5, 8, 1, 150),
+            "secondary": (3, 8, 12, 2, 120),
+            "isolation": (3, 10, 15, 2, 75),
+            "core": (2, 12, 20, 2, 60),
+        }
+    try:
+        return profiles[role]
+    except KeyError as error:
+        raise ValueError(f"Unknown template slot role: {role}") from error
 
 
 def _primary(movement: Movement) -> tuple[Movement, str]:
@@ -349,7 +453,10 @@ def _day(
     structure_focus: str,
     direct_target_muscles: tuple[MuscleGroup, ...],
     *slot_specs: tuple[Movement, str],
+    intensity_overrides: dict[str, tuple[TrainingTemplateMethod, str | None]] | None = None,
 ) -> TemplateDaySeed:
+    intensity_overrides = intensity_overrides or {}
+    ordered_specs = tuple(sorted(slot_specs, key=lambda item: item[1] == "core"))
     return TemplateDaySeed(
         title_en=title_en,
         title_fa=title_fa,
@@ -361,8 +468,10 @@ def _day(
                 catalog_slug_hints=(movement.key,),
                 target_muscles=movement.target_muscles,
                 movement_pattern=movement.movement_pattern,
+                intensity_method=intensity_overrides.get(movement.key, (Method.STANDARD, None))[0],
+                superset_group=intensity_overrides.get(movement.key, (Method.STANDARD, None))[1],
             )
-            for movement, _ in slot_specs
+            for movement, _ in ordered_specs
         ),
     )
 
@@ -370,14 +479,23 @@ def _day(
 def _render_shared_day(
     day: TemplateDaySeed,
     specs: tuple[tuple[Movement, str], ...],
+    supported_levels: tuple[ExperienceLevel, ...],
 ) -> TemplateDaySeed:
+    use_safe_movements = Level.FIRST_MONTH in supported_levels or Level.BEGINNER in supported_levels
     return TemplateDaySeed(
         title_en=day.title_en,
         title_fa=day.title_fa,
         structure_focus=day.structure_focus,
         direct_target_muscles=day.direct_target_muscles,
         slots=tuple(
-            _shared_slot(movement, canonical_slot, role)
+            _shared_slot(
+                _SAFE_FIRST_MONTH_MOVEMENTS.get(movement.key, movement)
+                if use_safe_movements
+                else movement,
+                canonical_slot,
+                role,
+                supported_levels,
+            )
             for canonical_slot, (movement, role) in zip(day.slots, specs, strict=True)
         ),
     )
@@ -389,10 +507,19 @@ def _day_definition(
     structure_focus: str,
     direct_target_muscles: tuple[MuscleGroup, ...],
     *slot_specs: tuple[Movement, str],
+    intensity_overrides: dict[str, tuple[TrainingTemplateMethod, str | None]] | None = None,
 ) -> tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]]:
+    ordered_specs = tuple(sorted(slot_specs, key=lambda item: item[1] == "core"))
     return (
-        _day(title_en, title_fa, structure_focus, direct_target_muscles, *slot_specs),
-        slot_specs,
+        _day(
+            title_en,
+            title_fa,
+            structure_focus,
+            direct_target_muscles,
+            *slot_specs,
+            intensity_overrides=intensity_overrides,
+        ),
+        ordered_specs,
     )
 
 
@@ -495,7 +622,16 @@ _DEFINITIONS = (
                 "Full Body A",
                 "تمام‌بدن A",
                 "full_body",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.CHEST, M.BACK, M.SHOULDERS),
+                (
+                    M.QUADRICEPS,
+                    M.HAMSTRINGS,
+                    M.CHEST,
+                    M.BACK,
+                    M.SHOULDERS,
+                    M.BICEPS,
+                    M.TRICEPS,
+                    M.CALVES,
+                ),
                 _primary(SQUAT),
                 _secondary(SEATED_LEG_CURL),
                 _primary(FLAT_PRESS),
@@ -507,7 +643,16 @@ _DEFINITIONS = (
                 "Full Body B",
                 "تمام‌بدن B",
                 "full_body",
-                (M.QUADRICEPS, M.HAMSTRINGS, M.CHEST, M.BACK, M.SHOULDERS),
+                (
+                    M.QUADRICEPS,
+                    M.HAMSTRINGS,
+                    M.CHEST,
+                    M.BACK,
+                    M.SHOULDERS,
+                    M.BICEPS,
+                    M.TRICEPS,
+                    M.CALVES,
+                ),
                 _primary(LEG_PRESS),
                 _primary(RDL),
                 _primary(INCLINE_PRESS),
@@ -583,7 +728,7 @@ _DEFINITIONS = (
         "An upper-priority three-day template with planned upper variation.",
         "قالب سه‌روزه با اولویت بالاتنه و تنوع برنامه‌ریزی‌شده در دو جلسه بالاتنه.",
         NO_FIRST_MONTH,
-        (Tag.UPPER_LOWER,),
+        (Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
         (
             _day_definition(
                 "Upper A",
@@ -1082,7 +1227,7 @@ _DEFINITIONS = (
                 "other",
                 (M.BICEPS, M.TRICEPS),
                 _isolation(BARBELL_CURL),
-                _isolation(HAMMER_CURL),
+                _isolation(CABLE_CURL),
                 _isolation(TRICEPS_PUSHDOWN),
                 _isolation(OVERHEAD_TRICEPS_EXTENSION),
                 _core(CRUNCH),
@@ -1545,16 +1690,21 @@ _DEFINITIONS = (
                 "other",
                 (M.BICEPS, M.TRICEPS),
                 _isolation(BARBELL_CURL),
-                _isolation(HAMMER_CURL),
+                _isolation(CABLE_CURL),
                 _isolation(TRICEPS_PUSHDOWN),
                 _isolation(OVERHEAD_TRICEPS_EXTENSION),
                 _core(CRUNCH),
+                intensity_overrides={
+                    "cable-curl": (Method.SUPERSET, "t16-arms-superset"),
+                    "triceps-pushdown": (Method.SUPERSET, "t16-arms-superset"),
+                    "overhead-triceps-extension": (Method.DROP_SET, None),
+                },
             ),
             _day_definition(
                 "Hamstrings + Glutes",
                 "همسترینگ + باسن",
-                "posterior_chain_core",
-                (M.HAMSTRINGS, M.GLUTES),
+                "lower",
+                (M.HAMSTRINGS, M.GLUTES, M.QUADRICEPS, M.CALVES),
                 _primary(RDL),
                 _secondary(LYING_LEG_CURL),
                 _primary(GLUTE_BRIDGE),
@@ -1625,6 +1775,10 @@ _DEFINITIONS = (
                 _isolation(CHEST_FLY),
                 _isolation(TRICEPS_PUSHDOWN),
                 _core(CRUNCH),
+                intensity_overrides={
+                    "chest-fly": (Method.SUPERSET, "t17-chest-superset"),
+                    "triceps-pushdown": (Method.SUPERSET, "t17-chest-superset"),
+                },
             ),
             _day_definition(
                 "Back + Delts Priority",
@@ -1638,6 +1792,7 @@ _DEFINITIONS = (
                 _isolation(LATERAL_RAISE),
                 _isolation(REAR_DELT_FLY),
                 _core(CRUNCH),
+                intensity_overrides={"lateral-raise": (Method.DROP_SET, None)},
             ),
             _day_definition(
                 "Legs Priority",
@@ -1670,12 +1825,15 @@ def _seed_from_definition(
     definition: CanonicalTemplateDefinition,
 ) -> TrainingProgramTemplateSeed:
     days = tuple(
-        _render_shared_day(day, specs)
+        _render_shared_day(day, specs, definition.supported_levels)
         for day, specs in zip(
             definition.days,
             definition.day_specs,
             strict=True,
         )
+    )
+    intensity_methods = tuple(
+        dict.fromkeys(slot.intensity_method for day in days for slot in day.slots)
     )
     seed = TrainingProgramTemplateSeed(
         canonical_slug=definition.canonical_slug,
@@ -1687,7 +1845,7 @@ def _seed_from_definition(
         days_per_week=len(days),
         supported_levels=definition.supported_levels,
         focus_tags=definition.focus_tags,
-        intensity_methods=(Method.STANDARD,),
+        intensity_methods=intensity_methods,
         days=days,
         programming_rationale=_rationale(definition),
         fitness_goal=FitnessGoal.BUILD_MUSCLE,

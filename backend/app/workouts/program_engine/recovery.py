@@ -7,6 +7,7 @@ from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.enums import LoadLimit
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import SplitPlan, WorkoutDay
+from app.workouts.program_engine.supplemental_policy import is_supplemental_muscle
 
 
 class ExposureLoad(StrEnum):
@@ -17,7 +18,9 @@ class ExposureLoad(StrEnum):
 
 def direct_muscles(day: WorkoutDay) -> frozenset[MuscleGroup]:
     return frozenset(
-        item.primary_muscle for item in day.exercises if item.primary_muscle is not None
+        item.primary_muscle
+        for item in day.exercises
+        if item.primary_muscle is not None and not is_supplemental_muscle(item.primary_muscle)
     )
 
 
@@ -29,7 +32,9 @@ def classify_muscle_exposures(
     effective_sets: defaultdict[MuscleGroup, float] = defaultdict(float)
     high_load_muscles: set[MuscleGroup] = set()
     for exercise in day.exercises:
-        if exercise.primary_muscle is not None:
+        if exercise.primary_muscle is not None and not is_supplemental_muscle(
+            exercise.primary_muscle
+        ):
             direct_sets[exercise.primary_muscle] += exercise.sets
             effective_sets[exercise.primary_muscle] += exercise.sets
             if "STRENGTH_PRIMARY_COMPOUND" in exercise.reason_codes or (
@@ -37,6 +42,8 @@ def classify_muscle_exposures(
             ):
                 high_load_muscles.add(exercise.primary_muscle)
         for muscle in exercise.secondary_muscles:
+            if is_supplemental_muscle(muscle):
+                continue
             effective_sets[muscle] += exercise.sets * ruleset.secondary_set_credit
     exposures: dict[MuscleGroup, ExposureLoad] = {}
     for muscle in sorted(effective_sets, key=lambda item: item.value):
