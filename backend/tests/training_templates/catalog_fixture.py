@@ -55,6 +55,8 @@ REAL_CATALOG_SLUGS = {
     "fedb-1452-lever-seated-crunch",
     "fedb-0464-front-plank",
     "fedb-0705-side-plank",
+    "fedb-0334-dumbbell-lateral-raise",
+    "owner-cb58d2dbac7f-dumbbell-bench-press",
 }
 
 

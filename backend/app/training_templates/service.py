@@ -11,12 +11,14 @@ from app.training_templates.catalog_invariants import validate_catalog_topology
 from app.training_templates.models import (
     StructureFamily,
     TrainingProgramStructure,
+    TrainingProgramStructureDay,
     TrainingProgramTemplate,
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
     TrainingTemplateCatalogState,
 )
 from app.training_templates.seed_data import (
+    APPROVED_STRUCTURE_SEEDS,
     LEGACY_NOVICE_PRESCRIPTIONS,
     LEGACY_SOURCE_NAME,
     LEGACY_SOURCE_URL,
@@ -37,7 +39,7 @@ class TrainingTemplateSeedResult:
 
 
 _CATALOG_STATE_KEY = "canonical"
-_CATALOG_REVISION = 4
+_CATALOG_REVISION = 5
 
 
 def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
@@ -49,6 +51,7 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
         )
     )
     db.flush()
+    _ensure_approved_structures(db)
     state = db.get(TrainingTemplateCatalogState, _CATALOG_STATE_KEY)
     if state is not None and state.catalog_revision >= _CATALOG_REVISION:
         db.commit()
@@ -70,6 +73,7 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
 
 def upgrade_training_program_template_catalog(db: Session) -> TrainingTemplateSeedResult:
     """Explicitly replace the managed catalog with the current approved revision."""
+    _ensure_approved_structures(db)
     _sync_canonical_catalog(db, replace_existing=True)
     state = db.get(TrainingTemplateCatalogState, _CATALOG_STATE_KEY)
     if state is None:
@@ -177,6 +181,45 @@ def _sync_canonical_catalog(db: Session, *, replace_existing: bool) -> None:
         _write_template(template, seed, exercises_by_slug, structure_ids_by_slug)
 
     db.flush()
+
+
+def _ensure_approved_structures(db: Session) -> dict[str, UUID]:
+    bind = db.get_bind()
+    if not inspect(bind).has_table(TrainingProgramStructure.__tablename__):
+        return {}
+
+    existing = {
+        structure.slug: structure for structure in db.scalars(select(TrainingProgramStructure))
+    }
+    for seed in APPROVED_STRUCTURE_SEEDS:
+        if seed.slug in existing:
+            continue
+        structure = TrainingProgramStructure(
+            slug=seed.slug,
+            name_en=seed.name_en,
+            name_fa=seed.name_fa,
+            days_per_week=seed.days_per_week,
+            family=seed.family,
+            split_type=seed.split_type,
+            description_en=seed.description_en,
+            description_fa=seed.description_fa,
+            is_active=True,
+        )
+        structure.structure_days = [
+            TrainingProgramStructureDay(
+                day_number=day_number,
+                day_type=day_type,
+                label_en=label_en,
+                label_fa=label_fa,
+            )
+            for day_number, (day_type, label_en, label_fa) in enumerate(seed.days, start=1)
+        ]
+        db.add(structure)
+        existing[seed.slug] = structure
+    db.flush()
+    return {
+        structure.slug: structure.id for structure in db.scalars(select(TrainingProgramStructure))
+    }
 
 
 def _write_template(

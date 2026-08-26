@@ -69,6 +69,7 @@ REAL_CATALOG_SLUGS = {
     "fedb-1299-lever-incline-hammer-chest-press",
     "fedb-0025-barbell-bench-press",
     "fedb-0314-dumbbell-incline-bench-press",
+    "owner-cb58d2dbac7f-dumbbell-bench-press",
     "fedb-1269-cable-standing-fly",
     "fedb-0581-lever-high-row",
     "owner-e0c26a271aac-barbell-bent-over-row",
@@ -79,6 +80,7 @@ REAL_CATALOG_SLUGS = {
     "fedb-0289-seated-dumbbell-shoulder-press",
     "fedb-0553-military-press",
     "fedb-0584-lever-lateral-raise",
+    "fedb-0334-dumbbell-lateral-raise",
     "fedb-0178-cable-lateral-raise",
     "fedb-0602-lever-seated-reverse-fly",
     "fedb-0592-lever-preacher-curl",
@@ -139,14 +141,13 @@ def _legacy_template(slug: str) -> TrainingProgramTemplate:
     )
 
 
-def test_catalog_defines_exactly_25_level_specific_programs() -> None:
-    canonical_slugs = {
-        getattr(seed, "canonical_slug", None) for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS
-    }
+def test_catalog_preserves_exactly_25_legacy_level_specific_programs() -> None:
+    legacy_seeds = [seed for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS if seed.days_per_week <= 4]
+    canonical_slugs = {getattr(seed, "canonical_slug", None) for seed in legacy_seeds}
 
     assert canonical_slugs == EXPECTED_CANONICAL_SLUGS
-    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 25
-    assert {seed.slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS} == EXPECTED_CANONICAL_SLUGS
+    assert len(legacy_seeds) == 25
+    assert {seed.slug for seed in legacy_seeds} == EXPECTED_CANONICAL_SLUGS
     assert next(
         seed
         for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS
@@ -215,7 +216,7 @@ def test_catalog_seed_is_idempotent_and_replaces_owned_days_and_slots(db: Sessio
 
     assert second == first
     assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == first.templates
-    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplateSlot)) > 0
+    assert (db.scalar(select(func.count()).select_from(TrainingProgramTemplateSlot)) or 0) > 0
 
 
 def test_catalog_slots_are_linked_to_active_programmable_non_placeholder_exercises(
@@ -225,18 +226,24 @@ def test_catalog_slots_are_linked_to_active_programmable_non_placeholder_exercis
     seed_training_program_templates(db)
 
     slots = list(db.scalars(select(TrainingProgramTemplateSlot)))
-    assert all(slot.exercise is not None for slot in slots)
-    assert all(slot.exercise.is_active and slot.exercise.is_programmable for slot in slots)
-    assert all(slot.exercise.source != "fitsho_training_template" for slot in slots)
+    assert all(
+        slot.exercise is not None
+        and slot.exercise.is_active
+        and slot.exercise.is_programmable
+        and slot.exercise.source != "fitsho_training_template"
+        for slot in slots
+    )
     assert all(
         slot.placeholder_name_en is None and slot.placeholder_name_fa is None for slot in slots
     )
 
 
 def test_catalog_days_guidance_and_prescriptions_match_document_contract() -> None:
-    assert len({seed.canonical_slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS}) == 25
+    assert len({seed.canonical_slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS}) == 49
     assert all(
-        4 <= len(day.slots) <= 9 for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS for day in seed.days
+        (4 if seed.days_per_week <= 4 else 3) <= len(day.slots) <= 9
+        for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS
+        for day in seed.days
     )
     assert all(
         len(seed.programming_rationale) == 5
@@ -247,7 +254,7 @@ def test_catalog_days_guidance_and_prescriptions_match_document_contract() -> No
         for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS
     )
     assert all(
-        1 <= slot.sets <= 4
+        1 <= slot.sets <= 7
         and slot.rep_min <= slot.rep_max
         and slot.target_rir in {1, 2, 3}
         and 45 <= slot.rest_seconds <= 150

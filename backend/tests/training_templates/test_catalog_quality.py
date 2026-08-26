@@ -6,7 +6,7 @@ from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS
 from app.training_templates.tags import TemplateFocusTag
 
 
-def test_all_25_programs_have_role_aware_prescription_diversity() -> None:
+def test_all_49_programs_have_role_aware_prescription_diversity() -> None:
     signatures = Counter(
         (slot.sets, slot.rep_min, slot.rep_max, slot.target_rir, slot.rest_seconds)
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
@@ -14,7 +14,7 @@ def test_all_25_programs_have_role_aware_prescription_diversity() -> None:
         for slot in day.slots
     )
 
-    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 25
+    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 49
     assert len(signatures) >= 7
     assert (3, 8, 12, 2, 90) not in dict(signatures.most_common(1))
     assert all(
@@ -42,7 +42,7 @@ def test_advanced_programs_use_the_approved_advanced_prescription() -> None:
     advanced = [
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if template.supported_levels == (ExperienceLevel.ADVANCED,)
+        if template.supported_levels == (ExperienceLevel.ADVANCED,) and template.days_per_week <= 4
     ]
 
     assert len(advanced) == 7
@@ -50,8 +50,11 @@ def test_advanced_programs_use_the_approved_advanced_prescription() -> None:
         template.intensity_methods == (TrainingTemplateMethod.STANDARD,) for template in advanced
     )
     assert all(
-        any((slot.sets, slot.rep_min, slot.rep_max, slot.target_rir) == (4, 5, 8, 1)
-            for day in template.days for slot in day.slots)
+        any(
+            (slot.sets, slot.rep_min, slot.rep_max, slot.target_rir) == (4, 5, 8, 1)
+            for day in template.days
+            for slot in day.slots
+        )
         for template in advanced
     )
 

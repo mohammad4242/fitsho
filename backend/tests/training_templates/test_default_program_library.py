@@ -944,10 +944,14 @@ EXPECTED_PROGRAMS = {
 }
 
 
-def test_default_program_matrix_contains_exactly_25_programs() -> None:
-    assert len(CANONICAL_TEMPLATE_DEFINITIONS) == 25
-    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 25
-    assert {seed.slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS} == set(EXPECTED_PROGRAMS)
+def test_default_program_matrix_preserves_exactly_25_legacy_programs() -> None:
+    legacy_definitions = [
+        definition for definition in CANONICAL_TEMPLATE_DEFINITIONS if len(definition.days) <= 4
+    ]
+    legacy_seeds = [seed for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS if seed.days_per_week <= 4]
+    assert len(legacy_definitions) == 25
+    assert len(legacy_seeds) == 25
+    assert {seed.slug for seed in legacy_seeds} == set(EXPECTED_PROGRAMS)
 
 
 def test_default_program_definitions_match_approved_days_and_exercises() -> None:
@@ -959,13 +963,16 @@ def test_default_program_definitions_match_approved_days_and_exercises() -> None
         definition = definitions[slug]
         assert definition.structure_slug == structure_slug
         assert definition.supported_levels == (level,)
-        assert tuple(
-            (
-                day_seed.title_en,
-                tuple((movement.exercise_slug, role) for movement, role in day_specs),
+        assert (
+            tuple(
+                (
+                    day_seed.title_en,
+                    tuple((movement.exercise_slug, role) for movement, role in day_specs),
+                )
+                for day_seed, day_specs in zip(definition.days, definition.day_specs, strict=True)
             )
-            for day_seed, day_specs in zip(definition.days, definition.day_specs, strict=True)
-        ) == expected_days
+            == expected_days
+        )
 
 
 def test_default_program_prescriptions_match_level_and_role() -> None:
@@ -986,23 +993,27 @@ def test_default_program_prescriptions_match_level_and_role() -> None:
                 ]
 
 
-def test_seed_creates_exactly_25_linked_programs_with_valid_structures(db: Session) -> None:
+def test_seed_creates_exactly_49_linked_programs_with_valid_structures(db: Session) -> None:
     seed_real_catalog_exercises(db)
 
     result = seed_training_program_templates(db)
 
-    assert result.templates == 25
-    assert db.scalar(
-        select(func.count())
-        .select_from(TrainingProgramTemplate)
-        .where(TrainingProgramTemplate.source_name == "Fitsho canonical training template catalog")
-    ) == 25
+    assert result.templates == 49
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(TrainingProgramTemplate)
+            .where(
+                TrainingProgramTemplate.source_name == "Fitsho canonical training template catalog"
+            )
+        )
+        == 49
+    )
     templates = list(
         db.scalars(
             select(TrainingProgramTemplate)
             .where(
-                TrainingProgramTemplate.source_name
-                == "Fitsho canonical training template catalog"
+                TrainingProgramTemplate.source_name == "Fitsho canonical training template catalog"
             )
             .options(
                 selectinload(TrainingProgramTemplate.days).selectinload(
@@ -1013,8 +1024,11 @@ def test_seed_creates_exactly_25_linked_programs_with_valid_structures(db: Sessi
         )
     )
     assert all(template.structure_id is not None for template in templates)
-    assert all(template.structure is not None for template in templates)
-    assert all(template.structure.days_per_week == template.days_per_week for template in templates)
+    assert all(
+        template.structure is not None
+        and template.structure.days_per_week == template.days_per_week
+        for template in templates
+    )
     assert all(len(template.days) == template.days_per_week for template in templates)
     assert all(
         slot.exercise_id is not None
@@ -1033,8 +1047,8 @@ def test_seed_is_idempotent_and_does_not_duplicate_program_days_or_slots(db: Ses
     second = seed_training_program_templates(db)
 
     assert second == first
-    assert second.templates == 25
-    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == 25
+    assert second.templates == 49
+    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == 49
     assert db.scalar(select(func.count()).select_from(TrainingProgramTemplateDay)) == first_days
     assert db.scalar(select(func.count()).select_from(TrainingProgramTemplateSlot)) == first_slots
 
@@ -1052,8 +1066,12 @@ def test_seed_uses_only_active_programmable_exercise_library_records(db: Session
             )
         )
     )
-    assert all(slot.exercise is not None for slot in slots)
-    assert all(slot.exercise.is_active and slot.exercise.is_programmable for slot in slots)
+    assert all(
+        slot.exercise is not None
+        and slot.exercise.is_active
+        and slot.exercise.is_programmable
+        for slot in slots
+    )
     assert db.scalar(select(func.count()).select_from(Exercise)) == before
 
 
