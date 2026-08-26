@@ -403,6 +403,48 @@ export type AdminTrainingProgramTemplate = {
   source_name: string;
   source_url: string;
   days: AdminTrainingTemplateDay[];
+  structure_id: string | null;
+};
+
+export type AdminTrainingProgramStructuresResponse = {
+  items: AdminTrainingProgramStructure[];
+};
+
+export type AdminTrainingProgramStructureDay = {
+  id: string;
+  day_number: number;
+  label_en: string;
+  label_fa: string;
+  day_type: string | null;
+};
+
+export type AdminTrainingProgramStructure = {
+  id: string;
+  slug: string;
+  name_en: string;
+  name_fa: string;
+  days_per_week: number;
+  description_en: string | null;
+  description_fa: string | null;
+  is_active: boolean;
+  structure_days: AdminTrainingProgramStructureDay[];
+};
+
+export type AdminTrainingProgramStructureDayWrite = {
+  day_number: number;
+  label_en: string;
+  label_fa: string;
+  day_type: string | null;
+};
+
+export type AdminTrainingProgramStructureWrite = {
+  slug: string;
+  name_en: string;
+  name_fa: string;
+  days_per_week: number;
+  description_en: string | null;
+  description_fa: string | null;
+  days: AdminTrainingProgramStructureDayWrite[];
 };
 
 export type AdminTrainingProgramTemplatesResponse = {
@@ -455,6 +497,7 @@ export type AdminTrainingProgramTemplateWrite = {
   source_name: string;
   source_url: string;
   days: AdminTrainingTemplateDayWrite[];
+  structure_id: string | null;
 };
 
 export type MealCategory = "breakfast" | "lunch" | "post_workout" | "snack" | "dinner";

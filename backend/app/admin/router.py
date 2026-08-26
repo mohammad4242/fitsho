@@ -28,6 +28,9 @@ from app.admin.schemas import (
     AdminExerciseDetail,
     AdminExerciseFilters,
     AdminExerciseMediaAssetDetail,
+    AdminTrainingProgramStructure,
+    AdminTrainingProgramStructuresResponse,
+    AdminTrainingProgramStructureWrite,
     AdminTrainingProgramTemplate,
     AdminTrainingProgramTemplatesResponse,
     AdminTrainingProgramTemplateWrite,
@@ -52,15 +55,25 @@ from app.exercises.models import Exercise
 from app.exercises.taxonomy import MUSCLES_BY_REGION, is_compatible_muscle_focus
 from app.profile.enums import ExperienceLevel
 from app.training_templates.admin_service import (
+    StructureWriteError,
     TemplateWriteError,
+    create_training_program_structure,
     create_training_program_template,
+    delete_training_program_structure,
     delete_training_program_template,
     delete_training_program_template_slot,
+    get_training_program_structure,
     get_training_program_template,
+    list_training_program_structures,
+    set_structure_active,
+    update_training_program_structure,
     update_training_program_template,
     update_training_program_template_slot,
 )
-from app.training_templates.models import TrainingProgramTemplate
+from app.training_templates.models import (
+    TrainingProgramStructure,
+    TrainingProgramTemplate,
+)
 from app.training_templates.service import list_training_program_templates
 
 router = APIRouter(
@@ -86,6 +99,7 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
         programming_rationale=template.programming_rationale,
         source_name=template.source_name,
         source_url=template.source_url,
+        structure_id=template.structure_id,
         days=[
             AdminTrainingTemplateDay(
                 id=day.id,
@@ -143,6 +157,155 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
     )
 
 
+def _structure_detail(structure: TrainingProgramStructure) -> AdminTrainingProgramStructure:
+    from app.admin.schemas import AdminTrainingProgramStructureDay as DaySchema
+
+    return AdminTrainingProgramStructure(
+        id=structure.id,
+        slug=structure.slug,
+        name_en=structure.name_en,
+        name_fa=structure.name_fa,
+        days_per_week=structure.days_per_week,
+        description_en=structure.description_en,
+        description_fa=structure.description_fa,
+        is_active=structure.is_active,
+        structure_days=[
+            DaySchema(
+                id=day.id,
+                day_number=day.day_number,
+                label_en=day.label_en,
+                label_fa=day.label_fa,
+                day_type=day.day_type,
+            )
+            for day in structure.structure_days
+        ],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Training Program Structure endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/training-program-structures",
+    response_model=AdminTrainingProgramStructuresResponse,
+)
+def read_training_program_structures(
+    db: DatabaseSession,
+    days_per_week: Annotated[int | None, Query(ge=2, le=6)] = None,
+    include_inactive: bool = False,
+) -> AdminTrainingProgramStructuresResponse:
+    structures = list_training_program_structures(
+        db,
+        days_per_week=days_per_week,
+        include_inactive=include_inactive,
+    )
+    return AdminTrainingProgramStructuresResponse(items=[_structure_detail(s) for s in structures])
+
+
+@router.get(
+    "/training-program-structures/{structure_id}",
+    response_model=AdminTrainingProgramStructure,
+)
+def read_training_program_structure(
+    structure_id: UUID,
+    db: DatabaseSession,
+) -> AdminTrainingProgramStructure:
+    structure = get_training_program_structure(db, structure_id)
+    if structure is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Structure not found")
+    return _structure_detail(structure)
+
+
+@router.post(
+    "/training-program-structures",
+    response_model=AdminTrainingProgramStructure,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def create_structure(
+    payload: AdminTrainingProgramStructureWrite,
+    db: DatabaseSession,
+) -> AdminTrainingProgramStructure:
+    try:
+        structure = create_training_program_structure(db, payload)
+    except StructureWriteError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    return _structure_detail(structure)
+
+
+@router.put(
+    "/training-program-structures/{structure_id}",
+    response_model=AdminTrainingProgramStructure,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_structure(
+    structure_id: UUID,
+    payload: AdminTrainingProgramStructureWrite,
+    db: DatabaseSession,
+) -> AdminTrainingProgramStructure:
+    try:
+        structure = update_training_program_structure(db, structure_id, payload)
+    except StructureWriteError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    if structure is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Structure not found")
+    return _structure_detail(structure)
+
+
+@router.patch(
+    "/training-program-structures/{structure_id}/activate",
+    response_model=AdminTrainingProgramStructure,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def activate_structure(
+    structure_id: UUID,
+    db: DatabaseSession,
+) -> AdminTrainingProgramStructure:
+    structure = set_structure_active(db, structure_id, is_active=True)
+    if structure is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Structure not found")
+    return _structure_detail(structure)
+
+
+@router.patch(
+    "/training-program-structures/{structure_id}/deactivate",
+    response_model=AdminTrainingProgramStructure,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def deactivate_structure(
+    structure_id: UUID,
+    db: DatabaseSession,
+) -> AdminTrainingProgramStructure:
+    structure = set_structure_active(db, structure_id, is_active=False)
+    if structure is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Structure not found")
+    return _structure_detail(structure)
+
+
+@router.delete(
+    "/training-program-structures/{structure_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def delete_structure(
+    structure_id: UUID,
+    db: DatabaseSession,
+) -> Response:
+    try:
+        found = delete_training_program_structure(db, structure_id)
+    except StructureWriteError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    if not found:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Structure not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get(
     "/training-program-templates",
     response_model=AdminTrainingProgramTemplatesResponse,
@@ -151,11 +314,13 @@ def read_training_program_templates(
     db: DatabaseSession,
     days_per_week: Annotated[int | None, Query(ge=2, le=6)] = None,
     training_level: ExperienceLevel | None = None,
+    structure_id: UUID | None = None,
 ) -> AdminTrainingProgramTemplatesResponse:
     templates = list_training_program_templates(
         db,
         days_per_week=days_per_week,
         training_level=training_level,
+        structure_id=structure_id,
     )
     return AdminTrainingProgramTemplatesResponse(
         items=[_training_template_detail(template) for template in templates]

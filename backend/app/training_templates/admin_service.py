@@ -3,10 +3,14 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.admin.schemas import AdminTrainingProgramTemplateWrite, AdminTrainingTemplateSlotWrite
+from app.admin.schemas import (
+    AdminTrainingProgramStructureWrite,
+    AdminTrainingProgramTemplateWrite,
+    AdminTrainingTemplateSlotWrite,
+)
 from app.exercises.enums import (
     Equipment,
     ExerciseContentType,
@@ -17,6 +21,8 @@ from app.exercises.enums import (
 from app.exercises.models import Exercise
 from app.training_templates.catalog_placeholders import TEMPLATE_PLACEHOLDER_SOURCE
 from app.training_templates.models import (
+    TrainingProgramStructure,
+    TrainingProgramStructureDay,
     TrainingProgramTemplate,
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
@@ -31,6 +37,165 @@ from app.workouts.program_engine.supersets import safe_superset_category
 
 class TemplateWriteError(ValueError):
     pass
+
+
+class StructureWriteError(ValueError):
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Structure CRUD
+# ---------------------------------------------------------------------------
+
+
+def list_training_program_structures(
+    db: Session,
+    *,
+    days_per_week: int | None = None,
+    include_inactive: bool = False,
+) -> list[TrainingProgramStructure]:
+    stmt = select(TrainingProgramStructure).options(
+        selectinload(TrainingProgramStructure.structure_days)
+    )
+    if days_per_week is not None:
+        stmt = stmt.where(TrainingProgramStructure.days_per_week == days_per_week)
+    if not include_inactive:
+        stmt = stmt.where(TrainingProgramStructure.is_active.is_(True))
+    stmt = stmt.order_by(TrainingProgramStructure.days_per_week, TrainingProgramStructure.name_en)
+    return list(db.scalars(stmt))
+
+
+def get_training_program_structure(
+    db: Session,
+    structure_id: UUID,
+) -> TrainingProgramStructure | None:
+    return db.scalar(
+        select(TrainingProgramStructure)
+        .where(TrainingProgramStructure.id == structure_id)
+        .options(selectinload(TrainingProgramStructure.structure_days))
+    )
+
+
+def create_training_program_structure(
+    db: Session,
+    payload: AdminTrainingProgramStructureWrite,
+) -> TrainingProgramStructure:
+    _validate_structure_payload(payload)
+    structure = TrainingProgramStructure(
+        slug=payload.slug,
+        name_en=payload.name_en,
+        name_fa=payload.name_fa,
+        days_per_week=payload.days_per_week,
+        description_en=payload.description_en,
+        description_fa=payload.description_fa,
+        is_active=True,
+    )
+    db.add(structure)
+    db.flush()
+    _replace_structure_days(structure, payload)
+    db.commit()
+    return _get_structure_or_raise(db, structure.id)
+
+
+def update_training_program_structure(
+    db: Session,
+    structure_id: UUID,
+    payload: AdminTrainingProgramStructureWrite,
+) -> TrainingProgramStructure | None:
+    structure = db.get(TrainingProgramStructure, structure_id)
+    if structure is None:
+        return None
+    _validate_structure_payload(payload)
+    structure.slug = payload.slug
+    structure.name_en = payload.name_en
+    structure.name_fa = payload.name_fa
+    structure.days_per_week = payload.days_per_week
+    structure.description_en = payload.description_en
+    structure.description_fa = payload.description_fa
+    structure.structure_days.clear()
+    db.flush()
+    _replace_structure_days(structure, payload)
+    db.commit()
+    return _get_structure_or_raise(db, structure.id)
+
+
+def set_structure_active(
+    db: Session,
+    structure_id: UUID,
+    *,
+    is_active: bool,
+) -> TrainingProgramStructure | None:
+    structure = db.get(TrainingProgramStructure, structure_id)
+    if structure is None:
+        return None
+    structure.is_active = is_active
+    db.commit()
+    return _get_structure_or_raise(db, structure.id)
+
+
+def delete_training_program_structure(
+    db: Session,
+    structure_id: UUID,
+) -> bool:
+    """Delete a structure. Raises StructureWriteError if referenced by templates."""
+    structure = db.get(TrainingProgramStructure, structure_id)
+    if structure is None:
+        return False
+    reference_count = db.scalar(
+        select(func.count())
+        .select_from(TrainingProgramTemplate)
+        .where(TrainingProgramTemplate.structure_id == structure_id)
+    )
+    if reference_count and reference_count > 0:
+        raise StructureWriteError(
+            f"Structure is referenced by {reference_count} template(s). "
+            "Deactivate it or reassign templates before deleting."
+        )
+    db.delete(structure)
+    db.commit()
+    return True
+
+
+def _validate_structure_payload(payload: AdminTrainingProgramStructureWrite) -> None:
+    if not re.match(r"^[a-z0-9]+(-[a-z0-9]+)*$", payload.slug):
+        raise StructureWriteError("slug must match ^[a-z0-9]+(-[a-z0-9]+)*$")
+    if payload.days_per_week not in range(2, 7):
+        raise StructureWriteError("days_per_week must be between 2 and 6")
+    if len(payload.days) != payload.days_per_week:
+        raise StructureWriteError(
+            f"days_per_week is {payload.days_per_week} but {len(payload.days)} days provided"
+        )
+    day_numbers = [d.day_number for d in payload.days]
+    if sorted(day_numbers) != list(range(1, payload.days_per_week + 1)):
+        raise StructureWriteError(
+            "day_number values must be exactly 1…days_per_week with no gaps or duplicates"
+        )
+
+
+def _replace_structure_days(
+    structure: TrainingProgramStructure,
+    payload: AdminTrainingProgramStructureWrite,
+) -> None:
+    for day_payload in sorted(payload.days, key=lambda d: d.day_number):
+        db_day = TrainingProgramStructureDay(
+            structure_id=structure.id,
+            day_number=day_payload.day_number,
+            label_en=day_payload.label_en,
+            label_fa=day_payload.label_fa,
+            day_type=day_payload.day_type,
+        )
+        structure.structure_days.append(db_day)
+
+
+def _get_structure_or_raise(db: Session, structure_id: UUID) -> TrainingProgramStructure:
+    structure = db.scalar(
+        select(TrainingProgramStructure)
+        .where(TrainingProgramStructure.id == structure_id)
+        .options(selectinload(TrainingProgramStructure.structure_days))
+    )
+    if structure is None:
+        raise RuntimeError(f"Structure {structure_id} disappeared after write")
+    return structure
 
 
 def get_training_program_template(
@@ -316,6 +481,7 @@ def _replace_template_content(
     template.source_name = payload.source_name
     template.source_url = payload.source_url
     template.is_active = True
+    template.structure_id = payload.structure_id
     for day_number, day_payload in enumerate(payload.days, start=1):
         day = TrainingProgramTemplateDay(
             day_number=day_number,

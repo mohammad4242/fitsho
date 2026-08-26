@@ -34,6 +34,7 @@ import type {
   MealCategory,
   NutritionDietStyle,
   NutritionProgramLifecycle,
+  AdminTrainingProgramStructuresResponse,
   AdminTrainingProgramTemplatesResponse,
   AdminTrainingProgramTemplate,
   AdminTrainingProgramTemplateWrite,
@@ -155,13 +156,28 @@ export function getAdminAiModels(): Promise<AdminAiModelsResponse> {
 export function getAdminTrainingProgramTemplates(
   daysPerWeek: number,
   trainingLevel: ExperienceLevel | "all" = "all",
+  structureId?: string,
 ): Promise<AdminTrainingProgramTemplatesResponse> {
   const query = new URLSearchParams({ days_per_week: String(daysPerWeek) });
   if (trainingLevel !== "all") query.set("training_level", trainingLevel);
+  if (structureId) query.set("structure_id", structureId);
   return request<AdminTrainingProgramTemplatesResponse>(
     `${adminTrainingProgramTemplatesPath}?${query.toString()}`,
   );
 }
+
+export function getAdminTrainingProgramStructures(
+  daysPerWeek?: number,
+  includeInactive: boolean = false,
+): Promise<AdminTrainingProgramStructuresResponse> {
+  const query = new URLSearchParams();
+  if (daysPerWeek) query.set("days_per_week", String(daysPerWeek));
+  if (includeInactive) query.set("include_inactive", "true");
+  return request<AdminTrainingProgramStructuresResponse>(
+    `/api/v1/admin/training-program-structures?${query.toString()}`,
+  );
+}
+
 
 export function getAdminTrainingProgramTemplate(
   templateId: string,

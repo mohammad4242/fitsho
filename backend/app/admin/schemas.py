@@ -244,6 +244,30 @@ class AdminTrainingTemplateProgrammingRationale(BaseModel):
     detail_fa: str
 
 
+class AdminTrainingProgramStructureDay(BaseModel):
+    id: UUID
+    day_number: int
+    label_en: str
+    label_fa: str
+    day_type: str | None
+
+
+class AdminTrainingProgramStructure(BaseModel):
+    id: UUID
+    slug: str
+    name_en: str
+    name_fa: str
+    days_per_week: int
+    description_en: str | None
+    description_fa: str | None
+    is_active: bool
+    structure_days: list[AdminTrainingProgramStructureDay]
+
+
+class AdminTrainingProgramStructuresResponse(BaseModel):
+    items: list[AdminTrainingProgramStructure]
+
+
 class AdminTrainingProgramTemplate(BaseModel):
     id: UUID
     slug: str
@@ -260,6 +284,8 @@ class AdminTrainingProgramTemplate(BaseModel):
     source_name: str
     source_url: str
     days: list[AdminTrainingTemplateDay]
+    # Nullable: admin-created programs without a structure assignment return null
+    structure_id: UUID | None = None
 
 
 class AdminTrainingProgramTemplatesResponse(BaseModel):
@@ -273,6 +299,36 @@ class AdminTrainingTemplateRationaleWrite(BaseModel):
     title_fa: Name
     detail_en: TextItem
     detail_fa: TextItem
+
+
+class AdminTrainingProgramStructureDayWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    day_number: int = Field(ge=1, le=6)
+    label_en: Name
+    label_fa: Name
+    day_type: Annotated[
+        str | None,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=60),
+    ] = None
+
+
+class AdminTrainingProgramStructureWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    slug: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+    name_en: Name
+    name_fa: Name
+    days_per_week: int = Field(ge=2, le=6)
+    description_en: Annotated[
+        str | None,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
+    ] = None
+    description_fa: Annotated[
+        str | None,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
+    ] = None
+    days: list[AdminTrainingProgramStructureDayWrite] = Field(min_length=2, max_length=6)
 
 
 class AdminTrainingTemplateSlotWrite(BaseModel):
@@ -343,6 +399,9 @@ class AdminTrainingProgramTemplateWrite(BaseModel):
     source_name: Name
     source_url: SourceUrl
     days: list[AdminTrainingTemplateDayWrite]
+    # Optional: link this program to an existing TrainingProgramStructure.
+    # structure.days_per_week must equal days_per_week if provided.
+    structure_id: UUID | None = None
 
     @field_validator("supported_levels")
     @classmethod

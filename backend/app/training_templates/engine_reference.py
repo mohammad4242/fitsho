@@ -62,6 +62,8 @@ def _slot_reference(slot: TrainingProgramTemplateSlot) -> TemplateReferenceSlot:
     return TemplateReferenceSlot(
         exercise_id=slot.exercise_id,
         exercise_slug_hint=slot.exercise_slug_hint,
+        superset_exercise_id=slot.superset_exercise_id,
+        superset_exercise_slug_hint=slot.superset_exercise_slug_hint,
         target_muscles=tuple(MuscleGroup(muscle) for muscle in slot.target_muscles),
         movement_pattern=slot.movement_pattern,
         intensity_method=slot.intensity_method.value,

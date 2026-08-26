@@ -20,6 +20,7 @@ from app.training_templates.seed_data import (
     SOURCE_NAME,
     SOURCE_URL,
     TRAINING_PROGRAM_TEMPLATE_SEEDS,
+    TemplateSlotSeed,
     TrainingProgramTemplateSeed,
 )
 
@@ -167,8 +168,8 @@ def _write_template(
             direct_target_muscles=[muscle.value for muscle in day_seed.direct_target_muscles],
         )
         template.days.append(day)
-        merged_slots = []
-        superset_pending = {}
+        merged_slots: list[tuple[TemplateSlotSeed, TemplateSlotSeed | None]] = []
+        superset_pending: dict[str, TemplateSlotSeed] = {}
         for slot_seed in day_seed.slots:
             if slot_seed.intensity_method.value == "superset" and slot_seed.superset_group:
                 group = slot_seed.superset_group
@@ -257,6 +258,7 @@ def list_training_program_templates(
     *,
     days_per_week: int | None = None,
     training_level: ExperienceLevel | None = None,
+    structure_id: UUID | None = None,
 ) -> list[TrainingProgramTemplate]:
     statement = (
         select(TrainingProgramTemplate)
@@ -264,7 +266,10 @@ def list_training_program_templates(
         .options(
             selectinload(TrainingProgramTemplate.days)
             .selectinload(TrainingProgramTemplateDay.slots)
-            .selectinload(TrainingProgramTemplateSlot.exercise)
+            .selectinload(TrainingProgramTemplateSlot.exercise),
+            selectinload(TrainingProgramTemplate.days)
+            .selectinload(TrainingProgramTemplateDay.slots)
+            .selectinload(TrainingProgramTemplateSlot.superset_exercise),
         )
         .order_by(
             TrainingProgramTemplate.days_per_week.asc(),
@@ -273,6 +278,8 @@ def list_training_program_templates(
     )
     if days_per_week is not None:
         statement = statement.where(TrainingProgramTemplate.days_per_week == days_per_week)
+    if structure_id is not None:
+        statement = statement.where(TrainingProgramTemplate.structure_id == structure_id)
     templates = list(db.scalars(statement))
     if training_level is not None:
         templates = [

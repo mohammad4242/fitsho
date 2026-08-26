@@ -5,7 +5,6 @@ import { Link } from "react-router-dom";
 import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
-import { getAdminTrainingProgramTemplates } from "./api";
 import { AdminTrainingTemplateSlotEditModal } from "./AdminTrainingTemplateSlotEditModal";
 import type { AdminTrainingProgramTemplatesResponse, AdminTrainingTemplateSlot } from "./types";
 import "./admin.css";
@@ -16,6 +15,8 @@ const trainingLevels = ["all", "first_month", "beginner", "intermediate", "advan
 export function AdminTrainingTemplatesPage() {
   const { i18n, t } = useTranslation();
   const [daysPerWeek, setDaysPerWeek] = useState<(typeof trainingDays)[number]>(2);
+  const [structureId, setStructureId] = useState<string>("all");
+  const [structures, setStructures] = useState<import("./types").AdminTrainingProgramStructure[]>([]);
   const [trainingLevel, setTrainingLevel] = useState<(typeof trainingLevels)[number]>("all");
   const [page, setPage] = useState<AdminTrainingProgramTemplatesResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -31,23 +32,36 @@ export function AdminTrainingTemplatesPage() {
   const english = i18n.resolvedLanguage === "en";
   const visibleTemplates = page?.items ?? [];
   const newProgramLevel = trainingLevel === "all" ? "beginner" : trainingLevel;
-  const newProgramPath = `/admin/training-program-templates/new?days=${daysPerWeek}&level=${newProgramLevel}`;
+  const newProgramPath = `/admin/training-program-templates/new?days=${daysPerWeek}&level=${newProgramLevel}${structureId !== "all" ? `&structure_id=${structureId}` : ""}`;
+
+  useEffect(() => {
+    let active = true;
+    import("./api").then(({ getAdminTrainingProgramStructures }) => {
+      getAdminTrainingProgramStructures(daysPerWeek).then((res) => {
+        if (!active) return;
+        setStructures(res.items);
+      }).catch(console.error);
+    });
+    return () => { active = false; };
+  }, [daysPerWeek]);
 
   useEffect(() => {
     let active = true;
     setState("loading");
     setFeedback(null);
-    void getAdminTrainingProgramTemplates(daysPerWeek, trainingLevel)
-      .then((result) => {
-        if (!active) return;
-        setPage(result);
-        setState("ready");
-      })
-      .catch(() => {
-        if (active) setState("error");
-      });
+    import("./api").then(({ getAdminTrainingProgramTemplates }) => {
+      getAdminTrainingProgramTemplates(daysPerWeek, trainingLevel, structureId === "all" ? undefined : structureId)
+        .then((result) => {
+          if (!active) return;
+          setPage(result);
+          setState("ready");
+        })
+        .catch(() => {
+          if (active) setState("error");
+        });
+    });
     return () => { active = false; };
-  }, [daysPerWeek, retry, trainingLevel]);
+  }, [daysPerWeek, retry, trainingLevel, structureId]);
 
   return (
     <div className="admin-page">
@@ -73,6 +87,7 @@ export function AdminTrainingTemplatesPage() {
                   key={days}
                   onClick={() => {
                     setDaysPerWeek(days);
+                    setStructureId("all");
                     setTrainingLevel("all");
                   }}
                   role="tab"
@@ -83,6 +98,32 @@ export function AdminTrainingTemplatesPage() {
               ))}
             </div>
           </div>
+          {structures.length > 0 && (
+            <div className="admin-template-filter-group">
+              <span>{t("admin.templates.structureFilter")}</span>
+              <div className="admin-template-tabs admin-template-tabs--structures" role="tablist" aria-label={t("admin.templates.structureFilter")}>
+                <button
+                  aria-selected={structureId === "all"}
+                  onClick={() => setStructureId("all")}
+                  role="tab"
+                  type="button"
+                >
+                  {t("admin.templates.allStructures")}
+                </button>
+                {structures.map((s) => (
+                  <button
+                    aria-selected={s.id === structureId}
+                    key={s.id}
+                    onClick={() => setStructureId(s.id)}
+                    role="tab"
+                    type="button"
+                  >
+                    {english ? s.name_en : s.name_fa}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="admin-template-filter-group">
             <span>{t("admin.templates.levelFilter")}</span>
             <div className="admin-template-tabs admin-template-tabs--levels" role="tablist" aria-label={t("admin.templates.levelFilter")}>

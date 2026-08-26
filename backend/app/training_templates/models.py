@@ -22,6 +22,79 @@ from app.exercises.models import Exercise, enum_values
 from app.profile.enums import FitnessGoal
 
 
+class TrainingProgramStructure(Base):
+    """Admin-manageable weekly training split skeleton.
+
+    Stores the ordered identity of each training day (e.g. Push / Pull / Legs).
+    Programs reference exactly one compatible Structure (same days_per_week).
+    """
+
+    __tablename__ = "training_program_structures"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_training_program_structures_slug"),
+        CheckConstraint(
+            "days_per_week BETWEEN 2 AND 6",
+            name="ck_training_program_structures_days_per_week",
+        ),
+        CheckConstraint(
+            "slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'",
+            name="ck_training_program_structures_slug_format",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    slug: Mapped[str] = mapped_column(String(120), nullable=False)
+    name_en: Mapped[str] = mapped_column(String(160), nullable=False)
+    name_fa: Mapped[str] = mapped_column(String(160), nullable=False)
+    days_per_week: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    description_en: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    description_fa: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+
+    structure_days: Mapped[list[TrainingProgramStructureDay]] = relationship(
+        back_populates="structure",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by=lambda: TrainingProgramStructureDay.day_number,
+    )
+    templates: Mapped[list[TrainingProgramTemplate]] = relationship(
+        back_populates="structure",
+        foreign_keys="TrainingProgramTemplate.structure_id",
+    )
+
+
+class TrainingProgramStructureDay(Base):
+    """One ordered day in a TrainingProgramStructure (e.g. day 2 = Pull)."""
+
+    __tablename__ = "training_program_structure_days"
+    __table_args__ = (
+        UniqueConstraint(
+            "structure_id",
+            "day_number",
+            name="uq_training_program_structure_days_structure_day",
+        ),
+        CheckConstraint(
+            "day_number >= 1",
+            name="ck_training_program_structure_days_day_number",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    structure_id: Mapped[UUID] = mapped_column(
+        ForeignKey("training_program_structures.id", ondelete="CASCADE"), nullable=False
+    )
+    day_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    label_en: Mapped[str] = mapped_column(String(120), nullable=False)
+    label_fa: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Optional stable day-type key for programmatic use (e.g. "upper", "lower", "push")
+    day_type: Mapped[str | None] = mapped_column(String(60), nullable=True)
+
+    structure: Mapped[TrainingProgramStructure] = relationship(back_populates="structure_days")
+
+
+
 class TrainingTemplateMethod(StrEnum):
     STANDARD = "standard"
     SUPERSET = "superset"
@@ -87,6 +160,13 @@ class TrainingProgramTemplate(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
+    # Nullable: existing admin-created programs may not have a structure assigned yet.
+    # New programs should always set structure_id to a compatible structure.
+    structure_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("training_program_structures.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     days: Mapped[list[TrainingProgramTemplateDay]] = relationship(
         back_populates="template",
@@ -94,6 +174,11 @@ class TrainingProgramTemplate(Base):
         passive_deletes=True,
         order_by=lambda: TrainingProgramTemplateDay.day_number,
     )
+    structure: Mapped[TrainingProgramStructure | None] = relationship(
+        back_populates="templates",
+        foreign_keys=[structure_id],
+    )
+
 
 
 class TrainingProgramTemplateDay(Base):

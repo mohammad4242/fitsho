@@ -58,12 +58,13 @@ const methods: TrainingTemplateMethod[] = ["standard", "superset", "drop_set"];
 const priorities: TrainingTemplateSlotPriority[] = ["core", "accessory", "optional"];
 
 export function AdminTrainingTemplateEditorPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const english = i18n.resolvedLanguage === "en";
   const { templateId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [form, setForm] = useState<AdminTrainingProgramTemplateForm>(() =>
-    emptyTemplate(defaultDays(searchParams.get("days")), defaultLevel(searchParams.get("level"))),
+    emptyTemplate(defaultDays(searchParams.get("days")), defaultLevel(searchParams.get("level")), searchParams.get("structure_id")),
   );
   const [state, setState] = useState<EditorState>(templateId === undefined ? "ready" : "loading");
   const [openSections, setOpenSections] = useState<Set<EditorSectionId>>(() =>
@@ -75,6 +76,18 @@ export function AdminTrainingTemplateEditorPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [structures, setStructures] = useState<import("./types").AdminTrainingProgramStructure[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    import("./api").then(({ getAdminTrainingProgramStructures }) => {
+      getAdminTrainingProgramStructures(form.days_per_week).then((res) => {
+        if (!active) return;
+        setStructures(res.items);
+      }).catch(console.error);
+    });
+    return () => { active = false; };
+  }, [form.days_per_week]);
 
   useEffect(() => {
     if (templateId === undefined) return;
@@ -134,6 +147,7 @@ export function AdminTrainingTemplateEditorPage() {
     setForm((current) => ({
       ...current,
       days_per_week: daysPerWeek,
+      structure_id: null,
       days: resizeDays(current.days, daysPerWeek),
     }));
   }
@@ -366,6 +380,19 @@ export function AdminTrainingTemplateEditorPage() {
                     {[2, 3, 4, 5, 6].map((days) => <option key={days} value={days}>{t("admin.templates.days", { count: days })}</option>)}
                   </select>
                 </label>
+                {structures.length > 0 && (
+                  <label className="admin-field">
+                    <span>{t("admin.templateEditor.structure")}</span>
+                    <select aria-label={t("admin.templateEditor.structure")} value={form.structure_id || ""} onChange={(event) => updateField("structure_id", event.target.value || null)}>
+                      <option value="">{t("admin.templateEditor.noStructure")}</option>
+                      {structures.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {english ? s.name_en : s.name_fa}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <fieldset className="admin-template-level-selector">
                   <legend>{t("admin.templateEditor.supportedLevels")}</legend>
                   <p>{t("admin.templateEditor.supportedLevelsHint")}</p>
@@ -752,7 +779,7 @@ function defaultLevel(value: string | null): ExperienceLevel {
   return levels.includes(value as ExperienceLevel) ? value as ExperienceLevel : "beginner";
 }
 
-function emptyTemplate(daysPerWeek: number, level: ExperienceLevel): AdminTrainingProgramTemplateForm {
+function emptyTemplate(daysPerWeek: number, level: ExperienceLevel, structureId: string | null): AdminTrainingProgramTemplateForm {
   return {
     name_en: "New Training Program",
     name_fa: "برنامه تمرینی جدید",
@@ -767,6 +794,7 @@ function emptyTemplate(daysPerWeek: number, level: ExperienceLevel): AdminTraini
     source_name: "Fitsho admin library",
     source_url: "https://fitsho.local/admin-library",
     days: Array.from({ length: daysPerWeek }, (_, index) => emptyDay(index + 1)),
+    structure_id: structureId,
   };
 }
 
@@ -826,6 +854,7 @@ function formToPayload(form: AdminTrainingProgramTemplateForm): AdminTrainingPro
     programming_rationale: form.programming_rationale,
     source_name: form.source_name,
     source_url: form.source_url,
+    structure_id: form.structure_id,
     days: form.days.map((day) => ({
       title_en: day.title_en,
       title_fa: day.title_fa,
