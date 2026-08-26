@@ -223,6 +223,7 @@ class AdminTrainingTemplateSlot(BaseModel):
     target_rir: int
     rest_seconds: int
     exercise: AdminTrainingTemplateExercise | None
+    superset_exercise: AdminTrainingTemplateExercise | None = None
 
 
 class AdminTrainingTemplateDay(BaseModel):
@@ -287,6 +288,7 @@ class AdminTrainingTemplateSlotWrite(BaseModel):
         str | None,
         StringConstraints(strip_whitespace=True, min_length=1, max_length=32),
     ] = None
+    superset_exercise_id: UUID | None = None
     sets: int = Field(ge=1, le=10)
     rep_min: int = Field(ge=1, le=100)
     rep_max: int = Field(ge=1, le=100)
@@ -307,7 +309,7 @@ class AdminTrainingTemplateDayWrite(BaseModel):
     title_fa: Name
     structure_focus: Name
     direct_target_muscles: list[MuscleGroup] = Field(min_length=1)
-    slots: list[AdminTrainingTemplateSlotWrite] = Field(min_length=5, max_length=9)
+    slots: list[AdminTrainingTemplateSlotWrite] = Field(min_length=1)
 
 
 class AdminTrainingProgramTemplateWrite(BaseModel):
@@ -365,17 +367,18 @@ class AdminTrainingProgramTemplateWrite(BaseModel):
         }:
             raise ValueError("First Month and Beginner templates cannot use advanced methods")
         for day in self.days:
-            groups: dict[str, list[int]] = {}
-            for index, slot in enumerate(day.slots):
+            print("METHODS:", [slot.intensity_method for slot in day.slots])
+            exercise_count = sum(2 if slot.intensity_method == TrainingTemplateMethod.SUPERSET else 1 for slot in day.slots)
+            if exercise_count < 4 or exercise_count > 9:
+                raise ValueError("Each day must contain exactly 4 to 9 runtime exercises (a superset counts as two)")
+        for day in self.days:
+            for slot in day.slots:
                 if slot.intensity_method is TrainingTemplateMethod.SUPERSET:
-                    if slot.superset_group is None:
-                        raise ValueError("Superset slots require a group")
-                    groups.setdefault(slot.superset_group, []).append(index)
-                elif slot.superset_group is not None:
-                    raise ValueError("Only superset slots may declare a superset group")
-            if any(
-                len(indices) != 2 or indices[1] != indices[0] + 1
-                for indices in groups.values()
-            ):
-                raise ValueError("Superset groups must contain one adjacent pair")
+                    if slot.superset_exercise_id is None:
+                        raise ValueError("Superset slots require a superset_exercise_id")
+                    if slot.exercise_id == slot.superset_exercise_id:
+                        raise ValueError("Superset exercises must be different")
+                else:
+                    if slot.superset_exercise_id is not None:
+                        raise ValueError("Only superset slots may declare a superset_exercise_id")
         return self

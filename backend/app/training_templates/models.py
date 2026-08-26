@@ -143,6 +143,10 @@ class TrainingProgramTemplateSlot(Base):
         CheckConstraint(
             "rest_seconds BETWEEN 0 AND 600", name="ck_training_program_template_slots_rest"
         ),
+        CheckConstraint(
+            "(intensity_method = 'superset' AND superset_exercise_id IS NOT NULL AND exercise_id != superset_exercise_id AND superset_exercise_slug_hint IS NOT NULL) OR (intensity_method != 'superset' AND superset_exercise_id IS NULL AND superset_exercise_slug_hint IS NULL)",
+            name="ck_training_program_template_slots_superset_validity"
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -194,6 +198,10 @@ class TrainingProgramTemplateSlot(Base):
         server_default=TrainingTemplateSlotPriority.ACCESSORY.value,
     )
     superset_group: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    superset_exercise_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("exercises.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    superset_exercise_slug_hint: Mapped[str | None] = mapped_column(String(120), nullable=True)
     sets: Mapped[int] = mapped_column(Integer, nullable=False)
     rep_min: Mapped[int] = mapped_column(Integer, nullable=False)
     rep_max: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -201,4 +209,5 @@ class TrainingProgramTemplateSlot(Base):
     rest_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
 
     day: Mapped[TrainingProgramTemplateDay] = relationship(back_populates="slots")
-    exercise: Mapped[Exercise | None] = relationship()
+    exercise: Mapped[Exercise | None] = relationship(foreign_keys=[exercise_id])
+    superset_exercise: Mapped[Exercise | None] = relationship(foreign_keys=[superset_exercise_id])

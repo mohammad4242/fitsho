@@ -734,3 +734,48 @@
 .admin-template-delete { border: 1px solid rgb(161 63 50 / 26%); border-radius: .65rem; background: rgb(161 63 50 / 9%); color: var(--danger); cursor: pointer; font: inherit; font-weight: 900; padding: .65rem .85rem; }
 .admin-template-delete:focus-visible { outline: 3px solid rgb(161 63 50 / 25%); }
 @media (max-width: 760px) { .admin-template-level-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }.admin-template-editor-actions > div { width: 100%; }.admin-template-editor-actions > div button { flex: 1; } }
+
+.admin-method-selector {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+.admin-method-selector label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+.admin-slot-picker-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  border: 1px solid var(--fitsho-border);
+  border-radius: var(--fitsho-radius);
+  background-color: var(--fitsho-surface);
+}
+.admin-slot-picker-group button {
+  background: var(--fitsho-primary);
+  color: white;
+  border: none;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.admin-badge {
+  display: inline-block;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+.admin-badge--superset {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.admin-badge--drop-set {
+  background: #fce7f3;
+  color: #be185d;
+}

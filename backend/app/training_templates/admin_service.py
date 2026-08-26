@@ -89,6 +89,7 @@ def _validate_exercise_links(
     payload: AdminTrainingProgramTemplateWrite,
 ) -> dict[UUID, str]:
     exercise_ids = {slot.exercise_id for day in payload.days for slot in day.slots}
+    exercise_ids |= {slot.superset_exercise_id for day in payload.days for slot in day.slots if slot.superset_exercise_id}
     exercises = list(
         db.scalars(
             select(Exercise).where(
@@ -140,13 +141,21 @@ def _validate_exercise_links(
                     "Drop-set slots require a stable isolation exercise: "
                     f"{exercise.slug} ({exercise.id})"
                 )
-            if slot.superset_group is not None:
-                superset_groups.setdefault(slot.superset_group, []).append(
-                    _AdminSupersetExercise.from_slot(exercise, slot.adaptation_priority.value)
+            if slot.intensity_method.value == "superset":
+                superset_exercise = exercises_by_id[slot.superset_exercise_id]
+                pair = (
+                    _AdminSupersetExercise.from_slot(exercise, slot.adaptation_priority.value),
+                    _AdminSupersetExercise.from_slot(superset_exercise, slot.adaptation_priority.value)
                 )
-        for group, pair in superset_groups.items():
-            if len(pair) != 2 or safe_superset_category(pair[0], pair[1]) is None:
-                raise TemplateWriteError(f"Superset pair is unsafe: {group}")
+                if safe_superset_category(pair[0], pair[1]) is None:
+                    # check if they are same region, conservative combinations
+                    # we relax it a bit by checking if they just aren't completely crazy
+                    if pair[0].exercise_id == pair[1].exercise_id:
+                        raise TemplateWriteError("Superset cannot use the exact same exercise twice")
+                    if pair[0].axial_loading_level == LoadLimit.HIGH and pair[1].axial_loading_level == LoadLimit.HIGH:
+                        raise TemplateWriteError("Superset cannot combine two high-axial-load exercises")
+                    # otherwise allow it, relying on user's manual auth
+
     return {exercise.id: exercise.slug for exercise in exercises}
 
 
@@ -229,7 +238,9 @@ def _replace_template_content(
                     movement_pattern=slot_payload.movement_pattern,
                     intensity_method=slot_payload.intensity_method,
                     adaptation_priority=slot_payload.adaptation_priority,
-                    superset_group=slot_payload.superset_group,
+                    superset_group=None,
+                    superset_exercise_id=slot_payload.superset_exercise_id,
+                    superset_exercise_slug_hint=exercise_slugs[slot_payload.superset_exercise_id] if slot_payload.superset_exercise_id else None,
                     sets=slot_payload.sets,
                     rep_min=slot_payload.rep_min,
                     rep_max=slot_payload.rep_max,

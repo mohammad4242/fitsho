@@ -167,13 +167,33 @@ def _write_template(
             direct_target_muscles=[muscle.value for muscle in day_seed.direct_target_muscles],
         )
         template.days.append(day)
-        for slot_order, slot_seed in enumerate(day_seed.slots, start=1):
+        merged_slots = []
+        superset_pending = {}
+        for slot_seed in day_seed.slots:
+            if slot_seed.intensity_method.value == "superset" and slot_seed.superset_group:
+                group = slot_seed.superset_group
+                if group not in superset_pending:
+                    superset_pending[group] = slot_seed
+                else:
+                    merged_slots.append((superset_pending.pop(group), slot_seed))
+            else:
+                merged_slots.append((slot_seed, None))
+
+        for slot_order, (slot_seed, second_seed) in enumerate(merged_slots, start=1):
             exercise_id = _exercise_id_for_slot(slot_seed.catalog_slug_hints, exercises_by_slug)
+            superset_exercise_id = None
+            superset_exercise_slug_hint = None
+            if second_seed is not None:
+                superset_exercise_id = _exercise_id_for_slot(second_seed.catalog_slug_hints, exercises_by_slug)
+                superset_exercise_slug_hint = second_seed.exercise_slug_hint
+                
             day.slots.append(
                 TrainingProgramTemplateSlot(
                     slot_order=slot_order,
                     exercise_id=exercise_id,
                     exercise_slug_hint=slot_seed.exercise_slug_hint,
+                    superset_exercise_id=superset_exercise_id,
+                    superset_exercise_slug_hint=superset_exercise_slug_hint,
                     placeholder_name_en=slot_seed.placeholder_name_en,
                     placeholder_name_fa=slot_seed.placeholder_name_fa,
                     target_muscles=[muscle.value for muscle in slot_seed.target_muscles],

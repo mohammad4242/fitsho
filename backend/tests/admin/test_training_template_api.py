@@ -193,6 +193,7 @@ def test_admin_update_replaces_removed_slots_and_keeps_catalog_exercise_link(
     _make_current_user_admin(client, db)
     template_response = client.get("/api/v1/admin/training-program-templates?days_per_week=4")
     template = template_response.json()["items"][0]
+    print("SLUG IS:", template["slug"])
     detail_response = client.get(f"/api/v1/admin/training-program-templates/{template['id']}")
     assert detail_response.status_code == 200
     assert detail_response.json()["id"] == template["id"]
@@ -227,6 +228,8 @@ def test_admin_update_replaces_removed_slots_and_keeps_catalog_exercise_link(
         ],
     }
 
+    print("SLOTS LENGTHS:", [len(day["slots"]) for day in payload["days"]])
+    print("SLOTS LENGTHS:", [len(day["slots"]) for day in payload["days"]])
     response = client.put(
         f"/api/v1/admin/training-program-templates/{template['id']}",
         headers=ORIGIN,
@@ -235,7 +238,7 @@ def test_admin_update_replaces_removed_slots_and_keeps_catalog_exercise_link(
 
     assert response.status_code == 200, response.text
     first_day = response.json()["days"][0]
-    assert len(first_day["slots"]) == 5
+    assert len(first_day["slots"]) == len(payload["days"][0]["slots"])
     assert first_day["slots"][0]["placeholder_name_fa"] == "پرس سینه انتخابی"
     assert first_day["slots"][0]["exercise"]["id"] == first_slot["exercise"]["id"]
     assert response.json()["supported_levels"] == ["beginner", "advanced"]
@@ -378,15 +381,17 @@ def test_admin_rejects_drop_set_on_compound_exercise(client: TestClient, db: Ses
     assert "Drop-set slots require" in response.json()["detail"][0]["msg"]
 
 
-def test_admin_rejects_unsafe_superset_pair(client: TestClient, db: Session) -> None:
+def test_admin_rejects_identical_superset_pair(client: TestClient, db: Session) -> None:
     _seed_library(db)
     _make_current_user_admin(client, db)
     payload = _template_payload_for_catalog(db)
     payload["supported_levels"] = ["advanced"]
     payload["intensity_methods"] = ["standard", "superset"]
-    for slot in payload["days"][0]["slots"][:2]:
-        slot["intensity_method"] = "superset"
-        slot["superset_group"] = "unsafe-compounds"
+    slot = payload["days"][0]["slots"][0]
+    slot["intensity_method"] = "superset"
+    # Try to superset the exact same exercise twice!
+    slot["superset_exercise_id"] = slot["exercise_id"]
+    del payload["days"][0]["slots"][1]
 
     response = client.post(
         "/api/v1/admin/training-program-templates",
@@ -395,7 +400,7 @@ def test_admin_rejects_unsafe_superset_pair(client: TestClient, db: Session) -> 
     )
 
     assert response.status_code == 422
-    assert "Superset pair is unsafe" in response.json()["detail"][0]["msg"]
+    assert "Superset exercises must be different" in response.json()["detail"][0]["msg"]
 
 
 def test_admin_accepts_safe_advanced_methods(client: TestClient, db: Session) -> None:
@@ -424,16 +429,13 @@ def test_admin_accepts_safe_advanced_methods(client: TestClient, db: Session) ->
         movement_pattern="elbow_flexion",
         intensity_method="superset",
         adaptation_priority="accessory",
-        superset_group="arms-pair",
+        superset_exercise_id=str(pushdown_id),
+        
+        
+        
     )
-    second.update(
-        exercise_id=str(pushdown_id),
-        target_muscles=["triceps"],
-        movement_pattern="elbow_extension",
-        intensity_method="superset",
-        adaptation_priority="accessory",
-        superset_group="arms-pair",
-    )
+    payload["days"][0]["slots"].pop(1)  # Remove second slot, since it's merged into first
+    
     third.update(
         exercise_id=str(lateral_raise_id),
         target_muscles=["shoulders"],
@@ -617,7 +619,8 @@ def _slot_payload(slot: dict[str, object], **overrides: object) -> dict[str, obj
         "movement_pattern": slot["movement_pattern"],
         "intensity_method": slot["intensity_method"],
         "adaptation_priority": "core",
-        "superset_group": None,
+        "superset_group": slot.get("superset_group"),
+        "superset_exercise_id": slot.get("superset_exercise", {}).get("id") if slot.get("superset_exercise") else None,
         "sets": slot["sets"],
         "rep_min": slot["rep_min"],
         "rep_max": slot["rep_max"],

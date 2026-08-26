@@ -384,6 +384,8 @@ class TemplateReferenceSlot:
     intensity_method: str
     adaptation_priority: str
     superset_group: str | None
+    superset_exercise_id: UUID | None
+    superset_exercise_slug_hint: str | None
     sets: int
     rep_min: int
     rep_max: int

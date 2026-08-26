@@ -244,6 +244,41 @@ export function AdminTrainingTemplateEditorPage() {
     setPickerTarget(null);
   }
 
+  function addDraftSlot(dayIndex: number) {
+    const existingSlotCount = form.days[dayIndex]?.slots.length ?? 0;
+    const slot: AdminTrainingTemplateSlotForm = {
+      exercise_id: null,
+      exercise_name_fa: null,
+      exercise_name_en: null,
+      exercise_slug: null,
+      superset_exercise_id: null,
+      superset_exercise_name_fa: null,
+      superset_exercise_name_en: null,
+      superset_exercise_slug: null,
+      display_name_en: null,
+      display_name_fa: null,
+      target_muscles: ["chest"],
+      movement_pattern: "other",
+      intensity_method: "standard",
+      adaptation_priority: "accessory",
+      superset_group: null,
+      sets: 3,
+      rep_min: 8,
+      rep_max: 12,
+      target_rir: 2,
+      rest_seconds: 90,
+    };
+    const newSlotKey = `${dayIndex}-${existingSlotCount}`;
+    setForm((current) => ({
+      ...current,
+      days: current.days.map((day, index) => (
+        index === dayIndex ? { ...day, slots: [...day.slots, slot] } : day
+      )),
+    }));
+    setExpandedDays((current) => new Set([...current, dayIndex]));
+    setExpandedSlots((current) => new Set([...current, newSlotKey]));
+  }
+
   async function save() {
     if (slotCountProblems) {
       setSaveError(t("admin.templateEditor.slotCountError"));
@@ -460,7 +495,18 @@ export function AdminTrainingTemplateEditorPage() {
                                     >
                                       <span className="admin-template-editor-slot__meta">
                                         <span className="admin-template-editor-slot__index">{slotIndex + 1}</span>
-                                        <strong className="admin-template-editor-slot__title">{slotName}</strong>
+                                        {slot.intensity_method === "superset" ? (
+                                          <div className="admin-template-editor-slot__title">
+                                            <span className="admin-badge admin-badge--superset">{t("admin.templates.methods.superset")}</span>
+                                            <div>A. {slot.exercise_name_fa || "?"}</div>
+                                            <div>B. {slot.superset_exercise_name_fa || "?"}</div>
+                                          </div>
+                                        ) : (
+                                          <strong className="admin-template-editor-slot__title">
+                                            {slot.intensity_method === "drop_set" && <span className="admin-badge admin-badge--drop-set">{t("admin.templates.methods.drop_set")} </span>}
+                                            {slotName}
+                                          </strong>
+                                        )}
                                         <span className="admin-template-editor-slot__prescription" dir="ltr">
                                           {prescriptionSummary}
                                         </span>
@@ -471,28 +517,62 @@ export function AdminTrainingTemplateEditorPage() {
 
                                   {isSlotExpanded && (
                                     <div className="admin-slot-accordion-panel admin-template-editor-slot__panel" id={slotPanelId}>
-                                      <div className="admin-template-editor-slot__actions">
-                                        <button
-                                          className="admin-slot-choose-btn"
-                                          onClick={() => setPickerTarget({ dayIndex, slotIndex })}
-                                          type="button"
-                                        >
-                                          {t("admin.templateEditor.chooseFromLibrary")}
-                                        </button>
-                                        <div className="admin-slot-actions-group">
-                                          <Link to={`/admin/exercises/${slot.exercise_id}/edit`}>
-                                            {t("admin.templateEditor.exerciseDetails")} ↗
-                                          </Link>
-                                          <button
-                                            aria-label={t("admin.templateEditor.removeExerciseAria", { name: slotName })}
-                                            onClick={() => removeSlot(dayIndex, slotIndex)}
-                                            type="button"
-                                          >
-                                            {t("admin.templateEditor.removeExercise")}
-                                          </button>
-                                        </div>
-                                      </div>
                                       <div className="admin-template-editor-grid admin-template-editor-grid--slot">
+                                        <div className="admin-field admin-field--full-width">
+                                          <span>{t("admin.templateEditor.executionMethod")}</span>
+                                          <div className="admin-method-selector">
+                                            {methods.map((method) => (
+                                              <label key={method}>
+                                                <input
+                                                  type="radio"
+                                                  name={`method-${slotKey}`}
+                                                  value={method}
+                                                  checked={slot.intensity_method === method}
+                                                  onChange={(e) => {
+                                                    const newMethod = e.target.value as TrainingTemplateMethod;
+                                                    if (newMethod === "standard" || newMethod === "drop_set") {
+                                                      patchSlot(dayIndex, slotIndex, {
+                                                        intensity_method: newMethod,
+                                                        superset_exercise_id: null,
+                                                        superset_exercise_name_fa: null,
+                                                        superset_exercise_name_en: null,
+                                                        superset_exercise_slug: null,
+                                                      });
+                                                    } else {
+                                                      patchSlot(dayIndex, slotIndex, {
+                                                        intensity_method: newMethod,
+                                                      });
+                                                    }
+                                                  }}
+                                                />
+                                                {t(`admin.templates.methods.${method}`)}
+                                              </label>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        <div className="admin-field admin-field--full-width">
+                                          <span>{slot.intensity_method === "superset" ? t("admin.templateEditor.movement1") : t("admin.templateEditor.movement")}</span>
+                                          <div className="admin-slot-picker-group">
+                                            <strong>{slot.exercise_name_fa || t("admin.templateEditor.emptyMovement")}</strong>
+                                            <button type="button" onClick={() => setPickerTarget({ dayIndex, slotIndex, member: "primary" })}>
+                                              {t("admin.templateEditor.chooseFromLibrary")}
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {slot.intensity_method === "superset" && (
+                                          <div className="admin-field admin-field--full-width">
+                                            <span>{t("admin.templateEditor.movement2")}</span>
+                                            <div className="admin-slot-picker-group">
+                                              <strong>{slot.superset_exercise_name_fa || t("admin.templateEditor.emptyMovement")}</strong>
+                                              <button type="button" onClick={() => setPickerTarget({ dayIndex, slotIndex, member: "superset" })}>
+                                                {t("admin.templateEditor.chooseFromLibrary")}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        )}
+
                                         <TextInput
                                           dir="rtl"
                                           label={t("admin.templateEditor.displayNameFa")}
@@ -512,12 +592,7 @@ export function AdminTrainingTemplateEditorPage() {
                                         <NumberInput label={t("admin.templateEditor.repMax")} value={slot.rep_max} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_max: value })} />
                                         <NumberInput label={t("admin.templateEditor.rir")} value={slot.target_rir} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_rir: value })} />
                                         <NumberInput label={t("admin.templateEditor.rest")} value={slot.rest_seconds} onChange={(value) => patchSlot(dayIndex, slotIndex, { rest_seconds: value })} />
-                                        <label className="admin-field">
-                                          <span>{t("admin.templateEditor.method")}</span>
-                                          <select value={slot.intensity_method} onChange={(event) => patchSlot(dayIndex, slotIndex, { intensity_method: event.target.value as TrainingTemplateMethod })}>
-                                            {methods.map((method) => <option key={method} value={method}>{t(`admin.templates.methods.${method}`)}</option>)}
-                                          </select>
-                                        </label>
+
                                         <label className="admin-field">
                                           <span>{t("admin.templateEditor.priority")}</span>
                                           <select value={slot.adaptation_priority} onChange={(event) => patchSlot(dayIndex, slotIndex, { adaptation_priority: event.target.value as TrainingTemplateSlotPriority })}>
@@ -532,13 +607,29 @@ export function AdminTrainingTemplateEditorPage() {
                                         </label>
                                         <TextInput dir="ltr" label={t("admin.templateEditor.slotMuscles")} value={slot.target_muscles.join(", ")} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_muscles: parseMuscles(value) })} />
                                       </div>
+                                      <div className="admin-template-editor-slot__actions-footer" style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                                        {slot.exercise_id && (
+                                            <Link to={`/admin/exercises/${slot.exercise_id}/edit`}>
+                                              {t("admin.templateEditor.exerciseDetails")} ↗
+                                            </Link>
+                                        )}
+                                        <button
+                                          aria-label={t("admin.templateEditor.removeExerciseAria", { name: slotName })}
+                                          onClick={() => removeSlot(dayIndex, slotIndex)}
+                                          type="button"
+                                          className="admin-slot-remove-btn"
+                                          style={{ color: 'var(--fitsho-destructive)', background: 'none', border: 'none', cursor: 'pointer' }}
+                                        >
+                                          {t("admin.templateEditor.removeExercise")}
+                                        </button>
+                                      </div>
                                     </div>
                                   )}
                                 </li>
                               );
                             })}
                           </ol>
-                          <button className="admin-template-editor-add" onClick={() => setPickerTarget({ dayIndex, slotIndex: null })} type="button">{t("admin.templateEditor.addExercise")}</button>
+                          <button className="admin-template-editor-add" onClick={() => addDraftSlot(dayIndex)} type="button">{t("admin.templateEditor.addExercise")}</button>
                         </div>
                       )}
                     </section>

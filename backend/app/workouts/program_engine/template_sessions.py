@@ -88,12 +88,14 @@ def build_template_sessions(
     catalog_source = eligible if exercise_catalog is None else exercise_catalog
     catalog_by_id = {candidate.id: candidate for candidate in catalog_source}
     used: Counter[object] = Counter()
-    reserved: Counter[UUID] = Counter(
-        slot.exercise_id
-        for day in template.days
-        for slot in day.slots
-        if slot.exercise_id is not None
-    )
+    reserved_ids = []
+    for day in template.days:
+        for slot in day.slots:
+            if slot.exercise_id is not None:
+                reserved_ids.append(slot.exercise_id)
+            if getattr(slot, 'superset_exercise_id', None) is not None:
+                reserved_ids.append(slot.superset_exercise_id)
+    reserved: Counter[UUID] = Counter(reserved_ids)
     drafts: list[SessionDraft] = []
     resolutions: list[TemplateSlotResolution] = []
     build_reasons: list[str] = []
@@ -136,7 +138,37 @@ def build_template_sessions(
         if planned_minimum < ruleset.minimum_exercises_per_session:
             build_reasons.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
         selected: list[tuple[ExerciseCandidate, TemplateReferenceSlot]] = []
+        
+        expanded_slots = []
         for slot in reference_day.slots:
+            if slot.intensity_method == "superset" and getattr(slot, 'superset_exercise_id', None):
+                group_id = slot.superset_group or f"auto_{str(slot.exercise_id)[:8]}_{str(slot.superset_exercise_id)[:8]}"
+                from dataclasses import replace
+                slot_first = replace(slot, superset_group=group_id)
+                expanded_slots.append(slot_first)
+                
+                second_candidate = next((ex for ex in eligible if ex.id == slot.superset_exercise_id), None)
+                if second_candidate:
+                    second_muscles = (second_candidate.primary_muscle,)
+                    second_pattern = second_candidate.movement_pattern
+                else:
+                    second_muscles = slot.target_muscles
+                    second_pattern = slot.movement_pattern
+                
+                slot_second = replace(
+                    slot_first,
+                    exercise_id=slot.superset_exercise_id,
+                    exercise_slug_hint=slot.superset_exercise_slug_hint,
+                    target_muscles=second_muscles,
+                    movement_pattern=second_pattern,
+                    superset_exercise_id=None,
+                    superset_exercise_slug_hint=None,
+                )
+                expanded_slots.append(slot_second)
+            else:
+                expanded_slots.append(slot)
+
+        for slot in expanded_slots:
             if slot.exercise_id is not None:
                 reserved[slot.exercise_id] -= 1
             original = catalog_by_id.get(slot.exercise_id) if slot.exercise_id is not None else None
@@ -911,6 +943,8 @@ def _add_targeted_accessories(
                     intensity_method="standard",
                     adaptation_priority="accessory",
                     superset_group=None,
+                    superset_exercise_id=None,
+                    superset_exercise_slug_hint=None,
                     sets=3,
                     rep_min=8,
                     rep_max=15,

@@ -96,6 +96,11 @@ def test_advanced_catalog_methods_reach_the_programmed_session(db: Session) -> N
         for day in reference.days
         for slot in day.slots
         if slot.exercise_id is not None
+    } | {
+        getattr(slot, 'superset_exercise_id', None)
+        for day in reference.days
+        for slot in day.slots
+        if getattr(slot, 'superset_exercise_id', None) is not None
     }
     catalog = (
         *(

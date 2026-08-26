@@ -148,6 +148,8 @@ it("browses exercise library hierarchy and adds a movement", async () => {
   await screen.findByRole("heading", { name: "افزودن برنامه تمرینی" });
   await user.click(screen.getByRole("button", { name: "باز کردن روز 1: روز 1" }));
   await user.click(screen.getByRole("button", { name: "افزودن حرکت" }));
+  screen.debug();
+  await user.click((await screen.findAllByRole("button", { name: /انتخاب از کتابخانه/ }))[0]);
 
   // Modal opens with Category hierarchy
   expect(await screen.findByRole("dialog", { name: "انتخاب از کتابخانه حرکات" })).toBeInTheDocument();
@@ -185,6 +187,8 @@ it("searches the exercise library by English or Persian name, links a movement, 
   await screen.findByRole("heading", { name: "افزودن برنامه تمرینی" });
   await user.click(screen.getByRole("button", { name: "باز کردن روز 1: روز 1" }));
   await user.click(screen.getByRole("button", { name: "افزودن حرکت" }));
+  screen.debug();
+  await user.click((await screen.findAllByRole("button", { name: /انتخاب از کتابخانه/ }))[0]);
 
   // Type in search bar
   const searchInput = await screen.findByPlaceholderText("جست‌وجو با نام فارسی یا انگلیسی…");
