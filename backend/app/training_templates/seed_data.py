@@ -303,7 +303,6 @@ OVERHEAD_TRICEPS_EXTENSION = _movement(
     P.ELBOW_EXTENSION,
 )
 SHRUG = _movement("barbell-shrug", "fedb-0095-barbell-shrug", (M.TRAPS,), P.SHRUG)
-CRUNCH = _movement("crunch", "fedb-1452-lever-seated-crunch", (M.ABS,), P.SPINAL_FLEXION)
 FRONT_PLANK = _movement("front-plank", "fedb-0464-front-plank", (M.ABS,), P.CORE_ANTI_EXTENSION)
 SIDE_PLANK = _movement(
     "side-plank", "fedb-0705-side-plank", (M.OBLIQUES,), P.CORE_ANTI_LATERAL_FLEXION
@@ -699,7 +698,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Full Body",
@@ -754,7 +752,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Upper B",
@@ -797,7 +794,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Upper",
@@ -823,13 +819,12 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(LYING_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
         ),
         "The two lower sessions use different emphasis and should not be identical.",
         "دو جلسه پایین‌تنه تأکیدهای متفاوت دارند و نباید یکسان باشند.",
-        "Compounds lead each lower day, followed by leg curls, calves, and core; the upper day stays complete but compact.",
-        "حرکات ترکیبی هر روز پایین‌تنه اول می‌آیند و بعد پشت‌پا، ساق و مرکزی قرار می‌گیرد؛ روز بالاتنه کامل اما فشرده است.",
+        "Compounds lead each lower day, followed by leg curls and calves; the upper day stays complete but compact.",
+        "حرکات ترکیبی هر روز پایین‌تنه اول می‌آیند و بعد پشت‌پا و ساق قرار می‌گیرند؛ روز بالاتنه کامل اما فشرده است.",
         "Avoid making both lower days heavy for every lower-body muscle and keep recovery between them.",
         "هر دو روز پایین‌تنه را برای همه عضلات سنگین نکن و بین آن‌ها زمان ریکاوری بگذار.",
     ),
@@ -864,7 +859,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Upper B",
@@ -888,13 +882,12 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(LYING_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
         ),
         "Each region receives two weekly sessions with controlled A/B movement variation; machines remain valid at every level.",
         "هر ناحیه دو جلسه در هفته دارد و تنوع حرکتی A/B کنترل‌شده است؛ دستگاه‌ها در همه سطوح معتبر می‌مانند.",
-        "Upper days group chest, back, and shoulders; lower days group squat or hinge work before isolation and core.",
-        "روزهای بالاتنه سینه، پشت و سرشانه را گروه‌بندی می‌کنند؛ روزهای پایین‌تنه اسکوات یا هینج را پیش از تک‌مفصلی و مرکزی می‌آورند.",
+        "Upper days group chest, back, and shoulders; lower days group squat or hinge work before isolation.",
+        "روزهای بالاتنه سینه، پشت و سرشانه را گروه‌بندی می‌کنند؛ روزهای پایین‌تنه اسکوات یا هینج را پیش از تک‌مفصلی می‌آورند.",
         "Use recovery days between repeated regional exposures and do not add advanced intensity techniques by default.",
         "بین مواجهه‌های تکراری ناحیه‌ای روز ریکاوری بگذار و به‌صورت پیش‌فرض تکنیک‌های شدت پیشرفته اضافه نکن.",
     ),
@@ -929,7 +922,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Upper B: Shoulders + Arms",
@@ -954,7 +946,6 @@ _DEFINITIONS = (
                 _primary(SEATED_CABLE_ROW),
                 _secondary(LAT_PULLDOWN),
                 _isolation(DUMBBELL_CURL),
-                _core(CRUNCH),
             ),
         ),
         "Do not make all three upper days identical; the dedicated shoulders-and-arms day limits chest/back repetition.",
@@ -982,7 +973,6 @@ _DEFINITIONS = (
                 _primary(LEG_PRESS),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Upper",
@@ -1007,7 +997,6 @@ _DEFINITIONS = (
                 _secondary(LYING_LEG_CURL),
                 _primary(GLUTE_BRIDGE),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Lower C: Quad + Glute",
@@ -1018,13 +1007,12 @@ _DEFINITIONS = (
                 _isolation(LEG_EXTENSION),
                 _primary(GLUTE_BRIDGE),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
         ),
         "Rotate quad, hamstring, and glute emphasis instead of making all three lower sessions heavy for every muscle.",
         "تأکید چهارسر، همسترینگ و باسن را بچرخان و هر سه روز پایین‌تنه را برای همه عضلات سنگین نکن.",
-        "Lower compounds lead each emphasis block, then curls, extensions, calves, and core follow without scattering muscle work.",
-        "حرکات ترکیبی هر بلوک پایین‌تنه اول می‌آیند و بعد پشت‌پا، جلوپا، ساق و مرکزی بدون پراکندگی عضله قرار می‌گیرند.",
+        "Lower compounds lead each emphasis block, then curls, extensions, and calves follow without scattering muscle work.",
+        "حرکات ترکیبی هر بلوک پایین‌تنه اول می‌آیند و بعد پشت‌پا، جلوپا و ساق بدون پراکندگی عضله قرار می‌گیرند.",
         "Keep the upper day efficient and use recovery between the three distinct lower exposures.",
         "روز بالاتنه را کارآمد نگه دار و بین سه مواجهه متفاوت پایین‌تنه ریکاوری کافی بگذار.",
     ),
@@ -1047,7 +1035,6 @@ _DEFINITIONS = (
                 _primary(SHOULDER_PRESS),
                 _isolation(LATERAL_RAISE),
                 _isolation(TRICEPS_PUSHDOWN),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Pull",
@@ -1058,7 +1045,6 @@ _DEFINITIONS = (
                 _primary(LAT_PULLDOWN),
                 _isolation(DUMBBELL_CURL),
                 _isolation(SHRUG),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Quads",
@@ -1070,7 +1056,6 @@ _DEFINITIONS = (
                 _isolation(LEG_EXTENSION),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Posterior",
@@ -1082,7 +1067,6 @@ _DEFINITIONS = (
                 _primary(GLUTE_BRIDGE),
                 _secondary(LUNGE),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
         ),
         "Push and pull stay compound-led while quad and posterior days retain distinct bodybuilding purposes.",
@@ -1111,7 +1095,6 @@ _DEFINITIONS = (
                 _primary(SHOULDER_PRESS),
                 _isolation(LATERAL_RAISE),
                 _isolation(TRICEPS_PUSHDOWN),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Pull",
@@ -1123,7 +1106,6 @@ _DEFINITIONS = (
                 _isolation(DUMBBELL_CURL),
                 _isolation(HAMMER_CURL),
                 _isolation(SHRUG),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Legs",
@@ -1135,7 +1117,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Upper",
@@ -1158,7 +1139,6 @@ _DEFINITIONS = (
                 _secondary(LYING_LEG_CURL),
                 _primary(GLUTE_BRIDGE),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
         ),
         "PPL provides focused sessions and Upper/Lower adds another broad exposure without redundant extra work.",
@@ -1186,7 +1166,6 @@ _DEFINITIONS = (
                 _secondary(INCLINE_PRESS),
                 _isolation(CHEST_FLY),
                 _isolation(TRICEPS_PUSHDOWN),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Back",
@@ -1197,7 +1176,6 @@ _DEFINITIONS = (
                 _primary(LAT_PULLDOWN),
                 _secondary(SEATED_CABLE_ROW),
                 _isolation(DUMBBELL_CURL),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Legs",
@@ -1219,7 +1197,6 @@ _DEFINITIONS = (
                 _isolation(LATERAL_RAISE),
                 _isolation(REAR_DELT_FLY),
                 _isolation(SHRUG),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Arms",
@@ -1230,13 +1207,12 @@ _DEFINITIONS = (
                 _isolation(CABLE_CURL),
                 _isolation(TRICEPS_PUSHDOWN),
                 _isolation(OVERHEAD_TRICEPS_EXTENSION),
-                _core(CRUNCH),
             ),
         ),
         "Major compounds lead dedicated days and direct arm work follows the larger-muscle training of the week.",
         "حرکات ترکیبی اصلی در ابتدای روزهای اختصاصی می‌آیند و کار مستقیم بازو در هفته بعد از عضلات بزرگ‌تر قرار می‌گیرد.",
-        "Chest, back, and legs begin with multi-joint work; fly, curls, extensions, calves, and core stay after the main work.",
-        "سینه، پشت و پا با کار چندمفصلی شروع می‌شوند؛ فلای، جلو بازو، پشت بازو، ساق و مرکزی بعد از کار اصلی می‌آیند.",
+        "Chest, back, and legs begin with multi-joint work; fly, curls, extensions, and calves stay after the main work.",
+        "سینه، پشت و پا با کار چندمفصلی شروع می‌شوند؛ فلای، جلو بازو، پشت بازو و ساق بعد از کار اصلی می‌آیند.",
         "Keep direct volume controlled and do not require drop sets, rest-pause, or forced failure.",
         "حجم مستقیم را کنترل کن و دراپ‌ست، رست‌پاز یا شکست اجباری را الزامی نکن.",
     ),
@@ -1259,7 +1235,6 @@ _DEFINITIONS = (
                 _primary(SHOULDER_PRESS),
                 _isolation(LATERAL_RAISE),
                 _isolation(TRICEPS_PUSHDOWN),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Pull",
@@ -1271,7 +1246,6 @@ _DEFINITIONS = (
                 _isolation(DUMBBELL_CURL),
                 _isolation(HAMMER_CURL),
                 _isolation(SHRUG),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Legs",
@@ -1283,7 +1257,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Upper Priority",
@@ -1295,7 +1268,6 @@ _DEFINITIONS = (
                 _primary(ROW),
                 _secondary(LAT_PULLDOWN),
                 _isolation(LATERAL_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Lower Priority",
@@ -1307,7 +1279,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
         ),
         "Priority days are meaningful second exposures, not permission for excessive per-session volume.",
@@ -1336,7 +1307,6 @@ _DEFINITIONS = (
                 _isolation(CHEST_FLY),
                 _isolation(TRICEPS_PUSHDOWN),
                 _isolation(OVERHEAD_TRICEPS_EXTENSION),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Back + Biceps",
@@ -1359,7 +1329,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Shoulders + Arms",
@@ -1371,7 +1340,6 @@ _DEFINITIONS = (
                 _isolation(REAR_DELT_FLY),
                 _isolation(DUMBBELL_CURL),
                 _isolation(TRICEPS_PUSHDOWN),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Chest Priority",
@@ -1381,14 +1349,13 @@ _DEFINITIONS = (
                 _primary(FLAT_PRESS),
                 _secondary(INCLINE_PRESS),
                 _isolation(CHEST_FLY),
-                _core(CRUNCH),
                 _isolation(CALF_RAISE),
             ),
         ),
         "Chest receives two direct weekly sessions; other regions remain trained without excessive direct chest volume.",
         "سینه دو جلسه مستقیم هفتگی دارد و نواحی دیگر نیز بدون حجم مستقیم بیش‌ازحد سینه تمرین می‌شوند.",
-        "Finish both chest presses before fly work; place triceps after chest and keep the priority-day core and calf work last.",
-        "هر دو پرس سینه را پیش از فلای تمام کن؛ پشت بازو بعد از سینه و کار مرکزی و ساق روز اولویت در انتها باشد.",
+        "Finish both chest presses before fly work; place triceps after chest and keep the priority-day calf work last.",
+        "هر دو پرس سینه را پیش از فلای تمام کن؛ پشت بازو بعد از سینه و کار ساق روز اولویت در انتها باشد.",
         "Use this only when chest priority is intended and keep the non-chest days recoverable.",
         "این قالب را فقط با قصد اولویت سینه استفاده کن و روزهای غیرسینه را قابل‌ریکاوری نگه دار.",
     ),
@@ -1411,7 +1378,6 @@ _DEFINITIONS = (
                 _secondary(SEATED_CABLE_ROW),
                 _isolation(DUMBBELL_CURL),
                 _isolation(HAMMER_CURL),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Chest + Triceps",
@@ -1422,7 +1388,6 @@ _DEFINITIONS = (
                 _secondary(INCLINE_PRESS),
                 _isolation(TRICEPS_PUSHDOWN),
                 _isolation(OVERHEAD_TRICEPS_EXTENSION),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Legs",
@@ -1434,7 +1399,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Shoulders + Arms",
@@ -1446,7 +1410,6 @@ _DEFINITIONS = (
                 _isolation(REAR_DELT_FLY),
                 _isolation(DUMBBELL_CURL),
                 _isolation(TRICEPS_PUSHDOWN),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Back Priority",
@@ -1456,7 +1419,6 @@ _DEFINITIONS = (
                 _primary(ROW),
                 _primary(LAT_PULLDOWN),
                 _secondary(STRAIGHT_ARM_PULLDOWN),
-                _core(CRUNCH),
                 _isolation(CALF_RAISE),
             ),
         ),
@@ -1486,7 +1448,6 @@ _DEFINITIONS = (
                 _isolation(LEG_EXTENSION),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Chest",
@@ -1497,7 +1458,6 @@ _DEFINITIONS = (
                 _secondary(INCLINE_PRESS),
                 _isolation(CHEST_FLY),
                 _isolation(TRICEPS_PUSHDOWN),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Back",
@@ -1508,7 +1468,6 @@ _DEFINITIONS = (
                 _primary(LAT_PULLDOWN),
                 _secondary(SEATED_CABLE_ROW),
                 _isolation(DUMBBELL_CURL),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Shoulders + Arms",
@@ -1520,7 +1479,6 @@ _DEFINITIONS = (
                 _isolation(REAR_DELT_FLY),
                 _isolation(DUMBBELL_CURL),
                 _isolation(TRICEPS_PUSHDOWN),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Posterior Chain",
@@ -1532,7 +1490,6 @@ _DEFINITIONS = (
                 _primary(GLUTE_BRIDGE),
                 _secondary(LUNGE),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
         ),
         "Split quad and posterior emphasis; hamstrings receive both hinge and curl patterns without excessive specialization volume.",
@@ -1561,7 +1518,6 @@ _DEFINITIONS = (
                 _primary(SHOULDER_PRESS),
                 _isolation(LATERAL_RAISE),
                 _isolation(TRICEPS_PUSHDOWN),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Pull A",
@@ -1573,7 +1529,6 @@ _DEFINITIONS = (
                 _isolation(DUMBBELL_CURL),
                 _isolation(HAMMER_CURL),
                 _isolation(SHRUG),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Legs A",
@@ -1585,7 +1540,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Push B",
@@ -1597,7 +1551,6 @@ _DEFINITIONS = (
                 _primary(SHOULDER_PRESS),
                 _isolation(LATERAL_RAISE),
                 _isolation(OVERHEAD_TRICEPS_EXTENSION),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Pull B",
@@ -1609,7 +1562,6 @@ _DEFINITIONS = (
                 _isolation(DUMBBELL_CURL),
                 _isolation(HAMMER_CURL),
                 _isolation(SHRUG),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Legs B",
@@ -1621,7 +1573,6 @@ _DEFINITIONS = (
                 _primary(FRONT_SQUAT),
                 _primary(GLUTE_BRIDGE),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
         ),
         "A/B variation is purposeful; Push B completes chest before shoulders and posterior work does not replace later compounds.",
@@ -1649,7 +1600,6 @@ _DEFINITIONS = (
                 _secondary(INCLINE_PRESS),
                 _isolation(CHEST_FLY),
                 _isolation(TRICEPS_PUSHDOWN),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Back",
@@ -1660,7 +1610,6 @@ _DEFINITIONS = (
                 _primary(LAT_PULLDOWN),
                 _secondary(SEATED_CABLE_ROW),
                 _isolation(DUMBBELL_CURL),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Quads",
@@ -1682,7 +1631,6 @@ _DEFINITIONS = (
                 _isolation(LATERAL_RAISE),
                 _isolation(REAR_DELT_FLY),
                 _isolation(SHRUG),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Arms",
@@ -1693,7 +1641,6 @@ _DEFINITIONS = (
                 _isolation(CABLE_CURL),
                 _isolation(TRICEPS_PUSHDOWN),
                 _isolation(OVERHEAD_TRICEPS_EXTENSION),
-                _core(CRUNCH),
                 intensity_overrides={
                     "cable-curl": (Method.SUPERSET, "t16-arms-superset"),
                     "triceps-pushdown": (Method.SUPERSET, "t16-arms-superset"),
@@ -1710,13 +1657,12 @@ _DEFINITIONS = (
                 _primary(GLUTE_BRIDGE),
                 _secondary(LUNGE),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
         ),
         "Each day has a clear focus and uses appropriate modalities without automatically adding advanced intensity methods.",
         "هر روز تمرکز روشن دارد و از وسایل مناسب استفاده می‌کند، بدون افزودن خودکار تکنیک‌های شدت پیشرفته.",
-        "Dedicated days place major compounds before isolation; arms, calves, and core remain after the main regional block.",
-        "روزهای اختصاصی حرکات ترکیبی اصلی را پیش از تک‌مفصلی می‌آورند؛ بازو، ساق و مرکزی بعد از بلوک اصلی ناحیه‌ای می‌آیند.",
+        "Dedicated days place major compounds before isolation; arms and calves remain after the main regional block.",
+        "روزهای اختصاصی حرکات ترکیبی اصلی را پیش از تک‌مفصلی می‌آورند؛ بازو و ساق بعد از بلوک اصلی ناحیه‌ای می‌آیند.",
         "Use this advanced option only when six-day recovery is realistic and keep technique ahead of fatigue.",
         "این گزینه پیشرفته را فقط وقتی استفاده کن که ریکاوری شش‌روزه واقع‌بینانه باشد و فرم بر خستگی مقدم بماند.",
     ),
@@ -1739,7 +1685,6 @@ _DEFINITIONS = (
                 _primary(SHOULDER_PRESS),
                 _isolation(LATERAL_RAISE),
                 _isolation(TRICEPS_PUSHDOWN),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Pull",
@@ -1751,7 +1696,6 @@ _DEFINITIONS = (
                 _isolation(DUMBBELL_CURL),
                 _isolation(HAMMER_CURL),
                 _isolation(SHRUG),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Legs",
@@ -1763,7 +1707,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(SEATED_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
             _day_definition(
                 "Chest Priority",
@@ -1774,7 +1717,6 @@ _DEFINITIONS = (
                 _secondary(INCLINE_PRESS),
                 _isolation(CHEST_FLY),
                 _isolation(TRICEPS_PUSHDOWN),
-                _core(CRUNCH),
                 intensity_overrides={
                     "chest-fly": (Method.SUPERSET, "t17-chest-superset"),
                     "triceps-pushdown": (Method.SUPERSET, "t17-chest-superset"),
@@ -1791,7 +1733,6 @@ _DEFINITIONS = (
                 _primary(SHOULDER_PRESS),
                 _isolation(LATERAL_RAISE),
                 _isolation(REAR_DELT_FLY),
-                _core(CRUNCH),
                 intensity_overrides={"lateral-raise": (Method.DROP_SET, None)},
             ),
             _day_definition(
@@ -1805,7 +1746,6 @@ _DEFINITIONS = (
                 _primary(RDL),
                 _secondary(LYING_LEG_CURL),
                 _isolation(CALF_RAISE),
-                _core(CRUNCH),
             ),
         ),
         "Second exposures have clear emphasis while chest, back, and lower-body volume stays controlled.",

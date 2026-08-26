@@ -58,7 +58,18 @@ def test_seed_has_approved_supported_level_unions_and_shared_day_counts() -> Non
                 if definition.canonical_slug == seed.canonical_slug
             )
         )
-        assert all(5 <= len(day.slots) <= 9 for day in seed.days)
+        assert all(4 <= len(day.slots) <= 9 for day in seed.days)
+
+
+def test_canonical_template_builder_excludes_lever_seated_crunch() -> None:
+    crunch_slug = "fedb-1452-lever-seated-crunch"
+
+    assert all(
+        crunch_slug not in (slot.exercise_slug_hint, *slot.catalog_slug_hints)
+        for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS
+        for day in seed.days
+        for slot in day.slots
+    )
 
 
 def test_seed_uses_real_active_programmable_exercise_rows_only(db: Session) -> None:

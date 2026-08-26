@@ -232,7 +232,7 @@ def test_catalog_slots_are_linked_to_active_programmable_non_placeholder_exercis
 def test_catalog_days_guidance_and_prescriptions_match_document_contract() -> None:
     assert len({seed.canonical_slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS}) == 17
     assert all(
-        5 <= len(day.slots) <= 9 for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS for day in seed.days
+        4 <= len(day.slots) <= 9 for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS for day in seed.days
     )
     assert all(
         len(seed.programming_rationale) == 5
