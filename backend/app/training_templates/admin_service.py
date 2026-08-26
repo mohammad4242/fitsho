@@ -1,11 +1,12 @@
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.admin.schemas import AdminTrainingProgramTemplateWrite
+from app.admin.schemas import AdminTrainingProgramTemplateWrite, AdminTrainingTemplateSlotWrite
 from app.exercises.enums import (
     Equipment,
     ExerciseContentType,
@@ -42,7 +43,10 @@ def get_training_program_template(
         .options(
             selectinload(TrainingProgramTemplate.days)
             .selectinload(TrainingProgramTemplateDay.slots)
-            .selectinload(TrainingProgramTemplateSlot.exercise)
+            .selectinload(TrainingProgramTemplateSlot.exercise),
+            selectinload(TrainingProgramTemplate.days)
+            .selectinload(TrainingProgramTemplateDay.slots)
+            .selectinload(TrainingProgramTemplateSlot.superset_exercise),
         )
     )
 
@@ -75,6 +79,87 @@ def update_training_program_template(
     return _get_template_or_raise(db, template.id)
 
 
+def update_training_program_template_slot(
+    db: Session,
+    template_id: UUID,
+    day_id: UUID,
+    slot_id: UUID,
+    payload: AdminTrainingTemplateSlotWrite,
+) -> TrainingProgramTemplate | None:
+    slot = db.scalar(
+        select(TrainingProgramTemplateSlot)
+        .join(TrainingProgramTemplateDay, TrainingProgramTemplateDay.id == TrainingProgramTemplateSlot.template_day_id)
+        .where(
+            TrainingProgramTemplateDay.template_id == template_id,
+            TrainingProgramTemplateDay.id == day_id,
+            TrainingProgramTemplateSlot.id == slot_id,
+        )
+    )
+    if slot is None:
+        return None
+
+    exercise_slugs = _validate_exercise_links_for_slots(db, (payload,))
+    slot.exercise_id = payload.exercise_id
+    slot.exercise_slug_hint = exercise_slugs[payload.exercise_id]
+    slot.placeholder_name_en = payload.display_name_en
+    slot.placeholder_name_fa = payload.display_name_fa
+    slot.target_muscles = [muscle.value for muscle in payload.target_muscles]
+    slot.movement_pattern = payload.movement_pattern
+    slot.intensity_method = payload.intensity_method
+    slot.adaptation_priority = payload.adaptation_priority
+    slot.superset_group = payload.superset_group
+    slot.superset_exercise_id = payload.superset_exercise_id
+    slot.superset_exercise_slug_hint = (
+        exercise_slugs[payload.superset_exercise_id]
+        if payload.superset_exercise_id is not None
+        else None
+    )
+    slot.sets = payload.sets
+    slot.rep_min = payload.rep_min
+    slot.rep_max = payload.rep_max
+    slot.target_rir = payload.target_rir
+    slot.rest_seconds = payload.rest_seconds
+    db.commit()
+    return _get_template_or_raise(db, template_id)
+
+
+def delete_training_program_template_slot(
+    db: Session,
+    template_id: UUID,
+    day_id: UUID,
+    slot_id: UUID,
+) -> TrainingProgramTemplate | None:
+    day = db.scalar(
+        select(TrainingProgramTemplateDay)
+        .where(
+            TrainingProgramTemplateDay.template_id == template_id,
+            TrainingProgramTemplateDay.id == day_id,
+        )
+        .options(selectinload(TrainingProgramTemplateDay.slots))
+    )
+    if day is None:
+        return None
+    slot = next((item for item in day.slots if item.id == slot_id), None)
+    if slot is None:
+        return None
+
+    runtime_count = sum(2 if item.intensity_method.value == "superset" else 1 for item in day.slots)
+    removed_count = 2 if slot.intensity_method.value == "superset" else 1
+    if runtime_count - removed_count < 4:
+        raise TemplateWriteError("Each day must contain exactly 4 to 9 runtime exercises")
+
+    db.delete(slot)
+    db.flush()
+    remaining_slots = [item for item in day.slots if item.id != slot.id]
+    for slot_order, remaining in enumerate(
+        sorted(remaining_slots, key=lambda item: item.slot_order),
+        start=1,
+    ):
+        remaining.slot_order = slot_order
+    db.commit()
+    return _get_template_or_raise(db, template_id)
+
+
 def delete_training_program_template(db: Session, template_id: UUID) -> bool:
     template = db.get(TrainingProgramTemplate, template_id)
     if template is None:
@@ -88,8 +173,23 @@ def _validate_exercise_links(
     db: Session,
     payload: AdminTrainingProgramTemplateWrite,
 ) -> dict[UUID, str]:
-    exercise_ids = {slot.exercise_id for day in payload.days for slot in day.slots}
-    exercise_ids |= {slot.superset_exercise_id for day in payload.days for slot in day.slots if slot.superset_exercise_id}
+    return _validate_exercise_links_for_slots(
+        db,
+        (slot for day in payload.days for slot in day.slots),
+    )
+
+
+def _validate_exercise_links_for_slots(
+    db: Session,
+    slots: Iterable[AdminTrainingTemplateSlotWrite],
+) -> dict[UUID, str]:
+    slot_items = tuple(slots)
+    exercise_ids = {slot.exercise_id for slot in slot_items}
+    exercise_ids |= {
+        slot.superset_exercise_id
+        for slot in slot_items
+        if slot.superset_exercise_id
+    }
     exercises = list(
         db.scalars(
             select(Exercise).where(
@@ -116,45 +216,44 @@ def _validate_exercise_links(
             f"{formatted_ids}"
         )
     exercises_by_id = {exercise.id: exercise for exercise in exercises}
-    for day in payload.days:
-        superset_groups: dict[str, list[_AdminSupersetExercise]] = {}
-        for slot in day.slots:
-            exercise = exercises_by_id[slot.exercise_id]
-            compatibility = evaluate_candidate_slot_compatibility(
-                _ExerciseSemanticAdapter(exercise),
-                allowed_patterns=template_slot_allowed_patterns(
-                    slot.movement_pattern,
-                    tuple(slot.target_muscles),
-                ),
-                target_muscles=frozenset(slot.target_muscles),
+    for slot in slot_items:
+        exercise = exercises_by_id[slot.exercise_id]
+        compatibility = evaluate_candidate_slot_compatibility(
+            _ExerciseSemanticAdapter(exercise),
+            allowed_patterns=template_slot_allowed_patterns(
+                slot.movement_pattern,
+                tuple(slot.target_muscles),
+            ),
+            target_muscles=frozenset(slot.target_muscles),
+        )
+        if not compatibility.compatible:
+            raise TemplateWriteError(
+                "Selected exercise is incompatible with the slot movement or target muscles: "
+                f"{exercise.slug} ({exercise.id})"
             )
-            if not compatibility.compatible:
-                raise TemplateWriteError(
-                    "Selected exercise is incompatible with the slot movement or target muscles: "
-                    f"{exercise.slug} ({exercise.id})"
-                )
-            if (
-                slot.intensity_method.value == "drop_set"
-                and exercise.exercise_type is not ExerciseType.ISOLATION
-            ):
-                raise TemplateWriteError(
-                    "Drop-set slots require a stable isolation exercise: "
-                    f"{exercise.slug} ({exercise.id})"
-                )
-            if slot.intensity_method.value == "superset":
-                superset_exercise = exercises_by_id[slot.superset_exercise_id]
-                pair = (
-                    _AdminSupersetExercise.from_slot(exercise, slot.adaptation_priority.value),
-                    _AdminSupersetExercise.from_slot(superset_exercise, slot.adaptation_priority.value)
-                )
-                if safe_superset_category(pair[0], pair[1]) is None:
-                    # check if they are same region, conservative combinations
-                    # we relax it a bit by checking if they just aren't completely crazy
-                    if pair[0].exercise_id == pair[1].exercise_id:
-                        raise TemplateWriteError("Superset cannot use the exact same exercise twice")
-                    if pair[0].axial_loading_level == LoadLimit.HIGH and pair[1].axial_loading_level == LoadLimit.HIGH:
-                        raise TemplateWriteError("Superset cannot combine two high-axial-load exercises")
-                    # otherwise allow it, relying on user's manual auth
+        if (
+            slot.intensity_method.value == "drop_set"
+            and exercise.exercise_type is not ExerciseType.ISOLATION
+        ):
+            raise TemplateWriteError(
+                "Drop-set slots require a stable isolation exercise: "
+                f"{exercise.slug} ({exercise.id})"
+            )
+        if slot.intensity_method.value == "superset":
+            assert slot.superset_exercise_id is not None
+            superset_exercise = exercises_by_id[slot.superset_exercise_id]
+            pair = (
+                _AdminSupersetExercise.from_slot(exercise, slot.adaptation_priority.value),
+                _AdminSupersetExercise.from_slot(superset_exercise, slot.adaptation_priority.value),
+            )
+            if safe_superset_category(pair[0], pair[1]) is None:
+                # check if they are same region, conservative combinations
+                # we relax it a bit by checking if they just aren't completely crazy
+                if pair[0].exercise_id == pair[1].exercise_id:
+                    raise TemplateWriteError("Superset cannot use the exact same exercise twice")
+                if pair[0].axial_loading_level == LoadLimit.HIGH and pair[1].axial_loading_level == LoadLimit.HIGH:
+                    raise TemplateWriteError("Superset cannot combine two high-axial-load exercises")
+                # otherwise allow it, relying on user's manual auth
 
     return {exercise.id: exercise.slug for exercise in exercises}
 
@@ -238,7 +337,7 @@ def _replace_template_content(
                     movement_pattern=slot_payload.movement_pattern,
                     intensity_method=slot_payload.intensity_method,
                     adaptation_priority=slot_payload.adaptation_priority,
-                    superset_group=None,
+                    superset_group=slot_payload.superset_group,
                     superset_exercise_id=slot_payload.superset_exercise_id,
                     superset_exercise_slug_hint=exercise_slugs[slot_payload.superset_exercise_id] if slot_payload.superset_exercise_id else None,
                     sets=slot_payload.sets,

@@ -244,6 +244,87 @@ def test_admin_update_replaces_removed_slots_and_keeps_catalog_exercise_link(
     assert response.json()["supported_levels"] == ["beginner", "advanced"]
 
 
+def test_admin_updates_only_the_requested_training_template_slot(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    template = client.get(
+        "/api/v1/admin/training-program-templates?days_per_week=4"
+    ).json()["items"][0]
+    target_day = template["days"][0]
+    target_slot = target_day["slots"][0]
+    before = {
+        (day["id"], slot["id"]): (
+            slot["exercise"]["id"],
+            slot["sets"],
+            slot["rep_min"],
+            slot["rep_max"],
+            slot["target_rir"],
+        )
+        for day in template["days"]
+        for slot in day["slots"]
+    }
+    target_exercise = db.get(Exercise, target_slot["exercise"]["id"])
+    assert target_exercise is not None
+    replacement_id = db.scalar(
+        select(Exercise.id)
+        .where(
+            Exercise.id != target_exercise.id,
+            Exercise.primary_muscle == target_exercise.primary_muscle,
+            Exercise.movement_pattern == target_exercise.movement_pattern,
+            Exercise.is_active.is_(True),
+            Exercise.is_programmable.is_(True),
+        )
+        .limit(1)
+    )
+    assert replacement_id is not None
+
+    response = client.patch(
+        f"/api/v1/admin/training-program-templates/{template['id']}/days/{target_day['id']}/slots/{target_slot['id']}",
+        headers=ORIGIN,
+        json=_slot_payload(
+            target_slot,
+            exercise_id=str(replacement_id),
+            sets=5,
+            rep_min=6,
+            rep_max=10,
+            target_rir=1,
+        ),
+    )
+
+    assert response.status_code == 200, response.text
+    updated = response.json()
+    assert len(updated["days"]) == len(template["days"])
+    assert [day["id"] for day in updated["days"]] == [day["id"] for day in template["days"]]
+    updated_target = next(
+        slot
+        for day in updated["days"]
+        if day["id"] == target_day["id"]
+        for slot in day["slots"]
+        if slot["id"] == target_slot["id"]
+    )
+    assert updated_target["exercise"]["id"] == str(replacement_id)
+    assert (
+        updated_target["sets"],
+        updated_target["rep_min"],
+        updated_target["rep_max"],
+        updated_target["target_rir"],
+    ) == (5, 6, 10, 1)
+    for day in updated["days"]:
+        for slot in day["slots"]:
+            if slot["id"] == target_slot["id"]:
+                continue
+            assert (
+                slot["exercise"]["id"],
+                slot["sets"],
+                slot["rep_min"],
+                slot["rep_max"],
+                slot["target_rir"],
+            ) == before[(day["id"], slot["id"])]
+
+
 def test_admin_deletes_template_and_owned_days(client: TestClient, db: Session) -> None:
     _seed_library(db)
     _make_current_user_admin(client, db)

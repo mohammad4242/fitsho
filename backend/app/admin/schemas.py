@@ -217,6 +217,7 @@ class AdminTrainingTemplateSlot(BaseModel):
     intensity_method: TrainingTemplateMethod
     adaptation_priority: TrainingTemplateSlotPriority
     superset_group: str | None
+    superset_exercise_id: UUID | None
     sets: int
     rep_min: int
     rep_max: int

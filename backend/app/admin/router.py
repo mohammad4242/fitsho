@@ -34,6 +34,7 @@ from app.admin.schemas import (
     AdminTrainingTemplateDay,
     AdminTrainingTemplateExercise,
     AdminTrainingTemplateSlot,
+    AdminTrainingTemplateSlotWrite,
     PaginatedAdminExercises,
 )
 from app.admin.service import (
@@ -54,8 +55,10 @@ from app.training_templates.admin_service import (
     TemplateWriteError,
     create_training_program_template,
     delete_training_program_template,
+    delete_training_program_template_slot,
     get_training_program_template,
     update_training_program_template,
+    update_training_program_template_slot,
 )
 from app.training_templates.models import TrainingProgramTemplate
 from app.training_templates.service import list_training_program_templates
@@ -103,6 +106,7 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
                         intensity_method=slot.intensity_method,
                         adaptation_priority=slot.adaptation_priority,
                         superset_group=slot.superset_group,
+                        superset_exercise_id=slot.superset_exercise_id,
                         sets=slot.sets,
                         rep_min=slot.rep_min,
                         rep_max=slot.rep_max,
@@ -198,6 +202,53 @@ def update_training_template(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Program template not found",
+        )
+    return _training_template_detail(template)
+
+
+@router.patch(
+    "/training-program-templates/{template_id}/days/{day_id}/slots/{slot_id}",
+    response_model=AdminTrainingProgramTemplate,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def update_training_template_slot(
+    template_id: UUID,
+    day_id: UUID,
+    slot_id: UUID,
+    payload: AdminTrainingTemplateSlotWrite,
+    db: DatabaseSession,
+) -> AdminTrainingProgramTemplate:
+    try:
+        template = update_training_program_template_slot(db, template_id, day_id, slot_id, payload)
+    except TemplateWriteError as error:
+        raise _validation_error("slot", str(error)) from None
+    if template is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Training template slot not found",
+        )
+    return _training_template_detail(template)
+
+
+@router.delete(
+    "/training-program-templates/{template_id}/days/{day_id}/slots/{slot_id}",
+    response_model=AdminTrainingProgramTemplate,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def delete_training_template_slot(
+    template_id: UUID,
+    day_id: UUID,
+    slot_id: UUID,
+    db: DatabaseSession,
+) -> AdminTrainingProgramTemplate:
+    try:
+        template = delete_training_program_template_slot(db, template_id, day_id, slot_id)
+    except TemplateWriteError as error:
+        raise _validation_error("slot", str(error)) from None
+    if template is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Training template slot not found",
         )
     return _training_template_detail(template)
 
