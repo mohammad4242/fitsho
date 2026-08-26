@@ -37,7 +37,6 @@ def _template(anchor: ExerciseCandidate) -> TemplateReference:
         slug="t05-shared-canonical-template",
         days_per_week=1,
         supported_levels=("first_month", "beginner", "intermediate", "advanced"),
-        fitness_goal="general_fitness",
         focus_tags=("full_body",),
         intensity_methods=("standard",),
         days=(
@@ -55,7 +54,9 @@ def _template(anchor: ExerciseCandidate) -> TemplateReference:
                         intensity_method="standard",
                         adaptation_priority="core",
                         superset_group=None,
-                        sets=3,
+                        superset_exercise_id=None,
+        superset_exercise_slug_hint=None,
+        sets=3,
                         rep_min=8,
                         rep_max=12,
                         target_rir=2,

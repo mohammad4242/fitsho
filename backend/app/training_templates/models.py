@@ -175,17 +175,6 @@ class TrainingProgramTemplate(Base):
     description_fa: Mapped[str] = mapped_column(String(1000), nullable=False)
     days_per_week: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     supported_levels: Mapped[list[str]] = mapped_column(JSON, nullable=False)
-    fitness_goal: Mapped[FitnessGoal] = mapped_column(
-        Enum(
-            FitnessGoal,
-            native_enum=False,
-            create_constraint=True,
-            validate_strings=True,
-            values_callable=enum_values,
-            name="ck_training_program_templates_fitness_goal_values",
-        ),
-        nullable=False,
-    )
     focus_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     intensity_methods: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     programming_rationale: Mapped[list[dict[str, str]]] = mapped_column(

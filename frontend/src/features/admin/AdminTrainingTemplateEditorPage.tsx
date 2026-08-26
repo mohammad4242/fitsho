@@ -414,12 +414,6 @@ export function AdminTrainingTemplateEditorPage() {
                     ))}
                   </div>
                 </fieldset>
-                <label className="admin-field">
-                  <span>{t("admin.templateEditor.goal")}</span>
-                  <select value={form.fitness_goal} onChange={(event) => updateField("fitness_goal", event.target.value as AdminTrainingProgramTemplateWrite["fitness_goal"])}>
-                    {fitnessGoals.map((goal) => <option key={goal} value={goal}>{t(`onboarding.fitnessGoal.${goal}`)}</option>)}
-                  </select>
-                </label>
                 <TextInput dir="ltr" label={t("admin.templateEditor.focusTags")} value={form.focus_tags.join(", ")} onChange={(value) => updateField("focus_tags", splitValues(value))} />
                 <TextInput dir="auto" label={t("admin.templateEditor.sourceName")} value={form.source_name} onChange={(value) => updateField("source_name", value)} />
                 <TextInput dir="ltr" label={t("admin.templateEditor.sourceUrl")} value={form.source_url} onChange={(value) => updateField("source_url", value)} />
@@ -792,7 +786,6 @@ function emptyTemplate(daysPerWeek: number, level: ExperienceLevel, structureId:
     description_fa: "برنامه مرجع جدید فیتشو.",
     days_per_week: daysPerWeek,
     supported_levels: [level],
-    fitness_goal: "build_muscle",
     focus_tags: ["full_body", "balanced"],
     intensity_methods: ["standard"],
     programming_rationale: Array.from({ length: 5 }, (_, index) => ({ title_en: `Reason ${index + 1}`, title_fa: `علت ${index + 1}`, detail_en: "Explain this program decision.", detail_fa: "دلیل این تصمیم برنامه‌نویسی را بنویس.", })),
@@ -853,7 +846,6 @@ function formToPayload(form: AdminTrainingProgramTemplateForm): AdminTrainingPro
     description_fa: form.description_fa,
     days_per_week: form.days_per_week,
     supported_levels: form.supported_levels,
-    fitness_goal: form.fitness_goal,
     focus_tags: form.focus_tags.filter(Boolean),
     intensity_methods: uniqueMethods(form.days),
     programming_rationale: form.programming_rationale,

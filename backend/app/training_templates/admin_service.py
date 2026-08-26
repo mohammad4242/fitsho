@@ -493,7 +493,6 @@ def _replace_template_content(
     template.description_fa = payload.description_fa
     template.days_per_week = payload.days_per_week
     template.supported_levels = [level.value for level in payload.supported_levels]
-    template.fitness_goal = payload.fitness_goal
     template.focus_tags = [tag.value for tag in payload.focus_tags]
     template.intensity_methods = [method.value for method in payload.intensity_methods]
     template.programming_rationale = [item.model_dump() for item in payload.programming_rationale]

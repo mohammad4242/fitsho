@@ -63,7 +63,6 @@ class TrainingProgramTemplateSeed:
     intensity_methods: tuple[TrainingTemplateMethod, ...]
     days: tuple[TemplateDaySeed, ...]
     programming_rationale: tuple[TemplateProgrammingRationaleSeed, ...]
-    fitness_goal: FitnessGoal = FitnessGoal.BUILD_MUSCLE
     is_active: bool = True
 
 
@@ -1790,7 +1789,6 @@ def _seed_from_definition(
         intensity_methods=intensity_methods,
         days=days,
         programming_rationale=_rationale(definition),
-        fitness_goal=FitnessGoal.BUILD_MUSCLE,
     )
     validate_template_focus_tags(
         seed.focus_tags,

@@ -396,7 +396,6 @@ export type AdminTrainingProgramTemplate = {
   description_fa: string;
   days_per_week: number;
   supported_levels: ExperienceLevel[];
-  fitness_goal: FitnessGoal;
   focus_tags: string[];
   intensity_methods: TrainingTemplateMethod[];
   programming_rationale: AdminTrainingTemplateProgrammingRationale[];
@@ -497,7 +496,6 @@ export type AdminTrainingProgramTemplateWrite = {
   description_fa: string;
   days_per_week: number;
   supported_levels: ExperienceLevel[];
-  fitness_goal: FitnessGoal;
   focus_tags: string[];
   intensity_methods: TrainingTemplateMethod[];
   programming_rationale: AdminTrainingTemplateRationaleWrite[];

@@ -22,14 +22,12 @@ def _template(
     *,
     days_per_week: int = 4,
     training_level: str = "intermediate",
-    fitness_goal: str = "build_muscle",
     focus_tags: tuple[str, ...] = (),
 ) -> TemplateReference:
     return TemplateReference(
         slug=slug,
         days_per_week=days_per_week,
         supported_levels=(training_level,),
-        fitness_goal=fitness_goal,
         focus_tags=focus_tags,
         intensity_methods=("standard",),
         days=(),
@@ -50,8 +48,8 @@ def _normalized_request():
 
 def test_selector_ignores_template_goal_for_hard_eligibility() -> None:
     templates = (
-        _template("strength-template", fitness_goal="strength"),
-        _template("fat-loss-template", fitness_goal="fat_loss"),
+        _template("strength-template"),
+        _template("fat-loss-template"),
         _template("wrong-days", days_per_week=3),
         _template("wrong-level", training_level="advanced"),
     )
@@ -76,9 +74,9 @@ def test_selector_ignores_template_goal_for_hard_eligibility() -> None:
 
 def test_same_days_and_level_have_same_eligible_pool_for_each_goal() -> None:
     templates = (
-        _template("build-muscle-template", fitness_goal="build_muscle"),
-        _template("fat-loss-template", fitness_goal="fat_loss"),
-        _template("strength-template", fitness_goal="strength"),
+        _template("build-muscle-template"),
+        _template("fat-loss-template"),
+        _template("strength-template"),
     )
 
     pools = []
@@ -108,7 +106,7 @@ def test_same_days_and_level_have_same_eligible_pool_for_each_goal() -> None:
 
 def test_selector_still_excludes_days_and_level_mismatches() -> None:
     templates = (
-        _template("valid", fitness_goal="strength"),
+        _template("valid"),
         _template("wrong-days", days_per_week=3),
         _template("wrong-level", training_level="advanced"),
     )
@@ -127,7 +125,6 @@ def test_selector_still_excludes_days_and_level_mismatches() -> None:
 def test_selector_excludes_unresolvable_core_structure() -> None:
     template = _template(
         "unresolvable",
-        fitness_goal="strength",
     )
     template = replace(
         template,
@@ -145,7 +142,9 @@ def test_selector_excludes_unresolvable_core_structure() -> None:
                         intensity_method="standard",
                         adaptation_priority="core",
                         superset_group=None,
-                        sets=3,
+                        superset_exercise_id=None,
+        superset_exercise_slug_hint=None,
+        sets=3,
                         rep_min=8,
                         rep_max=12,
                         target_rir=2,

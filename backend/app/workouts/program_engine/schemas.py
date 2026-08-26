@@ -408,7 +408,6 @@ class TemplateReference:
     slug: str
     days_per_week: int
     supported_levels: tuple[str, ...]
-    fitness_goal: str
     focus_tags: tuple[TemplateFocusTag, ...]
     intensity_methods: tuple[str, ...]
     days: tuple[TemplateReferenceDay, ...]

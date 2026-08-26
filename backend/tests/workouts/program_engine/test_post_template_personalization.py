@@ -92,7 +92,6 @@ def test_template_slot_resolution_uses_profile_ranking_not_catalog_order() -> No
         slug="ranked-resolution",
         days_per_week=1,
         supported_levels=(source.training_experience.value,),
-        fitness_goal="build_muscle",
         focus_tags=("balanced",),
         intensity_methods=("standard",),
         days=(
@@ -109,7 +108,9 @@ def test_template_slot_resolution_uses_profile_ranking_not_catalog_order() -> No
                         intensity_method="standard",
                         adaptation_priority="core",
                         superset_group=None,
-                        sets=3,
+                        superset_exercise_id=None,
+        superset_exercise_slug_hint=None,
+        sets=3,
                         rep_min=8,
                         rep_max=12,
                         target_rir=2,

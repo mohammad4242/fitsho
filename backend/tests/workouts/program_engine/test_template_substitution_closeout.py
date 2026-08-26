@@ -39,6 +39,8 @@ def _slot(
         intensity_method="rest_pause",
         adaptation_priority=priority,
         superset_group="push-a",
+        superset_exercise_id=None,
+        superset_exercise_slug_hint=None,
         sets=4,
         rep_min=8,
         rep_max=10,
@@ -52,7 +54,6 @@ def _template(*slots: TemplateReferenceSlot) -> TemplateReference:
         slug="template-substitution-closeout",
         days_per_week=1,
         supported_levels=("beginner",),
-        fitness_goal="general_fitness",
         focus_tags=("balanced",),
         intensity_methods=("rest_pause",),
         days=(

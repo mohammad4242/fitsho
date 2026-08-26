@@ -59,7 +59,6 @@ def test_novice_upgrade_updates_owned_defaults_and_preserves_custom_prescription
         description_fa="سفارشی.",
         days_per_week=2,
         supported_levels=[ExperienceLevel.BEGINNER.value],
-        fitness_goal=FitnessGoal.BUILD_MUSCLE,
         focus_tags=["full_body"],
         intensity_methods=["standard"],
         programming_rationale=[],

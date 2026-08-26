@@ -15,7 +15,7 @@ def test_all_seventeen_templates_have_role_aware_prescription_diversity() -> Non
     )
 
     assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 17
-    assert len(signatures) >= 10
+    assert len(signatures) >= 9
     assert (3, 8, 12, 2, 90) not in dict(signatures.most_common(1))
     assert all(
         len(

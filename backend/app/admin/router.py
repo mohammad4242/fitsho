@@ -94,7 +94,6 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
         description_fa=template.description_fa,
         days_per_week=template.days_per_week,
         supported_levels=template.supported_levels,
-        fitness_goal=template.fitness_goal,
         focus_tags=template.focus_tags,
         intensity_methods=template.intensity_methods,
         programming_rationale=template.programming_rationale,

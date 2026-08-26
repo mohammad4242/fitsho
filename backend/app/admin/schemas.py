@@ -284,7 +284,6 @@ class AdminTrainingProgramTemplate(BaseModel):
     description_fa: str
     days_per_week: int
     supported_levels: list[ExperienceLevel]
-    fitness_goal: FitnessGoal
     focus_tags: list[TemplateFocusTag]
     intensity_methods: list[TrainingTemplateMethod]
     programming_rationale: list[AdminTrainingTemplateProgrammingRationale]
@@ -412,7 +411,6 @@ class AdminTrainingProgramTemplateWrite(BaseModel):
     description_fa: TextItem
     days_per_week: int = Field(ge=2, le=6)
     supported_levels: list[ExperienceLevel] = Field(min_length=1, max_length=4)
-    fitness_goal: FitnessGoal
     focus_tags: list[TemplateFocusTag] = Field(min_length=1, max_length=12)
     intensity_methods: list[TrainingTemplateMethod] = Field(min_length=1, max_length=3)
     programming_rationale: list[AdminTrainingTemplateRationaleWrite] = Field(

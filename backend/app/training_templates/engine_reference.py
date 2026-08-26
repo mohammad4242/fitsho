@@ -37,7 +37,6 @@ def _reference(template: TrainingProgramTemplate) -> TemplateReference:
         slug=template.slug,
         days_per_week=template.days_per_week,
         supported_levels=tuple(template.supported_levels),
-        fitness_goal=template.fitness_goal.value,
         focus_tags=validate_template_focus_tags(
             template.focus_tags,
             intensity_methods=template.intensity_methods,

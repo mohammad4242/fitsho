@@ -262,7 +262,9 @@ def test_template_session_replaces_excess_redundancy_with_complementary_role() -
             intensity_method="standard",
             adaptation_priority="core",
             superset_group=None,
-            sets=3,
+            superset_exercise_id=None,
+        superset_exercise_slug_hint=None,
+        sets=3,
             rep_min=8,
             rep_max=12,
             target_rir=2,
@@ -274,7 +276,6 @@ def test_template_session_replaces_excess_redundancy_with_complementary_role() -
         slug="redundant-chest-template",
         days_per_week=1,
         supported_levels=("intermediate",),
-        fitness_goal="build_muscle",
         focus_tags=("chest_priority",),
         intensity_methods=("standard",),
         days=(

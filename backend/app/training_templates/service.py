@@ -185,7 +185,6 @@ def _write_template(
     template.description_fa = seed.description_fa
     template.days_per_week = seed.days_per_week
     template.supported_levels = [level.value for level in seed.supported_levels]
-    template.fitness_goal = seed.fitness_goal
     template.focus_tags = [tag.value for tag in seed.focus_tags]
     template.intensity_methods = [method.value for method in seed.intensity_methods]
     template.programming_rationale = [
