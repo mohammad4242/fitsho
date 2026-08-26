@@ -31,12 +31,17 @@ type EditorSectionId = "identity" | "reasons" | "days";
 type PickerTarget = {
   dayIndex: number;
   slotIndex: number | null;
+  member?: "primary" | "superset";
 };
 
-type AdminTrainingTemplateSlotForm = AdminTrainingTemplateSlotWrite & {
+type AdminTrainingTemplateSlotForm = Omit<AdminTrainingTemplateSlotWrite, "exercise_id"> & {
+  exercise_id: string | null;
   exercise_name_fa?: string | null;
   exercise_name_en?: string | null;
   exercise_slug?: string | null;
+  superset_exercise_name_fa?: string | null;
+  superset_exercise_name_en?: string | null;
+  superset_exercise_slug?: string | null;
 };
 
 type AdminTrainingTemplateDayForm = Omit<AdminTrainingTemplateDayWrite, "slots"> & {
@@ -201,15 +206,23 @@ export function AdminTrainingTemplateEditorPage() {
     const targetMuscles: MuscleGroup[] = muscles.length > 0 ? muscles : ["chest"];
 
     if (slotIndex !== null) {
-      // Replace exercise in existing slot, retaining workout-specific settings
-      patchSlot(dayIndex, slotIndex, {
-        exercise_id: exercise.id,
-        exercise_name_fa: exercise.name_fa,
-        exercise_name_en: exercise.name_en,
-        exercise_slug: exercise.slug,
-        movement_pattern: exercise.movement_pattern,
-        target_muscles: targetMuscles,
-      });
+      if (pickerTarget.member === "superset") {
+        patchSlot(dayIndex, slotIndex, {
+          superset_exercise_id: exercise.id,
+          superset_exercise_name_fa: exercise.name_fa,
+          superset_exercise_name_en: exercise.name_en,
+          superset_exercise_slug: exercise.slug,
+        });
+      } else {
+        patchSlot(dayIndex, slotIndex, {
+          exercise_id: exercise.id,
+          exercise_name_fa: exercise.name_fa,
+          exercise_name_en: exercise.name_en,
+          exercise_slug: exercise.slug,
+          movement_pattern: exercise.movement_pattern,
+          target_muscles: targetMuscles,
+        });
+      }
     } else {
       // Add new slot to day
       const existingSlotCount = form.days[dayIndex]?.slots.length ?? 0;
@@ -218,6 +231,10 @@ export function AdminTrainingTemplateEditorPage() {
         exercise_name_fa: exercise.name_fa,
         exercise_name_en: exercise.name_en,
         exercise_slug: exercise.slug,
+        superset_exercise_id: null,
+        superset_exercise_name_fa: null,
+        superset_exercise_name_en: null,
+        superset_exercise_slug: null,
         display_name_en: null,
         display_name_fa: null,
         target_muscles: targetMuscles,
@@ -607,7 +624,7 @@ export function AdminTrainingTemplateEditorPage() {
                                         </label>
                                         <TextInput dir="ltr" label={t("admin.templateEditor.slotMuscles")} value={slot.target_muscles.join(", ")} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_muscles: parseMuscles(value) })} />
                                       </div>
-                                      <div className="admin-template-editor-slot__actions-footer" style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                                      <div className="admin-template-editor-slot__actions-footer">
                                         {slot.exercise_id && (
                                             <Link to={`/admin/exercises/${slot.exercise_id}/edit`}>
                                               {t("admin.templateEditor.exerciseDetails")} ↗
@@ -618,7 +635,6 @@ export function AdminTrainingTemplateEditorPage() {
                                           onClick={() => removeSlot(dayIndex, slotIndex)}
                                           type="button"
                                           className="admin-slot-remove-btn"
-                                          style={{ color: 'var(--fitsho-destructive)', background: 'none', border: 'none', cursor: 'pointer' }}
                                         >
                                           {t("admin.templateEditor.removeExercise")}
                                         </button>
@@ -777,6 +793,10 @@ function templateToForm(template: AdminTrainingProgramTemplate): AdminTrainingPr
         exercise_name_en: slot.exercise!.name_en,
         exercise_name_fa: slot.exercise!.name_fa,
         exercise_slug: slot.exercise!.slug,
+        superset_exercise_id: slot.superset_exercise ? slot.superset_exercise.id : null,
+        superset_exercise_name_en: slot.superset_exercise ? slot.superset_exercise.name_en : null,
+        superset_exercise_name_fa: slot.superset_exercise ? slot.superset_exercise.name_fa : null,
+        superset_exercise_slug: slot.superset_exercise ? slot.superset_exercise.slug : null,
         display_name_en: slot.placeholder_name_en,
         display_name_fa: slot.placeholder_name_fa,
         target_muscles: slot.target_muscles,
@@ -814,7 +834,8 @@ function formToPayload(form: AdminTrainingProgramTemplateForm): AdminTrainingPro
       structure_focus: day.structure_focus,
       direct_target_muscles: day.direct_target_muscles,
       slots: day.slots.map((slot) => ({
-        exercise_id: slot.exercise_id,
+        exercise_id: slot.exercise_id ?? "",
+        superset_exercise_id: slot.superset_exercise_id ?? null,
         display_name_en: slot.display_name_en?.trim() ? slot.display_name_en.trim() : null,
         display_name_fa: slot.display_name_fa?.trim() ? slot.display_name_fa.trim() : null,
         target_muscles: slot.target_muscles,

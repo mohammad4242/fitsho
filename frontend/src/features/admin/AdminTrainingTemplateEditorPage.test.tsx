@@ -484,3 +484,79 @@ it("deletes an existing shared template after confirmation", async () => {
   expect(adminApi.deleteAdminTrainingProgramTemplate).toHaveBeenCalledWith("template-17");
   expect(await screen.findByText("کتابخانه برنامه‌ها")).toBeInTheDocument();
 });
+
+it.each([320, 360, 390, 430])(
+  "renders days and exercise slots cleanly without error on %ipx mobile width",
+  async (width) => {
+    window.innerWidth = width;
+    window.dispatchEvent(new Event("resize"));
+
+    adminApi.getAdminTrainingProgramTemplate.mockResolvedValue({
+      id: "template-mobile",
+      slug: "mobile-template",
+      name_en: "Mobile Template",
+      name_fa: "الگوی موبایل",
+      description_en: "Mobile view test.",
+      description_fa: "تست نمایش موبایل.",
+      days_per_week: 2,
+      supported_levels: ["beginner"],
+      fitness_goal: "build_muscle",
+      focus_tags: ["full_body"],
+      intensity_methods: ["standard"],
+      programming_rationale: [],
+      source_name: "Fitsho admin library",
+      source_url: "https://fitsho.local/admin-library",
+      days: [
+        {
+          title_en: "Day 1",
+          title_fa: "روز ۱",
+          structure_focus: "chest_and_triceps",
+          direct_target_muscles: ["chest", "triceps"],
+          slots: [
+            {
+              exercise: mockBenchPress,
+              placeholder_name_en: null,
+              placeholder_name_fa: null,
+              target_muscles: ["chest"],
+              movement_pattern: "horizontal_push",
+              intensity_method: "standard",
+              adaptation_priority: "core",
+              superset_group: null,
+              sets: 4,
+              rep_min: 8,
+              rep_max: 12,
+              target_rir: 2,
+              rest_seconds: 90,
+            },
+          ],
+        },
+      ],
+    });
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/admin/training-program-templates/template-mobile/edit"]}>
+        <Routes>
+          <Route
+            path="/admin/training-program-templates/:templateId/edit"
+            element={<AdminTrainingTemplateEditorPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("روزها و حرکت‌ها")).toBeInTheDocument();
+
+    const dayTrigger = screen.getByRole("button", { name: /روز ۱/ });
+    await user.click(dayTrigger);
+
+    const slotTrigger = screen.getByRole("button", { name: /پرس سینه دمبل/ });
+    await user.click(slotTrigger);
+
+    expect(screen.getByLabelText("نام فارسی روز")).toHaveValue("روز ۱");
+    expect(screen.getByRole("radio", { name: "استاندارد" })).toBeChecked();
+    expect(screen.getByText("انتخاب از کتابخانه حرکات")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "حذف پرس سینه دمبل" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "افزودن حرکت" })).toBeInTheDocument();
+  },
+);
