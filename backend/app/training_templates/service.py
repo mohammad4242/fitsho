@@ -17,8 +17,10 @@ from app.training_templates.models import (
     TrainingTemplateCatalogState,
 )
 from app.training_templates.seed_data import (
+    LEGACY_NOVICE_PRESCRIPTIONS,
     LEGACY_SOURCE_NAME,
     LEGACY_SOURCE_URL,
+    NOVICE_DEFAULT_PRESCRIPTION,
     SOURCE_NAME,
     SOURCE_URL,
     TRAINING_PROGRAM_TEMPLATE_SEEDS,
@@ -35,7 +37,7 @@ class TrainingTemplateSeedResult:
 
 
 _CATALOG_STATE_KEY = "canonical"
-_CATALOG_REVISION = 2
+_CATALOG_REVISION = 3
 
 
 def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
@@ -77,6 +79,43 @@ def upgrade_training_program_template_catalog(db: Session) -> TrainingTemplateSe
         state.catalog_revision = _CATALOG_REVISION
     db.commit()
     return _current_seed_result(db)
+
+
+def upgrade_novice_template_prescriptions(db: Session) -> int:
+    """Update only untouched legacy novice prescriptions in the canonical catalog."""
+    templates = list(
+        db.scalars(
+            select(TrainingProgramTemplate)
+            .where(
+                TrainingProgramTemplate.source_name == SOURCE_NAME,
+                TrainingProgramTemplate.source_url == SOURCE_URL,
+            )
+            .options(
+                selectinload(TrainingProgramTemplate.days).selectinload(
+                    TrainingProgramTemplateDay.slots
+                )
+            )
+        )
+    )
+    novice_levels = {ExperienceLevel.FIRST_MONTH.value, ExperienceLevel.BEGINNER.value}
+    updated_slots = 0
+    for template in templates:
+        if not novice_levels.intersection(template.supported_levels):
+            continue
+        for day in template.days:
+            for slot in day.slots:
+                signature = (slot.sets, slot.rep_min, slot.rep_max)
+                if signature not in LEGACY_NOVICE_PRESCRIPTIONS:
+                    continue
+                slot.sets, slot.rep_min, slot.rep_max = NOVICE_DEFAULT_PRESCRIPTION
+                updated_slots += 1
+
+    state = db.get(TrainingTemplateCatalogState, _CATALOG_STATE_KEY)
+    if state is not None:
+        state.catalog_revision = _CATALOG_REVISION
+    db.flush()
+    db.commit()
+    return updated_slots
 
 
 def _sync_canonical_catalog(db: Session, *, replace_existing: bool) -> None:

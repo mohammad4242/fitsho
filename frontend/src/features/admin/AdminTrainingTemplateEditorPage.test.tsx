@@ -314,12 +314,14 @@ it("replaces an existing exercise in a slot while preserving workout-specific pa
 
   await user.click(await screen.findByRole("button", { name: /زیربغل سیم‌کش/ }));
 
-  // Verify header is updated to the new exercise name and prescription is retained
+  // Verify novice replacement applies the shared default prescription while retaining other fields
   expect(screen.getByRole("button", { name: "بستن حرکت 1: زیربغل سیم‌کش" })).toBeInTheDocument();
-  expect(screen.getByText("4 × 10–15 · RIR 1")).toBeInTheDocument();
+  expect(screen.getByText("3 × 8–12 · RIR 1")).toBeInTheDocument();
 
-  // Verify inputs still retain sets=4, rest=120
-  expect(screen.getByLabelText("ست")).toHaveValue(4);
+  // Verify novice prescription resets while rest remains workout-specific
+  expect(screen.getByLabelText("ست")).toHaveValue(3);
+  expect(screen.getByLabelText("حداقل تکرار")).toHaveValue(8);
+  expect(screen.getByLabelText("حداکثر تکرار")).toHaveValue(12);
   expect(screen.getByLabelText("استراحت (ثانیه)")).toHaveValue(120);
 });
 

@@ -105,6 +105,8 @@ LEGACY_SOURCE_NAME = "Fitsho synthesis: Stronger By Science · Jeff Nippard · R
 LEGACY_SOURCE_URL = "https://www.strongerbyscience.com/exercise-order-video/"
 SOURCE_NAME = "Fitsho canonical training template catalog"
 SOURCE_URL = "https://fitsho.local/training-template-catalog"
+NOVICE_DEFAULT_PRESCRIPTION = (3, 8, 12)
+LEGACY_NOVICE_PRESCRIPTIONS = frozenset({(2, 10, 15), (2, 12, 15), (2, 12, 20)})
 
 CANONICAL_TEMPLATE_SLUGS = (
     "t01-2-day-full-body-ab",
@@ -405,10 +407,10 @@ def _prescription_for_role(
     """Return conservative role-specific prescription for the lowest level."""
     if Level.FIRST_MONTH in supported_levels or Level.BEGINNER in supported_levels:
         profiles = {
-            "primary": (2, 10, 15, 3, 120),
-            "secondary": (2, 10, 15, 3, 90),
-            "isolation": (2, 12, 15, 3, 60),
-            "core": (2, 12, 20, 3, 60),
+            "primary": (*NOVICE_DEFAULT_PRESCRIPTION, 3, 120),
+            "secondary": (*NOVICE_DEFAULT_PRESCRIPTION, 3, 90),
+            "isolation": (*NOVICE_DEFAULT_PRESCRIPTION, 3, 60),
+            "core": (*NOVICE_DEFAULT_PRESCRIPTION, 3, 60),
         }
     elif Level.INTERMEDIATE in supported_levels:
         profiles = {

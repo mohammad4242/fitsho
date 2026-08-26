@@ -33,6 +33,7 @@ export interface AdminTrainingTemplateSlotEditModalProps {
   templateId: string;
   dayId: string;
   slot: AdminTrainingTemplateSlot;
+  noviceDefaults?: boolean;
   onClose: () => void;
   onSaved: (template: AdminTrainingProgramTemplate) => void;
 }
@@ -41,6 +42,7 @@ export function AdminTrainingTemplateSlotEditModal({
   templateId,
   dayId,
   slot,
+  noviceDefaults = false,
   onClose,
   onSaved,
 }: AdminTrainingTemplateSlotEditModalProps) {
@@ -79,6 +81,7 @@ export function AdminTrainingTemplateSlotEditModal({
         movement_pattern: selectedFields.movement_pattern,
         target_muscles: selectedFields.target_muscles,
         sets: 3,
+        ...(noviceDefaults ? { rep_min: 8, rep_max: 12 } : {}),
       });
     }
     setPickerTarget(null);

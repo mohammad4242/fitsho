@@ -56,6 +56,7 @@ export function AdminTrainingTemplatesPage() {
     templateId: string;
     dayId: string;
     slot: AdminTrainingTemplateSlot;
+    noviceDefaults: boolean;
   } | null>(null);
   const english = i18n.resolvedLanguage === "en";
   const visibleTemplates = page?.items ?? [];
@@ -358,7 +359,14 @@ export function AdminTrainingTemplatesPage() {
                                               <button
                                                 aria-label={t("admin.templates.exerciseEditAria", { name: exerciseName })}
                                                 className="admin-template-exercise-edit"
-                                                onClick={() => setEditingSlot({ templateId: template.id, dayId: day.id, slot })}
+                                                onClick={() => setEditingSlot({
+                                                  templateId: template.id,
+                                                  dayId: day.id,
+                                                  slot,
+                                                  noviceDefaults: template.supported_levels.some(
+                                                    (level) => level === "first_month" || level === "beginner",
+                                                  ),
+                                                })}
                                                 type="button"
                                               >
                                                 <span aria-hidden="true">✏️</span>
@@ -416,6 +424,7 @@ export function AdminTrainingTemplatesPage() {
         {editingSlot !== null && (
           <AdminTrainingTemplateSlotEditModal
             dayId={editingSlot.dayId}
+            noviceDefaults={editingSlot.noviceDefaults}
             onClose={() => setEditingSlot(null)}
             onSaved={(updatedTemplate) => {
               setPage((current) => current === null

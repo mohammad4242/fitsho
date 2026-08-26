@@ -218,12 +218,16 @@ export function AdminTrainingTemplateEditorPage() {
     const selected = mapExerciseLibraryToTemplateFields(exercise);
 
     if (slotIndex !== null) {
+      const noviceDefaults = form.supported_levels.some(
+        (level) => level === "first_month" || level === "beginner",
+      );
       if (pickerTarget.member === "superset") {
         patchSlot(dayIndex, slotIndex, {
           superset_exercise_id: selected.exercise_id,
           superset_exercise_name_fa: selected.exercise_name_fa,
           superset_exercise_name_en: selected.exercise_name_en,
           superset_exercise_slug: selected.exercise_slug,
+          ...(noviceDefaults ? { sets: 3, rep_min: 8, rep_max: 12 } : {}),
         });
       } else {
         patchSlot(dayIndex, slotIndex, {
@@ -233,6 +237,7 @@ export function AdminTrainingTemplateEditorPage() {
           exercise_slug: selected.exercise_slug,
           movement_pattern: selected.movement_pattern,
           target_muscles: selected.target_muscles,
+          ...(noviceDefaults ? { sets: 3, rep_min: 8, rep_max: 12 } : {}),
         });
       }
     } else {

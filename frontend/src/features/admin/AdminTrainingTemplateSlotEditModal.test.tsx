@@ -129,6 +129,29 @@ it("replaces the slot through the existing exercise library picker", async () =>
   );
 });
 
+it("applies the novice default prescription when replacing a novice slot", async () => {
+  const user = userEvent.setup();
+  render(
+    <AdminTrainingTemplateSlotEditModal
+      dayId="day-1"
+      noviceDefaults
+      onClose={vi.fn()}
+      onSaved={vi.fn()}
+      slot={{ ...slot, sets: 2, rep_min: 10, rep_max: 15 }}
+      templateId="template-1"
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "تغییر حرکت از کتابخانه" }));
+  await user.click(await screen.findByRole("button", { name: /بالاتنه/ }));
+  await user.click(await screen.findByRole("button", { name: /سینه/ }));
+  await user.click(await screen.findByRole("button", { name: /انتخاب پرس جایگزین/ }));
+
+  expect(screen.getByRole("spinbutton", { name: "ست" })).toHaveValue(3);
+  expect(screen.getByRole("spinbutton", { name: "حداقل تکرار" })).toHaveValue(8);
+  expect(screen.getByRole("spinbutton", { name: "حداکثر تکرار" })).toHaveValue(12);
+});
+
 it("keeps numeric inputs editable and normalizes sets to the backend range", async () => {
   const user = userEvent.setup();
   render(
