@@ -143,7 +143,7 @@ it("keeps numeric inputs editable and normalizes sets to the backend range", asy
 
   const setsInput = screen.getByRole("spinbutton", { name: "ست" });
   await user.clear(setsInput);
-  expect(setsInput).toHaveValue("");
+  expect(setsInput).toHaveValue(null);
 
   await user.type(setsInput, "03");
   expect(setsInput).toHaveValue(3);

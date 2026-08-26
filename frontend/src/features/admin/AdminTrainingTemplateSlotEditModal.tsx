@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ApiError } from "../../shared/apiClient";
 import { muscleGroups, movementPatterns, type MuscleGroup } from "../exercises/types";
 import { deleteAdminTrainingTemplateSlot, updateAdminTrainingTemplateSlot } from "./api";
 import { ExerciseLibraryPickerModal } from "./ExerciseLibraryPickerModal";
@@ -18,7 +19,12 @@ import type {
 
 type PickerTarget = "primary" | "superset";
 
-type SlotDraft = AdminTrainingTemplateSlotWrite & {
+type SlotDraft = Omit<AdminTrainingTemplateSlotWrite, "sets" | "rep_min" | "rep_max" | "target_rir" | "rest_seconds"> & {
+  sets: number | "";
+  rep_min: number | "";
+  rep_max: number | "";
+  target_rir: number | "";
+  rest_seconds: number | "";
   exercise: AdminTrainingTemplateExercise | null;
   superset_exercise: AdminTrainingTemplateExercise | null;
 };
@@ -72,6 +78,7 @@ export function AdminTrainingTemplateSlotEditModal({
         exercise: selectedSummary,
         movement_pattern: selectedFields.movement_pattern,
         target_muscles: selectedFields.target_muscles,
+        sets: 3,
       });
     }
     setPickerTarget(null);
@@ -83,8 +90,8 @@ export function AdminTrainingTemplateSlotEditModal({
     try {
       const saved = await updateAdminTrainingTemplateSlot(templateId, dayId, slot.id, toPayload(draft));
       onSaved(saved);
-    } catch {
-      setError(t("admin.templateEditor.slotSaveError"));
+    } catch (caught) {
+      setError(formatSlotError(caught, t("admin.templateEditor.slotSaveError")));
     } finally {
       setSaving(false);
     }
@@ -97,8 +104,8 @@ export function AdminTrainingTemplateSlotEditModal({
     try {
       const saved = await deleteAdminTrainingTemplateSlot(templateId, dayId, slot.id);
       onSaved(saved);
-    } catch {
-      setError(t("admin.templateEditor.slotDeleteError"));
+    } catch (caught) {
+      setError(formatSlotError(caught, t("admin.templateEditor.slotDeleteError")));
     } finally {
       setRemoving(false);
     }
@@ -154,11 +161,11 @@ export function AdminTrainingTemplateSlotEditModal({
           <div className="admin-template-editor-grid admin-template-editor-grid--slot">
             <TextInput dir="rtl" label={t("admin.templateEditor.displayNameFa")} value={draft.display_name_fa ?? ""} onChange={(value) => patch({ display_name_fa: value || null })} />
             <TextInput dir="ltr" label={t("admin.templateEditor.displayNameEn")} value={draft.display_name_en ?? ""} onChange={(value) => patch({ display_name_en: value || null })} />
-            <NumberInput label={t("admin.templateEditor.sets")} value={draft.sets} onChange={(value) => patch({ sets: value })} />
-            <NumberInput label={t("admin.templateEditor.repMin")} value={draft.rep_min} onChange={(value) => patch({ rep_min: value })} />
-            <NumberInput label={t("admin.templateEditor.repMax")} value={draft.rep_max} onChange={(value) => patch({ rep_max: value })} />
-            <NumberInput label={t("admin.templateEditor.rir")} value={draft.target_rir} onChange={(value) => patch({ target_rir: value })} />
-            <NumberInput label={t("admin.templateEditor.rest")} value={draft.rest_seconds} onChange={(value) => patch({ rest_seconds: value })} />
+            <NumberInput label={t("admin.templateEditor.sets")} max={10} min={1} value={draft.sets} onChange={(value) => patch({ sets: value })} />
+            <NumberInput label={t("admin.templateEditor.repMin")} max={100} min={1} value={draft.rep_min} onChange={(value) => patch({ rep_min: value })} />
+            <NumberInput label={t("admin.templateEditor.repMax")} max={100} min={1} value={draft.rep_max} onChange={(value) => patch({ rep_max: value })} />
+            <NumberInput label={t("admin.templateEditor.rir")} max={6} min={0} value={draft.target_rir} onChange={(value) => patch({ target_rir: value })} />
+            <NumberInput label={t("admin.templateEditor.rest")} max={600} min={0} value={draft.rest_seconds} onChange={(value) => patch({ rest_seconds: value })} />
             <SelectInput label={t("admin.templateEditor.priority")} value={draft.adaptation_priority} options={["core", "accessory", "optional"]} getLabel={(value) => t(`admin.templateEditor.priorities.${value}`)} onChange={(value) => patch({ adaptation_priority: value as TrainingTemplateSlotPriority })} />
             <SelectInput label={t("admin.templateEditor.movementPattern")} value={draft.movement_pattern} options={movementPatterns} getLabel={(value) => t(`admin.programming.movementPattern.${value}`, value)} onChange={(value) => patch({ movement_pattern: value as AdminTrainingTemplateSlotWrite["movement_pattern"] })} />
             <TextInput dir="ltr" label={t("admin.templateEditor.slotMuscles")} value={draft.target_muscles.join(", ")} onChange={(value) => patch({ target_muscles: parseMuscles(value) })} />
@@ -196,6 +203,7 @@ export function AdminTrainingTemplateSlotEditModal({
       </section>
 
       <ExerciseLibraryPickerModal
+        filterExercise={(exercise) => exercise.movement_pattern !== "other"}
         isOpen={pickerTarget !== null}
         onClose={() => setPickerTarget(null)}
         onSelect={selectExercise}
@@ -237,11 +245,11 @@ function toPayload(draft: SlotDraft): AdminTrainingTemplateSlotWrite {
     adaptation_priority: draft.adaptation_priority,
     superset_group: draft.superset_group,
     superset_exercise_id: draft.superset_exercise_id,
-    sets: draft.sets,
-    rep_min: draft.rep_min,
-    rep_max: draft.rep_max,
-    target_rir: draft.target_rir,
-    rest_seconds: draft.rest_seconds,
+    sets: normalizeNumber(draft.sets, 1, 10),
+    rep_min: normalizeNumber(draft.rep_min, 1, 100),
+    rep_max: normalizeNumber(draft.rep_max, 1, 100),
+    target_rir: normalizeNumber(draft.target_rir, 0, 6),
+    rest_seconds: normalizeNumber(draft.rest_seconds, 0, 600),
   };
 }
 
@@ -262,13 +270,47 @@ function TextInput({ label, value, onChange, dir }: { label: string; value: stri
   );
 }
 
-function NumberInput({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+function NumberInput({ label, value, onChange, min, max }: { label: string; value: number | ""; onChange: (value: number | "") => void; min: number; max: number }) {
   return (
     <label className="admin-field">
       <span>{label}</span>
-      <input aria-label={label} dir="ltr" min={0} onChange={(event) => onChange(Number(event.target.value))} type="number" value={value} />
+      <input
+        aria-label={label}
+        dir="ltr"
+        inputMode="numeric"
+        max={max}
+        min={min}
+        onBlur={() => onChange(normalizeNumber(value, min, max))}
+        onChange={(event) => {
+          const rawValue = event.target.value;
+          if (rawValue === "") {
+            onChange("");
+            return;
+          }
+          const parsed = Number(rawValue);
+          if (Number.isFinite(parsed)) onChange(Math.trunc(parsed));
+        }}
+        step={1}
+        type="number"
+        value={value}
+      />
     </label>
   );
+}
+
+function normalizeNumber(value: number | "", min: number, max: number): number {
+  const integer = typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : min;
+  return Math.min(max, Math.max(min, integer));
+}
+
+function formatSlotError(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiError)) return fallback;
+  const messages = error.details
+    ?.map((detail) => detail.msg?.trim())
+    .filter((message): message is string => Boolean(message));
+  if (messages && messages.length > 0) return `HTTP ${error.status}: ${messages.join(" ")}`;
+  if (error.message && error.message !== "Request failed") return `HTTP ${error.status}: ${error.message}`;
+  return `${fallback} (HTTP ${error.status})`;
 }
 
 function SelectInput({ label, value, options, getLabel, onChange }: { label: string; value: string; options: readonly string[]; getLabel: (value: string) => string; onChange: (value: string) => void }) {

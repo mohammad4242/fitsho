@@ -14,6 +14,7 @@ import { getAdminExercises } from "./api";
 import type { AdminExercise } from "./types";
 
 export interface ExerciseLibraryPickerModalProps {
+  filterExercise?: (exercise: AdminExercise) => boolean;
   isOpen: boolean;
   onClose: () => void;
   onSelect: (exercise: AdminExercise) => void;
@@ -23,6 +24,7 @@ export interface ExerciseLibraryPickerModalProps {
 type Stage = "region" | "muscle" | "focus" | "exercises";
 
 export function ExerciseLibraryPickerModal({
+  filterExercise,
   isOpen,
   onClose,
   onSelect,
@@ -151,6 +153,10 @@ export function ExerciseLibraryPickerModal({
       active = false;
     };
   }, [debouncedSearch, isOpen, selectedFocus, selectedMuscle, selectedRegion]);
+
+  const visibleExercises = filterExercise
+    ? exercises.filter(filterExercise)
+    : exercises;
 
   // Determine available muscles for selected region
   const availableMuscles = useMemo(() => {
@@ -322,20 +328,20 @@ export function ExerciseLibraryPickerModal({
           {isSearching && (
             <div className="admin-exercise-picker-search-results">
               <h3 className="admin-picker-stage-title">
-                {t("catalog.searchLabel", "نتایج جست‌وجو")} ({exercises.length})
+                {t("catalog.searchLabel", "نتایج جست‌وجو")} ({visibleExercises.length})
               </h3>
               {exercisesLoading && (
                 <p className="admin-status" role="status">
                   {t("catalog.loadingExercises", "در حال دریافت حرکت‌ها…")}
                 </p>
               )}
-              {!exercisesLoading && exercises.length === 0 && (
+              {!exercisesLoading && visibleExercises.length === 0 && (
                 <p className="admin-status">
                   {t("catalog.noMatches", "حرکتی با این مشخصات یافت نشد.")}
                 </p>
               )}
               <div className="admin-exercise-picker-list">
-                {exercises.map((exercise) => (
+                {visibleExercises.map((exercise) => (
                   <ExercisePickerItem
                     exercise={exercise}
                     isEn={isEn}
@@ -445,7 +451,7 @@ export function ExerciseLibraryPickerModal({
                       ← {t("admin.templateEditor.backButton", "بازگشت")}
                     </button>
                     <h3 className="admin-picker-stage-title">
-                      {t("admin.templateEditor.selectMovement", "۴. انتخاب حرکت")} ({exercises.length})
+                      {t("admin.templateEditor.selectMovement", "۴. انتخاب حرکت")} ({visibleExercises.length})
                     </h3>
                   </div>
                   {exercisesLoading && (
@@ -453,13 +459,13 @@ export function ExerciseLibraryPickerModal({
                       {t("catalog.loadingExercises", "در حال دریافت حرکت‌ها…")}
                     </p>
                   )}
-                  {!exercisesLoading && exercises.length === 0 && (
+                  {!exercisesLoading && visibleExercises.length === 0 && (
                     <p className="admin-status">
                       {t("catalog.emptyGroup", "حرکتی در این دسته ثبت نشده است.")}
                     </p>
                   )}
                   <div className="admin-exercise-picker-list">
-                    {exercises.map((exercise) => (
+                    {visibleExercises.map((exercise) => (
                       <ExercisePickerItem
                         exercise={exercise}
                         isEn={isEn}
