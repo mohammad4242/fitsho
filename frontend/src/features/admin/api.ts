@@ -37,6 +37,7 @@ import type {
   AdminTrainingProgramTemplatesResponse,
   AdminTrainingProgramTemplate,
   AdminTrainingProgramTemplateWrite,
+  AdminTrainingTemplateSlotWrite,
   PaginatedAdminExercises,
   AdminPreparedRecipeWrite,
   PreparedRecipePreview,
@@ -185,6 +186,32 @@ export function updateAdminTrainingProgramTemplate(
     method: "PUT",
     body: JSON.stringify(input),
   });
+}
+
+export function updateAdminTrainingTemplateSlot(
+  templateId: string,
+  dayId: string,
+  slotId: string,
+  input: AdminTrainingTemplateSlotWrite,
+): Promise<AdminTrainingProgramTemplate> {
+  return request<AdminTrainingProgramTemplate>(
+    `${adminTrainingProgramTemplatesPath}/${templateId}/days/${dayId}/slots/${slotId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function deleteAdminTrainingTemplateSlot(
+  templateId: string,
+  dayId: string,
+  slotId: string,
+): Promise<AdminTrainingProgramTemplate> {
+  return request<AdminTrainingProgramTemplate>(
+    `${adminTrainingProgramTemplatesPath}/${templateId}/days/${dayId}/slots/${slotId}`,
+    { method: "DELETE" },
+  );
 }
 
 export function deleteAdminTrainingProgramTemplate(templateId: string): Promise<void> {

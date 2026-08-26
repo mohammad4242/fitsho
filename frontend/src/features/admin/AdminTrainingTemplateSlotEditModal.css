@@ -1,0 +1,17 @@
+.admin-template-exercise-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin-top: .35rem; }
+.admin-template-exercise-edit { display: inline-flex; align-items: center; gap: .25rem; padding: 0; border: 0; color: var(--turquoise-dark); background: transparent; cursor: pointer; font: inherit; font-size: .78rem; font-weight: 850; }
+.admin-template-exercise-edit span { font-size: .92rem; }.admin-template-exercise-edit:hover { color: var(--petrol-900); text-decoration: underline; }
+.admin-template-slot-modal-overlay { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgb(10 31 30 / 65%); backdrop-filter: blur(8px); }
+.admin-template-slot-modal { width: min(720px, 100%); max-height: min(90vh, 760px); overflow: auto; border: 1px solid var(--line); border-radius: 1.25rem; background: var(--paper); box-shadow: 0 24px 64px rgb(0 0 0 / 28%); }
+.admin-template-slot-modal__header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.25rem; color: white; background: var(--petrol-900); }
+.admin-template-slot-modal__header h2 { margin: .2rem 0 0; color: white; font-size: 1.2rem; }
+.admin-template-slot-modal__body { display: grid; gap: 1rem; padding: 1.15rem 1.25rem 1.25rem; }
+.admin-template-slot-modal__exercise { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem .9rem; border: 1px solid rgb(56 183 165 / 25%); border-radius: .8rem; background: rgb(238 248 246 / 65%); }
+.admin-template-slot-modal__exercise > div { display: grid; gap: .2rem; min-width: 0; }.admin-template-slot-modal__exercise strong { color: var(--petrol-900); }.admin-template-slot-modal__exercise small { overflow-wrap: anywhere; color: var(--muted); }
+.admin-template-slot-modal__label { color: var(--muted); font-size: .78rem; font-weight: 800; }
+.admin-template-slot-modal__actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: .35rem; border-top: 1px solid var(--line); }
+.admin-template-slot-modal__actions > div { display: flex; gap: .55rem; }.admin-template-slot-modal__actions button { min-height: 2.5rem; padding: .55rem .85rem; border-radius: .65rem; cursor: pointer; font: inherit; font-weight: 850; }
+.admin-template-slot-modal__remove { border: 1px solid rgb(161 63 50 / 26%); color: var(--danger); background: rgb(161 63 50 / 9%); }.admin-template-slot-modal__cancel { border: 1px solid var(--line); color: var(--petrol-900); background: white; }
+.admin-template-slot-modal__actions .admin-primary-link { border: 0; cursor: pointer; }
+.admin-template-slot-modal input:focus, .admin-template-slot-modal select:focus { outline: 3px solid rgb(56 183 165 / 28%); border-color: var(--turquoise); }
+@media (max-width: 760px) { .admin-template-slot-modal-overlay { align-items: flex-end; padding: .5rem; }.admin-template-slot-modal { max-height: 92vh; max-height: 92dvh; border-radius: 1.25rem 1.25rem .5rem .5rem; }.admin-template-slot-modal__body { padding: 1rem; }.admin-template-slot-modal__exercise, .admin-template-slot-modal__actions { align-items: stretch; flex-direction: column; }.admin-template-slot-modal__actions > div { display: grid; grid-template-columns: 1fr 1fr; }.admin-template-slot-modal__actions > div button { width: 100%; } }

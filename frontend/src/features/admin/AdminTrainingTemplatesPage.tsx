@@ -6,7 +6,8 @@ import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { getAdminTrainingProgramTemplates } from "./api";
-import type { AdminTrainingProgramTemplatesResponse } from "./types";
+import { AdminTrainingTemplateSlotEditModal } from "./AdminTrainingTemplateSlotEditModal";
+import type { AdminTrainingProgramTemplatesResponse, AdminTrainingTemplateSlot } from "./types";
 import "./admin.css";
 
 const trainingDays = [2, 3, 4, 5, 6] as const;
@@ -18,9 +19,15 @@ export function AdminTrainingTemplatesPage() {
   const [trainingLevel, setTrainingLevel] = useState<(typeof trainingLevels)[number]>("all");
   const [page, setPage] = useState<AdminTrainingProgramTemplatesResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [feedback, setFeedback] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [expandedPrograms, setExpandedPrograms] = useState<Set<string>>(() => new Set());
   const [expandedDays, setExpandedDays] = useState<Set<string>>(() => new Set());
+  const [editingSlot, setEditingSlot] = useState<{
+    templateId: string;
+    dayId: string;
+    slot: AdminTrainingTemplateSlot;
+  } | null>(null);
   const english = i18n.resolvedLanguage === "en";
   const visibleTemplates = page?.items ?? [];
   const newProgramLevel = trainingLevel === "all" ? "beginner" : trainingLevel;
@@ -29,6 +36,7 @@ export function AdminTrainingTemplatesPage() {
   useEffect(() => {
     let active = true;
     setState("loading");
+    setFeedback(null);
     void getAdminTrainingProgramTemplates(daysPerWeek, trainingLevel)
       .then((result) => {
         if (!active) return;
@@ -104,6 +112,7 @@ export function AdminTrainingTemplatesPage() {
             <button type="button" onClick={() => setRetry((value) => value + 1)}>{t("common.retry")}</button>
           </div>
         )}
+        {feedback !== null && <p className="admin-status admin-status--success" role="status">{feedback}</p>}
         {state === "ready" && visibleTemplates.length === 0 && (
           <p className="admin-status">{t("admin.templates.empty")}</p>
         )}
@@ -200,14 +209,25 @@ export function AdminTrainingTemplatesPage() {
                                           <strong>{exerciseName ?? slot.exercise_slug_hint}</strong>
                                           {slot.exercise === null && <small>{t("admin.templates.placeholder")}</small>}
                                           {slot.exercise !== null && (
-                                            <Link
-                                              aria-label={t("admin.templates.exerciseDetailAria", { name: exerciseName })}
-                                              className="admin-template-exercise-detail"
-                                              to={`/exercises/${slot.exercise.slug}`}
-                                            >
-                                              <span aria-hidden="true">↗</span>
-                                              {t("admin.templates.exerciseDetail")}
-                                            </Link>
+                                            <div className="admin-template-exercise-actions">
+                                              <Link
+                                                aria-label={t("admin.templates.exerciseDetailAria", { name: exerciseName })}
+                                                className="admin-template-exercise-detail"
+                                                to={`/exercises/${slot.exercise.slug}`}
+                                              >
+                                                <span aria-hidden="true">↗</span>
+                                                {t("admin.templates.exerciseDetail")}
+                                              </Link>
+                                              <button
+                                                aria-label={t("admin.templates.exerciseEditAria", { name: exerciseName })}
+                                                className="admin-template-exercise-edit"
+                                                onClick={() => setEditingSlot({ templateId: template.id, dayId: day.id, slot })}
+                                                type="button"
+                                              >
+                                                <span aria-hidden="true">✏️</span>
+                                                {t("admin.templates.exerciseEdit")}
+                                              </button>
+                                            </div>
                                           )}
                                           {slot.exercise?.needs_review && <small>{t("admin.templates.reviewMedia")}</small>}
                                         </div>
@@ -255,6 +275,21 @@ export function AdminTrainingTemplatesPage() {
           <div className="admin-template-add-program">
             <Link className="admin-primary-link" to={newProgramPath}>{t("admin.templates.addProgram")}</Link>
           </div>
+        )}
+        {editingSlot !== null && (
+          <AdminTrainingTemplateSlotEditModal
+            dayId={editingSlot.dayId}
+            onClose={() => setEditingSlot(null)}
+            onSaved={(updatedTemplate) => {
+              setPage((current) => current === null
+                ? current
+                : { ...current, items: current.items.map((item) => item.id === updatedTemplate.id ? updatedTemplate : item) });
+              setFeedback(t("admin.templates.exerciseSaved"));
+              setEditingSlot(null);
+            }}
+            slot={editingSlot.slot}
+            templateId={editingSlot.templateId}
+          />
         )}
       </main>
     </div>

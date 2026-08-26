@@ -360,12 +360,14 @@ export type AdminTrainingTemplateSlot = {
   intensity_method: TrainingTemplateMethod;
   adaptation_priority: TrainingTemplateSlotPriority;
   superset_group: string | null;
+  superset_exercise_id: string | null;
   sets: number;
   rep_min: number;
   rep_max: number;
   target_rir: number;
   rest_seconds: number;
   exercise: AdminTrainingTemplateExercise | null;
+  superset_exercise: AdminTrainingTemplateExercise | null;
 };
 
 export type AdminTrainingTemplateDay = {
@@ -423,6 +425,7 @@ export type AdminTrainingTemplateSlotWrite = {
   intensity_method: TrainingTemplateMethod;
   adaptation_priority: TrainingTemplateSlotPriority;
   superset_group: string | null;
+  superset_exercise_id: string | null;
   sets: number;
   rep_min: number;
   rep_max: number;

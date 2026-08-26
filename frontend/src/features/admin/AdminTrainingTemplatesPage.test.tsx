@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const adminApi = vi.hoisted(() => ({ getAdminTrainingProgramTemplates: vi.fn() }));
+const adminApi = vi.hoisted(() => ({
+  deleteAdminTrainingTemplateSlot: vi.fn(),
+  getAdminTrainingProgramTemplates: vi.fn(),
+  updateAdminTrainingTemplateSlot: vi.fn(),
+}));
 vi.mock("./api", () => adminApi);
 vi.mock("../auth/AuthContext", () => ({
   useAuth: () => ({
@@ -105,6 +109,8 @@ const templates = [
 
 beforeEach(() => {
   adminApi.getAdminTrainingProgramTemplates.mockReset();
+  adminApi.updateAdminTrainingTemplateSlot.mockReset();
+  adminApi.deleteAdminTrainingTemplateSlot.mockReset();
 });
 
 it("filters the library by day count and training level", async () => {
@@ -186,4 +192,68 @@ it("filters the library by day count and training level", async () => {
     "href",
     "/admin/training-program-templates/new?days=4&level=first_month",
   );
+});
+
+it("edits one exercise instance and keeps the accordion open", async () => {
+  adminApi.getAdminTrainingProgramTemplates.mockResolvedValue({ items: templates });
+  const updatedTemplate = {
+    ...template,
+    days: [{
+      ...template.days[0],
+      slots: [{
+        ...template.days[0].slots[0],
+        sets: 5,
+        rep_min: 6,
+        rep_max: 10,
+        target_rir: 1,
+        exercise: { ...template.days[0].slots[0].exercise, name_fa: "پرس سینه جایگزین" },
+      }, template.days[0].slots[1]],
+    }],
+  };
+  adminApi.updateAdminTrainingTemplateSlot.mockResolvedValue(updatedTemplate);
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <AdminTrainingTemplatesPage />
+    </MemoryRouter>,
+  );
+
+  await user.click(screen.getByRole("tab", { name: "4 روزه" }));
+  await user.click(await screen.findByRole("button", { name: "باز کردن برنامه: تفکیک کلاسیک چهار روزه" }));
+  await user.click(screen.getByRole("button", { name: "باز کردن روز 1: سینه + پشت بازو" }));
+  await user.click(screen.getByRole("button", { name: "ویرایش حرکت: پرس سینه دمبل" }));
+
+  expect(screen.getByRole("dialog", { name: "ویرایش حرکت: پرس سینه دمبل" })).toBeInTheDocument();
+  await user.clear(screen.getByRole("spinbutton", { name: "ست" }));
+  await user.type(screen.getByRole("spinbutton", { name: "ست" }), "5");
+  await user.click(screen.getByRole("button", { name: "ذخیره حرکت" }));
+
+  expect(adminApi.updateAdminTrainingTemplateSlot).toHaveBeenCalledWith(
+    "1",
+    "day-1",
+    "slot-1",
+    expect.objectContaining({ sets: 5, rep_min: 8, rep_max: 12, target_rir: 2 }),
+  );
+  expect(await screen.findByText("پرس سینه جایگزین")).toBeInTheDocument();
+  expect(screen.getByText("تغییر حرکت ذخیره شد.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "بستن روز 1: سینه + پشت بازو" })).toBeInTheDocument();
+});
+
+it("cancels an exercise edit without saving", async () => {
+  adminApi.getAdminTrainingProgramTemplates.mockResolvedValue({ items: templates });
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <AdminTrainingTemplatesPage />
+    </MemoryRouter>,
+  );
+
+  await user.click(screen.getByRole("tab", { name: "4 روزه" }));
+  await user.click(await screen.findByRole("button", { name: "باز کردن برنامه: تفکیک کلاسیک چهار روزه" }));
+  await user.click(screen.getByRole("button", { name: "باز کردن روز 1: سینه + پشت بازو" }));
+  await user.click(screen.getByRole("button", { name: "ویرایش حرکت: پرس سینه دمبل" }));
+  await user.click(screen.getByRole("button", { name: "انصراف" }));
+
+  expect(screen.queryByRole("dialog", { name: "ویرایش حرکت: پرس سینه دمبل" })).not.toBeInTheDocument();
+  expect(adminApi.updateAdminTrainingTemplateSlot).not.toHaveBeenCalled();
 });
