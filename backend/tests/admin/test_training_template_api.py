@@ -324,6 +324,47 @@ def test_admin_updates_only_the_requested_training_template_slot(
                 slot["target_rir"],
             ) == before[(day["id"], slot["id"])]
 
+    refreshed = client.get(f"/api/v1/admin/training-program-templates/{template['id']}")
+    assert refreshed.status_code == 200
+    refreshed_target = next(
+        slot
+        for day in refreshed.json()["days"]
+        if day["id"] == target_day["id"]
+        for slot in day["slots"]
+        if slot["id"] == target_slot["id"]
+    )
+    assert refreshed_target["exercise"]["id"] == str(replacement_id)
+    assert refreshed_target["sets"] == 5
+
+
+def test_admin_deletes_only_the_requested_training_template_slot(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    templates = client.get("/api/v1/admin/training-program-templates?days_per_week=3").json()["items"]
+    template = next(item for item in templates if item["slug"].startswith("t02-"))
+    target_day = template["days"][0]
+    target_slot = target_day["slots"][-1]
+
+    response = client.delete(
+        f"/api/v1/admin/training-program-templates/{template['id']}/days/{target_day['id']}/slots/{target_slot['id']}",
+        headers=ORIGIN,
+    )
+
+    assert response.status_code == 200, response.text
+    updated = response.json()
+    updated_day = next(day for day in updated["days"] if day["id"] == target_day["id"])
+    assert target_slot["id"] not in {slot["id"] for slot in updated_day["slots"]}
+    assert [slot["slot_order"] for slot in updated_day["slots"]] == list(range(1, len(updated_day["slots"]) + 1))
+    assert [day["id"] for day in updated["days"]] == [day["id"] for day in template["days"]]
+
+    refreshed = client.get(f"/api/v1/admin/training-program-templates/{template['id']}")
+    assert refreshed.status_code == 200
+    refreshed_day = next(day for day in refreshed.json()["days"] if day["id"] == target_day["id"])
+    assert target_slot["id"] not in {slot["id"] for slot in refreshed_day["slots"]}
+
 
 def test_admin_deletes_template_and_owned_days(client: TestClient, db: Session) -> None:
     _seed_library(db)

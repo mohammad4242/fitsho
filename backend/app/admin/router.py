@@ -123,6 +123,17 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
                             if slot.exercise is not None
                             else None
                         ),
+                        superset_exercise=(
+                            AdminTrainingTemplateExercise(
+                                id=slot.superset_exercise.id,
+                                slug=slot.superset_exercise.slug,
+                                name_en=slot.superset_exercise.name_en,
+                                name_fa=slot.superset_exercise.name_fa,
+                                needs_review=slot.superset_exercise.needs_review,
+                            )
+                            if slot.superset_exercise is not None
+                            else None
+                        ),
                     )
                     for slot in day.slots
                 ],
