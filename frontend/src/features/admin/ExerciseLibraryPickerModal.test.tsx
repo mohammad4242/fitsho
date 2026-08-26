@@ -150,6 +150,31 @@ describe("ExerciseLibraryPickerModal", () => {
     expect(onSelect).toHaveBeenCalledWith(mockBenchPress);
   });
 
+  it("shows every exercise for a muscle when all muscle exercises is selected", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ExerciseLibraryPickerModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /بالاتنه/ }));
+    await user.click(await screen.findByRole("button", { name: /سینه/ }));
+    await user.click(await screen.findByRole("button", { name: /همه حرکات این عضله/ }));
+
+    expect(adminApi.getAdminExercises).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        body_region: "upper_body",
+        primary_muscle: "chest",
+        muscle_focus: undefined,
+      }),
+    );
+    expect(await screen.findByRole("button", { name: /پرس بالا سینه دمبل/ })).toBeInTheDocument();
+  });
+
   it("skips focus stage when muscle has no focus subdivisions", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();

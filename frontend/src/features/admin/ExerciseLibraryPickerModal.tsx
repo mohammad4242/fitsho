@@ -39,6 +39,7 @@ export function ExerciseLibraryPickerModal({
   const [selectedRegion, setSelectedRegion] = useState<BodyRegion | null>(null);
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | null>(null);
   const [selectedFocus, setSelectedFocus] = useState<MuscleFocus | null>(null);
+  const [focusSelectionComplete, setFocusSelectionComplete] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -83,6 +84,7 @@ export function ExerciseLibraryPickerModal({
       setSelectedRegion(null);
       setSelectedMuscle(null);
       setSelectedFocus(null);
+      setFocusSelectionComplete(false);
       setSearchQuery("");
       setDebouncedSearch("");
       setExercises([]);
@@ -174,9 +176,9 @@ export function ExerciseLibraryPickerModal({
   const currentStage: Stage = useMemo(() => {
     if (selectedRegion === null) return "region";
     if (selectedMuscle === null) return "muscle";
-    if (availableFocuses.length > 0 && selectedFocus === null) return "focus";
+    if (availableFocuses.length > 0 && !focusSelectionComplete) return "focus";
     return "exercises";
-  }, [availableFocuses.length, selectedFocus, selectedMuscle, selectedRegion]);
+  }, [availableFocuses.length, focusSelectionComplete, selectedMuscle, selectedRegion]);
 
   const isSearching = debouncedSearch.length >= 2;
 
@@ -184,28 +186,39 @@ export function ExerciseLibraryPickerModal({
     setSelectedRegion(region);
     setSelectedMuscle(null);
     setSelectedFocus(null);
+    setFocusSelectionComplete(false);
   }
 
   function handleSelectMuscle(muscle: MuscleGroup) {
     setSelectedMuscle(muscle);
     setSelectedFocus(null);
+    setFocusSelectionComplete(false);
   }
 
   function handleSelectFocus(focus: MuscleFocus | null) {
     setSelectedFocus(focus);
+    setFocusSelectionComplete(true);
   }
 
   function handleBack() {
     if (currentStage === "exercises") {
       if (availableFocuses.length > 0) {
         setSelectedFocus(null);
+        setFocusSelectionComplete(false);
       } else {
         setSelectedMuscle(null);
+        setSelectedFocus(null);
+        setFocusSelectionComplete(false);
       }
     } else if (currentStage === "focus") {
       setSelectedMuscle(null);
+      setSelectedFocus(null);
+      setFocusSelectionComplete(false);
     } else if (currentStage === "muscle") {
       setSelectedRegion(null);
+      setSelectedMuscle(null);
+      setSelectedFocus(null);
+      setFocusSelectionComplete(false);
     }
   }
 
@@ -213,6 +226,7 @@ export function ExerciseLibraryPickerModal({
     setSelectedRegion(null);
     setSelectedMuscle(null);
     setSelectedFocus(null);
+    setFocusSelectionComplete(false);
   }
 
   if (!isOpen) return null;
@@ -287,6 +301,7 @@ export function ExerciseLibraryPickerModal({
                   onClick={() => {
                     setSelectedMuscle(null);
                     setSelectedFocus(null);
+                    setFocusSelectionComplete(false);
                   }}
                   type="button"
                 >
@@ -298,8 +313,11 @@ export function ExerciseLibraryPickerModal({
               <>
                 <span className="admin-breadcrumb-separator">›</span>
                 <button
-                  className={selectedFocus === null && availableFocuses.length > 0 ? "is-current" : ""}
-                  onClick={() => setSelectedFocus(null)}
+                  className={!focusSelectionComplete && availableFocuses.length > 0 ? "is-current" : ""}
+                  onClick={() => {
+                    setSelectedFocus(null);
+                    setFocusSelectionComplete(false);
+                  }}
                   type="button"
                 >
                   {isEn ? muscleObj.name_en : muscleObj.name_fa}
