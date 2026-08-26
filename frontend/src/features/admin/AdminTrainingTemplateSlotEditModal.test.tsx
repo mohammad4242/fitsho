@@ -19,8 +19,8 @@ const slot: AdminTrainingTemplateSlot = {
   id: "slot-1",
   slot_order: 1,
   exercise_slug_hint: "old-press",
-  placeholder_name_en: null,
-  placeholder_name_fa: null,
+  placeholder_name_en: "Old display name",
+  placeholder_name_fa: "نام نمایشی قبلی",
   target_muscles: ["chest"],
   movement_pattern: "horizontal_push",
   intensity_method: "standard",
@@ -51,6 +51,15 @@ const replacement = {
   secondary_muscles: ["triceps"],
   movement_pattern: "horizontal_push",
   needs_review: false,
+};
+
+const secondReplacement = {
+  ...replacement,
+  id: "newer-exercise",
+  slug: "newer-press",
+  name_en: "Newer Press",
+  name_fa: "پرس جدیدتر",
+  secondary_muscles: ["shoulders"],
 };
 
 const categories = {
@@ -88,6 +97,17 @@ it("replaces the slot through the existing exercise library picker", async () =>
   await user.click(await screen.findByRole("button", { name: /بالاتنه/ }));
   await user.click(await screen.findByRole("button", { name: /سینه/ }));
   await user.click(await screen.findByRole("button", { name: /انتخاب پرس جایگزین/ }));
+
+  expect(screen.getByRole("textbox", { name: "نام نمایشی فارسی" })).toHaveValue("پرس جایگزین");
+  expect(screen.getByRole("textbox", { name: "نام نمایشی انگلیسی" })).toHaveValue("New Press");
+
+  adminApi.getAdminExercises.mockResolvedValue({ items: [secondReplacement], total: 1 });
+  await user.click(screen.getByRole("button", { name: "تغییر حرکت از کتابخانه" }));
+  await user.click(await screen.findByRole("button", { name: /بالاتنه/ }));
+  await user.click(await screen.findByRole("button", { name: /سینه/ }));
+  await user.click(await screen.findByRole("button", { name: /انتخاب پرس جدیدتر/ }));
+
+  expect(screen.getByRole("textbox", { name: "نام نمایشی فارسی" })).toHaveValue("پرس جدیدتر");
   await user.click(screen.getByRole("button", { name: "ذخیره حرکت" }));
 
   expect(adminApi.updateAdminTrainingTemplateSlot).toHaveBeenCalledWith(
@@ -95,9 +115,11 @@ it("replaces the slot through the existing exercise library picker", async () =>
     "day-1",
     "slot-1",
     expect.objectContaining({
-      exercise_id: "new-exercise",
+      exercise_id: "newer-exercise",
+      display_name_fa: "پرس جدیدتر",
+      display_name_en: "Newer Press",
       movement_pattern: "horizontal_push",
-      target_muscles: ["chest", "triceps"],
+      target_muscles: ["chest", "shoulders"],
     }),
   );
 });

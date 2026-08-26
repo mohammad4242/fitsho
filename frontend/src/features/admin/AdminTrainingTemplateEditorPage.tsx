@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { muscleGroups, movementPatterns, type MuscleGroup } from "../exercises/types";
+import { muscleGroups, movementPatterns } from "../exercises/types";
 import { fitnessGoals, type ExperienceLevel } from "../profile/types";
 import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
@@ -15,6 +15,7 @@ import {
 } from "./api";
 import { AdminAccordionSection } from "./AdminAccordionSection";
 import { ExerciseLibraryPickerModal } from "./ExerciseLibraryPickerModal";
+import { mapExerciseLibraryToTemplateFields } from "./trainingTemplateExerciseMapping";
 import type {
   AdminExercise,
   AdminTrainingProgramTemplate,
@@ -200,45 +201,42 @@ export function AdminTrainingTemplateEditorPage() {
   function selectExercise(exercise: AdminExercise) {
     if (pickerTarget === null) return;
     const { dayIndex, slotIndex } = pickerTarget;
-    const muscles: MuscleGroup[] = exercise.primary_muscle === null
-      ? exercise.secondary_muscles.slice(0, 1)
-      : [exercise.primary_muscle, ...exercise.secondary_muscles];
-    const targetMuscles: MuscleGroup[] = muscles.length > 0 ? muscles : ["chest"];
+    const selected = mapExerciseLibraryToTemplateFields(exercise);
 
     if (slotIndex !== null) {
       if (pickerTarget.member === "superset") {
         patchSlot(dayIndex, slotIndex, {
-          superset_exercise_id: exercise.id,
-          superset_exercise_name_fa: exercise.name_fa,
-          superset_exercise_name_en: exercise.name_en,
-          superset_exercise_slug: exercise.slug,
+          superset_exercise_id: selected.exercise_id,
+          superset_exercise_name_fa: selected.exercise_name_fa,
+          superset_exercise_name_en: selected.exercise_name_en,
+          superset_exercise_slug: selected.exercise_slug,
         });
       } else {
         patchSlot(dayIndex, slotIndex, {
-          exercise_id: exercise.id,
-          exercise_name_fa: exercise.name_fa,
-          exercise_name_en: exercise.name_en,
-          exercise_slug: exercise.slug,
-          movement_pattern: exercise.movement_pattern,
-          target_muscles: targetMuscles,
+          exercise_id: selected.exercise_id,
+          exercise_name_fa: selected.exercise_name_fa,
+          exercise_name_en: selected.exercise_name_en,
+          exercise_slug: selected.exercise_slug,
+          movement_pattern: selected.movement_pattern,
+          target_muscles: selected.target_muscles,
         });
       }
     } else {
       // Add new slot to day
       const existingSlotCount = form.days[dayIndex]?.slots.length ?? 0;
       const slot: AdminTrainingTemplateSlotForm = {
-        exercise_id: exercise.id,
-        exercise_name_fa: exercise.name_fa,
-        exercise_name_en: exercise.name_en,
-        exercise_slug: exercise.slug,
+        exercise_id: selected.exercise_id,
+        exercise_name_fa: selected.exercise_name_fa,
+        exercise_name_en: selected.exercise_name_en,
+        exercise_slug: selected.exercise_slug,
         superset_exercise_id: null,
         superset_exercise_name_fa: null,
         superset_exercise_name_en: null,
         superset_exercise_slug: null,
         display_name_en: null,
         display_name_fa: null,
-        target_muscles: targetMuscles,
-        movement_pattern: exercise.movement_pattern,
+        target_muscles: selected.target_muscles,
+        movement_pattern: selected.movement_pattern,
         intensity_method: "standard",
         adaptation_priority: "core",
         superset_group: null,

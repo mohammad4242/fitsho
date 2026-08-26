@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { muscleGroups, movementPatterns, type MuscleGroup } from "../exercises/types";
 import { deleteAdminTrainingTemplateSlot, updateAdminTrainingTemplateSlot } from "./api";
 import { ExerciseLibraryPickerModal } from "./ExerciseLibraryPickerModal";
+import { mapExerciseLibraryToTemplateFields } from "./trainingTemplateExerciseMapping";
 import "./AdminTrainingTemplateSlotEditModal.css";
 import type {
   AdminExercise,
@@ -53,21 +54,24 @@ export function AdminTrainingTemplateSlotEditModal({
   }
 
   function selectExercise(selected: AdminExercise) {
+    const selectedFields = mapExerciseLibraryToTemplateFields(selected);
     const selectedSummary = {
-      id: selected.id,
-      slug: selected.slug,
-      name_en: selected.name_en,
-      name_fa: selected.name_fa,
+      id: selectedFields.exercise_id,
+      slug: selectedFields.exercise_slug,
+      name_en: selectedFields.exercise_name_en,
+      name_fa: selectedFields.exercise_name_fa,
       needs_review: selected.needs_review,
     } satisfies AdminTrainingTemplateExercise;
     if (pickerTarget === "superset") {
-      patch({ superset_exercise_id: selected.id, superset_exercise: selectedSummary });
+      patch({ superset_exercise_id: selectedFields.exercise_id, superset_exercise: selectedSummary });
     } else {
       patch({
-        exercise_id: selected.id,
+        exercise_id: selectedFields.exercise_id,
+        display_name_en: selectedFields.exercise_name_en,
+        display_name_fa: selectedFields.exercise_name_fa,
         exercise: selectedSummary,
-        movement_pattern: selected.movement_pattern,
-        target_muscles: exerciseTargetMuscles(selected, draft.target_muscles),
+        movement_pattern: selectedFields.movement_pattern,
+        target_muscles: selectedFields.target_muscles,
       });
     }
     setPickerTarget(null);
@@ -239,13 +243,6 @@ function toPayload(draft: SlotDraft): AdminTrainingTemplateSlotWrite {
     target_rir: draft.target_rir,
     rest_seconds: draft.rest_seconds,
   };
-}
-
-function exerciseTargetMuscles(exercise: AdminExercise, fallback: MuscleGroup[]): MuscleGroup[] {
-  const muscles = exercise.primary_muscle === null
-    ? exercise.secondary_muscles.slice(0, 1)
-    : [exercise.primary_muscle, ...exercise.secondary_muscles];
-  return muscles.length > 0 ? muscles : fallback;
 }
 
 function parseMuscles(value: string): MuscleGroup[] {
