@@ -302,6 +302,17 @@ class AdminTrainingTemplateSlotWrite(BaseModel):
             raise ValueError("Minimum repetitions cannot exceed maximum repetitions")
         return self
 
+    @model_validator(mode="after")
+    def validate_superset(self) -> "AdminTrainingTemplateSlotWrite":
+        if self.intensity_method is TrainingTemplateMethod.SUPERSET:
+            if self.superset_exercise_id is None:
+                raise ValueError("Superset slots require a superset_exercise_id")
+            if self.exercise_id == self.superset_exercise_id:
+                raise ValueError("Superset exercises must be different")
+        elif self.superset_exercise_id is not None:
+            raise ValueError("Only superset slots may declare a superset_exercise_id")
+        return self
+
 
 class AdminTrainingTemplateDayWrite(BaseModel):
     model_config = ConfigDict(extra="forbid")

@@ -337,6 +337,32 @@ def test_admin_updates_only_the_requested_training_template_slot(
     assert refreshed_target["sets"] == 5
 
 
+def test_admin_slot_update_rejects_incomplete_superset(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+    template = client.get(
+        "/api/v1/admin/training-program-templates?days_per_week=4"
+    ).json()["items"][0]
+    target_day = template["days"][0]
+    target_slot = target_day["slots"][0]
+
+    response = client.patch(
+        f"/api/v1/admin/training-program-templates/{template['id']}/days/{target_day['id']}/slots/{target_slot['id']}",
+        headers=ORIGIN,
+        json=_slot_payload(
+            target_slot,
+            intensity_method="superset",
+            superset_exercise_id=None,
+        ),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body"]
+
+
 def test_admin_deletes_only_the_requested_training_template_slot(
     client: TestClient,
     db: Session,
