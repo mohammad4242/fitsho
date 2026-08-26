@@ -55,3 +55,51 @@ it("creates a five-day body-part split with ordered database days", async () => 
     ]),
   }));
 });
+
+it("loads the current family on edit and preserves an upper-lower update", async () => {
+  adminApi.getAdminTrainingProgramStructure.mockResolvedValue({
+    id: "structure-6-upper-lower",
+    slug: "six-day-upper-lower",
+    name_en: "6-Day Upper / Lower",
+    name_fa: "بالاتنه / پایین‌تنه شش‌روزه",
+    days_per_week: 6,
+    family: "upper_lower",
+    split_type: null,
+    description_en: null,
+    description_fa: null,
+    is_active: true,
+    structure_days: Array.from({ length: 6 }, (_, index) => ({
+      id: `day-${index + 1}`,
+      day_number: index + 1,
+      label_en: `Day ${index + 1}`,
+      label_fa: `روز ${index + 1}`,
+      day_type: "upper_lower",
+    })),
+  });
+  adminApi.updateAdminTrainingProgramStructure.mockResolvedValue({ id: "structure-6-upper-lower" });
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={["/admin/training-program-structures/structure-6-upper-lower/edit"]}>
+      <Routes>
+        <Route path="/admin/training-program-structures/:structureId/edit" element={<AdminTrainingProgramStructureEditorPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByLabelText("خانواده ساختار")).toHaveValue("upper_lower");
+  expect(screen.queryByLabelText("نوع تقسیم Split")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "ذخیره ساختار" }));
+
+  expect(adminApi.updateAdminTrainingProgramStructure).toHaveBeenCalledWith(
+    "structure-6-upper-lower",
+    expect.objectContaining({
+      days_per_week: 6,
+      family: "upper_lower",
+      split_type: null,
+      days: expect.arrayContaining([
+        expect.objectContaining({ day_number: 1 }),
+        expect.objectContaining({ day_number: 6 }),
+      ]),
+    }),
+  );
+});

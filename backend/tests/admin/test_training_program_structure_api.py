@@ -75,9 +75,10 @@ def _structure_payload(
     days_per_week: int = 5,
     family: str | None = "split",
     split_type: str | None = "body_part",
+    slug: str = "five-day-body-part-b",
 ) -> dict[str, object]:
     return {
-        "slug": "five-day-body-part-b",
+        "slug": slug,
         "name_en": "5-Day Body-Part Split B",
         "name_fa": "تقسیم عضله‌ای پنج‌روزه ب",
         "days_per_week": days_per_week,
@@ -151,27 +152,46 @@ def test_template_family_filter_preserves_level_filter(
     assert all("advanced" in template["supported_levels"] for template in templates)
 
 
-def test_admin_creates_new_body_part_structure_for_family_filter(
+@pytest.mark.parametrize(
+    ("days_per_week", "family", "split_type", "slug"),
+    [
+        (5, "split", "body_part", "five-day-body-part-b"),
+        (6, "upper_lower", None, "six-day-upper-lower-b"),
+    ],
+)
+def test_admin_creates_structure_and_exposes_it_under_days_and_family(
     client: TestClient,
     db: Session,
+    days_per_week: int,
+    family: str,
+    split_type: str | None,
+    slug: str,
 ) -> None:
-    _register_admin(client, db, "structure-create@example.com")
+    _register_admin(client, db, f"structure-create-{days_per_week}@example.com")
 
     created = client.post(
         "/api/v1/admin/training-program-structures",
         headers=ORIGIN,
-        json=_structure_payload(),
+        json=_structure_payload(
+            days_per_week=days_per_week,
+            family=family,
+            split_type=split_type,
+            slug=slug,
+        ),
     )
 
     assert created.status_code == 201, created.text
     item = created.json()
-    assert item["family"] == "split"
-    assert item["split_type"] == "body_part"
-    assert len(item["structure_days"]) == 5
+    assert item["days_per_week"] == days_per_week
+    assert item["family"] == family
+    assert item["split_type"] == split_type
+    assert len(item["structure_days"]) == days_per_week
 
-    filtered = client.get("/api/v1/admin/training-program-structures?days_per_week=5&family=split")
+    filtered = client.get(
+        f"/api/v1/admin/training-program-structures?days_per_week={days_per_week}&family={family}"
+    )
     assert filtered.status_code == 200
-    assert "five-day-body-part-b" in {entry["slug"] for entry in filtered.json()["items"]}
+    assert slug in {entry["slug"] for entry in filtered.json()["items"]}
 
 
 @pytest.mark.parametrize(
