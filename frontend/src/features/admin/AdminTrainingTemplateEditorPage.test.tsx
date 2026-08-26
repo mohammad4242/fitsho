@@ -11,6 +11,7 @@ const adminApi = vi.hoisted(() => ({
   createAdminTrainingProgramTemplate: vi.fn(),
   deleteAdminTrainingProgramTemplate: vi.fn(),
   getAdminExercises: vi.fn(),
+  getAdminTrainingProgramStructures: vi.fn(),
   getAdminTrainingProgramTemplate: vi.fn(),
   getAdminTrainingProgramTemplates: vi.fn(),
   updateAdminTrainingProgramTemplate: vi.fn(),
@@ -90,6 +91,7 @@ beforeEach(() => {
     total: 2,
     total_pages: 1,
   });
+  adminApi.getAdminTrainingProgramStructures.mockResolvedValue({ items: [] });
 });
 
 it("creates a new program with shared content and multi-level eligibility", async () => {

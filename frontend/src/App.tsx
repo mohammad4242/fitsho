@@ -28,6 +28,8 @@ const AdminNutritionProgramsPage = lazy(() => import("./features/admin/AdminNutr
 const AdminSupplementsPage = lazy(() => import("./features/admin/AdminSupplementsPage").then(({ AdminSupplementsPage }) => ({ default: AdminSupplementsPage })));
 const AdminTrainingTemplateEditorPage = lazy(() => import("./features/admin/AdminTrainingTemplateEditorPage").then(({ AdminTrainingTemplateEditorPage }) => ({ default: AdminTrainingTemplateEditorPage })));
 const AdminTrainingTemplatesPage = lazy(() => import("./features/admin/AdminTrainingTemplatesPage").then(({ AdminTrainingTemplatesPage }) => ({ default: AdminTrainingTemplatesPage })));
+const AdminTrainingProgramStructuresPage = lazy(() => import("./features/admin/AdminTrainingProgramStructuresPage").then(({ AdminTrainingProgramStructuresPage }) => ({ default: AdminTrainingProgramStructuresPage })));
+const AdminTrainingProgramStructureEditorPage = lazy(() => import("./features/admin/AdminTrainingProgramStructureEditorPage").then(({ AdminTrainingProgramStructureEditorPage }) => ({ default: AdminTrainingProgramStructureEditorPage })));
 const BodyAnalysisResultPage = lazy(() => import("./features/bodyPhotos/BodyAnalysisResultPage").then(({ BodyAnalysisResultPage }) => ({ default: BodyAnalysisResultPage })));
 const BodyPhotoWizard = lazy(() => import("./features/bodyPhotos/BodyPhotoWizard").then(({ BodyPhotoWizard }) => ({ default: BodyPhotoWizard })));
 const BodyProgressPage = lazy(() => import("./features/bodyPhotos/BodyProgressPage").then(({ BodyProgressPage }) => ({ default: BodyProgressPage })));
@@ -73,6 +75,9 @@ export function AppRoutes() {
           <Route path="/admin/training-program-templates" element={deferred(<AdminTrainingTemplatesPage />)} />
           <Route path="/admin/training-program-templates/new" element={deferred(<AdminTrainingTemplateEditorPage />)} />
           <Route path="/admin/training-program-templates/:templateId/edit" element={deferred(<AdminTrainingTemplateEditorPage />)} />
+          <Route path="/admin/training-program-structures" element={deferred(<AdminTrainingProgramStructuresPage />)} />
+          <Route path="/admin/training-program-structures/new" element={deferred(<AdminTrainingProgramStructureEditorPage />)} />
+          <Route path="/admin/training-program-structures/:structureId/edit" element={deferred(<AdminTrainingProgramStructureEditorPage />)} />
           <Route path="/admin/exercises" element={<Navigate to="/exercises" replace />} />
           <Route path="/admin/exercises/new" element={deferred(<AdminExerciseNewPage />)} />
           <Route path="/admin/exercises/:exerciseId/edit" element={deferred(<AdminExerciseEditPage />)} />

@@ -410,6 +410,9 @@ export type AdminTrainingProgramStructuresResponse = {
   items: AdminTrainingProgramStructure[];
 };
 
+export type StructureFamily = "upper_lower" | "split";
+export type StructureSplitType = "ppl" | "body_part";
+
 export type AdminTrainingProgramStructureDay = {
   id: string;
   day_number: number;
@@ -424,6 +427,8 @@ export type AdminTrainingProgramStructure = {
   name_en: string;
   name_fa: string;
   days_per_week: number;
+  family: StructureFamily | null;
+  split_type: StructureSplitType | null;
   description_en: string | null;
   description_fa: string | null;
   is_active: boolean;
@@ -442,6 +447,8 @@ export type AdminTrainingProgramStructureWrite = {
   name_en: string;
   name_fa: string;
   days_per_week: number;
+  family: StructureFamily | null;
+  split_type: StructureSplitType | null;
   description_en: string | null;
   description_fa: string | null;
   days: AdminTrainingProgramStructureDayWrite[];

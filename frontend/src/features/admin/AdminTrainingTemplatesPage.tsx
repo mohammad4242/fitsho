@@ -6,17 +6,28 @@ import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { AdminTrainingTemplateSlotEditModal } from "./AdminTrainingTemplateSlotEditModal";
-import type { AdminTrainingProgramTemplatesResponse, AdminTrainingTemplateSlot } from "./types";
+import {
+  getAdminTrainingProgramStructures,
+  getAdminTrainingProgramTemplates,
+} from "./api";
+import type {
+  AdminTrainingProgramStructure,
+  AdminTrainingProgramTemplatesResponse,
+  AdminTrainingTemplateSlot,
+  StructureFamily,
+} from "./types";
 import "./admin.css";
 
 const trainingDays = [2, 3, 4, 5, 6] as const;
 const trainingLevels = ["all", "first_month", "beginner", "intermediate", "advanced"] as const;
+const structureFamilies: StructureFamily[] = ["upper_lower", "split"];
 
 export function AdminTrainingTemplatesPage() {
   const { i18n, t } = useTranslation();
   const [daysPerWeek, setDaysPerWeek] = useState<(typeof trainingDays)[number]>(2);
   const [structureId, setStructureId] = useState<string>("all");
-  const [structures, setStructures] = useState<import("./types").AdminTrainingProgramStructure[]>([]);
+  const [family, setFamily] = useState<StructureFamily | null>(null);
+  const [structures, setStructures] = useState<AdminTrainingProgramStructure[]>([]);
   const [trainingLevel, setTrainingLevel] = useState<(typeof trainingLevels)[number]>("all");
   const [page, setPage] = useState<AdminTrainingProgramTemplatesResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -33,15 +44,23 @@ export function AdminTrainingTemplatesPage() {
   const visibleTemplates = page?.items ?? [];
   const newProgramLevel = trainingLevel === "all" ? "beginner" : trainingLevel;
   const newProgramPath = `/admin/training-program-templates/new?days=${daysPerWeek}&level=${newProgramLevel}${structureId !== "all" ? `&structure_id=${structureId}` : ""}`;
+  const usesFamilyFilter = daysPerWeek >= 4;
+  const structureName = (structure: AdminTrainingProgramStructure) => english ? structure.name_en : structure.name_fa;
+  const familyLabel = (value: StructureFamily) => value === "upper_lower"
+    ? t("admin.templates.upperLowerFamily")
+    : t("admin.templates.splitFamily");
+  const structuresForFamily = (value: StructureFamily) => structures.filter((structure) => structure.family === value);
 
   useEffect(() => {
     let active = true;
-    import("./api").then(({ getAdminTrainingProgramStructures }) => {
-      getAdminTrainingProgramStructures(daysPerWeek).then((res) => {
+    getAdminTrainingProgramStructures(daysPerWeek)
+      .then((res) => {
         if (!active) return;
         setStructures(res.items);
-      }).catch(console.error);
-    });
+      })
+      .catch(() => {
+        if (active) setStructures([]);
+      });
     return () => { active = false; };
   }, [daysPerWeek]);
 
@@ -49,19 +68,23 @@ export function AdminTrainingTemplatesPage() {
     let active = true;
     setState("loading");
     setFeedback(null);
-    import("./api").then(({ getAdminTrainingProgramTemplates }) => {
-      getAdminTrainingProgramTemplates(daysPerWeek, trainingLevel, structureId === "all" ? undefined : structureId)
-        .then((result) => {
-          if (!active) return;
-          setPage(result);
-          setState("ready");
-        })
-        .catch(() => {
-          if (active) setState("error");
-        });
-    });
+    const selectedStructureId = structureId === "all" ? undefined : structureId;
+    const request = family !== null
+      ? getAdminTrainingProgramTemplates(daysPerWeek, trainingLevel, selectedStructureId, family)
+      : selectedStructureId === undefined
+        ? getAdminTrainingProgramTemplates(daysPerWeek, trainingLevel)
+        : getAdminTrainingProgramTemplates(daysPerWeek, trainingLevel, selectedStructureId);
+    request
+      .then((result) => {
+        if (!active) return;
+        setPage(result);
+        setState("ready");
+      })
+      .catch(() => {
+        if (active) setState("error");
+      });
     return () => { active = false; };
-  }, [daysPerWeek, retry, trainingLevel, structureId]);
+  }, [daysPerWeek, family, retry, trainingLevel, structureId]);
 
   return (
     <div className="admin-page">
@@ -73,6 +96,11 @@ export function AdminTrainingTemplatesPage() {
             <p className="eyebrow eyebrow--accent">{t("admin.templates.eyebrow")}</p>
             <h1 className="fitsho-display">{t("admin.templates.title")}</h1>
             <p>{t("admin.templates.intro")}</p>
+          </div>
+          <div className="admin-hero-actions">
+            <Link className="admin-secondary-link" to="/admin/training-program-structures">
+              {t("admin.templates.structureLibraryLink")}
+            </Link>
           </div>
         </header>
 
@@ -87,8 +115,9 @@ export function AdminTrainingTemplatesPage() {
                   key={days}
                   onClick={() => {
                     setDaysPerWeek(days);
+                    setFamily(null);
                     setStructureId("all");
-                    setTrainingLevel("all");
+                    setStructures([]);
                   }}
                   role="tab"
                   type="button"
@@ -98,29 +127,75 @@ export function AdminTrainingTemplatesPage() {
               ))}
             </div>
           </div>
-          {structures.length > 0 && (
+          {(structures.length > 0 || usesFamilyFilter) && (
             <div className="admin-template-filter-group">
               <span>{t("admin.templates.structureFilter")}</span>
-              <div className="admin-template-tabs admin-template-tabs--structures" role="tablist" aria-label={t("admin.templates.structureFilter")}>
+              <div className={`admin-template-tabs admin-template-tabs--structures${usesFamilyFilter ? " admin-template-tabs--families" : ""}`} role="tablist" aria-label={t("admin.templates.structureFilter")}>
                 <button
                   aria-selected={structureId === "all"}
-                  onClick={() => setStructureId("all")}
+                  onClick={() => {
+                    setFamily(null);
+                    setStructureId("all");
+                  }}
                   role="tab"
                   type="button"
                 >
                   {t("admin.templates.allStructures")}
                 </button>
-                {structures.map((s) => (
+                {!usesFamilyFilter && structures.map((structure) => (
                   <button
-                    aria-selected={s.id === structureId}
-                    key={s.id}
-                    onClick={() => setStructureId(s.id)}
+                    aria-selected={structure.id === structureId}
+                    key={structure.id}
+                    onClick={() => setStructureId(structure.id)}
                     role="tab"
                     type="button"
                   >
-                    {english ? s.name_en : s.name_fa}
+                    {structureName(structure)}
                   </button>
                 ))}
+                {usesFamilyFilter && structureFamilies.map((value) => {
+                  const expanded = family === value;
+                  const familyStructures = structuresForFamily(value);
+                  return (
+                    <div className="admin-structure-family" key={value}>
+                      <button
+                        aria-expanded={expanded}
+                        aria-pressed={expanded}
+                        className="admin-structure-family__trigger"
+                        onClick={() => {
+                          setFamily(expanded ? null : value);
+                          setStructureId("all");
+                        }}
+                        type="button"
+                      >
+                        <span>{familyLabel(value)}</span>
+                        <span aria-hidden="true" className="admin-structure-family__chevron">⌄</span>
+                      </button>
+                      {expanded && (
+                        <div className="admin-structure-family__options" role="list">
+                          {familyStructures.length === 0 && (
+                            <p className="admin-structure-family__empty">{t("admin.templates.noStructuresInFamily")}</p>
+                          )}
+                          {familyStructures.map((structure) => (
+                            <button
+                              aria-label={structureName(structure)}
+                              aria-selected={structure.id === structureId}
+                              className="admin-structure-option"
+                              key={structure.id}
+                              onClick={() => setStructureId(structure.id)}
+                              type="button"
+                            >
+                              <span>{structureName(structure)}</span>
+                              {structure.split_type !== null && (
+                                <small>{t(`admin.templates.splitTypes.${structure.split_type}`)}</small>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

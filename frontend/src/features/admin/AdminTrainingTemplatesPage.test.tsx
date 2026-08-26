@@ -6,6 +6,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 const adminApi = vi.hoisted(() => ({
   deleteAdminTrainingTemplateSlot: vi.fn(),
   getAdminTrainingProgramTemplates: vi.fn(),
+  getAdminTrainingProgramStructures: vi.fn(),
   updateAdminTrainingTemplateSlot: vi.fn(),
 }));
 vi.mock("./api", () => adminApi);
@@ -109,8 +110,130 @@ const templates = [
 
 beforeEach(() => {
   adminApi.getAdminTrainingProgramTemplates.mockReset();
+  adminApi.getAdminTrainingProgramTemplates.mockResolvedValue({ items: [] });
+  adminApi.getAdminTrainingProgramStructures.mockReset();
+  adminApi.getAdminTrainingProgramStructures.mockResolvedValue({ items: [] });
   adminApi.updateAdminTrainingTemplateSlot.mockReset();
   adminApi.deleteAdminTrainingTemplateSlot.mockReset();
+});
+
+it("uses family disclosure for longer weeks and resets dependent selections", async () => {
+  const structures = {
+    4: [
+      {
+        id: "4-upper-lower",
+        slug: "4d-upper-lower-2x",
+        name_en: "Upper / Lower ×2",
+        name_fa: "بالاتنه / پایین‌تنه دو بار",
+        days_per_week: 4,
+        family: "upper_lower" as const,
+        split_type: null,
+      },
+      {
+        id: "4-split",
+        slug: "4d-push-pull-quads-posterior",
+        name_en: "Push / Pull / Quads / Posterior",
+        name_fa: "پوش / پول / چهارسر / خلفی",
+        days_per_week: 4,
+        family: "split" as const,
+        split_type: "body_part" as const,
+      },
+    ],
+    5: [
+      {
+        id: "5-upper-lower",
+        slug: "5d-upper-lower",
+        name_en: "Upper / Lower",
+        name_fa: "بالاتنه / پایین‌تنه",
+        days_per_week: 5,
+        family: "upper_lower" as const,
+        split_type: null,
+      },
+      {
+        id: "5-ppl",
+        slug: "5d-ppl",
+        name_en: "Push / Pull / Legs / Upper / Lower",
+        name_fa: "پوش / پول / پا / بالاتنه / پایین‌تنه",
+        days_per_week: 5,
+        family: "split" as const,
+        split_type: "ppl" as const,
+      },
+      {
+        id: "5-body-part",
+        slug: "5d-body-part-b",
+        name_en: "5-Day Body-Part Split B",
+        name_fa: "تقسیم عضله‌ای پنج‌روزه ب",
+        days_per_week: 5,
+        family: "split" as const,
+        split_type: "body_part" as const,
+      },
+    ],
+  };
+  adminApi.getAdminTrainingProgramStructures.mockImplementation((days: number) => Promise.resolve({ items: structures[days as 4 | 5] ?? [] }));
+  adminApi.getAdminTrainingProgramTemplates.mockResolvedValue({ items: templates });
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <AdminTrainingTemplatesPage />
+    </MemoryRouter>,
+  );
+
+  await user.click(screen.getByRole("tab", { name: "5 روزه" }));
+  expect(screen.queryByRole("button", { name: "Upper / Lower" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "بالاتنه / پایین‌تنه" })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("button", { name: "Split" })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByText("پوش / پول / پا / بالاتنه / پایین‌تنه")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Split" }));
+  expect(screen.getByRole("button", { name: "Split" })).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("button", { name: "پوش / پول / پا / بالاتنه / پایین‌تنه" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "تقسیم عضله‌ای پنج‌روزه ب" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "بالاتنه / پایین‌تنه دو بار" })).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "پوش / پول / پا / بالاتنه / پایین‌تنه" }));
+  expect(screen.getByRole("button", { name: "پوش / پول / پا / بالاتنه / پایین‌تنه" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("link", { name: "افزودن برنامه جدید" })).toHaveAttribute(
+    "href",
+    "/admin/training-program-templates/new?days=5&level=beginner&structure_id=5-ppl",
+  );
+
+  await user.click(screen.getByRole("tab", { name: "4 روزه" }));
+  expect(screen.getByRole("button", { name: "بالاتنه / پایین‌تنه" })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("button", { name: "Split" })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("link", { name: "افزودن برنامه جدید" })).toHaveAttribute(
+    "href",
+    "/admin/training-program-templates/new?days=4&level=beginner",
+  );
+
+  await user.click(screen.getByRole("tab", { name: "همهٔ ساختارها" }));
+  expect(screen.getByRole("tab", { name: "همهٔ ساختارها" })).toHaveAttribute("aria-selected", "true");
+  expect(adminApi.getAdminTrainingProgramTemplates).toHaveBeenLastCalledWith(4, "all");
+});
+
+it("shows two- and three-day structures directly without family controls", async () => {
+  adminApi.getAdminTrainingProgramStructures.mockImplementation((days: number) => Promise.resolve({
+    items: [{
+      id: `${days}-structure`,
+      slug: `${days}d-structure`,
+      name_en: `${days}-Day Structure`,
+      name_fa: `ساختار ${days} روزه`,
+      days_per_week: days,
+      family: null,
+      split_type: null,
+    }],
+  }));
+  adminApi.getAdminTrainingProgramTemplates.mockResolvedValue({ items: [] });
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <AdminTrainingTemplatesPage />
+    </MemoryRouter>,
+  );
+
+  await user.click(screen.getByRole("tab", { name: "3 روزه" }));
+  expect(await screen.findByRole("tab", { name: "ساختار 3 روزه" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Upper / Lower" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Split" })).not.toBeInTheDocument();
 });
 
 it("filters the library by day count and training level", async () => {

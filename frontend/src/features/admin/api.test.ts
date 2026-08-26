@@ -16,6 +16,10 @@ import {
   restoreAdminNutritionProgram,
   uploadAdminMealImage,
   updateAdminAiRouting,
+  createAdminTrainingProgramStructure,
+  deactivateAdminTrainingProgramStructure,
+  getAdminTrainingProgramStructures,
+  updateAdminTrainingProgramStructure,
 } from "./api";
 import type {
   AdminAiModelsResponse,
@@ -192,6 +196,68 @@ it("filters shared training templates by level and deletes by canonical id", asy
     2,
     "/api/v1/admin/training-program-templates/template-17",
     expect.objectContaining({ method: "DELETE" }),
+  );
+});
+
+it("filters structures by family and manages structure lifecycle", async () => {
+  const structure = {
+    slug: "5d-body-part-b",
+    name_en: "5-Day Body-Part Split B",
+    name_fa: "تقسیم عضله‌ای پنج‌روزه ب",
+    days_per_week: 5,
+    family: "split" as const,
+    split_type: "body_part" as const,
+    description_en: null,
+    description_fa: null,
+    days: [
+      { day_number: 1, label_en: "Chest + Triceps", label_fa: "سینه + پشت بازو", day_type: null },
+      { day_number: 2, label_en: "Back + Biceps", label_fa: "پشت + جلو بازو", day_type: null },
+      { day_number: 3, label_en: "Quads", label_fa: "چهارسر", day_type: null },
+      { day_number: 4, label_en: "Shoulders + Traps", label_fa: "سرشانه + کول", day_type: null },
+      { day_number: 5, label_en: "Hamstrings", label_fa: "همسترینگ", day_type: null },
+    ],
+  };
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(jsonResponse({ items: [] }))
+    .mockResolvedValueOnce(jsonResponse({ id: "structure-1", ...structure }))
+    .mockResolvedValueOnce(jsonResponse({ id: "structure-1", ...structure }))
+    .mockResolvedValueOnce(jsonResponse({ id: "structure-1", ...structure, is_active: false }));
+
+  await expect(getAdminTrainingProgramStructures(5, "split", true)).resolves.toEqual({ items: [] });
+  await expect(createAdminTrainingProgramStructure(structure)).resolves.toMatchObject({ id: "structure-1" });
+  await expect(updateAdminTrainingProgramStructure("structure-1", structure)).resolves.toMatchObject({ id: "structure-1" });
+  await expect(deactivateAdminTrainingProgramStructure("structure-1")).resolves.toMatchObject({ is_active: false });
+
+  expect(fetch).toHaveBeenNthCalledWith(
+    1,
+    "/api/v1/admin/training-program-structures?days_per_week=5&family=split&include_inactive=true",
+    expect.objectContaining({ credentials: "include" }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    "/api/v1/admin/training-program-structures",
+    expect.objectContaining({ method: "POST", body: JSON.stringify(structure) }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    3,
+    "/api/v1/admin/training-program-structures/structure-1",
+    expect.objectContaining({ method: "PUT", body: JSON.stringify(structure) }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    4,
+    "/api/v1/admin/training-program-structures/structure-1/deactivate",
+    expect.objectContaining({ method: "PATCH" }),
+  );
+});
+
+it("passes family through the training template library query", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ items: [] }));
+
+  await expect(getAdminTrainingProgramTemplates(5, "advanced", undefined, "split")).resolves.toEqual({ items: [] });
+
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/admin/training-program-templates?days_per_week=5&training_level=advanced&family=split",
+    expect.objectContaining({ credentials: "include" }),
   );
 });
 

@@ -35,6 +35,8 @@ import type {
   NutritionDietStyle,
   NutritionProgramLifecycle,
   AdminTrainingProgramStructuresResponse,
+  AdminTrainingProgramStructure,
+  AdminTrainingProgramStructureWrite,
   AdminTrainingProgramTemplatesResponse,
   AdminTrainingProgramTemplate,
   AdminTrainingProgramTemplateWrite,
@@ -42,6 +44,7 @@ import type {
   PaginatedAdminExercises,
   AdminPreparedRecipeWrite,
   PreparedRecipePreview,
+  StructureFamily,
 } from "./types";
 import type { ExperienceLevel } from "../profile/types";
 
@@ -157,9 +160,11 @@ export function getAdminTrainingProgramTemplates(
   daysPerWeek: number,
   trainingLevel: ExperienceLevel | "all" = "all",
   structureId?: string,
+  family?: StructureFamily,
 ): Promise<AdminTrainingProgramTemplatesResponse> {
   const query = new URLSearchParams({ days_per_week: String(daysPerWeek) });
   if (trainingLevel !== "all") query.set("training_level", trainingLevel);
+  if (family) query.set("family", family);
   if (structureId) query.set("structure_id", structureId);
   return request<AdminTrainingProgramTemplatesResponse>(
     `${adminTrainingProgramTemplatesPath}?${query.toString()}`,
@@ -168,13 +173,60 @@ export function getAdminTrainingProgramTemplates(
 
 export function getAdminTrainingProgramStructures(
   daysPerWeek?: number,
+  family?: StructureFamily,
   includeInactive: boolean = false,
 ): Promise<AdminTrainingProgramStructuresResponse> {
   const query = new URLSearchParams();
   if (daysPerWeek) query.set("days_per_week", String(daysPerWeek));
+  if (family) query.set("family", family);
   if (includeInactive) query.set("include_inactive", "true");
   return request<AdminTrainingProgramStructuresResponse>(
     `/api/v1/admin/training-program-structures?${query.toString()}`,
+  );
+}
+
+const adminTrainingProgramStructuresPath = "/api/v1/admin/training-program-structures";
+
+export function getAdminTrainingProgramStructure(
+  structureId: string,
+): Promise<AdminTrainingProgramStructure> {
+  return request<AdminTrainingProgramStructure>(`${adminTrainingProgramStructuresPath}/${structureId}`);
+}
+
+export function createAdminTrainingProgramStructure(
+  input: AdminTrainingProgramStructureWrite,
+): Promise<AdminTrainingProgramStructure> {
+  return request<AdminTrainingProgramStructure>(adminTrainingProgramStructuresPath, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateAdminTrainingProgramStructure(
+  structureId: string,
+  input: AdminTrainingProgramStructureWrite,
+): Promise<AdminTrainingProgramStructure> {
+  return request<AdminTrainingProgramStructure>(`${adminTrainingProgramStructuresPath}/${structureId}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function activateAdminTrainingProgramStructure(
+  structureId: string,
+): Promise<AdminTrainingProgramStructure> {
+  return request<AdminTrainingProgramStructure>(
+    `${adminTrainingProgramStructuresPath}/${structureId}/activate`,
+    { method: "PATCH" },
+  );
+}
+
+export function deactivateAdminTrainingProgramStructure(
+  structureId: string,
+): Promise<AdminTrainingProgramStructure> {
+  return request<AdminTrainingProgramStructure>(
+    `${adminTrainingProgramStructuresPath}/${structureId}/deactivate`,
+    { method: "PATCH" },
   );
 }
 
