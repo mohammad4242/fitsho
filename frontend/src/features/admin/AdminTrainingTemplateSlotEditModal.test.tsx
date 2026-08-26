@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 
+import { ApiError } from "../../shared/apiClient";
+
 const exercisesApi = vi.hoisted(() => ({ getExerciseCategories: vi.fn() }));
 const adminApi = vi.hoisted(() => ({
   deleteAdminTrainingTemplateSlot: vi.fn(),
@@ -27,7 +29,7 @@ const slot: AdminTrainingTemplateSlot = {
   adaptation_priority: "core",
   superset_group: null,
   superset_exercise_id: null,
-  sets: 3,
+  sets: 2,
   rep_min: 8,
   rep_max: 12,
   target_rir: 2,
@@ -93,6 +95,7 @@ it("replaces the slot through the existing exercise library picker", async () =>
     />,
   );
 
+  expect(screen.getByRole("spinbutton", { name: "ست" })).toHaveValue(2);
   await user.click(screen.getByRole("button", { name: "تغییر حرکت از کتابخانه" }));
   await user.click(await screen.findByRole("button", { name: /بالاتنه/ }));
   await user.click(await screen.findByRole("button", { name: /سینه/ }));
@@ -100,6 +103,7 @@ it("replaces the slot through the existing exercise library picker", async () =>
 
   expect(screen.getByRole("textbox", { name: "نام نمایشی فارسی" })).toHaveValue("پرس جایگزین");
   expect(screen.getByRole("textbox", { name: "نام نمایشی انگلیسی" })).toHaveValue("New Press");
+  expect(screen.getByRole("spinbutton", { name: "ست" })).toHaveValue(3);
 
   adminApi.getAdminExercises.mockResolvedValue({ items: [secondReplacement], total: 1 });
   await user.click(screen.getByRole("button", { name: "تغییر حرکت از کتابخانه" }));
@@ -120,6 +124,68 @@ it("replaces the slot through the existing exercise library picker", async () =>
       display_name_en: "Newer Press",
       movement_pattern: "horizontal_push",
       target_muscles: ["chest", "shoulders"],
+      sets: 3,
     }),
+  );
+});
+
+it("keeps numeric inputs editable and normalizes sets to the backend range", async () => {
+  const user = userEvent.setup();
+  render(
+    <AdminTrainingTemplateSlotEditModal
+      dayId="day-1"
+      onClose={vi.fn()}
+      onSaved={vi.fn()}
+      slot={slot}
+      templateId="template-1"
+    />,
+  );
+
+  const setsInput = screen.getByRole("spinbutton", { name: "ست" });
+  await user.clear(setsInput);
+  expect(setsInput).toHaveValue("");
+
+  await user.type(setsInput, "03");
+  expect(setsInput).toHaveValue(3);
+  expect(setsInput).not.toHaveValue("03");
+
+  await user.clear(setsInput);
+  await user.type(setsInput, "11");
+  await user.tab();
+  expect(setsInput).toHaveValue(10);
+
+  await user.click(screen.getByRole("button", { name: "ذخیره حرکت" }));
+  expect(adminApi.updateAdminTrainingTemplateSlot).toHaveBeenCalledWith(
+    "template-1",
+    "day-1",
+    "slot-1",
+    expect.objectContaining({ sets: 10 }),
+  );
+});
+
+it("shows backend validation details when saving the slot fails", async () => {
+  const user = userEvent.setup();
+  adminApi.updateAdminTrainingTemplateSlot.mockRejectedValue(
+    new ApiError(422, "Request failed", [
+      {
+        loc: ["body", "slot"],
+        msg: "Selected exercise is incompatible with the slot movement or target muscles",
+      },
+    ]),
+  );
+  render(
+    <AdminTrainingTemplateSlotEditModal
+      dayId="day-1"
+      onClose={vi.fn()}
+      onSaved={vi.fn()}
+      slot={slot}
+      templateId="template-1"
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "ذخیره حرکت" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Selected exercise is incompatible with the slot movement or target muscles",
   );
 });

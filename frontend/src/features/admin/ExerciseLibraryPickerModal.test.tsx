@@ -83,6 +83,14 @@ const mockBenchPress: AdminExercise = {
   updated_at: "2026-07-27T00:00:00Z",
 };
 
+const mockIncompleteMetadataExercise: AdminExercise = {
+  ...mockBenchPress,
+  id: "ex-other",
+  name_en: "Incomplete Metadata Exercise",
+  name_fa: "حرکت با اطلاعات ناقص",
+  movement_pattern: "other",
+};
+
 describe("ExerciseLibraryPickerModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -196,6 +204,33 @@ describe("ExerciseLibraryPickerModal", () => {
     expect(exerciseItem).toBeInTheDocument();
     await user.click(exerciseItem);
     expect(onSelect).toHaveBeenCalledWith(mockBenchPress);
+  });
+
+  it("supports a slot-only filter for exercises with incomplete metadata", async () => {
+    const user = userEvent.setup();
+    adminApi.getAdminExercises.mockResolvedValue({
+      items: [mockIncompleteMetadataExercise, mockBenchPress],
+      page: 1,
+      page_size: 50,
+      total: 2,
+      total_pages: 1,
+    });
+
+    render(
+      <ExerciseLibraryPickerModal
+        filterExercise={(exercise) => exercise.movement_pattern !== "other"}
+        isOpen={true}
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /بالاتنه/ }));
+    await user.click(await screen.findByRole("button", { name: /سینه/ }));
+    await user.click(await screen.findByRole("button", { name: /بالاسینه/ }));
+
+    expect(await screen.findByRole("button", { name: /پرس بالا سینه دمبل/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /حرکت با اطلاعات ناقص/ })).not.toBeInTheDocument();
   });
 
   it("handles back button and breadcrumb clicks", async () => {
