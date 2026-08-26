@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.exercises.enums import MovementPattern, MuscleGroup
-from app.profile.enums import ExperienceLevel, FitnessGoal
+from app.profile.enums import ExperienceLevel
 from app.training_templates.models import TrainingTemplateMethod, TrainingTemplateSlotPriority
 from app.training_templates.tags import (
     TemplateFocusTag,
@@ -64,6 +64,7 @@ class TrainingProgramTemplateSeed:
     days: tuple[TemplateDaySeed, ...]
     programming_rationale: tuple[TemplateProgrammingRationaleSeed, ...]
     is_active: bool = True
+    structure_slug: str = ""
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,7 @@ class CanonicalTemplateDefinition:
     order_fa: str
     recovery_en: str
     recovery_fa: str
+    structure_slug: str = ""
 
 
 M = MuscleGroup
@@ -107,7 +109,7 @@ SOURCE_URL = "https://fitsho.local/training-template-catalog"
 NOVICE_DEFAULT_PRESCRIPTION = (3, 8, 12)
 LEGACY_NOVICE_PRESCRIPTIONS = frozenset({(2, 10, 15), (2, 12, 15), (2, 12, 20)})
 
-CANONICAL_TEMPLATE_SLUGS = (
+CANONICAL_TEMPLATE_SLUGS: tuple[str, ...] = (
     "t01-2-day-full-body-ab",
     "t02-3-day-upper-lower-full",
     "t03-3-day-upper-lower-upper",
@@ -408,7 +410,7 @@ def _prescription_for_role(
         profiles = {
             "primary": (*NOVICE_DEFAULT_PRESCRIPTION, 3, 120),
             "secondary": (*NOVICE_DEFAULT_PRESCRIPTION, 3, 90),
-            "isolation": (*NOVICE_DEFAULT_PRESCRIPTION, 3, 60),
+            "isolation": (3, 10, 15, 3, 60),
             "core": (*NOVICE_DEFAULT_PRESCRIPTION, 3, 60),
         }
     elif Level.INTERMEDIATE in supported_levels:
@@ -608,7 +610,7 @@ NO_FIRST_MONTH = (Level.BEGINNER, Level.INTERMEDIATE, Level.ADVANCED)
 INTERMEDIATE_ADVANCED = (Level.INTERMEDIATE, Level.ADVANCED)
 
 
-_DEFINITIONS = (
+_DEFINITIONS: tuple[CanonicalTemplateDefinition, ...] = (
     _definition(
         "t01-2-day-full-body-ab",
         "2-Day Full Body A/B",
@@ -1800,4 +1802,891 @@ def _seed_from_definition(
 
 TRAINING_PROGRAM_TEMPLATE_SEEDS = tuple(
     _seed_from_definition(definition) for definition in CANONICAL_TEMPLATE_DEFINITIONS
+)
+
+
+# The Default Program Library is intentionally level-specific.  The existing
+# TrainingProgramTemplate tables remain the storage model; each approved
+# program is one deterministic template row with one supported level.
+SMITH_CHAIR_SQUAT = _movement(
+    "smith-chair-squat",
+    "fedb-0750-smith-chair-squat",
+    (M.QUADRICEPS,),
+    P.SQUAT,
+)
+MACHINE_CHEST_PRESS = _movement(
+    "machine-chest-press",
+    "fedb-0577-lever-lying-chest-press",
+    (M.CHEST,),
+    P.HORIZONTAL_PUSH,
+)
+MACHINE_INCLINE_PRESS = _movement(
+    "machine-incline-press",
+    "fedb-1299-lever-incline-hammer-chest-press",
+    (M.CHEST,),
+    P.HORIZONTAL_PUSH,
+)
+HIGH_ROW = _movement(
+    "high-row",
+    "fedb-0581-lever-high-row",
+    (M.BACK,),
+    P.HORIZONTAL_PULL,
+)
+SMITH_SHOULDER_PRESS = _movement(
+    "smith-shoulder-press",
+    "fedb-0765-smith-seated-shoulder-press",
+    (M.SHOULDERS,),
+    P.VERTICAL_PUSH,
+)
+LEVER_LATERAL_RAISE = _movement(
+    "lever-lateral-raise",
+    "fedb-0584-lever-lateral-raise",
+    (M.SHOULDERS,),
+    P.SHOULDER_ABDUCTION,
+)
+
+_ROLE_NAMES = {"P": "primary", "S": "secondary", "I": "isolation"}
+_APPROVED_STRUCTURE_NAMES = {
+    "2d-full-body-ab": ("2-Day Full Body A/B", "تمام‌بدن دو روزه A/B"),
+    "3d-upper-lower-full-body": (
+        "3-Day Upper / Lower / Full",
+        "بالاتنه / پایین‌تنه / تمام‌بدن سه روزه",
+    ),
+    "3d-upper-lower-upper": (
+        "3-Day Upper / Lower / Upper",
+        "بالاتنه / پایین‌تنه / بالاتنه سه روزه",
+    ),
+    "3d-lower-upper-lower": (
+        "3-Day Lower / Upper / Lower",
+        "پایین‌تنه / بالاتنه / پایین‌تنه سه روزه",
+    ),
+    "4d-upper-lower-2x": (
+        "4-Day Upper / Lower / Upper / Lower",
+        "بالاتنه / پایین‌تنه / بالاتنه / پایین‌تنه چهار روزه",
+    ),
+    "4d-3-upper-1-lower": (
+        "4-Day 3 Upper + 1 Lower",
+        "چهارروزه؛ سه بالاتنه و یک پایین‌تنه",
+    ),
+    "4d-3-lower-1-upper": (
+        "4-Day 3 Lower + 1 Upper",
+        "چهارروزه؛ سه پایین‌تنه و یک بالاتنه",
+    ),
+    "4d-push-pull-quads-posterior": (
+        "4-Day Push / Pull / Quads / Posterior",
+        "پوش / پول / چهارسر / خلفی چهارروزه",
+    ),
+}
+_LEVEL_NAMES = {
+    Level.FIRST_MONTH: ("First Month", "ماه اول"),
+    Level.BEGINNER: ("Beginner", "مبتدی"),
+    Level.INTERMEDIATE: ("Intermediate", "متوسط"),
+    Level.ADVANCED: ("Advanced", "پیشرفته"),
+}
+_LEVEL_SLUG_SUFFIX = {
+    Level.FIRST_MONTH: "first-month",
+    Level.BEGINNER: "beginner",
+    Level.INTERMEDIATE: "intermediate",
+    Level.ADVANCED: "advanced",
+}
+_APPROVED_TAGS = {
+    "2d-full-body-ab": (Tag.FULL_BODY,),
+    "3d-upper-lower-full-body": (Tag.UPPER_LOWER,),
+    "3d-upper-lower-upper": (Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
+    "3d-lower-upper-lower": (Tag.UPPER_LOWER, Tag.LOWER_PRIORITY),
+    "4d-upper-lower-2x": (Tag.UPPER_LOWER,),
+    "4d-3-upper-1-lower": (Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
+    "4d-3-lower-1-upper": (Tag.UPPER_LOWER, Tag.LOWER_PRIORITY),
+    "4d-push-pull-quads-posterior": (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
+}
+_APPROVED_DAY_TITLES_FA = {
+    "Full Body A": "تمام‌بدن A",
+    "Full Body B": "تمام‌بدن B",
+    "Upper": "بالاتنه",
+    "Upper A": "بالاتنه A",
+    "Upper B": "بالاتنه B",
+    "Lower": "پایین‌تنه",
+    "Lower A": "پایین‌تنه A",
+    "Lower B": "پایین‌تنه B",
+    "Lower C": "پایین‌تنه C",
+    "Full": "تمام‌بدن",
+    "Upper C": "بالاتنه C",
+    "Push": "پوش",
+    "Pull": "پول",
+    "Quads": "چهارسر",
+    "Posterior": "خلفی",
+}
+
+_UPPER_MUSCLES = (M.CHEST, M.BACK, M.SHOULDERS, M.BICEPS, M.TRICEPS)
+_LOWER_MUSCLES = (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES)
+_FULL_BODY_MUSCLES = _LOWER_MUSCLES + _UPPER_MUSCLES
+
+
+def _approved_day(
+    title_en: str,
+    structure_focus: str,
+    direct_target_muscles: tuple[MuscleGroup, ...],
+    *slot_specs: tuple[Movement, str],
+) -> tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]]:
+    specs = tuple(slot_specs)
+    return (
+        TemplateDaySeed(
+            title_en=title_en,
+            title_fa=_APPROVED_DAY_TITLES_FA[title_en],
+            structure_focus=structure_focus,
+            direct_target_muscles=direct_target_muscles,
+            slots=tuple(
+                TemplateSlotSeed(
+                    exercise_slug_hint=movement.exercise_slug,
+                    catalog_slug_hints=(movement.exercise_slug,),
+                    target_muscles=movement.target_muscles,
+                    movement_pattern=movement.movement_pattern,
+                )
+                for movement, _ in specs
+            ),
+        ),
+        specs,
+    )
+
+
+def _approved_definition(
+    slug: str,
+    structure_slug: str,
+    level: ExperienceLevel,
+    days: tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...],
+) -> CanonicalTemplateDefinition:
+    structure_name_en, structure_name_fa = _APPROVED_STRUCTURE_NAMES[structure_slug]
+    level_name_en, level_name_fa = _LEVEL_NAMES[level]
+    return CanonicalTemplateDefinition(
+        canonical_slug=slug,
+        name_en=f"{structure_name_en} — {level_name_en}",
+        name_fa=f"{structure_name_fa} — {level_name_fa}",
+        description_en=f"Approved Fitsho default program: {structure_name_en} for {level_name_en} trainees.",
+        description_fa=f"برنامه پیش‌فرض تأییدشده فیتشو: {structure_name_fa} برای سطح {level_name_fa}.",
+        supported_levels=(level,),
+        focus_tags=_APPROVED_TAGS[structure_slug],
+        days=tuple(day for day, _ in days),
+        day_specs=tuple(specs for _, specs in days),
+        guidance_en="Follow the approved day order and keep the prescribed effort target for this level.",
+        guidance_fa="ترتیب روزهای تأییدشده را اجرا کن و هدف تلاش تعیین‌شده برای این سطح را حفظ کن.",
+        order_en="Complete exercises in the listed order.",
+        order_fa="حرکت‌ها را به همان ترتیب فهرست‌شده اجرا کن.",
+        recovery_en="Keep recovery days between repeated regional exposures when possible.",
+        recovery_fa="در صورت امکان بین مواجهه‌های تکراری ناحیه‌ای روزهای ریکاوری بگذار.",
+        structure_slug=structure_slug,
+    )
+
+
+def _approved_seed_from_definition(
+    definition: CanonicalTemplateDefinition,
+) -> TrainingProgramTemplateSeed:
+    level = definition.supported_levels[0]
+    days = tuple(
+        TemplateDaySeed(
+            title_en=day.title_en,
+            title_fa=day.title_fa,
+            structure_focus=day.structure_focus,
+            direct_target_muscles=day.direct_target_muscles,
+            slots=tuple(
+                _shared_slot(
+                    movement,
+                    canonical_slot,
+                    _ROLE_NAMES[role],
+                    (level,),
+                )
+                for canonical_slot, (movement, role) in zip(
+                    day.slots,
+                    specs,
+                    strict=True,
+                )
+            ),
+        )
+        for day, specs in zip(definition.days, definition.day_specs, strict=True)
+    )
+    seed = TrainingProgramTemplateSeed(
+        canonical_slug=definition.canonical_slug,
+        slug=definition.canonical_slug,
+        name_en=definition.name_en,
+        name_fa=definition.name_fa,
+        description_en=definition.description_en,
+        description_fa=definition.description_fa,
+        days_per_week=len(days),
+        supported_levels=definition.supported_levels,
+        focus_tags=definition.focus_tags,
+        intensity_methods=(Method.STANDARD,),
+        days=days,
+        programming_rationale=(
+            TemplateProgrammingRationaleSeed(
+                "Structure",
+                "ساختار",
+                definition.guidance_en,
+                definition.guidance_fa,
+            ),
+            TemplateProgrammingRationaleSeed(
+                "Exercise order",
+                "ترتیب حرکات",
+                definition.order_en,
+                definition.order_fa,
+            ),
+            TemplateProgrammingRationaleSeed(
+                "Working sets and reps",
+                "ست‌ها و تکرارهای کاری",
+                "Use the prescribed sets, rep range, RIR, and rest for this training level.",
+                "ست‌ها، دامنه تکرار، RIR و استراحت تعیین‌شده برای این سطح را اجرا کن.",
+            ),
+            TemplateProgrammingRationaleSeed(
+                "Progression",
+                "پیشرفت",
+                "Progress through the top of the rep range before adding load.",
+                "پیش از افزایش وزنه، در دامنه تکرار تا سقف پیشرفت کن.",
+            ),
+            TemplateProgrammingRationaleSeed(
+                "Recovery and safety",
+                "ریکاوری و ایمنی",
+                definition.recovery_en,
+                definition.recovery_fa,
+            ),
+        ),
+        structure_slug=definition.structure_slug,
+    )
+    validate_template_focus_tags(
+        seed.focus_tags,
+        intensity_methods=seed.intensity_methods,
+        days=seed.days,
+    )
+    return seed
+
+
+_FULL_BODY_FIRST_MONTH = (
+    _approved_day(
+        "Full Body A",
+        "full_body",
+        _FULL_BODY_MUSCLES,
+        (SMITH_CHAIR_SQUAT, "P"),
+        (SEATED_LEG_CURL, "S"),
+        (MACHINE_CHEST_PRESS, "P"),
+        (HIGH_ROW, "P"),
+        (LAT_PULLDOWN, "S"),
+        (SMITH_SHOULDER_PRESS, "S"),
+    ),
+    _approved_day(
+        "Full Body B",
+        "full_body",
+        _FULL_BODY_MUSCLES,
+        (LEG_PRESS, "P"),
+        (GLUTE_BRIDGE, "P"),
+        (MACHINE_INCLINE_PRESS, "P"),
+        (HIGH_ROW, "P"),
+        (LAT_PULLDOWN, "S"),
+        (LEVER_LATERAL_RAISE, "I"),
+    ),
+)
+_FULL_BODY_BEGINNER = (
+    _approved_day(
+        "Full Body A",
+        "full_body",
+        _FULL_BODY_MUSCLES,
+        (SMITH_CHAIR_SQUAT, "P"),
+        (SEATED_LEG_CURL, "S"),
+        (MACHINE_CHEST_PRESS, "P"),
+        (HIGH_ROW, "P"),
+        (LAT_PULLDOWN, "S"),
+        (SMITH_SHOULDER_PRESS, "S"),
+    ),
+    _approved_day(
+        "Full Body B",
+        "full_body",
+        _FULL_BODY_MUSCLES,
+        (LEG_PRESS, "P"),
+        (RDL, "P"),
+        (INCLINE_PRESS, "P"),
+        (SEATED_CABLE_ROW, "P"),
+        (LAT_PULLDOWN, "S"),
+        (LATERAL_RAISE, "I"),
+    ),
+)
+_FULL_BODY_INTERMEDIATE = (
+    _approved_day(
+        "Full Body A",
+        "full_body",
+        _FULL_BODY_MUSCLES,
+        (SQUAT, "P"),
+        (SEATED_LEG_CURL, "S"),
+        (FLAT_PRESS, "P"),
+        (ROW, "P"),
+        (LAT_PULLDOWN, "S"),
+        (SHOULDER_PRESS, "S"),
+    ),
+    _approved_day(
+        "Full Body B",
+        "full_body",
+        _FULL_BODY_MUSCLES,
+        (LEG_PRESS, "P"),
+        (RDL, "P"),
+        (INCLINE_PRESS, "P"),
+        (SEATED_CABLE_ROW, "P"),
+        (LAT_PULLDOWN, "S"),
+        (LATERAL_RAISE, "I"),
+    ),
+)
+
+
+def _upper_lower_full(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
+    if level is Level.FIRST_MONTH:
+        upper = (
+            (MACHINE_CHEST_PRESS, "P"),
+            (MACHINE_INCLINE_PRESS, "S"),
+            (HIGH_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (SMITH_SHOULDER_PRESS, "P"),
+            (LEVER_LATERAL_RAISE, "I"),
+        )
+        lower = (
+            (SMITH_CHAIR_SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (GLUTE_BRIDGE, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+        full = (
+            (LEG_PRESS, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (MACHINE_CHEST_PRESS, "P"),
+            (HIGH_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (LEVER_LATERAL_RAISE, "I"),
+        )
+    elif level is Level.BEGINNER:
+        upper = (
+            (MACHINE_CHEST_PRESS, "P"),
+            (INCLINE_PRESS, "S"),
+            (HIGH_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (SMITH_SHOULDER_PRESS, "P"),
+            (LATERAL_RAISE, "I"),
+        )
+        lower = (
+            (SMITH_CHAIR_SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (RDL, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+        full = (
+            (LEG_PRESS, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (MACHINE_CHEST_PRESS, "P"),
+            (SEATED_CABLE_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (LATERAL_RAISE, "I"),
+        )
+    else:
+        upper = (
+            (FLAT_PRESS, "P"),
+            (INCLINE_PRESS, "S"),
+            (ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (SHOULDER_PRESS, "P"),
+            (LATERAL_RAISE, "I"),
+        )
+        lower = (
+            (SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (RDL, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+        full = (
+            (LEG_PRESS, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (FLAT_PRESS, "P"),
+            (SEATED_CABLE_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (LATERAL_RAISE, "I"),
+        )
+    return (
+        _approved_day("Upper", "upper", _UPPER_MUSCLES, *upper),
+        _approved_day("Lower", "lower", _LOWER_MUSCLES, *lower),
+        _approved_day("Full", "full_body", _FULL_BODY_MUSCLES, *full),
+    )
+
+
+def _upper_lower_upper(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
+    upper_a = (
+        (MACHINE_CHEST_PRESS, "P"),
+        (INCLINE_PRESS, "S"),
+        (HIGH_ROW, "P"),
+        (LAT_PULLDOWN, "S"),
+        (SMITH_SHOULDER_PRESS, "P"),
+        (LATERAL_RAISE, "I"),
+        (PREACHER_CURL, "I"),
+        (TRICEPS_PUSHDOWN, "I"),
+    )
+    upper_b = (
+        (INCLINE_PRESS, "P"),
+        (MACHINE_CHEST_PRESS, "S"),
+        (SEATED_CABLE_ROW, "P"),
+        (LAT_PULLDOWN, "S"),
+        (REAR_DELT_FLY, "I"),
+        (LATERAL_RAISE, "I"),
+        (HAMMER_CURL, "I"),
+        (ROPE_TRICEPS_PUSHDOWN, "I"),
+    )
+    lower = (
+        (SMITH_CHAIR_SQUAT, "P"),
+        (LEG_PRESS, "P"),
+        (RDL, "P"),
+        (SEATED_LEG_CURL, "S"),
+        (CALF_RAISE, "I"),
+    )
+    if level is not Level.BEGINNER:
+        upper_a = (
+            (FLAT_PRESS, "P"),
+            (INCLINE_PRESS, "S"),
+            (ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (SHOULDER_PRESS, "P"),
+            (LATERAL_RAISE, "I"),
+            (DUMBBELL_CURL, "I"),
+            (TRICEPS_PUSHDOWN, "I"),
+        )
+        upper_b = (
+            (INCLINE_PRESS, "P"),
+            (FLAT_PRESS, "S"),
+            (SEATED_CABLE_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (REAR_DELT_FLY, "I"),
+            (LATERAL_RAISE, "I"),
+            (HAMMER_CURL, "I"),
+            (OVERHEAD_TRICEPS_EXTENSION, "I"),
+        )
+        lower = (
+            (SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (RDL, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+    return (
+        _approved_day("Upper A", "upper", _UPPER_MUSCLES, *upper_a),
+        _approved_day("Lower", "lower", _LOWER_MUSCLES, *lower),
+        _approved_day("Upper B", "upper", _UPPER_MUSCLES, *upper_b),
+    )
+
+
+def _lower_upper_lower(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
+    if level is Level.BEGINNER:
+        lower_a = (
+            (SMITH_CHAIR_SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (RDL, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+        upper = (
+            (MACHINE_CHEST_PRESS, "P"),
+            (INCLINE_PRESS, "S"),
+            (HIGH_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (SMITH_SHOULDER_PRESS, "P"),
+            (LATERAL_RAISE, "I"),
+            (PREACHER_CURL, "I"),
+            (TRICEPS_PUSHDOWN, "I"),
+        )
+        lower_b = (
+            (LEG_PRESS, "P"),
+            (LUNGE, "S"),
+            (RDL, "P"),
+            (LYING_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+    else:
+        lower_a = (
+            (SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (RDL, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+        upper = (
+            (FLAT_PRESS, "P"),
+            (INCLINE_PRESS, "S"),
+            (ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (SHOULDER_PRESS, "P"),
+            (LATERAL_RAISE, "I"),
+            (DUMBBELL_CURL, "I"),
+            (TRICEPS_PUSHDOWN, "I"),
+        )
+        lower_b = (
+            (LEG_PRESS, "P"),
+            (LUNGE, "S"),
+            (RDL, "P"),
+            (LYING_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+    return (
+        _approved_day("Lower A", "lower", _LOWER_MUSCLES, *lower_a),
+        _approved_day("Upper", "upper", _UPPER_MUSCLES, *upper),
+        _approved_day("Lower B", "lower", _LOWER_MUSCLES, *lower_b),
+    )
+
+
+def _upper_lower_2x(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
+    if level is Level.FIRST_MONTH:
+        upper_a = (
+            (MACHINE_CHEST_PRESS, "P"),
+            (MACHINE_INCLINE_PRESS, "S"),
+            (HIGH_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (SMITH_SHOULDER_PRESS, "P"),
+            (LEVER_LATERAL_RAISE, "I"),
+        )
+        lower_a = (
+            (SMITH_CHAIR_SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (GLUTE_BRIDGE, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+        upper_b = (
+            (MACHINE_INCLINE_PRESS, "P"),
+            (MACHINE_CHEST_PRESS, "S"),
+            (HIGH_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (REAR_DELT_FLY, "I"),
+            (LEVER_LATERAL_RAISE, "I"),
+        )
+        lower_b = (
+            (SMITH_CHAIR_SQUAT, "P"),
+            (LEG_EXTENSION, "I"),
+            (GLUTE_BRIDGE, "P"),
+            (LYING_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+    elif level is Level.BEGINNER:
+        upper_a = (
+            (MACHINE_CHEST_PRESS, "P"),
+            (INCLINE_PRESS, "S"),
+            (HIGH_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (SMITH_SHOULDER_PRESS, "P"),
+            (LATERAL_RAISE, "I"),
+        )
+        lower_a = (
+            (SMITH_CHAIR_SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (RDL, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+        upper_b = (
+            (INCLINE_PRESS, "P"),
+            (MACHINE_CHEST_PRESS, "S"),
+            (SEATED_CABLE_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (REAR_DELT_FLY, "I"),
+            (LATERAL_RAISE, "I"),
+        )
+        lower_b = (
+            (SMITH_CHAIR_SQUAT, "P"),
+            (LEG_EXTENSION, "I"),
+            (RDL, "P"),
+            (LYING_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+    else:
+        upper_a = (
+            (FLAT_PRESS, "P"),
+            (INCLINE_PRESS, "S"),
+            (ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (SHOULDER_PRESS, "P"),
+            (LATERAL_RAISE, "I"),
+        )
+        lower_a = (
+            (SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (RDL, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+        upper_b = (
+            (INCLINE_PRESS, "P"),
+            (FLAT_PRESS, "S"),
+            (SEATED_CABLE_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (REAR_DELT_FLY, "I"),
+            (LATERAL_RAISE, "I"),
+        )
+        lower_b = (
+            (FRONT_SQUAT, "P"),
+            (LEG_EXTENSION, "I"),
+            (RDL, "P"),
+            (LYING_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+    return (
+        _approved_day("Upper A", "upper", _UPPER_MUSCLES, *upper_a),
+        _approved_day("Lower A", "lower", _LOWER_MUSCLES, *lower_a),
+        _approved_day("Upper B", "upper", _UPPER_MUSCLES, *upper_b),
+        _approved_day("Lower B", "lower", _LOWER_MUSCLES, *lower_b),
+    )
+
+
+def _three_upper_one_lower(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
+    if level is Level.BEGINNER:
+        upper_a = (
+            (MACHINE_CHEST_PRESS, "P"),
+            (INCLINE_PRESS, "S"),
+            (HIGH_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (LATERAL_RAISE, "I"),
+            (TRICEPS_PUSHDOWN, "I"),
+        )
+        lower = (
+            (SMITH_CHAIR_SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (RDL, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+        upper_b = (
+            (SMITH_SHOULDER_PRESS, "P"),
+            (LATERAL_RAISE, "I"),
+            (REAR_DELT_FLY, "I"),
+            (PREACHER_CURL, "I"),
+            (HAMMER_CURL, "I"),
+            (TRICEPS_PUSHDOWN, "I"),
+            (ROPE_TRICEPS_PUSHDOWN, "I"),
+        )
+        upper_c = (
+            (INCLINE_PRESS, "P"),
+            (MACHINE_CHEST_PRESS, "S"),
+            (SEATED_CABLE_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (PREACHER_CURL, "I"),
+        )
+    else:
+        upper_a = (
+            (FLAT_PRESS, "P"),
+            (INCLINE_PRESS, "S"),
+            (ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (LATERAL_RAISE, "I"),
+            (TRICEPS_PUSHDOWN, "I"),
+        )
+        lower = (
+            (SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (RDL, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+        upper_b = (
+            (SHOULDER_PRESS, "P"),
+            (LATERAL_RAISE, "I"),
+            (REAR_DELT_FLY, "I"),
+            (DUMBBELL_CURL, "I"),
+            (HAMMER_CURL, "I"),
+            (TRICEPS_PUSHDOWN, "I"),
+            (OVERHEAD_TRICEPS_EXTENSION, "I"),
+        )
+        upper_c = (
+            (INCLINE_PRESS, "P"),
+            (FLAT_PRESS, "S"),
+            (SEATED_CABLE_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (DUMBBELL_CURL, "I"),
+        )
+    return (
+        _approved_day("Upper A", "upper", _UPPER_MUSCLES, *upper_a),
+        _approved_day("Lower", "lower", _LOWER_MUSCLES, *lower),
+        _approved_day("Upper B", "other", _UPPER_MUSCLES, *upper_b),
+        _approved_day("Upper C", "upper", _UPPER_MUSCLES, *upper_c),
+    )
+
+
+def _three_lower_one_upper(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
+    if level is Level.BEGINNER:
+        lower_a = (
+            (SMITH_CHAIR_SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+        upper = (
+            (MACHINE_CHEST_PRESS, "P"),
+            (INCLINE_PRESS, "S"),
+            (HIGH_ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (SMITH_SHOULDER_PRESS, "P"),
+            (LATERAL_RAISE, "I"),
+            (PREACHER_CURL, "I"),
+            (TRICEPS_PUSHDOWN, "I"),
+        )
+        lower_b = (
+            (RDL, "P"),
+            (LYING_LEG_CURL, "S"),
+            (GLUTE_BRIDGE, "P"),
+            (CALF_RAISE, "I"),
+        )
+        lower_c = (
+            (LEG_PRESS, "P"),
+            (LEG_EXTENSION, "I"),
+            (GLUTE_BRIDGE, "P"),
+            (CALF_RAISE, "I"),
+        )
+    else:
+        lower_a = (
+            (SQUAT, "P"),
+            (LEG_PRESS, "P"),
+            (SEATED_LEG_CURL, "S"),
+            (CALF_RAISE, "I"),
+        )
+        upper = (
+            (FLAT_PRESS, "P"),
+            (INCLINE_PRESS, "S"),
+            (ROW, "P"),
+            (LAT_PULLDOWN, "S"),
+            (SHOULDER_PRESS, "P"),
+            (LATERAL_RAISE, "I"),
+            (DUMBBELL_CURL, "I"),
+            (TRICEPS_PUSHDOWN, "I"),
+        )
+        lower_b = (
+            (RDL, "P"),
+            (LYING_LEG_CURL, "S"),
+            (GLUTE_BRIDGE, "P"),
+            (CALF_RAISE, "I"),
+        )
+        lower_c = (
+            (LEG_PRESS, "P"),
+            (LEG_EXTENSION, "I"),
+            (GLUTE_BRIDGE, "P"),
+            (CALF_RAISE, "I"),
+        )
+    return (
+        _approved_day("Lower A", "lower", _LOWER_MUSCLES, *lower_a),
+        _approved_day("Upper", "upper", _UPPER_MUSCLES, *upper),
+        _approved_day("Lower B", "posterior_chain_core", (M.HAMSTRINGS, M.GLUTES), *lower_b),
+        _approved_day("Lower C", "quadriceps_calves", (M.QUADRICEPS, M.GLUTES), *lower_c),
+    )
+
+
+_PUSH_PULL_QUADS_POSTERIOR = (
+    _approved_day(
+        "Push",
+        "push",
+        (M.CHEST, M.SHOULDERS, M.TRICEPS),
+        (FLAT_PRESS, "P"),
+        (INCLINE_PRESS, "S"),
+        (SHOULDER_PRESS, "P"),
+        (LATERAL_RAISE, "I"),
+        (TRICEPS_PUSHDOWN, "I"),
+    ),
+    _approved_day(
+        "Pull",
+        "pull",
+        (M.BACK, M.BICEPS, M.TRAPS),
+        (ROW, "P"),
+        (LAT_PULLDOWN, "P"),
+        (DUMBBELL_CURL, "I"),
+        (SHRUG, "I"),
+    ),
+    _approved_day(
+        "Quads",
+        "quadriceps_calves",
+        (M.QUADRICEPS, M.CALVES),
+        (SQUAT, "P"),
+        (LEG_PRESS, "P"),
+        (LEG_EXTENSION, "I"),
+        (SEATED_LEG_CURL, "S"),
+        (CALF_RAISE, "I"),
+    ),
+    _approved_day(
+        "Posterior",
+        "posterior_chain_core",
+        (M.HAMSTRINGS, M.GLUTES),
+        (RDL, "P"),
+        (LYING_LEG_CURL, "S"),
+        (GLUTE_BRIDGE, "P"),
+        (LUNGE, "S"),
+        (CALF_RAISE, "I"),
+    ),
+)
+
+
+_APPROVED_PROGRAM_BLUEPRINTS = (
+    ("p01-2-day-full-body-ab-first-month", "2d-full-body-ab", Level.FIRST_MONTH, _FULL_BODY_FIRST_MONTH),
+    ("p02-2-day-full-body-ab-beginner", "2d-full-body-ab", Level.BEGINNER, _FULL_BODY_BEGINNER),
+    ("p03-2-day-full-body-ab-intermediate", "2d-full-body-ab", Level.INTERMEDIATE, _FULL_BODY_INTERMEDIATE),
+    *(
+        (
+            f"p{index:02d}-3-day-upper-lower-full-{_LEVEL_SLUG_SUFFIX[level]}",
+            "3d-upper-lower-full-body",
+            level,
+            _upper_lower_full(level),
+        )
+        for index, level in ((4, Level.FIRST_MONTH), (5, Level.BEGINNER), (6, Level.INTERMEDIATE), (7, Level.ADVANCED))
+    ),
+    *(
+        (
+            f"p{index:02d}-3-day-upper-lower-upper-{_LEVEL_SLUG_SUFFIX[level]}",
+            "3d-upper-lower-upper",
+            level,
+            _upper_lower_upper(level),
+        )
+        for index, level in ((8, Level.BEGINNER), (9, Level.INTERMEDIATE), (10, Level.ADVANCED))
+    ),
+    *(
+        (
+            f"p{index:02d}-3-day-lower-upper-lower-{_LEVEL_SLUG_SUFFIX[level]}",
+            "3d-lower-upper-lower",
+            level,
+            _lower_upper_lower(level),
+        )
+        for index, level in ((11, Level.BEGINNER), (12, Level.INTERMEDIATE), (13, Level.ADVANCED))
+    ),
+    *(
+        (
+            f"p{index:02d}-4-day-upper-lower-upper-lower-{_LEVEL_SLUG_SUFFIX[level]}",
+            "4d-upper-lower-2x",
+            level,
+            _upper_lower_2x(level),
+        )
+        for index, level in ((14, Level.FIRST_MONTH), (15, Level.BEGINNER), (16, Level.INTERMEDIATE), (17, Level.ADVANCED))
+    ),
+    *(
+        (
+            f"p{index:02d}-4-day-3-upper-1-lower-{_LEVEL_SLUG_SUFFIX[level]}",
+            "4d-3-upper-1-lower",
+            level,
+            _three_upper_one_lower(level),
+        )
+        for index, level in ((18, Level.BEGINNER), (19, Level.INTERMEDIATE), (20, Level.ADVANCED))
+    ),
+    *(
+        (
+            f"p{index:02d}-4-day-3-lower-1-upper-{_LEVEL_SLUG_SUFFIX[level]}",
+            "4d-3-lower-1-upper",
+            level,
+            _three_lower_one_upper(level),
+        )
+        for index, level in ((21, Level.BEGINNER), (22, Level.INTERMEDIATE), (23, Level.ADVANCED))
+    ),
+    ("p24-4-day-push-pull-quads-posterior-intermediate", "4d-push-pull-quads-posterior", Level.INTERMEDIATE, _PUSH_PULL_QUADS_POSTERIOR),
+    ("p25-4-day-push-pull-quads-posterior-advanced", "4d-push-pull-quads-posterior", Level.ADVANCED, _PUSH_PULL_QUADS_POSTERIOR),
+)
+
+CANONICAL_TEMPLATE_DEFINITIONS = tuple(
+    _approved_definition(slug, structure_slug, level, days)
+    for slug, structure_slug, level, days in _APPROVED_PROGRAM_BLUEPRINTS
+)
+CANONICAL_TEMPLATE_SLUGS = tuple(
+    definition.canonical_slug for definition in CANONICAL_TEMPLATE_DEFINITIONS
+)
+TRAINING_PROGRAM_TEMPLATE_SEEDS = tuple(
+    _approved_seed_from_definition(definition)
+    for definition in CANONICAL_TEMPLATE_DEFINITIONS
 )

@@ -27,22 +27,18 @@ def template_request(**overrides: object):
     return request(**values)
 
 
-def test_shared_template_loads_as_one_engine_reference_with_supported_levels(db) -> None:
+def test_level_specific_template_loads_as_one_engine_reference(db) -> None:
     seed_real_catalog_exercises(db)
     seed_training_program_templates(db)
 
     references = [
         reference
         for reference in load_template_references(db)
-        if reference.slug == "t01-2-day-full-body-ab"
+        if reference.slug == "p01-2-day-full-body-ab-first-month"
     ]
 
     assert len(references) == 1
-    assert references[0].supported_levels == (
-        "first_month",
-        "beginner",
-        "intermediate",
-    )
+    assert references[0].supported_levels == ("first_month",)
 
 
 def _four_day_reference() -> TemplateReference:

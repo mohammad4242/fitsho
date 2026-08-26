@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.exercises.service import seed_exercises
-from app.training_templates.models import TrainingProgramStructure, TrainingProgramTemplate
+from app.training_templates.models import TrainingProgramTemplate
 from app.training_templates.service import seed_training_program_templates
 from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
 
@@ -31,31 +31,10 @@ def _seed_library(db: Session) -> None:
     seed_exercises(db)
     seed_real_catalog_exercises(db)
     seed_training_program_templates(db)
-    structure_slugs = {
-        "t01-2-day-full-body-ab": "2d-full-body-ab",
-        "t02-3-day-upper-lower-full": "3d-upper-lower-full-body",
-        "t03-3-day-upper-lower-upper": "3d-upper-lower-upper",
-        "t04-3-day-lower-upper-lower": "3d-lower-upper-lower",
-        "t05-4-day-upper-lower-2x": "4d-upper-lower-2x",
-        "t06-4-day-3-upper-1-lower": "4d-3-upper-1-lower",
-        "t07-4-day-3-lower-1-upper": "4d-3-lower-1-upper",
-        "t08-4-day-push-pull-quads-posterior": "4d-push-pull-quads-posterior",
-        "t09-5-day-ppl-upper-lower": "5d-ppl-upper-lower",
-        "t10-5-day-classic-body-part": "5d-classic-body-part",
-        "t11-5-day-ppl-upper-lower-priority": "5d-ppl-upper-lower",
-        "t12-5-day-chest-specialization": "5d-chest-spec-body-part",
-        "t13-5-day-back-specialization": "5d-back-spec-body-part",
-        "t14-5-day-leg-specialization": "5d-leg-spec-body-part",
-        "t15-6-day-ppl-2x": "6d-ppl-2x",
-        "t16-6-day-advanced-body-part": "6d-advanced-body-part",
-        "t17-6-day-balanced-specialization": "6d-ppl-specialization",
-    }
-    structures = {
-        structure.slug: structure for structure in db.scalars(select(TrainingProgramStructure))
-    }
-    for template in db.scalars(select(TrainingProgramTemplate)):
-        template.structure_id = structures[structure_slugs[template.slug]].id
-    db.commit()
+    assert all(
+        template.structure_id is not None
+        for template in db.scalars(select(TrainingProgramTemplate))
+    )
 
 
 def _structure_days(days_per_week: int) -> list[dict[str, object]]:
@@ -136,18 +115,13 @@ def test_template_family_filter_preserves_level_filter(
 
     response = client.get(
         "/api/v1/admin/training-program-templates"
-        "?days_per_week=5&family=split&training_level=advanced"
+        "?days_per_week=4&family=split&training_level=advanced"
     )
 
     assert response.status_code == 200, response.text
     templates = response.json()["items"]
     assert {template["slug"] for template in templates} == {
-        "t09-5-day-ppl-upper-lower",
-        "t10-5-day-classic-body-part",
-        "t11-5-day-ppl-upper-lower-priority",
-        "t12-5-day-chest-specialization",
-        "t13-5-day-back-specialization",
-        "t14-5-day-leg-specialization",
+        "p25-4-day-push-pull-quads-posterior-advanced",
     }
     assert all("advanced" in template["supported_levels"] for template in templates)
 

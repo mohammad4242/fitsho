@@ -25,23 +25,31 @@ LEGACY_SOURCE_URL = "https://www.strongerbyscience.com/exercise-order-video/"
 
 
 EXPECTED_CANONICAL_SLUGS = {
-    "t01-2-day-full-body-ab",
-    "t02-3-day-upper-lower-full",
-    "t03-3-day-upper-lower-upper",
-    "t04-3-day-lower-upper-lower",
-    "t05-4-day-upper-lower-2x",
-    "t06-4-day-3-upper-1-lower",
-    "t07-4-day-3-lower-1-upper",
-    "t08-4-day-push-pull-quads-posterior",
-    "t09-5-day-ppl-upper-lower",
-    "t10-5-day-classic-body-part",
-    "t11-5-day-ppl-upper-lower-priority",
-    "t12-5-day-chest-specialization",
-    "t13-5-day-back-specialization",
-    "t14-5-day-leg-specialization",
-    "t15-6-day-ppl-2x",
-    "t16-6-day-advanced-body-part",
-    "t17-6-day-balanced-specialization",
+    "p01-2-day-full-body-ab-first-month",
+    "p02-2-day-full-body-ab-beginner",
+    "p03-2-day-full-body-ab-intermediate",
+    "p04-3-day-upper-lower-full-first-month",
+    "p05-3-day-upper-lower-full-beginner",
+    "p06-3-day-upper-lower-full-intermediate",
+    "p07-3-day-upper-lower-full-advanced",
+    "p08-3-day-upper-lower-upper-beginner",
+    "p09-3-day-upper-lower-upper-intermediate",
+    "p10-3-day-upper-lower-upper-advanced",
+    "p11-3-day-lower-upper-lower-beginner",
+    "p12-3-day-lower-upper-lower-intermediate",
+    "p13-3-day-lower-upper-lower-advanced",
+    "p14-4-day-upper-lower-upper-lower-first-month",
+    "p15-4-day-upper-lower-upper-lower-beginner",
+    "p16-4-day-upper-lower-upper-lower-intermediate",
+    "p17-4-day-upper-lower-upper-lower-advanced",
+    "p18-4-day-3-upper-1-lower-beginner",
+    "p19-4-day-3-upper-1-lower-intermediate",
+    "p20-4-day-3-upper-1-lower-advanced",
+    "p21-4-day-3-lower-1-upper-beginner",
+    "p22-4-day-3-lower-1-upper-intermediate",
+    "p23-4-day-3-lower-1-upper-advanced",
+    "p24-4-day-push-pull-quads-posterior-intermediate",
+    "p25-4-day-push-pull-quads-posterior-advanced",
 }
 
 
@@ -131,21 +139,19 @@ def _legacy_template(slug: str) -> TrainingProgramTemplate:
     )
 
 
-def test_catalog_defines_exactly_seventeen_canonical_structures() -> None:
+def test_catalog_defines_exactly_25_level_specific_programs() -> None:
     canonical_slugs = {
         getattr(seed, "canonical_slug", None) for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS
     }
 
     assert canonical_slugs == EXPECTED_CANONICAL_SLUGS
-    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 17
+    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 25
     assert {seed.slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS} == EXPECTED_CANONICAL_SLUGS
     assert next(
-        seed for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS if seed.slug == "t01-2-day-full-body-ab"
-    ).supported_levels == (
-        "first_month",
-        "beginner",
-        "intermediate",
-    )
+        seed
+        for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS
+        if seed.slug == "p01-2-day-full-body-ab-first-month"
+    ).supported_levels == ("first_month",)
 
 
 def test_catalog_seed_requires_real_library_rows_and_creates_no_placeholders(db: Session) -> None:
@@ -228,7 +234,7 @@ def test_catalog_slots_are_linked_to_active_programmable_non_placeholder_exercis
 
 
 def test_catalog_days_guidance_and_prescriptions_match_document_contract() -> None:
-    assert len({seed.canonical_slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS}) == 17
+    assert len({seed.canonical_slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS}) == 25
     assert all(
         4 <= len(day.slots) <= 9 for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS for day in seed.days
     )

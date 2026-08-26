@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.exercises.enums import ExerciseContentType
 from app.exercises.models import Exercise
-from app.profile.enums import ExperienceLevel, FitnessGoal
+from app.profile.enums import ExperienceLevel
 from app.training_templates.models import (
     TrainingProgramTemplate,
     TrainingProgramTemplateDay,
@@ -23,30 +23,28 @@ from app.training_templates.service import seed_training_program_templates
 from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
 
 
-def test_seed_adds_exactly_seventeen_shared_canonical_templates(db: Session) -> None:
+def test_seed_adds_exactly_25_level_specific_canonical_templates(db: Session) -> None:
     seed_real_catalog_exercises(db)
 
     result = seed_training_program_templates(db)
 
-    assert len(CANONICAL_TEMPLATE_DEFINITIONS) == 17
-    assert result.templates == 17
-    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == 17
+    assert len(CANONICAL_TEMPLATE_DEFINITIONS) == 25
+    assert result.templates == 25
+    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == 25
     assert {template.days_per_week for template in db.scalars(select(TrainingProgramTemplate))} == {
         2,
         3,
         4,
-        5,
-        6,
     }
 
 
-def test_seed_has_approved_supported_level_unions_and_shared_day_counts() -> None:
+def test_seed_has_approved_supported_levels_and_day_counts() -> None:
     expected_levels = {
         definition.canonical_slug: set(definition.supported_levels)
         for definition in CANONICAL_TEMPLATE_DEFINITIONS
     }
 
-    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 17
+    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 25
     for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS:
         assert set(seed.supported_levels) == expected_levels[seed.canonical_slug]
         assert len(seed.supported_levels) == len(set(seed.supported_levels))
@@ -110,7 +108,7 @@ def test_seed_is_idempotent_without_duplicate_rows_or_days(db: Session) -> None:
     second = seed_training_program_templates(db)
 
     assert first == second
-    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == 17
+    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == 25
     assert (
         db.scalar(select(func.count()).select_from(TrainingProgramTemplateSlot))
         == first.linked_slots
@@ -182,7 +180,7 @@ def test_seed_physically_deletes_legacy_source_rows_and_keeps_custom_templates(
             .select_from(TrainingProgramTemplate)
             .where(TrainingProgramTemplate.source_name == SOURCE_NAME)
         )
-        == 17
+        == 25
     )
     assert SOURCE_URL == "https://fitsho.local/training-template-catalog"
 
@@ -222,7 +220,7 @@ def _seeded_template_with_content(db: Session, slug: str) -> TrainingProgramTemp
 def test_normal_seed_preserves_admin_template_edit(db: Session) -> None:
     seed_real_catalog_exercises(db)
     seed_training_program_templates(db)
-    template = _seeded_template_with_content(db, "t01-2-day-full-body-ab")
+    template = _seeded_template_with_content(db, "p01-2-day-full-body-ab-first-month")
     assert template is not None
     template.name_en = "Admin-owned edit"
     template.days[0].slots[0].rep_max = 15
@@ -239,7 +237,7 @@ def test_normal_seed_preserves_admin_template_edit(db: Session) -> None:
 def test_normal_seed_preserves_admin_slot_removal(db: Session) -> None:
     seed_real_catalog_exercises(db)
     seed_training_program_templates(db)
-    template = _seeded_template_with_content(db, "t01-2-day-full-body-ab")
+    template = _seeded_template_with_content(db, "p01-2-day-full-body-ab-first-month")
     assert template is not None
     original_count = len(template.days[0].slots)
     template.days[0].slots.pop()
@@ -255,20 +253,20 @@ def test_normal_seed_preserves_admin_slot_removal(db: Session) -> None:
 def test_normal_seed_does_not_recreate_physically_deleted_canonical_template(db: Session) -> None:
     seed_real_catalog_exercises(db)
     seed_training_program_templates(db)
-    template = _seeded_template_with_content(db, "t01-2-day-full-body-ab")
+    template = _seeded_template_with_content(db, "p01-2-day-full-body-ab-first-month")
     assert template is not None
     db.delete(template)
     db.commit()
 
     seed_training_program_templates(db)
 
-    assert _seeded_template_with_content(db, "t01-2-day-full-body-ab") is None
+    assert _seeded_template_with_content(db, "p01-2-day-full-body-ab-first-month") is None
 
 
 def test_normal_seed_preserves_disabled_canonical_template(db: Session) -> None:
     seed_real_catalog_exercises(db)
     seed_training_program_templates(db)
-    template = _seeded_template_with_content(db, "t01-2-day-full-body-ab")
+    template = _seeded_template_with_content(db, "p01-2-day-full-body-ab-first-month")
     assert template is not None
     template.is_active = False
     db.commit()

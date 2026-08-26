@@ -193,7 +193,7 @@ def test_structural_validator_rejects_a_false_primary_structure_claim() -> None:
     classic = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if template.slug == "t10-5-day-classic-body-part"
+        if template.slug == "p24-4-day-push-pull-quads-posterior-intermediate"
     )
 
     with pytest.raises(ValueError, match="Pure full-body"):
@@ -208,12 +208,12 @@ def test_structural_validator_rejects_an_incidental_muscle_priority_claim() -> N
     classic = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if template.slug == "t10-5-day-classic-body-part"
+        if template.slug == "p14-4-day-upper-lower-upper-lower-first-month"
     )
 
     with pytest.raises(ValueError, match="glute_priority lacks structural evidence"):
         template_tags.validate_template_focus_tags(
-            (TemplateFocusTag.BODY_PART_ROTATION, TemplateFocusTag.GLUTE_PRIORITY),
+            (TemplateFocusTag.UPPER_LOWER, TemplateFocusTag.GLUTE_PRIORITY),
             intensity_methods=classic.intensity_methods,
             days=classic.days,
         )
@@ -367,17 +367,14 @@ def test_seed_library_keeps_structural_emphasis_tags_without_user_mutation() -> 
     upper_priority = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if template.slug == "t11-5-day-ppl-upper-lower-priority"
+        if template.slug == "p18-4-day-3-upper-1-lower-beginner"
     )
     assert TemplateFocusTag.UPPER_PRIORITY in upper_priority.focus_tags
-    assert TemplateFocusTag.PUSH_PULL_LEGS in upper_priority.focus_tags
     assert TemplateFocusTag.UPPER_LOWER in upper_priority.focus_tags
 
     lower_priority = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if template.slug == "t14-5-day-leg-specialization"
+        if template.slug == "p21-4-day-3-lower-1-upper-beginner"
     )
     assert TemplateFocusTag.LOWER_PRIORITY in lower_priority.focus_tags
-    assert TemplateFocusTag.LOWER_PRIORITY in lower_priority.focus_tags
-    assert TemplateFocusTag.HAMSTRINGS_PRIORITY in lower_priority.focus_tags

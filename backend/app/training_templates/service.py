@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, inspect, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.exercises.enums import ExerciseContentType
@@ -37,7 +37,7 @@ class TrainingTemplateSeedResult:
 
 
 _CATALOG_STATE_KEY = "canonical"
-_CATALOG_REVISION = 3
+_CATALOG_REVISION = 4
 
 
 def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
@@ -49,17 +49,21 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
         )
     )
     db.flush()
-    if db.get(TrainingTemplateCatalogState, _CATALOG_STATE_KEY) is not None:
+    state = db.get(TrainingTemplateCatalogState, _CATALOG_STATE_KEY)
+    if state is not None and state.catalog_revision >= _CATALOG_REVISION:
         db.commit()
         return _current_seed_result(db)
 
-    _sync_canonical_catalog(db, replace_existing=False)
-    db.add(
-        TrainingTemplateCatalogState(
-            key=_CATALOG_STATE_KEY,
-            catalog_revision=_CATALOG_REVISION,
+    _sync_canonical_catalog(db, replace_existing=state is not None)
+    if state is None:
+        db.add(
+            TrainingTemplateCatalogState(
+                key=_CATALOG_STATE_KEY,
+                catalog_revision=_CATALOG_REVISION,
+            )
         )
-    )
+    else:
+        state.catalog_revision = _CATALOG_REVISION
     db.commit()
     return _current_seed_result(db)
 
@@ -136,6 +140,7 @@ def _sync_canonical_catalog(db: Session, *, replace_existing: bool) -> None:
             )
         )
     }
+    structure_ids_by_slug = _structure_ids_by_slug(db)
     existing_templates = list(
         db.scalars(
             select(TrainingProgramTemplate).options(
@@ -169,7 +174,7 @@ def _sync_canonical_catalog(db: Session, *, replace_existing: bool) -> None:
         else:
             continue
 
-        _write_template(template, seed, exercises_by_slug)
+        _write_template(template, seed, exercises_by_slug, structure_ids_by_slug)
 
     db.flush()
 
@@ -178,6 +183,7 @@ def _write_template(
     template: TrainingProgramTemplate,
     seed: TrainingProgramTemplateSeed,
     exercises_by_slug: dict[str, Exercise],
+    structure_ids_by_slug: dict[str, UUID],
 ) -> None:
     template.name_en = seed.name_en
     template.name_fa = seed.name_fa
@@ -199,6 +205,10 @@ def _write_template(
     template.source_name = SOURCE_NAME
     template.source_url = SOURCE_URL
     template.is_active = seed.is_active
+    if seed.structure_slug:
+        if structure_ids_by_slug and seed.structure_slug not in structure_ids_by_slug:
+            raise ValueError(f"Missing TrainingProgramStructure for {seed.structure_slug}")
+        template.structure_id = structure_ids_by_slug.get(seed.structure_slug)
     for day_number, day_seed in enumerate(seed.days, start=1):
         day = TrainingProgramTemplateDay(
             day_number=day_number,
@@ -225,9 +235,11 @@ def _write_template(
             superset_exercise_id = None
             superset_exercise_slug_hint = None
             if second_seed is not None:
-                superset_exercise_id = _exercise_id_for_slot(second_seed.catalog_slug_hints, exercises_by_slug)
+                superset_exercise_id = _exercise_id_for_slot(
+                    second_seed.catalog_slug_hints, exercises_by_slug
+                )
                 superset_exercise_slug_hint = second_seed.exercise_slug_hint
-                
+
             day.slots.append(
                 TrainingProgramTemplateSlot(
                     slot_order=slot_order,
@@ -249,6 +261,19 @@ def _write_template(
                     rest_seconds=slot_seed.rest_seconds,
                 )
             )
+
+
+def _structure_ids_by_slug(db: Session) -> dict[str, UUID]:
+    bind = db.get_bind()
+    if not inspect(bind).has_table(TrainingProgramStructure.__tablename__):
+        return {}
+    return {
+        structure.slug: structure.id
+        for structure in db.scalars(
+            select(TrainingProgramStructure).where(TrainingProgramStructure.is_active.is_(True))
+        )
+    }
+
 
 def _current_seed_result(db: Session) -> TrainingTemplateSeedResult:
     seeded_slugs = tuple(seed.slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS)

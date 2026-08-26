@@ -57,14 +57,13 @@ def test_admin_lists_complete_four_day_template_details(client: TestClient, db: 
 
     assert response.status_code == 200, response.text
     templates = response.json()["items"]
-    assert len(templates) == 4
-    classic = next(item for item in templates if item["slug"] == "t05-4-day-upper-lower-2x")
-    assert classic["supported_levels"] == [
-        "first_month",
-        "beginner",
-        "intermediate",
-        "advanced",
-    ]
+    assert len(templates) == 12
+    classic = next(
+        item
+        for item in templates
+        if item["slug"] == "p14-4-day-upper-lower-upper-lower-first-month"
+    )
+    assert classic["supported_levels"] == ["first_month"]
     assert "upper_lower" in classic["focus_tags"]
     assert len(classic["programming_rationale"]) == 5
     assert classic["programming_rationale"][0]["title_fa"] == "ساختار"
@@ -91,7 +90,7 @@ def test_training_template_library_has_no_public_endpoint(client: TestClient) ->
     assert response.status_code == 404
 
 
-def test_admin_level_filters_return_the_same_canonical_template_id(
+def test_admin_level_filters_return_level_specific_template_ids(
     client: TestClient,
     db: Session,
 ) -> None:
@@ -108,12 +107,16 @@ def test_admin_level_filters_return_the_same_canonical_template_id(
     assert beginner.status_code == 200
     assert intermediate.status_code == 200
     beginner_t01 = next(
-        item for item in beginner.json()["items"] if item["slug"].startswith("t01-")
+        item
+        for item in beginner.json()["items"]
+        if item["slug"] == "p02-2-day-full-body-ab-beginner"
     )
     intermediate_t01 = next(
-        item for item in intermediate.json()["items"] if item["slug"].startswith("t01-")
+        item
+        for item in intermediate.json()["items"]
+        if item["slug"] == "p03-2-day-full-body-ab-intermediate"
     )
-    assert beginner_t01["id"] == intermediate_t01["id"]
+    assert beginner_t01["id"] != intermediate_t01["id"]
 
 
 def test_admin_creates_a_complete_multi_level_template_with_shared_content(
@@ -367,8 +370,12 @@ def test_admin_deletes_only_the_requested_training_template_slot(
 ) -> None:
     _seed_library(db)
     _make_current_user_admin(client, db)
-    templates = client.get("/api/v1/admin/training-program-templates?days_per_week=3").json()["items"]
-    template = next(item for item in templates if item["slug"].startswith("t02-"))
+    templates = client.get(
+        "/api/v1/admin/training-program-templates?days_per_week=3"
+    ).json()["items"]
+    template = next(
+        item for item in templates if item["slug"] == "p04-3-day-upper-lower-full-first-month"
+    )
     target_day = template["days"][0]
     target_slot = target_day["slots"][-1]
 
@@ -381,7 +388,9 @@ def test_admin_deletes_only_the_requested_training_template_slot(
     updated = response.json()
     updated_day = next(day for day in updated["days"] if day["id"] == target_day["id"])
     assert target_slot["id"] not in {slot["id"] for slot in updated_day["slots"]}
-    assert [slot["slot_order"] for slot in updated_day["slots"]] == list(range(1, len(updated_day["slots"]) + 1))
+    assert [slot["slot_order"] for slot in updated_day["slots"]] == list(
+        range(1, len(updated_day["slots"]) + 1)
+    )
     assert [day["id"] for day in updated["days"]] == [day["id"] for day in template["days"]]
 
     refreshed = client.get(f"/api/v1/admin/training-program-templates/{template['id']}")
@@ -762,7 +771,11 @@ def _slot_payload(slot: dict[str, object], **overrides: object) -> dict[str, obj
         "intensity_method": slot["intensity_method"],
         "adaptation_priority": "core",
         "superset_group": slot.get("superset_group"),
-        "superset_exercise_id": slot.get("superset_exercise", {}).get("id") if slot.get("superset_exercise") else None,
+        "superset_exercise_id": (
+            slot.get("superset_exercise", {}).get("id")
+            if slot.get("superset_exercise")
+            else None
+        ),
         "sets": slot["sets"],
         "rep_min": slot["rep_min"],
         "rep_max": slot["rep_max"],

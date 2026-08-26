@@ -6,26 +6,37 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.exercises.enums import MovementPattern
-from app.profile.enums import ExperienceLevel, FitnessGoal
+from app.profile.enums import ExperienceLevel
 from app.training_templates import service
 from app.training_templates.models import (
     TrainingProgramTemplate,
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
 )
-from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS
+from app.training_templates.seed_data import (
+    CANONICAL_TEMPLATE_DEFINITIONS,
+    TRAINING_PROGRAM_TEMPLATE_SEEDS,
+)
 
 
-def test_first_month_and_beginner_seed_slots_use_three_sets_of_eight_to_twelve() -> None:
-    novice_levels = {ExperienceLevel.FIRST_MONTH, ExperienceLevel.BEGINNER}
+def test_first_month_and_beginner_seed_slots_use_role_specific_prescriptions() -> None:
+    definitions = {
+        definition.canonical_slug: definition for definition in CANONICAL_TEMPLATE_DEFINITIONS
+    }
+    expected = {
+        "P": (3, 8, 12),
+        "S": (3, 8, 12),
+        "I": (3, 10, 15),
+    }
 
     for template in TRAINING_PROGRAM_TEMPLATE_SEEDS:
-        if novice_levels.intersection(template.supported_levels):
-            assert all(
-                (slot.sets, slot.rep_min, slot.rep_max) == (3, 8, 12)
-                for day in template.days
-                for slot in day.slots
-            )
+        level = template.supported_levels[0]
+        if level not in {ExperienceLevel.FIRST_MONTH, ExperienceLevel.BEGINNER}:
+            continue
+        definition = definitions[template.canonical_slug]
+        for day, expected_slots in zip(template.days, definition.day_specs, strict=True):
+            for slot, (_, role) in zip(day.slots, expected_slots, strict=True):
+                assert (slot.sets, slot.rep_min, slot.rep_max) == expected[role]
 
 
 def test_novice_upgrade_updates_owned_defaults_and_preserves_custom_prescriptions(
@@ -37,7 +48,7 @@ def test_novice_upgrade_updates_owned_defaults_and_preserves_custom_prescription
     service.seed_training_program_templates(db)
     managed = db.scalar(
         select(TrainingProgramTemplate).where(
-            TrainingProgramTemplate.slug == "t01-2-day-full-body-ab"
+            TrainingProgramTemplate.slug == "p01-2-day-full-body-ab-first-month"
         )
     )
     assert managed is not None
@@ -98,7 +109,7 @@ def test_novice_upgrade_updates_owned_defaults_and_preserves_custom_prescription
     db.expire_all()
     refreshed_managed = db.scalar(
         select(TrainingProgramTemplate).where(
-            TrainingProgramTemplate.slug == "t01-2-day-full-body-ab"
+            TrainingProgramTemplate.slug == "p01-2-day-full-body-ab-first-month"
         )
     )
     assert refreshed_managed is not None
