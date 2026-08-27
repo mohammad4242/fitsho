@@ -93,6 +93,8 @@ def repair_session_durations(
         template_adjusted, template_superset_reasons = apply_template_supersets(day.exercises)
         reasons.extend(template_superset_reasons)
         current = _rebuild_day(day, template_adjusted, ruleset)
+        current, capacity_trim_reasons = _trim_optional_capacity_overflow(current, ruleset)
+        reasons.extend(capacity_trim_reasons)
         other_days = tuple(repaired) + days[day_index + 1 :]
 
         # ------------------------------------------------------------------
@@ -176,6 +178,32 @@ def repair_session_durations(
 
     repaired_tuple = _justify_duration_repeats(tuple(repaired))
     return repaired_tuple, tuple(dict.fromkeys(reasons))
+
+
+def _trim_optional_capacity_overflow(
+    day: WorkoutDay,
+    ruleset: ProgramRuleset,
+) -> tuple[WorkoutDay, tuple[str, ...]]:
+    """Keep optional tail work from exceeding the existing exercise cap."""
+    exercises = list(day.exercises)
+    removed = False
+    while len(exercises) > ruleset.max_exercises_per_session:
+        optional = [
+            (index, item)
+            for index, item in enumerate(exercises)
+            if "OPTIONAL_SUPPLEMENTAL_WORK" in item.reason_codes
+        ]
+        if not optional:
+            break
+        index, _ = min(
+            optional,
+            key=lambda pair: (-pair[1].estimated_minutes, str(pair[1].exercise_id)),
+        )
+        exercises.pop(index)
+        removed = True
+    if not removed:
+        return day, ()
+    return _rebuild_day(day, tuple(exercises), ruleset), ("SUPPLEMENTAL_WORK_TRIMMED_FOR_DURATION",)
 
 
 def _repair_underfill(

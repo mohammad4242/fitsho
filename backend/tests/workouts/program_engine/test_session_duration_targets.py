@@ -2,12 +2,19 @@ from dataclasses import replace
 
 import pytest
 
+from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
 from app.workouts.program_engine.duration_policy import get_session_duration_policy
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import estimate_exercise_minutes
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+from app.workouts.program_engine.schemas import (
+    ProgrammedExercise,
+    VolumeTarget,
+    WeeklyVolumePlan,
+    WorkoutDay,
+)
 from app.workouts.program_engine.session_duration import repair_session_durations
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
@@ -253,7 +260,7 @@ def test_advanced_strength_program_classifies_a_hard_constrained_120_minute_sess
     )
     # If the session finishes under the *minimum* budget and doesn't meet minimum sets/exercises,
     # it might be constrained. But under budget itself is no longer a violation.
-    # The check below relies on the trace reason codes for verification if it was indeed constrained.
+    # The check below relies on trace reason codes when it was indeed constrained.
     if resistance_minutes < policy.minimum_minutes:
         duration_trace = next(
             item
@@ -309,7 +316,7 @@ def test_underfilled_session_is_repaired_with_real_estimates() -> None:
         RULESET,
     )
 
-    # Phase 11.9: since reduced_exercises maintains the same length as original (which had >= 5 exercises),
+    # Phase 11.9: reduced_exercises maintains the same length as original (>= 5 exercises),
     # the underfill repair does NOT trigger. The time remains under budget, which is valid.
     assert repaired[0].estimated_duration_minutes == underfilled.estimated_duration_minutes
     assert "SESSION_DURATION_REPAIR_APPLIED" not in reasons
@@ -438,3 +445,115 @@ def test_final_validator_rejects_underfilled_session() -> None:
 
     assert "SESSION_DURATION_UNDER_TARGET" in report.errors
     assert "SESSION_DURATION_TARGET_UNSATISFIED" in report.errors
+
+
+def _duration_fixture_exercise(candidate, *, order: int, sets: int = 3, minutes: int = 8):
+    return ProgrammedExercise(
+        exercise_id=candidate.id,
+        exercise_name=candidate.name,
+        order=order,
+        sets=sets,
+        rep_min=8,
+        rep_max=12,
+        target_rir=2,
+        rest_seconds=90,
+        estimated_minutes=minutes,
+        reason_codes=("TEMPLATE_REFERENCE_EXERCISE",),
+        movement_pattern=candidate.movement_pattern,
+        primary_muscle=candidate.primary_muscle,
+        secondary_muscles=candidate.secondary_muscles,
+        equipment=candidate.equipment,
+        exercise_type=candidate.exercise_type,
+    )
+
+
+def test_template_underfill_keeps_explicit_constraint_when_no_hard_volume_room_exists() -> None:
+    source = request(
+        session_duration_minutes=45,
+        available_training_days=1,
+        training_experience="beginner",
+    )
+    normalized = normalize_request(source, RULESET)
+    catalog = tuple(full_catalog())
+    by_name = {item.name.lower(): item for item in catalog}
+    existing = tuple(
+        _duration_fixture_exercise(by_name[name], order=index, sets=4)
+        for index, name in enumerate(("bodyweight hinge", "hamstring walkout"), start=1)
+    )
+    day = WorkoutDay(
+        day_index=1,
+        weekday=0,
+        title="Lower template",
+        focus="template_reference_2",
+        estimated_duration_minutes=5 + sum(item.estimated_minutes for item in existing),
+        exercises=existing,
+        template_target_muscles=(MuscleGroup.HAMSTRINGS,),
+        template_structure_focus="lower",
+    )
+    volume = WeeklyVolumePlan(
+        targets=(
+            VolumeTarget(
+                muscle=MuscleGroup.HAMSTRINGS,
+                minimum_soft=0,
+                target_sets=6,
+                maximum_soft=8,
+                maximum_hard=8,
+                fractional_sets=0,
+                effective_target_sets=6,
+                minimum_direct_sets=0,
+            ),
+        ),
+        reason_codes=(),
+    )
+
+    repaired, reasons = repair_session_durations(
+        (day,),
+        normalized,
+        (
+            replace(
+                by_name["dumbbell rdl"],
+                movement_pattern=MovementPattern.KNEE_FLEXION,
+                substitution_group="duration_test_hamstring_curl",
+            ),
+        ),
+        RULESET,
+        volume=volume,
+        prefer_acceptable_volume_for_minimum_fill=True,
+    )
+
+    assert len(repaired[0].exercises) == 2
+    assert "SESSION_DURATION_TARGET_UNSATISFIED" in reasons
+    assert "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD" in reasons
+    assert all(item.counts_toward_volume for item in repaired[0].exercises)
+
+
+def test_capacity_trim_removes_optional_tail_when_main_capacity_is_full() -> None:
+    source = request(session_duration_minutes=60, available_training_days=1)
+    normalized = normalize_request(source, RULESET)
+    catalog = tuple(full_catalog())
+    main = tuple(
+        _duration_fixture_exercise(item, order=index, minutes=6)
+        for index, item in enumerate(catalog[:9], start=1)
+    )
+    optional = replace(
+        _duration_fixture_exercise(catalog[7], order=10, minutes=5),
+        reason_codes=("OPTIONAL_SUPPLEMENTAL_WORK",),
+        primary_muscle=MuscleGroup.ABS,
+        exercise_type=ExerciseType.CORE,
+        movement_pattern=MovementPattern.CORE_ANTI_EXTENSION,
+    )
+    day = WorkoutDay(
+        day_index=1,
+        weekday=0,
+        title="Full session",
+        focus="full_body_a",
+        estimated_duration_minutes=5 + sum(item.estimated_minutes for item in (*main, optional)),
+        exercises=(*main, optional),
+    )
+
+    repaired, _ = repair_session_durations((day,), normalized, catalog, RULESET)
+
+    assert len(repaired[0].exercises) == RULESET.max_exercises_per_session
+    assert all(
+        "OPTIONAL_SUPPLEMENTAL_WORK" not in item.reason_codes for item in repaired[0].exercises
+    )
