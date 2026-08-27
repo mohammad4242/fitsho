@@ -39,6 +39,7 @@ services:
       - ./backend/var/media:/var/lib/fitsho/media
       - fitsho_exercise_media:/var/lib/fitsho/media-legacy:ro
       - ./backend/var/media-migration:/app/var/media-migration
+      - ./backend/var/media-migration-source:/var/lib/fitsho/media-migration-source:ro
     depends_on:
       db:
         condition: service_healthy
