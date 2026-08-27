@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.exercises.enums import MuscleGroup
 from app.exercises.models import ExerciseAlternative
 from app.profile.enums import FitnessGoal, TrainingLocation
+from app.profile.models import UserProfile
 from app.profile.schemas import ProfileUpdate
 from app.profile.service import apply_profile_update_without_commit
 from app.workout_cycles.body_progress_schemas import (
@@ -909,9 +910,6 @@ def _confirmed_profile_update_from_feedback(
         elif feedback.next_training_location is TrainingLocation.GYM:
             values["home_training_setup"] = None
 
-    if feedback.new_limitation is not None and feedback.new_limitation.strip():
-        values["physical_limitations"] = feedback.new_limitation
-
     if not values:
         return None
     return ProfileUpdate.model_validate(values)
@@ -925,7 +923,15 @@ def apply_confirmed_end_cycle_profile_changes(
 ) -> None:
     profile_update = _confirmed_profile_update_from_feedback(feedback)
     if profile_update is not None:
-        apply_profile_update_without_commit(db, user_id, profile_update)
+        profile = apply_profile_update_without_commit(db, user_id, profile_update)
+    else:
+        profile = db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+    if profile is not None and feedback.new_limitation is not None:
+        limitation = feedback.new_limitation.strip()
+        if limitation:
+            # Preserve the legacy cycle-feedback audit value without exposing it
+            # to workout generation or accepting it in the profile API.
+            profile.physical_limitations = limitation
 
 
 def complete_cycle(

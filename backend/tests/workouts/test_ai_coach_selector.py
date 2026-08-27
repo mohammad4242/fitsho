@@ -22,13 +22,11 @@ def _template(
     exercise_id: object,
     days_per_week: int = 3,
     training_level: str = "beginner",
-    fitness_goal: str = "build_muscle",
 ) -> TemplateReference:
     return TemplateReference(
         slug=slug,
         days_per_week=days_per_week,
         supported_levels=(training_level,),
-        fitness_goal=fitness_goal,
         focus_tags=focus,
         intensity_methods=("standard",),
         days=(
@@ -46,8 +44,8 @@ def _template(
                         adaptation_priority="core",
                         superset_group=None,
                         superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+                        superset_exercise_slug_hint=None,
+                        sets=3,
                         rep_min=8,
                         rep_max=12,
                         target_rir=2,

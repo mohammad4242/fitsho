@@ -53,7 +53,6 @@ def select_ai_coach_candidates(
         if (
             template.days_per_week != profile.training_days_per_week
             or profile.experience_level.value not in template.supported_levels
-            or template.fitness_goal != str(profile.fitness_goal)
         ):
             continue
         exercise_ids = tuple(slot.exercise_id for day in template.days for slot in day.slots)
