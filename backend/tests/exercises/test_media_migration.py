@@ -39,6 +39,7 @@ def test_copy_and_verify_is_idempotent_and_refuses_hash_mismatch(tmp_path: Path)
     assert destination.read_bytes() == source.read_bytes()
     assert row["copied"] is False
     assert row["hash_verified"] is True
+    assert row["destination_sha256"] == digest
 
     destination.write_bytes(b"different video")
     with pytest.raises(MediaMigrationError, match="Destination hash mismatch"):

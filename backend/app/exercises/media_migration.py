@@ -151,6 +151,7 @@ def _media_row(
         else (_json_value(exercise.media_type) if exercise is not None else None),
         "file_size": source_path.stat().st_size if source_path is not None else None,
         "sha256": digest,
+        "destination_sha256": None,
         "destination_relative_path": destination_relative,
         "destination_physical_path": str(destination) if destination is not None else None,
         "destination_public_path": (
@@ -389,9 +390,7 @@ def build_inventory(
             )
 
     physical_files = {
-        path.resolve()
-        for root in source_roots
-        for path in _physical_storage_files(root.path)
+        path.resolve() for root in source_roots for path in _physical_storage_files(root.path)
     }
     if seed_root is not None:
         physical_files.update(path.resolve() for path in _iter_video_files(seed_root))
@@ -482,9 +481,13 @@ def copy_and_verify_row(row: dict[str, object]) -> None:
         raise MediaMigrationError(f"Source hash changed: {source}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
-        if not destination.is_file() or sha256_file(destination) != expected_digest:
+        if not destination.is_file():
+            raise MediaMigrationError(f"Destination hash mismatch: {destination}")
+        destination_digest = sha256_file(destination)
+        if destination_digest != expected_digest:
             raise MediaMigrationError(f"Destination hash mismatch: {destination}")
         row["copied"] = False
+        row["destination_sha256"] = destination_digest
         row["hash_verified"] = True
         return
     shutil.copy2(source, destination)
@@ -492,6 +495,7 @@ def copy_and_verify_row(row: dict[str, object]) -> None:
     if destination_digest != expected_digest:
         raise MediaMigrationError(f"Copied hash mismatch: {destination}")
     row["copied"] = True
+    row["destination_sha256"] = destination_digest
     row["hash_verified"] = True
 
 
@@ -597,6 +601,7 @@ def audit_manifest(
         for row in rows
         if row.get("destination_physical_path") and row.get("sha256")
     }
+
     def source_exists(path_value: str) -> bool:
         source = Path(path_value)
         if source.is_file():
@@ -613,7 +618,12 @@ def audit_manifest(
         if not row.get("sha256") or not row.get("destination_physical_path"):
             continue
         destination = Path(str(row["destination_physical_path"]))
-        if not destination.is_file() or sha256_file(destination) != row["sha256"]:
+        if not destination.is_file():
+            hash_mismatches.append(str(destination))
+            continue
+        destination_digest = sha256_file(destination)
+        row["destination_sha256"] = destination_digest
+        if destination_digest != row["sha256"]:
             hash_mismatches.append(str(destination))
     expected_destinations = {
         Path(path).resolve() for path in destination_files if Path(path).is_file()
@@ -632,6 +642,8 @@ def audit_manifest(
         "TOTAL_SOURCE_FILES": len(source_files),
         "TOTAL_DESTINATION_FILES": len(actual_destinations),
         "TOTAL_DISTINCT_SHA256": len({row["sha256"] for row in rows if row.get("sha256")}),
+        "HASHES_BEFORE": sum(1 for row in rows if row.get("sha256")),
+        "HASHES_AFTER": sum(1 for row in rows if row.get("destination_sha256")),
         "MISSING_SOURCE_FILES": len(missing_sources),
         "HASH_MISMATCHES": len(hash_mismatches),
         "BROKEN_DB_PATHS": len(broken_db_paths),
