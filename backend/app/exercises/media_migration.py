@@ -3,8 +3,11 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import io
 import json
+import os
 import shutil
+import tempfile
 from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -21,7 +24,22 @@ from app.exercises.models import Exercise, ExerciseMediaAsset
 
 VIDEO_EXTENSIONS = {".gif", ".mkv", ".mp4", ".webm"}
 PLACEHOLDER_TOKEN = "placeholder"
-MANIFEST_VERSION = 1
+MANIFEST_VERSION = 2
+SUPPORTED_MANIFEST_VERSIONS = frozenset({1, MANIFEST_VERSION})
+
+DISCOVERED = "DISCOVERED"
+COPIED = "COPIED"
+HASH_VERIFIED = "HASH_VERIFIED"
+DB_UPDATED = "DB_UPDATED"
+COMPLETED = "COMPLETED"
+LIFECYCLE_STATES = frozenset({DISCOVERED, COPIED, HASH_VERIFIED, DB_UPDATED, COMPLETED})
+_LIFECYCLE_RANK = {
+    DISCOVERED: 0,
+    COPIED: 1,
+    HASH_VERIFIED: 2,
+    DB_UPDATED: 3,
+    COMPLETED: 4,
+}
 
 
 class MediaMigrationError(RuntimeError):
@@ -120,7 +138,7 @@ def _media_row(
     destination_relative = (
         destination.relative_to(settings.media_root).as_posix() if destination is not None else None
     )
-    return {
+    row = {
         "reference_kind": reference_kind,
         "exercise_id": str(exercise.id) if exercise is not None else None,
         "exercise_slug": exercise.slug if exercise is not None else None,
@@ -166,6 +184,8 @@ def _media_row(
         "placeholder": _is_placeholder_path(current_path),
         "missing_before": source_path is None and not _is_placeholder_path(current_path),
     }
+    _set_row_state(row, DISCOVERED)
+    return row
 
 
 def _iter_video_files(root: Path) -> list[Path]:
@@ -419,34 +439,176 @@ def build_inventory(
         "seed_root": str(seed_root) if seed_root is not None else None,
         "created_at": datetime.now(UTC).isoformat(),
     }
-    return {
+    manifest = {
         "version": MANIFEST_VERSION,
         "summary": summary,
         "rows": rows,
     }
+    _set_manifest_state(manifest, DISCOVERED)
+    return manifest
+
+
+def _set_row_state(row: dict[str, object], state: str) -> None:
+    if state not in LIFECYCLE_STATES:
+        raise MediaMigrationError(f"Unsupported media migration state: {state}")
+    row["state"] = state
+    row["lifecycle_state"] = state
+
+
+def _advance_row_state(row: dict[str, object], state: str) -> None:
+    current_state = _inferred_row_state(row)
+    if _LIFECYCLE_RANK[current_state] > _LIFECYCLE_RANK[state]:
+        state = current_state
+    _set_row_state(row, state)
+
+
+def _inferred_row_state(row: dict[str, object]) -> str:
+    state = DISCOVERED
+    for key in ("lifecycle_state", "state"):
+        value = row.get(key)
+        if isinstance(value, str) and value in LIFECYCLE_STATES:
+            if _LIFECYCLE_RANK[value] > _LIFECYCLE_RANK[state]:
+                state = value
+    if row.get("db_updated") and _LIFECYCLE_RANK[state] < _LIFECYCLE_RANK[DB_UPDATED]:
+        state = DB_UPDATED
+    elif row.get("hash_verified") and _LIFECYCLE_RANK[state] < _LIFECYCLE_RANK[HASH_VERIFIED]:
+        state = HASH_VERIFIED
+    elif row.get("copied") and _LIFECYCLE_RANK[state] < _LIFECYCLE_RANK[COPIED]:
+        state = COPIED
+    return state
+
+
+def _set_manifest_state(manifest: dict[str, object], state: str) -> None:
+    if state not in LIFECYCLE_STATES:
+        raise MediaMigrationError(f"Unsupported media migration state: {state}")
+    manifest["state"] = state
+    manifest["lifecycle_state"] = state
+
+
+def _manifest_state_from_rows(manifest: dict[str, object]) -> str:
+    rows = manifest["rows"]
+    assert isinstance(rows, list)
+    if not rows:
+        return DISCOVERED
+
+    row_states = [_inferred_row_state(row) for row in rows if isinstance(row, dict)]
+    if len(row_states) != len(rows):
+        raise MediaMigrationError("Manifest row is invalid")
+
+    actionable_rows = [
+        row for row in rows if isinstance(row, dict) and row.get("destination_physical_path")
+    ]
+    if (
+        actionable_rows
+        and all(_inferred_row_state(row) == COMPLETED for row in actionable_rows)
+        and all(_inferred_row_state(row) == COMPLETED or row.get("placeholder") for row in rows)
+    ):
+        return COMPLETED
+    if actionable_rows and all(
+        _LIFECYCLE_RANK[_inferred_row_state(row)] >= _LIFECYCLE_RANK[DB_UPDATED]
+        for row in actionable_rows
+    ):
+        return DB_UPDATED
+    if actionable_rows and all(
+        _LIFECYCLE_RANK[_inferred_row_state(row)] >= _LIFECYCLE_RANK[HASH_VERIFIED]
+        for row in actionable_rows
+    ):
+        return HASH_VERIFIED
+    if any(_LIFECYCLE_RANK[_inferred_row_state(row)] >= _LIFECYCLE_RANK[COPIED] for row in rows):
+        return COPIED
+    return DISCOVERED
+
+
+def _normalise_manifest(manifest: dict[str, object]) -> dict[str, object]:
+    version = manifest.get("version")
+    if type(version) is not int or version not in SUPPORTED_MANIFEST_VERSIONS:
+        raise MediaMigrationError("Unsupported media migration manifest")
+    rows = manifest.get("rows")
+    if not isinstance(rows, list):
+        raise MediaMigrationError("Manifest rows are invalid")
+    for row in rows:
+        if not isinstance(row, dict):
+            raise MediaMigrationError("Manifest row is invalid")
+        _set_row_state(row, _inferred_row_state(row))
+    manifest_state = manifest.get("lifecycle_state") or manifest.get("state")
+    derived_state = _manifest_state_from_rows(manifest)
+    if not isinstance(manifest_state, str) or manifest_state not in LIFECYCLE_STATES:
+        manifest_state = derived_state
+    elif _LIFECYCLE_RANK[derived_state] > _LIFECYCLE_RANK[manifest_state]:
+        manifest_state = derived_state
+    _set_manifest_state(manifest, manifest_state)
+    return manifest
+
+
+def _atomic_write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=f".{path.name}.", dir=path.parent) as temp_dir:
+        temporary_path = Path(temp_dir) / "manifest.json"
+        with temporary_path.open("x", encoding="utf-8", newline="") as file:
+            file.write(content)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temporary_path, path)
+
+
+def _write_immutable_snapshot(path: Path, content: str) -> None:
+    if path.exists() or path.is_symlink():
+        if path.is_symlink() or not path.is_file():
+            raise MediaMigrationError(
+                f"Immutable snapshot must be a regular immutable snapshot: {path}"
+            )
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=f".{path.name}.", dir=path.parent) as temp_dir:
+        temporary_path = Path(temp_dir) / "snapshot"
+        with temporary_path.open("x", encoding="utf-8", newline="") as file:
+            file.write(content)
+            file.flush()
+            os.fsync(file.fileno())
+        try:
+            os.link(temporary_path, path)
+        except FileExistsError:
+            if path.is_symlink() or not path.is_file():
+                raise MediaMigrationError(
+                    f"Immutable snapshot must be a regular immutable snapshot: {path}"
+                ) from None
+
+
+def _manifest_json(manifest: dict[str, object]) -> str:
+    return json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True)
+
+
+def _manifest_csv(manifest: dict[str, object]) -> str:
+    rows = manifest["rows"]
+    assert isinstance(rows, list)
+    fieldnames = list(rows[0].keys()) if rows and isinstance(rows[0], dict) else []
+    output = io.StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+    if fieldnames:
+        writer.writeheader()
+        writer.writerows(rows)
+    return output.getvalue()
+
+
+def write_manifest(manifest: dict[str, object], manifest_dir: Path) -> None:
+    """Persist only the mutable manifest, replacing it atomically."""
+    _normalise_manifest(manifest)
+    _atomic_write_text(manifest_dir / "migration_manifest.json", _manifest_json(manifest))
 
 
 def write_inventory(manifest: dict[str, object], manifest_dir: Path) -> None:
+    """Create initial snapshots once, then persist the mutable manifest."""
+    _normalise_manifest(manifest)
     manifest_dir.mkdir(parents=True, exist_ok=True)
-    rows = manifest["rows"]
-    if not isinstance(rows, list):
-        raise MediaMigrationError("Manifest rows are invalid")
-    (manifest_dir / "before_inventory.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True),
-        encoding="utf-8",
+    _write_immutable_snapshot(
+        manifest_dir / "before_inventory.json",
+        _manifest_json(manifest),
     )
-    (manifest_dir / "migration_manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True),
-        encoding="utf-8",
+    _write_immutable_snapshot(
+        manifest_dir / "before_inventory.csv",
+        _manifest_csv(manifest),
     )
-    if rows:
-        fieldnames = list(rows[0].keys())
-        with (manifest_dir / "before_inventory.csv").open(
-            "w", encoding="utf-8", newline=""
-        ) as file:
-            writer = csv.DictWriter(file, fieldnames=fieldnames, extrasaction="ignore")
-            writer.writeheader()
-            writer.writerows(rows)
+    write_manifest(manifest, manifest_dir)
 
 
 def load_manifest(manifest_dir: Path) -> dict[str, object]:
@@ -455,16 +617,15 @@ def load_manifest(manifest_dir: Path) -> dict[str, object]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as error:
         raise MediaMigrationError(f"Manifest does not exist: {path}") from error
-    if not isinstance(payload, dict) or payload.get("version") != MANIFEST_VERSION:
+    if not isinstance(payload, dict):
         raise MediaMigrationError("Unsupported media migration manifest")
-    if not isinstance(payload.get("rows"), list):
-        raise MediaMigrationError("Manifest rows are invalid")
-    return payload
+    return _normalise_manifest(payload)
 
 
 def copy_and_verify_row(row: dict[str, object]) -> None:
     if row.get("placeholder"):
         row["hash_verified"] = False
+        _advance_row_state(row, DISCOVERED)
         return
     source_value = row.get("current_physical_path")
     destination_value = row.get("destination_physical_path")
@@ -483,6 +644,7 @@ def copy_and_verify_row(row: dict[str, object]) -> None:
         row["copied"] = False
         row["destination_sha256"] = destination_digest
         row["hash_verified"] = True
+        _advance_row_state(row, HASH_VERIFIED)
         return
     if not isinstance(source_value, str):
         raise MediaMigrationError("A media row has no source")
@@ -499,6 +661,7 @@ def copy_and_verify_row(row: dict[str, object]) -> None:
     row["copied"] = True
     row["destination_sha256"] = destination_digest
     row["hash_verified"] = True
+    _advance_row_state(row, HASH_VERIFIED)
 
 
 def _row_destination_map(manifest: dict[str, object]) -> dict[str, str]:
@@ -582,6 +745,19 @@ def mark_database_updated(manifest: dict[str, object]) -> None:
     for row in rows:
         if row.get("destination_public_path") and row.get("hash_verified"):
             row["db_updated"] = True
+            _advance_row_state(row, DB_UPDATED)
+    _set_manifest_state(manifest, _manifest_state_from_rows(manifest))
+
+
+def mark_completed(manifest: dict[str, object]) -> None:
+    rows = manifest["rows"]
+    assert isinstance(rows, list)
+    for row in rows:
+        if row.get("db_updated") and row.get("hash_verified"):
+            _advance_row_state(row, COMPLETED)
+        elif row.get("placeholder") and not row.get("destination_public_path"):
+            _advance_row_state(row, COMPLETED)
+    _set_manifest_state(manifest, _manifest_state_from_rows(manifest))
 
 
 def audit_manifest(
@@ -708,13 +884,15 @@ def main(argv: list[str] | None = None) -> int:
                 if not isinstance(row, dict):
                     raise MediaMigrationError("Manifest row is invalid")
                 copy_and_verify_row(row)
+            _set_manifest_state(manifest, _manifest_state_from_rows(manifest))
+            write_manifest(manifest, args.manifest_dir)
             if not args.apply:
-                write_inventory(manifest, args.manifest_dir)
                 print("COPY_VERIFY_ONLY")
                 return 0
             update_database_from_manifest(db, settings=settings, manifest=manifest)
             mark_database_updated(manifest)
-            write_inventory(manifest, args.manifest_dir)
+            mark_completed(manifest)
+            write_manifest(manifest, args.manifest_dir)
             print("COPY_VERIFY_DATABASE_UPDATE")
             return 0
         if args.command == "audit":
