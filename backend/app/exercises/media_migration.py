@@ -469,18 +469,12 @@ def copy_and_verify_row(row: dict[str, object]) -> None:
     source_value = row.get("current_physical_path")
     destination_value = row.get("destination_physical_path")
     expected_digest = row.get("sha256")
-    if not isinstance(source_value, str) or not isinstance(destination_value, str):
-        raise MediaMigrationError("A media row has no source or destination")
+    if not isinstance(destination_value, str):
+        raise MediaMigrationError("A media row has no destination")
     if not isinstance(expected_digest, str):
         raise MediaMigrationError("A media row has no source hash")
-    source = Path(source_value)
     destination = Path(destination_value)
-    if not source.is_file():
-        raise MediaMigrationError(f"Source media is missing: {source}")
-    if sha256_file(source) != expected_digest:
-        raise MediaMigrationError(f"Source hash changed: {source}")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists():
+    if destination.exists() or destination.is_symlink():
         if not destination.is_file():
             raise MediaMigrationError(f"Destination hash mismatch: {destination}")
         destination_digest = sha256_file(destination)
@@ -490,6 +484,14 @@ def copy_and_verify_row(row: dict[str, object]) -> None:
         row["destination_sha256"] = destination_digest
         row["hash_verified"] = True
         return
+    if not isinstance(source_value, str):
+        raise MediaMigrationError("A media row has no source")
+    source = Path(source_value)
+    if not source.is_file():
+        raise MediaMigrationError(f"Source media is missing: {source}")
+    if sha256_file(source) != expected_digest:
+        raise MediaMigrationError(f"Source hash changed: {source}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, destination)
     destination_digest = sha256_file(destination)
     if destination_digest != expected_digest:
