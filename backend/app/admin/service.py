@@ -25,6 +25,7 @@ from app.exercises.enums import (
     MediaType,
 )
 from app.exercises.media_metadata import OWNER_ATTRIBUTION, OWNER_LICENSE
+from app.exercises.media_resolver import is_valid_media_asset
 from app.exercises.models import (
     Exercise,
     ExerciseCautionTagItem,
@@ -128,12 +129,135 @@ def _sync_media_assets(
         )
     desired_keys = {_media_asset_key(asset) for asset in payload_assets}
     for asset in list(exercise.media_assets):
-        if (
-            asset.presentation,
-            asset.role,
-            asset.sort_order,
-        ) not in desired_keys:
+        if (asset.presentation, asset.role, asset.sort_order) not in desired_keys:
             exercise.media_assets.remove(asset)
+
+
+def _prepare_primary_media_assets(
+    exercise: Exercise,
+    payload_assets: list[AdminExerciseMediaAssetInput],
+    stored_assets: dict[MediaAssetKey, StoredMedia],
+    media: StoredMedia | None,
+) -> tuple[list[AdminExerciseMediaAssetInput], dict[MediaAssetKey, StoredMedia]]:
+    if media is None or media.media_type is not MediaType.VIDEO:
+        return list(payload_assets), dict(stored_assets)
+
+    assets = list(payload_assets)
+    primary_key_prefix = (MediaPresentation.UNSPECIFIED, MediaRole.VIDEO)
+    payload_primary = next(
+        (
+            asset
+            for asset in assets
+            if (asset.presentation, asset.role) == primary_key_prefix
+        ),
+        None,
+    )
+    existing_by_id = {asset.id: asset for asset in exercise.media_assets}
+    existing_by_key = {
+        (asset.presentation, asset.role, asset.sort_order): asset
+        for asset in exercise.media_assets
+    }
+    existing_same_path = next(
+        (
+            asset
+            for asset in exercise.media_assets
+            if asset.presentation is MediaPresentation.UNSPECIFIED
+            and asset.role is MediaRole.VIDEO
+            and is_valid_media_asset(asset)
+            and asset.media_path == media.public_path
+        ),
+        None,
+    )
+    if existing_same_path is not None:
+        payload_primary = next(
+            (
+                asset
+                for asset in assets
+                if asset.id == existing_same_path.id
+                or _media_asset_key(asset)
+                == (
+                    existing_same_path.presentation,
+                    existing_same_path.role,
+                    existing_same_path.sort_order,
+                )
+            ),
+            None,
+        )
+        if payload_primary is None:
+            payload_primary = AdminExerciseMediaAssetInput(
+                id=existing_same_path.id,
+                presentation=existing_same_path.presentation,
+                role=existing_same_path.role,
+                sort_order=existing_same_path.sort_order,
+                media_source_url=existing_same_path.media_source_url,
+                media_license=existing_same_path.media_license,
+                media_attribution=existing_same_path.media_attribution,
+            )
+            assets.append(payload_primary)
+        prepared_stored_assets = dict(stored_assets)
+        prepared_stored_assets[_media_asset_key(payload_primary)] = media
+        return assets, prepared_stored_assets
+    payload_stored_media = (
+        stored_assets.get(_media_asset_key(payload_primary))
+        if payload_primary is not None
+        else None
+    )
+    if (
+        payload_primary is not None
+        and payload_stored_media is not None
+        and payload_stored_media.public_path != media.public_path
+    ):
+        used_orders = [
+            asset.sort_order
+            for asset in exercise.media_assets
+            if (asset.presentation, asset.role) == primary_key_prefix
+        ] + [
+            asset.sort_order
+            for asset in assets
+            if (asset.presentation, asset.role) == primary_key_prefix
+        ]
+        payload_primary = AdminExerciseMediaAssetInput(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            sort_order=max(used_orders, default=-1) + 1,
+        )
+        assets.append(payload_primary)
+    payload_primary_existing = (
+        existing_by_id.get(payload_primary.id)
+        if payload_primary is not None and payload_primary.id is not None
+        else existing_by_key.get(_media_asset_key(payload_primary))
+        if payload_primary is not None
+        else None
+    )
+    if payload_primary_existing is not None or (
+        payload_primary is None and exercise.media_assets
+    ):
+        used_orders = [
+            asset.sort_order
+            for asset in exercise.media_assets
+            if (asset.presentation, asset.role) == primary_key_prefix
+        ] + [
+            asset.sort_order
+            for asset in assets
+            if (asset.presentation, asset.role) == primary_key_prefix
+        ]
+        payload_primary = AdminExerciseMediaAssetInput(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            sort_order=max(used_orders, default=-1) + 1,
+        )
+        assets.append(payload_primary)
+    elif payload_primary is None:
+        payload_primary = AdminExerciseMediaAssetInput(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            sort_order=0,
+        )
+        assets.append(payload_primary)
+
+    prepared_stored_assets = dict(stored_assets)
+    prepared_stored_assets[_media_asset_key(payload_primary)] = media
+    return assets, prepared_stored_assets
 
 
 def _sync_labels(exercise: Exercise, desired: list[ExerciseLabel]) -> None:
@@ -240,7 +364,6 @@ def create_admin_exercise(
     media_assets: dict[MediaAssetKey, StoredMedia] | None = None,
 ) -> Exercise:
     stored_media_assets = media_assets or {}
-    _validate_media_assets([], payload.media_assets, stored_media_assets)
     exercise = Exercise(
         slug=payload.slug,
         name_en=payload.name_en,
@@ -292,7 +415,10 @@ def create_admin_exercise(
         ],
         needs_review=payload.needs_review,
     )
-    _sync_media_assets(exercise, payload.media_assets, stored_media_assets)
+    payload_assets, stored_media_assets = _prepare_primary_media_assets(
+        exercise, payload.media_assets, stored_media_assets, media
+    )
+    _sync_media_assets(exercise, payload_assets, stored_media_assets)
     db.add(exercise)
     try:
         db.commit()
@@ -391,7 +517,15 @@ def update_admin_exercise(
     if media is not None:
         exercise.media_path = media.public_path
         exercise.media_type = media.media_type
-    _sync_media_assets(exercise, payload.media_assets, media_assets or {})
+        exercise.media_license = payload.media_license or OWNER_LICENSE
+        exercise.media_attribution = payload.media_attribution or OWNER_ATTRIBUTION
+    payload_assets, stored_media_assets = _prepare_primary_media_assets(
+        exercise,
+        payload.media_assets,
+        media_assets or {},
+        media,
+    )
+    _sync_media_assets(exercise, payload_assets, stored_media_assets)
 
     try:
         db.commit()

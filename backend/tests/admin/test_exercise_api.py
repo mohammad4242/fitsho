@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from app.admin.schemas import AdminExerciseMediaAssetInput
 from app.auth.models import User
 from app.config import Settings
+from app.exercises.enums import MediaPresentation
+from app.exercises.media_resolver import resolve_primary_media
 from app.exercises.models import Exercise, ExerciseMediaAsset
 from app.exercises.service import seed_exercises
 from app.workouts.enums import WorkoutPlanStatus
@@ -1171,6 +1173,221 @@ def test_admin_updates_a_gendered_media_asset(
     assert asset["media_source_url"] == "https://source.example/female.mp4"
     assert asset["media_license"] == "MIT"
     assert asset["media_attribution"] == "Female creator"
+
+
+def test_primary_upload_creates_primary_asset_and_wins_all_media_projections(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    make_current_user_admin(client, db)
+    monkeypatch.setattr("app.admin.media._probe_video_duration", lambda *_: 5.0)
+    initial = post_exercise(
+        client,
+        exercise_payload(
+            media_assets=[
+                {
+                    "presentation": "male",
+                    "role": "video",
+                    "sort_order": 0,
+                    "upload_index": None,
+                }
+            ]
+        ),
+        media_assets={"media_male_video": ("old-male.mp4", MP4_BYTES, "video/mp4")},
+    )
+    assert initial.status_code == 201
+    exercise_id = initial.json()["id"]
+    old_asset = initial.json()["media_assets"][0]
+    old_path = old_asset["media_path"]
+
+    primary_bytes = MP4_BYTES + b"primary"
+    updated = client.patch(
+        f"/api/v1/admin/exercises/{exercise_id}",
+        headers=ORIGIN,
+        data={
+            "payload": json.dumps(
+                exercise_payload(
+                    media_assets=[
+                        {
+                            "id": old_asset["id"],
+                            "presentation": "male",
+                            "role": "video",
+                            "sort_order": 0,
+                            "upload_index": None,
+                        }
+                    ]
+                )
+            )
+        },
+        files={"media": ("new-primary.mp4", primary_bytes, "video/mp4")},
+    )
+
+    assert updated.status_code == 200, updated.json()
+    body = updated.json()
+    assert body["media_type"] == "video"
+    assert body["media_path"].startswith("/media/")
+    assert body["media_assets"][0]["presentation"] == "unspecified"
+    assert body["media_assets"][0]["media_path"] == body["media_path"]
+    assert body["media_assets"][1]["media_path"] == old_path
+    assert client.get(old_path).content == MP4_BYTES
+
+    db.expire_all()
+    stored = db.get(Exercise, exercise_id)
+    assert stored is not None
+    assert len(stored.media_assets) == 2
+    assert stored.media_path == body["media_path"]
+    assert stored.media_assets[0].source == "admin"
+    assert resolve_primary_media(stored).path == body["media_path"]
+    assert (
+        resolve_primary_media(stored, MediaPresentation.FEMALE).path == body["media_path"]
+    )
+
+    assert client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE).status_code == 201
+    catalog = client.get("/api/v1/exercises?page_size=50")
+    assert catalog.status_code == 200
+    item = next(item for item in catalog.json()["items"] if item["id"] == exercise_id)
+    assert item["media_path"] == body["media_path"]
+
+    detail = client.get(f"/api/v1/exercises/{body['slug']}")
+    assert detail.status_code == 200
+    assert detail.json()["media_path"] == body["media_path"]
+    assert detail.json()["media_assets"][0]["media_path"] == body["media_path"]
+
+    metadata_only = client.patch(
+        f"/api/v1/admin/exercises/{exercise_id}",
+        headers=ORIGIN,
+        data={
+            "payload": json.dumps(
+                exercise_payload(
+                    name_en="Renamed Incline Push Up",
+                    media_assets=[
+                        {
+                            "id": asset["id"],
+                            "presentation": asset["presentation"],
+                            "role": asset["role"],
+                            "sort_order": asset["sort_order"],
+                            "upload_index": None,
+                        }
+                        for asset in body["media_assets"]
+                    ],
+                )
+            )
+        },
+    )
+    assert metadata_only.status_code == 200
+    assert metadata_only.json()["media_path"] == body["media_path"]
+    assert [asset["media_path"] for asset in metadata_only.json()["media_assets"]] == [
+        asset["media_path"] for asset in body["media_assets"]
+    ]
+
+    retry = client.patch(
+        f"/api/v1/admin/exercises/{exercise_id}",
+        headers=ORIGIN,
+        data={
+            "payload": json.dumps(
+                exercise_payload(
+                    media_assets=[
+                        {
+                            "id": asset["id"],
+                            "presentation": asset["presentation"],
+                            "role": asset["role"],
+                            "sort_order": asset["sort_order"],
+                            "upload_index": None,
+                        }
+                        for asset in metadata_only.json()["media_assets"]
+                    ]
+                )
+            )
+        },
+        files={"media": ("new-primary.mp4", primary_bytes, "video/mp4")},
+    )
+    assert retry.status_code == 200
+    assert [
+        (asset["id"], asset["media_path"]) for asset in retry.json()["media_assets"]
+    ] == [
+        (asset["id"], asset["media_path"])
+        for asset in metadata_only.json()["media_assets"]
+    ]
+
+
+def test_explicit_media_omission_removes_asset_without_deleting_file(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    make_current_user_admin(client, db)
+    monkeypatch.setattr("app.admin.media._probe_video_duration", lambda *_: 5.0)
+    created = post_exercise(
+        client,
+        exercise_payload(
+            media_assets=[
+                {"presentation": "male", "role": "video", "sort_order": 0}
+            ]
+        ),
+        media_assets={"media_male_video": ("keep-file.mp4", MP4_BYTES, "video/mp4")},
+    )
+    assert created.status_code == 201
+    exercise_id = created.json()["id"]
+    old_path = created.json()["media_assets"][0]["media_path"]
+
+    removed = client.patch(
+        f"/api/v1/admin/exercises/{exercise_id}",
+        headers=ORIGIN,
+        data={"payload": json.dumps(exercise_payload())},
+    )
+
+    assert removed.status_code == 200
+    assert removed.json()["media_assets"] == []
+    assert db.scalar(
+        select(ExerciseMediaAsset).where(ExerciseMediaAsset.exercise_id == exercise_id)
+    ) is None
+    assert client.get(old_path).content == MP4_BYTES
+    assert any(path.is_file() for path in test_settings.media_root.rglob("*.mp4"))
+
+
+def test_primary_and_unspecified_gallery_uploads_keep_distinct_assets(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    make_current_user_admin(client, db)
+    monkeypatch.setattr("app.admin.media._probe_video_duration", lambda *_: 5.0)
+    primary_bytes = MP4_BYTES + b"primary-upload"
+    gallery_bytes = MP4_BYTES + b"gallery-upload"
+
+    response = post_exercise(
+        client,
+        exercise_payload(
+            media_assets=[
+                {
+                    "presentation": "unspecified",
+                    "role": "video",
+                    "sort_order": 0,
+                    "upload_index": 0,
+                }
+            ]
+        ),
+        media=("primary.mp4", primary_bytes, "video/mp4"),
+        media_assets={"media_files": ("gallery.mp4", gallery_bytes, "video/mp4")},
+    )
+
+    assert response.status_code == 201
+    assets = response.json()["media_assets"]
+    assert len(assets) == 2
+    assert response.json()["media_path"] == assets[0]["media_path"]
+    assert {asset["media_path"] for asset in assets} == {
+        response.json()["media_path"],
+        assets[1]["media_path"],
+    }
+    assert client.get(response.json()["media_path"]).content == primary_bytes
+    assert client.get(assets[1]["media_path"]).content == gallery_bytes
+    stored = db.get(Exercise, response.json()["id"])
+    assert stored is not None
+    assert len(stored.media_assets) == 2
+    assert resolve_primary_media(stored).path == response.json()["media_path"]
 
 
 def test_admin_creates_review_exercise_with_labels_and_no_anatomy(

@@ -20,6 +20,23 @@ describe("buildExerciseMediaItems", () => {
     ]);
   });
 
+  it("pins the legacy primary path before gendered asset order", () => {
+    const items = buildExerciseMediaItems({
+      media_path: "/media/primary.mp4",
+      media_type: "video",
+      media_attribution: null,
+      media_assets: [
+        mediaAsset("/media/male-first.mp4", 0),
+        mediaAsset("/media/primary.mp4", 4),
+      ],
+    });
+
+    expect(items.map((item) => item.media_path)).toEqual([
+      "/media/primary.mp4",
+      "/media/male-first.mp4",
+    ]);
+  });
+
   it("uses legacy media when no gendered asset was returned", () => {
     const items = buildExerciseMediaItems({
       media_path: "/media/legacy.mp4",

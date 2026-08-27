@@ -51,7 +51,7 @@ from app.admin.service import (
 from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import AppSettings, DatabaseSession
 from app.exercises.enums import MediaPresentation, MediaRole, MediaType
-from app.exercises.media_resolver import resolve_primary_media
+from app.exercises.media_resolver import ordered_media_assets, resolve_primary_media
 from app.exercises.models import Exercise
 from app.exercises.taxonomy import MUSCLES_BY_REGION, is_compatible_muscle_focus
 from app.profile.enums import ExperienceLevel
@@ -452,6 +452,11 @@ def delete_training_template(template_id: UUID, db: DatabaseSession) -> Response
 
 def _detail(exercise: Exercise) -> AdminExerciseDetail:
     primary_media = resolve_primary_media(exercise)
+    media_assets = ordered_media_assets(
+        exercise.media_assets,
+        primary_path=exercise.media_path,
+        preserve_input_order_if_unpinned=True,
+    )
     return AdminExerciseDetail(
         id=exercise.id,
         slug=exercise.slug,
@@ -501,7 +506,7 @@ def _detail(exercise: Exercise) -> AdminExerciseDetail:
                 media_license=asset.media_license,
                 media_attribution=asset.media_attribution,
             )
-            for asset in exercise.media_assets
+            for asset in media_assets
         ],
         is_active=exercise.is_active,
         created_at=exercise.created_at,

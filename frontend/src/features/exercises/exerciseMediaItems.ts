@@ -30,6 +30,11 @@ export function buildExerciseMediaItems(
   const assets = [...(exercise.media_assets ?? [])]
     .filter((asset) => asset.media_type !== "placeholder" && !asset.media_path.includes("placeholder"))
     .sort((left, right) => left.sort_order - right.sort_order);
+  const primaryIndex = assets.findIndex((asset) => asset.media_path === exercise.media_path);
+  if (primaryIndex > 0) {
+    const [primary] = assets.splice(primaryIndex, 1);
+    assets.unshift(primary);
+  }
   if (assets.length === 0) {
     addItem({
       key: "legacy",

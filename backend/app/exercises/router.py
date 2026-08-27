@@ -114,12 +114,16 @@ def _detail(
     selected_presentation: MediaPresentation | None = None
     if filter_media:
         if presentation in {MediaPresentation.MALE, MediaPresentation.FEMALE}:
-            media_assets = ordered_media_assets(media_assets, presentation)
             media_assets = [
                 asset
                 for asset in media_assets
                 if asset.presentation in {presentation, MediaPresentation.UNSPECIFIED}
-            ] or ordered_media_assets(media_assets, presentation)
+            ] or media_assets
+        media_assets = ordered_media_assets(
+            media_assets,
+            presentation,
+            primary_path=exercise.media_path,
+        )
         if media_assets:
             selected_presentation = media_assets[0].presentation
     return ExerciseDetail(
