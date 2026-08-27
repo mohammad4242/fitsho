@@ -3,8 +3,438 @@ import json
 from pathlib import Path
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
+def _rollback_exercise(slug: str):
+    from app.exercises.enums import BodyRegion, Difficulty, MediaType, MuscleGroup
+    from app.exercises.models import Exercise
+
+    return Exercise(
+        slug=slug,
+        name_en="Rollback Exercise",
+        name_fa="حرکت بازگشت",
+        body_region=BodyRegion.LOWER_BODY,
+        primary_muscle=MuscleGroup.QUADRICEPS,
+        difficulty=Difficulty.BEGINNER,
+        instructions_en=["Set up.", "Move.", "Return."],
+        instructions_fa=["آماده شو.", "حرکت کن.", "برگرد."],
+        safety_notes_en=[],
+        safety_notes_fa=[],
+        media_path="/media/canonical-exercise.mp4",
+        media_type=MediaType.VIDEO,
+    )
+
+
+def _rollback_manifest(exercise, asset, old_exercise_path: str, old_asset_path: str, digest: str):
+    return {
+        "version": 2,
+        "summary": {},
+        "rows": [
+            {
+                "reference_kind": "legacy",
+                "exercise_id": str(exercise.id),
+                "current_db_path": old_exercise_path,
+                "current_physical_path": None,
+                "destination_public_path": exercise.media_path,
+                "sha256": digest,
+                "hash_verified": True,
+                "db_updated": True,
+                "placeholder": False,
+            },
+            {
+                "reference_kind": "asset",
+                "exercise_id": str(exercise.id),
+                "media_asset_id": str(asset.id),
+                "current_db_path": old_asset_path,
+                "current_physical_path": None,
+                "destination_public_path": asset.media_path,
+                "sha256": digest,
+                "hash_verified": True,
+                "db_updated": True,
+                "placeholder": False,
+            },
+            {
+                "reference_kind": "orphan",
+                "current_db_path": "",
+                "destination_public_path": "/media/exercises/_unreferenced/media.mp4",
+                "sha256": digest,
+                "hash_verified": True,
+                "db_updated": True,
+            },
+            {
+                "reference_kind": "seed-static",
+                "current_db_path": "/exercises/seed.mp4",
+                "destination_public_path": "/media/exercises/seed/media.mp4",
+                "sha256": digest,
+                "hash_verified": True,
+                "db_updated": True,
+            },
+        ],
+    }
+
+
+def _rollback_rows(report: dict[str, object]) -> list[dict[str, object]]:
+    rows = report["rows"]
+    assert isinstance(rows, list)
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def test_rollback_plan_uses_actual_references_and_legacy_root_evidence(
+    db: Session, test_settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    import app.exercises.media_migration as media_migration
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.media_migration import build_rollback_plan
+    from app.exercises.models import ExerciseMediaAsset
+
+    legacy = tmp_path / "legacy"
+    old_video = legacy / "old.mp4"
+    old_video.parent.mkdir(parents=True)
+    old_video.write_bytes(b"old video")
+    exercise = _rollback_exercise("rollback-plan")
+    exercise.media_path = "/media/canonical-exercise.mp4"
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            media_path="/media/canonical-asset.mp4",
+            media_type=MediaType.VIDEO,
+        )
+    )
+    db.add(exercise)
+    db.flush()
+    asset = exercise.media_assets[0]
+    placeholder_exercise = _rollback_exercise("rollback-exercise-placeholder")
+    placeholder_exercise.media_path = "/media/exercise-placeholder.svg"
+    db.add(placeholder_exercise)
+    db.flush()
+    placeholder_asset = ExerciseMediaAsset(
+        presentation=MediaPresentation.UNSPECIFIED,
+        role=MediaRole.VIDEO,
+        media_path="/media/exercise-placeholder.svg",
+        media_type=MediaType.VIDEO,
+    )
+    placeholder_exercise.media_assets.append(placeholder_asset)
+    db.flush()
+    manifest = _rollback_manifest(
+        exercise,
+        asset,
+        "/media/old.mp4",
+        "/media/old.mp4",
+        hashlib.sha256(b"old video").hexdigest(),
+    )
+    manifest["rows"].append(
+        {
+            "reference_kind": "asset",
+            "exercise_id": str(exercise.id),
+            "media_asset_id": str(placeholder_asset.id),
+            "current_db_path": placeholder_asset.media_path,
+            "destination_public_path": None,
+            "sha256": None,
+            "hash_verified": False,
+            "db_updated": False,
+            "placeholder": True,
+        }
+    )
+    manifest["rows"].append(
+        {
+            "reference_kind": "legacy",
+            "exercise_id": str(placeholder_exercise.id),
+            "current_db_path": placeholder_exercise.media_path,
+            "destination_public_path": None,
+            "sha256": None,
+            "hash_verified": False,
+            "db_updated": False,
+            "placeholder": True,
+        }
+    )
+    manifest["rows"][0]["destination_public_path"] = "/media/canonical-exercise.mp4"
+    manifest["rows"][1]["destination_public_path"] = "/media/canonical-asset.mp4"
+    manifest_before = json.dumps(manifest, sort_keys=True)
+
+    report = build_rollback_plan(
+        db,
+        settings=test_settings,
+        manifest=manifest,
+        legacy_roots=(legacy,),
+    )
+
+    assert report["summary"] == {
+        "total": 2,
+        "planned": 2,
+        "already_restored": 0,
+        "conflict": 0,
+        "missing": 0,
+    }
+    assert {row["reference_kind"] for row in _rollback_rows(report)} == {"legacy", "asset"}
+    assert all(row["status"] == "planned" for row in _rollback_rows(report))
+    assert all(row["source_path"] == str(old_video) for row in _rollback_rows(report))
+    assert exercise.media_path == "/media/canonical-exercise.mp4"
+    assert json.dumps(manifest, sort_keys=True) == manifest_before
+
+    manifest_dir = tmp_path / "manifest"
+    media_migration.write_manifest(manifest, manifest_dir)
+    monkeypatch.setattr(media_migration, "get_settings", lambda: test_settings)
+    monkeypatch.setattr(media_migration, "create_engine", lambda _: db.get_bind())
+    assert (
+        media_migration.main(
+            [
+                "rollback",
+                "--manifest-dir",
+                str(manifest_dir),
+                "--legacy-root",
+                str(legacy),
+            ]
+        )
+        == 0
+    )
+    dry_run = json.loads(capsys.readouterr().out)
+    assert dry_run["rollback_dry_run"] is True
+    assert dry_run["summary"] == report["summary"]
+
+
+def test_apply_rollback_restores_exercise_and_asset_without_deleting_files(
+    db: Session, test_settings, tmp_path: Path
+) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.media_migration import apply_database_rollback
+    from app.exercises.models import ExerciseMediaAsset
+
+    legacy = tmp_path / "legacy"
+    old_video = legacy / "old.mp4"
+    old_video.parent.mkdir(parents=True)
+    old_video.write_bytes(b"old video")
+    exercise = _rollback_exercise("rollback-apply")
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            media_path="/media/canonical-asset.mp4",
+            media_type=MediaType.VIDEO,
+        )
+    )
+    db.add(exercise)
+    db.flush()
+    asset = exercise.media_assets[0]
+    manifest = _rollback_manifest(
+        exercise,
+        asset,
+        "/media/old.mp4",
+        "/media/old.mp4",
+        hashlib.sha256(b"old video").hexdigest(),
+    )
+    manifest["rows"][0]["destination_public_path"] = "/media/canonical-exercise.mp4"
+    manifest["rows"][1]["destination_public_path"] = "/media/canonical-asset.mp4"
+
+    report = apply_database_rollback(
+        db,
+        settings=test_settings,
+        manifest=manifest,
+        legacy_roots=(legacy,),
+    )
+    db.expire_all()
+    stored = db.scalar(select(type(exercise)).where(type(exercise).id == exercise.id))
+
+    assert report["summary"]["planned"] == 2
+    assert stored is not None
+    assert stored.media_path == "/media/old.mp4"
+    assert stored.media_assets[0].media_path == "/media/old.mp4"
+    assert old_video.read_bytes() == b"old video"
+    assert all(row["db_updated"] is False for row in manifest["rows"][:2])
+    assert all(row["state"] == "HASH_VERIFIED" for row in manifest["rows"][:2])
+
+
+def test_rollback_conflict_aborts_all_database_changes(
+    db: Session, test_settings, tmp_path: Path
+) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.media_migration import MediaMigrationError, apply_database_rollback
+    from app.exercises.models import ExerciseMediaAsset
+
+    legacy = tmp_path / "legacy"
+    old_video = legacy / "old.mp4"
+    old_video.parent.mkdir(parents=True)
+    old_video.write_bytes(b"old video")
+    exercise = _rollback_exercise("rollback-conflict")
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            media_path="/media/canonical-asset.mp4",
+            media_type=MediaType.VIDEO,
+        )
+    )
+    db.add(exercise)
+    db.flush()
+    asset = exercise.media_assets[0]
+    manifest = _rollback_manifest(
+        exercise,
+        asset,
+        "/media/old.mp4",
+        "/media/old.mp4",
+        hashlib.sha256(b"old video").hexdigest(),
+    )
+    exercise.media_path = "/media/another-current-path.mp4"
+
+    with pytest.raises(MediaMigrationError, match="conflict"):
+        apply_database_rollback(
+            db,
+            settings=test_settings,
+            manifest=manifest,
+            legacy_roots=(legacy,),
+        )
+
+    assert exercise.media_path == "/media/another-current-path.mp4"
+    assert asset.media_path == "/media/canonical-asset.mp4"
+    assert all(row["db_updated"] is True for row in manifest["rows"][:2])
+
+
+def test_rollback_is_idempotent_when_references_are_already_restored(
+    db: Session, test_settings: object, tmp_path: Path
+) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.media_migration import apply_database_rollback
+    from app.exercises.models import ExerciseMediaAsset
+
+    legacy = tmp_path / "legacy"
+    old_video = legacy / "old.mp4"
+    old_video.parent.mkdir(parents=True)
+    old_video.write_bytes(b"old video")
+    exercise = _rollback_exercise("rollback-idempotent")
+    exercise.media_path = "/media/old.mp4"
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            media_path="/media/old.mp4",
+            media_type=MediaType.VIDEO,
+        )
+    )
+    db.add(exercise)
+    db.flush()
+    asset = exercise.media_assets[0]
+    manifest = _rollback_manifest(
+        exercise,
+        asset,
+        "/media/old.mp4",
+        "/media/old.mp4",
+        hashlib.sha256(b"old video").hexdigest(),
+    )
+    manifest["rows"][0]["destination_public_path"] = "/media/canonical-exercise.mp4"
+    manifest["rows"][1]["destination_public_path"] = "/media/canonical-asset.mp4"
+
+    report = apply_database_rollback(
+        db,
+        settings=test_settings,
+        manifest=manifest,
+        legacy_roots=(legacy,),
+    )
+
+    assert report["summary"]["already_restored"] == 2
+    assert report["summary"]["planned"] == 0
+    assert exercise.media_path == "/media/old.mp4"
+    assert asset.media_path == "/media/old.mp4"
+
+
+def test_rollback_missing_old_evidence_fails_without_database_changes(
+    db: Session, test_settings, tmp_path: Path
+) -> None:
+    from app.exercises.media_migration import MediaMigrationError, apply_database_rollback
+
+    exercise = _rollback_exercise("rollback-missing")
+    db.add(exercise)
+    db.flush()
+    manifest = {
+        "version": 2,
+        "summary": {},
+        "rows": [
+            {
+                "reference_kind": "legacy",
+                "exercise_id": str(exercise.id),
+                "current_db_path": "/media/missing.mp4",
+                "destination_public_path": exercise.media_path,
+                "sha256": "f" * 64,
+                "hash_verified": True,
+                "db_updated": True,
+            }
+        ],
+    }
+
+    with pytest.raises(MediaMigrationError, match="missing"):
+        apply_database_rollback(
+            db,
+            settings=test_settings,
+            manifest=manifest,
+            legacy_roots=(tmp_path / "legacy",),
+        )
+
+    assert exercise.media_path == "/media/canonical-exercise.mp4"
+
+
+@pytest.mark.parametrize("evidence", ["missing", "hash-mismatch"])
+def test_already_restored_requires_matching_old_source_evidence(
+    db: Session, test_settings, tmp_path: Path, evidence: str
+) -> None:
+    from app.exercises.media_migration import (
+        MediaMigrationError,
+        apply_database_rollback,
+        build_rollback_plan,
+    )
+
+    legacy = tmp_path / "legacy"
+    old_video = legacy / "old.mp4"
+    if evidence == "hash-mismatch":
+        old_video.parent.mkdir(parents=True)
+        old_video.write_bytes(b"changed old video")
+    exercise = _rollback_exercise(f"rollback-already-restored-{evidence}")
+    exercise.media_path = "/media/old.mp4"
+    db.add(exercise)
+    db.flush()
+    manifest = {
+        "version": 2,
+        "summary": {},
+        "rows": [
+            {
+                "reference_kind": "legacy",
+                "exercise_id": str(exercise.id),
+                "current_db_path": "/media/old.mp4",
+                "destination_public_path": "/media/canonical-exercise.mp4",
+                "sha256": hashlib.sha256(b"old video").hexdigest(),
+                "hash_verified": True,
+                "db_updated": True,
+                "placeholder": False,
+            }
+        ],
+    }
+    manifest_before = json.dumps(manifest, sort_keys=True)
+
+    report = build_rollback_plan(
+        db,
+        settings=test_settings,
+        manifest=manifest,
+        legacy_roots=(legacy,),
+    )
+
+    assert report["summary"] == {
+        "total": 1,
+        "planned": 0,
+        "already_restored": 0,
+        "conflict": 0,
+        "missing": 1,
+    }
+    assert report["rows"][0]["status"] == "missing"
+    with pytest.raises(MediaMigrationError, match="missing"):
+        apply_database_rollback(
+            db,
+            settings=test_settings,
+            manifest=manifest,
+            legacy_roots=(legacy,),
+        )
+
+    assert exercise.media_path == "/media/old.mp4"
+    assert json.dumps(manifest, sort_keys=True) == manifest_before
 def test_destination_path_is_deterministic_and_collision_safe() -> None:
     from app.exercises.media_migration import destination_relative_path
 
@@ -294,3 +724,44 @@ def test_load_manifest_backfills_lifecycle_and_progresses_v1_rows(tmp_path: Path
     mark_completed(manifest)
     assert manifest["state"] == "COMPLETED"
     assert manifest["rows"][0]["state"] == "COMPLETED"
+
+
+def test_mark_database_updated_only_marks_real_reference_rows() -> None:
+    from app.exercises.media_migration import mark_database_updated
+
+    manifest = {
+        "version": 2,
+        "summary": {},
+        "rows": [
+            {
+                "reference_kind": "asset",
+                "exercise_id": "exercise-1",
+                "media_asset_id": "asset-1",
+                "destination_public_path": "/media/asset.mp4",
+                "hash_verified": True,
+                "db_updated": False,
+            },
+            {
+                "reference_kind": "orphan",
+                "destination_public_path": "/media/orphan.mp4",
+                "hash_verified": True,
+                "db_updated": True,
+                "state": "DB_UPDATED",
+            },
+            {
+                "reference_kind": "seed-static",
+                "destination_public_path": "/media/seed.mp4",
+                "hash_verified": True,
+                "db_updated": True,
+                "state": "DB_UPDATED",
+            },
+        ],
+    }
+
+    mark_database_updated(manifest)
+
+    assert manifest["rows"][0]["db_updated"] is True
+    assert manifest["rows"][1]["db_updated"] is False
+    assert manifest["rows"][1]["state"] == "HASH_VERIFIED"
+    assert manifest["rows"][2]["db_updated"] is False
+    assert manifest["rows"][2]["state"] == "HASH_VERIFIED"

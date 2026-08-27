@@ -40,6 +40,10 @@ _LIFECYCLE_RANK = {
     DB_UPDATED: 3,
     COMPLETED: 4,
 }
+ROLLBACK_PLANNED = "planned"
+ROLLBACK_ALREADY_RESTORED = "already-restored"
+ROLLBACK_CONFLICT = "conflict"
+ROLLBACK_MISSING = "missing"
 
 
 class MediaMigrationError(RuntimeError):
@@ -676,6 +680,311 @@ def _row_destination_map(manifest: dict[str, object]) -> dict[str, str]:
     }
 
 
+def _is_database_reference_row(row: dict[str, object]) -> bool:
+    """Return whether a manifest row describes a real database media reference."""
+    reference_kind = row.get("reference_kind")
+    if reference_kind in {"orphan", "disk_orphan", "seed-static", "seed_static"}:
+        return False
+    if reference_kind == "asset" or (
+        reference_kind is None and row.get("media_asset_id")
+    ):
+        return bool(row.get("media_asset_id"))
+    if reference_kind in {"legacy", "exercise"} or reference_kind is None:
+        return bool(row.get("exercise_id"))
+    return False
+
+
+def _is_rollback_manifest_row(row: dict[str, object]) -> bool:
+    """Return whether a row records a verified database migration mapping."""
+    if not _is_database_reference_row(row):
+        return False
+    if any(
+        not isinstance(row.get(key), str) or not str(row[key]).strip()
+        for key in ("current_db_path", "destination_public_path", "sha256")
+    ):
+        return False
+    return bool(row.get("hash_verified") and row.get("db_updated"))
+
+
+def _rollback_manifest_rows(manifest: dict[str, object]) -> list[tuple[int, dict[str, object]]]:
+    rows = manifest.get("rows")
+    if not isinstance(rows, list):
+        raise MediaMigrationError("Manifest rows are invalid")
+    references: list[tuple[int, dict[str, object]]] = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise MediaMigrationError("Manifest row is invalid")
+        if _is_rollback_manifest_row(row):
+            references.append((index, row))
+    return references
+
+
+def _rollback_source_candidates(
+    row: dict[str, object],
+    *,
+    settings: Settings,
+    legacy_roots: tuple[Path, ...],
+) -> tuple[Path, ...]:
+    candidates: list[Path] = []
+
+    def add(path: Path) -> None:
+        if path not in candidates:
+            candidates.append(path)
+
+    physical_value = row.get("current_physical_path")
+    if isinstance(physical_value, str) and physical_value:
+        physical = Path(physical_value)
+        add(physical)
+        try:
+            relative = physical.relative_to(settings.media_root)
+        except ValueError:
+            relative = None
+        if relative is not None:
+            for root in legacy_roots:
+                add(root / relative)
+        staging_prefix = Path("/var/lib/fitsho/media-migration-source")
+        try:
+            staging_relative = physical.relative_to(staging_prefix)
+        except ValueError:
+            staging_relative = None
+        if staging_relative is not None:
+            for root in legacy_roots:
+                add(root / staging_prefix.name / staging_relative)
+        for root in legacy_roots:
+            add(root / physical.name)
+
+    public_value = row.get("current_db_path")
+    if isinstance(public_value, str) and public_value:
+        relative = _safe_relative_public_path(public_value, settings)
+        if relative is not None:
+            for root in (*legacy_roots, settings.media_root):
+                add(root / relative)
+        for root in legacy_roots:
+            add(root / Path(public_value).name)
+
+    return tuple(candidates)
+
+
+def _rollback_source_evidence(
+    row: dict[str, object],
+    *,
+    settings: Settings,
+    legacy_roots: tuple[Path, ...],
+) -> tuple[Path | None, str | None]:
+    expected_digest = row.get("sha256")
+    if not isinstance(expected_digest, str) or not expected_digest:
+        return None, "manifest source hash is missing"
+    candidates = _rollback_source_candidates(
+        row,
+        settings=settings,
+        legacy_roots=legacy_roots,
+    )
+    existing = [path for path in candidates if path.is_file()]
+    if not existing:
+        return None, "old media source is missing"
+    for source in existing:
+        if sha256_file(source) == expected_digest:
+            return source, None
+    return None, "old media source hash does not match manifest"
+
+
+def _rollback_reference(
+    db: Session,
+    row: dict[str, object],
+    *,
+    for_update: bool = False,
+) -> Exercise | ExerciseMediaAsset | None:
+    reference_kind = row.get("reference_kind")
+    if reference_kind == "asset" or (reference_kind is None and row.get("media_asset_id")):
+        value = row.get("media_asset_id")
+        if not isinstance(value, str):
+            return None
+        try:
+            asset_id = UUID(value)
+        except ValueError:
+            return None
+        asset_statement = select(ExerciseMediaAsset).where(ExerciseMediaAsset.id == asset_id)
+        if for_update:
+            asset_statement = asset_statement.with_for_update()
+        asset = db.scalar(asset_statement)
+        if asset is None:
+            return None
+        exercise_id = row.get("exercise_id")
+        if exercise_id and str(asset.exercise_id) != str(exercise_id):
+            return None
+        return asset
+    value = row.get("exercise_id")
+    if not isinstance(value, str):
+        return None
+    try:
+        exercise_id = UUID(value)
+    except ValueError:
+        return None
+    exercise_statement = select(Exercise).where(Exercise.id == exercise_id)
+    if for_update:
+        exercise_statement = exercise_statement.with_for_update()
+    return db.scalar(exercise_statement)
+
+
+def _rollback_plan_row(
+    db: Session,
+    *,
+    row_index: int,
+    row: dict[str, object],
+    settings: Settings,
+    legacy_roots: tuple[Path, ...],
+) -> dict[str, object]:
+    result: dict[str, object] = {
+        "manifest_row": row_index,
+        "reference_kind": row.get("reference_kind"),
+        "exercise_id": row.get("exercise_id"),
+        "media_asset_id": row.get("media_asset_id"),
+        "current_db_path": row.get("current_db_path"),
+        "destination_public_path": row.get("destination_public_path"),
+        "status": ROLLBACK_MISSING,
+        "source_path": None,
+        "reason": None,
+    }
+    current_path = row.get("current_db_path")
+    destination_path = row.get("destination_public_path")
+    reference = _rollback_reference(db, row)
+    if reference is None:
+        result["reason"] = "database reference row is missing"
+        return result
+    if not isinstance(current_path, str) or not current_path:
+        result["reason"] = "manifest current database path is missing"
+        return result
+    if not isinstance(destination_path, str) or not destination_path:
+        result["reason"] = "manifest destination public path is missing"
+        return result
+    actual_path = reference.media_path
+    if actual_path == destination_path:
+        result["status"] = ROLLBACK_PLANNED
+    elif actual_path == current_path:
+        result["status"] = ROLLBACK_ALREADY_RESTORED
+    else:
+        result["status"] = ROLLBACK_CONFLICT
+        result["reason"] = "database reference path conflicts with manifest"
+        return result
+    source_path, reason = _rollback_source_evidence(
+        row,
+        settings=settings,
+        legacy_roots=legacy_roots,
+    )
+    if source_path is None:
+        result["status"] = ROLLBACK_MISSING
+        result["reason"] = reason
+        return result
+    result["source_path"] = str(source_path)
+    return result
+
+
+def build_rollback_plan(
+    db: Session,
+    *,
+    settings: Settings,
+    manifest: dict[str, object],
+    legacy_roots: tuple[Path, ...] = (),
+) -> dict[str, object]:
+    """Build a read-only rollback plan for actual exercise media references."""
+    with db.no_autoflush:
+        planned_rows = [
+            _rollback_plan_row(
+                db,
+                row_index=index,
+                row=row,
+                settings=settings,
+                legacy_roots=legacy_roots,
+            )
+            for index, row in _rollback_manifest_rows(manifest)
+        ]
+    summary = {
+        "total": len(planned_rows),
+        "planned": sum(row["status"] == ROLLBACK_PLANNED for row in planned_rows),
+        "already_restored": sum(
+            row["status"] == ROLLBACK_ALREADY_RESTORED for row in planned_rows
+        ),
+        "conflict": sum(row["status"] == ROLLBACK_CONFLICT for row in planned_rows),
+        "missing": sum(row["status"] == ROLLBACK_MISSING for row in planned_rows),
+    }
+    return {"rows": planned_rows, "summary": summary}
+
+
+def _rollback_failure_summary(summary: object) -> bool:
+    return isinstance(summary, dict) and bool(summary.get("conflict") or summary.get("missing"))
+
+
+def _mark_database_rolled_back(manifest: dict[str, object], plan: dict[str, object]) -> None:
+    rows = manifest.get("rows")
+    plan_rows = plan.get("rows")
+    if not isinstance(rows, list) or not isinstance(plan_rows, list):
+        raise MediaMigrationError("Rollback plan is invalid")
+    for plan_row in plan_rows:
+        if not isinstance(plan_row, dict):
+            raise MediaMigrationError("Rollback plan row is invalid")
+        if plan_row.get("status") not in {ROLLBACK_PLANNED, ROLLBACK_ALREADY_RESTORED}:
+            continue
+        row_index = plan_row.get("manifest_row")
+        if not isinstance(row_index, int) or not 0 <= row_index < len(rows):
+            raise MediaMigrationError("Rollback plan row index is invalid")
+        row = rows[row_index]
+        if not isinstance(row, dict):
+            raise MediaMigrationError("Manifest row is invalid")
+        row["db_updated"] = False
+        _set_row_state(row, HASH_VERIFIED if row.get("hash_verified") else DISCOVERED)
+    _set_manifest_state(manifest, _manifest_state_from_rows(manifest))
+
+
+def apply_database_rollback(
+    db: Session,
+    *,
+    settings: Settings,
+    manifest: dict[str, object],
+    legacy_roots: tuple[Path, ...] = (),
+) -> dict[str, object]:
+    """Validate and apply a complete rollback plan atomically."""
+    plan = build_rollback_plan(
+        db,
+        settings=settings,
+        manifest=manifest,
+        legacy_roots=legacy_roots,
+    )
+    summary = plan["summary"]
+    if _rollback_failure_summary(summary):
+        raise MediaMigrationError("Rollback plan has conflict or missing rows")
+    plan_rows = plan["rows"]
+    assert isinstance(plan_rows, list)
+    try:
+        with db.begin_nested():
+            for plan_row in plan_rows:
+                assert isinstance(plan_row, dict)
+                if plan_row.get("status") != ROLLBACK_PLANNED:
+                    continue
+                row_index = plan_row.get("manifest_row")
+                assert isinstance(row_index, int)
+                rows = manifest["rows"]
+                assert isinstance(rows, list)
+                row = rows[row_index]
+                assert isinstance(row, dict)
+                reference = _rollback_reference(db, row, for_update=True)
+                if reference is None:
+                    raise MediaMigrationError("Rollback database reference disappeared")
+                destination_path = row.get("destination_public_path")
+                current_path = row.get("current_db_path")
+                if not isinstance(destination_path, str) or not isinstance(current_path, str):
+                    raise MediaMigrationError("Rollback manifest paths are invalid")
+                if reference.media_path != destination_path:
+                    raise MediaMigrationError("Rollback database reference conflict")
+                reference.media_path = current_path
+            db.flush()
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    _mark_database_rolled_back(manifest, plan)
+    return plan
+
+
 def update_database_from_manifest(
     db: Session,
     *,
@@ -743,6 +1052,12 @@ def mark_database_updated(manifest: dict[str, object]) -> None:
     rows = manifest["rows"]
     assert isinstance(rows, list)
     for row in rows:
+        if not isinstance(row, dict) or not _is_database_reference_row(row):
+            if isinstance(row, dict) and row.get("db_updated"):
+                row["db_updated"] = False
+                if row.get("state") == DB_UPDATED or row.get("lifecycle_state") == DB_UPDATED:
+                    _set_row_state(row, HASH_VERIFIED if row.get("hash_verified") else DISCOVERED)
+            continue
         if row.get("destination_public_path") and row.get("hash_verified"):
             row["db_updated"] = True
             _advance_row_state(row, DB_UPDATED)
@@ -753,7 +1068,7 @@ def mark_completed(manifest: dict[str, object]) -> None:
     rows = manifest["rows"]
     assert isinstance(rows, list)
     for row in rows:
-        if row.get("db_updated") and row.get("hash_verified"):
+        if row.get("destination_public_path") and row.get("hash_verified"):
             _advance_row_state(row, COMPLETED)
         elif row.get("placeholder") and not row.get("destination_public_path"):
             _advance_row_state(row, COMPLETED)
@@ -918,12 +1233,26 @@ def main(argv: list[str] | None = None) -> int:
         rows = manifest["rows"]
         if not isinstance(rows, list):
             raise MediaMigrationError("Manifest rows are invalid")
-        rollback_rows = [
-            row
-            for row in rows
-            if isinstance(row, dict) and row.get("current_db_path") and row.get("db_updated")
-        ]
-        print(json.dumps({"rollback_dry_run": True, "rows": len(rollback_rows)}, indent=2))
+        rollback_roots = tuple(root.path for root in source_roots)
+        if not args.apply:
+            report = build_rollback_plan(
+                db,
+                settings=settings,
+                manifest=manifest,
+                legacy_roots=rollback_roots,
+            )
+            report["rollback_dry_run"] = True
+            print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+            return 1 if _rollback_failure_summary(report.get("summary")) else 0
+        report = apply_database_rollback(
+            db,
+            settings=settings,
+            manifest=manifest,
+            legacy_roots=rollback_roots,
+        )
+        write_manifest(manifest, args.manifest_dir)
+        report["rollback_dry_run"] = False
+        print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
         return 0
 
 
