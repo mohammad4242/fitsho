@@ -127,13 +127,16 @@ function FoodCard({ food, language, onDetails, onImage, onPrice }: { food: FoodC
 }
 
 function FoodImage({ food, language }: { food: FoodCatalogueItem; language: "fa" | "en" }) {
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<{ imageUrl: string | null; failed: boolean }>({
+    imageUrl: food.image_url,
+    failed: false,
+  });
   const name = language === "fa" ? food.name_fa : food.name_en;
-  useEffect(() => setFailed(false), [food.image_url]);
+  const failed = failure.imageUrl === food.image_url && failure.failed;
   if (!food.image_url || failed) {
     return <div className="food-shelf-card__image food-shelf-card__image--fallback" role="img" aria-label={language === "fa" ? `تصویر پیش‌فرض ${food.name_fa}` : `Default image for ${food.name_en}`}><span aria-hidden="true">◇</span></div>;
   }
-  return <img className="food-shelf-card__image" src={food.image_url} alt={name} onError={() => setFailed(true)} />;
+  return <img className="food-shelf-card__image" src={food.image_url} alt={name} onError={() => setFailure({ imageUrl: food.image_url, failed: true })} />;
 }
 
 function FoodDetails({ food, language, onClose }: { food: FoodCatalogueItem; language: "fa" | "en"; onClose: () => void }) {
