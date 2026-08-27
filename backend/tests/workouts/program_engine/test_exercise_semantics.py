@@ -126,20 +126,12 @@ def test_canonical_semantic_family_rejects_same_role_variants(
 ) -> None:
     first = _candidate(
         movement_pattern=(
-            MovementPattern.SQUAT
-            if first_group.startswith("squat_")
-            else MovementPattern.HIP_HINGE
+            MovementPattern.SQUAT if first_group.startswith("squat_") else MovementPattern.HIP_HINGE
         ),
         primary_muscle=(
-            MuscleGroup.QUADRICEPS
-            if first_group.startswith("squat_")
-            else MuscleGroup.HAMSTRINGS
+            MuscleGroup.QUADRICEPS if first_group.startswith("squat_") else MuscleGroup.HAMSTRINGS
         ),
-        muscle_focus=(
-            MuscleFocus.GENERAL_QUADRICEPS
-            if first_group.startswith("squat_")
-            else None
-        ),
+        muscle_focus=(MuscleFocus.GENERAL_QUADRICEPS if first_group.startswith("squat_") else None),
         substitution_group=first_group,
     )
     second = replace(first, id=uuid4(), substitution_group=second_group)
@@ -163,3 +155,39 @@ def test_push_up_family_ignores_catalog_metadata_variation() -> None:
     )
 
     assert exercise_semantics.near_equivalent_exercises(first, second)
+
+
+def test_leg_press_and_squat_are_distinct_canonical_families() -> None:
+    squat = _candidate(
+        movement_pattern=MovementPattern.SQUAT,
+        primary_muscle=MuscleGroup.QUADRICEPS,
+        muscle_focus=MuscleFocus.GENERAL_QUADRICEPS,
+        substitution_group="squat_free_weight",
+    )
+    leg_press = replace(squat, id=uuid4(), substitution_group="leg_press_knee_dominant")
+
+    assert ExerciseRoleSignature.from_candidate(squat).canonical_family != (
+        ExerciseRoleSignature.from_candidate(leg_press).canonical_family
+    )
+    assert not exercise_semantics.near_equivalent_exercises(squat, leg_press)
+
+
+def test_hinge_variants_keep_one_role_when_catalog_focus_differs() -> None:
+    rdl = _candidate(
+        movement_pattern=MovementPattern.HIP_HINGE,
+        primary_muscle=MuscleGroup.HAMSTRINGS,
+        muscle_focus=MuscleFocus.HAMSTRINGS_HIP_EXTENSION,
+        substitution_group="hip_hinge_romanian_deadlift",
+    )
+    deadlift = replace(
+        rdl,
+        id=uuid4(),
+        primary_muscle=MuscleGroup.GLUTES,
+        muscle_focus=MuscleFocus.GLUTE_MAX,
+        substitution_group="hip_hinge_deadlift",
+    )
+
+    assert ExerciseRoleSignature.from_candidate(rdl).canonical_family == (
+        ExerciseRoleSignature.from_candidate(deadlift).canonical_family
+    )
+    assert exercise_semantics.near_equivalent_exercises(rdl, deadlift)

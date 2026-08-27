@@ -617,7 +617,7 @@ def test_capacity_trim_removes_optional_tail_when_main_capacity_is_full() -> Non
 
 @pytest.mark.parametrize(
     ("profile_number", "underfilled_day", "expected_count", "expected_duration"),
-    [(5, 2, 3, 34), (10, 3, 2, 19)],
+    [(5, 2, 3, 34), (10, 3, 2, 17)],
 )
 def test_batch2_profile_underfill_is_hard_volume_constrained(
     profile_number: int,

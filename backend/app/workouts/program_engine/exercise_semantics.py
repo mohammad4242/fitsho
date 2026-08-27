@@ -73,16 +73,33 @@ class ExerciseRoleSignature:
     def canonical_family(self) -> str:
         return _canonical_semantic_family(self)
 
+    @property
+    def canonical_role(self) -> tuple[object, ...]:
+        return (
+            self.canonical_family,
+            self.movement_pattern,
+            self.primary_muscle,
+            self.exercise_type,
+            self.muscle_focus,
+            self.secondary_muscles,
+            self.body_position,
+            self.laterality,
+            self.equipment,
+        )
+
 
 SEMANTIC_NEAR_DUPLICATE_REASON = "SEMANTIC_NEAR_DUPLICATE_REJECTED"
 
 _LEGACY_BROAD_GROUPS = frozenset(pattern.value for pattern in MovementPattern)
 _DISTINCT_SQUAT_FAMILIES = frozenset(
-    {"squat_wide_stance", "squat_supported_machine", "squat_sissy"}
+    {
+        "leg_press_knee_dominant",
+        "squat_wide_stance",
+        "squat_supported_machine",
+        "squat_sissy",
+    }
 )
-_DISTINCT_HINGE_FAMILIES = frozenset(
-    {"hip_hinge_reverse_hyperextension", "hip_hinge_good_morning"}
-)
+_DISTINCT_HINGE_FAMILIES = frozenset({"hip_hinge_reverse_hyperextension", "hip_hinge_good_morning"})
 
 
 def _canonical_semantic_family(signature: ExerciseRoleSignature) -> str:
@@ -119,13 +136,17 @@ def near_equivalent_exercises(
     right = ExerciseRoleSignature.from_candidate(second)
     if (
         left.movement_pattern is not right.movement_pattern
-        or left.primary_muscle is not right.primary_muscle
         or left.exercise_type is not right.exercise_type
     ):
         return False
     if left.canonical_family != right.canonical_family:
         return False
-    if left.canonical_family == "horizontal_push_push_up":
+    if (
+        left.primary_muscle is not right.primary_muscle
+        and left.canonical_family != "hip_hinge_primary"
+    ):
+        return False
+    if left.canonical_family in {"horizontal_push_push_up", "hip_hinge_primary"}:
         return left.body_position is right.body_position and left.laterality is right.laterality
     if (
         left.muscle_focus is not None

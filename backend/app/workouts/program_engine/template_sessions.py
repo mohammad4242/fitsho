@@ -352,7 +352,7 @@ def build_template_sessions(
             if slot.exercise_id is not None and candidate.id != slot.exercise_id:
                 substitutions_by_requested.setdefault(slot.exercise_id, set()).add(candidate.id)
 
-        _add_targeted_accessories(
+        accessory_fill_constrained = _add_targeted_accessories(
             request,
             selected,
             reference_day,
@@ -363,8 +363,9 @@ def build_template_sessions(
             planned_minimum,
             ruleset,
             repeated_targeted_accessories,
-            deliberate_redundancies,
         )
+        if accessory_fill_constrained:
+            build_reasons.append("TEMPLATE_SESSION_COUNT_CONSTRAINED_BY_SAFE_CAPACITY")
         while (
             sum(is_supplemental_muscle(candidate.primary_muscle) for candidate, _slot in selected)
             > 2
@@ -408,6 +409,7 @@ def build_template_sessions(
         )
         if (
             not planned_minimum <= main_exercise_count(candidate for candidate, _slot in selected)
+            and not accessory_fill_constrained
             or main_exercise_count(candidate for candidate, _slot in selected)
             > ruleset.max_exercises_per_session
         ):
@@ -914,8 +916,7 @@ def _add_targeted_accessories(
     required_minimum: int,
     ruleset: ProgramRuleset,
     repeated_targeted_accessories: set[tuple[int, UUID]],
-    deliberate_redundancies: set[UUID],
-) -> None:
+) -> bool:
     target_muscles = reference_day.focus
     while main_exercise_count(candidate for candidate, _slot in selected) < minimum_exercises:
         options = [
@@ -946,41 +947,8 @@ def _add_targeted_accessories(
             )
         ]
         if not options:
-            selected_ids = {candidate.id for candidate, _slot in selected}
-            options = [
-                item
-                for item in eligible
-                if item.id not in selected_ids
-                and not reserved[item.id]
-                and item.is_active
-                and item.is_programmable
-                and not item.needs_review
-                and not is_supplemental_muscle(item.primary_muscle)
-                and item.primary_muscle in target_muscles
-                and (
-                    main_exercise_count(candidate for candidate, _slot in selected)
-                    < required_minimum
-                    or not _template_role_is_excessive(item, selected)
-                )
-                and evaluate_candidate_slot_compatibility(
-                    item,
-                    allowed_patterns=frozenset(MovementPattern) - {MovementPattern.OTHER},
-                    target_muscles=frozenset(target_muscles),
-                    day_focus=f"template_reference_{reference_day.day_number}",
-                ).compatible
-                and not has_near_equivalent(
-                    item,
-                    (selected_candidate for selected_candidate, _selected_slot in selected),
-                )
-            ]
-            if not options:
-                return
+            return True
         candidate = rank_exercises(request, options, ruleset)[0].exercise
-        if has_near_equivalent(
-            candidate,
-            (selected_candidate for selected_candidate, _selected_slot in selected),
-        ):
-            deliberate_redundancies.add(candidate.id)
         if used[candidate.id]:
             repeated_targeted_accessories.add((reference_day.day_number, candidate.id))
         supplemental_start = next(
@@ -1014,6 +982,7 @@ def _add_targeted_accessories(
             ),
         )
         used[candidate.id] += 1
+    return False
 
 
 def _template_slot_is_compatible(
