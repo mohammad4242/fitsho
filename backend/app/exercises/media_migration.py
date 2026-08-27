@@ -6,12 +6,15 @@ import hashlib
 import io
 import json
 import os
+import posixpath
 import shutil
 import tempfile
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 from uuid import UUID
 
 from sqlalchemy import create_engine, select
@@ -98,6 +101,75 @@ def _safe_relative_public_path(public_path: str, settings: Settings) -> Path | N
     if not relative.parts or ".." in relative.parts or relative.is_absolute():
         return None
     return relative
+
+
+def _validated_local_media_path(
+    public_path: object,
+    settings: Settings,
+) -> tuple[Path | None, bool]:
+    """Return a canonical media-relative path and whether the value is unsafe.
+
+    Database media paths are public URL paths, never machine-local paths.  Keep
+    this check in the migration audit so the resolver remains a database-only
+    selection helper with no filesystem probing.
+    """
+    if not isinstance(public_path, str) or not public_path or public_path.strip() != public_path:
+        return None, True
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in public_path):
+        return None, True
+    if "\\" in public_path:
+        return None, True
+    try:
+        parsed = urlsplit(public_path)
+    except ValueError:
+        return None, True
+    if (
+        parsed.scheme
+        or parsed.netloc
+        or parsed.query
+        or parsed.fragment
+        or parsed.path != public_path
+    ):
+        return None, True
+
+    decoded = public_path
+    for _ in range(8):
+        next_decoded = unquote(decoded)
+        if next_decoded == decoded:
+            break
+        decoded = next_decoded
+    if decoded != public_path or "%" in public_path or "\\" in decoded:
+        return None, True
+    if unicodedata.normalize("NFC", public_path) != public_path:
+        return None, True
+
+    prefix = settings.media_public_path.rstrip("/")
+    if not prefix or not public_path.startswith(f"{prefix}/"):
+        return None, True
+    if posixpath.normpath(public_path) != public_path:
+        return None, True
+
+    relative_text = public_path.removeprefix(f"{prefix}/")
+    relative = Path(relative_text)
+    if (
+        not relative.parts
+        or relative.is_absolute()
+        or any(part in {"", ".", ".."} for part in relative.parts)
+    ):
+        return None, True
+
+    media_root = settings.media_root.resolve()
+    candidate = settings.media_root / relative
+    try:
+        resolved_candidate = candidate.resolve(strict=False)
+        resolved_candidate.relative_to(media_root)
+    except (OSError, RuntimeError, ValueError):
+        return None, True
+    return relative, False
+
+
+def _is_explicit_placeholder_media_type(media_type: object) -> bool:
+    return _json_value(media_type) == MediaType.PLACEHOLDER.value
 
 
 def resolve_source_path(
@@ -685,9 +757,7 @@ def _is_database_reference_row(row: dict[str, object]) -> bool:
     reference_kind = row.get("reference_kind")
     if reference_kind in {"orphan", "disk_orphan", "seed-static", "seed_static"}:
         return False
-    if reference_kind == "asset" or (
-        reference_kind is None and row.get("media_asset_id")
-    ):
+    if reference_kind == "asset" or (reference_kind is None and row.get("media_asset_id")):
         return bool(row.get("media_asset_id"))
     if reference_kind in {"legacy", "exercise"} or reference_kind is None:
         return bool(row.get("exercise_id"))
@@ -901,9 +971,7 @@ def build_rollback_plan(
     summary = {
         "total": len(planned_rows),
         "planned": sum(row["status"] == ROLLBACK_PLANNED for row in planned_rows),
-        "already_restored": sum(
-            row["status"] == ROLLBACK_ALREADY_RESTORED for row in planned_rows
-        ),
+        "already_restored": sum(row["status"] == ROLLBACK_ALREADY_RESTORED for row in planned_rows),
         "conflict": sum(row["status"] == ROLLBACK_CONFLICT for row in planned_rows),
         "missing": sum(row["status"] == ROLLBACK_MISSING for row in planned_rows),
     }
@@ -1134,11 +1202,19 @@ def audit_manifest(
     actual_destinations = {path.resolve() for path in _iter_video_files(exercises_root)}
     orphan_destinations = sorted(str(path) for path in actual_destinations - expected_destinations)
     broken_db_paths: list[str] = []
+    unsafe_db_paths: list[str] = []
     for exercise in _load_exercises(db):
-        paths = [exercise.media_path, *(asset.media_path for asset in exercise.media_assets)]
-        for public_path in paths:
-            relative = _safe_relative_public_path(public_path, settings)
-            if relative is not None and not (settings.media_root / relative).is_file():
+        references = [
+            (exercise.media_path, exercise.media_type),
+            *((asset.media_path, asset.media_type) for asset in exercise.media_assets),
+        ]
+        for public_path, media_type in references:
+            if _is_explicit_placeholder_media_type(media_type):
+                continue
+            relative, unsafe = _validated_local_media_path(public_path, settings)
+            if unsafe:
+                unsafe_db_paths.append(public_path)
+            if relative is None or not (settings.media_root / relative).is_file():
                 broken_db_paths.append(public_path)
     return {
         "TOTAL_SOURCE_FILES": len(source_files),
@@ -1149,10 +1225,12 @@ def audit_manifest(
         "MISSING_SOURCE_FILES": len(missing_sources),
         "HASH_MISMATCHES": len(hash_mismatches),
         "BROKEN_DB_PATHS": len(broken_db_paths),
+        "UNSAFE_DB_PATHS": len(unsafe_db_paths),
         "ORPHAN_DESTINATION_FILES": len(orphan_destinations),
         "missing_source_paths": missing_sources,
         "hash_mismatch_paths": hash_mismatches,
         "broken_db_paths": broken_db_paths,
+        "unsafe_db_paths": unsafe_db_paths,
         "orphan_destination_paths": orphan_destinations,
     }
 
@@ -1226,7 +1304,12 @@ def main(argv: list[str] | None = None) -> int:
                 0
                 if all(
                     report[key] == 0
-                    for key in ("MISSING_SOURCE_FILES", "HASH_MISMATCHES", "BROKEN_DB_PATHS")
+                    for key in (
+                        "MISSING_SOURCE_FILES",
+                        "HASH_MISMATCHES",
+                        "BROKEN_DB_PATHS",
+                        "UNSAFE_DB_PATHS",
+                    )
                 )
                 else 1
             )

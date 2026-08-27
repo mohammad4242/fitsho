@@ -435,6 +435,8 @@ def test_already_restored_requires_matching_old_source_evidence(
 
     assert exercise.media_path == "/media/old.mp4"
     assert json.dumps(manifest, sort_keys=True) == manifest_before
+
+
 def test_destination_path_is_deterministic_and_collision_safe() -> None:
     from app.exercises.media_migration import destination_relative_path
 
@@ -765,3 +767,173 @@ def test_mark_database_updated_only_marks_real_reference_rows() -> None:
     assert manifest["rows"][1]["state"] == "HASH_VERIFIED"
     assert manifest["rows"][2]["db_updated"] is False
     assert manifest["rows"][2]["state"] == "HASH_VERIFIED"
+
+
+def test_audit_accepts_existing_canonical_media_path_inside_media_root(
+    db: Session, test_settings, tmp_path: Path
+) -> None:
+    from app.exercises.media_migration import audit_manifest
+
+    canonical = test_settings.media_root / "exercises" / "canonical.mp4"
+    canonical.parent.mkdir(parents=True)
+    canonical.write_bytes(b"canonical video")
+    exercise = _rollback_exercise("audit-canonical-path")
+    exercise.media_path = "/media/exercises/canonical.mp4"
+    db.add(exercise)
+    db.flush()
+
+    report = audit_manifest(
+        db,
+        settings=test_settings,
+        manifest={"rows": []},
+    )
+
+    assert report["BROKEN_DB_PATHS"] == 0
+    assert report["UNSAFE_DB_PATHS"] == 0
+    assert report["broken_db_paths"] == []
+    assert report["unsafe_db_paths"] == []
+
+
+@pytest.mark.parametrize(
+    "media_path",
+    [
+        "/home/fitsho/video.mp4",
+        "/var/lib/fitsho/video.mp4",
+        "file:///media/exercises/video.mp4",
+        "/assets/exercises/video.mp4",
+        "/media/exercises/../video.mp4",
+        "/media/exercises/%2e%2e/video.mp4",
+        "/media/exercises/%252e%252e/video.mp4",
+        "/media/exercises/video%ZZ.mp4",
+        "/media/exercises/one/../video.mp4",
+        "/media/exercises/video\\clip.mp4",
+        "",
+    ],
+)
+def test_audit_reports_invalid_local_db_paths_as_broken_and_unsafe(
+    db: Session, test_settings, media_path: str
+) -> None:
+    from app.exercises.media_migration import audit_manifest
+
+    exercise = _rollback_exercise(f"audit-invalid-{abs(hash(media_path))}")
+    exercise.media_path = media_path
+    db.add(exercise)
+    db.flush()
+
+    report = audit_manifest(
+        db,
+        settings=test_settings,
+        manifest={"rows": []},
+    )
+
+    assert media_path in report["broken_db_paths"]
+    assert media_path in report["unsafe_db_paths"]
+    assert report["BROKEN_DB_PATHS"] >= 1
+    assert report["UNSAFE_DB_PATHS"] >= 1
+
+
+def test_audit_excludes_only_explicit_placeholder_media_references(
+    db: Session, test_settings
+) -> None:
+    from app.exercises.enums import MediaType
+    from app.exercises.media_migration import audit_manifest
+
+    placeholder = _rollback_exercise("audit-explicit-placeholder")
+    placeholder.media_path = "/exercises/exercise-placeholder.svg"
+    placeholder.media_type = MediaType.PLACEHOLDER
+    db.add(placeholder)
+    non_placeholder = _rollback_exercise("audit-implicit-placeholder")
+    non_placeholder.media_path = "/exercises/implicit-placeholder.svg"
+    db.add(non_placeholder)
+    db.flush()
+
+    report = audit_manifest(
+        db,
+        settings=test_settings,
+        manifest={"rows": []},
+    )
+
+    assert placeholder.media_path not in report["broken_db_paths"]
+    assert non_placeholder.media_path in report["broken_db_paths"]
+
+
+def test_audit_validates_media_asset_paths_with_the_same_contract(
+    db: Session, test_settings
+) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.media_migration import audit_manifest
+    from app.exercises.models import ExerciseMediaAsset
+
+    exercise = _rollback_exercise("audit-asset-invalid-path")
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            media_path="file:///media/exercises/asset.mp4",
+            media_type=MediaType.VIDEO,
+        )
+    )
+    db.add(exercise)
+    db.flush()
+
+    report = audit_manifest(
+        db,
+        settings=test_settings,
+        manifest={"rows": []},
+    )
+
+    assert "file:///media/exercises/asset.mp4" in report["broken_db_paths"]
+    assert "file:///media/exercises/asset.mp4" in report["unsafe_db_paths"]
+
+
+def test_audit_reports_media_symlink_escaping_media_root_as_broken_and_unsafe(
+    db: Session, test_settings, tmp_path: Path
+) -> None:
+    from app.exercises.media_migration import audit_manifest
+
+    outside = tmp_path / "outside.mp4"
+    outside.write_bytes(b"outside video")
+    link = test_settings.media_root / "exercises" / "escaped.mp4"
+    link.parent.mkdir(parents=True)
+    link.symlink_to(outside)
+    exercise = _rollback_exercise("audit-symlink-escape")
+    exercise.media_path = "/media/exercises/escaped.mp4"
+    db.add(exercise)
+    db.flush()
+
+    report = audit_manifest(
+        db,
+        settings=test_settings,
+        manifest={"rows": []},
+    )
+
+    assert report["BROKEN_DB_PATHS"] >= 1
+    assert report["UNSAFE_DB_PATHS"] >= 1
+    assert exercise.media_path in report["broken_db_paths"]
+    assert exercise.media_path in report["unsafe_db_paths"]
+
+
+def test_audit_command_returns_nonzero_for_unsafe_db_paths(
+    db: Session,
+    test_settings,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.exercises.media_migration as media_migration
+
+    exercise = _rollback_exercise("audit-command-unsafe")
+    exercise.media_path = "/home/fitsho/video.mp4"
+    db.add(exercise)
+    db.flush()
+    manifest_dir = tmp_path / "manifest"
+    manifest_dir.mkdir()
+    (manifest_dir / "migration_manifest.json").write_text(
+        json.dumps({"version": 2, "summary": {}, "rows": []}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(media_migration, "get_settings", lambda: test_settings)
+    monkeypatch.setattr(media_migration, "create_engine", lambda _: db.get_bind())
+
+    assert media_migration.main(["audit", "--manifest-dir", str(manifest_dir)]) == 1
+    report = json.loads((manifest_dir / "audit_report.json").read_text(encoding="utf-8"))
+    assert report["UNSAFE_DB_PATHS"] >= 1
