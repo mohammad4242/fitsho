@@ -4,6 +4,7 @@ import pytest
 
 from app.exercises.enums import Equipment, MuscleGroup
 from app.profile.enums import TrainingLocation
+from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     Goal,
     PhysicalJobDemand,
@@ -13,6 +14,7 @@ from app.workouts.program_engine.enums import (
     TrainingStatus,
 )
 from app.workouts.program_engine.normalization import normalize_request
+from app.workouts.program_engine.recovery import recovery_spacing_is_valid
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
     NormalizedProgramRequest,
@@ -31,6 +33,7 @@ from app.workouts.program_engine.volume_planner import (
     plan_weekly_volume,
 )
 from app.workouts.program_engine.volume_policy import VOLUME_POLICY
+from tests.workouts.program_engine.golden_fixtures import full_catalog
 
 
 def normalized(**overrides: object) -> NormalizedProgramRequest:
@@ -80,6 +83,7 @@ def test_four_days_generate_multiple_valid_split_candidates() -> None:
     candidates = generate_split_candidates(4)
     valid_focuses = {
         "upper",
+        "upper_specialization",
         "lower",
         "full_body",
         "full_body_b",
@@ -93,6 +97,7 @@ def test_four_days_generate_multiple_valid_split_candidates() -> None:
 
     assert tuple(candidate.split_type for candidate in candidates) == (
         SplitType.UPPER_LOWER,
+        SplitType.UPPER_LOWER_SPECIALIZATION,
         SplitType.FULL_BODY_FOUR,
         SplitType.UPPER_LOWER_FULL,
         SplitType.PHUL,
@@ -135,6 +140,79 @@ def test_four_day_recovery_context_can_select_a_lower_complexity_candidate() -> 
     )
 
     assert scored[0].split_type is SplitType.UPPER_LOWER_FULL
+
+
+def test_four_day_upper_priorities_rank_a_three_upper_one_lower_specialization() -> None:
+    request = normalized(
+        available_training_days=4,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS],
+    )
+
+    scored = score_split_candidates(request, generate_split_candidates(4), RULESET)
+
+    assert scored[0].split_type is SplitType.UPPER_LOWER_SPECIALIZATION
+    assert scored[0].day_focuses.count("lower") == 1
+    assert sum(focus.startswith("upper") for focus in scored[0].day_focuses) == 3
+    assert "SPLIT_SELECTED_FOR_UPPER_PRIORITY_SPECIALIZATION" in scored[0].reason_codes
+
+
+def test_four_day_lower_or_balanced_priorities_do_not_inherit_upper_specialization() -> None:
+    lower_request = normalized(
+        available_training_days=4,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        priority_muscles=[MuscleGroup.QUADRICEPS, MuscleGroup.GLUTES],
+    )
+    balanced_request = normalized(
+        available_training_days=4,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.QUADRICEPS],
+    )
+
+    lower_scored = score_split_candidates(lower_request, generate_split_candidates(4), RULESET)
+    balanced_scored = score_split_candidates(
+        balanced_request,
+        generate_split_candidates(4),
+        RULESET,
+    )
+
+    assert lower_scored[0].split_type is not SplitType.UPPER_LOWER_SPECIALIZATION
+    assert balanced_scored[0].split_type is not SplitType.UPPER_LOWER_SPECIALIZATION
+
+
+def test_four_day_upper_specialization_constructs_and_keeps_calendar_recovery_valid() -> None:
+    source = ProgramGenerationRequest.model_validate(
+        {
+            "user_id": uuid4(),
+            "age": 31,
+            "height_cm": 175,
+            "weight_kg": 76,
+            "primary_goal": Goal.HYPERTROPHY,
+            "training_experience": TrainingExperience.INTERMEDIATE,
+            "training_age_months": 30,
+            "available_training_days": 4,
+            "session_duration_minutes": 60,
+            "available_equipment": [Equipment.BODYWEIGHT, Equipment.DUMBBELL],
+            "training_location": TrainingLocation.HOME,
+            "priority_muscles": [MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS],
+            "seed_optional": 17,
+        }
+    )
+
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert result.program is not None
+    assert result.program.split.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
+    assert len(result.program.weekly_schedule) == 4
+    assert sum(day.focus.startswith("upper") for day in result.program.weekly_schedule) == 3
+    assert sum(day.focus == "lower" for day in result.program.weekly_schedule) == 1
+    assert recovery_spacing_is_valid(result.program.weekly_schedule, RULESET)
 
 
 def test_partial_weekday_preferences_do_not_claim_recovery_adjustment() -> None:

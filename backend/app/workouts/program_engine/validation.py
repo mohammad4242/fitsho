@@ -9,7 +9,7 @@ from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
     complete_tracked_metrics,
 )
-from app.workouts.program_engine.enums import SafetyStatus
+from app.workouts.program_engine.enums import SafetyStatus, SplitType
 from app.workouts.program_engine.equipment import effective_required_equipment
 from app.workouts.program_engine.exercise_semantics import has_near_equivalent
 from app.workouts.program_engine.recovery import recovery_spacing_is_valid
@@ -293,6 +293,8 @@ def validate_program(
     training_days = len(program.weekly_schedule)
     if training_days <= 4:
         effective_frequency_cap = ruleset.maximum_direct_sessions_per_muscle_per_week
+        if program.split.split_type is SplitType.UPPER_LOWER_SPECIALIZATION and training_days == 4:
+            effective_frequency_cap += 1
     elif training_days == 5:
         effective_frequency_cap = ruleset.maximum_direct_sessions_per_muscle_per_week + 1
     else:

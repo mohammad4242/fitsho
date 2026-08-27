@@ -38,6 +38,7 @@ from app.workouts.program_engine.volume_policy import recovery_burden_for_reques
 
 _DYNAMIC_FOCUSES = (
     "upper",
+    "upper_specialization",
     "lower",
     "push",
     "pull",
@@ -400,6 +401,10 @@ def generate_split_candidates(days: int) -> tuple[SplitCandidate, ...]:
                 ("upper", "lower", "upper", "lower"),
             ),
             SplitCandidate(
+                SplitType.UPPER_LOWER_SPECIALIZATION,
+                ("upper", "lower", "upper", "upper_specialization"),
+            ),
+            SplitCandidate(
                 SplitType.FULL_BODY_FOUR,
                 ("full_body", "full_body_b", "full_body_c", "full_body_d"),
             ),
@@ -529,9 +534,17 @@ def score_split_candidates(
         if (
             priority_policy.explicit_priorities
             and candidate.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
+            and len(candidate.day_focuses) == 5
         ):
             score += weights["priority_specialization"]
             reasons.append("SPLIT_SELECTED_FOR_PRIORITY_MUSCLE")
+        if (
+            candidate.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
+            and len(candidate.day_focuses) == 4
+            and _is_upper_priority_specialization(priority_policy)
+        ):
+            score += weights["priority_specialization"]
+            reasons.append("SPLIT_SELECTED_FOR_UPPER_PRIORITY_SPECIALIZATION")
         if (
             request.source.session_duration_minutes <= ruleset.short_session_minutes
             and candidate.split_type is SplitType.FULL_BODY_FOUR
@@ -742,6 +755,8 @@ def _select_weekdays(
         selected = tuple(sorted(preferred[:days]))
         if _spacing_is_acceptable(selected, focuses, ruleset):
             return selected
+    if _is_upper_specialization_layout(focuses):
+        return (0, 1, 3, 5)
     return ruleset.default_weekdays[days]
 
 
@@ -764,3 +779,26 @@ def _spacing_is_acceptable(
         if recovery_sensitive and gap < ruleset.minimum_recovery_gap_days:
             return False
     return True
+
+
+def _is_upper_priority_specialization(policy: PriorityAllocationPolicy) -> bool:
+    upper = {
+        MuscleGroup.CHEST,
+        MuscleGroup.BACK,
+        MuscleGroup.SHOULDERS,
+        MuscleGroup.BICEPS,
+        MuscleGroup.TRICEPS,
+        MuscleGroup.TRAPS,
+    }
+    lower = {
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+        MuscleGroup.CALVES,
+    }
+    explicit = set(policy.explicit_priorities)
+    return len(explicit.intersection(upper)) >= 2 and not explicit.intersection(lower)
+
+
+def _is_upper_specialization_layout(focuses: tuple[str, ...]) -> bool:
+    return focuses == ("upper", "lower", "upper", "upper_specialization")

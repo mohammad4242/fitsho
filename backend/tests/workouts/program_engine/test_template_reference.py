@@ -4,8 +4,9 @@ from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.training_templates.engine_reference import load_template_references
 from app.training_templates.service import seed_training_program_templates
 from app.workouts.program_engine.engine import _template_rejection_category, generate_program
-from app.workouts.program_engine.enums import RecoveryRating, ValidationStatus
+from app.workouts.program_engine.enums import RecoveryRating, SplitType, ValidationStatus
 from app.workouts.program_engine.normalization import normalize_request
+from app.workouts.program_engine.recovery import recovery_spacing_is_valid
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -63,8 +64,8 @@ def _four_day_reference() -> TemplateReference:
                         adaptation_priority="core",
                         superset_group=None,
                         superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+                        superset_exercise_slug_hint=None,
+                        sets=3,
                         rep_min=8,
                         rep_max=12,
                         target_rir=2,
@@ -82,8 +83,8 @@ def _four_day_reference() -> TemplateReference:
                             adaptation_priority="accessory",
                             superset_group=None,
                             superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+                            superset_exercise_slug_hint=None,
+                            sets=3,
                             rep_min=10,
                             rep_max=15,
                             target_rir=2,
@@ -104,8 +105,8 @@ def _four_day_reference() -> TemplateReference:
                             adaptation_priority="core",
                             superset_group=None,
                             superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+                            superset_exercise_slug_hint=None,
+                            sets=3,
                             rep_min=8,
                             rep_max=12,
                             target_rir=2,
@@ -179,8 +180,8 @@ def _upper_lower_reference() -> tuple[TemplateReference, list[ExerciseCandidate]
             adaptation_priority=priority,
             superset_group=None,
             superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=4,
+            superset_exercise_slug_hint=None,
+            sets=4,
             rep_min=8,
             rep_max=10,
             target_rir=1,
@@ -259,8 +260,8 @@ def test_safe_core_substitution_can_repeat_across_sessions_deterministically() -
             adaptation_priority=priority,
             superset_group=None,
             superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+            superset_exercise_slug_hint=None,
+            sets=3,
             rep_min=8,
             rep_max=12,
             target_rir=2,
@@ -418,6 +419,37 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
     assert candidate_trace["feasibility"]["resolvable_slots"] == 6
     assert candidate_trace["feasibility"]["unresolved_non_core_slots"] == 0
     assert candidate_trace["reason_codes"] == ()
+
+
+def test_upper_priority_reference_template_preserves_three_upper_one_lower_topology() -> None:
+    base, catalog = _upper_lower_reference()
+    special = replace(
+        base,
+        slug="four-day-upper-priority-reference",
+        focus_tags=("upper_lower", "upper_priority"),
+        days=(base.days[0], base.days[1], base.days[2], replace(base.days[0], day_number=4)),
+    )
+
+    result = generate_program(
+        template_request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+            priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS],
+        ),
+        catalog,
+        RULESET,
+        reference_templates=(special,),
+    )
+
+    assert result.program is not None, result.errors
+    assert result.program.aggregate_metrics["reference_template"] == special.slug
+    assert result.program.split.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
+    assert sum(focus == "lower" for focus in result.program.split.day_focuses) == 1
+    assert sum(focus == "upper" for focus in result.program.split.day_focuses) == 3
+    assert recovery_spacing_is_valid(result.program.weekly_schedule, RULESET)
 
 
 def test_template_priority_stays_inside_flexible_range_with_duration_planning() -> None:

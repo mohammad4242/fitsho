@@ -43,6 +43,7 @@ from app.workouts.program_engine.schemas import (
     ProgramGenerationRequest,
     ProgramGenerationResult,
     RejectedCandidate,
+    SessionDraft,
     SplitPlan,
     TemplateReference,
     ValidationReport,
@@ -769,9 +770,10 @@ def _reference_program(
     session_capacity: SessionCapacity,
     template_selection_trace: tuple[dict[str, object], ...],
 ) -> ProgramGenerationResult:
+    reference_focuses = tuple(_reference_split_focus(draft) for draft in build.drafts)
     split = SplitPlan(
         split_type=reference.split_type,
-        day_focuses=tuple(draft.focus for draft in build.drafts),
+        day_focuses=reference_focuses,
         weekdays=tuple(draft.weekday for draft in build.drafts if draft.weekday is not None),
         score=100,
         reason_codes=("TEMPLATE_REFERENCE_SELECTED",),
@@ -1003,6 +1005,29 @@ def _reference_program(
         rejected_candidates=rejected,
         decision_trace=final_trace,
     )
+
+
+def _reference_split_focus(draft: SessionDraft) -> str:
+    upper = {
+        MuscleGroup.CHEST,
+        MuscleGroup.BACK,
+        MuscleGroup.SHOULDERS,
+        MuscleGroup.BICEPS,
+        MuscleGroup.TRICEPS,
+        MuscleGroup.TRAPS,
+    }
+    lower = {
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+        MuscleGroup.CALVES,
+    }
+    targets = set(draft.template_target_muscles)
+    if targets and targets.intersection(upper) and not targets.intersection(lower):
+        return "upper"
+    if targets and targets.intersection(lower) and not targets.intersection(upper):
+        return "lower"
+    return draft.focus
 
 
 def _day_count_errors(actual: int, expected: int, *, stage: str) -> tuple[str, ...]:

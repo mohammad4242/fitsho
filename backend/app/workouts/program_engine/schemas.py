@@ -420,6 +420,8 @@ class TemplateReference:
                 return SplitType.PUSH_PULL_LEGS_UPPER_LOWER
             return SplitType.PUSH_PULL_LEGS
         if TemplateFocusTag.UPPER_LOWER in structures:
+            if self.days_per_week == 4 and TemplateFocusTag.UPPER_PRIORITY in structures:
+                return SplitType.UPPER_LOWER_SPECIALIZATION
             return SplitType.UPPER_LOWER
         if TemplateFocusTag.FULL_BODY in structures:
             return SplitType.FULL_BODY

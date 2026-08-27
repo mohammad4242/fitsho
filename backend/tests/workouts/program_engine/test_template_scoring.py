@@ -11,7 +11,7 @@ from app.workouts.program_engine.duration_capacity import (
 )
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.engine import generate_program
-from app.workouts.program_engine.enums import Goal, TrainingExperience
+from app.workouts.program_engine.enums import Goal, SplitType, TrainingExperience
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
@@ -67,8 +67,8 @@ def _duration_template(
             adaptation_priority="core" if index < core_slots else "optional",
             superset_group=None,
             superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+            superset_exercise_slug_hint=None,
+            sets=3,
             rep_min=5,
             rep_max=10,
             target_rir=2,
@@ -148,6 +148,17 @@ def test_exact_explicit_priority_beats_regional_and_balanced_templates() -> None
         )
         == exact
     )
+
+
+def test_four_day_upper_priority_template_reports_specialization_split() -> None:
+    template = _template(
+        "four-day-upper-priority",
+        TemplateFocusTag.UPPER_LOWER,
+        TemplateFocusTag.UPPER_PRIORITY,
+        days_per_week=4,
+    )
+
+    assert template.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
 
 
 def test_regional_explicit_priority_beats_unrelated_alternative() -> None:
@@ -512,8 +523,8 @@ def test_days_level_and_resolvable_core_slots_remain_hard_eligibility() -> None:
                         adaptation_priority="core",
                         superset_group=None,
                         superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+                        superset_exercise_slug_hint=None,
+                        sets=3,
                         rep_min=8,
                         rep_max=12,
                         target_rir=2,
@@ -553,8 +564,8 @@ def _core_template(slug: str, *tags: TemplateFocusTag) -> TemplateReference:
                         adaptation_priority="core",
                         superset_group=None,
                         superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+                        superset_exercise_slug_hint=None,
+                        sets=3,
                         rep_min=8,
                         rep_max=12,
                         target_rir=2,
