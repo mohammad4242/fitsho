@@ -125,6 +125,8 @@ def near_equivalent_exercises(
         return False
     if left.canonical_family != right.canonical_family:
         return False
+    if left.canonical_family == "horizontal_push_push_up":
+        return left.body_position is right.body_position and left.laterality is right.laterality
     if (
         left.muscle_focus is not None
         and right.muscle_focus is not None

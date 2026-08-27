@@ -159,6 +159,7 @@ def test_push_up_family_ignores_catalog_metadata_variation() -> None:
         first,
         id=uuid4(),
         secondary_muscles=(MuscleGroup.SHOULDERS,),
+        muscle_focus=MuscleFocus.GENERAL_CHEST,
     )
 
     assert exercise_semantics.near_equivalent_exercises(first, second)
