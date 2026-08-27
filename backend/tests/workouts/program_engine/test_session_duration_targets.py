@@ -536,6 +536,51 @@ def test_template_underfill_keeps_explicit_constraint_when_no_hard_volume_room_e
     assert all(item.counts_toward_volume for item in repaired[0].exercises)
 
 
+def test_focus_rejection_does_not_claim_hard_volume_constraint() -> None:
+    source = request(session_duration_minutes=45, available_training_days=1)
+    normalized = normalize_request(source, RULESET)
+    catalog = tuple(full_catalog())
+    day = WorkoutDay(
+        day_index=1,
+        weekday=0,
+        title="Upper template",
+        focus="upper",
+        estimated_duration_minutes=5,
+        exercises=(),
+        template_target_muscles=(MuscleGroup.CHEST,),
+        template_structure_focus="upper",
+    )
+    volume = WeeklyVolumePlan(
+        targets=(
+            VolumeTarget(
+                muscle=MuscleGroup.CHEST,
+                minimum_soft=0,
+                target_sets=6,
+                maximum_soft=8,
+                maximum_hard=8,
+                fractional_sets=0,
+                effective_target_sets=6,
+                minimum_direct_sets=0,
+            ),
+        ),
+        reason_codes=(),
+    )
+
+    repaired, reasons = repair_session_durations(
+        (day,),
+        normalized,
+        (next(item for item in catalog if item.name.lower() == "dumbbell rdl"),),
+        RULESET,
+        volume=volume,
+        prefer_acceptable_volume_for_minimum_fill=True,
+    )
+
+    assert repaired[0].exercises == ()
+    assert "SESSION_DURATION_TARGET_UNSATISFIED" in reasons
+    assert "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD" in reasons
+    assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" not in reasons
+
+
 def test_capacity_trim_removes_optional_tail_when_main_capacity_is_full() -> None:
     source = request(session_duration_minutes=60, available_training_days=1)
     normalized = normalize_request(source, RULESET)

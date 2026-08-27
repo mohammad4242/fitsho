@@ -248,9 +248,9 @@ def _repair_underfill(
             continue
         # Cannot add a safe, useful, compatible exercise — stop.
         # Do NOT increase sets to substitute for missing exercise count.
-        if (
-            volume is not None
-            and _select_exercise_addition(
+        if volume is not None:
+            strict_hard_status: list[bool] = []
+            _select_exercise_addition(
                 day,
                 exercises,
                 request,
@@ -261,10 +261,9 @@ def _repair_underfill(
                 volume=volume,
                 prefer_acceptable_volume_for_minimum_fill=False,
                 minimum_exercises=minimum_exercises,
+                hard_volume_rejection=strict_hard_status,
             )
-            is None
-        ):
-            if hard_volume_status is not None:
+            if hard_volume_status is not None and strict_hard_status == [True]:
                 hard_volume_status.append(True)
         break
     return day
@@ -287,6 +286,7 @@ def _select_exercise_addition(
     volume: WeeklyVolumePlan | None,
     prefer_acceptable_volume_for_minimum_fill: bool,
     minimum_exercises: int,
+    hard_volume_rejection: list[bool] | None = None,
 ) -> ProgrammedExercise | None:
     if main_exercise_count(exercises) >= ruleset.max_exercises_per_session:
         return None
@@ -320,6 +320,7 @@ def _select_exercise_addition(
         )
     )
     hard_volume_fallback: ProgrammedExercise | None = None
+    hard_volume_rejected = False
     for ranked_item in ranked:
         candidate = ranked_item.exercise
         if candidate.primary_muscle is None:
@@ -396,10 +397,13 @@ def _select_exercise_addition(
         if training_days >= 4 and other_frequency + 1 > frequency_cap:
             continue
         weekly_exercises = [item for day in other_days for item in day.exercises] + simulated
+        within_hard_volume = _within_weekly_hard_volume(weekly_exercises, ruleset, request, volume)
+        if not within_hard_volume:
+            hard_volume_rejected = True
         if (
             not prefer_acceptable_volume_for_minimum_fill
             and main_exercise_count(exercises) < minimum_exercises
-            and _within_weekly_hard_volume(weekly_exercises, ruleset, request, volume)
+            and within_hard_volume
         ):
             return simulated[-1]
         if _acceptable_volume_change(
@@ -413,9 +417,11 @@ def _select_exercise_addition(
         if (
             hard_volume_fallback is None
             and main_exercise_count(exercises) < minimum_exercises
-            and _within_weekly_hard_volume(weekly_exercises, ruleset, request, volume)
+            and within_hard_volume
         ):
             hard_volume_fallback = simulated[-1]
+    if hard_volume_rejection is not None:
+        hard_volume_rejection.append(hard_volume_rejected)
     return hard_volume_fallback
 
 
