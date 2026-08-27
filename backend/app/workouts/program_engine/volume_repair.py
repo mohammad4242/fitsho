@@ -130,7 +130,18 @@ def repair_weekly_volume(
                         exercise.warmup_sets,
                         ruleset,
                     ),
-                    reason_codes=exercise.reason_codes + (reduction_reason,),
+                    reason_codes=exercise.reason_codes
+                    + (reduction_reason,)
+                    + (
+                        ("VOLUME_REPAIR_RELAXED_DIRECT_MINIMUM_FOR_HARD_CAP",)
+                        if _direct_minimum_relaxed_for_hard_cap(
+                            exercise,
+                            direct,
+                            targets,
+                            hard_weekly_excessive,
+                        )
+                        else ()
+                    ),
                 )
                 reasons.append(reduction_reason)
                 if priority_over_target:
@@ -159,6 +170,13 @@ def repair_weekly_volume(
             ):
                 repaired[day_index].pop(exercise_index)
                 reasons.append("VOLUME_REPAIR_REMOVED_REDUNDANT_EXERCISE")
+                if _direct_minimum_relaxed_for_hard_cap(
+                    exercise,
+                    direct,
+                    targets,
+                    hard_weekly_excessive,
+                ):
+                    reasons.append("VOLUME_REPAIR_RELAXED_DIRECT_MINIMUM_FOR_HARD_CAP")
                 continue
 
         direct_under = {
@@ -776,6 +794,7 @@ def _select_reduction_candidate(
                 and (day_index, exercise.primary_muscle) not in per_session_excessive
                 and direct[exercise.primary_muscle.value] - reduction_sets
                 < minimum_direct.minimum_direct_sets
+                and not affected.intersection(hard_weekly_excessive)
             ):
                 continue
             if (
@@ -818,6 +837,24 @@ def _affected_muscle_values(exercise: ProgrammedExercise) -> set[str]:
     if exercise.primary_muscle is not None:
         values.add(exercise.primary_muscle.value)
     return values
+
+
+def _direct_minimum_relaxed_for_hard_cap(
+    exercise: ProgrammedExercise,
+    direct: Counter[str],
+    targets: dict[MuscleGroup, VolumeTarget],
+    hard_weekly_excessive: set[str],
+) -> bool:
+    if exercise.primary_muscle is None or not _affected_muscle_values(exercise).intersection(
+        hard_weekly_excessive
+    ):
+        return False
+    target = targets.get(exercise.primary_muscle)
+    return bool(
+        target is not None
+        and target.direct_minimum_required
+        and direct[exercise.primary_muscle.value] - exercise.sets < target.minimum_direct_sets
+    )
 
 
 def _is_last_hard_movement_role(

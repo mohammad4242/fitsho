@@ -268,6 +268,15 @@ def _focus_availability(
             item.movement_pattern in slot.patterns for item in exercises
         ):
             relaxed += 1
+        elif request.source.blocked_caution_tags and len(compatible) >= max(
+            1,
+            min(
+                ruleset.minimum_exercises_per_session,
+                session_capacity.expected_exercise_count_capacity,
+            )
+            - 2,
+        ):
+            relaxed += 1
     duration = _focus_duration_assessment(
         request,
         focus,

@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 from app.exercises.enums import (
+    Equipment,
     ExerciseCautionTag,
     ExerciseLabel,
     ExerciseType,
@@ -21,6 +22,7 @@ from app.workouts.program_engine.enums import (
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
     TemplateReference,
     TemplateReferenceDay,
@@ -54,6 +56,45 @@ def test_required_muscle_without_any_safe_coverage_is_structured_unsatisfied() -
     for day in result.program.weekly_schedule:
         for ex in day.exercises:
             assert "HARD_INCOMPATIBLE" not in ex.reason_codes
+
+
+def test_bodyweight_wrist_caution_relaxes_unavailable_push_without_unsafe_selection() -> None:
+    source = request(
+        available_training_days=3,
+        available_equipment=[Equipment.BODYWEIGHT],
+        blocked_caution_tags=[ExerciseCautionTag.WRIST_LOADING],
+        priority_muscles=[MuscleGroup.QUADRICEPS, MuscleGroup.GLUTES],
+    )
+
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert result.program is not None, result.errors
+    assert len(result.program.weekly_schedule) == 3
+    assert all(
+        not effective_caution_tags(item).intersection(source.blocked_caution_tags)
+        for day in result.program.weekly_schedule
+        for item in day.exercises
+    )
+    assert any(
+        day.focus in {"lower", "legs"}
+        or any(
+            item.primary_muscle in {MuscleGroup.QUADRICEPS, MuscleGroup.GLUTES}
+            for item in day.exercises
+        )
+        for day in result.program.weekly_schedule
+    )
+    ranges = result.program.aggregate_metrics["volume_ranges_by_muscle"]
+    assert all(
+        values["actual_effective_volume"] <= values["effective_maximum_hard"]
+        for values in ranges.values()
+    )
+    recovery = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "construction_recovery"
+    )
+    assert "REQUIRED_PATTERN_RELAXED_FOR_STRUCTURED_LIMITATION" in recovery["reason_codes"]
+    assert "PROGRAM_REBALANCED_TOWARD_SAFE_LOWER_BODY" in recovery["reason_codes"]
 
 
 def test_safe_layout_recovery_omits_hard_blocked_required_pattern() -> None:
@@ -263,8 +304,8 @@ def test_template_session_replaces_excess_redundancy_with_complementary_role() -
             adaptation_priority="core",
             superset_group=None,
             superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+            superset_exercise_slug_hint=None,
+            sets=3,
             rep_min=8,
             rep_max=12,
             target_rir=2,

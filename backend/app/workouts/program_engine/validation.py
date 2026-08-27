@@ -159,7 +159,16 @@ def validate_program(
 
         per_session: Counter[str] = Counter()
         for index, item in enumerate(day.exercises):
-            if has_near_equivalent(item, day.exercises[:index]):
+            intentional_semantic_repeat = bool(
+                {
+                    "CORE_MOVEMENT_REPEATED_FOR_PROGRESSION",
+                    "DELIBERATE_REDUNDANCY_FOR_TEMPLATE_STRUCTURE",
+                    "DELIBERATE_REDUNDANCY_FOR_SESSION_COVERAGE",
+                    "DELIBERATE_REDUNDANCY_FOR_REQUIRED_PATTERN",
+                    "DELIBERATE_REDUNDANCY_FOR_TARGET_VOLUME",
+                }.intersection(item.reason_codes)
+            )
+            if has_near_equivalent(item, day.exercises[:index]) and not intentional_semantic_repeat:
                 errors.append("SEMANTIC_NEAR_DUPLICATE_EXERCISE")
             if "OPTIONAL_SUPPLEMENTAL_WORK" not in item.reason_codes:
                 semantic_patterns, semantic_muscles = focus_scope(day.focus)

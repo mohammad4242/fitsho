@@ -28,13 +28,9 @@ CORE_PATTERNS = frozenset(
         MovementPattern.CORE_ANTI_LATERAL_FLEXION,
     }
 )
-SHOULDER_PATTERNS = frozenset(
-    {MovementPattern.VERTICAL_PUSH, MovementPattern.SHOULDER_ABDUCTION}
-)
+SHOULDER_PATTERNS = frozenset({MovementPattern.VERTICAL_PUSH, MovementPattern.SHOULDER_ABDUCTION})
 ARM_PATTERNS = frozenset({MovementPattern.ELBOW_FLEXION, MovementPattern.ELBOW_EXTENSION})
-LOWER_ACCESSORY_PATTERNS = frozenset(
-    {MovementPattern.KNEE_FLEXION, MovementPattern.CALF_RAISE}
-)
+LOWER_ACCESSORY_PATTERNS = frozenset({MovementPattern.KNEE_FLEXION, MovementPattern.CALF_RAISE})
 
 _POSTERIOR_CHAIN_PATTERNS = HINGE_PATTERNS | frozenset({MovementPattern.KNEE_FLEXION})
 _QUADRICEPS_FALLBACK_PATTERNS = frozenset({MovementPattern.SQUAT, MovementPattern.LUNGE})

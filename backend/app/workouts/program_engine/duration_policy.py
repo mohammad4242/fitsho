@@ -1,5 +1,7 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_args
+
+from app.profile.schemas import SessionDurationMinutes
 
 if TYPE_CHECKING:
     pass
@@ -17,10 +19,6 @@ CORE_PRESERVATION_EXTENSION_MINUTES = 20
 # `session_duration_minutes` means: available time for the resistance-training
 # portion of the session — it does NOT include general warm-up, cardio, or
 # general cooldown.
-from typing import get_args
-
-from app.profile.schemas import SessionDurationMinutes
-
 OFFICIAL_SESSION_DURATIONS: tuple[int, ...] = get_args(SessionDurationMinutes)
 
 

@@ -590,6 +590,12 @@ def _program_for_split(
     relaxed_groups = tuple(
         dict.fromkeys(group for draft in drafts for group in draft.relaxed_required_pattern_groups)
     )
+    structured_relaxed_groups = _structured_relaxed_pattern_groups(
+        normalized,
+        eligible,
+        rejected_slot_candidates,
+    )
+    relaxed_groups = tuple(dict.fromkeys((*relaxed_groups, *structured_relaxed_groups)))
     relaxed_slots = tuple(
         dict.fromkeys(
             (group, target)
@@ -625,6 +631,17 @@ def _program_for_split(
                 *(("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE",) if rejected_splits else ()),
                 *_rejected_split_recovery_reasons(rejected_splits),
                 *session_reasons,
+                *(
+                    ("REQUIRED_PATTERN_RELAXED_FOR_STRUCTURED_LIMITATION",)
+                    if structured_relaxed_groups
+                    else ()
+                ),
+                *(
+                    ("PROGRAM_REBALANCED_TOWARD_SAFE_LOWER_BODY",)
+                    if structured_relaxed_groups
+                    and any(day.focus in {"lower", "legs"} for day in days)
+                    else ()
+                ),
                 *recovery_repair_reasons,
                 *duration_repair_reasons,
             )
@@ -1030,6 +1047,32 @@ def _reference_split_focus(draft: SessionDraft) -> str:
     return draft.focus
 
 
+def _structured_relaxed_pattern_groups(
+    request: NormalizedProgramRequest,
+    eligible: tuple[ExerciseCandidate, ...],
+    rejected_slot_candidates: tuple[tuple[ExerciseCandidate, tuple[str, ...]], ...],
+) -> tuple[tuple[MovementPattern, ...], ...]:
+    if not request.source.blocked_caution_tags:
+        return ()
+    required_groups = (
+        frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH}),
+        frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL}),
+        frozenset({MovementPattern.SQUAT, MovementPattern.LUNGE, MovementPattern.KNEE_EXTENSION}),
+        frozenset({MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION}),
+    )
+    eligible_patterns = {item.movement_pattern for item in eligible}
+    blocked_pattern_groups = []
+    for group in required_groups:
+        if eligible_patterns.intersection(group):
+            continue
+        if any(
+            item.movement_pattern in group and "EXERCISE_REJECTED_BLOCKED_CAUTION_TAG" in reasons
+            for item, reasons in rejected_slot_candidates
+        ):
+            blocked_pattern_groups.append(tuple(sorted(group, key=lambda item: item.value)))
+    return tuple(blocked_pattern_groups)
+
+
 def _day_count_errors(actual: int, expected: int, *, stage: str) -> tuple[str, ...]:
     if actual == expected:
         return ()
@@ -1152,7 +1195,12 @@ def _coach_quality_metrics(
         "fit"
         if resistance_time_budget_fit
         else "constrained"
-        if "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in trace_reason_codes
+        if trace_reason_codes.intersection(
+            {
+                "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+                "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
+            }
+        )
         else "failed"
     )
     duration_constrained_quality = bool(

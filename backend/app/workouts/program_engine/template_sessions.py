@@ -312,13 +312,11 @@ def build_template_sessions(
                     complementary_replacements.add(candidate.id)
                     build_reasons.append("TEMPLATE_REDUNDANCY_REPLACED_WITH_COMPLEMENTARY_ROLE")
                 elif semantic_duplicate:
-                    if slot.adaptation_priority == "core":
-                        raise TemplateConstructionError(
-                            "TEMPLATE_CORE_SEMANTIC_DUPLICATE_UNRESOLVABLE",
-                            f"TEMPLATE_DAY:{index}",
-                        )
-                    build_reasons.append("TEMPLATE_SEMANTIC_DUPLICATE_OPTIONAL_OMITTED")
-                    continue
+                    # A template's explicit slot structure is an intentional
+                    # redundancy declaration. Preserve it when no safe
+                    # complementary role exists and expose that decision.
+                    deliberate_redundancies.add(candidate.id)
+                    build_reasons.append("TEMPLATE_SEMANTIC_DUPLICATE_PRESERVED_INTENTIONAL")
                 else:
                     deliberate_redundancies.add(candidate.id)
                     build_reasons.append("DELIBERATE_REDUNDANCY_FOR_TEMPLATE_STRUCTURE")
@@ -348,6 +346,7 @@ def build_template_sessions(
             planned_minimum,
             ruleset,
             repeated_targeted_accessories,
+            deliberate_redundancies,
         )
         while (
             sum(is_supplemental_muscle(candidate.primary_muscle) for candidate, _slot in selected)
@@ -898,6 +897,7 @@ def _add_targeted_accessories(
     required_minimum: int,
     ruleset: ProgramRuleset,
     repeated_targeted_accessories: set[tuple[int, UUID]],
+    deliberate_redundancies: set[UUID],
 ) -> None:
     target_muscles = reference_day.focus
     while main_exercise_count(candidate for candidate, _slot in selected) < minimum_exercises:
@@ -921,6 +921,14 @@ def _add_targeted_accessories(
                 target_muscles=frozenset(target_muscles),
                 day_focus=f"template_reference_{reference_day.day_number}",
             ).compatible
+            and (
+                not has_near_equivalent(
+                    item,
+                    (selected_candidate for selected_candidate, _selected_slot in selected),
+                )
+                or main_exercise_count(candidate for candidate, _slot in selected)
+                < required_minimum
+            )
         ]
         if not options:
             selected_ids = {candidate.id for candidate, _slot in selected}
@@ -945,14 +953,23 @@ def _add_targeted_accessories(
                     target_muscles=frozenset(target_muscles),
                     day_focus=f"template_reference_{reference_day.day_number}",
                 ).compatible
-                and not has_near_equivalent(
-                    item,
-                    (selected_candidate for selected_candidate, _selected_slot in selected),
+                and (
+                    not has_near_equivalent(
+                        item,
+                        (selected_candidate for selected_candidate, _selected_slot in selected),
+                    )
+                    or main_exercise_count(candidate for candidate, _slot in selected)
+                    < required_minimum
                 )
             ]
             if not options:
                 return
         candidate = rank_exercises(request, options, ruleset)[0].exercise
+        if has_near_equivalent(
+            candidate,
+            (selected_candidate for selected_candidate, _selected_slot in selected),
+        ):
+            deliberate_redundancies.add(candidate.id)
         if used[candidate.id]:
             repeated_targeted_accessories.add((reference_day.day_number, candidate.id))
         supplemental_start = next(

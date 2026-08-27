@@ -18,6 +18,7 @@ def effective_caution_tags(
         exercise.movement_pattern
         in {
             MovementPattern.HORIZONTAL_PUSH,
+            MovementPattern.VERTICAL_PUSH,
             MovementPattern.ELBOW_EXTENSION,
             MovementPattern.CORE_ANTI_EXTENSION,
             MovementPattern.CORE_ANTI_LATERAL_FLEXION,

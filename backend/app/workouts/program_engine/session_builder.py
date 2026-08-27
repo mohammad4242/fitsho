@@ -205,6 +205,11 @@ def build_sessions(
                             "REQUIRED_SLOT_RELAXABLE_TRAINING_QUALITY",
                             "RECOVERY_APPLIED_REQUIRED_SLOT_RELAXATION",
                             *(
+                                ("REQUIRED_SLOT_RELAXED_FOR_STRUCTURED_LIMITATION",)
+                                if request.source.blocked_caution_tags
+                                else ()
+                            ),
+                            *(
                                 (f"RECOVERY_RELAXED_TARGET_MUSCLE:{slot.target_muscle.value}",)
                                 if slot.target_muscle is not None
                                 else ()
