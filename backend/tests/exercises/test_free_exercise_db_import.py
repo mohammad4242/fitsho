@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.config import Settings
 from app.exercises.enums import (
@@ -13,11 +13,14 @@ from app.exercises.enums import (
     ExerciseCautionTag,
     ExerciseLabel,
     ExerciseType,
+    MediaPresentation,
+    MediaRole,
+    MediaType,
     MovementPattern,
     MuscleFocus,
     MuscleGroup,
 )
-from app.exercises.models import Exercise
+from app.exercises.models import Exercise, ExerciseMediaAsset
 
 MP4_BYTES = b"\x00\x00\x00\x18ftypisom\x00\x00\x00\x00isomiso2"
 JPEG_BYTES = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00"
@@ -79,7 +82,7 @@ def write_source(
     *,
     missing: set[str] | None = None,
 ) -> None:
-    (root / "data").mkdir(parents=True)
+    (root / "data").mkdir(parents=True, exist_ok=True)
     (root / "data" / "exercises.json").write_text(json.dumps([record]), encoding="utf-8")
     assets = {
         "videos/male/push-up.mp4": MP4_BYTES,
@@ -93,6 +96,43 @@ def write_source(
         path = root / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(contents)
+
+
+def add_media_asset(
+    exercise: Exercise,
+    *,
+    presentation: MediaPresentation,
+    sort_order: int,
+    source: str,
+    source_id: str,
+    media_path: str,
+    media_source_url: str | None,
+    media_license: str | None,
+    media_attribution: str | None,
+) -> ExerciseMediaAsset:
+    asset = ExerciseMediaAsset(
+        presentation=presentation,
+        role=MediaRole.VIDEO,
+        sort_order=sort_order,
+        media_path=media_path,
+        media_type=MediaType.VIDEO,
+        media_source_url=media_source_url,
+        media_license=media_license,
+        media_attribution=media_attribution,
+        source=source,
+        source_id=source_id,
+    )
+    exercise.media_assets.append(asset)
+    return asset
+
+
+def load_imported_exercise(db: Session) -> Exercise | None:
+    db.expire_all()
+    return db.scalar(
+        select(Exercise)
+        .where(Exercise.source == "free-exercise-db", Exercise.source_id == "0001")
+        .options(selectinload(Exercise.media_assets))
+    )
 
 
 def test_free_exercise_db_maps_known_values_and_reports_unknown_values() -> None:
@@ -397,7 +437,6 @@ def test_importer_does_not_overwrite_admin_owned_media(
     test_settings: Settings,
     tmp_path: Path,
 ) -> None:
-    from app.exercises.enums import MediaPresentation
     from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
 
     source_root = tmp_path / "source"
@@ -417,18 +456,254 @@ def test_importer_does_not_overwrite_admin_owned_media(
         asset for asset in exercise.media_assets if asset.presentation is MediaPresentation.MALE
     )
     admin_asset.media_path = admin_path
-    admin_asset.media_source_url = None
+    admin_asset.media_source_url = "https://admin.invalid/push-up.mp4"
+    admin_asset.media_license = "Fitsho internal"
+    admin_asset.media_attribution = "Fitsho admin"
     admin_asset.source = "admin"
     admin_asset.source_id = "admin-push-up-video"
+    admin_asset.sort_order = 0
     exercise.media_path = admin_path
     db.commit()
 
-    importer.run()
+    record = source_record()
+    record["name"] = "Updated Push-Up"
+    write_source(source_root, record)
+    report = importer.run()
 
-    db.refresh(exercise)
+    exercise = load_imported_exercise(db)
+    assert report.updated_records == ["0001"]
+    assert exercise is not None
     preserved = next(asset for asset in exercise.media_assets if asset.source == "admin")
     assert preserved.media_path == admin_path
+    assert preserved.media_source_url == "https://admin.invalid/push-up.mp4"
+    assert preserved.media_license == "Fitsho internal"
+    assert preserved.media_attribution == "Fitsho admin"
+    assert preserved.sort_order == 0
+    assert {
+        (asset.source, asset.presentation, asset.sort_order) for asset in exercise.media_assets
+    } == {
+        ("admin", MediaPresentation.MALE, 0),
+        ("free-exercise-db", MediaPresentation.MALE, 1),
+        ("free-exercise-db", MediaPresentation.FEMALE, 0),
+    }
     assert exercise.media_path == admin_path
+
+
+def test_importer_preserves_owner_video_assets_when_syncing_fedb_media(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    write_source(source_root, source_record())
+    importer = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=FakeTranslator(),
+    )
+    importer.run()
+    exercise = load_imported_exercise(db)
+    assert exercise is not None
+    owner_asset = next(
+        asset for asset in exercise.media_assets if asset.presentation is MediaPresentation.MALE
+    )
+    owner_path = owner_asset.media_path
+    owner_asset.media_source_url = "https://owner.invalid/push-up.mp4"
+    owner_asset.media_license = "Owner license"
+    owner_asset.media_attribution = "Exercise owner"
+    owner_asset.source = "owner-video"
+    owner_asset.source_id = "owner-push-up-video"
+    owner_asset.sort_order = 0
+    db.commit()
+
+    record = source_record()
+    record["name"] = "Updated Push-Up"
+    write_source(source_root, record)
+    report = importer.run()
+
+    exercise = load_imported_exercise(db)
+    assert report.updated_records == ["0001"]
+    assert exercise is not None
+    preserved = next(asset for asset in exercise.media_assets if asset.source == "owner-video")
+    assert preserved.media_path == owner_path
+    assert preserved.media_source_url == "https://owner.invalid/push-up.mp4"
+    assert preserved.media_license == "Owner license"
+    assert preserved.media_attribution == "Exercise owner"
+    assert preserved.sort_order == 0
+    assert {
+        (asset.source, asset.presentation, asset.sort_order) for asset in exercise.media_assets
+    } == {
+        ("owner-video", MediaPresentation.MALE, 0),
+        ("free-exercise-db", MediaPresentation.MALE, 1),
+        ("free-exercise-db", MediaPresentation.FEMALE, 0),
+    }
+
+
+def test_importer_preserves_owner_and_admin_assets_when_syncing_fedb_media(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    write_source(source_root, source_record())
+    importer = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=FakeTranslator(),
+    )
+    importer.run()
+    exercise = load_imported_exercise(db)
+    assert exercise is not None
+    owner_asset = next(
+        asset for asset in exercise.media_assets if asset.presentation is MediaPresentation.MALE
+    )
+    admin_asset = next(
+        asset for asset in exercise.media_assets if asset.presentation is MediaPresentation.FEMALE
+    )
+    owner_path = owner_asset.media_path
+    admin_path = admin_asset.media_path
+    owner_asset.media_source_url = "https://owner.invalid/push-up.mp4"
+    owner_asset.media_license = "Owner license"
+    owner_asset.media_attribution = "Exercise owner"
+    owner_asset.source = "owner-video"
+    owner_asset.source_id = "owner-push-up-video"
+    owner_asset.sort_order = 0
+    admin_asset.media_source_url = "https://admin.invalid/push-up.mp4"
+    admin_asset.media_license = "Fitsho internal"
+    admin_asset.media_attribution = "Fitsho admin"
+    admin_asset.source = "admin"
+    admin_asset.source_id = "admin-push-up-video"
+    admin_asset.sort_order = 0
+    exercise.media_path = admin_path
+    db.commit()
+
+    record = source_record()
+    record["name"] = "Updated Push-Up"
+    write_source(source_root, record)
+    report = importer.run()
+
+    exercise = load_imported_exercise(db)
+    assert report.updated_records == ["0001"]
+    assert exercise is not None
+    preserved_owner = next(
+        asset for asset in exercise.media_assets if asset.source == "owner-video"
+    )
+    preserved_admin = next(asset for asset in exercise.media_assets if asset.source == "admin")
+    assert preserved_owner.media_path == owner_path
+    assert preserved_owner.media_source_url == "https://owner.invalid/push-up.mp4"
+    assert preserved_owner.media_license == "Owner license"
+    assert preserved_owner.media_attribution == "Exercise owner"
+    assert preserved_owner.sort_order == 0
+    assert preserved_admin.media_path == admin_path
+    assert preserved_admin.media_source_url == "https://admin.invalid/push-up.mp4"
+    assert preserved_admin.media_license == "Fitsho internal"
+    assert preserved_admin.media_attribution == "Fitsho admin"
+    assert preserved_admin.sort_order == 0
+    assert {
+        (asset.source, asset.presentation, asset.sort_order) for asset in exercise.media_assets
+    } == {
+        ("owner-video", MediaPresentation.MALE, 0),
+        ("admin", MediaPresentation.FEMALE, 0),
+        ("free-exercise-db", MediaPresentation.MALE, 1),
+        ("free-exercise-db", MediaPresentation.FEMALE, 1),
+    }
+    assert exercise.media_path == admin_path
+
+
+def test_repeated_unchanged_import_skips_with_mixed_media_provenance(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    write_source(source_root, source_record())
+    translator = FakeTranslator()
+    importer = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=translator,
+    )
+    first = importer.run()
+    exercise = load_imported_exercise(db)
+    assert exercise is not None
+    male_path = next(
+        asset.media_path
+        for asset in exercise.media_assets
+        if asset.presentation is MediaPresentation.MALE
+    )
+    female_path = next(
+        asset.media_path
+        for asset in exercise.media_assets
+        if asset.presentation is MediaPresentation.FEMALE
+    )
+    add_media_asset(
+        exercise,
+        presentation=MediaPresentation.MALE,
+        sort_order=1,
+        source="owner-video",
+        source_id="owner-push-up-video",
+        media_path=male_path,
+        media_source_url="https://owner.invalid/push-up.mp4",
+        media_license="Owner license",
+        media_attribution="Exercise owner",
+    )
+    add_media_asset(
+        exercise,
+        presentation=MediaPresentation.FEMALE,
+        sort_order=1,
+        source="admin",
+        source_id="admin-push-up-video",
+        media_path=female_path,
+        media_source_url="https://admin.invalid/push-up.mp4",
+        media_license="Fitsho internal",
+        media_attribution="Fitsho admin",
+    )
+    db.commit()
+    before = sorted(
+        (
+            asset.source,
+            asset.source_id,
+            asset.presentation.value,
+            asset.sort_order,
+            asset.media_path,
+            asset.media_source_url,
+            asset.media_license,
+            asset.media_attribution,
+        )
+        for asset in exercise.media_assets
+    )
+
+    second = importer.run()
+
+    exercise = load_imported_exercise(db)
+    assert first.imported_records == ["0001"]
+    assert second.skipped_records == ["0001"]
+    assert second.updated_records == []
+    assert exercise is not None
+    after = sorted(
+        (
+            asset.source,
+            asset.source_id,
+            asset.presentation.value,
+            asset.sort_order,
+            asset.media_path,
+            asset.media_source_url,
+            asset.media_license,
+            asset.media_attribution,
+        )
+        for asset in exercise.media_assets
+    )
+    assert after == before
+    assert translator.calls == [["0001"]]
 
 
 def test_importer_recopies_existing_media_when_target_storage_is_empty(

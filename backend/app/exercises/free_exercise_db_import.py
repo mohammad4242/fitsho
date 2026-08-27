@@ -845,7 +845,7 @@ class FreeExerciseDbImporter:
         )
 
     def _is_current(self, exercise: Exercise, candidate: ImportCandidate) -> bool:
-        managed_assets = [asset for asset in exercise.media_assets if asset.source != "admin"]
+        managed_assets = [asset for asset in exercise.media_assets if asset.source == SOURCE_NAME]
         prescription = prescription_metadata_for_identifier(SOURCE_NAME, candidate.source_id)
         expected_assets = {
             (asset.presentation, asset.role, asset.source_url) for asset in candidate.media_assets
@@ -1059,7 +1059,7 @@ class FreeExerciseDbImporter:
         exercise: Exercise,
         desired: list[tuple[ImportMediaAsset, str]],
     ) -> None:
-        managed_assets = [asset for asset in exercise.media_assets if asset.source != "admin"]
+        managed_assets = [asset for asset in exercise.media_assets if asset.source == SOURCE_NAME]
         desired_keys = {(asset.presentation, asset.role) for asset, _ in desired}
         for item in managed_assets:
             if (item.presentation, item.role) not in desired_keys:
@@ -1067,7 +1067,7 @@ class FreeExerciseDbImporter:
         existing = {
             (item.presentation, item.role): item
             for item in exercise.media_assets
-            if item.source != "admin"
+            if item.source == SOURCE_NAME
         }
         for asset, public_path in desired:
             media_item: ExerciseMediaAsset | None = existing.get((asset.presentation, asset.role))
