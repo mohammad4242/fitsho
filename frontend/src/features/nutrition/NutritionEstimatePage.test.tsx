@@ -353,7 +353,7 @@ it("shows four Free Meal macro inputs and adds the saved intake to the actual da
   const user = userEvent.setup();
   render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
 
-  expect(await screen.findByText("وعده آزاد")).toBeInTheDocument();
+  expect(await screen.findAllByText("وعده آزاد")).toHaveLength(2);
   expect(screen.getByText(/لطفاً جهت محاسبه کالری روزانه/)).toBeInTheDocument();
   await user.type(screen.getByRole("spinbutton", { name: "کالری" }), "700");
   await user.type(screen.getByRole("spinbutton", { name: "پروتئین" }), "35");

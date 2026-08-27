@@ -14,7 +14,7 @@ import type {
   MuscleFocus,
   MuscleGroup,
 } from "../exercises/types";
-import type { ExperienceLevel, FitnessGoal } from "../profile/types";
+import type { ExperienceLevel } from "../profile/types";
 
 export type AdminExerciseMediaAssetInput = {
   id?: string | null;

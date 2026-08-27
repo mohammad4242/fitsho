@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { muscleGroups, movementPatterns } from "../exercises/types";
-import { fitnessGoals, type ExperienceLevel } from "../profile/types";
+import { type ExperienceLevel } from "../profile/types";
 import appTrainingAccent from "../../assets/landing/app-training-accent.jpg";
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
