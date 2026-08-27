@@ -609,8 +609,17 @@ def audit_manifest(
         try:
             relative = source.relative_to(settings.media_root)
         except ValueError:
+            relative = None
+        if relative is not None and any((root / relative).is_file() for root in fallback_roots):
+            return True
+        staging_prefix = Path("/var/lib/fitsho/media-migration-source")
+        try:
+            staging_relative = source.relative_to(staging_prefix)
+        except ValueError:
             return False
-        return any((root / relative).is_file() for root in fallback_roots)
+        return any(
+            (root / staging_prefix.name / staging_relative).is_file() for root in fallback_roots
+        )
 
     missing_sources = [path for path in sorted(source_files) if not source_exists(path)]
     hash_mismatches: list[str] = []
