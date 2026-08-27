@@ -329,6 +329,7 @@ def build_inventory(
     destination_by_digest: dict[tuple[str, str], Path] = {}
 
     for exercise in exercises:
+        asset_rows: list[dict[str, object]] = []
         for asset in exercise.media_assets:
             source_path = resolve_source_path(
                 asset.media_path,
@@ -339,17 +340,17 @@ def build_inventory(
             if source_path is not None:
                 reference_source_paths.add(source_path.resolve())
             if source_path is None or _is_placeholder_path(asset.media_path):
-                rows.append(
-                    _media_row(
-                        settings=settings,
-                        exercise=exercise,
-                        asset=asset,
-                        current_path=asset.media_path,
-                        source_path=source_path,
-                        reference_kind="asset",
-                        destination=None,
-                    )
+                row = _media_row(
+                    settings=settings,
+                    exercise=exercise,
+                    asset=asset,
+                    current_path=asset.media_path,
+                    source_path=source_path,
+                    reference_kind="asset",
+                    destination=None,
                 )
+                rows.append(row)
+                asset_rows.append(row)
                 continue
             digest = sha256_file(source_path)
             extension = source_path.suffix.lower()
@@ -364,20 +365,31 @@ def build_inventory(
                 ),
             )
             destination_by_digest.setdefault((digest, extension), destination)
+            row = _media_row(
+                settings=settings,
+                exercise=exercise,
+                asset=asset,
+                current_path=asset.media_path,
+                source_path=source_path,
+                reference_kind="asset",
+                destination=destination,
+            )
+            rows.append(row)
+            asset_rows.append(row)
+
+        valid_assets = [asset for asset in exercise.media_assets if is_valid_media_asset(asset)]
+        if valid_assets and _is_placeholder_path(exercise.media_path):
             rows.append(
                 _media_row(
                     settings=settings,
                     exercise=exercise,
-                    asset=asset,
-                    current_path=asset.media_path,
-                    source_path=source_path,
-                    reference_kind="asset",
-                    destination=destination,
+                    asset=None,
+                    current_path=exercise.media_path,
+                    source_path=None,
+                    reference_kind="legacy",
+                    destination=None,
                 )
             )
-
-        valid_assets = [asset for asset in exercise.media_assets if is_valid_media_asset(asset)]
-        if valid_assets:
             continue
         source_path = resolve_source_path(
             exercise.media_path,
@@ -387,6 +399,40 @@ def build_inventory(
         )
         if source_path is not None:
             reference_source_paths.add(source_path.resolve())
+
+        if source_path is None and not _is_placeholder_path(exercise.media_path):
+            matching_destinations = {
+                str(row["destination_physical_path"])
+                for row in asset_rows
+                if row["current_db_path"] == exercise.media_path
+                and row.get("destination_physical_path")
+            }
+            matching_sources = [
+                Path(str(row["current_physical_path"]))
+                for row in asset_rows
+                if row["current_db_path"] == exercise.media_path
+                and row.get("current_physical_path")
+            ]
+            if len(matching_destinations) == 1:
+                destination = Path(next(iter(matching_destinations)))
+                source_path = next(
+                    (candidate for candidate in matching_sources if candidate.is_file()),
+                    None,
+                )
+                if source_path is not None:
+                    reference_source_paths.add(source_path.resolve())
+                rows.append(
+                    _media_row(
+                        settings=settings,
+                        exercise=exercise,
+                        asset=None,
+                        current_path=exercise.media_path,
+                        source_path=source_path,
+                        reference_kind="legacy",
+                        destination=destination,
+                    )
+                )
+                continue
         if source_path is None or _is_placeholder_path(exercise.media_path):
             rows.append(
                 _media_row(
@@ -776,11 +822,13 @@ def _is_rollback_manifest_row(row: dict[str, object]) -> bool:
     return bool(row.get("hash_verified") and row.get("db_updated"))
 
 
-def _rollback_manifest_rows(manifest: dict[str, object]) -> list[tuple[int, dict[str, object]]]:
+def _rollback_manifest_rows(
+    manifest: dict[str, object],
+) -> list[tuple[int | None, dict[str, object]]]:
     rows = manifest.get("rows")
     if not isinstance(rows, list):
         raise MediaMigrationError("Manifest rows are invalid")
-    references: list[tuple[int, dict[str, object]]] = []
+    references: list[tuple[int | None, dict[str, object]]] = []
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             raise MediaMigrationError("Manifest row is invalid")
@@ -896,10 +944,146 @@ def _rollback_reference(
     return db.scalar(exercise_statement)
 
 
+def _is_legacy_pointer_manifest_row(row: dict[str, object]) -> bool:
+    return (
+        row.get("reference_kind") in {"legacy", "exercise"}
+        and bool(row.get("exercise_id"))
+        and isinstance(row.get("current_db_path"), str)
+        and isinstance(row.get("destination_public_path"), str)
+        and isinstance(row.get("sha256"), str)
+    )
+
+
+def _v1_pointer_rollback_rows(
+    db: Session,
+    manifest: dict[str, object],
+) -> list[dict[str, object]]:
+    """Derive legacy Exercise.media_path rows from an asset-only v1 manifest.
+
+    v1 did not record the legacy Exercise pointer separately.  A pointer is
+    recoverable only when its current canonical destination identifies one
+    destination for that exercise.  Duplicate asset rows are acceptable when
+    they carry the same old path and digest; different destinations are not.
+    """
+    if manifest.get("version") != 1:
+        return []
+    rows = manifest.get("rows")
+    if not isinstance(rows, list):
+        raise MediaMigrationError("Manifest rows are invalid")
+    if any(_is_legacy_pointer_manifest_row(row) for row in rows if isinstance(row, dict)):
+        existing_exercises = {
+            str(row["exercise_id"])
+            for row in rows
+            if isinstance(row, dict) and _is_legacy_pointer_manifest_row(row)
+        }
+    else:
+        existing_exercises = set()
+    asset_rows_by_exercise: dict[str, list[dict[str, object]]] = {}
+    for row in rows:
+        if not isinstance(row, dict) or not _is_rollback_manifest_row(row):
+            continue
+        if row.get("reference_kind") not in {"asset", None} or not row.get("media_asset_id"):
+            continue
+        exercise_id = row.get("exercise_id")
+        destination = row.get("destination_public_path")
+        if not isinstance(exercise_id, str) or not isinstance(destination, str):
+            continue
+        asset_rows_by_exercise.setdefault(exercise_id, []).append(row)
+
+    derived: list[dict[str, object]] = []
+    for exercise in _load_exercises(db):
+        exercise_id = str(exercise.id)
+        if exercise_id in existing_exercises or _is_placeholder_path(exercise.media_path):
+            continue
+        candidates = [
+            row
+            for row in asset_rows_by_exercise.get(exercise_id, [])
+            if row.get("destination_public_path") == exercise.media_path
+        ]
+        candidate_groups: dict[str, list[dict[str, object]]] = {}
+        for row in candidates:
+            destination = str(row["destination_public_path"])
+            candidate_groups.setdefault(destination, []).append(row)
+        candidate_group = next(iter(candidate_groups.values()), [])
+        old_evidence = {(row.get("current_db_path"), row.get("sha256")) for row in candidate_group}
+        if len(candidate_groups) == 1 and len(old_evidence) == 1:
+            candidate = candidate_group[0]
+            derived.append(
+                {
+                    "reference_kind": "legacy",
+                    "exercise_id": exercise_id,
+                    "current_db_path": candidate.get("current_db_path"),
+                    "current_physical_path": candidate.get("current_physical_path"),
+                    "destination_public_path": exercise.media_path,
+                    "sha256": candidate.get("sha256"),
+                    "hash_verified": True,
+                    "db_updated": True,
+                    "placeholder": False,
+                    "derived_from_v1_asset": candidate.get("media_asset_id"),
+                }
+            )
+            continue
+        restored_candidates = [
+            row
+            for row in asset_rows_by_exercise.get(exercise_id, [])
+            if row.get("current_db_path") == exercise.media_path
+        ]
+        restored_groups: dict[str, list[dict[str, object]]] = {}
+        for row in restored_candidates:
+            destination = row.get("destination_public_path")
+            if isinstance(destination, str):
+                restored_groups.setdefault(destination, []).append(row)
+        restored_group = next(iter(restored_groups.values()), [])
+        restored_evidence = {
+            (row.get("current_db_path"), row.get("sha256")) for row in restored_group
+        }
+        if len(restored_groups) == 1 and len(restored_evidence) == 1:
+            candidate = restored_group[0]
+            derived.append(
+                {
+                    "reference_kind": "legacy",
+                    "exercise_id": exercise_id,
+                    "current_db_path": exercise.media_path,
+                    "current_physical_path": candidate.get("current_physical_path"),
+                    "destination_public_path": candidate.get("destination_public_path"),
+                    "sha256": candidate.get("sha256"),
+                    "hash_verified": True,
+                    "db_updated": True,
+                    "placeholder": False,
+                    "derived_from_v1_asset": candidate.get("media_asset_id"),
+                }
+            )
+            continue
+        reason = (
+            "v1 Exercise.media_path matches multiple verified asset destinations"
+            if (
+                len(candidate_groups) > 1
+                or (len(candidate_groups) == 1 and len(old_evidence) > 1)
+                or len(restored_groups) > 1
+                or (len(restored_groups) == 1 and len(restored_evidence) > 1)
+            )
+            else "v1 Exercise.media_path has no uniquely verified asset destination"
+        )
+        derived.append(
+            {
+                "reference_kind": "legacy",
+                "exercise_id": exercise_id,
+                "current_db_path": exercise.media_path,
+                "destination_public_path": exercise.media_path,
+                "sha256": None,
+                "hash_verified": False,
+                "db_updated": False,
+                "placeholder": False,
+                "derivation_error": reason,
+            }
+        )
+    return derived
+
+
 def _rollback_plan_row(
     db: Session,
     *,
-    row_index: int,
+    row_index: int | None,
     row: dict[str, object],
     settings: Settings,
     legacy_roots: tuple[Path, ...],
@@ -911,10 +1095,15 @@ def _rollback_plan_row(
         "media_asset_id": row.get("media_asset_id"),
         "current_db_path": row.get("current_db_path"),
         "destination_public_path": row.get("destination_public_path"),
+        "sha256": row.get("sha256"),
         "status": ROLLBACK_MISSING,
         "source_path": None,
         "reason": None,
     }
+    derivation_error = row.get("derivation_error")
+    if isinstance(derivation_error, str) and derivation_error:
+        result["reason"] = derivation_error
+        return result
     current_path = row.get("current_db_path")
     destination_path = row.get("destination_public_path")
     reference = _rollback_reference(db, row)
@@ -957,6 +1146,8 @@ def build_rollback_plan(
     legacy_roots: tuple[Path, ...] = (),
 ) -> dict[str, object]:
     """Build a read-only rollback plan for actual exercise media references."""
+    manifest_rows = _rollback_manifest_rows(manifest)
+    manifest_rows.extend((None, row) for row in _v1_pointer_rollback_rows(db, manifest))
     with db.no_autoflush:
         planned_rows = [
             _rollback_plan_row(
@@ -966,7 +1157,7 @@ def build_rollback_plan(
                 settings=settings,
                 legacy_roots=legacy_roots,
             )
-            for index, row in _rollback_manifest_rows(manifest)
+            for index, row in manifest_rows
         ]
     summary = {
         "total": len(planned_rows),
@@ -993,6 +1184,8 @@ def _mark_database_rolled_back(manifest: dict[str, object], plan: dict[str, obje
         if plan_row.get("status") not in {ROLLBACK_PLANNED, ROLLBACK_ALREADY_RESTORED}:
             continue
         row_index = plan_row.get("manifest_row")
+        if row_index is None:
+            continue
         if not isinstance(row_index, int) or not 0 <= row_index < len(rows):
             raise MediaMigrationError("Rollback plan row index is invalid")
         row = rows[row_index]
@@ -1029,11 +1222,13 @@ def apply_database_rollback(
                 if plan_row.get("status") != ROLLBACK_PLANNED:
                     continue
                 row_index = plan_row.get("manifest_row")
-                assert isinstance(row_index, int)
-                rows = manifest["rows"]
-                assert isinstance(rows, list)
-                row = rows[row_index]
-                assert isinstance(row, dict)
+                if isinstance(row_index, int):
+                    rows = manifest["rows"]
+                    assert isinstance(rows, list)
+                    row = rows[row_index]
+                    assert isinstance(row, dict)
+                else:
+                    row = plan_row
                 reference = _rollback_reference(db, row, for_update=True)
                 if reference is None:
                     raise MediaMigrationError("Rollback database reference disappeared")
@@ -1049,6 +1244,29 @@ def apply_database_rollback(
     except Exception:
         db.rollback()
         raise
+    rows = manifest.get("rows")
+    if not isinstance(rows, list):
+        raise MediaMigrationError("Manifest rows are invalid")
+    for plan_row in plan_rows:
+        if plan_row.get("manifest_row") is not None:
+            continue
+        if plan_row.get("status") not in {ROLLBACK_PLANNED, ROLLBACK_ALREADY_RESTORED}:
+            continue
+        rows.append(
+            {
+                "reference_kind": "legacy",
+                "exercise_id": plan_row.get("exercise_id"),
+                "current_db_path": plan_row.get("current_db_path"),
+                "current_physical_path": plan_row.get("source_path"),
+                "destination_public_path": plan_row.get("destination_public_path"),
+                "sha256": plan_row.get("sha256"),
+                "hash_verified": True,
+                "db_updated": False,
+                "placeholder": False,
+                "state": HASH_VERIFIED,
+                "lifecycle_state": HASH_VERIFIED,
+            }
+        )
     _mark_database_rolled_back(manifest, plan)
     return plan
 
@@ -1062,12 +1280,10 @@ def update_database_from_manifest(
     rows = manifest["rows"]
     assert isinstance(rows, list)
     asset_destinations = _row_destination_map(manifest)
-    legacy_destinations = {
-        str(row["exercise_id"]): str(row["destination_public_path"])
+    legacy_rows = {
+        str(row["exercise_id"]): row
         for row in rows
-        if row.get("reference_kind") == "legacy"
-        and row.get("exercise_id")
-        and row.get("destination_public_path")
+        if row.get("reference_kind") == "legacy" and row.get("exercise_id")
     }
     exercises = _load_exercises(db)
     assets_updated = 0
@@ -1094,23 +1310,32 @@ def update_database_from_manifest(
                                 f"{exercise.source_id}:{asset.presentation.value}:"
                                 f"{asset.sort_order}"
                             )
-            primary = resolve_primary_media(exercise)
-            if any(is_valid_media_asset(asset) for asset in exercise.media_assets):
+            pointer_row = legacy_rows.get(str(exercise.id))
+            if pointer_row is not None and pointer_row.get("placeholder"):
+                continue
+            if (
+                pointer_row is not None
+                and pointer_row.get("destination_public_path")
+                and pointer_row.get("hash_verified")
+            ):
+                exercise.media_path = str(pointer_row["destination_public_path"])
+                pointer_media_type = pointer_row.get("media_type")
+                if pointer_media_type is not None:
+                    exercise.media_type = MediaType(str(pointer_media_type))
+            elif any(is_valid_media_asset(asset) for asset in exercise.media_assets):
+                primary = resolve_primary_media(exercise)
                 exercise.media_path = primary.path
                 exercise.media_type = primary.media_type
             else:
-                destination = legacy_destinations.get(str(exercise.id))
-                if destination is not None:
-                    exercise.media_path = destination
-                    exercise.media_type = MediaType(
-                        next(
-                            str(row["media_type"])
-                            for row in rows
-                            if row.get("reference_kind") == "legacy"
-                            and row.get("exercise_id") == str(exercise.id)
-                            and row.get("media_type")
-                        )
-                    )
+                if (
+                    pointer_row is not None
+                    and pointer_row.get("destination_public_path")
+                    and pointer_row.get("hash_verified")
+                ):
+                    exercise.media_path = str(pointer_row["destination_public_path"])
+                    pointer_media_type = pointer_row.get("media_type")
+                    if pointer_media_type is not None:
+                        exercise.media_type = MediaType(str(pointer_media_type))
         db.flush()
     db.commit()
     return assets_updated

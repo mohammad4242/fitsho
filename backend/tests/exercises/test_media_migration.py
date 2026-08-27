@@ -195,6 +195,423 @@ def test_rollback_plan_uses_actual_references_and_legacy_root_evidence(
     assert dry_run["summary"] == report["summary"]
 
 
+def test_build_inventory_preserves_exercise_pointer_alongside_valid_asset(
+    db: Session, test_settings, tmp_path: Path
+) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.media_migration import SourceRoot, build_inventory
+    from app.exercises.models import ExerciseMediaAsset
+
+    source_root = tmp_path / "legacy"
+    source = source_root / "owner-video" / "exercise.mp4"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"primary video")
+    exercise = _rollback_exercise("inventory-pointer")
+    exercise.media_path = "/media/owner-video/exercise.mp4"
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            media_path=exercise.media_path,
+            media_type=MediaType.VIDEO,
+        )
+    )
+    db.add(exercise)
+    db.flush()
+
+    manifest = build_inventory(
+        db,
+        settings=test_settings,
+        source_roots=(SourceRoot("legacy", source_root),),
+    )
+
+    rows = [row for row in manifest["rows"] if row["exercise_id"] == str(exercise.id)]
+    asset_row = next(row for row in rows if row["reference_kind"] == "asset")
+    pointer_row = next(row for row in rows if row["reference_kind"] == "legacy")
+    assert pointer_row["current_db_path"] == exercise.media_path
+    assert pointer_row["sha256"] == asset_row["sha256"]
+    assert pointer_row["destination_public_path"] == asset_row["destination_public_path"]
+
+
+def test_v1_rollback_derives_unique_exercise_pointer_from_verified_asset(
+    db: Session, test_settings, tmp_path: Path
+) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.media_migration import build_rollback_plan
+    from app.exercises.models import ExerciseMediaAsset
+
+    legacy = tmp_path / "legacy"
+    old_video = legacy / "old.mp4"
+    old_video.parent.mkdir(parents=True)
+    old_video.write_bytes(b"old video")
+    exercise = _rollback_exercise("rollback-v1-pointer")
+    exercise.media_path = "/media/exercises/canonical.mp4"
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            media_path=exercise.media_path,
+            media_type=MediaType.VIDEO,
+        )
+    )
+    db.add(exercise)
+    db.flush()
+    asset = exercise.media_assets[0]
+    manifest = {
+        "version": 1,
+        "rows": [
+            {
+                "media_asset_id": str(asset.id),
+                "exercise_id": str(exercise.id),
+                "current_db_path": "/media/old.mp4",
+                "destination_public_path": exercise.media_path,
+                "sha256": hashlib.sha256(b"old video").hexdigest(),
+                "hash_verified": True,
+                "db_updated": True,
+            }
+        ],
+    }
+
+    report = build_rollback_plan(
+        db,
+        settings=test_settings,
+        manifest=manifest,
+        legacy_roots=(legacy,),
+    )
+
+    assert report["summary"] == {
+        "total": 2,
+        "planned": 2,
+        "already_restored": 0,
+        "conflict": 0,
+        "missing": 0,
+    }
+    pointer_rows = [row for row in report["rows"] if row["reference_kind"] == "legacy"]
+    assert len(pointer_rows) == 1
+    assert pointer_rows[0]["exercise_id"] == str(exercise.id)
+    assert pointer_rows[0]["current_db_path"] == "/media/old.mp4"
+
+
+def test_inventory_migration_maps_explicit_pointer_before_asset_reordering(
+    db: Session, test_settings, tmp_path: Path
+) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.media_migration import (
+        SourceRoot,
+        build_inventory,
+        copy_and_verify_row,
+        update_database_from_manifest,
+    )
+    from app.exercises.models import ExerciseMediaAsset
+
+    source_root = tmp_path / "legacy"
+    male_path = source_root / "male.mp4"
+    female_path = source_root / "female.mp4"
+    source_root.mkdir()
+    male_path.write_bytes(b"male video")
+    female_path.write_bytes(b"female primary video")
+    exercise = _rollback_exercise("inventory-explicit-pointer")
+    exercise.media_path = "/media/female.mp4"
+    exercise.media_assets.extend(
+        [
+            ExerciseMediaAsset(
+                presentation=MediaPresentation.MALE,
+                role=MediaRole.VIDEO,
+                media_path="/media/male.mp4",
+                media_type=MediaType.VIDEO,
+            ),
+            ExerciseMediaAsset(
+                presentation=MediaPresentation.FEMALE,
+                role=MediaRole.VIDEO,
+                media_path=exercise.media_path,
+                media_type=MediaType.VIDEO,
+            ),
+        ]
+    )
+    db.add(exercise)
+    db.flush()
+
+    manifest = build_inventory(
+        db,
+        settings=test_settings,
+        source_roots=(SourceRoot("legacy", source_root),),
+    )
+    for row in manifest["rows"]:
+        if row["sha256"] is not None:
+            copy_and_verify_row(row)
+    female_asset = next(
+        row
+        for row in manifest["rows"]
+        if row["reference_kind"] == "asset" and row["current_db_path"] == exercise.media_path
+    )
+    female_pointer = next(
+        row
+        for row in manifest["rows"]
+        if row["reference_kind"] == "legacy" and row["exercise_id"] == str(exercise.id)
+    )
+
+    update_database_from_manifest(db, settings=test_settings, manifest=manifest)
+
+    assert exercise.media_path == female_pointer["destination_public_path"]
+    assert exercise.media_path == female_asset["destination_public_path"]
+
+
+def test_v1_rollback_refuses_ambiguous_pointer_derivation(
+    db: Session, test_settings, tmp_path: Path
+) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.media_migration import build_rollback_plan
+    from app.exercises.models import ExerciseMediaAsset
+
+    legacy = tmp_path / "legacy"
+    legacy.mkdir()
+    old_a = legacy / "old-a.mp4"
+    old_b = legacy / "old-b.mp4"
+    old_a.write_bytes(b"old video a")
+    old_b.write_bytes(b"old video b")
+    exercise = _rollback_exercise("rollback-v1-ambiguous")
+    exercise.media_path = "/media/exercises/canonical.mp4"
+    exercise.media_assets.extend(
+        [
+            ExerciseMediaAsset(
+                presentation=MediaPresentation.MALE,
+                role=MediaRole.VIDEO,
+                media_path=exercise.media_path,
+                media_type=MediaType.VIDEO,
+            ),
+            ExerciseMediaAsset(
+                presentation=MediaPresentation.FEMALE,
+                role=MediaRole.VIDEO,
+                media_path=exercise.media_path,
+                media_type=MediaType.VIDEO,
+            ),
+        ]
+    )
+    db.add(exercise)
+    db.flush()
+    manifest = {
+        "version": 1,
+        "rows": [
+            {
+                "media_asset_id": str(asset.id),
+                "exercise_id": str(exercise.id),
+                "current_db_path": f"/media/{old.name}",
+                "current_physical_path": str(old),
+                "destination_public_path": exercise.media_path,
+                "sha256": hashlib.sha256(old.read_bytes()).hexdigest(),
+                "hash_verified": True,
+                "db_updated": True,
+            }
+            for asset, old in zip(exercise.media_assets, (old_a, old_b), strict=True)
+        ],
+    }
+
+    report = build_rollback_plan(
+        db,
+        settings=test_settings,
+        manifest=manifest,
+        legacy_roots=(legacy,),
+    )
+
+    assert report["summary"]["missing"] == 1
+    pointer_rows = [row for row in report["rows"] if row["reference_kind"] == "legacy"]
+    assert len(pointer_rows) == 1
+    assert pointer_rows[0]["status"] == "missing"
+    assert "multiple" in pointer_rows[0]["reason"]
+
+
+def test_v1_rollback_apply_restores_derived_pointer_and_is_idempotent(
+    db: Session, test_settings, tmp_path: Path
+) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.media_migration import apply_database_rollback
+    from app.exercises.models import ExerciseMediaAsset
+
+    legacy = tmp_path / "legacy"
+    old_video = legacy / "old.mp4"
+    legacy.mkdir()
+    old_video.write_bytes(b"old video")
+    exercise = _rollback_exercise("rollback-v1-apply")
+    exercise.media_path = "/media/exercises/canonical.mp4"
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            media_path=exercise.media_path,
+            media_type=MediaType.VIDEO,
+        )
+    )
+    db.add(exercise)
+    db.flush()
+    asset = exercise.media_assets[0]
+    manifest = {
+        "version": 1,
+        "rows": [
+            {
+                "media_asset_id": str(asset.id),
+                "exercise_id": str(exercise.id),
+                "current_db_path": "/media/old.mp4",
+                "current_physical_path": str(old_video),
+                "destination_public_path": exercise.media_path,
+                "sha256": hashlib.sha256(b"old video").hexdigest(),
+                "hash_verified": True,
+                "db_updated": True,
+            }
+        ],
+    }
+
+    report = apply_database_rollback(
+        db,
+        settings=test_settings,
+        manifest=manifest,
+        legacy_roots=(legacy,),
+    )
+    assert report["summary"]["planned"] == 2
+    assert exercise.media_path == "/media/old.mp4"
+    assert asset.media_path == "/media/old.mp4"
+
+    second = apply_database_rollback(
+        db,
+        settings=test_settings,
+        manifest=manifest,
+        legacy_roots=(legacy,),
+    )
+    assert second["summary"]["total"] == 0
+    assert exercise.media_path == "/media/old.mp4"
+    assert asset.media_path == "/media/old.mp4"
+
+
+def test_v1_rollback_recovers_pointer_after_database_commit_before_manifest_write(
+    db: Session, test_settings, tmp_path: Path
+) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.media_migration import apply_database_rollback, build_rollback_plan
+    from app.exercises.models import ExerciseMediaAsset
+
+    legacy = tmp_path / "legacy"
+    old_video = legacy / "old.mp4"
+    legacy.mkdir()
+    old_video.write_bytes(b"old video")
+    exercise = _rollback_exercise("rollback-v1-crash-recovery")
+    exercise.media_path = "/media/old.mp4"
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            media_path=exercise.media_path,
+            media_type=MediaType.VIDEO,
+        )
+    )
+    db.add(exercise)
+    db.flush()
+    asset = exercise.media_assets[0]
+    manifest = {
+        "version": 1,
+        "rows": [
+            {
+                "media_asset_id": str(asset.id),
+                "exercise_id": str(exercise.id),
+                "current_db_path": "/media/old.mp4",
+                "current_physical_path": str(old_video),
+                "destination_public_path": "/media/exercises/canonical.mp4",
+                "sha256": hashlib.sha256(b"old video").hexdigest(),
+                "hash_verified": True,
+                "db_updated": True,
+            }
+        ],
+    }
+
+    report = build_rollback_plan(
+        db,
+        settings=test_settings,
+        manifest=manifest,
+        legacy_roots=(legacy,),
+    )
+
+    assert report["summary"] == {
+        "total": 2,
+        "planned": 0,
+        "already_restored": 2,
+        "conflict": 0,
+        "missing": 0,
+    }
+    pointer_rows = [row for row in report["rows"] if row["reference_kind"] == "legacy"]
+    assert len(pointer_rows) == 1
+    assert pointer_rows[0]["status"] == "already-restored"
+    assert pointer_rows[0]["current_db_path"] == "/media/old.mp4"
+
+    applied = apply_database_rollback(
+        db,
+        settings=test_settings,
+        manifest=manifest,
+        legacy_roots=(legacy,),
+    )
+    assert applied["summary"]["already_restored"] == 2
+    assert len(manifest["rows"]) == 2
+    assert all(row["db_updated"] is False for row in manifest["rows"])
+    repeated = apply_database_rollback(
+        db,
+        settings=test_settings,
+        manifest=manifest,
+        legacy_roots=(legacy,),
+    )
+    assert repeated["summary"]["total"] == 0
+
+
+def test_inventory_preserves_explicit_placeholder_pointer_with_valid_asset(
+    db: Session, test_settings, tmp_path: Path
+) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+    from app.exercises.media_migration import (
+        SourceRoot,
+        build_inventory,
+        copy_and_verify_row,
+        update_database_from_manifest,
+    )
+    from app.exercises.media_resolver import resolve_primary_media
+    from app.exercises.models import ExerciseMediaAsset
+
+    source_root = tmp_path / "legacy"
+    source = source_root / "video.mp4"
+    source_root.mkdir()
+    source.write_bytes(b"valid video")
+    exercise = _rollback_exercise("inventory-fallback-pointer")
+    placeholder = "/media/exercise-placeholder.svg"
+    exercise.media_path = placeholder
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            media_path="/media/video.mp4",
+            media_type=MediaType.VIDEO,
+        )
+    )
+    db.add(exercise)
+    db.flush()
+
+    manifest = build_inventory(
+        db,
+        settings=test_settings,
+        source_roots=(SourceRoot("legacy", source_root),),
+    )
+    rows = [row for row in manifest["rows"] if row["exercise_id"] == str(exercise.id)]
+    pointer_row = next(row for row in rows if row["reference_kind"] == "legacy")
+    assert pointer_row["current_db_path"] == placeholder
+    assert pointer_row["placeholder"] is True
+    assert pointer_row["destination_public_path"] is None
+    for row in rows:
+        if row["sha256"] is not None:
+            copy_and_verify_row(row)
+
+    update_database_from_manifest(db, settings=test_settings, manifest=manifest)
+
+    assert exercise.media_path == placeholder
+    assert resolve_primary_media(exercise).path != placeholder
+    assert resolve_primary_media(exercise).path == next(
+        row["destination_public_path"] for row in rows if row["reference_kind"] == "asset"
+    )
+
+
 def test_apply_rollback_restores_exercise_and_asset_without_deleting_files(
     db: Session, test_settings, tmp_path: Path
 ) -> None:
