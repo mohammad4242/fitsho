@@ -84,9 +84,8 @@ class ProfileCreate(BaseModel):
     workout_generation_method: WorkoutGenerationMethod = WorkoutGenerationMethod.FITSHO_COACH
     session_duration_minutes: SessionDurationMinutes
     training_intensity: TrainingIntensity | None = None
-    physical_limitations: str | None = Field(default=None, max_length=1000)
 
-    @field_validator("display_name", "physical_limitations", mode="before")
+    @field_validator("display_name", mode="before")
     @classmethod
     def normalize_text(cls, value: object) -> object:
         if not isinstance(value, str):
@@ -201,9 +200,8 @@ class ProfileUpdate(BaseModel):
     workout_generation_method: WorkoutGenerationMethod | None = None
     session_duration_minutes: SessionDurationMinutes | None = None
     training_intensity: TrainingIntensity | None = None
-    physical_limitations: str | None = Field(default=None, max_length=1000)
 
-    @field_validator("display_name", "physical_limitations", mode="before")
+    @field_validator("display_name", mode="before")
     @classmethod
     def normalize_text(cls, value: object) -> object:
         if not isinstance(value, str):
@@ -273,7 +271,6 @@ class ProfileUpdate(BaseModel):
         required_fields = profile_fields_set - {
             "home_training_setup",
             "available_equipment",
-            "physical_limitations",
             "training_age_months",
             "preferred_weekdays",
             "priority_muscles",

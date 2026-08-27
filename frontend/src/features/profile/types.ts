@@ -109,7 +109,6 @@ export type ProfileInput = {
   available_equipment?: Equipment[] | null;
   session_duration_minutes: SessionDurationMinutes;
   training_intensity?: TrainingIntensity | null;
-  physical_limitations: string | null;
   training_cautions: TrainingCaution[];
   plan_duration_weeks: PlanDurationWeeks;
   workout_generation_method?: WorkoutGenerationMethod;
@@ -123,6 +122,7 @@ export type Profile = ProfileInput & {
   circumferences_measured_at: string | null;
   created_at: string;
   updated_at: string;
+  physical_limitations: string | null;
 };
 
 export type ProfileFormValues = {
@@ -145,7 +145,6 @@ export type ProfileFormValues = {
   available_equipment?: Equipment[];
   session_duration_minutes: string;
   training_intensity: TrainingIntensity | "";
-  physical_limitations: string;
   training_cautions: TrainingCaution[] | null;
   plan_duration_weeks: string;
 };

@@ -78,7 +78,6 @@ from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET,
 from app.workouts.program_engine.schemas import (
     BodyAnalysisInfluence,
     ExerciseCandidate,
-    Limitation,
     ProgramGenerationRequest,
     RecentTrainingHistory,
     TemplateReference,
@@ -95,7 +94,6 @@ from app.workouts.repository import (
 from app.workouts.schemas import CandidateSet, ProgramGenerationOverrides, WorkoutGenerationProfile
 from app.workouts.signature import (
     build_generation_request_signature,
-    normalize_physical_limitations,
 )
 from app.workouts.time_budget import (
     ExerciseTiming,
@@ -777,7 +775,6 @@ class WorkoutGenerationService:
                 )
             ),
             "training_cautions": [item.value for item in profile.training_cautions],
-            "physical_limitations": profile.physical_limitations,
             "body_analysis_priorities": (
                 [priority.model_dump(mode="json") for priority in body_analysis.priorities]
                 if body_analysis is not None
@@ -810,7 +807,7 @@ class WorkoutGenerationService:
                     key=lambda item: item.value,
                 )
             ),
-            physical_limitations=self._sanitize_limitations(profile.physical_limitations),
+            physical_limitations=None,
             current_weight_kg=source.measurement.weight_kg,
             age=self._age(profile.birth_date),
             sex=profile.sex,
@@ -950,8 +947,6 @@ class WorkoutGenerationService:
         )
         cautions = tuple(item.caution for item in profile.training_caution_items)
         blocked_caution_tags = caution_tags_for_training_cautions(cautions)
-        sanitized = self._sanitize_limitations(profile.physical_limitations)
-        limitations = (Limitation(name=sanitized, stable=False),) if sanitized is not None else ()
         training_age = (
             profile.training_age_months
             if profile.training_age_months is not None
@@ -974,7 +969,7 @@ class WorkoutGenerationService:
             "session_duration_minutes": profile.session_duration_minutes,
             "available_equipment": equipment,
             "training_location": profile.training_location,
-            "injuries_and_limitations": limitations,
+            "injuries_and_limitations": (),
             "blocked_caution_tags": blocked_caution_tags,
             "program_duration_weeks": profile.plan_duration_weeks,
             "body_analysis_influence": body_analysis_influence,
@@ -1283,11 +1278,6 @@ class WorkoutGenerationService:
             - birth_date.year
             - ((today.month, today.day) < (birth_date.month, birth_date.day))
         )
-
-    @staticmethod
-    def _sanitize_limitations(value: str | None) -> str | None:
-        normalized = normalize_physical_limitations(value)
-        return normalized[:500] if normalized is not None else None
 
     @staticmethod
     def plan_duration_weeks(plan: WorkoutPlan) -> int:

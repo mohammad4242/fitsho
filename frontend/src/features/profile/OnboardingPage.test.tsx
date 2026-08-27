@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import {
   MemoryRouter,
@@ -356,20 +356,16 @@ it("returns to step two with entered values preserved", async () => {
   expect(screen.getByLabelText("هدف ورزشی")).toHaveValue("build_muscle");
 });
 
-it("blocks invalid training days and long limitations", async () => {
+it("blocks invalid training days", async () => {
   const user = userEvent.setup();
   renderOnboarding();
   await reachExperienceStep(user);
 
   await user.selectOptions(screen.getByLabelText("سطح تجربه"), "beginner");
   await user.type(screen.getByLabelText("روزهای تمرین در هفته"), "8");
-  fireEvent.change(screen.getByLabelText("محدودیت‌های جسمی (اختیاری)"), {
-    target: { value: "x".repeat(1001) },
-  });
   await user.click(screen.getByRole("button", { name: "ساخت پروفایل" }));
 
   expect(screen.getByText("روزهای تمرین باید بین ۲ تا ۶ باشد.")).toBeInTheDocument();
-  expect(screen.getByText("محدودیت‌ها حداکثر ۱۰۰۰ نویسه است.")).toBeInTheDocument();
   expect(profileContext.createProfile).not.toHaveBeenCalled();
 });
 
@@ -381,11 +377,6 @@ it("submits one normalized typed profile payload", async () => {
   await completeExperienceFields(user);
   await user.click(screen.getByLabelText("احتیاط برای زانو"));
   await user.selectOptions(screen.getByLabelText("مدت این برنامه چقدر باشد؟"), "6");
-  await user.type(
-    screen.getByLabelText("محدودیت‌های جسمی (اختیاری)"),
-    "  knee pain  ",
-  );
-
   await user.click(screen.getByRole("button", { name: "ساخت پروفایل" }));
 
   await waitFor(() => expect(profileContext.createProfile).toHaveBeenCalledOnce());
@@ -409,7 +400,6 @@ it("submits one normalized typed profile payload", async () => {
     available_equipment: null,
     session_duration_minutes: 60,
     training_intensity: "moderate",
-    physical_limitations: "knee pain",
     training_cautions: ["knee"],
     plan_duration_weeks: 6,
   });
@@ -435,10 +425,6 @@ it("keeps entered values and shows an alert when creation fails", async () => {
   renderOnboarding();
   await reachExperienceStep(user, "Mohammad");
   await completeExperienceFields(user);
-  await user.type(
-    screen.getByLabelText("محدودیت‌های جسمی (اختیاری)"),
-    "knee pain",
-  );
 
   await user.click(screen.getByRole("button", { name: "ساخت پروفایل" }));
 
@@ -446,9 +432,7 @@ it("keeps entered values and shows an alert when creation fails", async () => {
     "درخواست انجام نشد",
   );
   expect(screen.getByLabelText("روزهای تمرین در هفته")).toHaveValue(3);
-  expect(screen.getByLabelText("محدودیت‌های جسمی (اختیاری)")).toHaveValue(
-    "knee pain",
-  );
+  expect(screen.queryByLabelText("محدودیت‌های جسمی (اختیاری)")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "بازگشت" }));
   await user.click(screen.getByRole("button", { name: "بازگشت" }));
   expect(screen.getByLabelText("نام نمایشی")).toHaveValue("Mohammad");

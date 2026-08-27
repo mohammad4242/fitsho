@@ -11,7 +11,7 @@ const values = {
   height_cm: "165", current_weight_kg: "62", shoulder_circumference_cm: "",
   waist_circumference_cm: "", hip_circumference_cm: "", fitness_goal: "fat_loss" as const,
   experience_level: "" as const, training_days_per_week: "", preferred_weekdays: [], priority_muscles: [], training_location: "" as const,
-  home_training_setup: "" as const, session_duration_minutes: "", physical_limitations: "",
+  home_training_setup: "" as const, session_duration_minutes: "",
   training_intensity: "" as const,
   training_age_months: "",
   training_cautions: null, plan_duration_weeks: "4",

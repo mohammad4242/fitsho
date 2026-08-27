@@ -214,9 +214,7 @@ it("renders every saved profile value in its editable profile page", async () =>
     "75",
   );
   expect(screen.getByLabelText("شدت معمول تمرین")).toHaveValue("moderate");
-  expect(screen.getByLabelText("محدودیت‌های جسمی (اختیاری)")).toHaveValue(
-    "Knee pain",
-  );
+  expect(screen.queryByLabelText("محدودیت‌های جسمی (اختیاری)")).not.toBeInTheDocument();
 });
 
 it("uses the supplied training still in the profile header", () => {
@@ -319,23 +317,15 @@ it("sends only a changed current weight", async () => {
   );
 });
 
-it("sends null when physical limitations are cleared", async () => {
-  context.updateProfile.mockResolvedValue({
-    ...savedProfile,
-    physical_limitations: null,
-  });
+it("does not expose or patch legacy free-text limitations", async () => {
   const user = userEvent.setup();
   renderProfilePage();
 
   await openTrainingPage(user);
-  await user.clear(screen.getByLabelText("محدودیت‌های جسمی (اختیاری)"));
+  expect(screen.queryByLabelText("محدودیت‌های جسمی (اختیاری)")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
 
-  await waitFor(() =>
-    expect(context.updateProfile).toHaveBeenCalledWith({
-      physical_limitations: null,
-    }),
-  );
+  expect(context.updateProfile).not.toHaveBeenCalled();
 });
 
 it("updates the canonical home equipment inventory and derived legacy setup", async () => {

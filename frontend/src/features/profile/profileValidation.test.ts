@@ -31,7 +31,6 @@ const validValues: ProfileFormValues = {
   available_equipment: [],
   session_duration_minutes: "60",
   training_intensity: "moderate",
-  physical_limitations: "",
   training_cautions: [],
   plan_duration_weeks: "4",
 };
@@ -149,7 +148,7 @@ describe("profile validation", () => {
     });
   });
 
-  it("accepts only two through six training days and catches overlong limitations", () => {
+  it("accepts only two through six training days", () => {
     expect(validateStep({ ...validValues, training_days_per_week: "6" }, 3, today)).toEqual({});
     expect(validateStep({ ...validValues, training_days_per_week: "1" }, 3, today)).toEqual({
       training_days_per_week: "trainingDaysRange",
@@ -157,9 +156,6 @@ describe("profile validation", () => {
     expect(validateStep({ ...validValues, training_days_per_week: "7" }, 3, today)).toEqual({
       training_days_per_week: "trainingDaysRange",
     });
-    expect(
-      validateStep({ ...validValues, physical_limitations: "x".repeat(1001) }, 3, today),
-    ).toEqual({ physical_limitations: "limitationsLength" });
   });
 
   it("limits preferred weekdays to the configured training days", () => {
@@ -225,7 +221,6 @@ describe("profile validation", () => {
         waist_circumference_cm: " 84 ",
         hip_circumference_cm: " 98.25 ",
         training_days_per_week: " 3 ",
-        physical_limitations: "   ",
       }),
     ).toEqual({
       display_name: "Mohammad",
@@ -247,10 +242,13 @@ describe("profile validation", () => {
       available_equipment: null,
       session_duration_minutes: 60,
       training_intensity: "moderate",
-      physical_limitations: null,
-  training_cautions: [],
-  plan_duration_weeks: 4,
+      training_cautions: [],
+      plan_duration_weeks: 4,
     });
+  });
+
+  it("does not serialize legacy free-text limitations", () => {
+    expect(toProfileInput(validValues)).not.toHaveProperty("physical_limitations");
   });
 
   it("converts a saved profile into editable string values", () => {

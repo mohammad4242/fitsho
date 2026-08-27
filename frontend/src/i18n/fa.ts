@@ -209,11 +209,9 @@ const fa = {
         trainingIntensity: "شدت معمول تمرین",
         trainingCautions: "موارد احتیاط تمرین",
         planDuration: "مدت این برنامه چقدر باشد؟",
-        limitations: "محدودیت‌های جسمی (اختیاری)",
       },
       hints: {
         birthDate: "سن باید بین ۱۸ تا ۱۰۰ سال باشد.",
-        limitations: "آسیب‌دیدگی یا شرایطی که باید در تمرین در نظر گرفته شود.",
         trainingAge: "اگر تمرین منظم نداشتی، خالی بگذار.",
         preferredWeekdays: "حداکثر به اندازه تعداد روزهای تمرین انتخاب کن.",
         priorityMuscles: "در صورت تمایل، نواحی مهم برای برنامه‌های بعدی را انتخاب کن.",
@@ -338,7 +336,6 @@ const fa = {
         preferredWeekdaysInvalid: "تعداد روزهای ترجیحی نمی‌تواند از روزهای تمرین بیشتر باشد.",
         sessionDurationInvalid: "زمان جلسه باید یکی از گزینه‌های موجود باشد.",
         planDurationInvalid: "مدت برنامه باید ۴، ۶ یا ۸ هفته باشد.",
-        limitationsLength: "محدودیت‌ها حداکثر ۱۰۰۰ نویسه است.",
       },
     },
     errors: {

@@ -141,7 +141,6 @@ def create_profile(
         ),
         "session_duration_minutes": payload.session_duration_minutes,
         "training_intensity": payload.training_intensity,
-        "physical_limitations": payload.physical_limitations,
         "plan_duration_weeks": payload.plan_duration_weeks,
         "workout_generation_method": payload.workout_generation_method,
     }.items():

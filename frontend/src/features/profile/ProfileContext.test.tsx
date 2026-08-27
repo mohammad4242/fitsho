@@ -41,7 +41,6 @@ const profileInput: ProfileInput = {
   training_location: "gym",
   home_training_setup: null,
   session_duration_minutes: 60,
-  physical_limitations: null,
   training_cautions: [],
   plan_duration_weeks: 4,
 };
@@ -49,6 +48,7 @@ const profileInput: ProfileInput = {
 const profile: Profile = {
   ...profileInput,
   user_id: user.id,
+  physical_limitations: null,
   weight_measured_at: "2026-07-27T10:30:00Z",
   circumferences_measured_at: null,
   created_at: "2026-07-27T10:30:00Z",

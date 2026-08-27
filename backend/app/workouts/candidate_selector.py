@@ -54,6 +54,8 @@ _ALLOWED_DIFFICULTIES: dict[ExperienceLevel, frozenset[Difficulty]] = {
     ExperienceLevel.INTERMEDIATE: frozenset({Difficulty.BEGINNER, Difficulty.INTERMEDIATE}),
     ExperienceLevel.ADVANCED: frozenset(Difficulty),
 }
+
+
 class WorkoutCandidateSelector:
     def __init__(self, db: Session, *, maximum_candidates: int | None = 80) -> None:
         self._db = db

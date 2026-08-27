@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import unicodedata
 from collections.abc import Iterable, Mapping
 from decimal import Decimal
 from enum import Enum
@@ -59,18 +58,6 @@ def _canonical_value(value: object) -> object:
     return value
 
 
-def normalize_physical_limitations(value: str | None) -> str | None:
-    if value is None:
-        return None
-    normalized = unicodedata.normalize("NFKC", value)
-    normalized = "".join(
-        " " if unicodedata.category(character).startswith("C") else character
-        for character in normalized
-    )
-    normalized = " ".join(normalized.split()).casefold()
-    return normalized or None
-
-
 def weight_bucket(weight_kg: Decimal | float | int | None) -> int | None:
     if weight_kg is None:
         return None
@@ -107,13 +94,11 @@ def build_generation_signature(context: GenerationSignatureContext) -> str:
         "training_location": _value(context.training_location),
         "home_training_setup": _value(context.home_training_setup),
         "available_equipment": sorted(
-            _string_value(value)
-            for value in (context.available_equipment or frozenset())
+            _string_value(value) for value in (context.available_equipment or frozenset())
         ),
         "session_duration_minutes": context.session_duration_minutes,
         "plan_duration_weeks": context.plan_duration_weeks,
         "training_cautions": sorted(_string_value(value) for value in context.training_cautions),
-        "physical_limitations": normalize_physical_limitations(context.physical_limitations),
         "weight_bucket_kg": weight_bucket(context.current_weight_kg),
         "candidate_set_hash": context.candidate_set_hash,
         "catalog_programming_version": context.catalog_programming_version,

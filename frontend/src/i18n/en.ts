@@ -209,11 +209,9 @@ const en = {
         trainingIntensity: "Usual training intensity",
         trainingCautions: "Training considerations",
         planDuration: "How long should this plan run?",
-        limitations: "Physical limitations (optional)",
       },
       hints: {
         birthDate: "Age must be between 18 and 100.",
-        limitations: "Injuries or conditions that should be considered during training.",
         trainingAge: "Leave blank if you have not trained regularly.",
         preferredWeekdays: "Choose no more than your number of training days.",
         priorityMuscles: "Optionally choose areas to carry into future programs.",
@@ -338,7 +336,6 @@ const en = {
         preferredWeekdaysInvalid: "Preferred weekdays cannot exceed training days.",
         sessionDurationInvalid: "Choose one of the available session durations.",
         planDurationInvalid: "Choose 4, 6, or 8 weeks.",
-        limitationsLength: "Limitations can have at most 1,000 characters.",
       },
     },
     errors: {

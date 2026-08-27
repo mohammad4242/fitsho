@@ -46,7 +46,6 @@ const emptyValues: ProfileFormValues = {
   available_equipment: [],
   session_duration_minutes: "",
   training_intensity: "",
-  physical_limitations: "",
   training_cautions: null,
   plan_duration_weeks: "4",
 };
@@ -261,7 +260,6 @@ export function OnboardingPage() {
                 disabled={busy}
                 onChange={updateValue}
               />
-              <button className="text-button" type="button" onClick={() => updateValue("physical_limitations", "")}>رد کردن توضیحات اختیاری</button>
             </>
           )}
 

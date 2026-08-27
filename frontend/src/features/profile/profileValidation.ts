@@ -30,8 +30,7 @@ export type ProfileValidationCode =
   | "trainingAgeRange"
   | "preferredWeekdaysInvalid"
   | "sessionDurationInvalid"
-  | "planDurationInvalid"
-  | "limitationsLength";
+  | "planDurationInvalid";
 
 export type ProfileValidationErrors = Partial<
   Record<keyof ProfileFormValues, ProfileValidationCode>
@@ -221,9 +220,6 @@ function validateStepThree(values: ProfileFormValues): ProfileValidationErrors {
     errors.plan_duration_weeks = "planDurationInvalid";
   }
 
-  if (values.physical_limitations.trim().length > 1000) {
-    errors.physical_limitations = "limitationsLength";
-  }
   return errors;
 }
 
@@ -295,7 +291,6 @@ export function toProfileInput(values: ProfileFormValues): ProfileInput {
       values.session_duration_minutes,
     ) as SessionDurationMinutes,
     training_intensity: values.training_intensity as ProfileInput["training_intensity"],
-    physical_limitations: values.physical_limitations.trim() || null,
     training_cautions: values.training_cautions as TrainingCaution[],
     plan_duration_weeks: Number(values.plan_duration_weeks) as PlanDurationWeeks,
   };
@@ -324,7 +319,6 @@ export function profileToFormValues(profile: Profile): ProfileFormValues {
     available_equipment: [...(profile.available_equipment ?? [])],
     session_duration_minutes: String(profile.session_duration_minutes),
     training_intensity: profile.training_intensity ?? "",
-    physical_limitations: profile.physical_limitations ?? "",
     training_cautions: profile.training_cautions,
     plan_duration_weeks: String(profile.plan_duration_weeks),
   };
@@ -395,9 +389,6 @@ export function toProfilePatch(
   }
   if (input.training_intensity !== currentProfile.training_intensity) {
     patch.training_intensity = input.training_intensity;
-  }
-  if (input.physical_limitations !== currentProfile.physical_limitations) {
-    patch.physical_limitations = input.physical_limitations;
   }
   if (input.training_cautions.join(",") !== currentProfile.training_cautions.join(",")) {
     patch.training_cautions = input.training_cautions;

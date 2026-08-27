@@ -132,7 +132,7 @@ it("offers email at the final account step and labels other providers upcoming",
       current_weight_kg: 76, shoulder_circumference_cm: null, waist_circumference_cm: null,
       hip_circumference_cm: null, fitness_goal: "build_muscle", experience_level: "beginner",
       training_days_per_week: 3, training_location: "gym", home_training_setup: null,
-      session_duration_minutes: 60, physical_limitations: null, training_cautions: [], plan_duration_weeks: 4,
+      session_duration_minutes: 60, training_cautions: [], plan_duration_weeks: 4,
     },
     readyForAuth: true,
   }));

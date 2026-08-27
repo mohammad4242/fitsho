@@ -22,7 +22,6 @@ VALID_PROFILE = {
     "training_location": "home",
     "home_training_setup": "dumbbells_available",
     "session_duration_minutes": 60,
-    "physical_limitations": None,
 }
 
 
@@ -169,7 +168,7 @@ def test_patch_rejects_explicit_null_for_required_field(client: TestClient) -> N
     assert response.status_code == 422
 
 
-def test_patch_clears_limitations_with_null(client: TestClient) -> None:
+def test_patch_rejects_legacy_limitation_input(client: TestClient) -> None:
     register(client)
     create_profile(client)
 
@@ -179,8 +178,7 @@ def test_patch_clears_limitations_with_null(client: TestClient) -> None:
         json={"physical_limitations": None},
     )
 
-    assert response.status_code == 200
-    assert response.json()["physical_limitations"] is None
+    assert response.status_code == 422
 
 
 def test_patch_switching_to_gym_clears_home_training_setup(

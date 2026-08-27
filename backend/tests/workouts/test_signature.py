@@ -54,9 +54,9 @@ def test_relevant_conditions_and_candidate_set_change_generation_signature() -> 
     )
 
 
-def test_limitations_normalization_ignores_unicode_form_and_control_character_changes() -> None:
+def test_legacy_limitation_text_does_not_affect_generation_signature() -> None:
     baseline = build_generation_signature(context(physical_limitations="avoid shoulder load"))
 
     assert baseline == build_generation_signature(
-        context(physical_limitations="avoid\u0000  shoulder\tload")
+        context(physical_limitations="a completely different legacy note")
     )

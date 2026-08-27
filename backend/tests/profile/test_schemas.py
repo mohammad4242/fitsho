@@ -23,7 +23,6 @@ def valid_payload() -> dict[str, object]:
         "training_location": "gym",
         "home_training_setup": None,
         "session_duration_minutes": 60,
-        "physical_limitations": "   ",
     }
 
 
@@ -32,7 +31,7 @@ def test_profile_create_normalizes_text_and_decimal() -> None:
 
     assert profile.display_name == "Mohammad"
     assert profile.current_weight_kg == Decimal("76.50")
-    assert profile.physical_limitations is None
+    assert "physical_limitations" not in profile.model_dump()
     assert profile.training_age_months == 24
     assert profile.preferred_weekdays == (0, 2, 4)
     assert profile.priority_muscles == ("back", "glutes")
@@ -153,7 +152,6 @@ def test_profile_create_accepts_the_ninety_plus_workout_duration() -> None:
     [
         ("display_name", " x "),
         ("display_name", "x" * 81),
-        ("physical_limitations", "x" * 1001),
     ],
 )
 def test_profile_create_rejects_invalid_text_lengths(field: str, value: object) -> None:
@@ -192,10 +190,9 @@ def test_profile_update_rejects_empty_body_and_null_required_field() -> None:
         ProfileUpdate.model_validate({"height_cm": None})
 
 
-def test_profile_update_allows_clearing_limitations() -> None:
-    update = ProfileUpdate.model_validate({"physical_limitations": None})
-
-    assert update.model_fields_set == {"physical_limitations"}
+def test_profile_update_ignores_legacy_limitation_input() -> None:
+    with pytest.raises(ValidationError, match="At least one profile field is required"):
+        ProfileUpdate.model_validate({"physical_limitations": None})
 
 
 def test_profile_update_normalizes_supplied_text() -> None:
@@ -204,7 +201,7 @@ def test_profile_update_normalizes_supplied_text() -> None:
     )
 
     assert update.display_name == "Mohammad"
-    assert update.physical_limitations == "Knee pain"
+    assert "physical_limitations" not in update.model_dump()
 
 
 def test_home_profile_requires_training_setup() -> None:

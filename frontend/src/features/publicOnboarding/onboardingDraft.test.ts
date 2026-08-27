@@ -22,7 +22,6 @@ const trainingInput = {
   training_location: "gym" as const,
   home_training_setup: null,
   session_duration_minutes: 60 as const,
-  physical_limitations: null,
   training_cautions: [],
   plan_duration_weeks: 4 as const,
 };
@@ -35,7 +34,7 @@ beforeEach(() => {
   });
   vi.mocked(profileApi.createProfile).mockResolvedValue({
     ...trainingInput,
-    user_id: "u1", weight_measured_at: "now", circumferences_measured_at: null,
+    user_id: "u1", physical_limitations: null, weight_measured_at: "now", circumferences_measured_at: null,
     created_at: "now", updated_at: "now",
   });
   vi.mocked(nutritionApi.saveSafetyProfile).mockResolvedValue({} as never);

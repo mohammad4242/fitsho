@@ -229,6 +229,23 @@ def test_generation_overrides_do_not_erase_profile_caution_constraints(db: Sessi
     )
 
 
+def test_legacy_physical_limitations_do_not_become_uncomputable_generation_constraints(
+    db: Session,
+) -> None:
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.physical_limitations = "old lower-back note from the legacy form"
+    profile.training_caution_items.append(
+        UserProfileTrainingCaution(caution=TrainingCaution.LOWER_BACK)
+    )
+    db.flush()
+
+    request = _service(db)._to_program_request(get_profile(db, user.id), None)
+
+    assert request.injuries_and_limitations == ()
+    assert ExerciseCautionTag.LOWER_BACK_LOADING in request.blocked_caution_tags
+
+
 def test_domain_candidate_uses_persisted_programming_metadata(db: Session) -> None:
     exercise = _exercise(
         db,
@@ -438,7 +455,6 @@ def _ai_template(slug: str, exercise_ids: tuple[object, ...]) -> TemplateReferen
         slug=slug,
         days_per_week=2,
         supported_levels=("beginner",),
-        fitness_goal="build_muscle",
         focus_tags=("balanced",),
         intensity_methods=("standard",),
         days=tuple(
@@ -456,8 +472,8 @@ def _ai_template(slug: str, exercise_ids: tuple[object, ...]) -> TemplateReferen
                         adaptation_priority="core",
                         superset_group=None,
                         superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+                        superset_exercise_slug_hint=None,
+                        sets=3,
                         rep_min=8,
                         rep_max=12,
                         target_rir=2,

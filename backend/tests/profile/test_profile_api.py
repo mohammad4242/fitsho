@@ -25,7 +25,6 @@ VALID_PROFILE = {
     "training_location": "gym",
     "home_training_setup": None,
     "session_duration_minutes": 60,
-    "physical_limitations": None,
 }
 
 
@@ -309,8 +308,8 @@ def test_commit_failure_rolls_back_profile_and_measurement(
     assert db.scalar(select(BodyMeasurement).where(BodyMeasurement.user_id == user_id)) is None
 
 
-def test_profile_validation_does_not_echo_sensitive_text(client: TestClient) -> None:
-    register(client)
+def test_profile_create_ignores_legacy_limitation_text(client: TestClient) -> None:
+    user_id = register(client)
     rejected_text = "sensitive medical detail"
     response = client.post(
         "/api/v1/profile",
@@ -318,9 +317,12 @@ def test_profile_validation_does_not_echo_sensitive_text(client: TestClient) -> 
         json={**VALID_PROFILE, "physical_limitations": rejected_text * 100},
     )
 
-    assert response.status_code == 422
+    assert response.status_code == 201
     assert rejected_text not in response.text
-    assert all("input" not in error for error in response.json()["detail"])
+    assert response.json()["physical_limitations"] is None
+    profile = client.get("/api/v1/profile", headers=ORIGIN)
+    assert profile.status_code == 200
+    assert profile.json()["user_id"] == str(user_id)
 
 
 def test_profile_stores_normalized_training_cautions_and_plan_duration(

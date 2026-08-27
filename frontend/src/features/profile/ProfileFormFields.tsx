@@ -574,31 +574,6 @@ export function ExperienceFields({
         <FieldError field="plan_duration_weeks" error={errors.plan_duration_weeks} />
       </div>
 
-      <div className="profile-field">
-        <label htmlFor="profile-limitations">{t("onboarding.fields.limitations")}</label>
-        <textarea
-          id="profile-limitations"
-          name="physical_limitations"
-          autoComplete="off"
-          maxLength={1000}
-          rows={4}
-          value={values.physical_limitations}
-          aria-invalid={errors.physical_limitations !== undefined}
-          aria-describedby={describedBy(
-            "physical_limitations",
-            errors.physical_limitations,
-            true,
-          )}
-          onChange={(event) => onChange("physical_limitations", event.target.value)}
-        />
-        <p className="profile-field__hint" id="physical_limitations-hint">
-          {t("onboarding.hints.limitations")}
-        </p>
-        <FieldError
-          field="physical_limitations"
-          error={errors.physical_limitations}
-        />
-      </div>
     </fieldset>
   );
 }
