@@ -623,7 +623,7 @@ def test_volume_planner_tracks_all_muscles_and_priority_can_target_biceps() -> N
     )
 
 
-def test_specialized_four_day_split_caps_volume_to_one_safe_exposure() -> None:
+def test_specialized_four_day_split_respects_session_volume_cap() -> None:
     request = normalized(
         primary_goal=Goal.HYPERTROPHY,
         available_training_days=4,
@@ -635,7 +635,7 @@ def test_specialized_four_day_split_caps_volume_to_one_safe_exposure() -> None:
 
     assert plan.direct_sets_for(MuscleGroup.CHEST) <= RULESET.max_sets_per_muscle_per_session
     assert plan.direct_sets_for(MuscleGroup.SHOULDERS) <= RULESET.max_sets_per_muscle_per_session
-    assert "VOLUME_CAPPED_FOR_SPLIT_FREQUENCY" in plan.reason_codes
+    assert "VOLUME_CAPPED_FOR_SPLIT_FREQUENCY" not in plan.reason_codes
 
 
 def test_poor_recovery_reduces_volume_without_falling_below_novice_floor() -> None:

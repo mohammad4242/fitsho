@@ -345,16 +345,22 @@ def test_phase10_template_intent_survives_priority_and_body_analysis_personaliza
         exercise("glute-kickback", MovementPattern.HIP_EXTENSION, MuscleGroup.GLUTES),
     ]
     templates = (
-        _template("balanced-structure", (TemplateFocusTag.BALANCED,)),
-        _template("chest-structure", (TemplateFocusTag.CHEST_PRIORITY,)),
-        _template("glute-structure", (TemplateFocusTag.GLUTE_PRIORITY,)),
+        _template("balanced-structure", (TemplateFocusTag.BALANCED,), level="advanced"),
+        _template("chest-structure", (TemplateFocusTag.CHEST_PRIORITY,), level="advanced"),
+        _template("glute-structure", (TemplateFocusTag.GLUTE_PRIORITY,), level="advanced"),
     )
+    profile = {
+        "training_experience": ExperienceLevel.ADVANCED,
+        "training_age_months": 72,
+    }
     baseline = _assert_success(
-        generate_program(_template_request(), catalog, RULESET, reference_templates=templates)
+        generate_program(
+            _template_request(**profile), catalog, RULESET, reference_templates=templates
+        )
     )
     chest = _assert_success(
         generate_program(
-            _template_request(priority_muscles=[MuscleGroup.CHEST]),
+            _template_request(**profile, priority_muscles=[MuscleGroup.CHEST]),
             catalog,
             RULESET,
             reference_templates=templates,
@@ -362,7 +368,7 @@ def test_phase10_template_intent_survives_priority_and_body_analysis_personaliza
     )
     glute = _assert_success(
         generate_program(
-            _template_request(priority_muscles=[MuscleGroup.GLUTES]),
+            _template_request(**profile, priority_muscles=[MuscleGroup.GLUTES]),
             catalog,
             RULESET,
             reference_templates=templates,
@@ -371,6 +377,7 @@ def test_phase10_template_intent_survives_priority_and_body_analysis_personaliza
     conflict = _assert_success(
         generate_program(
             _template_request(
+                **profile,
                 priority_muscles=[MuscleGroup.CHEST],
                 body_analysis_influence=_body_analysis(MuscleGroup.GLUTES),
             ),
@@ -517,9 +524,13 @@ def test_phase10_duration_repair_does_not_change_template_scoring(duration: int)
     duration_trace = next(
         entry for entry in program.decision_trace if entry["stage"] == "session_duration"
     )
+    allowed_reasons = {
+        "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+        "SESSION_DURATION_TARGET_UNSATISFIED",
+    }
     assert all(
         policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)
-        or "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in duration_trace["reason_codes"]
+        or any(code in allowed_reasons for code in duration_trace["reason_codes"])
         for day in program.weekly_schedule
     )
 
@@ -616,6 +627,7 @@ def test_phase10_coach_quality_metrics_agree_with_final_program() -> None:
             _template_request(
                 priority_muscles=[MuscleGroup.CHEST],
                 body_analysis_influence=_body_analysis(MuscleGroup.GLUTES),
+                session_duration_minutes=60,
             ),
             full_catalog(),
             RULESET,

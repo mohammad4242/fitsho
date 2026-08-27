@@ -108,7 +108,7 @@ def test_volume_repair_uses_a_second_exercise_before_dumping_sets() -> None:
     first = _programmed("Push-Up", MuscleGroup.CHEST, 4)
     second = _candidate("Chest Press", MuscleGroup.CHEST)
 
-    days, reasons = repair_weekly_volume(
+    days, _ = repair_weekly_volume(
         (_day(1, (first,)),),
         normalized(),
         _volume_target(MuscleGroup.CHEST),
@@ -119,10 +119,44 @@ def test_volume_repair_uses_a_second_exercise_before_dumping_sets() -> None:
     chest = [
         item for day in days for item in day.exercises if item.primary_muscle is MuscleGroup.CHEST
     ]
-    # Under new rules (min 3, session max 6), Push-Up takes 4 sets, leaving 2 slots.
-    # 2 < minimum_working_sets (3), so Chest Press cannot be added — only 1 exercise.
-    assert len(chest) == 1
-    assert max(item.sets for item in chest) <= 5
+    assert len(chest) == 2
+    assert sum(item.sets for item in chest) == 8
+    assert all(item.sets <= RULESET.max_working_sets_per_exercise_absolute for item in chest)
+
+
+def test_volume_repair_allows_twelve_direct_sets_for_one_muscle_in_session() -> None:
+    exercises = tuple(
+        _programmed(f"Chest Exercise {index}", MuscleGroup.CHEST, 4) for index in range(3)
+    )
+
+    days, _ = repair_weekly_volume(
+        (_day(1, exercises),),
+        normalized(),
+        _volume_target(MuscleGroup.CHEST, target_sets=12),
+        RULESET,
+    )
+
+    chest = tuple(item for item in days[0].exercises if item.primary_muscle is MuscleGroup.CHEST)
+    assert sum(item.sets for item in chest) == 12
+    assert all(item.sets <= RULESET.max_working_sets_per_exercise_absolute for item in chest)
+
+
+def test_volume_repair_reduces_more_than_twelve_direct_sets_in_one_session() -> None:
+    exercises = tuple(
+        _programmed(f"Chest Exercise {index}", MuscleGroup.CHEST, 4) for index in range(4)
+    )
+
+    days, _ = repair_weekly_volume(
+        (_day(1, exercises),),
+        normalized(),
+        _volume_target(MuscleGroup.CHEST, target_sets=16),
+        RULESET,
+    )
+
+    chest_sets = sum(
+        item.sets for item in days[0].exercises if item.primary_muscle is MuscleGroup.CHEST
+    )
+    assert chest_sets == 12
 
 
 def test_volume_repair_spreads_existing_sets_across_days() -> None:

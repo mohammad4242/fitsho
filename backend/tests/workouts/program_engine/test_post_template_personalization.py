@@ -402,8 +402,8 @@ def test_same_template_gives_explicit_chest_priority_more_final_direct_volume() 
 def test_explicit_chest_priority_dominates_conflicting_body_analysis_lag() -> None:
     source = request(
         primary_goal="build_muscle",
-        training_experience="intermediate",
-        training_age_months=24,
+        training_experience="advanced",
+        training_age_months=72,
         available_training_days=4,
         session_duration_minutes=60,
         priority_muscles=[MuscleGroup.CHEST],

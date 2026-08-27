@@ -121,7 +121,8 @@ def test_priority_frequency_is_only_increased_when_volume_needs_distribution() -
     policy = PriorityAllocationPolicy.for_request(normalized, RULESET)
 
     assert policy.useful_frequency(5, RULESET) == 1
-    assert policy.useful_frequency(9, RULESET) == 2
+    assert policy.useful_frequency(12, RULESET) == 1
+    assert policy.useful_frequency(13, RULESET) == 2
 
 
 def _six_day_priority_request(*, priorities: frozenset[MuscleGroup]) -> ProgramGenerationRequest:
@@ -270,18 +271,18 @@ def test_priority_is_satisfied_when_catalog_can_provide_frequency_capacity() -> 
     result = generate_program(
         request(
             primary_goal=Goal.MUSCLE_GAIN,
-            training_experience=TrainingExperience.INTERMEDIATE,
-            training_age_months=30,
+            training_experience=TrainingExperience.ADVANCED,
+            training_age_months=72,
             available_training_days=4,
-            session_duration_minutes=45,
-            priority_muscles=[MuscleGroup.GLUTES],
+            session_duration_minutes=60,
+            priority_muscles=[MuscleGroup.CHEST],
         ),
         full_catalog(),
         RULESET,
     )
 
     assert result.program is not None, result.errors
-    metrics = result.program.aggregate_metrics["priority_metrics"][MuscleGroup.GLUTES.value]
+    metrics = result.program.aggregate_metrics["priority_metrics"][MuscleGroup.CHEST.value]
     assert metrics["status"] == "satisfied"
     assert metrics["session_frequency"] >= metrics["preferred_frequency"]
     assert "PRIORITY_FREQUENCY_INCREASED" in metrics["reason_codes"]
