@@ -1132,7 +1132,7 @@ class WorkoutGenerationService:
             axial_loading_level=(
                 LoadLimit.HIGH
                 if ExerciseCautionTag.LOWER_BACK_LOADING in caution_tags
-                else LoadLimit.LOW
+                else demands.axial_loading_level
             ),
             fatigue_cost=demands.fatigue_cost,
             setup_cost=demands.setup_cost,

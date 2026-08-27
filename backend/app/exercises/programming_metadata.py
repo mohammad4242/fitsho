@@ -80,6 +80,7 @@ class InferredExerciseDemands:
     stability_demand: StabilityDemand
     skill_demand: SkillDemand
     impact_level: ImpactLimit
+    axial_loading_level: LoadLimit
     fatigue_cost: int
     setup_cost: int
 
@@ -93,6 +94,8 @@ def _name_tokens(exercise: Exercise) -> str:
 
 
 def _infer_body_position(exercise: Exercise) -> BodyPosition | None:
+    if exercise.body_position is not None:
+        return exercise.body_position
     name = _name_tokens(exercise)
     if "push up" in name:
         return BodyPosition.SUPPORTED
@@ -133,7 +136,10 @@ def _infer_skill_demand(exercise: Exercise) -> SkillDemand:
     }[exercise.difficulty]
 
 
-def _infer_axial_loading(exercise: Exercise) -> LoadLimit | None:
+def _infer_axial_loading(
+    exercise: Exercise,
+    body_position: BodyPosition | None = None,
+) -> LoadLimit | None:
     cautions = _values(item.caution_tag for item in exercise.caution_tag_items)
     equipment = _values(item.equipment for item in exercise.equipment_items)
     if Equipment.BARBELL in equipment and exercise.movement_pattern in {
@@ -142,6 +148,12 @@ def _infer_axial_loading(exercise: Exercise) -> LoadLimit | None:
     }:
         return LoadLimit.HIGH
     if ExerciseCautionTag.LOWER_BACK_LOADING in cautions:
+        return LoadLimit.MODERATE
+    if (
+        exercise.movement_pattern is MovementPattern.HORIZONTAL_PULL
+        and (body_position or _infer_body_position(exercise) or BodyPosition.STANDING)
+        is BodyPosition.STANDING
+    ):
         return LoadLimit.MODERATE
     return None
 
@@ -228,6 +240,7 @@ def infer_exercise_demands(exercise: Exercise) -> InferredExerciseDemands:
         stability_demand=stability,
         skill_demand=skill,
         impact_level=impact,
+        axial_loading_level=_infer_axial_loading(exercise, body_position) or LoadLimit.LOW,
         fatigue_cost=fatigue,
         setup_cost=setup,
     )
@@ -249,7 +262,7 @@ def infer_programming_metadata(exercise: Exercise) -> dict[str, object]:
     if exercise.exercise_type is ExerciseType.MOBILITY:
         metadata["impact_level"] = ImpactLimit.LOW
 
-    axial_loading_level = _infer_axial_loading(exercise)
+    axial_loading_level = _infer_axial_loading(exercise, body_position)
     if axial_loading_level is not None:
         metadata["axial_loading_level"] = axial_loading_level
 

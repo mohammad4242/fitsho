@@ -1,7 +1,8 @@
+from dataclasses import replace
 from uuid import uuid4
 
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
-from app.workouts.program_engine.enums import RecoveryRating, SplitType
+from app.workouts.program_engine.enums import BodyPosition, LoadLimit, RecoveryRating, SplitType
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.recovery import (
     ExposureLoad,
@@ -19,6 +20,11 @@ def _exercise(
     *,
     sets: int,
     reason_codes: tuple[str, ...] = ("TEST",),
+    primary_muscle: MuscleGroup = MuscleGroup.BICEPS,
+    secondary_muscles: tuple[MuscleGroup, ...] = (),
+    movement_pattern: MovementPattern = MovementPattern.ELBOW_FLEXION,
+    body_position: BodyPosition = BodyPosition.STANDING,
+    axial_loading_level: LoadLimit = LoadLimit.LOW,
 ) -> ProgrammedExercise:
     return ProgrammedExercise(
         exercise_id=uuid4(),
@@ -31,8 +37,11 @@ def _exercise(
         rest_seconds=75,
         estimated_minutes=5,
         reason_codes=reason_codes,
-        movement_pattern=MovementPattern.ELBOW_FLEXION,
-        primary_muscle=MuscleGroup.BICEPS,
+        movement_pattern=movement_pattern,
+        primary_muscle=primary_muscle,
+        secondary_muscles=secondary_muscles,
+        body_position=body_position,
+        axial_loading_level=axial_loading_level,
         exercise_type=ExerciseType.ISOLATION,
     )
 
@@ -95,6 +104,48 @@ def test_high_exposure_requires_two_day_calendar_spacing() -> None:
         (_day(weekday=0, exercise=high), _day(weekday=2, exercise=_exercise(sets=2))),
         RULESET,
     )
+
+
+def test_meaningful_secondary_chest_stress_blocks_next_day_direct_shoulders() -> None:
+    chest_day = _day(
+        weekday=0,
+        exercise=_exercise(
+            sets=6,
+            primary_muscle=MuscleGroup.CHEST,
+            secondary_muscles=(MuscleGroup.SHOULDERS,),
+            movement_pattern=MovementPattern.HORIZONTAL_PUSH,
+        ),
+    )
+    shoulder_day = _day(
+        weekday=1,
+        exercise=_exercise(sets=3, primary_muscle=MuscleGroup.SHOULDERS),
+    )
+
+    assert (
+        classify_muscle_exposures(chest_day, RULESET)[MuscleGroup.SHOULDERS]
+        is ExposureLoad.MODERATE
+    )
+    assert not recovery_spacing_is_valid((chest_day, shoulder_day), RULESET)
+    assert recovery_spacing_is_valid((chest_day, replace(shoulder_day, weekday=2)), RULESET)
+
+
+def test_meaningful_secondary_glute_stress_blocks_next_day_direct_glutes() -> None:
+    quad_day = _day(
+        weekday=0,
+        exercise=_exercise(
+            sets=6,
+            primary_muscle=MuscleGroup.QUADRICEPS,
+            secondary_muscles=(MuscleGroup.GLUTES,),
+            movement_pattern=MovementPattern.SQUAT,
+        ),
+    )
+    glute_day = _day(
+        weekday=1,
+        exercise=_exercise(sets=3, primary_muscle=MuscleGroup.GLUTES),
+    )
+
+    assert classify_muscle_exposures(quad_day, RULESET)[MuscleGroup.GLUTES] is ExposureLoad.MODERATE
+    assert not recovery_spacing_is_valid((quad_day, glute_day), RULESET)
 
 
 def test_recovery_repair_rearranges_days_without_removing_a_session() -> None:

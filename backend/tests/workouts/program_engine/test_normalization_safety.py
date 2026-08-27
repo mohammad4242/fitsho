@@ -8,6 +8,7 @@ from app.exercises.enums import Equipment, ExerciseCautionTag, MovementPattern
 from app.profile.enums import TrainingLocation
 from app.workouts.program_engine.enums import (
     Goal,
+    LoadLimit,
     MedicalClearanceStatus,
     RedFlag,
     SafetyStatus,
@@ -167,6 +168,14 @@ def test_stable_limitation_with_computable_constraints_is_allowed_with_modificat
 
     assert assessment.status is SafetyStatus.CLEAR_WITH_MODIFICATIONS
     assert MovementPattern.VERTICAL_PUSH in normalized.constraints.blocked_movement_patterns
+
+
+def test_lower_back_caution_derives_a_low_axial_load_limit() -> None:
+    normalized = normalize_request(
+        request(blocked_caution_tags=[ExerciseCautionTag.LOWER_BACK_LOADING])
+    )
+
+    assert normalized.constraints.axial_load_limit is LoadLimit.LOW
 
 
 def test_missing_medical_clearance_for_reported_condition_requires_review() -> None:

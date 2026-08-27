@@ -1,3 +1,5 @@
+from app.exercises.enums import ExerciseCautionTag
+from app.workouts.program_engine.enums import LoadLimit
 from app.workouts.program_engine.schemas import DerivedConstraints, ProgramGenerationRequest
 
 
@@ -24,6 +26,9 @@ def derive_constraints(request: ProgramGenerationRequest) -> DerivedConstraints:
             balance_requirement = min(
                 balance_requirement, limitation.balance_requirement, key=_balance_rank
             )
+
+    if ExerciseCautionTag.LOWER_BACK_LOADING in caution_tags:
+        axial_load_limit = min(axial_load_limit, LoadLimit.LOW, key=_limit_rank)
 
     return DerivedConstraints(
         available_equipment=request.available_equipment,

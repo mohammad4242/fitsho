@@ -305,6 +305,30 @@ def test_domain_candidate_uses_legacy_fallback_only_for_missing_metadata(db: Ses
     assert candidate.range_of_motion_profile == frozenset()
 
 
+def test_domain_candidate_infers_supported_row_axial_load_from_semantics(db: Session) -> None:
+    standing_row = _exercise(
+        db,
+        "standing-row",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+    )
+    supported_row = _exercise(
+        db,
+        "chest-supported-row",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+    )
+    standing_row.name_en = "Standing Cable Row"
+    supported_row.name_en = "Chest-Supported Row"
+    db.flush()
+
+    standing_candidate = WorkoutGenerationService._domain_candidate(standing_row)
+    supported_candidate = WorkoutGenerationService._domain_candidate(supported_row)
+
+    assert standing_candidate.axial_loading_level is LoadLimit.MODERATE
+    assert supported_candidate.axial_loading_level is LoadLimit.LOW
+
+
 def test_catalog_snapshot_keeps_programming_metadata_and_stable_collections(
     db: Session,
 ) -> None:

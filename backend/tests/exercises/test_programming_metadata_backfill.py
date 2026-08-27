@@ -130,6 +130,21 @@ def test_floor_bridge_is_lying_low_stability() -> None:
     assert metadata["stability_demand"] is StabilityDemand.LOW
 
 
+def test_infers_axial_loading_for_unsupported_rows_but_preserves_supported_rows() -> None:
+    standing_row = make_exercise("standing-row")
+    standing_row.name_en = "Standing Cable Row"
+    standing_row.movement_pattern = MovementPattern.HORIZONTAL_PULL
+    standing_row.equipment_items.append(ExerciseEquipment(equipment=Equipment.BODYWEIGHT))
+
+    supported_row = make_exercise("supported-row")
+    supported_row.name_en = "Chest-Supported Row"
+    supported_row.movement_pattern = MovementPattern.HORIZONTAL_PULL
+    supported_row.equipment_items.append(ExerciseEquipment(equipment=Equipment.BODYWEIGHT))
+
+    assert infer_programming_metadata(standing_row)["axial_loading_level"] is LoadLimit.MODERATE
+    assert infer_exercise_demands(supported_row).axial_loading_level is LoadLimit.LOW
+
+
 def test_backfill_repairs_legacy_movement_pattern_substitution_group(db: Session) -> None:
     exercise = make_exercise("backfill-legacy-substitution-group")
     exercise.name_en = "Dumbbell Goblet Squat"

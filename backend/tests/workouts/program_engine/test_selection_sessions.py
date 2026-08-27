@@ -15,6 +15,7 @@ from app.profile.enums import TrainingLocation
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.enums import (
     BalanceAbility,
+    BodyPosition,
     Goal,
     ImpactLimit,
     LoadLimit,
@@ -937,6 +938,32 @@ def test_lower_risk_compatible_replacement_outranks_riskier_candidate() -> None:
     ranked = rank_replacement_exercises(request, target, (riskier, lower_risk))
 
     assert ranked[0] is lower_risk
+
+
+def test_lower_back_caution_rejects_unsupported_row_but_keeps_supported_row() -> None:
+    request = normalized(
+        blocked_caution_tags=[ExerciseCautionTag.LOWER_BACK_LOADING],
+    )
+    unsupported = candidate(
+        "standing row",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+        body_position=BodyPosition.STANDING,
+        axial_loading_level=LoadLimit.MODERATE,
+    )
+    supported = candidate(
+        "chest supported row",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+        body_position=BodyPosition.SUPPORTED,
+        axial_loading_level=LoadLimit.LOW,
+    )
+
+    result = filter_eligible_exercises(request, [unsupported, supported])
+
+    assert result.eligible == (supported,)
+    assert result.rejected[0].exercise_id == unsupported.id
+    assert "EXERCISE_REJECTED_AXIAL_LOAD_LIMIT" in result.rejected[0].reason_codes
 
 
 def test_dislike_applies_after_semantic_fit_and_order_remains_deterministic() -> None:
