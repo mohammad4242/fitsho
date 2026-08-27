@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
-import shutil
 import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -12,6 +10,13 @@ from uuid import uuid4
 
 from app.admin.media import _signature_extension
 from app.config import Settings
+from app.exercises.media_storage import (
+    ExerciseMediaStorageError,
+    publish_exercise_media,
+)
+from app.exercises.media_storage import (
+    sha256_file as sha256_file,
+)
 
 CommandRunner = Callable[..., subprocess.CompletedProcess[str]]
 FRAME_POSITIONS = (0.10, 0.30, 0.50, 0.70, 0.90)
@@ -42,14 +47,6 @@ class PublishedOwnerVideo:
     public_path: str
     absolute_path: Path
     created: bool
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as file_handle:
-        while chunk := file_handle.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _run(
@@ -292,33 +289,21 @@ def publish_owner_video(
     prepared: PreparedOwnerVideo,
     *,
     settings: Settings,
+    namespace: str,
     runner: CommandRunner = subprocess.run,
 ) -> PublishedOwnerVideo:
-    relative_path = Path("owner-video") / prepared.source_id[:2] / f"{prepared.source_id}.mp4"
-    destination = settings.media_root / relative_path
-    public_path = f"{settings.media_public_path.rstrip('/')}/{relative_path.as_posix()}"
-    if destination.is_file():
-        try:
-            _muted_video_is_valid(destination, settings, runner)
-        except OwnerVideoMediaError:
-            pass
-        else:
-            return PublishedOwnerVideo(
-                public_path=public_path,
-                absolute_path=destination,
-                created=False,
-            )
-
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    staged_path = destination.parent / f".publish-{uuid4().hex}.mp4"
     try:
-        shutil.copyfile(prepared.muted_path, staged_path)
-        _muted_video_is_valid(staged_path, settings, runner)
-        os.replace(staged_path, destination)
-    finally:
-        staged_path.unlink(missing_ok=True)
+        _muted_video_is_valid(prepared.muted_path, settings, runner)
+        stored = publish_exercise_media(
+            prepared.muted_path,
+            settings=settings,
+            namespace=namespace,
+            extension=".mp4",
+        )
+    except ExerciseMediaStorageError as error:
+        raise OwnerVideoMediaError(str(error)) from error
     return PublishedOwnerVideo(
-        public_path=public_path,
-        absolute_path=destination,
-        created=True,
+        public_path=stored.public_path,
+        absolute_path=stored.absolute_path,
+        created=stored.created,
     )

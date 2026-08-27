@@ -207,7 +207,11 @@ class OwnerVideoImporter:
                 )
                 return
 
-            published = self._publish_video(prepared, settings=self._settings)
+            published = self._publish_video(
+                prepared,
+                settings=self._settings,
+                namespace=f"owner-{source_id}",
+            )
             if match_id is not None:
                 exercise = self._attach_to_existing(
                     match_id,

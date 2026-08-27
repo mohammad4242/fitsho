@@ -588,14 +588,14 @@ def _parse_payload(raw_payload: str) -> AdminExerciseCreate:
 def _variant_uploads(
     settings: AppSettings,
     uploads: dict[MediaAssetKey, UploadFile | None],
-    subdirectory: str,
+    namespace: str,
 ) -> dict[MediaAssetKey, StoredMedia]:
     stored: dict[MediaAssetKey, StoredMedia] = {}
     try:
         for key, upload in uploads.items():
             if upload is None:
                 continue
-            media = store_upload(upload, settings, subdirectory)
+            media = store_upload(upload, settings, namespace)
             expected_type = MediaType.VIDEO
             if media.media_type is not expected_type:
                 discard_media(media)
@@ -612,7 +612,7 @@ def _gallery_uploads(
     settings: AppSettings,
     payload: AdminExerciseCreate,
     uploads: list[UploadFile],
-    subdirectory: str,
+    namespace: str,
 ) -> dict[MediaAssetKey, StoredMedia]:
     stored: dict[MediaAssetKey, StoredMedia] = {}
     try:
@@ -624,7 +624,7 @@ def _gallery_uploads(
             key: MediaAssetKey = (asset.presentation, asset.role, asset.sort_order)
             if key in stored:
                 raise MediaValidationError("Duplicate media gallery item")
-            media = store_upload(uploads[asset.upload_index], settings, subdirectory)
+            media = store_upload(uploads[asset.upload_index], settings, namespace)
             expected_type = MediaType.VIDEO
             if media.media_type is not expected_type:
                 discard_media(media)
@@ -687,19 +687,19 @@ def update_exercise(
     stored_media: StoredMedia | None = None
     stored_media_assets: dict[MediaAssetKey, StoredMedia] = {}
     try:
-        media_directory = f"exercises/{exercise_payload.slug}--{str(exercise_id)[:8]}"
+        media_namespace = f"{exercise_payload.slug}--{str(exercise_id)[:8]}"
         if media is not None:
-            stored_media = store_upload(media, settings, media_directory)
+            stored_media = store_upload(media, settings, media_namespace)
         stored_media_assets = _variant_uploads(
             settings,
             {
                 (MediaPresentation.MALE, MediaRole.VIDEO, 0): media_male_video,
                 (MediaPresentation.FEMALE, MediaRole.VIDEO, 0): media_female_video,
             },
-            media_directory,
+            media_namespace,
         )
         stored_media_assets.update(
-            _gallery_uploads(settings, exercise_payload, media_files or [], media_directory)
+            _gallery_uploads(settings, exercise_payload, media_files or [], media_namespace)
         )
         exercise = update_admin_exercise(
             db,
@@ -780,19 +780,19 @@ def create_exercise(
     stored_media: StoredMedia | None = None
     stored_media_assets: dict[MediaAssetKey, StoredMedia] = {}
     try:
-        media_directory = f"exercises/{exercise_payload.slug}"
+        media_namespace = exercise_payload.slug
         if media is not None:
-            stored_media = store_upload(media, settings, media_directory)
+            stored_media = store_upload(media, settings, media_namespace)
         stored_media_assets = _variant_uploads(
             settings,
             {
                 (MediaPresentation.MALE, MediaRole.VIDEO, 0): media_male_video,
                 (MediaPresentation.FEMALE, MediaRole.VIDEO, 0): media_female_video,
             },
-            media_directory,
+            media_namespace,
         )
         stored_media_assets.update(
-            _gallery_uploads(settings, exercise_payload, media_files or [], media_directory)
+            _gallery_uploads(settings, exercise_payload, media_files or [], media_namespace)
         )
         exercise = create_admin_exercise(
             db,

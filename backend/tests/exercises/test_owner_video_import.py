@@ -117,8 +117,10 @@ def fake_publish(
     prepared: PreparedOwnerVideo,
     *,
     settings: Settings,
+    namespace: str,
 ) -> PublishedOwnerVideo:
-    relative = Path("owner-video") / prepared.source_id[:2] / f"{prepared.source_id}.mp4"
+    digest = hashlib.sha256(prepared.muted_path.read_bytes()).hexdigest()
+    relative = Path("exercises") / namespace / f"media-{digest}.mp4"
     destination = settings.media_root / relative
     existed = destination.exists()
     destination.parent.mkdir(parents=True, exist_ok=True)

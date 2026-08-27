@@ -1,6 +1,6 @@
+import hashlib
 from io import BytesIO
 from pathlib import Path
-from uuid import UUID
 
 import pytest
 from fastapi import UploadFile
@@ -42,21 +42,62 @@ def settings(
 
 
 def test_valid_gif_is_stored_with_server_filename(tmp_path: Path) -> None:
-    stored = store_upload(upload("demo.gif", GIF_BYTES, "image/gif"), settings(tmp_path))
+    active_settings = settings(tmp_path)
+    stored = store_upload(
+        upload("demo.gif", GIF_BYTES, "image/gif"), active_settings, "test-exercise"
+    )
+    digest = hashlib.sha256(GIF_BYTES).hexdigest()
 
     assert stored.media_type is MediaType.GIF
-    assert stored.public_path.startswith("/media/")
-    assert stored.absolute_path.parent == tmp_path
+    assert stored.public_path == f"/media/exercises/test-exercise/media-{digest}.gif"
+    assert stored.absolute_path.parent == tmp_path / "exercises" / "test-exercise"
     assert stored.absolute_path.suffix == ".gif"
     assert stored.absolute_path.name != "demo.gif"
     assert stored.absolute_path.read_bytes() == GIF_BYTES
 
 
+def test_identical_exercise_upload_reuses_verified_destination(tmp_path: Path) -> None:
+    active_settings = settings(tmp_path)
+
+    first = store_upload(
+        upload("demo.gif", GIF_BYTES, "image/gif"), active_settings, "test-exercise"
+    )
+    second = store_upload(
+        upload("renamed.gif", GIF_BYTES, "image/gif"), active_settings, "test-exercise"
+    )
+
+    assert second.absolute_path == first.absolute_path
+    assert second.public_path == first.public_path
+    assert first.created is True
+    assert second.created is False
+    assert len(list((tmp_path / "exercises").rglob("*.gif"))) == 1
+
+
+def test_exercise_upload_rejects_mismatching_existing_destination_without_overwrite(
+    tmp_path: Path,
+) -> None:
+    digest = hashlib.sha256(GIF_BYTES).hexdigest()
+    destination = tmp_path / "exercises" / "test-exercise" / f"media-{digest}.gif"
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(b"keep this unrelated file")
+
+    with pytest.raises(MediaValidationError, match="does not match"):
+        store_upload(
+            upload("demo.gif", GIF_BYTES, "image/gif"), settings(tmp_path), "test-exercise"
+        )
+
+    assert destination.read_bytes() == b"keep this unrelated file"
+
+
 def test_valid_jpeg_thumbnail_is_stored_with_image_type(tmp_path: Path) -> None:
-    stored = store_upload(upload("demo.jpg", JPEG_BYTES, "image/jpeg"), settings(tmp_path))
+    stored = store_upload(
+        upload("demo.jpeg", JPEG_BYTES, "image/jpeg"), settings(tmp_path), "test-exercise"
+    )
+    digest = hashlib.sha256(JPEG_BYTES).hexdigest()
 
     assert stored.media_type is MediaType.IMAGE
-    assert stored.absolute_path.suffix == ".jpg"
+    assert stored.public_path == f"/media/exercises/test-exercise/media-{digest}.jpeg"
+    assert stored.absolute_path.suffix == ".jpeg"
     assert stored.absolute_path.read_bytes() == JPEG_BYTES
 
 
@@ -124,7 +165,9 @@ def test_valid_short_video_is_stored(
 ) -> None:
     monkeypatch.setattr("app.admin.media._probe_video_duration", lambda *_: 5.0)
 
-    stored = store_upload(upload(filename, content, content_type), settings(tmp_path))
+    stored = store_upload(
+        upload(filename, content, content_type), settings(tmp_path), "test-exercise"
+    )
 
     assert stored.media_type is expected_type
     assert stored.absolute_path.suffix == Path(filename).suffix
@@ -137,7 +180,9 @@ def test_video_upload_allows_up_to_64_mebibytes(
     monkeypatch.setattr("app.admin.media._probe_video_duration", lambda *_: 5.0)
     content = MP4_BYTES + b"\x00" * (64 * 1024 * 1024 - len(MP4_BYTES))
 
-    stored = store_upload(upload("large.mp4", content, "video/mp4"), settings(tmp_path))
+    stored = store_upload(
+        upload("large.mp4", content, "video/mp4"), settings(tmp_path), "test-exercise"
+    )
 
     assert stored.media_type is MediaType.VIDEO
     assert stored.absolute_path.stat().st_size == 64 * 1024 * 1024
@@ -160,14 +205,18 @@ def test_invalid_type_or_mismatched_signature_is_rejected(
     content_type: str,
 ) -> None:
     with pytest.raises(MediaValidationError):
-        store_upload(upload(filename, content, content_type), settings(tmp_path))
+        store_upload(
+            upload(filename, content, content_type), settings(tmp_path), "test-exercise"
+        )
 
     assert list(tmp_path.iterdir()) == []
 
 
 def test_empty_file_is_rejected(tmp_path: Path) -> None:
     with pytest.raises(MediaValidationError, match="empty"):
-        store_upload(upload("empty.gif", b"", "image/gif"), settings(tmp_path))
+        store_upload(
+            upload("empty.gif", b"", "image/gif"), settings(tmp_path), "test-exercise"
+        )
 
 
 def test_oversized_file_is_rejected_and_cleaned_up(tmp_path: Path) -> None:
@@ -175,6 +224,7 @@ def test_oversized_file_is_rejected_and_cleaned_up(tmp_path: Path) -> None:
         store_upload(
             upload("large.gif", GIF_BYTES, "image/gif"),
             settings(tmp_path, media_max_bytes=20),
+            "test-exercise",
         )
 
     assert list(tmp_path.iterdir()) == []
@@ -187,7 +237,9 @@ def test_excessive_video_duration_is_rejected(
     monkeypatch.setattr("app.admin.media._probe_video_duration", lambda *_: 20.01)
 
     with pytest.raises(MediaValidationError, match="20 seconds"):
-        store_upload(upload("long.mp4", MP4_BYTES, "video/mp4"), settings(tmp_path))
+        store_upload(
+            upload("long.mp4", MP4_BYTES, "video/mp4"), settings(tmp_path), "test-exercise"
+        )
 
     assert list(tmp_path.iterdir()) == []
 
@@ -195,30 +247,29 @@ def test_excessive_video_duration_is_rejected(
 @pytest.mark.parametrize("filename", ["../demo.gif", "folder/demo.gif", "folder\\demo.gif"])
 def test_path_traversal_filename_is_rejected(tmp_path: Path, filename: str) -> None:
     with pytest.raises(MediaValidationError, match="filename"):
-        store_upload(upload(filename, GIF_BYTES, "image/gif"), settings(tmp_path))
+        store_upload(
+            upload(filename, GIF_BYTES, "image/gif"), settings(tmp_path), "test-exercise"
+        )
 
     assert list(tmp_path.iterdir()) == []
 
 
-def test_filename_collision_never_overwrites_existing_file(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    first = UUID("00000000-0000-0000-0000-000000000001")
-    second = UUID("00000000-0000-0000-0000-000000000002")
-    existing = tmp_path / f"{first.hex}.gif"
+def test_unrelated_existing_file_is_never_overwritten(tmp_path: Path) -> None:
+    existing = tmp_path / "legacy.gif"
     existing.write_bytes(b"keep me")
-    values = iter([first, second])
-    monkeypatch.setattr("app.admin.media.uuid4", lambda: next(values))
 
-    stored = store_upload(upload("demo.gif", GIF_BYTES, "image/gif"), settings(tmp_path))
+    stored = store_upload(
+        upload("demo.gif", GIF_BYTES, "image/gif"), settings(tmp_path), "test-exercise"
+    )
 
     assert existing.read_bytes() == b"keep me"
-    assert stored.absolute_path.name == f"{second.hex}.gif"
+    assert stored.absolute_path.name != existing.name
 
 
 def test_discard_media_removes_only_stored_file(tmp_path: Path) -> None:
-    stored = store_upload(upload("demo.gif", GIF_BYTES, "image/gif"), settings(tmp_path))
+    stored = store_upload(
+        upload("demo.gif", GIF_BYTES, "image/gif"), settings(tmp_path), "test-exercise"
+    )
 
     discard_media(stored)
 

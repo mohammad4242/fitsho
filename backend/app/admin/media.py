@@ -11,6 +11,10 @@ from fastapi import UploadFile
 
 from app.config import Settings
 from app.exercises.enums import MediaType
+from app.exercises.media_storage import (
+    ExerciseMediaStorageError,
+    publish_exercise_media,
+)
 
 ALLOWED_MEDIA: dict[str, tuple[str, MediaType]] = {
     ".gif": ("image/gif", MediaType.GIF),
@@ -38,6 +42,7 @@ class StoredMedia:
     public_path: str
     media_type: MediaType
     absolute_path: Path
+    created: bool = True
 
 
 def _validate_filename(filename: str | None) -> tuple[str, str, MediaType]:
@@ -151,15 +156,13 @@ def _publish_temporary(
 def store_upload(
     upload: UploadFile,
     settings: Settings,
-    subdirectory: str | None = None,
+    namespace: str,
 ) -> StoredMedia:
     extension, expected_content_type, media_type = _validate_filename(upload.filename)
     if upload.content_type != expected_content_type:
         raise MediaValidationError("Media MIME type does not match its extension")
 
-    storage_root = (
-        settings.media_root if subdirectory is None else settings.media_root / subdirectory
-    )
+    storage_root = settings.media_root
     temporary_path = _write_temporary(
         upload,
         settings,
@@ -182,22 +185,31 @@ def store_upload(
             if duration > settings.media_max_video_duration_seconds:
                 limit = settings.media_max_video_duration_seconds
                 raise MediaValidationError(f"Video duration exceeds the {limit:g} seconds limit")
-        final_path = _publish_temporary(temporary_path, extension, storage_root)
+        try:
+            published = publish_exercise_media(
+                temporary_path,
+                settings=settings,
+                namespace=namespace,
+                extension=extension,
+            )
+        except ExerciseMediaStorageError as error:
+            raise MediaValidationError(str(error)) from error
+        temporary_path.unlink(missing_ok=True)
     except Exception:
         temporary_path.unlink(missing_ok=True)
         raise
 
-    public_root = settings.media_public_path.rstrip("/")
-    relative_path = final_path.relative_to(settings.media_root).as_posix()
     return StoredMedia(
-        public_path=f"{public_root}/{relative_path}",
+        public_path=published.public_path,
         media_type=media_type,
-        absolute_path=final_path,
+        absolute_path=published.absolute_path,
+        created=published.created,
     )
 
 
 def discard_media(media: StoredMedia) -> None:
-    media.absolute_path.unlink(missing_ok=True)
+    if media.created:
+        media.absolute_path.unlink(missing_ok=True)
 
 
 def discard_managed_media_file(public_path: str | None, settings: Settings) -> None:

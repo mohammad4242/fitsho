@@ -1,11 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-import os
-import shutil
-import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,6 +31,7 @@ from app.exercises.enums import (
 )
 from app.exercises.focus_classifier import classify_muscle_focus, refine_primary_muscle
 from app.exercises.free_exercise_db_translations import CURATED_TRANSLATIONS
+from app.exercises.media_storage import publish_exercise_media, sha256_file
 from app.exercises.models import (
     Exercise,
     ExerciseCautionTagItem,
@@ -853,10 +850,20 @@ class FreeExerciseDbImporter:
         actual_assets = {
             (asset.presentation, asset.role, asset.media_source_url) for asset in managed_assets
         }
+        source_paths: dict[tuple[MediaPresentation, MediaRole, str | None], Path] = {
+            (asset.presentation, asset.role, asset.source_url): asset.source_path
+            for asset in candidate.media_assets
+        }
         return (
             exercise.source_metadata_en == candidate.source_metadata
             and actual_assets == expected_assets
-            and all(self._stored_media_exists(asset.media_path) for asset in managed_assets)
+            and all(
+                self._stored_media_matches(
+                    asset.media_path,
+                    source_paths[(asset.presentation, asset.role, asset.media_source_url)],
+                )
+                for asset in managed_assets
+            )
             and exercise.movement_pattern is candidate.programming_metadata.movement_pattern
             and exercise.primary_muscle is candidate.primary_muscle
             and exercise.muscle_focus is candidate.muscle_focus
@@ -871,7 +878,7 @@ class FreeExerciseDbImporter:
             == set(candidate.programming_metadata.caution_tags)
         )
 
-    def _stored_media_exists(self, public_path: str) -> bool:
+    def _stored_media_matches(self, public_path: str, source_path: Path) -> bool:
         public_root = self._settings.media_public_path.rstrip("/")
         prefix = f"{public_root}/"
         if not public_path.startswith(prefix):
@@ -879,7 +886,13 @@ class FreeExerciseDbImporter:
         relative_path = Path(public_path.removeprefix(prefix))
         if ".." in relative_path.parts:
             return False
-        return (self._settings.media_root / relative_path).is_file()
+        destination = self._settings.media_root / relative_path
+        if not destination.is_file():
+            return False
+        try:
+            return sha256_file(destination) == sha256_file(source_path)
+        except OSError:
+            return False
 
     def _translate(
         self,
@@ -918,7 +931,7 @@ class FreeExerciseDbImporter:
         try:
             stored_assets = []
             for asset in candidate.media_assets:
-                public_path, absolute_path = self._copy_media(asset)
+                public_path, absolute_path = self._copy_media(asset, namespace=candidate.slug)
                 if absolute_path is not None:
                     copied_paths.append(absolute_path)
                 stored_assets.append((asset, public_path))
@@ -1095,7 +1108,7 @@ class FreeExerciseDbImporter:
             media_item.source = SOURCE_NAME
             media_item.source_id = asset.source_id
 
-    def _copy_media(self, asset: ImportMediaAsset) -> tuple[str, Path | None]:
+    def _copy_media(self, asset: ImportMediaAsset, *, namespace: str) -> tuple[str, Path | None]:
         source_size = asset.source_path.stat().st_size
         if source_size == 0:
             raise MediaValidationError("Media file cannot be empty")
@@ -1108,36 +1121,15 @@ class FreeExerciseDbImporter:
         expected_extension = ".mp4" if asset.media_type is MediaType.VIDEO else ".jpg"
         if signature != expected_extension:
             raise MediaValidationError("Media signature does not match its expected type")
-        digest = self._sha256(asset.source_path)
-        relative_path = Path(SOURCE_NAME) / digest[:2] / f"{digest}{expected_extension}"
-        destination = self._settings.media_root / relative_path
-        public_path = f"{self._settings.media_public_path.rstrip('/')}/{relative_path.as_posix()}"
-        if destination.exists():
-            return public_path, None
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        temporary_path: Path | None = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="wb", dir=destination.parent, prefix=".import-", delete=False
-            ) as temporary:
-                temporary_path = Path(temporary.name)
-                with asset.source_path.open("rb") as source_file:
-                    shutil.copyfileobj(source_file, temporary)
-            os.replace(temporary_path, destination)
-        except Exception:
-            if temporary_path is not None:
-                temporary_path.unlink(missing_ok=True)
-            raise
-        self._created_media.append(destination)
-        return public_path, destination
-
-    @staticmethod
-    def _sha256(path: Path) -> str:
-        digest = hashlib.sha256()
-        with path.open("rb") as file_handle:
-            while chunk := file_handle.read(1024 * 1024):
-                digest.update(chunk)
-        return digest.hexdigest()
+        stored = publish_exercise_media(
+            asset.source_path,
+            settings=self._settings,
+            namespace=namespace,
+            extension=expected_extension,
+        )
+        if stored.created:
+            self._created_media.append(stored.absolute_path)
+        return stored.public_path, stored.absolute_path if stored.created else None
 
     def _discard_created_media(self) -> None:
         for path in self._created_media:

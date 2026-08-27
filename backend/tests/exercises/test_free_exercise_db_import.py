@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -430,6 +431,68 @@ def test_importer_prevents_duplicates_on_a_second_run(
     assert exercise.needs_review is True
     assert len(exercise.media_assets) == 2
     assert translator.calls == [["0001"]]
+
+
+def test_importer_stores_media_at_verified_content_addressed_exercise_paths(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    write_source(source_root, source_record())
+
+    report = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=FakeTranslator(),
+    ).run()
+    exercise = load_imported_exercise(db)
+    digest = hashlib.sha256(MP4_BYTES).hexdigest()
+    namespace = "fedb-0001-push-up"
+
+    assert report.imported_records == ["0001"]
+    assert exercise is not None
+    assert all(
+        asset.media_path == f"/media/exercises/{namespace}/media-{digest}.mp4"
+        for asset in exercise.media_assets
+    )
+    assert (
+        test_settings.media_root / "exercises" / namespace / f"media-{digest}.mp4"
+    ).read_bytes() == MP4_BYTES
+
+
+def test_importer_rejects_mismatching_existing_media_without_overwrite(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    write_source(source_root, source_record())
+    digest = hashlib.sha256(MP4_BYTES).hexdigest()
+    namespace = "fedb-0001-push-up"
+    destination = test_settings.media_root / "exercises" / namespace / f"media-{digest}.mp4"
+    importer = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=FakeTranslator(),
+    )
+    first = importer.run()
+    destination.write_bytes(b"keep this unrelated file")
+    report = importer.run()
+
+    assert first.imported_records == ["0001"]
+    assert report.imported_records == []
+    assert report.skipped_records == ["0001"]
+    assert report.validation_failures == [
+        "0001: Existing exercise media destination does not match content hash",
+    ]
+    assert destination.read_bytes() == b"keep this unrelated file"
 
 
 def test_importer_does_not_overwrite_admin_owned_media(

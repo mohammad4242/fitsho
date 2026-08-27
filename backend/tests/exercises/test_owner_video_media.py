@@ -3,6 +3,8 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
+import pytest
+
 from app.config import Settings
 
 
@@ -92,15 +94,16 @@ def test_publish_owner_video_uses_stable_media_path_and_reuses_valid_file(
     from app.exercises.owner_video_media import prepare_owner_video, publish_owner_video
 
     source = tmp_path / "source.mp4"
-    original = make_av_video(source)
+    make_av_video(source)
     settings = owner_video_settings(test_settings, tmp_path)
     prepared = prepare_owner_video(source, settings=settings)
+    namespace = f"owner-{prepared.source_id}"
 
-    first = publish_owner_video(prepared, settings=settings)
-    second = publish_owner_video(prepared, settings=settings)
+    first = publish_owner_video(prepared, settings=settings, namespace=namespace)
+    second = publish_owner_video(prepared, settings=settings, namespace=namespace)
 
-    digest = hashlib.sha256(original).hexdigest()
-    assert first.public_path == f"/media/owner-video/{digest[:2]}/{digest}.mp4"
+    digest = hashlib.sha256(prepared.muted_path.read_bytes()).hexdigest()
+    assert first.public_path == f"/media/exercises/{namespace}/media-{digest}.mp4"
     assert first.absolute_path.is_file()
     assert first.created is True
     assert second == first.__class__(
@@ -108,6 +111,32 @@ def test_publish_owner_video_uses_stable_media_path_and_reuses_valid_file(
         absolute_path=first.absolute_path,
         created=False,
     )
+
+
+def test_publish_owner_video_rejects_mismatching_existing_destination_without_overwrite(
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.owner_video_media import (
+        OwnerVideoMediaError,
+        prepare_owner_video,
+        publish_owner_video,
+    )
+
+    source = tmp_path / "source.mp4"
+    make_av_video(source)
+    settings = owner_video_settings(test_settings, tmp_path)
+    prepared = prepare_owner_video(source, settings=settings)
+    namespace = f"owner-{prepared.source_id}"
+    digest = hashlib.sha256(prepared.muted_path.read_bytes()).hexdigest()
+    destination = settings.media_root / "exercises" / namespace / f"media-{digest}.mp4"
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(b"keep this unrelated file")
+
+    with pytest.raises(OwnerVideoMediaError, match="does not match"):
+        publish_owner_video(prepared, settings=settings, namespace=namespace)
+
+    assert destination.read_bytes() == b"keep this unrelated file"
 
 
 def test_prepare_owner_video_falls_back_when_stream_copy_fails(
