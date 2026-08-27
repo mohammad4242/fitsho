@@ -7,6 +7,7 @@ from app.workouts.program_engine.duration_policy import get_session_duration_pol
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
+from app.workouts.program_engine.exercise_semantics import has_near_equivalent
 from app.workouts.program_engine.prescription import (
     estimate_exercise_minutes,
     prescription_for,
@@ -507,14 +508,15 @@ def _select_exercise_addition(
                     continue
                 if any(item.exercise_id == candidate.id for item in day):
                     continue
+                if has_near_equivalent(candidate, day):
+                    continue
                 if original.focus.startswith("template_reference"):
                     if (
                         template_has_target_day
                         and candidate.primary_muscle not in original.template_target_muscles
                         and not (
                             use_hard_maximums
-                            and candidate.primary_muscle
-                            in priority_policy.explicit_priorities
+                            and candidate.primary_muscle in priority_policy.explicit_priorities
                         )
                     ):
                         continue
@@ -595,6 +597,10 @@ def _select_exercise_addition(
                     impact_level=candidate.impact_level,
                     axial_loading_level=candidate.axial_loading_level,
                     stability_demand=candidate.stability_demand,
+                    muscle_focus=candidate.muscle_focus,
+                    body_position=candidate.body_position,
+                    laterality=candidate.laterality,
+                    substitution_group=candidate.substitution_group,
                     is_active=candidate.is_active,
                     is_programmable=candidate.is_programmable,
                     needs_review=candidate.needs_review,

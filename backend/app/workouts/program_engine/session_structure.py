@@ -244,14 +244,18 @@ def _role_phase(unit: _ExerciseUnit, goal: Goal) -> int:
     if goal is Goal.STRENGTH:
         if _contains_reason(unit, "STRENGTH_PRIMARY_COMPOUND"):
             return 0
+        if _contains_reason(unit, "PRIMARY_WORKING_COMPOUND"):
+            return 1
         if _contains_reason(unit, "STRENGTH_SECONDARY_COMPOUND") or any(
             item.exercise_type is ExerciseType.COMPOUND for item in unit.exercises
         ):
-            return 1
-        return 2
-    if any(item.exercise_type is ExerciseType.COMPOUND for item in unit.exercises):
+            return 2
+        return 3
+    if _contains_reason(unit, "PRIMARY_WORKING_COMPOUND"):
         return 0
-    return 1
+    if any(item.exercise_type is ExerciseType.COMPOUND for item in unit.exercises):
+        return 1
+    return 2
 
 
 def _contains_reason(unit: _ExerciseUnit, reason: str) -> bool:

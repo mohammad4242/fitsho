@@ -6,6 +6,10 @@ from app.exercises.enums import Equipment, ExerciseType, MovementPattern, Muscle
 from app.workouts.program_engine.duration_capacity import SessionCapacity
 from app.workouts.program_engine.enums import TrainingExperience
 from app.workouts.program_engine.exercise_ranker import rank_exercises
+from app.workouts.program_engine.exercise_semantics import (
+    has_near_equivalent,
+    is_primary_working_compound,
+)
 from app.workouts.program_engine.prescription import estimate_exercise_minutes
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -93,7 +97,7 @@ def build_template_sessions(
         for slot in day.slots:
             if slot.exercise_id is not None:
                 reserved_ids.append(slot.exercise_id)
-            if getattr(slot, 'superset_exercise_id', None) is not None:
+            if getattr(slot, "superset_exercise_id", None) is not None:
                 reserved_ids.append(slot.superset_exercise_id)
     reserved: Counter[UUID] = Counter(reserved_ids)
     drafts: list[SessionDraft] = []
@@ -138,23 +142,29 @@ def build_template_sessions(
         if planned_minimum < ruleset.minimum_exercises_per_session:
             build_reasons.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
         selected: list[tuple[ExerciseCandidate, TemplateReferenceSlot]] = []
-        
+
         expanded_slots = []
         for slot in reference_day.slots:
-            if slot.intensity_method == "superset" and getattr(slot, 'superset_exercise_id', None):
-                group_id = slot.superset_group or f"auto_{str(slot.exercise_id)[:8]}_{str(slot.superset_exercise_id)[:8]}"
+            if slot.intensity_method == "superset" and getattr(slot, "superset_exercise_id", None):
+                group_id = (
+                    slot.superset_group
+                    or f"auto_{str(slot.exercise_id)[:8]}_{str(slot.superset_exercise_id)[:8]}"
+                )
                 from dataclasses import replace
+
                 slot_first = replace(slot, superset_group=group_id)
                 expanded_slots.append(slot_first)
-                
-                second_candidate = next((ex for ex in eligible if ex.id == slot.superset_exercise_id), None)
+
+                second_candidate = next(
+                    (ex for ex in eligible if ex.id == slot.superset_exercise_id), None
+                )
                 if second_candidate:
                     second_muscles = (second_candidate.primary_muscle,)
                     second_pattern = second_candidate.movement_pattern
                 else:
                     second_muscles = slot.target_muscles
                     second_pattern = slot.movement_pattern
-                
+
                 slot_second = replace(
                     slot_first,
                     exercise_id=slot.superset_exercise_id,
@@ -283,6 +293,10 @@ def build_template_sessions(
                 else:
                     build_reasons.append("TEMPLATE_OPTIONAL_SLOT_OMITTED_UNAVAILABLE")
                     continue
+            semantic_duplicate = has_near_equivalent(
+                candidate,
+                (selected_candidate for selected_candidate, _selected_slot in selected),
+            )
             if _template_role_is_excessive(candidate, selected):
                 complementary = _complementary_template_candidate(
                     request,
@@ -297,6 +311,14 @@ def build_template_sessions(
                     candidate = complementary
                     complementary_replacements.add(candidate.id)
                     build_reasons.append("TEMPLATE_REDUNDANCY_REPLACED_WITH_COMPLEMENTARY_ROLE")
+                elif semantic_duplicate:
+                    if slot.adaptation_priority == "core":
+                        raise TemplateConstructionError(
+                            "TEMPLATE_CORE_SEMANTIC_DUPLICATE_UNRESOLVABLE",
+                            f"TEMPLATE_DAY:{index}",
+                        )
+                    build_reasons.append("TEMPLATE_SEMANTIC_DUPLICATE_OPTIONAL_OMITTED")
+                    continue
                 else:
                     deliberate_redundancies.add(candidate.id)
                     build_reasons.append("DELIBERATE_REDUNDANCY_FOR_TEMPLATE_STRUCTURE")
@@ -426,6 +448,7 @@ def build_template_sessions(
                     and is_supplemental_muscle(candidate.primary_muscle)
                     else ()
                 ),
+                *(("PRIMARY_WORKING_COMPOUND",) if is_primary_working_compound(candidate) else ()),
             )
             if preserved and is_template_slot:
                 preserved_template_occurrences[candidate.id] += 1
@@ -618,10 +641,7 @@ def _level_appropriate_template_candidate(
         item
         for item in eligible
         if _template_slot_is_compatible(item, slot, day_index)
-        and (
-            item.id == original.id
-            or (not used[item.id] and not reserved[item.id])
-        )
+        and (item.id == original.id or (not used[item.id] and not reserved[item.id]))
     ]
     if len(options) <= 1:
         return original
@@ -666,6 +686,11 @@ def _template_role_is_excessive(
     candidate: ExerciseCandidate,
     selected: list[tuple[ExerciseCandidate, TemplateReferenceSlot]],
 ) -> bool:
+    if has_near_equivalent(
+        candidate,
+        (selected_candidate for selected_candidate, _selected_slot in selected),
+    ):
+        return True
     role_count = sum(
         item.primary_muscle is candidate.primary_muscle
         and item.movement_pattern is candidate.movement_pattern
@@ -701,6 +726,10 @@ def _complementary_template_candidate(
             target_muscles=frozenset(focus),
             day_focus=f"template_reference_{reference_day.day_number}",
         ).compatible
+        and not has_near_equivalent(
+            item,
+            (selected_candidate for selected_candidate, _selected_slot in selected),
+        )
         and not _template_role_is_excessive(item, selected)
     ]
     if not options:
@@ -883,8 +912,7 @@ def _add_targeted_accessories(
             and not is_supplemental_muscle(item.primary_muscle)
             and item.primary_muscle in target_muscles
             and (
-                main_exercise_count(candidate for candidate, _slot in selected)
-                < required_minimum
+                main_exercise_count(candidate for candidate, _slot in selected) < required_minimum
                 or not _template_role_is_excessive(item, selected)
             )
             and evaluate_candidate_slot_compatibility(
@@ -917,6 +945,10 @@ def _add_targeted_accessories(
                     target_muscles=frozenset(target_muscles),
                     day_focus=f"template_reference_{reference_day.day_number}",
                 ).compatible
+                and not has_near_equivalent(
+                    item,
+                    (selected_candidate for selected_candidate, _selected_slot in selected),
+                )
             ]
             if not options:
                 return

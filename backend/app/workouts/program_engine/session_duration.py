@@ -13,6 +13,7 @@ from app.workouts.program_engine.effective_volume import calculate_effective_vol
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.equipment import effective_required_equipment
 from app.workouts.program_engine.exercise_ranker import rank_exercises
+from app.workouts.program_engine.exercise_semantics import has_near_equivalent
 from app.workouts.program_engine.prescription import (
     ExercisePrescription,
     estimate_exercise_minutes,
@@ -254,6 +255,7 @@ def _select_exercise_addition(
         )
         and _candidate_is_safe(item, request)
         and ExerciseLabel.CARDIO not in item.labels
+        and not has_near_equivalent(item, exercises)
     )
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     ranked = tuple(
@@ -617,6 +619,10 @@ def _program_candidate(
         impact_level=candidate.impact_level,
         axial_loading_level=candidate.axial_loading_level,
         stability_demand=candidate.stability_demand,
+        muscle_focus=candidate.muscle_focus,
+        body_position=candidate.body_position,
+        laterality=candidate.laterality,
+        substitution_group=candidate.substitution_group,
         is_active=candidate.is_active,
         is_programmable=candidate.is_programmable,
         needs_review=candidate.needs_review,

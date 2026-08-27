@@ -7,6 +7,12 @@ from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.duration_capacity import SessionCapacity
 from app.workouts.program_engine.enums import CompatibilityLevel, Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
+from app.workouts.program_engine.exercise_semantics import (
+    SEMANTIC_NEAR_DUPLICATE_REASON,
+    has_near_equivalent,
+    is_primary_working_compound,
+    near_equivalent_exercises,
+)
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -151,6 +157,7 @@ def build_sessions(
             chosen_ids = {selected.id for selected in chosen}
             options: list[ExerciseCandidate] = []
             rejected_slot_reasons: list[str] = []
+            semantic_redundancy_rejected = False
             comp_levels = {}
             for item in exercises:
                 if item.id in chosen_ids:
@@ -167,6 +174,9 @@ def build_sessions(
                     allow_full_body=focus.startswith("full_body"),
                 )
                 if compatibility.compatible:
+                    if has_near_equivalent(item, chosen):
+                        semantic_redundancy_rejected = True
+                        continue
                     options.append(item)
                     comp_levels[item.id] = compatibility.level
                 else:
@@ -208,6 +218,8 @@ def build_sessions(
                     )
                 else:
                     continue
+            if semantic_redundancy_rejected:
+                session_reasons = session_reasons + (SEMANTIC_NEAR_DUPLICATE_REASON,)
             needed_muscle = slot.target_muscle
             if needed_muscle is None:
                 needed_muscle = next(
@@ -245,6 +257,8 @@ def build_sessions(
             chosen.append(selected.exercise)
             selected_slots[selected.exercise.id] = slot
             selection_reasons = list(selected.reason_codes)
+            if slot.required and is_primary_working_compound(selected.exercise):
+                selection_reasons.append("PRIMARY_WORKING_COMPOUND")
             if _role_repeated(selected.exercise, chosen[:-1]):
                 redundancy_reason = (
                     "DELIBERATE_REDUNDANCY_FOR_REQUIRED_PATTERN"
@@ -295,9 +309,13 @@ def build_sessions(
             usage[selected.exercise.id] += 1
             session_reasons = session_reasons + ("SESSION_SUPPLEMENTED_TO_MINIMUM",)
 
-        supplemental_count = sum(
-            is_supplemental_muscle(item.primary_muscle) for item in chosen
-        )
+        chosen_ids = {item.id for item in chosen}
+        if any(
+            item.id not in chosen_ids and has_near_equivalent(item, chosen) for item in exercises
+        ):
+            session_reasons = session_reasons + (SEMANTIC_NEAR_DUPLICATE_REASON,)
+
+        supplemental_count = sum(is_supplemental_muscle(item.primary_muscle) for item in chosen)
         while supplemental_count < 2 and main_exercise_count(chosen) >= min(
             main_capacity, ruleset.minimum_exercises_per_session
         ):
@@ -509,10 +527,15 @@ def _compatible_supplements(
         if (
             item.id not in chosen_ids
             and not is_supplemental_muscle(item.primary_muscle)
+            and not has_near_equivalent(item, chosen)
             and (
-                allow_role_redundancy
+                (allow_role_redundancy and focus.startswith("full_body"))
                 or _role_occurrence_count(item, chosen)
                 < min(role_limit, _session_role_limit(item))
+                or (
+                    item.movement_pattern is not MovementPattern.SHRUG
+                    and not _has_complementary_option(focus, item, exercises, chosen)
+                )
             )
         ):
             comp = evaluate_exercise_focus_compatibility(item, focus)
@@ -520,6 +543,26 @@ def _compatible_supplements(
                 options.append(item)
                 levels[item.id] = comp.level
     return options, levels
+
+
+def _has_complementary_option(
+    focus: str,
+    exercise: ExerciseCandidate,
+    exercises: tuple[ExerciseCandidate, ...],
+    chosen: list[ExerciseCandidate],
+) -> bool:
+    chosen_ids = {item.id for item in chosen}
+    return any(
+        item.id not in chosen_ids
+        and not is_supplemental_muscle(item.primary_muscle)
+        and not has_near_equivalent(item, chosen)
+        and (
+            item.primary_muscle is not exercise.primary_muscle
+            or item.movement_pattern is not exercise.movement_pattern
+        )
+        and evaluate_exercise_focus_compatibility(item, focus).compatible
+        for item in exercises
+    )
 
 
 def evaluate_exercise_focus_compatibility(
@@ -543,7 +586,7 @@ def _role_repeated(
     exercise: ExerciseCandidate,
     chosen: list[ExerciseCandidate],
 ) -> bool:
-    return any(
+    return has_near_equivalent(exercise, chosen) or any(
         item.primary_muscle is exercise.primary_muscle
         and item.movement_pattern is exercise.movement_pattern
         for item in chosen

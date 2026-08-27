@@ -697,6 +697,39 @@ def test_validator_still_rejects_an_unjustified_duplicate_exercise() -> None:
     assert "UNJUSTIFIED_DUPLICATE_EXERCISE" in report.errors
 
 
+def test_validator_rejects_distinct_ids_with_semantically_redundant_roles() -> None:
+    source = request(available_training_days=1)
+    result = generate_program(source, catalog(), RULESET)
+    assert result.program is not None
+    day = result.program.weekly_schedule[0]
+    semantic_duplicate = replace(
+        day.exercises[1],
+        exercise_id=uuid4(),
+        primary_muscle=day.exercises[0].primary_muscle,
+        movement_pattern=day.exercises[0].movement_pattern,
+        exercise_type=day.exercises[0].exercise_type,
+        secondary_muscles=day.exercises[0].secondary_muscles,
+        muscle_focus=day.exercises[0].muscle_focus,
+        body_position=day.exercises[0].body_position,
+        laterality=day.exercises[0].laterality,
+        substitution_group=day.exercises[0].substitution_group,
+        reason_codes=("ACCIDENTAL_SEMANTIC_DUPLICATE",),
+    )
+    invalid = replace(
+        result.program,
+        weekly_schedule=(
+            replace(
+                day,
+                exercises=(day.exercises[0], semantic_duplicate, *day.exercises[2:]),
+            ),
+        ),
+    )
+
+    report = validate_program(invalid, source, RULESET)
+
+    assert "SEMANTIC_NEAR_DUPLICATE_EXERCISE" in report.errors
+
+
 def test_validator_rejects_a_third_direct_weekly_muscle_exposure_for_four_day_programs() -> None:
     source = request(
         available_training_days=4,

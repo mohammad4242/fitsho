@@ -461,6 +461,10 @@ class ProgrammedExercise:
     duration_min_seconds: int | None = None
     duration_max_seconds: int | None = None
     superset_group: str | None = None
+    muscle_focus: MuscleFocus | None = None
+    body_position: BodyPosition = BodyPosition.STANDING
+    laterality: Laterality = Laterality.BILATERAL
+    substitution_group: str | None = None
 
     def __post_init__(self) -> None:
         if self.superset_group is not None and not 1 <= len(self.superset_group) <= 32:

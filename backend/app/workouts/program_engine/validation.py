@@ -11,6 +11,7 @@ from app.workouts.program_engine.effective_volume import (
 )
 from app.workouts.program_engine.enums import SafetyStatus
 from app.workouts.program_engine.equipment import effective_required_equipment
+from app.workouts.program_engine.exercise_semantics import has_near_equivalent
 from app.workouts.program_engine.recovery import recovery_spacing_is_valid
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.safety import effective_caution_tags
@@ -157,7 +158,9 @@ def validate_program(
                 errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
 
         per_session: Counter[str] = Counter()
-        for item in day.exercises:
+        for index, item in enumerate(day.exercises):
+            if has_near_equivalent(item, day.exercises[:index]):
+                errors.append("SEMANTIC_NEAR_DUPLICATE_EXERCISE")
             if "OPTIONAL_SUPPLEMENTAL_WORK" not in item.reason_codes:
                 semantic_patterns, semantic_muscles = focus_scope(day.focus)
                 if not day.focus.startswith("template_reference"):

@@ -393,6 +393,60 @@ def test_full_body_session_covers_required_patterns_and_priority_is_first() -> N
     )
 
 
+def test_session_selection_rejects_semantic_squat_duplicate_and_uses_quad_complement() -> None:
+    request = normalized(
+        available_equipment=frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.BARBELL})
+    )
+    squat_one = candidate(
+        "barbell squat",
+        MovementPattern.SQUAT,
+        MuscleGroup.QUADRICEPS,
+        muscle_focus=MuscleFocus.GENERAL_QUADRICEPS,
+        secondary_muscles=(MuscleGroup.GLUTES,),
+        equipment=frozenset({Equipment.BARBELL}),
+        substitution_group="squat_free_weight",
+    )
+    squat_two = candidate(
+        "squat",
+        MovementPattern.SQUAT,
+        MuscleGroup.QUADRICEPS,
+        muscle_focus=MuscleFocus.GENERAL_QUADRICEPS,
+        secondary_muscles=(MuscleGroup.GLUTES,),
+        equipment=frozenset({Equipment.BARBELL}),
+        substitution_group="squat_free_weight",
+    )
+    knee_extension = candidate(
+        "leg extension",
+        MovementPattern.KNEE_EXTENSION,
+        MuscleGroup.QUADRICEPS,
+        exercise_type=ExerciseType.ISOLATION,
+        equipment=frozenset({Equipment.DUMBBELL}),
+        substitution_group="knee_extension",
+    )
+    catalog = [
+        candidate("push", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+        candidate("row", MovementPattern.HORIZONTAL_PULL, MuscleGroup.BACK),
+        squat_one,
+        squat_two,
+        knee_extension,
+        candidate("hinge", MovementPattern.HIP_HINGE, MuscleGroup.HAMSTRINGS),
+        candidate("calf", MovementPattern.CALF_RAISE, MuscleGroup.CALVES),
+    ]
+
+    sessions = build_sessions(
+        request,
+        select_split(request, RULESET),
+        plan_weekly_volume(request, select_split(request, RULESET), RULESET),
+        filter_eligible_exercises(request, catalog).eligible,
+        RULESET,
+    )
+
+    selected = sessions[0].exercises
+    assert sum(item.id in {squat_one.id, squat_two.id} for item in selected) == 1
+    assert any(item.id == knee_extension.id for item in selected)
+    assert "SEMANTIC_NEAR_DUPLICATE_REJECTED" in sessions[0].reason_codes
+
+
 def test_optional_trunk_work_is_not_forced_or_preference_selected() -> None:
     oblique_id = uuid4()
     request = normalized(preferred_exercises=[oblique_id])

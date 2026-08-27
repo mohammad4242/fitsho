@@ -322,6 +322,90 @@ def test_strength_primary_lift_stays_first() -> None:
     assert finalized.exercises[0].exercise_name == "Primary Bench"
 
 
+def test_working_bodyweight_push_is_in_first_two_main_exercises() -> None:
+    push_up = _programmed(
+        "Working Push",
+        MuscleGroup.CHEST,
+        ExerciseType.COMPOUND,
+        pattern=MovementPattern.HORIZONTAL_PUSH,
+        order=4,
+        reasons=("PRIMARY_WORKING_COMPOUND",),
+    )
+    push_up = replace(push_up, equipment=frozenset({Equipment.BODYWEIGHT}))
+    row = _programmed(
+        "Row",
+        MuscleGroup.BACK,
+        ExerciseType.COMPOUND,
+        pattern=MovementPattern.HORIZONTAL_PULL,
+        order=1,
+    )
+    isolation = _programmed(
+        "Curl",
+        MuscleGroup.BICEPS,
+        ExerciseType.ISOLATION,
+        pattern=MovementPattern.ELBOW_FLEXION,
+        order=2,
+    )
+    lateral_raise = _programmed(
+        "Lateral Raise",
+        MuscleGroup.SHOULDERS,
+        ExerciseType.ISOLATION,
+        pattern=MovementPattern.SHOULDER_ABDUCTION,
+        order=3,
+    )
+
+    finalized = finalize_session_structure(
+        (_day("upper", (row, isolation, lateral_raise, push_up)),),
+        _normalized(),
+        RULESET,
+    )[0]
+
+    assert finalized.exercises[0].exercise_name == "Working Push"
+    assert finalized.exercises[0].order <= 2
+
+
+def test_working_bodyweight_pull_is_in_first_two_main_exercises() -> None:
+    pull_up = _programmed(
+        "Working Pull",
+        MuscleGroup.BACK,
+        ExerciseType.COMPOUND,
+        pattern=MovementPattern.VERTICAL_PULL,
+        order=4,
+        reasons=("PRIMARY_WORKING_COMPOUND",),
+    )
+    pull_up = replace(pull_up, equipment=frozenset({Equipment.BODYWEIGHT}))
+    press = _programmed(
+        "Press",
+        MuscleGroup.CHEST,
+        ExerciseType.COMPOUND,
+        pattern=MovementPattern.HORIZONTAL_PUSH,
+        order=1,
+    )
+    curl = _programmed(
+        "Curl",
+        MuscleGroup.BICEPS,
+        ExerciseType.ISOLATION,
+        pattern=MovementPattern.ELBOW_FLEXION,
+        order=2,
+    )
+    raise_work = _programmed(
+        "Raise",
+        MuscleGroup.SHOULDERS,
+        ExerciseType.ISOLATION,
+        pattern=MovementPattern.SHOULDER_ABDUCTION,
+        order=3,
+    )
+
+    finalized = finalize_session_structure(
+        (_day("upper", (press, curl, raise_work, pull_up)),),
+        _normalized(),
+        RULESET,
+    )[0]
+
+    assert finalized.exercises[0].exercise_name == "Working Pull"
+    assert finalized.exercises[0].order <= 2
+
+
 def test_full_body_major_muscle_alternation_is_valid() -> None:
     exercises = (
         _programmed(
@@ -670,8 +754,7 @@ def test_zero_to_two_supplemental_exercises_are_valid_and_last(
     assert session_structure_errors(_day("pull", exercises), Goal.HYPERTROPHY) == ()
     if supplemental_count:
         assert all(
-            is_supplemental_muscle(item.primary_muscle)
-            for item in exercises[-supplemental_count:]
+            is_supplemental_muscle(item.primary_muscle) for item in exercises[-supplemental_count:]
         )
 
 
