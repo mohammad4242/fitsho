@@ -27,9 +27,9 @@ export function buildExerciseMediaItems(
     items.push({ ...item, key });
   }
 
-  const assets = [...(exercise.media_assets ?? [])].sort((left, right) =>
-    left.sort_order - right.sort_order,
-  );
+  const assets = [...(exercise.media_assets ?? [])]
+    .filter((asset) => asset.media_type !== "placeholder" && !asset.media_path.includes("placeholder"))
+    .sort((left, right) => left.sort_order - right.sort_order);
   if (assets.length === 0) {
     addItem({
       key: "legacy",

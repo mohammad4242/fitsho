@@ -10,10 +10,13 @@ from app.exercises.enums import (
     ExerciseContentType,
     ExerciseLabel,
     ExerciseType,
+    MediaPresentation,
+    MediaRole,
+    MediaType,
     MuscleFocus,
     MuscleGroup,
 )
-from app.exercises.models import Exercise, ExerciseLabelItem
+from app.exercises.models import Exercise, ExerciseLabelItem, ExerciseMediaAsset
 from app.exercises.service import seed_exercises
 
 ORIGIN = {"Origin": "http://localhost:5173"}
@@ -377,6 +380,35 @@ def test_detail_returns_complete_bilingual_exercise(
     assert payload["common_mistakes_en"] == ["Flaring the elbows."]
     assert payload["breathing_en"] == "Exhale while pressing."
     assert payload["needs_review"] is True
+
+
+def test_catalog_uses_valid_media_asset_when_legacy_path_is_placeholder(
+    client: TestClient,
+    db: Session,
+) -> None:
+    prepare_catalog(client, db, "asset-first@example.com")
+    exercise = db.scalar(select(Exercise).where(Exercise.slug == "dumbbell-bench-press"))
+    assert exercise is not None
+    exercise.media_path = "/exercises/exercise-placeholder.svg"
+    exercise.media_type = MediaType.PLACEHOLDER
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.UNSPECIFIED,
+            role=MediaRole.VIDEO,
+            sort_order=0,
+            media_path="/media/exercises/dumbbell-bench-press--asset/video.mp4",
+            media_type=MediaType.VIDEO,
+            source="admin",
+        )
+    )
+    db.commit()
+
+    response = client.get("/api/v1/exercises?page_size=50")
+
+    assert response.status_code == 200
+    item = next(item for item in response.json()["items"] if item["slug"] == "dumbbell-bench-press")
+    assert item["media_path"] == "/media/exercises/dumbbell-bench-press--asset/video.mp4"
+    assert item["media_type"] == "video"
 
 
 def test_inactive_exercises_are_hidden_from_list_and_detail(

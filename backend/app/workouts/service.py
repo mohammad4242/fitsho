@@ -26,6 +26,7 @@ from app.exercises.enums import (
     MediaPresentation,
     MuscleGroup,
 )
+from app.exercises.media_resolver import resolve_primary_media
 from app.exercises.models import Exercise
 from app.exercises.programming_metadata import infer_exercise_demands
 from app.exercises.substitution_groups import effective_substitution_group
@@ -1156,23 +1157,8 @@ class WorkoutGenerationService:
             if profile_sex is Sex.FEMALE
             else None
         )
-        assets = sorted(
-            exercise.media_assets,
-            key=lambda asset: (asset.presentation.value, asset.sort_order, str(asset.id)),
-        )
-        if preferred_presentation is not None:
-            preferred_assets = [
-                asset for asset in assets if asset.presentation is preferred_presentation
-            ]
-            fallback_assets = [
-                asset for asset in assets if asset.presentation is not preferred_presentation
-            ]
-            selected = preferred_assets or fallback_assets
-        else:
-            selected = assets
-        if selected:
-            return selected[0].media_path, selected[0].media_type.value
-        return exercise.media_path, exercise.media_type.value
+        selected = resolve_primary_media(exercise, preferred_presentation)
+        return selected.path, selected.media_type.value
 
     @staticmethod
     def _candidate_snapshot(candidate: ExerciseCandidate) -> dict[str, object]:

@@ -411,7 +411,7 @@ def test_admin_creates_exercise_with_gif_and_safe_owner_metadata(
     assert response.json()["media_path"].startswith("/media/")
     assert response.json()["media_license"] == "Project owner supplied and authorized"
     assert response.json()["media_attribution"] == "Provided by Fitsho project owner"
-    assert len(list(test_settings.media_root.glob("*.gif"))) == 1
+    assert len(list(test_settings.media_root.rglob("*.gif"))) == 1
     public_media = client.get(response.json()["media_path"])
     assert public_media.status_code == 200
     assert public_media.content == GIF_BYTES
@@ -435,7 +435,7 @@ def test_admin_creates_exercise_with_short_video(
 
     assert response.status_code == 201
     assert response.json()["media_type"] == "video"
-    assert len(list(test_settings.media_root.glob("*.mp4"))) == 1
+    assert len(list(test_settings.media_root.rglob("*.mp4"))) == 1
 
 
 def test_admin_creates_gendered_media_assets_and_public_detail_returns_them(
@@ -479,6 +479,7 @@ def test_admin_creates_gendered_media_assets_and_public_detail_returns_them(
         "male",
     ]
     assert response.json()["media_assets"][0]["media_type"] == "video"
+    assert response.json()["media_path"].startswith("/media/exercises/")
     assert response.json()["media_assets"][0]["sort_order"] == 0
     assert client.post("/api/v1/profile", headers=ORIGIN, json=VALID_PROFILE).status_code == 201
 
@@ -709,7 +710,7 @@ def test_invalid_upload_returns_field_error_and_leaves_no_file(
 
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"] == ["body", "media"]
-    assert list(test_settings.media_root.iterdir()) == []
+    assert not any(path.is_file() for path in test_settings.media_root.rglob("*"))
 
 
 def test_invalid_variant_upload_removes_already_stored_legacy_media(
@@ -737,7 +738,7 @@ def test_invalid_variant_upload_removes_already_stored_legacy_media(
     )
 
     assert response.status_code == 422
-    assert list(test_settings.media_root.iterdir()) == []
+    assert not any(path.is_file() for path in test_settings.media_root.rglob("*"))
 
 
 def test_database_failure_rolls_back_and_removes_new_media(
@@ -761,7 +762,7 @@ def test_database_failure_rolls_back_and_removes_new_media(
 
     assert response.status_code == 503
     assert db.scalar(select(Exercise).where(Exercise.slug == "incline-push-up")) is None
-    assert list(test_settings.media_root.iterdir()) == []
+    assert not any(path.is_file() for path in test_settings.media_root.rglob("*"))
 
 
 def test_duplicate_slug_returns_conflict(client: TestClient, db: Session) -> None:

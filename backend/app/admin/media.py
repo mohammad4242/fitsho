@@ -148,14 +148,22 @@ def _publish_temporary(
     raise MediaValidationError("Could not allocate a unique media filename")
 
 
-def store_upload(upload: UploadFile, settings: Settings) -> StoredMedia:
+def store_upload(
+    upload: UploadFile,
+    settings: Settings,
+    subdirectory: str | None = None,
+) -> StoredMedia:
     extension, expected_content_type, media_type = _validate_filename(upload.filename)
     if upload.content_type != expected_content_type:
         raise MediaValidationError("Media MIME type does not match its extension")
 
+    storage_root = (
+        settings.media_root if subdirectory is None else settings.media_root / subdirectory
+    )
     temporary_path = _write_temporary(
         upload,
         settings,
+        storage_root=storage_root,
         max_bytes=(
             settings.media_max_video_bytes
             if media_type is MediaType.VIDEO
@@ -174,14 +182,15 @@ def store_upload(upload: UploadFile, settings: Settings) -> StoredMedia:
             if duration > settings.media_max_video_duration_seconds:
                 limit = settings.media_max_video_duration_seconds
                 raise MediaValidationError(f"Video duration exceeds the {limit:g} seconds limit")
-        final_path = _publish_temporary(temporary_path, extension, settings.media_root)
+        final_path = _publish_temporary(temporary_path, extension, storage_root)
     except Exception:
         temporary_path.unlink(missing_ok=True)
         raise
 
     public_root = settings.media_public_path.rstrip("/")
+    relative_path = final_path.relative_to(settings.media_root).as_posix()
     return StoredMedia(
-        public_path=f"{public_root}/{final_path.name}",
+        public_path=f"{public_root}/{relative_path}",
         media_type=media_type,
         absolute_path=final_path,
     )

@@ -140,6 +140,7 @@ def _exercise(
 ) -> ExerciseSeed:
     movement_pattern, exercise_type, caution_tags = PROGRAMMING_METADATA[slug]
     media_path, media_type = _OWNER_MEDIA[slug]
+    media_path = f"/media/exercises/seed/{slug}.gif"
     return ExerciseSeed(
         slug=slug,
         name_en=name_en,

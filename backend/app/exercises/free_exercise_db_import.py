@@ -504,6 +504,7 @@ class ImportMediaAsset:
     source_url: str
     source_path: Path
     media_type: MediaType
+    source_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -825,6 +826,7 @@ class FreeExerciseDbImporter:
                     source_url=value,
                     source_path=source_path,
                     media_type=MediaType.VIDEO,
+                    source_id=f"{source_id}:{presentation.value}",
                 )
             )
         return assets
@@ -843,18 +845,18 @@ class FreeExerciseDbImporter:
         )
 
     def _is_current(self, exercise: Exercise, candidate: ImportCandidate) -> bool:
+        managed_assets = [asset for asset in exercise.media_assets if asset.source != "admin"]
         prescription = prescription_metadata_for_identifier(SOURCE_NAME, candidate.source_id)
         expected_assets = {
             (asset.presentation, asset.role, asset.source_url) for asset in candidate.media_assets
         }
         actual_assets = {
-            (asset.presentation, asset.role, asset.media_source_url)
-            for asset in exercise.media_assets
+            (asset.presentation, asset.role, asset.media_source_url) for asset in managed_assets
         }
         return (
             exercise.source_metadata_en == candidate.source_metadata
             and actual_assets == expected_assets
-            and all(self._stored_media_exists(asset.media_path) for asset in exercise.media_assets)
+            and all(self._stored_media_exists(asset.media_path) for asset in managed_assets)
             and exercise.movement_pattern is candidate.programming_metadata.movement_pattern
             and exercise.primary_muscle is candidate.primary_muscle
             and exercise.muscle_focus is candidate.muscle_focus
@@ -971,11 +973,18 @@ class FreeExerciseDbImporter:
         exercise.instructions_fa = [item.strip() for item in translation.instructions_fa]
         exercise.safety_notes_en = []
         exercise.safety_notes_fa = []
-        exercise.media_path = default_path
-        exercise.media_type = default_asset.media_type
-        exercise.media_source_url = default_asset.source_url
-        exercise.media_license = None
-        exercise.media_attribution = None
+        admin_assets = [asset for asset in exercise.media_assets if asset.source == "admin"]
+        admin_paths = {asset.media_path for asset in admin_assets}
+        admin_primary = exercise.media_path in admin_paths or (
+            exercise.media_attribution == "Provided by Fitsho project owner"
+            and exercise.media_path.startswith("/media/exercises/")
+        )
+        if not admin_primary:
+            exercise.media_path = default_path
+            exercise.media_type = default_asset.media_type
+            exercise.media_source_url = default_asset.source_url
+            exercise.media_license = None
+            exercise.media_attribution = None
         exercise.source = SOURCE_NAME
         exercise.source_id = candidate.source_id
         exercise.aliases_en = candidate.aliases_en
@@ -1050,17 +1059,32 @@ class FreeExerciseDbImporter:
         exercise: Exercise,
         desired: list[tuple[ImportMediaAsset, str]],
     ) -> None:
+        managed_assets = [asset for asset in exercise.media_assets if asset.source != "admin"]
         desired_keys = {(asset.presentation, asset.role) for asset, _ in desired}
-        for item in list(exercise.media_assets):
+        for item in managed_assets:
             if (item.presentation, item.role) not in desired_keys:
                 exercise.media_assets.remove(item)
-        existing = {(item.presentation, item.role): item for item in exercise.media_assets}
+        existing = {
+            (item.presentation, item.role): item
+            for item in exercise.media_assets
+            if item.source != "admin"
+        }
         for asset, public_path in desired:
             media_item: ExerciseMediaAsset | None = existing.get((asset.presentation, asset.role))
+            occupied_orders = {
+                item.sort_order
+                for item in exercise.media_assets
+                if item.presentation is asset.presentation and item.role is asset.role
+            }
             if media_item is None:
                 media_item = ExerciseMediaAsset(
                     presentation=asset.presentation,
                     role=asset.role,
+                    sort_order=next(
+                        order
+                        for order in range(len(occupied_orders) + 1)
+                        if order not in occupied_orders
+                    ),
                 )
                 exercise.media_assets.append(media_item)
             media_item.media_path = public_path
@@ -1068,6 +1092,8 @@ class FreeExerciseDbImporter:
             media_item.media_source_url = asset.source_url
             media_item.media_license = None
             media_item.media_attribution = None
+            media_item.source = SOURCE_NAME
+            media_item.source_id = asset.source_id
 
     def _copy_media(self, asset: ImportMediaAsset) -> tuple[str, Path | None]:
         source_size = asset.source_path.stat().st_size

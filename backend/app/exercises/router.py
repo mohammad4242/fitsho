@@ -5,6 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.auth.dependencies import DatabaseSession
 from app.exercises.dependencies import CurrentUser, require_completed_profile
 from app.exercises.enums import BodyRegion, MediaPresentation, MuscleGroup
+from app.exercises.media_resolver import (
+    ordered_media_assets,
+    resolve_primary_media,
+    valid_media_assets,
+)
 from app.exercises.models import Exercise
 from app.exercises.schemas import (
     BodyRegionCategory,
@@ -74,6 +79,7 @@ def _body_region_items() -> list[BodyRegionCategory]:
 
 
 def _summary(exercise: Exercise) -> ExerciseSummary:
+    primary_media = resolve_primary_media(exercise)
     return ExerciseSummary(
         id=exercise.id,
         slug=exercise.slug,
@@ -93,8 +99,8 @@ def _summary(exercise: Exercise) -> ExerciseSummary:
         ),
         difficulty=exercise.difficulty,
         labels=sorted((item.label for item in exercise.labels), key=lambda value: value.value),
-        media_path=exercise.media_path,
-        media_type=exercise.media_type,
+        media_path=primary_media.path,
+        media_type=primary_media.media_type,
     )
 
 
@@ -104,18 +110,16 @@ def _detail(
     filter_media: bool = False,
 ) -> ExerciseDetail:
     summary = _summary(exercise)
-    media_assets = list(exercise.media_assets)
+    media_assets = valid_media_assets(exercise)
     selected_presentation: MediaPresentation | None = None
     if filter_media:
         if presentation in {MediaPresentation.MALE, MediaPresentation.FEMALE}:
-            preferred = [asset for asset in media_assets if asset.presentation is presentation]
-            fallback = [
+            media_assets = ordered_media_assets(media_assets, presentation)
+            media_assets = [
                 asset
                 for asset in media_assets
-                if asset.presentation in {MediaPresentation.MALE, MediaPresentation.FEMALE}
-                and asset.presentation is not presentation
-            ]
-            media_assets = preferred or fallback
+                if asset.presentation in {presentation, MediaPresentation.UNSPECIFIED}
+            ] or ordered_media_assets(media_assets, presentation)
         if media_assets:
             selected_presentation = media_assets[0].presentation
     return ExerciseDetail(

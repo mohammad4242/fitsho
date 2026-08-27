@@ -117,6 +117,8 @@ def _sync_media_assets(
         if stored_media is not None:
             asset.media_path = stored_media.public_path
             asset.media_type = stored_media.media_type
+            asset.source = "admin"
+            asset.source_id = None
         asset.media_source_url = payload_asset.media_source_url
         asset.media_license = payload_asset.media_license or (
             OWNER_LICENSE if stored_media is not None else asset.media_license

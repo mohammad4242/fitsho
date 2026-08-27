@@ -98,13 +98,16 @@ def test_seed_manifest_uses_only_approved_media() -> None:
     assert set(owner_media) == OWNER_MEDIA_SLUGS
     assert len(owner_media) == 17
     for seed in owner_media.values():
-        assert seed.media_path.startswith("/exercises/")
-        assert seed.media_path != "/exercises/exercise-placeholder.svg"
+        assert seed.media_path.startswith("/media/exercises/seed/")
+        assert seed.media_path != "/media/exercises/seed/exercise-placeholder.svg"
         assert seed.media_type is MediaType.GIF
         assert seed.media_source_url is None
         assert seed.media_license == "Project owner supplied and authorized"
         assert seed.media_attribution == "Provided by Fitsho project owner"
-    assert all(seed.media_path != "/exercises/exercise-placeholder.svg" for seed in EXERCISE_SEEDS)
+    assert all(
+        seed.media_path != "/media/exercises/seed/exercise-placeholder.svg"
+        for seed in EXERCISE_SEEDS
+    )
 
 
 def test_seed_is_idempotent_and_restores_seed_owned_fields(db: Session) -> None:
@@ -187,6 +190,35 @@ def test_seed_is_idempotent_and_restores_seed_owned_fields(db: Session) -> None:
     assert {item.equipment for item in preserved_custom.equipment_items} == {Equipment.BODYWEIGHT}
     assert db.scalar(select(func.count()).select_from(Exercise)) == 18
     assert db.scalar(select(func.count()).select_from(ExerciseAlternative)) == 1
+
+
+def test_seed_preserves_admin_owned_media(db: Session) -> None:
+    from app.exercises.enums import MediaPresentation, MediaRole
+    from app.exercises.models import Exercise, ExerciseMediaAsset
+    from app.exercises.service import seed_exercises
+
+    seed_exercises(db)
+    exercise = db.scalar(select(Exercise).where(Exercise.slug == "romanian-deadlift"))
+    assert exercise is not None
+    exercise.media_path = "/media/exercises/romanian-deadlift--admin/video.mp4"
+    exercise.media_type = "video"
+    exercise.media_assets.append(
+        ExerciseMediaAsset(
+            presentation=MediaPresentation.MALE,
+            role=MediaRole.VIDEO,
+            sort_order=0,
+            media_path="/media/exercises/romanian-deadlift--admin/video.mp4",
+            media_type="video",
+            source="admin",
+        )
+    )
+    db.commit()
+
+    seed_exercises(db)
+    db.refresh(exercise)
+
+    assert exercise.media_path == "/media/exercises/romanian-deadlift--admin/video.mp4"
+    assert exercise.media_assets[0].media_path == exercise.media_path
 
 
 def test_seed_rolls_back_when_commit_fails(

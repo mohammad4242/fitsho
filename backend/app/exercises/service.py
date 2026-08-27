@@ -131,11 +131,23 @@ def _apply_seed_fields(exercise: Exercise, seed: ExerciseSeed) -> None:
     exercise.instructions_fa = list(seed.instructions_fa)
     exercise.safety_notes_en = list(seed.safety_notes_en)
     exercise.safety_notes_fa = list(seed.safety_notes_fa)
-    exercise.media_path = seed.media_path
-    exercise.media_type = seed.media_type
-    exercise.media_source_url = seed.media_source_url
-    exercise.media_license = seed.media_license
-    exercise.media_attribution = seed.media_attribution
+    current_media_path = exercise.media_path or ""
+    seed_owned_path = (
+        not current_media_path
+        or current_media_path.startswith("/exercises/")
+        or current_media_path
+        in {
+            "/exercises/exercise-placeholder.svg",
+            seed.media_path,
+        }
+    )
+    admin_owned_media = any(asset.source == "admin" for asset in exercise.media_assets)
+    if seed_owned_path and not admin_owned_media:
+        exercise.media_path = seed.media_path
+        exercise.media_type = seed.media_type
+        exercise.media_source_url = seed.media_source_url
+        exercise.media_license = seed.media_license
+        exercise.media_attribution = seed.media_attribution
     exercise.is_active = True
 
 
@@ -195,6 +207,7 @@ def seed_exercises(db: Session) -> SeedResult:
                 selectinload(Exercise.caution_tag_items),
                 selectinload(Exercise.secondary_muscles),
                 selectinload(Exercise.equipment_items),
+                selectinload(Exercise.media_assets),
             )
         )
     }

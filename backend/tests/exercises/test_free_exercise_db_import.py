@@ -392,6 +392,45 @@ def test_importer_prevents_duplicates_on_a_second_run(
     assert translator.calls == [["0001"]]
 
 
+def test_importer_does_not_overwrite_admin_owned_media(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.enums import MediaPresentation
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+
+    source_root = tmp_path / "source"
+    write_source(source_root, source_record())
+    translator = FakeTranslator()
+    importer = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=translator,
+    )
+    importer.run()
+    exercise = db.scalar(select(Exercise).where(Exercise.source_id == "0001"))
+    assert exercise is not None
+    admin_path = "/media/exercises/push-up--admin/video.mp4"
+    admin_asset = next(
+        asset for asset in exercise.media_assets if asset.presentation is MediaPresentation.MALE
+    )
+    admin_asset.media_path = admin_path
+    admin_asset.media_source_url = None
+    admin_asset.source = "admin"
+    admin_asset.source_id = "admin-push-up-video"
+    exercise.media_path = admin_path
+    db.commit()
+
+    importer.run()
+
+    db.refresh(exercise)
+    preserved = next(asset for asset in exercise.media_assets if asset.source == "admin")
+    assert preserved.media_path == admin_path
+    assert exercise.media_path == admin_path
+
+
 def test_importer_recopies_existing_media_when_target_storage_is_empty(
     db: Session,
     test_settings: Settings,

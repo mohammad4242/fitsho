@@ -30,15 +30,32 @@ describe("buildExerciseMediaItems", () => {
 
     expect(items.map((item) => item.media_path)).toEqual(["/media/legacy.mp4"]);
   });
+
+  it("falls back to legacy media when assets are placeholders", () => {
+    const items = buildExerciseMediaItems({
+      media_path: "/media/legacy.mp4",
+      media_type: "video",
+      media_attribution: null,
+      media_assets: [
+        mediaAsset("/exercises/exercise-placeholder.svg", 0, "placeholder"),
+      ],
+    });
+
+    expect(items.map((item) => item.media_path)).toEqual(["/media/legacy.mp4"]);
+  });
 });
 
-function mediaAsset(media_path: string, sort_order: number) {
+function mediaAsset(
+  media_path: string,
+  sort_order: number,
+  media_type: "video" | "placeholder" = "video",
+) {
   return {
     presentation: "male" as const,
     role: "video" as const,
     sort_order,
     media_path,
-    media_type: "video" as const,
+    media_type,
     media_source_url: null,
     media_license: null,
     media_attribution: null,

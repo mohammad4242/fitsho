@@ -11,6 +11,7 @@ from app.auth.cookies import require_trusted_origin
 from app.auth.models import User
 from app.database.session import get_db
 from app.exercises.dependencies import require_completed_profile
+from app.exercises.media_resolver import resolve_primary_media
 from app.exercises.models import Exercise
 from app.exercises.schemas import ExerciseSummary
 from app.profile.models import UserProfile
@@ -349,6 +350,7 @@ def to_snapshot_or_live_summary(
 
 
 def to_exercise_summary(exercise: Exercise) -> ExerciseSummary:
+    primary_media = resolve_primary_media(exercise)
     return ExerciseSummary(
         id=exercise.id,
         slug=exercise.slug,
@@ -362,8 +364,8 @@ def to_exercise_summary(exercise: Exercise) -> ExerciseSummary:
         secondary_muscles=[secondary.muscle for secondary in exercise.secondary_muscles],
         equipment=[equipment.equipment for equipment in exercise.equipment_items],
         difficulty=exercise.difficulty,
-        media_path=exercise.media_path,
-        media_type=exercise.media_type,
+        media_path=primary_media.path,
+        media_type=primary_media.media_type,
     )
 
 

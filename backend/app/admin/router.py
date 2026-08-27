@@ -51,6 +51,7 @@ from app.admin.service import (
 from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import AppSettings, DatabaseSession
 from app.exercises.enums import MediaPresentation, MediaRole, MediaType
+from app.exercises.media_resolver import resolve_primary_media
 from app.exercises.models import Exercise
 from app.exercises.taxonomy import MUSCLES_BY_REGION, is_compatible_muscle_focus
 from app.profile.enums import ExperienceLevel
@@ -450,6 +451,7 @@ def delete_training_template(template_id: UUID, db: DatabaseSession) -> Response
 
 
 def _detail(exercise: Exercise) -> AdminExerciseDetail:
+    primary_media = resolve_primary_media(exercise)
     return AdminExerciseDetail(
         id=exercise.id,
         slug=exercise.slug,
@@ -482,8 +484,8 @@ def _detail(exercise: Exercise) -> AdminExerciseDetail:
         common_mistakes_en=exercise.common_mistakes_en,
         breathing_en=exercise.breathing_en,
         needs_review=exercise.needs_review,
-        media_path=exercise.media_path,
-        media_type=exercise.media_type,
+        media_path=primary_media.path,
+        media_type=primary_media.media_type,
         media_source_url=exercise.media_source_url,
         media_license=exercise.media_license,
         media_attribution=exercise.media_attribution,
@@ -586,13 +588,14 @@ def _parse_payload(raw_payload: str) -> AdminExerciseCreate:
 def _variant_uploads(
     settings: AppSettings,
     uploads: dict[MediaAssetKey, UploadFile | None],
+    subdirectory: str,
 ) -> dict[MediaAssetKey, StoredMedia]:
     stored: dict[MediaAssetKey, StoredMedia] = {}
     try:
         for key, upload in uploads.items():
             if upload is None:
                 continue
-            media = store_upload(upload, settings)
+            media = store_upload(upload, settings, subdirectory)
             expected_type = MediaType.VIDEO
             if media.media_type is not expected_type:
                 discard_media(media)
@@ -609,6 +612,7 @@ def _gallery_uploads(
     settings: AppSettings,
     payload: AdminExerciseCreate,
     uploads: list[UploadFile],
+    subdirectory: str,
 ) -> dict[MediaAssetKey, StoredMedia]:
     stored: dict[MediaAssetKey, StoredMedia] = {}
     try:
@@ -620,7 +624,7 @@ def _gallery_uploads(
             key: MediaAssetKey = (asset.presentation, asset.role, asset.sort_order)
             if key in stored:
                 raise MediaValidationError("Duplicate media gallery item")
-            media = store_upload(uploads[asset.upload_index], settings)
+            media = store_upload(uploads[asset.upload_index], settings, subdirectory)
             expected_type = MediaType.VIDEO
             if media.media_type is not expected_type:
                 discard_media(media)
@@ -683,16 +687,20 @@ def update_exercise(
     stored_media: StoredMedia | None = None
     stored_media_assets: dict[MediaAssetKey, StoredMedia] = {}
     try:
+        media_directory = f"exercises/{exercise_payload.slug}--{str(exercise_id)[:8]}"
         if media is not None:
-            stored_media = store_upload(media, settings)
+            stored_media = store_upload(media, settings, media_directory)
         stored_media_assets = _variant_uploads(
             settings,
             {
                 (MediaPresentation.MALE, MediaRole.VIDEO, 0): media_male_video,
                 (MediaPresentation.FEMALE, MediaRole.VIDEO, 0): media_female_video,
             },
+            media_directory,
         )
-        stored_media_assets.update(_gallery_uploads(settings, exercise_payload, media_files or []))
+        stored_media_assets.update(
+            _gallery_uploads(settings, exercise_payload, media_files or [], media_directory)
+        )
         exercise = update_admin_exercise(
             db,
             exercise_id,
@@ -772,16 +780,20 @@ def create_exercise(
     stored_media: StoredMedia | None = None
     stored_media_assets: dict[MediaAssetKey, StoredMedia] = {}
     try:
+        media_directory = f"exercises/{exercise_payload.slug}"
         if media is not None:
-            stored_media = store_upload(media, settings)
+            stored_media = store_upload(media, settings, media_directory)
         stored_media_assets = _variant_uploads(
             settings,
             {
                 (MediaPresentation.MALE, MediaRole.VIDEO, 0): media_male_video,
                 (MediaPresentation.FEMALE, MediaRole.VIDEO, 0): media_female_video,
             },
+            media_directory,
         )
-        stored_media_assets.update(_gallery_uploads(settings, exercise_payload, media_files or []))
+        stored_media_assets.update(
+            _gallery_uploads(settings, exercise_payload, media_files or [], media_directory)
+        )
         exercise = create_admin_exercise(
             db,
             exercise_payload,
