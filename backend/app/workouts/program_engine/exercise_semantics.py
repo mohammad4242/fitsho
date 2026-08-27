@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.exercises.enums import ExerciseType, MovementPattern, MuscleFocus, MuscleGroup
+from app.exercises.enums import Equipment, ExerciseType, MovementPattern, MuscleFocus, MuscleGroup
 from app.workouts.program_engine.enums import BodyPosition, Laterality
 
 
@@ -35,6 +35,9 @@ class ExerciseRoleSource(Protocol):
     @property
     def substitution_group(self) -> str | None: ...
 
+    @property
+    def equipment(self) -> frozenset[Equipment]: ...
+
 
 @dataclass(frozen=True, slots=True)
 class ExerciseRoleSignature:
@@ -48,6 +51,7 @@ class ExerciseRoleSignature:
     body_position: BodyPosition
     laterality: Laterality
     substitution_group: str | None
+    equipment: frozenset[Equipment] = frozenset()
 
     @classmethod
     def from_candidate(cls, candidate: ExerciseRoleSource) -> ExerciseRoleSignature:
@@ -62,10 +66,47 @@ class ExerciseRoleSignature:
             body_position=candidate.body_position,
             laterality=candidate.laterality,
             substitution_group=candidate.substitution_group,
+            equipment=frozenset(candidate.equipment),
         )
+
+    @property
+    def canonical_family(self) -> str:
+        return _canonical_semantic_family(self)
 
 
 SEMANTIC_NEAR_DUPLICATE_REASON = "SEMANTIC_NEAR_DUPLICATE_REJECTED"
+
+_LEGACY_BROAD_GROUPS = frozenset(pattern.value for pattern in MovementPattern)
+_DISTINCT_SQUAT_FAMILIES = frozenset(
+    {"squat_wide_stance", "squat_supported_machine", "squat_sissy"}
+)
+_DISTINCT_HINGE_FAMILIES = frozenset(
+    {"hip_hinge_reverse_hyperextension", "hip_hinge_good_morning"}
+)
+
+
+def _canonical_semantic_family(signature: ExerciseRoleSignature) -> str:
+    """Normalize equipment-specific metadata into a programming-role family."""
+
+    group = signature.substitution_group
+    if group in _LEGACY_BROAD_GROUPS:
+        group = None
+    if signature.movement_pattern is MovementPattern.SQUAT:
+        if group in _DISTINCT_SQUAT_FAMILIES:
+            return group
+        return "squat_primary"
+    if signature.movement_pattern is MovementPattern.HIP_HINGE:
+        if group in _DISTINCT_HINGE_FAMILIES:
+            return group
+        return "hip_hinge_primary"
+    if signature.movement_pattern is MovementPattern.HORIZONTAL_PUSH and group is not None:
+        if "push_up" in group or group == "pushup":
+            return "horizontal_push_push_up"
+    return group or (
+        f"{signature.movement_pattern.value}:"
+        f"{signature.primary_muscle.value if signature.primary_muscle is not None else 'none'}:"
+        f"{signature.exercise_type.value}"
+    )
 
 
 def near_equivalent_exercises(
@@ -82,11 +123,7 @@ def near_equivalent_exercises(
         or left.exercise_type is not right.exercise_type
     ):
         return False
-    if (
-        left.substitution_group is not None
-        and right.substitution_group is not None
-        and left.substitution_group != right.substitution_group
-    ):
+    if left.canonical_family != right.canonical_family:
         return False
     if (
         left.muscle_focus is not None
@@ -94,9 +131,13 @@ def near_equivalent_exercises(
         and left.muscle_focus is not right.muscle_focus
     ):
         return False
-    if left.secondary_muscles != right.secondary_muscles:
-        return False
     if left.body_position is not right.body_position or left.laterality is not right.laterality:
+        return False
+    if left.canonical_family.startswith(("squat_", "hip_hinge_", "horizontal_push_push_up")):
+        return True
+    if left.equipment != right.equipment:
+        return False
+    if left.secondary_muscles != right.secondary_muscles:
         return False
     return bool(
         left.muscle_focus is not None

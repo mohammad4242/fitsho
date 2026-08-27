@@ -111,3 +111,54 @@ def test_near_equivalent_policy_preserves_distinct_training_roles() -> None:
     assert near_equivalent is not None
     assert not near_equivalent(squat, lunge)
     assert not near_equivalent(flat_press, incline_press)
+
+
+@pytest.mark.parametrize(
+    ("first_group", "second_group"),
+    [
+        ("squat_free_weight", "squat_bodyweight"),
+        ("squat_free_weight", "squat_dumbbell"),
+        ("hip_hinge_romanian_deadlift", "hip_hinge_deadlift"),
+    ],
+)
+def test_canonical_semantic_family_rejects_same_role_variants(
+    first_group: str, second_group: str
+) -> None:
+    first = _candidate(
+        movement_pattern=(
+            MovementPattern.SQUAT
+            if first_group.startswith("squat_")
+            else MovementPattern.HIP_HINGE
+        ),
+        primary_muscle=(
+            MuscleGroup.QUADRICEPS
+            if first_group.startswith("squat_")
+            else MuscleGroup.HAMSTRINGS
+        ),
+        muscle_focus=(
+            MuscleFocus.GENERAL_QUADRICEPS
+            if first_group.startswith("squat_")
+            else None
+        ),
+        substitution_group=first_group,
+    )
+    second = replace(first, id=uuid4(), substitution_group=second_group)
+
+    assert ExerciseRoleSignature.from_candidate(first).canonical_family == (
+        ExerciseRoleSignature.from_candidate(second).canonical_family
+    )
+    assert exercise_semantics.near_equivalent_exercises(first, second)
+
+
+def test_push_up_family_ignores_catalog_metadata_variation() -> None:
+    first = _candidate(
+        secondary_muscles=(MuscleGroup.TRICEPS,),
+        substitution_group="horizontal_press_push_up",
+    )
+    second = replace(
+        first,
+        id=uuid4(),
+        secondary_muscles=(MuscleGroup.SHOULDERS,),
+    )
+
+    assert exercise_semantics.near_equivalent_exercises(first, second)

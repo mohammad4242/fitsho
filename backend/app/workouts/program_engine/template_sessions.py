@@ -297,6 +297,29 @@ def build_template_sessions(
                 candidate,
                 (selected_candidate for selected_candidate, _selected_slot in selected),
             )
+            if semantic_duplicate:
+                complementary = _complementary_template_candidate(
+                    request,
+                    reference_day,
+                    selected,
+                    eligible,
+                    used,
+                    reserved,
+                    ruleset,
+                )
+                if complementary is not None:
+                    candidate = complementary
+                    complementary_replacements.add(candidate.id)
+                    build_reasons.append("TEMPLATE_REDUNDANCY_REPLACED_WITH_COMPLEMENTARY_ROLE")
+                else:
+                    build_reasons.append("TEMPLATE_SEMANTIC_DUPLICATE_OMITTED")
+                    if slot.adaptation_priority == "core":
+                        raise TemplateConstructionError(
+                            "TEMPLATE_CORE_SEMANTIC_DUPLICATE_UNRESOLVABLE",
+                            f"TEMPLATE_DAY:{index}",
+                            f"TEMPLATE_PATTERN:{slot.movement_pattern.value}",
+                        )
+                    continue
             if _template_role_is_excessive(candidate, selected):
                 complementary = _complementary_template_candidate(
                     request,
@@ -311,12 +334,6 @@ def build_template_sessions(
                     candidate = complementary
                     complementary_replacements.add(candidate.id)
                     build_reasons.append("TEMPLATE_REDUNDANCY_REPLACED_WITH_COMPLEMENTARY_ROLE")
-                elif semantic_duplicate:
-                    # A template's explicit slot structure is an intentional
-                    # redundancy declaration. Preserve it when no safe
-                    # complementary role exists and expose that decision.
-                    deliberate_redundancies.add(candidate.id)
-                    build_reasons.append("TEMPLATE_SEMANTIC_DUPLICATE_PRESERVED_INTENTIONAL")
                 else:
                     deliberate_redundancies.add(candidate.id)
                     build_reasons.append("DELIBERATE_REDUNDANCY_FOR_TEMPLATE_STRUCTURE")
@@ -926,8 +943,6 @@ def _add_targeted_accessories(
                     item,
                     (selected_candidate for selected_candidate, _selected_slot in selected),
                 )
-                or main_exercise_count(candidate for candidate, _slot in selected)
-                < required_minimum
             )
         ]
         if not options:
@@ -953,13 +968,9 @@ def _add_targeted_accessories(
                     target_muscles=frozenset(target_muscles),
                     day_focus=f"template_reference_{reference_day.day_number}",
                 ).compatible
-                and (
-                    not has_near_equivalent(
-                        item,
-                        (selected_candidate for selected_candidate, _selected_slot in selected),
-                    )
-                    or main_exercise_count(candidate for candidate, _slot in selected)
-                    < required_minimum
+                and not has_near_equivalent(
+                    item,
+                    (selected_candidate for selected_candidate, _selected_slot in selected),
                 )
             ]
             if not options:
