@@ -103,6 +103,7 @@ def repair_session_durations(
         # ------------------------------------------------------------------
         if main_exercise_count(current.exercises) < planned_minimum_exercises:
             reasons.append("SESSION_DURATION_UNDERFILLED")
+            hard_volume_status: list[bool] = []
             current = _repair_underfill(
                 current,
                 request,
@@ -115,7 +116,10 @@ def repair_session_durations(
                     prefer_acceptable_volume_for_minimum_fill
                 ),
                 minimum_exercises=planned_minimum_exercises,
+                hard_volume_status=hard_volume_status,
             )
+            if hard_volume_status and hard_volume_status[0]:
+                reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
 
         # ------------------------------------------------------------------
         # Overfill = resistance-only portion exceeds budget + tolerance.
@@ -217,6 +221,7 @@ def _repair_underfill(
     volume: WeeklyVolumePlan | None,
     prefer_acceptable_volume_for_minimum_fill: bool,
     minimum_exercises: int,
+    hard_volume_status: list[bool] | None = None,
 ) -> WorkoutDay:
     """Add exercises (or sets) until exercise-count floor is satisfied.
 
@@ -243,6 +248,24 @@ def _repair_underfill(
             continue
         # Cannot add a safe, useful, compatible exercise — stop.
         # Do NOT increase sets to substitute for missing exercise count.
+        if (
+            volume is not None
+            and _select_exercise_addition(
+                day,
+                exercises,
+                request,
+                candidates,
+                policy,
+                ruleset,
+                other_days=other_days,
+                volume=volume,
+                prefer_acceptable_volume_for_minimum_fill=False,
+                minimum_exercises=minimum_exercises,
+            )
+            is None
+        ):
+            if hard_volume_status is not None:
+                hard_volume_status.append(True)
         break
     return day
 

@@ -467,7 +467,16 @@ def _duration_fixture_exercise(candidate, *, order: int, sets: int = 3, minutes:
     )
 
 
-def test_template_underfill_keeps_explicit_constraint_when_no_hard_volume_room_exists() -> None:
+@pytest.mark.parametrize(
+    ("existing_names", "expected_count"),
+    [
+        (("bodyweight hinge", "hamstring walkout"), 2),
+        (("bodyweight hinge", "hamstring walkout", "bodyweight squat"), 3),
+    ],
+)
+def test_template_underfill_keeps_explicit_constraint_when_no_hard_volume_room_exists(
+    existing_names: tuple[str, ...], expected_count: int
+) -> None:
     source = request(
         session_duration_minutes=45,
         available_training_days=1,
@@ -478,7 +487,7 @@ def test_template_underfill_keeps_explicit_constraint_when_no_hard_volume_room_e
     by_name = {item.name.lower(): item for item in catalog}
     existing = tuple(
         _duration_fixture_exercise(by_name[name], order=index, sets=4)
-        for index, name in enumerate(("bodyweight hinge", "hamstring walkout"), start=1)
+        for index, name in enumerate(existing_names, start=1)
     )
     day = WorkoutDay(
         day_index=1,
@@ -521,7 +530,7 @@ def test_template_underfill_keeps_explicit_constraint_when_no_hard_volume_room_e
         prefer_acceptable_volume_for_minimum_fill=True,
     )
 
-    assert len(repaired[0].exercises) == 2
+    assert len(repaired[0].exercises) == expected_count
     assert "SESSION_DURATION_TARGET_UNSATISFIED" in reasons
     assert "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD" in reasons
     assert all(item.counts_toward_volume for item in repaired[0].exercises)
@@ -551,9 +560,95 @@ def test_capacity_trim_removes_optional_tail_when_main_capacity_is_full() -> Non
         exercises=(*main, optional),
     )
 
-    repaired, _ = repair_session_durations((day,), normalized, catalog, RULESET)
+    repaired, reasons = repair_session_durations((day,), normalized, catalog, RULESET)
 
     assert len(repaired[0].exercises) == RULESET.max_exercises_per_session
+    assert repaired[0].estimated_duration_minutes == 59
+    assert "SUPPLEMENTAL_WORK_TRIMMED_FOR_DURATION" in reasons
     assert all(
         "OPTIONAL_SUPPLEMENTAL_WORK" not in item.reason_codes for item in repaired[0].exercises
+    )
+
+
+@pytest.mark.parametrize(
+    ("profile_number", "underfilled_day", "expected_count", "expected_duration"),
+    [(5, 2, 3, 34), (10, 3, 2, 19)],
+)
+def test_batch2_profile_underfill_is_hard_volume_constrained(
+    profile_number: int,
+    underfilled_day: int,
+    expected_count: int,
+    expected_duration: int,
+) -> None:
+    """Exercise the same catalog/template/service path as the Batch2 production run."""
+    import scripts.generate_e2e_report_batch2 as batch2
+    from app.workouts.program_engine import session_duration as duration_module
+
+    profiles = batch2.TEST_PROFILES_BATCH2
+    original_profiles = profiles[:]
+    profiles[:] = [profile for profile in original_profiles if profile["num"] == profile_number]
+    original_selector = duration_module._select_exercise_addition
+    original_hard_check = duration_module._within_weekly_hard_volume
+    strict_attempts: list[dict[str, int]] = []
+    active_attempt: dict[str, int] | None = None
+
+    def record_hard_check(*args, **kwargs):
+        result = original_hard_check(*args, **kwargs)
+        if active_attempt is not None:
+            active_attempt["checks"] += 1
+            active_attempt["safe"] += int(result)
+        return result
+
+    def record_selector(*args, **kwargs):
+        nonlocal active_attempt
+        strict = not kwargs["prefer_acceptable_volume_for_minimum_fill"]
+        if not strict:
+            return original_selector(*args, **kwargs)
+        day, exercises, normalized_request = args[:3]
+        active_attempt = {
+            "day": day.day_index,
+            "existing": len(exercises),
+            "checks": 0,
+            "safe": 0,
+            "duration": normalized_request.source.session_duration_minutes,
+        }
+        try:
+            return original_selector(*args, **kwargs)
+        finally:
+            strict_attempts.append(active_attempt)
+            active_attempt = None
+
+    duration_module._select_exercise_addition = record_selector
+    duration_module._within_weekly_hard_volume = record_hard_check
+    try:
+        results = batch2.run_batch2_profiles()
+    finally:
+        profiles[:] = original_profiles
+        duration_module._select_exercise_addition = original_selector
+        duration_module._within_weekly_hard_volume = original_hard_check
+
+    assert len(results) == 1
+    _, result = results[0]
+    assert result["success"] is True
+    plan = result["plan"]
+    assert plan is not None
+    day = plan.days[underfilled_day - 1]
+
+    assert len(day.exercises) == expected_count
+    assert day.estimated_duration_minutes == expected_duration
+    assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in plan.warnings
+    assert all(exercise.sets >= RULESET.minimum_working_sets for exercise in day.exercises)
+    assert all(exercise.exercise.content_type.value == "exercise" for exercise in day.exercises)
+
+    hard_attempt = next(attempt for attempt in strict_attempts if attempt["day"] == underfilled_day)
+    assert hard_attempt["duration"] == 45
+    assert hard_attempt["existing"] == expected_count
+    assert hard_attempt["checks"] > 0
+    assert hard_attempt["safe"] == 0
+
+    ranges = plan.aggregate_metrics["volume_ranges_by_muscle"]
+    assert any(
+        values["actual_effective_volume"] >= values["acceptable_maximum"]
+        and values["actual_effective_volume"] <= values["maximum_hard"]
+        for values in ranges.values()
     )
