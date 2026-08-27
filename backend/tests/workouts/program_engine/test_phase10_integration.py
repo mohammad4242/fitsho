@@ -65,6 +65,8 @@ def _slot(
         rep_max=12,
         target_rir=2,
         rest_seconds=90,
+        superset_exercise_id=None,
+        superset_exercise_slug_hint=None,
     )
 
 
@@ -114,7 +116,6 @@ def _template(
         slug=slug,
         days_per_week=4,
         supported_levels=(level,),
-        fitness_goal="build_muscle",
         focus_tags=tags,
         intensity_methods=("standard",),
         days=(
