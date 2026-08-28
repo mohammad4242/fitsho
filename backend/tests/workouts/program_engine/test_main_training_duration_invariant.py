@@ -1,6 +1,8 @@
+from dataclasses import replace
 from types import SimpleNamespace
 
 from app.exercises.enums import ExerciseLabel, ExerciseType
+from app.workouts.program_engine.coach_quality import build_coach_quality_metrics
 from app.workouts.program_engine.duration_capacity import build_session_capacity
 from app.workouts.program_engine.duration_policy import (
     calculate_core_addon_minutes,
@@ -8,11 +10,23 @@ from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes_from_exercises,
     get_session_duration_policy,
 )
+from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal
+from app.workouts.program_engine.final_gate import evaluate_final_program
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import prescribe_sessions
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-from app.workouts.program_engine.schemas import SessionDraft, VolumeTarget, WeeklyVolumePlan
+from app.workouts.program_engine.schemas import (
+    SessionDraft,
+    ValidationReport,
+    VolumeTarget,
+    WeeklyVolumePlan,
+)
+from app.workouts.program_engine.session_duration import (
+    SessionDurationRepairEvidence,
+    repair_session_durations,
+)
+from app.workouts.program_engine.validation import validate_program
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
@@ -140,3 +154,172 @@ def test_prescription_budget_counts_main_exercises_not_anatomical_core() -> None
     )
     assert with_core.exercises[-1].exercise_type is ExerciseType.CORE
     assert with_core.exercises[-1].estimated_minutes > 0
+
+
+def _generated_program():
+    result = generate_program(
+        request(session_duration_minutes=60, available_training_days=1),
+        full_catalog(),
+        RULESET,
+    )
+    assert result.program is not None, result.errors
+    return result.program
+
+
+def _duration_day(day, main_minutes: int, core_minutes: int = 0):
+    main = [item for item in day.exercises if item.exercise_type is not ExerciseType.CORE]
+    assert main
+    updated = [replace(item, estimated_minutes=0) for item in main]
+    updated[0] = replace(updated[0], estimated_minutes=main_minutes)
+    if core_minutes:
+        core = next(
+            (item for item in day.exercises if item.exercise_type is ExerciseType.CORE),
+            None,
+        )
+        if core is None:
+            core = replace(updated.pop(), exercise_type=ExerciseType.CORE)
+        exercises = (*updated, replace(core, estimated_minutes=core_minutes))
+    else:
+        exercises = tuple(updated)
+    cardio_minutes = day.cardio.duration_minutes if day.cardio else 0
+    return replace(
+        day,
+        exercises=exercises,
+        estimated_duration_minutes=(
+            RULESET.general_warmup_minutes + main_minutes + core_minutes + cardio_minutes
+        ),
+    )
+
+
+def _with_duration_trace(program, day, reason_codes: tuple[str, ...]):
+    evidence = SessionDurationRepairEvidence.from_day(day, reason_codes).as_trace()
+    trace = tuple(
+        {
+            **entry,
+            "reason_codes": reason_codes,
+            "per_session_evidence": (evidence,),
+        }
+        if entry.get("stage") == "session_duration"
+        else entry
+        for entry in program.decision_trace
+    )
+    return replace(program, weekly_schedule=(day,), decision_trace=trace)
+
+
+def test_core_and_cardio_are_additive_to_a_valid_main_training_duration() -> None:
+    program = _generated_program()
+    day = _duration_day(program.weekly_schedule[0], main_minutes=60, core_minutes=8)
+
+    assert calculate_main_training_minutes(day) == 60
+    assert calculate_core_addon_minutes(day) == 8
+    assert day.estimated_duration_minutes == 83
+    report = validate_program(
+        replace(program, weekly_schedule=(day,)),
+        request(session_duration_minutes=60, available_training_days=1),
+        RULESET,
+    )
+
+    assert not {
+        "SESSION_DURATION_EXCEEDED",
+        "SESSION_DURATION_OVER_TARGET",
+        "SESSION_DURATION_UNDER_TARGET",
+    }.intersection(report.errors)
+
+
+def test_underfilled_main_training_is_invalid_even_when_addons_make_total_long() -> None:
+    program = _generated_program()
+    day = _duration_day(program.weekly_schedule[0], main_minutes=47, core_minutes=10)
+    mutated = replace(program, weekly_schedule=(day,))
+
+    report = validate_program(
+        mutated,
+        request(session_duration_minutes=60, available_training_days=1),
+        RULESET,
+    )
+
+    assert "SESSION_DURATION_UNDER_TARGET" in report.errors
+    assert "SESSION_DURATION_TARGET_UNSATISFIED" in report.errors
+
+
+def test_underfill_repair_adds_main_work_without_using_core_or_rest() -> None:
+    program = _generated_program()
+    day = _duration_day(program.weekly_schedule[0], main_minutes=47, core_minutes=10)
+    normalized = normalize_request(
+        request(session_duration_minutes=60, available_training_days=1),
+        RULESET,
+    )
+    original_main = calculate_main_training_minutes(day)
+    original_core = calculate_core_addon_minutes(day)
+    original_rests = tuple(item.rest_seconds for item in day.exercises)
+
+    result = repair_session_durations(
+        (day,),
+        normalized,
+        full_catalog(),
+        RULESET,
+    )
+    repaired = result.days[0]
+
+    assert original_main == 47
+    assert original_core == 10
+    assert calculate_main_training_minutes(repaired) >= 50
+    assert calculate_core_addon_minutes(repaired) == original_core
+    assert tuple(item.rest_seconds for item in repaired.exercises) == original_rests
+
+
+def test_template_core_reason_cannot_excuse_main_training_overfill() -> None:
+    program = _generated_program()
+    day = _duration_day(program.weekly_schedule[0], main_minutes=71)
+    first = day.exercises[0]
+    day = replace(
+        day,
+        exercises=(
+            replace(first, reason_codes=("TEMPLATE_ADAPTATION_PRIORITY:core",)),
+            *day.exercises[1:],
+        ),
+    )
+    mutated = _with_duration_trace(
+        program,
+        day,
+        ("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE",),
+    )
+
+    report = validate_program(
+        mutated,
+        request(session_duration_minutes=60, available_training_days=1),
+        RULESET,
+    )
+
+    assert "SESSION_DURATION_OVER_TARGET" in report.errors
+
+
+def test_coach_duration_fit_requires_both_main_training_bounds() -> None:
+    program = _generated_program()
+    day = _duration_day(program.weekly_schedule[0], main_minutes=47, core_minutes=10)
+    mutated = replace(program, weekly_schedule=(day,))
+    report = ValidationReport((), (), mutated.assumptions, mutated.aggregate_metrics, ())
+
+    metrics = build_coach_quality_metrics(
+        mutated,
+        request(session_duration_minutes=60, available_training_days=1),
+        report,
+        RULESET,
+    )
+
+    assert metrics["duration_fit"]["percentage"] < 100
+
+
+def test_final_gate_rejects_main_training_outside_bounds_without_duration_codes() -> None:
+    program = _generated_program()
+    day = _duration_day(program.weekly_schedule[0], main_minutes=71)
+    mutated = replace(program, weekly_schedule=(day,))
+    report = ValidationReport((), (), mutated.assumptions, mutated.aggregate_metrics, ())
+
+    decision = evaluate_final_program(
+        mutated,
+        request(session_duration_minutes=60, available_training_days=1),
+        report,
+        RULESET,
+    )
+
+    assert not decision.is_accepted
