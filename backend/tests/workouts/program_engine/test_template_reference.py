@@ -398,6 +398,7 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
         "volume_repair",
         "session_duration",
         "session_structure",
+        "weekly_coverage",
         "substitution_observability",
         "template_attempt",
         "final_construction",

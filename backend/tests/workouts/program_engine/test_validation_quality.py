@@ -77,6 +77,7 @@ def test_coach_quality_metrics_are_deterministic_and_decomposed() -> None:
         "body_analysis_target_satisfaction",
         "volume_fit",
         "duration_fit",
+        "coverage_fit",
         "recovery_fit",
         "substitution_count",
         "constraint_count",

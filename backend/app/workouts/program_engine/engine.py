@@ -82,6 +82,7 @@ from app.workouts.program_engine.volume_history import (
 )
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from app.workouts.program_engine.volume_repair import repair_weekly_volume
+from app.workouts.program_engine.weekly_coverage import assess_weekly_coverage
 
 
 def generate_program(
@@ -630,6 +631,8 @@ def _program_for_split(
         ),
         **substitution_metrics,
     }
+    weekly_coverage = assess_weekly_coverage(days, metrics, ruleset=ruleset)
+    metrics["weekly_coverage"] = weekly_coverage.metrics
     body_trace = body_analysis_trace(normalized, ruleset)
     session_reasons = tuple(
         dict.fromkeys(reason for draft in drafts for reason in draft.reason_codes)
@@ -706,6 +709,13 @@ def _program_for_split(
             "stage": "session_structure",
             "status": "finalized",
             "reason_codes": ("FINAL_SESSION_SEQUENCE_APPLIED",),
+        },
+        {
+            "stage": "weekly_coverage",
+            "status": weekly_coverage.metrics["status"],
+            "reason_codes": weekly_coverage.metrics["reason_codes"],
+            "missing_patterns": weekly_coverage.metrics["missing_patterns"],
+            "missing_major_muscles": weekly_coverage.metrics["missing_major_muscles"],
         },
         {
             "stage": "substitution_observability",
@@ -856,6 +866,8 @@ def _reference_program(
         ),
         **substitution_metrics,
     }
+    weekly_coverage = assess_weekly_coverage(days, metrics, ruleset=ruleset)
+    metrics["weekly_coverage"] = weekly_coverage.metrics
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises), ruleset
     )
@@ -914,6 +926,13 @@ def _reference_program(
             "stage": "session_structure",
             "status": "finalized",
             "reason_codes": ("FINAL_SESSION_SEQUENCE_APPLIED",),
+        },
+        {
+            "stage": "weekly_coverage",
+            "status": weekly_coverage.metrics["status"],
+            "reason_codes": weekly_coverage.metrics["reason_codes"],
+            "missing_patterns": weekly_coverage.metrics["missing_patterns"],
+            "missing_major_muscles": weekly_coverage.metrics["missing_major_muscles"],
         },
         {
             "stage": "substitution_observability",
@@ -1298,6 +1317,7 @@ def _coach_quality_metrics(
         "body_analysis_target_satisfaction": satisfaction(body_priorities),
         "volume_fit": volume_fit,
         "duration_fit": duration_fit,
+        "coverage_fit": _metric_status(program.aggregate_metrics.get("weekly_coverage")),
         "recovery_fit": recovery_fit,
         "substitution_count": substitution_count,
         "constraint_count": len(constraint_codes),
@@ -1309,6 +1329,14 @@ def _coach_quality_metrics(
         "duration_constrained_quality": duration_constrained_quality,
         "late_duration_repair_class": late_repair_class,
     }
+
+
+def _metric_status(value: object) -> str:
+    return (
+        value.get("status", "not_applicable")
+        if isinstance(value, dict) and isinstance(value.get("status"), str)
+        else "not_applicable"
+    )
 
 
 def _volume_metrics(
