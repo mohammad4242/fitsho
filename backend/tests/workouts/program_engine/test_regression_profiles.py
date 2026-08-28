@@ -9,6 +9,7 @@ from app.exercises.enums import (
     PrescriptionMode,
 )
 from app.profile.enums import TrainingLocation
+from app.workouts.program_engine.duration_capacity import build_session_capacity
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import CompatibilityLevel, Goal, TrainingExperience
 from app.workouts.program_engine.normalization import normalize_request
@@ -20,6 +21,8 @@ from app.workouts.program_engine.slot_compatibility import (
     focus_scope,
 )
 from app.workouts.program_engine.split_selector import (
+    _dynamic_layout_sort_key,
+    _focus_availability,
     generate_split_candidates,
     rank_availability_aware_fallbacks,
 )
@@ -27,6 +30,63 @@ from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
+
+
+def test_dynamic_fallback_awards_no_priority_credit_to_structural_upper() -> None:
+    source = request(
+        available_training_days=5,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=24,
+        priority_muscles=[MuscleGroup.CHEST],
+    )
+    normalized = normalize_request(source, RULESET)
+    catalog = tuple(full_catalog())
+    capacity = build_session_capacity(normalized, catalog, RULESET)
+
+    upper = _focus_availability(
+        "upper", catalog, frozenset({MuscleGroup.CHEST}), normalized, RULESET, capacity
+    )
+    chest = _focus_availability(
+        "chest_triceps",
+        catalog,
+        frozenset({MuscleGroup.CHEST}),
+        normalized,
+        RULESET,
+        capacity,
+    )
+
+    assert upper.priority_affinity_score == 0
+    assert chest.priority_affinity_score > 0
+
+
+def test_dynamic_fallback_does_not_treat_upper_as_priority_coverage() -> None:
+    source = request(
+        available_training_days=5,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=24,
+        priority_muscles=[MuscleGroup.CHEST],
+    )
+    normalized = normalize_request(source, RULESET)
+    catalog = tuple(full_catalog())
+    capacity = build_session_capacity(normalized, catalog, RULESET)
+    priorities = frozenset({MuscleGroup.CHEST})
+    availability = tuple(
+        _focus_availability(focus, catalog, priorities, normalized, RULESET, capacity)
+        for focus in ("upper", "lower", "chest_triceps")
+    )
+
+    upper_key = _dynamic_layout_sort_key(
+        ("upper", "lower"), availability, normalized, capacity.expected_exercise_count_capacity
+    )
+    dedicated_key = _dynamic_layout_sort_key(
+        ("chest_triceps", "lower"),
+        availability,
+        normalized,
+        capacity.expected_exercise_count_capacity,
+    )
+
+    assert upper_key[1] == 1
+    assert dedicated_key[1] == 0
 
 
 def test_five_day_fallback_is_built_from_available_focuses() -> None:

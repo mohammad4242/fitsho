@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, cast
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.exercises.enums import (
     Difficulty,
@@ -29,6 +29,7 @@ from app.profile.enums import (
 )
 from app.profile.schemas import SessionDurationMinutes
 from app.profile.training_compatibility import SUPPORTED_RESISTANCE_TRAINING_DAYS
+from app.profile.training_focus import validate_user_priority_muscles
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.program_engine.enums import (
     ActivityLevel,
@@ -297,3 +298,19 @@ class ProgramGenerationOverrides(BaseModel):
     recent_training_history: RecentTrainingHistory | None = None
     known_strength_data: dict[UUID, float] = Field(default_factory=dict)
     seed_optional: int | None = None
+
+    @field_validator("priority_muscles", mode="before")
+    @classmethod
+    def validate_priority_muscles(cls, value: object) -> frozenset[MuscleGroup]:
+        if value is None:
+            return frozenset()
+        values: tuple[MuscleGroup | str, ...]
+        if isinstance(value, (str, MuscleGroup)):
+            values = (value,)
+        else:
+            try:
+                values = cast(tuple[MuscleGroup | str, ...], tuple(value))  # type: ignore[arg-type]
+            except TypeError as error:
+                raise ValueError("Priority muscles must be iterable") from error
+        normalized = validate_user_priority_muscles(values)
+        return frozenset(normalized or ())

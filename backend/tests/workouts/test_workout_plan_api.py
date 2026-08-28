@@ -553,6 +553,44 @@ def test_generate_accepts_typed_optional_engine_evidence(client: TestClient, db:
     assert captured_seed == [123]
 
 
+@pytest.mark.parametrize("priorities", [["chest", "back"], ["chest", "chest"]])
+def test_generate_rejects_multiple_or_duplicate_user_priority_overrides(
+    client: TestClient,
+    db: Session,
+    priorities: list[str],
+) -> None:
+    user_id = _register_and_complete_profile(
+        client, f"generate-invalid-priority-{len(priorities)}-{priorities[-1]}@example.com"
+    )
+    plan = _plan(db, user_id)
+    captured: list[ProgramGenerationOverrides] = []
+
+    class FakeService:
+        async def generate(
+            self,
+            current_user_id: UUID,
+            payload: ProgramGenerationOverrides,
+        ) -> WorkoutPlanGenerationResult:
+            assert current_user_id == user_id
+            captured.append(payload)
+            return WorkoutPlanGenerationResult(plan=plan, reused=False)
+
+    from app.workouts.dependencies import get_workout_generation_service
+
+    app = cast(FastAPI, client.app)
+    app.dependency_overrides[get_workout_generation_service] = lambda: FakeService()
+
+    response = client.post(
+        "/api/v1/workout-plans/generate",
+        headers=ORIGIN,
+        json={"priority_muscles": priorities},
+    )
+    app.dependency_overrides.pop(get_workout_generation_service)
+
+    assert response.status_code == 422
+    assert captured == []
+
+
 def test_generate_returns_structured_professional_review_status(client: TestClient) -> None:
     _register_and_complete_profile(client, "review-plan@example.com")
 

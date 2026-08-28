@@ -18,7 +18,11 @@ from app.workouts.program_engine.enums import (
     SplitType,
     TrainingStatus,
 )
-from app.workouts.program_engine.focus_topology import MUSCLE_SPECIFIC_UPPER_PRIORITIES
+from app.workouts.program_engine.focus_topology import (
+    MUSCLE_SPECIFIC_UPPER_PRIORITIES,
+    FocusAffinity,
+    priority_affinity,
+)
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -101,7 +105,7 @@ class _FocusAvailability:
     patterns: frozenset[MovementPattern]
     muscles: frozenset[MuscleGroup]
     compound_count: int
-    priority_count: int
+    priority_affinity_score: int
     duration_status: CapacityFeasibility
     required_work_minutes: int
     optional_work_likely_trimmed: int
@@ -331,7 +335,10 @@ def _focus_availability(
             item.primary_muscle for item in compatible if item.primary_muscle is not None
         ),
         compound_count=sum(item.exercise_type is ExerciseType.COMPOUND for item in compatible),
-        priority_count=sum(item.primary_muscle in priorities for item in compatible),
+        priority_affinity_score=sum(
+            ruleset.priority_affinity_weights[priority_affinity(focus, muscle)]
+            for muscle in priorities
+        ),
         duration_status=duration.status,
         required_work_minutes=duration.required_work_cost_minutes,
         optional_work_likely_trimmed=duration.optional_work_likely_trimmed,
@@ -376,8 +383,9 @@ def _dynamic_layout_sort_key(
     missing_pattern_groups = sum(
         not covered_patterns.intersection(group) for group in required_pattern_groups
     )
-    missing_priorities = len(
-        set(request.source.priority_muscles - SUPPLEMENTAL_MUSCLES) - covered_muscles
+    missing_priorities = sum(
+        not any(priority_affinity(focus, muscle) is not FocusAffinity.NONE for focus in layout)
+        for muscle in request.source.priority_muscles - SUPPLEMENTAL_MUSCLES
     )
     duration_shortfall = sum(max(0, target_capacity - item.candidate_count) for item in selected)
     duration_infeasible = sum(
@@ -402,7 +410,7 @@ def _dynamic_layout_sort_key(
         if request.training_status is TrainingStatus.ADVANCED
         else 0
     )
-    priority_opportunities = sum(item.priority_count for item in selected)
+    priority_opportunities = sum(item.priority_affinity_score for item in selected)
     repetition = sum(max(0, count - 1) ** 2 for count in counts.values())
     broad_focuses = sum(focus.startswith("full_body") for focus in layout)
     return (
