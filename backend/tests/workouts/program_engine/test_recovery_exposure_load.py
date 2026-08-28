@@ -2,7 +2,15 @@ from dataclasses import replace
 from uuid import uuid4
 
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
-from app.workouts.program_engine.enums import BodyPosition, LoadLimit, RecoveryRating, SplitType
+from app.workouts.program_engine.engine import generate_program
+from app.workouts.program_engine.enums import (
+    BodyPosition,
+    Goal,
+    LoadLimit,
+    RecoveryRating,
+    SplitType,
+    TrainingExperience,
+)
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.recovery import (
     ExposureLoad,
@@ -13,7 +21,7 @@ from app.workouts.program_engine.recovery import (
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import ProgrammedExercise, SplitPlan, WorkoutDay
 from app.workouts.program_engine.split_selector import rank_split_candidates
-from tests.workouts.program_engine.golden_fixtures import request
+from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
 def _exercise(
@@ -189,3 +197,69 @@ def test_poor_recovery_ranking_preserves_requested_resistance_day_count() -> Non
     assert ranked
     assert all(len(split.day_focuses) == 6 for split in ranked)
     assert all("SPLIT_REDUCED_FOR_RECOVERY" not in split.reason_codes for split in ranked)
+
+
+def test_production_dense_chest_shoulder_generation_repairs_weekdays_and_preserves_exposure() -> (
+    None
+):
+    catalog = full_catalog()
+    expected_weekdays = {
+        4: (0, 1, 2, 4),
+        5: (0, 1, 2, 3, 4),
+        6: (0, 1, 2, 3, 4, 5),
+    }
+    split_reasons: dict[int, tuple[str, ...]] = {}
+
+    for training_days in (4, 5, 6):
+        source = request(
+            available_training_days=training_days,
+            primary_goal=Goal.HYPERTROPHY,
+            training_experience=TrainingExperience.ADVANCED,
+            training_age_months=72,
+            priority_muscles=[MuscleGroup.CHEST, MuscleGroup.SHOULDERS],
+            preferred_weekdays=tuple(range(training_days)),
+        )
+        result = generate_program(source, catalog, RULESET)
+        repeated = generate_program(source, catalog, RULESET)
+
+        assert result.is_success, result.errors
+        assert result.program is not None
+        assert repeated.program is not None
+        program = result.program
+        split_reasons[training_days] = program.split.reason_codes
+        assert len(program.weekly_schedule) == training_days
+        assert (
+            tuple(day.weekday for day in program.weekly_schedule)
+            == expected_weekdays[training_days]
+        )
+        assert tuple(day.weekday for day in repeated.program.weekly_schedule) == tuple(
+            day.weekday for day in program.weekly_schedule
+        )
+        assert program.split.reason_codes == repeated.program.split.reason_codes
+
+        chest_days = [
+            day
+            for day in program.weekly_schedule
+            if MuscleGroup.CHEST in classify_muscle_exposures(day, RULESET)
+        ]
+        shoulder_days = [
+            day
+            for day in program.weekly_schedule
+            if MuscleGroup.SHOULDERS in classify_muscle_exposures(day, RULESET)
+        ]
+        assert chest_days
+        assert shoulder_days
+        assert any(
+            MuscleGroup.SHOULDERS in exercise.secondary_muscles
+            for day in chest_days
+            for exercise in day.exercises
+            if exercise.primary_muscle is MuscleGroup.CHEST
+        )
+        assert all(
+            classify_muscle_exposures(day, RULESET)[MuscleGroup.SHOULDERS]
+            in {ExposureLoad.MODERATE, ExposureLoad.HIGH}
+            for day in shoulder_days
+        )
+        assert recovery_spacing_is_valid(program.weekly_schedule, RULESET)
+
+    assert "RECOVERY_WEEKDAYS_REARRANGED_FOR_EXPOSURE_LOAD" in split_reasons[4]
