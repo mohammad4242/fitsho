@@ -2,7 +2,7 @@ from collections import Counter
 
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup, PrescriptionMode
 from app.workouts.program_engine.duration_policy import (
-    calculate_resistance_minutes,
+    calculate_main_training_minutes,
     effective_main_exercise_floor,
     get_session_duration_policy,
 )
@@ -114,39 +114,15 @@ def validate_program(
         elif exercise_count > ruleset.max_exercises_per_session:
             errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
 
-        # ------------------------------------------------------------------
-        # Duration validation (Phase 11.9 semantics):
-        # Being under budget is only an error when the program is incomplete.
-        # Over budget always requires justification.
-        # ------------------------------------------------------------------
-        workout_duration = calculate_resistance_minutes(day, ruleset.general_warmup_minutes)
-        if workout_duration < duration_policy.minimum_minutes:
-            # Under-budget: only a hard error when exercise count also fails
-            if exercise_count < effective_floor:
-                if duration_feasibility_constrained:
-                    warnings.extend(
-                        code
-                        for code in (
-                            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
-                            "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
-                        )
-                        if code in duration_reason_codes
-                    )
-                else:
-                    errors.append("SESSION_DURATION_UNDER_TARGET")
-                    errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
-            # else: program finishes under budget with enough exercises — acceptable
-        if workout_duration > duration_policy.maximum_minutes:
-            core_extension_is_valid = (
-                "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE" in duration_reason_codes
-                and workout_duration <= duration_policy.core_preservation_maximum_minutes
-            )
-            if core_extension_is_valid:
-                warnings.append("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE")
-            else:
-                errors.append("SESSION_DURATION_EXCEEDED")
-                errors.append("SESSION_DURATION_OVER_TARGET")
-                errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
+        # Main training is the hard duration invariant. Add-ons are excluded.
+        main_minutes = calculate_main_training_minutes(day)
+        if main_minutes < duration_policy.minimum_minutes:
+            errors.append("SESSION_DURATION_UNDER_TARGET")
+            errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
+        elif main_minutes > duration_policy.maximum_minutes:
+            errors.append("SESSION_DURATION_EXCEEDED")
+            errors.append("SESSION_DURATION_OVER_TARGET")
+            errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
 
         per_session: Counter[str] = Counter()
         for index, item in enumerate(day.exercises):
