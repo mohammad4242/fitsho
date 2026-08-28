@@ -25,7 +25,7 @@ const validValues: ProfileFormValues = {
   training_age_months: "24",
   training_days_per_week: "3",
   preferred_weekdays: [0, 2, 4],
-  priority_muscles: ["back", "glutes"],
+  priority_muscle: "back",
   training_location: "gym",
   home_training_setup: "",
   available_equipment: [],
@@ -52,7 +52,7 @@ const profile: Profile = {
   training_age_months: 24,
   training_days_per_week: 3,
   preferred_weekdays: [0, 2, 4],
-  priority_muscles: ["back", "glutes"],
+  priority_muscles: ["back"],
   training_location: "gym",
   home_training_setup: null,
   available_equipment: [],
@@ -236,7 +236,7 @@ describe("profile validation", () => {
       training_age_months: 24,
       training_days_per_week: 3,
       preferred_weekdays: [0, 2, 4],
-      priority_muscles: ["back", "glutes"],
+      priority_muscles: ["back"],
       training_location: "gym",
       home_training_setup: null,
       available_equipment: null,
@@ -251,13 +251,11 @@ describe("profile validation", () => {
     expect(toProfileInput(validValues)).not.toHaveProperty("physical_limitations");
   });
 
-  it("serializes at most one explicit priority muscle", () => {
-    expect(
-      toProfileInput({
-        ...validValues,
-        priority_muscles: ["chest", "biceps"],
-      }).priority_muscles,
-    ).toEqual(["biceps"]);
+  it("serializes no focus as null and one focus as a one-item wire list", () => {
+    expect(toProfileInput({ ...validValues, priority_muscle: "" }).priority_muscles).toBeNull();
+    expect(toProfileInput({ ...validValues, priority_muscle: "chest" }).priority_muscles).toEqual([
+      "chest",
+    ]);
   });
 
   it("converts a saved profile into editable string values", () => {

@@ -53,6 +53,20 @@ export const muscleGroups = [
 ] as const;
 export type MuscleGroup = (typeof muscleGroups)[number];
 
+// Product choices are intentionally narrower than the internal muscle taxonomy.
+export const userSelectablePriorityMuscles = [
+  "chest",
+  "back",
+  "shoulders",
+  "biceps",
+  "triceps",
+  "glutes",
+  "quadriceps",
+  "hamstrings",
+  "calves",
+] as const;
+export type UserSelectablePriorityMuscle = (typeof userSelectablePriorityMuscles)[number];
+
 export const planDurations = [4, 6, 8] as const;
 export type PlanDurationWeeks = (typeof planDurations)[number];
 export const workoutGenerationMethods = ["fitsho_coach", "ai"] as const;
@@ -103,7 +117,7 @@ export type ProfileInput = {
   training_age_months?: number | null;
   training_days_per_week: number;
   preferred_weekdays?: number[] | null;
-  priority_muscles?: MuscleGroup[] | null;
+  priority_muscles?: UserSelectablePriorityMuscle[] | null;
   training_location: TrainingLocation;
   home_training_setup: HomeTrainingSetup | null;
   available_equipment?: Equipment[] | null;
@@ -139,7 +153,7 @@ export type ProfileFormValues = {
   training_age_months: string;
   training_days_per_week: string;
   preferred_weekdays: number[];
-  priority_muscles: MuscleGroup[];
+  priority_muscle: UserSelectablePriorityMuscle | "";
   training_location: TrainingLocation | "";
   home_training_setup: HomeTrainingSetup | "";
   available_equipment?: Equipment[];
@@ -154,6 +168,5 @@ export type ProfileFormValue =
   | TrainingCaution[]
   | number[]
   | PreferredWeekday[]
-  | MuscleGroup[]
   | Equipment[]
   | null;

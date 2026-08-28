@@ -188,6 +188,9 @@ const en = {
         bodyGoal: "Body and goal",
         experience: "Experience and schedule",
       },
+      questions: {
+        priorityMuscle: "Which muscle would you like the program to prioritize?",
+      },
       fields: {
         displayName: "Display name",
         birthDate: "Birth date",
@@ -202,7 +205,7 @@ const en = {
         trainingAge: "Regular training history (months, optional)",
         trainingDays: "Training days per week",
         preferredWeekdays: "Preferred training weekdays (optional)",
-        priorityMuscles: "Priority muscles (optional)",
+        priorityMuscles: "Focus on one muscle (optional)",
         trainingLocation: "Where do you train?",
         homeTrainingSetup: "What equipment do you have for training at home?",
         sessionDuration: "How much time do you usually have for each workout?",
@@ -214,7 +217,7 @@ const en = {
         birthDate: "Age must be between 18 and 100.",
         trainingAge: "Leave blank if you have not trained regularly.",
         preferredWeekdays: "Choose no more than your number of training days.",
-        priorityMuscles: "Optionally choose areas to carry into future programs.",
+        priorityMuscles: "If you want, choose one muscle for extra focus.",
         circumference: "Used for body-proportion analysis; measure at the widest point.",
         homeTrainingSetup: "Select every piece of equipment you actually have at home.",
       },
@@ -292,6 +295,7 @@ const en = {
           6: "Friday",
         },
         muscle: {
+          none: "No special focus",
           chest: "Chest",
           back: "Back",
           shoulders: "Shoulders",
@@ -667,7 +671,7 @@ const en = {
         editProgram: "Edit program",
         editProgramAria: "Edit program: {{name}}",
         addProgram: "Add new program",
-        tags: { full_body: "Full body", upper_lower: "Upper / lower", push_pull_legs: "Push / pull / legs", body_part_rotation: "Body-part rotation", balanced: "Balanced", upper_priority: "Upper-body priority", lower_priority: "Lower-body priority", chest_priority: "Chest priority", back_priority: "Back priority", shoulders_priority: "Shoulder priority", arms_priority: "Arm priority", glute_priority: "Glute priority", quad_priority: "Quadriceps priority", hamstrings_priority: "Hamstrings priority", strength_bias: "Strength bias", compound_focus: "Compound focus", specialization: "Specialization" },
+        tags: { full_body: "Full body", upper_lower: "Upper / lower", push_pull_legs: "Push / pull / legs", body_part_rotation: "Body-part rotation", balanced: "Balanced", lower_priority: "Lower-body priority", chest_priority: "Chest priority", back_priority: "Back priority", shoulders_priority: "Shoulder priority", arms_priority: "Arm priority", glute_priority: "Glute priority", quad_priority: "Quadriceps priority", hamstrings_priority: "Hamstrings priority", strength_bias: "Strength bias", compound_focus: "Compound focus", specialization: "Specialization" },
               methods: {
         standard: "Standard",
         superset: "Superset",

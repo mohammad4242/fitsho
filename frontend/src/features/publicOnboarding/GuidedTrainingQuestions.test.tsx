@@ -10,7 +10,8 @@ const values = {
   display_name: "Sara", birth_date: "2000-05-14", sex: "female" as const,
   height_cm: "165", current_weight_kg: "62", shoulder_circumference_cm: "",
   waist_circumference_cm: "", hip_circumference_cm: "", fitness_goal: "fat_loss" as const,
-  experience_level: "" as const, training_days_per_week: "", preferred_weekdays: [], priority_muscles: [], training_location: "" as const,
+  experience_level: "" as const, training_days_per_week: "", preferred_weekdays: [], priority_muscle: "" as const,
+  training_location: "" as const,
   home_training_setup: "" as const, session_duration_minutes: "",
   training_intensity: "" as const,
   training_age_months: "",
@@ -62,6 +63,10 @@ it("uses fixed experience, weekly-day, and workout-time choices", async () => {
   expect(screen.getByRole("heading", { name: "دوست داری در برنامه روی کدام عضله بیشتر تمرکز شود؟" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "بالاتنه" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "سینه" }));
+  expect(screen.getByRole("button", { name: "سینه" })).toHaveClass("is-selected");
+  await user.click(screen.getByRole("button", { name: "جلو بازو" }));
+  expect(screen.getByRole("button", { name: "سینه" })).not.toHaveClass("is-selected");
+  expect(screen.getByRole("button", { name: "جلو بازو" })).toHaveClass("is-selected");
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   expect(screen.getByText("cautions-set")).toBeInTheDocument();

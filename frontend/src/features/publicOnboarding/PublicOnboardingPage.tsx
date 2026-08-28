@@ -18,7 +18,7 @@ const emptyValues: ProfileFormValues = {
   shoulder_circumference_cm: "", waist_circumference_cm: "", hip_circumference_cm: "",
   fitness_goal: "", experience_level: "", training_days_per_week: "",
   training_age_months: "",
-  preferred_weekdays: [], priority_muscles: [],
+  preferred_weekdays: [], priority_muscle: "",
   training_location: "", home_training_setup: "", session_duration_minutes: "",
   training_intensity: "",
   training_cautions: null, plan_duration_weeks: "4",

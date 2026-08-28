@@ -69,6 +69,7 @@ const savedProfile: Profile = {
   training_location: "home",
   home_training_setup: "dumbbells_available",
   available_equipment: ["bodyweight", "dumbbell", "bench"],
+  priority_muscles: ["chest"],
   session_duration_minutes: 75,
   training_intensity: "moderate",
   physical_limitations: "Knee pain",
@@ -214,7 +215,23 @@ it("renders every saved profile value in its editable profile page", async () =>
     "75",
   );
   expect(screen.getByLabelText("شدت معمول تمرین")).toHaveValue("moderate");
+  expect(screen.getByLabelText("سینه")).toBeChecked();
+  expect(screen.queryByLabelText("بالاتنه")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("محدودیت‌های جسمی (اختیاری)")).not.toBeInTheDocument();
+});
+
+it("keeps profile focus single-select and patches only the replacement focus", async () => {
+  const user = userEvent.setup();
+  context.updateProfile.mockResolvedValue({ ...savedProfile, priority_muscles: ["biceps"] });
+  renderProfilePage();
+
+  await openTrainingPage(user);
+  await user.click(screen.getByLabelText("جلو بازو"));
+  expect(screen.getByLabelText("جلو بازو")).toBeChecked();
+  expect(screen.getByLabelText("سینه")).not.toBeChecked();
+  await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
+
+  await waitFor(() => expect(context.updateProfile).toHaveBeenCalledWith({ priority_muscles: ["biceps"] }));
 });
 
 it("uses the supplied training still in the profile header", () => {

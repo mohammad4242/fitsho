@@ -1,6 +1,11 @@
 import type { NutritionProfileInput, SafetyProfileInput, StructuredExerciseInput } from "../nutrition/types";
 import * as profileApi from "../profile/api";
-import type { ProductMode, ProfileInput, SharedProfileInput } from "../profile/types";
+import {
+  userSelectablePriorityMuscles,
+  type ProductMode,
+  type ProfileInput,
+  type SharedProfileInput,
+} from "../profile/types";
 
 export const ONBOARDING_DRAFT_KEY = "fitsho:onboarding-draft:v1";
 export const PENDING_NUTRITION_BASICS_KEY = "fitsho:pending-nutrition-basics:v1";
@@ -29,7 +34,18 @@ export type OnboardingDraft = {
   readyForAuth?: boolean;
 };
 
+function hasInvalidTrainingPriority(draft: Partial<OnboardingDraft>): boolean {
+  const priorities = draft.training?.priority_muscles;
+  return priorities !== undefined && priorities !== null && (
+    priorities.length > 1
+    || priorities.some((priority) => !userSelectablePriorityMuscles.includes(priority))
+  );
+}
+
 export function saveOnboardingDraft(draft: OnboardingDraft): void {
+  if (hasInvalidTrainingPriority(draft)) {
+    throw new Error("Training draft must contain zero or one approved priority muscle");
+  }
   sessionStorage.setItem(ONBOARDING_DRAFT_KEY, JSON.stringify(draft));
 }
 
@@ -39,6 +55,10 @@ export function loadOnboardingDraft(): OnboardingDraft | null {
   try {
     const draft = JSON.parse(stored) as Partial<OnboardingDraft>;
     if (draft.mode !== "training" && draft.mode !== "nutrition" && draft.mode !== "both") {
+      clearOnboardingDraft();
+      return null;
+    }
+    if (hasInvalidTrainingPriority(draft)) {
       clearOnboardingDraft();
       return null;
     }

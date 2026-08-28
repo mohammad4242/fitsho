@@ -12,11 +12,11 @@ import {
   sexes,
   trainingCautions,
   trainingIntensities,
-  muscleGroups,
+  userSelectablePriorityMuscles,
   preferredWeekdays,
   availableEquipment,
   type TrainingCaution,
-  type MuscleGroup,
+  type UserSelectablePriorityMuscle,
   type Equipment,
   type ProfileFormValue,
   trainingLocations,
@@ -277,14 +277,8 @@ export function ExperienceFields({
     );
   }
 
-  function togglePriorityMuscle(muscle: MuscleGroup) {
-    const selected = values.priority_muscles;
-    onChange(
-      "priority_muscles",
-      selected.includes(muscle)
-        ? selected.filter((item) => item !== muscle)
-        : [...selected, muscle].sort(),
-    );
+  function selectPriorityMuscle(muscle: UserSelectablePriorityMuscle | "") {
+    onChange("priority_muscle", muscle);
   }
 
   function toggleEquipment(equipment: Equipment) {
@@ -400,13 +394,24 @@ export function ExperienceFields({
         <legend>{t("onboarding.fields.priorityMuscles")}</legend>
         <p className="profile-field__hint">{t("onboarding.hints.priorityMuscles")}</p>
         <div className="profile-checkboxes">
-          {muscleGroups.map((muscle) => (
+          <label>
+            <input
+              type="radio"
+              name="priority_muscle"
+              value=""
+              checked={values.priority_muscle === ""}
+              onChange={() => selectPriorityMuscle("")}
+            />
+            {t("onboarding.options.muscle.none")}
+          </label>
+          {userSelectablePriorityMuscles.map((muscle) => (
             <label key={muscle}>
               <input
-                type="checkbox"
-                name="priority_muscles"
-                checked={values.priority_muscles.includes(muscle)}
-                onChange={() => togglePriorityMuscle(muscle)}
+                type="radio"
+                name="priority_muscle"
+                value={muscle}
+                checked={values.priority_muscle === muscle}
+                onChange={() => selectPriorityMuscle(muscle)}
               />
               {t(`onboarding.options.muscle.${muscle}`)}
             </label>

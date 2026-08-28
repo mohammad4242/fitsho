@@ -188,6 +188,9 @@ const fa = {
         bodyGoal: "بدن و هدف",
         experience: "تجربه و برنامه",
       },
+      questions: {
+        priorityMuscle: "دوست داری در برنامه روی کدام عضله بیشتر تمرکز شود؟",
+      },
       fields: {
         displayName: "نام نمایشی",
         birthDate: "تاریخ تولد",
@@ -202,7 +205,7 @@ const fa = {
         trainingAge: "سابقه تمرین منظم (ماه، اختیاری)",
         trainingDays: "روزهای تمرین در هفته",
         preferredWeekdays: "روزهای ترجیحی تمرین (اختیاری)",
-        priorityMuscles: "عضلات اولویت‌دار (اختیاری)",
+        priorityMuscles: "تمرکز روی یک عضله (اختیاری)",
         trainingLocation: "کجا تمرین می‌کنی؟",
         homeTrainingSetup: "برای تمرین در خانه چه امکاناتی داری؟",
         sessionDuration: "معمولاً برای هر جلسه چقدر زمان داری؟",
@@ -214,7 +217,7 @@ const fa = {
         birthDate: "سن باید بین ۱۸ تا ۱۰۰ سال باشد.",
         trainingAge: "اگر تمرین منظم نداشتی، خالی بگذار.",
         preferredWeekdays: "حداکثر به اندازه تعداد روزهای تمرین انتخاب کن.",
-        priorityMuscles: "در صورت تمایل، نواحی مهم برای برنامه‌های بعدی را انتخاب کن.",
+        priorityMuscles: "اگر بخواهی، فقط یک عضله را برای تمرکز بیشتر انتخاب کن.",
         circumference: "برای تحلیل تناسب بدن؛ در پهن‌ترین بخش اندازه بگیر.",
         homeTrainingSetup: "هر وسیله‌ای را که واقعاً در خانه داری انتخاب کن.",
       },
@@ -292,6 +295,7 @@ const fa = {
           6: "جمعه",
         },
         muscle: {
+          none: "تمرکز ویژه‌ای ندارم",
           chest: "سینه",
           back: "پشت",
           shoulders: "سرشانه",
@@ -667,7 +671,7 @@ const fa = {
         editProgram: "ویرایش برنامه",
         editProgramAria: "ویرایش برنامه: {{name}}",
         addProgram: "افزودن برنامه جدید",
-        tags: { full_body: "تمام‌بدن", upper_lower: "بالاتنه / پایین‌تنه", push_pull_legs: "پوش / پول / پا", body_part_rotation: "تفکیک عضلات", balanced: "متعادل", upper_priority: "اولویت بالاتنه", lower_priority: "اولویت پایین‌تنه", chest_priority: "اولویت سینه", back_priority: "اولویت زیربغل", shoulders_priority: "اولویت سرشانه", arms_priority: "اولویت بازو", glute_priority: "اولویت باسن", quad_priority: "اولویت چهارسر", hamstrings_priority: "اولویت همسترینگ", strength_bias: "گرایش قدرتی", compound_focus: "تمرکز چندمفصلی", specialization: "تخصصی" },
+        tags: { full_body: "تمام‌بدن", upper_lower: "بالاتنه / پایین‌تنه", push_pull_legs: "پوش / پول / پا", body_part_rotation: "تفکیک عضلات", balanced: "متعادل", lower_priority: "اولویت پایین‌تنه", chest_priority: "اولویت سینه", back_priority: "اولویت زیربغل", shoulders_priority: "اولویت سرشانه", arms_priority: "اولویت بازو", glute_priority: "اولویت باسن", quad_priority: "اولویت چهارسر", hamstrings_priority: "اولویت همسترینگ", strength_bias: "گرایش قدرتی", compound_focus: "تمرکز چندمفصلی", specialization: "تخصصی" },
               methods: {
         standard: "استاندارد",
         superset: "سوپرست",

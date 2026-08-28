@@ -61,7 +61,7 @@ const emptyProfileValues: ProfileFormValues = {
   training_location: "", home_training_setup: "", session_duration_minutes: "",
   training_intensity: "",
   training_age_months: "",
-  preferred_weekdays: [], priority_muscles: [],
+  preferred_weekdays: [], priority_muscle: "",
   training_cautions: null, plan_duration_weeks: "4",
 };
 
@@ -86,6 +86,9 @@ function draftValues(draft?: OnboardingDraft): ProfileFormValues {
       home_training_setup: draft.training.home_training_setup ?? "",
       session_duration_minutes: String(draft.training.session_duration_minutes),
       training_intensity: draft.training.training_intensity ?? "",
+      priority_muscle: draft.training.priority_muscles?.length === 1
+        ? draft.training.priority_muscles[0]
+        : "",
       training_cautions: draft.training.training_cautions,
       plan_duration_weeks: String(draft.training.plan_duration_weeks),
     }),

@@ -40,7 +40,7 @@ const emptyValues: ProfileFormValues = {
   training_age_months: "",
   training_days_per_week: "",
   preferred_weekdays: [],
-  priority_muscles: [],
+  priority_muscle: "",
   training_location: "",
   home_training_setup: "",
   available_equipment: [],

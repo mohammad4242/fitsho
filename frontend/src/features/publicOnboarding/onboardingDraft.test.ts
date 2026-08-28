@@ -22,6 +22,7 @@ const trainingInput = {
   training_location: "gym" as const,
   home_training_setup: null,
   session_duration_minutes: 60 as const,
+  priority_muscles: ["chest" as const],
   training_cautions: [],
   plan_duration_weeks: 4 as const,
 };
@@ -48,6 +49,16 @@ it("keeps a pre-auth draft only in the current browser session", () => {
   expect(loadOnboardingDraft()).toEqual({ mode: "training", training: trainingInput });
   clearOnboardingDraft();
   expect(loadOnboardingDraft()).toBeNull();
+});
+
+it("preserves one priority muscle through draft storage and rejects multiple priorities", () => {
+  saveOnboardingDraft({ mode: "training", training: trainingInput });
+  expect(loadOnboardingDraft()?.training?.priority_muscles).toEqual(["chest"]);
+
+  expect(() => saveOnboardingDraft({
+    mode: "training",
+    training: { ...trainingInput, priority_muscles: ["chest", "biceps"] },
+  })).toThrow("zero or one");
 });
 
 it("hydrates the selected mode before its profile and clears only after success", async () => {

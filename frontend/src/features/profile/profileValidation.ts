@@ -280,8 +280,8 @@ export function toProfileInput(values: ProfileFormValues): ProfileInput {
     preferred_weekdays: values.preferred_weekdays.length > 0
       ? [...values.preferred_weekdays]
       : null,
-    priority_muscles: values.priority_muscles.length > 0
-      ? [...values.priority_muscles]
+    priority_muscles: values.priority_muscle !== ""
+      ? [values.priority_muscle]
       : null,
     training_location: values.training_location as TrainingLocation,
     home_training_setup:
@@ -313,7 +313,9 @@ export function profileToFormValues(profile: Profile): ProfileFormValues {
       : String(profile.training_age_months),
     training_days_per_week: String(profile.training_days_per_week),
     preferred_weekdays: [...(profile.preferred_weekdays ?? [])].sort((a, b) => a - b),
-    priority_muscles: [...(profile.priority_muscles ?? [])].sort(),
+    priority_muscle: profile.priority_muscles?.length === 1
+      ? profile.priority_muscles[0]
+      : "",
     training_location: profile.training_location,
     home_training_setup: profile.home_training_setup ?? "",
     available_equipment: [...(profile.available_equipment ?? [])],
