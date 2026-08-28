@@ -59,6 +59,10 @@ it("uses fixed experience, weekly-day, and workout-time choices", async () => {
   expect(screen.getByRole("heading", { name: "شدت معمول تمرینت چقدر است؟" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "متوسط" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));
+  expect(screen.getByRole("heading", { name: "دوست داری در برنامه روی کدام عضله بیشتر تمرکز شود؟" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "بالاتنه" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "سینه" }));
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   expect(screen.getByText("cautions-set")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "۴ هفته" }));

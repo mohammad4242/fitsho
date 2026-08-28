@@ -21,7 +21,7 @@ VALID_PROFILE = {
     "training_age_months": 24,
     "training_days_per_week": 3,
     "preferred_weekdays": [0, 2, 4],
-    "priority_muscles": ["back", "glutes"],
+    "priority_muscles": ["back"],
     "training_location": "gym",
     "home_training_setup": None,
     "session_duration_minutes": 60,
@@ -62,7 +62,7 @@ def test_create_profile_atomically_stores_profile_and_initial_weight(
     assert response.json()["training_age_months"] == 24
     assert response.json()["training_days_compatibility"] == "recommended"
     assert response.json()["preferred_weekdays"] == [0, 2, 4]
-    assert response.json()["priority_muscles"] == ["back", "glutes"]
+    assert response.json()["priority_muscles"] == ["back"]
     assert db.get(UserProfile, user_id) is not None
     measurements = db.scalars(
         select(BodyMeasurement).where(BodyMeasurement.user_id == user_id)
@@ -372,13 +372,28 @@ def test_profile_preferences_can_be_read_and_updated(client: TestClient) -> None
     updated = client.patch(
         "/api/v1/profile",
         headers=ORIGIN,
-        json={"preferred_weekdays": [1, 3], "priority_muscles": ["chest", "quadriceps"]},
+        json={"preferred_weekdays": [1, 3], "priority_muscles": ["chest"]},
     )
 
     assert updated.status_code == 200
     assert updated.json()["preferred_weekdays"] == [1, 3]
-    assert updated.json()["priority_muscles"] == ["chest", "quadriceps"]
+    assert updated.json()["priority_muscles"] == ["chest"]
     assert client.get("/api/v1/profile").json()["preferred_weekdays"] == [1, 3]
+
+
+@pytest.mark.parametrize("priority_muscles", [["chest", "back"], ["chest", "chest"]])
+def test_profile_create_rejects_more_than_one_priority(
+    client: TestClient, priority_muscles: list[str]
+) -> None:
+    register(client, f"invalid-priority-{len(priority_muscles)}-{priority_muscles[-1]}@example.com")
+
+    response = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={**VALID_PROFILE, "priority_muscles": priority_muscles},
+    )
+
+    assert response.status_code == 422
 
 
 def test_profile_preferences_reject_weekday_count_above_training_days(client: TestClient) -> None:

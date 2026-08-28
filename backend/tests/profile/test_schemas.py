@@ -19,7 +19,7 @@ def valid_payload() -> dict[str, object]:
         "training_age_months": 24,
         "training_days_per_week": 3,
         "preferred_weekdays": [0, 2, 4],
-        "priority_muscles": ["back", "glutes"],
+        "priority_muscles": ["back"],
         "training_location": "gym",
         "home_training_setup": None,
         "session_duration_minutes": 60,
@@ -34,7 +34,7 @@ def test_profile_create_normalizes_text_and_decimal() -> None:
     assert "physical_limitations" not in profile.model_dump()
     assert profile.training_age_months == 24
     assert profile.preferred_weekdays == (0, 2, 4)
-    assert profile.priority_muscles == ("back", "glutes")
+    assert profile.priority_muscles == ("back",)
 
 
 def test_profile_create_accepts_optional_circumference_measurements() -> None:
@@ -79,6 +79,8 @@ def test_calculate_age_handles_birthday_boundary() -> None:
         ("preferred_weekdays", [0, 0]),
         ("preferred_weekdays", [7]),
         ("priority_muscles", ["back", "back"]),
+        ("priority_muscles", ["back", "glutes"]),
+        ("priority_muscles", ["traps"]),
         ("priority_muscles", ["not_a_muscle"]),
         ("sex", "unknown"),
         ("fitness_goal", "bulk"),

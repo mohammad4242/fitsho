@@ -100,6 +100,22 @@ def test_patch_updates_training_age_months(client: TestClient, db: Session) -> N
     assert profile.training_age_months == 48
 
 
+@pytest.mark.parametrize("priority_muscles", [["chest", "back"], ["chest", "chest"]])
+def test_patch_rejects_more_than_one_priority(
+    client: TestClient, priority_muscles: list[str]
+) -> None:
+    register(client, f"patch-invalid-priority-{len(priority_muscles)}-{priority_muscles[-1]}@example.com")
+    create_profile(client)
+
+    response = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={"priority_muscles": priority_muscles},
+    )
+
+    assert response.status_code == 422
+
+
 def test_patch_rejects_unsupported_effective_training_schedule(
     client: TestClient, db: Session
 ) -> None:

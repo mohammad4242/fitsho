@@ -150,27 +150,26 @@ def test_exact_explicit_priority_beats_regional_and_balanced_templates() -> None
     )
 
 
-def test_four_day_upper_priority_template_reports_specialization_split() -> None:
+def test_four_day_upper_lower_template_does_not_infer_specialization_from_region() -> None:
     template = _template(
         "four-day-upper-priority",
         TemplateFocusTag.UPPER_LOWER,
-        TemplateFocusTag.UPPER_PRIORITY,
         days_per_week=4,
     )
 
-    assert template.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
+    assert template.split_type is SplitType.UPPER_LOWER
 
 
-def test_regional_explicit_priority_beats_unrelated_alternative() -> None:
+def test_generic_upper_template_gets_no_explicit_chest_priority_credit() -> None:
     normalized = _normalized(priority_muscles=[MuscleGroup.CHEST])
     regional = _template("a-upper", TemplateFocusTag.UPPER_PRIORITY)
     unrelated = _template("z-lower", TemplateFocusTag.LOWER_PRIORITY)
 
-    assert _score(normalized, regional).priority_score == 40
+    assert _score(normalized, regional).priority_score == 0
     assert _score(normalized, unrelated).priority_score == 0
     assert (
         select_template_reference(normalized, tuple(full_catalog()), (unrelated, regional), RULESET)
-        == regional
+        == unrelated
     )
 
 

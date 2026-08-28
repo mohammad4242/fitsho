@@ -251,6 +251,15 @@ describe("profile validation", () => {
     expect(toProfileInput(validValues)).not.toHaveProperty("physical_limitations");
   });
 
+  it("serializes at most one explicit priority muscle", () => {
+    expect(
+      toProfileInput({
+        ...validValues,
+        priority_muscles: ["chest", "biceps"],
+      }).priority_muscles,
+    ).toEqual(["biceps"]);
+  });
+
   it("converts a saved profile into editable string values", () => {
     expect(profileToFormValues(profile)).toEqual(validValues);
   });

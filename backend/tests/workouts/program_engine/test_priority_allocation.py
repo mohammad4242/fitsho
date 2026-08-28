@@ -1,3 +1,5 @@
+import pytest
+
 from app.exercises.enums import Equipment, MuscleGroup
 from app.profile.enums import TrainingLocation
 from app.workouts.program_engine.engine import generate_program
@@ -8,6 +10,7 @@ from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import BodyAnalysisInfluence, ProgramGenerationRequest
 from app.workouts.program_engine.split_selector import rank_split_candidates, select_split
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
+from app.training_templates.tags import TemplateFocusTag, priority_tags_for_muscles
 
 from .golden_fixtures import ADVANCED_HISTORY, full_catalog, request
 
@@ -55,6 +58,38 @@ def test_priority_precedence_is_explicit_then_clear_then_mild() -> None:
     assert policy.precedence_key(MuscleGroup.CHEST)[0] == 0
     assert policy.precedence_key(MuscleGroup.BACK)[0] == 1
     assert policy.precedence_key(MuscleGroup.SHOULDERS)[0] == 2
+
+
+@pytest.mark.parametrize(
+    ("focus", "muscle"),
+    [
+        ("upper", MuscleGroup.CHEST),
+        ("upper", MuscleGroup.BACK),
+        ("upper", MuscleGroup.SHOULDERS),
+        ("upper", MuscleGroup.BICEPS),
+        ("upper", MuscleGroup.TRICEPS),
+        ("full_body", MuscleGroup.CHEST),
+    ],
+)
+def test_structural_compatibility_does_not_award_generic_priority_affinity(
+    focus: str, muscle: MuscleGroup
+) -> None:
+    policy = PriorityAllocationPolicy.for_request(
+        normalize_request(request(priority_muscles=[muscle]), RULESET), RULESET
+    )
+
+    assert policy.focus_trains_muscle(focus, muscle) is False
+
+
+def test_direct_priority_request_rejects_multiple_user_priorities() -> None:
+    with pytest.raises(ValueError, match="at most one"):
+        request(priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK])
+
+
+def test_upper_muscle_uses_exact_template_priority_tag_only() -> None:
+    assert priority_tags_for_muscles((MuscleGroup.CHEST,)) == {
+        TemplateFocusTag.CHEST_PRIORITY
+    }
 
 
 def test_same_muscle_priority_and_body_analysis_do_not_double_stack() -> None:

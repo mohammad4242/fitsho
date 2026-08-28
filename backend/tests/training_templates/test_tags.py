@@ -25,7 +25,6 @@ def test_focus_tags_have_one_canonical_vocabulary() -> None:
         "push_pull_legs",
         "body_part_rotation",
         "balanced",
-        "upper_priority",
         "lower_priority",
         "chest_priority",
         "back_priority",
@@ -50,7 +49,6 @@ def test_every_focus_tag_has_one_semantic_category_and_documented_contract() -> 
         "push_pull_legs": "primary_structure",
         "body_part_rotation": "primary_structure",
         "balanced": "regional_balance",
-        "upper_priority": "regional_balance",
         "lower_priority": "regional_balance",
         "chest_priority": "muscle_priority",
         "back_priority": "muscle_priority",
@@ -151,6 +149,12 @@ def test_priority_muscles_map_to_one_explicit_canonical_vocabulary() -> None:
         (TemplateFocusTag.FULL_BODY, TemplateFocusTag.CHEST_PRIORITY),
         TemplateFocusTag.CHEST_PRIORITY,
     )
+
+
+def test_upper_muscle_priority_has_no_regional_upper_priority_mapping() -> None:
+    assert template_tags.regional_priority_tags_for_muscles(
+        (MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS)
+    ) == frozenset()
 
 
 def test_body_analysis_does_not_keep_a_competing_template_tag_mapping() -> None:
