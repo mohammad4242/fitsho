@@ -1,20 +1,21 @@
 from __future__ import annotations
 
-import asyncio
+import time
+from collections.abc import Mapping
 from datetime import date
 from decimal import Decimal
+from enum import Enum
 from html import escape
 from pathlib import Path
-import time
-from uuid import uuid4
+from uuid import UUID, uuid4
 
+import weasyprint
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-import weasyprint
 
 from app.auth.models import User
 from app.config import get_settings
-from app.exercises.enums import MuscleGroup, PrescriptionMode
+from app.exercises.enums import PrescriptionMode
 from app.main import create_app
 from app.profile.enums import (
     ExperienceLevel,
@@ -33,7 +34,11 @@ from app.training_templates.engine_reference import load_template_references
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.router import to_plan_response
-from app.workouts.schemas import WorkoutDayResponse, WorkoutPlanExerciseResponse, WorkoutPlanResponse
+from app.workouts.schemas import (
+    WorkoutDayResponse,
+    WorkoutPlanExerciseResponse,
+    WorkoutPlanResponse,
+)
 from app.workouts.service import WorkoutGenerationService, WorkoutGenerationSettings
 
 _PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
@@ -43,6 +48,69 @@ def fa_num(val: object) -> str:
     if val is None:
         return "—"
     return str(val).translate(_PERSIAN_DIGITS)
+
+
+def _json_ready(value: object) -> object:
+    """Return a detached, JSON-compatible copy of engine evidence."""
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_json_ready(item) for item in value]
+    if isinstance(value, Mapping):
+        return {str(_json_ready(key)): _json_ready(item) for key, item in value.items()}
+    return value
+
+
+def _evidence_mapping(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    ready = _json_ready(value)
+    return ready if isinstance(ready, dict) else {}
+
+
+def project_batch2_results(results: list[tuple[dict, dict]]) -> dict[str, object]:
+    """Project raw Batch2 outcomes into one detached report model."""
+    details = []
+    for profile, raw in results:
+        success = bool(raw.get("success"))
+        final_gate = _evidence_mapping(raw.get("final_gate"))
+        coverage = _evidence_mapping(raw.get("weekly_coverage"))
+        distribution = _evidence_mapping(raw.get("weekly_distribution"))
+        gate_status = final_gate.get("status")
+        status = (
+            "failure"
+            if not success
+            else "constrained"
+            if gate_status == "accepted_with_constraints"
+            else "success"
+        )
+        details.append(
+            {
+                "profile_number": profile.get("num"),
+                "profile_name": profile.get("name"),
+                "status": status,
+                "success": success,
+                "error_code": _json_ready(raw.get("error_code")),
+                "errors": list(_json_ready(raw.get("errors") or ())),
+                "safety_status": _json_ready(raw.get("safety_status")),
+                "final_gate": final_gate,
+                "weekly_coverage": coverage,
+                "weekly_distribution": distribution,
+                "requested_day_count": _json_ready(raw.get("requested_day_count")),
+                "actual_day_count": _json_ready(raw.get("actual_day_count")),
+                "per_day": list(_json_ready(raw.get("per_day") or ())),
+            }
+        )
+
+    summary = {
+        "total": len(details),
+        "success": sum(item["success"] is True for item in details),
+        "failure": sum(item["status"] == "failure" for item in details),
+        "constrained": sum(item["status"] == "constrained" for item in details),
+    }
+    return {"summary": summary, "details": details}
 
 
 GOAL_FA = {
@@ -109,7 +177,9 @@ MUSCLE_FA = {
 GUIDANCE_FA = {
     "Select a load that preserves the target RIR": "انتخاب وزنه‌ای متناسب با RIR هدف",
     "Use a moderate load with strict form": "استفاده از وزنه متوسط با فرم صحیح و کنترل‌شده",
-    "Explosive concentric and controlled eccentric": "اجرای انفجاری در فاز مثبت و کنترل‌شده در فاز منفی",
+    "Explosive concentric and controlled eccentric": (
+        "اجرای انفجاری در فاز مثبت و کنترل‌شده در فاز منفی"
+    ),
 }
 
 PROGRESSION_FA = {
@@ -353,8 +423,38 @@ TEST_PROFILES_BATCH2 = [
 ]
 
 
+def _successful_result_evidence(program, requested_day_count: int) -> dict[str, object]:
+    aggregate_metrics = program.aggregate_metrics
+    final_gate = _evidence_mapping(aggregate_metrics.get("final_quality_gate"))
+    weekly_coverage = _evidence_mapping(aggregate_metrics.get("weekly_coverage"))
+    weekly_distribution = _evidence_mapping(aggregate_metrics.get("weekly_distribution"))
+    if not final_gate.get("status"):
+        raise RuntimeError("Successful Batch2 generation is missing final gate evidence")
+    if not weekly_coverage:
+        raise RuntimeError("Successful Batch2 generation is missing weekly coverage evidence")
+    if not weekly_distribution:
+        raise RuntimeError("Successful Batch2 generation is missing weekly distribution evidence")
+
+    per_day = tuple(
+        {
+            "day_number": day.day_index,
+            "exercise_count": len(day.exercises),
+            "duration_minutes": day.estimated_duration_minutes,
+        }
+        for day in program.weekly_schedule
+    )
+    return {
+        "final_gate": final_gate,
+        "weekly_coverage": weekly_coverage,
+        "weekly_distribution": weekly_distribution,
+        "requested_day_count": requested_day_count,
+        "actual_day_count": len(program.weekly_schedule),
+        "per_day": per_day,
+    }
+
+
 def run_batch2_profiles():
-    app = create_app()
+    create_app()
     settings = get_settings()
     engine = create_engine(settings.database_url)
 
@@ -463,6 +563,7 @@ def run_batch2_profiles():
                     "errors": (),
                     "safety_status": res.safety_status.value if res.safety_status else "clear",
                     "latency_sec": dur,
+                    **_successful_result_evidence(res.program, req.available_training_days),
                 }
             else:
                 err_code = res.error_code.value if res.error_code else "UNKNOWN_ERROR"
@@ -471,10 +572,10 @@ def run_batch2_profiles():
                     "plan": None,
                     "error_code": err_code,
                     "errors": res.errors,
-                    "safety_status": (
-                        res.safety_status.value if res.safety_status else "rejected"
-                    ),
+                    "safety_status": (res.safety_status.value if res.safety_status else "rejected"),
                     "latency_sec": dur,
+                    "engine_error_code": err_code,
+                    "engine_error_reasons": tuple(res.errors),
                 }
 
             results.append((p, res_obj))
@@ -495,7 +596,8 @@ CSS = """
   size: A4;
   margin: 10mm 12mm 12mm 12mm;
   @bottom-center {
-    content: "صفحه " counter(page) " از " counter(pages) " · گزارش تست سرتاسری موتور تمرینی فیت‌شو (سری دوم)";
+    content: "صفحه " counter(page) " از " counter(pages) " · گزارش تست سرتاسری موتور "
+             "تمرینی فیت‌شو (سری دوم)";
     font-family: "Vazirmatn", "Noto Sans Arabic", "DejaVu Sans", sans-serif;
     font-size: 7.5pt;
     color: #718096;
@@ -548,7 +650,7 @@ h1 {
 }
 .stat-col {
   display: table-cell;
-  width: 33.33%;
+  width: 25%;
   text-align: center;
   padding: 1.5mm;
   background: #edf2f7;
@@ -662,6 +764,29 @@ h1 {
   margin-bottom: 1.5mm;
   border-bottom: 1px dashed #cbd5e0;
   padding-bottom: 0.8mm;
+}
+.evidence-box {
+  background: #f8fafc;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  padding: 2mm 3mm;
+  margin-bottom: 2mm;
+  font-size: 7.2pt;
+  line-height: 1.5;
+}
+.evidence-title {
+  color: #087d6c;
+  font-weight: bold;
+  margin-bottom: 0.8mm;
+}
+.evidence-box code {
+  direction: ltr;
+  unicode-bidi: embed;
+  color: #134e4a;
+}
+.evidence-days {
+  margin: 0.8mm 0 0 0;
+  padding-right: 3mm;
 }
 
 .day-box {
@@ -779,14 +904,19 @@ def render_exercise_row(idx: int, item: WorkoutPlanExerciseResponse) -> str:
     if item.prescription_mode == PrescriptionMode.REPS:
         meta = f"{fa_num(item.sets)} ست × {fa_num(item.reps_min)} تا {fa_num(item.reps_max)} تکرار"
     else:
-        meta = f"{fa_num(item.sets)} ست × {fa_num(item.duration_min_seconds)} تا {fa_num(item.duration_max_seconds)} ثانیه"
+        meta = (
+            f"{fa_num(item.sets)} ست × {fa_num(item.duration_min_seconds)} تا "
+            f"{fa_num(item.duration_max_seconds)} ثانیه"
+        )
 
     rest = f"{fa_num(item.rest_seconds)} ثانیه"
     rir = f"RIR {fa_num(item.rir)}" if item.rir is not None else "—"
 
     superset_html = ""
     if item.superset_group:
-        superset_html = f'<span class="superset-tag">سوپرست {escape(str(item.superset_group))}</span> '
+        superset_html = (
+            f'<span class="superset-tag">سوپرست {escape(str(item.superset_group))}</span> '
+        )
 
     notes = []
     if item.warmup_sets:
@@ -815,12 +945,14 @@ def render_exercise_row(idx: int, item: WorkoutPlanExerciseResponse) -> str:
 
 
 def render_day_block(day: WorkoutDayResponse) -> str:
-    rows = "".join(
-        render_exercise_row(i, ex) for i, ex in enumerate(day.exercises, start=1)
+    rows = "".join(render_exercise_row(i, ex) for i, ex in enumerate(day.exercises, start=1))
+    title = (
+        f"{escape(day.title_fa)} ({fa_num(len(day.exercises))} حرکت · تخمین زمان: "
+        f"{fa_num(day.estimated_duration_minutes)} دقیقه)"
     )
     return f"""
     <div class="day-box">
-      <div class="day-title">{escape(day.title_fa)} ({fa_num(len(day.exercises))} حرکت · تخمین زمان: {fa_num(day.estimated_duration_minutes)} دقیقه)</div>
+      <div class="day-title">{title}</div>
       <table class="exercise-table">
         <thead>
           <tr>
@@ -839,82 +971,154 @@ def render_day_block(day: WorkoutDayResponse) -> str:
     """
 
 
-def render_user_profile_card(p: dict, res: dict, index: int) -> str:
+def _evidence_values(evidence: dict[str, object], key: str) -> tuple[str, ...]:
+    value = evidence.get(key)
+    if not isinstance(value, (list, tuple)):
+        return ()
+    return tuple(str(item) for item in value)
+
+
+def _render_engine_evidence(detail: dict[str, object]) -> str:
+    final_gate = detail["final_gate"]
+    coverage = detail["weekly_coverage"]
+    distribution = detail["weekly_distribution"]
+    if not isinstance(final_gate, dict):
+        final_gate = {}
+    if not isinstance(coverage, dict):
+        coverage = {}
+    if not isinstance(distribution, dict):
+        distribution = {}
+
+    gate_reasons = _evidence_values(final_gate, "reason_codes")
+    gate_constraints = _evidence_values(final_gate, "constraint_reason_codes")
+    coverage_reasons = _evidence_values(coverage, "reason_codes")
+    coverage_missing_patterns = _evidence_values(coverage, "missing_patterns")
+    coverage_missing_muscles = _evidence_values(coverage, "missing_major_muscles")
+    distribution_reasons = _evidence_values(distribution, "reason_codes")
+    day_rows = "".join(
+        f"<li>روز {fa_num(day.get('day_number'))}: {fa_num(day.get('exercise_count'))} حرکت · "
+        f"{fa_num(day.get('duration_minutes'))} دقیقه</li>"
+        for day in detail["per_day"]
+        if isinstance(day, dict)
+    )
+
+    def codes(values: tuple[str, ...]) -> str:
+        return " · ".join(f"<code>{escape(value)}</code>" for value in values) or "—"
+
+    return f"""
+        <div class="evidence-box">
+          <div class="evidence-title">شواهد نهایی موتور</div>
+          <div>گیت نهایی: <code>{escape(str(final_gate.get("status", "—")))}</code> ·
+          دلایل: {codes(gate_reasons)} · قیود: {codes(gate_constraints)}</div>
+          <div>پوشش هفتگی: <code>{escape(str(coverage.get("status", "—")))}</code> ·
+          دلایل: {codes(coverage_reasons)} · الگوهای پوشش‌داده‌نشده:
+          {codes(coverage_missing_patterns)} · عضلات پوشش‌داده‌نشده:
+          {codes(coverage_missing_muscles)}</div>
+          <div>توزیع هفتگی: <code>{escape(str(distribution.get("status", "—")))}</code> ·
+          دلایل: {codes(distribution_reasons)}</div>
+          <div>روزهای درخواستی/واقعی: <code>{fa_num(detail.get("requested_day_count"))}</code> /
+          <code>{fa_num(detail.get("actual_day_count"))}</code></div>
+          <ul class="evidence-days">{day_rows}</ul>
+        </div>
+        """
+
+
+def render_user_profile_card(
+    p: dict, res: dict, index: int, detail: dict[str, object] | None = None
+) -> str:
+    if detail is None:
+        projected = project_batch2_results([(p, res)])
+        detail = projected["details"][0]
     age = calculate_age(p["birth_date"])
-    sex_str = SEX_FA.get(p["sex"], str(p["sex"].value))
-    goal_str = GOAL_FA.get(p["fitness_goal"], str(p["fitness_goal"].value))
-    level_str = LEVEL_FA.get(p["experience_level"], str(p["experience_level"].value))
-    loc_str = LOCATION_FA.get(p["training_location"], str(p["training_location"].value))
+    sex_str = escape(SEX_FA.get(p["sex"], str(p["sex"].value)))
+    goal_str = escape(GOAL_FA.get(p["fitness_goal"], str(p["fitness_goal"].value)))
+    level_str = escape(LEVEL_FA.get(p["experience_level"], str(p["experience_level"].value)))
+    loc_str = escape(LOCATION_FA.get(p["training_location"], str(p["training_location"].value)))
 
     if p["training_location"] == TrainingLocation.HOME:
-        equip_str = HOME_SETUP_FA.get(p["home_setup"], "تجهیزات خانگی")
+        equip_str = escape(HOME_SETUP_FA.get(p["home_setup"], "تجهیزات خانگی"))
     else:
-        equip_str = "باشگاه کامل (هالتر، دمبل، دستگاه، کابل)"
+        equip_str = escape("باشگاه کامل (هالتر، دمبل، دستگاه، کابل)")
 
     cautions_list = [CAUTION_FA.get(c, c.value) for c in p["cautions"]]
     if p["limitations_text"]:
         cautions_list.append(f"توضیحات آسیب: {p['limitations_text']}")
-    caution_str = "، ".join(cautions_list) if cautions_list else "بدون آسیب و محدودیت"
+    caution_str = escape("، ".join(cautions_list) if cautions_list else "بدون آسیب و محدودیت")
 
     prio_list = [MUSCLE_FA.get(m, m) for m in p["priority_muscles"]]
-    prio_str = "، ".join(prio_list) if prio_list else "عضلات عمومی متعادل"
+    prio_str = escape("، ".join(prio_list) if prio_list else "عضلات عمومی متعادل")
 
-    measure_str = f"دور شانه: {fa_num(p['shoulder_cm'])} cm · دور کمر: {fa_num(p['waist_cm'])} cm · دور باسن: {fa_num(p['hip_cm'])} cm"
+    measure_str = escape(
+        f"دور شانه: {fa_num(p['shoulder_cm'])} cm · دور کمر: "
+        f"{fa_num(p['waist_cm'])} cm · دور باسن: {fa_num(p['hip_cm'])} cm"
+    )
 
-    success = res["success"]
+    status = detail["status"]
+    success = status != "failure"
     plan: WorkoutPlanResponse | None = res["plan"]
 
     if success and plan:
-        safety_status = plan.safety_status
-        if safety_status == "clear":
-            badge_html = '<span class="badge success">موفق · ایمنی تأییدشده</span>'
-        elif safety_status == "clear_with_modifications":
-            badge_html = '<span class="badge warning">موفق · اصلاح با محدودیت</span>'
+        gate = detail["final_gate"]
+        gate_status = gate.get("status") if isinstance(gate, dict) else None
+        if status == "constrained":
+            badge_html = (
+                f'<span class="badge warning">محدودشده · گیت نهایی: '
+                f"{escape(str(gate_status or '—'))}</span>"
+            )
         else:
-            badge_html = f'<span class="badge success">موفق ({escape(safety_status)})</span>'
+            badge_html = (
+                f'<span class="badge success">موفق · گیت نهایی: '
+                f"{escape(str(gate_status or '—'))}</span>"
+            )
 
         days_html = "".join(render_day_block(day) for day in plan.days)
+        actual_day_count = detail.get("actual_day_count")
+        plan_heading = (
+            f"برنامه تمرینی تولیدشده توسط موتور ({fa_num(actual_day_count)} روز واقعی · "
+            f"دوره {fa_num(plan.plan_duration_weeks)} هفته‌ای · نسخه موتور: "
+            f"{escape(plan.engine_version)})"
+        )
         plan_content = f"""
         <div class="plan-section">
-          <div class="plan-heading">برنامه تمرینی تولیدشده توسط موتور ({fa_num(len(plan.days))} روز در هفته · دوره {fa_num(plan.plan_duration_weeks)} هفته‌ای · نسخه موتور: {escape(plan.engine_version)})</div>
+          <div class="plan-heading">{plan_heading}</div>
+          {_render_engine_evidence(detail)}
           {days_html}
         </div>
         """
         header_class = "user-header"
         title_class = "user-title"
     else:
-        badge_html = '<span class="badge danger">ناموفق / رد ایمنی</span>'
-        err_code = res.get("error_code") or "ERROR"
-        err_errors = res.get("errors") or ()
-        errors_joined = " · ".join(err_errors)
-
-        if err_code == "PROGRAM_REJECTED_SAFETY_STATUS":
-            err_desc = (
-                "موتور فیت‌شو به دلیل وجود آسیب‌دیدگی متنی ثبت‌نشده (Unstructured Physical Limitations)، "
-                "جهت جلوگیری از آسیب احتمالی، تولید خودکار را مسدود کرده و کاربر را ملزم به بررسی و تایید مربی/پزشک متخصص نموده است."
-            )
-        elif err_code == "UNSATISFIED_CONSTRAINT":
-            err_desc = "قیدهای برنامه تمرینی ارضا نشد و چیدمان استانداردی برای این ترکیب پارامترها یافت نشد."
-        else:
-            err_desc = f"کد خطا: {err_code} - جزئیات: {errors_joined}"
+        err_code = str(detail.get("error_code") or "ERROR")
+        err_errors = tuple(str(error) for error in detail.get("errors", ()))
+        errors_joined = " · ".join(escape(error) for error in err_errors) or "—"
+        badge_html = f'<span class="badge danger">ناموفق · کد موتور: {escape(err_code)}</span>'
+        err_desc = f"کد خطای موتور: {escape(err_code)} · دلایل دقیق موتور: {errors_joined}"
 
         plan_content = f"""
         <div class="error-card">
           <div class="error-title">علت و کد خطای موتور: {escape(err_code)}</div>
           <p class="error-desc">{err_desc}</p>
-          <div style="font-size: 7pt; color: #9b2c2c; margin-top: 1.2mm;"><strong>کدهای تشخیصی موتور:</strong> {escape(errors_joined)}</div>
+          <div style="font-size: 7pt; color: #9b2c2c; margin-top: 1.2mm;">
+            <strong>کدهای تشخیصی موتور:</strong> {errors_joined}
+          </div>
         </div>
         """
         header_class = "user-header failed"
         title_class = "user-title failed"
 
     page_break = " page-break" if index > 1 else ""
+    height_weight = f"{fa_num(p['height_cm'])} سانتی‌متر · {fa_num(p['weight_kg'])} کیلوگرم"
+    session_settings = (
+        f"مدت {fa_num(p['session_duration_minutes'])} دقیقه · "
+        f"دوره {fa_num(p['plan_duration_weeks'])} هفته"
+    )
+    intensity = escape(INTENSITY_FA.get(p["training_intensity"], "متوسط"))
 
     return f"""
     <section class="user-card{page_break}">
       <div class="{header_class}">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <h2 class="{title_class}">کاربر شماره {fa_num(p['num'])}: {escape(p['name'])}</h2>
+        <h2 class="{title_class}">کاربر شماره {fa_num(p["num"])}: {escape(str(p["name"]))}</h2>
           {badge_html}
         </div>
       </div>
@@ -923,17 +1127,17 @@ def render_user_profile_card(p: dict, res: dict, index: int) -> str:
           <td class="label">سن و جنسیت:</td>
           <td class="value">{fa_num(age)} سال · {sex_str}</td>
           <td class="label">قد و وزن:</td>
-          <td class="value">{fa_num(p['height_cm'])} سانتی‌متر · {fa_num(p['weight_kg'])} کیلوگرم</td>
+          <td class="value">{height_weight}</td>
         </tr>
         <tr>
           <td class="label">هدف تمرینی:</td>
           <td class="value">{goal_str}</td>
           <td class="label">سطح و سابقه:</td>
-          <td class="value">{level_str} ({fa_num(p['training_age_months'])} ماه سابقه)</td>
+          <td class="value">{level_str} ({fa_num(p["training_age_months"])} ماه سابقه)</td>
         </tr>
         <tr>
           <td class="label">روزهای تمرین:</td>
-          <td class="value">{fa_num(p['training_days_per_week'])} روز در هفته</td>
+          <td class="value">{fa_num(p["training_days_per_week"])} روز در هفته</td>
           <td class="label">محیط تمرین:</td>
           <td class="value">{loc_str}</td>
         </tr>
@@ -951,9 +1155,9 @@ def render_user_profile_card(p: dict, res: dict, index: int) -> str:
         </tr>
         <tr>
           <td class="label">تنظیمات جلسه:</td>
-          <td class="value">مدت {fa_num(p['session_duration_minutes'])} دقیقه · دوره {fa_num(p['plan_duration_weeks'])} هفته</td>
+          <td class="value">{session_settings}</td>
           <td class="label">شدت تمرین:</td>
-          <td class="value">{INTENSITY_FA.get(p['training_intensity'], 'متوسط')}</td>
+          <td class="value">{intensity}</td>
         </tr>
       </table>
       {plan_content}
@@ -963,22 +1167,42 @@ def render_user_profile_card(p: dict, res: dict, index: int) -> str:
 
 def calculate_age(bdate: date) -> int:
     today = date.today()
-    return (
-        today.year
-        - bdate.year
-        - ((today.month, today.day) < (bdate.month, bdate.day))
-    )
+    return today.year - bdate.year - ((today.month, today.day) < (bdate.month, bdate.day))
 
 
 def generate_html_report(results: list) -> str:
-    total_count = len(results)
-    success_count = sum(1 for _, res in results if res["success"])
-    fail_count = total_count - success_count
+    projection = project_batch2_results(results)
+    summary = projection["summary"]
+    details = projection["details"]
+    total_count = summary["total"]
+    success_count = summary["success"]
+    fail_count = summary["failure"]
+    constrained_count = summary["constrained"]
 
     cards_html = "".join(
-        render_user_profile_card(p, res, i)
-        for i, (p, res) in enumerate(results, start=1)
+        render_user_profile_card(p, res, i, detail)
+        for i, ((p, res), detail) in enumerate(zip(results, details, strict=True), start=1)
     )
+
+    failure_codes = sorted(
+        {
+            str(detail["error_code"])
+            for detail in details
+            if detail["status"] == "failure" and detail["error_code"]
+        }
+    )
+    failure_code_text = " · ".join(escape(code) for code in failure_codes) or "—"
+    summary_observation = (
+        f"تعداد کل پروفایل‌های اجراشده: <strong>{fa_num(total_count)}</strong> · "
+        f"موفق: <strong>{fa_num(success_count)}</strong> · "
+        f"ناموفق: <strong>{fa_num(fail_count)}</strong> · "
+        f"محدودشده: <strong>{fa_num(constrained_count)}</strong>"
+    )
+    report_subtitle = (
+        f"آزمون جامع عملکرد روی {fa_num(total_count)} پروفایل کاملاً جدید، متنوع و با "
+        "ترکیب‌های تمرینی پیشرفته"
+    )
+    summary_title = f"خلاصه نتایج آزمون جامع موتور ({fa_num(total_count)} پروفایل جدید)"
 
     return f"""<!doctype html>
 <html lang="fa" dir="rtl">
@@ -992,13 +1216,13 @@ def generate_html_report(results: list) -> str:
     <div class="logo-title">
       <div>
         <h1>گزارش تست سرتاسری موتور تولید برنامه تمرینی فیت‌شو (سری دوم)</h1>
-        <p class="subtitle">آزمون جامع عملکرد روی ۱۰ پروفایل کاملاً جدید، متنوع و با ترکیب‌های تمرینی پیشرفته</p>
+        <p class="subtitle">{report_subtitle}</p>
       </div>
     </div>
   </header>
 
   <section class="summary-box">
-    <div class="summary-title">خلاصه نتایج آزمون جامع موتور (۱۰ پروفایل جدید)</div>
+    <div class="summary-title">{summary_title}</div>
     <div class="stats-grid">
       <div class="stat-col">
         <div class="stat-val">{fa_num(total_count)}</div>
@@ -1010,17 +1234,22 @@ def generate_html_report(results: list) -> str:
       </div>
       <div class="stat-col">
         <div class="stat-val error">{fa_num(fail_count)}</div>
-        <div class="stat-lbl">رد ایمنی یا نیازمند تایید متخصص</div>
+        <div class="stat-lbl">نتایج ناموفق موتور</div>
+      </div>
+      <div class="stat-col">
+        <div class="stat-val">{fa_num(constrained_count)}</div>
+        <div class="stat-lbl">تعداد برنامه‌های محدودشده</div>
       </div>
     </div>
 
-    <div style="font-weight: bold; font-size: 8.5pt; color: #1a202c; margin-top: 2mm;">تحلیل مهندسی نتایج و مشاهدات تخصصی موتور:</div>
+    <div style="font-weight: bold; font-size: 8.5pt; color: #1a202c; margin-top: 2mm;">
+      مشاهدات مبتنی بر خروجی واقعی موتور:
+    </div>
     <ul class="analysis-list">
-      <li><strong>تولید موفق برنامه‌های خانگی با وزن بدن (کاربر ۶):</strong> در شرایط تمرین در خانه با وزن بدن بدون آسیب مچ، موتور با موفقیت برنامه فول‌بادی ۲ روزه متوازن با حرکات شنا، پلانک، اسکات و لانج وزن بدن تولید کرد.</li>
-      <li><strong>تطبیق هوشمند احتیاط‌های شانه و زانو در خانه و باشگاه (کاربران ۲، ۷ و ۹):</strong> در کاربر شماره ۷ با آسیب شانه و کاربر شماره ۹ با تمرین در خانه و آسیب زانو، موتور به درستی حرکات پرخطر را فیلتر کرده و برنامه‌های کاملاً ایمن و بهینه ارائه داد (<code>clear_with_modifications</code>).</li>
-      <li><strong>پوشش سطوح پیشرفته با حجم بالا (کاربران ۳ و ۸):</strong> برای کاربران پیشرفته ۵ روزه و ۴ روزه قدرتی، الگوهای پیشرفته اسپلیت (Push/Pull/Legs/Upper/Lower) همراه با تخصیص بهینه ست‌ها و استراحت‌های تخصصی اعمال شد.</li>
-      <li><strong>سد ایمنی آسیب‌های متنی ثبت‌نشده (کاربر ۱۰):</strong> با وجود آسیب جراحی تاندون آشیل به صورت متن آزاد، موتور از تولید بدون نظارت خودداری کرده و ارجاع پزشکی را فعال نمود (<code>REQUIRES_PROFESSIONAL_REVIEW</code>).</li>
-      <li><strong>نام‌گذاری و راهنمای کاملاً فارسی:</strong> تمام نام‌های حرکات از دیتابیس رسمی فیت‌شو استخراج شده و دستورالعمل‌های بارگذاری و قوانین پیشرفت کاملاً فارسی‌سازی شده‌اند.</li>
+      <li>{summary_observation}</li>
+      <li>کدهای خطای مشاهده‌شده در خروجی ناموفق: <code>{failure_code_text}</code></li>
+      <li>هر کارت وضعیت گیت نهایی، پوشش هفتگی، توزیع هفتگی و شمارش روزهای
+      درخواستی/واقعی خود را از همان رکورد خام نمایش می‌دهد.</li>
     </ul>
   </section>
 
@@ -1044,9 +1273,7 @@ def main():
     print(f"Rendering PDF via WeasyPrint to {pdf_path}...")
     weasyprint.HTML(string=html_content).write_pdf(str(pdf_path))
 
-    print(
-        f"PDF successfully generated: {pdf_path} ({pdf_path.stat().st_size} bytes)"
-    )
+    print(f"PDF successfully generated: {pdf_path} ({pdf_path.stat().st_size} bytes)")
 
 
 if __name__ == "__main__":
