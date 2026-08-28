@@ -1,6 +1,11 @@
 """Focused contract tests for the truthful Batch2 report projection."""
 
+import json
+import os
+import subprocess
+import sys
 from copy import deepcopy
+from pathlib import Path
 from types import SimpleNamespace
 
 from sqlalchemy import create_engine, func, select
@@ -231,3 +236,31 @@ def test_repeated_real_batch2_runs_are_deterministic_and_profile_isolated(monkey
     second_ids = captured_user_ids[len(TEST_PROFILES_BATCH2) :]
     assert first_ids == second_ids
     assert len(first_ids) == len(set(first_ids)) == len(TEST_PROFILES_BATCH2)
+
+
+def test_batch2_projection_is_stable_across_python_hash_seeds() -> None:
+    child_code = """
+import contextlib
+import io
+import json
+import scripts.generate_e2e_report_batch2 as batch2
+
+with contextlib.redirect_stdout(io.StringIO()):
+    projected = batch2.project_batch2_results(batch2.run_batch2_profiles())
+print(json.dumps(projected, ensure_ascii=False, sort_keys=True))
+"""
+    backend_root = Path(__file__).parents[3]
+    projections = []
+    for seed in range(1, 6):
+        environment = os.environ | {"PYTHONHASHSEED": str(seed)}
+        completed = subprocess.run(
+            [sys.executable, "-c", child_code],
+            cwd=backend_root,
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        projections.append(json.loads(completed.stdout))
+
+    assert all(projection == projections[0] for projection in projections[1:])

@@ -1,4 +1,10 @@
 import hashlib
+import json
+from collections.abc import Mapping
+from enum import Enum
+from uuid import UUID
+
+from pydantic import BaseModel
 
 from app.workouts.program_engine.constraints import derive_constraints
 from app.workouts.program_engine.enums import TrainingExperience, TrainingStatus
@@ -13,7 +19,11 @@ def normalize_request(
     training_status, assumptions = _classify_status(request, ruleset)
     seed = request.seed_optional
     if seed is None:
-        canonical = request.model_dump_json(exclude={"seed_optional"})
+        canonical = json.dumps(
+            _canonical_value(request.model_dump(mode="python", exclude={"seed_optional"})),
+            sort_keys=True,
+            separators=(",", ":"),
+        )
         seed = int.from_bytes(hashlib.sha256(canonical.encode()).digest()[:8], "big") % (2**63 - 1)
         assumptions.append("SEED_DERIVED_FROM_NORMALIZED_INPUT")
     resistance_days = min(request.available_training_days, ruleset.max_resistance_days)
@@ -28,6 +38,24 @@ def normalize_request(
         constraints=derive_constraints(request),
         assumptions=tuple(assumptions),
     )
+
+
+def _canonical_value(value: object) -> object:
+    if isinstance(value, (Enum, UUID)):
+        return str(value.value if isinstance(value, Enum) else value)
+    if isinstance(value, BaseModel):
+        return _canonical_value(value.model_dump(mode="python"))
+    if isinstance(value, Mapping):
+        return {
+            str(_canonical_value(key)): _canonical_value(item)
+            for key, item in sorted(value.items(), key=lambda item: str(item[0]))
+        }
+    if isinstance(value, (set, frozenset)):
+        items = [_canonical_value(item) for item in value]
+        return sorted(items, key=lambda item: json.dumps(item, sort_keys=True))
+    if isinstance(value, (list, tuple)):
+        return [_canonical_value(item) for item in value]
+    return value
 
 
 def _classify_status(
