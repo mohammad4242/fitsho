@@ -346,7 +346,7 @@ def _repeated_core_reference() -> tuple[TemplateReference, list[ExerciseCandidat
     )
 
 
-def test_safe_matching_template_becomes_deterministic_program_reference() -> None:
+def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> None:
     catalog = full_catalog()
     template = _four_day_reference()
 
@@ -367,10 +367,10 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
     assert result.program.aggregate_metrics["reference_template"] == template.slug
     assert result.program.aggregate_metrics["substitution_requests"] > 0
     coverage = result.program.aggregate_metrics["weekly_coverage"]
-    assert coverage["status"] == "satisfied"
-    assert coverage["fully_balanced"] is True
-    assert coverage["missing_patterns"] == ()
-    assert coverage["missing_major_muscles"] == ()
+    assert coverage["status"] == "not_applicable"
+    assert coverage["claimed_full_body"] is False
+    assert coverage["claimed_balanced"] is False
+    assert coverage["fully_balanced"] is False
     assert coverage["availability_evidence"]["patterns"]["pull"]["eligible_candidate_count"] > 0
     assert coverage["availability_evidence"]["muscles"]["back"]["eligible_candidate_count"] > 0
     substitution_trace = next(
@@ -434,6 +434,108 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
     assert candidate_trace["feasibility"]["resolvable_slots"] == 6
     assert candidate_trace["feasibility"]["unresolved_non_core_slots"] == 0
     assert candidate_trace["reason_codes"] == ()
+
+
+def test_upper_lower_template_does_not_claim_aggregate_full_body_coverage() -> None:
+    template, catalog = _upper_lower_reference()
+    template = replace(
+        template,
+        slug="four-day-upper-lower-coverage-reference",
+        focus_tags=("upper_lower",),
+    )
+
+    result = generate_program(
+        template_request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+        ),
+        catalog,
+        RULESET,
+        reference_templates=(template,),
+    )
+
+    assert result.program is not None, result.errors
+    coverage = result.program.aggregate_metrics["weekly_coverage"]
+    assert coverage["status"] == "not_applicable"
+    assert coverage["claimed_full_body"] is False
+    assert coverage["availability_evidence"]["patterns"]["pull"]["candidate_count"] > 0
+
+
+def _full_body_reference() -> TemplateReference:
+    by_name = {candidate.name: candidate for candidate in full_catalog()}
+
+    def slot(name: str, target_muscles: tuple[MuscleGroup, ...]) -> TemplateReferenceSlot:
+        candidate = by_name[name]
+        return TemplateReferenceSlot(
+            exercise_id=candidate.id,
+            exercise_slug_hint=name,
+            target_muscles=target_muscles,
+            movement_pattern=candidate.movement_pattern,
+            intensity_method="standard",
+            adaptation_priority="core",
+            superset_group=None,
+            superset_exercise_id=None,
+            superset_exercise_slug_hint=None,
+            sets=3,
+            rep_min=8,
+            rep_max=12,
+            target_rir=2,
+            rest_seconds=60,
+        )
+
+    targets = (
+        MuscleGroup.CHEST,
+        MuscleGroup.BACK,
+        MuscleGroup.SHOULDERS,
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+    )
+    slots = (
+        slot("Push Up", (MuscleGroup.CHEST,)),
+        slot("Bodyweight Row", (MuscleGroup.BACK,)),
+        slot("Bodyweight Squat", (MuscleGroup.QUADRICEPS, MuscleGroup.GLUTES)),
+        slot("Bodyweight Hinge", (MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES)),
+        slot("Lateral Raise", (MuscleGroup.SHOULDERS,)),
+    )
+    return TemplateReference(
+        slug="one-day-explicit-full-body-reference",
+        days_per_week=1,
+        supported_levels=("intermediate",),
+        focus_tags=("full_body", "balanced"),
+        intensity_methods=("standard",),
+        days=(TemplateReferenceDay(1, "Full Body", targets, slots, "full_body"),),
+    )
+
+
+def test_explicit_full_body_template_reports_actual_coverage_and_evidence() -> None:
+    template = _full_body_reference()
+    result = generate_program(
+        template_request(
+            available_training_days=1,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=24,
+            session_duration_minutes=60,
+        ),
+        full_catalog(),
+        RULESET,
+        reference_templates=(template,),
+    )
+
+    assert result.program is not None, result.errors
+    assert result.program.aggregate_metrics["reference_template"] == template.slug
+    coverage = result.program.aggregate_metrics["weekly_coverage"]
+    assert coverage["status"] == "satisfied"
+    assert coverage["claimed_full_body"] is True
+    assert coverage["fully_balanced"] is True
+    assert coverage["missing_patterns"] == ()
+    assert coverage["missing_major_muscles"] == ()
+    assert coverage["availability_evidence"]["patterns"]["pull"]["eligible_candidate_count"] > 0
+    assert coverage["availability_evidence"]["muscles"]["shoulders"]["eligible_candidate_count"] > 0
 
 
 def test_upper_priority_reference_template_preserves_three_upper_one_lower_topology() -> None:

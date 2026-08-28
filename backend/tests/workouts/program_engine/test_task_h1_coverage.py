@@ -5,7 +5,10 @@ from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.equipment import effective_required_equipment
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.safety import effective_caution_tags
-from app.workouts.program_engine.weekly_coverage import assess_weekly_coverage
+from app.workouts.program_engine.weekly_coverage import (
+    assess_weekly_coverage,
+    build_coverage_availability_evidence,
+)
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
@@ -205,3 +208,43 @@ def test_full_body_coverage_does_not_expand_unavailable_quads_or_hamstrings_to_g
     assert coverage["unavailable_major_muscles"] == ()
     assert "glutes" in coverage["missing_major_muscles"]
     assert "FULL_BODY_COVERAGE_MISSING:glutes" in coverage["reason_codes"]
+
+
+def test_shoulder_abduction_candidate_prevents_false_unavailable_shoulders() -> None:
+    result = generate_program(
+        request(available_training_days=1, session_duration_minutes=60),
+        full_catalog(),
+        RULESET,
+    )
+
+    assert result.program is not None, result.errors
+    lateral_raise = next(
+        candidate
+        for candidate in full_catalog()
+        if candidate.movement_pattern is MovementPattern.SHOULDER_ABDUCTION
+    )
+    days = tuple(
+        replace(
+            day,
+            exercises=tuple(
+                item
+                for item in day.exercises
+                if item.primary_muscle is not MuscleGroup.SHOULDERS
+                and MuscleGroup.SHOULDERS not in item.secondary_muscles
+            ),
+        )
+        for day in result.program.weekly_schedule
+    )
+    coverage = assess_weekly_coverage(
+        days,
+        {},
+        ruleset=RULESET,
+        availability_evidence=build_coverage_availability_evidence((lateral_raise,), ()),
+    ).metrics
+
+    assert coverage["status"] == "unsatisfied"
+    assert coverage["missing_major_muscles"] == ("shoulders",)
+    assert coverage["unavailable_major_muscles"] == ()
+    assert (
+        coverage["availability_evidence"]["muscles"]["shoulders"]["eligible_candidate_count"] == 1
+    )

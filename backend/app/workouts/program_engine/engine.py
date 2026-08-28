@@ -29,7 +29,7 @@ from app.workouts.program_engine.effective_volume import (
     complete_tracked_metrics,
 )
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
-from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus
+from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import prescribe_sessions
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
@@ -888,6 +888,7 @@ def _reference_program(
         metrics,
         ruleset=ruleset,
         availability_evidence=coverage_availability_evidence,
+        full_body_claim=reference.split_type is SplitType.FULL_BODY,
     )
     metrics["weekly_coverage"] = weekly_coverage.metrics
     effective_volume = calculate_effective_volume(
