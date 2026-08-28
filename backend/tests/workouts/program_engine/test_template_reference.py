@@ -17,6 +17,7 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceDay,
     TemplateReferenceSlot,
 )
+from app.workouts.program_engine.split_selector import classify_template_region
 from app.workouts.program_engine.template_selector import eligible_template_references
 from app.workouts.program_engine.template_sessions import build_template_sessions
 from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
@@ -497,6 +498,16 @@ def test_original_upper_priority_profile_keeps_template_topology_and_weekday_rec
     )
     assert upper_weekdays == (0, 2, 4)
     assert recovery_spacing_is_valid(first.program.weekly_schedule, RULESET)
+
+
+@pytest.mark.parametrize(
+    "supplemental",
+    [MuscleGroup.ABS, MuscleGroup.OBLIQUES, MuscleGroup.LOWER_BACK],
+)
+def test_supplemental_only_template_day_cannot_satisfy_lower_topology(
+    supplemental: MuscleGroup,
+) -> None:
+    assert classify_template_region((supplemental,)) is None
 
 
 def test_upper_priority_does_not_accept_eligible_two_upper_two_lower_template() -> None:

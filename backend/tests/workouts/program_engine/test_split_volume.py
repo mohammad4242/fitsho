@@ -159,6 +159,39 @@ def test_four_day_upper_priorities_rank_a_three_upper_one_lower_specialization()
     assert "SPLIT_SELECTED_FOR_UPPER_PRIORITY_SPECIALIZATION" in scored[0].reason_codes
 
 
+@pytest.mark.parametrize(
+    "lower_priority",
+    [
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+        MuscleGroup.CALVES,
+        MuscleGroup.ADDUCTORS,
+        MuscleGroup.ABDUCTORS,
+        MuscleGroup.LEGS,
+    ],
+)
+def test_mixed_upper_and_lower_priorities_do_not_trigger_upper_specialization(
+    lower_priority: MuscleGroup,
+) -> None:
+    request = normalized(
+        available_training_days=4,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, lower_priority],
+    )
+
+    scored = score_split_candidates(request, generate_split_candidates(4), RULESET)
+    specialization = next(
+        item
+        for item in scored
+        if item.split_type is SplitType.UPPER_LOWER_SPECIALIZATION and len(item.day_focuses) == 4
+    )
+
+    assert "SPLIT_SELECTED_FOR_UPPER_PRIORITY_SPECIALIZATION" not in specialization.reason_codes
+
+
 def test_four_day_lower_or_balanced_priorities_do_not_inherit_upper_specialization() -> None:
     lower_request = normalized(
         available_training_days=4,

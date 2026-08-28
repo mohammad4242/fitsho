@@ -76,18 +76,14 @@ LOWER_REGION_MUSCLES = frozenset(
         MuscleGroup.LEGS,
     }
 )
-_LOWER_TEMPLATE_MUSCLES = LOWER_REGION_MUSCLES | {
-    MuscleGroup.ABS,
-    MuscleGroup.OBLIQUES,
-    MuscleGroup.LOWER_BACK,
-}
 
 
 def classify_template_region(muscles: Iterable[MuscleGroup]) -> str | None:
-    region = frozenset(muscles)
+    """Classify a template region using only split-driving muscles."""
+    region = frozenset(muscles).difference(SUPPLEMENTAL_MUSCLES)
     if region and region <= UPPER_REGION_MUSCLES:
         return "upper"
-    if region and region <= _LOWER_TEMPLATE_MUSCLES:
+    if region and region <= LOWER_REGION_MUSCLES:
         return "lower"
     return None
 
@@ -828,22 +824,11 @@ def _spacing_is_acceptable(
 
 
 def _is_upper_priority_specialization(policy: PriorityAllocationPolicy) -> bool:
-    upper = {
-        MuscleGroup.CHEST,
-        MuscleGroup.BACK,
-        MuscleGroup.SHOULDERS,
-        MuscleGroup.BICEPS,
-        MuscleGroup.TRICEPS,
-        MuscleGroup.TRAPS,
-    }
-    lower = {
-        MuscleGroup.QUADRICEPS,
-        MuscleGroup.HAMSTRINGS,
-        MuscleGroup.GLUTES,
-        MuscleGroup.CALVES,
-    }
-    explicit = set(policy.explicit_priorities)
-    return len(explicit.intersection(upper)) >= 2 and not explicit.intersection(lower)
+    explicit = frozenset(policy.explicit_priorities)
+    return (
+        len(explicit.intersection(UPPER_REGION_MUSCLES)) >= 2
+        and classify_template_region(explicit) == "upper"
+    )
 
 
 def _is_upper_specialization_layout(focuses: tuple[str, ...]) -> bool:
