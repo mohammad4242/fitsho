@@ -16,7 +16,7 @@ from app.workouts.program_engine.body_analysis import (
     eligible_body_analysis_priorities,
 )
 from app.workouts.program_engine.cardio import add_cardio
-from app.workouts.program_engine.coach_quality import build_coach_quality_metrics
+from app.workouts.program_engine.coach_quality import build_coach_quality_metrics, metric_status
 from app.workouts.program_engine.duration_capacity import (
     SessionCapacity,
     build_session_capacity,
@@ -82,7 +82,10 @@ from app.workouts.program_engine.volume_history import (
 )
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from app.workouts.program_engine.volume_repair import repair_weekly_volume
-from app.workouts.program_engine.weekly_coverage import assess_weekly_coverage
+from app.workouts.program_engine.weekly_coverage import (
+    assess_weekly_coverage,
+    build_coverage_availability_evidence,
+)
 
 
 def generate_program(
@@ -153,6 +156,10 @@ def generate_program(
         for candidate in exercise_catalog
         if candidate.id in rejected_by_id
     )
+    coverage_availability_evidence = build_coverage_availability_evidence(
+        eligibility.eligible,
+        rejected_slot_candidates,
+    )
     template_rejection_trace: tuple[dict[str, object], ...] = template_selection_trace
     for ranking in template_selection.candidates:
         reference = ranking.template
@@ -179,6 +186,7 @@ def generate_program(
                 previous_volume=previous_volume,
                 session_capacity=session_capacity,
                 template_selection_trace=template_rejection_trace,
+                coverage_availability_evidence=coverage_availability_evidence,
             )
             if reference_result.is_success:
                 return _append_successful_template_attempt(
@@ -292,6 +300,7 @@ def generate_program(
             rejected_splits=tuple(rejected_splits),
             template_rejection_trace=template_rejection_trace,
             rejected_slot_candidates=rejected_slot_candidates,
+            coverage_availability_evidence=coverage_availability_evidence,
         )
         if result.is_success:
             return result
@@ -333,6 +342,7 @@ def generate_program(
             rejected_splits=tuple(rejected_splits),
             template_rejection_trace=template_rejection_trace,
             rejected_slot_candidates=rejected_slot_candidates,
+            coverage_availability_evidence=coverage_availability_evidence,
         )
         if result.is_success:
             return result
@@ -494,6 +504,7 @@ def _program_for_split(
     rejected_splits: tuple[dict[str, object], ...],
     template_rejection_trace: tuple[dict[str, object], ...],
     rejected_slot_candidates: tuple[tuple[ExerciseCandidate, tuple[str, ...]], ...],
+    coverage_availability_evidence: dict[str, object],
 ) -> ProgramGenerationResult:
     volume = plan_weekly_volume(
         normalized,
@@ -631,7 +642,12 @@ def _program_for_split(
         ),
         **substitution_metrics,
     }
-    weekly_coverage = assess_weekly_coverage(days, metrics, ruleset=ruleset)
+    weekly_coverage = assess_weekly_coverage(
+        days,
+        metrics,
+        ruleset=ruleset,
+        availability_evidence=coverage_availability_evidence,
+    )
     metrics["weekly_coverage"] = weekly_coverage.metrics
     body_trace = body_analysis_trace(normalized, ruleset)
     session_reasons = tuple(
@@ -804,6 +820,7 @@ def _reference_program(
     previous_volume: PreviousVolumeBaseline,
     session_capacity: SessionCapacity,
     template_selection_trace: tuple[dict[str, object], ...],
+    coverage_availability_evidence: dict[str, object],
 ) -> ProgramGenerationResult:
     reference_focuses = tuple(_reference_split_focus(draft) for draft in build.drafts)
     split = SplitPlan(
@@ -866,7 +883,12 @@ def _reference_program(
         ),
         **substitution_metrics,
     }
-    weekly_coverage = assess_weekly_coverage(days, metrics, ruleset=ruleset)
+    weekly_coverage = assess_weekly_coverage(
+        days,
+        metrics,
+        ruleset=ruleset,
+        availability_evidence=coverage_availability_evidence,
+    )
     metrics["weekly_coverage"] = weekly_coverage.metrics
     effective_volume = calculate_effective_volume(
         (item for day in days for item in day.exercises), ruleset
@@ -1317,7 +1339,7 @@ def _coach_quality_metrics(
         "body_analysis_target_satisfaction": satisfaction(body_priorities),
         "volume_fit": volume_fit,
         "duration_fit": duration_fit,
-        "coverage_fit": _metric_status(program.aggregate_metrics.get("weekly_coverage")),
+        "coverage_fit": metric_status(program.aggregate_metrics.get("weekly_coverage")),
         "recovery_fit": recovery_fit,
         "substitution_count": substitution_count,
         "constraint_count": len(constraint_codes),
@@ -1329,14 +1351,6 @@ def _coach_quality_metrics(
         "duration_constrained_quality": duration_constrained_quality,
         "late_duration_repair_class": late_repair_class,
     }
-
-
-def _metric_status(value: object) -> str:
-    return (
-        value.get("status", "not_applicable")
-        if isinstance(value, dict) and isinstance(value.get("status"), str)
-        else "not_applicable"
-    )
 
 
 def _volume_metrics(

@@ -25,7 +25,7 @@ def build_coach_quality_metrics(
         "body_analysis_target_satisfaction": _target_satisfaction(priority_metrics, body_analysis),
         "volume_fit": _volume_fit(program.aggregate_metrics),
         "duration_fit": _duration_fit(program, request, report, ruleset),
-        "coverage_fit": _status_metric(program.aggregate_metrics.get("weekly_coverage")),
+        "coverage_fit": metric_status(program.aggregate_metrics.get("weekly_coverage")),
         "recovery_fit": _ratio(
             1.0 if recovery_spacing_is_valid(program.weekly_schedule, ruleset) else 0.0,
             1.0,
@@ -113,7 +113,7 @@ def _mapping(value: object) -> Mapping[str, object]:
     return value if isinstance(value, Mapping) else {}
 
 
-def _status_metric(value: object) -> str:
+def metric_status(value: object) -> str:
     status = _mapping(value).get("status")
     return status if isinstance(status, str) else "not_applicable"
 

@@ -31,30 +31,21 @@ from app.workouts.program_engine.substitution_engine import (
     SubstitutionContext,
     rank_substitutions,
 )
-from app.workouts.program_engine.substitution_policy import SubstitutionCause
+from app.workouts.program_engine.substitution_policy import (
+    CORE_PATTERNS,
+    HINGE_PATTERNS,
+    KNEE_PATTERNS,
+    PULL_PATTERNS,
+    PUSH_PATTERNS,
+    SHOULDER_PATTERNS,
+    SubstitutionCause,
+)
 from app.workouts.program_engine.supplemental_policy import (
     is_supplemental_muscle,
     main_exercise_count,
     supplemental_muscle_fits_focus,
     supplemental_reason_codes,
 )
-
-PUSH_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH})
-PULL_PATTERNS = frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL})
-KNEE_PATTERNS = frozenset(
-    {MovementPattern.SQUAT, MovementPattern.LUNGE, MovementPattern.KNEE_EXTENSION}
-)
-HINGE_PATTERNS = frozenset({MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION})
-CORE_PATTERNS = frozenset(
-    {
-        MovementPattern.CORE_ANTI_EXTENSION,
-        MovementPattern.CORE_ANTI_ROTATION,
-        MovementPattern.CORE_ANTI_LATERAL_FLEXION,
-    }
-)
-SHOULDER_PATTERNS = frozenset({MovementPattern.VERTICAL_PUSH, MovementPattern.SHOULDER_ABDUCTION})
-ARM_PATTERNS = frozenset({MovementPattern.ELBOW_FLEXION, MovementPattern.ELBOW_EXTENSION})
-LOWER_ACCESSORY_PATTERNS = frozenset({MovementPattern.KNEE_FLEXION, MovementPattern.CALF_RAISE})
 
 
 @dataclass(frozen=True)

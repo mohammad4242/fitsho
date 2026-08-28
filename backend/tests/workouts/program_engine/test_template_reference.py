@@ -366,6 +366,13 @@ def test_safe_matching_template_becomes_deterministic_program_reference() -> Non
     assert result.program is not None, result.errors
     assert result.program.aggregate_metrics["reference_template"] == template.slug
     assert result.program.aggregate_metrics["substitution_requests"] > 0
+    coverage = result.program.aggregate_metrics["weekly_coverage"]
+    assert coverage["status"] == "satisfied"
+    assert coverage["fully_balanced"] is True
+    assert coverage["missing_patterns"] == ()
+    assert coverage["missing_major_muscles"] == ()
+    assert coverage["availability_evidence"]["patterns"]["pull"]["eligible_candidate_count"] > 0
+    assert coverage["availability_evidence"]["muscles"]["back"]["eligible_candidate_count"] > 0
     substitution_trace = next(
         entry
         for entry in result.program.decision_trace

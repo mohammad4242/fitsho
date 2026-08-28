@@ -32,6 +32,13 @@ SHOULDER_PATTERNS = frozenset({MovementPattern.VERTICAL_PUSH, MovementPattern.SH
 ARM_PATTERNS = frozenset({MovementPattern.ELBOW_FLEXION, MovementPattern.ELBOW_EXTENSION})
 LOWER_ACCESSORY_PATTERNS = frozenset({MovementPattern.KNEE_FLEXION, MovementPattern.CALF_RAISE})
 
+FULL_BODY_PATTERN_GROUPS: tuple[tuple[str, frozenset[MovementPattern]], ...] = (
+    ("push", PUSH_PATTERNS),
+    ("pull", PULL_PATTERNS),
+    ("knee", KNEE_PATTERNS),
+    ("hinge", HINGE_PATTERNS),
+)
+
 _POSTERIOR_CHAIN_PATTERNS = HINGE_PATTERNS | frozenset({MovementPattern.KNEE_FLEXION})
 _QUADRICEPS_FALLBACK_PATTERNS = frozenset({MovementPattern.SQUAT, MovementPattern.LUNGE})
 

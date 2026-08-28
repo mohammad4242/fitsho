@@ -80,6 +80,16 @@ def test_batch2_profile_6_reports_unavailable_pull_without_balanced_claim(monkey
     assert coverage["unavailable_major_muscles"] == ("back",)
     assert "FULL_BODY_PATTERN_UNAVAILABLE:pull" in coverage["reason_codes"]
     assert "FULL_BODY_COVERAGE_UNAVAILABLE:back" in coverage["reason_codes"]
+    pull_evidence = coverage["availability_evidence"]["patterns"]["pull"]
+    back_evidence = coverage["availability_evidence"]["muscles"]["back"]
+    assert pull_evidence["candidate_count"] == pull_evidence["rejected_candidate_count"]
+    assert pull_evidence["eligible_candidate_count"] == 0
+    assert "EXERCISE_REJECTED_MISSING_EQUIPMENT" in pull_evidence["rejection_reason_codes"]
+    assert back_evidence["candidate_count"] == back_evidence["rejected_candidate_count"]
+    assert back_evidence["eligible_candidate_count"] == 0
+    assert "EXERCISE_REJECTED_MISSING_EQUIPMENT" in back_evidence["rejection_reason_codes"]
+    assert pull_evidence["unavailable"] is True
+    assert back_evidence["unavailable"] is True
     assert coverage["fully_balanced"] is False
     assert coverage["claimed_balanced"] is False
     assert program.aggregate_metrics["coach_quality"]["coverage_fit"] == "constrained"
@@ -156,3 +166,42 @@ def test_full_body_coverage_distinguishes_missing_available_work() -> None:
     assert coverage["unavailable_major_muscles"] == ()
     assert "FULL_BODY_PATTERN_MISSING:pull" in coverage["reason_codes"]
     assert "FULL_BODY_COVERAGE_MISSING:back" in coverage["reason_codes"]
+
+
+def test_full_body_coverage_does_not_expand_unavailable_quads_or_hamstrings_to_glutes() -> None:
+    result = generate_program(
+        request(available_training_days=1, session_duration_minutes=60),
+        full_catalog(),
+        RULESET,
+    )
+
+    assert result.program is not None, result.errors
+    days = tuple(
+        replace(
+            day,
+            exercises=tuple(
+                item
+                for item in day.exercises
+                if item.movement_pattern
+                in {MovementPattern.HORIZONTAL_PUSH, MovementPattern.HORIZONTAL_PULL}
+            ),
+        )
+        for day in result.program.weekly_schedule
+    )
+    coverage = assess_weekly_coverage(
+        days,
+        {
+            "unavailable_muscle_coverage": ("quadriceps", "hamstrings"),
+            "relaxed_required_pattern_groups": (
+                ("squat", "lunge", "knee_extension"),
+                ("hip_hinge", "hip_extension"),
+            ),
+        },
+        ruleset=RULESET,
+    ).metrics
+
+    assert coverage["status"] == "unsatisfied"
+    assert coverage["unavailable_patterns"] == ()
+    assert coverage["unavailable_major_muscles"] == ()
+    assert "glutes" in coverage["missing_major_muscles"]
+    assert "FULL_BODY_COVERAGE_MISSING:glutes" in coverage["reason_codes"]
