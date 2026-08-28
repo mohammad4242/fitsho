@@ -1,8 +1,11 @@
 from dataclasses import dataclass
 from enum import StrEnum
 
-from app.exercises.enums import ExerciseLabel, ExerciseType
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.exercises.enums import ExerciseType
+from app.workouts.program_engine.duration_policy import (
+    get_session_duration_policy,
+    is_main_training_exercise,
+)
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.prescription import (
     estimate_exercise_minutes,
@@ -238,9 +241,7 @@ def _representative_candidate(
     resistance_candidates = tuple(
         candidate
         for candidate in candidates
-        if candidate.exercise_type
-        in {ExerciseType.COMPOUND, ExerciseType.ISOLATION, ExerciseType.CORE}
-        and ExerciseLabel.CARDIO not in candidate.labels
+        if is_main_training_exercise(candidate)
     )
     compounds = tuple(
         candidate
