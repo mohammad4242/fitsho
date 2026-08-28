@@ -42,9 +42,16 @@ _LOWER_PRIORITY_MUSCLES = frozenset(
         MuscleGroup.HAMSTRINGS,
         MuscleGroup.GLUTES,
         MuscleGroup.CALVES,
+        MuscleGroup.ADDUCTORS,
+        MuscleGroup.ABDUCTORS,
+        MuscleGroup.LEGS,
     }
 )
-_LOWER_TEMPLATE_MUSCLES = _LOWER_PRIORITY_MUSCLES | {MuscleGroup.ABS}
+_LOWER_TEMPLATE_MUSCLES = _LOWER_PRIORITY_MUSCLES | {
+    MuscleGroup.ABS,
+    MuscleGroup.OBLIQUES,
+    MuscleGroup.LOWER_BACK,
+}
 
 
 @dataclass(frozen=True)

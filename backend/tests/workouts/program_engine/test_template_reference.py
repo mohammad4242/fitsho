@@ -1,5 +1,7 @@
 from dataclasses import replace
 
+import pytest
+
 from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.training_templates.engine_reference import load_template_references
 from app.training_templates.service import seed_training_program_templates
@@ -15,6 +17,7 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceDay,
     TemplateReferenceSlot,
 )
+from app.workouts.program_engine.template_selector import eligible_template_references
 from app.workouts.program_engine.template_sessions import build_template_sessions
 from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
@@ -532,6 +535,38 @@ def test_upper_priority_does_not_accept_eligible_two_upper_two_lower_template() 
     )
     assert lower_weekdays == (1,)
     assert recovery_spacing_is_valid(result.program.weekly_schedule, RULESET)
+
+
+@pytest.mark.parametrize(
+    "lower_priority",
+    [
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+        MuscleGroup.CALVES,
+        MuscleGroup.ADDUCTORS,
+        MuscleGroup.ABDUCTORS,
+        MuscleGroup.LEGS,
+    ],
+)
+def test_mixed_upper_and_lower_priority_keeps_two_upper_two_lower_template_eligible(
+    lower_priority: MuscleGroup,
+) -> None:
+    reference, catalog = _upper_lower_reference()
+    normalized = normalize_request(
+        template_request(
+            available_training_days=4,
+            primary_goal="build_muscle",
+            training_experience="intermediate",
+            training_age_months=30,
+            session_duration_minutes=60,
+            priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, lower_priority],
+            seed_optional=17,
+        ),
+        RULESET,
+    )
+
+    assert eligible_template_references(normalized, tuple(catalog), (reference,)) == (reference,)
 
 
 def test_template_priority_stays_inside_flexible_range_with_duration_planning() -> None:
