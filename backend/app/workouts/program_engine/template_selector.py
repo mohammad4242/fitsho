@@ -11,6 +11,7 @@ from app.workouts.program_engine.duration_capacity import (
     build_session_capacity,
     estimate_candidate_cost,
 )
+from app.workouts.program_engine.duration_policy import is_main_training_exercise
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -610,9 +611,10 @@ def _template_day_duration_assessment(
         if first_compound:
             first_compound_pending = False
         used_ids.add(candidate.id)
-        planned = PlannedWorkCost(
-            minutes=cost.minutes,
-            working_sets=cost.working_sets,
+        planned = (
+            PlannedWorkCost(minutes=cost.minutes, working_sets=cost.working_sets)
+            if is_main_training_exercise(candidate)
+            else PlannedWorkCost(minutes=0, working_sets=0, exercise_count=0)
         )
         if slot.adaptation_priority == "core":
             required.append(planned)
