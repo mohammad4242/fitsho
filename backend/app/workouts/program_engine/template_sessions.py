@@ -1,5 +1,6 @@
 from collections import Counter
 from dataclasses import dataclass, replace
+from typing import cast
 from uuid import UUID
 
 from app.exercises.enums import Equipment, ExerciseType, MovementPattern, MuscleGroup
@@ -97,8 +98,9 @@ def build_template_sessions(
         for slot in day.slots:
             if slot.exercise_id is not None:
                 reserved_ids.append(slot.exercise_id)
-            if getattr(slot, "superset_exercise_id", None) is not None:
-                reserved_ids.append(slot.superset_exercise_id)
+            superset_exercise_id = getattr(slot, "superset_exercise_id", None)
+            if superset_exercise_id is not None:
+                reserved_ids.append(superset_exercise_id)
     reserved: Counter[UUID] = Counter(reserved_ids)
     drafts: list[SessionDraft] = []
     resolutions: list[TemplateSlotResolution] = []
@@ -159,7 +161,9 @@ def build_template_sessions(
                     (ex for ex in eligible if ex.id == slot.superset_exercise_id), None
                 )
                 if second_candidate:
-                    second_muscles = (second_candidate.primary_muscle,)
+                    second_muscles = cast(
+                        tuple[MuscleGroup, ...], (second_candidate.primary_muscle,)
+                    )
                     second_pattern = second_candidate.movement_pattern
                 else:
                     second_muscles = slot.target_muscles
@@ -168,7 +172,7 @@ def build_template_sessions(
                 slot_second = replace(
                     slot_first,
                     exercise_id=slot.superset_exercise_id,
-                    exercise_slug_hint=slot.superset_exercise_slug_hint,
+                    exercise_slug_hint=cast(str, slot.superset_exercise_slug_hint),
                     target_muscles=second_muscles,
                     movement_pattern=second_pattern,
                     superset_exercise_id=None,
