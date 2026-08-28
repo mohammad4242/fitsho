@@ -86,6 +86,7 @@ from app.workouts.program_engine.weekly_coverage import (
     assess_weekly_coverage,
     build_coverage_availability_evidence,
 )
+from app.workouts.program_engine.weekly_distribution import redistribute_weekly_exercises
 
 
 def generate_program(
@@ -573,6 +574,8 @@ def _program_for_split(
     )
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
     days = finalize_session_structure(days, normalized, ruleset)
+    weekly_distribution = redistribute_weekly_exercises(days, normalized, ruleset)
+    days = weekly_distribution.days
     day_count_errors = _day_count_errors(
         len(days), normalized.resistance_training_days, stage="dynamic_construction"
     )
@@ -641,6 +644,7 @@ def _program_for_split(
             repair_reason_codes=tuple(dict.fromkeys((*repair_reasons, *duration_repair_reasons))),
         ),
         **substitution_metrics,
+        "weekly_distribution": weekly_distribution.metrics,
     }
     weekly_coverage = assess_weekly_coverage(
         days,
@@ -870,6 +874,13 @@ def _reference_program(
     )
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
     days = finalize_session_structure(days, normalized, ruleset)
+    weekly_distribution = redistribute_weekly_exercises(
+        days,
+        normalized,
+        ruleset,
+        preserve_template_core_structure=True,
+    )
+    days = weekly_distribution.days
     substitution_metrics = aggregate_substitution_observability(substitution_decisions)
     metrics = {
         **_volume_metrics(
@@ -882,6 +893,7 @@ def _reference_program(
             repair_reason_codes=tuple(dict.fromkeys((*repair_reasons, *duration_repair_reasons))),
         ),
         **substitution_metrics,
+        "weekly_distribution": weekly_distribution.metrics,
     }
     weekly_coverage = assess_weekly_coverage(
         days,
