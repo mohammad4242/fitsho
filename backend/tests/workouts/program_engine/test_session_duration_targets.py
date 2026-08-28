@@ -323,6 +323,28 @@ def test_underfilled_session_is_repaired_with_real_estimates() -> None:
     assert "SESSION_DURATION_TARGET_SATISFIED" in reasons
 
 
+def test_short_session_without_capacity_uses_effective_exercise_floor() -> None:
+    source = request(session_duration_minutes=30, available_training_days=1)
+    normalized = normalize_request(source, RULESET)
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert result.program is not None, result.errors
+    day = result.program.weekly_schedule[0]
+    underfilled = replace(
+        day,
+        exercises=day.exercises[:3],
+        estimated_duration_minutes=RULESET.general_warmup_minutes
+        + sum(item.estimated_minutes for item in day.exercises[:3]),
+    )
+
+    repaired, reasons = repair_session_durations(
+        (underfilled,), normalized, (), RULESET, session_capacity=None
+    )
+
+    assert len(repaired[0].exercises) == 3
+    assert "SESSION_DURATION_UNDERFILLED" not in reasons
+
+
 def test_duration_repair_cannot_add_hidden_or_per_session_volume() -> None:
     source = request(session_duration_minutes=60, available_training_days=1)
     normalized = normalize_request(source, RULESET)

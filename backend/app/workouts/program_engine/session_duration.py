@@ -85,7 +85,7 @@ def repair_session_durations(
                     ),
                 )
                 if day_capacity is not None
-                else ruleset.minimum_exercises_per_session
+                else short_session_floor
             )
             planned_minimum_exercises = (
                 short_session_floor
