@@ -33,7 +33,7 @@ def test_template_structure_propagation_chest_triceps() -> None:
         training_experience=TrainingExperience.INTERMEDIATE,
         available_training_days=1,
         primary_goal=Goal.HYPERTROPHY,
-        session_duration_minutes=30,
+        session_duration_minutes=45,
     )
     catalog = full_catalog()
     ref = _chest_triceps_reference()
@@ -43,13 +43,9 @@ def test_template_structure_propagation_chest_triceps() -> None:
     program = result.program
     assert program is not None
 
-    chest_days = [
+    chest_day = next(
         d for d in program.weekly_schedule if d.template_structure_focus == "chest_triceps"
-    ]
-    if not chest_days:
-        assert result.program.aggregate_metrics.get("reference_template") is None
-        return
-    chest_day = chest_days[0]
+    )
 
     chest_indices = [
         i for i, ex in enumerate(chest_day.exercises) if ex.primary_muscle == MuscleGroup.CHEST
@@ -126,7 +122,7 @@ def test_template_structure_propagation_back_biceps() -> None:
         training_experience=TrainingExperience.INTERMEDIATE,
         available_training_days=1,
         primary_goal=Goal.HYPERTROPHY,
-        session_duration_minutes=30,
+        session_duration_minutes=60,
     )
     catalog = full_catalog()
     ref = _back_biceps_reference()
@@ -136,11 +132,9 @@ def test_template_structure_propagation_back_biceps() -> None:
     program = result.program
     assert program is not None
 
-    back_days = [d for d in program.weekly_schedule if d.template_structure_focus == "back_biceps"]
-    if not back_days:
-        assert result.program.aggregate_metrics.get("reference_template") is None
-        return
-    back_day = back_days[0]
+    back_day = next(
+        d for d in program.weekly_schedule if d.template_structure_focus == "back_biceps"
+    )
 
     back_indices = [
         i for i, ex in enumerate(back_day.exercises) if ex.primary_muscle == MuscleGroup.BACK
@@ -178,7 +172,7 @@ def test_template_structure_propagation_full_body() -> None:
         training_experience=TrainingExperience.INTERMEDIATE,
         available_training_days=1,
         primary_goal=Goal.HYPERTROPHY,
-        session_duration_minutes=30,
+        session_duration_minutes=45,
     )
     catalog = full_catalog()
     ref = _full_body_reference()
@@ -189,9 +183,7 @@ def test_template_structure_propagation_full_body() -> None:
     assert program is not None
 
     for day in program.weekly_schedule:
-        if day.template_structure_focus != "full_body":
-            assert program.aggregate_metrics.get("reference_template") is None
-            return
+        assert day.template_structure_focus == "full_body"
 
 
 def _upper_lower_reference() -> TemplateReference:
@@ -225,7 +217,7 @@ def test_template_structure_propagation_upper_lower() -> None:
         training_experience=TrainingExperience.INTERMEDIATE,
         available_training_days=2,
         primary_goal=Goal.HYPERTROPHY,
-        session_duration_minutes=30,
+        session_duration_minutes=120,
     )
     catalog = full_catalog()
     ref = _upper_lower_reference()

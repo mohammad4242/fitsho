@@ -37,18 +37,24 @@ def _enum_value(value: object) -> object:
     return getattr(value, "value", value)
 
 
-def is_main_training_exercise(exercise: object) -> bool:
-    """Return whether an exercise contributes to the requested main-training time."""
-    exercise_type = _enum_value(_value(exercise, "exercise_type"))
-    if exercise_type in {ExerciseType.CORE.value, "cardio"}:
-        return False
+def _is_cardio_exercise(exercise: object) -> bool:
+    if _enum_value(_value(exercise, "exercise_type")) == "cardio":
+        return True
     labels = _value(exercise, "labels", ())
     if not isinstance(labels, Iterable) or isinstance(labels, (str, bytes)):
-        return True
-    return not any(
+        return False
+    return any(
         _enum_value(label) == ExerciseLabel.CARDIO.value
         for label in cast(Iterable[object], labels)
     )
+
+
+def is_main_training_exercise(exercise: object) -> bool:
+    """Return whether an exercise contributes to the requested main-training time."""
+    exercise_type = _enum_value(_value(exercise, "exercise_type"))
+    if exercise_type == ExerciseType.CORE.value or _is_cardio_exercise(exercise):
+        return False
+    return True
 
 
 def calculate_main_training_minutes_from_exercises(exercises: Iterable[object]) -> int:
@@ -75,11 +81,21 @@ def calculate_core_addon_minutes(value: object) -> int:
 
 
 def calculate_cardio_addon_minutes(day: object) -> int | None:
-    """Return attached day-cardio minutes, or ``None`` before cardio is attached."""
+    """Return attached or embedded cardio minutes, or ``None`` before attachment."""
     cardio = _value(day, "cardio")
-    if cardio is None:
+    embedded_minutes = sum(
+        max(0, _minutes(_value(exercise, "estimated_minutes", 0)))
+        for exercise in _exercise_items(day)
+        if _is_cardio_exercise(exercise)
+    )
+    if cardio is None and embedded_minutes == 0:
         return None
-    return max(0, _minutes(_value(cardio, "duration_minutes", 0)))
+    attached_minutes = (
+        0
+        if cardio is None
+        else max(0, _minutes(_value(cardio, "duration_minutes", 0)))
+    )
+    return attached_minutes + embedded_minutes
 
 
 def calculate_total_session_minutes(day: object) -> int:

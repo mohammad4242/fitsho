@@ -61,8 +61,9 @@ def _template_attempts(result: ProgramGenerationResult) -> tuple[dict[str, objec
 
 
 def test_top_ranked_template_failure_recovers_with_second_without_dynamic_fallback() -> None:
+    good, _ = _upper_lower_reference()
     good = replace(
-        _four_day_reference(),
+        good,
         slug="a-second-good",
         focus_tags=(TemplateFocusTag.BALANCED.value,),
     )
@@ -74,24 +75,24 @@ def test_top_ranked_template_failure_recovers_with_second_without_dynamic_fallba
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics.get("reference_template") is None
+    assert result.program.aggregate_metrics["reference_template"] == good.slug
     assert [entry["slug"] for entry in _template_attempts(result)] == [
         "z-top-failing",
         "a-second-good",
     ]
     assert [entry["status"] for entry in _template_attempts(result)] == [
         "rejected",
-        "rejected",
+        "succeeded",
     ]
-    assert any(
-        "SESSION_DURATION_UNDER_TARGET" in entry.get("reason_codes", ())
-        for entry in _template_attempts(result)
+    assert not any(
+        entry.get("stage") == "construction_recovery" for entry in result.program.decision_trace
     )
 
 
 def test_multiple_ranked_templates_fail_before_later_template_succeeds() -> None:
+    good, _ = _upper_lower_reference()
     good = replace(
-        _four_day_reference(),
+        good,
         slug="a-later-good",
         focus_tags=(TemplateFocusTag.BALANCED.value,),
     )
@@ -107,16 +108,15 @@ def test_multiple_ranked_templates_fail_before_later_template_succeeds() -> None
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics.get("reference_template") is None
+    assert result.program.aggregate_metrics["reference_template"] == good.slug
     attempts = _template_attempts(result)
-    assert [entry["rank"] for entry in attempts] == [1, 2, 3]
+    assert [entry["rank"] for entry in attempts] == [1, 2]
     assert [entry["slug"] for entry in attempts] == [
         "z-first-failing",
         "a-later-good",
-        "y-second-failing",
     ]
     assert attempts[0]["reason_codes"]
-    assert all(entry["status"] == "rejected" for entry in attempts)
+    assert attempts[1]["status"] == "succeeded"
     rejections = tuple(
         entry
         for entry in result.program.decision_trace

@@ -7,6 +7,7 @@ from app.exercises.enums import ExerciseLabel, ExerciseType
 from app.workouts.program_engine.coach_quality import build_coach_quality_metrics
 from app.workouts.program_engine.duration_capacity import build_session_capacity
 from app.workouts.program_engine.duration_policy import (
+    calculate_cardio_addon_minutes,
     calculate_core_addon_minutes,
     calculate_main_training_minutes,
     calculate_main_training_minutes_from_exercises,
@@ -16,7 +17,7 @@ from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.final_gate import evaluate_final_program
 from app.workouts.program_engine.normalization import normalize_request
-from app.workouts.program_engine.prescription import prescribe_sessions
+from app.workouts.program_engine.prescription import estimate_exercise_minutes, prescribe_sessions
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
     SessionDraft,
@@ -45,7 +46,7 @@ def test_main_training_excludes_anatomical_core_and_cardio_only() -> None:
         _item(ExerciseType.COMPOUND, 35),
         _item(ExerciseType.ISOLATION, 25),
         _item(ExerciseType.CORE, 8),
-        _item("cardio", 10, cardio=True),
+        _item(ExerciseType.OTHER, 10, cardio=True),
     )
 
     assert calculate_main_training_minutes_from_exercises(exercises) == 60
@@ -67,6 +68,22 @@ def test_day_main_training_is_independent_of_warmup_core_and_cardio_addons() -> 
     assert calculate_core_addon_minutes(day.exercises) == 8
 
 
+def test_embedded_cardio_is_an_addon_and_is_reported_separately() -> None:
+    day = SimpleNamespace(
+        exercises=(
+            _item(ExerciseType.COMPOUND, 60),
+            _item(ExerciseType.CORE, 8),
+            _item(ExerciseType.OTHER, 10, cardio=True),
+        ),
+        cardio=None,
+        estimated_duration_minutes=83,
+    )
+
+    assert calculate_main_training_minutes(day) == 60
+    assert calculate_core_addon_minutes(day) == 8
+    assert calculate_cardio_addon_minutes(day) == 10
+
+
 def test_duration_policy_contains_main_training_bounds() -> None:
     policy = get_session_duration_policy(60)
 
@@ -82,13 +99,18 @@ def test_duration_policy_contains_main_training_bounds() -> None:
 
 @pytest.mark.parametrize(
     ("duration", "goal", "experience"),
-    (
-        (30, "fat_loss", "beginner"),
-        (45, "muscle_gain", "beginner"),
-        (60, "hypertrophy", "intermediate"),
-        (75, "strength", "advanced"),
-        (90, "fat_loss", "intermediate"),
-        (120, "strength", "advanced"),
+    tuple(
+        (duration, goal, experience)
+        for duration in (30, 45, 60, 75, 90, 120)
+        for goal, experience in (
+            ("fat_loss", "beginner"),
+            ("muscle_gain", "intermediate"),
+            ("hypertrophy", "intermediate"),
+        )
+    )
+    + tuple(
+        (duration, "strength", "advanced")
+        for duration in (45, 60, 75, 90, 120)
     ),
 )
 def test_official_duration_matrix_never_returns_an_invalid_success(
@@ -110,6 +132,7 @@ def test_official_duration_matrix_never_returns_an_invalid_success(
     )
 
     if result.program is None:
+        assert result.error_code.value == "UNSATISFIED_CONSTRAINT"
         assert "SESSION_DURATION_UNDER_TARGET" in result.errors
         return
     policy = get_session_duration_policy(duration)
@@ -131,9 +154,12 @@ def test_anatomical_core_does_not_create_or_reduce_main_capacity() -> None:
         RULESET,
     )
     core = next(item for item in full_catalog() if item.exercise_type is ExerciseType.CORE)
+    main_candidates = tuple(
+        item for item in full_catalog() if item.exercise_type is not ExerciseType.CORE
+    )
 
-    without_core = build_session_capacity(normalized, (), RULESET)
-    with_core = build_session_capacity(normalized, (core,), RULESET)
+    without_core = build_session_capacity(normalized, main_candidates, RULESET)
+    with_core = build_session_capacity(normalized, (*main_candidates, core), RULESET)
 
     assert (
         with_core.expected_exercise_count_capacity
@@ -141,6 +167,15 @@ def test_anatomical_core_does_not_create_or_reduce_main_capacity() -> None:
     )
     assert with_core.expected_working_set_capacity == without_core.expected_working_set_capacity
     assert with_core.representative_exercise_minutes == without_core.representative_exercise_minutes
+
+
+def test_exercise_specific_warmup_stays_inside_main_training_minutes() -> None:
+    without_warmup = estimate_exercise_minutes(3, 90, 0, RULESET)
+    with_warmup = estimate_exercise_minutes(3, 90, 2, RULESET)
+    exercise = _item(ExerciseType.COMPOUND, with_warmup)
+
+    assert with_warmup > without_warmup
+    assert calculate_main_training_minutes_from_exercises((exercise,)) == with_warmup
 
 
 def test_prescription_budget_counts_main_exercises_not_anatomical_core() -> None:
@@ -364,3 +399,28 @@ def test_final_gate_rejects_main_training_outside_bounds_without_duration_codes(
     )
 
     assert not decision.is_accepted
+
+
+def test_final_gate_rejects_underfill_even_with_constraint_evidence() -> None:
+    program = _generated_program()
+    day = _duration_day(program.weekly_schedule[0], main_minutes=47, core_minutes=10)
+    reason_codes = (
+        "SESSION_DURATION_UNDER_TARGET",
+        "SESSION_DURATION_TARGET_UNSATISFIED",
+        "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+    )
+    mutated = _with_duration_trace(program, day, reason_codes)
+    report = ValidationReport((), (), mutated.assumptions, mutated.aggregate_metrics, ())
+
+    decision = evaluate_final_program(
+        mutated,
+        request(session_duration_minutes=60, available_training_days=1),
+        report,
+        RULESET,
+    )
+
+    assert decision.status.value == "rejected"
+    assert "SESSION_DURATION_UNDER_TARGET" in decision.reason_codes
+    assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" not in (
+        decision.constraint_reason_codes
+    )

@@ -138,14 +138,28 @@ def evaluate_final_program(
         checks["duration"] = {
             "status": (
                 "constrained"
-                if duration_evidence and duration_evidence_complete and not report.errors
+                if (
+                    duration_evidence
+                    and duration_evidence_complete
+                    and not report.errors
+                    and not invariant_duration_codes
+                )
                 else "rejected"
             ),
             "reason_codes": tuple(dict.fromkeys((*duration_evidence, *duration_codes))),
         }
-        if report.errors or not duration_evidence or not duration_evidence_complete:
+        if (
+            report.errors
+            or invariant_duration_codes
+            or not duration_evidence
+            or not duration_evidence_complete
+        ):
             reasons.extend(duration_codes)
-            if not duration_evidence or not duration_evidence_complete:
+            if (
+                not duration_evidence
+                or not duration_evidence_complete
+                or invariant_duration_codes
+            ):
                 reasons.append("SESSION_DURATION_CONSTRAINT_UNEXPLAINED")
         else:
             constraints.extend(duration_evidence)
