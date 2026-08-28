@@ -452,6 +452,50 @@ def test_upper_priority_reference_template_preserves_three_upper_one_lower_topol
     assert recovery_spacing_is_valid(result.program.weekly_schedule, RULESET)
 
 
+def test_original_upper_priority_profile_keeps_template_topology_and_weekday_recovery() -> None:
+    base, catalog = _upper_lower_reference()
+    special = replace(
+        base,
+        slug="task-e-original-upper-priority-reference",
+        focus_tags=("upper_lower", "upper_priority"),
+        days=(base.days[0], base.days[1], base.days[2], replace(base.days[0], day_number=4)),
+    )
+    source = template_request(
+        age=31,
+        height_cm=175,
+        weight_kg=76,
+        available_training_days=4,
+        primary_goal="build_muscle",
+        training_experience="intermediate",
+        training_age_months=30,
+        session_duration_minutes=60,
+        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS],
+        seed_optional=17,
+    )
+
+    first = generate_program(source, catalog, RULESET, reference_templates=(special,))
+    second = generate_program(source, catalog, RULESET, reference_templates=(special,))
+
+    assert first.program is not None, first.errors
+    assert second.program is not None, second.errors
+    assert first.program == second.program
+    assert first.program.aggregate_metrics["reference_template"] == special.slug
+    assert first.program.split.day_focuses == ("upper", "lower", "upper", "upper")
+    assert len(first.program.weekly_schedule) == 4
+    assert first.program.split.weekdays == (0, 1, 2, 4)
+    upper_weekdays = tuple(
+        day.weekday
+        for day, focus in zip(
+            first.program.weekly_schedule,
+            first.program.split.day_focuses,
+            strict=True,
+        )
+        if focus.startswith("upper") and day.weekday is not None
+    )
+    assert upper_weekdays == (0, 2, 4)
+    assert recovery_spacing_is_valid(first.program.weekly_schedule, RULESET)
+
+
 def test_template_priority_stays_inside_flexible_range_with_duration_planning() -> None:
     reference, catalog = _upper_lower_reference()
     result = generate_program(
