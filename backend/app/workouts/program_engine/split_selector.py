@@ -1,4 +1,5 @@
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
@@ -53,6 +54,42 @@ _DYNAMIC_FOCUSES = (
     "full_body_c",
     "full_body_d",
 )
+
+UPPER_REGION_MUSCLES = frozenset(
+    {
+        MuscleGroup.CHEST,
+        MuscleGroup.BACK,
+        MuscleGroup.SHOULDERS,
+        MuscleGroup.BICEPS,
+        MuscleGroup.TRICEPS,
+        MuscleGroup.TRAPS,
+    }
+)
+LOWER_REGION_MUSCLES = frozenset(
+    {
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+        MuscleGroup.CALVES,
+        MuscleGroup.ADDUCTORS,
+        MuscleGroup.ABDUCTORS,
+        MuscleGroup.LEGS,
+    }
+)
+_LOWER_TEMPLATE_MUSCLES = LOWER_REGION_MUSCLES | {
+    MuscleGroup.ABS,
+    MuscleGroup.OBLIQUES,
+    MuscleGroup.LOWER_BACK,
+}
+
+
+def classify_template_region(muscles: Iterable[MuscleGroup]) -> str | None:
+    region = frozenset(muscles)
+    if region and region <= UPPER_REGION_MUSCLES:
+        return "upper"
+    if region and region <= _LOWER_TEMPLATE_MUSCLES:
+        return "lower"
+    return None
 
 
 @dataclass(frozen=True)

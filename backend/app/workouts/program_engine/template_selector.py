@@ -1,7 +1,7 @@
 from dataclasses import dataclass, replace
 from uuid import UUID
 
-from app.exercises.enums import ExerciseType, MuscleGroup
+from app.exercises.enums import ExerciseType
 from app.workouts.program_engine.duration_capacity import (
     CapacityFeasibility,
     PlannedWorkCost,
@@ -21,37 +21,15 @@ from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     template_slot_allowed_patterns,
 )
+from app.workouts.program_engine.split_selector import (
+    LOWER_REGION_MUSCLES,
+    UPPER_REGION_MUSCLES,
+    classify_template_region,
+)
 from app.workouts.program_engine.template_scoring import (
     TemplateScore,
     score_template_reference_result,
 )
-
-_UPPER_PRIORITY_MUSCLES = frozenset(
-    {
-        MuscleGroup.CHEST,
-        MuscleGroup.BACK,
-        MuscleGroup.SHOULDERS,
-        MuscleGroup.BICEPS,
-        MuscleGroup.TRICEPS,
-        MuscleGroup.TRAPS,
-    }
-)
-_LOWER_PRIORITY_MUSCLES = frozenset(
-    {
-        MuscleGroup.QUADRICEPS,
-        MuscleGroup.HAMSTRINGS,
-        MuscleGroup.GLUTES,
-        MuscleGroup.CALVES,
-        MuscleGroup.ADDUCTORS,
-        MuscleGroup.ABDUCTORS,
-        MuscleGroup.LEGS,
-    }
-)
-_LOWER_TEMPLATE_MUSCLES = _LOWER_PRIORITY_MUSCLES | {
-    MuscleGroup.ABS,
-    MuscleGroup.OBLIQUES,
-    MuscleGroup.LOWER_BACK,
-}
 
 
 @dataclass(frozen=True)
@@ -404,8 +382,8 @@ def _upper_priority_template_topology_matches(
     explicit = set(request.source.priority_muscles)
     if (
         request.resistance_training_days != 4
-        or len(explicit.intersection(_UPPER_PRIORITY_MUSCLES)) < 2
-        or explicit.intersection(_LOWER_PRIORITY_MUSCLES)
+        or len(explicit.intersection(UPPER_REGION_MUSCLES)) < 2
+        or explicit.intersection(LOWER_REGION_MUSCLES)
     ):
         return True
 
@@ -421,12 +399,10 @@ def _upper_priority_template_topology_matches(
         muscles = frozenset(day.focus) or frozenset(
             muscle for slot in day.slots for muscle in slot.target_muscles
         )
-        if muscles and muscles <= _UPPER_PRIORITY_MUSCLES:
-            topology.append("upper")
-        elif muscles and muscles <= _LOWER_TEMPLATE_MUSCLES:
-            topology.append("lower")
-        else:
+        region = classify_template_region(muscles)
+        if region is None:
             return False
+        topology.append(region)
     return len(topology) == 4 and topology.count("upper") == 3 and topology.count("lower") == 1
 
 

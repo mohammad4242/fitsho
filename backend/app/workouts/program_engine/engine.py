@@ -56,6 +56,7 @@ from app.workouts.program_engine.session_builder import SessionConstructionError
 from app.workouts.program_engine.session_duration import repair_session_durations
 from app.workouts.program_engine.session_structure import finalize_session_structure
 from app.workouts.program_engine.split_selector import (
+    classify_template_region,
     rank_availability_aware_fallbacks,
     rank_split_candidates,
 )
@@ -1025,25 +1026,10 @@ def _reference_program(
 
 
 def _reference_split_focus(draft: SessionDraft) -> str:
-    upper = {
-        MuscleGroup.CHEST,
-        MuscleGroup.BACK,
-        MuscleGroup.SHOULDERS,
-        MuscleGroup.BICEPS,
-        MuscleGroup.TRICEPS,
-        MuscleGroup.TRAPS,
-    }
-    lower = {
-        MuscleGroup.QUADRICEPS,
-        MuscleGroup.HAMSTRINGS,
-        MuscleGroup.GLUTES,
-        MuscleGroup.CALVES,
-    }
     targets = set(draft.template_target_muscles)
-    if targets and targets.intersection(upper) and not targets.intersection(lower):
-        return "upper"
-    if targets and targets.intersection(lower) and not targets.intersection(upper):
-        return "lower"
+    region = classify_template_region(targets)
+    if region is not None:
+        return region
     return draft.focus
 
 
