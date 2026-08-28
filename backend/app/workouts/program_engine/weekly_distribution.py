@@ -6,6 +6,7 @@ from typing import cast
 
 from app.workouts.program_engine.duration_policy import (
     calculate_resistance_minutes,
+    effective_main_exercise_floor,
     get_session_duration_policy,
 )
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
@@ -114,7 +115,7 @@ def _best_improving_move(
     recipients = tuple(index for index, count in enumerate(counts) if count == smallest_count)
     donors = tuple(index for index, count in enumerate(counts) if count > smallest_count)
     proposals: list[tuple[tuple[object, ...], tuple[WorkoutDay, ...], ProgrammedExercise]] = []
-    floor = ruleset.minimum_exercises_per_session
+    floor = effective_main_exercise_floor(request.source.session_duration_minutes, ruleset)
     for recipient_index in recipients:
         recipient = days[recipient_index]
         for donor_index in donors:
@@ -255,8 +256,7 @@ def _movable(
 
 def _template_origin(exercise: ProgrammedExercise) -> bool:
     return template_adaptation_priority(exercise) is not None or any(
-        code in {"TEMPLATE_REFERENCE_EXERCISE", "TEMPLATE_SAFE_SUBSTITUTION"}
-        for code in exercise.reason_codes
+        code.startswith("TEMPLATE_") for code in exercise.reason_codes
     )
 
 

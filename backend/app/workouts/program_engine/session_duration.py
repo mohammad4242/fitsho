@@ -7,6 +7,7 @@ from app.workouts.program_engine.duration_capacity import (
 )
 from app.workouts.program_engine.duration_policy import (
     SessionDurationPolicy,
+    effective_main_exercise_floor,
     get_session_duration_policy,
 )
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
@@ -63,6 +64,7 @@ def repair_session_durations(
 
     policy = get_session_duration_policy(request.source.session_duration_minutes)
     resistance_budget = request.source.session_duration_minutes  # pure resistance budget
+    short_session_floor = effective_main_exercise_floor(resistance_budget, ruleset)
     repaired: list[WorkoutDay] = []
     reasons: list[str] = []
     for day_index, day in enumerate(days):
@@ -72,15 +74,21 @@ def repair_session_durations(
         #   30-min budget  → allow 3-4 when 5 cannot fit, floor = 3
         #   45+ min budget → minimum 5 (duration alone never lowers this)
         # -------------------------------------------------------------------
-        if resistance_budget <= 30:
+        if resistance_budget <= ruleset.short_session_minutes:
             # For 30-min sessions, let capacity decide the floor (3–5)
             capacity_floor = (
-                max(3, min(5, day_capacity.expected_exercise_count_capacity))
+                max(
+                    short_session_floor,
+                    min(
+                        ruleset.minimum_exercises_per_session,
+                        day_capacity.expected_exercise_count_capacity,
+                    ),
+                )
                 if day_capacity is not None
                 else ruleset.minimum_exercises_per_session
             )
             planned_minimum_exercises = (
-                3
+                short_session_floor
                 if prefer_acceptable_volume_for_minimum_fill
                 and volume is not None
                 and _duration_shortfall_is_hard_constrained(request, volume)

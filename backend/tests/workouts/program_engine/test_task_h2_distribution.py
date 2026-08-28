@@ -224,6 +224,28 @@ def test_donor_at_main_exercise_floor_is_not_depleted() -> None:
     assert result.days == imbalanced_days
 
 
+def test_short_session_uses_effective_floor_for_redistribution() -> None:
+    source = request(available_training_days=2, session_duration_minutes=30)
+    generated = generate_program(source, full_catalog(), RULESET)
+    assert generated.program is not None, generated.errors
+    base_days = generated.program.weekly_schedule
+    imbalanced_days = (
+        replace(base_days[0], exercises=base_days[0].exercises[:2]),
+        replace(base_days[1], exercises=base_days[1].exercises[:4]),
+    )
+
+    result = redistribute_weekly_exercises(
+        imbalanced_days,
+        normalize_request(source, RULESET),
+        RULESET,
+    )
+
+    assert result.before_exercise_counts == (2, 4)
+    assert result.after_exercise_counts == (3, 3)
+    assert result.status == "applied"
+    assert result.reason_codes == ("WEEKLY_REDISTRIBUTION_APPLIED",)
+
+
 def test_template_non_core_work_without_slot_metadata_stays_stationary() -> None:
     source = request(available_training_days=3, session_duration_minutes=60)
     generated = generate_program(source, full_catalog(), RULESET)

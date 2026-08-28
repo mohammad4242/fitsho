@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, get_args
 
 from app.profile.schemas import SessionDurationMinutes
+from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 
 if TYPE_CHECKING:
     pass
@@ -14,6 +15,7 @@ def calculate_resistance_minutes(day: "Any", general_warmup_minutes: int) -> int
 
 SESSION_DURATION_TOLERANCE_MINUTES = 10
 CORE_PRESERVATION_EXTENSION_MINUTES = 20
+SHORT_SESSION_MINIMUM_MAIN_EXERCISES = 3
 
 # Official supported resistance-session durations.
 # `session_duration_minutes` means: available time for the resistance-training
@@ -36,6 +38,17 @@ def validate_session_duration(minutes: int) -> int:
             f"Supported values: {supported}"
         )
     return minutes
+
+
+def effective_main_exercise_floor(
+    session_duration_minutes: int,
+    ruleset: ProgramRuleset,
+) -> int:
+    return (
+        SHORT_SESSION_MINIMUM_MAIN_EXERCISES
+        if session_duration_minutes <= ruleset.short_session_minutes
+        else ruleset.minimum_exercises_per_session
+    )
 
 
 @dataclass(frozen=True)

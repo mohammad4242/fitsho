@@ -3,6 +3,7 @@ from collections import Counter
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup, PrescriptionMode
 from app.workouts.program_engine.duration_policy import (
     calculate_resistance_minutes,
+    effective_main_exercise_floor,
     get_session_duration_policy,
 )
 from app.workouts.program_engine.effective_volume import (
@@ -87,7 +88,7 @@ def validate_program(
         weekly_exposures.update(
             {item.primary_muscle for item in day.exercises if item.primary_muscle is not None}
         )
-    short_session = request.session_duration_minutes <= 30
+    short_session = request.session_duration_minutes <= ruleset.short_session_minutes
     for day in program.weekly_schedule:
         exercise_count = main_exercise_count(day.exercises)
         errors.extend(superset_structure_errors(day.exercises))
@@ -98,7 +99,7 @@ def validate_program(
         # 30-min: floor = 3 (allowed 3-4 when 5 doesn't fit)
         # 45+min: floor = 5; DURATION_PLANNED_REDUCED_EXERCISE_COUNT forbidden
         # ------------------------------------------------------------------
-        effective_floor = 3 if short_session else ruleset.minimum_exercises_per_session
+        effective_floor = effective_main_exercise_floor(request.session_duration_minutes, ruleset)
         if exercise_count < effective_floor:
             # Below absolute hard floor — always an error
             if volume_feasibility_constrained or duration_feasibility_constrained:
