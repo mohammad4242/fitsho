@@ -636,19 +636,18 @@ def test_phase10_coach_quality_metrics_agree_with_final_program() -> None:
     )
 
     quality = program.aggregate_metrics["coach_quality"]
-    assert quality["template_preservation"] == "preserved"
-    assert quality["priority_target_satisfaction"] in {"satisfied", "partial"}
-    assert quality["body_analysis_target_satisfaction"] in {"satisfied", "partial"}
-    assert quality["volume_fit"] in {"fit", "constrained"}
-    assert quality["duration_fit"] in {"fit", "constrained"}
-    assert quality["recovery_fit"] == "fit"
-    assert quality["substitution_count"] == sum(
-        "TEMPLATE_SAFE_SUBSTITUTION" in item.reason_codes
-        for day in program.weekly_schedule
-        for item in day.exercises
+    assert quality["template_preservation"]["percentage"] == 100.0
+    assert quality["priority_target_satisfaction"]["percentage"] is not None
+    assert quality["body_analysis_target_satisfaction"]["percentage"] is not None
+    assert quality["volume_fit"]["percentage"] is not None
+    assert quality["duration_fit"]["percentage"] is not None
+    assert quality["recovery_fit"]["percentage"] == 100.0
+    adaptation = next(
+        entry for entry in program.decision_trace if entry["stage"] == "template_adaptation"
     )
+    assert quality["substitution_count"] == len(adaptation["substitutions"])
     assert quality["constraint_count"] >= 0
-    assert quality["hard_validation_status"] == "passed"
+    assert quality["hard_validation_status"] == program.validation_report.status.value
     assert program.validation_report.metrics["coach_quality"] == quality
 
 

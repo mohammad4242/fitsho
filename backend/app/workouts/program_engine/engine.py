@@ -13,16 +13,12 @@ from app.workouts.program_engine.body_analysis import (
     body_analysis_priority_muscles,
     body_analysis_provenance,
     body_analysis_trace,
-    eligible_body_analysis_priorities,
 )
 from app.workouts.program_engine.cardio import add_cardio
-from app.workouts.program_engine.coach_quality import build_coach_quality_metrics, metric_status
+from app.workouts.program_engine.coach_quality import build_coach_quality_metrics
 from app.workouts.program_engine.duration_capacity import (
     SessionCapacity,
     build_session_capacity,
-)
-from app.workouts.program_engine.duration_policy import (
-    calculate_resistance_minutes,
 )
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
@@ -35,7 +31,7 @@ from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import prescribe_sessions
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.progression import deload_policy, double_progression_policy
-from app.workouts.program_engine.recovery import recovery_spacing_is_valid, repair_recovery_weekdays
+from app.workouts.program_engine.recovery import repair_recovery_weekdays
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.safety import screen_safety
 from app.workouts.program_engine.schemas import (
@@ -163,6 +159,7 @@ def generate_program(
         rejected_slot_candidates,
     )
     template_rejection_trace: tuple[dict[str, object], ...] = template_selection_trace
+    validation_failed = False
     for ranking in template_selection.candidates:
         reference = ranking.template
         try:
@@ -195,6 +192,9 @@ def generate_program(
                     reference_result,
                     _template_attempt_trace(ranking, status="succeeded"),
                 )
+            validation_failed = validation_failed or (
+                reference_result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
+            )
             rejection_category = _template_rejection_category(reference_result.errors)
             rejection = {
                 "stage": "template_reference",
@@ -306,6 +306,9 @@ def generate_program(
         )
         if result.is_success:
             return result
+        validation_failed = validation_failed or (
+            result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
+        )
         collected_errors.extend(result.errors)
         rejected_attempt: dict[str, object] = {
             "split": split.split_type.value,
@@ -348,6 +351,9 @@ def generate_program(
         )
         if result.is_success:
             return result
+        validation_failed = validation_failed or (
+            result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
+        )
         collected_errors.extend(result.errors)
         rejected_splits.append(
             {
@@ -366,7 +372,11 @@ def generate_program(
     )
     return ProgramGenerationResult(
         program=None,
-        error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
+        error_code=(
+            GenerationErrorCode.PROGRAM_VALIDATION_FAILED
+            if validation_failed
+            else GenerationErrorCode.UNSATISFIED_CONSTRAINT
+        ),
         errors=errors,
         safety_status=safety.status,
         rejected_candidates=eligibility.rejected,
@@ -778,7 +788,6 @@ def _program_for_split(
     return _finalize_program(
         program,
         request,
-        normalized,
         ruleset,
         safety_status=safety_status,
         rejected=rejected,
@@ -1032,7 +1041,6 @@ def _reference_program(
     return _finalize_program(
         program,
         request,
-        normalized,
         ruleset,
         safety_status=safety_status,
         rejected=rejected,
@@ -1121,11 +1129,10 @@ def _day_count_errors(actual: int, expected: int, *, stage: str) -> tuple[str, .
 def _attach_coach_quality_metrics(
     program: WorkoutProgram,
     request: ProgramGenerationRequest,
-    normalized: NormalizedProgramRequest,
     report: ValidationReport,
     ruleset: ProgramRuleset,
 ) -> tuple[WorkoutProgram, ValidationReport]:
-    quality = _coach_quality_metrics(program, request, normalized, report, ruleset)
+    quality = build_coach_quality_metrics(program, request, report, ruleset)
     aggregate_metrics = {**program.aggregate_metrics, "coach_quality": quality}
     report = replace(report, metrics={**report.metrics, "coach_quality": quality})
     return replace(program, aggregate_metrics=aggregate_metrics), report
@@ -1134,7 +1141,6 @@ def _attach_coach_quality_metrics(
 def _finalize_program(
     program: WorkoutProgram,
     request: ProgramGenerationRequest,
-    normalized: NormalizedProgramRequest,
     ruleset: ProgramRuleset,
     *,
     safety_status: SafetyStatus,
@@ -1142,23 +1148,17 @@ def _finalize_program(
     trace: tuple[dict[str, object], ...],
 ) -> ProgramGenerationResult:
     report = validate_program(program, request, ruleset)
-    if not report.is_valid:
-        return ProgramGenerationResult(
-            program=None,
-            error_code=GenerationErrorCode.PROGRAM_VALIDATION_FAILED,
-            errors=report.errors,
-            safety_status=safety_status,
-            rejected_candidates=rejected,
-            decision_trace=trace,
-        )
-
-    program, report = _attach_coach_quality_metrics(program, request, normalized, report, ruleset)
-    quality_metrics = build_coach_quality_metrics(program, request, report, ruleset)
+    program, report = _attach_coach_quality_metrics(program, request, report, ruleset)
+    quality_metrics = program.aggregate_metrics["coach_quality"]
+    construction_status = "succeeded" if report.is_valid else "rejected"
+    construction_reason_codes = (
+        ("FINAL_CONSTRUCTION_SUCCEEDED",) if report.is_valid else report.errors
+    )
     pre_gate_trace = trace + (
         {
             "stage": "final_construction",
-            "status": "succeeded",
-            "reason_codes": ("FINAL_CONSTRUCTION_SUCCEEDED",),
+            "status": construction_status,
+            "reason_codes": construction_reason_codes,
         },
         {"stage": "coach_quality", "metrics": quality_metrics},
     )
@@ -1269,137 +1269,6 @@ def _duration_repair_trace(
         "repair_classification": classification,
         "unavoidable_duration_constraints": unavoidable_constraints,
         "reason_codes": reason_codes,
-    }
-
-
-def _coach_quality_metrics(
-    program: WorkoutProgram,
-    request: ProgramGenerationRequest,
-    normalized: NormalizedProgramRequest,
-    report: ValidationReport,
-    ruleset: ProgramRuleset,
-) -> dict[str, object]:
-    trace_reason_codes = {
-        code
-        for entry in program.decision_trace
-        for key in ("reason_codes", "reasons")
-        for code in _string_sequence(entry.get(key))
-    }
-    ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
-    hard_volume_exceeded = isinstance(ranges, dict) and any(
-        isinstance(values, dict)
-        and float(values.get("actual_effective_volume", 0))
-        > float(values.get("effective_maximum_hard", ruleset.maximum_sets[program.training_status]))
-        for values in ranges.values()
-    )
-    volume_fit = (
-        "failed"
-        if hard_volume_exceeded or "WEEKLY_MUSCLE_VOLUME_EXCEEDED" in report.errors
-        else "constrained"
-        if "WEEKLY_VOLUME_CONSTRAINED" in report.warnings
-        or "VOLUME_REPAIR_SOFT_TARGET_REDUCED" in trace_reason_codes
-        else "fit"
-    )
-    resistance_budget = request.session_duration_minutes
-    # resistance_time_budget_fit: did every session stay within the resistance budget (+tolerance)?
-    session_resistance_minutes = [
-        calculate_resistance_minutes(day, ruleset.general_warmup_minutes)
-        for day in program.weekly_schedule
-    ]
-    overrun_minutes = [max(0, m - resistance_budget) for m in session_resistance_minutes]
-    resistance_time_budget_fit = all(m <= resistance_budget for m in session_resistance_minutes)
-    utilization = [round(m / max(1, resistance_budget), 3) for m in session_resistance_minutes]
-    duration_fit = (
-        "fit"
-        if resistance_time_budget_fit
-        else "constrained"
-        if trace_reason_codes.intersection(
-            {
-                "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
-                "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
-            }
-        )
-        else "failed"
-    )
-    duration_constrained_quality = bool(
-        trace_reason_codes.intersection(
-            {
-                "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
-                "DURATION_REDUCTION_VIOLATED_MINIMUM_EXERCISE_FLOOR",
-            }
-        )
-    )
-    late_repair_class = "not_needed"
-    if "SESSION_DURATION_REPAIR_APPLIED" in trace_reason_codes:
-        # classify based on the repair trace
-        duration_trace = next(
-            (e for e in program.decision_trace if e.get("stage") == "session_duration"),
-            {},
-        )
-        rc = duration_trace.get("repair_classification", "minor")
-        late_repair_class = rc if isinstance(rc, str) else "minor"
-
-    recovery_fit = (
-        "fit" if recovery_spacing_is_valid(program.weekly_schedule, ruleset) else "failed"
-    )
-    priority_metrics_raw = program.aggregate_metrics.get("priority_metrics", {})
-    priority_metrics = priority_metrics_raw if isinstance(priority_metrics_raw, dict) else {}
-    explicit_priorities = tuple(request.priority_muscles)
-    body_priorities = tuple(
-        item.muscle for item in eligible_body_analysis_priorities(normalized, ruleset)
-    )
-
-    def satisfaction(muscles: tuple[MuscleGroup, ...]) -> str:
-        statuses: list[str] = []
-        for muscle in muscles:
-            metric = priority_metrics.get(muscle.value, {})
-            if not isinstance(metric, dict):
-                continue
-            status = metric.get("status")
-            if status in {"satisfied", "partial"}:
-                statuses.append(status)
-        if not statuses:
-            return "not_applicable"
-        return "satisfied" if all(status == "satisfied" for status in statuses) else "partial"
-
-    constraint_codes = {
-        code
-        for code in trace_reason_codes
-        if any(marker in code for marker in ("CONSTRAIN", "CAP", "LIMIT", "UNSATISFIED", "REPAIR"))
-    }
-    substitution_count = sum(
-        "TEMPLATE_SAFE_SUBSTITUTION" in item.reason_codes
-        for day in program.weekly_schedule
-        for item in day.exercises
-    )
-    has_template = isinstance(program.aggregate_metrics.get("reference_template"), str)
-    template_preservation = (
-        "preserved"
-        if has_template
-        and any(
-            any(code.startswith("TEMPLATE_") for code in item.reason_codes)
-            for day in program.weekly_schedule
-            for item in day.exercises
-        )
-        else "not_applicable"
-    )
-    return {
-        "template_preservation": template_preservation,
-        "priority_target_satisfaction": satisfaction(explicit_priorities),
-        "body_analysis_target_satisfaction": satisfaction(body_priorities),
-        "volume_fit": volume_fit,
-        "duration_fit": duration_fit,
-        "coverage_fit": metric_status(program.aggregate_metrics.get("weekly_coverage")),
-        "recovery_fit": recovery_fit,
-        "substitution_count": substitution_count,
-        "constraint_count": len(constraint_codes),
-        "hard_validation_status": "passed" if report.is_valid else "failed",
-        # Phase 11.9 duration metrics
-        "resistance_time_budget_fit": resistance_time_budget_fit,
-        "resistance_time_utilization": utilization,
-        "resistance_time_overrun_minutes": overrun_minutes,
-        "duration_constrained_quality": duration_constrained_quality,
-        "late_duration_repair_class": late_repair_class,
     }
 
 

@@ -104,13 +104,9 @@ def test_phase119_budget_semantics_overrun_only(duration):
     assert res.is_success
 
     metrics = res.program.aggregate_metrics.get("coach_quality", {})
-    assert "resistance_time_budget_fit" in metrics
-    assert "resistance_time_utilization" in metrics
-    assert "resistance_time_overrun_minutes" in metrics
-    assert "duration_constrained_quality" in metrics
-    assert "late_duration_repair_class" in metrics
-
-    assert isinstance(metrics["resistance_time_budget_fit"], bool)
+    duration_fit = metrics.get("duration_fit")
+    assert isinstance(duration_fit, dict)
+    assert {"satisfied", "total", "percentage"}.issubset(duration_fit)
 
 
 @pytest.mark.parametrize("goal", [Goal.HYPERTROPHY, Goal.STRENGTH, Goal.FAT_LOSS])
@@ -160,7 +156,7 @@ def test_phase119_cardio_ordering_and_coach_quality_fit():
 
     # Check that coach_quality duration_fit is identical to engine's budget fit semantics
     engine_metrics = res.program.aggregate_metrics.get("coach_quality", {})
-    budget_fit = engine_metrics.get("resistance_time_budget_fit")
+    budget_fit = engine_metrics["duration_fit"]["percentage"] == 100.0
 
     from app.workouts.program_engine.coach_quality import build_coach_quality_metrics
 

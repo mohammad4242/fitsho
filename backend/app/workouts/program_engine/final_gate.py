@@ -68,7 +68,6 @@ def evaluate_final_program(
     report: ValidationReport,
     ruleset: ProgramRuleset,
 ) -> FinalGateResult:
-    """Check final authoritative metrics and validation output after all repairs."""
     reasons = list(report.errors)
     constraints = [code for code in report.warnings if code not in _DURATION_OUTCOME_CODES]
     checks: dict[str, object] = {
@@ -89,7 +88,12 @@ def evaluate_final_program(
     duration_codes = tuple(
         code for code in (*report.errors, *report.warnings) if code in _DURATION_CODES
     )
-    duration_evidence = _trace_reason_codes(program).intersection(_DURATION_CONSTRAINTS)
+    duration_evidence = {
+        code
+        for entry in program.decision_trace
+        for key in ("reason_codes", "reasons")
+        for code in _string_values(entry.get(key))
+    }.intersection(_DURATION_CONSTRAINTS)
     if duration_codes:
         checks["duration"] = {
             "status": "constrained" if duration_evidence and not report.errors else "rejected",
@@ -103,7 +107,9 @@ def evaluate_final_program(
             constraints.extend(duration_evidence)
 
     coverage = _mapping(program.aggregate_metrics.get("weekly_coverage"))
-    if _full_body_claim(program):
+    if program.split.split_type in _FULL_BODY_SPLITS or any(
+        day.focus.startswith("full_body") for day in program.weekly_schedule
+    ):
         if not coverage:
             reasons.append("WEEKLY_COVERAGE_EVIDENCE_MISSING")
             checks["coverage"] = {"status": "rejected", "reason_codes": reasons[-1:]}
@@ -112,14 +118,7 @@ def evaluate_final_program(
             coverage_reasons = _string_values(coverage.get("reason_codes"))
             checks["coverage"] = {"status": coverage_status, "reason_codes": coverage_reasons}
             if coverage_status == "unsatisfied":
-                missing_muscles = set(_string_values(coverage.get("missing_major_muscles")))
-                unavailable_muscles = set(
-                    _string_values(program.aggregate_metrics.get("unavailable_muscle_coverage"))
-                )
-                if coverage_reasons and missing_muscles and missing_muscles <= unavailable_muscles:
-                    constraints.extend((*coverage_reasons, "FULL_BODY_COVERAGE_CONSTRAINED"))
-                else:
-                    reasons.extend((*coverage_reasons, "FULL_BODY_COVERAGE_UNSATISFIED"))
+                reasons.extend((*coverage_reasons, "FULL_BODY_COVERAGE_UNSATISFIED"))
             elif coverage_status == "constrained":
                 if _coverage_constraint_is_proven(coverage):
                     constraints.extend(coverage_reasons)
@@ -135,7 +134,13 @@ def evaluate_final_program(
         "reason_codes": distribution_reasons,
     }
     actual_counts = tuple(len(day.exercises) for day in program.weekly_schedule)
-    after_counts = _int_tuple(distribution.get("after_exercise_counts"))
+    raw_after_counts = distribution.get("after_exercise_counts")
+    after_counts = (
+        tuple(raw_after_counts)
+        if isinstance(raw_after_counts, (tuple, list))
+        and all(isinstance(item, int) for item in raw_after_counts)
+        else ()
+    )
     if not distribution:
         reasons.append("WEEKLY_DISTRIBUTION_EVIDENCE_MISSING")
     elif not after_counts:
@@ -219,16 +224,32 @@ def evaluate_final_program(
 
 def _coverage_constraint_is_proven(coverage: Mapping[str, object]) -> bool:
     reasons = set(_string_values(coverage.get("reason_codes"))) - {"FULL_BODY_COVERAGE_CONSTRAINED"}
-    if not reasons or not all(
-        reason.startswith(("FULL_BODY_COVERAGE_UNAVAILABLE:", "FULL_BODY_PATTERN_UNAVAILABLE:"))
+    pattern_reasons = {
+        reason.partition(":")[2]
         for reason in reasons
+        if reason.startswith("FULL_BODY_PATTERN_UNAVAILABLE:")
+    }
+    muscle_reasons = {
+        reason.partition(":")[2]
+        for reason in reasons
+        if reason.startswith("FULL_BODY_COVERAGE_UNAVAILABLE:")
+    }
+    expected = {
+        *(f"FULL_BODY_PATTERN_UNAVAILABLE:{pattern}" for pattern in pattern_reasons),
+        *(f"FULL_BODY_COVERAGE_UNAVAILABLE:{muscle}" for muscle in muscle_reasons),
+    }
+    if (
+        not (pattern_reasons or muscle_reasons)
+        or reasons != expected
+        or pattern_reasons != set(_string_values(coverage.get("missing_patterns")))
+        or muscle_reasons != set(_string_values(coverage.get("missing_major_muscles")))
     ):
         return False
     evidence = _mapping(coverage.get("availability_evidence"))
-    return any(
-        isinstance(value, Mapping) and value.get("unavailable") is True
-        for category in ("patterns", "muscles")
-        for value in _mapping(evidence.get(category)).values()
+    return all(
+        _mapping(_mapping(evidence.get(category)).get(name)).get("unavailable") is True
+        for category, names in (("patterns", pattern_reasons), ("muscles", muscle_reasons))
+        for name in names
     )
 
 
@@ -268,21 +289,6 @@ def _final_session_region(day: WorkoutDay) -> str | None:
     return target_region if has_target_evidence else None
 
 
-def _trace_reason_codes(program: WorkoutProgram) -> set[str]:
-    return {
-        code
-        for entry in program.decision_trace
-        for key in ("reason_codes", "reasons")
-        for code in _string_values(entry.get(key))
-    }
-
-
-def _full_body_claim(program: WorkoutProgram) -> bool:
-    return program.split.split_type in _FULL_BODY_SPLITS or any(
-        day.focus.startswith("full_body") for day in program.weekly_schedule
-    )
-
-
 def _mapping(value: object) -> Mapping[str, object]:
     return value if isinstance(value, Mapping) else {}
 
@@ -290,10 +296,4 @@ def _mapping(value: object) -> Mapping[str, object]:
 def _string_values(value: object) -> tuple[str, ...]:
     if isinstance(value, (tuple, list, set, frozenset)):
         return tuple(item for item in value if isinstance(item, str))
-    return ()
-
-
-def _int_tuple(value: object) -> tuple[int, ...]:
-    if isinstance(value, (tuple, list)) and all(isinstance(item, int) for item in value):
-        return tuple(value)
     return ()

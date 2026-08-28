@@ -584,16 +584,16 @@ def test_safety_state_prevents_generation() -> None:
     assert result.safety_status is SafetyStatus.STOP_AND_REFER
 
 
-def test_missing_safe_candidates_relaxes_coverage_requirement() -> None:
+def test_missing_safe_candidates_reject_unsatisfied_coverage() -> None:
     result = generate_program(
         request(blocked_movement_patterns=[MovementPattern.HORIZONTAL_PULL]),
         catalog(),
         RULESET,
     )
 
-    assert result.is_success
-    assert "unavailable_muscle_coverage" in result.program.aggregate_metrics
-    assert "back" in result.program.aggregate_metrics["unavailable_muscle_coverage"]
+    assert not result.is_success
+    assert result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
+    assert "FULL_BODY_COVERAGE_UNSATISFIED" in result.errors
 
 
 def test_every_successful_program_passes_independent_validator() -> None:

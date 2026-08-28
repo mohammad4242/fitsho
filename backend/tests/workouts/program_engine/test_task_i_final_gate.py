@@ -3,7 +3,7 @@ from dataclasses import replace
 from app.exercises.enums import Equipment, ExerciseCautionTag, MuscleGroup
 from app.workouts.program_engine import engine
 from app.workouts.program_engine.engine import generate_program
-from app.workouts.program_engine.enums import SplitType
+from app.workouts.program_engine.enums import GenerationErrorCode, SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import ValidationReport
 from app.workouts.program_engine.validation import validate_program
@@ -26,6 +26,31 @@ def test_generated_program_contains_the_final_quality_gate_stage() -> None:
         "accepted",
         "accepted_with_constraints",
     }
+
+
+def test_validation_failure_still_emits_rejected_final_quality_gate(monkeypatch) -> None:
+    source = request(available_training_days=1)
+    original_validate = engine.validate_program
+
+    def force_validation_failure(program, source, ruleset):
+        report = original_validate(program, source, ruleset)
+        return replace(report, errors=(*report.errors, "FORCED_VALIDATION_FAILURE"))
+
+    monkeypatch.setattr(engine, "validate_program", force_validation_failure)
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert result.program is None
+    assert result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
+    attempts = result.decision_trace[0]["attempts"]
+    gate = next(
+        item
+        for attempt in attempts
+        for item in attempt.get("decision_trace", ())
+        if item["stage"] == "final_quality_gate"
+    )
+    assert gate["status"] == "rejected"
+    assert "FORCED_VALIDATION_FAILURE" in gate["reason_codes"]
+    assert gate["checks"]["validation"]["status"] == "rejected"
 
 
 def _gate(program, source):
@@ -153,6 +178,94 @@ def test_final_gate_rejects_semantics_recovery_day_count_and_coverage() -> None:
         decision = _gate(candidate, source)
         assert decision.status == "rejected"
         assert expected in decision.reason_codes
+
+
+def test_final_gate_rejects_any_unsatisfied_weekly_coverage_status() -> None:
+    source = request(available_training_days=1)
+    base = _program(source)
+    coverage = {
+        **base.aggregate_metrics["weekly_coverage"],
+        "status": "unsatisfied",
+        "reason_codes": ("FULL_BODY_PATTERN_UNAVAILABLE:pull",),
+        "missing_major_muscles": ("back",),
+    }
+    candidate = replace(
+        base,
+        aggregate_metrics={
+            **base.aggregate_metrics,
+            "weekly_coverage": coverage,
+            "unavailable_muscle_coverage": ("back",),
+        },
+    )
+
+    decision = _gate(candidate, source)
+
+    assert decision.status == "rejected"
+    assert "FULL_BODY_COVERAGE_UNSATISFIED" in decision.reason_codes
+
+
+def test_final_gate_requires_exact_evidence_for_constrained_coverage() -> None:
+    source = request(available_training_days=1)
+    base = _program(source)
+    coverage = {
+        **base.aggregate_metrics["weekly_coverage"],
+        "status": "constrained",
+        "missing_patterns": ("pull",),
+        "missing_major_muscles": ("back",),
+        "reason_codes": (
+            "FULL_BODY_PATTERN_UNAVAILABLE:pull",
+            "FULL_BODY_COVERAGE_UNAVAILABLE:back",
+            "FULL_BODY_COVERAGE_CONSTRAINED",
+        ),
+    }
+    candidate = replace(
+        base,
+        aggregate_metrics={**base.aggregate_metrics, "weekly_coverage": coverage},
+    )
+
+    decision = _gate(candidate, source)
+
+    assert decision.status == "rejected"
+    assert "FULL_BODY_COVERAGE_CONSTRAINT_UNEXPLAINED" in decision.reason_codes
+
+
+def test_final_coach_quality_projection_matches_trace_and_aggregate() -> None:
+    dynamic_source = request(available_training_days=1)
+    constrained_source = request(
+        available_training_days=1,
+        session_duration_minutes=45,
+        priority_muscles=[MuscleGroup.CHEST],
+    )
+    template_source = request(
+        available_training_days=4,
+        primary_goal="build_muscle",
+        training_experience="intermediate",
+        training_age_months=24,
+    )
+    template = _four_day_reference()
+    scenarios = (
+        (dynamic_source, ()),
+        (template_source, (template,)),
+        (constrained_source, ()),
+    )
+
+    for source, templates in scenarios:
+        result = generate_program(
+            source,
+            full_catalog(),
+            RULESET,
+            reference_templates=templates,
+        )
+        assert result.program is not None, result.errors
+        quality = result.program.aggregate_metrics["coach_quality"]
+        traced_quality = next(
+            item["metrics"]
+            for item in result.program.decision_trace
+            if item["stage"] == "coach_quality"
+        )
+        assert quality == traced_quality
+        assert "constraint_count" in quality
+        assert result.program.validation_report.metrics["coach_quality"] == quality
 
 
 def test_final_gate_rejects_unexplained_distribution_and_accepts_proven_constraints() -> None:

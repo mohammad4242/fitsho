@@ -488,6 +488,7 @@ def test_mobility_and_cardio_content_cannot_fill_resistance_slots() -> None:
     assert result.program is None
     assert result.error_code in {
         GenerationErrorCode.NO_SAFE_EXERCISE_FOR_PATTERN,
+        GenerationErrorCode.PROGRAM_VALIDATION_FAILED,
         GenerationErrorCode.UNSATISFIED_CONSTRAINT,
     }
 
