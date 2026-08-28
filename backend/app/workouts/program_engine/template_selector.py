@@ -389,13 +389,6 @@ def _upper_priority_template_topology_matches(
 
     topology: list[str] = []
     for day in template.days:
-        structure_focus = day.structure_focus
-        if structure_focus in {"upper", "upper_specialization"}:
-            topology.append("upper")
-            continue
-        if structure_focus == "lower":
-            topology.append("lower")
-            continue
         muscles = frozenset(day.focus) or frozenset(
             muscle for slot in day.slots for muscle in slot.target_muscles
         )

@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
+from app.exercises.enums import Equipment, ExerciseType, MovementPattern, MuscleGroup
 from app.training_templates.engine_reference import load_template_references
 from app.training_templates.service import seed_training_program_templates
 from app.workouts.program_engine.engine import _template_rejection_category, generate_program
@@ -17,7 +17,10 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceDay,
     TemplateReferenceSlot,
 )
-from app.workouts.program_engine.split_selector import classify_template_region
+from app.workouts.program_engine.split_selector import (
+    LOWER_REGION_MUSCLES,
+    classify_template_region,
+)
 from app.workouts.program_engine.template_selector import eligible_template_references
 from app.workouts.program_engine.template_sessions import build_template_sessions
 from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
@@ -508,6 +511,80 @@ def test_supplemental_only_template_day_cannot_satisfy_lower_topology(
     supplemental: MuscleGroup,
 ) -> None:
     assert classify_template_region((supplemental,)) is None
+
+
+@pytest.mark.parametrize(
+    ("supplemental", "pattern", "exercise_type"),
+    [
+        (MuscleGroup.ABS, MovementPattern.CORE_ANTI_EXTENSION, ExerciseType.CORE),
+        (MuscleGroup.OBLIQUES, MovementPattern.CORE_ANTI_LATERAL_FLEXION, ExerciseType.CORE),
+        (MuscleGroup.LOWER_BACK, MovementPattern.HIP_HINGE, ExerciseType.COMPOUND),
+    ],
+)
+def test_supplemental_only_lower_label_cannot_satisfy_upper_priority_template_topology(
+    supplemental: MuscleGroup,
+    pattern: MovementPattern,
+    exercise_type: ExerciseType,
+) -> None:
+    base, catalog = _upper_lower_reference()
+    supplemental_candidate = exercise(
+        f"task-e-supplemental-{supplemental.value}",
+        pattern,
+        supplemental,
+        exercise_type=exercise_type,
+    )
+    supplemental_slot = replace(
+        base.days[3].slots[0],
+        exercise_id=supplemental_candidate.id,
+        exercise_slug_hint=supplemental_candidate.name,
+        target_muscles=(supplemental,),
+        movement_pattern=pattern,
+    )
+    malformed_lower = replace(
+        base.days[3],
+        focus=(supplemental,),
+        structure_focus="lower",
+        slots=(supplemental_slot,),
+    )
+    reference = replace(
+        base,
+        slug=f"task-e-supplemental-only-{supplemental.value}",
+        focus_tags=("upper_lower", "upper_priority"),
+        days=(base.days[0], base.days[2], replace(base.days[0], day_number=3), malformed_lower),
+    )
+    source = template_request(
+        age=31,
+        height_cm=175,
+        weight_kg=76,
+        available_training_days=4,
+        primary_goal="build_muscle",
+        training_experience="intermediate",
+        training_age_months=30,
+        session_duration_minutes=60,
+        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS],
+        seed_optional=17,
+    )
+    normalized = normalize_request(source, RULESET)
+    catalog_with_supplemental = tuple(catalog + [supplemental_candidate])
+
+    assert eligible_template_references(normalized, catalog_with_supplemental, (reference,)) == ()
+
+    result = generate_program(
+        source,
+        list(catalog_with_supplemental),
+        RULESET,
+        reference_templates=(reference,),
+    )
+
+    assert result.program is not None, result.errors
+    assert result.program.aggregate_metrics.get("reference_template") is None
+    assert result.program.split.day_focuses == ("upper", "lower", "upper", "upper_specialization")
+    lower_index = result.program.split.day_focuses.index("lower")
+    assert any(
+        exercise.primary_muscle in LOWER_REGION_MUSCLES
+        for exercise in result.program.weekly_schedule[lower_index].exercises
+    )
+    assert recovery_spacing_is_valid(result.program.weekly_schedule, RULESET)
 
 
 def test_upper_priority_does_not_accept_eligible_two_upper_two_lower_template() -> None:
