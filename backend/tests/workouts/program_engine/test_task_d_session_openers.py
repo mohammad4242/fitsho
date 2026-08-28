@@ -1,3 +1,4 @@
+from dataclasses import replace
 from uuid import NAMESPACE_URL, uuid5
 
 import pytest
@@ -9,6 +10,7 @@ from app.exercises.enums import (
     MovementPattern,
     MuscleGroup,
 )
+from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.exercise_semantics import ExerciseRoleSignature
 from app.workouts.program_engine.normalization import normalize_request
@@ -22,7 +24,8 @@ from app.workouts.program_engine.session_structure import (
     finalize_session_structure,
     session_structure_errors,
 )
-from tests.workouts.program_engine.golden_fixtures import request
+from app.workouts.program_engine.validation import validate_program
+from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
 def _programmed(
@@ -34,6 +37,9 @@ def _programmed(
     substitution_group: str,
     exercise_type: ExerciseType = ExerciseType.COMPOUND,
     caution_tags: frozenset[ExerciseCautionTag] = frozenset(),
+    reasons: tuple[str, ...] = ("TEST",),
+    equipment: frozenset[Equipment] | None = None,
+    range_of_motion_profile: frozenset[str] = frozenset(),
 ) -> ProgrammedExercise:
     return ProgrammedExercise(
         exercise_id=uuid5(NAMESPACE_URL, f"https://fitsho.test/task-d/{slug}"),
@@ -45,11 +51,12 @@ def _programmed(
         target_rir=2,
         rest_seconds=75,
         estimated_minutes=6,
-        reason_codes=("TEST",),
+        reason_codes=reasons,
         movement_pattern=pattern,
         primary_muscle=muscle,
-        equipment=frozenset({Equipment.BODYWEIGHT}),
+        equipment=equipment or frozenset({Equipment.BODYWEIGHT}),
         caution_tags=caution_tags,
+        range_of_motion_profile=range_of_motion_profile,
         exercise_type=exercise_type,
         substitution_group=substitution_group,
     )
@@ -190,6 +197,211 @@ def test_knee_contraindication_does_not_promote_leg_extension_primer() -> None:
     )[0]
 
     assert _families(finalized) == ("squat_primary", "knee_extension:quadriceps:isolation")
+
+
+def test_strength_primary_remains_first_non_opener() -> None:
+    opener = _programmed(
+        "push-up",
+        pattern=MovementPattern.HORIZONTAL_PUSH,
+        muscle=MuscleGroup.CHEST,
+        order=1,
+        substitution_group="horizontal_press_push_up",
+    )
+    primary = _programmed(
+        "strength-bench",
+        pattern=MovementPattern.HORIZONTAL_PUSH,
+        muscle=MuscleGroup.CHEST,
+        order=2,
+        substitution_group="horizontal_press_flat",
+        reasons=("STRENGTH_PRIMARY_COMPOUND",),
+    )
+
+    normalized = _normalized(primary_goal=Goal.STRENGTH)
+    finalized = finalize_session_structure(
+        (_day("upper", (opener, primary)),), normalized, RULESET
+    )[0]
+
+    assert _families(finalized) == ("horizontal_push_push_up", "horizontal_press_flat")
+    assert "STRENGTH_PRIMARY_NOT_FIRST" not in session_structure_errors(
+        finalized, Goal.STRENGTH, normalized.source
+    )
+
+
+def test_mixed_push_up_and_pull_up_openers_fail_final_validation() -> None:
+    source = request(available_training_days=1)
+    result = generate_program(source, full_catalog(), RULESET, reference_templates=())
+    assert result.program is not None, result.errors
+    day = result.program.weekly_schedule[0]
+    push_up = _programmed(
+        "mixed-push-up",
+        pattern=MovementPattern.HORIZONTAL_PUSH,
+        muscle=MuscleGroup.CHEST,
+        order=1,
+        substitution_group="horizontal_press_push_up",
+    )
+    pull_up = _programmed(
+        "mixed-pull-up",
+        pattern=MovementPattern.VERTICAL_PULL,
+        muscle=MuscleGroup.BACK,
+        order=2,
+        substitution_group="vertical_pull_bodyweight",
+        equipment=frozenset({Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR}),
+    )
+    mutated = replace(
+        result.program,
+        weekly_schedule=(
+            replace(day, focus="upper", exercises=(push_up, pull_up, *day.exercises[2:])),
+        ),
+    )
+
+    report = validate_program(mutated, source, RULESET)
+
+    assert "SEMANTIC_OPENER_CONFLICT" in report.errors
+
+
+def test_every_safe_leg_extension_primer_precedes_every_squat() -> None:
+    first_primer = _programmed(
+        "leg-extension-a",
+        pattern=MovementPattern.KNEE_EXTENSION,
+        muscle=MuscleGroup.QUADRICEPS,
+        order=1,
+        substitution_group="knee_extension",
+        exercise_type=ExerciseType.ISOLATION,
+    )
+    squat = _programmed(
+        "squat",
+        pattern=MovementPattern.SQUAT,
+        muscle=MuscleGroup.QUADRICEPS,
+        order=2,
+        substitution_group="squat_free_weight",
+    )
+    second_primer = _programmed(
+        "leg-extension-b",
+        pattern=MovementPattern.KNEE_EXTENSION,
+        muscle=MuscleGroup.QUADRICEPS,
+        order=3,
+        substitution_group="knee_extension",
+        exercise_type=ExerciseType.ISOLATION,
+    )
+
+    errors = session_structure_errors(
+        _day("legs", (first_primer, squat, second_primer)), Goal.HYPERTROPHY
+    )
+
+    assert "LEG_EXTENSION_PRIMER_ORDER_INVALID" in errors
+
+
+def test_ineligible_leg_extension_is_not_promoted_for_equipment_or_id() -> None:
+    squat = _programmed(
+        "squat",
+        pattern=MovementPattern.SQUAT,
+        muscle=MuscleGroup.QUADRICEPS,
+        order=1,
+        substitution_group="squat_free_weight",
+    )
+    leg_extension = _programmed(
+        "leg-extension",
+        pattern=MovementPattern.KNEE_EXTENSION,
+        muscle=MuscleGroup.QUADRICEPS,
+        order=2,
+        substitution_group="knee_extension",
+        exercise_type=ExerciseType.ISOLATION,
+        equipment=frozenset({Equipment.DUMBBELL}),
+    )
+
+    for source in (
+        _normalized(available_equipment={Equipment.BODYWEIGHT}),
+        _normalized(blocked_exercises={leg_extension.exercise_id}),
+    ):
+        finalized = finalize_session_structure(
+            (_day("legs", (squat, leg_extension)),), source, RULESET
+        )[0]
+        assert _families(finalized) == ("squat_primary", "knee_extension:quadriceps:isolation")
+
+
+@pytest.mark.parametrize(
+    ("focus", "items", "expected_error"),
+    [
+        (
+            "upper",
+            (
+                _programmed(
+                    "late-press",
+                    pattern=MovementPattern.HORIZONTAL_PUSH,
+                    muscle=MuscleGroup.CHEST,
+                    order=1,
+                    substitution_group="horizontal_press_flat",
+                ),
+                _programmed(
+                    "late-push-up",
+                    pattern=MovementPattern.HORIZONTAL_PUSH,
+                    muscle=MuscleGroup.CHEST,
+                    order=2,
+                    substitution_group="horizontal_press_push_up",
+                ),
+            ),
+            "PUSH_UP_OPENER_ORDER_INVALID",
+        ),
+        (
+            "upper",
+            (
+                _programmed(
+                    "late-row",
+                    pattern=MovementPattern.HORIZONTAL_PULL,
+                    muscle=MuscleGroup.BACK,
+                    order=1,
+                    substitution_group="horizontal_pull_row_unsupported",
+                ),
+                _programmed(
+                    "late-pull-up",
+                    pattern=MovementPattern.VERTICAL_PULL,
+                    muscle=MuscleGroup.BACK,
+                    order=2,
+                    substitution_group="vertical_pull_bodyweight",
+                ),
+            ),
+            "PULL_UP_OPENER_ORDER_INVALID",
+        ),
+        (
+            "legs",
+            (
+                _programmed(
+                    "late-squat",
+                    pattern=MovementPattern.SQUAT,
+                    muscle=MuscleGroup.QUADRICEPS,
+                    order=1,
+                    substitution_group="squat_free_weight",
+                ),
+                _programmed(
+                    "late-leg-extension",
+                    pattern=MovementPattern.KNEE_EXTENSION,
+                    muscle=MuscleGroup.QUADRICEPS,
+                    order=2,
+                    substitution_group="knee_extension",
+                    exercise_type=ExerciseType.ISOLATION,
+                ),
+            ),
+            "LEG_EXTENSION_PRIMER_ORDER_INVALID",
+        ),
+    ],
+)
+def test_validate_program_rejects_late_opener_mutations(
+    focus: str,
+    items: tuple[ProgrammedExercise, ...],
+    expected_error: str,
+) -> None:
+    source = request(available_training_days=1)
+    result = generate_program(source, full_catalog(), RULESET, reference_templates=())
+    assert result.program is not None, result.errors
+    day = result.program.weekly_schedule[0]
+    mutated = replace(
+        result.program,
+        weekly_schedule=(replace(day, focus=focus, exercises=(*items, *day.exercises[2:])),),
+    )
+
+    report = validate_program(mutated, source, RULESET)
+
+    assert expected_error in report.errors
 
 
 @pytest.mark.parametrize(

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, replace
 
-from app.exercises.enums import ExerciseType, MuscleFocus, MuscleGroup
+from app.exercises.enums import Difficulty, ExerciseType, MuscleFocus, MuscleGroup
+from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.exercise_semantics import (
     is_leg_extension_primer,
@@ -8,11 +9,12 @@ from app.workouts.program_engine.exercise_semantics import (
     is_push_up_family,
     is_squat_family,
 )
+from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import estimate_exercise_minutes
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
-from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
+    ExerciseCandidate,
     NormalizedProgramRequest,
     ProgramGenerationRequest,
     ProgrammedExercise,
@@ -184,9 +186,8 @@ def session_structure_errors(
         phase = _role_phase(unit, goal)
         if any(is_push_up_family(item) or is_pull_up_family(item) for item in unit.exercises):
             phase = 0
-        elif any(
-            is_leg_extension_primer(item) and _ordering_eligible(item, request)
-            for item in unit.exercises
+        elif _has_safe_leg_extension_primer(units, request) and any(
+            is_leg_extension_primer(item) for item in unit.exercises
         ):
             phase = 0
         if block is None:
@@ -209,8 +210,16 @@ def session_structure_errors(
             for unit in units
             if not all(is_supplemental_muscle(muscle) for muscle in unit.muscles)
         )
-        if any(_contains_reason(unit, "STRENGTH_PRIMARY_COMPOUND") for unit in main_units) and (
-            not main_units or not _contains_reason(main_units[0], "STRENGTH_PRIMARY_COMPOUND")
+        non_opener_units = tuple(
+            unit
+            for unit in main_units
+            if not _is_required_semantic_opener(unit, units, request)
+        )
+        if any(
+            _contains_reason(unit, "STRENGTH_PRIMARY_COMPOUND") for unit in non_opener_units
+        ) and (
+            not non_opener_units
+            or not _contains_reason(non_opener_units[0], "STRENGTH_PRIMARY_COMPOUND")
         ):
             errors.append("STRENGTH_PRIMARY_NOT_FIRST")
     return tuple(dict.fromkeys(errors))
@@ -284,9 +293,45 @@ def _semantic_order_rank(
         for candidate_unit in all_units
         for item in candidate_unit.exercises
     )
-    if has_safe_primer and any(is_leg_extension_primer(item) for item in unit.exercises):
+    has_squat = any(
+        is_squat_family(item) for candidate_unit in all_units for item in candidate_unit.exercises
+    )
+    if (
+        has_safe_primer
+        and has_squat
+        and any(is_leg_extension_primer(item) for item in unit.exercises)
+    ):
         return 1
     return 2
+
+
+def _has_safe_leg_extension_primer(
+    units: tuple[_ExerciseUnit, ...],
+    request: NormalizedProgramRequest | ProgramGenerationRequest | None,
+) -> bool:
+    has_squat = any(is_squat_family(item) for unit in units for item in unit.exercises)
+    return has_squat and any(
+        is_leg_extension_primer(item) and _ordering_eligible(item, request)
+        for unit in units
+        for item in unit.exercises
+    )
+
+
+def _is_required_semantic_opener(
+    unit: _ExerciseUnit,
+    all_units: tuple[_ExerciseUnit, ...],
+    request: ProgramGenerationRequest | NormalizedProgramRequest | None,
+) -> bool:
+    return (
+        _session_has_meaningful_muscle(all_units, MuscleGroup.CHEST)
+        and any(is_push_up_family(item) for item in unit.exercises)
+    ) or (
+        _session_has_meaningful_back(all_units)
+        and any(is_pull_up_family(item) for item in unit.exercises)
+    ) or (
+        _has_safe_leg_extension_primer(all_units, request)
+        and any(is_leg_extension_primer(item) for item in unit.exercises)
+    )
 
 
 def _session_has_meaningful_muscle(units: tuple[_ExerciseUnit, ...], muscle: MuscleGroup) -> bool:
@@ -331,19 +376,35 @@ def _ordering_eligible(
 ) -> bool:
     if request is None:
         return True
-    if isinstance(request, NormalizedProgramRequest):
-        blocked_patterns = set(request.constraints.blocked_movement_patterns)
-        blocked_cautions = set(request.constraints.blocked_caution_tags)
-    else:
-        blocked_patterns = set(request.blocked_movement_patterns)
-        blocked_cautions = set(request.blocked_caution_tags)
-        for limitation in request.injuries_and_limitations:
-            blocked_patterns = blocked_patterns | limitation.blocked_movement_patterns
-            blocked_cautions = blocked_cautions | limitation.blocked_caution_tags
-    return not (
-        item.movement_pattern in blocked_patterns
-        or effective_caution_tags(item).intersection(blocked_cautions)
+    normalized = (
+        request if isinstance(request, NormalizedProgramRequest) else normalize_request(request)
     )
+    candidate = ExerciseCandidate(
+        id=item.exercise_id,
+        name=item.exercise_name,
+        primary_muscle=item.primary_muscle,
+        secondary_muscles=item.secondary_muscles,
+        movement_pattern=item.movement_pattern,
+        exercise_type=item.exercise_type,
+        equipment=item.equipment,
+        difficulty=Difficulty.BEGINNER,
+        muscle_focus=item.muscle_focus,
+        caution_tags=item.caution_tags,
+        is_active=item.is_active,
+        is_programmable=item.is_programmable,
+        needs_review=item.needs_review,
+        laterality=item.laterality,
+        body_position=item.body_position,
+        stability_demand=item.stability_demand,
+        impact_level=item.impact_level,
+        axial_loading_level=item.axial_loading_level,
+        range_of_motion_profile=item.range_of_motion_profile,
+        substitution_group=item.substitution_group,
+        prescription_mode=item.prescription_mode,
+        duration_min_seconds=item.duration_min_seconds,
+        duration_max_seconds=item.duration_max_seconds,
+    )
+    return candidate in filter_eligible_exercises(normalized, (candidate,)).eligible
 
 
 def _semantic_ordering_errors(
@@ -356,11 +417,15 @@ def _semantic_ordering_errors(
     if not main_units:
         return []
     errors: list[str] = []
-    first_unit = main_units[0]
-    first_has_upper_opener = any(
-        is_push_up_family(item) or is_pull_up_family(item) for item in first_unit.exercises
+    push_up_required = _session_has_meaningful_muscle(units, MuscleGroup.CHEST) and any(
+        is_push_up_family(item) for unit in main_units for item in unit.exercises
     )
-    if _session_has_meaningful_muscle(units, MuscleGroup.CHEST):
+    pull_up_required = _session_has_meaningful_back(units) and any(
+        is_pull_up_family(item) for unit in main_units for item in unit.exercises
+    )
+    if push_up_required and pull_up_required:
+        errors.append("SEMANTIC_OPENER_CONFLICT")
+    elif push_up_required:
         push_index = next(
             (
                 index
@@ -369,9 +434,9 @@ def _semantic_ordering_errors(
             ),
             None,
         )
-        if push_index is not None and push_index != 0 and not first_has_upper_opener:
+        if push_index is not None and push_index != 0:
             errors.append("PUSH_UP_OPENER_ORDER_INVALID")
-    if _session_has_meaningful_back(units):
+    elif pull_up_required:
         pull_index = next(
             (
                 index
@@ -380,7 +445,7 @@ def _semantic_ordering_errors(
             ),
             None,
         )
-        if pull_index is not None and pull_index != 0 and not first_has_upper_opener:
+        if pull_index is not None and pull_index != 0:
             errors.append("PULL_UP_OPENER_ORDER_INVALID")
     primer_indices = [
         index
@@ -395,7 +460,7 @@ def _semantic_ordering_errors(
         for index, unit in enumerate(main_units)
         if any(is_squat_family(item) for item in unit.exercises)
     ]
-    if primer_indices and squat_indices and min(primer_indices) > min(squat_indices):
+    if primer_indices and squat_indices and max(primer_indices) >= min(squat_indices):
         errors.append("LEG_EXTENSION_PRIMER_ORDER_INVALID")
     return errors
 
