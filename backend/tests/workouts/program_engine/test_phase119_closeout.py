@@ -59,8 +59,7 @@ def test_phase119_cardio_additive_semantics():
         day_index=1, weekday=0, title="", focus="chest", exercises=(), estimated_duration_minutes=45
     )
 
-    # Available cardio should be 10 because duration_policy.maximum_total_minutes(5) = 45+10+5 = 60
-    # 60 - 45 = 15, min(10, 15) = 10
+    # Main-training capacity is independent of additive cardio; the scheduled default is 10 min.
     days = add_cardio(normalized, (day,), tuple(full_catalog()), RULESET)
     assert days[0].cardio is not None
     assert days[0].cardio.duration_minutes == 10

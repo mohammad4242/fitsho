@@ -9,7 +9,10 @@ from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, S
 from app.profile.schemas import ProfileCreate
 from app.profile.training_compatibility import UnsupportedResistanceTrainingCombinationError
 from app.training_templates.tags import TemplateFocusTag
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, ImpactLimit, PhysicalJobDemand, RecoveryRating
 from app.workouts.program_engine.recovery import recovery_spacing_is_valid
@@ -528,7 +531,7 @@ def test_phase10_duration_repair_does_not_change_template_scoring(duration: int)
         "SESSION_DURATION_TARGET_UNSATISFIED",
     }
     assert all(
-        policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)
+        policy.contains(calculate_main_training_minutes(day))
         or any(code in allowed_reasons for code in duration_trace["reason_codes"])
         for day in program.weekly_schedule
     )

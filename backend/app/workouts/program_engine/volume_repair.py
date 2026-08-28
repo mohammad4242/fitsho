@@ -4,7 +4,9 @@ from dataclasses import replace
 
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.duration_policy import (
+    calculate_cardio_addon_minutes,
     calculate_main_training_minutes_from_exercises,
+    calculate_total_session_minutes_from_exercises,
     get_session_duration_policy,
     is_main_training_exercise,
 )
@@ -1095,10 +1097,10 @@ def _rebuild_days(
                 original,
                 exercises=reordered,
                 title=english_session_title(original.day_index, reordered),
-                estimated_duration_minutes=(
-                    ruleset.general_warmup_minutes
-                    + sum(item.estimated_minutes for item in reordered)
-                    + (original.cardio.duration_minutes if original.cardio else 0)
+                estimated_duration_minutes=calculate_total_session_minutes_from_exercises(
+                    reordered,
+                    ruleset.general_warmup_minutes,
+                    calculate_cardio_addon_minutes(original) or 0,
                 ),
             )
         )

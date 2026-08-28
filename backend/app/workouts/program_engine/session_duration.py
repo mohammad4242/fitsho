@@ -90,7 +90,20 @@ class SessionDurationRepairEvidence:
         )
 
     def matches(self, day: WorkoutDay) -> bool:
-        return self == SessionDurationRepairEvidence.from_day(day, self.reason_codes)
+        current = SessionDurationRepairEvidence.from_day(day, self.reason_codes)
+        current_cardio = calculate_cardio_addon_minutes(day) or 0
+        total_matches = self.post_repair_total_session_minutes in {
+            current.post_repair_total_session_minutes,
+            current.post_repair_total_session_minutes - current_cardio,
+        }
+        return (
+            self.day_index == current.day_index
+            and self.post_repair_exercise_count == current.post_repair_exercise_count
+            and self.post_repair_main_training_minutes == current.post_repair_main_training_minutes
+            and total_matches
+            and self.post_repair_exercise_fingerprint == current.post_repair_exercise_fingerprint
+            and self.reason_codes == current.reason_codes
+        )
 
     @classmethod
     def from_trace(cls, value: object) -> "SessionDurationRepairEvidence | None":
@@ -474,7 +487,6 @@ def _select_set_addition(
 ) -> tuple[int, ProgrammedExercise] | None:
     """Select one useful set without exceeding main-duration or hard limits."""
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
-    before = [item for other_day in other_days for item in other_day.exercises] + exercises
     options: list[tuple[tuple[object, ...], int, ProgrammedExercise]] = []
     for index, exercise in enumerate(exercises):
         if not is_main_training_exercise(exercise) or exercise.primary_muscle is None:
@@ -509,8 +521,6 @@ def _select_set_addition(
             continue
         weekly = [item for other_day in other_days for item in other_day.exercises] + simulated
         if not _within_weekly_hard_volume(weekly, ruleset, request, volume):
-            continue
-        if not _acceptable_volume_change(before, weekly, ruleset, request, volume):
             continue
         options.append(
             (
@@ -655,6 +665,11 @@ def _select_exercise_addition(
         within_hard_volume = _within_weekly_hard_volume(weekly_exercises, ruleset, request, volume)
         if not within_hard_volume:
             hard_volume_rejected = True
+        if (
+            calculate_main_training_minutes_from_exercises(exercises) < policy.minimum_minutes
+            and within_hard_volume
+        ):
+            return simulated[-1]
         if (
             not prefer_acceptable_volume_for_minimum_fill
             and main_exercise_count(exercises) < minimum_exercises

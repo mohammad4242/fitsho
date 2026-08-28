@@ -1,6 +1,8 @@
 from dataclasses import replace
 from types import SimpleNamespace
 
+import pytest
+
 from app.exercises.enums import ExerciseLabel, ExerciseType
 from app.workouts.program_engine.coach_quality import build_coach_quality_metrics
 from app.workouts.program_engine.duration_capacity import build_session_capacity
@@ -76,6 +78,45 @@ def test_duration_policy_contains_main_training_bounds() -> None:
         True,
         False,
     ]
+
+
+@pytest.mark.parametrize(
+    ("duration", "goal", "experience"),
+    (
+        (30, "fat_loss", "beginner"),
+        (45, "muscle_gain", "beginner"),
+        (60, "hypertrophy", "intermediate"),
+        (75, "strength", "advanced"),
+        (90, "fat_loss", "intermediate"),
+        (120, "strength", "advanced"),
+    ),
+)
+def test_official_duration_matrix_never_returns_an_invalid_success(
+    duration: int,
+    goal: str,
+    experience: str,
+) -> None:
+    result = generate_program(
+        request(
+            session_duration_minutes=duration,
+            available_training_days=1,
+            primary_goal=goal,
+            training_experience=experience,
+            training_age_months=30,
+        ),
+        full_catalog(),
+        RULESET,
+        reference_templates=(),
+    )
+
+    if result.program is None:
+        assert "SESSION_DURATION_UNDER_TARGET" in result.errors
+        return
+    policy = get_session_duration_policy(duration)
+    assert all(
+        policy.contains(calculate_main_training_minutes(day))
+        for day in result.program.weekly_schedule
+    )
 
 
 def test_anatomical_core_does_not_create_or_reduce_main_capacity() -> None:

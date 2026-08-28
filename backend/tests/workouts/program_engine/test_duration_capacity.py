@@ -2,7 +2,10 @@ from importlib import import_module
 
 from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.cardio import planned_cardio_day_indexes
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.normalization import normalize_request
@@ -52,7 +55,7 @@ def test_capacity_preserves_workout_warmup_and_cardio_semantics() -> None:
 
     assert capacity.requested_workout_minutes == 45
     assert capacity.target_total_minutes == 45 + RULESET.general_warmup_minutes
-    # Phase 11.9: resistance budget = full session_duration_minutes (cardio is additive, not deducted)
+    # Phase 11.9: resistance budget is the full session duration; cardio is additive.
     assert capacity.resistance_work_budget_minutes == 45
     assert capacity.minimum_resistance_work_minutes == 45 - 10  # tolerance-based min
     assert capacity.maximum_resistance_work_minutes == 45 + 10  # tolerance-based max
@@ -301,7 +304,7 @@ def test_weekly_volume_targets_are_allocated_from_real_time_capacity() -> None:
     )
 
 
-def test_thirty_minute_strength_program_uses_intentional_reduced_exercise_count() -> None:
+def test_thirty_minute_strength_program_keeps_main_training_inside_bounds() -> None:
     source = request(
         primary_goal=Goal.STRENGTH,
         session_duration_minutes=30,
@@ -313,23 +316,9 @@ def test_thirty_minute_strength_program_uses_intentional_reduced_exercise_count(
     result = generate_program(source, full_catalog(), RULESET, reference_templates=())
 
     assert result.program is not None, result.errors
-    assert any(
-        len(day.exercises) < RULESET.minimum_exercises_per_session
-        for day in result.program.weekly_schedule
-    )
-    trace_reasons = {
-        reason
-        for entry in result.program.decision_trace
-        for reason in entry.get("reason_codes", ())
-    }
-    assert "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in trace_reasons
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.contains_total(
-            day.estimated_duration_minutes
-            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0),
-            RULESET.general_warmup_minutes,
-        )
+        policy.contains(calculate_main_training_minutes(day))
         for day in result.program.weekly_schedule
     )
     primary = next(

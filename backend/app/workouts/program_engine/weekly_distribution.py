@@ -5,7 +5,7 @@ from dataclasses import dataclass, fields, replace
 from typing import cast
 
 from app.workouts.program_engine.duration_policy import (
-    calculate_resistance_minutes,
+    calculate_main_training_minutes,
     effective_main_exercise_floor,
     get_session_duration_policy,
 )
@@ -232,9 +232,9 @@ def _duration_is_safe(
 ) -> bool:
     policy = get_session_duration_policy(request.source.session_duration_minutes)
     for prior, candidate in zip(before, after, strict=True):
-        prior_minutes = calculate_resistance_minutes(prior, ruleset.general_warmup_minutes)
-        candidate_minutes = calculate_resistance_minutes(candidate, ruleset.general_warmup_minutes)
-        if candidate_minutes > policy.core_preservation_maximum_minutes or (
+        prior_minutes = calculate_main_training_minutes(prior)
+        candidate_minutes = calculate_main_training_minutes(candidate)
+        if candidate_minutes > policy.maximum_minutes or (
             prior_minutes <= policy.maximum_minutes and candidate_minutes > policy.maximum_minutes
         ):
             return False

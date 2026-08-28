@@ -3,7 +3,7 @@ from dataclasses import replace
 
 import pytest
 
-from app.workouts.program_engine.duration_policy import calculate_resistance_minutes
+from app.workouts.program_engine.duration_policy import calculate_main_training_minutes
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.equipment import effective_required_equipment
@@ -139,7 +139,7 @@ def test_batch2_constrained_controls_preserve_volume_and_day_count(
         for day in program.weekly_schedule
     )
     assert all(
-        calculate_resistance_minutes(day, RULESET.general_warmup_minutes)
+        calculate_main_training_minutes(day)
         <= source.session_duration_minutes + 10
         for day in program.weekly_schedule
     )

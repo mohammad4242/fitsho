@@ -39,6 +39,7 @@ from app.profile.enums import (
 from app.profile.service import ProfileSnapshot
 from app.training_templates.engine_reference import load_template_references
 from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
     get_session_duration_policy,
 )
 from app.workouts.program_engine.engine import generate_program
@@ -556,21 +557,9 @@ def _audit_program(
         issue("RECOVERY_SPACING_INVALID", "quality", "direct/exposure overlap")
 
     policy = get_session_duration_policy(request.session_duration_minutes)
-    duration_trace = _trace_entry(result, "session_duration") or {}
-    constrained_duration = bool(
-        set(_string_values(duration_trace.get("reason_codes")))
-        & {
-            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
-            "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
-            "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE",
-        }
-    )
     for day in program.weekly_schedule:
-        if not policy.contains_total(
-            day.estimated_duration_minutes, RULESET.general_warmup_minutes
-        ):
-            if not constrained_duration:
-                issue("DURATION_OUTSIDE_POLICY", "quality", str(day.day_index))
+        if not policy.contains(calculate_main_training_minutes(day)):
+            issue("DURATION_OUTSIDE_POLICY", "quality", str(day.day_index))
 
     priority_metrics = metrics.get("priority_metrics", {})
     if isinstance(priority_metrics, Mapping):
@@ -677,16 +666,9 @@ def _audit_quality_metrics(
     duration_trace = _trace_entry(result, "session_duration") or {}
     duration_reasons = set(_string_values(duration_trace.get("reason_codes")))
     durations_fit = all(
-        policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)
+        policy.contains(calculate_main_training_minutes(day))
         for day in program.weekly_schedule
     )
-    core_extended = "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE" in duration_reasons
-    if not durations_fit and core_extended:
-        durations_fit = all(
-            day.estimated_duration_minutes
-            <= policy.core_preservation_maximum_total_minutes(RULESET.general_warmup_minutes)
-            for day in program.weekly_schedule
-        )
     duration_fit = (
         "fit"
         if durations_fit

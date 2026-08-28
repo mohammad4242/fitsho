@@ -3,7 +3,10 @@ from dataclasses import replace
 import pytest
 
 from app.exercises.enums import Equipment, ExerciseCautionTag, MovementPattern, MuscleGroup
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -60,21 +63,11 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
     assert result.program.validation_report.is_valid
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.workout_minutes(
-            day.estimated_duration_minutes
-            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0),
-            RULESET.general_warmup_minutes,
-        )
-        <= policy.maximum_minutes
+        policy.contains(calculate_main_training_minutes(day))
         for day in result.program.weekly_schedule
     )
     if any(
-        policy.workout_minutes(
-            day.estimated_duration_minutes
-            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0),
-            RULESET.general_warmup_minutes,
-        )
-        < policy.minimum_minutes
+        calculate_main_training_minutes(day) < policy.minimum_minutes
         for day in result.program.weekly_schedule
     ):
         duration_trace = next(
@@ -460,8 +453,7 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
     )
     duration_policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        day.estimated_duration_minutes
-        <= duration_policy.maximum_total_minutes(RULESET.general_warmup_minutes)
+        duration_policy.contains(calculate_main_training_minutes(day))
         for day in first.program.weekly_schedule
     )
     selected = [item for day in first.program.weekly_schedule for item in day.exercises]

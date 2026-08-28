@@ -32,7 +32,10 @@ from app.profile.enums import (
     TrainingLocation,
 )
 from app.training_templates.engine_reference import load_template_references
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     BalanceAbility,
@@ -555,14 +558,11 @@ def _duration_counts_for_record(record: Mapping[str, object]) -> dict[str, float
         "legacy_absolute_deviation": 0.0,
     }
     for day in cast(Sequence[Mapping[str, object]], final_program.get("days", ())):
-        total = cast(int, day["estimated_duration_minutes"])
-        cardio_dict = cast(Mapping[str, object] | None, day.get("cardio"))
-        cardio_mins = int(cardio_dict.get("duration_minutes", 0)) if cardio_dict else 0  # type: ignore
-        workout = max(0, total - RULESET.general_warmup_minutes - cardio_mins)
+        workout = calculate_main_training_minutes(day)
         counts["sessions"] += 1
-        if workout <= requested:
+        if policy.contains(workout):
             counts["budget_fit"] += 1
-        counts["overrun_minutes"] += max(0, workout - requested)
+        counts["overrun_minutes"] += max(0, workout - policy.maximum_minutes)
         counts["utilization_sum"] += workout / requested if requested else 0
 
         counts["legacy_absolute_deviation"] += abs(workout - requested)

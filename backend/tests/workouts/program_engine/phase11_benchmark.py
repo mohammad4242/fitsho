@@ -47,6 +47,7 @@ from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS
 from app.training_templates.service import upgrade_training_program_template_catalog
 from app.workouts.program_engine.duration_policy import (
     OFFICIAL_SESSION_DURATIONS,
+    calculate_main_training_minutes,
     get_session_duration_policy,
 )
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
@@ -76,7 +77,6 @@ from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     focus_scope,
 )
-from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.schemas import ProgramGenerationOverrides
 from app.workouts.service import WorkoutGenerationService, WorkoutGenerationSettings
 
@@ -654,33 +654,17 @@ def _string_values(value: object) -> tuple[str, ...]:
 def _duration_policy_failure(
     *,
     requested_minutes: int,
-    estimated_total_minutes: int,
-    cardio_minutes: int,
-    main_exercises: int,
-    minimum_exercises: int,
+    day: object,
     reason_codes: Sequence[str],
 ) -> str | None:
+    del reason_codes
     policy = get_session_duration_policy(requested_minutes)
-    workout_minutes = policy.workout_minutes(
-        estimated_total_minutes - cardio_minutes, RULESET.general_warmup_minutes
-    )
-    reasons = set(reason_codes)
-    if workout_minutes > policy.maximum_minutes:
-        core_extension = (
-            "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE" in reasons
-            and workout_minutes <= policy.core_preservation_maximum_minutes
-        )
-        return None if core_extension else "above_maximum"
-    if workout_minutes >= policy.minimum_minutes or main_exercises >= minimum_exercises:
-        return None
-    if reasons.intersection(
-        {
-            "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
-            "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
-        }
-    ):
-        return None
-    return "below_minimum_incomplete"
+    main_minutes = calculate_main_training_minutes(day)
+    if main_minutes > policy.maximum_minutes:
+        return "above_maximum"
+    if main_minutes < policy.minimum_minutes:
+        return "below_minimum"
+    return None
 
 
 def _classify_final_unsat(result: ProgramGenerationResult) -> dict[str, object]:
@@ -892,14 +876,7 @@ def _audit_program(
     for day in program.weekly_schedule:
         duration_failure = _duration_policy_failure(
             requested_minutes=request.session_duration_minutes,
-            estimated_total_minutes=day.estimated_duration_minutes,
-            cardio_minutes=day.cardio.duration_minutes if day.cardio else 0,
-            main_exercises=main_exercise_count(day.exercises),
-            minimum_exercises=(
-                3
-                if request.session_duration_minutes <= RULESET.short_session_minutes
-                else RULESET.minimum_exercises_per_session
-            ),
+            day=day,
             reason_codes=duration_reasons,
         )
         if duration_failure is not None:
@@ -1045,16 +1022,8 @@ def _audit_quality_metrics(
     duration_trace = _trace_entry(result, "session_duration") or {}
     duration_reasons = set(_string_values(duration_trace.get("reason_codes")))
     durations_fit = all(
-        policy.contains_total(day.estimated_duration_minutes, RULESET.general_warmup_minutes)
-        for day in program.weekly_schedule
+        policy.contains(calculate_main_training_minutes(day)) for day in program.weekly_schedule
     )
-    core_extended = "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE" in duration_reasons
-    if not durations_fit and core_extended:
-        durations_fit = all(
-            day.estimated_duration_minutes
-            <= policy.core_preservation_maximum_total_minutes(RULESET.general_warmup_minutes)
-            for day in program.weekly_schedule
-        )
     duration_fit = (
         "fit"
         if durations_fit

@@ -6,7 +6,7 @@ import pytest
 from app.exercises.enums import Equipment, ExerciseCautionTag, MuscleGroup
 from app.profile.enums import TrainingLocation
 from app.workouts.program_engine.duration_policy import (
-    calculate_resistance_minutes,
+    calculate_main_training_minutes,
     get_session_duration_policy,
 )
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
@@ -270,8 +270,8 @@ def _assert_reference_invariants(
 
     for day in program.weekly_schedule:
         assert day.exercises
-        resistance_minutes = calculate_resistance_minutes(day, RULESET.general_warmup_minutes)
-        assert resistance_minutes <= policy.maximum_minutes
+        main_training_minutes = calculate_main_training_minutes(day)
+        assert main_training_minutes <= policy.maximum_minutes
         for first_index, first in enumerate(day.exercises):
             assert first.is_active and first.is_programmable and not first.needs_review
             assert effective_required_equipment(first.equipment, first.movement_pattern).issubset(

@@ -121,7 +121,7 @@ class WorkoutReviewDraftValidator:
         source_max_exercises = max((len(day.exercises) for day in source.days), default=1)
         policy = replace(
             policy,
-            session_duration_minutes=duration_policy.maximum_total_minutes(policy.warmup_minutes),
+            session_duration_minutes=duration_policy.maximum_minutes + policy.warmup_minutes,
             maximum_exercises_per_day=max(
                 policy.maximum_exercises_per_day,
                 source_max_exercises,

@@ -1,13 +1,10 @@
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, get_args
+from typing import get_args
 
 from app.exercises.enums import ExerciseLabel, ExerciseType
 from app.profile.schemas import SessionDurationMinutes
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
-
-if TYPE_CHECKING:
-    pass
 
 
 def _value(item: object, field: str, default: object = None) -> object:
@@ -86,14 +83,7 @@ def calculate_total_session_minutes_from_exercises(
     )
 
 
-def calculate_resistance_minutes(day: "Any", general_warmup_minutes: int) -> int:
-    """Deprecated compatibility wrapper for main-training minutes."""
-    del general_warmup_minutes
-    return calculate_main_training_minutes(day)
-
-
 SESSION_DURATION_TOLERANCE_MINUTES = 10
-CORE_PRESERVATION_EXTENSION_MINUTES = 20
 SHORT_SESSION_MINIMUM_MAIN_EXERCISES = 3
 
 # Official supported resistance-session durations.
@@ -138,25 +128,6 @@ class SessionDurationPolicy:
 
     def contains(self, estimated_minutes: int) -> bool:
         return self.minimum_minutes <= estimated_minutes <= self.maximum_minutes
-
-    @property
-    def core_preservation_maximum_minutes(self) -> int:
-        return self.requested_minutes + CORE_PRESERVATION_EXTENSION_MINUTES
-
-    def workout_minutes(self, estimated_total_minutes: int, general_warmup_minutes: int) -> int:
-        return max(0, estimated_total_minutes - general_warmup_minutes)
-
-    def contains_total(self, estimated_total_minutes: int, general_warmup_minutes: int) -> bool:
-        return self.contains(self.workout_minutes(estimated_total_minutes, general_warmup_minutes))
-
-    def minimum_total_minutes(self, general_warmup_minutes: int) -> int:
-        return self.minimum_minutes + general_warmup_minutes
-
-    def maximum_total_minutes(self, general_warmup_minutes: int) -> int:
-        return self.maximum_minutes + general_warmup_minutes
-
-    def core_preservation_maximum_total_minutes(self, general_warmup_minutes: int) -> int:
-        return self.core_preservation_maximum_minutes + general_warmup_minutes
 
 
 def get_session_duration_policy(

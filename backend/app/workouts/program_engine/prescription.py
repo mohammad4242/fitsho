@@ -3,7 +3,10 @@ from collections import Counter
 from dataclasses import dataclass
 
 from app.exercises.enums import ExerciseType, PrescriptionMode
-from app.workouts.program_engine.duration_policy import is_main_training_exercise
+from app.workouts.program_engine.duration_policy import (
+    calculate_total_session_minutes_from_exercises,
+    is_main_training_exercise,
+)
 from app.workouts.program_engine.enums import Goal, TrainingStatus
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -203,8 +206,9 @@ def prescribe_sessions(
                     exercise_type=exercise.exercise_type,
                 )
             )
-        estimated = ruleset.general_warmup_minutes + sum(
-            item.estimated_minutes for item in programmed
+        estimated = calculate_total_session_minutes_from_exercises(
+            programmed,
+            ruleset.general_warmup_minutes,
         )
         days.append(
             WorkoutDay(
