@@ -496,6 +496,44 @@ def test_original_upper_priority_profile_keeps_template_topology_and_weekday_rec
     assert recovery_spacing_is_valid(first.program.weekly_schedule, RULESET)
 
 
+def test_upper_priority_does_not_accept_eligible_two_upper_two_lower_template() -> None:
+    reference, catalog = _upper_lower_reference()
+    source = template_request(
+        age=31,
+        height_cm=175,
+        weight_kg=76,
+        available_training_days=4,
+        primary_goal="build_muscle",
+        training_experience="intermediate",
+        training_age_months=30,
+        session_duration_minutes=60,
+        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS],
+        seed_optional=17,
+    )
+
+    result = generate_program(source, catalog, RULESET, reference_templates=(reference,))
+    repeat = generate_program(source, catalog, RULESET, reference_templates=(reference,))
+
+    assert result.program is not None, result.errors
+    assert repeat.program is not None, repeat.errors
+    assert result.program == repeat.program
+    assert result.program.aggregate_metrics.get("reference_template") is None
+    assert result.program.split.day_focuses == ("upper", "lower", "upper", "upper_specialization")
+    assert len(result.program.weekly_schedule) == 4
+    assert tuple(day.weekday for day in result.program.weekly_schedule) == (0, 1, 3, 5)
+    lower_weekdays = tuple(
+        day.weekday
+        for day, focus in zip(
+            result.program.weekly_schedule,
+            result.program.split.day_focuses,
+            strict=True,
+        )
+        if focus == "lower" and day.weekday is not None
+    )
+    assert lower_weekdays == (1,)
+    assert recovery_spacing_is_valid(result.program.weekly_schedule, RULESET)
+
+
 def test_template_priority_stays_inside_flexible_range_with_duration_planning() -> None:
     reference, catalog = _upper_lower_reference()
     result = generate_program(

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, replace
 from uuid import UUID
 
-from app.exercises.enums import ExerciseType
+from app.exercises.enums import ExerciseType, MuscleGroup
 from app.workouts.program_engine.duration_capacity import (
     CapacityFeasibility,
     PlannedWorkCost,
@@ -25,6 +25,26 @@ from app.workouts.program_engine.template_scoring import (
     TemplateScore,
     score_template_reference_result,
 )
+
+_UPPER_PRIORITY_MUSCLES = frozenset(
+    {
+        MuscleGroup.CHEST,
+        MuscleGroup.BACK,
+        MuscleGroup.SHOULDERS,
+        MuscleGroup.BICEPS,
+        MuscleGroup.TRICEPS,
+        MuscleGroup.TRAPS,
+    }
+)
+_LOWER_PRIORITY_MUSCLES = frozenset(
+    {
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+        MuscleGroup.CALVES,
+    }
+)
+_LOWER_TEMPLATE_MUSCLES = _LOWER_PRIORITY_MUSCLES | {MuscleGroup.ABS}
 
 
 @dataclass(frozen=True)
@@ -350,6 +370,8 @@ def _hard_rejection_reason_codes(
         {candidate.id for candidate in eligible},
     ):
         reasons.append("CORE_SLOT_UNRESOLVABLE")
+    if not _upper_priority_template_topology_matches(request, template):
+        reasons.append("UPPER_PRIORITY_TEMPLATE_TOPOLOGY_MISMATCH")
     if ruleset is not None:
         capacity = session_capacity or build_session_capacity(
             request,
@@ -366,6 +388,39 @@ def _hard_rejection_reason_codes(
         if duration.status is CapacityFeasibility.PROVABLY_INFEASIBLE:
             reasons.append("REQUIRED_CORE_DURATION_INFEASIBLE")
     return tuple(reasons)
+
+
+def _upper_priority_template_topology_matches(
+    request: NormalizedProgramRequest,
+    template: TemplateReference,
+) -> bool:
+    explicit = set(request.source.priority_muscles)
+    if (
+        request.resistance_training_days != 4
+        or len(explicit.intersection(_UPPER_PRIORITY_MUSCLES)) < 2
+        or explicit.intersection(_LOWER_PRIORITY_MUSCLES)
+    ):
+        return True
+
+    topology: list[str] = []
+    for day in template.days:
+        structure_focus = day.structure_focus
+        if structure_focus in {"upper", "upper_specialization"}:
+            topology.append("upper")
+            continue
+        if structure_focus == "lower":
+            topology.append("lower")
+            continue
+        muscles = frozenset(day.focus) or frozenset(
+            muscle for slot in day.slots for muscle in slot.target_muscles
+        )
+        if muscles and muscles <= _UPPER_PRIORITY_MUSCLES:
+            topology.append("upper")
+        elif muscles and muscles <= _LOWER_TEMPLATE_MUSCLES:
+            topology.append("lower")
+        else:
+            return False
+    return len(topology) == 4 and topology.count("upper") == 3 and topology.count("lower") == 1
 
 
 def _template_level(request: NormalizedProgramRequest) -> str:
