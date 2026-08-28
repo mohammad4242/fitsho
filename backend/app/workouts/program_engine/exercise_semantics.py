@@ -90,6 +90,10 @@ class ExerciseRoleSignature:
 
 SEMANTIC_NEAR_DUPLICATE_REASON = "SEMANTIC_NEAR_DUPLICATE_REJECTED"
 
+PUSH_UP_FAMILY = "horizontal_push_push_up"
+PULL_UP_FAMILY = "vertical_pull_bodyweight"
+LEG_EXTENSION_PRIMER_FAMILY = "knee_extension"
+
 _LEGACY_BROAD_GROUPS = frozenset(pattern.value for pattern in MovementPattern)
 _DISTINCT_SQUAT_FAMILIES = frozenset(
     {
@@ -175,6 +179,26 @@ def has_near_equivalent(
     others: Iterable[ExerciseRoleSource],
 ) -> bool:
     return any(near_equivalent_exercises(exercise, other) for other in others)
+
+
+def is_push_up_family(exercise: ExerciseRoleSource) -> bool:
+    return ExerciseRoleSignature.from_candidate(exercise).canonical_family == PUSH_UP_FAMILY
+
+
+def is_pull_up_family(exercise: ExerciseRoleSource) -> bool:
+    return ExerciseRoleSignature.from_candidate(exercise).canonical_family == PULL_UP_FAMILY
+
+
+def is_leg_extension_primer(exercise: ExerciseRoleSource) -> bool:
+    signature = ExerciseRoleSignature.from_candidate(exercise)
+    return (
+        signature.movement_pattern is MovementPattern.KNEE_EXTENSION
+        and signature.substitution_group == LEG_EXTENSION_PRIMER_FAMILY
+    )
+
+
+def is_squat_family(exercise: ExerciseRoleSource) -> bool:
+    return exercise.movement_pattern is MovementPattern.SQUAT
 
 
 def is_primary_working_compound(exercise: ExerciseRoleSource) -> bool:

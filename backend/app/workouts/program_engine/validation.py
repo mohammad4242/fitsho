@@ -91,7 +91,7 @@ def validate_program(
     for day in program.weekly_schedule:
         exercise_count = main_exercise_count(day.exercises)
         errors.extend(superset_structure_errors(day.exercises))
-        errors.extend(session_structure_errors(day, request.primary_goal))
+        errors.extend(session_structure_errors(day, request.primary_goal, request))
 
         # ------------------------------------------------------------------
         # Exercise count validation (Phase 11.9 semantics)
