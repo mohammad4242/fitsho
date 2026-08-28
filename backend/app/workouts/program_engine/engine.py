@@ -640,7 +640,17 @@ def _program_for_split(
                 *(
                     ("PROGRAM_REBALANCED_TOWARD_SAFE_LOWER_BODY",)
                     if structured_relaxed_groups
-                    and any(day.focus in {"lower", "legs"} for day in days)
+                    and any(
+                        item.primary_muscle
+                        in {
+                            MuscleGroup.QUADRICEPS,
+                            MuscleGroup.HAMSTRINGS,
+                            MuscleGroup.GLUTES,
+                            MuscleGroup.CALVES,
+                        }
+                        for day in days
+                        for item in day.exercises
+                    )
                     else ()
                 ),
                 *recovery_repair_reasons,

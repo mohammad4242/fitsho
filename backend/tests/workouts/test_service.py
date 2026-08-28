@@ -57,6 +57,8 @@ from app.workouts.ai_coach_provider import AiCoachRecommendation, OpenRouterAiCo
 from app.workouts.body_analysis_resolver import BodyAnalysisInfluenceResolver
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanGeneration
+from app.workouts.program_engine.eligibility import filter_eligible_exercises
+from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     BodyPosition,
     GenerationErrorCode,
@@ -69,6 +71,9 @@ from app.workouts.program_engine.enums import (
     StabilityDemand,
     TrainingExperience,
 )
+from app.workouts.program_engine.normalization import normalize_request
+from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
     BodyAnalysisInfluence,
     ProgramGenerationResult,
@@ -244,6 +249,62 @@ def test_legacy_physical_limitations_do_not_become_uncomputable_generation_const
 
     assert request.injuries_and_limitations == ()
     assert ExerciseCautionTag.LOWER_BACK_LOADING in request.blocked_caution_tags
+    _seed_candidates(db)
+    result = generate_program(request, _service(db)._load_catalog(), RULESET)
+
+    assert result.is_success, result.errors
+    assert result.program is not None
+    assert len(result.program.weekly_schedule) == profile.training_days_per_week
+    assert all(
+        ExerciseCautionTag.LOWER_BACK_LOADING not in effective_caution_tags(exercise)
+        for day in result.program.weekly_schedule
+        for exercise in day.exercises
+    )
+    safety_trace = next(trace for trace in result.decision_trace if trace.get("stage") == "safety")
+    assert "EXPLICIT_LIMITATIONS_APPLIED" in safety_trace["reasons"]
+    assert "old lower-back note from the legacy form" not in request.model_dump_json()
+
+
+def test_service_generation_adapts_home_wrist_caution_without_wrist_loading(
+    db: Session,
+) -> None:
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.training_caution_items.append(UserProfileTrainingCaution(caution=TrainingCaution.WRIST))
+    _seed_candidates(db)
+
+    service = _service(db)
+    source = get_profile(db, user.id)
+    request = service._to_program_request(source, None)
+    result = generate_program(request, service._load_catalog(), RULESET)
+
+    assert result.is_success, result.errors
+    assert result.program is not None
+    assert len(result.program.weekly_schedule) == profile.training_days_per_week
+    assert all(
+        ExerciseCautionTag.WRIST_LOADING not in effective_caution_tags(exercise)
+        for day in result.program.weekly_schedule
+        for exercise in day.exercises
+    )
+    assert any(
+        exercise.primary_muscle
+        in {
+            MuscleGroup.QUADRICEPS,
+            MuscleGroup.HAMSTRINGS,
+            MuscleGroup.GLUTES,
+            MuscleGroup.CALVES,
+        }
+        for day in result.program.weekly_schedule
+        for exercise in day.exercises
+    )
+    reason_codes = {
+        reason
+        for trace in result.decision_trace
+        for reason in trace.get("reason_codes", ())
+        if isinstance(reason, str)
+    }
+    assert "REQUIRED_PATTERN_RELAXED_FOR_STRUCTURED_LIMITATION" in reason_codes
+    assert "PROGRAM_REBALANCED_TOWARD_SAFE_LOWER_BODY" in reason_codes
 
 
 def test_domain_candidate_uses_persisted_programming_metadata(db: Session) -> None:
@@ -327,6 +388,46 @@ def test_domain_candidate_infers_supported_row_axial_load_from_semantics(db: Ses
 
     assert standing_candidate.axial_loading_level is LoadLimit.MODERATE
     assert supported_candidate.axial_loading_level is LoadLimit.LOW
+
+
+def test_lower_back_safety_uses_row_support_semantics_without_explicit_caution_tags(
+    db: Session,
+) -> None:
+    standing_row = _exercise(
+        db,
+        "standing-row-semantic-safety",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+    )
+    supported_row = _exercise(
+        db,
+        "chest-supported-row-semantic-safety",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+    )
+    standing_row.name_en = "row-semantic-unsafe"
+    standing_row.body_position = BodyPosition.STANDING
+    standing_row.axial_loading_level = LoadLimit.MODERATE
+    supported_row.name_en = "row-semantic-safe"
+    supported_row.body_position = BodyPosition.SUPPORTED
+    supported_row.axial_loading_level = LoadLimit.LOW
+    db.flush()
+
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.training_caution_items.append(
+        UserProfileTrainingCaution(caution=TrainingCaution.LOWER_BACK)
+    )
+    db.flush()
+    source_request = _service(db)._to_program_request(get_profile(db, user.id), None)
+    source = normalize_request(source_request)
+    candidates = tuple(
+        WorkoutGenerationService._domain_candidate(item) for item in (standing_row, supported_row)
+    )
+    result = filter_eligible_exercises(source, candidates)
+
+    assert standing_row.id not in {item.id for item in result.eligible}
+    assert supported_row.id in {item.id for item in result.eligible}
 
 
 def test_catalog_snapshot_keeps_programming_metadata_and_stable_collections(
