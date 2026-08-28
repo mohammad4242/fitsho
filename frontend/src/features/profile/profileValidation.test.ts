@@ -262,6 +262,15 @@ describe("profile validation", () => {
     expect(profileToFormValues(profile)).toEqual(validValues);
   });
 
+  it("does not silently rewrite a legacy multi-focus profile", () => {
+    expect(
+      toProfilePatch(
+        { ...validValues, priority_muscle: "" },
+        { ...profile, priority_muscles: ["chest", "back"] },
+      ),
+    ).toEqual({});
+  });
+
   it("catches emitting unchanged fields or omitting changed fields in patches", () => {
     expect(toProfilePatch(validValues, profile)).toEqual({});
     expect(

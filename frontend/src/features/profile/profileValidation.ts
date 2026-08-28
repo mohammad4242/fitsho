@@ -372,7 +372,12 @@ export function toProfilePatch(
   if (input.preferred_weekdays?.join(",") !== currentProfile.preferred_weekdays?.join(",")) {
     patch.preferred_weekdays = input.preferred_weekdays;
   }
-  if (input.priority_muscles?.join(",") !== currentProfile.priority_muscles?.join(",")) {
+  const preservesLegacyMultiplePriorities =
+    values.priority_muscle === "" && (currentProfile.priority_muscles?.length ?? 0) > 1;
+  if (
+    !preservesLegacyMultiplePriorities
+    && input.priority_muscles?.join(",") !== currentProfile.priority_muscles?.join(",")
+  ) {
     patch.priority_muscles = input.priority_muscles;
   }
   if (input.training_location !== currentProfile.training_location) {
