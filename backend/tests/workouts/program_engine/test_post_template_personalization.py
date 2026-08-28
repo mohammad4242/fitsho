@@ -24,7 +24,6 @@ from app.workouts.program_engine.template_sessions import build_template_session
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
 from tests.workouts.program_engine.test_template_reference import (
-    _four_day_reference,
     _upper_lower_reference,
     template_request,
 )
