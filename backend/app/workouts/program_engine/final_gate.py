@@ -2,6 +2,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
+from app.workouts.program_engine.duration_policy import (
+    calculate_resistance_minutes,
+    effective_main_exercise_floor,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.enums import SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -10,11 +15,13 @@ from app.workouts.program_engine.schemas import (
     WorkoutDay,
     WorkoutProgram,
 )
+from app.workouts.program_engine.session_duration import SessionDurationRepairEvidence
 from app.workouts.program_engine.split_selector import (
     LOWER_REGION_MUSCLES,
     UPPER_REGION_MUSCLES,
     classify_template_region,
 )
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 
 FINAL_GATE_SCHEMA_VERSION = "final_quality_gate_v1"
 _FULL_BODY_SPLITS = frozenset(item for item in SplitType if item.value.startswith("full_body"))
@@ -88,20 +95,44 @@ def evaluate_final_program(
     duration_codes = tuple(
         code for code in (*report.errors, *report.warnings) if code in _DURATION_CODES
     )
-    duration_evidence = {
-        code
-        for entry in program.decision_trace
-        for key in ("reason_codes", "reasons")
-        for code in _string_values(entry.get(key))
-    }.intersection(_DURATION_CONSTRAINTS)
+    duration_evidence_codes: set[str] = set()
+    duration_evidence_complete = bool(duration_codes)
+    for duration_code in duration_codes:
+        affected_days = tuple(
+            day
+            for day in program.weekly_schedule
+            if _duration_code_applies_to_day(duration_code, day, request, ruleset)
+        )
+        if not affected_days:
+            duration_evidence_complete = False
+            continue
+        for day in affected_days:
+            matching = _duration_evidence_for_day(program, day)
+            if not any(
+                _evidence_proves_duration_code(evidence, duration_code, day, request, ruleset)
+                for evidence in matching
+            ):
+                duration_evidence_complete = False
+                continue
+            duration_evidence_codes.update(
+                evidence_code
+                for evidence in matching
+                for evidence_code in evidence.reason_codes
+                if evidence_code in _DURATION_CONSTRAINTS
+            )
+    duration_evidence = tuple(sorted(duration_evidence_codes))
     if duration_codes:
         checks["duration"] = {
-            "status": "constrained" if duration_evidence and not report.errors else "rejected",
+            "status": (
+                "constrained"
+                if duration_evidence and duration_evidence_complete and not report.errors
+                else "rejected"
+            ),
             "reason_codes": tuple(dict.fromkeys((*duration_evidence, *duration_codes))),
         }
-        if report.errors or not duration_evidence:
+        if report.errors or not duration_evidence or not duration_evidence_complete:
             reasons.extend(duration_codes)
-            if not duration_evidence:
+            if not duration_evidence or not duration_evidence_complete:
                 reasons.append("SESSION_DURATION_CONSTRAINT_UNEXPLAINED")
         else:
             constraints.extend(duration_evidence)
@@ -297,3 +328,87 @@ def _string_values(value: object) -> tuple[str, ...]:
     if isinstance(value, (tuple, list, set, frozenset)):
         return tuple(item for item in value if isinstance(item, str))
     return ()
+
+
+def _duration_evidence_for_day(
+    program: WorkoutProgram,
+    day: WorkoutDay,
+) -> tuple[SessionDurationRepairEvidence, ...]:
+    matches: list[SessionDurationRepairEvidence] = []
+    for entry in program.decision_trace:
+        if entry.get("stage") != "session_duration":
+            continue
+        raw_evidence = entry.get("per_session_evidence")
+        if not isinstance(raw_evidence, (tuple, list)):
+            continue
+        parsed = tuple(
+            evidence
+            for item in raw_evidence
+            if (evidence := SessionDurationRepairEvidence.from_trace(item)) is not None
+            and evidence.day_index == day.day_index
+            and evidence.matches(day)
+        )
+        matches.extend(parsed)
+    return tuple(matches) if len(matches) == 1 else ()
+
+
+def _evidence_proves_duration_code(
+    evidence: SessionDurationRepairEvidence,
+    duration_code: str,
+    day: WorkoutDay,
+    request: ProgramGenerationRequest,
+    ruleset: ProgramRuleset,
+) -> bool:
+    reasons = set(evidence.reason_codes)
+    workout_duration = calculate_resistance_minutes(day, ruleset.general_warmup_minutes)
+    policy = get_session_duration_policy(request.session_duration_minutes)
+    exercise_count = main_exercise_count(day.exercises)
+    floor = effective_main_exercise_floor(request.session_duration_minutes, ruleset)
+    if duration_code in {
+        "SESSION_DURATION_UNDER_TARGET",
+        "SESSION_DURATION_TARGET_UNSATISFIED",
+    }:
+        return (
+            duration_code in reasons
+            and workout_duration < policy.minimum_minutes
+            and exercise_count < floor
+        )
+    if duration_code == "SESSION_EXERCISE_COUNT_OUT_OF_RANGE":
+        return bool(
+            exercise_count < ruleset.minimum_exercises_per_session
+            and reasons.intersection(
+                {
+                    "DURATION_PLANNED_REDUCED_EXERCISE_COUNT",
+                    "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+                    "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
+                }
+            )
+        )
+    if duration_code in {"SESSION_DURATION_EXCEEDED", "SESSION_DURATION_OVER_TARGET"}:
+        return (
+            "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE" in reasons
+            and workout_duration > policy.maximum_minutes
+        )
+    return False
+
+
+def _duration_code_applies_to_day(
+    duration_code: str,
+    day: WorkoutDay,
+    request: ProgramGenerationRequest,
+    ruleset: ProgramRuleset,
+) -> bool:
+    workout_duration = calculate_resistance_minutes(day, ruleset.general_warmup_minutes)
+    policy = get_session_duration_policy(request.session_duration_minutes)
+    exercise_count = main_exercise_count(day.exercises)
+    floor = effective_main_exercise_floor(request.session_duration_minutes, ruleset)
+    if duration_code in {
+        "SESSION_DURATION_UNDER_TARGET",
+        "SESSION_DURATION_TARGET_UNSATISFIED",
+    }:
+        return workout_duration < policy.minimum_minutes and exercise_count < floor
+    if duration_code in {"SESSION_DURATION_EXCEEDED", "SESSION_DURATION_OVER_TARGET"}:
+        return workout_duration > policy.maximum_minutes
+    if duration_code == "SESSION_EXERCISE_COUNT_OUT_OF_RANGE":
+        return exercise_count < ruleset.minimum_exercises_per_session
+    return False

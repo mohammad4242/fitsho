@@ -15,7 +15,10 @@ from app.workouts.program_engine.schemas import (
     WeeklyVolumePlan,
     WorkoutDay,
 )
-from app.workouts.program_engine.session_duration import repair_session_durations
+from app.workouts.program_engine.session_duration import (
+    SessionDurationRepairEvidence,
+    repair_session_durations,
+)
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
@@ -178,11 +181,20 @@ def test_core_preservation_extension_is_a_valid_user_facing_warning() -> None:
         )
         + RULESET.general_warmup_minutes,
     )
-    trace = result.program.decision_trace + (
+    trace = tuple(
         {
-            "stage": "session_duration",
+            **entry,
             "reason_codes": ("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE",),
-        },
+            "per_session_evidence": (
+                SessionDurationRepairEvidence.from_day(
+                    day,
+                    ("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE",),
+                ).as_trace(),
+            ),
+        }
+        if entry.get("stage") == "session_duration"
+        else entry
+        for entry in result.program.decision_trace
     )
     program = replace(result.program, weekly_schedule=(day,), decision_trace=trace)
 

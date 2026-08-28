@@ -50,7 +50,11 @@ from app.workouts.program_engine.schemas import (
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_builder import SessionConstructionError, build_sessions
-from app.workouts.program_engine.session_duration import repair_session_durations
+from app.workouts.program_engine.session_duration import (
+    DurationRepairResult,
+    SessionDurationRepairEvidence,
+    repair_session_durations,
+)
 from app.workouts.program_engine.session_structure import finalize_session_structure
 from app.workouts.program_engine.split_selector import (
     classify_template_region,
@@ -561,7 +565,7 @@ def _program_for_split(
         substitution_decisions=substitution_decisions,
     )
     days_before_duration_repair = days
-    days, duration_repair_reasons = repair_session_durations(
+    duration_repair = repair_session_durations(
         days,
         normalized,
         eligible,
@@ -569,10 +573,22 @@ def _program_for_split(
         volume=volume,
         session_capacity=session_capacity,
     )
+    days = duration_repair.days
+    duration_repair_reasons = duration_repair.reasons
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
     days = finalize_session_structure(days, normalized, ruleset)
     weekly_distribution = redistribute_weekly_exercises(days, normalized, ruleset)
     days = weekly_distribution.days
+    duration_repair = _certify_duration_repair(
+        duration_repair,
+        days,
+        normalized,
+        eligible,
+        ruleset,
+        volume=volume,
+        session_capacity=session_capacity,
+    )
+    duration_repair_reasons = duration_repair.reasons
     day_count_errors = _day_count_errors(
         len(days), normalized.resistance_training_days, stage="dynamic_construction"
     )
@@ -721,6 +737,7 @@ def _program_for_split(
             days_before_duration_repair,
             days,
             duration_repair_reasons,
+            duration_repair.evidence,
         ),
         {
             "stage": "session_structure",
@@ -835,7 +852,7 @@ def _reference_program(
         substitution_decisions=substitution_decisions,
     )
     days_before_duration_repair = days
-    days, duration_repair_reasons = repair_session_durations(
+    duration_repair = repair_session_durations(
         days,
         normalized,
         eligible,
@@ -844,6 +861,8 @@ def _reference_program(
         prefer_acceptable_volume_for_minimum_fill=True,
         session_capacity=session_capacity,
     )
+    days = duration_repair.days
+    duration_repair_reasons = duration_repair.reasons
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
     days = finalize_session_structure(days, normalized, ruleset)
     weekly_distribution = redistribute_weekly_exercises(
@@ -853,6 +872,17 @@ def _reference_program(
         preserve_template_core_structure=True,
     )
     days = weekly_distribution.days
+    duration_repair = _certify_duration_repair(
+        duration_repair,
+        days,
+        normalized,
+        eligible,
+        ruleset,
+        volume=volume,
+        prefer_acceptable_volume_for_minimum_fill=True,
+        session_capacity=session_capacity,
+    )
+    duration_repair_reasons = duration_repair.reasons
     substitution_metrics = aggregate_substitution_observability(substitution_decisions)
     metrics = {
         **_volume_metrics(
@@ -928,6 +958,7 @@ def _reference_program(
             days_before_duration_repair,
             days,
             duration_repair_reasons,
+            duration_repair.evidence,
         ),
         {
             "stage": "session_structure",
@@ -1221,6 +1252,7 @@ def _duration_repair_trace(
     before: tuple[WorkoutDay, ...],
     after: tuple[WorkoutDay, ...],
     reason_codes: tuple[str, ...],
+    evidence: tuple[SessionDurationRepairEvidence, ...],
 ) -> dict[str, object]:
     repair_applied = "SESSION_DURATION_REPAIR_APPLIED" in reason_codes
     duration_deltas = tuple(
@@ -1238,7 +1270,7 @@ def _duration_repair_trace(
     else:
         classification = "major"
     unavoidable_constraints = tuple(
-        code for code in reason_codes if "CONSTRAINED" in code or "EXTENDED" in code
+        sorted(code for code in reason_codes if "CONSTRAINED" in code or "EXTENDED" in code)
     )
     return {
         "stage": "session_duration",
@@ -1255,7 +1287,39 @@ def _duration_repair_trace(
         "repair_classification": classification,
         "unavoidable_duration_constraints": unavoidable_constraints,
         "reason_codes": reason_codes,
+        "per_session_evidence": tuple(item.as_trace() for item in evidence),
     }
+
+
+def _certify_duration_repair(
+    original: DurationRepairResult,
+    days: tuple[WorkoutDay, ...],
+    request: NormalizedProgramRequest,
+    candidates: tuple[ExerciseCandidate, ...],
+    ruleset: ProgramRuleset,
+    *,
+    volume: WeeklyVolumePlan,
+    prefer_acceptable_volume_for_minimum_fill: bool = False,
+    session_capacity: SessionCapacity,
+) -> DurationRepairResult:
+    """Re-prove duration constraints after late structural passes, fail closed otherwise."""
+    certified = repair_session_durations(
+        days,
+        request,
+        candidates,
+        ruleset,
+        volume=volume,
+        prefer_acceptable_volume_for_minimum_fill=prefer_acceptable_volume_for_minimum_fill,
+        session_capacity=session_capacity,
+        _certification=True,
+    )
+    if certified.days != days:
+        return DurationRepairResult(days=days, reasons=original.reasons, evidence=())
+    return DurationRepairResult(
+        days=days,
+        reasons=tuple(dict.fromkeys((*original.reasons, *certified.reasons))),
+        evidence=certified.evidence,
+    )
 
 
 def _volume_metrics(

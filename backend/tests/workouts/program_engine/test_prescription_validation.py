@@ -657,7 +657,7 @@ def test_validator_rejects_session_exercise_counts_outside_the_ruleset(
     report = validate_program(invalid, source, RULESET)
 
     if exercise_count == 4:
-        assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.warnings
+        assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors
     else:
         assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors
 

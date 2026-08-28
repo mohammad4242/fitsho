@@ -19,9 +19,11 @@ from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
     ProgramGenerationRequest,
     ValidationReport,
+    WorkoutDay,
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_builder import slots_for_focus
+from app.workouts.program_engine.session_duration import SessionDurationRepairEvidence
 from app.workouts.program_engine.session_structure import session_structure_errors
 from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
@@ -48,33 +50,6 @@ def validate_program(
     volume_ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
     priority_muscles = set(request.priority_muscles)
     duration_policy = get_session_duration_policy(request.session_duration_minutes)
-    trace_reason_codes = {
-        code
-        for entry in program.decision_trace
-        for key in ("reason_codes", "reasons")
-        for code in _sequence_metric(entry.get(key))
-        if isinstance(code, str)
-    }
-    volume_feasibility_constrained = bool(
-        trace_reason_codes.intersection(
-            {
-                "VOLUME_REPAIR_SOFT_TARGET_REDUCED",
-                "VOLUME_REPAIR_HARD_MINIMUM_UNSATISFIED",
-                "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
-                "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
-                "VOLUME_REDUCED_FOR_DURATION_CAPACITY",
-            }
-        )
-    )
-    duration_planned_reduced_count = "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in trace_reason_codes
-    duration_feasibility_constrained = bool(
-        trace_reason_codes.intersection(
-            {
-                "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
-                "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
-            }
-        )
-    )
     if isinstance(volume_ranges, dict):
         priority_muscles.update(
             MuscleGroup(muscle)
@@ -90,6 +65,21 @@ def validate_program(
         )
     short_session = request.session_duration_minutes <= ruleset.short_session_minutes
     for day in program.weekly_schedule:
+        duration_evidence = _duration_evidence_for_day(program.decision_trace, day)
+        duration_reason_codes = (
+            set(duration_evidence.reason_codes) if duration_evidence is not None else set()
+        )
+        duration_planned_reduced_count = (
+            "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in duration_reason_codes
+        )
+        duration_feasibility_constrained = bool(
+            duration_reason_codes.intersection(
+                {
+                    "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+                    "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
+                }
+            )
+        )
         exercise_count = main_exercise_count(day.exercises)
         errors.extend(superset_structure_errors(day.exercises))
         errors.extend(session_structure_errors(day, request.primary_goal, request))
@@ -102,7 +92,7 @@ def validate_program(
         effective_floor = effective_main_exercise_floor(request.session_duration_minutes, ruleset)
         if exercise_count < effective_floor:
             # Below absolute hard floor — always an error
-            if volume_feasibility_constrained or duration_feasibility_constrained:
+            if duration_feasibility_constrained:
                 warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
             else:
                 errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
@@ -117,7 +107,7 @@ def validate_program(
                 # 45+min: duration alone MUST NOT reduce below 5 — this is a hard error
                 errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
                 errors.append("DURATION_REDUCTION_VIOLATED_MINIMUM_EXERCISE_FLOOR")
-            elif volume_feasibility_constrained:
+            elif duration_feasibility_constrained:
                 warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
             else:
                 errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
@@ -140,7 +130,7 @@ def validate_program(
                             "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
                             "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
                         )
-                        if code in trace_reason_codes
+                        if code in duration_reason_codes
                     )
                 else:
                     errors.append("SESSION_DURATION_UNDER_TARGET")
@@ -148,7 +138,7 @@ def validate_program(
             # else: program finishes under budget with enough exercises — acceptable
         if workout_duration > duration_policy.maximum_minutes:
             core_extension_is_valid = (
-                "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE" in trace_reason_codes
+                "SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE" in duration_reason_codes
                 and workout_duration <= duration_policy.core_preservation_maximum_minutes
             )
             if core_extension_is_valid:
@@ -476,3 +466,23 @@ def _sequence_metric(value: object) -> tuple[object, ...]:
     if isinstance(value, (tuple, list, set, frozenset)):
         return tuple(value)
     return ()
+
+
+def _duration_evidence_for_day(
+    trace: tuple[dict[str, object], ...],
+    day: WorkoutDay,
+) -> SessionDurationRepairEvidence | None:
+    matches: list[SessionDurationRepairEvidence] = []
+    for entry in trace:
+        if entry.get("stage") != "session_duration":
+            continue
+        raw_evidence = entry.get("per_session_evidence")
+        if not isinstance(raw_evidence, (tuple, list)):
+            continue
+        for item in raw_evidence:
+            evidence = SessionDurationRepairEvidence.from_trace(item)
+            if evidence is not None and evidence.day_index == day.day_index:
+                matches.append(evidence)
+    if len(matches) != 1 or not matches[0].matches(day):
+        return None
+    return matches[0]

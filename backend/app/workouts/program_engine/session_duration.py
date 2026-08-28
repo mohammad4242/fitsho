@@ -1,5 +1,6 @@
 from collections import Counter
-from dataclasses import replace
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass, replace
 
 from app.exercises.enums import ExerciseLabel, ExerciseType, MuscleGroup
 from app.workouts.program_engine.duration_capacity import (
@@ -50,6 +51,106 @@ from app.workouts.program_engine.template_sessions import (
 )
 
 
+@dataclass(frozen=True)
+class SessionDurationRepairEvidence:
+    """Immutable proof that one repaired session was inspected at a known shape."""
+
+    day_index: int
+    post_repair_exercise_count: int
+    post_repair_duration_minutes: int
+    post_repair_exercise_fingerprint: tuple[tuple[str, int, int, int], ...]
+    reason_codes: tuple[str, ...]
+
+    @classmethod
+    def from_day(
+        cls,
+        day: WorkoutDay,
+        reason_codes: tuple[str, ...] = (),
+    ) -> "SessionDurationRepairEvidence":
+        return cls(
+            day_index=day.day_index,
+            post_repair_exercise_count=len(day.exercises),
+            post_repair_duration_minutes=max(
+                0,
+                day.estimated_duration_minutes - (day.cardio.duration_minutes if day.cardio else 0),
+            ),
+            post_repair_exercise_fingerprint=tuple(
+                sorted(
+                    (
+                        str(item.exercise_id),
+                        item.sets,
+                        item.rest_seconds,
+                        item.estimated_minutes,
+                    )
+                    for item in day.exercises
+                )
+            ),
+            reason_codes=tuple(dict.fromkeys(reason_codes)),
+        )
+
+    def matches(self, day: WorkoutDay) -> bool:
+        return self == SessionDurationRepairEvidence.from_day(day, self.reason_codes)
+
+    @classmethod
+    def from_trace(cls, value: object) -> "SessionDurationRepairEvidence | None":
+        if not isinstance(value, Mapping):
+            return None
+        day_index = value.get("day_index")
+        exercise_count = value.get("post_repair_exercise_count")
+        duration = value.get("post_repair_duration_minutes")
+        raw_fingerprint = value.get("post_repair_exercise_fingerprint")
+        raw_reasons = value.get("reason_codes")
+        if not (
+            isinstance(day_index, int)
+            and isinstance(exercise_count, int)
+            and isinstance(duration, int)
+            and isinstance(raw_fingerprint, (tuple, list))
+            and isinstance(raw_reasons, (tuple, list))
+        ):
+            return None
+        fingerprint: list[tuple[str, int, int, int]] = []
+        for item in raw_fingerprint:
+            if not (
+                isinstance(item, (tuple, list))
+                and len(item) == 4
+                and isinstance(item[0], str)
+                and all(isinstance(part, int) for part in item[1:])
+            ):
+                return None
+            fingerprint.append((item[0], item[1], item[2], item[3]))
+        if not all(isinstance(reason, str) for reason in raw_reasons):
+            return None
+        evidence = cls(
+            day_index=day_index,
+            post_repair_exercise_count=exercise_count,
+            post_repair_duration_minutes=duration,
+            post_repair_exercise_fingerprint=tuple(sorted(fingerprint)),
+            reason_codes=tuple(raw_reasons),
+        )
+        return evidence
+
+    def as_trace(self) -> dict[str, object]:
+        return {
+            "day_index": self.day_index,
+            "post_repair_exercise_count": self.post_repair_exercise_count,
+            "post_repair_duration_minutes": self.post_repair_duration_minutes,
+            "post_repair_exercise_fingerprint": self.post_repair_exercise_fingerprint,
+            "reason_codes": self.reason_codes,
+        }
+
+
+@dataclass(frozen=True)
+class DurationRepairResult:
+    days: tuple[WorkoutDay, ...]
+    reasons: tuple[str, ...]
+    evidence: tuple[SessionDurationRepairEvidence, ...]
+
+    def __iter__(self) -> Iterator[tuple[WorkoutDay, ...] | tuple[str, ...]]:
+        """Preserve the historical ``days, reasons = ...`` call contract."""
+        yield self.days
+        yield self.reasons
+
+
 def repair_session_durations(
     days: tuple[WorkoutDay, ...],
     request: NormalizedProgramRequest,
@@ -59,7 +160,8 @@ def repair_session_durations(
     volume: WeeklyVolumePlan | None = None,
     prefer_acceptable_volume_for_minimum_fill: bool = False,
     session_capacity: SessionCapacity | None = None,
-) -> tuple[tuple[WorkoutDay, ...], tuple[str, ...]]:
+    _certification: bool = False,
+) -> DurationRepairResult:
     """Repair real session estimates while preserving hard program constraints."""
 
     policy = get_session_duration_policy(request.source.session_duration_minutes)
@@ -67,7 +169,9 @@ def repair_session_durations(
     short_session_floor = effective_main_exercise_floor(resistance_budget, ruleset)
     repaired: list[WorkoutDay] = []
     reasons: list[str] = []
+    day_reason_codes: list[tuple[str, ...]] = []
     for day_index, day in enumerate(days):
+        day_reason_start = len(reasons)
         day_capacity = session_capacity
         # -------------------------------------------------------------------
         # Minimum exercises policy:
@@ -98,7 +202,12 @@ def repair_session_durations(
             # 45+ min: duration alone MUST NOT reduce below 5
             planned_minimum_exercises = ruleset.minimum_exercises_per_session
 
-        template_adjusted, template_superset_reasons = apply_template_supersets(day.exercises)
+        template_adjusted: tuple[ProgrammedExercise, ...]
+        template_superset_reasons: tuple[str, ...]
+        if _certification:
+            template_adjusted, template_superset_reasons = day.exercises, ()
+        else:
+            template_adjusted, template_superset_reasons = apply_template_supersets(day.exercises)
         reasons.extend(template_superset_reasons)
         current = _rebuild_day(day, template_adjusted, ruleset)
         current, capacity_trim_reasons = _trim_optional_capacity_overflow(current, ruleset)
@@ -128,6 +237,8 @@ def repair_session_durations(
             )
             if hard_volume_status and hard_volume_status[0]:
                 reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
+            elif main_exercise_count(current.exercises) < planned_minimum_exercises:
+                reasons.append("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD")
 
         # ------------------------------------------------------------------
         # Overfill = resistance-only portion exceeds budget + tolerance.
@@ -187,9 +298,26 @@ def repair_session_durations(
             reasons.append("SESSION_DURATION_TARGET_UNSATISFIED")
 
         repaired.append(current)
+        day_reason_codes.append(tuple(dict.fromkeys(reasons[day_reason_start:])))
 
     repaired_tuple = _justify_duration_repeats(tuple(repaired))
-    return repaired_tuple, tuple(dict.fromkeys(reasons))
+    evidence_items: list[SessionDurationRepairEvidence] = []
+    for index, day in enumerate(repaired_tuple):
+        evidence_reasons = list(day_reason_codes[index])
+        if (
+            resistance_budget <= ruleset.short_session_minutes
+            and short_session_floor
+            <= main_exercise_count(day.exercises)
+            < ruleset.minimum_exercises_per_session
+        ):
+            evidence_reasons.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
+        evidence_items.append(SessionDurationRepairEvidence.from_day(day, tuple(evidence_reasons)))
+    evidence = tuple(evidence_items)
+    return DurationRepairResult(
+        days=repaired_tuple,
+        reasons=tuple(dict.fromkeys(reasons)),
+        evidence=evidence,
+    )
 
 
 def _trim_optional_capacity_overflow(
