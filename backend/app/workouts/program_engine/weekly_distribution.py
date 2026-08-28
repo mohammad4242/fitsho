@@ -25,13 +25,11 @@ from app.workouts.program_engine.session_structure import (
 )
 from app.workouts.program_engine.supplemental_policy import (
     is_supplemental_muscle,
+    main_exercise_count,
     supplemental_muscle_fits_focus,
 )
 from app.workouts.program_engine.template_sessions import template_adaptation_priority
 
-_APPLIED = "WEEKLY_REDISTRIBUTION_APPLIED"
-_ALREADY_BALANCED = "WEEKLY_REDISTRIBUTION_ALREADY_BALANCED"
-_NO_SAFE_MOVE = "WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE"
 _IGNORED_FIELDS = frozenset({"order", "warmup_sets", "estimated_minutes"})
 
 
@@ -51,10 +49,8 @@ class WeeklyDistributionResult:
 
     @property
     def metrics(self) -> dict[str, object]:
-        metrics = vars(self).copy()
-        metrics.pop("days")
-        metrics["moves_applied"] = len(self.moved_exercise_ids)
-        return metrics
+        metrics = {key: value for key, value in vars(self).items() if key != "days"}
+        return metrics | {"moves_applied": len(self.moved_exercise_ids)}
 
 
 def redistribute_weekly_exercises(
@@ -64,7 +60,7 @@ def redistribute_weekly_exercises(
     *,
     preserve_template_core_structure: bool = False,
 ) -> WeeklyDistributionResult:
-    preserve_template_core_structure = preserve_template_core_structure or any(
+    preserve_template_core_structure |= any(
         day.focus.startswith("template_reference") for day in days
     )
     before_counts = _exercise_counts(days)
@@ -83,11 +79,11 @@ def redistribute_weekly_exercises(
 
     after_counts = _exercise_counts(current)
     status, reason_codes = (
-        ("applied", (_APPLIED,))
+        ("applied", ("WEEKLY_REDISTRIBUTION_APPLIED",))
         if moved
-        else ("not_needed", (_ALREADY_BALANCED,))
+        else ("not_needed", ("WEEKLY_REDISTRIBUTION_ALREADY_BALANCED",))
         if _balance_score(before_counts)[0] <= 1
-        else ("constrained", (_NO_SAFE_MOVE,))
+        else ("constrained", ("WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE",))
     )
     after_direct, after_effective = _volume(current, ruleset)
     return WeeklyDistributionResult(
@@ -118,13 +114,19 @@ def _best_improving_move(
     recipients = tuple(index for index, count in enumerate(counts) if count == smallest_count)
     donors = tuple(index for index, count in enumerate(counts) if count > smallest_count)
     proposals: list[tuple[tuple[object, ...], tuple[WorkoutDay, ...], ProgrammedExercise]] = []
+    floor = ruleset.minimum_exercises_per_session
     for recipient_index in recipients:
         recipient = days[recipient_index]
         for donor_index in donors:
             donor = days[donor_index]
-            if len(donor.exercises) < ruleset.minimum_exercises_per_session:
+            donor_main_count = main_exercise_count(donor.exercises)
+            if len(donor.exercises) <= floor or donor_main_count < floor:
                 continue
             for exercise_index, exercise in enumerate(donor.exercises):
+                if donor_main_count == floor and not is_supplemental_muscle(
+                    exercise.primary_muscle
+                ):
+                    continue
                 if not _movable(
                     exercise,
                     preserve_template_core_structure=preserve_template_core_structure,
@@ -153,7 +155,7 @@ def _best_improving_move(
                     request,
                     ruleset,
                     recipient_index=recipient_index,
-                    moved_exercise_id=str(exercise.exercise_id),
+                    moved_id=str(exercise.exercise_id),
                 ):
                     continue
                 key = (
@@ -178,10 +180,9 @@ def _proposed_days(
     exercise: ProgrammedExercise,
 ) -> tuple[WorkoutDay, ...]:
     proposed = list(days)
+    donor = days[donor_index]
     proposed[donor_index] = replace(
-        proposed[donor_index],
-        exercises=proposed[donor_index].exercises[:exercise_index]
-        + proposed[donor_index].exercises[exercise_index + 1 :],
+        donor, exercises=donor.exercises[:exercise_index] + donor.exercises[exercise_index + 1 :]
     )
     proposed[recipient_index] = replace(
         proposed[recipient_index], exercises=(*proposed[recipient_index].exercises, exercise)
@@ -196,14 +197,19 @@ def _invariants_hold(
     ruleset: ProgramRuleset,
     *,
     recipient_index: int,
-    moved_exercise_id: str,
+    moved_id: str,
 ) -> bool:
     if (
         tuple((day.day_index, day.weekday) for day in before)
         != tuple((day.day_index, day.weekday) for day in after)
         or _exercise_signatures(before) != _exercise_signatures(after)
         or _volume(before, ruleset) != _volume(after, ruleset)
-        or not _session_volume_is_safe(after, ruleset)
+        or any(
+            sum(item.sets for item in day.exercises if item.primary_muscle is muscle)
+            > ruleset.max_sets_per_muscle_per_session
+            for day in after
+            for muscle in {item.primary_muscle for item in day.exercises if item.primary_muscle}
+        )
         or not recovery_spacing_is_valid(after, ruleset)
         or not _duration_is_safe(before, after, request, ruleset)
         or any(session_structure_errors(day, request.primary_goal, request) for day in after)
@@ -214,9 +220,7 @@ def _invariants_hold(
         )
     ):
         return False
-    return any(
-        str(item.exercise_id) == moved_exercise_id for item in after[recipient_index].exercises
-    )
+    return any(str(item.exercise_id) == moved_id for item in after[recipient_index].exercises)
 
 
 def _duration_is_safe(
@@ -245,9 +249,14 @@ def _movable(
         exercise.superset_group is None
         and exercise.order != 1
         and "STRENGTH_PRIMARY_COMPOUND" not in exercise.reason_codes
-        and (
-            not preserve_template_core_structure or template_adaptation_priority(exercise) != "core"
-        )
+        and (not preserve_template_core_structure or not _template_origin(exercise))
+    )
+
+
+def _template_origin(exercise: ProgrammedExercise) -> bool:
+    return template_adaptation_priority(exercise) is not None or any(
+        code in {"TEMPLATE_REFERENCE_EXERCISE", "TEMPLATE_SAFE_SUBSTITUTION"}
+        for code in exercise.reason_codes
     )
 
 
@@ -262,15 +271,6 @@ def _fits_recipient_focus(exercise: ProgrammedExercise, day: WorkoutDay) -> bool
             else day.focus,
         )
     return exercise_fits_focus(cast(ExerciseCandidate, exercise), day.focus)
-
-
-def _session_volume_is_safe(days: tuple[WorkoutDay, ...], ruleset: ProgramRuleset) -> bool:
-    cap = ruleset.max_sets_per_muscle_per_session
-    return all(
-        sum(i.sets for i in d.exercises if i.primary_muscle is m) <= cap
-        for d in days
-        for m in {i.primary_muscle for i in d.exercises if i.primary_muscle}
-    )
 
 
 def _exercise_counts(days: tuple[WorkoutDay, ...]) -> tuple[int, ...]:

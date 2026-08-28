@@ -12,6 +12,8 @@ from app.workouts.program_engine.recovery import recovery_spacing_is_valid
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.session_structure import session_structure_errors
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
+from app.workouts.program_engine.weekly_distribution import redistribute_weekly_exercises
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 from tests.workouts.program_engine.test_template_reference import _upper_lower_reference
 
@@ -153,8 +155,6 @@ def test_batch2_constrained_controls_preserve_volume_and_day_count(
 
 
 def test_weekly_redistribution_reports_stable_constrained_reason_without_safe_move() -> None:
-    from app.workouts.program_engine.weekly_distribution import redistribute_weekly_exercises
-
     source = request(available_training_days=2, session_duration_minutes=45)
     result = generate_program(source, full_catalog(), RULESET)
     assert result.program is not None, result.errors
@@ -195,6 +195,74 @@ def test_weekly_redistribution_reports_stable_constrained_reason_without_safe_mo
     assert first.status == "constrained"
     assert first.reason_codes == ("WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE",)
     assert first.days == imbalanced_days
+
+
+def test_donor_at_main_exercise_floor_is_not_depleted() -> None:
+    source = request(available_training_days=2, session_duration_minutes=60)
+    generated = generate_program(source, full_catalog(), RULESET)
+    assert generated.program is not None, generated.errors
+    base_days = generated.program.weekly_schedule
+    imbalanced_days = (
+        replace(base_days[0], exercises=base_days[0].exercises[:3]),
+        replace(base_days[1], exercises=base_days[1].exercises[:5]),
+    )
+
+    result = redistribute_weekly_exercises(
+        imbalanced_days,
+        normalize_request(source, RULESET),
+        RULESET,
+    )
+
+    assert result.before_exercise_counts == (3, 5)
+    assert result.after_exercise_counts == (3, 5)
+    assert (
+        main_exercise_count(imbalanced_days[1].exercises) == RULESET.minimum_exercises_per_session
+    )
+    assert main_exercise_count(result.days[1].exercises) == RULESET.minimum_exercises_per_session
+    assert result.status == "constrained"
+    assert result.reason_codes == ("WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE",)
+    assert result.days == imbalanced_days
+
+
+def test_template_non_core_work_without_slot_metadata_stays_stationary() -> None:
+    source = request(available_training_days=3, session_duration_minutes=60)
+    generated = generate_program(source, full_catalog(), RULESET)
+    assert generated.program is not None, generated.errors
+    base_days = generated.program.weekly_schedule
+    candidate = base_days[0].exercises[1]
+    assert candidate.primary_muscle is not None
+    template_days = tuple(
+        replace(
+            day,
+            focus=f"template_reference_{index + 1}",
+            template_target_muscles=(candidate.primary_muscle,),
+            exercises=tuple(
+                replace(
+                    item,
+                    reason_codes=(
+                        *item.reason_codes,
+                        "TEMPLATE_REFERENCE_EXERCISE",
+                    ),
+                )
+                for item in day.exercises
+            ),
+        )
+        for index, day in enumerate(base_days)
+    )
+    donor = template_days[0]
+    recipient = replace(template_days[2], exercises=template_days[2].exercises[:4])
+    imbalanced_days = (donor, template_days[1], recipient)
+
+    result = redistribute_weekly_exercises(
+        imbalanced_days,
+        normalize_request(source, RULESET),
+        RULESET,
+        preserve_template_core_structure=True,
+    )
+
+    assert result.status == "constrained"
+    assert result.reason_codes == ("WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE",)
+    assert result.days == imbalanced_days
 
 
 def test_template_redistribution_preserves_core_exercise_ownership() -> None:
