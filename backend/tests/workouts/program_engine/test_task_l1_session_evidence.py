@@ -4,9 +4,10 @@ import sys
 from dataclasses import replace
 
 from app.workouts.program_engine.engine import generate_program
+from app.workouts.program_engine.enums import CardioIntensity
 from app.workouts.program_engine.final_gate import evaluate_final_program
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-from app.workouts.program_engine.schemas import ValidationReport
+from app.workouts.program_engine.schemas import CardioPrescription, ValidationReport
 from app.workouts.program_engine.session_duration import SessionDurationRepairEvidence
 from app.workouts.program_engine.validation import validate_program
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
@@ -87,6 +88,103 @@ def test_duration_evidence_must_match_the_exact_day_fingerprint() -> None:
 
     assert evidence.matches(day)
     assert not evidence.matches(changed)
+
+
+def test_duration_evidence_fingerprint_detects_reason_code_changes() -> None:
+    program = _program()
+    day = program.weekly_schedule[0]
+    evidence = SessionDurationRepairEvidence.from_day(day)
+    changed_exercise = replace(
+        day.exercises[0],
+        reason_codes=(*day.exercises[0].reason_codes, "TEMPLATE_ADAPTATION_PRIORITY:core"),
+    )
+
+    assert not evidence.matches(replace(day, exercises=(changed_exercise, *day.exercises[1:])))
+
+
+def test_duration_evidence_fingerprint_detects_semantic_role_changes() -> None:
+    program = _program()
+    day = program.weekly_schedule[0]
+    evidence = SessionDurationRepairEvidence.from_day(day)
+    changed_exercise = replace(
+        day.exercises[0],
+        reason_codes=(*day.exercises[0].reason_codes, "STRENGTH_PRIMARY_COMPOUND"),
+    )
+
+    assert not evidence.matches(replace(day, exercises=(changed_exercise, *day.exercises[1:])))
+
+
+def test_duration_evidence_fingerprint_detects_superset_metadata_changes() -> None:
+    program = _program()
+    day = program.weekly_schedule[0]
+    evidence = SessionDurationRepairEvidence.from_day(day)
+    changed_exercise = replace(day.exercises[0], superset_group="changed")
+
+    assert not evidence.matches(replace(day, exercises=(changed_exercise, *day.exercises[1:])))
+
+
+def test_duration_evidence_fingerprint_detects_day_structure_changes() -> None:
+    program = _program()
+    day = program.weekly_schedule[0]
+    evidence = SessionDurationRepairEvidence.from_day(day)
+
+    assert not evidence.matches(replace(day, focus=f"{day.focus}-changed"))
+    assert not evidence.matches(replace(day, weekday=99))
+    assert not evidence.matches(replace(day, template_structure_focus="changed"))
+
+
+def test_duration_evidence_matches_after_later_cardio_is_added() -> None:
+    program = _program()
+    source_day = program.weekly_schedule[0]
+    source_cardio_minutes = (
+        source_day.cardio.duration_minutes if source_day.cardio is not None else 0
+    )
+    day = replace(
+        source_day,
+        cardio=None,
+        estimated_duration_minutes=source_day.estimated_duration_minutes - source_cardio_minutes,
+    )
+    evidence = SessionDurationRepairEvidence.from_day(day)
+    cardio = CardioPrescription(
+        modality_exercise_id=day.exercises[0].exercise_id,
+        modality_name="Walking",
+        duration_minutes=10,
+        intensity=CardioIntensity.EASY,
+        reason_codes=("CARDIO_ADDED",),
+    )
+    with_cardio = replace(
+        day,
+        cardio=cardio,
+        estimated_duration_minutes=day.estimated_duration_minutes + cardio.duration_minutes,
+    )
+
+    assert evidence.matches(with_cardio)
+
+
+def test_duration_evidence_trace_rejects_legacy_incomplete_fingerprint() -> None:
+    program = _program()
+    day = program.weekly_schedule[0]
+    evidence = SessionDurationRepairEvidence.from_day(day)
+    trace = evidence.as_trace()
+    trace["post_repair_exercise_fingerprint"] = [
+        [str(item.exercise_id), item.sets, item.rest_seconds, item.estimated_minutes]
+        for item in day.exercises
+    ]
+
+    assert SessionDurationRepairEvidence.from_trace(trace) is None
+
+
+def test_duration_evidence_trace_rejects_malformed_digest_and_scalar_types() -> None:
+    program = _program()
+    evidence = SessionDurationRepairEvidence.from_day(program.weekly_schedule[0])
+
+    malformed_digest = evidence.as_trace()
+    malformed_digest["post_repair_exercise_fingerprint"] = "not-a-sha256-digest"
+    assert SessionDurationRepairEvidence.from_trace(malformed_digest) is None
+
+    malformed_count = evidence.as_trace()
+    malformed_count["post_repair_exercise_count"] = True
+    assert SessionDurationRepairEvidence.from_trace(malformed_count) is None
 
 
 def test_final_gate_rejects_stale_duration_evidence() -> None:

@@ -1,6 +1,10 @@
+import hashlib
+import json
 from collections import Counter
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, is_dataclass, replace
+from enum import Enum
+from uuid import UUID
 
 from app.exercises.enums import ExerciseLabel, ExerciseType, MuscleGroup
 from app.workouts.program_engine.duration_capacity import (
@@ -58,7 +62,7 @@ class SessionDurationRepairEvidence:
     day_index: int
     post_repair_exercise_count: int
     post_repair_duration_minutes: int
-    post_repair_exercise_fingerprint: tuple[tuple[str, int, int, int], ...]
+    post_repair_exercise_fingerprint: str
     reason_codes: tuple[str, ...]
 
     @classmethod
@@ -74,17 +78,7 @@ class SessionDurationRepairEvidence:
                 0,
                 day.estimated_duration_minutes - (day.cardio.duration_minutes if day.cardio else 0),
             ),
-            post_repair_exercise_fingerprint=tuple(
-                sorted(
-                    (
-                        str(item.exercise_id),
-                        item.sets,
-                        item.rest_seconds,
-                        item.estimated_minutes,
-                    )
-                    for item in day.exercises
-                )
-            ),
+            post_repair_exercise_fingerprint=_resistance_session_fingerprint(day),
             reason_codes=tuple(dict.fromkeys(reason_codes)),
         )
 
@@ -101,30 +95,24 @@ class SessionDurationRepairEvidence:
         raw_fingerprint = value.get("post_repair_exercise_fingerprint")
         raw_reasons = value.get("reason_codes")
         if not (
-            isinstance(day_index, int)
-            and isinstance(exercise_count, int)
-            and isinstance(duration, int)
-            and isinstance(raw_fingerprint, (tuple, list))
+            type(day_index) is int
+            and day_index >= 0
+            and type(exercise_count) is int
+            and exercise_count >= 0
+            and type(duration) is int
+            and duration >= 0
+            and isinstance(raw_fingerprint, str)
+            and _is_session_fingerprint(raw_fingerprint)
             and isinstance(raw_reasons, (tuple, list))
         ):
             return None
-        fingerprint: list[tuple[str, int, int, int]] = []
-        for item in raw_fingerprint:
-            if not (
-                isinstance(item, (tuple, list))
-                and len(item) == 4
-                and isinstance(item[0], str)
-                and all(isinstance(part, int) for part in item[1:])
-            ):
-                return None
-            fingerprint.append((item[0], item[1], item[2], item[3]))
         if not all(isinstance(reason, str) for reason in raw_reasons):
             return None
         evidence = cls(
             day_index=day_index,
             post_repair_exercise_count=exercise_count,
             post_repair_duration_minutes=duration,
-            post_repair_exercise_fingerprint=tuple(sorted(fingerprint)),
+            post_repair_exercise_fingerprint=raw_fingerprint,
             reason_codes=tuple(raw_reasons),
         )
         return evidence
@@ -137,6 +125,71 @@ class SessionDurationRepairEvidence:
             "post_repair_exercise_fingerprint": self.post_repair_exercise_fingerprint,
             "reason_codes": self.reason_codes,
         }
+
+
+_SESSION_FINGERPRINT_SCHEMA = "resistance_session_v1"
+
+
+def _canonicalize_fingerprint_value(value: object) -> object:
+    """Convert nested engine values into a deterministic JSON value."""
+    if isinstance(value, Enum):
+        return _canonicalize_fingerprint_value(value.value)
+    if isinstance(value, UUID):
+        return str(value)
+    if is_dataclass(value):
+        return {
+            item.name: _canonicalize_fingerprint_value(getattr(value, item.name))
+            for item in fields(value)
+        }
+    if isinstance(value, Mapping):
+        return {
+            str(key): _canonicalize_fingerprint_value(value[key]) for key in sorted(value, key=str)
+        }
+    if isinstance(value, (tuple, list)):
+        return [_canonicalize_fingerprint_value(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        canonical_items = [_canonicalize_fingerprint_value(item) for item in value]
+        return sorted(canonical_items, key=_canonical_fingerprint_json)
+    return value
+
+
+def _canonical_fingerprint_json(value: object) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+
+
+def _resistance_session_fingerprint(day: WorkoutDay) -> str:
+    """Digest every resistance-relevant day and exercise field.
+
+    Cardio is intentionally appended after duration repair, so it is excluded
+    here and only its contribution to the day estimate is normalized away.
+    """
+    day_payload = {
+        field.name: getattr(day, field.name) for field in fields(day) if field.name != "cardio"
+    }
+    day_payload["estimated_duration_minutes"] = max(
+        0,
+        day.estimated_duration_minutes
+        - (day.cardio.duration_minutes if day.cardio is not None else 0),
+    )
+    day_payload["exercises"] = tuple(
+        {field.name: getattr(exercise, field.name) for field in fields(exercise)}
+        | {"strength_role": _programmed_strength_role(exercise).value}
+        for exercise in day.exercises
+    )
+    canonical = _canonicalize_fingerprint_value(
+        {"schema": _SESSION_FINGERPRINT_SCHEMA, "day": day_payload}
+    )
+    return hashlib.sha256(_canonical_fingerprint_json(canonical).encode("utf-8")).hexdigest()
+
+
+def _is_session_fingerprint(value: str) -> bool:
+    return len(value) == 64 and all(char in "0123456789abcdef" for char in value)
 
 
 @dataclass(frozen=True)
