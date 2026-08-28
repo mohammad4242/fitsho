@@ -211,9 +211,7 @@ def session_structure_errors(
             if not all(is_supplemental_muscle(muscle) for muscle in unit.muscles)
         )
         non_opener_units = tuple(
-            unit
-            for unit in main_units
-            if not _is_required_semantic_opener(unit, units, request)
+            unit for unit in main_units if not _is_required_semantic_opener(unit, units, request)
         )
         if any(
             _contains_reason(unit, "STRENGTH_PRIMARY_COMPOUND") for unit in non_opener_units
@@ -323,14 +321,18 @@ def _is_required_semantic_opener(
     request: ProgramGenerationRequest | NormalizedProgramRequest | None,
 ) -> bool:
     return (
-        _session_has_meaningful_muscle(all_units, MuscleGroup.CHEST)
-        and any(is_push_up_family(item) for item in unit.exercises)
-    ) or (
-        _session_has_meaningful_back(all_units)
-        and any(is_pull_up_family(item) for item in unit.exercises)
-    ) or (
-        _has_safe_leg_extension_primer(all_units, request)
-        and any(is_leg_extension_primer(item) for item in unit.exercises)
+        (
+            _session_has_meaningful_muscle(all_units, MuscleGroup.CHEST)
+            and any(is_push_up_family(item) for item in unit.exercises)
+        )
+        or (
+            _session_has_meaningful_back(all_units)
+            and any(is_pull_up_family(item) for item in unit.exercises)
+        )
+        or (
+            _has_safe_leg_extension_primer(all_units, request)
+            and any(is_leg_extension_primer(item) for item in unit.exercises)
+        )
     )
 
 
