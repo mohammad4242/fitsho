@@ -141,6 +141,8 @@ def test_html_uses_projection_evidence_and_escapes_engine_diagnostics() -> None:
     assert "سابقه متنی برای ممیزی" in html
     assert "تولید موفق برنامه‌های خانگی با وزن بدن (کاربر ۶)" not in html
     assert "سد ایمنی آسیب‌های متنی ثبت‌نشده (کاربر ۱۰)" not in html
+    assert "برنامه‌های تولیدشده و پذیرفته‌شده" in html
+    assert "بهینه‌سازی‌شده" not in html
 
 
 def test_real_batch2_run_is_rollback_isolated_and_evidence_reconciles(monkeypatch) -> None:
@@ -205,3 +207,27 @@ def test_real_batch2_run_is_rollback_isolated_and_evidence_reconciles(monkeypatc
             )
     finally:
         engine.dispose()
+
+
+def test_repeated_real_batch2_runs_are_deterministic_and_profile_isolated(monkeypatch) -> None:
+    captured_user_ids = []
+    original_generate = batch2.generate_program
+
+    def capture_generate(*args, **kwargs):
+        result = original_generate(*args, **kwargs)
+        captured_user_ids.append(args[0].user_id)
+        return result
+
+    monkeypatch.setattr(batch2, "generate_program", capture_generate)
+
+    first_results = batch2.run_batch2_profiles()
+    second_results = batch2.run_batch2_profiles()
+
+    assert batch2.project_batch2_results(first_results) == batch2.project_batch2_results(
+        second_results
+    )
+
+    first_ids = captured_user_ids[: len(TEST_PROFILES_BATCH2)]
+    second_ids = captured_user_ids[len(TEST_PROFILES_BATCH2) :]
+    assert first_ids == second_ids
+    assert len(first_ids) == len(set(first_ids)) == len(TEST_PROFILES_BATCH2)

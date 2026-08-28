@@ -7,7 +7,7 @@ from decimal import Decimal
 from enum import Enum
 from html import escape
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import weasyprint
 from sqlalchemy import create_engine
@@ -42,6 +42,12 @@ from app.workouts.schemas import (
 from app.workouts.service import WorkoutGenerationService, WorkoutGenerationSettings
 
 _PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+BATCH2_USER_NAMESPACE = uuid5(NAMESPACE_URL, "fitsho-e2e-workout-engine-batch2")
+
+
+def batch2_user_id(profile_number: int) -> UUID:
+    """Return the stable, profile-isolated identity used by the deterministic harness."""
+    return uuid5(BATCH2_USER_NAMESPACE, f"profile:{profile_number}")
 
 
 def fa_num(val: object) -> str:
@@ -486,7 +492,7 @@ def run_batch2_profiles():
 
         for p in TEST_PROFILES_BATCH2:
             t0 = time.perf_counter()
-            user_id = uuid4()
+            user_id = batch2_user_id(p["num"])
             user = User(
                 id=user_id,
                 email=f"test_{user_id.hex[:8]}@example.com",
@@ -1230,7 +1236,7 @@ def generate_html_report(results: list) -> str:
       </div>
       <div class="stat-col">
         <div class="stat-val">{fa_num(success_count)}</div>
-        <div class="stat-lbl">برنامه‌های موفق و بهینه‌سازی‌شده</div>
+        <div class="stat-lbl">برنامه‌های تولیدشده و پذیرفته‌شده</div>
       </div>
       <div class="stat-col">
         <div class="stat-val error">{fa_num(fail_count)}</div>
