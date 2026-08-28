@@ -28,7 +28,9 @@ def test_generated_program_contains_the_final_quality_gate_stage() -> None:
     }
 
 
-def test_validation_failure_still_emits_rejected_final_quality_gate(monkeypatch) -> None:
+def test_validation_failure_still_emits_rejected_final_quality_gate_before_outer_exhaustion(
+    monkeypatch,
+) -> None:
     source = request(available_training_days=1)
     original_validate = engine.validate_program
 
@@ -40,7 +42,8 @@ def test_validation_failure_still_emits_rejected_final_quality_gate(monkeypatch)
     result = generate_program(source, full_catalog(), RULESET)
 
     assert result.program is None
-    assert result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
+    assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
+    assert "FORCED_VALIDATION_FAILURE" in result.errors
     attempts = result.decision_trace[0]["attempts"]
     gate = next(
         item
@@ -51,6 +54,46 @@ def test_validation_failure_still_emits_rejected_final_quality_gate(monkeypatch)
     assert gate["status"] == "rejected"
     assert "FORCED_VALIDATION_FAILURE" in gate["reason_codes"]
     assert gate["checks"]["validation"]["status"] == "rejected"
+
+
+def test_validation_failure_preserves_rejected_gate_in_template_attempt(monkeypatch) -> None:
+    source = request(
+        available_training_days=4,
+        training_experience="intermediate",
+        training_age_months=24,
+    )
+    original_validate = engine.validate_program
+
+    def force_validation_failure(program, source, ruleset):
+        report = original_validate(program, source, ruleset)
+        return replace(report, errors=(*report.errors, "FORCED_VALIDATION_FAILURE"))
+
+    monkeypatch.setattr(engine, "validate_program", force_validation_failure)
+    result = generate_program(
+        source,
+        full_catalog(),
+        RULESET,
+        reference_templates=(_four_day_reference(),),
+    )
+
+    assert result.program is None
+    assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
+    attempts = result.decision_trace[0]["attempts"]
+    template_entries = [
+        entry
+        for attempt in attempts
+        for entry in attempt.get("decision_trace", ())
+        if entry.get("stage") == "template_reference" and entry.get("status") == "rejected"
+    ]
+    assert template_entries
+    gate_entries = [
+        entry
+        for entry in template_entries[0]["decision_trace"]
+        if entry["stage"] == "final_quality_gate"
+    ]
+    assert len(gate_entries) == 1
+    assert gate_entries[0]["status"] == "rejected"
+    assert "FORCED_VALIDATION_FAILURE" in gate_entries[0]["reason_codes"]
 
 
 def _gate(program, source):

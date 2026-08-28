@@ -159,7 +159,6 @@ def generate_program(
         rejected_slot_candidates,
     )
     template_rejection_trace: tuple[dict[str, object], ...] = template_selection_trace
-    validation_failed = False
     for ranking in template_selection.candidates:
         reference = ranking.template
         try:
@@ -192,9 +191,6 @@ def generate_program(
                     reference_result,
                     _template_attempt_trace(ranking, status="succeeded"),
                 )
-            validation_failed = validation_failed or (
-                reference_result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
-            )
             rejection_category = _template_rejection_category(reference_result.errors)
             rejection = {
                 "stage": "template_reference",
@@ -306,9 +302,6 @@ def generate_program(
         )
         if result.is_success:
             return result
-        validation_failed = validation_failed or (
-            result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
-        )
         collected_errors.extend(result.errors)
         rejected_attempt: dict[str, object] = {
             "split": split.split_type.value,
@@ -351,9 +344,6 @@ def generate_program(
         )
         if result.is_success:
             return result
-        validation_failed = validation_failed or (
-            result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
-        )
         collected_errors.extend(result.errors)
         rejected_splits.append(
             {
@@ -372,11 +362,7 @@ def generate_program(
     )
     return ProgramGenerationResult(
         program=None,
-        error_code=(
-            GenerationErrorCode.PROGRAM_VALIDATION_FAILED
-            if validation_failed
-            else GenerationErrorCode.UNSATISFIED_CONSTRAINT
-        ),
+        error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
         errors=errors,
         safety_status=safety.status,
         rejected_candidates=eligibility.rejected,

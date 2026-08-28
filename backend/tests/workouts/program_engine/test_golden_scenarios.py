@@ -502,7 +502,7 @@ def test_generation_exhausts_safe_splits_when_required_pull_is_unavailable() -> 
     result = generate_program(source, catalog, RULESET)
 
     assert result.program is None
-    assert result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
+    assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
     assert result.errors[0] == "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED"
     assert "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT" in result.errors
     assert any(error.startswith("REQUIRED_PATTERN_UNAVAILABLE:") for error in result.errors)

@@ -1212,6 +1212,7 @@ def test_missing_safe_pattern_does_not_persist_partial_plan(db: Session) -> None
     assert error.value.error_code == "UNSATISFIED_CONSTRAINT"
     assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0
     generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
+    assert generation.error_code == "UNSATISFIED_CONSTRAINT"
     assert generation.safe_error_message == (
         "No safe workout layout satisfies all required session constraints."
     )
@@ -1273,6 +1274,12 @@ def test_failed_replacement_preserves_previous_active_plan(db: Session) -> None:
     with pytest.raises(WorkoutConstructionUnsatisfiedError):
         asyncio.run(_service(db).generate(user.id))
 
+    generation = (
+        db.query(WorkoutPlanGeneration)
+        .filter_by(user_id=user.id, status=WorkoutGenerationStatus.FAILED)
+        .one()
+    )
+    assert generation.error_code == "UNSATISFIED_CONSTRAINT"
     assert initial.plan.status is WorkoutPlanStatus.PENDING_REVIEW
     assert db.get(WorkoutPlan, active_plan.id).status is WorkoutPlanStatus.ACTIVE
 

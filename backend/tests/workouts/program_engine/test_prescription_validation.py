@@ -592,7 +592,7 @@ def test_missing_safe_candidates_reject_unsatisfied_coverage() -> None:
     )
 
     assert not result.is_success
-    assert result.error_code is GenerationErrorCode.PROGRAM_VALIDATION_FAILED
+    assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
     assert "FULL_BODY_COVERAGE_UNSATISFIED" in result.errors
 
 
