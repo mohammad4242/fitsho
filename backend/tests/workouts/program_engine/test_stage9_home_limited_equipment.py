@@ -362,6 +362,7 @@ def test_historical_bodyweight_home_paths_keep_exact_days_and_no_pull_up_bar_lea
         TrainingExperience.INTERMEDIATE,
         Goal.GENERAL_FITNESS,
         6,
+        session_duration_minutes=30,
     )
     result = generate_program(source, catalog, RULESET)
 

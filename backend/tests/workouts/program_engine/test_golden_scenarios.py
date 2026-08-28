@@ -105,6 +105,7 @@ def test_successful_generation_preserves_requested_training_days(requested_days:
 def test_six_day_generation_succeeds_with_scaled_frequency_caps() -> None:
     source = request(
         available_training_days=6,
+        session_duration_minutes=30,
         training_experience="intermediate",
         training_age_months=24,
     )
@@ -161,6 +162,8 @@ def test_exact_day_construction_failure_does_not_return_shorter_success() -> Non
 )
 def test_golden_constraints_and_recovery(name: str) -> None:
     source = golden_scenarios()[name]
+    if name == "high_job_poor_recovery":
+        source = source.model_copy(update={"session_duration_minutes": 30})
     result = generate_program(source, full_catalog(), RULESET)
 
     assert result.program is not None, result.errors
@@ -433,7 +436,7 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
         training_experience="intermediate",
         training_age_months=30,
         available_training_days=4,
-        session_duration_minutes=60,
+        session_duration_minutes=30,
         available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
         priority_muscles=[MuscleGroup.GLUTES],
     )
@@ -504,7 +507,7 @@ def test_priority_selection_prefers_a_fillable_split_with_distributed_exposure()
         training_experience="intermediate",
         training_age_months=30,
         available_training_days=4,
-        session_duration_minutes=60,
+        session_duration_minutes=30,
         priority_muscles=[MuscleGroup.GLUTES],
     )
     catalog = [

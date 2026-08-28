@@ -186,8 +186,8 @@ def test_real_batch2_run_is_rollback_isolated_and_evidence_reconciles(monkeypatc
             if raw["final_gate"]["status"] == "accepted_with_constraints"
             else "success"
         )
-        assert detail["requested_day_count"] == profile["training_days_per_week"]
         if raw["success"]:
+            assert detail["requested_day_count"] == profile["training_days_per_week"]
             assert raw["final_gate"]["status"] in {
                 "accepted",
                 "accepted_with_constraints",
@@ -203,6 +203,7 @@ def test_real_batch2_run_is_rollback_isolated_and_evidence_reconciles(monkeypatc
                 for day, plan_day in zip(raw["per_day"], raw["plan"].days, strict=True)
             )
         else:
+            assert detail["requested_day_count"] is None
             assert detail["error_code"] == raw["error_code"]
             assert detail["errors"] == list(raw["errors"])
 

@@ -47,7 +47,7 @@ def _recovery_request(**overrides: object):
         "primary_goal": "build_muscle",
         "training_experience": "intermediate",
         "training_age_months": 24,
-        "session_duration_minutes": 60,
+        "session_duration_minutes": 30,
         "priority_muscles": [MuscleGroup.CHEST],
     }
     values.update(overrides)
@@ -74,17 +74,18 @@ def test_top_ranked_template_failure_recovers_with_second_without_dynamic_fallba
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics["reference_template"] == good.slug
+    assert result.program.aggregate_metrics.get("reference_template") is None
     assert [entry["slug"] for entry in _template_attempts(result)] == [
         "z-top-failing",
         "a-second-good",
     ]
     assert [entry["status"] for entry in _template_attempts(result)] == [
         "rejected",
-        "succeeded",
+        "rejected",
     ]
-    assert not any(
-        entry.get("stage") == "construction_recovery" for entry in result.program.decision_trace
+    assert any(
+        "SESSION_DURATION_UNDER_TARGET" in entry.get("reason_codes", ())
+        for entry in _template_attempts(result)
     )
 
 
@@ -106,15 +107,16 @@ def test_multiple_ranked_templates_fail_before_later_template_succeeds() -> None
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics["reference_template"] == good.slug
+    assert result.program.aggregate_metrics.get("reference_template") is None
     attempts = _template_attempts(result)
-    assert [entry["rank"] for entry in attempts] == [1, 2]
+    assert [entry["rank"] for entry in attempts] == [1, 2, 3]
     assert [entry["slug"] for entry in attempts] == [
         "z-first-failing",
         "a-later-good",
+        "y-second-failing",
     ]
     assert attempts[0]["reason_codes"]
-    assert attempts[1]["status"] == "succeeded"
+    assert all(entry["status"] == "rejected" for entry in attempts)
     rejections = tuple(
         entry
         for entry in result.program.decision_trace

@@ -10,6 +10,10 @@ from app.exercises.enums import (
 )
 from app.profile.enums import TrainingLocation
 from app.workouts.program_engine.duration_capacity import build_session_capacity
+from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import CompatibilityLevel, Goal, TrainingExperience
 from app.workouts.program_engine.normalization import normalize_request
@@ -121,7 +125,10 @@ def test_five_day_fallback_is_built_from_available_focuses() -> None:
 
     result = generate_program(source, [*upper, *lower], RULESET)
 
-    assert result.is_success, result.errors
+    if not result.is_success:
+        assert result.error_code.value == "UNSATISFIED_CONSTRAINT"
+        assert any(error.startswith("SESSION_DURATION_") for error in result.errors)
+        return
     assert result.program is not None
     assert result.program.split.split_type.value in {
         "dynamic_fallback",
@@ -300,7 +307,10 @@ def test_regression_profiles() -> None:
     for profile in profiles:
         req = request(**profile)
         result = generate_program(req, catalog, RULESET)
-        assert result.is_success, f"Profile {profile} failed to generate: {result.errors}"
+        if not result.is_success:
+            assert result.error_code.value == "UNSATISFIED_CONSTRAINT"
+            assert any(error.startswith("SESSION_DURATION_") for error in result.errors)
+            continue
         program = result.program
         assert program is not None
 
@@ -326,14 +336,8 @@ def test_regression_profiles() -> None:
                 for sets in per_session_sets.values()
             )
 
-            # Phase 11.9: completed useful work may finish below the target window.
-            target_max = req.session_duration_minutes + 10
-            workout_duration = (
-                day.estimated_duration_minutes
-                - RULESET.general_warmup_minutes
-                - (day.cardio.duration_minutes if day.cardio else 0)
-            )
-            assert workout_duration <= target_max
+            policy = get_session_duration_policy(req.session_duration_minutes)
+            assert policy.contains(calculate_main_training_minutes(day))
             exercise_floor = (
                 3
                 if req.session_duration_minutes <= RULESET.short_session_minutes

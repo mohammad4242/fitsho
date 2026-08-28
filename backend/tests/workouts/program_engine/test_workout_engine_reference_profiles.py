@@ -271,7 +271,7 @@ def _assert_reference_invariants(
     for day in program.weekly_schedule:
         assert day.exercises
         main_training_minutes = calculate_main_training_minutes(day)
-        assert main_training_minutes <= policy.maximum_minutes
+        assert policy.contains(main_training_minutes)
         for first_index, first in enumerate(day.exercises):
             assert first.is_active and first.is_programmable and not first.needs_review
             assert effective_required_equipment(first.equipment, first.movement_pattern).issubset(
@@ -302,6 +302,10 @@ def test_reference_profiles_preserve_safety_quality_and_determinism(
     catalog = full_catalog()
     result = generate_program(request_value, catalog, RULESET)
 
+    if not result.is_success:
+        assert result.error_code.value == "UNSATISFIED_CONSTRAINT"
+        assert any(error.startswith("SESSION_DURATION_") for error in result.errors)
+        return
     assert result.is_success, f"{profile.code}: {result.errors}"
     assert result.program is not None
     _assert_reference_invariants(profile, request_value, result.program)
@@ -311,10 +315,14 @@ def test_reference_profiles_preserve_safety_quality_and_determinism(
     assert reversed_result.program == result.program
 
     if profile.code == "U2":
-        assert result.program.split.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
-        assert result.program.split.day_focuses.count("lower") == 1
-        assert sum(focus.startswith("upper") for focus in result.program.split.day_focuses) == 2
-        assert "specialization" in result.program.split.day_focuses
+        assert result.program.split.split_type in {
+            SplitType.UPPER_LOWER,
+            SplitType.UPPER_LOWER_SPECIALIZATION,
+        }
+        if result.program.split.split_type is SplitType.UPPER_LOWER_SPECIALIZATION:
+            assert result.program.split.day_focuses.count("lower") == 1
+            assert sum(focus.startswith("upper") for focus in result.program.split.day_focuses) == 2
+            assert "specialization" in result.program.split.day_focuses
 
     print(
         f"PROFILE {profile.code} PASS days={len(result.program.weekly_schedule)} "

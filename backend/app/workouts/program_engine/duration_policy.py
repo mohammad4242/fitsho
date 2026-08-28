@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import get_args
+from typing import cast, get_args
 
 from app.exercises.enums import ExerciseLabel, ExerciseType
 from app.profile.schemas import SessionDurationMinutes
@@ -11,6 +11,19 @@ def _value(item: object, field: str, default: object = None) -> object:
     if isinstance(item, Mapping):
         return item.get(field, default)
     return getattr(item, field, default)
+
+
+def _minutes(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int | float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return 0
+    return 0
 
 
 def _exercise_items(value: object) -> Iterable[object]:
@@ -30,13 +43,18 @@ def is_main_training_exercise(exercise: object) -> bool:
     if exercise_type in {ExerciseType.CORE.value, "cardio"}:
         return False
     labels = _value(exercise, "labels", ())
-    return not any(_enum_value(label) == ExerciseLabel.CARDIO.value for label in labels)
+    if not isinstance(labels, Iterable) or isinstance(labels, (str, bytes)):
+        return True
+    return not any(
+        _enum_value(label) == ExerciseLabel.CARDIO.value
+        for label in cast(Iterable[object], labels)
+    )
 
 
 def calculate_main_training_minutes_from_exercises(exercises: Iterable[object]) -> int:
     """Sum programmed exercise time, excluding only anatomical core and cardio."""
     return sum(
-        max(0, int(_value(exercise, "estimated_minutes", 0) or 0))
+        max(0, _minutes(_value(exercise, "estimated_minutes", 0)))
         for exercise in exercises
         if is_main_training_exercise(exercise)
     )
@@ -50,7 +68,7 @@ def calculate_main_training_minutes(day: object) -> int:
 def calculate_core_addon_minutes(value: object) -> int:
     """Return anatomical core exercise minutes that sit outside main training."""
     return sum(
-        max(0, int(_value(exercise, "estimated_minutes", 0) or 0))
+        max(0, _minutes(_value(exercise, "estimated_minutes", 0)))
         for exercise in _exercise_items(value)
         if _enum_value(_value(exercise, "exercise_type")) == ExerciseType.CORE.value
     )
@@ -61,12 +79,12 @@ def calculate_cardio_addon_minutes(day: object) -> int | None:
     cardio = _value(day, "cardio")
     if cardio is None:
         return None
-    return max(0, int(_value(cardio, "duration_minutes", 0) or 0))
+    return max(0, _minutes(_value(cardio, "duration_minutes", 0)))
 
 
 def calculate_total_session_minutes(day: object) -> int:
     """Return the stored total session estimate, including all attached add-ons."""
-    return max(0, int(_value(day, "estimated_duration_minutes", 0) or 0))
+    return max(0, _minutes(_value(day, "estimated_duration_minutes", 0)))
 
 
 def calculate_total_session_minutes_from_exercises(
@@ -78,7 +96,7 @@ def calculate_total_session_minutes_from_exercises(
     return max(
         0,
         general_warmup_minutes
-        + sum(max(0, int(_value(exercise, "estimated_minutes", 0) or 0)) for exercise in exercises)
+        + sum(max(0, _minutes(_value(exercise, "estimated_minutes", 0))) for exercise in exercises)
         + cardio_minutes,
     )
 

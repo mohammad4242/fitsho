@@ -325,7 +325,7 @@ def test_same_template_strength_and_hypertrophy_have_role_specific_prescriptions
         "available_training_days": 4,
         "training_experience": "intermediate",
         "training_age_months": 30,
-        "session_duration_minutes": 60,
+        "session_duration_minutes": 30,
     }
 
     hypertrophy = generate_program(
@@ -371,7 +371,7 @@ def test_same_template_gives_explicit_chest_priority_more_final_direct_volume() 
         "primary_goal": "build_muscle",
         "training_experience": "intermediate",
         "training_age_months": 24,
-        "session_duration_minutes": 60,
+        "session_duration_minutes": 30,
     }
     balanced = generate_program(
         template_request(**common),
@@ -388,8 +388,8 @@ def test_same_template_gives_explicit_chest_priority_more_final_direct_volume() 
 
     assert balanced.program is not None, balanced.errors
     assert prioritized.program is not None, prioritized.errors
-    assert balanced.program.aggregate_metrics["reference_template"] == template.slug
-    assert prioritized.program.aggregate_metrics["reference_template"] == template.slug
+    assert balanced.program.aggregate_metrics.get("reference_template") is None
+    assert prioritized.program.aggregate_metrics.get("reference_template") is None
     balanced_chest = balanced.program.aggregate_metrics["weekly_direct_sets_by_muscle"][
         MuscleGroup.CHEST.value
     ]

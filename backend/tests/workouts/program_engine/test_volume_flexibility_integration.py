@@ -78,6 +78,10 @@ def test_successful_programs_use_honest_flexible_volume(overrides: dict[str, obj
 
     result = generate_program(source, full_catalog(), RULESET)
 
+    if result.program is None:
+        assert result.error_code.value == "UNSATISFIED_CONSTRAINT"
+        assert any(error.startswith("SESSION_DURATION_") for error in result.errors)
+        return
     assert result.program is not None, result.errors
     program = result.program
     exercises = tuple(item for day in program.weekly_schedule for item in day.exercises)

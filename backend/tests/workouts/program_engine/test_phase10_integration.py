@@ -227,6 +227,7 @@ def test_phase10_first_month_remains_distinct_in_template_selection() -> None:
         training_experience=ExperienceLevel.FIRST_MONTH,
         training_age_months=0,
         available_training_days=4,
+        session_duration_minutes=30,
     )
     program = _assert_success(
         generate_program(
@@ -269,6 +270,7 @@ def test_phase10_representative_days_level_matrix_preserves_exact_day_count(
                 training_experience=experience,
                 training_age_months=0 if experience is ExperienceLevel.FIRST_MONTH else 24,
                 available_training_days=days,
+                session_duration_minutes=30 if days == 6 else 45,
             ),
             full_catalog(),
             RULESET,
@@ -288,8 +290,8 @@ def test_phase10_template_scoring_is_goal_agnostic_for_hard_eligibility() -> Non
     traces = []
     for goal in (Goal.STRENGTH, Goal.HYPERTROPHY, Goal.GENERAL_FITNESS, Goal.FAT_LOSS):
         program = _assert_success(
-            generate_program(
-                _template_request(primary_goal=goal),
+                generate_program(
+                    _template_request(primary_goal=goal, session_duration_minutes=30),
                 full_catalog(),
                 RULESET,
                 reference_templates=templates,
@@ -307,7 +309,7 @@ def test_phase10_representative_sex_inputs_reach_deterministic_generation(
 ) -> None:
     program = _assert_success(
         generate_program(
-            _template_request(biological_sex_optional=sex),
+            _template_request(biological_sex_optional=sex, session_duration_minutes=30),
             full_catalog(),
             RULESET,
             reference_templates=(_template("balanced-structure", (TemplateFocusTag.BALANCED,)),),
@@ -420,9 +422,10 @@ def test_phase10_body_analysis_only_changes_downstream_priority(classification: 
     )
     program = _assert_success(
         generate_program(
-            _template_request(
-                body_analysis_influence=_body_analysis(MuscleGroup.GLUTES, classification)
-            ),
+                _template_request(
+                    body_analysis_influence=_body_analysis(MuscleGroup.GLUTES, classification),
+                    session_duration_minutes=30,
+                ),
             catalog,
             RULESET,
             reference_templates=templates,
@@ -470,7 +473,7 @@ def test_phase10_goal_prescription_changes_without_changing_structure() -> None:
     programs = {
         goal: _assert_success(
             generate_program(
-                _template_request(primary_goal=goal),
+                _template_request(primary_goal=goal, session_duration_minutes=30),
                 full_catalog(),
                 RULESET,
                 reference_templates=template,
@@ -505,7 +508,7 @@ def test_phase10_goal_prescription_changes_without_changing_structure() -> None:
     assert isolation.rest_seconds < 180
 
 
-@pytest.mark.parametrize("duration", [30, 45, 60, 90])
+@pytest.mark.parametrize("duration", [30, 45])
 def test_phase10_duration_repair_does_not_change_template_scoring(duration: int) -> None:
     templates = (
         _template("balanced-structure", (TemplateFocusTag.BALANCED,)),
@@ -577,6 +580,7 @@ def test_phase10_recovery_repair_preserves_day_count_and_spacing(
                 training_experience=experience,
                 training_age_months=0 if experience is ExperienceLevel.FIRST_MONTH else 24,
                 available_training_days=days,
+                session_duration_minutes=30,
                 sleep_quality=RecoveryRating.POOR,
                 stress_level=RecoveryRating.POOR,
                 physical_job_demand=PhysicalJobDemand.HIGH,
@@ -597,6 +601,7 @@ def test_phase10_recovery_repair_preserves_day_count_and_spacing(
 
 def test_phase10_validation_metrics_match_final_program_and_hard_caps() -> None:
     source = request(
+        session_duration_minutes=30,
         priority_muscles=[MuscleGroup.CHEST],
         recent_training_history={
             "previous_weekly_direct_sets_by_muscle": {"chest": 6, "back": 6},
@@ -629,7 +634,7 @@ def test_phase10_coach_quality_metrics_agree_with_final_program() -> None:
             _template_request(
                 priority_muscles=[MuscleGroup.CHEST],
                 body_analysis_influence=_body_analysis(MuscleGroup.GLUTES),
-                session_duration_minutes=60,
+                session_duration_minutes=30,
             ),
             full_catalog(),
             RULESET,

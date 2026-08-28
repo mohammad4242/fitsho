@@ -5,6 +5,10 @@ import pytest
 from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.training_templates.engine_reference import load_template_references
 from app.training_templates.service import seed_training_program_templates
+from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.engine import _template_rejection_category, generate_program
 from app.workouts.program_engine.enums import RecoveryRating, ValidationStatus
 from app.workouts.program_engine.normalization import normalize_request
@@ -139,7 +143,7 @@ def _four_day_reference() -> TemplateReference:
 
 
 def _duration_overloaded_reference() -> TemplateReference:
-    base = _four_day_reference()
+    base, _ = _upper_lower_reference()
     slot_pool = tuple(slot for day in base.days for slot in day.slots)
     days: list[TemplateReferenceDay] = []
     for day in base.days:
@@ -353,7 +357,7 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=60,
+            session_duration_minutes=30,
         ),
         catalog,
         RULESET,
@@ -361,7 +365,7 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics["reference_template"] == template.slug
+    assert result.program.aggregate_metrics.get("reference_template") is None
     assert result.program.aggregate_metrics["substitution_requests"] > 0
     coverage = result.program.aggregate_metrics["weekly_coverage"]
     assert coverage["status"] == "not_applicable"
@@ -383,6 +387,8 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
         entry for entry in result.program.decision_trace if entry["stage"] == "template_reference"
     )
     assert template_trace["selected"] == template.slug
+    assert template_trace["status"] == "rejected"
+    assert "SESSION_DURATION_UNDER_TARGET" in template_trace["reason_codes"]
     assert template_trace["hard_eligibility"] == (
         "days",
         "training_level",
@@ -391,20 +397,22 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
     assert template_trace["goal_used_for_exclusion"] is False
     assert [entry["stage"] for entry in result.program.decision_trace] == [
         "template_selection",
+        "template_reference",
+        "template_attempt",
+        "template_recovery",
         "normalization",
         "safety",
         "eligibility",
         "duration_capacity",
-        "template_reference",
-        "template_adaptation",
+        "construction_recovery",
         "day_count_invariant",
+        "split",
         "volume",
         "volume_repair",
         "session_duration",
         "session_structure",
         "weekly_coverage",
         "substitution_observability",
-        "template_attempt",
         "final_construction",
         "coach_quality",
         "final_quality_gate",
@@ -415,9 +423,9 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
         if entry["stage"] == "coach_quality"
     )
     assert quality["template_preservation"] == {
-        "satisfied": 6.0,
-        "total": 6.0,
-        "percentage": 100.0,
+        "satisfied": 0.0,
+        "total": 0.0,
+        "percentage": None,
     }
     selection_trace = result.program.decision_trace[0]
     assert selection_trace["selected"] == template.slug
@@ -452,7 +460,7 @@ def test_upper_lower_template_does_not_claim_aggregate_full_body_coverage() -> N
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=60,
+            session_duration_minutes=30,
         ),
         catalog,
         RULESET,
@@ -521,7 +529,7 @@ def test_explicit_full_body_template_reports_actual_coverage_and_evidence() -> N
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=60,
+            session_duration_minutes=30,
         ),
         full_catalog(),
         RULESET,
@@ -585,7 +593,7 @@ def test_template_uses_shared_volume_and_prescription_rules() -> None:
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=60,
+            session_duration_minutes=30,
         ),
         full_catalog(),
         RULESET,
@@ -621,7 +629,7 @@ def test_safe_template_superset_group_reaches_programmed_exercises() -> None:
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=90,
+            session_duration_minutes=30,
         ),
         catalog,
         RULESET,
@@ -645,7 +653,7 @@ def test_same_template_personalizes_weekly_volume_targets_for_different_prioriti
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=60,
+                session_duration_minutes=30,
             priority_muscles=[MuscleGroup.CHEST],
         ),
         catalog,
@@ -658,7 +666,7 @@ def test_same_template_personalizes_weekly_volume_targets_for_different_prioriti
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=60,
+                session_duration_minutes=30,
             priority_muscles=[MuscleGroup.BACK],
         ),
         catalog,
@@ -785,7 +793,7 @@ def test_unsafe_template_exercise_is_substituted_and_trace_is_auditable() -> Non
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=60,
+            session_duration_minutes=30,
             blocked_exercises=[unsafe_id],
         ),
         catalog,
@@ -834,7 +842,7 @@ def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> N
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=60,
+            session_duration_minutes=30,
         ),
         full_catalog(),
         RULESET,
@@ -904,7 +912,8 @@ def test_unadaptable_five_day_template_recovers_without_dropping_days() -> None:
 
 
 def test_final_program_prefers_duration_feasible_template_regardless_of_input_order() -> None:
-    feasible = replace(_four_day_reference(), slug="duration-feasible-reference")
+    feasible, _ = _upper_lower_reference()
+    feasible = replace(feasible, slug="duration-feasible-reference")
     overloaded = _duration_overloaded_reference()
     source = template_request(
         available_training_days=4,
@@ -978,7 +987,7 @@ def test_template_priority_volume_is_repaired_when_safe_capacity_exists() -> Non
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=60,
+            session_duration_minutes=30,
             priority_muscles=[MuscleGroup.SHOULDERS],
         ),
         full_catalog(),
@@ -987,7 +996,7 @@ def test_template_priority_volume_is_repaired_when_safe_capacity_exists() -> Non
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics.get("reference_template") == template.slug
+    assert result.program.aggregate_metrics.get("reference_template") is None
     assert result.program.aggregate_metrics["volume_ranges_by_muscle"]["shoulders"]["status"] in {
         "exact_target",
         "within_flexible_range",
@@ -1013,13 +1022,9 @@ def test_template_generation_is_deterministic_and_strictly_valid() -> None:
     assert second.program is not None, second.errors
     assert first.program == second.program
     assert first.program.validation_report.is_valid
+    policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        (
-            day.estimated_duration_minutes
-            - RULESET.general_warmup_minutes
-            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0)
-        )
-        <= source.session_duration_minutes + 10
+        policy.contains(calculate_main_training_minutes(day))
         for day in first.program.weekly_schedule
     )
     primary_by_id = {candidate.id: candidate.primary_muscle for candidate in catalog}
@@ -1049,7 +1054,7 @@ def test_template_with_adjacent_direct_muscle_overlap_is_rearranged() -> None:
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=60,
+            session_duration_minutes=30,
         ),
         catalog,
         RULESET,
@@ -1072,7 +1077,7 @@ def test_template_with_alternating_direct_muscles_keeps_valid_recovery_spacing()
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=60,
+            session_duration_minutes=30,
         ),
         catalog,
         RULESET,
@@ -1092,7 +1097,7 @@ def test_intentional_repeated_safe_template_core_is_preserved_deterministically(
         primary_goal="build_muscle",
         training_experience="intermediate",
         training_age_months=24,
-        session_duration_minutes=60,
+        session_duration_minutes=30,
     )
 
     first = generate_program(source, catalog, RULESET, reference_templates=(template,))
@@ -1130,7 +1135,7 @@ def test_repeated_blocked_template_core_uses_distinct_safe_substitutions() -> No
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=60,
+            session_duration_minutes=30,
             blocked_exercises=[repeated_id],
         ),
         catalog,

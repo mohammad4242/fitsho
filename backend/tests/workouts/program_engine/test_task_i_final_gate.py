@@ -124,10 +124,10 @@ def test_final_gate_rejects_each_hard_final_invariant() -> None:
         weekly_schedule=(
             replace(
                 day,
-                estimated_duration_minutes=RULESET.general_warmup_minutes
-                + source.session_duration_minutes
-                + (day.cardio.duration_minutes if day.cardio else 0)
-                + 11,
+                exercises=(
+                    replace(day.exercises[0], estimated_minutes=99),
+                    *day.exercises[1:],
+                ),
             ),
         ),
     )
@@ -374,13 +374,13 @@ def test_final_gate_accepts_valid_dynamic_template_fallback_and_repaired_outputs
         primary_goal="build_muscle",
         training_experience="intermediate",
         training_age_months=24,
-        session_duration_minutes=60,
+        session_duration_minutes=30,
     )
     scenarios = (
         (request(available_training_days=1), ()),
         (source, (reference,)),
         (source, (fallback_reference,)),
-        (request(available_training_days=4, session_duration_minutes=60), ()),
+        (request(available_training_days=4, session_duration_minutes=30), ()),
     )
     for scenario, templates in scenarios:
         result = generate_program(scenario, full_catalog(), RULESET, reference_templates=templates)
