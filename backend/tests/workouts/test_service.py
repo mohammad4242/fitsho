@@ -370,7 +370,9 @@ def test_domain_candidate_uses_legacy_fallback_only_for_missing_metadata(db: Ses
     assert candidate.range_of_motion_profile == frozenset()
 
 
-def test_domain_candidate_infers_supported_row_axial_load_from_semantics(db: Session) -> None:
+def test_domain_candidate_defaults_unknown_row_axial_load_without_name_inference(
+    db: Session,
+) -> None:
     standing_row = _exercise(
         db,
         "standing-row",
@@ -391,7 +393,7 @@ def test_domain_candidate_infers_supported_row_axial_load_from_semantics(db: Ses
     supported_candidate = WorkoutGenerationService._domain_candidate(supported_row)
 
     assert standing_candidate.axial_loading_level is LoadLimit.MODERATE
-    assert supported_candidate.axial_loading_level is LoadLimit.LOW
+    assert supported_candidate.axial_loading_level is LoadLimit.MODERATE
 
 
 def test_lower_back_safety_uses_row_support_semantics_without_explicit_caution_tags(
@@ -438,6 +440,59 @@ def test_lower_back_safety_uses_row_support_semantics_without_explicit_caution_t
     assert standing_candidate.axial_loading_level is LoadLimit.MODERATE
     assert supported_candidate.body_position is BodyPosition.SUPPORTED
     assert supported_candidate.axial_loading_level is LoadLimit.LOW
+
+
+def test_lower_back_runtime_metadata_does_not_parse_row_display_names(
+    db: Session,
+) -> None:
+    unknown_supported_name = _exercise(
+        db,
+        "unknown-supported-name",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+    )
+    unknown_supported_name.name_en = "Chest-Supported Row"
+    unknown_standing_name = _exercise(
+        db,
+        "unknown-standing-name",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+    )
+    unknown_standing_name.name_en = "Standing Cable Row"
+    explicit_supported = _exercise(
+        db,
+        "explicit-supported-row",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+    )
+    explicit_supported.name_en = "Standing Barbell Row"
+    explicit_supported.body_position = BodyPosition.SUPPORTED
+    explicit_supported.axial_loading_level = LoadLimit.LOW
+    db.flush()
+
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.training_caution_items.append(
+        UserProfileTrainingCaution(caution=TrainingCaution.LOWER_BACK)
+    )
+    db.flush()
+    source = normalize_request(_service(db)._to_program_request(get_profile(db, user.id), None))
+    candidates = tuple(
+        WorkoutGenerationService._domain_candidate(item)
+        for item in (unknown_supported_name, unknown_standing_name, explicit_supported)
+    )
+    result = filter_eligible_exercises(source, candidates)
+    eligible_ids = {item.id for item in result.eligible}
+
+    assert candidates[0].body_position is BodyPosition.STANDING
+    assert candidates[0].axial_loading_level is LoadLimit.MODERATE
+    assert candidates[1].body_position is BodyPosition.STANDING
+    assert candidates[1].axial_loading_level is LoadLimit.MODERATE
+    assert candidates[2].body_position is BodyPosition.SUPPORTED
+    assert candidates[2].axial_loading_level is LoadLimit.LOW
+    assert unknown_supported_name.id not in eligible_ids
+    assert unknown_standing_name.id not in eligible_ids
+    assert explicit_supported.id in eligible_ids
 
 
 def test_catalog_snapshot_keeps_programming_metadata_and_stable_collections(

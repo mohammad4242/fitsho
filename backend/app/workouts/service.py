@@ -21,9 +21,11 @@ from app.ai.schemas import (
 )
 from app.body_analysis.providers import ProviderRoutingPreferences
 from app.exercises.enums import (
+    Equipment,
     ExerciseCautionTag,
     ExerciseContentType,
     MediaPresentation,
+    MovementPattern,
     MuscleGroup,
 )
 from app.exercises.media_resolver import resolve_primary_media
@@ -1122,19 +1124,41 @@ class WorkoutGenerationService:
         exercise: Exercise,
         caution_tags: frozenset[ExerciseCautionTag],
     ) -> _LegacyExerciseProgrammingMetadata:
-        """Infer only the legacy defaults needed by incomplete catalog rows."""
+        """Provide conservative runtime safety defaults for legacy rows.
+
+        Persisted semantic fields are selected by ``_domain_candidate``. These
+        defaults only cover missing fields on legacy rows. Safety-critical body
+        position and axial load never come from display-name inference; the
+        existing legacy inference is retained for non-safety workload fields.
+        """
 
         demands = infer_exercise_demands(exercise)
+        body_position = exercise.body_position or BodyPosition.STANDING
+        equipment = {item.equipment for item in exercise.equipment_items}
+        if ExerciseCautionTag.LOWER_BACK_LOADING in caution_tags:
+            axial_loading = LoadLimit.HIGH
+        elif Equipment.BARBELL in equipment and exercise.movement_pattern in {
+            MovementPattern.SQUAT,
+            MovementPattern.HIP_HINGE,
+        }:
+            axial_loading = LoadLimit.HIGH
+        elif body_position in {
+            BodyPosition.SEATED,
+            BodyPosition.LYING,
+            BodyPosition.SUPPORTED,
+        }:
+            axial_loading = LoadLimit.LOW
+        elif exercise.movement_pattern is MovementPattern.HORIZONTAL_PULL:
+            axial_loading = LoadLimit.MODERATE
+        else:
+            axial_loading = LoadLimit.LOW
+
         return _LegacyExerciseProgrammingMetadata(
-            body_position=demands.body_position,
+            body_position=body_position,
             stability_demand=demands.stability_demand,
             skill_demand=demands.skill_demand,
             impact_level=demands.impact_level,
-            axial_loading_level=(
-                LoadLimit.HIGH
-                if ExerciseCautionTag.LOWER_BACK_LOADING in caution_tags
-                else demands.axial_loading_level
-            ),
+            axial_loading_level=axial_loading,
             fatigue_cost=demands.fatigue_cost,
             setup_cost=demands.setup_cost,
             laterality=Laterality.BILATERAL,
