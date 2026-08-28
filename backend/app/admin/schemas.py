@@ -28,7 +28,7 @@ from app.exercises.enums import (
 )
 from app.exercises.schemas import ExerciseDetail
 from app.exercises.taxonomy import is_compatible_muscle_focus
-from app.profile.enums import ExperienceLevel, FitnessGoal
+from app.profile.enums import ExperienceLevel
 from app.training_templates.catalog_invariants import validate_catalog_topology
 from app.training_templates.models import (
     StructureFamily,
@@ -442,6 +442,8 @@ class AdminTrainingProgramTemplateWrite(BaseModel):
             raise ValueError("Intensity methods must be unique")
         if len(self.focus_tags) != len(set(self.focus_tags)):
             raise ValueError("Focus tags must be unique")
+        if any(str(tag) == "upper_priority" for tag in self.focus_tags):
+            raise ValueError("upper_priority is deprecated and cannot be used by active templates")
         validate_template_focus_tags(
             self.focus_tags,
             intensity_methods=self.intensity_methods,
@@ -460,9 +462,15 @@ class AdminTrainingProgramTemplateWrite(BaseModel):
             raise ValueError("First Month and Beginner templates cannot use advanced methods")
         for day in self.days:
             print("METHODS:", [slot.intensity_method for slot in day.slots])
-            exercise_count = sum(2 if slot.intensity_method == TrainingTemplateMethod.SUPERSET else 1 for slot in day.slots)
+            exercise_count = sum(
+                2 if slot.intensity_method == TrainingTemplateMethod.SUPERSET else 1
+                for slot in day.slots
+            )
             if exercise_count < 4 or exercise_count > 9:
-                raise ValueError("Each day must contain exactly 4 to 9 runtime exercises (a superset counts as two)")
+                raise ValueError(
+                    "Each day must contain exactly 4 to 9 runtime exercises "
+                    "(a superset counts as two)"
+                )
         for day in self.days:
             for slot in day.slots:
                 if slot.intensity_method is TrainingTemplateMethod.SUPERSET:

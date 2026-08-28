@@ -43,7 +43,7 @@ def test_phase11_6_profile_diversity_is_realistic_and_broad() -> None:
     }
     assert {item.sex for item in profiles} >= {None}
     assert any(item.priority_muscles for item in profiles)
-    assert any(len(item.priority_muscles) > 1 for item in profiles)
+    assert all(len(item.priority_muscles) <= 1 for item in profiles)
     assert any(item.body_analysis_priorities for item in profiles)
     assert any(len(item.body_analysis_priorities) > 1 for item in profiles)
     assert any(item.priority_muscles and item.body_analysis_priorities for item in profiles)

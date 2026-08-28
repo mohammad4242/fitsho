@@ -19,7 +19,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
 from app.exercises.enums import MovementPattern
 from app.exercises.models import Exercise, enum_values
-from app.profile.enums import FitnessGoal
 
 
 class StructureFamily(StrEnum):
@@ -257,7 +256,11 @@ class TrainingProgramTemplateSlot(Base):
             "rest_seconds BETWEEN 0 AND 600", name="ck_training_program_template_slots_rest"
         ),
         CheckConstraint(
-            "(intensity_method = 'superset' AND superset_exercise_id IS NOT NULL AND exercise_id != superset_exercise_id AND superset_exercise_slug_hint IS NOT NULL) OR (intensity_method != 'superset' AND superset_exercise_id IS NULL AND superset_exercise_slug_hint IS NULL)",
+            "(intensity_method = 'superset' AND superset_exercise_id IS NOT NULL "
+            "AND exercise_id != superset_exercise_id "
+            "AND superset_exercise_slug_hint IS NOT NULL) OR "
+            "(intensity_method != 'superset' AND superset_exercise_id IS NULL "
+            "AND superset_exercise_slug_hint IS NULL)",
             name="ck_training_program_template_slots_superset_validity"
         ),
     )

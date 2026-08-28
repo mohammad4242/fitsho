@@ -17,7 +17,6 @@ class TemplateFocusTag(StrEnum):
     BODY_PART_ROTATION = "body_part_rotation"
 
     BALANCED = "balanced"
-    UPPER_PRIORITY = "upper_priority"
     LOWER_PRIORITY = "lower_priority"
 
     CHEST_PRIORITY = "chest_priority"
@@ -67,10 +66,6 @@ TEMPLATE_FOCUS_TAG_DEFINITIONS: dict[TemplateFocusTag, TemplateTagDefinition] = 
         TemplateTagCategory.REGIONAL_BALANCE,
         "No region or muscle receives deliberate additional structural exposure.",
     ),
-    TemplateFocusTag.UPPER_PRIORITY: TemplateTagDefinition(
-        TemplateTagCategory.REGIONAL_BALANCE,
-        "The weekly layout deliberately adds upper-body structural exposure.",
-    ),
     TemplateFocusTag.LOWER_PRIORITY: TemplateTagDefinition(
         TemplateTagCategory.REGIONAL_BALANCE,
         "The weekly layout deliberately adds lower-body structural exposure.",
@@ -117,6 +112,10 @@ TEMPLATE_FOCUS_TAG_DEFINITIONS: dict[TemplateFocusTag, TemplateTagDefinition] = 
     ),
 }
 
+# Historical database rows may still contain this value. It is parsed and
+# discarded before a reference becomes active engine data.
+LEGACY_UPPER_PRIORITY_TAG = "upper_priority"
+
 CANONICAL_TEMPLATE_FOCUS_TAGS = frozenset(TEMPLATE_FOCUS_TAG_DEFINITIONS)
 TEMPLATE_FOCUS_TAGS_BY_CATEGORY: dict[TemplateTagCategory, frozenset[TemplateFocusTag]] = {
     category: frozenset(
@@ -129,9 +128,7 @@ TEMPLATE_FOCUS_TAGS_BY_CATEGORY: dict[TemplateTagCategory, frozenset[TemplateFoc
 PRIMARY_STRUCTURE_TAGS = TEMPLATE_FOCUS_TAGS_BY_CATEGORY[TemplateTagCategory.PRIMARY_STRUCTURE]
 REGIONAL_BALANCE_TAGS = TEMPLATE_FOCUS_TAGS_BY_CATEGORY[TemplateTagCategory.REGIONAL_BALANCE]
 MUSCLE_PRIORITY_TAGS = TEMPLATE_FOCUS_TAGS_BY_CATEGORY[TemplateTagCategory.MUSCLE_PRIORITY]
-REGIONAL_PRIORITY_TAGS = frozenset(
-    {TemplateFocusTag.UPPER_PRIORITY, TemplateFocusTag.LOWER_PRIORITY}
-)
+REGIONAL_PRIORITY_TAGS = frozenset({TemplateFocusTag.LOWER_PRIORITY})
 PRIORITY_TAGS = REGIONAL_PRIORITY_TAGS | MUSCLE_PRIORITY_TAGS
 _ALLOWED_HYBRID_STRUCTURES = frozenset(
     {frozenset({TemplateFocusTag.PUSH_PULL_LEGS, TemplateFocusTag.UPPER_LOWER})}
@@ -150,14 +147,6 @@ PRIORITY_TAG_BY_MUSCLE: dict[MuscleGroup, TemplateFocusTag] = {
 }
 
 REGIONAL_PRIORITY_TAG_BY_MUSCLE: dict[MuscleGroup, TemplateFocusTag] = {
-    MuscleGroup.CHEST: TemplateFocusTag.UPPER_PRIORITY,
-    MuscleGroup.BACK: TemplateFocusTag.UPPER_PRIORITY,
-    MuscleGroup.SHOULDERS: TemplateFocusTag.UPPER_PRIORITY,
-    MuscleGroup.BICEPS: TemplateFocusTag.UPPER_PRIORITY,
-    MuscleGroup.TRICEPS: TemplateFocusTag.UPPER_PRIORITY,
-    MuscleGroup.TRAPS: TemplateFocusTag.UPPER_PRIORITY,
-    MuscleGroup.FOREARMS: TemplateFocusTag.UPPER_PRIORITY,
-    MuscleGroup.NECK: TemplateFocusTag.UPPER_PRIORITY,
     MuscleGroup.GLUTES: TemplateFocusTag.LOWER_PRIORITY,
     MuscleGroup.QUADRICEPS: TemplateFocusTag.LOWER_PRIORITY,
     MuscleGroup.HAMSTRINGS: TemplateFocusTag.LOWER_PRIORITY,
@@ -229,7 +218,9 @@ _COMPOUND_MOVEMENT_PATTERNS = frozenset(
 
 
 def validate_focus_tags(tags: Iterable[str | TemplateFocusTag]) -> tuple[TemplateFocusTag, ...]:
-    values = tuple(str(tag) for tag in tags)
+    values = tuple(
+        str(tag) for tag in tags if str(tag) != LEGACY_UPPER_PRIORITY_TAG
+    )
     unknown = sorted(set(values) - CANONICAL_TEMPLATE_FOCUS_TAGS)
     if unknown:
         raise ValueError(f"Unknown template focus tag(s): {', '.join(unknown)}")
@@ -244,11 +235,6 @@ def validate_focus_tags(tags: Iterable[str | TemplateFocusTag]) -> tuple[Templat
         raise ValueError("Unsupported primary structure combination")
     if TemplateFocusTag.BALANCED in tag_set and tag_set & PRIORITY_TAGS:
         raise ValueError("Balanced templates cannot declare priority tags")
-    if {
-        TemplateFocusTag.UPPER_PRIORITY,
-        TemplateFocusTag.LOWER_PRIORITY,
-    }.issubset(tag_set):
-        raise ValueError("Upper and lower priority tags conflict")
     if TemplateFocusTag.SPECIALIZATION in tag_set and not tag_set & PRIORITY_TAGS:
         raise ValueError("Specialization requires a priority tag")
     return canonical
@@ -317,19 +303,10 @@ def _validate_structural_evidence(
     ):
         raise ValueError("body_part_rotation lacks structural evidence")
 
-    upper_days = sum(
-        bool(muscles & _UPPER_BODY_MUSCLES) and not bool(muscles & _LOWER_BODY_MUSCLES)
-        for muscles in direct_muscles
-    )
     lower_days = sum(
         bool(muscles & _LOWER_BODY_MUSCLES) and not bool(muscles & _UPPER_BODY_MUSCLES)
         for muscles in direct_muscles
     )
-    minimum_upper_days = 2 if len(days) == 3 else 3
-    if TemplateFocusTag.UPPER_PRIORITY in tags and not (
-        upper_days >= minimum_upper_days and upper_days > lower_days
-    ):
-        raise ValueError("upper_priority lacks structural evidence")
     if TemplateFocusTag.LOWER_PRIORITY in tags and lower_days < 2:
         raise ValueError("lower_priority lacks structural evidence")
     if TemplateFocusTag.BALANCED in tags:

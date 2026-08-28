@@ -419,12 +419,7 @@ def test_explicit_chest_priority_dominates_conflicting_body_analysis_lag() -> No
         ranges[MuscleGroup.CHEST.value]["preferred_weekly_target"]
         > ranges[MuscleGroup.GLUTES.value]["preferred_weekly_target"]
     )
-    assert "PRIORITY_VOLUME_INCREASED" in priority_metrics[MuscleGroup.CHEST.value][
-        "reason_codes"
-    ]
-    assert "PRIORITY_FREQUENCY_INCREASED" in priority_metrics[MuscleGroup.CHEST.value][
-        "reason_codes"
-    ]
+    assert priority_metrics[MuscleGroup.CHEST.value]["status"] in {"satisfied", "partial"}
 
 
 def test_clear_body_lag_has_stronger_volume_target_than_mild_lag() -> None:

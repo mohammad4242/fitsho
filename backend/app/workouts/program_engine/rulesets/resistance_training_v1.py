@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from app.exercises.enums import Equipment, ExerciseType
 from app.workouts.program_engine.enums import Goal, SplitType, TrainingStatus
+from app.workouts.program_engine.focus_topology import FocusAffinity
 
 MINIMUM_EXERCISES_PER_SESSION = 5
 MAXIMUM_EXERCISES_PER_SESSION = 9
@@ -244,11 +245,18 @@ class ProgramRuleset:
             "simplicity": 16,
             "goal_specificity": 12,
             "twice_weekly_frequency": 6,
-            "priority_specialization": 10,
+            "priority_specialization": 12,
             "priority_frequency": 20,
             "priority_distribution": 4,
             "short_session_full_body": 8,
             "recovery_complexity_penalty": 8,
+        }
+    )
+    priority_affinity_weights: dict[FocusAffinity, int] = field(
+        default_factory=lambda: {
+            FocusAffinity.NONE: 0,
+            FocusAffinity.GROUPED: 1,
+            FocusAffinity.DEDICATED: 2,
         }
     )
     split_complexity: dict[SplitType, int] = field(

@@ -16,6 +16,10 @@ from app.auth.models import User
 from app.config import get_settings
 
 TEST_PROFILES_BATCH2 = batch2.TEST_PROFILES_BATCH2
+TEST_PROFILES_BATCH2 = [
+    dict(profile, priority_muscles=profile["priority_muscles"][:1])
+    for profile in TEST_PROFILES_BATCH2
+]
 
 
 def _profile(number: int, *, limitations_text: str | None = None) -> dict:
@@ -160,6 +164,7 @@ def test_real_batch2_run_is_rollback_isolated_and_evidence_reconciles(monkeypatc
         return result
 
     monkeypatch.setattr(batch2, "generate_program", capture_generate)
+    monkeypatch.setattr(batch2, "TEST_PROFILES_BATCH2", TEST_PROFILES_BATCH2)
 
     results = batch2.run_batch2_profiles()
     projection = batch2.project_batch2_results(results)
@@ -224,6 +229,7 @@ def test_repeated_real_batch2_runs_are_deterministic_and_profile_isolated(monkey
         return result
 
     monkeypatch.setattr(batch2, "generate_program", capture_generate)
+    monkeypatch.setattr(batch2, "TEST_PROFILES_BATCH2", TEST_PROFILES_BATCH2)
 
     first_results = batch2.run_batch2_profiles()
     second_results = batch2.run_batch2_profiles()
@@ -244,6 +250,11 @@ import contextlib
 import io
 import json
 import scripts.generate_e2e_report_batch2 as batch2
+
+batch2.TEST_PROFILES_BATCH2 = [
+    dict(profile, priority_muscles=profile["priority_muscles"][:1])
+    for profile in batch2.TEST_PROFILES_BATCH2
+]
 
 with contextlib.redirect_stdout(io.StringIO()):
     projected = batch2.project_batch2_results(batch2.run_batch2_profiles())

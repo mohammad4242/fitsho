@@ -95,12 +95,10 @@ def build_sessions(
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     effective_priorities = frozenset(priority_policy.priorities)
     usage: Counter[UUID] = Counter()
-    weekly_direct_exposures: Counter[MuscleGroup] = Counter()
     sessions: list[SessionDraft] = []
     short_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
     for index, planned_focus in enumerate(split.day_focuses):
         focus = _resolve_focus(planned_focus, request, volume, ruleset)
-        upper_specialization_week = "upper_specialization" in split.day_focuses
         slots = slots_for_focus(focus)
         required_slot_count = sum(slot.required for slot in slots)
         day_capacity = session_capacity
@@ -243,13 +241,6 @@ def build_sessions(
             selected = min(
                 ranked,
                 key=lambda item: (
-                    _priority_frequency_is_capped(
-                        item.exercise,
-                        weekly_direct_exposures,
-                        priority_policy,
-                        ruleset,
-                        enabled=upper_specialization_week,
-                    ),
                     _role_repeated(item.exercise, chosen),
                     item.exercise.primary_muscle not in priority_policy.explicit_priorities,
                     usage[item.exercise.id],
@@ -295,13 +286,6 @@ def build_sessions(
             selected = min(
                 rank_exercises(request, options, ruleset, compatibility_levels=comp_levels),
                 key=lambda item: (
-                    _priority_frequency_is_capped(
-                        item.exercise,
-                        weekly_direct_exposures,
-                        priority_policy,
-                        ruleset,
-                        enabled=upper_specialization_week,
-                    ),
                     item.exercise.primary_muscle not in priority_policy.explicit_priorities,
                     _role_repeated(item.exercise, chosen),
                     usage[item.exercise.id],
@@ -395,9 +379,6 @@ def build_sessions(
                 else "BODY_ANALYSIS_PRIORITY_PLACED_FIRST"
             )
             reasons[chosen[0].id] = reasons[chosen[0].id] + (placement_reason,)
-        weekly_direct_exposures.update(
-            {item.primary_muscle for item in chosen if item.primary_muscle is not None}
-        )
         substitutions: dict[UUID, tuple[UUID, ...]] = {}
         substitution_decisions = []
         for item in chosen:
@@ -578,22 +559,6 @@ def _has_complementary_option(
     )
 
 
-def _priority_frequency_is_capped(
-    exercise: ExerciseCandidate,
-    weekly_direct_exposures: Counter[MuscleGroup],
-    policy: PriorityAllocationPolicy,
-    ruleset: ProgramRuleset,
-    *,
-    enabled: bool,
-) -> bool:
-    return bool(
-        enabled
-        and exercise.primary_muscle in policy.explicit_priorities
-        and weekly_direct_exposures[exercise.primary_muscle]
-        >= ruleset.maximum_direct_sessions_per_muscle_per_week
-    )
-
-
 def evaluate_exercise_focus_compatibility(
     exercise: ExerciseCandidate, focus: str
 ) -> SlotCompatibility:
@@ -746,6 +711,18 @@ def slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
             SlotSpec(frozenset({MovementPattern.ELBOW_FLEXION}), False, MuscleGroup.BICEPS),
             SlotSpec(frozenset({MovementPattern.ELBOW_FLEXION}), False, MuscleGroup.BICEPS),
         )
+    if focus == "biceps":
+        return (
+            SlotSpec(frozenset({MovementPattern.ELBOW_FLEXION}), True, MuscleGroup.BICEPS),
+            SlotSpec(frozenset({MovementPattern.ELBOW_FLEXION}), False, MuscleGroup.BICEPS),
+            SlotSpec(frozenset({MovementPattern.ELBOW_FLEXION}), False, MuscleGroup.BICEPS),
+        )
+    if focus == "triceps":
+        return (
+            SlotSpec(frozenset({MovementPattern.ELBOW_EXTENSION}), True, MuscleGroup.TRICEPS),
+            SlotSpec(frozenset({MovementPattern.ELBOW_EXTENSION}), False, MuscleGroup.TRICEPS),
+            SlotSpec(frozenset({MovementPattern.ELBOW_EXTENSION}), False, MuscleGroup.TRICEPS),
+        )
     if focus == "shoulders_traps":
         return (
             SlotSpec(SHOULDER_PATTERNS, True, MuscleGroup.SHOULDERS),
@@ -783,7 +760,12 @@ def _resolve_focus(
 ) -> str:
     if focus != "specialization":
         return focus
-    priorities = frozenset(PriorityAllocationPolicy.for_request(request, ruleset).priorities)
+    policy = PriorityAllocationPolicy.for_request(request, ruleset)
+    priorities = frozenset(policy.explicit_priorities or policy.priorities)
+    if priorities == {MuscleGroup.BICEPS}:
+        return "biceps"
+    if priorities == {MuscleGroup.TRICEPS}:
+        return "triceps"
     for muscle_group, specialized_focus in (
         ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
         ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),

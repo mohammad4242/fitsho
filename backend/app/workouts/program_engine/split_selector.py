@@ -18,6 +18,7 @@ from app.workouts.program_engine.enums import (
     SplitType,
     TrainingStatus,
 )
+from app.workouts.program_engine.focus_topology import MUSCLE_SPECIFIC_UPPER_PRIORITIES
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -39,13 +40,14 @@ from app.workouts.program_engine.volume_policy import recovery_burden_for_reques
 
 _DYNAMIC_FOCUSES = (
     "upper",
-    "upper_specialization",
     "lower",
     "push",
     "pull",
     "legs",
     "chest_triceps",
     "back_biceps",
+    "biceps",
+    "triceps",
     "shoulders_traps",
     "quadriceps_calves",
     "posterior_chain_core",
@@ -444,7 +446,7 @@ def generate_split_candidates(days: int) -> tuple[SplitCandidate, ...]:
             ),
             SplitCandidate(
                 SplitType.UPPER_LOWER_SPECIALIZATION,
-                ("upper", "lower", "upper", "upper_specialization"),
+                ("upper", "lower", "upper", "specialization"),
             ),
             SplitCandidate(
                 SplitType.FULL_BODY_FOUR,
@@ -576,17 +578,19 @@ def score_split_candidates(
         if (
             priority_policy.explicit_priorities
             and candidate.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
-            and len(candidate.day_focuses) == 5
+            and (
+                len(candidate.day_focuses) == 5
+                or (
+                    len(candidate.day_focuses) == 4
+                    and any(
+                        muscle in MUSCLE_SPECIFIC_UPPER_PRIORITIES
+                        for muscle in priority_policy.explicit_priorities
+                    )
+                )
+            )
         ):
             score += weights["priority_specialization"]
             reasons.append("SPLIT_SELECTED_FOR_PRIORITY_MUSCLE")
-        if (
-            candidate.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
-            and len(candidate.day_focuses) == 4
-            and _is_upper_priority_specialization(priority_policy)
-        ):
-            score += weights["priority_specialization"]
-            reasons.append("SPLIT_SELECTED_FOR_UPPER_PRIORITY_SPECIALIZATION")
         if (
             request.source.session_duration_minutes <= ruleset.short_session_minutes
             and candidate.split_type is SplitType.FULL_BODY_FOUR
@@ -706,7 +710,12 @@ def _capacity_focus(
 ) -> str:
     if focus != "specialization":
         return focus
-    priorities = frozenset(PriorityAllocationPolicy.for_request(request, ruleset).priorities)
+    policy = PriorityAllocationPolicy.for_request(request, ruleset)
+    priorities = frozenset(policy.explicit_priorities or policy.priorities)
+    if priorities == {MuscleGroup.BICEPS}:
+        return "biceps"
+    if priorities == {MuscleGroup.TRICEPS}:
+        return "triceps"
     for muscle_groups, specialized_focus in (
         ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
         ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),
@@ -797,8 +806,6 @@ def _select_weekdays(
         selected = tuple(sorted(preferred[:days]))
         if _spacing_is_acceptable(selected, focuses, ruleset):
             return selected
-    if _is_upper_specialization_layout(focuses):
-        return (0, 1, 3, 5)
     return ruleset.default_weekdays[days]
 
 
@@ -821,15 +828,3 @@ def _spacing_is_acceptable(
         if recovery_sensitive and gap < ruleset.minimum_recovery_gap_days:
             return False
     return True
-
-
-def _is_upper_priority_specialization(policy: PriorityAllocationPolicy) -> bool:
-    explicit = frozenset(policy.explicit_priorities)
-    return (
-        len(explicit.intersection(UPPER_REGION_MUSCLES)) >= 2
-        and classify_template_region(explicit) == "upper"
-    )
-
-
-def _is_upper_specialization_layout(focuses: tuple[str, ...]) -> bool:
-    return focuses == ("upper", "lower", "upper", "upper_specialization")

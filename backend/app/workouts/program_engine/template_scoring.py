@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from app.profile.enums import Sex
 from app.training_templates.tags import (
+    LEGACY_UPPER_PRIORITY_TAG,
     TemplateFocusTag,
     priority_tag_for_muscle,
     priority_tags_for_muscles,
@@ -17,7 +18,7 @@ from app.workouts.program_engine.supplemental_policy import SUPPLEMENTAL_MUSCLES
 @dataclass(frozen=True)
 class TemplateScoringPolicy:
     explicit_priority_exact: int = 100
-    explicit_priority_regional: int = 40
+    explicit_priority_lower_regional: int = 40
     explicit_priority_cap: int = 120
     body_analysis_clear_lag: int = 40
     body_analysis_mild_lag: int = 20
@@ -29,7 +30,6 @@ class TemplateScoringPolicy:
     female_glute_affinity: int = 20
     female_lower_affinity: int = 10
     male_chest_or_back_affinity: int = 20
-    male_upper_affinity: int = 10
     sex_cap: int = 20
     balanced_fallback: int = 5
 
@@ -79,7 +79,11 @@ def score_template_reference_result(
     ruleset: ProgramRuleset,
     policy: TemplateScoringPolicy = DEFAULT_TEMPLATE_SCORING_POLICY,
 ) -> TemplateScoringResult:
-    tags = frozenset(TemplateFocusTag(str(tag)) for tag in template.focus_tags)
+    tags = frozenset(
+        TemplateFocusTag(str(tag))
+        for tag in template.focus_tags
+        if str(tag) != LEGACY_UPPER_PRIORITY_TAG
+    )
     priority_score, priority_reasons = _priority_score(request, tags, policy)
     body_analysis_score, body_analysis_reasons = _body_analysis_score(
         request, tags, ruleset, policy
@@ -115,15 +119,21 @@ def _priority_score(
         muscle for muscle in request.source.priority_muscles if muscle not in SUPPLEMENTAL_MUSCLES
     )
     exact_matches = priority_tags_for_muscles(main_priorities) & tags
-    regional_matches = regional_priority_tags_for_muscles(main_priorities) & tags
+    lower_regional_matches = regional_priority_tags_for_muscles(main_priorities) & tags
     score = min(
         policy.explicit_priority_cap,
         len(exact_matches) * policy.explicit_priority_exact
-        + len(regional_matches) * policy.explicit_priority_regional,
+        + len(lower_regional_matches) * policy.explicit_priority_lower_regional,
+        # regional_priority_tags_for_muscles contains lower-body mappings only;
+        # upper-body selections have no regional priority credit.
     )
     reasons = (
         *(("EXPLICIT_PRIORITY_EXACT_MATCH",) if exact_matches else ()),
-        *(("EXPLICIT_PRIORITY_REGIONAL_MATCH",) if regional_matches else ()),
+        *(
+            ("EXPLICIT_PRIORITY_LOWER_REGIONAL_MATCH",)
+            if lower_regional_matches
+            else ()
+        ),
     )
     return score, reasons
 
@@ -212,15 +222,13 @@ def _sex_score(
             policy.male_chest_or_back_affinity
             if tags & {TemplateFocusTag.CHEST_PRIORITY, TemplateFocusTag.BACK_PRIORITY}
             else 0,
-            policy.male_upper_affinity if TemplateFocusTag.UPPER_PRIORITY in tags else 0,
         )
         reasons = (
-            ("SEX_PRIOR_UPPER_MATCH",)
+            ("SEX_PRIOR_MUSCLE_MATCH",)
             if tags
             & {
                 TemplateFocusTag.CHEST_PRIORITY,
                 TemplateFocusTag.BACK_PRIORITY,
-                TemplateFocusTag.UPPER_PRIORITY,
             }
             else ()
         )

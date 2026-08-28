@@ -7,6 +7,7 @@ from app.workouts.program_engine.enums import (
     ImpactLimit,
     TrainingStatus,
 )
+from app.workouts.program_engine.focus_topology import FocusAffinity, priority_affinity
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
     CardioPrescription,
@@ -14,7 +15,6 @@ from app.workouts.program_engine.schemas import (
     NormalizedProgramRequest,
     WorkoutDay,
 )
-from app.workouts.program_engine.slot_compatibility import focus_scope
 
 
 def planned_cardio_day_indexes(
@@ -96,8 +96,10 @@ def _focus_contains_priority(
 ) -> bool:
     if not priority_muscles:
         return False
-    _patterns, focus_muscles = focus_scope(focus)
-    return focus_muscles is not None and bool(focus_muscles.intersection(priority_muscles))
+    return any(
+        priority_affinity(focus, muscle) is not FocusAffinity.NONE
+        for muscle in priority_muscles
+    )
 
 
 def _safe_cardio(

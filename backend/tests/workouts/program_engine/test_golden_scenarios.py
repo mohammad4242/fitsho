@@ -442,7 +442,7 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
         available_training_days=4,
         session_duration_minutes=60,
         available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
-        priority_muscles=[MuscleGroup.GLUTES, MuscleGroup.QUADRICEPS],
+        priority_muscles=[MuscleGroup.GLUTES],
     )
     catalog = [item for item in full_catalog() if item.name != "Isometric Shrug"]
 
@@ -478,10 +478,7 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
         "SESSION_DURATION_TARGET_SATISFIED",
     }.intersection(recovery["reason_codes"])
     priority_metrics = first.program.aggregate_metrics["priority_metrics"]
-    assert all(
-        priority_metrics[muscle.value]["session_frequency"] >= 2
-        for muscle in (MuscleGroup.GLUTES, MuscleGroup.QUADRICEPS)
-    )
+    assert priority_metrics[MuscleGroup.GLUTES.value]["session_frequency"] >= 2
 
 
 def test_generation_exhausts_safe_splits_when_required_pull_is_unavailable() -> None:
@@ -516,7 +513,7 @@ def test_priority_selection_prefers_a_fillable_split_with_distributed_exposure()
         training_age_months=30,
         available_training_days=4,
         session_duration_minutes=60,
-        priority_muscles=[MuscleGroup.GLUTES, MuscleGroup.QUADRICEPS],
+        priority_muscles=[MuscleGroup.GLUTES],
     )
     catalog = [
         item
@@ -529,7 +526,4 @@ def test_priority_selection_prefers_a_fillable_split_with_distributed_exposure()
     assert result.program is not None, result.errors
     assert result.program.split.split_type is SplitType.UPPER_LOWER
     priority_metrics = result.program.aggregate_metrics["priority_metrics"]
-    assert all(
-        priority_metrics[muscle.value]["session_frequency"] >= 2
-        for muscle in (MuscleGroup.GLUTES, MuscleGroup.QUADRICEPS)
-    )
+    assert priority_metrics[MuscleGroup.GLUTES.value]["session_frequency"] >= 2

@@ -10,9 +10,13 @@ from app.workouts.program_engine.enums import (
     Goal,
     TrainingStatus,
 )
+from app.workouts.program_engine.focus_topology import (
+    MUSCLE_SPECIFIC_UPPER_PRIORITIES,
+    FocusAffinity,
+    priority_affinity,
+)
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import NormalizedProgramRequest
-from app.workouts.program_engine.slot_compatibility import focus_scope
 from app.workouts.program_engine.supplemental_policy import SUPPLEMENTAL_MUSCLES
 from app.workouts.program_engine.volume_policy import recovery_burden_for_request
 
@@ -182,9 +186,21 @@ class PriorityAllocationPolicy:
         if not self.priorities or self.preferred_frequency <= 0:
             return 0, ()
         exposure_counts = {
-            muscle: sum(self.focus_trains_muscle(focus, muscle) for focus in focuses)
+            muscle: sum(
+                priority_affinity(self._resolve_specialization(focus), muscle)
+                is not FocusAffinity.NONE
+                for focus in focuses
+            )
             for muscle in self.priorities
         }
+        affinity_score = sum(
+            ruleset.priority_affinity_weights[
+                priority_affinity(self._resolve_specialization(focus), muscle)
+            ]
+            for muscle in self.priorities
+            for focus in focuses
+            if muscle in MUSCLE_SPECIFIC_UPPER_PRIORITIES
+        )
         fulfilled = sum(
             min(exposure_counts[muscle], self.preferred_frequency) for muscle in self.priorities
         )
@@ -192,7 +208,7 @@ class PriorityAllocationPolicy:
         spread = max(exposure_counts.values()) - min(exposure_counts.values())
         frequency_weight = ruleset.split_weights.get("priority_frequency", 20)
         balance_penalty = ruleset.split_weights.get("priority_distribution", 4)
-        score = fulfilled * frequency_weight + covered - spread * balance_penalty
+        score = fulfilled * frequency_weight + covered + affinity_score - spread * balance_penalty
         reasons: list[str] = []
         if all(exposure_counts[muscle] >= self.preferred_frequency for muscle in self.priorities):
             reasons.append("PRIORITY_FREQUENCY_INCREASED")
@@ -203,13 +219,19 @@ class PriorityAllocationPolicy:
         return score, tuple(reasons)
 
     def focus_trains_muscle(self, focus: str, muscle: MuscleGroup) -> bool:
-        resolved = self._resolve_specialization(focus)
-        _patterns, muscles = focus_scope(resolved)
-        return muscles is None or muscle in muscles
+        return self.focus_affinity(focus, muscle) is not FocusAffinity.NONE
+
+    def focus_affinity(self, focus: str, muscle: MuscleGroup) -> FocusAffinity:
+        return priority_affinity(self._resolve_specialization(focus), muscle)
 
     def _resolve_specialization(self, focus: str) -> str:
         if focus != "specialization":
             return focus
+        priority_source = self.explicit_priorities or self.priorities
+        if priority_source == (MuscleGroup.BICEPS,):
+            return "biceps"
+        if priority_source == (MuscleGroup.TRICEPS,):
+            return "triceps"
         for group, specialized_focus in (
             ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
             ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),
@@ -217,7 +239,7 @@ class PriorityAllocationPolicy:
             ((MuscleGroup.QUADRICEPS, MuscleGroup.CALVES), "quadriceps_calves"),
             ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.ABS), "posterior_chain_core"),
         ):
-            if set(group).intersection(self.priorities):
+            if set(group).intersection(priority_source):
                 return specialized_focus
         return "chest_triceps"
 

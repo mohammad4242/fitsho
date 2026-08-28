@@ -529,7 +529,7 @@ def test_supplemental_work_is_last_optional_and_absent_from_title() -> None:
 def test_supplemental_policy_is_shared_and_does_not_drive_volume_or_split() -> None:
     normalized = _normalized(
         available_training_days=5,
-        priority_muscles=[MuscleGroup.ABS],
+        priority_muscles=[],
     )
     policy = PriorityAllocationPolicy.for_request(normalized, RULESET)
     split = SplitPlan(
@@ -551,7 +551,7 @@ def test_supplemental_policy_is_shared_and_does_not_drive_volume_or_split() -> N
         }
     )
     assert MuscleGroup.ABS not in policy.priorities
-    assert MuscleGroup.ABS in policy.supplemental_priorities
+    assert policy.supplemental_priorities == ()
     assert volume.direct_sets_for(MuscleGroup.ABS) == 0
     assert all(target.muscle not in SUPPLEMENTAL_MUSCLES for target in volume.targets)
     selected = select_split(normalized, RULESET)
@@ -626,7 +626,7 @@ def test_duration_pressure_trims_planned_supplemental_before_main_work() -> None
     )
     normalized = _normalized(
         session_duration_minutes=30,
-        priority_muscles=[MuscleGroup.FOREARMS],
+        priority_muscles=[],
     )
 
     repaired, reasons = _repair_overfill(

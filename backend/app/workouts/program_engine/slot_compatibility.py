@@ -217,6 +217,14 @@ def _scope_for_focus(
             PULL_PATTERNS | frozenset({MovementPattern.ELBOW_FLEXION}),
             frozenset({MuscleGroup.BACK, MuscleGroup.BICEPS}),
         ),
+        "biceps": (
+            frozenset({MovementPattern.ELBOW_FLEXION}),
+            frozenset({MuscleGroup.BICEPS}),
+        ),
+        "triceps": (
+            frozenset({MovementPattern.ELBOW_EXTENSION}),
+            frozenset({MuscleGroup.TRICEPS}),
+        ),
         "shoulders_traps": (
             SHOULDER_PATTERNS | frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.SHRUG}),
             frozenset({MuscleGroup.SHOULDERS, MuscleGroup.TRAPS}),

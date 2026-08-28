@@ -104,7 +104,10 @@ def test_patch_updates_training_age_months(client: TestClient, db: Session) -> N
 def test_patch_rejects_more_than_one_priority(
     client: TestClient, priority_muscles: list[str]
 ) -> None:
-    register(client, f"patch-invalid-priority-{len(priority_muscles)}-{priority_muscles[-1]}@example.com")
+    register(
+        client,
+        f"patch-invalid-priority-{len(priority_muscles)}-{priority_muscles[-1]}@example.com",
+    )
     create_profile(client)
 
     response = client.patch(

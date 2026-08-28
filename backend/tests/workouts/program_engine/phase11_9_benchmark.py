@@ -130,7 +130,7 @@ def _persona(
         },
         {
             "goal": Goal.GENERAL_FITNESS,
-            "priority_muscles": (MuscleGroup.GLUTES, MuscleGroup.SHOULDERS),
+            "priority_muscles": (MuscleGroup.GLUTES,),
             "body_analysis_priorities": (
                 (MuscleGroup.HAMSTRINGS, "clear_lag"),
                 (MuscleGroup.BACK, "mild_lag"),
@@ -150,7 +150,7 @@ def _persona(
         },
         {
             "goal": Goal.HYPERTROPHY,
-            "priority_muscles": (MuscleGroup.CHEST, MuscleGroup.BACK),
+            "priority_muscles": (MuscleGroup.CHEST,),
             "body_analysis_priorities": (),
             "sex": Sex.FEMALE,
             "duration_minutes": 45,
@@ -205,7 +205,7 @@ def _persona(
         },
         {
             "goal": Goal.STRENGTH,
-            "priority_muscles": (MuscleGroup.QUADRICEPS, MuscleGroup.GLUTES),
+            "priority_muscles": (MuscleGroup.QUADRICEPS,),
             "body_analysis_priorities": (
                 (MuscleGroup.HAMSTRINGS, "clear_lag"),
                 (MuscleGroup.BACK, "clear_lag"),

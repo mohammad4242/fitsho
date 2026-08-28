@@ -3,7 +3,7 @@ from dataclasses import replace
 from app.exercises.enums import Equipment, ExerciseCautionTag, MuscleGroup
 from app.workouts.program_engine import engine
 from app.workouts.program_engine.engine import generate_program
-from app.workouts.program_engine.enums import GenerationErrorCode, SplitType
+from app.workouts.program_engine.enums import GenerationErrorCode
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import ValidationReport
 from app.workouts.program_engine.validation import validate_program
@@ -362,30 +362,6 @@ def test_final_gate_rejects_unexplained_duration_constraint() -> None:
     assert "SESSION_DURATION_CONSTRAINT_UNEXPLAINED" in decision.reason_codes
     assert "SESSION_DURATION_CONSTRAINT_UNEXPLAINED" not in decision.constraint_reason_codes
     assert "SESSION_DURATION_UNDER_TARGET" not in decision.constraint_reason_codes
-
-
-def test_final_gate_rejects_failed_supported_upper_priority_topology() -> None:
-    source = request(
-        available_training_days=4,
-        primary_goal="build_muscle",
-        training_experience="intermediate",
-        training_age_months=24,
-        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS],
-    )
-    base = _program(source)
-    assert base.split.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
-    lower_day = next(day for day in base.weekly_schedule if day.focus == "lower")
-    upper_index = next(
-        index for index, day in enumerate(base.weekly_schedule) if day.focus.startswith("upper")
-    )
-    altered_days = list(base.weekly_schedule)
-    altered_days[upper_index] = replace(
-        altered_days[upper_index],
-        exercises=lower_day.exercises,
-    )
-    decision = _gate(replace(base, weekly_schedule=tuple(altered_days)), source)
-    assert decision.status == "rejected"
-    assert "UPPER_PRIORITY_TOPOLOGY_INVALID" in decision.reason_codes
 
 
 def test_final_gate_accepts_valid_dynamic_template_fallback_and_repaired_outputs() -> None:

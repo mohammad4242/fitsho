@@ -272,7 +272,10 @@ def update_training_program_template_slot(
 ) -> TrainingProgramTemplate | None:
     slot = db.scalar(
         select(TrainingProgramTemplateSlot)
-        .join(TrainingProgramTemplateDay, TrainingProgramTemplateDay.id == TrainingProgramTemplateSlot.template_day_id)
+        .join(
+            TrainingProgramTemplateDay,
+            TrainingProgramTemplateDay.id == TrainingProgramTemplateSlot.template_day_id,
+        )
         .where(
             TrainingProgramTemplateDay.template_id == template_id,
             TrainingProgramTemplateDay.id == day_id,
@@ -435,8 +438,13 @@ def _validate_exercise_links_for_slots(
                 # we relax it a bit by checking if they just aren't completely crazy
                 if pair[0].exercise_id == pair[1].exercise_id:
                     raise TemplateWriteError("Superset cannot use the exact same exercise twice")
-                if pair[0].axial_loading_level == LoadLimit.HIGH and pair[1].axial_loading_level == LoadLimit.HIGH:
-                    raise TemplateWriteError("Superset cannot combine two high-axial-load exercises")
+                if (
+                    pair[0].axial_loading_level == LoadLimit.HIGH
+                    and pair[1].axial_loading_level == LoadLimit.HIGH
+                ):
+                    raise TemplateWriteError(
+                        "Superset cannot combine two high-axial-load exercises"
+                    )
                 # otherwise allow it, relying on user's manual auth
 
     return {exercise.id: exercise.slug for exercise in exercises}
@@ -523,7 +531,11 @@ def _replace_template_content(
                     adaptation_priority=slot_payload.adaptation_priority,
                     superset_group=slot_payload.superset_group,
                     superset_exercise_id=slot_payload.superset_exercise_id,
-                    superset_exercise_slug_hint=exercise_slugs[slot_payload.superset_exercise_id] if slot_payload.superset_exercise_id else None,
+                    superset_exercise_slug_hint=(
+                        exercise_slugs[slot_payload.superset_exercise_id]
+                        if slot_payload.superset_exercise_id
+                        else None
+                    ),
                     sets=slot_payload.sets,
                     rep_min=slot_payload.rep_min,
                     rep_max=slot_payload.rep_max,

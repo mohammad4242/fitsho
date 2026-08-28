@@ -39,6 +39,7 @@ from app.profile.enums import (
     TrainingCaution,
     TrainingLocation,
 )
+from app.profile.exceptions import InvalidProfilePreferencesError
 from app.profile.models import BodyMeasurement, UserProfile, UserProfileTrainingCaution
 from app.profile.service import get_profile
 from app.profile.training_compatibility import UnsupportedResistanceTrainingCombinationError
@@ -130,6 +131,18 @@ def test_program_request_uses_persisted_profile_preferences(db: Session) -> None
 
     assert request.preferred_weekdays == (0, 3)
     assert request.priority_muscles == frozenset({MuscleGroup.BACK})
+
+
+def test_program_request_fails_closed_for_legacy_multiple_priorities(db: Session) -> None:
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.priority_muscles = [MuscleGroup.CHEST.value, MuscleGroup.BACK.value]
+    db.flush()
+
+    with pytest.raises(InvalidProfilePreferencesError):
+        _service(db)._to_program_request(get_profile(db, user.id), None)
+
+    assert profile.priority_muscles == [MuscleGroup.CHEST.value, MuscleGroup.BACK.value]
 
 
 def test_program_request_uses_explicit_profile_equipment_inventory(db: Session) -> None:
@@ -275,7 +288,7 @@ def test_service_generation_adapts_home_wrist_caution_without_wrist_loading(
     user = _user_with_profile(db)
     profile = get_profile(db, user.id).profile
     profile.training_caution_items.append(UserProfileTrainingCaution(caution=TrainingCaution.WRIST))
-    profile.priority_muscles = [MuscleGroup.QUADRICEPS.value, MuscleGroup.GLUTES.value]
+    profile.priority_muscles = [MuscleGroup.QUADRICEPS.value]
     _seed_candidates(db)
     service = _service(db)
     catalog = service._load_catalog()

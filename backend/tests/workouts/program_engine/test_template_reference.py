@@ -2,13 +2,12 @@ from dataclasses import replace
 
 import pytest
 
-from app.exercises.enums import Equipment, ExerciseType, MovementPattern, MuscleGroup
+from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.training_templates.engine_reference import load_template_references
 from app.training_templates.service import seed_training_program_templates
 from app.workouts.program_engine.engine import _template_rejection_category, generate_program
-from app.workouts.program_engine.enums import RecoveryRating, SplitType, ValidationStatus
+from app.workouts.program_engine.enums import RecoveryRating, ValidationStatus
 from app.workouts.program_engine.normalization import normalize_request
-from app.workouts.program_engine.recovery import recovery_spacing_is_valid
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
@@ -18,10 +17,8 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceSlot,
 )
 from app.workouts.program_engine.split_selector import (
-    LOWER_REGION_MUSCLES,
     classify_template_region,
 )
-from app.workouts.program_engine.template_selector import eligible_template_references
 from app.workouts.program_engine.template_sessions import build_template_sessions
 from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
@@ -543,81 +540,6 @@ def test_explicit_full_body_template_reports_actual_coverage_and_evidence() -> N
     assert coverage["availability_evidence"]["muscles"]["shoulders"]["eligible_candidate_count"] > 0
 
 
-def test_upper_priority_reference_template_preserves_three_upper_one_lower_topology() -> None:
-    base, catalog = _upper_lower_reference()
-    special = replace(
-        base,
-        slug="four-day-upper-priority-reference",
-        focus_tags=("upper_lower", "upper_priority"),
-        days=(base.days[0], base.days[1], base.days[2], replace(base.days[0], day_number=4)),
-    )
-
-    result = generate_program(
-        template_request(
-            available_training_days=4,
-            primary_goal="build_muscle",
-            training_experience="intermediate",
-            training_age_months=24,
-            session_duration_minutes=60,
-            priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS],
-        ),
-        catalog,
-        RULESET,
-        reference_templates=(special,),
-    )
-
-    assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics["reference_template"] == special.slug
-    assert result.program.split.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
-    assert sum(focus == "lower" for focus in result.program.split.day_focuses) == 1
-    assert sum(focus == "upper" for focus in result.program.split.day_focuses) == 3
-    assert recovery_spacing_is_valid(result.program.weekly_schedule, RULESET)
-
-
-def test_original_upper_priority_profile_keeps_template_topology_and_weekday_recovery() -> None:
-    base, catalog = _upper_lower_reference()
-    special = replace(
-        base,
-        slug="task-e-original-upper-priority-reference",
-        focus_tags=("upper_lower", "upper_priority"),
-        days=(base.days[0], base.days[1], base.days[2], replace(base.days[0], day_number=4)),
-    )
-    source = template_request(
-        age=31,
-        height_cm=175,
-        weight_kg=76,
-        available_training_days=4,
-        primary_goal="build_muscle",
-        training_experience="intermediate",
-        training_age_months=30,
-        session_duration_minutes=60,
-        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS],
-        seed_optional=17,
-    )
-
-    first = generate_program(source, catalog, RULESET, reference_templates=(special,))
-    second = generate_program(source, catalog, RULESET, reference_templates=(special,))
-
-    assert first.program is not None, first.errors
-    assert second.program is not None, second.errors
-    assert first.program == second.program
-    assert first.program.aggregate_metrics["reference_template"] == special.slug
-    assert first.program.split.day_focuses == ("upper", "lower", "upper", "upper")
-    assert len(first.program.weekly_schedule) == 4
-    assert first.program.split.weekdays == (0, 1, 2, 4)
-    upper_weekdays = tuple(
-        day.weekday
-        for day, focus in zip(
-            first.program.weekly_schedule,
-            first.program.split.day_focuses,
-            strict=True,
-        )
-        if focus.startswith("upper") and day.weekday is not None
-    )
-    assert upper_weekdays == (0, 2, 4)
-    assert recovery_spacing_is_valid(first.program.weekly_schedule, RULESET)
-
-
 @pytest.mark.parametrize(
     "supplemental",
     [MuscleGroup.ABS, MuscleGroup.OBLIQUES, MuscleGroup.LOWER_BACK],
@@ -626,226 +548,6 @@ def test_supplemental_only_template_day_cannot_satisfy_lower_topology(
     supplemental: MuscleGroup,
 ) -> None:
     assert classify_template_region((supplemental,)) is None
-
-
-@pytest.mark.parametrize(
-    ("supplemental", "pattern", "exercise_type"),
-    [
-        (MuscleGroup.ABS, MovementPattern.CORE_ANTI_EXTENSION, ExerciseType.CORE),
-        (MuscleGroup.OBLIQUES, MovementPattern.CORE_ANTI_LATERAL_FLEXION, ExerciseType.CORE),
-        (MuscleGroup.LOWER_BACK, MovementPattern.HIP_HINGE, ExerciseType.COMPOUND),
-    ],
-)
-def test_supplemental_only_lower_label_cannot_satisfy_upper_priority_template_topology(
-    supplemental: MuscleGroup,
-    pattern: MovementPattern,
-    exercise_type: ExerciseType,
-) -> None:
-    base, catalog = _upper_lower_reference()
-    supplemental_candidate = exercise(
-        f"task-e-supplemental-{supplemental.value}",
-        pattern,
-        supplemental,
-        exercise_type=exercise_type,
-    )
-    supplemental_slot = replace(
-        base.days[3].slots[0],
-        exercise_id=supplemental_candidate.id,
-        exercise_slug_hint=supplemental_candidate.name,
-        target_muscles=(supplemental,),
-        movement_pattern=pattern,
-    )
-    malformed_lower = replace(
-        base.days[3],
-        focus=(supplemental,),
-        structure_focus="lower",
-        slots=(supplemental_slot,),
-    )
-    reference = replace(
-        base,
-        slug=f"task-e-supplemental-only-{supplemental.value}",
-        focus_tags=("upper_lower", "upper_priority"),
-        days=(base.days[0], base.days[2], replace(base.days[0], day_number=3), malformed_lower),
-    )
-    source = template_request(
-        age=31,
-        height_cm=175,
-        weight_kg=76,
-        available_training_days=4,
-        primary_goal="build_muscle",
-        training_experience="intermediate",
-        training_age_months=30,
-        session_duration_minutes=60,
-        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS],
-        seed_optional=17,
-    )
-    normalized = normalize_request(source, RULESET)
-    catalog_with_supplemental = tuple(catalog + [supplemental_candidate])
-
-    assert eligible_template_references(normalized, catalog_with_supplemental, (reference,)) == ()
-
-    result = generate_program(
-        source,
-        list(catalog_with_supplemental),
-        RULESET,
-        reference_templates=(reference,),
-    )
-
-    assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics.get("reference_template") is None
-    assert result.program.split.day_focuses == ("upper", "lower", "upper", "upper_specialization")
-    lower_index = result.program.split.day_focuses.index("lower")
-    assert any(
-        exercise.primary_muscle in LOWER_REGION_MUSCLES
-        for exercise in result.program.weekly_schedule[lower_index].exercises
-    )
-    assert recovery_spacing_is_valid(result.program.weekly_schedule, RULESET)
-
-
-def test_upper_priority_does_not_accept_eligible_two_upper_two_lower_template() -> None:
-    reference, catalog = _upper_lower_reference()
-    source = template_request(
-        age=31,
-        height_cm=175,
-        weight_kg=76,
-        available_training_days=4,
-        primary_goal="build_muscle",
-        training_experience="intermediate",
-        training_age_months=30,
-        session_duration_minutes=60,
-        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS],
-        seed_optional=17,
-    )
-
-    result = generate_program(source, catalog, RULESET, reference_templates=(reference,))
-    repeat = generate_program(source, catalog, RULESET, reference_templates=(reference,))
-
-    assert result.program is not None, result.errors
-    assert repeat.program is not None, repeat.errors
-    assert result.program == repeat.program
-    assert result.program.aggregate_metrics.get("reference_template") is None
-    assert result.program.split.day_focuses == ("upper", "lower", "upper", "upper_specialization")
-    assert len(result.program.weekly_schedule) == 4
-    assert tuple(day.weekday for day in result.program.weekly_schedule) == (0, 1, 3, 5)
-    lower_weekdays = tuple(
-        day.weekday
-        for day, focus in zip(
-            result.program.weekly_schedule,
-            result.program.split.day_focuses,
-            strict=True,
-        )
-        if focus == "lower" and day.weekday is not None
-    )
-    assert lower_weekdays == (1,)
-    assert recovery_spacing_is_valid(result.program.weekly_schedule, RULESET)
-
-
-@pytest.mark.parametrize(
-    "lower_priority",
-    [
-        MuscleGroup.QUADRICEPS,
-        MuscleGroup.HAMSTRINGS,
-        MuscleGroup.GLUTES,
-        MuscleGroup.CALVES,
-        MuscleGroup.ADDUCTORS,
-        MuscleGroup.ABDUCTORS,
-        MuscleGroup.LEGS,
-    ],
-)
-def test_mixed_upper_and_lower_priority_keeps_two_upper_two_lower_template_eligible(
-    lower_priority: MuscleGroup,
-) -> None:
-    reference, catalog = _upper_lower_reference()
-    normalized = normalize_request(
-        template_request(
-            available_training_days=4,
-            primary_goal="build_muscle",
-            training_experience="intermediate",
-            training_age_months=30,
-            session_duration_minutes=60,
-            priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, lower_priority],
-            seed_optional=17,
-        ),
-        RULESET,
-    )
-
-    assert eligible_template_references(normalized, tuple(catalog), (reference,)) == (reference,)
-
-
-@pytest.mark.parametrize(
-    ("lower_muscle", "expected_weekdays"),
-    [
-        (MuscleGroup.QUADRICEPS, (0, 1, 2, 4)),
-        (MuscleGroup.HAMSTRINGS, (0, 1, 2, 4)),
-        (MuscleGroup.GLUTES, (0, 2, 3, 5)),
-        (MuscleGroup.CALVES, (0, 1, 2, 4)),
-        (MuscleGroup.ADDUCTORS, (0, 1, 2, 4)),
-        (MuscleGroup.ABDUCTORS, (0, 1, 2, 4)),
-        (MuscleGroup.LEGS, (0, 1, 2, 4)),
-    ],
-)
-def test_template_path_realizes_each_lower_region_as_lower_day(
-    lower_muscle: MuscleGroup,
-    expected_weekdays: tuple[int, ...],
-) -> None:
-    base, catalog = _upper_lower_reference()
-    lower_candidate = exercise(
-        f"template-{lower_muscle.value}",
-        MovementPattern.SQUAT,
-        lower_muscle,
-    )
-    lower_day = base.days[1]
-    lower_slot = replace(
-        lower_day.slots[0],
-        exercise_id=lower_candidate.id,
-        exercise_slug_hint=lower_candidate.name,
-        target_muscles=(lower_muscle,),
-        movement_pattern=MovementPattern.SQUAT,
-    )
-    lower_day = replace(lower_day, focus=(lower_muscle,), slots=(lower_slot,))
-    reference = replace(
-        base,
-        slug=f"task-e-lower-region-{lower_muscle.value}",
-        focus_tags=("upper_lower", "upper_priority"),
-        days=(base.days[0], lower_day, base.days[2], replace(base.days[0], day_number=4)),
-    )
-    source = template_request(
-        age=31,
-        height_cm=175,
-        weight_kg=76,
-        available_training_days=4,
-        primary_goal="build_muscle",
-        training_experience="intermediate",
-        training_age_months=30,
-        session_duration_minutes=60,
-        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS],
-        seed_optional=17,
-    )
-
-    result = generate_program(
-        source,
-        catalog + [lower_candidate],
-        RULESET,
-        reference_templates=(reference,),
-    )
-
-    assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics["reference_template"] == reference.slug
-    assert result.program.split.day_focuses == ("upper", "lower", "upper", "upper")
-    assert len(result.program.weekly_schedule) == 4
-    assert tuple(day.weekday for day in result.program.weekly_schedule) == expected_weekdays
-    lower_weekdays = tuple(
-        day.weekday
-        for day, focus in zip(
-            result.program.weekly_schedule,
-            result.program.split.day_focuses,
-            strict=True,
-        )
-        if focus == "lower" and day.weekday is not None
-    )
-    lower_index = result.program.split.day_focuses.index("lower")
-    assert lower_weekdays == (expected_weekdays[lower_index],)
-    assert recovery_spacing_is_valid(result.program.weekly_schedule, RULESET)
 
 
 def test_template_priority_stays_inside_flexible_range_with_duration_planning() -> None:

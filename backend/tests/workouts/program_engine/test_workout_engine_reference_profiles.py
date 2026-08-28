@@ -57,7 +57,7 @@ REFERENCE_PROFILES = (
         3,
         TrainingLocation.GYM,
         tuple(Equipment),
-        (MuscleGroup.GLUTES, MuscleGroup.ABS),
+        (MuscleGroup.GLUTES,),
         (ExerciseCautionTag.DEEP_KNEE_FLEXION,),
         45,
         6,
@@ -73,7 +73,7 @@ REFERENCE_PROFILES = (
         4,
         TrainingLocation.GYM,
         tuple(Equipment),
-        (MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.SHOULDERS),
+        (MuscleGroup.CHEST,),
         (),
         60,
         8,
@@ -105,7 +105,7 @@ REFERENCE_PROFILES = (
         3,
         TrainingLocation.GYM,
         tuple(Equipment),
-        (MuscleGroup.BACK, MuscleGroup.BICEPS),
+        (MuscleGroup.BACK,),
         (ExerciseCautionTag.LOWER_BACK_LOADING, ExerciseCautionTag.SPINAL_FLEXION),
         60,
         6,
@@ -121,7 +121,7 @@ REFERENCE_PROFILES = (
         3,
         TrainingLocation.HOME,
         (Equipment.BODYWEIGHT,),
-        (MuscleGroup.QUADRICEPS, MuscleGroup.GLUTES),
+        (MuscleGroup.QUADRICEPS,),
         (ExerciseCautionTag.WRIST_LOADING,),
         45,
         4,
@@ -137,7 +137,7 @@ REFERENCE_PROFILES = (
         5,
         TrainingLocation.GYM,
         tuple(Equipment),
-        (MuscleGroup.CHEST, MuscleGroup.QUADRICEPS, MuscleGroup.BACK),
+        (MuscleGroup.CHEST,),
         (),
         75,
         8,
@@ -153,7 +153,7 @@ REFERENCE_PROFILES = (
         5,
         TrainingLocation.GYM,
         tuple(Equipment),
-        (MuscleGroup.GLUTES, MuscleGroup.HAMSTRINGS, MuscleGroup.SHOULDERS),
+        (MuscleGroup.GLUTES,),
         (
             ExerciseCautionTag.OVERHEAD_POSITION,
             ExerciseCautionTag.SHOULDER_INTERNAL_ROTATION,
@@ -193,7 +193,7 @@ REFERENCE_PROFILES = (
         4,
         TrainingLocation.GYM,
         tuple(Equipment),
-        (MuscleGroup.GLUTES, MuscleGroup.BACK, MuscleGroup.ABS),
+        (MuscleGroup.GLUTES,),
         (),
         75,
         8,
@@ -209,7 +209,7 @@ REFERENCE_PROFILES = (
         3,
         TrainingLocation.HOME,
         (Equipment.BODYWEIGHT, Equipment.DUMBBELL),
-        (MuscleGroup.CHEST, MuscleGroup.BICEPS),
+        (MuscleGroup.CHEST,),
         (),
         45,
         4,
@@ -313,7 +313,8 @@ def test_reference_profiles_preserve_safety_quality_and_determinism(
     if profile.code == "U2":
         assert result.program.split.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
         assert result.program.split.day_focuses.count("lower") == 1
-        assert sum(focus.startswith("upper") for focus in result.program.split.day_focuses) == 3
+        assert sum(focus.startswith("upper") for focus in result.program.split.day_focuses) == 2
+        assert "specialization" in result.program.split.day_focuses
 
     print(
         f"PROFILE {profile.code} PASS days={len(result.program.weekly_schedule)} "

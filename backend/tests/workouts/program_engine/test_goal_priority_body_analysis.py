@@ -276,16 +276,16 @@ def test_11_lower_body_priority_survives() -> None:
     )
 
 
-def test_12_multiple_priorities_deterministic() -> None:
+def test_12_single_priority_is_deterministic() -> None:
     result1 = _generate(
         goal=Goal.HYPERTROPHY,
         days=4,
-        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK],
+        priority_muscles=[MuscleGroup.CHEST],
     )
     result2 = _generate(
         goal=Goal.HYPERTROPHY,
         days=4,
-        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK],
+        priority_muscles=[MuscleGroup.CHEST],
     )
     assert result1.program is not None and result2.program is not None
     assert result1.program.decision_trace == result2.program.decision_trace

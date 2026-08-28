@@ -33,7 +33,11 @@ def _run_batch2_profile(monkeypatch, profile_number: int):
     monkeypatch.setattr(
         batch2,
         "TEST_PROFILES_BATCH2",
-        [profile for profile in batch2.TEST_PROFILES_BATCH2 if profile["num"] == profile_number],
+        [
+            dict(profile, priority_muscles=profile["priority_muscles"][:1])
+            for profile in batch2.TEST_PROFILES_BATCH2
+            if profile["num"] == profile_number
+        ],
     )
     results = batch2.run_batch2_profiles()
 
@@ -42,7 +46,7 @@ def _run_batch2_profile(monkeypatch, profile_number: int):
     return results[0], captured[0]
 
 
-def test_batch2_profile_8_redistributes_vestigial_resistance_day(monkeypatch) -> None:
+def test_batch2_profile_8_preserves_volume_when_no_safe_redistribution_exists(monkeypatch) -> None:
     (profile, response), (source, generation) = _run_batch2_profile(monkeypatch, 8)
 
     assert response["success"] is True
@@ -51,13 +55,11 @@ def test_batch2_profile_8_redistributes_vestigial_resistance_day(monkeypatch) ->
     distribution = program.aggregate_metrics["weekly_distribution"]
 
     assert profile["num"] == 8
-    assert distribution["status"] == "applied"
-    assert distribution["reason_codes"] == ("WEEKLY_REDISTRIBUTION_APPLIED",)
-    assert distribution["before_exercise_counts"] == (6, 6, 6, 5, 3)
-    assert distribution["after_exercise_counts"] == (6, 5, 6, 5, 4)
-    assert min(distribution["after_exercise_counts"]) > min(distribution["before_exercise_counts"])
+    assert distribution["status"] == "constrained"
+    assert distribution["reason_codes"] == ("WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE",)
+    assert distribution["after_exercise_counts"] == distribution["before_exercise_counts"]
     assert sum(distribution["after_exercise_counts"]) == sum(distribution["before_exercise_counts"])
-    assert len(distribution["moved_exercise_ids"]) == 1
+    assert distribution["moved_exercise_ids"] == ()
 
     before_ids = Counter(distribution["before_exercise_ids"])
     after_ids = Counter(
@@ -71,7 +73,7 @@ def test_batch2_profile_8_redistributes_vestigial_resistance_day(monkeypatch) ->
         distribution["before_effective_sets_by_muscle"]
         == distribution["after_effective_sets_by_muscle"]
     )
-    assert program.split.weekdays == (0, 1, 2, 3, 5)
+    assert program.split.weekdays == (0, 1, 2, 4, 5)
     assert tuple(day.weekday for day in program.weekly_schedule) == program.split.weekdays
     assert recovery_spacing_is_valid(program.weekly_schedule, RULESET)
     assert all(

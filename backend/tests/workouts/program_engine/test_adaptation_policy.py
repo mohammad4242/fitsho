@@ -747,12 +747,12 @@ def test_difference_summary_is_deterministic_for_collection_order() -> None:
     back_id = uuid4()
     previous = CycleAdaptationProgramSnapshot(
         weekly_effective_sets_by_muscle={MuscleGroup.BACK: 8.0, MuscleGroup.CHEST: 10.0},
-        priority_muscles=(MuscleGroup.BACK, MuscleGroup.CHEST),
+        priority_muscles=(MuscleGroup.BACK,),
         disliked_exercises=(back_id, chest_id),
     )
     proposed = CycleAdaptationProgramSnapshot(
         weekly_effective_sets_by_muscle={MuscleGroup.CHEST: 10.0, MuscleGroup.BACK: 8.0},
-        priority_muscles=(MuscleGroup.CHEST, MuscleGroup.BACK),
+        priority_muscles=(MuscleGroup.BACK,),
         disliked_exercises=(chest_id, back_id),
     )
     state = _state()

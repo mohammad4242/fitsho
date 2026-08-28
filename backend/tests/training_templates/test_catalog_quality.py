@@ -59,11 +59,12 @@ def test_advanced_programs_use_the_approved_advanced_prescription() -> None:
     )
 
 
-def test_t03_declares_its_structural_upper_priority() -> None:
+def test_t03_is_a_neutral_upper_lower_structure() -> None:
     template = next(
         item
         for item in TRAINING_PROGRAM_TEMPLATE_SEEDS
         if item.slug == "p08-3-day-upper-lower-upper-beginner"
     )
 
-    assert TemplateFocusTag.UPPER_PRIORITY in template.focus_tags
+    assert TemplateFocusTag.UPPER_LOWER in template.focus_tags
+    assert "upper_priority" not in template.focus_tags

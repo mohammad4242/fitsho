@@ -21,11 +21,6 @@ from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     template_slot_allowed_patterns,
 )
-from app.workouts.program_engine.split_selector import (
-    LOWER_REGION_MUSCLES,
-    UPPER_REGION_MUSCLES,
-    classify_template_region,
-)
 from app.workouts.program_engine.template_scoring import (
     TemplateScore,
     score_template_reference_result,
@@ -355,8 +350,6 @@ def _hard_rejection_reason_codes(
         {candidate.id for candidate in eligible},
     ):
         reasons.append("CORE_SLOT_UNRESOLVABLE")
-    if not _upper_priority_template_topology_matches(request, template):
-        reasons.append("UPPER_PRIORITY_TEMPLATE_TOPOLOGY_MISMATCH")
     if ruleset is not None:
         capacity = session_capacity or build_session_capacity(
             request,
@@ -373,30 +366,6 @@ def _hard_rejection_reason_codes(
         if duration.status is CapacityFeasibility.PROVABLY_INFEASIBLE:
             reasons.append("REQUIRED_CORE_DURATION_INFEASIBLE")
     return tuple(reasons)
-
-
-def _upper_priority_template_topology_matches(
-    request: NormalizedProgramRequest,
-    template: TemplateReference,
-) -> bool:
-    explicit = set(request.source.priority_muscles)
-    if (
-        request.resistance_training_days != 4
-        or len(explicit.intersection(UPPER_REGION_MUSCLES)) < 2
-        or explicit.intersection(LOWER_REGION_MUSCLES)
-    ):
-        return True
-
-    topology: list[str] = []
-    for day in template.days:
-        muscles = frozenset(day.focus) or frozenset(
-            muscle for slot in day.slots for muscle in slot.target_muscles
-        )
-        region = classify_template_region(muscles)
-        if region is None:
-            return False
-        topology.append(region)
-    return len(topology) == 4 and topology.count("upper") == 3 and topology.count("lower") == 1
 
 
 def _template_level(request: NormalizedProgramRequest) -> str:

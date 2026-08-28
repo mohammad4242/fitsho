@@ -16,11 +16,6 @@ from app.workouts.program_engine.schemas import (
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_duration import SessionDurationRepairEvidence
-from app.workouts.program_engine.split_selector import (
-    LOWER_REGION_MUSCLES,
-    UPPER_REGION_MUSCLES,
-    classify_template_region,
-)
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
 
 FINAL_GATE_SCHEMA_VERSION = "final_quality_gate_v1"
@@ -89,7 +84,6 @@ def evaluate_final_program(
         "recovery": {"status": "passed", "reason_codes": ()},
         "safety": {"status": "passed", "reason_codes": ()},
         "day_count": {"status": "passed", "reason_codes": ()},
-        "upper_priority_topology": {"status": "not_applicable", "reason_codes": ()},
     }
 
     duration_codes = tuple(
@@ -221,13 +215,6 @@ def evaluate_final_program(
         reasons.extend(safety_errors)
         checks["safety"] = {"status": "rejected", "reason_codes": safety_errors}
 
-    topology_status, topology_reasons = _upper_priority_topology(program, request)
-    checks["upper_priority_topology"] = {
-        "status": topology_status,
-        "reason_codes": topology_reasons,
-    }
-    reasons.extend(topology_reasons)
-
     unique_reasons = tuple(dict.fromkeys(reasons))
     unique_constraints = tuple(dict.fromkeys(constraints))
     status = (
@@ -282,42 +269,6 @@ def _coverage_constraint_is_proven(coverage: Mapping[str, object]) -> bool:
         for category, names in (("patterns", pattern_reasons), ("muscles", muscle_reasons))
         for name in names
     )
-
-
-def _upper_priority_topology(
-    program: WorkoutProgram,
-    request: ProgramGenerationRequest,
-) -> tuple[str, tuple[str, ...]]:
-    priorities = frozenset(request.priority_muscles)
-    supported = (
-        request.available_training_days == 4
-        and program.split.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
-        and len(priorities.intersection(UPPER_REGION_MUSCLES)) >= 2
-        and not priorities.intersection(LOWER_REGION_MUSCLES)
-        and classify_template_region(priorities) == "upper"
-    )
-    if not supported:
-        return "not_applicable", ()
-    regions = tuple(_final_session_region(day) for day in program.weekly_schedule)
-    if len(regions) == 4 and regions.count("upper") == 3 and regions.count("lower") == 1:
-        return "passed", ()
-    return "rejected", ("UPPER_PRIORITY_TOPOLOGY_INVALID",)
-
-
-def _final_session_region(day: WorkoutDay) -> str | None:
-    primary_muscles = tuple(
-        item.primary_muscle for item in day.exercises if item.primary_muscle is not None
-    )
-    region = classify_template_region(primary_muscles)
-    if region is not None:
-        return region
-    target_region = classify_template_region(day.template_target_muscles)
-    if target_region is None:
-        return None
-    has_target_evidence = any(
-        classify_template_region((muscle,)) == target_region for muscle in primary_muscles
-    )
-    return target_region if has_target_evidence else None
 
 
 def _mapping(value: object) -> Mapping[str, object]:

@@ -162,7 +162,7 @@ def test_four_day_upper_lower_template_does_not_infer_specialization_from_region
 
 def test_generic_upper_template_gets_no_explicit_chest_priority_credit() -> None:
     normalized = _normalized(priority_muscles=[MuscleGroup.CHEST])
-    regional = _template("a-upper", TemplateFocusTag.UPPER_PRIORITY)
+    regional = _template("a-upper", "upper_priority")
     unrelated = _template("z-lower", TemplateFocusTag.LOWER_PRIORITY)
 
     assert _score(normalized, regional).priority_score == 0
@@ -184,8 +184,8 @@ def test_generic_upper_template_gets_no_explicit_chest_priority_credit() -> None
     ],
 )
 def test_supplemental_priority_does_not_drive_template_scoring(muscle: MuscleGroup) -> None:
-    normalized = _normalized(priority_muscles=[muscle])
-    upper = _template("upper", TemplateFocusTag.UPPER_PRIORITY)
+    normalized = _normalized()
+    upper = _template("upper", "upper_priority")
     lower = _template("lower", TemplateFocusTag.LOWER_PRIORITY)
 
     assert _score(normalized, upper).priority_score == 0
@@ -196,7 +196,7 @@ def test_supplemental_body_analysis_does_not_drive_template_scoring() -> None:
     normalized = _normalized(
         body_analysis_influence=_body_analysis((MuscleGroup.FOREARMS, "clear_lag")),
     )
-    upper = _template("upper", TemplateFocusTag.UPPER_PRIORITY)
+    upper = _template("upper", "upper_priority")
 
     assert _score(normalized, upper).body_analysis_score == 0
 
@@ -298,11 +298,10 @@ def test_female_without_explicit_priority_prefers_glute_then_lower() -> None:
     [
         (TemplateFocusTag.CHEST_PRIORITY, 20),
         (TemplateFocusTag.BACK_PRIORITY, 20),
-        (TemplateFocusTag.UPPER_PRIORITY, 10),
         (TemplateFocusTag.LOWER_PRIORITY, 0),
     ],
 )
-def test_male_without_explicit_priority_has_capped_upper_affinity(
+def test_male_without_explicit_priority_has_only_exact_muscle_affinity(
     tag: TemplateFocusTag, expected: int
 ) -> None:
     normalized = _normalized(biological_sex_optional="male")
@@ -336,22 +335,14 @@ def test_non_binary_or_missing_sex_is_neutral(sex: str | None) -> None:
     )
 
 
-def test_multiple_explicit_priorities_are_capped() -> None:
-    normalized = _normalized(
-        priority_muscles=[
-            MuscleGroup.CHEST,
-            MuscleGroup.BACK,
-            MuscleGroup.GLUTES,
-        ]
-    )
+def test_single_explicit_priority_has_exact_muscle_score() -> None:
+    normalized = _normalized(priority_muscles=[MuscleGroup.CHEST])
     template = _template(
-        "many-priorities",
+        "one-priority",
         TemplateFocusTag.CHEST_PRIORITY,
-        TemplateFocusTag.BACK_PRIORITY,
-        TemplateFocusTag.GLUTE_PRIORITY,
     )
 
-    assert _score(normalized, template).priority_score == 120
+    assert _score(normalized, template).priority_score == 100
 
 
 def test_balanced_fallback_is_weak() -> None:

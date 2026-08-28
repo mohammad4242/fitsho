@@ -24,6 +24,7 @@ from app.profile.training_compatibility import (
     ResistanceTrainingDayStatus,
     require_supported_resistance_training_days,
 )
+from app.profile.training_focus import validate_user_priority_muscles
 
 SessionDurationMinutes = Literal[30, 45, 60, 75, 90, 120]
 PlanDurationWeeks = Literal[4, 6, 8]
@@ -121,11 +122,7 @@ class ProfileCreate(BaseModel):
     def validate_priority_muscles(
         cls, muscles: tuple[MuscleGroup, ...] | None
     ) -> tuple[MuscleGroup, ...] | None:
-        if muscles is None:
-            return None
-        if len(muscles) != len(set(muscles)):
-            raise ValueError("Priority muscles must be unique")
-        return tuple(sorted(muscles, key=lambda muscle: muscle.value))
+        return validate_user_priority_muscles(muscles)
 
     @field_validator("available_equipment")
     @classmethod
@@ -237,11 +234,7 @@ class ProfileUpdate(BaseModel):
     def validate_priority_muscles(
         cls, muscles: tuple[MuscleGroup, ...] | None
     ) -> tuple[MuscleGroup, ...] | None:
-        if muscles is None:
-            return None
-        if len(muscles) != len(set(muscles)):
-            raise ValueError("Priority muscles must be unique")
-        return tuple(sorted(muscles, key=lambda muscle: muscle.value))
+        return validate_user_priority_muscles(muscles)
 
     @field_validator("available_equipment")
     @classmethod

@@ -33,11 +33,13 @@ from app.exercises.models import Exercise
 from app.exercises.programming_metadata import infer_exercise_demands
 from app.exercises.substitution_groups import effective_substitution_group
 from app.profile.enums import ExperienceLevel, Sex
+from app.profile.exceptions import InvalidProfilePreferencesError
 from app.profile.service import ProfileSnapshot, get_profile
 from app.profile.training_compatibility import (
     UnsupportedResistanceTrainingCombinationError,
     require_supported_resistance_training_days,
 )
+from app.profile.training_focus import validate_user_priority_muscles
 from app.training_templates.engine_reference import load_template_references
 from app.workout_cycles.enums import WorkoutCycleStatus
 from app.workout_cycles.models import WorkoutCycle, WorkoutCycleWeeklyCheckIn
@@ -243,6 +245,8 @@ class WorkoutGenerationService:
             )
         except UnsupportedResistanceTrainingCombinationError as error:
             raise ProgramGenerationRejectedError("UNSUPPORTED_RESISTANCE_TRAINING_DAYS") from error
+        except InvalidProfilePreferencesError as error:
+            raise ProgramGenerationRejectedError("INVALID_PROFILE_INPUT") from error
         except ValidationError as error:
             raise ProgramGenerationRejectedError("INVALID_PROFILE_INPUT") from error
         catalog = self._load_catalog(source_profile.profile.sex)
@@ -955,6 +959,12 @@ class WorkoutGenerationService:
             if profile.training_age_months is not None
             else legacy_training_age_months(profile.experience_level)
         )
+        try:
+            profile_priority_muscles = validate_user_priority_muscles(profile.priority_muscles)
+        except ValueError as error:
+            raise InvalidProfilePreferencesError(
+                "Persisted profile contains an unsupported or multiple user priorities"
+            ) from error
         values: dict[str, object] = {
             "user_id": profile.user_id,
             "age": self._age(profile.birth_date),
@@ -966,9 +976,7 @@ class WorkoutGenerationService:
             "training_age_months": training_age,
             "available_training_days": profile.training_days_per_week,
             "preferred_weekdays": tuple(profile.preferred_weekdays or ()),
-            "priority_muscles": frozenset(
-                MuscleGroup(value) for value in (profile.priority_muscles or ())
-            ),
+            "priority_muscles": frozenset(profile_priority_muscles or ()),
             "session_duration_minutes": profile.session_duration_minutes,
             "available_equipment": equipment,
             "training_location": profile.training_location,

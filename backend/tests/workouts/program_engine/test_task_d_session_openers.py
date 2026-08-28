@@ -493,7 +493,11 @@ def test_batch2_profiles_2_and_9_keep_selected_push_up_as_chest_opener(monkeypat
     monkeypatch.setattr(
         batch2,
         "TEST_PROFILES_BATCH2",
-        [item for item in batch2.TEST_PROFILES_BATCH2 if item["num"] in {2, 9}],
+        [
+            dict(item, priority_muscles=item["priority_muscles"][:1])
+            for item in batch2.TEST_PROFILES_BATCH2
+            if item["num"] in {2, 9}
+        ],
     )
 
     results = batch2.run_batch2_profiles()

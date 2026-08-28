@@ -100,7 +100,7 @@ def test_multiple_ranked_templates_fail_before_later_template_succeeds() -> None
         RULESET,
         reference_templates=(
             _unadaptable_reference("z-first-failing"),
-            _empty_reference("y-second-failing", TemplateFocusTag.UPPER_PRIORITY.value),
+            _unadaptable_reference("y-second-failing", TemplateFocusTag.UPPER_LOWER.value),
             good,
         ),
     )
@@ -108,15 +108,13 @@ def test_multiple_ranked_templates_fail_before_later_template_succeeds() -> None
     assert result.program is not None, result.errors
     assert result.program.aggregate_metrics["reference_template"] == good.slug
     attempts = _template_attempts(result)
-    assert [entry["rank"] for entry in attempts] == [1, 2, 3]
+    assert [entry["rank"] for entry in attempts] == [1, 2]
     assert [entry["slug"] for entry in attempts] == [
         "z-first-failing",
-        "y-second-failing",
         "a-later-good",
     ]
     assert attempts[0]["reason_codes"]
-    assert attempts[1]["reason_codes"]
-    assert attempts[2]["status"] == "succeeded"
+    assert attempts[1]["status"] == "succeeded"
     rejections = tuple(
         entry
         for entry in result.program.decision_trace
@@ -138,7 +136,7 @@ def test_all_template_candidates_are_exhausted_before_dynamic_fallback() -> None
         RULESET,
         reference_templates=(
             _unadaptable_reference("z-first-failing"),
-            _empty_reference("y-second-failing", TemplateFocusTag.UPPER_PRIORITY.value),
+            _empty_reference("y-second-failing", TemplateFocusTag.UPPER_LOWER.value),
         ),
     )
 
@@ -162,7 +160,7 @@ def test_all_template_candidates_are_exhausted_before_dynamic_fallback() -> None
 def test_template_retry_order_and_trace_are_deterministic() -> None:
     templates = (
         _unadaptable_reference("z-first-failing"),
-        _empty_reference("y-second-failing", TemplateFocusTag.UPPER_PRIORITY.value),
+        _empty_reference("y-second-failing", TemplateFocusTag.UPPER_LOWER.value),
         replace(
             _four_day_reference(),
             slug="a-later-good",

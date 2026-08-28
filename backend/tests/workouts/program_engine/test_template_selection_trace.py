@@ -74,7 +74,7 @@ def test_trace_contains_every_scored_candidate_and_reuses_ranked_score() -> None
     templates = (
         _template("balanced", TemplateFocusTag.BALANCED),
         _template("chest", TemplateFocusTag.CHEST_PRIORITY),
-        _template("upper", TemplateFocusTag.UPPER_PRIORITY),
+        _template("upper", "upper_priority"),
     )
 
     selection = select_template_reference_result(
@@ -98,7 +98,7 @@ def test_trace_contains_every_scored_candidate_and_reuses_ranked_score() -> None
         )
 
 
-def test_priority_reasons_and_sex_prior_suppression_are_traceable() -> None:
+def test_exact_priority_is_traceable_without_regional_upper_credit() -> None:
     normalized = _normalized(
         biological_sex_optional="female",
         priority_muscles=[MuscleGroup.CHEST],
@@ -108,7 +108,7 @@ def test_priority_reasons_and_sex_prior_suppression_are_traceable() -> None:
         tuple(full_catalog()),
         (
             _template("exact", TemplateFocusTag.CHEST_PRIORITY),
-            _template("regional", TemplateFocusTag.UPPER_PRIORITY),
+        _template("regional", "upper_priority"),
         ),
         RULESET,
     )
@@ -120,7 +120,6 @@ def test_priority_reasons_and_sex_prior_suppression_are_traceable() -> None:
         "SEX_PRIOR_DISABLED_BY_EXPLICIT_PRIORITY",
     )
     assert reasons["regional"] == (
-        "EXPLICIT_PRIORITY_REGIONAL_MATCH",
         "SEX_PRIOR_DISABLED_BY_EXPLICIT_PRIORITY",
     )
     assert all(item.score.sex_score == 0 for item in selection.candidates)

@@ -18,7 +18,9 @@ from app.workouts.program_engine import body_analysis
 
 
 def test_focus_tags_have_one_canonical_vocabulary() -> None:
-    assert set(TEMPLATE_FOCUS_TAG_DEFINITIONS) == {tag.value for tag in TemplateFocusTag}
+    assert set(TEMPLATE_FOCUS_TAG_DEFINITIONS) == {
+        tag.value for tag in TemplateFocusTag
+    }
     assert CANONICAL_TEMPLATE_FOCUS_TAGS == {
         "full_body",
         "upper_lower",
@@ -92,14 +94,6 @@ def test_unknown_and_duplicate_focus_tags_are_rejected() -> None:
                 TemplateFocusTag.CHEST_PRIORITY,
             ),
             "Balanced templates cannot declare priority tags",
-        ),
-        (
-            (
-                TemplateFocusTag.BODY_PART_ROTATION,
-                TemplateFocusTag.UPPER_PRIORITY,
-                TemplateFocusTag.LOWER_PRIORITY,
-            ),
-            "Upper and lower priority tags conflict",
         ),
         (
             (TemplateFocusTag.BODY_PART_ROTATION, TemplateFocusTag.SPECIALIZATION),
@@ -331,50 +325,30 @@ def test_priority_tags_have_structural_exposure_and_balanced_is_not_priority() -
             )
 
 
-def test_upper_and_lower_priority_tags_match_the_weekly_layout() -> None:
-    upper_templates = [
-        template
-        for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if TemplateFocusTag.UPPER_PRIORITY in template.focus_tags
-    ]
+def test_lower_priority_tags_match_the_weekly_layout() -> None:
     lower = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
         if TemplateFocusTag.LOWER_PRIORITY in template.focus_tags
     )
-    upper_muscles = {
-        MuscleGroup.CHEST,
-        MuscleGroup.BACK,
-        MuscleGroup.SHOULDERS,
-        MuscleGroup.BICEPS,
-        MuscleGroup.TRICEPS,
-    }
     lower_muscles = {
         MuscleGroup.QUADRICEPS,
         MuscleGroup.HAMSTRINGS,
         MuscleGroup.GLUTES,
         MuscleGroup.CALVES,
     }
-    upper_day_counts = [
-        sum(bool(set(day.direct_target_muscles) & upper_muscles) for day in template.days)
-        for template in upper_templates
-    ]
     lower_days = sum(bool(set(day.direct_target_muscles) & lower_muscles) for day in lower.days)
-    assert all(
-        upper_days >= (2 if len(template.days) == 3 else 3)
-        for template, upper_days in zip(upper_templates, upper_day_counts, strict=True)
-    )
     assert lower_days >= 2
 
 
 def test_seed_library_keeps_structural_emphasis_tags_without_user_mutation() -> None:
-    upper_priority = next(
+    upper_structure = next(
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
         if template.slug == "p18-4-day-3-upper-1-lower-beginner"
     )
-    assert TemplateFocusTag.UPPER_PRIORITY in upper_priority.focus_tags
-    assert TemplateFocusTag.UPPER_LOWER in upper_priority.focus_tags
+    assert "upper_priority" not in upper_structure.focus_tags
+    assert TemplateFocusTag.UPPER_LOWER in upper_structure.focus_tags
 
     lower_priority = next(
         template

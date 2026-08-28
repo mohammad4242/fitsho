@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal, cast
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -19,6 +19,7 @@ from app.exercises.enums import (
 )
 from app.profile.enums import TrainingLocation
 from app.profile.schemas import SessionDurationMinutes
+from app.profile.training_focus import validate_user_priority_muscles
 from app.training_templates.tags import TemplateFocusTag
 from app.workouts.program_engine.enums import (
     ActivityLevel,
@@ -199,6 +200,22 @@ class ProgramGenerationRequest(BaseModel):
         if len(value) != len(set(value)) or any(day < 0 or day > 6 for day in value):
             raise ValueError("preferred weekdays must be unique values from 0 through 6")
         return value
+
+    @field_validator("priority_muscles", mode="before")
+    @classmethod
+    def validate_priority_muscles(cls, value: object) -> frozenset[MuscleGroup]:
+        if value is None:
+            return frozenset()
+        values: tuple[MuscleGroup | str, ...]
+        if isinstance(value, (str, MuscleGroup)):
+            values = (value,)
+        else:
+            try:
+                values = cast(tuple[MuscleGroup | str, ...], tuple(value))  # type: ignore[arg-type]
+            except TypeError as error:
+                raise ValueError("Priority muscles must be iterable") from error
+        normalized = validate_user_priority_muscles(values)
+        return frozenset(normalized or ())
 
 
 @dataclass(frozen=True)
@@ -420,8 +437,6 @@ class TemplateReference:
                 return SplitType.PUSH_PULL_LEGS_UPPER_LOWER
             return SplitType.PUSH_PULL_LEGS
         if TemplateFocusTag.UPPER_LOWER in structures:
-            if self.days_per_week == 4 and TemplateFocusTag.UPPER_PRIORITY in structures:
-                return SplitType.UPPER_LOWER_SPECIALIZATION
             return SplitType.UPPER_LOWER
         if TemplateFocusTag.FULL_BODY in structures:
             return SplitType.FULL_BODY

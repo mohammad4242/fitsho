@@ -69,7 +69,7 @@ def test_bodyweight_wrist_caution_relaxes_unavailable_push_without_unsafe_select
         available_training_days=3,
         available_equipment=[Equipment.BODYWEIGHT],
         blocked_caution_tags=[ExerciseCautionTag.WRIST_LOADING],
-        priority_muscles=[MuscleGroup.QUADRICEPS, MuscleGroup.GLUTES],
+        priority_muscles=[MuscleGroup.QUADRICEPS],
     )
 
     result = generate_program(source, full_catalog(), RULESET)
@@ -295,7 +295,7 @@ def test_dynamic_sessions_use_actual_direct_muscles_for_recovery_spacing() -> No
             training_age_months=24,
             available_training_days=5,
             session_duration_minutes=60,
-            priority_muscles=[MuscleGroup.GLUTES, MuscleGroup.HAMSTRINGS],
+            priority_muscles=[MuscleGroup.GLUTES],
         ),
         full_catalog(),
         RULESET,

@@ -216,7 +216,7 @@ def test_production_dense_chest_shoulder_generation_repairs_weekdays_and_preserv
             primary_goal=Goal.HYPERTROPHY,
             training_experience=TrainingExperience.ADVANCED,
             training_age_months=72,
-            priority_muscles=[MuscleGroup.CHEST, MuscleGroup.SHOULDERS],
+            priority_muscles=[MuscleGroup.CHEST],
             preferred_weekdays=tuple(range(training_days)),
         )
         result = generate_program(source, catalog, RULESET)

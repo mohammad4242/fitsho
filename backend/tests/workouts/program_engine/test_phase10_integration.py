@@ -437,14 +437,14 @@ def test_phase10_body_analysis_only_changes_downstream_priority(classification: 
     )
 
 
-def test_phase10_multiple_explicit_priorities_are_preserved_within_caps() -> None:
+def test_phase10_single_explicit_priority_is_preserved_within_caps() -> None:
     catalog = [
         *full_catalog(),
         exercise("glute-kickback", MovementPattern.HIP_EXTENSION, MuscleGroup.GLUTES),
     ]
     program = _assert_success(
         generate_program(
-            _template_request(priority_muscles=[MuscleGroup.CHEST, MuscleGroup.GLUTES]),
+            _template_request(priority_muscles=[MuscleGroup.CHEST]),
             catalog,
             RULESET,
             reference_templates=(
@@ -456,7 +456,6 @@ def test_phase10_multiple_explicit_priorities_are_preserved_within_caps() -> Non
 
     priority_metrics = program.aggregate_metrics["priority_metrics"]
     assert priority_metrics[MuscleGroup.CHEST.value]["status"] in {"satisfied", "partial"}
-    assert priority_metrics[MuscleGroup.GLUTES.value]["status"] in {"satisfied", "partial"}
     assert all(
         values["actual_effective_volume"] <= values["effective_maximum_hard"]
         for values in program.aggregate_metrics["volume_ranges_by_muscle"].values()
@@ -595,7 +594,7 @@ def test_phase10_recovery_repair_preserves_day_count_and_spacing(
 
 def test_phase10_validation_metrics_match_final_program_and_hard_caps() -> None:
     source = request(
-        priority_muscles=[MuscleGroup.CHEST, MuscleGroup.BACK],
+        priority_muscles=[MuscleGroup.CHEST],
         recent_training_history={
             "previous_weekly_direct_sets_by_muscle": {"chest": 6, "back": 6},
             "previous_volume_confidence": 0.9,

@@ -78,7 +78,7 @@ def test_useful_workload_limit_does_not_force_artificial_rest() -> None:
         training_experience="beginner",
         training_age_months=3,
         primary_goal="muscle_gain",
-        priority_muscles=["chest", "back"],
+        priority_muscles=["chest"],
     )
 
     result = generate_program(source, full_catalog(), RULESET, reference_templates=())

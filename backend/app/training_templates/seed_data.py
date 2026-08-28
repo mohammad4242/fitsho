@@ -744,10 +744,10 @@ _DEFINITIONS: tuple[CanonicalTemplateDefinition, ...] = (
         "t03-3-day-upper-lower-upper",
         "3-Day Upper / Lower / Upper",
         "بالاتنه / پایین‌تنه / بالاتنه سه روزه",
-        "An upper-priority three-day template with planned upper variation.",
-        "قالب سه‌روزه با اولویت بالاتنه و تنوع برنامه‌ریزی‌شده در دو جلسه بالاتنه.",
+        "A three-day upper/lower template with planned upper variation.",
+        "قالب سه‌روزه بالاتنه و پایین‌تنه با تنوع برنامه‌ریزی‌شده در دو جلسه بالاتنه.",
         NO_FIRST_MONTH,
-        (Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
+        (Tag.UPPER_LOWER,),
         (
             _day_definition(
                 "Upper A",
@@ -916,10 +916,10 @@ _DEFINITIONS: tuple[CanonicalTemplateDefinition, ...] = (
         "t06-4-day-3-upper-1-lower",
         "4-Day 3 Upper + 1 Lower",
         "چهارروزه؛ سه بالاتنه و یک پایین‌تنه",
-        "An upper-priority catalog structure with one complete lower-body session.",
-        "ساختار چهارروزه با اولویت بالاتنه و یک جلسه کامل پایین‌تنه.",
+        "A catalog structure with three upper-body sessions and one complete lower-body session.",
+        "ساختار چهارروزه با سه جلسه بالاتنه و یک جلسه کامل پایین‌تنه.",
         NO_FIRST_MONTH,
-        (Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
+        (Tag.UPPER_LOWER,),
         (
             _day_definition(
                 "Upper A: Chest + Back",
@@ -1239,12 +1239,12 @@ _DEFINITIONS: tuple[CanonicalTemplateDefinition, ...] = (
     ),
     _definition(
         "t11-5-day-ppl-upper-lower-priority",
-        "5-Day PPL + Upper Priority + Lower Priority",
-        "پنج‌روزه PPL با اولویت بالاتنه و پایین‌تنه",
+        "5-Day PPL + Upper / Lower",
+        "پنج‌روزه PPL با بالاتنه و پایین‌تنه",
         "A higher-volume five-day structure with meaningful second exposures.",
         "ساختار پنج‌روزه با حجم بیشتر و مواجهه دوم معنادار.",
         INTERMEDIATE_ADVANCED,
-        (Tag.PUSH_PULL_LEGS, Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
+        (Tag.PUSH_PULL_LEGS, Tag.UPPER_LOWER),
         (
             _day_definition(
                 "Push",
@@ -1910,10 +1910,10 @@ _LEVEL_SLUG_SUFFIX = {
 _APPROVED_TAGS = {
     "2d-full-body-ab": (Tag.FULL_BODY,),
     "3d-upper-lower-full-body": (Tag.UPPER_LOWER,),
-    "3d-upper-lower-upper": (Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
+    "3d-upper-lower-upper": (Tag.UPPER_LOWER,),
     "3d-lower-upper-lower": (Tag.UPPER_LOWER, Tag.LOWER_PRIORITY),
     "4d-upper-lower-2x": (Tag.UPPER_LOWER,),
-    "4d-3-upper-1-lower": (Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
+    "4d-3-upper-1-lower": (Tag.UPPER_LOWER,),
     "4d-3-lower-1-upper": (Tag.UPPER_LOWER, Tag.LOWER_PRIORITY),
     "4d-push-pull-quads-posterior": (Tag.PUSH_PULL_LEGS, Tag.BALANCED),
 }
@@ -2906,9 +2906,9 @@ _APPROVED_DAY_TITLES_FA.update(
 
 _NEW_STRUCTURE_NAMES = {
     "5d-classic-body-part-approved": ("5-Day Classic Body-Part Split", "تقسیم کلاسیک عضله‌ای پنج‌روزه"),
-    "5d-split-weak-point": ("5-Day Split + Weak Point", "تقسیم پنج‌روزه با نقطه ضعف"),
-    "5d-upper-priority-iranian": ("5-Day Upper-Priority Iranian Split", "تقسیم ایرانی پنج‌روزه با اولویت بالاتنه"),
-    "5d-upper-lower-specialty": ("5-Day Upper / Lower + Specialty", "بالاتنه / پایین‌تنه پنج‌روزه با تخصص"),
+    "5d-split-weak-point": ("5-Day Split + Focus Variation", "تقسیم پنج‌روزه با تنوع تمرکز"),
+    "5d-upper-priority-iranian": ("5-Day Upper / Lower Iranian Split", "تقسیم ایرانی پنج‌روزه بالاتنه / پایین‌تنه"),
+    "5d-upper-lower-specialty": ("5-Day Upper / Lower Variation", "تنوع پنج‌روزه بالاتنه / پایین‌تنه"),
     "5d-fst7-arms-priority": ("5-Day FST-7 / Arms Priority", "پنج‌روزه FST-7 با اولویت بازو"),
     "5d-professional-compound": ("5-Day Professional Split + Compound Day", "تقسیم حرفه‌ای پنج‌روزه با روز ترکیبی"),
     "6d-upper-lower-x3": ("6-Day Upper / Lower ×3", "بالاتنه / پایین‌تنه سه‌بار در هفته"),
@@ -2921,9 +2921,9 @@ _NEW_STRUCTURE_NAMES["6d-ppl-2x"] = ("PPL A/B", "پوش / پول / پا A/B")
 
 _NEW_STRUCTURE_TAGS = {
     "5d-classic-body-part-approved": (Tag.BODY_PART_ROTATION,),
-    "5d-split-weak-point": (Tag.BODY_PART_ROTATION, Tag.UPPER_PRIORITY),
-    "5d-upper-priority-iranian": (Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
-    "5d-upper-lower-specialty": (Tag.UPPER_LOWER, Tag.UPPER_PRIORITY),
+    "5d-split-weak-point": (Tag.BODY_PART_ROTATION,),
+    "5d-upper-priority-iranian": (Tag.UPPER_LOWER,),
+    "5d-upper-lower-specialty": (Tag.UPPER_LOWER,),
     "5d-fst7-arms-priority": (Tag.BODY_PART_ROTATION, Tag.ARMS_PRIORITY, Tag.SPECIALIZATION),
     "5d-professional-compound": (Tag.BODY_PART_ROTATION,),
     "6d-ppl-2x": (Tag.PUSH_PULL_LEGS,),
@@ -3105,7 +3105,7 @@ def _split_weak_point_5d(
     )
 
 
-def _upper_priority_iranian_5d(
+def _upper_lower_iranian_5d(
     level: ExperienceLevel,
 ) -> tuple[tuple[str, str, tuple[MuscleGroup, ...], tuple[_ApprovedSlotSpec, ...]], ...]:
     return (
@@ -4138,8 +4138,8 @@ _NEW_CATALOG_PROGRAM_BLUEPRINTS = (
     ("p27-5-day-classic-body-part-advanced", "5d-classic-body-part-approved", Level.ADVANCED, _classic_body_part_5d),
     ("p28-5-day-split-weak-point-intermediate", "5d-split-weak-point", Level.INTERMEDIATE, _split_weak_point_5d),
     ("p29-5-day-split-weak-point-advanced", "5d-split-weak-point", Level.ADVANCED, _split_weak_point_5d),
-    ("p30-5-day-upper-priority-iranian-intermediate", "5d-upper-priority-iranian", Level.INTERMEDIATE, _upper_priority_iranian_5d),
-    ("p31-5-day-upper-priority-iranian-advanced", "5d-upper-priority-iranian", Level.ADVANCED, _upper_priority_iranian_5d),
+    ("p30-5-day-upper-priority-iranian-intermediate", "5d-upper-priority-iranian", Level.INTERMEDIATE, _upper_lower_iranian_5d),
+    ("p31-5-day-upper-priority-iranian-advanced", "5d-upper-priority-iranian", Level.ADVANCED, _upper_lower_iranian_5d),
     ("p32-5-day-upper-lower-specialty-intermediate", "5d-upper-lower-specialty", Level.INTERMEDIATE, _upper_lower_specialty_5d),
     ("p33-5-day-upper-lower-specialty-advanced", "5d-upper-lower-specialty", Level.ADVANCED, _upper_lower_specialty_5d),
     ("p34-5-day-fst7-arms-priority-intermediate", "5d-fst7-arms-priority", Level.INTERMEDIATE, _fst7_arms_priority_5d),

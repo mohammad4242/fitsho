@@ -63,13 +63,13 @@ def test_collection_ordering_does_not_change_signature() -> None:
     first = _request(
         disliked_exercises=frozenset({UUID(int=1), UUID(int=2)}),
         blocked_exercises=frozenset({UUID(int=3), UUID(int=4)}),
-        priority_muscles=frozenset({MuscleGroup.BACK, MuscleGroup.CHEST}),
+        priority_muscles=frozenset({MuscleGroup.BACK}),
         available_equipment=frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL}),
     )
     second = _request(
         disliked_exercises=frozenset({UUID(int=2), UUID(int=1)}),
         blocked_exercises=frozenset({UUID(int=4), UUID(int=3)}),
-        priority_muscles=frozenset({MuscleGroup.CHEST, MuscleGroup.BACK}),
+        priority_muscles=frozenset({MuscleGroup.BACK}),
         available_equipment=frozenset({Equipment.DUMBBELL, Equipment.BODYWEIGHT}),
     )
 
