@@ -596,6 +596,14 @@ def _program_for_split(
         eligible,
         rejected_slot_candidates,
     )
+    causal_structured_relaxed_groups = tuple(
+        dict.fromkeys(
+            group
+            for draft in drafts
+            if "REQUIRED_SLOT_RELAXED_FOR_STRUCTURED_LIMITATION" in draft.reason_codes
+            for group in draft.relaxed_required_pattern_groups
+        )
+    )
     relaxed_groups = tuple(dict.fromkeys((*relaxed_groups, *structured_relaxed_groups)))
     relaxed_slots = tuple(
         dict.fromkeys(
@@ -634,23 +642,12 @@ def _program_for_split(
                 *session_reasons,
                 *(
                     ("REQUIRED_PATTERN_RELAXED_FOR_STRUCTURED_LIMITATION",)
-                    if structured_relaxed_groups
+                    if causal_structured_relaxed_groups
                     else ()
                 ),
                 *(
                     ("PROGRAM_REBALANCED_TOWARD_SAFE_LOWER_BODY",)
-                    if structured_relaxed_groups
-                    and any(
-                        item.primary_muscle
-                        in {
-                            MuscleGroup.QUADRICEPS,
-                            MuscleGroup.HAMSTRINGS,
-                            MuscleGroup.GLUTES,
-                            MuscleGroup.CALVES,
-                        }
-                        for day in days
-                        for item in day.exercises
-                    )
+                    if _has_structured_lower_body_rebalance(drafts, days)
                     else ()
                 ),
                 *recovery_repair_reasons,
@@ -1067,6 +1064,40 @@ def _structured_relaxed_pattern_groups(
         ):
             blocked_pattern_groups.append(tuple(sorted(group, key=lambda item: item.value)))
     return tuple(blocked_pattern_groups)
+
+
+def _has_structured_lower_body_rebalance(
+    drafts: tuple[SessionDraft, ...],
+    days: tuple[WorkoutDay, ...],
+) -> bool:
+    days_by_index = {day.day_index: day for day in days}
+    lower_body_muscles = frozenset(
+        {
+            MuscleGroup.QUADRICEPS,
+            MuscleGroup.HAMSTRINGS,
+            MuscleGroup.GLUTES,
+            MuscleGroup.CALVES,
+        }
+    )
+    for draft in drafts:
+        if (
+            "REQUIRED_SLOT_RELAXED_FOR_STRUCTURED_LIMITATION" not in draft.reason_codes
+            or not draft.relaxed_required_pattern_groups
+        ):
+            continue
+        day = days_by_index.get(draft.day_index)
+        if day is None:
+            continue
+        if any(
+            item.primary_muscle in lower_body_muscles
+            and all(
+                item.movement_pattern not in relaxed_group
+                for relaxed_group in draft.relaxed_required_pattern_groups
+            )
+            for item in day.exercises
+        ):
+            return True
+    return False
 
 
 def _day_count_errors(actual: int, expected: int, *, stage: str) -> tuple[str, ...]:

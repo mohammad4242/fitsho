@@ -58,7 +58,6 @@ from app.workouts.body_analysis_resolver import BodyAnalysisInfluenceResolver
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanGeneration
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
-from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     BodyPosition,
     GenerationErrorCode,
@@ -72,7 +71,6 @@ from app.workouts.program_engine.enums import (
     TrainingExperience,
 )
 from app.workouts.program_engine.normalization import normalize_request
-from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
     BodyAnalysisInfluence,
@@ -250,19 +248,25 @@ def test_legacy_physical_limitations_do_not_become_uncomputable_generation_const
     assert request.injuries_and_limitations == ()
     assert ExerciseCautionTag.LOWER_BACK_LOADING in request.blocked_caution_tags
     _seed_candidates(db)
-    result = generate_program(request, _service(db)._load_catalog(), RULESET)
+    service = _service(db)
+    catalog = service._load_catalog()
+    result = asyncio.run(service.generate(user.id))
 
-    assert result.is_success, result.errors
-    assert result.program is not None
-    assert len(result.program.weekly_schedule) == profile.training_days_per_week
+    assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert len(result.plan.days) == profile.training_days_per_week
+    catalog_by_id = {item.id: item for item in catalog}
     assert all(
-        ExerciseCautionTag.LOWER_BACK_LOADING not in effective_caution_tags(exercise)
-        for day in result.program.weekly_schedule
-        for exercise in day.exercises
+        ExerciseCautionTag.LOWER_BACK_LOADING
+        not in effective_caution_tags(catalog_by_id[item.exercise_id])
+        for day in result.plan.days
+        for item in day.exercises
     )
-    safety_trace = next(trace for trace in result.decision_trace if trace.get("stage") == "safety")
+    safety_trace = next(
+        trace for trace in result.plan.decision_trace if trace.get("stage") == "safety"
+    )
     assert "EXPLICIT_LIMITATIONS_APPLIED" in safety_trace["reasons"]
     assert "old lower-back note from the legacy form" not in request.model_dump_json()
+    assert "old lower-back note from the legacy form" not in str(result.plan.decision_trace)
 
 
 def test_service_generation_adapts_home_wrist_caution_without_wrist_loading(
@@ -271,35 +275,35 @@ def test_service_generation_adapts_home_wrist_caution_without_wrist_loading(
     user = _user_with_profile(db)
     profile = get_profile(db, user.id).profile
     profile.training_caution_items.append(UserProfileTrainingCaution(caution=TrainingCaution.WRIST))
+    profile.priority_muscles = [MuscleGroup.QUADRICEPS.value, MuscleGroup.GLUTES.value]
     _seed_candidates(db)
-
     service = _service(db)
-    source = get_profile(db, user.id)
-    request = service._to_program_request(source, None)
-    result = generate_program(request, service._load_catalog(), RULESET)
+    catalog = service._load_catalog()
+    result = asyncio.run(service.generate(user.id))
 
-    assert result.is_success, result.errors
-    assert result.program is not None
-    assert len(result.program.weekly_schedule) == profile.training_days_per_week
+    assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert len(result.plan.days) == profile.training_days_per_week
+    catalog_by_id = {item.id: item for item in catalog}
     assert all(
-        ExerciseCautionTag.WRIST_LOADING not in effective_caution_tags(exercise)
-        for day in result.program.weekly_schedule
-        for exercise in day.exercises
+        ExerciseCautionTag.WRIST_LOADING
+        not in effective_caution_tags(catalog_by_id[item.exercise_id])
+        for day in result.plan.days
+        for item in day.exercises
     )
     assert any(
-        exercise.primary_muscle
+        catalog_by_id[item.exercise_id].primary_muscle
         in {
             MuscleGroup.QUADRICEPS,
             MuscleGroup.HAMSTRINGS,
             MuscleGroup.GLUTES,
             MuscleGroup.CALVES,
         }
-        for day in result.program.weekly_schedule
-        for exercise in day.exercises
+        for day in result.plan.days
+        for item in day.exercises
     )
     reason_codes = {
         reason
-        for trace in result.decision_trace
+        for trace in result.plan.decision_trace
         for reason in trace.get("reason_codes", ())
         if isinstance(reason, str)
     }
@@ -405,10 +409,10 @@ def test_lower_back_safety_uses_row_support_semantics_without_explicit_caution_t
         MovementPattern.HORIZONTAL_PULL,
         MuscleGroup.BACK,
     )
-    standing_row.name_en = "row-semantic-unsafe"
+    standing_row.name_en = "Chest-Supported Row"
     standing_row.body_position = BodyPosition.STANDING
     standing_row.axial_loading_level = LoadLimit.MODERATE
-    supported_row.name_en = "row-semantic-safe"
+    supported_row.name_en = "Standing Cable Row"
     supported_row.body_position = BodyPosition.SUPPORTED
     supported_row.axial_loading_level = LoadLimit.LOW
     db.flush()
@@ -428,6 +432,12 @@ def test_lower_back_safety_uses_row_support_semantics_without_explicit_caution_t
 
     assert standing_row.id not in {item.id for item in result.eligible}
     assert supported_row.id in {item.id for item in result.eligible}
+    standing_candidate = next(item for item in candidates if item.id == standing_row.id)
+    supported_candidate = next(item for item in candidates if item.id == supported_row.id)
+    assert standing_candidate.body_position is BodyPosition.STANDING
+    assert standing_candidate.axial_loading_level is LoadLimit.MODERATE
+    assert supported_candidate.body_position is BodyPosition.SUPPORTED
+    assert supported_candidate.axial_loading_level is LoadLimit.LOW
 
 
 def test_catalog_snapshot_keeps_programming_metadata_and_stable_collections(

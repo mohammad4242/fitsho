@@ -1,4 +1,5 @@
 from dataclasses import replace
+from uuid import uuid4
 
 from app.exercises.enums import (
     Equipment,
@@ -10,7 +11,10 @@ from app.exercises.enums import (
 )
 from app.workouts.program_engine.cardio import add_cardio
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
-from app.workouts.program_engine.engine import generate_program
+from app.workouts.program_engine.engine import (
+    _has_structured_lower_body_rebalance,
+    generate_program,
+)
 from app.workouts.program_engine.enums import (
     GenerationErrorCode,
     ImpactLimit,
@@ -24,6 +28,8 @@ from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
+    ProgrammedExercise,
+    SessionDraft,
     TemplateReference,
     TemplateReferenceDay,
     TemplateReferenceSlot,
@@ -95,6 +101,66 @@ def test_bodyweight_wrist_caution_relaxes_unavailable_push_without_unsafe_select
     )
     assert "REQUIRED_PATTERN_RELAXED_FOR_STRUCTURED_LIMITATION" in recovery["reason_codes"]
     assert "PROGRAM_REBALANCED_TOWARD_SAFE_LOWER_BODY" in recovery["reason_codes"]
+
+
+def test_wrist_caution_does_not_claim_rebalance_without_causal_relaxed_slot(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.workouts.program_engine.engine._structured_relaxed_pattern_groups",
+        lambda *_args: ((MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH),),
+    )
+    source = request(
+        available_training_days=3,
+        available_equipment=[Equipment.BODYWEIGHT],
+    )
+
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert result.program is not None, result.errors
+    recovery = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "construction_recovery"
+    )
+    assert "PROGRAM_REBALANCED_TOWARD_SAFE_LOWER_BODY" not in recovery["reason_codes"]
+
+
+def test_rebalance_reason_requires_causal_relaxed_slot_and_same_day_safe_lower_body() -> None:
+    draft = SessionDraft(
+        day_index=1,
+        weekday=0,
+        focus="full_body_a",
+        reason_codes=("REQUIRED_SLOT_RELAXED_FOR_STRUCTURED_LIMITATION",),
+        relaxed_required_pattern_groups=(
+            (MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH),
+        ),
+    )
+    lower_body = ProgrammedExercise(
+        exercise_id=uuid4(),
+        exercise_name="lower",
+        order=1,
+        sets=3,
+        rep_min=8,
+        rep_max=12,
+        target_rir=2,
+        rest_seconds=90,
+        estimated_minutes=8,
+        reason_codes=(),
+        movement_pattern=MovementPattern.SQUAT,
+        primary_muscle=MuscleGroup.QUADRICEPS,
+    )
+    day = WorkoutDay(1, 0, "day", "full_body_a", 45, (lower_body,))
+
+    assert _has_structured_lower_body_rebalance((draft,), (day,))
+    assert not _has_structured_lower_body_rebalance(
+        (SessionDraft(day_index=1, weekday=0, focus="full_body_a"),),
+        (day,),
+    )
+    assert not _has_structured_lower_body_rebalance(
+        (draft,),
+        (WorkoutDay(1, 0, "day", "full_body_a", 45, ()),),
+    )
 
 
 def test_safe_layout_recovery_omits_hard_blocked_required_pattern() -> None:
