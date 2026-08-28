@@ -132,7 +132,6 @@ class TrainingProgramStructureDay(Base):
     structure: Mapped[TrainingProgramStructure] = relationship(back_populates="structure_days")
 
 
-
 class TrainingTemplateMethod(StrEnum):
     STANDARD = "standard"
     SUPERSET = "superset"
@@ -165,7 +164,6 @@ class TrainingProgramTemplate(Base):
             name="ck_training_program_templates_slug_format",
         ),
     )
-
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     slug: Mapped[str] = mapped_column(String(120), nullable=False)
     name_en: Mapped[str] = mapped_column(String(160), nullable=False)
@@ -194,7 +192,6 @@ class TrainingProgramTemplate(Base):
         nullable=True,
         index=True,
     )
-
     days: Mapped[list[TrainingProgramTemplateDay]] = relationship(
         back_populates="template",
         cascade="all, delete-orphan",
@@ -205,7 +202,6 @@ class TrainingProgramTemplate(Base):
         back_populates="templates",
         foreign_keys=[structure_id],
     )
-
 
 
 class TrainingProgramTemplateDay(Base):
@@ -261,7 +257,7 @@ class TrainingProgramTemplateSlot(Base):
             "AND superset_exercise_slug_hint IS NOT NULL) OR "
             "(intensity_method != 'superset' AND superset_exercise_id IS NULL "
             "AND superset_exercise_slug_hint IS NULL)",
-            name="ck_training_program_template_slots_superset_validity"
+            name="ck_training_program_template_slots_superset_validity",
         ),
     )
 

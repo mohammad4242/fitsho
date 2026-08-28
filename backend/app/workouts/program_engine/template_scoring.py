@@ -129,11 +129,7 @@ def _priority_score(
     )
     reasons = (
         *(("EXPLICIT_PRIORITY_EXACT_MATCH",) if exact_matches else ()),
-        *(
-            ("EXPLICIT_PRIORITY_LOWER_REGIONAL_MATCH",)
-            if lower_regional_matches
-            else ()
-        ),
+        *(("EXPLICIT_PRIORITY_LOWER_REGIONAL_MATCH",) if lower_regional_matches else ()),
     )
     return score, reasons
 

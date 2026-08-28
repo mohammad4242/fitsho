@@ -26,12 +26,17 @@ def priority_affinity(focus: str, muscle: MuscleGroup) -> FocusAffinity:
         return FocusAffinity.NONE
 
     if focus.startswith("full_body"):
-        return FocusAffinity.GROUPED if muscle in {
-            MuscleGroup.QUADRICEPS,
-            MuscleGroup.HAMSTRINGS,
-            MuscleGroup.GLUTES,
-            MuscleGroup.CALVES,
-        } else FocusAffinity.NONE
+        return (
+            FocusAffinity.GROUPED
+            if muscle
+            in {
+                MuscleGroup.QUADRICEPS,
+                MuscleGroup.HAMSTRINGS,
+                MuscleGroup.GLUTES,
+                MuscleGroup.CALVES,
+            }
+            else FocusAffinity.NONE
+        )
 
     affinities: dict[str, dict[MuscleGroup, FocusAffinity]] = {
         "chest_triceps": {

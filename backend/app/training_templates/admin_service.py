@@ -372,14 +372,11 @@ def _validate_exercise_links_for_slots(
 ) -> dict[UUID, str]:
     slot_items = tuple(slots)
     exercise_ids = {slot.exercise_id for slot in slot_items}
-    exercise_ids |= {
-        slot.superset_exercise_id
-        for slot in slot_items
-        if slot.superset_exercise_id
-    }
+    exercise_ids |= {slot.superset_exercise_id for slot in slot_items if slot.superset_exercise_id}
     exercises = list(
         db.scalars(
-            select(Exercise).where(
+            select(Exercise)
+            .where(
                 Exercise.id.in_(exercise_ids),
                 Exercise.is_active.is_(True),
                 Exercise.is_programmable.is_(True),

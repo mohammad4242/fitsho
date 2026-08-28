@@ -450,9 +450,7 @@ class AdminTrainingProgramTemplateWrite(BaseModel):
             days=self.days,
         )
         validate_catalog_topology(self.days_per_week, self.focus_tags)
-        slot_methods = {
-            slot.intensity_method for day in self.days for slot in day.slots
-        }
+        slot_methods = {slot.intensity_method for day in self.days for slot in day.slots}
         if set(self.intensity_methods) != slot_methods:
             raise ValueError("Template intensity methods must match configured slot methods")
         novice_levels = {ExperienceLevel.FIRST_MONTH, ExperienceLevel.BEGINNER}

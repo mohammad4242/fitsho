@@ -96,10 +96,11 @@ def _focus_contains_priority(
 ) -> bool:
     if not priority_muscles:
         return False
-    return any(
-        priority_affinity(focus, muscle) is not FocusAffinity.NONE
-        for muscle in priority_muscles
-    )
+    return any(_has_priority_affinity(focus, muscle) for muscle in priority_muscles)
+
+
+def _has_priority_affinity(focus: str, muscle: MuscleGroup) -> bool:
+    return priority_affinity(focus, muscle) is not FocusAffinity.NONE
 
 
 def _safe_cardio(

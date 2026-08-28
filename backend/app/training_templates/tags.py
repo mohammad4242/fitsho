@@ -218,9 +218,7 @@ _COMPOUND_MOVEMENT_PATTERNS = frozenset(
 
 
 def validate_focus_tags(tags: Iterable[str | TemplateFocusTag]) -> tuple[TemplateFocusTag, ...]:
-    values = tuple(
-        str(tag) for tag in tags if str(tag) != LEGACY_UPPER_PRIORITY_TAG
-    )
+    values = tuple(str(tag) for tag in tags if str(tag) != LEGACY_UPPER_PRIORITY_TAG)
     unknown = sorted(set(values) - CANONICAL_TEMPLATE_FOCUS_TAGS)
     if unknown:
         raise ValueError(f"Unknown template focus tag(s): {', '.join(unknown)}")
