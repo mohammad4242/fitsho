@@ -30,6 +30,7 @@ from app.workouts.program_engine.effective_volume import (
 )
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
+from app.workouts.program_engine.final_gate import evaluate_final_program
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import prescribe_sessions
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
@@ -774,38 +775,14 @@ def _program_for_split(
         decision_trace=trace,
         body_analysis_provenance=body_analysis_provenance(normalized),
     )
-    report = validate_program(program, request, ruleset)
-    if not report.is_valid:
-        return ProgramGenerationResult(
-            program=None,
-            error_code=GenerationErrorCode.PROGRAM_VALIDATION_FAILED,
-            errors=report.errors,
-            safety_status=safety_status,
-            rejected_candidates=rejected,
-            decision_trace=trace,
-        )
-    program, report = _attach_coach_quality_metrics(program, request, normalized, report, ruleset)
-    quality_metrics = build_coach_quality_metrics(program, request, report, ruleset)
-    final_trace = trace + (
-        {
-            "stage": "final_construction",
-            "status": "succeeded",
-            "reason_codes": ("FINAL_CONSTRUCTION_SUCCEEDED",),
-        },
-        {"stage": "coach_quality", "metrics": quality_metrics},
-    )
-    report = replace(report, decision_trace=final_trace)
-    program = replace(
+    return _finalize_program(
         program,
-        validation_report=report,
-        warnings=report.warnings,
-        decision_trace=final_trace,
-    )
-    return ProgramGenerationResult(
-        program=program,
+        request,
+        normalized,
+        ruleset,
         safety_status=safety_status,
-        rejected_candidates=rejected,
-        decision_trace=final_trace,
+        rejected=rejected,
+        trace=trace,
     )
 
 
@@ -1052,37 +1029,14 @@ def _reference_program(
         decision_trace=trace,
         body_analysis_provenance=body_analysis_provenance(normalized),
     )
-    report = validate_program(program, request, ruleset)
-    if not report.is_valid:
-        return ProgramGenerationResult(
-            program=None,
-            error_code=GenerationErrorCode.PROGRAM_VALIDATION_FAILED,
-            errors=report.errors,
-            safety_status=safety_status,
-            rejected_candidates=rejected,
-            decision_trace=trace,
-        )
-    program, report = _attach_coach_quality_metrics(program, request, normalized, report, ruleset)
-    quality_metrics = build_coach_quality_metrics(program, request, report, ruleset)
-    final_trace = trace + (
-        {
-            "stage": "final_construction",
-            "status": "succeeded",
-            "reason_codes": ("FINAL_CONSTRUCTION_SUCCEEDED",),
-        },
-        {"stage": "coach_quality", "metrics": quality_metrics},
-    )
-    report = replace(report, decision_trace=final_trace)
-    return ProgramGenerationResult(
-        program=replace(
-            program,
-            validation_report=report,
-            warnings=report.warnings,
-            decision_trace=final_trace,
-        ),
+    return _finalize_program(
+        program,
+        request,
+        normalized,
+        ruleset,
         safety_status=safety_status,
-        rejected_candidates=rejected,
-        decision_trace=final_trace,
+        rejected=rejected,
+        trace=trace,
     )
 
 
@@ -1175,6 +1129,89 @@ def _attach_coach_quality_metrics(
     aggregate_metrics = {**program.aggregate_metrics, "coach_quality": quality}
     report = replace(report, metrics={**report.metrics, "coach_quality": quality})
     return replace(program, aggregate_metrics=aggregate_metrics), report
+
+
+def _finalize_program(
+    program: WorkoutProgram,
+    request: ProgramGenerationRequest,
+    normalized: NormalizedProgramRequest,
+    ruleset: ProgramRuleset,
+    *,
+    safety_status: SafetyStatus,
+    rejected: tuple[RejectedCandidate, ...],
+    trace: tuple[dict[str, object], ...],
+) -> ProgramGenerationResult:
+    report = validate_program(program, request, ruleset)
+    if not report.is_valid:
+        return ProgramGenerationResult(
+            program=None,
+            error_code=GenerationErrorCode.PROGRAM_VALIDATION_FAILED,
+            errors=report.errors,
+            safety_status=safety_status,
+            rejected_candidates=rejected,
+            decision_trace=trace,
+        )
+
+    program, report = _attach_coach_quality_metrics(program, request, normalized, report, ruleset)
+    quality_metrics = build_coach_quality_metrics(program, request, report, ruleset)
+    pre_gate_trace = trace + (
+        {
+            "stage": "final_construction",
+            "status": "succeeded",
+            "reason_codes": ("FINAL_CONSTRUCTION_SUCCEEDED",),
+        },
+        {"stage": "coach_quality", "metrics": quality_metrics},
+    )
+    report = replace(report, decision_trace=pre_gate_trace)
+    program = replace(
+        program,
+        validation_report=report,
+        warnings=report.warnings,
+        decision_trace=pre_gate_trace,
+    )
+    gate = evaluate_final_program(program, request, report, ruleset)
+    final_trace = pre_gate_trace + (gate.decision_trace(),)
+    if not gate.is_accepted:
+        error_code = (
+            GenerationErrorCode.PROGRAM_VALIDATION_FAILED
+            if gate.validation_report.errors
+            else GenerationErrorCode.UNSATISFIED_CONSTRAINT
+        )
+        return ProgramGenerationResult(
+            program=None,
+            error_code=error_code,
+            errors=gate.reason_codes,
+            safety_status=safety_status,
+            rejected_candidates=rejected,
+            decision_trace=final_trace,
+        )
+
+    warnings = tuple(
+        dict.fromkeys((*gate.validation_report.warnings, *gate.constraint_reason_codes))
+    )
+    final_metrics = {
+        **gate.validation_report.metrics,
+        "final_quality_gate": gate.metrics,
+    }
+    final_report = replace(
+        gate.validation_report,
+        warnings=warnings,
+        metrics=final_metrics,
+        decision_trace=final_trace,
+    )
+    final_program = replace(
+        program,
+        validation_report=final_report,
+        aggregate_metrics={**program.aggregate_metrics, "final_quality_gate": gate.metrics},
+        warnings=warnings,
+        decision_trace=final_trace,
+    )
+    return ProgramGenerationResult(
+        program=final_program,
+        safety_status=safety_status,
+        rejected_candidates=rejected,
+        decision_trace=final_trace,
+    )
 
 
 def _duration_capacity_trace(capacity: SessionCapacity) -> dict[str, object]:

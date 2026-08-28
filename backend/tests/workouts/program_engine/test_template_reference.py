@@ -410,8 +410,13 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
         "template_attempt",
         "final_construction",
         "coach_quality",
+        "final_quality_gate",
     ]
-    quality = result.program.decision_trace[-1]["metrics"]
+    quality = next(
+        entry["metrics"]
+        for entry in result.program.decision_trace
+        if entry["stage"] == "coach_quality"
+    )
     assert quality["template_preservation"] == {
         "satisfied": 6.0,
         "total": 6.0,
@@ -1102,7 +1107,11 @@ def test_unsafe_template_exercise_is_substituted_and_trace_is_auditable() -> Non
         for item in adaptation_trace["substitutions"]
     )
     assert adaptation_trace["prescription_changes"]
-    quality = result.program.decision_trace[-1]["metrics"]
+    quality = next(
+        entry["metrics"]
+        for entry in result.program.decision_trace
+        if entry["stage"] == "coach_quality"
+    )
     assert quality["substitution_count"] >= 1
 
 
