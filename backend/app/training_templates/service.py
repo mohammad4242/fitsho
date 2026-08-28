@@ -39,7 +39,7 @@ class TrainingTemplateSeedResult:
 
 
 _CATALOG_STATE_KEY = "canonical"
-_CATALOG_REVISION = 5
+_CATALOG_REVISION = 6
 
 
 def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:

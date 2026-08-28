@@ -701,7 +701,7 @@ def test_frozen_2_3_4_day_seed_signatures_are_unchanged() -> None:
     actual = {
         seed.slug: seed_signature(seed)
         for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if seed.days_per_week in {2, 3, 4}
+        if seed.slug in FROZEN_2_3_4_SIGNATURES
     }
 
     assert actual == FROZEN_2_3_4_SIGNATURES
@@ -751,7 +751,7 @@ def test_seed_is_idempotent_for_5_and_6_day_additions(db: Session) -> None:
 
     assert second == first
     assert second_counts == first_counts
-    assert first.templates == 49
+    assert first.templates == 53
 
 
 def test_default_library_groups_new_rows_by_structure_and_level(db: Session) -> None:

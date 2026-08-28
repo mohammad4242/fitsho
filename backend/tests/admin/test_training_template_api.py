@@ -57,7 +57,7 @@ def test_admin_lists_complete_four_day_template_details(client: TestClient, db: 
 
     assert response.status_code == 200, response.text
     templates = response.json()["items"]
-    assert len(templates) == 12
+    assert len(templates) == 16
     classic = next(
         item
         for item in templates

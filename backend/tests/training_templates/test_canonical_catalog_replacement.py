@@ -142,7 +142,9 @@ def _legacy_template(slug: str) -> TrainingProgramTemplate:
 
 
 def test_catalog_preserves_exactly_25_legacy_level_specific_programs() -> None:
-    legacy_seeds = [seed for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS if seed.days_per_week <= 4]
+    legacy_seeds = [
+        seed for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS if seed.slug in EXPECTED_CANONICAL_SLUGS
+    ]
     canonical_slugs = {getattr(seed, "canonical_slug", None) for seed in legacy_seeds}
 
     assert canonical_slugs == EXPECTED_CANONICAL_SLUGS
@@ -239,7 +241,7 @@ def test_catalog_slots_are_linked_to_active_programmable_non_placeholder_exercis
 
 
 def test_catalog_days_guidance_and_prescriptions_match_document_contract() -> None:
-    assert len({seed.canonical_slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS}) == 49
+    assert len({seed.canonical_slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS}) == 53
     assert all(
         (4 if seed.days_per_week <= 4 else 3) <= len(day.slots) <= 9
         for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS

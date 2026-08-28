@@ -946,9 +946,13 @@ EXPECTED_PROGRAMS = {
 
 def test_default_program_matrix_preserves_exactly_25_legacy_programs() -> None:
     legacy_definitions = [
-        definition for definition in CANONICAL_TEMPLATE_DEFINITIONS if len(definition.days) <= 4
+        definition
+        for definition in CANONICAL_TEMPLATE_DEFINITIONS
+        if definition.canonical_slug in EXPECTED_PROGRAMS
     ]
-    legacy_seeds = [seed for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS if seed.days_per_week <= 4]
+    legacy_seeds = [
+        seed for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS if seed.slug in EXPECTED_PROGRAMS
+    ]
     assert len(legacy_definitions) == 25
     assert len(legacy_seeds) == 25
     assert {seed.slug for seed in legacy_seeds} == set(EXPECTED_PROGRAMS)
@@ -993,12 +997,12 @@ def test_default_program_prescriptions_match_level_and_role() -> None:
                 ]
 
 
-def test_seed_creates_exactly_49_linked_programs_with_valid_structures(db: Session) -> None:
+def test_seed_creates_exactly_53_linked_programs_with_valid_structures(db: Session) -> None:
     seed_real_catalog_exercises(db)
 
     result = seed_training_program_templates(db)
 
-    assert result.templates == 49
+    assert result.templates == 53
     assert (
         db.scalar(
             select(func.count())
@@ -1007,7 +1011,7 @@ def test_seed_creates_exactly_49_linked_programs_with_valid_structures(db: Sessi
                 TrainingProgramTemplate.source_name == "Fitsho canonical training template catalog"
             )
         )
-        == 49
+        == 53
     )
     templates = list(
         db.scalars(
@@ -1047,8 +1051,8 @@ def test_seed_is_idempotent_and_does_not_duplicate_program_days_or_slots(db: Ses
     second = seed_training_program_templates(db)
 
     assert second == first
-    assert second.templates == 49
-    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == 49
+    assert second.templates == 53
+    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == 53
     assert db.scalar(select(func.count()).select_from(TrainingProgramTemplateDay)) == first_days
     assert db.scalar(select(func.count()).select_from(TrainingProgramTemplateSlot)) == first_slots
 

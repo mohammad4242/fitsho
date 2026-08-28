@@ -9,7 +9,7 @@ from app.training_templates.seed_data import (
 from app.training_templates.tags import TemplateFocusTag
 
 
-def test_all_49_programs_have_role_aware_prescription_diversity() -> None:
+def test_all_53_programs_have_role_aware_prescription_diversity() -> None:
     signatures = Counter(
         (slot.sets, slot.rep_min, slot.rep_max, slot.target_rir, slot.rest_seconds)
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
@@ -17,7 +17,7 @@ def test_all_49_programs_have_role_aware_prescription_diversity() -> None:
         for slot in day.slots
     )
 
-    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 49
+    assert len(TRAINING_PROGRAM_TEMPLATE_SEEDS) == 53
     assert len(signatures) >= 7
     assert (3, 8, 12, 2, 90) not in dict(signatures.most_common(1))
     assert all(
@@ -42,10 +42,19 @@ def test_first_month_and_beginner_templates_use_standard_methods_only() -> None:
 
 
 def test_advanced_programs_use_the_approved_advanced_prescription() -> None:
+    legacy_advanced_slugs = {
+        "p07-3-day-upper-lower-full-advanced",
+        "p10-3-day-upper-lower-upper-advanced",
+        "p13-3-day-lower-upper-lower-advanced",
+        "p17-4-day-upper-lower-upper-lower-advanced",
+        "p20-4-day-3-upper-1-lower-advanced",
+        "p23-4-day-3-lower-1-upper-advanced",
+        "p25-4-day-push-pull-quads-posterior-advanced",
+    }
     advanced = [
         template
         for template in TRAINING_PROGRAM_TEMPLATE_SEEDS
-        if template.supported_levels == (ExperienceLevel.ADVANCED,) and template.days_per_week <= 4
+        if template.slug in legacy_advanced_slugs
     ]
 
     assert len(advanced) == 7

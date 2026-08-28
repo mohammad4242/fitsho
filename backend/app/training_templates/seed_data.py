@@ -2811,6 +2811,9 @@ def _approved_catalog_definition(
     structure_slug: str,
     level: ExperienceLevel,
     days: tuple[tuple[str, str, tuple[MuscleGroup, ...], tuple[_ApprovedSlotSpec, ...]], ...],
+    *,
+    name_en: str | None = None,
+    name_fa: str | None = None,
 ) -> CanonicalTemplateDefinition:
     structure_name_en, structure_name_fa = _NEW_STRUCTURE_NAMES[structure_slug]
     rendered_days = tuple(
@@ -2820,8 +2823,8 @@ def _approved_catalog_definition(
     tags = validate_focus_tags(_NEW_STRUCTURE_TAGS[structure_slug])
     return CanonicalTemplateDefinition(
         canonical_slug=slug,
-        name_en=f"{structure_name_en} — {_LEVEL_NAMES[level][0]}",
-        name_fa=f"{structure_name_fa} — {_LEVEL_NAMES[level][1]}",
+        name_en=name_en or f"{structure_name_en} — {_LEVEL_NAMES[level][0]}",
+        name_fa=name_fa or f"{structure_name_fa} — {_LEVEL_NAMES[level][1]}",
         description_en=f"Approved Fitsho default program: {structure_name_en} for {_LEVEL_NAMES[level][0]} trainees.",
         description_fa=f"برنامه پیش‌فرض تأییدشده فیتشو: {structure_name_fa} برای سطح {_LEVEL_NAMES[level][1]}.",
         supported_levels=(level,),
@@ -2900,11 +2903,21 @@ _APPROVED_DAY_TITLES_FA.update(
         "Back + Biceps + Shoulders B": "پشت + جلو بازو + سرشانه B",
         "Chest + Triceps B": "سینه + پشت بازو B",
         "Compound Day": "روز حرکات ترکیبی",
+        "Quads + Calves": "جلو پا + ساق",
+        "Shoulders + Hamstrings": "سرشانه + پشت پا",
+        "Quad-Focused Legs": "پا با تأکید چهارسر",
+        "Chest + Shoulders": "سینه + سرشانه",
+        "Back + Biceps + Triceps": "پشت + جلو بازو + پشت بازو",
+        "Posterior Chain": "پشت پا + زنجیره خلفی",
+        "Shoulders + Traps": "سرشانه + کول",
+        "Shoulders + Abs": "سرشانه + شکم",
     }
 )
 
 
 _NEW_STRUCTURE_NAMES = {
+    "4d-upper-lower-2x": _APPROVED_STRUCTURE_NAMES["4d-upper-lower-2x"],
+    "4d-3-upper-1-lower": _APPROVED_STRUCTURE_NAMES["4d-3-upper-1-lower"],
     "5d-classic-body-part-approved": ("5-Day Classic Body-Part Split", "تقسیم کلاسیک عضله‌ای پنج‌روزه"),
     "5d-split-weak-point": ("5-Day Split + Focus Variation", "تقسیم پنج‌روزه با تنوع تمرکز"),
     "5d-upper-priority-iranian": ("5-Day Upper / Lower Iranian Split", "تقسیم ایرانی پنج‌روزه بالاتنه / پایین‌تنه"),
@@ -2920,6 +2933,8 @@ _NEW_STRUCTURE_NAMES = {
 _NEW_STRUCTURE_NAMES["6d-ppl-2x"] = ("PPL A/B", "پوش / پول / پا A/B")
 
 _NEW_STRUCTURE_TAGS = {
+    "4d-upper-lower-2x": _APPROVED_TAGS["4d-upper-lower-2x"],
+    "4d-3-upper-1-lower": _APPROVED_TAGS["4d-3-upper-1-lower"],
     "5d-classic-body-part-approved": (Tag.BODY_PART_ROTATION,),
     "5d-split-weak-point": (Tag.BODY_PART_ROTATION,),
     "5d-upper-priority-iranian": (Tag.UPPER_LOWER,),
@@ -4160,11 +4175,261 @@ _NEW_CATALOG_PROGRAM_BLUEPRINTS = (
     ("p49-6-day-ronnie-double-exposure-advanced", "6d-ronnie-double-exposure", Level.ADVANCED, _ronnie_double_exposure_6d),
 )
 
+
+_BRANDED_4_DAY_PROGRAM_BLUEPRINTS = (
+    (
+        "p50-4-day-iranmuscle-intermediate",
+        "4d-upper-lower-2x",
+        Level.INTERMEDIATE,
+        "IRANMUSCLE 4-Day Intermediate",
+        "ایران ماسل - برنامه ۴ روزه متوسط",
+        (
+            (
+                "Quads + Calves",
+                "lower",
+                (M.QUADRICEPS, M.CALVES),
+                (
+                    _approved_slot(SQUAT, "large_primary", 120),
+                    _approved_slot(LEG_PRESS, "large_primary", 120),
+                    _approved_slot(LEG_EXTENSION, "large_isolation", 60),
+                    _approved_slot(CALF_RAISE, "small_isolation", 60),
+                ),
+            ),
+            (
+                "Chest + Triceps",
+                "upper",
+                (M.CHEST, M.TRICEPS),
+                (
+                    _approved_slot(FLAT_PRESS, "large_primary", 120),
+                    _approved_slot(INCLINE_PRESS, "large_primary", 120),
+                    _approved_slot(CHEST_FLY, "large_isolation", 60),
+                    _approved_slot(TRICEPS_PUSHDOWN, "small_main", 60),
+                    _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", 60),
+                ),
+            ),
+            (
+                "Back + Biceps",
+                "upper",
+                (M.BACK, M.BICEPS),
+                (
+                    _approved_slot(ROW, "large_primary", 120),
+                    _approved_slot(LAT_PULLDOWN, "large_primary", 120),
+                    _approved_slot(SEATED_CABLE_ROW, "large_compound", 120),
+                    _approved_slot(BARBELL_CURL, "small_main", 60),
+                    _approved_slot(DUMBBELL_CURL, "small_isolation", 60),
+                ),
+            ),
+            (
+                "Shoulders + Hamstrings",
+                "shoulders",
+                (M.SHOULDERS, M.HAMSTRINGS),
+                (
+                    _approved_slot(SHOULDER_PRESS, "small_main", 90),
+                    _approved_slot(LATERAL_RAISE, "small_isolation", 60),
+                    _approved_slot(REAR_DELT_FLY, "small_isolation", 60),
+                    _approved_slot(RDL, "large_primary", 120),
+                    _approved_slot(LYING_LEG_CURL, "large_isolation", 60),
+                ),
+            ),
+        ),
+    ),
+    (
+        "p51-4-day-gymextreme-advanced",
+        "4d-upper-lower-2x",
+        Level.ADVANCED,
+        "GymExtreme 4-Day Advanced",
+        "جیم اکستریم - برنامه ۴ روزه پیشرفته",
+        (
+            (
+                "Quad-Focused Legs",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
+                (
+                    _approved_slot(SQUAT, "large_primary", 150),
+                    _approved_slot(LUNGE, "large_compound", 120),
+                    _approved_slot(LEG_PRESS, "large_primary", 150),
+                    _approved_slot(LEG_EXTENSION, "large_isolation", 75),
+                    _approved_slot(SEATED_LEG_CURL, "large_isolation", 75),
+                    _approved_slot(CALF_RAISE, "small_isolation", 75),
+                ),
+            ),
+            (
+                "Chest + Shoulders",
+                "upper",
+                (M.CHEST, M.SHOULDERS),
+                (
+                    _approved_slot(FLAT_PRESS, "large_primary", 150),
+                    _approved_slot(INCLINE_PRESS, "large_primary", 150),
+                    _approved_slot(CHEST_FLY, "large_isolation", 75),
+                    _approved_slot(SHOULDER_PRESS, "small_main", 120),
+                    _approved_slot(LATERAL_RAISE, "small_isolation", 75),
+                    _approved_slot(REAR_DELT_FLY, "small_isolation", 75),
+                ),
+            ),
+            (
+                "Back + Biceps + Triceps",
+                "upper",
+                (M.BACK, M.BICEPS, M.TRICEPS),
+                (
+                    _approved_slot(ROW, "large_primary", 150),
+                    _approved_slot(LAT_PULLDOWN, "large_primary", 150),
+                    _approved_slot(SEATED_CABLE_ROW, "large_compound", 120),
+                    _approved_slot(CABLE_CURL, "small_main", 90),
+                    _approved_slot(ROPE_TRICEPS_PUSHDOWN, "small_main", 90),
+                    _approved_slot(HAMMER_CURL, "small_isolation", 75),
+                    _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", 75),
+                ),
+            ),
+            (
+                "Posterior Chain",
+                "lower",
+                (M.QUADRICEPS, M.HAMSTRINGS, M.GLUTES, M.CALVES),
+                (
+                    _approved_slot(RDL, "large_primary", 150),
+                    _approved_slot(LYING_LEG_CURL, "large_isolation", 75),
+                    _approved_slot(GLUTE_BRIDGE, "large_compound", 120),
+                    _approved_slot(LUNGE, "large_compound", 120),
+                    _approved_slot(CALF_RAISE, "small_isolation", 75),
+                ),
+            ),
+        ),
+    ),
+    (
+        "p52-4-day-arnoldsho-advanced",
+        "4d-3-upper-1-lower",
+        Level.ADVANCED,
+        "Arnoldsho 4-Day Advanced",
+        "آرنولدشو - برنامه ۴ روزه پیشرفته",
+        (
+            (
+                "Chest + Triceps",
+                "upper",
+                (M.CHEST, M.TRICEPS),
+                (
+                    _approved_slot(FLAT_PRESS, "large_primary", 150),
+                    _approved_slot(INCLINE_PRESS, "large_primary", 150),
+                    _approved_slot(CHEST_FLY, "large_isolation", 75),
+                    _approved_slot(TRICEPS_PUSHDOWN, "small_main", 90),
+                    _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", 75),
+                ),
+            ),
+            (
+                "Back + Biceps",
+                "upper",
+                (M.BACK, M.BICEPS),
+                (
+                    _approved_slot(ROW, "large_primary", 150),
+                    _approved_slot(LAT_PULLDOWN, "large_primary", 150),
+                    _approved_slot(SEATED_CABLE_ROW, "large_compound", 120),
+                    _approved_slot(STRAIGHT_ARM_PULLDOWN, "large_isolation", 75),
+                    _approved_slot(BARBELL_CURL, "small_main", 90),
+                    _approved_slot(PREACHER_CURL, "small_isolation", 75),
+                ),
+            ),
+            (
+                "Shoulders + Traps",
+                "shoulders",
+                (M.SHOULDERS, M.TRAPS),
+                (
+                    _approved_slot(SHOULDER_PRESS, "small_main", 120),
+                    _approved_slot(LATERAL_RAISE, "small_isolation", 75),
+                    _approved_slot(REAR_DELT_FLY, "small_isolation", 75),
+                    _approved_slot(SHRUG, "small_isolation", 75),
+                ),
+            ),
+            (
+                "Legs",
+                "lower",
+                LEG_MUSCLES,
+                (
+                    _approved_slot(SQUAT, "large_primary", 150),
+                    _approved_slot(LEG_EXTENSION, "large_isolation", 75),
+                    _approved_slot(SEATED_LEG_CURL, "large_isolation", 75),
+                    _approved_slot(LEG_PRESS, "large_primary", 150),
+                    _approved_slot(CALF_RAISE, "small_isolation", 75),
+                ),
+            ),
+        ),
+    ),
+    (
+        "p53-4-day-aloplay-intermediate",
+        "4d-upper-lower-2x",
+        Level.INTERMEDIATE,
+        "Aloplay 4-Day Intermediate",
+        "الوپلی - برنامه ۴ روزه متوسط",
+        (
+            (
+                "Chest + Triceps",
+                "upper",
+                (M.CHEST, M.TRICEPS),
+                (
+                    _approved_slot(FLAT_PRESS, "large_primary", 120),
+                    _approved_slot(INCLINE_PRESS, "large_primary", 120),
+                    _approved_slot(CHEST_FLY, "large_isolation", 60),
+                    _approved_slot(TRICEPS_PUSHDOWN, "small_main", 60),
+                    _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", 60),
+                ),
+            ),
+            (
+                "Legs",
+                "lower",
+                LEG_MUSCLES,
+                (
+                    _approved_slot(SQUAT, "large_primary", 120),
+                    _approved_slot(LEG_PRESS, "large_primary", 120),
+                    _approved_slot(LEG_EXTENSION, "large_isolation", 60),
+                    _approved_slot(LYING_LEG_CURL, "large_isolation", 60),
+                    _approved_slot(CALF_RAISE, "small_isolation", 60),
+                ),
+            ),
+            (
+                "Back + Biceps",
+                "upper",
+                (M.BACK, M.BICEPS),
+                (
+                    _approved_slot(ROW, "large_primary", 120),
+                    _approved_slot(LAT_PULLDOWN, "large_primary", 120),
+                    _approved_slot(SEATED_CABLE_ROW, "large_compound", 120),
+                    _approved_slot(BARBELL_CURL, "small_main", 60),
+                    _approved_slot(DUMBBELL_CURL, "small_isolation", 60),
+                ),
+            ),
+            (
+                "Shoulders + Abs",
+                "upper",
+                (M.SHOULDERS, M.TRAPS, M.ABS, M.OBLIQUES),
+                (
+                    _approved_slot(SHOULDER_PRESS, "small_main", 90),
+                    _approved_slot(LATERAL_RAISE, "small_isolation", 60),
+                    _approved_slot(SHRUG, "small_isolation", 60),
+                    _approved_slot(FRONT_PLANK, "front_plank", 60),
+                    _approved_slot(SIDE_PLANK, "side_plank", 60),
+                ),
+            ),
+        ),
+    ),
+)
+
 _NEW_CANONICAL_TEMPLATE_DEFINITIONS = tuple(
     _approved_catalog_definition(slug, structure_slug, level, builder(level))
     for slug, structure_slug, level, builder in _NEW_CATALOG_PROGRAM_BLUEPRINTS
 )
-CANONICAL_TEMPLATE_DEFINITIONS = CANONICAL_TEMPLATE_DEFINITIONS + _NEW_CANONICAL_TEMPLATE_DEFINITIONS
+_BRANDED_CANONICAL_TEMPLATE_DEFINITIONS = tuple(
+    _approved_catalog_definition(
+        slug,
+        structure_slug,
+        level,
+        days,
+        name_en=name_en,
+        name_fa=name_fa,
+    )
+    for slug, structure_slug, level, name_en, name_fa, days in _BRANDED_4_DAY_PROGRAM_BLUEPRINTS
+)
+CANONICAL_TEMPLATE_DEFINITIONS = (
+    CANONICAL_TEMPLATE_DEFINITIONS
+    + _NEW_CANONICAL_TEMPLATE_DEFINITIONS
+    + _BRANDED_CANONICAL_TEMPLATE_DEFINITIONS
+)
 CANONICAL_TEMPLATE_SLUGS = tuple(
     definition.canonical_slug for definition in CANONICAL_TEMPLATE_DEFINITIONS
 )
