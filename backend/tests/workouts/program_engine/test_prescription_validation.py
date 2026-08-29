@@ -305,7 +305,7 @@ def test_volume_target_exposes_clamped_preferred_flexible_range() -> None:
     source = request(
         primary_goal=Goal.HYPERTROPHY,
         training_experience=TrainingExperience.INTERMEDIATE,
-        training_age_months=30,
+        training_age_months=24,
     )
     normalized = normalize_request(source, RULESET)
     volume = plan_weekly_volume(normalized, select_split(normalized, RULESET), RULESET)
@@ -322,7 +322,7 @@ def test_previous_volume_cap_clamps_flexible_maximum() -> None:
     source = request(
         primary_goal=Goal.HYPERTROPHY,
         training_experience=TrainingExperience.INTERMEDIATE,
-        training_age_months=30,
+        training_age_months=24,
         recent_training_history={
             "previous_weekly_effective_sets_by_muscle": {MuscleGroup.CHEST: 6},
             "previous_volume_confidence": 1.0,
@@ -738,9 +738,9 @@ def test_validator_enforces_duration_aware_main_count_matrix(
     has_count_error = "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors
     assert has_count_error is expected_error
     assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" not in report.warnings
-    assert (
-        "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in report.warnings
-    ) is (duration == 30 and main_count in (3, 4))
+    assert ("DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in report.warnings) is (
+        duration == 30 and main_count in (3, 4)
+    )
 
 
 @pytest.mark.parametrize(
@@ -855,7 +855,9 @@ def test_validator_rejects_distinct_ids_with_semantically_redundant_roles() -> N
     assert "SEMANTIC_NEAR_DUPLICATE_EXERCISE" in report.errors
 
 
-def test_validator_rejects_a_third_direct_weekly_muscle_exposure_for_four_day_programs() -> None:
+def test_validator_warns_on_exceeding_direct_weekly_muscle_frequency_for_four_day_programs() -> (
+    None
+):
     source = request(
         available_training_days=4,
         training_experience=TrainingExperience.INTERMEDIATE,
@@ -889,7 +891,8 @@ def test_validator_rejects_a_third_direct_weekly_muscle_exposure_for_four_day_pr
 
     report = validate_program(invalid, source, RULESET)
 
-    assert "MUSCLE_DIRECT_FREQUENCY_EXCEEDED" in report.errors
+    assert "MUSCLE_DIRECT_FREQUENCY_EXCEEDED" in report.warnings
+    assert "MUSCLE_DIRECT_FREQUENCY_EXCEEDED" not in report.errors
     assert report.metrics["direct_session_frequency_by_muscle"]["chest"] == 3
 
 

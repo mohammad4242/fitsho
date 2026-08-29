@@ -44,6 +44,7 @@ from app.workouts.program_engine.supplemental_policy import (
     main_exercise_count,
 )
 from app.workouts.program_engine.template_sessions import adaptation_preservation_rank
+from app.workouts.program_engine.volume_policy import session_direct_volume_range
 
 _HARD_MOVEMENT_PATTERN_GROUPS = (
     frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH}),
@@ -58,6 +59,8 @@ _HARD_MOVEMENT_PATTERN_GROUPS = (
         }
     ),
 )
+
+
 def repair_weekly_volume(
     days: tuple[WorkoutDay, ...],
     request: NormalizedProgramRequest,
@@ -102,7 +105,7 @@ def repair_weekly_volume(
             for muscle, sets in effective.items()
             if sets > _hard_maximum_for(muscle, targets, ruleset, request)
         }
-        per_session_excessive = _per_session_excessive(repaired, ruleset)
+        per_session_excessive = _per_session_excessive(repaired, request, ruleset)
         per_exercise_excessive = _per_exercise_excessive(repaired, request, targets, ruleset)
         reduction = _select_reduction_candidate(
             repaired,
@@ -172,13 +175,11 @@ def repair_weekly_volume(
                 or (day_index, exercise.primary_muscle) in per_session_excessive
                 or (day_index, exercise_index) in per_exercise_excessive
             )
-            count_floor_allows_removal = (
-                not is_main_resistance_exercise(exercise)
-                or main_exercise_count(repaired[day_index]) - 1
-                >= effective_main_exercise_floor(
-                    request.source.session_duration_minutes,
-                    ruleset,
-                )
+            count_floor_allows_removal = not is_main_resistance_exercise(
+                exercise
+            ) or main_exercise_count(repaired[day_index]) - 1 >= effective_main_exercise_floor(
+                request.source.session_duration_minutes,
+                ruleset,
             )
             if (same_muscle_exposures > 1 or hard_removal_required) and (
                 hard_removal_required or count_floor_allows_removal
@@ -373,9 +374,15 @@ def _select_set_redistribution(
         direct_by_session = _direct_sets([exercises])
         for recipient_index, recipient in enumerate(exercises):
             recipient_muscle = recipient.primary_muscle
+            if recipient_muscle is None:
+                continue
+            sess_range = session_direct_volume_range(
+                recipient_muscle, request.source.training_age_months
+            )
+            sess_max = sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
             if (
                 recipient_muscle not in hard_direct_under
-                or direct_by_session[recipient_muscle] >= ruleset.max_sets_per_muscle_per_session
+                or direct_by_session[recipient_muscle] >= sess_max
                 or recipient.sets >= _exercise_set_cap(recipient, days, request, targets, ruleset)
             ):
                 continue
@@ -433,9 +440,7 @@ def _select_set_redistribution(
                     for muscle, target in targets.items()
                 ):
                     continue
-                main_minutes = calculate_main_training_minutes_from_exercises(
-                    simulated[day_index]
-                )
+                main_minutes = calculate_main_training_minutes_from_exercises(simulated[day_index])
                 if main_minutes > duration_policy.maximum_minutes:
                     continue
                 options.append(
@@ -522,7 +527,9 @@ def _select_exercise_addition(
                 - current_effective_sets.get(muscle.value, 0)
             )
             sets = max(ruleset.minimum_working_sets, math.ceil(required_sets))
-            sets = min(sets, ruleset.max_sets_per_muscle_per_session)
+            sess_range = session_direct_volume_range(muscle, request.source.training_age_months)
+            sess_max = sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
+            sets = min(sets, sess_max)
             sets = min(sets, _candidate_set_cap(candidate, days, request, targets, ruleset))
             prescription = prescription_for(
                 request.primary_goal,
@@ -563,9 +570,7 @@ def _select_exercise_addition(
                 elif not exercise_fits_focus(candidate, original.focus):
                     continue
                 direct_by_session = _direct_sets([day])
-                session_overage = (
-                    direct_by_session[muscle] + sets - ruleset.max_sets_per_muscle_per_session
-                )
+                session_overage = direct_by_session[muscle] + sets - sess_max
                 if session_overage > 0:
                     reducible_same_muscle = sum(
                         max(0, item.sets - ruleset.minimum_working_sets)
@@ -582,8 +587,7 @@ def _select_exercise_addition(
                 current_frequency = _weekly_exposure_count(days, muscle)
                 adds_exposure = not any(item.primary_muscle is muscle for item in day)
                 frequency_cap = _direct_frequency_cap(len(days), ruleset)
-                if current_frequency + int(adds_exposure) > frequency_cap:
-                    continue
+                exceeds_frequency = (current_frequency + int(adds_exposure)) > frequency_cap
                 main_minutes = calculate_main_training_minutes_from_exercises(day)
                 if is_main_training_exercise(candidate):
                     main_minutes += estimated
@@ -675,6 +679,7 @@ def _select_exercise_addition(
                         (
                             0 if muscle in direct_under else 1,
                             0 if muscle in priority_policy.priorities else 1,
+                            1 if exceeds_frequency else 0,
                             *priority_policy.day_priority_key(
                                 day_contexts,
                                 muscle,
@@ -682,6 +687,8 @@ def _select_exercise_addition(
                                 preferred_frequency=priority_policy.useful_frequency(
                                     targets[muscle].target_sets,
                                     ruleset,
+                                    muscle,
+                                    request,
                                 ),
                             ),
                             direct_by_session[muscle],
@@ -734,11 +741,15 @@ def _maximum_for(
 ) -> int:
     muscle_enum = next((item for item in MuscleGroup if item.value == muscle), None)
     target = targets.get(muscle_enum) if muscle_enum is not None else None
-    return (
-        target.acceptable_maximum
-        if target is not None
-        else ruleset.maximum_sets[request.training_status]
-    )
+    if target is not None:
+        return target.acceptable_maximum
+    if muscle_enum is not None:
+        from app.workouts.program_engine.volume_policy import weekly_direct_volume_range
+
+        range_limit = weekly_direct_volume_range(muscle_enum, request.source.training_age_months)
+        if range_limit:
+            return range_limit.maximum
+    return ruleset.maximum_sets[request.training_status]
 
 
 def _hard_maximum_for(
@@ -749,9 +760,15 @@ def _hard_maximum_for(
 ) -> int:
     muscle_enum = next((item for item in MuscleGroup if item.value == muscle), None)
     target = targets.get(muscle_enum) if muscle_enum is not None else None
-    return (
-        target.maximum_hard if target is not None else ruleset.maximum_sets[request.training_status]
-    )
+    if target is not None:
+        return target.maximum_hard
+    if muscle_enum is not None:
+        from app.workouts.program_engine.volume_policy import weekly_direct_volume_range
+
+        range_limit = weekly_direct_volume_range(muscle_enum, request.source.training_age_months)
+        if range_limit:
+            return range_limit.maximum
+    return ruleset.maximum_sets[request.training_status]
 
 
 def _select_reduction_candidate(
@@ -938,7 +955,9 @@ def _select_addition_candidate(
                 and weekly_direct[primary.value] >= primary_target.direct_sets
             ):
                 continue
-            if direct_by_session[primary] >= ruleset.max_sets_per_muscle_per_session:
+            sess_range = session_direct_volume_range(primary, request.source.training_age_months)
+            sess_max = sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
+            if direct_by_session[primary] >= sess_max:
                 continue
             if exercise.sets >= _exercise_set_cap(exercise, days, request, targets, ruleset):
                 continue
@@ -996,6 +1015,8 @@ def _select_addition_candidate(
                             preferred_frequency=priority_policy.useful_frequency(
                                 frequency_target.target_sets,
                                 ruleset,
+                                primary,
+                                request,
                             ),
                         ),
                         direct_by_session[primary],
@@ -1026,16 +1047,16 @@ def _direct_sets(days: list[list[ProgrammedExercise]]) -> Counter[MuscleGroup]:
 
 
 def _per_session_excessive(
-    days: list[list[ProgrammedExercise]], ruleset: ProgramRuleset
+    days: list[list[ProgrammedExercise]], request: NormalizedProgramRequest, ruleset: ProgramRuleset
 ) -> set[tuple[int, MuscleGroup]]:
     excessive: set[tuple[int, MuscleGroup]] = set()
     for day_index, exercises in enumerate(days):
         direct = _direct_sets([exercises])
-        excessive.update(
-            (day_index, muscle)
-            for muscle, sets in direct.items()
-            if sets > ruleset.max_sets_per_muscle_per_session
-        )
+        for muscle, sets in direct.items():
+            sess_range = session_direct_volume_range(muscle, request.source.training_age_months)
+            sess_max = sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
+            if sets > sess_max:
+                excessive.add((day_index, muscle))
     return excessive
 
 

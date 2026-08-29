@@ -37,6 +37,7 @@ from app.workouts.program_engine.schemas import (
     ExerciseCandidate,
     NormalizedProgramRequest,
     ProgrammedExercise,
+    RankedCandidate,
     WeeklyVolumePlan,
     WorkoutDay,
 )
@@ -59,6 +60,7 @@ from app.workouts.program_engine.template_sessions import (
     adaptation_preservation_rank,
     template_removal_rank,
 )
+from app.workouts.program_engine.volume_policy import session_direct_volume_range
 
 
 @dataclass(frozen=True)
@@ -126,10 +128,7 @@ class SessionDurationRepairEvidence:
             and exercise_count >= 0
             and type(main_value) is int
             and main_value >= 0
-            and (
-                total_session is None
-                or (type(total_session) is int and total_session >= 0)
-            )
+            and (total_session is None or (type(total_session) is int and total_session >= 0))
             and isinstance(raw_fingerprint, str)
             and _is_session_fingerprint(raw_fingerprint)
             and isinstance(raw_reasons, (tuple, list))
@@ -497,11 +496,13 @@ def _select_set_addition(
         ):
             continue
         direct_sets = sum(
-            item.sets
-            for item in exercises
-            if item.primary_muscle is exercise.primary_muscle
+            item.sets for item in exercises if item.primary_muscle is exercise.primary_muscle
         )
-        if direct_sets + 1 > ruleset.max_sets_per_muscle_per_session:
+        sess_range = session_direct_volume_range(
+            exercise.primary_muscle, request.source.training_age_months
+        )
+        sess_max = sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
+        if direct_sets + 1 > sess_max:
             continue
         updated = _with_additional_set(exercise, ruleset)
         simulated = [*exercises]
@@ -548,9 +549,12 @@ def _select_exercise_addition(
     minimum_exercises: int,
     hard_volume_rejection: list[bool] | None = None,
 ) -> ProgrammedExercise | None:
-    if main_exercise_count(exercises) >= get_session_exercise_count_policy(
-        policy.requested_minutes, ruleset
-    ).maximum_main_exercises:
+    if (
+        main_exercise_count(exercises)
+        >= get_session_exercise_count_policy(
+            policy.requested_minutes, ruleset
+        ).maximum_main_exercises
+    ):
         return None
     existing_ids = {item.exercise_id for item in exercises}
     template_muscles = frozenset(day.template_target_muscles).union(
@@ -571,15 +575,37 @@ def _select_exercise_addition(
         and ExerciseLabel.CARDIO not in item.labels
         and not has_near_equivalent(item, exercises)
     )
+    training_days = len(other_days) + 1
+    frequency_cap = ruleset.maximum_direct_sessions_per_muscle_per_week
+    if training_days == 5:
+        frequency_cap += 1
+    elif training_days >= 6:
+        frequency_cap += 2
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
+
+    def _candidate_ranking_key(item: RankedCandidate) -> tuple[object, ...]:
+        candidate_exercise = item.exercise
+        if candidate_exercise.primary_muscle is None:
+            exceeds_frequency = 0
+        else:
+            other_frequency = sum(
+                any(e.primary_muscle is candidate_exercise.primary_muscle for e in d.exercises)
+                for d in other_days
+            )
+            has_cur = any(e.primary_muscle is candidate_exercise.primary_muscle for e in exercises)
+            new_frequency = other_frequency + (0 if has_cur else 1)
+            exceeds_frequency = 1 if (training_days >= 4 and new_frequency > frequency_cap) else 0
+        return (
+            exceeds_frequency,
+            *priority_policy.precedence_key(item.exercise.primary_muscle),
+            -item.score,
+            str(item.exercise.id),
+        )
+
     ranked = tuple(
         sorted(
             rank_exercises(request, options, ruleset),
-            key=lambda item: (
-                *priority_policy.precedence_key(item.exercise.primary_muscle),
-                -item.score,
-                str(item.exercise.id),
-            ),
+            key=_candidate_ranking_key,
         )
     )
     hard_volume_fallback: ProgrammedExercise | None = None
@@ -591,9 +617,13 @@ def _select_exercise_addition(
         direct_sets_for_muscle = sum(
             item.sets for item in exercises if item.primary_muscle is candidate.primary_muscle
         )
+        sess_range = session_direct_volume_range(
+            candidate.primary_muscle, request.source.training_age_months
+        )
+        sess_max = sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
         sets = min(
             ruleset.minimum_working_sets,
-            ruleset.max_sets_per_muscle_per_session,
+            sess_max,
             ruleset.max_working_sets_for_exercise(
                 training_status=request.training_status,
                 goal=request.primary_goal,
@@ -605,7 +635,7 @@ def _select_exercise_addition(
         )
         if sets < 1:
             continue
-        if direct_sets_for_muscle + sets > ruleset.max_sets_per_muscle_per_session:
+        if direct_sets_for_muscle + sets > sess_max:
             continue
         prescription = prescription_for(
             request.primary_goal,
@@ -639,18 +669,6 @@ def _select_exercise_addition(
         )
         simulated = [*exercises, programmed]
         if calculate_main_training_minutes_from_exercises(simulated) > policy.maximum_minutes:
-            continue
-        other_frequency = sum(
-            any(item.primary_muscle is candidate.primary_muscle for item in day.exercises)
-            for day in other_days
-        )
-        training_days = len(other_days) + 1
-        frequency_cap = ruleset.maximum_direct_sessions_per_muscle_per_week
-        if training_days == 5:
-            frequency_cap += 1
-        elif training_days >= 6:
-            frequency_cap += 2
-        if training_days >= 4 and other_frequency + 1 > frequency_cap:
             continue
         weekly_exercises = [item for day in other_days for item in day.exercises] + simulated
         within_hard_volume = _within_weekly_hard_volume(weekly_exercises, ruleset, request, volume)
@@ -729,9 +747,7 @@ def _repair_overfill(
     reasons: list[str] = []
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     effective_maximum_exercises = (
-        ruleset.max_exercises_per_session
-        if maximum_exercises is None
-        else maximum_exercises
+        ruleset.max_exercises_per_session if maximum_exercises is None else maximum_exercises
     )
     while main_exercise_count(exercises) > effective_maximum_exercises:
         removable = [
@@ -767,17 +783,18 @@ def _repair_overfill(
             if is_main_training_exercise(item)
             and (
                 is_supplemental_muscle(item.primary_muscle)
-            or (
-                _can_remove_for_floor(item, exercises, minimum_exercises)
-                and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
-                and template_removal_rank(item) < 3
-                and priority_policy.preservation_rank(item.primary_muscle) == 0
-                and (
-                    template_removal_rank(item) in {0, 1}
-                    or "SESSION_SIZE_ACCESSORY" in item.reason_codes
-                    or "OPTIONAL_SUPPLEMENTAL_WORK" in item.reason_codes
+                or (
+                    _can_remove_for_floor(item, exercises, minimum_exercises)
+                    and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
+                    and template_removal_rank(item) < 3
+                    and priority_policy.preservation_rank(item.primary_muscle) == 0
+                    and (
+                        template_removal_rank(item) in {0, 1}
+                        or "SESSION_SIZE_ACCESSORY" in item.reason_codes
+                        or "OPTIONAL_SUPPLEMENTAL_WORK" in item.reason_codes
+                    )
                 )
-            ))
+            )
         ]
         if low_value_removable:
             index, removed = min(

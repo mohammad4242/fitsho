@@ -29,6 +29,9 @@ from app.workouts.program_engine.slot_compatibility import (
 )
 from app.workouts.program_engine.supersets import superset_structure_errors
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
+from app.workouts.program_engine.volume_policy import (
+    session_direct_volume_range,
+)
 
 
 def validate_program(
@@ -191,17 +194,26 @@ def validate_program(
                 per_session[key] += item.sets
         for muscle in per_session:
             direct_session_frequency[muscle] += 1
-        configured_limit = program.aggregate_metrics.get(
-            "reference_max_sets_per_muscle_per_session",
-            ruleset.max_sets_per_muscle_per_session,
-        )
-        per_session_limit = (
-            configured_limit
-            if isinstance(configured_limit, int)
-            else ruleset.max_sets_per_muscle_per_session
-        )
-        if any(value > per_session_limit for value in per_session.values()):
-            errors.append("PER_SESSION_MUSCLE_VOLUME_EXCEEDED")
+        for muscle_str, value in per_session.items():
+            muscle_enum = next((m for m in MuscleGroup if m.value == muscle_str), None)
+            if muscle_enum is not None:
+                sess_range = session_direct_volume_range(muscle_enum, request.training_age_months)
+                dynamic_user_max = (
+                    sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
+                )
+            else:
+                dynamic_user_max = ruleset.max_sets_per_muscle_per_session
+
+            configured_limit = program.aggregate_metrics.get(
+                "reference_max_sets_per_muscle_per_session"
+            )
+            if isinstance(configured_limit, int):
+                per_session_limit = min(dynamic_user_max, configured_limit)
+            else:
+                per_session_limit = dynamic_user_max
+
+            if value > per_session_limit:
+                errors.append("PER_SESSION_MUSCLE_VOLUME_EXCEEDED")
         if (
             day.cardio
             and day.cardio.intensity.value == "vigorous"
@@ -236,7 +248,7 @@ def validate_program(
     if training_days >= 4 and any(
         frequency > effective_frequency_cap for frequency in direct_session_frequency.values()
     ):
-        errors.append("MUSCLE_DIRECT_FREQUENCY_EXCEEDED")
+        warnings.append("MUSCLE_DIRECT_FREQUENCY_EXCEEDED")
     if not recovery_spacing_is_valid(program.weekly_schedule, ruleset):
         errors.append("RECOVERY_SPACING_INVALID")
     if program.safety_status not in {
@@ -327,7 +339,7 @@ def validate_program(
                 if status == "constrained":
                     warnings.append("WEEKLY_VOLUME_CONSTRAINED")
                 elif actual_effective <= effective_maximum_hard:
-                    errors.append("WEEKLY_VOLUME_OUTSIDE_ACCEPTABLE_RANGE")
+                    warnings.append("WEEKLY_VOLUME_OUTSIDE_ACCEPTABLE_RANGE")
             minimum_effective = _int_metric(
                 range_values.get("minimum_effective_sets", range_values.get("minimum_soft")),
                 0,
