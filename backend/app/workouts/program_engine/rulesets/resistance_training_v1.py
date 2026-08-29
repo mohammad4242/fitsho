@@ -5,7 +5,7 @@ from app.workouts.program_engine.enums import Goal, SplitType, TrainingStatus
 from app.workouts.program_engine.focus_topology import FocusAffinity
 
 MINIMUM_EXERCISES_PER_SESSION = 5
-MAXIMUM_EXERCISES_PER_SESSION = 9
+MAXIMUM_EXERCISES_PER_SESSION = 12
 PREFERRED_MAIN_EXERCISES_PER_SESSION = 8
 
 

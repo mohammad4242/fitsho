@@ -695,7 +695,7 @@ def test_validator_rejects_duration_overrun() -> None:
     assert "SESSION_DURATION_EXCEEDED" in report.errors
 
 
-@pytest.mark.parametrize("exercise_count", (4, 10))
+@pytest.mark.parametrize("exercise_count", (4, 13))
 def test_validator_rejects_session_exercise_counts_outside_the_ruleset(
     exercise_count: int,
 ) -> None:
@@ -711,10 +711,7 @@ def test_validator_rejects_session_exercise_counts_outside_the_ruleset(
 
     report = validate_program(invalid, source, RULESET)
 
-    if exercise_count == 4:
-        assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors
-    else:
-        assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors
+    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors
 
 
 @pytest.mark.parametrize(
@@ -727,7 +724,13 @@ def test_validator_rejects_session_exercise_counts_outside_the_ruleset(
         *(
             (duration, main_count, expected_error)
             for duration in (45, 60, 75, 90)
-            for main_count, expected_error in ((4, True), (5, False), (9, False), (10, True))
+            for main_count, expected_error in (
+                (4, True),
+                (5, False),
+                (9, False),
+                (12, False),
+                (13, True),
+            )
         ),
     ),
 )

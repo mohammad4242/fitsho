@@ -7,6 +7,7 @@ from app.workouts.program_engine.duration_policy import (
     calculate_total_session_minutes_from_exercises,
     get_session_exercise_count_policy,
 )
+from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.supplemental_policy import (
     exercise_count_breakdown,
     main_exercise_count,
@@ -26,11 +27,11 @@ def test_core_is_never_counted_as_main_when_primary_muscle_is_non_supplemental()
     ("duration", "minimum", "maximum"),
     (
         (30, 3, 4),
-        (45, 5, 9),
-        (60, 5, 9),
-        (75, 5, 9),
-        (90, 5, 9),
-        (120, 5, 9),
+        (45, 5, 12),
+        (60, 5, 12),
+        (75, 5, 12),
+        (90, 5, 12),
+        (120, 5, 12),
     ),
 )
 def test_session_exercise_count_policy_covers_supported_duration_matrix(
@@ -47,6 +48,27 @@ def test_session_exercise_count_policy_covers_supported_duration_matrix(
         True,
         False,
     ]
+
+
+def test_normal_session_count_policy_keeps_preferred_workload_below_hard_ceiling() -> None:
+    policy = get_session_exercise_count_policy(60)
+
+    assert policy.minimum_main_exercises == 5
+    assert policy.maximum_main_exercises == 12
+    assert RULESET.preferred_main_exercises_per_session == 8
+
+
+def test_thirty_minute_count_policy_still_caps_main_exercises_at_four() -> None:
+    policy = get_session_exercise_count_policy(30)
+
+    assert (policy.minimum_main_exercises, policy.maximum_main_exercises) == (3, 4)
+
+
+def test_thirteenth_main_exercise_is_outside_normal_session_policy() -> None:
+    policy = get_session_exercise_count_policy(60)
+
+    assert policy.contains(12)
+    assert not policy.contains(13)
 
 
 def test_count_breakdown_uses_structured_metadata_across_nested_wrappers() -> None:

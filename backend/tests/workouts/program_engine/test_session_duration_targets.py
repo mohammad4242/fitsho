@@ -22,7 +22,10 @@ from app.workouts.program_engine.session_duration import (
     SessionDurationRepairEvidence,
     repair_session_durations,
 )
-from app.workouts.program_engine.supplemental_policy import main_exercise_count
+from app.workouts.program_engine.supplemental_policy import (
+    is_main_resistance_exercise,
+    main_exercise_count,
+)
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from app.workouts.program_engine.volume_policy import session_hard_volume_cap
@@ -56,6 +59,23 @@ def test_general_warmup_is_outside_the_requested_workout_duration() -> None:
 
     assert "SESSION_DURATION_EXCEEDED" not in report.errors
     assert "SESSION_DURATION_OVER_TARGET" not in report.errors
+
+
+def test_thirty_minute_generation_stays_within_four_main_exercises() -> None:
+    source = request(session_duration_minutes=30, available_training_days=3)
+    result = generate_program(source, full_catalog(), RULESET, reference_templates=())
+
+    assert result.program is not None, result.errors
+    assert all(main_exercise_count(day.exercises) <= 4 for day in result.program.weekly_schedule)
+
+
+def test_ordinary_generation_does_not_target_the_new_hard_ceiling() -> None:
+    source = request(session_duration_minutes=60, available_training_days=1)
+    result = generate_program(source, full_catalog(), RULESET, reference_templates=())
+
+    assert result.program is not None, result.errors
+    main_counts = [main_exercise_count(day.exercises) for day in result.program.weekly_schedule]
+    assert all(count < RULESET.max_exercises_per_session for count in main_counts)
 
 
 def test_high_quality_fifty_two_minute_workout_satisfies_sixty_minute_request() -> None:
@@ -507,6 +527,53 @@ def _duration_fixture_exercise(candidate, *, order: int, sets: int = 3, minutes:
 
 
 @pytest.mark.parametrize(
+    ("requested", "existing_count", "existing_minutes"),
+    [(60, 9, 5), (75, 10, 6), (90, 11, 7)],
+)
+def test_duration_repair_can_add_tenth_eleventh_or_twelfth_main_exercise(
+    requested: int, existing_count: int, existing_minutes: int
+) -> None:
+    source = request(session_duration_minutes=requested, available_training_days=1)
+    normalized = normalize_request(source, RULESET)
+    catalog = {item.name.lower(): item for item in full_catalog()}
+    ordered_names = (
+        "push up",
+        "bodyweight row",
+        "bodyweight squat",
+        "bodyweight hinge",
+        "reverse lunge",
+        "wall knee extension",
+        "calf raise",
+        "dumbbell overhead press",
+        "dumbbell pullover",
+        "dumbbell curl",
+        "dumbbell triceps extension",
+        "dumbbell shrug",
+    )
+    existing = tuple(
+        _duration_fixture_exercise(catalog[name], order=index, sets=4, minutes=existing_minutes)
+        for index, name in enumerate(ordered_names[:existing_count], start=1)
+    )
+    candidate = catalog[ordered_names[existing_count]]
+    day = WorkoutDay(
+        day_index=1,
+        weekday=0,
+        title="Duration repair",
+        focus="full_body",
+        estimated_duration_minutes=RULESET.general_warmup_minutes
+        + sum(item.estimated_minutes for item in existing),
+        exercises=existing,
+    )
+
+    result = repair_session_durations((day,), normalized, (candidate,), RULESET)
+
+    repaired = result.days[0]
+    assert main_exercise_count(repaired.exercises) == existing_count + 1
+    assert candidate.id in {item.exercise_id for item in repaired.exercises}
+    assert calculate_main_training_minutes(repaired) >= requested - 10
+
+
+@pytest.mark.parametrize(
     ("existing_names", "expected_count"),
     [
         (("bodyweight hinge", "hamstring walkout"), 2),
@@ -624,12 +691,15 @@ def test_capacity_trim_preserves_optional_core_when_main_capacity_is_full() -> N
     source = request(session_duration_minutes=60, available_training_days=1)
     normalized = normalize_request(source, RULESET)
     catalog = tuple(full_catalog())
+    main_catalog = tuple(item for item in catalog if is_main_resistance_exercise(item))
     main = tuple(
-        _duration_fixture_exercise(item, order=index, minutes=6)
-        for index, item in enumerate(catalog[:9], start=1)
+        _duration_fixture_exercise(item, order=index, minutes=5)
+        for index, item in enumerate(main_catalog[: RULESET.max_exercises_per_session], start=1)
     )
     optional = replace(
-        _duration_fixture_exercise(catalog[7], order=10, minutes=5),
+        _duration_fixture_exercise(
+            catalog[7], order=RULESET.max_exercises_per_session + 1, minutes=5
+        ),
         reason_codes=("OPTIONAL_SUPPLEMENTAL_WORK",),
         primary_muscle=MuscleGroup.ABS,
         exercise_type=ExerciseType.CORE,
@@ -654,6 +724,33 @@ def test_capacity_trim_preserves_optional_core_when_main_capacity_is_full() -> N
     )
     assert "SUPPLEMENTAL_WORK_TRIMMED_FOR_DURATION" not in reasons
     assert optional.exercise_id in {item.exercise_id for item in repaired[0].exercises}
+
+
+def test_duration_repair_trims_a_thirteenth_main_exercise() -> None:
+    source = request(session_duration_minutes=60, available_training_days=1)
+    normalized = normalize_request(source, RULESET)
+    main_catalog = tuple(item for item in full_catalog() if is_main_resistance_exercise(item))
+    exercises = tuple(
+        replace(
+            _duration_fixture_exercise(item, order=index, minutes=5),
+            reason_codes=("SESSION_SIZE_ACCESSORY",),
+        )
+        for index, item in enumerate(main_catalog[: RULESET.max_exercises_per_session + 1], start=1)
+    )
+    day = WorkoutDay(
+        day_index=1,
+        weekday=0,
+        title="Thirteenth exercise",
+        focus="full_body",
+        estimated_duration_minutes=RULESET.general_warmup_minutes
+        + sum(item.estimated_minutes for item in exercises),
+        exercises=exercises,
+    )
+
+    result = repair_session_durations((day,), normalized, (), RULESET)
+
+    assert main_exercise_count(result.days[0].exercises) == RULESET.max_exercises_per_session
+    assert "MAIN_EXERCISE_TRIMMED_FOR_COUNT" in result.reasons
 
 
 @pytest.mark.parametrize(
