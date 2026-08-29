@@ -167,17 +167,40 @@ def weekly_direct_volume_range(muscle: MuscleGroup, training_age_months: int) ->
     band = volume_experience_band(training_age_months)
     if muscle in LARGE_MUSCLES:
         if band == "NOVICE":
-            return VolumeRange(6, 12)
+            return VolumeRange(6, 10)
         if band == "INTERMEDIATE":
-            return VolumeRange(8, 16)
-        return VolumeRange(10, 20)
+            return VolumeRange(10, 24)
+        return VolumeRange(12, 30)
     if muscle in SMALL_MUSCLES:
         if band == "NOVICE":
-            return VolumeRange(4, 8)
+            return VolumeRange(4, 6)
         if band == "INTERMEDIATE":
-            return VolumeRange(6, 12)
-        return VolumeRange(8, 16)
+            return VolumeRange(6, 20)
+        return VolumeRange(8, 20)
     return None
+
+
+def weekly_volume_constraint_value(
+    muscle: MuscleGroup,
+    training_age_months: int,
+    *,
+    direct_sets: int | float,
+    effective_sets: int | float,
+) -> int | float:
+    """Return the weekly value used by classified hard/soft volume constraints."""
+    if weekly_direct_volume_range(muscle, training_age_months) is not None:
+        return direct_sets
+    return effective_sets
+
+
+def weekly_volume_constraint_maximum(
+    muscle: MuscleGroup,
+    training_age_months: int,
+    legacy_maximum: int,
+) -> int:
+    """Return the direct weekly maximum or the legacy fallback for unclassified muscles."""
+    range_limit = weekly_direct_volume_range(muscle, training_age_months)
+    return range_limit.maximum if range_limit is not None else legacy_maximum
 
 
 def session_direct_volume_range(

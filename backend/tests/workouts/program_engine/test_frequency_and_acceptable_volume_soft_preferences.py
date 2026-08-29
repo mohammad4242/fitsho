@@ -1,6 +1,8 @@
 from dataclasses import replace
 from uuid import uuid4
 
+import pytest
+
 from app.exercises.enums import (
     Difficulty,
     Equipment,
@@ -13,7 +15,7 @@ from app.profile.enums import TrainingLocation
 from app.workouts.program_engine.duration_policy import SessionDurationPolicy
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, SplitType, TrainingExperience
-from app.workouts.program_engine.final_gate import FinalGateStatus, evaluate_final_program
+from app.workouts.program_engine.final_gate import evaluate_final_program
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
@@ -76,6 +78,46 @@ def _make_test_candidate(
         is_programmable=True,
         exercise_type=exercise_type,
         substitution_group=pattern.value,
+        prescription_mode=PrescriptionMode.REPS,
+    )
+
+
+def _secondary_chest_exercise(order: int) -> ProgrammedExercise:
+    return ProgrammedExercise(
+        exercise_id=uuid4(),
+        exercise_name=f"Biceps secondary {order}",
+        order=order,
+        sets=4,
+        rep_min=8,
+        rep_max=12,
+        target_rir=2,
+        rest_seconds=90,
+        estimated_minutes=8,
+        reason_codes=("SELECTION",),
+        primary_muscle=MuscleGroup.BICEPS,
+        secondary_muscles=(MuscleGroup.CHEST,),
+        exercise_type=ExerciseType.ISOLATION,
+        movement_pattern=MovementPattern.ELBOW_FLEXION,
+        prescription_mode=PrescriptionMode.REPS,
+    )
+
+
+def _direct_chest_exercise(order: int, sets: int) -> ProgrammedExercise:
+    return ProgrammedExercise(
+        exercise_id=uuid4(),
+        exercise_name=f"Chest direct {order}",
+        order=order,
+        sets=sets,
+        rep_min=8,
+        rep_max=12,
+        target_rir=2,
+        rest_seconds=90,
+        estimated_minutes=8,
+        reason_codes=("SELECTION",),
+        primary_muscle=MuscleGroup.CHEST,
+        secondary_muscles=(),
+        exercise_type=ExerciseType.COMPOUND,
+        movement_pattern=MovementPattern.HORIZONTAL_PUSH,
         prescription_mode=PrescriptionMode.REPS,
     )
 
@@ -143,34 +185,77 @@ def test_weekly_volume_outside_acceptable_range_is_warning_when_under_hard_maxim
     assert "WEEKLY_VOLUME_OUTSIDE_ACCEPTABLE_RANGE" not in gate_result.reason_codes
 
 
-def test_weekly_volume_exceeding_hard_maximum_is_error_and_final_gate_rejected() -> None:
+@pytest.mark.parametrize(
+    ("training_age_months", "direct_sets", "expect_error"),
+    [
+        (12, 20, False),
+        (12, 25, True),
+        (72, 30, False),
+        (72, 31, True),
+    ],
+)
+def test_weekly_hard_volume_uses_direct_sets_for_classified_muscles(
+    training_age_months: int,
+    direct_sets: int,
+    expect_error: bool,
+) -> None:
     source = request(
-        available_training_days=4,
-        training_experience=TrainingExperience.INTERMEDIATE,
-        training_age_months=24,
+        available_training_days=1,
+        training_experience=(
+            TrainingExperience.INTERMEDIATE
+            if training_age_months <= 24
+            else TrainingExperience.ADVANCED
+        ),
+        training_age_months=training_age_months,
     )
     result = generate_program(source, full_catalog(), RULESET)
     assert result.program is not None
 
-    # Set hard maximum lower than actual volume (4 < 10)
-    ranges = {
-        "chest": {
-            "acceptable_minimum": 2.0,
-            "acceptable_maximum": 4.0,
-            "effective_maximum_hard": 4,
-            "status": "normal",
-        }
-    }
-    metrics = dict(result.program.aggregate_metrics)
-    metrics["volume_ranges_by_muscle"] = ranges
-    program_above_hard_max = replace(result.program, aggregate_metrics=metrics)
+    base_day = result.program.weekly_schedule[0]
+    base_program = replace(
+        result.program,
+        weekly_schedule=(
+            replace(
+                base_day,
+                exercises=tuple(
+                    item
+                    for item in base_day.exercises
+                    if item.primary_muscle is not MuscleGroup.CHEST
+                ),
+            ),
+            *result.program.weekly_schedule[1:],
+        ),
+    )
+    chest_exercises: list[ProgrammedExercise] = []
+    remaining = direct_sets
+    order = 1
+    while remaining > 0:
+        sets = min(4, remaining)
+        chest_exercises.append(_direct_chest_exercise(order, sets))
+        remaining -= sets
+        order += 1
+    secondary_exercises = (
+        tuple(_secondary_chest_exercise(order + index) for index in range(3))
+        if training_age_months <= 24 and direct_sets == 20
+        else ()
+    )
+    repaired_day = replace(
+        base_program.weekly_schedule[0],
+        exercises=tuple(chest_exercises) + secondary_exercises,
+    )
+    program = replace(
+        base_program,
+        weekly_schedule=(repaired_day, *base_program.weekly_schedule[1:]),
+    )
 
-    report = validate_program(program_above_hard_max, source, RULESET)
-    assert "WEEKLY_MUSCLE_VOLUME_EXCEEDED" in report.errors
+    report = validate_program(program, source, RULESET)
 
-    gate_result = evaluate_final_program(program_above_hard_max, source, report, RULESET)
-    assert gate_result.status is FinalGateStatus.REJECTED
-    assert "WEEKLY_MUSCLE_VOLUME_EXCEEDED" in gate_result.reason_codes
+    assert report.metrics["weekly_direct_sets_by_muscle"][MuscleGroup.CHEST.value] == direct_sets
+    if training_age_months == 12 and direct_sets == 20:
+        assert report.metrics["weekly_effective_sets_by_muscle"][MuscleGroup.CHEST.value] > 24
+    assert ("WEEKLY_MUSCLE_VOLUME_EXCEEDED" in report.errors) is expect_error
+    gate_result = evaluate_final_program(program, source, report, RULESET)
+    assert ("WEEKLY_MUSCLE_VOLUME_EXCEEDED" in gate_result.reason_codes) is expect_error
 
 
 def test_session_duration_selects_candidate_exceeding_frequency_when_necessary() -> None:

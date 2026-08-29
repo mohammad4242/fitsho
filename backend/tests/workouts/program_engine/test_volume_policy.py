@@ -1,3 +1,5 @@
+import pytest
+
 from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.enums import (
     Goal,
@@ -11,6 +13,8 @@ from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import RecentTrainingHistory, SplitPlan
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from app.workouts.program_engine.volume_policy import (
+    LARGE_MUSCLES,
+    SMALL_MUSCLES,
     session_direct_volume_range,
     session_hard_volume_cap,
     weekly_direct_volume_range,
@@ -100,7 +104,7 @@ def test_volume_flexibility_changes_with_personalized_target_size() -> None:
 
     assert novice_triceps.maximum_soft - novice_triceps.target_sets == 1
     assert intermediate_chest.target_sets - intermediate_chest.minimum_soft == 0
-    assert advanced_back.target_sets - advanced_back.minimum_soft == 3
+    assert advanced_back.maximum_soft - advanced_back.target_sets == 3
 
 
 def test_previous_volume_twenty_percent_limit_is_default_soft_cap() -> None:
@@ -124,10 +128,13 @@ def test_reliable_positive_history_can_override_previous_volume_soft_cap() -> No
         performance_trend="stable",
         recovery_problems=False,
     )
-    _, plan = _plan(recent_training_history=history)
+    _, plan = _plan(
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=12,
+        recent_training_history=history,
+    )
 
     assert plan.effective_target_for(MuscleGroup.CHEST) == 10
-    pass
 
 
 def test_recovery_signals_form_a_bounded_burden_instead_of_additive_penalties() -> None:
@@ -179,35 +186,86 @@ def test_session_hard_volume_cap_boundaries():
     assert session_hard_volume_cap(60) == 30
 
 
-def test_volume_policy_boundary_conditions():
-    # NOVICE boundaries (0, 5)
-    for months in (0, 5):
-        # LARGE
-        assert weekly_direct_volume_range(MuscleGroup.CHEST, months) == (6, 12)
-        assert session_direct_volume_range(MuscleGroup.CHEST, months) == (3, 6)
-        # SMALL
-        assert weekly_direct_volume_range(MuscleGroup.BICEPS, months) == (4, 8)
-        assert session_direct_volume_range(MuscleGroup.BICEPS, months) == (2, 4)
+@pytest.mark.parametrize(
+    ("months", "large_range", "small_range"),
+    [
+        (0, (6, 10), (4, 6)),
+        (5, (6, 10), (4, 6)),
+        (6, (10, 24), (6, 20)),
+        (24, (10, 24), (6, 20)),
+        (25, (12, 30), (8, 20)),
+        (60, (12, 30), (8, 20)),
+    ],
+)
+def test_weekly_direct_volume_range_boundaries(
+    months: int,
+    large_range: tuple[int, int],
+    small_range: tuple[int, int],
+) -> None:
+    for muscle in LARGE_MUSCLES:
+        assert weekly_direct_volume_range(muscle, months) == large_range
+    for muscle in SMALL_MUSCLES:
+        assert weekly_direct_volume_range(muscle, months) == small_range
 
-    # INTERMEDIATE boundaries (6, 24)
-    for months in (6, 24):
-        # LARGE
-        assert weekly_direct_volume_range(MuscleGroup.BACK, months) == (8, 16)
-        assert session_direct_volume_range(MuscleGroup.BACK, months) == (4, 8)
-        # SMALL
-        assert weekly_direct_volume_range(MuscleGroup.TRICEPS, months) == (6, 12)
-        assert session_direct_volume_range(MuscleGroup.TRICEPS, months) == (3, 6)
 
-    # ADVANCED boundaries (25, 60)
-    for months in (25, 60):
-        # LARGE
-        assert weekly_direct_volume_range(MuscleGroup.QUADRICEPS, months) == (10, 20)
-        assert session_direct_volume_range(MuscleGroup.QUADRICEPS, months) == (5, 10)
-        # SMALL
-        assert weekly_direct_volume_range(MuscleGroup.FOREARMS, months) == (8, 16)
-        assert session_direct_volume_range(MuscleGroup.FOREARMS, months) == (4, 8)
+@pytest.mark.parametrize(
+    "muscle",
+    [
+        MuscleGroup.ABS,
+        MuscleGroup.TRAPS,
+        MuscleGroup.NECK,
+        MuscleGroup.ADDUCTORS,
+        MuscleGroup.ABDUCTORS,
+        MuscleGroup.LEGS,
+        MuscleGroup.OBLIQUES,
+        MuscleGroup.LOWER_BACK,
+    ],
+)
+def test_unclassified_muscles_keep_legacy_weekly_range_fallback(muscle: MuscleGroup) -> None:
+    for months in (0, 6, 25, 60):
+        assert weekly_direct_volume_range(muscle, months) is None
 
-    # UNCLASSIFIED preserves legacy (returns None)
-    for months in (0, 24, 60):
-        assert weekly_direct_volume_range(MuscleGroup.ABS, months) is None
-        assert session_direct_volume_range(MuscleGroup.TRAPS, months) is None
+
+def test_session_direct_ranges_remain_unchanged_and_are_not_weekly_hard_caps() -> None:
+    assert session_direct_volume_range(MuscleGroup.CHEST, 0) == (3, 6)
+    assert session_direct_volume_range(MuscleGroup.CHEST, 6) == (4, 8)
+    assert session_direct_volume_range(MuscleGroup.CHEST, 25) == (5, 10)
+    assert session_direct_volume_range(MuscleGroup.BICEPS, 0) == (2, 4)
+    assert session_direct_volume_range(MuscleGroup.BICEPS, 6) == (3, 6)
+    assert session_direct_volume_range(MuscleGroup.BICEPS, 25) == (4, 8)
+
+
+@pytest.mark.parametrize(
+    ("months", "experience", "expected"),
+    [
+        (12, TrainingExperience.INTERMEDIATE, 24),
+        (72, TrainingExperience.ADVANCED, 30),
+    ],
+)
+def test_classified_planner_maximum_hard_uses_weekly_direct_range(
+    months: int,
+    experience: TrainingExperience,
+    expected: int,
+) -> None:
+    _, plan = _plan(training_age_months=months, training_experience=experience)
+    chest = next(target for target in plan.targets if target.muscle is MuscleGroup.CHEST)
+    assert chest.maximum_hard == expected
+
+
+def test_small_muscle_planner_maximum_hard_uses_weekly_direct_range() -> None:
+    _, intermediate = _plan(
+        training_age_months=12,
+        training_experience=TrainingExperience.INTERMEDIATE,
+    )
+    _, advanced = _plan(
+        training_age_months=72,
+        training_experience=TrainingExperience.ADVANCED,
+    )
+    intermediate_biceps = next(
+        target for target in intermediate.targets if target.muscle is MuscleGroup.BICEPS
+    )
+    advanced_biceps = next(
+        target for target in advanced.targets if target.muscle is MuscleGroup.BICEPS
+    )
+    assert intermediate_biceps.maximum_hard == 20
+    assert advanced_biceps.maximum_hard == 20

@@ -60,7 +60,11 @@ from app.workouts.program_engine.template_sessions import (
     adaptation_preservation_rank,
     template_removal_rank,
 )
-from app.workouts.program_engine.volume_policy import session_hard_volume_cap
+from app.workouts.program_engine.volume_policy import (
+    session_hard_volume_cap,
+    weekly_volume_constraint_maximum,
+    weekly_volume_constraint_value,
+)
 
 
 @dataclass(frozen=True)
@@ -1097,13 +1101,38 @@ def _within_weekly_hard_volume(
     volume: WeeklyVolumePlan | None,
 ) -> bool:
     effective = calculate_effective_volume(exercises, ruleset)
-    maximum = ruleset.maximum_sets[request.training_status]
-    if any(value > maximum for value in effective.effective_sets_by_muscle.values()):
-        return False
+    legacy_maximum = ruleset.maximum_sets[request.training_status]
+    for muscle_key in set(effective.direct_sets_by_muscle).union(
+        effective.effective_sets_by_muscle
+    ):
+        muscle = _muscle_group(muscle_key)
+        if muscle is None:
+            actual = effective.effective_sets_by_muscle.get(muscle_key, 0)
+            maximum = legacy_maximum
+        else:
+            actual = _weekly_constraint_value_for_key(
+                muscle_key,
+                effective.direct_sets_by_muscle,
+                effective.effective_sets_by_muscle,
+                request,
+            )
+            maximum = weekly_volume_constraint_maximum(
+                muscle,
+                request.source.training_age_months,
+                legacy_maximum,
+            )
+        if actual > maximum:
+            return False
     if volume is None:
         return True
     return all(
-        effective.effective_sets_by_muscle.get(target.muscle.value, 0) <= target.maximum_hard
+        _weekly_constraint_value_for_key(
+            target.muscle.value,
+            effective.direct_sets_by_muscle,
+            effective.effective_sets_by_muscle,
+            request,
+        )
+        <= target.maximum_hard
         for target in volume.targets
     )
 
@@ -1120,7 +1149,13 @@ def _within_weekly_acceptable_volume(
         return True
     effective = calculate_effective_volume(exercises, ruleset)
     return all(
-        effective.effective_sets_by_muscle.get(target.muscle.value, 0) <= target.acceptable_maximum
+        _weekly_constraint_value_for_key(
+            target.muscle.value,
+            effective.direct_sets_by_muscle,
+            effective.effective_sets_by_muscle,
+            request,
+        )
+        <= target.acceptable_maximum
         for target in volume.targets
     )
 
@@ -1139,10 +1174,25 @@ def _acceptable_volume_change(
     before_effective = calculate_effective_volume(before, ruleset)
     after_effective = calculate_effective_volume(after, ruleset)
     return all(
-        after_effective.effective_sets_by_muscle.get(target.muscle.value, 0)
+        _weekly_constraint_value_for_key(
+            target.muscle.value,
+            after_effective.direct_sets_by_muscle,
+            after_effective.effective_sets_by_muscle,
+            request,
+        )
         <= target.acceptable_maximum
-        or after_effective.effective_sets_by_muscle.get(target.muscle.value, 0)
-        <= before_effective.effective_sets_by_muscle.get(target.muscle.value, 0)
+        or _weekly_constraint_value_for_key(
+            target.muscle.value,
+            after_effective.direct_sets_by_muscle,
+            after_effective.effective_sets_by_muscle,
+            request,
+        )
+        <= _weekly_constraint_value_for_key(
+            target.muscle.value,
+            before_effective.direct_sets_by_muscle,
+            before_effective.effective_sets_by_muscle,
+            request,
+        )
         for target in volume.targets
     )
 
@@ -1167,6 +1217,30 @@ def _within_weekly_minimum_volume(
             >= target.minimum_effective_sets
         )
         for target in volume.targets
+    )
+
+
+def _muscle_group(value: str) -> MuscleGroup | None:
+    try:
+        return MuscleGroup(value)
+    except ValueError:
+        return None
+
+
+def _weekly_constraint_value_for_key(
+    muscle_key: str,
+    direct_sets: Mapping[str, int],
+    effective_sets: Mapping[str, float],
+    request: NormalizedProgramRequest,
+) -> int | float:
+    muscle = _muscle_group(muscle_key)
+    if muscle is None:
+        return effective_sets.get(muscle_key, 0)
+    return weekly_volume_constraint_value(
+        muscle,
+        request.source.training_age_months,
+        direct_sets=direct_sets.get(muscle_key, 0),
+        effective_sets=effective_sets.get(muscle_key, 0),
     )
 
 

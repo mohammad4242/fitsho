@@ -88,6 +88,7 @@ from app.workouts.program_engine.volume_history import (
     derive_previous_volume_baseline,
 )
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
+from app.workouts.program_engine.volume_policy import weekly_volume_constraint_value
 from app.workouts.program_engine.volume_repair import repair_weekly_volume
 from app.workouts.program_engine.weekly_coverage import (
     assess_weekly_coverage,
@@ -321,6 +322,7 @@ def generate_program(
         }
         if result.decision_trace:
             rejected_attempt["decision_trace"] = result.decision_trace
+        print(f"Rejected exact {split.split_type}: {result.errors}")
         rejected_splits.append(rejected_attempt)
 
     weekdays_fallback = (
@@ -355,6 +357,7 @@ def generate_program(
         if result.is_success:
             return result
         collected_errors.extend(result.errors)
+        print(f"Rejected fallback {fallback_split.split_type}: {result.errors}")
         rejected_splits.append(
             {
                 "split": fallback_split.split_type.value,
@@ -1292,9 +1295,7 @@ def _duration_repair_trace(
         classification = "minor"
     else:
         classification = "major"
-    unavoidable_constraints = tuple(
-        sorted(code for code in reason_codes if "CONSTRAINED" in code)
-    )
+    unavoidable_constraints = tuple(sorted(code for code in reason_codes if "CONSTRAINED" in code))
     session_metrics = tuple(
         {
             "day_index": updated.day_index,
@@ -1415,6 +1416,7 @@ def _volume_metrics(
                 effective_volume.effective_sets_by_muscle.get(target.muscle.value, 0.0),
                 days,
                 repair_reason_codes,
+                request.source.training_age_months,
             )
             for target in volume.targets
         },
@@ -1450,6 +1452,7 @@ def _volume_metrics(
             effective_volume.effective_sets_by_muscle,
             priority_policy,
             ruleset,
+            request,
         ),
     }
     if reference_template is not None:
@@ -1524,9 +1527,16 @@ def _volume_range_metric(
     actual_effective: float,
     days: tuple[WorkoutDay, ...],
     repair_reason_codes: tuple[str, ...],
+    training_age_months: int,
 ) -> dict[str, object]:
     constraint_reasons = list(target.constraint_reason_codes)
-    inside_range = target.acceptable_minimum <= actual_effective <= target.acceptable_maximum
+    actual_weekly_volume = weekly_volume_constraint_value(
+        target.muscle,
+        training_age_months,
+        direct_sets=actual_direct,
+        effective_sets=actual_effective,
+    )
+    inside_range = target.acceptable_minimum <= actual_weekly_volume <= target.acceptable_maximum
     if not inside_range and set(repair_reason_codes).intersection(
         {
             "VOLUME_REPAIR_SOFT_TARGET_REDUCED",
@@ -1541,7 +1551,7 @@ def _volume_range_metric(
         for item in day.exercises
     ):
         constraint_reasons.append("VOLUME_CONSTRAINED_BY_TEMPLATE_STRUCTURE")
-    if actual_effective == target.preferred_target:
+    if actual_weekly_volume == target.preferred_target:
         status = "exact_target"
     elif inside_range:
         status = "within_flexible_range"
@@ -1584,6 +1594,7 @@ def _priority_metrics(
     effective_sets: dict[str, float],
     policy: PriorityAllocationPolicy,
     ruleset: ProgramRuleset,
+    request: NormalizedProgramRequest,
 ) -> dict[str, dict[str, object]]:
     metrics: dict[str, dict[str, object]] = {}
     for muscle in policy.priorities:
@@ -1599,7 +1610,7 @@ def _priority_metrics(
         target_available = target > 0 or effective_target > 0
         direct_satisfied = target_available and direct >= target
         effective_satisfied = target_available and effective >= effective_target
-        useful_frequency = policy.useful_frequency(target, ruleset)
+        useful_frequency = policy.useful_frequency(target, ruleset, muscle, request)
         frequency_satisfied = len(session_indexes) >= useful_frequency
         status = (
             "satisfied"

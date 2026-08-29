@@ -31,6 +31,9 @@ from app.workouts.program_engine.supersets import superset_structure_errors
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.volume_policy import (
     session_hard_volume_cap,
+    weekly_direct_volume_range,
+    weekly_volume_constraint_maximum,
+    weekly_volume_constraint_value,
 )
 
 
@@ -305,11 +308,38 @@ def validate_program(
                 continue
             muscle_key = str(muscle)
             actual_effective = effective_sets.get(muscle_key, 0)
-            effective_maximum_hard = _int_metric(
-                range_values.get("effective_maximum_hard"),
-                ruleset.maximum_sets[program.training_status],
+            muscle_enum = _muscle_group(muscle_key)
+            direct_range = (
+                weekly_direct_volume_range(muscle_enum, request.training_age_months)
+                if muscle_enum is not None
+                else None
             )
-            if actual_effective > effective_maximum_hard:
+            actual_weekly = (
+                weekly_volume_constraint_value(
+                    muscle_enum,
+                    request.training_age_months,
+                    direct_sets=direct_sets.get(muscle_key, 0),
+                    effective_sets=actual_effective,
+                )
+                if muscle_enum is not None
+                else actual_effective
+            )
+            weekly_maximum_hard = (
+                weekly_volume_constraint_maximum(
+                    muscle_enum,
+                    request.training_age_months,
+                    ruleset.maximum_sets[program.training_status],
+                )
+                if direct_range is not None and muscle_enum is not None
+                else _int_metric(
+                    range_values.get(
+                        "effective_maximum_hard",
+                        range_values.get("maximum_hard"),
+                    ),
+                    ruleset.maximum_sets[program.training_status],
+                )
+            )
+            if actual_weekly > weekly_maximum_hard:
                 errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
             acceptable_minimum = _float_metric(
                 range_values.get("acceptable_minimum", range_values.get("minimum_soft")),
@@ -320,17 +350,17 @@ def validate_program(
                     "acceptable_maximum",
                     range_values.get("effective_maximum_soft", range_values.get("maximum_soft")),
                 ),
-                effective_maximum_hard,
+                weekly_maximum_hard,
             )
             status = range_values.get("status")
-            if actual_effective > acceptable_maximum:
+            if actual_weekly > acceptable_maximum:
                 warnings.append("SOFT_WEEKLY_VOLUME_EXCEEDED")
             if actual_effective < acceptable_minimum:
                 warnings.append("EFFECTIVE_VOLUME_BELOW_ACCEPTABLE_RANGE")
-            if not acceptable_minimum <= actual_effective <= acceptable_maximum:
+            if not acceptable_minimum <= actual_weekly <= acceptable_maximum:
                 if status == "constrained":
                     warnings.append("WEEKLY_VOLUME_CONSTRAINED")
-                elif actual_effective <= effective_maximum_hard:
+                elif actual_weekly <= weekly_maximum_hard:
                     warnings.append("WEEKLY_VOLUME_OUTSIDE_ACCEPTABLE_RANGE")
             minimum_effective = _int_metric(
                 range_values.get("minimum_effective_sets", range_values.get("minimum_soft")),
@@ -359,11 +389,36 @@ def validate_program(
                 else:
                     warnings.append("DIRECT_VOLUME_BELOW_SOFT_TARGET")
     else:
-        maximum = ruleset.maximum_sets[program.training_status]
-        if any(value > maximum for value in effective_sets.values()):
-            errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
+        for muscle_key in set(direct_sets).union(effective_sets):
+            muscle_enum = _muscle_group(muscle_key)
+            actual_weekly = (
+                _weekly_constraint_value_for_key(
+                    muscle_key,
+                    request.training_age_months,
+                    direct_sets,
+                    effective_sets,
+                )
+                if muscle_enum is not None
+                else effective_sets.get(muscle_key, 0)
+            )
+            maximum = (
+                weekly_volume_constraint_maximum(
+                    muscle_enum,
+                    request.training_age_months,
+                    ruleset.maximum_sets[program.training_status],
+                )
+                if muscle_enum is not None
+                else ruleset.maximum_sets[program.training_status]
+            )
+            if actual_weekly > maximum:
+                errors.append("WEEKLY_MUSCLE_VOLUME_EXCEEDED")
     if isinstance(planned, dict) and any(
-        effective_sets.get(str(muscle), 0)
+        _weekly_constraint_value_for_key(
+            str(muscle),
+            request.training_age_months,
+            direct_sets,
+            effective_sets,
+        )
         < _float_metric(
             ranges.get(str(muscle), {}).get("acceptable_minimum", target)
             if isinstance(ranges, dict) and isinstance(ranges.get(str(muscle)), dict)
@@ -413,3 +468,27 @@ def _sequence_metric(value: object) -> tuple[object, ...]:
     if isinstance(value, (tuple, list, set, frozenset)):
         return tuple(value)
     return ()
+
+
+def _muscle_group(value: str) -> MuscleGroup | None:
+    try:
+        return MuscleGroup(value)
+    except ValueError:
+        return None
+
+
+def _weekly_constraint_value_for_key(
+    muscle_key: str,
+    training_age_months: int,
+    direct_sets: Counter[str],
+    effective_sets: dict[str, float],
+) -> int | float:
+    muscle = _muscle_group(muscle_key)
+    if muscle is None:
+        return effective_sets.get(muscle_key, 0)
+    return weekly_volume_constraint_value(
+        muscle,
+        training_age_months,
+        direct_sets=direct_sets.get(muscle_key, 0),
+        effective_sets=effective_sets.get(muscle_key, 0),
+    )

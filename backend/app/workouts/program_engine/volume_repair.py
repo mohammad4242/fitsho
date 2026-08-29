@@ -44,7 +44,10 @@ from app.workouts.program_engine.supplemental_policy import (
     main_exercise_count,
 )
 from app.workouts.program_engine.template_sessions import adaptation_preservation_rank
-from app.workouts.program_engine.volume_policy import session_hard_volume_cap
+from app.workouts.program_engine.volume_policy import (
+    session_hard_volume_cap,
+    weekly_volume_constraint_value,
+)
 
 _HARD_MOVEMENT_PATTERN_GROUPS = (
     frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH}),
@@ -95,14 +98,18 @@ def repair_weekly_volume(
         )
         direct = Counter(effective_volume.direct_sets_by_muscle)
         effective = effective_volume.effective_sets_by_muscle
+        weekly_values = {
+            muscle: _weekly_constraint_value_for_key(muscle, direct, effective, request)
+            for muscle in set(direct).union(effective)
+        }
         weekly_excessive = {
             muscle
-            for muscle, sets in effective.items()
+            for muscle, sets in weekly_values.items()
             if sets > _maximum_for(muscle, targets, ruleset, request)
         }
         hard_weekly_excessive = {
             muscle
-            for muscle, sets in effective.items()
+            for muscle, sets in weekly_values.items()
             if sets > _hard_maximum_for(muscle, targets, ruleset, request)
         }
         per_session_excessive = _per_session_excessive(repaired, request, ruleset)
@@ -651,15 +658,24 @@ def _select_exercise_addition(
                     ruleset,
                 )
                 violations = tuple(
-                    (target_muscle, target, simulated_sets)
+                    (target_muscle, target, simulated_value)
                     for target_muscle, target in targets.items()
                     if (
-                        simulated_sets := simulated_volume.effective_sets_by_muscle.get(
-                            target_muscle.value, 0
+                        simulated_value := _weekly_constraint_value_for_key(
+                            target_muscle.value,
+                            simulated_volume.direct_sets_by_muscle,
+                            simulated_volume.effective_sets_by_muscle,
+                            request,
                         )
                     )
                     > (target.maximum_hard if use_hard_maximums else target.acceptable_maximum)
-                    and simulated_sets > current_effective_sets.get(target_muscle.value, 0)
+                    and simulated_value
+                    > _weekly_constraint_value_for_key(
+                        target_muscle.value,
+                        current_direct_sets,
+                        current_effective_sets,
+                        request,
+                    )
                 )
                 if violations and not _repairable_direct_priority_overage(
                     violations,
@@ -713,7 +729,7 @@ def _repairable_direct_priority_overage(
 ) -> bool:
     if len(violations) != 1 or candidate.primary_muscle not in direct_under:
         return False
-    muscle, target, simulated_effective = violations[0]
+    muscle, target, simulated_volume_value = violations[0]
     if muscle is not candidate.primary_muscle:
         return False
     direct_overage = simulated_direct_sets.get(muscle.value, 0) - target.minimum_direct_sets
@@ -725,7 +741,7 @@ def _repairable_direct_priority_overage(
     return (
         direct_overage > 0
         and direct_overage <= reducible_existing_sets
-        and simulated_effective - direct_overage <= target.maximum_hard
+        and simulated_volume_value - direct_overage <= target.maximum_hard
     )
 
 
@@ -932,7 +948,9 @@ def _select_addition_candidate(
     }
     current_effective = calculate_effective_volume(
         (item for items in days for item in items), ruleset
-    ).effective_sets_by_muscle
+    )
+    current_effective_sets = current_effective.effective_sets_by_muscle
+    current_direct_sets = current_effective.direct_sets_by_muscle
     for day_index, exercises in enumerate(days):
         direct_by_session = _direct_sets([exercises])
         for exercise_index, exercise in enumerate(exercises):
@@ -986,9 +1004,25 @@ def _select_addition_candidate(
                 ruleset,
             )
             if any(
-                simulated_volume.effective_sets_by_muscle.get(muscle, 0) > maximum
-                and simulated_volume.effective_sets_by_muscle.get(muscle, 0)
-                > current_effective.get(muscle, 0)
+                _weekly_constraint_value_for_key(
+                    muscle,
+                    simulated_volume.direct_sets_by_muscle,
+                    simulated_volume.effective_sets_by_muscle,
+                    request,
+                )
+                > maximum
+                and _weekly_constraint_value_for_key(
+                    muscle,
+                    simulated_volume.direct_sets_by_muscle,
+                    simulated_volume.effective_sets_by_muscle,
+                    request,
+                )
+                > _weekly_constraint_value_for_key(
+                    muscle,
+                    current_direct_sets,
+                    current_effective_sets,
+                    request,
+                )
                 for muscle, maximum in maximums.items()
             ):
                 continue
@@ -1038,6 +1072,24 @@ def _direct_sets(days: list[list[ProgrammedExercise]]) -> Counter[MuscleGroup]:
         for item in exercises
         if item.primary_muscle is not None
         for _ in range(item.sets)
+    )
+
+
+def _weekly_constraint_value_for_key(
+    muscle_key: str,
+    direct_sets: dict[str, int] | Counter[str],
+    effective_sets: dict[str, float],
+    request: NormalizedProgramRequest,
+) -> int | float:
+    try:
+        muscle = MuscleGroup(muscle_key)
+    except ValueError:
+        return effective_sets.get(muscle_key, 0)
+    return weekly_volume_constraint_value(
+        muscle,
+        request.source.training_age_months,
+        direct_sets=direct_sets.get(muscle_key, 0),
+        effective_sets=effective_sets.get(muscle_key, 0),
     )
 
 
