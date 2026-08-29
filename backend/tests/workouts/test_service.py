@@ -80,6 +80,7 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceDay,
     TemplateReferenceSlot,
 )
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.repository import create_generation, get_plan_for_user
 from app.workouts.router import to_plan_response
 from app.workouts.schemas import ProgramGenerationOverrides
@@ -283,7 +284,7 @@ def test_legacy_physical_limitations_do_not_become_uncomputable_generation_const
     assert "old lower-back note from the legacy form" not in str(result.plan.decision_trace)
 
 
-def test_service_generation_adapts_home_wrist_caution_without_wrist_loading(
+def test_service_generation_rejects_home_wrist_caution_without_five_safe_main_exercises(
     db: Session,
 ) -> None:
     user = _user_with_profile(db)
@@ -293,36 +294,27 @@ def test_service_generation_adapts_home_wrist_caution_without_wrist_loading(
     _seed_candidates(db)
     service = _service(db)
     catalog = service._load_catalog()
-    result = asyncio.run(service.generate(user.id))
+    request = service._to_program_request(get_profile(db, user.id), None)
+    eligible = filter_eligible_exercises(normalize_request(request), catalog).eligible
+    assert main_exercise_count(eligible) == 4
 
-    assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
-    assert len(result.plan.days) == profile.training_days_per_week
-    catalog_by_id = {item.id: item for item in catalog}
-    assert all(
-        ExerciseCautionTag.WRIST_LOADING
-        not in effective_caution_tags(catalog_by_id[item.exercise_id])
-        for day in result.plan.days
-        for item in day.exercises
+    with pytest.raises(WorkoutConstructionUnsatisfiedError) as error:
+        asyncio.run(service.generate(user.id))
+
+    assert error.value.error_code == GenerationErrorCode.UNSATISFIED_CONSTRAINT.value
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0
+    generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
+    assert generation.status is WorkoutGenerationStatus.FAILED
+    assert generation.error_code == GenerationErrorCode.UNSATISFIED_CONSTRAINT.value
+    assert generation.safe_error_message == (
+        "No safe workout layout satisfies all required session constraints."
     )
-    assert any(
-        catalog_by_id[item.exercise_id].primary_muscle
-        in {
-            MuscleGroup.QUADRICEPS,
-            MuscleGroup.HAMSTRINGS,
-            MuscleGroup.GLUTES,
-            MuscleGroup.CALVES,
-        }
-        for day in result.plan.days
-        for item in day.exercises
-    )
-    reason_codes = {
-        reason
-        for trace in result.plan.decision_trace
-        for reason in trace.get("reason_codes", ())
-        if isinstance(reason, str)
-    }
-    assert "REQUIRED_PATTERN_RELAXED_FOR_STRUCTURED_LIMITATION" in reason_codes
-    assert "PROGRAM_REBALANCED_TOWARD_SAFE_LOWER_BODY" in reason_codes
+    assert generation.validation_diagnostics is not None
+    assert {
+        problem["message"]
+        for diagnostic in generation.validation_diagnostics
+        for problem in diagnostic["problems"]
+    } == {"Safe program construction exhausted all ranked split alternatives."}
 
 
 def test_domain_candidate_uses_persisted_programming_metadata(db: Session) -> None:
