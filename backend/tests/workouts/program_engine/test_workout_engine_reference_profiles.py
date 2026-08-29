@@ -324,14 +324,8 @@ def test_reference_profiles_preserve_safety_quality_and_determinism(
     assert reversed_result.program == result.program
 
     if profile.code == "U2":
-        assert result.program.split.split_type in {
-            SplitType.UPPER_LOWER,
-            SplitType.UPPER_LOWER_SPECIALIZATION,
-        }
-        if result.program.split.split_type is SplitType.UPPER_LOWER_SPECIALIZATION:
-            assert result.program.split.day_focuses.count("lower") == 1
-            assert sum(focus.startswith("upper") for focus in result.program.split.day_focuses) == 2
-            assert "specialization" in result.program.split.day_focuses
+        assert result.program.split.split_type is SplitType.BODY_PART_ROTATION
+        assert "PROFESSIONAL_TOPOLOGY_BODY_PART_PREFERENCE" in result.program.split.reason_codes
 
     print(
         f"PROFILE {profile.code} PASS days={len(result.program.weekly_schedule)} "

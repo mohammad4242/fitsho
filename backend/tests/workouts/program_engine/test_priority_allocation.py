@@ -239,7 +239,8 @@ def test_six_day_priority_prefers_a_split_with_twice_weekly_priority_exposure() 
 
     ranked = rank_split_candidates(normalized, RULESET)
 
-    assert ranked[0].split_type is SplitType.BODY_PART_ROTATION
+    assert ranked[0].split_type is SplitType.PUSH_PULL_LEGS_X2
+    assert "PROFESSIONAL_TOPOLOGY_PPL_PREFERENCE" in ranked[0].reason_codes
     assert "PRIORITY_FREQUENCY_INCREASED" in ranked[0].reason_codes
 
 

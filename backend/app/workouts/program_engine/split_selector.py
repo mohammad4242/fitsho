@@ -41,6 +41,10 @@ from app.workouts.program_engine.supplemental_policy import (
     SUPPLEMENTAL_MUSCLES,
     is_supplemental_muscle,
 )
+from app.workouts.program_engine.topology_preference import (
+    is_professional_topology_scope,
+    professional_topology_preference,
+)
 from app.workouts.program_engine.volume_policy import recovery_burden_for_request
 
 _DYNAMIC_FOCUSES = (
@@ -548,6 +552,13 @@ def score_split_candidates(
         complexity = ruleset.split_complexity[candidate.split_type]
         score = weights["base"] - complexity
         reasons: list[str] = []
+        professional_topology = professional_topology_preference(
+            request,
+            candidate.split_type,
+            ruleset,
+        )
+        score += professional_topology.score
+        reasons.extend(professional_topology.reason_codes)
         if preferred_days is not None:
             score -= (
                 abs(len(candidate.day_focuses) - preferred_days)
@@ -632,9 +643,13 @@ def score_split_candidates(
         ):
             score += ruleset.phul_bonus
             reasons.append("SPLIT_SELECTED_FOR_PERIODIZED_UPPER_LOWER")
-        if candidate.split_type is SplitType.BODY_PART_ROTATION and (
-            len(candidate.day_focuses) < 6
-            or (request.training_status is TrainingStatus.ADVANCED and not recovery_limited)
+        if (
+            not is_professional_topology_scope(request)
+            and candidate.split_type is SplitType.BODY_PART_ROTATION
+            and (
+                len(candidate.day_focuses) < 6
+                or (request.training_status is TrainingStatus.ADVANCED and not recovery_limited)
+            )
         ):
             score += ruleset.body_part_rotation_bonus
             reasons.append("SPLIT_SELECTED_FOR_SPECIALIZED_DIRECT_TARGETS")

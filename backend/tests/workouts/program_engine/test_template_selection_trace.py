@@ -94,7 +94,15 @@ def test_trace_contains_every_scored_candidate_and_reuses_ranked_score() -> None
         assert ranking.score == score_template_reference(normalized, ranking.template, RULESET)
         score_trace = candidate_trace["score"]
         assert score_trace["total"] == sum(
-            score_trace[key] for key in ("priority", "body_analysis", "goal", "sex", "fallback")
+            score_trace[key]
+            for key in (
+                "priority",
+                "body_analysis",
+                "goal",
+                "sex",
+                "fallback",
+                "professional_structure",
+            )
         )
 
 
@@ -291,5 +299,6 @@ def test_session_duration_is_not_present_in_template_score_trace() -> None:
         "goal",
         "sex",
         "fallback",
+        "professional_structure",
         "total",
     )

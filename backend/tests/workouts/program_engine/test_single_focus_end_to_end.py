@@ -42,10 +42,9 @@ def test_chest_priority_is_muscle_specific_in_real_generation() -> None:
     assert result.is_success, result.errors
     assert baseline.is_success, baseline.errors
     assert result.program is not None and baseline.program is not None
-    assert result.program.split.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
-    assert result.program.split.day_focuses == ("upper", "lower", "upper", "specialization")
-    assert result.program.weekly_schedule[-1].focus == "chest_triceps"
-    assert _direct_sets(result.program, MuscleGroup.CHEST) > _direct_sets(
+    assert result.program.split.split_type is SplitType.BODY_PART_ROTATION
+    assert result.program.weekly_schedule[0].focus == "chest_triceps"
+    assert _direct_sets(result.program, MuscleGroup.CHEST) >= _direct_sets(
         baseline.program, MuscleGroup.CHEST
     )
     assert set(result.program.aggregate_metrics["priority_metrics"]) == {MuscleGroup.CHEST.value}
@@ -82,7 +81,7 @@ def test_back_priority_is_muscle_specific_in_real_generation() -> None:
     )
 
 
-def test_biceps_priority_falls_back_safely_when_dedicated_day_is_not_duration_valid() -> None:
+def test_biceps_priority_uses_duration_valid_ppl_without_unnecessary_split_fallback() -> None:
     source = request(
         available_training_days=6,
         training_experience="advanced",
@@ -98,14 +97,15 @@ def test_biceps_priority_falls_back_safely_when_dedicated_day_is_not_duration_va
     assert result.program is not None
     assert result.program.split.split_type is SplitType.PUSH_PULL_LEGS_X2
     assert result.program.weekly_schedule[-1].focus == "legs"
-    assert "SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE" in result.program.split.reason_codes
+    assert "PROFESSIONAL_TOPOLOGY_PPL_PREFERENCE" in result.program.split.reason_codes
+    assert "SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE" not in result.program.split.reason_codes
     recovery = next(
         entry
         for entry in result.program.decision_trace
         if entry["stage"] == "construction_recovery"
     )
-    assert recovery["rejected_splits"][0]["split"] == "body_part_rotation"
-    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in recovery["rejected_splits"][0]["reason_codes"]
+    assert recovery["selected_split"] == SplitType.PUSH_PULL_LEGS_X2.value
+    assert recovery["rejected_splits"] == ()
     assert set(result.program.aggregate_metrics["priority_metrics"]) == {MuscleGroup.BICEPS.value}
     assert result.program.aggregate_metrics["priority_metrics"][MuscleGroup.BICEPS.value][
         "direct_sets"

@@ -199,15 +199,8 @@ def test_poor_recovery_ranking_preserves_requested_resistance_day_count() -> Non
     assert all("SPLIT_REDUCED_FOR_RECOVERY" not in split.reason_codes for split in ranked)
 
 
-def test_production_dense_chest_shoulder_generation_repairs_weekdays_and_preserves_exposure() -> (
-    None
-):
+def test_production_dense_chest_shoulder_generation_preserves_valid_preferred_weekdays() -> None:
     catalog = full_catalog()
-    expected_weekdays = {
-        4: (0, 1, 2, 4),
-        5: (0, 1, 2, 3, 4),
-        6: (0, 1, 2, 3, 4, 5),
-    }
     split_reasons: dict[int, tuple[str, ...]] = {}
 
     for training_days in (4, 5, 6):
@@ -228,10 +221,7 @@ def test_production_dense_chest_shoulder_generation_repairs_weekdays_and_preserv
         program = result.program
         split_reasons[training_days] = program.split.reason_codes
         assert len(program.weekly_schedule) == training_days
-        assert (
-            tuple(day.weekday for day in program.weekly_schedule)
-            == expected_weekdays[training_days]
-        )
+        assert tuple(day.weekday for day in program.weekly_schedule) == tuple(range(training_days))
         assert tuple(day.weekday for day in repeated.program.weekly_schedule) == tuple(
             day.weekday for day in program.weekly_schedule
         )
@@ -262,4 +252,10 @@ def test_production_dense_chest_shoulder_generation_repairs_weekdays_and_preserv
         )
         assert recovery_spacing_is_valid(program.weekly_schedule, RULESET)
 
-    assert "RECOVERY_WEEKDAYS_REARRANGED_FOR_EXPOSURE_LOAD" in split_reasons[4]
+    assert "PROFESSIONAL_TOPOLOGY_BODY_PART_PREFERENCE" in split_reasons[4]
+    assert "PROFESSIONAL_TOPOLOGY_BODY_PART_PREFERENCE" in split_reasons[5]
+    assert "PROFESSIONAL_TOPOLOGY_PPL_PREFERENCE" in split_reasons[6]
+    assert all(
+        "RECOVERY_WEEKDAYS_REARRANGED_FOR_EXPOSURE_LOAD" not in reasons
+        for reasons in split_reasons.values()
+    )

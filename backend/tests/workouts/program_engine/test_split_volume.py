@@ -124,8 +124,14 @@ def test_four_days_generate_multiple_valid_split_candidates() -> None:
     )
 
 
-def test_four_day_recovery_context_can_select_a_lower_complexity_candidate() -> None:
-    request = normalized(
+def test_four_day_recovery_context_still_penalizes_professional_complexity() -> None:
+    good_recovery = normalized(
+        available_training_days=4,
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=30,
+    )
+    poor_recovery = normalized(
         available_training_days=4,
         primary_goal=Goal.HYPERTROPHY,
         training_experience=TrainingExperience.INTERMEDIATE,
@@ -133,17 +139,20 @@ def test_four_day_recovery_context_can_select_a_lower_complexity_candidate() -> 
         sleep_quality=RecoveryRating.POOR,
     )
 
-    scored = score_split_candidates(
-        request,
-        generate_split_candidates(4),
-        RULESET,
-        preferred_days=4,
-    )
+    candidates = generate_split_candidates(4)
+    good_scores = {
+        plan.split_type: plan.score
+        for plan in score_split_candidates(good_recovery, candidates, RULESET, preferred_days=4)
+    }
+    poor_scores = {
+        plan.split_type: plan.score
+        for plan in score_split_candidates(poor_recovery, candidates, RULESET, preferred_days=4)
+    }
 
-    assert scored[0].split_type is SplitType.UPPER_LOWER_FULL
+    assert poor_scores[SplitType.BODY_PART_ROTATION] < good_scores[SplitType.BODY_PART_ROTATION]
 
 
-def test_four_day_single_chest_priority_uses_exact_topology_without_upper_priority() -> None:
+def test_four_day_single_chest_priority_keeps_exact_affinity_without_upper_priority() -> None:
     request = normalized(
         available_training_days=4,
         primary_goal=Goal.HYPERTROPHY,
@@ -154,10 +163,14 @@ def test_four_day_single_chest_priority_uses_exact_topology_without_upper_priori
 
     scored = score_split_candidates(request, generate_split_candidates(4), RULESET)
 
-    assert scored[0].split_type is SplitType.UPPER_LOWER_SPECIALIZATION
-    assert "specialization" in scored[0].day_focuses
-    assert all("upper_specialization" not in focus for focus in scored[0].day_focuses)
-    assert "SPLIT_SELECTED_FOR_UPPER_PRIORITY_SPECIALIZATION" not in scored[0].reason_codes
+    specialized = next(
+        plan for plan in scored if plan.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
+    )
+    assert scored[0].split_type is SplitType.BODY_PART_ROTATION
+    assert "specialization" in specialized.day_focuses
+    assert all("upper_specialization" not in focus for focus in specialized.day_focuses)
+    assert "SPLIT_SELECTED_FOR_PRIORITY_MUSCLE" in specialized.reason_codes
+    assert "SPLIT_SELECTED_FOR_UPPER_PRIORITY_SPECIALIZATION" not in specialized.reason_codes
 
 
 def test_four_day_lower_priority_keeps_upper_lower_structural_candidate() -> None:
@@ -323,7 +336,7 @@ def test_five_days_generate_multiple_valid_split_candidates() -> None:
     assert scored == score_split_candidates(request, candidates, RULESET, preferred_days=5)
 
 
-def test_five_day_context_can_select_specialization_over_body_part_rotation() -> None:
+def test_five_day_priority_and_recovery_signals_remain_in_professional_ranking() -> None:
     candidates = generate_split_candidates(5)
     request = normalized(
         available_training_days=5,
@@ -336,8 +349,12 @@ def test_five_day_context_can_select_specialization_over_body_part_rotation() ->
 
     scored = score_split_candidates(request, candidates, RULESET, preferred_days=5)
 
-    assert scored[0].split_type is SplitType.UPPER_LOWER_SPECIALIZATION
-    assert "SPLIT_SELECTED_FOR_PRIORITY_MUSCLE" in scored[0].reason_codes
+    specialized = next(
+        plan for plan in scored if plan.split_type is SplitType.UPPER_LOWER_SPECIALIZATION
+    )
+    assert scored[0].split_type is SplitType.BODY_PART_ROTATION
+    assert "PRIORITY_FREQUENCY_INCREASED" in scored[0].reason_codes
+    assert "SPLIT_SELECTED_FOR_PRIORITY_MUSCLE" in specialized.reason_codes
 
 
 def test_five_day_context_can_keep_body_part_rotation_when_recovery_is_good() -> None:
@@ -397,7 +414,7 @@ def test_six_days_generate_multiple_valid_split_candidates() -> None:
     assert scored == score_split_candidates(request, candidates, RULESET, preferred_days=6)
 
 
-def test_six_day_goal_and_status_context_can_select_upper_lower_x3() -> None:
+def test_six_day_intermediate_prefers_ppl_x2_over_upper_lower_x3() -> None:
     request = normalized(
         available_training_days=6,
         primary_goal=Goal.HYPERTROPHY,
@@ -413,10 +430,11 @@ def test_six_day_goal_and_status_context_can_select_upper_lower_x3() -> None:
         preferred_days=6,
     )
 
-    assert scored[0].split_type is SplitType.UPPER_LOWER_X3
+    assert scored[0].split_type is SplitType.PUSH_PULL_LEGS_X2
+    assert "PROFESSIONAL_TOPOLOGY_PPL_PREFERENCE" in scored[0].reason_codes
 
 
-def test_six_day_advanced_context_can_select_body_part_rotation() -> None:
+def test_six_day_advanced_goal_signals_can_select_ppl_over_higher_body_part_tier() -> None:
     request = normalized(
         available_training_days=6,
         primary_goal=Goal.STRENGTH,
@@ -431,7 +449,10 @@ def test_six_day_advanced_context_can_select_body_part_rotation() -> None:
         preferred_days=6,
     )
 
-    assert scored[0].split_type is SplitType.BODY_PART_ROTATION
+    body_part = next(plan for plan in scored if plan.split_type is SplitType.BODY_PART_ROTATION)
+    assert scored[0].split_type is SplitType.PUSH_PULL_LEGS_X2
+    assert scored[0].score > body_part.score
+    assert "SPLIT_SELECTED_FOR_ADVANCED_STATUS" in scored[0].reason_codes
 
 
 def test_six_day_recovery_context_penalizes_more_complex_candidates() -> None:
@@ -465,7 +486,7 @@ def test_six_day_recovery_context_penalizes_more_complex_candidates() -> None:
     }
 
     assert poor_scores[SplitType.BODY_PART_ROTATION] < good_scores[SplitType.BODY_PART_ROTATION]
-    assert poor_scores[SplitType.BODY_PART_ROTATION] < poor_scores[SplitType.UPPER_LOWER_X3]
+    assert poor_scores[SplitType.PUSH_PULL_LEGS_X2] < good_scores[SplitType.PUSH_PULL_LEGS_X2]
 
 
 def test_six_day_poor_recovery_does_not_promote_advanced_ppl_bonus() -> None:
@@ -485,7 +506,9 @@ def test_six_day_poor_recovery_does_not_promote_advanced_ppl_bonus() -> None:
         preferred_days=6,
     )
 
-    assert scored[0].split_type is SplitType.UPPER_LOWER_X3
+    ppl = next(plan for plan in scored if plan.split_type is SplitType.PUSH_PULL_LEGS_X2)
+    assert scored[0].split_type is SplitType.BODY_PART_ROTATION
+    assert "SPLIT_SELECTED_FOR_ADVANCED_STATUS" not in ppl.reason_codes
 
 
 def test_six_day_priority_adds_specialization_context_to_body_part_score() -> None:

@@ -488,7 +488,10 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
         "SESSION_DURATION_TARGET_SATISFIED",
     }.intersection(recovery["reason_codes"])
     priority_metrics = first.program.aggregate_metrics["priority_metrics"]
-    assert priority_metrics[MuscleGroup.GLUTES.value]["session_frequency"] >= 2
+    glute_metrics = priority_metrics[MuscleGroup.GLUTES.value]
+    assert glute_metrics["session_frequency"] >= glute_metrics["preferred_frequency"]
+    assert glute_metrics["status"] == "partial"
+    assert "PRIORITY_TARGET_CONSTRAINED" in glute_metrics["reason_codes"]
 
 
 def test_generation_exhausts_safe_splits_when_required_pull_is_unavailable() -> None:

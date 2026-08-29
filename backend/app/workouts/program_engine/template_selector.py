@@ -46,6 +46,7 @@ class TemplateRankingResult:
                 "goal": self.score.goal_score,
                 "sex": self.score.sex_score,
                 "fallback": self.score.fallback_score,
+                "professional_structure": self.score.professional_structure_score,
                 "total": self.score.total,
             },
             "feasibility": self.feasibility.decision_trace(),

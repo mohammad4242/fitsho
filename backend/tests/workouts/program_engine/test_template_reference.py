@@ -438,6 +438,7 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
         "goal": 0,
         "sex": 0,
         "fallback": 0,
+        "professional_structure": 0,
         "total": 0,
     }
     assert candidate_trace["feasibility"]["resolvable_slots"] == 6

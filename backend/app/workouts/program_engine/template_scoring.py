@@ -13,6 +13,7 @@ from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import NormalizedProgramRequest, TemplateReference
 from app.workouts.program_engine.supplemental_policy import SUPPLEMENTAL_MUSCLES
+from app.workouts.program_engine.topology_preference import professional_topology_preference
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ class TemplateScore:
     goal_score: int
     sex_score: int
     fallback_score: int
+    professional_structure_score: int = 0
     total: int = field(init=False)
 
     def __post_init__(self) -> None:
@@ -54,7 +56,8 @@ class TemplateScore:
             + self.body_analysis_score
             + self.goal_score
             + self.sex_score
-            + self.fallback_score,
+            + self.fallback_score
+            + self.professional_structure_score,
         )
 
 
@@ -92,6 +95,12 @@ def score_template_reference_result(
     sex_score, sex_reasons = _sex_score(request, tags, policy)
     fallback_score = policy.balanced_fallback if TemplateFocusTag.BALANCED in tags else 0
     fallback_reasons = ("BALANCED_FALLBACK",) if fallback_score else ()
+    professional_structure = professional_topology_preference(
+        request,
+        template.split_type,
+        ruleset,
+        template_tags=tags,
+    )
     return TemplateScoringResult(
         score=TemplateScore(
             priority_score=priority_score,
@@ -99,6 +108,7 @@ def score_template_reference_result(
             goal_score=goal_score,
             sex_score=sex_score,
             fallback_score=fallback_score,
+            professional_structure_score=professional_structure.score,
         ),
         reason_codes=(
             *priority_reasons,
@@ -106,6 +116,7 @@ def score_template_reference_result(
             *goal_reasons,
             *sex_reasons,
             *fallback_reasons,
+            *professional_structure.reason_codes,
         ),
     )
 

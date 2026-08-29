@@ -278,9 +278,7 @@ def test_generate_program_ranks_and_attempts_feasible_professional_reference_fir
     assert selection["candidates"][0]["slug"] == professional.slug
     assert selection["selected"] == professional.slug
     attempt = next(
-        item
-        for item in result.program.decision_trace
-        if item.get("stage") == "template_attempt"
+        item for item in result.program.decision_trace if item.get("stage") == "template_attempt"
     )
     assert attempt["slug"] == professional.slug
     assert attempt["rank"] == 1
@@ -288,8 +286,7 @@ def test_generate_program_ranks_and_attempts_feasible_professional_reference_fir
     assert result.program.aggregate_metrics["reference_template"] == professional.slug
 
 
-def test_generate_program_keeps_generic_upper_lower_when_professional_reference_is_hard_ineligible(
-) -> None:
+def test_generate_program_keeps_upper_lower_when_professional_reference_is_ineligible() -> None:
     source = request(
         primary_goal=Goal.HYPERTROPHY,
         training_experience=TrainingExperience.INTERMEDIATE,
@@ -347,9 +344,7 @@ def test_generate_program_falls_back_to_generic_after_professional_construction_
     selection = result.program.decision_trace[0]
     assert selection["candidates"][0]["slug"] == professional.slug
     attempts = [
-        item
-        for item in result.program.decision_trace
-        if item.get("stage") == "template_attempt"
+        item for item in result.program.decision_trace if item.get("stage") == "template_attempt"
     ]
     assert attempts[0]["slug"] == professional.slug
     assert attempts[0]["status"] == "rejected"
