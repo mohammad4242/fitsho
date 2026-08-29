@@ -253,7 +253,10 @@ def test_main_training_overfill_is_invalid_regardless_of_template_reason() -> No
 
 @pytest.mark.parametrize("requested", [30, 45, 60, 75, 90])
 def test_generate_program_keeps_every_session_inside_duration_target(requested: int) -> None:
-    source = request(session_duration_minutes=requested, available_training_days=1)
+    source = request(
+        session_duration_minutes=requested,
+        available_training_days=2 if requested == 30 else 1,
+    )
 
     result = generate_program(source, full_catalog(), RULESET)
 
@@ -334,7 +337,7 @@ def test_underfilled_session_is_repaired_with_real_estimates() -> None:
 
 
 def test_short_session_without_capacity_uses_effective_exercise_floor() -> None:
-    source = request(session_duration_minutes=30, available_training_days=1)
+    source = request(session_duration_minutes=30, available_training_days=2)
     normalized = normalize_request(source, RULESET)
     result = generate_program(source, full_catalog(), RULESET)
 

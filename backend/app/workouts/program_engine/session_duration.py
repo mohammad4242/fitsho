@@ -66,6 +66,7 @@ class SessionDurationRepairEvidence:
     """Immutable proof that one repaired session was inspected at a known shape."""
 
     day_index: int
+    # Legacy field name retained for trace compatibility; value is canonical MAIN count.
     post_repair_exercise_count: int
     post_repair_main_training_minutes: int
     post_repair_total_session_minutes: int
@@ -82,7 +83,7 @@ class SessionDurationRepairEvidence:
     ) -> "SessionDurationRepairEvidence":
         return cls(
             day_index=day.day_index,
-            post_repair_exercise_count=len(day.exercises),
+            post_repair_exercise_count=main_exercise_count(day.exercises),
             post_repair_main_training_minutes=calculate_main_training_minutes(day),
             post_repair_total_session_minutes=day.estimated_duration_minutes,
             post_repair_duration_minutes=calculate_main_training_minutes(day),

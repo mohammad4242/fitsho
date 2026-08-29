@@ -2,13 +2,18 @@ import os
 import subprocess
 import sys
 from dataclasses import replace
+from uuid import uuid4
 
+from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import CardioIntensity
 from app.workouts.program_engine.final_gate import evaluate_final_program
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import CardioPrescription, ValidationReport
-from app.workouts.program_engine.session_duration import SessionDurationRepairEvidence
+from app.workouts.program_engine.session_duration import (
+    SessionDurationRepairEvidence,
+)
+from app.workouts.program_engine.supplemental_policy import is_main_resistance_exercise
 from app.workouts.program_engine.validation import validate_program
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 from tests.workouts.program_engine.test_template_reference import (
@@ -100,6 +105,44 @@ def test_duration_evidence_fingerprint_detects_reason_code_changes() -> None:
     )
 
     assert not evidence.matches(replace(day, exercises=(changed_exercise, *day.exercises[1:])))
+
+
+def test_duration_evidence_counts_main_but_fingerprints_core_shape_and_cost() -> None:
+    program = _program(1)
+    source_day = program.weekly_schedule[0]
+    main = tuple(item for item in source_day.exercises if is_main_resistance_exercise(item))[:4]
+    core = tuple(
+        replace(
+            main[index],
+            exercise_id=uuid4(),
+            exercise_name=f"Evidence Core {index}",
+            exercise_type=ExerciseType.CORE,
+            primary_muscle=MuscleGroup.CHEST if index == 0 else MuscleGroup.ABS,
+            movement_pattern=MovementPattern.CORE_ANTI_EXTENSION,
+            estimated_minutes=3,
+            sets=1,
+            counts_toward_volume=False,
+            reason_codes=("OPTIONAL_SUPPLEMENTAL_WORK",),
+        )
+        for index in range(2)
+    )
+    day = replace(
+        source_day,
+        cardio=None,
+        exercises=(*main, *core),
+        estimated_duration_minutes=RULESET.general_warmup_minutes
+        + sum(item.estimated_minutes for item in (*main, *core)),
+    )
+
+    evidence = SessionDurationRepairEvidence.from_day(day)
+
+    assert evidence.post_repair_exercise_count == 4
+    assert evidence.post_repair_total_session_minutes == day.estimated_duration_minutes
+    assert evidence.post_repair_main_training_minutes == sum(
+        item.estimated_minutes for item in main
+    )
+    assert evidence.matches(day)
+    assert not evidence.matches(replace(day, exercises=(*main, core[0])))
 
 
 def test_duration_evidence_fingerprint_detects_semantic_role_changes() -> None:
