@@ -52,6 +52,9 @@
 .workout-day summary h3 { overflow: hidden; font-size: .95rem; text-overflow: ellipsis; white-space: nowrap; }
 .workout-day summary p { margin-top: .1rem; color: var(--fitsho-muted); font-size: .68rem; }
 .workout-day > ol { margin: 0; padding: 0; border-top: 1px solid var(--fitsho-line); list-style: none; }
+.workout-day__section { border-top: 1px solid var(--fitsho-line); }
+.workout-day__section > h4 { margin: 0; padding: .7rem .8rem .35rem; color: var(--fitsho-aqua); font-size: .78rem; }
+.workout-day__section > ol { margin: 0; padding: 0; list-style: none; }
 .workout-exercise { display: grid; grid-template-columns: 4.75rem minmax(0, 1fr); gap: .75rem; padding: .75rem .8rem; }
 .workout-exercise + .workout-exercise { border-top: 1px solid var(--fitsho-line); }
 .workout-exercise > img, .workout-exercise > video { width: 4.75rem; height: 4.25rem; object-fit: cover; border-radius: .65rem; background: var(--fitsho-surface-raised); }

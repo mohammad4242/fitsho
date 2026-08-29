@@ -5,6 +5,7 @@ export type WorkoutPlanStatus = "generating" | "pending_review" | "active" | "su
 export type WorkoutPlanExercise = {
   id: string;
   order_index: number;
+  section?: "main" | "core";
   sets: number;
   prescription_mode?: PrescriptionMode;
   reps_min: number | null;

@@ -137,6 +137,7 @@ class WorkoutPlanExerciseResponse(BaseModel):
 
     id: UUID
     order_index: int
+    section: Literal["main", "core"] = "main"
     sets: int
     prescription_mode: PrescriptionMode = PrescriptionMode.REPS
     reps_min: int | None

@@ -381,27 +381,15 @@ function WorkoutDays({ plan, isEnglish, titleId, interactive }: { plan: WorkoutP
   const l = (fa: string, en: string) => isEnglish ? en : fa;
   return (
     <div className="workout-days" role="list" aria-labelledby={titleId}>
-      {plan.days.map((day, dayIndex) => (
-        <details className={`workout-day${dayIndex === 0 ? " workout-day--focus" : ""}`} key={day.day_number} role="listitem">
-          <summary>
-            {dayIndex === 0 && day.exercises[0]?.exercise.media_path && <span className="workout-day__media"><ExerciseMedia ambient path={day.exercises[0].exercise.media_path} name={isEnglish ? day.exercises[0].exercise.name_en : day.exercises[0].exercise.name_fa} mediaType={day.exercises[0].exercise.media_type} /></span>}
-            <span>{String(day.day_number).padStart(2, "0")}</span>
-            <div>
-              {dayIndex === 0 && <small>{l("جلسه بعد", "Next session")}</small>}
-              <h3>{isEnglish ? day.title_en : day.title_fa}</h3>
-              <p>{dayIndex === 0 && day.exercises[0] ? `${isEnglish ? day.exercises[0].exercise.name_en : day.exercises[0].exercise.name_fa} · ` : ""}{t("workoutPlan.sessionMinutes", { count: day.estimated_duration_minutes })}</p>
-            </div>
-          </summary>
-          {day.ai_coach_explanation_fa && (
-            <aside className="workout-ai-coach workout-ai-coach--day">
-              <span className="workout-ai-coach__icon" aria-hidden="true">✦</span>
-              <div><p>{t("workoutPlan.aiCoach")}</p><strong>{day.ai_coach_explanation_fa}</strong></div>
-            </aside>
-          )}
+      {plan.days.map((day, dayIndex) => {
+        const mainExercises = day.exercises.filter((item) => item.section !== "core");
+        const coreExercises = day.exercises.filter((item) => item.section === "core");
+        const leadExercise = mainExercises[0] ?? day.exercises[0];
+        const renderExercises = (exercises: WorkoutPlanExercise[]) => (
           <ol>
-            {day.exercises.map((item, itemIndex) => {
+            {exercises.map((item, itemIndex) => {
               const groupIndices = item.superset_group
-                ? day.exercises.flatMap((candidate, index) => (
+                ? exercises.flatMap((candidate, index) => (
                   candidate.superset_group === item.superset_group ? [index] : []
                 ))
                 : [];
@@ -448,8 +436,34 @@ function WorkoutDays({ plan, isEnglish, titleId, interactive }: { plan: WorkoutP
               );
             })}
           </ol>
+        );
+        return (
+        <details className={`workout-day${dayIndex === 0 ? " workout-day--focus" : ""}`} key={day.day_number} role="listitem">
+          <summary>
+            {dayIndex === 0 && leadExercise?.exercise.media_path && <span className="workout-day__media"><ExerciseMedia ambient path={leadExercise.exercise.media_path} name={isEnglish ? leadExercise.exercise.name_en : leadExercise.exercise.name_fa} mediaType={leadExercise.exercise.media_type} /></span>}
+            <span>{String(day.day_number).padStart(2, "0")}</span>
+            <div>
+              {dayIndex === 0 && <small>{l("جلسه بعد", "Next session")}</small>}
+              <h3>{isEnglish ? day.title_en : day.title_fa}</h3>
+              <p>{dayIndex === 0 && leadExercise ? `${isEnglish ? leadExercise.exercise.name_en : leadExercise.exercise.name_fa} · ` : ""}{t("workoutPlan.sessionMinutes", { count: day.estimated_duration_minutes })}</p>
+            </div>
+          </summary>
+          {day.ai_coach_explanation_fa && (
+            <aside className="workout-ai-coach workout-ai-coach--day">
+              <span className="workout-ai-coach__icon" aria-hidden="true">✦</span>
+              <div><p>{t("workoutPlan.aiCoach")}</p><strong>{day.ai_coach_explanation_fa}</strong></div>
+            </aside>
+          )}
+          {renderExercises(mainExercises)}
+          {coreExercises.length > 0 && (
+            <section className="workout-day__section" aria-labelledby={`workout-day-${day.day_number}-core-title`}>
+              <h4 id={`workout-day-${day.day_number}-core-title`}>Core</h4>
+              {renderExercises(coreExercises)}
+            </section>
+          )}
         </details>
-      ))}
+        );
+      })}
     </div>
   );
 }

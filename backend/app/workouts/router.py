@@ -24,7 +24,10 @@ from app.workouts.program_engine.session_targets import (
     persian_session_title_for_targets,
     target_muscles_from_values,
 )
-from app.workouts.program_engine.supplemental_policy import exercise_count_breakdown
+from app.workouts.program_engine.supplemental_policy import (
+    exercise_count_breakdown,
+    is_core_or_supplemental_exercise,
+)
 from app.workouts.repository import get_plan_for_user, list_plans_for_user
 from app.workouts.schemas import (
     ProgramGenerationOverrides,
@@ -209,6 +212,9 @@ def to_plan_response(
                     WorkoutPlanExerciseResponse(
                         id=item.id,
                         order_index=item.order_index,
+                        section=(
+                            "core" if is_core_or_supplemental_exercise(item) else "main"
+                        ),
                         sets=item.sets,
                         prescription_mode=item.prescription_mode,
                         reps_min=item.reps_min,
@@ -305,6 +311,7 @@ def _day_titles(plan: WorkoutPlan, day: WorkoutDay) -> tuple[str, str]:
         if item.exercise_snapshot
         else item.exercise.primary_muscle
         for item in day.exercises
+        if not is_core_or_supplemental_exercise(item)
     )
     if not targets:
         return day.title_en, day.title_fa

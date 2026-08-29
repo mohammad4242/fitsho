@@ -464,7 +464,9 @@ def test_workout_plan_response_exposes_core_section_metadata_from_exercise_class
     user_id = _register_and_complete_profile(client, "core-section@example.com")
     plan = _plan(db, user_id)
     main = _exercise("section-chest", muscle=MuscleGroup.CHEST)
+    main.exercise_type = ExerciseType.COMPOUND
     triceps = _exercise("section-triceps", muscle=MuscleGroup.TRICEPS)
+    triceps.exercise_type = ExerciseType.ISOLATION
     core = _exercise("section-abs", muscle=MuscleGroup.ABS)
     core.exercise_type = ExerciseType.CORE
     day = WorkoutDay(
