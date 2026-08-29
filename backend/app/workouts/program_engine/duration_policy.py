@@ -119,6 +119,7 @@ def calculate_total_session_minutes_from_exercises(
 
 SESSION_DURATION_TOLERANCE_MINUTES = 10
 SHORT_SESSION_MINIMUM_MAIN_EXERCISES = 3
+SHORT_SESSION_MAXIMUM_MAIN_EXERCISES = 4
 
 # Official supported resistance-session durations.
 # `session_duration_minutes` means: available time for the resistance-training
@@ -147,10 +148,49 @@ def effective_main_exercise_floor(
     session_duration_minutes: int,
     ruleset: ProgramRuleset,
 ) -> int:
-    return (
-        SHORT_SESSION_MINIMUM_MAIN_EXERCISES
-        if session_duration_minutes <= ruleset.short_session_minutes
-        else ruleset.minimum_exercises_per_session
+    return get_session_exercise_count_policy(
+        session_duration_minutes, ruleset
+    ).minimum_main_exercises
+
+
+def effective_main_exercise_ceiling(
+    session_duration_minutes: int,
+    ruleset: ProgramRuleset,
+) -> int:
+    return get_session_exercise_count_policy(
+        session_duration_minutes, ruleset
+    ).maximum_main_exercises
+
+
+@dataclass(frozen=True)
+class SessionExerciseCountPolicy:
+    requested_minutes: int
+    minimum_main_exercises: int
+    maximum_main_exercises: int
+
+    def contains(self, main_count: int) -> bool:
+        return self.minimum_main_exercises <= main_count <= self.maximum_main_exercises
+
+
+def get_session_exercise_count_policy(
+    requested_minutes: int,
+    ruleset: ProgramRuleset | None = None,
+) -> SessionExerciseCountPolicy:
+    """Return hard MAIN exercise bounds for a supported session duration."""
+    effective_ruleset = ruleset or ProgramRuleset()
+    short_session = requested_minutes <= effective_ruleset.short_session_minutes
+    return SessionExerciseCountPolicy(
+        requested_minutes=requested_minutes,
+        minimum_main_exercises=(
+            SHORT_SESSION_MINIMUM_MAIN_EXERCISES
+            if short_session
+            else effective_ruleset.minimum_exercises_per_session
+        ),
+        maximum_main_exercises=(
+            SHORT_SESSION_MAXIMUM_MAIN_EXERCISES
+            if short_session
+            else effective_ruleset.max_exercises_per_session
+        ),
     )
 
 
