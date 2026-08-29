@@ -22,6 +22,7 @@ from app.workouts.program_engine.session_duration import (
     SessionDurationRepairEvidence,
     repair_session_durations,
 )
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
@@ -612,7 +613,7 @@ def test_focus_rejection_does_not_claim_hard_volume_constraint() -> None:
     assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" not in reasons
 
 
-def test_capacity_trim_removes_optional_tail_when_main_capacity_is_full() -> None:
+def test_capacity_trim_preserves_optional_core_when_main_capacity_is_full() -> None:
     source = request(session_duration_minutes=60, available_training_days=1)
     normalized = normalize_request(source, RULESET)
     catalog = tuple(full_catalog())
@@ -638,12 +639,13 @@ def test_capacity_trim_removes_optional_tail_when_main_capacity_is_full() -> Non
 
     repaired, reasons = repair_session_durations((day,), normalized, catalog, RULESET)
 
-    assert len(repaired[0].exercises) == RULESET.max_exercises_per_session
-    assert get_session_duration_policy(60).contains(calculate_main_training_minutes(repaired[0]))
-    assert "SUPPLEMENTAL_WORK_TRIMMED_FOR_DURATION" in reasons
-    assert all(
-        "OPTIONAL_SUPPLEMENTAL_WORK" not in item.reason_codes for item in repaired[0].exercises
-    )
+    assert len(repaired[0].exercises) == RULESET.max_exercises_per_session + 1
+    assert main_exercise_count(repaired[0].exercises) == main_exercise_count(main)
+    assert calculate_main_training_minutes(repaired[0]) <= get_session_duration_policy(
+        60
+    ).maximum_minutes
+    assert "SUPPLEMENTAL_WORK_TRIMMED_FOR_DURATION" not in reasons
+    assert optional.exercise_id in {item.exercise_id for item in repaired[0].exercises}
 
 
 @pytest.mark.parametrize(

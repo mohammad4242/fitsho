@@ -4,6 +4,7 @@ from enum import StrEnum
 from app.exercises.enums import ExerciseType
 from app.workouts.program_engine.duration_policy import (
     get_session_duration_policy,
+    get_session_exercise_count_policy,
     is_main_training_exercise,
 )
 from app.workouts.program_engine.enums import Goal
@@ -161,7 +162,9 @@ def build_session_capacity(
             resistance_budget,
             first_cost.minutes,
             later_cost.minutes,
-            ruleset.max_exercises_per_session,
+            get_session_exercise_count_policy(
+                request.source.session_duration_minutes, ruleset
+            ).maximum_main_exercises,
         )
         working_set_capacity = _working_set_capacity(
             request,

@@ -5,6 +5,7 @@ from uuid import UUID
 
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.duration_capacity import SessionCapacity
+from app.workouts.program_engine.duration_policy import get_session_exercise_count_policy
 from app.workouts.program_engine.enums import CompatibilityLevel, Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.exercise_semantics import (
@@ -41,6 +42,8 @@ from app.workouts.program_engine.substitution_policy import (
     SubstitutionCause,
 )
 from app.workouts.program_engine.supplemental_policy import (
+    is_core_or_supplemental_exercise,
+    is_main_resistance_exercise,
     is_supplemental_muscle,
     main_exercise_count,
     supplemental_muscle_fits_focus,
@@ -97,6 +100,9 @@ def build_sessions(
     usage: Counter[UUID] = Counter()
     sessions: list[SessionDraft] = []
     short_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
+    count_policy = get_session_exercise_count_policy(
+        request.source.session_duration_minutes, ruleset
+    )
     for index, planned_focus in enumerate(split.day_focuses):
         focus = _resolve_focus(planned_focus, request, volume, ruleset)
         slots = slots_for_focus(focus)
@@ -119,11 +125,11 @@ def build_sessions(
                 ),
             )
         )
-        capacity = max(1, capacity)
+        capacity = min(count_policy.maximum_main_exercises, max(1, capacity))
 
         # Phase 11.9: duration alone NEVER reduces capacity below 5 for 45+ min sessions.
         if not short_session:
-            capacity = max(capacity, ruleset.minimum_exercises_per_session)
+            capacity = max(capacity, count_policy.minimum_main_exercises)
 
         main_slots = tuple(slot for slot in slots if not _slot_is_supplemental(slot))
         ordered_slots = tuple(slot for slot in main_slots if slot.required) + tuple(
@@ -133,7 +139,7 @@ def build_sessions(
         selected_slots: dict[UUID, SlotSpec] = {}
         reasons: dict[UUID, tuple[str, ...]] = {}
         session_reasons: tuple[str, ...] = ()
-        if capacity < ruleset.minimum_exercises_per_session:
+        if capacity < count_policy.minimum_main_exercises:
             # This can now only happen when short_session is True
             session_reasons = ("DURATION_PLANNED_REDUCED_EXERCISE_COUNT",)
         this_session_relaxed_groups: list[tuple[MovementPattern, ...]] = []
@@ -152,7 +158,7 @@ def build_sessions(
             for item in exercises:
                 if item.id in chosen_ids:
                     continue
-                if is_supplemental_muscle(item.primary_muscle):
+                if not is_main_resistance_exercise(item):
                     continue
                 compatibility = evaluate_candidate_slot_compatibility(
                     item,
@@ -181,7 +187,7 @@ def build_sessions(
                         chosen,
                         minimum_exercises=max(
                             1,
-                            ruleset.minimum_exercises_per_session - 2,
+                            count_policy.minimum_main_exercises - 2,
                         ),
                         rejected_slot_candidates=rejected_slot_candidates,
                     ):
@@ -273,7 +279,7 @@ def build_sessions(
                 exercises,
                 chosen,
                 allow_role_redundancy=(
-                    main_exercise_count(chosen) < ruleset.minimum_exercises_per_session
+                    main_exercise_count(chosen) < count_policy.minimum_main_exercises
                 ),
                 role_limit=2 if main_capacity >= 7 else 1,
             )
@@ -310,9 +316,9 @@ def build_sessions(
         ):
             session_reasons = session_reasons + (SEMANTIC_NEAR_DUPLICATE_REASON,)
 
-        supplemental_count = sum(is_supplemental_muscle(item.primary_muscle) for item in chosen)
+        supplemental_count = sum(is_core_or_supplemental_exercise(item) for item in chosen)
         while supplemental_count < 2 and main_exercise_count(chosen) >= min(
-            main_capacity, ruleset.minimum_exercises_per_session
+            main_capacity, count_policy.minimum_main_exercises
         ):
             supplemental_options = _supplemental_options(
                 focus,
@@ -442,11 +448,11 @@ def _safe_session_completion_is_possible(
     *,
     minimum_exercises: int,
 ) -> bool:
-    compatible_ids = {item.id for item in chosen}
+    compatible_ids = {item.id for item in chosen if is_main_resistance_exercise(item)}
     compatible_ids.update(
         item.id
         for item in exercises
-        if not is_supplemental_muscle(item.primary_muscle)
+        if is_main_resistance_exercise(item)
         if evaluate_exercise_focus_compatibility(item, focus).compatible
     )
     return len(compatible_ids) >= minimum_exercises
@@ -521,7 +527,7 @@ def _compatible_supplements(
     for item in exercises:
         if (
             item.id not in chosen_ids
-            and not is_supplemental_muscle(item.primary_muscle)
+            and is_main_resistance_exercise(item)
             and not has_near_equivalent(item, chosen)
             and (
                 (allow_role_redundancy and focus.startswith("full_body"))
@@ -548,7 +554,7 @@ def _has_complementary_option(
     chosen_ids = {item.id for item in chosen}
     return any(
         item.id not in chosen_ids
-        and not is_supplemental_muscle(item.primary_muscle)
+        and is_main_resistance_exercise(item)
         and not has_near_equivalent(item, chosen)
         and (
             item.primary_muscle is not exercise.primary_muscle

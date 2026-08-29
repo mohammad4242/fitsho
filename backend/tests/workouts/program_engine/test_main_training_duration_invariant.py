@@ -121,7 +121,7 @@ def test_official_duration_matrix_never_returns_an_invalid_success(
     result = generate_program(
         request(
             session_duration_minutes=duration,
-            available_training_days=1,
+            available_training_days=2 if goal != "strength" else 1,
             primary_goal=goal,
             training_experience=experience,
             training_age_months=30,

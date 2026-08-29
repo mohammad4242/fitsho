@@ -106,8 +106,8 @@ def test_fat_loss_reserves_cardio_before_resistance_construction() -> None:
 
 
 def test_same_profile_gets_more_useful_capacity_at_sixty_minutes() -> None:
-    short = _program(Goal.HYPERTROPHY, 30, available_training_days=1)
-    long = _program(Goal.HYPERTROPHY, 60, available_training_days=1)
+    short = _program(Goal.HYPERTROPHY, 30, available_training_days=2)
+    long = _program(Goal.HYPERTROPHY, 60, available_training_days=2)
 
     short_work = sum(item.sets for day in short.weekly_schedule for item in day.exercises)
     long_work = sum(item.sets for day in long.weekly_schedule for item in day.exercises)

@@ -12,6 +12,7 @@ from app.exercises.enums import (
     MuscleGroup,
 )
 from app.profile.enums import TrainingLocation
+from app.workouts.program_engine.duration_policy import get_session_exercise_count_policy
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.enums import (
     BalanceAbility,
@@ -650,7 +651,8 @@ def test_short_session_keeps_the_minimum_exercise_count() -> None:
 
     sessions = build_sessions(request, split, volume, eligible, RULESET)
 
-    assert main_exercise_count(sessions[0].exercises) == RULESET.minimum_exercises_per_session
+    count_policy = get_session_exercise_count_policy(30, RULESET)
+    assert count_policy.contains(main_exercise_count(sessions[0].exercises))
     assert "SESSION_TRIMMED_FOR_TIME_LIMIT" in sessions[0].reason_codes
 
 

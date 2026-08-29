@@ -16,8 +16,8 @@ from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     calculate_main_training_minutes_from_exercises,
     calculate_total_session_minutes_from_exercises,
-    effective_main_exercise_floor,
     get_session_duration_policy,
+    get_session_exercise_count_policy,
     is_main_training_exercise,
 )
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
@@ -51,6 +51,7 @@ from app.workouts.program_engine.supersets import (
     apply_template_supersets,
 )
 from app.workouts.program_engine.supplemental_policy import (
+    is_main_resistance_exercise,
     is_supplemental_muscle,
     main_exercise_count,
 )
@@ -252,33 +253,21 @@ def repair_session_durations(
 
     policy = get_session_duration_policy(request.source.session_duration_minutes)
     resistance_budget = request.source.session_duration_minutes  # pure resistance budget
-    short_session_floor = effective_main_exercise_floor(resistance_budget, ruleset)
+    count_policy = get_session_exercise_count_policy(resistance_budget, ruleset)
     repaired: list[WorkoutDay] = []
     reasons: list[str] = []
     day_reason_codes: list[tuple[str, ...]] = []
     for day_index, day in enumerate(days):
         day_reason_start = len(reasons)
-        day_capacity = session_capacity
         # -------------------------------------------------------------------
         # Minimum exercises policy:
         #   30-min budget  → allow 3-4 when 5 cannot fit, floor = 3
         #   45+ min budget → minimum 5 (duration alone never lowers this)
         # -------------------------------------------------------------------
         if resistance_budget <= ruleset.short_session_minutes:
-            # For 30-min sessions, let capacity decide the floor (3–5)
-            capacity_floor = (
-                max(
-                    short_session_floor,
-                    min(
-                        ruleset.minimum_exercises_per_session,
-                        day_capacity.expected_exercise_count_capacity,
-                    ),
-                )
-                if day_capacity is not None
-                else short_session_floor
-            )
+            capacity_floor = count_policy.minimum_main_exercises
             planned_minimum_exercises = (
-                short_session_floor
+                count_policy.minimum_main_exercises
                 if prefer_acceptable_volume_for_minimum_fill
                 and volume is not None
                 and _duration_shortfall_is_hard_constrained(request, volume)
@@ -286,7 +275,7 @@ def repair_session_durations(
             )
         else:
             # 45+ min: duration alone MUST NOT reduce below 5
-            planned_minimum_exercises = ruleset.minimum_exercises_per_session
+            planned_minimum_exercises = count_policy.minimum_main_exercises
 
         template_adjusted: tuple[ProgrammedExercise, ...]
         template_superset_reasons: tuple[str, ...]
@@ -328,14 +317,19 @@ def repair_session_durations(
 
         # Overfill is measured from main-training exercises only.  General
         # warm-up, anatomical core, and attached cardio are add-ons.
-        if calculate_main_training_minutes(current) > policy.maximum_minutes:
-            reasons.append("SESSION_DURATION_OVERFILLED")
+        if (
+            calculate_main_training_minutes(current) > policy.maximum_minutes
+            or main_exercise_count(current.exercises) > count_policy.maximum_main_exercises
+        ):
+            if calculate_main_training_minutes(current) > policy.maximum_minutes:
+                reasons.append("SESSION_DURATION_OVERFILLED")
             current, overfill_reasons = _repair_overfill(
                 current,
                 request,
                 policy,
                 ruleset,
                 minimum_exercises=planned_minimum_exercises,
+                maximum_exercises=count_policy.maximum_main_exercises,
             )
             reasons.extend(overfill_reasons)
 
@@ -360,13 +354,6 @@ def repair_session_durations(
     evidence_items: list[SessionDurationRepairEvidence] = []
     for index, day in enumerate(repaired_tuple):
         evidence_reasons = list(day_reason_codes[index])
-        if (
-            resistance_budget <= ruleset.short_session_minutes
-            and short_session_floor
-            <= main_exercise_count(day.exercises)
-            < ruleset.minimum_exercises_per_session
-        ):
-            evidence_reasons.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
         evidence_items.append(SessionDurationRepairEvidence.from_day(day, tuple(evidence_reasons)))
     evidence = tuple(evidence_items)
     return DurationRepairResult(
@@ -380,7 +367,7 @@ def _trim_optional_capacity_overflow(
     day: WorkoutDay,
     ruleset: ProgramRuleset,
 ) -> tuple[WorkoutDay, tuple[str, ...]]:
-    """Keep optional tail work from exceeding the existing exercise cap."""
+    """Keep optional non-core tail work within the existing total exercise cap."""
     exercises = list(day.exercises)
     removed = False
     while len(exercises) > ruleset.max_exercises_per_session:
@@ -388,6 +375,7 @@ def _trim_optional_capacity_overflow(
             (index, item)
             for index, item in enumerate(exercises)
             if "OPTIONAL_SUPPLEMENTAL_WORK" in item.reason_codes
+            and item.exercise_type is not ExerciseType.CORE
         ]
         if not optional:
             break
@@ -559,7 +547,9 @@ def _select_exercise_addition(
     minimum_exercises: int,
     hard_volume_rejection: list[bool] | None = None,
 ) -> ProgrammedExercise | None:
-    if main_exercise_count(exercises) >= ruleset.max_exercises_per_session:
+    if main_exercise_count(exercises) >= get_session_exercise_count_policy(
+        policy.requested_minutes, ruleset
+    ).maximum_main_exercises:
         return None
     existing_ids = {item.exercise_id for item in exercises}
     template_muscles = frozenset(day.template_target_muscles).union(
@@ -732,10 +722,43 @@ def _repair_overfill(
     ruleset: ProgramRuleset,
     *,
     minimum_exercises: int,
+    maximum_exercises: int | None = None,
 ) -> tuple[WorkoutDay, tuple[str, ...]]:
     exercises = list(day.exercises)
     reasons: list[str] = []
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
+    effective_maximum_exercises = (
+        ruleset.max_exercises_per_session
+        if maximum_exercises is None
+        else maximum_exercises
+    )
+    while main_exercise_count(exercises) > effective_maximum_exercises:
+        removable = [
+            (index, item)
+            for index, item in enumerate(exercises)
+            if is_main_resistance_exercise(item)
+            and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
+            and template_removal_rank(item) < 3
+            and priority_policy.preservation_rank(item.primary_muscle) == 0
+            and (
+                template_removal_rank(item) in {0, 1}
+                or "SESSION_SIZE_ACCESSORY" in item.reason_codes
+                or "OPTIONAL_SUPPLEMENTAL_WORK" in item.reason_codes
+            )
+        ]
+        if not removable:
+            break
+        index, removed = min(
+            removable,
+            key=lambda pair: (
+                adaptation_preservation_rank(pair[1], priority_policy),
+                -pair[1].estimated_minutes,
+                str(pair[1].exercise_id),
+            ),
+        )
+        exercises.pop(index)
+        reasons.append("MAIN_EXERCISE_TRIMMED_FOR_COUNT")
+        day = _rebuild_day(day, tuple(exercises), ruleset)
     while calculate_main_training_minutes(day) > policy.maximum_minutes:
         low_value_removable = [
             (index, item)

@@ -5,6 +5,7 @@ from uuid import UUID
 
 from app.exercises.enums import Equipment, ExerciseType, MovementPattern, MuscleGroup
 from app.workouts.program_engine.duration_capacity import SessionCapacity
+from app.workouts.program_engine.duration_policy import get_session_exercise_count_policy
 from app.workouts.program_engine.enums import TrainingExperience
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.exercise_semantics import (
@@ -32,6 +33,8 @@ from app.workouts.program_engine.substitution_engine import (
 )
 from app.workouts.program_engine.substitution_policy import SubstitutionCause
 from app.workouts.program_engine.supplemental_policy import (
+    is_core_or_supplemental_exercise,
+    is_main_resistance_exercise,
     is_supplemental_muscle,
     main_exercise_count,
     supplemental_reason_codes,
@@ -114,6 +117,9 @@ def build_template_sessions(
     substitutions_by_requested: dict[UUID, set[UUID]] = {}
     preserved_template_occurrences: Counter[UUID] = Counter()
     weekly_direct_sessions: Counter[MuscleGroup] = Counter()
+    count_policy = get_session_exercise_count_policy(
+        request.source.session_duration_minutes, ruleset
+    )
     for index, reference_day in enumerate(template.days, start=1):
         required_slot_count = sum(
             slot.adaptation_priority == "core" for slot in reference_day.slots
@@ -138,10 +144,11 @@ def build_template_sessions(
         capacity = max(1, capacity)
         short_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
         if not short_session:
-            capacity = max(capacity, ruleset.minimum_exercises_per_session)
-        planned_minimum = min(ruleset.minimum_exercises_per_session, capacity)
-        planned_target = min(ruleset.preferred_main_exercises_per_session, capacity)
-        if planned_minimum < ruleset.minimum_exercises_per_session:
+            capacity = max(capacity, count_policy.minimum_main_exercises)
+        main_capacity = min(count_policy.maximum_main_exercises, capacity)
+        planned_minimum = min(count_policy.minimum_main_exercises, main_capacity)
+        planned_target = min(ruleset.preferred_main_exercises_per_session, main_capacity)
+        if planned_minimum < count_policy.minimum_main_exercises:
             build_reasons.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
         selected: list[tuple[ExerciseCandidate, TemplateReferenceSlot]] = []
 
@@ -341,6 +348,19 @@ def build_template_sessions(
                 else:
                     deliberate_redundancies.add(candidate.id)
                     build_reasons.append("DELIBERATE_REDUNDANCY_FOR_TEMPLATE_STRUCTURE")
+            if (
+                is_main_resistance_exercise(candidate)
+                and main_exercise_count(candidate for candidate, _slot in selected)
+                >= main_capacity
+            ):
+                if slot.adaptation_priority == "core":
+                    raise TemplateConstructionError(
+                        "TEMPLATE_SESSION_EXERCISE_COUNT_UNSATISFIED",
+                        f"TEMPLATE_DAY:{index}",
+                        "TEMPLATE_MAIN_COUNT_OUT_OF_RANGE",
+                    )
+                build_reasons.append("TEMPLATE_MAIN_COUNT_CAPPED_FOR_DURATION")
+                continue
             selected_muscles = {item.primary_muscle for item, _selected_slot in selected}
             if (
                 slot.adaptation_priority == "optional"
@@ -371,15 +391,15 @@ def build_template_sessions(
         if accessory_fill_constrained:
             build_reasons.append("TEMPLATE_SESSION_COUNT_CONSTRAINED_BY_SAFE_CAPACITY")
         while (
-            sum(is_supplemental_muscle(candidate.primary_muscle) for candidate, _slot in selected)
+            sum(is_core_or_supplemental_exercise(candidate) for candidate, _slot in selected)
             > 2
-            or main_exercise_count(candidate for candidate, _slot in selected) > capacity
+            or main_exercise_count(candidate for candidate, _slot in selected) > main_capacity
         ):
             removable = next(
                 (
                     position
                     for position in range(len(selected) - 1, -1, -1)
-                    if is_supplemental_muscle(selected[position][0].primary_muscle)
+                    if is_core_or_supplemental_exercise(selected[position][0])
                 ),
                 None,
             )
@@ -400,7 +420,7 @@ def build_template_sessions(
                 )
             removed, _ = selected.pop(removable)
             used[removed.id] -= 1
-            if is_supplemental_muscle(removed.primary_muscle):
+            if is_core_or_supplemental_exercise(removed):
                 build_reasons.append("TEMPLATE_SUPPLEMENTAL_TRIMMED_FOR_CAPACITY")
             else:
                 build_reasons.append("TEMPLATE_ACCESSORY_TRIMMED_FOR_TIME_LIMIT")
@@ -415,7 +435,7 @@ def build_template_sessions(
             not planned_minimum <= main_exercise_count(candidate for candidate, _slot in selected)
             and not accessory_fill_constrained
             or main_exercise_count(candidate for candidate, _slot in selected)
-            > ruleset.max_exercises_per_session
+            > main_capacity
         ):
             raise TemplateConstructionError(
                 "TEMPLATE_SESSION_EXERCISE_COUNT_UNSATISFIED",
@@ -931,7 +951,7 @@ def _add_targeted_accessories(
             and item.is_active
             and item.is_programmable
             and not item.needs_review
-            and not is_supplemental_muscle(item.primary_muscle)
+            and is_main_resistance_exercise(item)
             and item.primary_muscle in target_muscles
             and (
                 main_exercise_count(candidate for candidate, _slot in selected) < required_minimum
