@@ -19,7 +19,10 @@ from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import ProgrammedExercise, WorkoutDay
 from app.workouts.program_engine.session_structure import session_structure_errors
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
-from app.workouts.program_engine.weekly_distribution import redistribute_weekly_exercises
+from app.workouts.program_engine.weekly_distribution import (
+    _invariants_hold,
+    redistribute_weekly_exercises,
+)
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 from tests.workouts.program_engine.test_template_reference import _upper_lower_reference
 
@@ -29,6 +32,7 @@ def _distribution_item(
     muscle: MuscleGroup,
     *,
     exercise_type: ExerciseType = ExerciseType.COMPOUND,
+    estimated_minutes: int = 10,
 ) -> ProgrammedExercise:
     patterns = (
         MovementPattern.HORIZONTAL_PUSH,
@@ -49,7 +53,7 @@ def _distribution_item(
         rep_max=12,
         target_rir=2,
         rest_seconds=90,
-        estimated_minutes=5,
+        estimated_minutes=estimated_minutes,
         reason_codes=("TEST",),
         movement_pattern=patterns[index - 1],
         primary_muscle=muscle,
@@ -161,7 +165,7 @@ def test_batch2_profile_8_preserves_volume_when_no_safe_redistribution_exists(mo
 
 @pytest.mark.parametrize(
     "profile_number, before_counts",
-    [(5, (7, 5, 5)), (10, (5, 5, 5))],
+    [(5, (7, 5, 5)), (10, (6, 5, 5))],
 )
 def test_batch2_constrained_controls_preserve_volume_and_day_count(
     monkeypatch, profile_number: int, before_counts: tuple[int, ...]
@@ -356,6 +360,59 @@ def test_redistribution_rejects_recipient_main_ceiling_even_when_total_balance_i
     assert result.moved_exercise_ids == ()
     assert result.days == imbalanced_days
     assert result.after_exercise_counts == (6, 4)
+
+
+def test_redistribution_rejects_donor_duration_under_minimum_after_move() -> None:
+    source = request(available_training_days=2, session_duration_minutes=60)
+    donor_muscles = (
+        MuscleGroup.CHEST,
+        MuscleGroup.BACK,
+        MuscleGroup.SHOULDERS,
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+    )
+    recipient_muscles = (
+        MuscleGroup.BICEPS,
+        MuscleGroup.TRICEPS,
+        MuscleGroup.TRAPS,
+        MuscleGroup.CALVES,
+        MuscleGroup.ADDUCTORS,
+    )
+    moved = _distribution_item(6, MuscleGroup.GLUTES, estimated_minutes=20)
+    before = (
+        _distribution_day(
+            1,
+            tuple(
+                _distribution_item(index, muscle, estimated_minutes=8)
+                for index, muscle in enumerate(donor_muscles[:5], 1)
+            )
+            + (moved,),
+        ),
+        _distribution_day(
+            2,
+            tuple(
+                _distribution_item(index, muscle)
+                for index, muscle in enumerate(recipient_muscles, 1)
+            ),
+        ),
+    )
+    after = (
+        replace(before[0], exercises=before[0].exercises[:-1]),
+        replace(before[1], exercises=(*before[1].exercises, moved)),
+    )
+
+    assert calculate_main_training_minutes(before[0]) == 60
+    assert calculate_main_training_minutes(before[1]) == 50
+    assert calculate_main_training_minutes(after[0]) == 40
+    assert not _invariants_hold(
+        before,
+        after,
+        normalize_request(source, RULESET),
+        RULESET,
+        recipient_index=1,
+        moved_id=str(moved.exercise_id),
+    )
 
 
 def test_short_session_uses_effective_floor_for_redistribution() -> None:

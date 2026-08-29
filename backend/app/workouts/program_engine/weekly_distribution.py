@@ -249,6 +249,9 @@ def _duration_is_safe(
         candidate_minutes = calculate_main_training_minutes(candidate)
         if candidate_minutes > policy.maximum_minutes or (
             prior_minutes <= policy.maximum_minutes and candidate_minutes > policy.maximum_minutes
+        ) or (
+            prior_minutes >= policy.minimum_minutes
+            and candidate_minutes < policy.minimum_minutes
         ):
             return False
     return True

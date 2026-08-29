@@ -721,3 +721,28 @@ def test_volume_repair_does_not_remove_below_long_session_floor_for_soft_excess(
     )
 
     assert main_exercise_count(repaired[0].exercises) == 5
+
+
+def test_volume_repair_removes_soft_excess_to_short_session_main_floor() -> None:
+    existing = tuple(
+        _programmed(f"Existing Chest {index}", MuscleGroup.CHEST, 3)
+        for index in range(4)
+    )
+    target = replace(
+        _volume_target(MuscleGroup.CHEST, target_sets=1).targets[0],
+        minimum_soft=0,
+        maximum_soft=6,
+        maximum_hard=20,
+        minimum_direct_sets=0,
+        minimum_effective_sets=0,
+        effective_target_sets=1,
+    )
+
+    repaired, _reasons = repair_weekly_volume(
+        (_day(1, existing, focus="upper"),),
+        normalized(session_duration_minutes=30),
+        WeeklyVolumePlan(targets=(target,), reason_codes=()),
+        RULESET,
+    )
+
+    assert main_exercise_count(repaired[0].exercises) == 3

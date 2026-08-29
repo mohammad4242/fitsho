@@ -181,14 +181,7 @@ def repair_weekly_volume(
                 )
             )
             if (same_muscle_exposures > 1 or hard_removal_required) and (
-                hard_removal_required
-                or (
-                    count_floor_allows_removal
-                    and (
-                        len(repaired[day_index]) > ruleset.minimum_exercises_per_session
-                        or preserve_template_core_structure
-                    )
-                )
+                hard_removal_required or count_floor_allows_removal
             ):
                 repaired[day_index].pop(exercise_index)
                 reasons.append("VOLUME_REPAIR_REMOVED_REDUNDANT_EXERCISE")
@@ -815,6 +808,13 @@ def _select_reduction_candidate(
                 item.primary_muscle is exercise.primary_muscle for items in days for item in items
             )
             reduction_sets = 1 if exercise.sets > ruleset.minimum_working_sets else exercise.sets
+            if (
+                minimum_direct is not None
+                and not hard_constraint
+                and direct[exercise.primary_muscle.value] - reduction_sets
+                < minimum_direct.acceptable_minimum
+            ):
+                continue
             if (
                 minimum_direct is not None
                 and minimum_direct.direct_minimum_required
