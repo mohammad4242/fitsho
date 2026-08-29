@@ -16,6 +16,7 @@ import scripts.generate_e2e_report_batch2 as batch2
 from app.auth.models import User
 from app.config import get_settings
 from app.exercises.enums import ExerciseType, MuscleGroup
+from app.workouts.program_engine.supplemental_policy import exercise_count_breakdown
 from app.workouts.schemas import WorkoutDayResponse
 
 TEST_PROFILES_BATCH2 = batch2.TEST_PROFILES_BATCH2
@@ -129,6 +130,25 @@ def test_batch2_evidence_uses_canonical_main_and_supplemental_counts() -> None:
             "duration_minutes": 60,
         },
     )
+
+
+def test_count_breakdown_prefers_persisted_snapshot_over_live_exercise_metadata() -> None:
+    persisted_wrapper = SimpleNamespace(
+        exercise_snapshot={
+            "exercise_type": ExerciseType.CORE.value,
+            "primary_muscle": MuscleGroup.CHEST.value,
+        },
+        exercise=SimpleNamespace(
+            exercise_type=ExerciseType.COMPOUND,
+            primary_muscle=MuscleGroup.CHEST,
+        ),
+    )
+
+    breakdown = exercise_count_breakdown((persisted_wrapper,))
+
+    assert breakdown.main_count == 0
+    assert breakdown.supplemental_count == 1
+    assert breakdown.total_count == 1
 
 
 def test_projection_reconciles_mixed_outcomes_from_the_same_raw_records() -> None:

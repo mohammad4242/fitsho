@@ -48,11 +48,15 @@ def _structured_value(item: object, field: str) -> object | None:
     current = item
     for _ in range(3):
         if isinstance(current, Mapping):
+            snapshot = current.get("exercise_snapshot")
             value = current.get(field)
             nested = current.get("exercise")
         else:
+            snapshot = getattr(current, "exercise_snapshot", None)
             value = getattr(current, field, None)
             nested = getattr(current, "exercise", None)
+        if isinstance(snapshot, Mapping) and snapshot and field in snapshot:
+            return cast(object, snapshot[field])
         if value is not None:
             return cast(object, value)
         if nested is None or nested is current:
