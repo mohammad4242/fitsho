@@ -23,6 +23,7 @@ from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import ProgramGenerationRequest, WorkoutProgram
 from app.workouts.program_engine.supplemental_policy import is_supplemental_muscle
 from app.workouts.program_engine.validation import validate_program
+from app.workouts.program_engine.volume_policy import weekly_direct_volume_range
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
@@ -254,9 +255,17 @@ def _assert_reference_invariants(
     ).effective_sets_by_muscle
     ranges = program.aggregate_metrics["volume_ranges_by_muscle"]
     assert isinstance(ranges, dict)
+    direct = program.aggregate_metrics["weekly_direct_sets_by_muscle"]
     for muscle, value in effective.items():
         if muscle in ranges:
-            assert value <= ranges[muscle]["effective_maximum_hard"]
+            muscle_range = weekly_direct_volume_range(
+                MuscleGroup(muscle),
+                request_value.training_age_months,
+            )
+            if muscle_range is not None:
+                assert direct[muscle] <= ranges[muscle]["maximum_hard"]
+            else:
+                assert value <= ranges[muscle]["effective_maximum_hard"]
 
     priority_metrics = program.aggregate_metrics["priority_metrics"]
     assert isinstance(priority_metrics, dict)

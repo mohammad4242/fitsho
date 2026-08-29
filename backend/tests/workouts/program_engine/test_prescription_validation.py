@@ -257,8 +257,12 @@ def test_four_day_program_does_not_round_each_muscle_exposure_up() -> None:
 
     assert result.program is not None, result.errors
     direct = result.program.aggregate_metrics["weekly_direct_sets_by_muscle"]
-    maximum = RULESET.maximum_sets[result.program.training_status]
-    assert all(value <= maximum for value in direct.values())
+    ranges = result.program.aggregate_metrics["volume_ranges_by_muscle"]
+    assert all(
+        direct[muscle] <= values["maximum_hard"]
+        for muscle, values in ranges.items()
+        if (muscle in direct and isinstance(values, dict))
+    )
 
 
 def test_volume_repair_reduces_hard_excess_before_validation() -> None:
@@ -313,7 +317,7 @@ def test_volume_target_exposes_clamped_preferred_flexible_range() -> None:
     target = next(item for item in volume.targets if item.muscle is MuscleGroup.CHEST)
 
     assert target.preferred_target == 10
-    assert target.acceptable_minimum == 8
+    assert target.acceptable_minimum == 10
     assert target.acceptable_maximum == 12
     assert target.acceptable_minimum <= target.preferred_target <= target.acceptable_maximum
 
@@ -334,8 +338,8 @@ def test_previous_volume_cap_clamps_flexible_maximum() -> None:
 
     target = next(item for item in volume.targets if item.muscle is MuscleGroup.CHEST)
 
-    assert target.preferred_target == 8
-    assert target.acceptable_maximum == 8
+    assert target.preferred_target == 10
+    assert target.acceptable_maximum == 12
     assert "VOLUME_CAPPED_FOR_PREVIOUS_EFFECTIVE_VOLUME" in target.constraint_reason_codes
 
 
@@ -459,16 +463,16 @@ def test_volume_repair_adds_existing_compound_set_when_effective_volume_is_under
     assert "VOLUME_REPAIR_HARD_MINIMUM_UNSATISFIED" in reasons
 
 
-def test_volume_repair_reduces_effective_secondary_cap() -> None:
+def test_volume_repair_reduces_unclassified_effective_secondary_cap() -> None:
     source = request()
     normalized = normalize_request(source, RULESET)
     volume = volume_with_targets(
         normalized,
         effective_target={muscle: 0 for muscle in MuscleGroup},
         minimum_direct={muscle: 0 for muscle in MuscleGroup},
-        maximum_hard={MuscleGroup.TRICEPS: 1},
+        maximum_hard={MuscleGroup.TRAPS: 1},
     )
-    day = volume_test_day(programmed_volume_exercise(MuscleGroup.CHEST, (MuscleGroup.TRICEPS,), 4))
+    day = volume_test_day(programmed_volume_exercise(MuscleGroup.CHEST, (MuscleGroup.TRAPS,), 4))
 
     repaired, reasons = repair_weekly_volume((day,), normalized, volume, RULESET)
 

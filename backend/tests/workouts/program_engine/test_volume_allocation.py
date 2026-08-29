@@ -510,14 +510,14 @@ def test_reference_repair_adds_hard_major_coverage_outside_original_focus() -> N
     assert any(item.primary_muscle is MuscleGroup.ABS for item in days[0].exercises)
 
 
-def test_volume_repair_preserves_last_hard_movement_role_while_reducing_secondary_excess() -> None:
+def test_volume_repair_reduces_unclassified_excess_preserving_hard_role() -> None:
     hinge = replace(
         _programmed(
             "Romanian Deadlift",
             MuscleGroup.HAMSTRINGS,
             3,
             pattern=MovementPattern.HIP_HINGE,
-            secondary_muscles=(MuscleGroup.GLUTES,),
+            secondary_muscles=(MuscleGroup.TRAPS,),
         ),
         order=2,
         reason_codes=("TEMPLATE_ADAPTATION_PRIORITY:core",),
@@ -527,12 +527,12 @@ def test_volume_repair_preserves_last_hard_movement_role_while_reducing_secondar
         MuscleGroup.HAMSTRINGS,
         3,
         pattern=MovementPattern.KNEE_FLEXION,
-        secondary_muscles=(MuscleGroup.GLUTES,),
+        secondary_muscles=(MuscleGroup.TRAPS,),
     )
     volume = WeeklyVolumePlan(
         targets=(
             VolumeTarget(
-                muscle=MuscleGroup.GLUTES,
+                muscle=MuscleGroup.TRAPS,
                 minimum_soft=0,
                 target_sets=2,
                 maximum_soft=2,
@@ -697,8 +697,7 @@ def test_volume_repair_does_not_add_main_above_short_session_ceiling() -> None:
 
 def test_volume_repair_does_not_remove_below_long_session_floor_for_soft_excess() -> None:
     main_exercises = tuple(
-        _programmed(f"Existing Chest {index}", MuscleGroup.CHEST, 1)
-        for index in range(5)
+        _programmed(f"Existing Chest {index}", MuscleGroup.CHEST, 1) for index in range(5)
     )
     core_exercises = (
         _programmed("Core One", MuscleGroup.ABS, 1, exercise_type=ExerciseType.CORE),
@@ -725,8 +724,7 @@ def test_volume_repair_does_not_remove_below_long_session_floor_for_soft_excess(
 
 def test_volume_repair_removes_soft_excess_to_short_session_main_floor() -> None:
     existing = tuple(
-        _programmed(f"Existing Chest {index}", MuscleGroup.CHEST, 3)
-        for index in range(4)
+        _programmed(f"Existing Chest {index}", MuscleGroup.CHEST, 3) for index in range(4)
     )
     target = replace(
         _volume_target(MuscleGroup.CHEST, target_sets=1).targets[0],

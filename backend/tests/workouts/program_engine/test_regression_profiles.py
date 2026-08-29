@@ -33,7 +33,10 @@ from app.workouts.program_engine.split_selector import (
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
-from app.workouts.program_engine.volume_policy import session_hard_volume_cap
+from app.workouts.program_engine.volume_policy import (
+    session_hard_volume_cap,
+    weekly_direct_volume_range,
+)
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
 
 
@@ -410,11 +413,17 @@ def test_regression_profiles() -> None:
                     )
 
         ranges = program.aggregate_metrics["volume_ranges_by_muscle"]
+        direct = program.aggregate_metrics["weekly_direct_sets_by_muscle"]
         effective = program.aggregate_metrics["weekly_effective_sets_by_muscle"]
         assert all(
-            sets <= ranges[muscle]["effective_maximum_hard"]
-            for muscle, sets in effective.items()
-            if muscle in ranges
+            (
+                direct[muscle] <= values["maximum_hard"]
+                if weekly_direct_volume_range(MuscleGroup(muscle), req.training_age_months)
+                is not None
+                else effective[muscle] <= values["effective_maximum_hard"]
+            )
+            for muscle, values in ranges.items()
+            if muscle in direct and isinstance(values, dict)
         )
 
     req_imp = request(**impossible_profile)

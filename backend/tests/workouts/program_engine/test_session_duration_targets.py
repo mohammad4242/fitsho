@@ -726,11 +726,16 @@ def test_batch2_profile_underfill_is_hard_volume_constrained(
     assert all(exercise.sets >= RULESET.minimum_working_sets for exercise in day.exercises)
     assert all(exercise.exercise.content_type.value == "exercise" for exercise in day.exercises)
 
-    hard_attempt = next(attempt for attempt in strict_attempts if attempt["day"] == underfilled_day)
-    assert hard_attempt["duration"] == 45
-    assert hard_attempt["existing"] >= 1
-    assert hard_attempt["checks"] > 0
-    assert 0 <= hard_attempt["safe"] <= hard_attempt["checks"]
+    hard_attempts = [attempt for attempt in strict_attempts if attempt["day"] == underfilled_day]
+    if profile_number == 5:
+        # Secondary effective volume is not a hard blocker for classified muscles.
+        assert hard_attempts == []
+    else:
+        hard_attempt = hard_attempts[0]
+        assert hard_attempt["duration"] == 45
+        assert hard_attempt["existing"] >= 1
+        assert hard_attempt["checks"] > 0
+        assert 0 <= hard_attempt["safe"] <= hard_attempt["checks"]
 
     ranges = plan.aggregate_metrics["volume_ranges_by_muscle"]
     assert any(
