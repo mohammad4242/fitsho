@@ -68,7 +68,7 @@ def _generate_with_constraint(
     target_id: UUID,
     request_updates: dict[str, object],
     candidate_updates: dict[str, object] | None = None,
-    days: int = 3,
+    days: int = 4,
 ) -> tuple[Any, set[UUID]]:
     updates = {"available_training_days": days, **request_updates}
     effective_request = request.model_copy(update=updates)

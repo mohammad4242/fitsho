@@ -163,11 +163,11 @@ def test_replacement_approval_preserves_edits_provenance_and_is_idempotent(
     draft_payload["days"][0]["exercises"][0].update(
         {
             "exercise_id": str(replacement_id),
-            "sets": 5,
+            "sets": 4,
             "reps_min": 6,
             "reps_max": 10,
             "rir": 3,
-            "rest_seconds": 150,
+            "rest_seconds": 60,
             "notes_en": "Use controlled tempo.",
             "notes_fa": "با ریتم کنترل‌شده اجرا شود.",
         }
@@ -251,11 +251,11 @@ def test_replacement_approval_preserves_edits_provenance_and_is_idempotent(
         "notes_fa": source.days[0].exercises[0].notes_fa,
     }
     assert approved_item.exercise_id == replacement_id
-    assert approved_item.sets == 5
+    assert approved_item.sets == 4
     assert approved_item.reps_min == 6
     assert approved_item.reps_max == 10
     assert approved_item.rir == 3
-    assert approved_item.rest_seconds == 150
+    assert approved_item.rest_seconds == 60
     assert approved_item.notes_en == "Use controlled tempo."
     assert approved_item.notes_fa == "با ریتم کنترل‌شده اجرا شود."
     assert review.status is WorkoutReviewStatus.APPROVED

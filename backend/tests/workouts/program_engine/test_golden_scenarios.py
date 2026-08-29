@@ -85,12 +85,12 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
         )
 
 
-@pytest.mark.parametrize("requested_days", [2, 3, 4, 5])
+@pytest.mark.parametrize("requested_days", [3, 4, 5])
 def test_successful_generation_preserves_requested_training_days(requested_days: int) -> None:
     source = request(
         available_training_days=requested_days,
-        training_experience="intermediate",
-        training_age_months=24,
+        training_experience="advanced",
+        training_age_months=60,
     )
 
     catalog = full_catalog()
@@ -104,12 +104,26 @@ def test_successful_generation_preserves_requested_training_days(requested_days:
     assert all(day.exercises for day in result.program.weekly_schedule)
 
 
+def test_advanced_two_day_generation_is_rejected_by_compatibility_policy() -> None:
+    source = request(
+        available_training_days=2,
+        training_experience="advanced",
+        training_age_months=60,
+    )
+
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert result.program is None
+    assert result.error_code is GenerationErrorCode.UNSUPPORTED_RESISTANCE_TRAINING_DAYS
+    assert result.errors == ("UNSUPPORTED_RESISTANCE_TRAINING_DAYS",)
+
+
 def test_six_day_generation_succeeds_with_scaled_frequency_caps() -> None:
     source = request(
         available_training_days=6,
         session_duration_minutes=30,
-        training_experience="intermediate",
-        training_age_months=24,
+        training_experience="advanced",
+        training_age_months=60,
     )
     catalog = full_catalog()
     catalog.append(exercise("seated-calf", MovementPattern.CALF_RAISE, MuscleGroup.CALVES))
@@ -124,8 +138,8 @@ def test_preferred_weekdays_are_preserved_for_exact_day_generation() -> None:
     source = request(
         available_training_days=3,
         preferred_weekdays=(0, 2, 4),
-        training_experience="intermediate",
-        training_age_months=24,
+        training_experience="advanced",
+        training_age_months=60,
     )
 
     result = generate_program(source, full_catalog(), RULESET)
@@ -137,8 +151,8 @@ def test_preferred_weekdays_are_preserved_for_exact_day_generation() -> None:
 def test_exact_day_construction_failure_does_not_return_shorter_success() -> None:
     source = request(
         available_training_days=5,
-        training_experience="intermediate",
-        training_age_months=24,
+        training_experience="advanced",
+        training_age_months=60,
     )
     catalog = [item for item in full_catalog() if item.primary_muscle is MuscleGroup.CHEST]
 
@@ -450,9 +464,7 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
     assert first.program is not None, first.errors
     assert second.program == first.program
     assert first.program.validation_report.is_valid
-    count_policy = get_session_exercise_count_policy(
-        source.session_duration_minutes, RULESET
-    )
+    count_policy = get_session_exercise_count_policy(source.session_duration_minutes, RULESET)
     assert all(
         count_policy.contains(main_exercise_count(day.exercises))
         for day in first.program.weekly_schedule
