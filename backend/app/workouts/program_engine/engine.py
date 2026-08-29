@@ -496,6 +496,20 @@ def _rejected_split_recovery_reasons(
     return tuple(dict.fromkeys(reasons))
 
 
+def _rejected_split_summaries(
+    rejected_splits: tuple[dict[str, object], ...],
+) -> tuple[dict[str, object], ...]:
+    """Keep prior split evidence bounded when building the next attempt trace."""
+    return tuple(
+        {
+            key: rejected_split[key]
+            for key in ("split", "day_focuses", "status", "reason_codes")
+            if key in rejected_split
+        }
+        for rejected_split in rejected_splits
+    )
+
+
 def _program_for_split(
     request: ProgramGenerationRequest,
     normalized: NormalizedProgramRequest,
@@ -711,7 +725,7 @@ def _program_for_split(
             "stage": "construction_recovery",
             "status": "recovered" if recovery_reasons else "not_required",
             "selected_split": split.split_type.value,
-            "rejected_splits": rejected_splits,
+            "rejected_splits": _rejected_split_summaries(rejected_splits),
             "reason_codes": recovery_reasons,
             "session_reasons": tuple(
                 {
