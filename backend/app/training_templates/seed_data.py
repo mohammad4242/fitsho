@@ -2149,7 +2149,9 @@ _FULL_BODY_INTERMEDIATE = (
 )
 
 
-def _upper_lower_full(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
+def _upper_lower_full(
+    level: ExperienceLevel,
+) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
     if level is Level.FIRST_MONTH:
         upper = (
             (MACHINE_CHEST_PRESS, "P"),
@@ -2229,7 +2231,9 @@ def _upper_lower_full(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tu
     )
 
 
-def _upper_lower_upper(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
+def _upper_lower_upper(
+    level: ExperienceLevel,
+) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
     upper_a = (
         (MACHINE_CHEST_PRESS, "P"),
         (INCLINE_PRESS, "S"),
@@ -2292,7 +2296,9 @@ def _upper_lower_upper(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, t
     )
 
 
-def _lower_upper_lower(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
+def _lower_upper_lower(
+    level: ExperienceLevel,
+) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
     if level is Level.BEGINNER:
         lower_a = (
             (SMITH_CHAIR_SQUAT, "P"),
@@ -2350,7 +2356,9 @@ def _lower_upper_lower(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, t
     )
 
 
-def _upper_lower_2x(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
+def _upper_lower_2x(
+    level: ExperienceLevel,
+) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
     if level is Level.FIRST_MONTH:
         upper_a = (
             (MACHINE_CHEST_PRESS, "P"),
@@ -2452,7 +2460,9 @@ def _upper_lower_2x(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tupl
     )
 
 
-def _three_upper_one_lower(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
+def _three_upper_one_lower(
+    level: ExperienceLevel,
+) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
     if level is Level.BEGINNER:
         upper_a = (
             (MACHINE_CHEST_PRESS, "P"),
@@ -2525,7 +2535,9 @@ def _three_upper_one_lower(level: ExperienceLevel) -> tuple[tuple[TemplateDaySee
     )
 
 
-def _three_lower_one_upper(level: ExperienceLevel) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
+def _three_lower_one_upper(
+    level: ExperienceLevel,
+) -> tuple[tuple[TemplateDaySeed, tuple[tuple[Movement, str], ...]], ...]:
     if level is Level.BEGINNER:
         lower_a = (
             (SMITH_CHAIR_SQUAT, "P"),
@@ -2636,9 +2648,19 @@ _PUSH_PULL_QUADS_POSTERIOR = (
 
 
 _APPROVED_PROGRAM_BLUEPRINTS = (
-    ("p01-2-day-full-body-ab-first-month", "2d-full-body-ab", Level.FIRST_MONTH, _FULL_BODY_FIRST_MONTH),
+    (
+        "p01-2-day-full-body-ab-first-month",
+        "2d-full-body-ab",
+        Level.FIRST_MONTH,
+        _FULL_BODY_FIRST_MONTH,
+    ),
     ("p02-2-day-full-body-ab-beginner", "2d-full-body-ab", Level.BEGINNER, _FULL_BODY_BEGINNER),
-    ("p03-2-day-full-body-ab-intermediate", "2d-full-body-ab", Level.INTERMEDIATE, _FULL_BODY_INTERMEDIATE),
+    (
+        "p03-2-day-full-body-ab-intermediate",
+        "2d-full-body-ab",
+        Level.INTERMEDIATE,
+        _FULL_BODY_INTERMEDIATE,
+    ),
     *(
         (
             f"p{index:02d}-3-day-upper-lower-full-{_LEVEL_SLUG_SUFFIX[level]}",
@@ -2646,7 +2668,12 @@ _APPROVED_PROGRAM_BLUEPRINTS = (
             level,
             _upper_lower_full(level),
         )
-        for index, level in ((4, Level.FIRST_MONTH), (5, Level.BEGINNER), (6, Level.INTERMEDIATE), (7, Level.ADVANCED))
+        for index, level in (
+            (4, Level.FIRST_MONTH),
+            (5, Level.BEGINNER),
+            (6, Level.INTERMEDIATE),
+            (7, Level.ADVANCED),
+        )
     ),
     *(
         (
@@ -2673,7 +2700,12 @@ _APPROVED_PROGRAM_BLUEPRINTS = (
             level,
             _upper_lower_2x(level),
         )
-        for index, level in ((14, Level.FIRST_MONTH), (15, Level.BEGINNER), (16, Level.INTERMEDIATE), (17, Level.ADVANCED))
+        for index, level in (
+            (14, Level.FIRST_MONTH),
+            (15, Level.BEGINNER),
+            (16, Level.INTERMEDIATE),
+            (17, Level.ADVANCED),
+        )
     ),
     *(
         (
@@ -2693,8 +2725,18 @@ _APPROVED_PROGRAM_BLUEPRINTS = (
         )
         for index, level in ((21, Level.BEGINNER), (22, Level.INTERMEDIATE), (23, Level.ADVANCED))
     ),
-    ("p24-4-day-push-pull-quads-posterior-intermediate", "4d-push-pull-quads-posterior", Level.INTERMEDIATE, _PUSH_PULL_QUADS_POSTERIOR),
-    ("p25-4-day-push-pull-quads-posterior-advanced", "4d-push-pull-quads-posterior", Level.ADVANCED, _PUSH_PULL_QUADS_POSTERIOR),
+    (
+        "p24-4-day-push-pull-quads-posterior-intermediate",
+        "4d-push-pull-quads-posterior",
+        Level.INTERMEDIATE,
+        _PUSH_PULL_QUADS_POSTERIOR,
+    ),
+    (
+        "p25-4-day-push-pull-quads-posterior-advanced",
+        "4d-push-pull-quads-posterior",
+        Level.ADVANCED,
+        _PUSH_PULL_QUADS_POSTERIOR,
+    ),
 )
 
 CANONICAL_TEMPLATE_DEFINITIONS = tuple(
@@ -2705,8 +2747,7 @@ CANONICAL_TEMPLATE_SLUGS = tuple(
     definition.canonical_slug for definition in CANONICAL_TEMPLATE_DEFINITIONS
 )
 TRAINING_PROGRAM_TEMPLATE_SEEDS = tuple(
-    _approved_seed_from_definition(definition)
-    for definition in CANONICAL_TEMPLATE_DEFINITIONS
+    _approved_seed_from_definition(definition) for definition in CANONICAL_TEMPLATE_DEFINITIONS
 )
 
 
@@ -2918,12 +2959,37 @@ _APPROVED_DAY_TITLES_FA.update(
 _NEW_STRUCTURE_NAMES = {
     "4d-upper-lower-2x": _APPROVED_STRUCTURE_NAMES["4d-upper-lower-2x"],
     "4d-3-upper-1-lower": _APPROVED_STRUCTURE_NAMES["4d-3-upper-1-lower"],
-    "5d-classic-body-part-approved": ("5-Day Classic Body-Part Split", "تقسیم کلاسیک عضله‌ای پنج‌روزه"),
+    "4d-iranmuscle-body-part": (
+        "IRANMUSCLE 4-Day Body-Part Split",
+        "تقسیم عضله‌ای ۴ روزه ایران ماسل",
+    ),
+    "4d-gymextreme-body-part": (
+        "GymExtreme 4-Day Advanced Split",
+        "تقسیم پیشرفته ۴ روزه جیم اکستریم",
+    ),
+    "4d-arnoldsho-classic-body-part": (
+        "Arnoldsho 4-Day Classic Body-Part Split",
+        "تقسیم کلاسیک ۴ روزه آرنولدشو",
+    ),
+    "4d-aloplay-body-part": ("Aloplay 4-Day Body-Part Split", "تقسیم عضله‌ای ۴ روزه الوپلی"),
+    "5d-classic-body-part-approved": (
+        "5-Day Classic Body-Part Split",
+        "تقسیم کلاسیک عضله‌ای پنج‌روزه",
+    ),
     "5d-split-weak-point": ("5-Day Split + Focus Variation", "تقسیم پنج‌روزه با تنوع تمرکز"),
-    "5d-upper-priority-iranian": ("5-Day Upper / Lower Iranian Split", "تقسیم ایرانی پنج‌روزه بالاتنه / پایین‌تنه"),
-    "5d-upper-lower-specialty": ("5-Day Upper / Lower Variation", "تنوع پنج‌روزه بالاتنه / پایین‌تنه"),
+    "5d-upper-priority-iranian": (
+        "5-Day Upper / Lower Iranian Split",
+        "تقسیم ایرانی پنج‌روزه بالاتنه / پایین‌تنه",
+    ),
+    "5d-upper-lower-specialty": (
+        "5-Day Upper / Lower Variation",
+        "تنوع پنج‌روزه بالاتنه / پایین‌تنه",
+    ),
     "5d-fst7-arms-priority": ("5-Day FST-7 / Arms Priority", "پنج‌روزه FST-7 با اولویت بازو"),
-    "5d-professional-compound": ("5-Day Professional Split + Compound Day", "تقسیم حرفه‌ای پنج‌روزه با روز ترکیبی"),
+    "5d-professional-compound": (
+        "5-Day Professional Split + Compound Day",
+        "تقسیم حرفه‌ای پنج‌روزه با روز ترکیبی",
+    ),
     "6d-upper-lower-x3": ("6-Day Upper / Lower ×3", "بالاتنه / پایین‌تنه سه‌بار در هفته"),
     "6d-fitclub-hybrid": ("6-Day FitClub Hybrid", "ترکیبی شش‌روزه فیت‌کلاب"),
     "6d-arnold-split": ("6-Day Arnold Split", "تقسیم آرنولد شش‌روزه"),
@@ -2935,6 +3001,10 @@ _NEW_STRUCTURE_NAMES["6d-ppl-2x"] = ("PPL A/B", "پوش / پول / پا A/B")
 _NEW_STRUCTURE_TAGS = {
     "4d-upper-lower-2x": _APPROVED_TAGS["4d-upper-lower-2x"],
     "4d-3-upper-1-lower": _APPROVED_TAGS["4d-3-upper-1-lower"],
+    "4d-iranmuscle-body-part": (Tag.BODY_PART_ROTATION,),
+    "4d-gymextreme-body-part": (Tag.BODY_PART_ROTATION,),
+    "4d-arnoldsho-classic-body-part": (Tag.BODY_PART_ROTATION,),
+    "4d-aloplay-body-part": (Tag.BODY_PART_ROTATION,),
     "5d-classic-body-part-approved": (Tag.BODY_PART_ROTATION,),
     "5d-split-weak-point": (Tag.BODY_PART_ROTATION,),
     "5d-upper-priority-iranian": (Tag.UPPER_LOWER,),
@@ -3014,7 +3084,9 @@ def _classic_body_part_5d(
                 _approved_slot(ROW, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(row_second, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(third_back, "large_compound", _advanced_rest(level, 120, 120)),
-                _approved_slot(STRAIGHT_ARM_PULLDOWN, "large_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    STRAIGHT_ARM_PULLDOWN, "large_isolation", _advanced_rest(level, 60, 75)
+                ),
             ),
         ),
         (
@@ -3046,10 +3118,14 @@ def _classic_body_part_5d(
                     "large_isolation",
                     _advanced_rest(level, 60, 75),
                 ),
-                *((_approved_slot(LUNGE, "large_compound", 120),) if level is Level.ADVANCED else ()),
+                *(
+                    (_approved_slot(LUNGE, "large_compound", 120),)
+                    if level is Level.ADVANCED
+                    else ()
+                ),
                 _approved_slot(CALF_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
             ),
-        )
+        ),
     )
 
 
@@ -3058,29 +3134,55 @@ def _split_weak_point_5d(
 ) -> tuple[tuple[str, str, tuple[MuscleGroup, ...], tuple[_ApprovedSlotSpec, ...]], ...]:
     return (
         (
-            "Chest + Triceps", "upper", (M.CHEST, M.TRICEPS),
+            "Chest + Triceps",
+            "upper",
+            (M.CHEST, M.TRICEPS),
             (
                 _approved_slot(FLAT_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(MACHINE_INCLINE_PRESS if level is Level.ADVANCED else INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
+                _approved_slot(
+                    MACHINE_INCLINE_PRESS if level is Level.ADVANCED else INCLINE_PRESS,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
                 _approved_slot(CHEST_FLY, "large_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(ROPE_TRICEPS_PUSHDOWN if level is Level.ADVANCED else TRICEPS_PUSHDOWN, "small_main", _advanced_rest(level, 60, 90)),
-                _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    ROPE_TRICEPS_PUSHDOWN if level is Level.ADVANCED else TRICEPS_PUSHDOWN,
+                    "small_main",
+                    _advanced_rest(level, 60, 90),
+                ),
+                _approved_slot(
+                    OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)
+                ),
             ),
         ),
         (
-            "Back + Biceps", "upper", (M.BACK, M.BICEPS),
+            "Back + Biceps",
+            "upper",
+            (M.BACK, M.BICEPS),
             (
-                _approved_slot(HIGH_ROW if level is Level.ADVANCED else ROW, "large_primary", _advanced_rest(level, 120, 150)),
+                _approved_slot(
+                    HIGH_ROW if level is Level.ADVANCED else ROW,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
                 _approved_slot(LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(SEATED_CABLE_ROW, "large_compound", 120),
                 _approved_slot(BARBELL_CURL, "small_main", _advanced_rest(level, 60, 90)),
-                _approved_slot(CABLE_CURL if level is Level.ADVANCED else DUMBBELL_CURL, "small_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    CABLE_CURL if level is Level.ADVANCED else DUMBBELL_CURL,
+                    "small_isolation",
+                    _advanced_rest(level, 60, 75),
+                ),
             ),
         ),
         (
-            "Legs", "lower", LEG_MUSCLES,
+            "Legs",
+            "lower",
+            LEG_MUSCLES,
             (
-                _approved_slot(FRONT_SQUAT if level is Level.ADVANCED else SQUAT, "large_primary", 150),
+                _approved_slot(
+                    FRONT_SQUAT if level is Level.ADVANCED else SQUAT, "large_primary", 150
+                ),
                 _approved_slot(RDL, "large_primary", 150),
                 _approved_slot(LEG_PRESS, "large_compound", 120),
                 _approved_slot(LYING_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)),
@@ -3088,21 +3190,47 @@ def _split_weak_point_5d(
             ),
         ),
         (
-            "Shoulders + Core", "upper", SHOULDER_MUSCLES,
+            "Shoulders + Core",
+            "upper",
+            SHOULDER_MUSCLES,
             (
-                _approved_slot(SHOULDER_PRESS if level is Level.INTERMEDIATE else SMITH_SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
-                _approved_slot(DUMBBELL_LATERAL_RAISE if level is Level.ADVANCED else LATERAL_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    SHOULDER_PRESS if level is Level.INTERMEDIATE else SMITH_SHOULDER_PRESS,
+                    "small_main",
+                    _advanced_rest(level, 90, 120),
+                ),
+                _approved_slot(
+                    DUMBBELL_LATERAL_RAISE if level is Level.ADVANCED else LATERAL_RAISE,
+                    "small_isolation",
+                    _advanced_rest(level, 60, 75),
+                ),
                 _approved_slot(REAR_DELT_FLY, "small_isolation", _advanced_rest(level, 60, 75)),
-                *((_approved_slot(SHRUG, "small_isolation", _advanced_rest(level, 60, 75)),) if level is Level.ADVANCED else ()),
+                *(
+                    (_approved_slot(SHRUG, "small_isolation", _advanced_rest(level, 60, 75)),)
+                    if level is Level.ADVANCED
+                    else ()
+                ),
                 _approved_slot(FRONT_PLANK, "front_plank", 60),
-                *((_approved_slot(SIDE_PLANK, "side_plank", 60),) if level is Level.INTERMEDIATE else ()),
+                *(
+                    (_approved_slot(SIDE_PLANK, "side_plank", 60),)
+                    if level is Level.INTERMEDIATE
+                    else ()
+                ),
             ),
         ),
         (
-            "Weak Point / Light Full Body", "full_body", _FULL_BODY_MUSCLES,
+            "Weak Point / Light Full Body",
+            "full_body",
+            _FULL_BODY_MUSCLES,
             (
-                _approved_slot(DUMBBELL_BENCH_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(ROW if level is Level.ADVANCED else HIGH_ROW, "large_primary", _advanced_rest(level, 120, 150)),
+                _approved_slot(
+                    DUMBBELL_BENCH_PRESS, "large_primary", _advanced_rest(level, 120, 150)
+                ),
+                _approved_slot(
+                    ROW if level is Level.ADVANCED else HIGH_ROW,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
                 _approved_slot(GLUTE_BRIDGE, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(LUNGE, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(
@@ -3110,7 +3238,9 @@ def _split_weak_point_5d(
                     "small_isolation",
                     _advanced_rest(level, 60, 75),
                     intensity_method=_level_method(level, Method.DROP_SET),
-                ) if level is Level.ADVANCED else _approved_slot(
+                )
+                if level is Level.ADVANCED
+                else _approved_slot(
                     LEVER_LATERAL_RAISE,
                     "small_isolation",
                     _advanced_rest(level, 60, 75),
@@ -3125,53 +3255,120 @@ def _upper_lower_iranian_5d(
 ) -> tuple[tuple[str, str, tuple[MuscleGroup, ...], tuple[_ApprovedSlotSpec, ...]], ...]:
     return (
         (
-            "Chest + Triceps", "upper", UPPER_MUSCLES_APPROVED,
+            "Chest + Triceps",
+            "upper",
+            UPPER_MUSCLES_APPROVED,
             (
                 _approved_slot(FLAT_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(MACHINE_INCLINE_PRESS if level is Level.ADVANCED else INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
+                _approved_slot(
+                    MACHINE_INCLINE_PRESS if level is Level.ADVANCED else INCLINE_PRESS,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
                 _approved_slot(CHEST_FLY, "large_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(ROPE_TRICEPS_PUSHDOWN if level is Level.ADVANCED else TRICEPS_PUSHDOWN, "small_main", _advanced_rest(level, 60, 90)),
-                _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    ROPE_TRICEPS_PUSHDOWN if level is Level.ADVANCED else TRICEPS_PUSHDOWN,
+                    "small_main",
+                    _advanced_rest(level, 60, 90),
+                ),
+                _approved_slot(
+                    OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)
+                ),
             ),
         ),
         (
-            "Shoulders + Biceps", "upper", UPPER_MUSCLES_APPROVED,
+            "Shoulders + Biceps",
+            "upper",
+            UPPER_MUSCLES_APPROVED,
             (
-                _approved_slot(SMITH_SHOULDER_PRESS if level is Level.INTERMEDIATE else SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
-                _approved_slot(LEVER_LATERAL_RAISE if level is Level.ADVANCED else LATERAL_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    SMITH_SHOULDER_PRESS if level is Level.INTERMEDIATE else SHOULDER_PRESS,
+                    "small_main",
+                    _advanced_rest(level, 90, 120),
+                ),
+                _approved_slot(
+                    LEVER_LATERAL_RAISE if level is Level.ADVANCED else LATERAL_RAISE,
+                    "small_isolation",
+                    _advanced_rest(level, 60, 75),
+                ),
                 _approved_slot(REAR_DELT_FLY, "small_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(BARBELL_CURL if level is Level.ADVANCED else PREACHER_CURL, "small_main", _advanced_rest(level, 60, 90)),
+                _approved_slot(
+                    BARBELL_CURL if level is Level.ADVANCED else PREACHER_CURL,
+                    "small_main",
+                    _advanced_rest(level, 60, 90),
+                ),
                 _approved_slot(HAMMER_CURL, "small_isolation", _advanced_rest(level, 60, 75)),
             ),
         ),
         (
-            "Legs + Core", "lower", LEG_MUSCLES,
+            "Legs + Core",
+            "lower",
+            LEG_MUSCLES,
             (
-                _approved_slot(FRONT_SQUAT if level is Level.ADVANCED else SQUAT, "large_primary", 150),
+                _approved_slot(
+                    FRONT_SQUAT if level is Level.ADVANCED else SQUAT, "large_primary", 150
+                ),
                 _approved_slot(LEG_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(LYING_LEG_CURL if level is Level.ADVANCED else SEATED_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    LYING_LEG_CURL if level is Level.ADVANCED else SEATED_LEG_CURL,
+                    "large_isolation",
+                    _advanced_rest(level, 60, 75),
+                ),
                 _approved_slot(CALF_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
                 _approved_slot(FRONT_PLANK, "front_plank", 60),
             ),
         ),
         (
-            "Upper Chest + Biceps", "upper", UPPER_MUSCLES_APPROVED,
+            "Upper Chest + Biceps",
+            "upper",
+            UPPER_MUSCLES_APPROVED,
             (
                 _approved_slot(INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(MACHINE_CHEST_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(CHEST_FLY, "large_isolation", _advanced_rest(level, 60, 75), intensity_method=_level_method(level, Method.DROP_SET)),
-                _approved_slot(PREACHER_CURL if level is Level.ADVANCED else CABLE_CURL, "small_main", _advanced_rest(level, 60, 90)),
-                _approved_slot(CABLE_CURL if level is Level.ADVANCED else DUMBBELL_CURL, "small_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    MACHINE_CHEST_PRESS, "large_primary", _advanced_rest(level, 120, 150)
+                ),
+                _approved_slot(
+                    CHEST_FLY,
+                    "large_isolation",
+                    _advanced_rest(level, 60, 75),
+                    intensity_method=_level_method(level, Method.DROP_SET),
+                ),
+                _approved_slot(
+                    PREACHER_CURL if level is Level.ADVANCED else CABLE_CURL,
+                    "small_main",
+                    _advanced_rest(level, 60, 90),
+                ),
+                _approved_slot(
+                    CABLE_CURL if level is Level.ADVANCED else DUMBBELL_CURL,
+                    "small_isolation",
+                    _advanced_rest(level, 60, 75),
+                ),
             ),
         ),
         (
-            "Back + Core", "upper", UPPER_MUSCLES_APPROVED,
+            "Back + Core",
+            "upper",
+            UPPER_MUSCLES_APPROVED,
             (
                 _approved_slot(ROW, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(HIGH_ROW if level is Level.ADVANCED else LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
-                *((_approved_slot(LAT_PULLDOWN, "large_compound", 120),) if level is Level.ADVANCED else (_approved_slot(SEATED_CABLE_ROW, "large_compound", 120),)),
-                _approved_slot(STRAIGHT_ARM_PULLDOWN, "large_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(FRONT_PLANK if level is Level.ADVANCED else SIDE_PLANK, "front_plank" if level is Level.ADVANCED else "side_plank", 60),
+                _approved_slot(
+                    HIGH_ROW if level is Level.ADVANCED else LAT_PULLDOWN,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
+                *(
+                    (_approved_slot(LAT_PULLDOWN, "large_compound", 120),)
+                    if level is Level.ADVANCED
+                    else (_approved_slot(SEATED_CABLE_ROW, "large_compound", 120),)
+                ),
+                _approved_slot(
+                    STRAIGHT_ARM_PULLDOWN, "large_isolation", _advanced_rest(level, 60, 75)
+                ),
+                _approved_slot(
+                    FRONT_PLANK if level is Level.ADVANCED else SIDE_PLANK,
+                    "front_plank" if level is Level.ADVANCED else "side_plank",
+                    60,
+                ),
             ),
         ),
     )
@@ -3183,18 +3380,30 @@ def _upper_lower_specialty_5d(
     advanced = level is Level.ADVANCED
     return (
         (
-            "Upper A", "upper", UPPER_MUSCLES_APPROVED,
+            "Upper A",
+            "upper",
+            UPPER_MUSCLES_APPROVED,
             (
                 _approved_slot(FLAT_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(ROW, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
-                *((_approved_slot(BARBELL_CURL, "small_main", _advanced_rest(level, 60, 90)),
-                   _approved_slot(TRICEPS_PUSHDOWN, "small_main", _advanced_rest(level, 60, 90))) if not advanced else ()),
+                *(
+                    (
+                        _approved_slot(BARBELL_CURL, "small_main", _advanced_rest(level, 60, 90)),
+                        _approved_slot(
+                            TRICEPS_PUSHDOWN, "small_main", _advanced_rest(level, 60, 90)
+                        ),
+                    )
+                    if not advanced
+                    else ()
+                ),
             ),
         ),
         (
-            "Lower A", "lower", LEG_MUSCLES,
+            "Lower A",
+            "lower",
+            LEG_MUSCLES,
             (
                 _approved_slot(SQUAT, "large_primary", 150),
                 _approved_slot(RDL, "large_primary", 150),
@@ -3204,9 +3413,15 @@ def _upper_lower_specialty_5d(
             ),
         ),
         (
-            "Upper B", "upper", UPPER_MUSCLES_APPROVED,
+            "Upper B",
+            "upper",
+            UPPER_MUSCLES_APPROVED,
             (
-                _approved_slot(MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
+                _approved_slot(
+                    MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
                 _approved_slot(SEATED_CABLE_ROW, "large_primary", _advanced_rest(level, 120, 150)),
                 *(
                     (
@@ -3225,7 +3440,9 @@ def _upper_lower_specialty_5d(
             ),
         ),
         (
-            "Lower B", "lower", LEG_MUSCLES,
+            "Lower B",
+            "lower",
+            LEG_MUSCLES,
             (
                 _approved_slot(FRONT_SQUAT, "large_primary", 150),
                 _approved_slot(GLUTE_BRIDGE, "large_primary", _advanced_rest(level, 120, 150)),
@@ -3235,7 +3452,9 @@ def _upper_lower_specialty_5d(
             ),
         ),
         (
-            "Arms + Delts Specialty", "upper", SHOULDERS_ARMS_MUSCLES,
+            "Arms + Delts Specialty",
+            "upper",
+            SHOULDERS_ARMS_MUSCLES,
             (
                 _approved_slot(SMITH_SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
                 *(
@@ -3254,13 +3473,31 @@ def _upper_lower_specialty_5d(
                         ),
                     )
                 ),
-                *((_approved_slot(BARBELL_CURL, "small_main", 60),
-                   _approved_slot(ROPE_TRICEPS_PUSHDOWN, "small_main", 60),
-                   _approved_slot(HAMMER_CURL, "small_isolation", 60)) if not advanced else (
-                    _approved_slot(CABLE_CURL, "superset", 90, intensity_method=Method.SUPERSET, superset_group="SS-A"),
-                    _approved_slot(ROPE_TRICEPS_PUSHDOWN, "superset", 90, intensity_method=Method.SUPERSET, superset_group="SS-A"),
-                    _approved_slot(HAMMER_CURL, "small_main", 90),
-                )),
+                *(
+                    (
+                        _approved_slot(BARBELL_CURL, "small_main", 60),
+                        _approved_slot(ROPE_TRICEPS_PUSHDOWN, "small_main", 60),
+                        _approved_slot(HAMMER_CURL, "small_isolation", 60),
+                    )
+                    if not advanced
+                    else (
+                        _approved_slot(
+                            CABLE_CURL,
+                            "superset",
+                            90,
+                            intensity_method=Method.SUPERSET,
+                            superset_group="SS-A",
+                        ),
+                        _approved_slot(
+                            ROPE_TRICEPS_PUSHDOWN,
+                            "superset",
+                            90,
+                            intensity_method=Method.SUPERSET,
+                            superset_group="SS-A",
+                        ),
+                        _approved_slot(HAMMER_CURL, "small_main", 90),
+                    )
+                ),
             ),
         ),
     )
@@ -3276,27 +3513,59 @@ def _fst7_arms_priority_5d(
 
     return (
         (
-            "Chest + Biceps", "upper", UPPER_MUSCLES_APPROVED,
+            "Chest + Biceps",
+            "upper",
+            UPPER_MUSCLES_APPROVED,
             (
-                _approved_slot(FLAT_PRESS if advanced else DUMBBELL_BENCH_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                fst(CHEST_FLY, 60) if advanced else _approved_slot(CHEST_FLY, "large_isolation", 60),
-                _approved_slot(BARBELL_CURL if advanced else DUMBBELL_CURL, "small_main", _advanced_rest(level, 60, 90)),
+                _approved_slot(
+                    FLAT_PRESS if advanced else DUMBBELL_BENCH_PRESS,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
+                _approved_slot(
+                    MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
+                fst(CHEST_FLY, 60)
+                if advanced
+                else _approved_slot(CHEST_FLY, "large_isolation", 60),
+                _approved_slot(
+                    BARBELL_CURL if advanced else DUMBBELL_CURL,
+                    "small_main",
+                    _advanced_rest(level, 60, 90),
+                ),
                 *((_approved_slot(PREACHER_CURL, "small_isolation", 60),) if not advanced else ()),
             ),
         ),
         (
-            "Back + Triceps", "upper", UPPER_MUSCLES_APPROVED,
+            "Back + Triceps",
+            "upper",
+            UPPER_MUSCLES_APPROVED,
             (
-                _approved_slot(ROW if advanced else HIGH_ROW, "large_primary", _advanced_rest(level, 120, 150)),
+                _approved_slot(
+                    ROW if advanced else HIGH_ROW, "large_primary", _advanced_rest(level, 120, 150)
+                ),
                 _approved_slot(LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
-                fst(STRAIGHT_ARM_PULLDOWN, 60) if advanced else _approved_slot(STRAIGHT_ARM_PULLDOWN, "large_isolation", 60),
-                _approved_slot(ROPE_TRICEPS_PUSHDOWN if advanced else TRICEPS_PUSHDOWN, "small_main", _advanced_rest(level, 60, 90)),
-                *((_approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", 60),) if not advanced else ()),
+                fst(STRAIGHT_ARM_PULLDOWN, 60)
+                if advanced
+                else _approved_slot(STRAIGHT_ARM_PULLDOWN, "large_isolation", 60),
+                _approved_slot(
+                    ROPE_TRICEPS_PUSHDOWN if advanced else TRICEPS_PUSHDOWN,
+                    "small_main",
+                    _advanced_rest(level, 60, 90),
+                ),
+                *(
+                    (_approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", 60),)
+                    if not advanced
+                    else ()
+                ),
             ),
         ),
         (
-            "Legs", "lower", LEG_MUSCLES,
+            "Legs",
+            "lower",
+            LEG_MUSCLES,
             (
                 _approved_slot(FRONT_SQUAT if advanced else SQUAT, "large_primary", 150),
                 *(
@@ -3310,13 +3579,17 @@ def _fst7_arms_priority_5d(
                         _approved_slot(RDL, "large_compound", 120),
                     )
                 ),
-                fst(LEG_EXTENSION, 60) if advanced else _approved_slot(LEG_EXTENSION, "large_isolation", 60),
+                fst(LEG_EXTENSION, 60)
+                if advanced
+                else _approved_slot(LEG_EXTENSION, "large_isolation", 60),
                 _approved_slot(LYING_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)),
                 *((_approved_slot(CALF_RAISE, "small_isolation", 60),) if not advanced else ()),
             ),
         ),
         (
-            "Shoulders + Calves", "shoulders", SHOULDER_MUSCLES,
+            "Shoulders + Calves",
+            "shoulders",
+            SHOULDER_MUSCLES,
             (
                 _approved_slot(SMITH_SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
                 *(
@@ -3327,8 +3600,12 @@ def _fst7_arms_priority_5d(
                     )
                     if advanced
                     else (
-                        _approved_slot(LATERAL_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
-                        _approved_slot(REAR_DELT_FLY, "small_isolation", _advanced_rest(level, 60, 75)),
+                        _approved_slot(
+                            LATERAL_RAISE, "small_isolation", _advanced_rest(level, 60, 75)
+                        ),
+                        _approved_slot(
+                            REAR_DELT_FLY, "small_isolation", _advanced_rest(level, 60, 75)
+                        ),
                         _approved_slot(SHRUG, "small_isolation", _advanced_rest(level, 60, 75)),
                         _approved_slot(CALF_RAISE, "small_isolation", 60),
                     )
@@ -3336,12 +3613,18 @@ def _fst7_arms_priority_5d(
             ),
         ),
         (
-            "Arms", "arms", ARM_MUSCLES,
+            "Arms",
+            "arms",
+            ARM_MUSCLES,
             (
                 _approved_slot(BARBELL_CURL, "small_main", _advanced_rest(level, 60, 90)),
                 _approved_slot(ROPE_TRICEPS_PUSHDOWN, "small_main", _advanced_rest(level, 60, 90)),
-                fst(PREACHER_CURL, 45) if advanced else _approved_slot(CABLE_CURL, "small_isolation", 60),
-                _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)),
+                fst(PREACHER_CURL, 45)
+                if advanced
+                else _approved_slot(CABLE_CURL, "small_isolation", 60),
+                _approved_slot(
+                    OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)
+                ),
                 *((_approved_slot(HAMMER_CURL, "small_isolation", 60),) if not advanced else ()),
             ),
         ),
@@ -3354,16 +3637,28 @@ def _professional_compound_5d(
     advanced = level is Level.ADVANCED
     return (
         (
-            "Chest + Triceps", "upper", UPPER_MUSCLES_APPROVED,
+            "Chest + Triceps",
+            "upper",
+            UPPER_MUSCLES_APPROVED,
             (
                 _approved_slot(FLAT_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
+                _approved_slot(
+                    MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
                 _approved_slot(CHEST_FLY, "large_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(ROPE_TRICEPS_PUSHDOWN if advanced else TRICEPS_PUSHDOWN, "small_main", _advanced_rest(level, 60, 90)),
+                _approved_slot(
+                    ROPE_TRICEPS_PUSHDOWN if advanced else TRICEPS_PUSHDOWN,
+                    "small_main",
+                    _advanced_rest(level, 60, 90),
+                ),
             ),
         ),
         (
-            "Legs + Core", "lower", LEG_MUSCLES,
+            "Legs + Core",
+            "lower",
+            LEG_MUSCLES,
             (
                 _approved_slot(FRONT_SQUAT if advanced else SQUAT, "large_primary", 150),
                 *(
@@ -3384,19 +3679,31 @@ def _professional_compound_5d(
             ),
         ),
         (
-            "Back + Biceps", "upper", UPPER_MUSCLES_APPROVED,
+            "Back + Biceps",
+            "upper",
+            UPPER_MUSCLES_APPROVED,
             (
                 _approved_slot(LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(ROW, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(HIGH_ROW, "large_compound", _advanced_rest(level, 120, 120)),
                 _approved_slot(BARBELL_CURL, "small_main", _advanced_rest(level, 60, 90)),
-                _approved_slot(HAMMER_CURL if advanced else DUMBBELL_CURL, "small_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    HAMMER_CURL if advanced else DUMBBELL_CURL,
+                    "small_isolation",
+                    _advanced_rest(level, 60, 75),
+                ),
             ),
         ),
         (
-            "Shoulders", "shoulders", SHOULDER_MUSCLES,
+            "Shoulders",
+            "shoulders",
+            SHOULDER_MUSCLES,
             (
-                _approved_slot(SMITH_SHOULDER_PRESS if advanced else SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
+                _approved_slot(
+                    SMITH_SHOULDER_PRESS if advanced else SHOULDER_PRESS,
+                    "small_main",
+                    _advanced_rest(level, 90, 120),
+                ),
                 _approved_slot(
                     DUMBBELL_LATERAL_RAISE if not advanced else LATERAL_RAISE,
                     "small_isolation",
@@ -3407,7 +3714,9 @@ def _professional_compound_5d(
             ),
         ),
         (
-            "Compound Day", "full_body", _FULL_BODY_MUSCLES,
+            "Compound Day",
+            "full_body",
+            _FULL_BODY_MUSCLES,
             (
                 *(
                     (
@@ -3420,10 +3729,16 @@ def _professional_compound_5d(
                     if advanced
                     else (
                         _approved_slot(RDL, "large_primary", 150),
-                        _approved_slot(DUMBBELL_BENCH_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                        _approved_slot(SEATED_CABLE_ROW, "large_primary", _advanced_rest(level, 120, 150)),
+                        _approved_slot(
+                            DUMBBELL_BENCH_PRESS, "large_primary", _advanced_rest(level, 120, 150)
+                        ),
+                        _approved_slot(
+                            SEATED_CABLE_ROW, "large_primary", _advanced_rest(level, 120, 150)
+                        ),
                         _approved_slot(FRONT_SQUAT, "large_primary", 150),
-                        _approved_slot(SMITH_SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
+                        _approved_slot(
+                            SMITH_SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)
+                        ),
                     )
                 ),
             ),
@@ -3437,30 +3752,46 @@ def _ppl_ab_6d(
     advanced = level is Level.ADVANCED
     return (
         (
-            "Push A", "push", (M.CHEST, M.SHOULDERS, M.TRICEPS),
+            "Push A",
+            "push",
+            (M.CHEST, M.SHOULDERS, M.TRICEPS),
             (
                 _approved_slot(FLAT_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                *((
-                    _approved_slot(CHEST_FLY, "large_isolation", 75),
-                ) if advanced else ()),
+                _approved_slot(
+                    MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
+                *((_approved_slot(CHEST_FLY, "large_isolation", 75),) if advanced else ()),
                 *((_approved_slot(SHOULDER_PRESS, "small_main", 90),) if not advanced else ()),
                 _approved_slot(LATERAL_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(ROPE_TRICEPS_PUSHDOWN if advanced else TRICEPS_PUSHDOWN, "small_main", _advanced_rest(level, 60, 90)),
+                _approved_slot(
+                    ROPE_TRICEPS_PUSHDOWN if advanced else TRICEPS_PUSHDOWN,
+                    "small_main",
+                    _advanced_rest(level, 60, 90),
+                ),
             ),
         ),
         (
-            "Pull A", "pull", (M.BACK, M.BICEPS, M.TRAPS),
+            "Pull A",
+            "pull",
+            (M.BACK, M.BICEPS, M.TRAPS),
             (
                 _approved_slot(LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(HIGH_ROW, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(REAR_DELT_FLY, "small_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(BARBELL_CURL if advanced else DUMBBELL_CURL, "small_main", _advanced_rest(level, 60, 90)),
+                _approved_slot(
+                    BARBELL_CURL if advanced else DUMBBELL_CURL,
+                    "small_main",
+                    _advanced_rest(level, 60, 90),
+                ),
                 _approved_slot(SHRUG, "small_isolation", _advanced_rest(level, 60, 75)),
             ),
         ),
         (
-            "Legs A", "lower", LEG_MUSCLES,
+            "Legs A",
+            "lower",
+            LEG_MUSCLES,
             (
                 _approved_slot(SQUAT, "large_primary", 150),
                 _approved_slot(LEG_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
@@ -3475,32 +3806,66 @@ def _ppl_ab_6d(
             ),
         ),
         (
-            "Push B", "push", (M.CHEST, M.SHOULDERS, M.TRICEPS),
+            "Push B",
+            "push",
+            (M.CHEST, M.SHOULDERS, M.TRICEPS),
             (
                 _approved_slot(SMITH_SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
-                _approved_slot(DUMBBELL_BENCH_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(CHEST_FLY if advanced else MACHINE_INCLINE_PRESS, "large_isolation" if advanced else "large_primary", _advanced_rest(level, 60, 75) if advanced else _advanced_rest(level, 120, 150)),
-                _approved_slot(DUMBBELL_LATERAL_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_main", _advanced_rest(level, 60, 90)),
+                _approved_slot(
+                    DUMBBELL_BENCH_PRESS, "large_primary", _advanced_rest(level, 120, 150)
+                ),
+                _approved_slot(
+                    CHEST_FLY if advanced else MACHINE_INCLINE_PRESS,
+                    "large_isolation" if advanced else "large_primary",
+                    _advanced_rest(level, 60, 75) if advanced else _advanced_rest(level, 120, 150),
+                ),
+                _approved_slot(
+                    DUMBBELL_LATERAL_RAISE, "small_isolation", _advanced_rest(level, 60, 75)
+                ),
+                _approved_slot(
+                    OVERHEAD_TRICEPS_EXTENSION, "small_main", _advanced_rest(level, 60, 90)
+                ),
             ),
         ),
         (
-            "Pull B", "pull", (M.BACK, M.BICEPS, M.SHOULDERS),
+            "Pull B",
+            "pull",
+            (M.BACK, M.BICEPS, M.SHOULDERS),
             (
-                _approved_slot(SEATED_CABLE_ROW if not advanced else ROW, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(ROW if not advanced else SEATED_CABLE_ROW, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(STRAIGHT_ARM_PULLDOWN, "large_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    SEATED_CABLE_ROW if not advanced else ROW,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
+                _approved_slot(
+                    ROW if not advanced else SEATED_CABLE_ROW,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
+                _approved_slot(
+                    STRAIGHT_ARM_PULLDOWN, "large_isolation", _advanced_rest(level, 60, 75)
+                ),
                 _approved_slot(HAMMER_CURL, "small_main", _advanced_rest(level, 60, 90)),
                 _approved_slot(REAR_DELT_FLY, "small_isolation", _advanced_rest(level, 60, 75)),
             ),
         ),
         (
-            "Legs B", "lower", LEG_MUSCLES,
+            "Legs B",
+            "lower",
+            LEG_MUSCLES,
             (
                 _approved_slot(RDL, "large_primary", 150),
                 _approved_slot(LYING_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(FRONT_SQUAT if advanced else GLUTE_BRIDGE, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(GLUTE_BRIDGE if advanced else FRONT_SQUAT, "large_compound", _advanced_rest(level, 120, 120)),
+                _approved_slot(
+                    FRONT_SQUAT if advanced else GLUTE_BRIDGE,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
+                _approved_slot(
+                    GLUTE_BRIDGE if advanced else FRONT_SQUAT,
+                    "large_compound",
+                    _advanced_rest(level, 120, 120),
+                ),
                 _approved_slot(LUNGE, "large_compound", 120),
                 _approved_slot(CALF_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
             ),
@@ -3517,10 +3882,21 @@ def _upper_lower_x3_6d(
         _approved_slot(ROW, "large_primary", _advanced_rest(level, 120, 150)),
         _approved_slot(SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
         _approved_slot(LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
-        *((_approved_slot(BARBELL_CURL, "small_main", 60), _approved_slot(TRICEPS_PUSHDOWN, "small_main", 60)) if not advanced else ()),
+        *(
+            (
+                _approved_slot(BARBELL_CURL, "small_main", 60),
+                _approved_slot(TRICEPS_PUSHDOWN, "small_main", 60),
+            )
+            if not advanced
+            else ()
+        ),
     )
     upper_b = (
-        _approved_slot(MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
+        _approved_slot(
+            MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS,
+            "large_primary",
+            _advanced_rest(level, 120, 150),
+        ),
         _approved_slot(SEATED_CABLE_ROW, "large_primary", _advanced_rest(level, 120, 150)),
         _approved_slot(HIGH_ROW, "large_primary", _advanced_rest(level, 120, 150)),
         _approved_slot(
@@ -3529,19 +3905,56 @@ def _upper_lower_x3_6d(
             _advanced_rest(level, 60, 75),
             intensity_method=_level_method(level, Method.DROP_SET),
         ),
-        *((_approved_slot(PREACHER_CURL, "small_main", 60), _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_main", 60)) if not advanced else ()),
-        *((_approved_slot(PREACHER_CURL, "small_main", 90), _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_main", 90)) if advanced else ()),
+        *(
+            (
+                _approved_slot(PREACHER_CURL, "small_main", 60),
+                _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_main", 60),
+            )
+            if not advanced
+            else ()
+        ),
+        *(
+            (
+                _approved_slot(PREACHER_CURL, "small_main", 90),
+                _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_main", 90),
+            )
+            if advanced
+            else ()
+        ),
     )
     upper_c = (
         _approved_slot(DUMBBELL_BENCH_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
         _approved_slot(LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
         _approved_slot(SMITH_SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
         _approved_slot(STRAIGHT_ARM_PULLDOWN, "large_isolation", _advanced_rest(level, 60, 75)),
-        *((_approved_slot(HAMMER_CURL, "small_main", 60), _approved_slot(ROPE_TRICEPS_PUSHDOWN, "small_main", 60)) if not advanced else ()),
-        *((
-            _approved_slot(CABLE_CURL, "superset", 90, intensity_method=Method.SUPERSET, superset_group="SS-A"),
-            _approved_slot(ROPE_TRICEPS_PUSHDOWN, "superset", 90, intensity_method=Method.SUPERSET, superset_group="SS-A"),
-        ) if advanced else ()),
+        *(
+            (
+                _approved_slot(HAMMER_CURL, "small_main", 60),
+                _approved_slot(ROPE_TRICEPS_PUSHDOWN, "small_main", 60),
+            )
+            if not advanced
+            else ()
+        ),
+        *(
+            (
+                _approved_slot(
+                    CABLE_CURL,
+                    "superset",
+                    90,
+                    intensity_method=Method.SUPERSET,
+                    superset_group="SS-A",
+                ),
+                _approved_slot(
+                    ROPE_TRICEPS_PUSHDOWN,
+                    "superset",
+                    90,
+                    intensity_method=Method.SUPERSET,
+                    superset_group="SS-A",
+                ),
+            )
+            if advanced
+            else ()
+        ),
     )
     lower_a = (
         _approved_slot(SQUAT, "large_primary", 150),
@@ -3581,17 +3994,27 @@ def _fitclub_hybrid_6d(
     advanced = level is Level.ADVANCED
     return (
         (
-            "Chest + Triceps", "upper", (M.CHEST, M.TRICEPS),
+            "Chest + Triceps",
+            "upper",
+            (M.CHEST, M.TRICEPS),
             (
                 _approved_slot(FLAT_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(CHEST_FLY, "large_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(ROPE_TRICEPS_PUSHDOWN if advanced else TRICEPS_PUSHDOWN, "small_main", _advanced_rest(level, 60, 90)),
-                _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    ROPE_TRICEPS_PUSHDOWN if advanced else TRICEPS_PUSHDOWN,
+                    "small_main",
+                    _advanced_rest(level, 60, 90),
+                ),
+                _approved_slot(
+                    OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)
+                ),
             ),
         ),
         (
-            "Back + Biceps", "upper", (M.BACK, M.BICEPS),
+            "Back + Biceps",
+            "upper",
+            (M.BACK, M.BICEPS),
             (
                 _approved_slot(ROW, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
@@ -3601,7 +4024,9 @@ def _fitclub_hybrid_6d(
             ),
         ),
         (
-            "Legs", "lower", LEG_MUSCLES,
+            "Legs",
+            "lower",
+            LEG_MUSCLES,
             (
                 _approved_slot(SQUAT, "large_primary", 150),
                 _approved_slot(LEG_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
@@ -3611,7 +4036,9 @@ def _fitclub_hybrid_6d(
             ),
         ),
         (
-            "Shoulders + Core", "shoulders", SHOULDER_MUSCLES,
+            "Shoulders + Core",
+            "shoulders",
+            SHOULDER_MUSCLES,
             (
                 _approved_slot(SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
                 _approved_slot(LATERAL_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
@@ -3621,14 +4048,30 @@ def _fitclub_hybrid_6d(
             ),
         ),
         (
-            "Chest + Back", "upper", CHEST_BACK_MUSCLES,
+            "Chest + Back",
+            "upper",
+            CHEST_BACK_MUSCLES,
             (
-                _approved_slot(MACHINE_CHEST_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
+                _approved_slot(
+                    MACHINE_CHEST_PRESS, "large_primary", _advanced_rest(level, 120, 150)
+                ),
                 _approved_slot(SEATED_CABLE_ROW, "large_primary", _advanced_rest(level, 120, 150)),
                 *(
                     (
-                        _approved_slot(CHEST_FLY, "superset", 90, intensity_method=Method.SUPERSET, superset_group="SS-A"),
-                        _approved_slot(STRAIGHT_ARM_PULLDOWN, "superset", 90, intensity_method=Method.SUPERSET, superset_group="SS-A"),
+                        _approved_slot(
+                            CHEST_FLY,
+                            "superset",
+                            90,
+                            intensity_method=Method.SUPERSET,
+                            superset_group="SS-A",
+                        ),
+                        _approved_slot(
+                            STRAIGHT_ARM_PULLDOWN,
+                            "superset",
+                            90,
+                            intensity_method=Method.SUPERSET,
+                            superset_group="SS-A",
+                        ),
                         _approved_slot(MACHINE_INCLINE_PRESS, "large_primary", 150),
                         _approved_slot(LAT_PULLDOWN, "large_primary", 150),
                     )
@@ -3643,7 +4086,9 @@ def _fitclub_hybrid_6d(
             ),
         ),
         (
-            "Posterior + Core", "lower", POSTERIOR_MUSCLES,
+            "Posterior + Core",
+            "lower",
+            POSTERIOR_MUSCLES,
             (
                 _approved_slot(RDL, "large_primary", 150),
                 _approved_slot(LYING_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)),
@@ -3665,10 +4110,34 @@ def _arnold_split_6d(
         _approved_slot(ROW, "large_primary", _advanced_rest(level, 120, 150)),
         *(
             (
-                _approved_slot(INCLINE_PRESS, "superset", 120, intensity_method=Method.SUPERSET, superset_group="SS-A"),
-                _approved_slot(LAT_PULLDOWN, "superset", 120, intensity_method=Method.SUPERSET, superset_group="SS-A"),
-                _approved_slot(CHEST_FLY, "superset", 90, intensity_method=Method.SUPERSET, superset_group="SS-B"),
-                _approved_slot(STRAIGHT_ARM_PULLDOWN, "superset", 90, intensity_method=Method.SUPERSET, superset_group="SS-B"),
+                _approved_slot(
+                    INCLINE_PRESS,
+                    "superset",
+                    120,
+                    intensity_method=Method.SUPERSET,
+                    superset_group="SS-A",
+                ),
+                _approved_slot(
+                    LAT_PULLDOWN,
+                    "superset",
+                    120,
+                    intensity_method=Method.SUPERSET,
+                    superset_group="SS-A",
+                ),
+                _approved_slot(
+                    CHEST_FLY,
+                    "superset",
+                    90,
+                    intensity_method=Method.SUPERSET,
+                    superset_group="SS-B",
+                ),
+                _approved_slot(
+                    STRAIGHT_ARM_PULLDOWN,
+                    "superset",
+                    90,
+                    intensity_method=Method.SUPERSET,
+                    superset_group="SS-B",
+                ),
             )
             if advanced
             else (
@@ -3685,8 +4154,20 @@ def _arnold_split_6d(
         _approved_slot(REAR_DELT_FLY, "small_isolation", _advanced_rest(level, 60, 75)),
         *(
             (
-                _approved_slot(BARBELL_CURL, "superset", 90, intensity_method=Method.SUPERSET, superset_group="SS-A"),
-                _approved_slot(ROPE_TRICEPS_PUSHDOWN, "superset", 90, intensity_method=Method.SUPERSET, superset_group="SS-A"),
+                _approved_slot(
+                    BARBELL_CURL,
+                    "superset",
+                    90,
+                    intensity_method=Method.SUPERSET,
+                    superset_group="SS-A",
+                ),
+                _approved_slot(
+                    ROPE_TRICEPS_PUSHDOWN,
+                    "superset",
+                    90,
+                    intensity_method=Method.SUPERSET,
+                    superset_group="SS-A",
+                ),
             )
             if advanced
             else (
@@ -3701,8 +4182,20 @@ def _arnold_split_6d(
         _approved_slot(SEATED_CABLE_ROW, "large_primary", _advanced_rest(level, 120, 150)),
         *(
             (
-                _approved_slot(MACHINE_INCLINE_PRESS, "superset", 120, intensity_method=Method.SUPERSET, superset_group="SS-A"),
-                _approved_slot(HIGH_ROW, "superset", 120, intensity_method=Method.SUPERSET, superset_group="SS-A"),
+                _approved_slot(
+                    MACHINE_INCLINE_PRESS,
+                    "superset",
+                    120,
+                    intensity_method=Method.SUPERSET,
+                    superset_group="SS-A",
+                ),
+                _approved_slot(
+                    HIGH_ROW,
+                    "superset",
+                    120,
+                    intensity_method=Method.SUPERSET,
+                    superset_group="SS-A",
+                ),
                 _approved_slot(CHEST_FLY, "large_isolation", 75),
                 _approved_slot(LAT_PULLDOWN, "large_compound", 120),
             )
@@ -3717,11 +4210,27 @@ def _arnold_split_6d(
     )
     day5 = (
         _approved_slot(SMITH_SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
-        _approved_slot(LEVER_LATERAL_RAISE if advanced else DUMBBELL_LATERAL_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
+        _approved_slot(
+            LEVER_LATERAL_RAISE if advanced else DUMBBELL_LATERAL_RAISE,
+            "small_isolation",
+            _advanced_rest(level, 60, 75),
+        ),
         *(
             (
-                _approved_slot(PREACHER_CURL, "superset", 90, intensity_method=Method.SUPERSET, superset_group="SS-A"),
-                _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "superset", 90, intensity_method=Method.SUPERSET, superset_group="SS-A"),
+                _approved_slot(
+                    PREACHER_CURL,
+                    "superset",
+                    90,
+                    intensity_method=Method.SUPERSET,
+                    superset_group="SS-A",
+                ),
+                _approved_slot(
+                    OVERHEAD_TRICEPS_EXTENSION,
+                    "superset",
+                    90,
+                    intensity_method=Method.SUPERSET,
+                    superset_group="SS-A",
+                ),
                 _approved_slot(HAMMER_CURL, "small_main", 90),
             )
             if advanced
@@ -3744,12 +4253,17 @@ def _arnold_split_6d(
     return (
         ("Chest + Back A", "upper", CHEST_BACK_MUSCLES, day1),
         ("Shoulders + Arms A", "upper", SHOULDERS_ARMS_MUSCLES, day2),
-        ("Legs A", "lower", LEG_MUSCLES, (
-            _approved_slot(SQUAT, "large_primary", 150),
-            _approved_slot(LEG_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-            _approved_slot(SEATED_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)),
-            _approved_slot(CALF_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
-        )),
+        (
+            "Legs A",
+            "lower",
+            LEG_MUSCLES,
+            (
+                _approved_slot(SQUAT, "large_primary", 150),
+                _approved_slot(LEG_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
+                _approved_slot(SEATED_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(CALF_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
+            ),
+        ),
         ("Chest + Back B", "upper", CHEST_BACK_MUSCLES, day4),
         ("Shoulders + Arms B", "upper", SHOULDERS_ARMS_MUSCLES, day5),
         ("Legs B", "lower", LEG_MUSCLES, day6),
@@ -3762,55 +4276,106 @@ def _classic_six_body_part_6d(
     advanced = level is Level.ADVANCED
     return (
         (
-            "Chest", "chest", CHEST_MUSCLES,
+            "Chest",
+            "chest",
+            CHEST_MUSCLES,
             (
                 _approved_slot(FLAT_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(DUMBBELL_BENCH_PRESS if advanced else MACHINE_CHEST_PRESS, "large_compound", _advanced_rest(level, 120, 120)),
-                _approved_slot(CHEST_FLY, "large_isolation", _advanced_rest(level, 60, 75), intensity_method=_level_method(level, Method.DROP_SET)),
+                _approved_slot(
+                    MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
+                _approved_slot(
+                    DUMBBELL_BENCH_PRESS if advanced else MACHINE_CHEST_PRESS,
+                    "large_compound",
+                    _advanced_rest(level, 120, 120),
+                ),
+                _approved_slot(
+                    CHEST_FLY,
+                    "large_isolation",
+                    _advanced_rest(level, 60, 75),
+                    intensity_method=_level_method(level, Method.DROP_SET),
+                ),
             ),
         ),
         (
-            "Biceps", "arms", (M.BICEPS,),
+            "Biceps",
+            "arms",
+            (M.BICEPS,),
             (
                 _approved_slot(BARBELL_CURL, "small_main", _advanced_rest(level, 60, 90)),
                 _approved_slot(PREACHER_CURL, "small_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(HAMMER_CURL if not advanced else CABLE_CURL, "small_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(CABLE_CURL if not advanced else HAMMER_CURL, "small_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    HAMMER_CURL if not advanced else CABLE_CURL,
+                    "small_isolation",
+                    _advanced_rest(level, 60, 75),
+                ),
+                _approved_slot(
+                    CABLE_CURL if not advanced else HAMMER_CURL,
+                    "small_isolation",
+                    _advanced_rest(level, 60, 75),
+                ),
             ),
         ),
         (
-            "Legs", "lower", LEG_MUSCLES,
+            "Legs",
+            "lower",
+            LEG_MUSCLES,
             (
                 _approved_slot(FRONT_SQUAT if advanced else SQUAT, "large_primary", 150),
                 _approved_slot(LEG_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(RDL, "large_compound", 120),
-                _approved_slot(LYING_LEG_CURL if advanced else SEATED_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    LYING_LEG_CURL if advanced else SEATED_LEG_CURL,
+                    "large_isolation",
+                    _advanced_rest(level, 60, 75),
+                ),
                 _approved_slot(CALF_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
             ),
         ),
         (
-            "Triceps", "arms", (M.TRICEPS,),
+            "Triceps",
+            "arms",
+            (M.TRICEPS,),
             (
                 _approved_slot(TRICEPS_PUSHDOWN, "small_main", _advanced_rest(level, 60, 90)),
-                _approved_slot(ROPE_TRICEPS_PUSHDOWN, "small_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    ROPE_TRICEPS_PUSHDOWN, "small_isolation", _advanced_rest(level, 60, 75)
+                ),
+                _approved_slot(
+                    OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)
+                ),
             ),
         ),
         (
-            "Back", "back", BACK_MUSCLES,
+            "Back",
+            "back",
+            BACK_MUSCLES,
             (
                 _approved_slot(ROW, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(SEATED_CABLE_ROW, "large_compound", _advanced_rest(level, 120, 120)),
-                *((_approved_slot(HIGH_ROW, "large_compound", _advanced_rest(level, 120, 120)),) if not advanced else ()),
-                _approved_slot(STRAIGHT_ARM_PULLDOWN, "large_isolation", _advanced_rest(level, 60, 75)),
+                *(
+                    (_approved_slot(HIGH_ROW, "large_compound", _advanced_rest(level, 120, 120)),)
+                    if not advanced
+                    else ()
+                ),
+                _approved_slot(
+                    STRAIGHT_ARM_PULLDOWN, "large_isolation", _advanced_rest(level, 60, 75)
+                ),
             ),
         ),
         (
-            "Shoulders", "shoulders", SHOULDER_MUSCLES,
+            "Shoulders",
+            "shoulders",
+            SHOULDER_MUSCLES,
             (
-                _approved_slot(SMITH_SHOULDER_PRESS if advanced else SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
+                _approved_slot(
+                    SMITH_SHOULDER_PRESS if advanced else SHOULDER_PRESS,
+                    "small_main",
+                    _advanced_rest(level, 90, 120),
+                ),
                 _approved_slot(LATERAL_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
                 _approved_slot(REAR_DELT_FLY, "small_isolation", _advanced_rest(level, 60, 75)),
                 _approved_slot(SHRUG, "small_isolation", _advanced_rest(level, 60, 75)),
@@ -3825,17 +4390,25 @@ def _ronnie_double_exposure_6d(
     advanced = level is Level.ADVANCED
     return (
         (
-            "Back + Biceps + Shoulders A", "upper", (M.BACK, M.BICEPS, M.SHOULDERS),
+            "Back + Biceps + Shoulders A",
+            "upper",
+            (M.BACK, M.BICEPS, M.SHOULDERS),
             (
                 _approved_slot(LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(ROW, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(REAR_DELT_FLY, "small_isolation", _advanced_rest(level, 60, 75)),
-                _approved_slot(BARBELL_CURL if advanced else DUMBBELL_CURL, "small_main", _advanced_rest(level, 60, 90)),
+                _approved_slot(
+                    BARBELL_CURL if advanced else DUMBBELL_CURL,
+                    "small_main",
+                    _advanced_rest(level, 60, 90),
+                ),
                 _approved_slot(LATERAL_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
             ),
         ),
         (
-            "Legs A", "lower", LEG_MUSCLES,
+            "Legs A",
+            "lower",
+            LEG_MUSCLES,
             (
                 _approved_slot(SQUAT, "large_primary", 150),
                 _approved_slot(LEG_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
@@ -3845,42 +4418,73 @@ def _ronnie_double_exposure_6d(
             ),
         ),
         (
-            "Chest + Triceps A", "upper", (M.CHEST, M.TRICEPS),
+            "Chest + Triceps A",
+            "upper",
+            (M.CHEST, M.TRICEPS),
             (
                 _approved_slot(FLAT_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
+                _approved_slot(
+                    MACHINE_INCLINE_PRESS if advanced else INCLINE_PRESS,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
                 _approved_slot(CHEST_FLY, "large_isolation", _advanced_rest(level, 60, 75)),
                 _approved_slot(TRICEPS_PUSHDOWN, "small_main", _advanced_rest(level, 60, 90)),
-                _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)
+                ),
             ),
         ),
         (
-            "Back + Biceps + Shoulders B", "upper", (M.BACK, M.BICEPS, M.SHOULDERS),
+            "Back + Biceps + Shoulders B",
+            "upper",
+            (M.BACK, M.BICEPS, M.SHOULDERS),
             (
                 _approved_slot(SEATED_CABLE_ROW, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(HIGH_ROW, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(STRAIGHT_ARM_PULLDOWN, "large_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    STRAIGHT_ARM_PULLDOWN, "large_isolation", _advanced_rest(level, 60, 75)
+                ),
                 _approved_slot(HAMMER_CURL, "small_main", _advanced_rest(level, 60, 90)),
                 _approved_slot(SMITH_SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
-                *((_approved_slot(LATERAL_RAISE, "small_isolation", _advanced_rest(level, 60, 75), intensity_method=Method.DROP_SET),) if advanced else ()),
+                *(
+                    (
+                        _approved_slot(
+                            LATERAL_RAISE,
+                            "small_isolation",
+                            _advanced_rest(level, 60, 75),
+                            intensity_method=Method.DROP_SET,
+                        ),
+                    )
+                    if advanced
+                    else ()
+                ),
             ),
         ),
         (
-            "Legs B", "lower", LEG_MUSCLES,
+            "Legs B",
+            "lower",
+            LEG_MUSCLES,
             (
                 _approved_slot(RDL, "large_primary", 150),
                 *(
                     (_approved_slot(FRONT_SQUAT, "large_primary", 150),)
                     if advanced
                     else (
-                        _approved_slot(LYING_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)),
-                        _approved_slot(GLUTE_BRIDGE, "large_primary", _advanced_rest(level, 120, 120)),
+                        _approved_slot(
+                            LYING_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)
+                        ),
+                        _approved_slot(
+                            GLUTE_BRIDGE, "large_primary", _advanced_rest(level, 120, 120)
+                        ),
                         _approved_slot(FRONT_SQUAT, "large_compound", 120),
                     )
                 ),
                 *(
                     (
-                        _approved_slot(LYING_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)),
+                        _approved_slot(
+                            LYING_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)
+                        ),
                         _approved_slot(GLUTE_BRIDGE, "large_compound", 120),
                     )
                     if advanced
@@ -3891,13 +4495,23 @@ def _ronnie_double_exposure_6d(
             ),
         ),
         (
-            "Chest + Triceps B", "upper", (M.CHEST, M.TRICEPS),
+            "Chest + Triceps B",
+            "upper",
+            (M.CHEST, M.TRICEPS),
             (
-                _approved_slot(DUMBBELL_BENCH_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(INCLINE_PRESS if advanced else MACHINE_INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
+                _approved_slot(
+                    DUMBBELL_BENCH_PRESS, "large_primary", _advanced_rest(level, 120, 150)
+                ),
+                _approved_slot(
+                    INCLINE_PRESS if advanced else MACHINE_INCLINE_PRESS,
+                    "large_primary",
+                    _advanced_rest(level, 120, 150),
+                ),
                 _approved_slot(CHEST_FLY, "large_isolation", _advanced_rest(level, 60, 75)),
                 _approved_slot(ROPE_TRICEPS_PUSHDOWN, "small_main", _advanced_rest(level, 60, 90)),
-                _approved_slot(OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)),
+                _approved_slot(
+                    OVERHEAD_TRICEPS_EXTENSION, "small_isolation", _advanced_rest(level, 60, 75)
+                ),
             ),
         ),
     )
@@ -3935,6 +4549,70 @@ def _catalog_seed_from_definition(
 
 
 APPROVED_STRUCTURE_SEEDS = (
+    TrainingProgramStructureSeed(
+        "4d-iranmuscle-body-part",
+        "IRANMUSCLE 4-Day Body-Part Split",
+        "تقسیم عضله‌ای ۴ روزه ایران ماسل",
+        4,
+        StructureFamily.SPLIT,
+        StructureSplitType.BODY_PART,
+        "Approved four-day IRANMUSCLE body-part split.",
+        "تقسیم عضله‌ای چهارروزه ایران ماسل تأییدشده.",
+        (
+            ("lower", "Quads + Calves", "جلو پا + ساق"),
+            ("upper", "Chest + Triceps", "سینه + پشت بازو"),
+            ("upper", "Back + Biceps", "پشت + جلو بازو"),
+            ("shoulders", "Shoulders + Hamstrings", "سرشانه + پشت پا"),
+        ),
+    ),
+    TrainingProgramStructureSeed(
+        "4d-gymextreme-body-part",
+        "GymExtreme 4-Day Advanced Split",
+        "تقسیم پیشرفته ۴ روزه جیم اکستریم",
+        4,
+        StructureFamily.SPLIT,
+        StructureSplitType.BODY_PART,
+        "Approved four-day GymExtreme advanced split.",
+        "تقسیم پیشرفته چهارروزه جیم اکستریم تأییدشده.",
+        (
+            ("lower", "Quad-Focused Legs", "پا با تأکید چهارسر"),
+            ("upper", "Chest + Shoulders", "سینه + سرشانه"),
+            ("upper", "Back + Biceps + Triceps", "پشت + جلو بازو + پشت بازو"),
+            ("lower", "Posterior Chain", "پشت پا + زنجیره خلفی"),
+        ),
+    ),
+    TrainingProgramStructureSeed(
+        "4d-arnoldsho-classic-body-part",
+        "Arnoldsho 4-Day Classic Body-Part Split",
+        "تقسیم کلاسیک ۴ روزه آرنولدشو",
+        4,
+        StructureFamily.SPLIT,
+        StructureSplitType.BODY_PART,
+        "Approved four-day Arnoldsho classic body-part split.",
+        "تقسیم کلاسیک چهارروزه آرنولدشو تأییدشده.",
+        (
+            ("upper", "Chest + Triceps", "سینه + پشت بازو"),
+            ("upper", "Back + Biceps", "پشت + جلو بازو"),
+            ("shoulders", "Shoulders + Traps", "سرشانه + کول"),
+            ("lower", "Legs", "پا"),
+        ),
+    ),
+    TrainingProgramStructureSeed(
+        "4d-aloplay-body-part",
+        "Aloplay 4-Day Body-Part Split",
+        "تقسیم عضله‌ای ۴ روزه الوپلی",
+        4,
+        StructureFamily.SPLIT,
+        StructureSplitType.BODY_PART,
+        "Approved four-day Aloplay body-part split.",
+        "تقسیم عضله‌ای چهارروزه الوپلی تأییدشده.",
+        (
+            ("upper", "Chest + Triceps", "سینه + پشت بازو"),
+            ("lower", "Legs", "پا"),
+            ("upper", "Back + Biceps", "پشت + جلو بازو"),
+            ("upper", "Shoulders + Abs", "سرشانه + شکم"),
+        ),
+    ),
     TrainingProgramStructureSeed(
         "5d-classic-body-part-approved",
         "5-Day Classic Body-Part Split",
@@ -4149,37 +4827,132 @@ APPROVED_STRUCTURE_SEEDS = (
 
 
 _NEW_CATALOG_PROGRAM_BLUEPRINTS = (
-    ("p26-5-day-classic-body-part-intermediate", "5d-classic-body-part-approved", Level.INTERMEDIATE, _classic_body_part_5d),
-    ("p27-5-day-classic-body-part-advanced", "5d-classic-body-part-approved", Level.ADVANCED, _classic_body_part_5d),
-    ("p28-5-day-split-weak-point-intermediate", "5d-split-weak-point", Level.INTERMEDIATE, _split_weak_point_5d),
-    ("p29-5-day-split-weak-point-advanced", "5d-split-weak-point", Level.ADVANCED, _split_weak_point_5d),
-    ("p30-5-day-upper-priority-iranian-intermediate", "5d-upper-priority-iranian", Level.INTERMEDIATE, _upper_lower_iranian_5d),
-    ("p31-5-day-upper-priority-iranian-advanced", "5d-upper-priority-iranian", Level.ADVANCED, _upper_lower_iranian_5d),
-    ("p32-5-day-upper-lower-specialty-intermediate", "5d-upper-lower-specialty", Level.INTERMEDIATE, _upper_lower_specialty_5d),
-    ("p33-5-day-upper-lower-specialty-advanced", "5d-upper-lower-specialty", Level.ADVANCED, _upper_lower_specialty_5d),
-    ("p34-5-day-fst7-arms-priority-intermediate", "5d-fst7-arms-priority", Level.INTERMEDIATE, _fst7_arms_priority_5d),
-    ("p35-5-day-fst7-arms-priority-advanced", "5d-fst7-arms-priority", Level.ADVANCED, _fst7_arms_priority_5d),
-    ("p36-5-day-professional-compound-intermediate", "5d-professional-compound", Level.INTERMEDIATE, _professional_compound_5d),
-    ("p37-5-day-professional-compound-advanced", "5d-professional-compound", Level.ADVANCED, _professional_compound_5d),
+    (
+        "p26-5-day-classic-body-part-intermediate",
+        "5d-classic-body-part-approved",
+        Level.INTERMEDIATE,
+        _classic_body_part_5d,
+    ),
+    (
+        "p27-5-day-classic-body-part-advanced",
+        "5d-classic-body-part-approved",
+        Level.ADVANCED,
+        _classic_body_part_5d,
+    ),
+    (
+        "p28-5-day-split-weak-point-intermediate",
+        "5d-split-weak-point",
+        Level.INTERMEDIATE,
+        _split_weak_point_5d,
+    ),
+    (
+        "p29-5-day-split-weak-point-advanced",
+        "5d-split-weak-point",
+        Level.ADVANCED,
+        _split_weak_point_5d,
+    ),
+    (
+        "p30-5-day-upper-priority-iranian-intermediate",
+        "5d-upper-priority-iranian",
+        Level.INTERMEDIATE,
+        _upper_lower_iranian_5d,
+    ),
+    (
+        "p31-5-day-upper-priority-iranian-advanced",
+        "5d-upper-priority-iranian",
+        Level.ADVANCED,
+        _upper_lower_iranian_5d,
+    ),
+    (
+        "p32-5-day-upper-lower-specialty-intermediate",
+        "5d-upper-lower-specialty",
+        Level.INTERMEDIATE,
+        _upper_lower_specialty_5d,
+    ),
+    (
+        "p33-5-day-upper-lower-specialty-advanced",
+        "5d-upper-lower-specialty",
+        Level.ADVANCED,
+        _upper_lower_specialty_5d,
+    ),
+    (
+        "p34-5-day-fst7-arms-priority-intermediate",
+        "5d-fst7-arms-priority",
+        Level.INTERMEDIATE,
+        _fst7_arms_priority_5d,
+    ),
+    (
+        "p35-5-day-fst7-arms-priority-advanced",
+        "5d-fst7-arms-priority",
+        Level.ADVANCED,
+        _fst7_arms_priority_5d,
+    ),
+    (
+        "p36-5-day-professional-compound-intermediate",
+        "5d-professional-compound",
+        Level.INTERMEDIATE,
+        _professional_compound_5d,
+    ),
+    (
+        "p37-5-day-professional-compound-advanced",
+        "5d-professional-compound",
+        Level.ADVANCED,
+        _professional_compound_5d,
+    ),
     ("p38-6-day-ppl-ab-intermediate", "6d-ppl-2x", Level.INTERMEDIATE, _ppl_ab_6d),
     ("p39-6-day-ppl-ab-advanced", "6d-ppl-2x", Level.ADVANCED, _ppl_ab_6d),
-    ("p40-6-day-upper-lower-x3-intermediate", "6d-upper-lower-x3", Level.INTERMEDIATE, _upper_lower_x3_6d),
+    (
+        "p40-6-day-upper-lower-x3-intermediate",
+        "6d-upper-lower-x3",
+        Level.INTERMEDIATE,
+        _upper_lower_x3_6d,
+    ),
     ("p41-6-day-upper-lower-x3-advanced", "6d-upper-lower-x3", Level.ADVANCED, _upper_lower_x3_6d),
-    ("p42-6-day-fitclub-hybrid-intermediate", "6d-fitclub-hybrid", Level.INTERMEDIATE, _fitclub_hybrid_6d),
+    (
+        "p42-6-day-fitclub-hybrid-intermediate",
+        "6d-fitclub-hybrid",
+        Level.INTERMEDIATE,
+        _fitclub_hybrid_6d,
+    ),
     ("p43-6-day-fitclub-hybrid-advanced", "6d-fitclub-hybrid", Level.ADVANCED, _fitclub_hybrid_6d),
-    ("p44-6-day-arnold-split-intermediate", "6d-arnold-split", Level.INTERMEDIATE, _arnold_split_6d),
+    (
+        "p44-6-day-arnold-split-intermediate",
+        "6d-arnold-split",
+        Level.INTERMEDIATE,
+        _arnold_split_6d,
+    ),
     ("p45-6-day-arnold-split-advanced", "6d-arnold-split", Level.ADVANCED, _arnold_split_6d),
-    ("p46-6-day-classic-body-part-intermediate", "6d-classic-body-part", Level.INTERMEDIATE, _classic_six_body_part_6d),
-    ("p47-6-day-classic-body-part-advanced", "6d-classic-body-part", Level.ADVANCED, _classic_six_body_part_6d),
-    ("p48-6-day-ronnie-double-exposure-intermediate", "6d-ronnie-double-exposure", Level.INTERMEDIATE, _ronnie_double_exposure_6d),
-    ("p49-6-day-ronnie-double-exposure-advanced", "6d-ronnie-double-exposure", Level.ADVANCED, _ronnie_double_exposure_6d),
+    (
+        "p46-6-day-classic-body-part-intermediate",
+        "6d-classic-body-part",
+        Level.INTERMEDIATE,
+        _classic_six_body_part_6d,
+    ),
+    (
+        "p47-6-day-classic-body-part-advanced",
+        "6d-classic-body-part",
+        Level.ADVANCED,
+        _classic_six_body_part_6d,
+    ),
+    (
+        "p48-6-day-ronnie-double-exposure-intermediate",
+        "6d-ronnie-double-exposure",
+        Level.INTERMEDIATE,
+        _ronnie_double_exposure_6d,
+    ),
+    (
+        "p49-6-day-ronnie-double-exposure-advanced",
+        "6d-ronnie-double-exposure",
+        Level.ADVANCED,
+        _ronnie_double_exposure_6d,
+    ),
 )
 
 
 _BRANDED_4_DAY_PROGRAM_BLUEPRINTS = (
     (
         "p50-4-day-iranmuscle-intermediate",
-        "4d-upper-lower-2x",
+        "4d-iranmuscle-body-part",
         Level.INTERMEDIATE,
         "IRANMUSCLE 4-Day Intermediate",
         "ایران ماسل - برنامه ۴ روزه متوسط",
@@ -4235,7 +5008,7 @@ _BRANDED_4_DAY_PROGRAM_BLUEPRINTS = (
     ),
     (
         "p51-4-day-gymextreme-advanced",
-        "4d-upper-lower-2x",
+        "4d-gymextreme-body-part",
         Level.ADVANCED,
         "GymExtreme 4-Day Advanced",
         "جیم اکستریم - برنامه ۴ روزه پیشرفته",
@@ -4296,7 +5069,7 @@ _BRANDED_4_DAY_PROGRAM_BLUEPRINTS = (
     ),
     (
         "p52-4-day-arnoldsho-advanced",
-        "4d-3-upper-1-lower",
+        "4d-arnoldsho-classic-body-part",
         Level.ADVANCED,
         "Arnoldsho 4-Day Advanced",
         "آرنولدشو - برنامه ۴ روزه پیشرفته",
@@ -4353,7 +5126,7 @@ _BRANDED_4_DAY_PROGRAM_BLUEPRINTS = (
     ),
     (
         "p53-4-day-aloplay-intermediate",
-        "4d-upper-lower-2x",
+        "4d-aloplay-body-part",
         Level.INTERMEDIATE,
         "Aloplay 4-Day Intermediate",
         "الوپلی - برنامه ۴ روزه متوسط",

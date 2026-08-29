@@ -39,7 +39,7 @@ class TrainingTemplateSeedResult:
 
 
 _CATALOG_STATE_KEY = "canonical"
-_CATALOG_REVISION = 6
+_CATALOG_REVISION = 7
 
 
 def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
@@ -322,9 +322,7 @@ def _current_seed_result(db: Session) -> TrainingTemplateSeedResult:
     seeded_slugs = tuple(seed.slug for seed in TRAINING_PROGRAM_TEMPLATE_SEEDS)
     template_filter = TrainingProgramTemplate.slug.in_(seeded_slugs)
     templates = (
-        db.scalar(
-            select(func.count()).select_from(TrainingProgramTemplate).where(template_filter)
-        )
+        db.scalar(select(func.count()).select_from(TrainingProgramTemplate).where(template_filter))
         or 0
     )
     slot_statement = (
@@ -334,12 +332,12 @@ def _current_seed_result(db: Session) -> TrainingTemplateSeedResult:
         .join(TrainingProgramTemplate)
         .where(template_filter)
     )
-    linked_slots = db.scalar(
-        slot_statement.where(TrainingProgramTemplateSlot.exercise_id.is_not(None))
-    ) or 0
-    placeholder_slots = db.scalar(
-        slot_statement.where(TrainingProgramTemplateSlot.exercise_id.is_(None))
-    ) or 0
+    linked_slots = (
+        db.scalar(slot_statement.where(TrainingProgramTemplateSlot.exercise_id.is_not(None))) or 0
+    )
+    placeholder_slots = (
+        db.scalar(slot_statement.where(TrainingProgramTemplateSlot.exercise_id.is_(None))) or 0
+    )
     return TrainingTemplateSeedResult(
         templates=templates,
         linked_slots=linked_slots,

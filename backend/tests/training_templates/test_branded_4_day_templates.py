@@ -7,6 +7,9 @@ from app.exercises.enums import ExerciseContentType
 from app.exercises.models import Exercise
 from app.profile.enums import ExperienceLevel
 from app.training_templates.models import (
+    StructureFamily,
+    StructureSplitType,
+    TrainingProgramStructure,
     TrainingProgramTemplate,
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
@@ -296,3 +299,108 @@ def test_four_branded_templates_are_idempotent_and_keep_zero_placeholders(db: Se
     assert first.placeholder_slots == 0
     assert second.placeholder_slots == 0
     assert second_counts == first_counts == (4, 83)
+
+
+EXPECTED_BRANDED_STRUCTURES = {
+    "4d-iranmuscle-body-part": (
+        "IRANMUSCLE 4-Day Body-Part Split",
+        "تقسیم عضله‌ای ۴ روزه ایران ماسل",
+        (
+            ("lower", "Quads + Calves", "جلو پا + ساق"),
+            ("upper", "Chest + Triceps", "سینه + پشت بازو"),
+            ("upper", "Back + Biceps", "پشت + جلو بازو"),
+            ("shoulders", "Shoulders + Hamstrings", "سرشانه + پشت پا"),
+        ),
+    ),
+    "4d-gymextreme-body-part": (
+        "GymExtreme 4-Day Advanced Split",
+        "تقسیم پیشرفته ۴ روزه جیم اکستریم",
+        (
+            ("lower", "Quad-Focused Legs", "پا با تأکید چهارسر"),
+            ("upper", "Chest + Shoulders", "سینه + سرشانه"),
+            ("upper", "Back + Biceps + Triceps", "پشت + جلو بازو + پشت بازو"),
+            ("lower", "Posterior Chain", "پشت پا + زنجیره خلفی"),
+        ),
+    ),
+    "4d-arnoldsho-classic-body-part": (
+        "Arnoldsho 4-Day Classic Body-Part Split",
+        "تقسیم کلاسیک ۴ روزه آرنولدشو",
+        (
+            ("upper", "Chest + Triceps", "سینه + پشت بازو"),
+            ("upper", "Back + Biceps", "پشت + جلو بازو"),
+            ("shoulders", "Shoulders + Traps", "سرشانه + کول"),
+            ("lower", "Legs", "پا"),
+        ),
+    ),
+    "4d-aloplay-body-part": (
+        "Aloplay 4-Day Body-Part Split",
+        "تقسیم عضله‌ای ۴ روزه الوپلی",
+        (
+            ("upper", "Chest + Triceps", "سینه + پشت بازو"),
+            ("lower", "Legs", "پا"),
+            ("upper", "Back + Biceps", "پشت + جلو بازو"),
+            ("upper", "Shoulders + Abs", "سرشانه + شکم"),
+        ),
+    ),
+}
+
+TEMPLATE_TO_STRUCTURE = {
+    "p50-4-day-iranmuscle-intermediate": "4d-iranmuscle-body-part",
+    "p51-4-day-gymextreme-advanced": "4d-gymextreme-body-part",
+    "p52-4-day-arnoldsho-advanced": "4d-arnoldsho-classic-body-part",
+    "p53-4-day-aloplay-intermediate": "4d-aloplay-body-part",
+}
+
+
+def test_four_branded_templates_have_dedicated_4_day_structures_in_db(db: Session) -> None:
+    seed_real_catalog_exercises(db)
+    seed_training_program_templates(db)
+
+    structures = {
+        structure.slug: structure
+        for structure in db.scalars(
+            select(TrainingProgramStructure)
+            .where(TrainingProgramStructure.slug.in_(EXPECTED_BRANDED_STRUCTURES.keys()))
+            .options(selectinload(TrainingProgramStructure.structure_days))
+        )
+    }
+
+    assert set(structures.keys()) == set(EXPECTED_BRANDED_STRUCTURES.keys())
+
+    for slug, (name_en, name_fa, expected_days) in EXPECTED_BRANDED_STRUCTURES.items():
+        structure = structures[slug]
+        assert structure.name_en == name_en
+        assert structure.name_fa == name_fa
+        assert structure.days_per_week == 4
+        assert structure.family == StructureFamily.SPLIT
+        assert structure.split_type == StructureSplitType.BODY_PART
+        assert structure.is_active is True
+        assert len(structure.structure_days) == 4
+
+        days = sorted(structure.structure_days, key=lambda d: d.day_number)
+        assert [d.day_number for d in days] == [1, 2, 3, 4]
+        assert [(d.day_type, d.label_en, d.label_fa) for d in days] == list(expected_days)
+
+
+def test_four_branded_templates_link_to_dedicated_structures_not_general_structures(
+    db: Session,
+) -> None:
+    seed_real_catalog_exercises(db)
+    seed_training_program_templates(db)
+
+    templates = {
+        template.slug: template
+        for template in db.scalars(
+            select(TrainingProgramTemplate)
+            .where(TrainingProgramTemplate.slug.in_(TEMPLATE_TO_STRUCTURE.keys()))
+            .options(selectinload(TrainingProgramTemplate.structure))
+        )
+    }
+
+    generic_structure_slugs = {"4d-upper-lower-2x", "4d-3-upper-1-lower"}
+
+    for template_slug, expected_structure_slug in TEMPLATE_TO_STRUCTURE.items():
+        template = templates[template_slug]
+        assert template.structure is not None
+        assert template.structure.slug == expected_structure_slug
+        assert template.structure.slug not in generic_structure_slugs
