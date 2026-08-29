@@ -33,7 +33,9 @@ from app.workouts.program_engine.schemas import (
     ProgrammedExercise,
     WorkoutDay,
 )
+from app.workouts.program_engine.session_duration import SessionDurationRepairEvidence
 from app.workouts.program_engine.split_selector import select_split
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from app.workouts.program_engine.volume_repair import repair_weekly_volume
@@ -116,6 +118,50 @@ def catalog(*, cardio_impact: ImpactLimit = ImpactLimit.LOW) -> list[ExerciseCan
             impact=cardio_impact,
         ),
     ]
+
+
+def _count_test_program(
+    duration: int,
+    main_count: int,
+    core_count: int = 0,
+    reason_codes: tuple[str, ...] = (),
+):
+    """Build a validator fixture whose assertions only inspect count diagnostics."""
+    result = generate_program(
+        request(session_duration_minutes=45),
+        full_catalog(),
+        RULESET,
+    )
+    assert result.program is not None, result.errors
+    source_day = result.program.weekly_schedule[0]
+    main = next(item for item in source_day.exercises if main_exercise_count((item,)) == 1)
+    core = next(item for item in source_day.exercises if item.exercise_type is ExerciseType.CORE)
+    # CORE remains supplemental even when its primary muscle metadata is unexpected.
+    core = replace(core, exercise_type=ExerciseType.CORE, primary_muscle=MuscleGroup.CHEST)
+    exercises = tuple(
+        replace(main, exercise_id=uuid4(), order=index + 1) for index in range(main_count)
+    ) + tuple(
+        replace(core, exercise_id=uuid4(), order=main_count + index + 1)
+        for index in range(core_count)
+    )
+    day = replace(
+        source_day,
+        exercises=exercises,
+        estimated_duration_minutes=duration,
+    )
+    trace = (
+        {
+            "stage": "session_duration",
+            "per_session_evidence": (
+                SessionDurationRepairEvidence.from_day(day, reason_codes).as_trace(),
+            ),
+        },
+    )
+    return replace(
+        result.program,
+        weekly_schedule=(day,),
+        decision_trace=trace,
+    )
 
 
 def test_identical_input_catalog_ruleset_and_seed_are_identical() -> None:
@@ -665,6 +711,80 @@ def test_validator_rejects_session_exercise_counts_outside_the_ruleset(
         assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors
     else:
         assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors
+
+
+@pytest.mark.parametrize(
+    ("duration", "main_count", "expected_error"),
+    (
+        (30, 2, True),
+        (30, 3, False),
+        (30, 4, False),
+        (30, 5, True),
+        *(
+            (duration, main_count, expected_error)
+            for duration in (45, 60, 75, 90)
+            for main_count, expected_error in ((4, True), (5, False), (9, False), (10, True))
+        ),
+    ),
+)
+def test_validator_enforces_duration_aware_main_count_matrix(
+    duration: int,
+    main_count: int,
+    expected_error: bool,
+) -> None:
+    program = _count_test_program(duration, main_count)
+    report = validate_program(program, request(session_duration_minutes=duration), RULESET)
+
+    has_count_error = "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors
+    assert has_count_error is expected_error
+    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" not in report.warnings
+    assert (
+        "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in report.warnings
+    ) is (duration == 30 and main_count in (3, 4))
+
+
+@pytest.mark.parametrize(
+    ("duration", "main_count", "core_count", "expected_error"),
+    (
+        (30, 3, 2, False),
+        (30, 4, 3, False),
+        (30, 5, 0, True),
+        (60, 4, 3, True),
+        (60, 5, 3, False),
+    ),
+)
+def test_validator_counts_core_as_addon_not_main(
+    duration: int,
+    main_count: int,
+    core_count: int,
+    expected_error: bool,
+) -> None:
+    program = _count_test_program(duration, main_count, core_count)
+    report = validate_program(program, request(session_duration_minutes=duration), RULESET)
+
+    assert ("SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors) is expected_error
+    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" not in report.warnings
+
+
+@pytest.mark.parametrize(
+    "reason_codes",
+    (
+        ("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",),
+        ("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",),
+        (
+            "DURATION_PLANNED_REDUCED_EXERCISE_COUNT",
+            "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
+        ),
+    ),
+)
+def test_duration_evidence_cannot_downgrade_main_count_violation(
+    reason_codes: tuple[str, ...],
+) -> None:
+    program = _count_test_program(45, 4, reason_codes=reason_codes)
+    report = validate_program(program, request(session_duration_minutes=45), RULESET)
+
+    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors
+    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" not in report.warnings
 
 
 def test_validator_rejects_adjacent_full_body_sessions() -> None:

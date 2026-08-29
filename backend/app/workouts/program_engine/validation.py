@@ -3,8 +3,8 @@ from collections import Counter
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup, PrescriptionMode
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
-    effective_main_exercise_floor,
     get_session_duration_policy,
+    get_session_exercise_count_policy,
 )
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
@@ -19,11 +19,9 @@ from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
     ProgramGenerationRequest,
     ValidationReport,
-    WorkoutDay,
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_builder import slots_for_focus
-from app.workouts.program_engine.session_duration import SessionDurationRepairEvidence
 from app.workouts.program_engine.session_structure import session_structure_errors
 from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
@@ -63,23 +61,8 @@ def validate_program(
         weekly_exposures.update(
             {item.primary_muscle for item in day.exercises if item.primary_muscle is not None}
         )
-    short_session = request.session_duration_minutes <= ruleset.short_session_minutes
+    count_policy = get_session_exercise_count_policy(request.session_duration_minutes, ruleset)
     for day in program.weekly_schedule:
-        duration_evidence = _duration_evidence_for_day(program.decision_trace, day)
-        duration_reason_codes = (
-            set(duration_evidence.reason_codes) if duration_evidence is not None else set()
-        )
-        duration_planned_reduced_count = (
-            "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in duration_reason_codes
-        )
-        duration_feasibility_constrained = bool(
-            duration_reason_codes.intersection(
-                {
-                    "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
-                    "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
-                }
-            )
-        )
         exercise_count = main_exercise_count(day.exercises)
         errors.extend(superset_structure_errors(day.exercises))
         errors.extend(session_structure_errors(day, request.primary_goal, request))
@@ -87,32 +70,16 @@ def validate_program(
         # ------------------------------------------------------------------
         # Exercise count validation (Phase 11.9 semantics)
         # 30-min: floor = 3 (allowed 3-4 when 5 doesn't fit)
-        # 45+min: floor = 5; DURATION_PLANNED_REDUCED_EXERCISE_COUNT forbidden
+        # 45+min: floor = 5; any out-of-range count is a hard error
         # ------------------------------------------------------------------
-        effective_floor = effective_main_exercise_floor(request.session_duration_minutes, ruleset)
-        if exercise_count < effective_floor:
-            # Below absolute hard floor — always an error
-            if duration_feasibility_constrained:
-                warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-            else:
-                errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-        elif exercise_count < ruleset.minimum_exercises_per_session:
-            if short_session:
-                # 30-min: 3-4 exercises is acceptable when proven necessary
-                if duration_planned_reduced_count:
-                    warnings.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
-                else:
-                    warnings.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
-            elif duration_planned_reduced_count:
-                # 45+min: duration alone MUST NOT reduce below 5 — this is a hard error
-                errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-                errors.append("DURATION_REDUCTION_VIOLATED_MINIMUM_EXERCISE_FLOOR")
-            elif duration_feasibility_constrained:
-                warnings.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-            else:
-                errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-        elif exercise_count > ruleset.max_exercises_per_session:
+        if not count_policy.contains(exercise_count):
             errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
+        elif (
+            count_policy.requested_minutes <= ruleset.short_session_minutes
+            and exercise_count < ruleset.minimum_exercises_per_session
+        ):
+            # 30-min: only the in-range 3-4 MAIN case receives this warning.
+            warnings.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
 
         # Main training is the hard duration invariant. Add-ons are excluded.
         main_minutes = calculate_main_training_minutes(day)
@@ -442,23 +409,3 @@ def _sequence_metric(value: object) -> tuple[object, ...]:
     if isinstance(value, (tuple, list, set, frozenset)):
         return tuple(value)
     return ()
-
-
-def _duration_evidence_for_day(
-    trace: tuple[dict[str, object], ...],
-    day: WorkoutDay,
-) -> SessionDurationRepairEvidence | None:
-    matches: list[SessionDurationRepairEvidence] = []
-    for entry in trace:
-        if entry.get("stage") != "session_duration":
-            continue
-        raw_evidence = entry.get("per_session_evidence")
-        if not isinstance(raw_evidence, (tuple, list)):
-            continue
-        for item in raw_evidence:
-            evidence = SessionDurationRepairEvidence.from_trace(item)
-            if evidence is not None and evidence.day_index == day.day_index:
-                matches.append(evidence)
-    if len(matches) != 1 or not matches[0].matches(day):
-        return None
-    return matches[0]

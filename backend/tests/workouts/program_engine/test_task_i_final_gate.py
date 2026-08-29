@@ -398,8 +398,10 @@ def test_final_gate_accepts_valid_dynamic_template_fallback_and_repaired_outputs
 
     repaired = generate_program(scenarios[-1][0], full_catalog(), RULESET)
     assert repaired.program is not None, repaired.errors
-    assert repaired.program.aggregate_metrics["weekly_distribution"]["status"] == "constrained"
+    distribution = repaired.program.aggregate_metrics["weekly_distribution"]
+    assert distribution["status"] == "not_needed"
+    assert "WEEKLY_REDISTRIBUTION_ALREADY_BALANCED" in distribution["reason_codes"]
     assert (
         "WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE"
-        in repaired.program.aggregate_metrics["final_quality_gate"]["constraint_reason_codes"]
+        not in repaired.program.aggregate_metrics["final_quality_gate"]["constraint_reason_codes"]
     )
