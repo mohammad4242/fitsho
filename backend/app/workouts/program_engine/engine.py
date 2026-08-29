@@ -322,7 +322,6 @@ def generate_program(
         }
         if result.decision_trace:
             rejected_attempt["decision_trace"] = result.decision_trace
-        print(f"Rejected exact {split.split_type}: {result.errors}")
         rejected_splits.append(rejected_attempt)
 
     weekdays_fallback = (
@@ -357,7 +356,6 @@ def generate_program(
         if result.is_success:
             return result
         collected_errors.extend(result.errors)
-        print(f"Rejected fallback {fallback_split.split_type}: {result.errors}")
         rejected_splits.append(
             {
                 "split": fallback_split.split_type.value,
@@ -1295,7 +1293,9 @@ def _duration_repair_trace(
         classification = "minor"
     else:
         classification = "major"
-    unavoidable_constraints = tuple(sorted(code for code in reason_codes if "CONSTRAINED" in code))
+    unavoidable_constraints = tuple(
+        sorted(code for code in reason_codes if "CONSTRAINED" in code)
+    )
     session_metrics = tuple(
         {
             "day_index": updated.day_index,
