@@ -33,6 +33,7 @@ from app.profile.service import get_profile
 from app.training_templates.engine_reference import load_template_references
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+from app.workouts.program_engine.supplemental_policy import exercise_count_breakdown
 from app.workouts.router import to_plan_response
 from app.workouts.schemas import (
     WorkoutDayResponse,
@@ -444,10 +445,14 @@ def _successful_result_evidence(program, requested_day_count: int) -> dict[str, 
     per_day = tuple(
         {
             "day_number": day.day_index,
-            "exercise_count": len(day.exercises),
+            "exercise_count": counts.main_count,
+            "main_exercise_count": counts.main_count,
+            "supplemental_exercise_count": counts.supplemental_count,
+            "total_exercise_count": counts.total_count,
             "duration_minutes": day.estimated_duration_minutes,
         }
         for day in program.weekly_schedule
+        for counts in (exercise_count_breakdown(day.exercises),)
     )
     return {
         "final_gate": final_gate,
@@ -953,7 +958,9 @@ def render_exercise_row(idx: int, item: WorkoutPlanExerciseResponse) -> str:
 def render_day_block(day: WorkoutDayResponse) -> str:
     rows = "".join(render_exercise_row(i, ex) for i, ex in enumerate(day.exercises, start=1))
     title = (
-        f"{escape(day.title_fa)} ({fa_num(len(day.exercises))} حرکت · تخمین زمان: "
+        f"{escape(day.title_fa)} (حرکات اصلی: {fa_num(day.main_exercise_count)} · "
+        f"Core / تکمیلی: {fa_num(day.supplemental_exercise_count)} · "
+        f"مجموع حرکات: {fa_num(day.total_exercise_count)} · تخمین زمان: "
         f"{fa_num(day.estimated_duration_minutes)} دقیقه)"
     )
     return f"""
@@ -1002,7 +1009,10 @@ def _render_engine_evidence(detail: dict[str, object]) -> str:
     coverage_missing_muscles = _evidence_values(coverage, "missing_major_muscles")
     distribution_reasons = _evidence_values(distribution, "reason_codes")
     day_rows = "".join(
-        f"<li>روز {fa_num(day.get('day_number'))}: {fa_num(day.get('exercise_count'))} حرکت · "
+        f"<li>روز {fa_num(day.get('day_number'))}: حرکات اصلی: "
+        f"{fa_num(day.get('main_exercise_count', day.get('exercise_count')))} · "
+        f"Core / تکمیلی: {fa_num(day.get('supplemental_exercise_count'))} · "
+        f"مجموع حرکات: {fa_num(day.get('total_exercise_count'))} · "
         f"{fa_num(day.get('duration_minutes'))} دقیقه</li>"
         for day in detail["per_day"]
         if isinstance(day, dict)

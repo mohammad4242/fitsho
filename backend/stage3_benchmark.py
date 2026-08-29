@@ -61,6 +61,7 @@ from app.workouts.program_engine.schemas import (
     ProgramGenerationResult,
     RecentTrainingHistory,
 )
+from app.workouts.program_engine.supplemental_policy import exercise_count_breakdown
 from app.workouts.schemas import ProgramGenerationOverrides
 from app.workouts.service import WorkoutGenerationService, WorkoutGenerationSettings
 
@@ -786,7 +787,10 @@ def _case_record(
                     "day_index": day.day_index,
                     "weekday": day.weekday,
                     "focus": day.focus,
-                    "exercise_count": len(day.exercises),
+                    "exercise_count": counts.main_count,
+                    "main_exercise_count": counts.main_count,
+                    "supplemental_exercise_count": counts.supplemental_count,
+                    "total_exercise_count": counts.total_count,
                     "estimated_duration_minutes": day.estimated_duration_minutes,
                     "exercises": [
                         {
@@ -821,6 +825,7 @@ def _case_record(
                     "cardio": _jsonable(day.cardio),
                 }
                 for day in program.weekly_schedule
+                for counts in (exercise_count_breakdown(day.exercises),)
             ],
             "direct_volume": program.aggregate_metrics.get("weekly_direct_sets_by_muscle", {}),
             "effective_volume": program.aggregate_metrics.get(

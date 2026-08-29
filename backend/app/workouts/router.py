@@ -24,6 +24,7 @@ from app.workouts.program_engine.session_targets import (
     persian_session_title_for_targets,
     target_muscles_from_values,
 )
+from app.workouts.program_engine.supplemental_policy import exercise_count_breakdown
 from app.workouts.repository import get_plan_for_user, list_plans_for_user
 from app.workouts.schemas import (
     ProgramGenerationOverrides,
@@ -199,6 +200,7 @@ def to_plan_response(
                 title_en=_day_titles(plan, day)[0],
                 title_fa=_day_titles(plan, day)[1],
                 estimated_duration_minutes=day.estimated_duration_minutes,
+                **_day_count_fields(day.exercises),
                 weekday=day.weekday,
                 focus=day.focus,
                 cardio=day.cardio,
@@ -248,6 +250,15 @@ def to_plan_response(
         ai_coach_program_explanation_fa=plan.ai_coach_program_explanation_fa,
         coach_review=_coach_review_response(plan, db),
     )
+
+
+def _day_count_fields(exercises: list[WorkoutPlanExercise]) -> dict[str, int]:
+    counts = exercise_count_breakdown(exercises)
+    return {
+        "main_exercise_count": counts.main_count,
+        "supplemental_exercise_count": counts.supplemental_count,
+        "total_exercise_count": counts.total_count,
+    }
 
 
 def _public_validation_report(report: dict[str, object]) -> dict[str, object]:

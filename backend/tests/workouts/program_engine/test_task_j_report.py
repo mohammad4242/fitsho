@@ -11,9 +11,12 @@ from types import SimpleNamespace
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
+import scripts.generate_e2e_report as report
 import scripts.generate_e2e_report_batch2 as batch2
 from app.auth.models import User
 from app.config import get_settings
+from app.exercises.enums import ExerciseType, MuscleGroup
+from app.workouts.schemas import WorkoutDayResponse
 
 TEST_PROFILES_BATCH2 = batch2.TEST_PROFILES_BATCH2
 TEST_PROFILES_BATCH2 = [
@@ -68,11 +71,64 @@ def _success_result(
         "requested_day_count": 2,
         "actual_day_count": 2,
         "per_day": (
-            {"day_number": 1, "exercise_count": 4, "duration_minutes": 45},
-            {"day_number": 2, "exercise_count": 3, "duration_minutes": 43},
+            {
+                "day_number": 1,
+                "exercise_count": 4,
+                "main_exercise_count": 4,
+                "supplemental_exercise_count": 0,
+                "total_exercise_count": 4,
+                "duration_minutes": 45,
+            },
+            {
+                "day_number": 2,
+                "exercise_count": 3,
+                "main_exercise_count": 3,
+                "supplemental_exercise_count": 0,
+                "total_exercise_count": 3,
+                "duration_minutes": 43,
+            },
         ),
         "profile_number": number,
     }
+
+
+def test_batch2_evidence_uses_canonical_main_and_supplemental_counts() -> None:
+    main_item = SimpleNamespace(
+        exercise_type=ExerciseType.COMPOUND,
+        primary_muscle=MuscleGroup.CHEST,
+    )
+    core_item = SimpleNamespace(
+        # CORE remains supplemental even when its stored muscle is unexpected.
+        exercise_type=ExerciseType.CORE,
+        primary_muscle=MuscleGroup.CHEST,
+    )
+    program = SimpleNamespace(
+        aggregate_metrics={
+            "final_quality_gate": {"status": "accepted"},
+            "weekly_coverage": {"status": "satisfied"},
+            "weekly_distribution": {"status": "not_needed"},
+        },
+        weekly_schedule=(
+            SimpleNamespace(
+                day_index=1,
+                exercises=(main_item, main_item, main_item, main_item, core_item),
+                estimated_duration_minutes=60,
+            ),
+        ),
+    )
+
+    evidence = batch2._successful_result_evidence(program, requested_day_count=1)
+
+    assert evidence["per_day"] == (
+        {
+            "day_number": 1,
+            "exercise_count": 4,
+            "main_exercise_count": 4,
+            "supplemental_exercise_count": 1,
+            "total_exercise_count": 5,
+            "duration_minutes": 60,
+        },
+    )
 
 
 def test_projection_reconciles_mixed_outcomes_from_the_same_raw_records() -> None:
@@ -154,6 +210,22 @@ def test_html_uses_projection_evidence_and_escapes_engine_diagnostics() -> None:
     assert "بهینه‌سازی‌شده" not in html
 
 
+def test_persian_day_reports_name_all_three_exercise_count_concepts() -> None:
+    day = WorkoutDayResponse.model_construct(
+        title_fa="روز اول",
+        exercises=[],
+        estimated_duration_minutes=60,
+        main_exercise_count=4,
+        supplemental_exercise_count=1,
+        total_exercise_count=5,
+    )
+
+    for rendered in (report.render_day_block(day), batch2.render_day_block(day)):
+        assert "حرکات اصلی: ۴" in rendered
+        assert "Core / تکمیلی: ۱" in rendered
+        assert "مجموع حرکات: ۵" in rendered
+
+
 def test_real_batch2_run_is_rollback_isolated_and_evidence_reconciles(monkeypatch) -> None:
     captured_user_ids = []
     original_generate = batch2.generate_program
@@ -198,7 +270,14 @@ def test_real_batch2_run_is_rollback_isolated_and_evidence_reconciles(monkeypatc
             assert raw["actual_day_count"] == len(raw["per_day"])
             assert raw["actual_day_count"] == len(raw["plan"].days)
             assert all(
-                day["exercise_count"] == len(plan_day.exercises)
+                day["exercise_count"] == day["main_exercise_count"]
+                and day["total_exercise_count"] == len(plan_day.exercises)
+                and day["supplemental_exercise_count"]
+                == day["total_exercise_count"] - day["main_exercise_count"]
+                and plan_day.main_exercise_count == day["main_exercise_count"]
+                and plan_day.supplemental_exercise_count
+                == day["supplemental_exercise_count"]
+                and plan_day.total_exercise_count == day["total_exercise_count"]
                 and day["duration_minutes"] == plan_day.estimated_duration_minutes
                 for day, plan_day in zip(raw["per_day"], raw["plan"].days, strict=True)
             )

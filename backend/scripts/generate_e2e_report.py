@@ -818,9 +818,18 @@ def render_day_block(day: WorkoutDayResponse) -> str:
     rows = "".join(
         render_exercise_row(i, ex) for i, ex in enumerate(day.exercises, start=1)
     )
+    count_summary = (
+        f"حرکات اصلی: {fa_num(day.main_exercise_count)} · "
+        f"Core / تکمیلی: {fa_num(day.supplemental_exercise_count)} · "
+        f"مجموع حرکات: {fa_num(day.total_exercise_count)}"
+    )
+    day_title = (
+        f"{escape(day.title_fa)} ({count_summary} · "
+        f"تخمین زمان: {fa_num(day.estimated_duration_minutes)} دقیقه)"
+    )
     return f"""
     <div class="day-box">
-      <div class="day-title">{escape(day.title_fa)} ({fa_num(len(day.exercises))} حرکت · تخمین زمان: {fa_num(day.estimated_duration_minutes)} دقیقه)</div>
+      <div class="day-title">{day_title}</div>
       <table class="exercise-table">
         <thead>
           <tr>

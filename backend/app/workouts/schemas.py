@@ -191,6 +191,9 @@ class WorkoutDayResponse(BaseModel):
     title_fa: str
     estimated_duration_minutes: int
     exercises: list[WorkoutPlanExerciseResponse]
+    main_exercise_count: int = Field(default=0, ge=0)
+    supplemental_exercise_count: int = Field(default=0, ge=0)
+    total_exercise_count: int = Field(default=0, ge=0)
     weekday: int | None = None
     focus: str = "legacy"
     cardio: dict[str, object] | None = None
