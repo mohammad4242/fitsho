@@ -23,6 +23,7 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceDay,
     TemplateReferenceSlot,
 )
+from app.workouts.program_engine.volume_policy import weekly_direct_volume_range
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
 
 
@@ -621,9 +622,16 @@ def test_phase10_validation_metrics_match_final_program_and_hard_caps() -> None:
         == aggregate["weekly_effective_sets_by_muscle"]
     )
     assert report.decision_trace == program.decision_trace
+    direct = aggregate["weekly_direct_sets_by_muscle"]
+    effective = aggregate["weekly_effective_sets_by_muscle"]
     assert all(
-        values["actual_effective_volume"] <= values["effective_maximum_hard"]
-        for values in aggregate["volume_ranges_by_muscle"].values()
+        (
+            direct[muscle] <= values["maximum_hard"]
+            if weekly_direct_volume_range(MuscleGroup(muscle), source.training_age_months)
+            is not None
+            else effective[muscle] <= values["effective_maximum_hard"]
+        )
+        for muscle, values in aggregate["volume_ranges_by_muscle"].items()
     )
     assert report.is_valid is True
 

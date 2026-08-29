@@ -82,7 +82,7 @@ def test_back_priority_is_muscle_specific_in_real_generation() -> None:
     )
 
 
-def test_biceps_priority_gets_direct_specialization_without_upper_inheritance() -> None:
+def test_biceps_priority_falls_back_safely_when_dedicated_day_is_not_duration_valid() -> None:
     source = request(
         available_training_days=6,
         training_experience="advanced",
@@ -94,13 +94,18 @@ def test_biceps_priority_gets_direct_specialization_without_upper_inheritance() 
     )
     result = generate_program(source, full_catalog(), RULESET)
 
-    if not result.is_success:
-        assert result.error_code.value == "UNSATISFIED_CONSTRAINT"
-        assert any(error.startswith("SESSION_DURATION_") for error in result.errors)
-        return
     assert result.is_success, result.errors
     assert result.program is not None
-    assert result.program.weekly_schedule[-1].focus == "biceps"
+    assert result.program.split.split_type is SplitType.PUSH_PULL_LEGS_X2
+    assert result.program.weekly_schedule[-1].focus == "legs"
+    assert "SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE" in result.program.split.reason_codes
+    recovery = next(
+        entry
+        for entry in result.program.decision_trace
+        if entry["stage"] == "construction_recovery"
+    )
+    assert recovery["rejected_splits"][0]["split"] == "body_part_rotation"
+    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in recovery["rejected_splits"][0]["reason_codes"]
     assert set(result.program.aggregate_metrics["priority_metrics"]) == {MuscleGroup.BICEPS.value}
     assert result.program.aggregate_metrics["priority_metrics"][MuscleGroup.BICEPS.value][
         "direct_sets"

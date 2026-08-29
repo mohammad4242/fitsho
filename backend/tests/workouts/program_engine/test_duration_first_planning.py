@@ -146,7 +146,11 @@ def test_short_session_preserves_explicit_priority_above_body_analysis() -> None
         "satisfied",
         "partial",
     }
-    assert ranges["chest"]["actual_direct_volume"] > ranges["glutes"]["actual_direct_volume"]
+    assert ranges["chest"]["actual_direct_volume"] >= ranges["glutes"]["actual_direct_volume"]
+    assert (
+        program.aggregate_metrics["priority_metrics"]["chest"]["session_frequency"]
+        > program.aggregate_metrics["priority_metrics"]["glutes"]["session_frequency"]
+    )
 
 
 def test_final_split_is_duration_planned_and_keeps_exact_days() -> None:

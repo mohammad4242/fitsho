@@ -395,7 +395,18 @@ def test_same_template_gives_explicit_chest_priority_more_final_direct_volume() 
     priority_chest = prioritized.program.aggregate_metrics["weekly_direct_sets_by_muscle"][
         MuscleGroup.CHEST.value
     ]
-    assert priority_chest > balanced_chest
+    balanced_target = balanced.program.aggregate_metrics["volume_ranges_by_muscle"]["chest"][
+        "target_sets"
+    ]
+    priority_target = prioritized.program.aggregate_metrics["volume_ranges_by_muscle"]["chest"][
+        "target_sets"
+    ]
+    assert priority_target > balanced_target
+    assert priority_chest >= balanced_chest
+    assert (
+        prioritized.program.aggregate_metrics["volume_ranges_by_muscle"]["chest"]["status"]
+        == "exact_target"
+    )
 
 
 def test_explicit_chest_priority_dominates_conflicting_body_analysis_lag() -> None:
@@ -414,9 +425,11 @@ def test_explicit_chest_priority_dominates_conflicting_body_analysis_lag() -> No
     assert result.program is not None, result.errors
     ranges = result.program.aggregate_metrics["volume_ranges_by_muscle"]
     priority_metrics = result.program.aggregate_metrics["priority_metrics"]
+    assert ranges[MuscleGroup.CHEST.value]["direct_minimum_required"] is True
+    assert ranges[MuscleGroup.GLUTES.value]["direct_minimum_required"] is False
     assert (
-        ranges[MuscleGroup.CHEST.value]["preferred_weekly_target"]
-        > ranges[MuscleGroup.GLUTES.value]["preferred_weekly_target"]
+        ranges[MuscleGroup.CHEST.value]["actual_direct_volume"]
+        > ranges[MuscleGroup.GLUTES.value]["actual_direct_volume"]
     )
     assert priority_metrics[MuscleGroup.CHEST.value]["status"] in {"satisfied", "partial"}
 

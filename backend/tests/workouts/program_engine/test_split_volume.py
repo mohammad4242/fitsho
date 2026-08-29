@@ -33,6 +33,7 @@ from app.workouts.program_engine.volume_planner import (
 from app.workouts.program_engine.volume_policy import (
     VOLUME_POLICY,
     session_hard_volume_cap,
+    weekly_direct_volume_range,
 )
 
 
@@ -608,7 +609,13 @@ def test_secondary_muscles_receive_explicit_conservative_volume_targets(
     plan = plan_weekly_volume(request, select_split(request, RULESET), RULESET)
     target = next(item for item in plan.targets if item.muscle is muscle)
 
-    assert target.maximum_hard == RULESET.secondary_muscle_maximum_sets[request.training_status]
+    direct_range = weekly_direct_volume_range(muscle, request.source.training_age_months)
+    expected_maximum = (
+        direct_range.maximum
+        if direct_range is not None
+        else RULESET.secondary_muscle_maximum_sets[request.training_status]
+    )
+    assert target.maximum_hard == expected_maximum
     assert target.minimum_soft >= RULESET.secondary_muscle_minimum_sets[request.training_status]
     assert target.target_sets <= target.maximum_hard
 
@@ -636,12 +643,26 @@ def test_secondary_targets_follow_goal_and_training_status_caps(
         for item in plan_weekly_volume(request, select_split(request, RULESET), RULESET).targets
         if item.muscle is MuscleGroup.TRICEPS
     )
+    direct_range = weekly_direct_volume_range(
+        MuscleGroup.TRICEPS,
+        request.source.training_age_months,
+    )
+    expected_minimum = (
+        direct_range.minimum
+        if direct_range is not None
+        else RULESET.secondary_muscle_minimum_sets[request.training_status]
+    )
+    expected_maximum = (
+        direct_range.maximum
+        if direct_range is not None
+        else RULESET.secondary_muscle_maximum_sets[request.training_status]
+    )
     expected = min(
         max(
             VOLUME_POLICY.preferred_target(MuscleGroup.TRICEPS, request.training_status, goal),
-            RULESET.secondary_muscle_minimum_sets[request.training_status],
+            expected_minimum,
         ),
-        RULESET.secondary_muscle_maximum_sets[request.training_status],
+        expected_maximum,
     )
 
     assert target.target_sets == expected
@@ -741,7 +762,12 @@ def test_history_aware_effective_volume_caps_next_cycle_jump() -> None:
 
     plan = plan_weekly_volume(request, select_split(request, RULESET), RULESET)
 
-    assert plan.effective_target_for(MuscleGroup.CHEST) <= 9
+    direct_range = weekly_direct_volume_range(
+        MuscleGroup.CHEST,
+        request.source.training_age_months,
+    )
+    assert direct_range is not None
+    assert plan.effective_target_for(MuscleGroup.CHEST) == direct_range.minimum
     assert "VOLUME_CAPPED_FOR_PREVIOUS_EFFECTIVE_VOLUME" in plan.reason_codes
 
 

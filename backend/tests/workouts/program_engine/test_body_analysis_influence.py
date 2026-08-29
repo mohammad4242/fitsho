@@ -16,6 +16,7 @@ from app.workouts.program_engine.schemas import (
 from app.workouts.program_engine.split_selector import select_split
 from app.workouts.program_engine.template_selector import select_template_reference
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
+from app.workouts.program_engine.volume_policy import weekly_direct_volume_range
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
@@ -156,7 +157,10 @@ def test_clear_lag_volume_boost_stays_inside_hard_ruleset_limit() -> None:
 
     assert target.target_sets > baseline_plan.direct_sets_for(MuscleGroup.SHOULDERS)
     assert target.target_sets <= target.maximum_hard
-    assert target.maximum_hard == RULESET.maximum_sets[normalized.training_status]
+    assert target.maximum_hard <= weekly_direct_volume_range(
+        MuscleGroup.SHOULDERS,
+        normalized.source.training_age_months,
+    ).maximum
     assert "VOLUME_INCREASED_FOR_BODY_ANALYSIS" in plan.reason_codes
 
 
@@ -287,35 +291,35 @@ def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> Non
         ),
     )
 
+    source = request(
+        primary_goal="build_muscle",
+        training_experience="intermediate",
+        training_age_months=24,
+        available_training_days=4,
+        session_duration_minutes=45,
+        available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
+    )
     result = generate_program(
-        request(
-            primary_goal="build_muscle",
-            training_experience="intermediate",
-            training_age_months=24,
-            available_training_days=4,
-            session_duration_minutes=45,
-            available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
-        ),
+        source,
         full_catalog(),
         RULESET,
         reference_templates=(oversized,),
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics.get("reference_template") is None
-    rejection = next(
-        entry
-        for entry in result.program.decision_trace
-        if entry["stage"] == "template_reference" and entry.get("status") == "rejected"
-    )
-    assert "MUSCLE_DIRECT_FREQUENCY_EXCEEDED" in rejection["reason_codes"]
+    assert result.program.aggregate_metrics.get("reference_template") == oversized.slug
     assert all(
-        values["maximum_hard"] <= RULESET.maximum_sets[result.program.training_status]
-        for values in result.program.aggregate_metrics["volume_ranges_by_muscle"].values()
+        values["maximum_hard"] <= weekly_direct_volume_range(
+            MuscleGroup(muscle),
+            source.training_age_months,
+        ).maximum
+        for muscle, values in result.program.aggregate_metrics["volume_ranges_by_muscle"].items()
+        if weekly_direct_volume_range(MuscleGroup(muscle), source.training_age_months) is not None
     )
     assert all(
-        values["actual_effective_volume"] <= values["effective_maximum_hard"]
-        for values in result.program.aggregate_metrics["volume_ranges_by_muscle"].values()
+        values["actual_direct_volume"] <= values["maximum_hard"]
+        for muscle, values in result.program.aggregate_metrics["volume_ranges_by_muscle"].items()
+        if weekly_direct_volume_range(MuscleGroup(muscle), source.training_age_months) is not None
     )
 
 

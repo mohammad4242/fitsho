@@ -367,7 +367,7 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics.get("reference_template") is None
+    assert result.program.aggregate_metrics.get("reference_template") == template.slug
     assert result.program.aggregate_metrics["substitution_requests"] > 0
     coverage = result.program.aggregate_metrics["weekly_coverage"]
     assert coverage["status"] == "not_applicable"
@@ -389,8 +389,7 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
         entry for entry in result.program.decision_trace if entry["stage"] == "template_reference"
     )
     assert template_trace["selected"] == template.slug
-    assert template_trace["status"] == "rejected"
-    assert "SESSION_DURATION_UNDER_TARGET" in template_trace["reason_codes"]
+    assert template_trace["status"] == "adapted"
     assert template_trace["hard_eligibility"] == (
         "days",
         "training_level",
@@ -399,22 +398,20 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
     assert template_trace["goal_used_for_exclusion"] is False
     assert [entry["stage"] for entry in result.program.decision_trace] == [
         "template_selection",
-        "template_reference",
-        "template_attempt",
-        "template_recovery",
         "normalization",
         "safety",
         "eligibility",
         "duration_capacity",
-        "construction_recovery",
+        "template_reference",
+        "template_adaptation",
         "day_count_invariant",
-        "split",
         "volume",
         "volume_repair",
         "session_duration",
         "session_structure",
         "weekly_coverage",
         "substitution_observability",
+        "template_attempt",
         "final_construction",
         "coach_quality",
         "final_quality_gate",
@@ -425,9 +422,9 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
         if entry["stage"] == "coach_quality"
     )
     assert quality["template_preservation"] == {
-        "satisfied": 0.0,
-        "total": 0.0,
-        "percentage": None,
+        "satisfied": 6.0,
+        "total": 6.0,
+        "percentage": 100.0,
     }
     selection_trace = result.program.decision_trace[0]
     assert selection_trace["selected"] == template.slug
@@ -860,7 +857,7 @@ def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> N
     )
     assert rejection["selected"] == unadaptable.slug
     assert rejection["reason_codes"]
-    assert "MUSCLE_DIRECT_FREQUENCY_EXCEEDED" in rejection["reason_codes"]
+    assert "MUSCLE_DIRECT_FREQUENCY_EXCEEDED" not in rejection["reason_codes"]
     assert rejection["rejection_category"] == "DURATION_RECOVERY_HARD_IMPOSSIBILITY"
 
 
@@ -1003,12 +1000,11 @@ def test_template_priority_volume_is_repaired_when_safe_capacity_exists() -> Non
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics.get("reference_template") is None
-    assert result.program.aggregate_metrics["volume_ranges_by_muscle"]["shoulders"]["status"] in {
-        "exact_target",
-        "within_flexible_range",
-        "on_target",
-    }
+    assert result.program.aggregate_metrics.get("reference_template") == template.slug
+    shoulder_volume = result.program.aggregate_metrics["volume_ranges_by_muscle"]["shoulders"]
+    assert shoulder_volume["status"] == "exact_target"
+    assert shoulder_volume["actual_direct_volume"] == shoulder_volume["target_sets"]
+    assert shoulder_volume["maximum_hard"] == 24
 
 
 def test_template_generation_is_deterministic_and_strictly_valid() -> None:

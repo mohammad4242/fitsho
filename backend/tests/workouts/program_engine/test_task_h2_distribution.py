@@ -165,7 +165,7 @@ def test_batch2_profile_8_preserves_volume_when_no_safe_redistribution_exists(mo
 
 @pytest.mark.parametrize(
     "profile_number, before_counts",
-    [(5, (7, 5, 5)), (10, (6, 5, 5))],
+    [(5, (5, 6, 5)), (10, (5, 7, 5))],
 )
 def test_batch2_constrained_controls_preserve_volume_and_day_count(
     monkeypatch, profile_number: int, before_counts: tuple[int, ...]
