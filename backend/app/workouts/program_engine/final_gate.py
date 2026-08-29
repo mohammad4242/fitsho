@@ -191,7 +191,7 @@ def evaluate_final_program(
         "status": distribution.get("status", "missing"),
         "reason_codes": distribution_reasons,
     }
-    actual_counts = tuple(len(day.exercises) for day in program.weekly_schedule)
+    actual_counts = tuple(main_exercise_count(day.exercises) for day in program.weekly_schedule)
     raw_after_counts = distribution.get("after_exercise_counts")
     after_counts = (
         tuple(raw_after_counts)

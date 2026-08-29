@@ -1,8 +1,10 @@
 from collections import Counter
 from dataclasses import replace
+from uuid import uuid4
 
 import pytest
 
+from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     get_session_duration_policy,
@@ -14,11 +16,56 @@ from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.recovery import recovery_spacing_is_valid
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.safety import effective_caution_tags
+from app.workouts.program_engine.schemas import ProgrammedExercise, WorkoutDay
 from app.workouts.program_engine.session_structure import session_structure_errors
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.weekly_distribution import redistribute_weekly_exercises
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 from tests.workouts.program_engine.test_template_reference import _upper_lower_reference
+
+
+def _distribution_item(
+    index: int,
+    muscle: MuscleGroup,
+    *,
+    exercise_type: ExerciseType = ExerciseType.COMPOUND,
+) -> ProgrammedExercise:
+    patterns = (
+        MovementPattern.HORIZONTAL_PUSH,
+        MovementPattern.VERTICAL_PUSH,
+        MovementPattern.HORIZONTAL_PULL,
+        MovementPattern.VERTICAL_PULL,
+        MovementPattern.SQUAT,
+        MovementPattern.HIP_HINGE,
+        MovementPattern.KNEE_FLEXION,
+        MovementPattern.CORE_ANTI_EXTENSION,
+    )
+    return ProgrammedExercise(
+        exercise_id=uuid4(),
+        exercise_name=f"Distribution Exercise {index}",
+        order=index,
+        sets=2,
+        rep_min=8,
+        rep_max=12,
+        target_rir=2,
+        rest_seconds=90,
+        estimated_minutes=5,
+        reason_codes=("TEST",),
+        movement_pattern=patterns[index - 1],
+        primary_muscle=muscle,
+        exercise_type=exercise_type,
+    )
+
+
+def _distribution_day(index: int, exercises: tuple[ProgrammedExercise, ...]) -> WorkoutDay:
+    return WorkoutDay(
+        day_index=index,
+        weekday=index,
+        title=f"Distribution Day {index}",
+        focus="full_body_a",
+        estimated_duration_minutes=30,
+        exercises=exercises,
+    )
 
 
 def _run_batch2_profile(monkeypatch, profile_number: int):
@@ -112,7 +159,10 @@ def test_batch2_profile_8_preserves_volume_when_no_safe_redistribution_exists(mo
     assert effective.effective_sets_by_muscle == distribution["after_effective_sets_by_muscle"]
 
 
-@pytest.mark.parametrize("profile_number, before_counts", [(5, (8, 6, 5)), (10, (6, 6, 6))])
+@pytest.mark.parametrize(
+    "profile_number, before_counts",
+    [(5, (7, 5, 5)), (10, (5, 5, 5))],
+)
 def test_batch2_constrained_controls_preserve_volume_and_day_count(
     monkeypatch, profile_number: int, before_counts: tuple[int, ...]
 ) -> None:
@@ -230,6 +280,82 @@ def test_donor_at_main_exercise_floor_is_not_depleted() -> None:
     if result.status == "constrained":
         assert result.reason_codes == ("WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE",)
     assert result.days == imbalanced_days
+
+
+def test_distribution_exercise_counts_are_canonical_main_counts_with_core_present() -> None:
+    source = request(available_training_days=2, session_duration_minutes=60)
+    main_muscles = (
+        MuscleGroup.CHEST,
+        MuscleGroup.BACK,
+        MuscleGroup.SHOULDERS,
+        MuscleGroup.QUADRICEPS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+        MuscleGroup.CALVES,
+    )
+    base_days = tuple(
+        _distribution_day(
+            index,
+            tuple(_distribution_item(i, muscle) for i, muscle in enumerate(main_muscles, 1))
+            + (_distribution_item(8, MuscleGroup.ABS, exercise_type=ExerciseType.CORE),),
+        )
+        for index in (1, 2)
+    )
+    assert all(
+        any(item.exercise_type is ExerciseType.CORE for item in day.exercises)
+        for day in base_days
+    )
+
+    result = redistribute_weekly_exercises(
+        base_days,
+        normalize_request(source, RULESET),
+        RULESET,
+    )
+
+    expected = tuple(main_exercise_count(day.exercises) for day in base_days)
+    assert result.before_exercise_counts == expected
+    assert result.after_exercise_counts == expected
+
+
+def test_redistribution_rejects_recipient_main_ceiling_even_when_total_balance_improves() -> None:
+    source = request(available_training_days=2, session_duration_minutes=30)
+    imbalanced_days = (
+        _distribution_day(
+            1,
+            tuple(
+                _distribution_item(index, muscle)
+                for index, muscle in enumerate(
+                    (
+                        MuscleGroup.CHEST,
+                        MuscleGroup.BACK,
+                        MuscleGroup.SHOULDERS,
+                        MuscleGroup.QUADRICEPS,
+                        MuscleGroup.HAMSTRINGS,
+                        MuscleGroup.GLUTES,
+                    ),
+                    1,
+                )
+            ),
+        ),
+        _distribution_day(
+            2,
+            tuple(
+                _distribution_item(index, muscle)
+                for index, muscle in enumerate(
+                    (MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.TRICEPS, MuscleGroup.CALVES),
+                    1,
+                )
+            ),
+        ),
+    )
+    normalized = normalize_request(source, RULESET)
+
+    result = redistribute_weekly_exercises(imbalanced_days, normalized, RULESET)
+
+    assert tuple(main_exercise_count(day.exercises) for day in imbalanced_days) == (6, 4)
+    assert result.moved_exercise_ids == ()
+    assert result.days == imbalanced_days
+    assert result.after_exercise_counts == (6, 4)
 
 
 def test_short_session_uses_effective_floor_for_redistribution() -> None:

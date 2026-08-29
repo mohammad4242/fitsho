@@ -7,6 +7,8 @@ from app.workouts.program_engine.duration_policy import (
     calculate_cardio_addon_minutes,
     calculate_main_training_minutes_from_exercises,
     calculate_total_session_minutes_from_exercises,
+    effective_main_exercise_ceiling,
+    effective_main_exercise_floor,
     get_session_duration_policy,
     is_main_training_exercise,
 )
@@ -37,7 +39,10 @@ from app.workouts.program_engine.substitution_engine import (
     rank_substitutions,
 )
 from app.workouts.program_engine.substitution_policy import SubstitutionCause
-from app.workouts.program_engine.supplemental_policy import main_exercise_count
+from app.workouts.program_engine.supplemental_policy import (
+    is_main_resistance_exercise,
+    main_exercise_count,
+)
 from app.workouts.program_engine.template_sessions import adaptation_preservation_rank
 
 _HARD_MOVEMENT_PATTERN_GROUPS = (
@@ -167,10 +172,23 @@ def repair_weekly_volume(
                 or (day_index, exercise.primary_muscle) in per_session_excessive
                 or (day_index, exercise_index) in per_exercise_excessive
             )
+            count_floor_allows_removal = (
+                not is_main_resistance_exercise(exercise)
+                or main_exercise_count(repaired[day_index]) - 1
+                >= effective_main_exercise_floor(
+                    request.source.session_duration_minutes,
+                    ruleset,
+                )
+            )
             if (same_muscle_exposures > 1 or hard_removal_required) and (
-                len(repaired[day_index]) > ruleset.minimum_exercises_per_session
-                or preserve_template_core_structure
-                or hard_removal_required
+                hard_removal_required
+                or (
+                    count_floor_allows_removal
+                    and (
+                        len(repaired[day_index]) > ruleset.minimum_exercises_per_session
+                        or preserve_template_core_structure
+                    )
+                )
             ):
                 repaired[day_index].pop(exercise_index)
                 reasons.append("VOLUME_REPAIR_REMOVED_REDUNDANT_EXERCISE")
@@ -463,6 +481,10 @@ def _select_exercise_addition(
     duration_policy = get_session_duration_policy(
         request.source.session_duration_minutes,
     )
+    main_ceiling = effective_main_exercise_ceiling(
+        request.source.session_duration_minutes,
+        ruleset,
+    )
     day_contexts = tuple(
         replace(original, exercises=tuple(exercises))
         for original, exercises in zip(originals, days, strict=True)
@@ -526,7 +548,10 @@ def _select_exercise_addition(
             )
             estimated = estimate_exercise_minutes(sets, prescription.rest_seconds, 0, ruleset)
             for day_index, (day, original) in enumerate(zip(days, originals, strict=True)):
-                if main_exercise_count(day) >= ruleset.max_exercises_per_session:
+                if (
+                    is_main_resistance_exercise(candidate)
+                    and main_exercise_count(day) >= main_ceiling
+                ):
                     continue
                 if any(item.exercise_id == candidate.id for item in day):
                     continue

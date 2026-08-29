@@ -663,3 +663,61 @@ def test_volume_repair_handles_secondary_target_for_untracked_primary() -> None:
 
     assert selected is not None
     assert selected[:2] == (0, 0)
+
+
+def test_volume_repair_does_not_add_main_above_short_session_ceiling() -> None:
+    existing = (
+        _programmed("Existing Chest", MuscleGroup.CHEST, 5),
+        _programmed("Existing Back", MuscleGroup.BACK, 5),
+        _programmed("Existing Shoulders", MuscleGroup.SHOULDERS, 5),
+        _programmed("Existing Triceps", MuscleGroup.TRICEPS, 5),
+    )
+    candidate = _candidate("Fifth Chest Exercise", MuscleGroup.CHEST)
+    target = replace(
+        _volume_target(MuscleGroup.CHEST, target_sets=10).targets[0],
+        minimum_direct_sets=10,
+        minimum_effective_sets=10,
+        effective_target_sets=10,
+        minimum_coverage_required=True,
+        direct_minimum_required=True,
+    )
+
+    repaired, reasons = repair_weekly_volume(
+        (_day(1, existing, focus="upper"),),
+        normalized(session_duration_minutes=30),
+        WeeklyVolumePlan(targets=(target,), reason_codes=()),
+        RULESET,
+        candidates=(candidate,),
+    )
+
+    assert main_exercise_count(repaired[0].exercises) == 4
+    assert all(item.exercise_id != candidate.id for item in repaired[0].exercises)
+    assert "VOLUME_REPAIR_HARD_MINIMUM_UNSATISFIED" in reasons
+
+
+def test_volume_repair_does_not_remove_below_long_session_floor_for_soft_excess() -> None:
+    main_exercises = tuple(
+        _programmed(f"Existing Chest {index}", MuscleGroup.CHEST, 1)
+        for index in range(5)
+    )
+    core_exercises = (
+        _programmed("Core One", MuscleGroup.ABS, 1, exercise_type=ExerciseType.CORE),
+        _programmed("Core Two", MuscleGroup.ABS, 1, exercise_type=ExerciseType.CORE),
+    )
+    target = replace(
+        _volume_target(MuscleGroup.CHEST, target_sets=1).targets[0],
+        minimum_soft=0,
+        minimum_direct_sets=0,
+        minimum_effective_sets=0,
+        effective_target_sets=1,
+        maximum_hard=10,
+    )
+
+    repaired, _reasons = repair_weekly_volume(
+        (_day(1, main_exercises + core_exercises, focus="upper"),),
+        normalized(session_duration_minutes=45),
+        WeeklyVolumePlan(targets=(target,), reason_codes=()),
+        RULESET,
+    )
+
+    assert main_exercise_count(repaired[0].exercises) == 5

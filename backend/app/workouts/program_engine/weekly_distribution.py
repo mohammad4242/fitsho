@@ -6,6 +6,7 @@ from typing import cast
 
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
+    effective_main_exercise_ceiling,
     effective_main_exercise_floor,
     get_session_duration_policy,
 )
@@ -116,12 +117,15 @@ def _best_improving_move(
     donors = tuple(index for index, count in enumerate(counts) if count > smallest_count)
     proposals: list[tuple[tuple[object, ...], tuple[WorkoutDay, ...], ProgrammedExercise]] = []
     floor = effective_main_exercise_floor(request.source.session_duration_minutes, ruleset)
+    ceiling = effective_main_exercise_ceiling(request.source.session_duration_minutes, ruleset)
     for recipient_index in recipients:
         recipient = days[recipient_index]
+        if main_exercise_count(recipient.exercises) >= ceiling:
+            continue
         for donor_index in donors:
             donor = days[donor_index]
             donor_main_count = main_exercise_count(donor.exercises)
-            if len(donor.exercises) <= floor or donor_main_count < floor:
+            if donor_main_count <= floor:
                 continue
             for exercise_index, exercise in enumerate(donor.exercises):
                 if donor_main_count == floor and not is_supplemental_muscle(
@@ -200,6 +204,10 @@ def _invariants_hold(
     recipient_index: int,
     moved_id: str,
 ) -> bool:
+    floor = effective_main_exercise_floor(request.source.session_duration_minutes, ruleset)
+    ceiling = effective_main_exercise_ceiling(request.source.session_duration_minutes, ruleset)
+    before_counts = _exercise_counts(before)
+    after_counts = _exercise_counts(after)
     if (
         tuple((day.day_index, day.weekday) for day in before)
         != tuple((day.day_index, day.weekday) for day in after)
@@ -218,6 +226,11 @@ def _invariants_hold(
             has_near_equivalent(item, day.exercises[index + 1 :])
             for day in after
             for index, item in enumerate(day.exercises)
+        )
+        or any(
+            (candidate < prior and candidate < floor)
+            or (candidate > prior and candidate > ceiling)
+            for prior, candidate in zip(before_counts, after_counts, strict=True)
         )
     ):
         return False
@@ -274,7 +287,7 @@ def _fits_recipient_focus(exercise: ProgrammedExercise, day: WorkoutDay) -> bool
 
 
 def _exercise_counts(days: tuple[WorkoutDay, ...]) -> tuple[int, ...]:
-    return tuple(len(day.exercises) for day in days)
+    return tuple(main_exercise_count(day.exercises) for day in days)
 
 
 def _balance_score(counts: tuple[int, ...]) -> tuple[int, int, tuple[int, ...]]:
