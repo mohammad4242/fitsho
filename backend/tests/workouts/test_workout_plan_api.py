@@ -499,7 +499,7 @@ def test_strength_profile_is_created_and_reaches_real_fitsho_coach_generation(
             "experience_level": "advanced",
             "training_age_months": 96,
             "training_days_per_week": 5,
-            "session_duration_minutes": 75,
+            "session_duration_minutes": 60,
         },
     )
     assert profile.status_code == 201

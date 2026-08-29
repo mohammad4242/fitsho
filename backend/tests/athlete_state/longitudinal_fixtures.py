@@ -247,7 +247,7 @@ def longitudinal_scenarios() -> tuple[LongitudinalScenario, ...]:
                 4,
                 TrainingLocation.GYM,
                 None,
-                75,
+                60,
             ),
             cycles=(
                 CycleFixture(
