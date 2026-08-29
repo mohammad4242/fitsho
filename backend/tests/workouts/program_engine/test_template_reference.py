@@ -8,6 +8,7 @@ from app.training_templates.service import seed_training_program_templates
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     get_session_duration_policy,
+    get_session_exercise_count_policy,
 )
 from app.workouts.program_engine.engine import _template_rejection_category, generate_program
 from app.workouts.program_engine.enums import RecoveryRating, ValidationStatus
@@ -23,6 +24,7 @@ from app.workouts.program_engine.schemas import (
 from app.workouts.program_engine.split_selector import (
     classify_template_region,
 )
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.template_sessions import build_template_sessions
 from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
@@ -529,7 +531,7 @@ def test_explicit_full_body_template_reports_actual_coverage_and_evidence() -> N
             primary_goal="build_muscle",
             training_experience="intermediate",
             training_age_months=24,
-            session_duration_minutes=30,
+            session_duration_minutes=45,
         ),
         full_catalog(),
         RULESET,
@@ -949,7 +951,7 @@ def test_final_program_prefers_duration_feasible_template_regardless_of_input_or
     )
 
 
-def test_final_program_trims_duration_optional_slots_without_rejecting_template() -> None:
+def test_final_program_caps_30_min_main_slots_without_dropping_core() -> None:
     overloaded = _duration_overloaded_reference()
     source = template_request(
         available_training_days=4,
@@ -972,7 +974,12 @@ def test_final_program_trims_duration_optional_slots_without_rejecting_template(
         entry for entry in result.program.decision_trace if entry["stage"] == "template_adaptation"
     )
     assert adaptation["retained_core_slot_count"] == adaptation["core_slot_count"]
-    assert "TEMPLATE_ACCESSORY_TRIMMED_FOR_TIME_LIMIT" in adaptation["reason_codes"]
+    assert "TEMPLATE_MAIN_COUNT_CAPPED_FOR_DURATION" in adaptation["reason_codes"]
+    count_policy = get_session_exercise_count_policy(30, RULESET)
+    assert all(
+        count_policy.contains(main_exercise_count(day.exercises))
+        for day in result.program.weekly_schedule
+    )
     assert sum(len(day.exercises) for day in result.program.weekly_schedule) < sum(
         len(day.slots) for day in overloaded.days
     )

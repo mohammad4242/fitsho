@@ -112,9 +112,9 @@ EQUIPMENT_CASES = (
         ),
         TrainingExperience.BEGINNER,
         Goal.MUSCLE_GAIN,
-        3,
+        2,
         True,
-        id="complete-home-beginner-muscle-gain-3d",
+        id="complete-home-beginner-muscle-gain-2d",
     ),
 )
 

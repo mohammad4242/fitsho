@@ -4,12 +4,14 @@ from app.workouts.program_engine.duration_capacity import build_session_capacity
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     get_session_duration_policy,
+    get_session_exercise_count_policy,
     is_main_training_exercise,
     validate_session_duration,
 )
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 RULESET = ProgramRuleset()
@@ -136,9 +138,12 @@ def test_phase119_full_matrix_semantics(goal, duration):
         for day in res.program.weekly_schedule
     )
 
-    # 3. Correct exercise count floor
-    effective_floor = 3 if duration <= 30 else RULESET.minimum_exercises_per_session
-    assert all(len(day.exercises) >= effective_floor for day in res.program.weekly_schedule)
+    # 3. Correct duration-aware MAIN exercise-count bounds
+    count_policy = get_session_exercise_count_policy(duration, RULESET)
+    assert all(
+        count_policy.contains(main_exercise_count(day.exercises))
+        for day in res.program.weekly_schedule
+    )
 
 
 def test_phase119_cardio_ordering_and_coach_quality_fit():
@@ -147,7 +152,7 @@ def test_phase119_cardio_ordering_and_coach_quality_fit():
     # Generate a program that might have cardio
     source = request(
         primary_goal=Goal.FAT_LOSS,
-        session_duration_minutes=60,
+        session_duration_minutes=45,
         available_training_days=3,
         training_experience="beginner",
     )
@@ -170,7 +175,7 @@ def test_phase119_cardio_ordering_and_coach_quality_fit():
     if budget_fit:
         assert cq["duration_fit"]["percentage"] == 100.0
     else:
-        # Otherwise, the days that exceeded 60 won't be counted
+        # Otherwise, the days that exceeded 45 won't be counted
         assert cq["duration_fit"]["percentage"] < 100.0
 
     # Cardio must not affect the duration_fit
@@ -229,7 +234,7 @@ def test_phase119_cardio_additive():
     # Cardio remains additive to the main-training duration contract.
     source = request(
         primary_goal=Goal.FAT_LOSS,
-        session_duration_minutes=60,
+        session_duration_minutes=45,
         available_training_days=3,
         training_experience="beginner",
     )

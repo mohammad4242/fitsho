@@ -293,7 +293,7 @@ def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> Non
             training_experience="intermediate",
             training_age_months=24,
             available_training_days=4,
-            session_duration_minutes=30,
+            session_duration_minutes=45,
             available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
         ),
         full_catalog(),

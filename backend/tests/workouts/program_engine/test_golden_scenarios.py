@@ -6,10 +6,12 @@ from app.exercises.enums import Equipment, ExerciseCautionTag, MovementPattern, 
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     get_session_duration_policy,
+    get_session_exercise_count_policy,
 )
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import PLANNED_MUSCLES, TRACKED_MUSCLES
 from tests.workouts.program_engine.golden_fixtures import (
@@ -448,10 +450,11 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
     assert first.program is not None, first.errors
     assert second.program == first.program
     assert first.program.validation_report.is_valid
+    count_policy = get_session_exercise_count_policy(
+        source.session_duration_minutes, RULESET
+    )
     assert all(
-        RULESET.minimum_exercises_per_session
-        <= len(day.exercises)
-        <= RULESET.max_exercises_per_session
+        count_policy.contains(main_exercise_count(day.exercises))
         for day in first.program.weekly_schedule
     )
     duration_policy = get_session_duration_policy(source.session_duration_minutes)
