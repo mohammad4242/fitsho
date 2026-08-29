@@ -23,9 +23,15 @@ from app.workouts.program_engine.enums import (
 )
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.normalization import normalize_request
-from app.workouts.program_engine.prescription import prescription_for
+from app.workouts.program_engine.prescription import prescribe_sessions, prescription_for
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-from app.workouts.program_engine.schemas import ExerciseCandidate, ProgramGenerationRequest
+from app.workouts.program_engine.schemas import (
+    ExerciseCandidate,
+    ProgramGenerationRequest,
+    SessionDraft,
+    VolumeTarget,
+    WeeklyVolumePlan,
+)
 from app.workouts.program_engine.strength_programming import (
     StrengthExerciseRole,
     classify_strength_role,
@@ -37,6 +43,7 @@ def _candidate(
     name: str,
     *,
     equipment: frozenset[Equipment],
+    slug: str | None = None,
     exercise_type: ExerciseType = ExerciseType.COMPOUND,
     difficulty: Difficulty = Difficulty.INTERMEDIATE,
     skill_demand: SkillDemand = SkillDemand.MODERATE,
@@ -52,10 +59,12 @@ def _candidate(
         exercise_type=exercise_type,
         equipment=equipment,
         difficulty=difficulty,
+        slug=slug,
         skill_demand=skill_demand,
         stability_demand=stability_demand,
         caution_tags=caution_tags,
         substitution_group="horizontal_push",
+        display_snapshot={"slug": slug} if slug is not None else {},
     )
 
 
@@ -270,3 +279,123 @@ def test_advanced_strength_end_to_end_places_loaded_main_work_before_pushups() -
         for day in result.program.weekly_schedule
         for item in day.exercises
     )
+
+
+APPROVED_PRIMARY_STRENGTH_LIFTS = (
+    ("Barbell Back Squat", "fedb-1435-barbell-back-squat"),
+    ("Barbell Bench Press", "fedb-0025-barbell-bench-press"),
+    ("Barbell Bent-Over Row", "barbell-bent-over-row"),
+    ("Conventional Barbell Deadlift", "conventional-barbell-deadlift"),
+)
+
+
+def _prescribed_sets(
+    candidate: ExerciseCandidate,
+    *,
+    goal: Goal = Goal.STRENGTH,
+    priority: bool = False,
+) -> tuple[int, tuple[str, ...]]:
+    source = _strength_request(
+        primary_goal=goal,
+        priority_muscles=[MuscleGroup.CHEST] if priority else [],
+    )
+    normalized = normalize_request(source, RULESET)
+    draft = SessionDraft(
+        day_index=1,
+        weekday=0,
+        focus="full_body",
+        exercises=[candidate],
+        selection_reasons={candidate.id: ()},
+        substitutions={candidate.id: ()},
+    )
+    volume = WeeklyVolumePlan(
+        targets=(
+            VolumeTarget(
+                muscle=MuscleGroup.CHEST,
+                minimum_soft=7,
+                target_sets=7,
+                maximum_soft=9,
+                maximum_hard=12,
+                fractional_sets=0.0,
+                effective_target_sets=7,
+                minimum_direct_sets=3,
+                direct_minimum_required=priority,
+            ),
+        ),
+        reason_codes=(),
+    )
+    item = prescribe_sessions(normalized, (draft,), volume, RULESET)[0].exercises[0]
+    return item.sets, item.reason_codes
+
+
+@pytest.mark.parametrize("name, slug", APPROVED_PRIMARY_STRENGTH_LIFTS)
+def test_each_approved_primary_strength_lift_can_reach_five_sets(
+    name: str,
+    slug: str,
+) -> None:
+    candidate = _candidate(
+        name,
+        slug=slug,
+        equipment=frozenset({Equipment.BARBELL, Equipment.BENCH}),
+    )
+
+    sets, reasons = _prescribed_sets(candidate)
+
+    assert sets == 5
+    assert "STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED" in reasons
+
+
+@pytest.mark.parametrize("name, slug", APPROVED_PRIMARY_STRENGTH_LIFTS)
+def test_approved_lifts_outside_strength_stay_at_four_sets(
+    name: str,
+    slug: str,
+) -> None:
+    candidate = _candidate(
+        name,
+        slug=slug,
+        equipment=frozenset({Equipment.BARBELL, Equipment.BENCH}),
+    )
+
+    sets, reasons = _prescribed_sets(candidate, goal=Goal.HYPERTROPHY)
+
+    assert sets == 4
+    assert "STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED" not in reasons
+
+
+def test_unrelated_primary_strength_compound_stays_at_four_sets() -> None:
+    candidate = _candidate(
+        "Barbell Incline Bench Press",
+        slug="fedb-0047-barbell-incline-bench-press",
+        equipment=frozenset({Equipment.BARBELL, Equipment.BENCH}),
+    )
+
+    sets, reasons = _prescribed_sets(candidate)
+
+    assert sets == 4
+    assert "STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED" not in reasons
+
+
+def test_dumbbell_deadlift_does_not_inherit_barbell_deadlift_cap() -> None:
+    candidate = _candidate(
+        "Dumbbell Deadlift",
+        slug="fedb-0300-dumbbell-deadlift",
+        equipment=frozenset({Equipment.DUMBBELL}),
+    )
+
+    sets, reasons = _prescribed_sets(candidate)
+
+    assert sets == 4
+    assert "STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED" not in reasons
+
+
+def test_priority_and_single_exposure_bonuses_cannot_make_unrelated_lift_five_sets() -> None:
+    candidate = _candidate(
+        "Barbell Incline Bench Press",
+        slug="fedb-0047-barbell-incline-bench-press",
+        equipment=frozenset({Equipment.BARBELL, Equipment.BENCH}),
+    )
+
+    sets, reasons = _prescribed_sets(candidate, priority=True)
+
+    assert sets == 4
+    assert "STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED" not in reasons

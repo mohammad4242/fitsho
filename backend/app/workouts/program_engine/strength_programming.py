@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.exercises.enums import Difficulty, ExerciseType
-from app.workouts.program_engine.enums import SkillDemand, StabilityDemand, TrainingStatus
+from app.workouts.program_engine.enums import Goal, SkillDemand, StabilityDemand, TrainingStatus
 from app.workouts.program_engine.equipment import effective_required_equipment
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.safety import effective_caution_tags
@@ -19,6 +19,33 @@ class StrengthExerciseRole(StrEnum):
 class StrengthRoleDecision:
     role: StrengthExerciseRole
     reason_codes: tuple[str, ...]
+
+
+# Catalog slugs are the authorization boundary; display names are not consulted.
+APPROVED_PRIMARY_STRENGTH_LIFT_SLUGS = frozenset(
+    {
+        "fedb-1435-barbell-back-squat",
+        "fedb-0025-barbell-bench-press",
+        "barbell-bent-over-row",
+        "conventional-barbell-deadlift",
+    }
+)
+STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED = "STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED"
+
+
+def is_strength_set_cap_authorized(
+    *,
+    goal: Goal,
+    exercise_type: ExerciseType,
+    exercise_slug: str | None,
+    is_primary_strength: bool,
+) -> bool:
+    return (
+        goal is Goal.STRENGTH
+        and exercise_type is ExerciseType.COMPOUND
+        and is_primary_strength
+        and exercise_slug in APPROVED_PRIMARY_STRENGTH_LIFT_SLUGS
+    )
 
 
 _DIFFICULTY_RANK = {

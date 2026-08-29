@@ -14,7 +14,11 @@ from app.workouts.program_engine.prescription import (
 )
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import ExerciseCandidate, NormalizedProgramRequest
-from app.workouts.program_engine.strength_programming import classify_strength_role
+from app.workouts.program_engine.strength_programming import (
+    StrengthExerciseRole,
+    classify_strength_role,
+    is_strength_set_cap_authorized,
+)
 
 
 class CapacityFeasibility(StrEnum):
@@ -94,17 +98,21 @@ def estimate_candidate_cost(
         fatigue_cost=candidate.fatigue_cost,
     )
     is_priority = candidate.primary_muscle in request.source.priority_muscles
+    is_primary_strength = strength_role is StrengthExerciseRole.PRIMARY_STRENGTH
+    strength_set_cap_authorized = is_strength_set_cap_authorized(
+        goal=request.primary_goal,
+        exercise_type=candidate.exercise_type,
+        exercise_slug=candidate.slug,
+        is_primary_strength=is_primary_strength,
+    )
     working_set_cap = ruleset.max_working_sets_for_exercise(
         training_status=request.training_status,
         goal=request.primary_goal,
         exercise_type=candidate.exercise_type,
         is_priority=is_priority,
         weekly_exposure_count=1,
-        is_primary_strength=(
-            request.primary_goal is Goal.STRENGTH
-            and strength_role is not None
-            and strength_role.value == "primary_strength"
-        ),
+        is_primary_strength=is_primary_strength,
+        is_approved_primary_strength_lift=strength_set_cap_authorized,
     )
     working_sets = min(
         max(ruleset.minimum_working_sets, sets or ruleset.minimum_working_sets),

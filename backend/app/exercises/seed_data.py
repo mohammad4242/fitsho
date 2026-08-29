@@ -137,10 +137,32 @@ def _exercise(
     instructions_fa: tuple[str, str, str],
     safety_en: str,
     safety_fa: str,
+    *,
+    media_path: str | None = None,
+    media_type: MediaType | None = None,
+    media_license: str | None = None,
+    media_attribution: str | None = None,
 ) -> ExerciseSeed:
     movement_pattern, exercise_type, caution_tags = PROGRAMMING_METADATA[slug]
-    media_path, media_type = _OWNER_MEDIA[slug]
-    media_path = f"/media/exercises/seed/{slug}.gif"
+    owner_media = _OWNER_MEDIA.get(slug)
+    if media_path is None:
+        resolved_media_path = (
+            f"/media/exercises/seed/{slug}.gif"
+            if owner_media is not None
+            else "/exercises/exercise-placeholder.svg"
+        )
+        resolved_media_type = owner_media[1] if owner_media is not None else MediaType.PLACEHOLDER
+    else:
+        resolved_media_path = media_path
+        resolved_media_type = media_type or (
+            owner_media[1] if owner_media is not None else MediaType.PLACEHOLDER
+        )
+    resolved_media_license = media_license or (
+        OWNER_LICENSE if owner_media is not None else "Fitsho original"
+    )
+    resolved_media_attribution = media_attribution or (
+        OWNER_ATTRIBUTION if owner_media is not None else "Fitsho"
+    )
     return ExerciseSeed(
         slug=slug,
         name_en=name_en,
@@ -160,11 +182,11 @@ def _exercise(
         instructions_fa=instructions_fa,
         safety_notes_en=(safety_en,),
         safety_notes_fa=(safety_fa,),
-        media_path=media_path,
-        media_type=media_type,
+        media_path=resolved_media_path,
+        media_type=resolved_media_type,
         media_source_url=None,
-        media_license=OWNER_LICENSE,
-        media_attribution=OWNER_ATTRIBUTION,
+        media_license=resolved_media_license,
+        media_attribution=resolved_media_attribution,
     )
 
 
@@ -194,6 +216,7 @@ SEED_MUSCLE_FOCUS: dict[str, MuscleFocus | None] = {
     "leg-extension": None,
     "dumbbell-lunge": None,
     "romanian-deadlift": F.HAMSTRINGS_HIP_EXTENSION,
+    "conventional-barbell-deadlift": F.HAMSTRINGS_HIP_EXTENSION,
     "standing-calf-raise": F.GASTROCNEMIUS,
 }
 
@@ -216,6 +239,7 @@ PROGRAMMING_METADATA: dict[
     "leg-extension": (P.KNEE_EXTENSION, T.ISOLATION, ()),
     "dumbbell-lunge": (P.LUNGE, T.COMPOUND, (C.DEEP_KNEE_FLEXION, C.BALANCE_DEMAND)),
     "romanian-deadlift": (P.HIP_HINGE, T.COMPOUND, (C.LOWER_BACK_LOADING,)),
+    "conventional-barbell-deadlift": (P.HIP_HINGE, T.COMPOUND, (C.LOWER_BACK_LOADING,)),
     "standing-calf-raise": (P.CALF_RAISE, T.ISOLATION, (C.BALANCE_DEMAND,)),
 }
 
@@ -573,6 +597,32 @@ EXERCISE_SEEDS: tuple[ExerciseSeed, ...] = (
         ),
         "Keep the spine neutral and end the descent before the back rounds.",
         "ستون فقرات را خنثی نگه دار و پیش از گرد شدن کمر، پایین رفتن را تمام کن.",
+    ),
+    _exercise(
+        "conventional-barbell-deadlift",
+        "Conventional Barbell Deadlift",
+        "ددلیفت هالتر استاندارد",
+        B.LOWER_BODY,
+        M.HAMSTRINGS,
+        (M.GLUTES, M.LOWER_BACK),
+        (E.BARBELL,),
+        D.INTERMEDIATE,
+        (
+            "Stand with the bar over the mid-foot and grip it just outside the legs.",
+            "Brace the trunk, push the floor away, and keep the bar close as you stand.",
+            "Lower the bar by hinging at the hips, then bend the knees once it passes them.",
+        ),
+        (
+            "با هالتر روی میانه پا بایست و آن را کمی بیرون‌تر از پاها بگیر.",
+            "میان‌تنه را محکم کن، زمین را با پاها فشار بده و هالتر را نزدیک بدن بالا بیاور.",
+            "با خم کردن لگن هالتر را پایین ببر و پس از عبور از زانوها، زانوها را خم کن.",
+        ),
+        "Use a manageable load and stop if the spine cannot stay neutral.",
+        "وزنه قابل‌کنترل انتخاب کن و اگر ستون فقرات خنثی نمی‌ماند، ست را متوقف کن.",
+        media_path="/exercises/exercise-placeholder.svg",
+        media_type=MediaType.PLACEHOLDER,
+        media_license="Fitsho original",
+        media_attribution="Fitsho",
     ),
     _exercise(
         "standing-calf-raise",

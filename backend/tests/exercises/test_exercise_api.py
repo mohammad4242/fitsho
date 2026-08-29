@@ -207,7 +207,7 @@ def test_list_returns_active_exercises_with_pagination_metadata(
     payload = response.json()
     assert payload["page"] == 1
     assert payload["page_size"] == 12
-    assert payload["total"] == 17
+    assert payload["total"] == 18
     assert payload["total_pages"] == 2
     assert len(payload["items"]) == 12
     assert [item["name_en"] for item in payload["items"]] == sorted(
@@ -425,7 +425,7 @@ def test_inactive_exercises_are_hidden_from_list_and_detail(
     detail = client.get("/api/v1/exercises/dumbbell-bench-press")
 
     assert listing.status_code == 200
-    assert listing.json()["total"] == 16
+    assert listing.json()["total"] == 17
     assert "dumbbell-bench-press" not in {item["slug"] for item in listing.json()["items"]}
     assert detail.status_code == 404
     assert detail.json() == {"detail": "Exercise not found"}
@@ -443,7 +443,7 @@ def test_unknown_slug_returns_not_found(client: TestClient, db: Session) -> None
 @pytest.mark.parametrize(
     ("query", "expected_total", "expected_value"),
     [
-        ("body_region=lower_body", 7, ("body_region", "lower_body")),
+        ("body_region=lower_body", 8, ("body_region", "lower_body")),
         ("primary_muscle=biceps", 4, ("primary_muscle", "biceps")),
         ("equipment=dumbbell", 8, ("equipment", "dumbbell")),
         ("difficulty=beginner", 11, ("difficulty", "beginner")),
@@ -567,7 +567,7 @@ def test_pagination_returns_stable_pages_and_empty_out_of_range_page(
     second = client.get("/api/v1/exercises?page=2&page_size=5").json()
     beyond = client.get("/api/v1/exercises?page=99&page_size=5").json()
 
-    assert first["total"] == second["total"] == beyond["total"] == 17
+    assert first["total"] == second["total"] == beyond["total"] == 18
     assert first["total_pages"] == second["total_pages"] == beyond["total_pages"] == 4
     assert len(first["items"]) == len(second["items"]) == 5
     assert {item["id"] for item in first["items"]}.isdisjoint(

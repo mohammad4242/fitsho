@@ -18,8 +18,10 @@ from app.workouts.program_engine.schemas import (
 )
 from app.workouts.program_engine.session_targets import english_session_title
 from app.workouts.program_engine.strength_programming import (
+    STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED,
     StrengthExerciseRole,
     classify_strength_role,
+    is_strength_set_cap_authorized,
 )
 
 
@@ -99,6 +101,16 @@ def prescribe_sessions(
                 if request.primary_goal is Goal.STRENGTH
                 else None
             )
+            is_primary_strength = (
+                strength_role is not None
+                and strength_role.role is StrengthExerciseRole.PRIMARY_STRENGTH
+            )
+            strength_set_cap_authorized = is_strength_set_cap_authorized(
+                goal=request.primary_goal,
+                exercise_type=exercise.exercise_type,
+                exercise_slug=exercise.slug,
+                is_primary_strength=is_primary_strength,
+            )
             primary_muscle = exercise.primary_muscle
             session_size_accessory = False
             if primary_muscle is not None:
@@ -134,6 +146,8 @@ def prescribe_sessions(
                 weekly_exposure_count=(
                     exposure_counts[primary_muscle] if primary_muscle is not None else 0
                 ),
+                is_primary_strength=is_primary_strength,
+                is_approved_primary_strength_lift=strength_set_cap_authorized,
             )
             cap_applied = sets > cap
             sets = min(sets, cap)
@@ -184,6 +198,11 @@ def prescribe_sessions(
                         dict.fromkeys(
                             draft.selection_reasons[exercise.id]
                             + (strength_role.reason_codes if strength_role is not None else ())
+                            + (
+                                (STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED,)
+                                if strength_set_cap_authorized
+                                else ()
+                            )
                             + (("VOLUME_SET_CAP_APPLIED",) if cap_applied else ())
                             + (("SESSION_SIZE_ACCESSORY",) if session_size_accessory else ())
                         )
@@ -208,6 +227,7 @@ def prescribe_sessions(
                     is_programmable=exercise.is_programmable,
                     needs_review=exercise.needs_review,
                     exercise_type=exercise.exercise_type,
+                    exercise_slug=exercise.slug,
                 )
             )
         estimated = calculate_total_session_minutes_from_exercises(

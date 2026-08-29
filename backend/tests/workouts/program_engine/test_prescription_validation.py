@@ -519,6 +519,70 @@ def test_validator_rejects_legacy_hidden_volume_flag_and_still_counts_sets() -> 
     )
 
 
+def test_validator_accepts_five_sets_for_authorized_primary_strength_lift() -> None:
+    source = request(primary_goal=Goal.STRENGTH)
+    result = generate_program(source, full_catalog(), RULESET)
+    assert result.program is not None
+    day = result.program.weekly_schedule[0]
+    item = next(item for item in day.exercises if item.exercise_type is ExerciseType.COMPOUND)
+    authorized = replace(
+        item,
+        sets=5,
+        exercise_slug="fedb-0025-barbell-bench-press",
+        reason_codes=("STRENGTH_PRIMARY_COMPOUND", "STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED"),
+    )
+    changed = replace(
+        result.program,
+        weekly_schedule=(
+            replace(
+                day,
+                exercises=tuple(
+                    authorized if candidate is item else candidate
+                    for candidate in day.exercises
+                ),
+            ),
+            *result.program.weekly_schedule[1:],
+        ),
+    )
+
+    report = validate_program(changed, source, RULESET)
+
+    assert "INVALID_EXERCISE_PRESCRIPTION" not in report.errors
+    assert "PER_EXERCISE_SET_CAP_EXCEEDED" not in report.errors
+
+
+def test_validator_rejects_six_sets_even_for_authorized_primary_strength_lift() -> None:
+    source = request(primary_goal=Goal.STRENGTH)
+    result = generate_program(source, full_catalog(), RULESET)
+    assert result.program is not None
+    day = result.program.weekly_schedule[0]
+    item = next(item for item in day.exercises if item.exercise_type is ExerciseType.COMPOUND)
+    invalid_item = replace(
+        item,
+        sets=6,
+        exercise_slug="fedb-0025-barbell-bench-press",
+        reason_codes=("STRENGTH_PRIMARY_COMPOUND", "STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED"),
+    )
+    invalid = replace(
+        result.program,
+        weekly_schedule=(
+            replace(
+                day,
+                exercises=tuple(
+                    invalid_item if candidate is item else candidate
+                    for candidate in day.exercises
+                ),
+            ),
+            *result.program.weekly_schedule[1:],
+        ),
+    )
+
+    report = validate_program(invalid, source, RULESET)
+
+    assert "INVALID_EXERCISE_PRESCRIPTION" in report.errors
+    assert "PER_EXERCISE_SET_CAP_EXCEEDED" in report.errors
+
+
 def test_validator_rejects_core_work_outside_three_or_four_sets() -> None:
     source = request()
     result = generate_program(source, full_catalog(), RULESET)

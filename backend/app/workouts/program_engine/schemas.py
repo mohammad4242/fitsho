@@ -258,6 +258,7 @@ class ExerciseCandidate:
     exercise_type: ExerciseType
     equipment: frozenset[Equipment]
     difficulty: Difficulty
+    slug: str | None = None
     muscle_focus: MuscleFocus | None = None
     caution_tags: frozenset[ExerciseCautionTag] = frozenset()
     labels: frozenset[ExerciseLabel] = frozenset()
@@ -482,6 +483,7 @@ class ProgrammedExercise:
     body_position: BodyPosition = BodyPosition.STANDING
     laterality: Laterality = Laterality.BILATERAL
     substitution_group: str | None = None
+    exercise_slug: str | None = None
 
     def __post_init__(self) -> None:
         if self.superset_group is not None and not 1 <= len(self.superset_group) <= 32:

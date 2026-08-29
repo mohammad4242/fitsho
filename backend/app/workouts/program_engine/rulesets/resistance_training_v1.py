@@ -206,19 +206,31 @@ class ProgramRuleset:
         is_priority: bool,
         weekly_exposure_count: int,
         is_primary_strength: bool = False,
+        is_approved_primary_strength_lift: bool = False,
     ) -> int:
         cap = min(
             self.max_working_sets_per_exercise_per_session[training_status],
             self.exercise_type_set_cap[exercise_type],
         )
-        if is_primary_strength:
+        strength_set_cap_authorized = (
+            goal is Goal.STRENGTH
+            and exercise_type is ExerciseType.COMPOUND
+            and is_primary_strength
+            and is_approved_primary_strength_lift
+        )
+        if strength_set_cap_authorized:
             cap += self.strength_compound_set_cap_bonus
         if is_priority:
             cap += self.priority_set_cap_bonus
         if weekly_exposure_count <= 1:
             cap += self.single_exposure_set_cap_bonus
 
-        absolute_cap = 4
+        absolute_cap = min(self.max_working_sets_per_exercise_absolute, 4)
+        if strength_set_cap_authorized:
+            absolute_cap = min(
+                absolute_cap + self.strength_compound_set_cap_bonus,
+                5,
+            )
         return min(
             cap,
             absolute_cap,

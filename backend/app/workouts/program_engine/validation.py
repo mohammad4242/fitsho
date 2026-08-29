@@ -27,6 +27,9 @@ from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     focus_scope,
 )
+from app.workouts.program_engine.strength_programming import (
+    is_strength_set_cap_authorized,
+)
 from app.workouts.program_engine.supersets import superset_structure_errors
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.volume_policy import (
@@ -143,11 +146,21 @@ def validate_program(
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
             if not item.counts_toward_volume:
                 errors.append("RESISTANCE_WORK_EXCLUDED_FROM_VOLUME")
+            is_primary_strength = "STRENGTH_PRIMARY_COMPOUND" in item.reason_codes
+            strength_set_cap_authorized = is_strength_set_cap_authorized(
+                goal=request.primary_goal,
+                exercise_type=item.exercise_type,
+                exercise_slug=item.exercise_slug,
+                is_primary_strength=is_primary_strength,
+            )
             if item.exercise_type in {
                 ExerciseType.COMPOUND,
                 ExerciseType.ISOLATION,
                 ExerciseType.CORE,
-            } and item.sets not in {3, 4}:
+            } and not (
+                item.sets in {3, 4}
+                or (item.sets == 5 and strength_set_cap_authorized)
+            ):
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
             if (
                 item.primary_muscle is not None
@@ -158,7 +171,8 @@ def validate_program(
                     exercise_type=item.exercise_type,
                     is_priority=item.primary_muscle in priority_muscles,
                     weekly_exposure_count=weekly_exposures[item.primary_muscle],
-                    is_primary_strength="STRENGTH_PRIMARY_COMPOUND" in item.reason_codes,
+                    is_primary_strength=is_primary_strength,
+                    is_approved_primary_strength_lift=strength_set_cap_authorized,
                 )
             ):
                 errors.append("PER_EXERCISE_SET_CAP_EXCEEDED")

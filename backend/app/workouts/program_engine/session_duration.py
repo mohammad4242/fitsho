@@ -44,8 +44,10 @@ from app.workouts.program_engine.schemas import (
 from app.workouts.program_engine.session_builder import exercise_fits_focus
 from app.workouts.program_engine.session_targets import english_session_title
 from app.workouts.program_engine.strength_programming import (
+    STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED,
     StrengthExerciseRole,
     classify_strength_role,
+    is_strength_set_cap_authorized,
 )
 from app.workouts.program_engine.supersets import (
     apply_duration_pressure_superset,
@@ -483,21 +485,26 @@ def _select_set_addition(
     for index, exercise in enumerate(exercises):
         if not is_main_training_exercise(exercise) or exercise.primary_muscle is None:
             continue
+        is_primary_strength = (
+            request.primary_goal is Goal.STRENGTH
+            and _programmed_strength_role(exercise) is StrengthExerciseRole.PRIMARY_STRENGTH
+        )
+        strength_set_cap_authorized = is_strength_set_cap_authorized(
+            goal=request.primary_goal,
+            exercise_type=exercise.exercise_type,
+            exercise_slug=exercise.exercise_slug,
+            is_primary_strength=is_primary_strength,
+        )
         set_cap = ruleset.max_working_sets_for_exercise(
             training_status=request.training_status,
             goal=request.primary_goal,
             exercise_type=exercise.exercise_type,
             is_priority=exercise.primary_muscle in priority_policy.priorities,
             weekly_exposure_count=1,
-            is_primary_strength=(
-                request.primary_goal is Goal.STRENGTH
-                and _programmed_strength_role(exercise) is StrengthExerciseRole.PRIMARY_STRENGTH
-            ),
+            is_primary_strength=is_primary_strength,
+            is_approved_primary_strength_lift=strength_set_cap_authorized,
         )
-        if (
-            exercise.sets >= set_cap
-            or exercise.sets >= ruleset.max_working_sets_per_exercise_absolute
-        ):
+        if exercise.sets >= set_cap:
             continue
         direct_sets = sum(
             item.sets for item in exercises if item.primary_muscle is exercise.primary_muscle
@@ -619,6 +626,21 @@ def _select_exercise_addition(
             item.sets for item in exercises if item.primary_muscle is candidate.primary_muscle
         )
         sess_max = session_hard_volume_cap(request.source.training_age_months)
+        strength_role = (
+            classify_strength_role(candidate, request, ruleset)
+            if request.primary_goal is Goal.STRENGTH
+            else None
+        )
+        is_primary_strength = (
+            strength_role is not None
+            and strength_role.role is StrengthExerciseRole.PRIMARY_STRENGTH
+        )
+        strength_set_cap_authorized = is_strength_set_cap_authorized(
+            goal=request.primary_goal,
+            exercise_type=candidate.exercise_type,
+            exercise_slug=candidate.slug,
+            is_primary_strength=is_primary_strength,
+        )
         sets = min(
             ruleset.minimum_working_sets,
             sess_max,
@@ -628,7 +650,8 @@ def _select_exercise_addition(
                 exercise_type=candidate.exercise_type,
                 is_priority=candidate.primary_muscle in priority_policy.priorities,
                 weekly_exposure_count=1,
-                is_primary_strength=False,
+                is_primary_strength=is_primary_strength,
+                is_approved_primary_strength_lift=strength_set_cap_authorized,
             ),
         )
         if sets < 1:
@@ -643,11 +666,7 @@ def _select_exercise_addition(
             prescription_mode=candidate.prescription_mode,
             duration_min_seconds=candidate.duration_min_seconds,
             duration_max_seconds=candidate.duration_max_seconds,
-            strength_role=(
-                classify_strength_role(candidate, request, ruleset).role
-                if request.primary_goal is Goal.STRENGTH
-                else None
-            ),
+            strength_role=strength_role.role if strength_role is not None else None,
             fatigue_cost=candidate.fatigue_cost,
         )
         estimated = estimate_exercise_minutes(sets, prescription.rest_seconds, 0, ruleset)
@@ -656,11 +675,16 @@ def _select_exercise_addition(
             for other_day in other_days
             for item in other_day.exercises
         )
+        ranked_reasons = ranked_item.reason_codes + (
+            (STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED,)
+            if strength_set_cap_authorized
+            else ()
+        )
         programmed = _program_candidate(
             candidate,
             sets,
             estimated,
-            ranked_item.reason_codes,
+            ranked_reasons,
             prescription,
             ruleset,
             repeated=repeated,
@@ -1011,6 +1035,7 @@ def _program_candidate(
         body_position=candidate.body_position,
         laterality=candidate.laterality,
         substitution_group=candidate.substitution_group,
+        exercise_slug=candidate.slug,
         is_active=candidate.is_active,
         is_programmable=candidate.is_programmable,
         needs_review=candidate.needs_review,

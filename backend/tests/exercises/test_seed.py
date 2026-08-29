@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-EXPECTED_BY_REGION = {"upper_body": 10, "lower_body": 7}
+EXPECTED_BY_REGION = {"upper_body": 10, "lower_body": 8}
 EXPECTED_BY_MUSCLE = {
     "chest": 1,
     "back": 1,
@@ -15,7 +15,7 @@ EXPECTED_BY_MUSCLE = {
     "triceps": 1,
     "glutes": 1,
     "quadriceps": 4,
-    "hamstrings": 1,
+    "hamstrings": 2,
     "calves": 1,
 }
 OWNER_MEDIA_SLUGS = {
@@ -37,13 +37,14 @@ OWNER_MEDIA_SLUGS = {
     "romanian-deadlift",
     "standing-calf-raise",
 }
+PLACEHOLDER_MEDIA_SLUGS = {"conventional-barbell-deadlift"}
 
 
 def test_seed_manifest_covers_every_catalog_category() -> None:
     from app.exercises.seed_data import EXERCISE_SEEDS
 
-    assert len(EXERCISE_SEEDS) == 17
-    assert len({seed.slug for seed in EXERCISE_SEEDS}) == 17
+    assert len(EXERCISE_SEEDS) == 18
+    assert len({seed.slug for seed in EXERCISE_SEEDS}) == 18
     assert Counter(seed.body_region.value for seed in EXERCISE_SEEDS) == EXPECTED_BY_REGION
     assert Counter(seed.primary_muscle.value for seed in EXERCISE_SEEDS) == EXPECTED_BY_MUSCLE
 
@@ -104,9 +105,15 @@ def test_seed_manifest_uses_only_approved_media() -> None:
         assert seed.media_source_url is None
         assert seed.media_license == "Project owner supplied and authorized"
         assert seed.media_attribution == "Provided by Fitsho project owner"
-    assert all(
-        seed.media_path != "/media/exercises/seed/exercise-placeholder.svg"
-        for seed in EXERCISE_SEEDS
+    placeholder_media = {
+        seed.slug for seed in EXERCISE_SEEDS if seed.media_type is MediaType.PLACEHOLDER
+    }
+    assert placeholder_media == PLACEHOLDER_MEDIA_SLUGS
+    conventional_deadlift = next(
+        seed for seed in EXERCISE_SEEDS if seed.slug == "conventional-barbell-deadlift"
+    )
+    assert conventional_deadlift.name_en == (
+        "Conventional Barbell Deadlift"
     )
 
 
@@ -171,7 +178,7 @@ def test_seed_is_idempotent_and_restores_seed_owned_fields(db: Session) -> None:
         select(Exercise).where(Exercise.slug == "dumbbell-bench-press")
     )
 
-    assert first.exercises == second.exercises == 17
+    assert first.exercises == second.exercises == 18
     assert first.alternatives == second.alternatives == 1
     assert ids_after == ids_before
     assert restored_bench_press is not None
@@ -188,7 +195,7 @@ def test_seed_is_idempotent_and_restores_seed_owned_fields(db: Session) -> None:
     assert preserved_custom.id == custom_id
     assert preserved_custom.media_path == "/exercises/exercise-placeholder.svg"
     assert {item.equipment for item in preserved_custom.equipment_items} == {Equipment.BODYWEIGHT}
-    assert db.scalar(select(func.count()).select_from(Exercise)) == 18
+    assert db.scalar(select(func.count()).select_from(Exercise)) == 19
     assert db.scalar(select(func.count()).select_from(ExerciseAlternative)) == 1
 
 

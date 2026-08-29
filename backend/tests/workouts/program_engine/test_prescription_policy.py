@@ -4,7 +4,11 @@ from app.exercises.enums import ExerciseType, PrescriptionMode
 from app.workouts.program_engine.enums import Goal, TrainingStatus
 from app.workouts.program_engine.prescription import prescription_for
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-from app.workouts.program_engine.strength_programming import StrengthExerciseRole
+from app.workouts.program_engine.strength_programming import (
+    APPROVED_PRIMARY_STRENGTH_LIFT_SLUGS,
+    StrengthExerciseRole,
+    is_strength_set_cap_authorized,
+)
 
 
 def test_hypertrophy_rir_depends_on_role_and_experience() -> None:
@@ -140,6 +144,62 @@ def test_high_fatigue_strength_work_uses_upper_range_without_five_minute_rest() 
 
     assert prescription.rest_seconds == prescription.maximum_rest_seconds == 150
     assert prescription.rest_seconds < 300
+
+
+@pytest.mark.parametrize("exercise_slug", sorted(APPROVED_PRIMARY_STRENGTH_LIFT_SLUGS))
+def test_strength_compound_set_cap_bonus_authorizes_only_approved_lifts(
+    exercise_slug: str,
+) -> None:
+    assert is_strength_set_cap_authorized(
+        goal=Goal.STRENGTH,
+        exercise_type=ExerciseType.COMPOUND,
+        exercise_slug=exercise_slug,
+        is_primary_strength=True,
+    )
+    cap = RULESET.max_working_sets_for_exercise(
+        training_status=TrainingStatus.ADVANCED,
+        goal=Goal.STRENGTH,
+        exercise_type=ExerciseType.COMPOUND,
+        is_priority=True,
+        weekly_exposure_count=1,
+        is_primary_strength=True,
+        is_approved_primary_strength_lift=True,
+    )
+
+    assert cap == 5
+
+
+def test_strength_compound_set_cap_bonus_keeps_unrelated_context_at_four_sets() -> None:
+    common = {
+        "training_status": TrainingStatus.ADVANCED,
+        "exercise_type": ExerciseType.COMPOUND,
+        "is_priority": True,
+        "weekly_exposure_count": 1,
+        "is_primary_strength": True,
+        "is_approved_primary_strength_lift": True,
+    }
+
+    assert RULESET.max_working_sets_for_exercise(goal=Goal.HYPERTROPHY, **common) == 4
+    assert (
+        RULESET.max_working_sets_for_exercise(
+            goal=Goal.STRENGTH,
+            exercise_type=ExerciseType.ISOLATION,
+            **{key: value for key, value in common.items() if key != "exercise_type"},
+        )
+        == 4
+    )
+    assert (
+        RULESET.max_working_sets_for_exercise(
+            goal=Goal.STRENGTH,
+            is_approved_primary_strength_lift=False,
+            **{
+                key: value
+                for key, value in common.items()
+                if key != "is_approved_primary_strength_lift"
+            },
+        )
+        == 4
+    )
 
 
 def test_duration_core_preserves_metadata_without_fake_rep_or_rir_values() -> None:
