@@ -122,6 +122,8 @@ def test_template_family_filter_preserves_level_filter(
     templates = response.json()["items"]
     assert {template["slug"] for template in templates} == {
         "p25-4-day-push-pull-quads-posterior-advanced",
+        "p51-4-day-gymextreme-advanced",
+        "p52-4-day-arnoldsho-advanced",
     }
     assert all("advanced" in template["supported_levels"] for template in templates)
 
