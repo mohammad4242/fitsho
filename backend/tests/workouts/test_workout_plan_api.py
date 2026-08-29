@@ -10,6 +10,7 @@ from app.ai.schemas import ProviderErrorCode
 from app.exercises.enums import (
     BodyRegion,
     Difficulty,
+    ExerciseType,
     MediaType,
     MuscleGroup,
 )
@@ -455,6 +456,79 @@ def test_deterministic_plan_response_derives_titles_from_direct_targets(
     ]
     assert response.json()["days"][0]["title_en"] == "Day 1: Chest + Triceps"
     assert response.json()["days"][0]["title_fa"] == "روز 1: سینه + پشت بازو"
+
+
+def test_workout_plan_response_exposes_core_section_metadata_from_exercise_classification(
+    client: TestClient, db: Session
+) -> None:
+    user_id = _register_and_complete_profile(client, "core-section@example.com")
+    plan = _plan(db, user_id)
+    main = _exercise("section-chest", muscle=MuscleGroup.CHEST)
+    triceps = _exercise("section-triceps", muscle=MuscleGroup.TRICEPS)
+    core = _exercise("section-abs", muscle=MuscleGroup.ABS)
+    core.exercise_type = ExerciseType.CORE
+    day = WorkoutDay(
+        workout_plan=plan,
+        day_number=1,
+        title_en="Full body",
+        title_fa="تمام بدن",
+        estimated_duration_minutes=30,
+    )
+    db.add_all(
+        [
+            main,
+            triceps,
+            core,
+            day,
+            WorkoutPlanExercise(
+                workout_day=day,
+                exercise=main,
+                order_index=1,
+                sets=3,
+                reps_min=8,
+                reps_max=12,
+                rest_seconds=90,
+                rir=2,
+                estimated_minutes=8,
+            ),
+            WorkoutPlanExercise(
+                workout_day=day,
+                exercise=triceps,
+                order_index=2,
+                sets=3,
+                reps_min=10,
+                reps_max=15,
+                rest_seconds=60,
+                rir=2,
+                estimated_minutes=8,
+            ),
+            WorkoutPlanExercise(
+                workout_day=day,
+                exercise=core,
+                order_index=3,
+                sets=2,
+                reps_min=8,
+                reps_max=20,
+                rest_seconds=60,
+                rir=2,
+                estimated_minutes=5,
+            ),
+        ]
+    )
+    db.commit()
+
+    response = client.get(f"/api/v1/workout-plans/{plan.id}")
+
+    assert response.status_code == 200
+    response_day = response.json()["days"][0]
+    assert [item["section"] for item in response_day["exercises"]] == [
+        "main",
+        "main",
+        "core",
+    ]
+    assert response_day["main_exercise_count"] == 2
+    assert response_day["supplemental_exercise_count"] == 1
+    assert response_day["total_exercise_count"] == 3
 
 
 def test_generate_uses_authenticated_user_and_returns_reuse_flag(

@@ -249,6 +249,46 @@ it("translates the core-preservation duration warning for members", async () => 
   expect(await screen.findByText("برای حفظ اثربخشی برنامه، لطفاً زمان تمرین خود را کمی افزایش دهید.")).toBeInTheDocument();
 });
 
+it("renders sectioned Core exercises after the main workout block", async () => {
+  const sectionedPlan = {
+    ...plan,
+    days: [
+      {
+        ...plan.days[0],
+        exercises: [
+          { ...plan.days[0].exercises[0], section: "main" as const },
+          {
+            ...plan.days[0].exercises[0],
+            id: "018f0000-0000-7000-8000-000000000012",
+            order_index: 2,
+            sets: 2,
+            section: "core" as const,
+            alternatives: [],
+            exercise: {
+              ...plan.days[0].exercises[0].exercise,
+              id: "018f0000-0000-7000-8000-000000000013",
+              slug: "plank",
+              name_en: "Plank",
+              name_fa: "پلانک",
+              primary_muscle: "abs",
+            },
+          },
+        ],
+      },
+    ],
+  };
+  api.getActiveWorkoutPlan.mockResolvedValue(sectionedPlan);
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  const mainExercise = await screen.findByText("پرس سینه دمبل");
+  const coreExercise = await screen.findByText("پلانک");
+  const coreHeading = screen.getByRole("heading", { name: "Core" });
+
+  expect(mainExercise.compareDocumentPosition(coreHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(coreHeading.compareDocumentPosition(coreExercise) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 it("places the locked end-of-cycle feedback between PDF and Body Analysis tools", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue(plan);
 
