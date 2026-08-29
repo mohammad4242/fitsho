@@ -5,6 +5,7 @@ from enum import StrEnum
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     get_session_duration_policy,
+    get_session_exercise_count_policy,
 )
 from app.workouts.program_engine.enums import SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
@@ -18,18 +19,18 @@ from app.workouts.program_engine.session_duration import SessionDurationRepairEv
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
 
 FINAL_GATE_SCHEMA_VERSION = "final_quality_gate_v1"
+_COUNT_OUT_OF_RANGE_CODE = "SESSION_EXERCISE_COUNT_OUT_OF_RANGE"
 _FULL_BODY_SPLITS = frozenset(item for item in SplitType if item.value.startswith("full_body"))
 _DURATION_CODES = frozenset(
-    "SESSION_EXERCISE_COUNT_OUT_OF_RANGE SESSION_DURATION_UNDER_TARGET "
-    "SESSION_DURATION_TARGET_UNSATISFIED SESSION_DURATION_EXCEEDED "
-    "SESSION_DURATION_OVER_TARGET".split()
+    "SESSION_DURATION_UNDER_TARGET SESSION_DURATION_TARGET_UNSATISFIED "
+    "SESSION_DURATION_EXCEEDED SESSION_DURATION_OVER_TARGET".split()
 )
 _DURATION_CONSTRAINTS = frozenset(
     "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS "
     "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD "
     "VOLUME_REDUCED_FOR_DURATION_CAPACITY DURATION_PLANNED_REDUCED_EXERCISE_COUNT".split()
 )
-_DURATION_OUTCOME_CODES = frozenset(_DURATION_CODES - {"SESSION_EXERCISE_COUNT_OUT_OF_RANGE"})
+_DURATION_OUTCOME_CODES = _DURATION_CODES
 
 
 class FinalGateStatus(StrEnum):
@@ -70,7 +71,12 @@ def evaluate_final_program(
     ruleset: ProgramRuleset,
 ) -> FinalGateResult:
     reasons = list(report.errors)
-    constraints = [code for code in report.warnings if code not in _DURATION_OUTCOME_CODES]
+    constraints = [
+        code
+        for code in report.warnings
+        if code not in _DURATION_OUTCOME_CODES
+        and code != _COUNT_OUT_OF_RANGE_CODE
+    ]
     checks: dict[str, object] = {
         "validation": {
             "status": "rejected" if report.errors else "passed",
@@ -78,6 +84,7 @@ def evaluate_final_program(
             "warning_codes": report.warnings,
         },
         "duration": {"status": "passed", "reason_codes": ()},
+        "exercise_count": {"status": "passed", "reason_codes": ()},
         "coverage": {"status": "not_applicable", "reason_codes": ()},
         "distribution": {"status": "missing", "reason_codes": ()},
         "recovery": {"status": "passed", "reason_codes": ()},
@@ -86,6 +93,18 @@ def evaluate_final_program(
     }
 
     duration_policy = get_session_duration_policy(request.session_duration_minutes)
+    count_policy = get_session_exercise_count_policy(request.session_duration_minutes, ruleset)
+    count_invariant_reasons = tuple(
+        _COUNT_OUT_OF_RANGE_CODE
+        for day in program.weekly_schedule
+        if not count_policy.contains(main_exercise_count(day.exercises))
+    )
+    if count_invariant_reasons:
+        reasons.extend(count_invariant_reasons)
+        checks["exercise_count"] = {
+            "status": "rejected",
+            "reason_codes": tuple(dict.fromkeys(count_invariant_reasons)),
+        }
     invariant_duration_codes: list[str] = []
     for day in program.weekly_schedule:
         main_minutes = calculate_main_training_minutes(day)
@@ -346,7 +365,6 @@ def _evidence_proves_duration_code(
     reasons = set(evidence.reason_codes)
     main_minutes = calculate_main_training_minutes(day)
     policy = get_session_duration_policy(request.session_duration_minutes)
-    exercise_count = main_exercise_count(day.exercises)
     if duration_code in {
         "SESSION_DURATION_UNDER_TARGET",
         "SESSION_DURATION_TARGET_UNSATISFIED",
@@ -354,17 +372,6 @@ def _evidence_proves_duration_code(
         return (
             duration_code in reasons
             and main_minutes < policy.minimum_minutes
-        )
-    if duration_code == "SESSION_EXERCISE_COUNT_OUT_OF_RANGE":
-        return bool(
-            exercise_count < ruleset.minimum_exercises_per_session
-            and reasons.intersection(
-                {
-                    "DURATION_PLANNED_REDUCED_EXERCISE_COUNT",
-                    "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
-                    "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
-                }
-            )
         )
     if duration_code in {"SESSION_DURATION_EXCEEDED", "SESSION_DURATION_OVER_TARGET"}:
         return (
@@ -382,7 +389,6 @@ def _duration_code_applies_to_day(
 ) -> bool:
     main_minutes = calculate_main_training_minutes(day)
     policy = get_session_duration_policy(request.session_duration_minutes)
-    exercise_count = main_exercise_count(day.exercises)
     if duration_code in {
         "SESSION_DURATION_UNDER_TARGET",
         "SESSION_DURATION_TARGET_UNSATISFIED",
@@ -390,6 +396,4 @@ def _duration_code_applies_to_day(
         return main_minutes < policy.minimum_minutes
     if duration_code in {"SESSION_DURATION_EXCEEDED", "SESSION_DURATION_OVER_TARGET"}:
         return main_minutes > policy.maximum_minutes
-    if duration_code == "SESSION_EXERCISE_COUNT_OUT_OF_RANGE":
-        return exercise_count < ruleset.minimum_exercises_per_session
     return False

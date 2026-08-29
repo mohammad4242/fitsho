@@ -6,6 +6,11 @@ from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import GenerationErrorCode
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import ValidationReport
+from app.workouts.program_engine.session_duration import SessionDurationRepairEvidence
+from app.workouts.program_engine.supplemental_policy import (
+    is_main_resistance_exercise,
+    main_exercise_count,
+)
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.weekly_coverage import assess_weekly_coverage
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
@@ -108,6 +113,26 @@ def _program(source=None):
     result = generate_program(source, full_catalog(), RULESET)
     assert result.program is not None, result.errors
     return result.program
+
+
+def _four_main_with_non_main(day):
+    main_items = tuple(item for item in day.exercises if is_main_resistance_exercise(item))
+    assert len(main_items) >= 4
+    selected_ids = {item.exercise_id for item in main_items[:4]}
+    durations = dict(
+        zip((item.exercise_id for item in main_items[:4]), (13, 13, 12, 12), strict=True)
+    )
+    return replace(
+        day,
+        exercises=tuple(
+            replace(item, estimated_minutes=durations[item.exercise_id])
+            if item.exercise_id in selected_ids
+            else item
+            for item in day.exercises
+            if not is_main_resistance_exercise(item) or item.exercise_id in selected_ids
+        ),
+        estimated_duration_minutes=60,
+    )
 
 
 def test_final_gate_rejects_each_hard_final_invariant() -> None:
@@ -405,3 +430,101 @@ def test_final_gate_accepts_valid_dynamic_template_fallback_and_repaired_outputs
         "WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE"
         not in repaired.program.aggregate_metrics["final_quality_gate"]["constraint_reason_codes"]
     )
+
+
+def test_final_gate_rejects_four_main_at_sixty_minutes_even_with_exact_constraint_evidence(
+) -> None:
+    source = request(available_training_days=1, session_duration_minutes=60)
+    base = _program(source)
+    day = base.weekly_schedule[0]
+    non_main_ids = {
+        item.exercise_id for item in day.exercises if not is_main_resistance_exercise(item)
+    }
+    four_main = _four_main_with_non_main(day)
+    assert main_exercise_count(four_main.exercises) == 4
+    assert {
+        item.exercise_id for item in four_main.exercises if not is_main_resistance_exercise(item)
+    } == non_main_ids
+    evidence = SessionDurationRepairEvidence.from_day(
+        four_main,
+        (
+            "SESSION_EXERCISE_COUNT_OUT_OF_RANGE",
+            "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
+        ),
+    )
+    trace = (
+        {
+            "stage": "session_duration",
+            "per_session_evidence": (evidence.as_trace(),),
+        },
+    )
+    distribution = base.aggregate_metrics["weekly_distribution"]
+    candidate = replace(
+        base,
+        weekly_schedule=(four_main,),
+        aggregate_metrics={
+            **base.aggregate_metrics,
+            "weekly_distribution": {
+                **distribution,
+                "after_exercise_counts": (main_exercise_count(four_main.exercises),),
+            },
+        },
+        decision_trace=trace,
+    )
+    report = ValidationReport(
+        errors=(),
+        warnings=("SESSION_EXERCISE_COUNT_OUT_OF_RANGE",),
+        assumptions=base.assumptions,
+        metrics=candidate.aggregate_metrics,
+        decision_trace=trace,
+    )
+
+    decision = engine.evaluate_final_program(candidate, source, report, RULESET)
+
+    assert decision.status == "rejected"
+    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in decision.reason_codes
+    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" not in decision.constraint_reason_codes
+
+
+def test_engine_rejects_invalid_main_count_after_weekly_redistribution(monkeypatch) -> None:
+    source = request(available_training_days=1, session_duration_minutes=60)
+    original_redistribute = engine.redistribute_weekly_exercises
+    calls = 0
+
+    def inject_invalid_count(days, normalized, ruleset, **kwargs):
+        nonlocal calls
+        calls += 1
+        distributed = original_redistribute(days, normalized, ruleset, **kwargs)
+        day = distributed.days[0]
+        non_main_ids = {
+            item.exercise_id for item in day.exercises if not is_main_resistance_exercise(item)
+        }
+        invalid_day = _four_main_with_non_main(day)
+        assert main_exercise_count(invalid_day.exercises) == 4
+        assert {
+            item.exercise_id
+            for item in invalid_day.exercises
+            if not is_main_resistance_exercise(item)
+        } == non_main_ids
+        return replace(
+            distributed,
+            days=(invalid_day,),
+            after_exercise_counts=(main_exercise_count(invalid_day.exercises),),
+        )
+
+    monkeypatch.setattr(engine, "redistribute_weekly_exercises", inject_invalid_count)
+
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert calls > 0
+    assert result.program is None
+    assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
+    gates = [
+        entry
+        for attempt in result.decision_trace[0]["attempts"]
+        for entry in attempt.get("decision_trace", ())
+        if entry.get("stage") == "final_quality_gate"
+    ]
+    assert gates
+    assert all(entry["status"] == "rejected" for entry in gates)
+    assert all("SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in entry["reason_codes"] for entry in gates)
