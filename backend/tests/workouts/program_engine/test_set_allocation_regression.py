@@ -3,6 +3,7 @@ import pytest
 from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+from app.workouts.program_engine.supplemental_policy import is_core_or_supplemental_exercise
 from tests.workouts.program_engine.golden_fixtures import full_catalog
 from tests.workouts.program_engine.test_template_reference import template_request
 
@@ -70,6 +71,7 @@ def test_set_allocation_invariants(catalog):
 
         for day in result.program.weekly_schedule:
             for ex in day.exercises:
-                assert ex.sets in {3, 4}, (
-                    f"Exercise {ex.exercise_name} has {ex.sets} sets (must be 3 or 4)"
+                allowed_sets = {2, 3, 4} if is_core_or_supplemental_exercise(ex) else {3, 4}
+                assert ex.sets in allowed_sets, (
+                    f"Exercise {ex.exercise_name} has {ex.sets} sets (allowed: {allowed_sets})"
                 )

@@ -27,7 +27,8 @@ from app.workouts.program_engine.schemas import (
 from app.workouts.program_engine.session_targets import english_session_title_for_targets
 from app.workouts.program_engine.supplemental_policy import (
     SUPPLEMENTAL_MUSCLES,
-    is_supplemental_muscle,
+    is_core_or_supplemental_exercise,
+    is_main_resistance_exercise,
     main_exercise_count,
     supplemental_reason_codes,
 )
@@ -80,6 +81,10 @@ class _ExerciseUnit:
     @property
     def original_order(self) -> int:
         return min(item.order for item in self.exercises)
+
+    @property
+    def is_core_or_supplemental(self) -> bool:
+        return all(is_core_or_supplemental_exercise(item) for item in self.exercises)
 
 
 def finalize_session_structure(
@@ -152,7 +157,8 @@ def main_session_title(
         dict.fromkeys(
             item.primary_muscle
             for item in exercises
-            if item.primary_muscle is not None and not is_supplemental_muscle(item.primary_muscle)
+            if item.primary_muscle is not None
+            and not is_core_or_supplemental_exercise(item)
         )
     )
     return english_session_title_for_targets(day_index, targets)
@@ -170,7 +176,7 @@ def session_structure_errors(
     supplemental_seen = False
     supplemental_count = 0
     for item in day.exercises:
-        if is_supplemental_muscle(item.primary_muscle):
+        if is_core_or_supplemental_exercise(item):
             supplemental_seen = True
             supplemental_count += 1
         elif supplemental_seen:
@@ -185,7 +191,7 @@ def session_structure_errors(
     phases_by_block: dict[int, int] = {}
     previous_phase = -1
     for unit in units:
-        if all(is_supplemental_muscle(muscle) for muscle in unit.muscles):
+        if unit.is_core_or_supplemental:
             continue
         phase = _role_phase(unit, goal)
         if any(is_push_up_family(item) or is_pull_up_family(item) for item in unit.exercises):
@@ -212,7 +218,7 @@ def session_structure_errors(
         main_units = tuple(
             unit
             for unit in units
-            if not all(is_supplemental_muscle(muscle) for muscle in unit.muscles)
+            if not unit.is_core_or_supplemental
         )
         non_opener_units = tuple(
             unit for unit in main_units if not _is_required_semantic_opener(unit, units, request)
@@ -258,8 +264,13 @@ def _unit_sort_key(
     goal: Goal,
     policy: PriorityAllocationPolicy,
 ) -> tuple[object, ...]:
-    supplemental = all(is_supplemental_muscle(muscle) for muscle in unit.muscles)
-    main_muscles = tuple(muscle for muscle in unit.muscles if not is_supplemental_muscle(muscle))
+    supplemental = unit.is_core_or_supplemental
+    main_muscles = tuple(
+        item.primary_muscle
+        for item in unit.exercises
+        if item.primary_muscle is not None
+        and not is_core_or_supplemental_exercise(item)
+    )
     priority = min(
         (policy.precedence_key(muscle) for muscle in main_muscles),
         default=(4, 0, ""),
@@ -342,17 +353,20 @@ def _is_required_semantic_opener(
 
 def _session_has_meaningful_muscle(units: tuple[_ExerciseUnit, ...], muscle: MuscleGroup) -> bool:
     return any(
-        item.primary_muscle is muscle
-        or muscle in item.secondary_muscles
-        or (
-            muscle is MuscleGroup.CHEST
-            and item.muscle_focus
-            in {
-                MuscleFocus.GENERAL_CHEST,
-                MuscleFocus.UPPER_CHEST,
-                MuscleFocus.MID_CHEST,
-                MuscleFocus.LOWER_CHEST,
-            }
+        is_main_resistance_exercise(item)
+        and (
+            item.primary_muscle is muscle
+            or muscle in item.secondary_muscles
+            or (
+                muscle is MuscleGroup.CHEST
+                and item.muscle_focus
+                in {
+                    MuscleFocus.GENERAL_CHEST,
+                    MuscleFocus.UPPER_CHEST,
+                    MuscleFocus.MID_CHEST,
+                    MuscleFocus.LOWER_CHEST,
+                }
+            )
         )
         for unit in units
         for item in unit.exercises
@@ -361,16 +375,19 @@ def _session_has_meaningful_muscle(units: tuple[_ExerciseUnit, ...], muscle: Mus
 
 def _session_has_meaningful_back(units: tuple[_ExerciseUnit, ...]) -> bool:
     return any(
-        item.primary_muscle is MuscleGroup.BACK
-        or MuscleGroup.BACK in item.secondary_muscles
-        or item.muscle_focus
-        in {
-            MuscleFocus.GENERAL_BACK,
-            MuscleFocus.LATS,
-            MuscleFocus.LOWER_BACK,
-            MuscleFocus.MID_BACK_RHOMBOIDS,
-            MuscleFocus.UPPER_BACK,
-        }
+        is_main_resistance_exercise(item)
+        and (
+            item.primary_muscle is MuscleGroup.BACK
+            or MuscleGroup.BACK in item.secondary_muscles
+            or item.muscle_focus
+            in {
+                MuscleFocus.GENERAL_BACK,
+                MuscleFocus.LATS,
+                MuscleFocus.LOWER_BACK,
+                MuscleFocus.MID_BACK_RHOMBOIDS,
+                MuscleFocus.UPPER_BACK,
+            }
+        )
         for unit in units
         for item in unit.exercises
     )
@@ -418,7 +435,7 @@ def _semantic_ordering_errors(
     request: ProgramGenerationRequest | NormalizedProgramRequest | None,
 ) -> list[str]:
     main_units = tuple(
-        unit for unit in units if not all(is_supplemental_muscle(muscle) for muscle in unit.muscles)
+        unit for unit in units if not unit.is_core_or_supplemental
     )
     if not main_units:
         return []
@@ -501,8 +518,10 @@ def _unit_block_rank(
         return 0
     ranks = tuple(
         index
-        for muscle in unit.muscles
-        if not is_supplemental_muscle(muscle)
+        for item in unit.exercises
+        if not is_core_or_supplemental_exercise(item)
+        for muscle in (item.primary_muscle,)
+        if muscle is not None
         for index, muscles in enumerate(block)
         if muscle in muscles
     )

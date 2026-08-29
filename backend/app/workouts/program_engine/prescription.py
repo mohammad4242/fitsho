@@ -23,6 +23,10 @@ from app.workouts.program_engine.strength_programming import (
     classify_strength_role,
     is_strength_set_cap_authorized,
 )
+from app.workouts.program_engine.supplemental_policy import (
+    contextual_minimum_working_sets,
+    is_core_or_supplemental_exercise,
+)
 
 
 @dataclass(frozen=True)
@@ -56,13 +60,26 @@ def prescribe_sessions(
         for muscle in {item.primary_muscle for item in draft.exercises}
         if muscle is not None
     )
+    allocation_minimums: dict[object, int] = {}
+    for draft in drafts:
+        for item in draft.exercises:
+            if item.primary_muscle is None:
+                continue
+            contextual_minimum = contextual_minimum_working_sets(
+                item,
+                ruleset.minimum_working_sets,
+            )
+            allocation_minimums[item.primary_muscle] = min(
+                allocation_minimums.get(item.primary_muscle, ruleset.minimum_working_sets),
+                contextual_minimum,
+            )
     targets = {target.muscle: target for target in volume.targets}
     allocations = {
         muscle: iter(
             allocate_direct_sets(
                 volume.direct_sets_for(muscle),
                 count,
-                ruleset.minimum_working_sets,
+                allocation_minimums.get(muscle, ruleset.minimum_working_sets),
             )
         )
         for muscle, count in appearances.items()
@@ -112,6 +129,11 @@ def prescribe_sessions(
                 is_primary_strength=is_primary_strength,
             )
             primary_muscle = exercise.primary_muscle
+            core_or_supplemental = is_core_or_supplemental_exercise(exercise)
+            minimum_working_sets = contextual_minimum_working_sets(
+                exercise,
+                ruleset.minimum_working_sets,
+            )
             session_size_accessory = False
             if primary_muscle is not None:
                 from app.workouts.program_engine.volume_policy import session_hard_volume_cap
@@ -122,16 +144,17 @@ def prescribe_sessions(
 
             if primary_muscle in allocations:
                 allocated_sets = next(allocations[primary_muscle])
-                sets = max(ruleset.minimum_working_sets, allocated_sets)
-                session_size_accessory = allocated_sets < ruleset.minimum_working_sets
+                sets = max(minimum_working_sets, allocated_sets)
+                session_size_accessory = allocated_sets < minimum_working_sets
             else:
-                sets = min(
-                    sess_max,
-                    ruleset.default_untracked_muscle_sets,
+                sets = (
+                    minimum_working_sets
+                    if core_or_supplemental
+                    else min(sess_max, ruleset.default_untracked_muscle_sets)
                 )
             if primary_muscle is not None:
                 remaining_direct_sets = sess_max - direct_session_sets[primary_muscle]
-                if remaining_direct_sets >= ruleset.minimum_working_sets:
+                if remaining_direct_sets >= minimum_working_sets:
                     sets = min(sets, remaining_direct_sets)
                 direct_session_sets[primary_muscle] += sets
             cap = ruleset.max_working_sets_for_exercise(

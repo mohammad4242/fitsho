@@ -99,6 +99,16 @@ def is_core_or_supplemental_exercise(exercise: object) -> bool:
     }
 
 
+def contextual_minimum_working_sets(
+    exercise: object,
+    normal_minimum_working_sets: int,
+) -> int:
+    """Return the minimum working sets allowed by an exercise's classification."""
+    if normal_minimum_working_sets < 1:
+        raise ValueError("normal minimum working sets must be positive")
+    return 2 if is_core_or_supplemental_exercise(exercise) else normal_minimum_working_sets
+
+
 @dataclass(frozen=True, slots=True)
 class ExerciseCountBreakdown:
     """Canonical counts for a session's structured exercise items."""

@@ -583,7 +583,7 @@ def test_validator_rejects_six_sets_even_for_authorized_primary_strength_lift() 
     assert "PER_EXERCISE_SET_CAP_EXCEEDED" in report.errors
 
 
-def test_validator_rejects_core_work_outside_three_or_four_sets() -> None:
+def test_validator_accepts_two_set_core_work_but_rejects_one_set() -> None:
     source = request()
     result = generate_program(source, full_catalog(), RULESET)
     assert result.program is not None
@@ -593,18 +593,30 @@ def test_validator_rejects_core_work_outside_three_or_four_sets() -> None:
         if any(item.exercise_type is ExerciseType.CORE for item in day.exercises)
     )
     core = next(item for item in day.exercises if item.exercise_type is ExerciseType.CORE)
-    invalid_day = replace(
+    two_set_day = replace(
         day,
         exercises=tuple(replace(item, sets=2) if item is core else item for item in day.exercises),
     )
-    invalid = replace(
+    two_set_program = replace(
         result.program,
         weekly_schedule=tuple(
-            invalid_day if item is day else item for item in result.program.weekly_schedule
+            two_set_day if item is day else item for item in result.program.weekly_schedule
         ),
     )
+    two_set_report = validate_program(two_set_program, source, RULESET)
+    assert "INVALID_EXERCISE_PRESCRIPTION" not in two_set_report.errors
 
-    report = validate_program(invalid, source, RULESET)
+    one_set_day = replace(
+        day,
+        exercises=tuple(replace(item, sets=1) if item is core else item for item in day.exercises),
+    )
+    one_set_program = replace(
+        result.program,
+        weekly_schedule=tuple(
+            one_set_day if item is day else item for item in result.program.weekly_schedule
+        ),
+    )
+    report = validate_program(one_set_program, source, RULESET)
 
     assert "INVALID_EXERCISE_PRESCRIPTION" in report.errors
 

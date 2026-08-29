@@ -31,7 +31,10 @@ from app.workouts.program_engine.strength_programming import (
     is_strength_set_cap_authorized,
 )
 from app.workouts.program_engine.supersets import superset_structure_errors
-from app.workouts.program_engine.supplemental_policy import main_exercise_count
+from app.workouts.program_engine.supplemental_policy import (
+    contextual_minimum_working_sets,
+    main_exercise_count,
+)
 from app.workouts.program_engine.volume_policy import (
     session_hard_volume_cap,
     weekly_direct_volume_range,
@@ -153,12 +156,16 @@ def validate_program(
                 exercise_slug=item.exercise_slug,
                 is_primary_strength=is_primary_strength,
             )
+            minimum_working_sets = contextual_minimum_working_sets(
+                item,
+                ruleset.minimum_working_sets,
+            )
             if item.exercise_type in {
                 ExerciseType.COMPOUND,
                 ExerciseType.ISOLATION,
                 ExerciseType.CORE,
             } and not (
-                item.sets in {3, 4}
+                item.sets in {minimum_working_sets, ruleset.minimum_working_sets, 4}
                 or (item.sets == 5 and strength_set_cap_authorized)
             ):
                 errors.append("INVALID_EXERCISE_PRESCRIPTION")
