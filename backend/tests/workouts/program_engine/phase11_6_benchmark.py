@@ -32,7 +32,10 @@ from app.profile.enums import (
     TrainingLocation,
 )
 from app.training_templates.engine_reference import load_template_references
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     BalanceAbility,
@@ -535,8 +538,7 @@ def _duration_counts_for_record(record: Mapping[str, object]) -> dict[str, int]:
     policy = get_session_duration_policy(requested)
     counts = {"sessions": 0, "within": 0, "under": 0, "over": 0, "absolute_deviation": 0}
     for day in cast(Sequence[Mapping[str, object]], final_program.get("days", ())):
-        total = cast(int, day["estimated_duration_minutes"])
-        workout = policy.workout_minutes(total, RULESET.general_warmup_minutes)
+        workout = calculate_main_training_minutes(day)
         counts["sessions"] += 1
         counts["absolute_deviation"] += abs(workout - requested)
         if workout < policy.minimum_minutes:

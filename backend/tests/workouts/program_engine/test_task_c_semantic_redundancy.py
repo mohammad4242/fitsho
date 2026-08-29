@@ -121,7 +121,11 @@ def test_actual_batch2_service_path_replays_profiles_2_3_6_and_9(monkeypatch) ->
         batch2,
         "TEST_PROFILES_BATCH2",
         [
-            dict(item, priority_muscles=item["priority_muscles"][:1])
+            dict(
+                item,
+                priority_muscles=item["priority_muscles"][:1],
+                session_duration_minutes=30,
+            )
             for item in batch2.TEST_PROFILES_BATCH2
             if item["num"] in selected_numbers
         ],

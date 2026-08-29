@@ -34,7 +34,7 @@ def _duration_trace(program, evidence):
 
 def test_duration_evidence_is_emitted_for_dynamic_and_template_programs() -> None:
     template_result = generate_program(
-        template_request(available_training_days=4),
+        template_request(available_training_days=4, session_duration_minutes=30),
         full_catalog(),
         RULESET,
         reference_templates=(_four_day_reference(),),
@@ -79,7 +79,7 @@ def test_duration_evidence_must_match_the_exact_day_fingerprint() -> None:
     day = program.weekly_schedule[0]
     evidence = SessionDurationRepairEvidence.from_day(
         day,
-        ("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE",),
+        ("SESSION_DURATION_TARGET_SATISFIED",),
     )
     changed = replace(
         day,

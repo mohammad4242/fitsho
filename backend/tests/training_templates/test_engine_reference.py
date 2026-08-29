@@ -110,7 +110,7 @@ def test_advanced_catalog_program_reaches_the_programmed_session(db: Session) ->
         training_experience=TrainingExperience.ADVANCED,
         training_age_months=72,
         available_training_days=4,
-        session_duration_minutes=90,
+        session_duration_minutes=75,
         available_equipment=list(Equipment),
         training_location=TrainingLocation.GYM,
     )

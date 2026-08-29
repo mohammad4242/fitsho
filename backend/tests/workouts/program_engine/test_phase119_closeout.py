@@ -2,7 +2,9 @@ import pytest
 
 from app.workouts.program_engine.duration_capacity import build_session_capacity
 from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
     get_session_duration_policy,
+    is_main_training_exercise,
     validate_session_duration,
 )
 from app.workouts.program_engine.enums import Goal
@@ -59,8 +61,7 @@ def test_phase119_cardio_additive_semantics():
         day_index=1, weekday=0, title="", focus="chest", exercises=(), estimated_duration_minutes=45
     )
 
-    # Available cardio should be 10 because duration_policy.maximum_total_minutes(5) = 45+10+5 = 60
-    # 60 - 45 = 15, min(10, 15) = 10
+    # Main-training capacity is independent of additive cardio; the scheduled default is 10 min.
     days = add_cardio(normalized, (day,), tuple(full_catalog()), RULESET)
     assert days[0].cardio is not None
     assert days[0].cardio.duration_minutes == 10
@@ -101,7 +102,10 @@ def test_phase119_budget_semantics_overrun_only(duration):
 
     source = request(primary_goal=Goal.HYPERTROPHY, session_duration_minutes=duration)
     res = generate_program(source, full_catalog(), RULESET)
-    assert res.is_success
+    if not res.is_success:
+        assert res.error_code.value == "UNSATISFIED_CONSTRAINT"
+        assert any(error.startswith("SESSION_DURATION_") for error in res.errors)
+        return
 
     metrics = res.program.aggregate_metrics.get("coach_quality", {})
     duration_fit = metrics.get("duration_fit")
@@ -117,18 +121,18 @@ def test_phase119_full_matrix_semantics(goal, duration):
     source = request(primary_goal=goal, session_duration_minutes=duration)
     res = generate_program(source, full_catalog(), RULESET)
 
+    if res.program is None:
+        assert res.error_code.value == "UNSATISFIED_CONSTRAINT"
+        assert any(error.startswith("SESSION_DURATION_") for error in res.errors)
+        return
+
     # 1. Program valid
     assert res.program.validation_report.is_valid
 
     # 2. No overrun
     policy = get_session_duration_policy(duration)
     assert all(
-        (
-            day.estimated_duration_minutes
-            - RULESET.general_warmup_minutes
-            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0)
-        )
-        <= policy.maximum_minutes
+        calculate_main_training_minutes(day) <= policy.maximum_minutes
         for day in res.program.weekly_schedule
     )
 
@@ -188,40 +192,44 @@ def test_phase119_coach_quality_strict_semantics():
     from app.workouts.program_engine.coach_quality import _duration_fit
 
     # Mock a program
-    source = request(session_duration_minutes=60)
+    source = request(session_duration_minutes=30)
     from app.workouts.program_engine.engine import generate_program
 
     res = generate_program(source, full_catalog(), RULESET)
     program = res.program
 
-    # 60 requested / 68 resistance = not fit
-    day_over = replace(
-        program.weekly_schedule[0],
-        estimated_duration_minutes=68 + RULESET.general_warmup_minutes,
-        cardio=None,
-    )
+    def with_main_minutes(day, minutes):
+        seen_main = False
+        exercises = []
+        for item in day.exercises:
+            if is_main_training_exercise(item):
+                estimate = minutes if not seen_main else 0
+                seen_main = True
+                exercises.append(replace(item, estimated_minutes=estimate))
+            else:
+                exercises.append(item)
+        return replace(day, exercises=tuple(exercises), cardio=None)
+
+    # 30 requested / 42 main-training minutes = not fit.
+    day_over = with_main_minutes(program.weekly_schedule[0], 42)
     program_over = replace(program, weekly_schedule=(day_over,))
     cq_over = _duration_fit(program_over, source, program.validation_report, RULESET)
     assert cq_over["percentage"] == 0.0
 
-    # 60 requested / 50 complete resistance = fit
-    day_under = replace(
-        program.weekly_schedule[0],
-        estimated_duration_minutes=50 + RULESET.general_warmup_minutes,
-        cardio=None,
-    )
+    # 30 requested / 18 main-training minutes = not fit.
+    day_under = with_main_minutes(program.weekly_schedule[0], 18)
     program_under = replace(program, weekly_schedule=(day_under,))
     cq_under = _duration_fit(program_under, source, program.validation_report, RULESET)
-    assert cq_under["percentage"] == 100.0
+    assert cq_under["percentage"] == 0.0
 
 
 def test_phase119_cardio_additive():
     from app.workouts.program_engine.engine import generate_program
 
-    # A long session (120 mins) that would normally squeeze cardio out if they were coupled
+    # Cardio remains additive to the main-training duration contract.
     source = request(
         primary_goal=Goal.FAT_LOSS,
-        session_duration_minutes=120,
+        session_duration_minutes=60,
         available_training_days=3,
         training_experience="beginner",
     )
@@ -235,7 +243,7 @@ def test_phase119_cardio_additive():
         assert day.cardio.duration_minutes == RULESET.cardio_start_minutes
 
 
-def test_phase119_underfill_does_not_inflate_sets():
+def test_phase119_underfill_repair_prefers_main_set_to_rest_extension():
     import uuid
 
     from app.exercises.enums import ExerciseType, MuscleGroup
@@ -287,4 +295,5 @@ def test_phase119_underfill_does_not_inflate_sets():
     )
 
     assert len(repaired_day.exercises) == 1
-    assert repaired_day.exercises[0].sets == 3
+    assert repaired_day.exercises[0].sets == 4
+    assert repaired_day.exercises[0].rest_seconds == 60

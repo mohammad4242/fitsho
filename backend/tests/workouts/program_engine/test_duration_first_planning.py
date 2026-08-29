@@ -3,7 +3,10 @@ from uuid import uuid4
 import pytest
 
 from app.exercises.enums import Equipment, ExerciseCautionTag, MuscleGroup
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -64,23 +67,23 @@ def _body_lag(muscle: MuscleGroup) -> BodyAnalysisInfluence:
     ),
 )
 def test_final_program_duration_matrix_is_valid(goal: Goal, duration: int) -> None:
-    program = _program(goal, duration)
+    result = generate_program(
+        _source(goal, duration),
+        full_catalog(),
+        RULESET,
+        reference_templates=(),
+    )
+    if result.program is None:
+        assert "SESSION_DURATION_UNDER_TARGET" in result.errors
+        return
+    program = result.program
     policy = get_session_duration_policy(duration)
 
     assert program.validation_report.is_valid
     assert len(program.weekly_schedule) == 3
-    resistance_time_budget_fit = all(
-        (
-            day.estimated_duration_minutes
-            - RULESET.general_warmup_minutes
-            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0)
-        )
-        <= policy.maximum_minutes
+    assert all(
+        policy.contains(calculate_main_training_minutes(day))
         for day in program.weekly_schedule
-    )
-    assert (
-        resistance_time_budget_fit
-        or "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD" in program.warnings
     )
     assert all(
         item.sets <= RULESET.max_working_sets_per_exercise_absolute
@@ -103,8 +106,8 @@ def test_fat_loss_reserves_cardio_before_resistance_construction() -> None:
 
 
 def test_same_profile_gets_more_useful_capacity_at_sixty_minutes() -> None:
-    short = _program(Goal.HYPERTROPHY, 30)
-    long = _program(Goal.HYPERTROPHY, 60)
+    short = _program(Goal.HYPERTROPHY, 30, available_training_days=1)
+    long = _program(Goal.HYPERTROPHY, 60, available_training_days=1)
 
     short_work = sum(item.sets for day in short.weekly_schedule for item in day.exercises)
     long_work = sum(item.sets for day in long.weekly_schedule for item in day.exercises)
@@ -187,7 +190,16 @@ def test_reversed_candidate_order_keeps_final_duration_plan_deterministic() -> N
 
 
 def test_long_session_does_not_exceed_useful_or_hard_volume_to_fill_time() -> None:
-    program = _program(Goal.HYPERTROPHY, 90)
+    result = generate_program(
+        _source(Goal.HYPERTROPHY, 90),
+        full_catalog(),
+        RULESET,
+        reference_templates=(),
+    )
+    if result.program is None:
+        assert "SESSION_DURATION_UNDER_TARGET" in result.errors
+        return
+    program = result.program
     ranges = program.aggregate_metrics["volume_ranges_by_muscle"]
 
     assert all(

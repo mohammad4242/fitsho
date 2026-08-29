@@ -27,7 +27,11 @@ def _run_batch2_profile_6(monkeypatch):
     monkeypatch.setattr(
         batch2,
         "TEST_PROFILES_BATCH2",
-        [profile for profile in batch2.TEST_PROFILES_BATCH2 if profile["num"] == 6],
+        [
+            dict(profile, session_duration_minutes=30)
+            for profile in batch2.TEST_PROFILES_BATCH2
+            if profile["num"] == 6
+        ],
     )
     results = batch2.run_batch2_profiles()
 

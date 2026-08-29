@@ -47,7 +47,7 @@ def _recovery_request(**overrides: object):
         "primary_goal": "build_muscle",
         "training_experience": "intermediate",
         "training_age_months": 24,
-        "session_duration_minutes": 60,
+        "session_duration_minutes": 30,
         "priority_muscles": [MuscleGroup.CHEST],
     }
     values.update(overrides)
@@ -61,8 +61,9 @@ def _template_attempts(result: ProgramGenerationResult) -> tuple[dict[str, objec
 
 
 def test_top_ranked_template_failure_recovers_with_second_without_dynamic_fallback() -> None:
+    good, _ = _upper_lower_reference()
     good = replace(
-        _four_day_reference(),
+        good,
         slug="a-second-good",
         focus_tags=(TemplateFocusTag.BALANCED.value,),
     )
@@ -89,8 +90,9 @@ def test_top_ranked_template_failure_recovers_with_second_without_dynamic_fallba
 
 
 def test_multiple_ranked_templates_fail_before_later_template_succeeds() -> None:
+    good, _ = _upper_lower_reference()
     good = replace(
-        _four_day_reference(),
+        good,
         slug="a-later-good",
         focus_tags=(TemplateFocusTag.BALANCED.value,),
     )

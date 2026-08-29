@@ -75,8 +75,14 @@ def test_phase11_9_duration_diagnostics_use_workout_minutes_and_repair_trace() -
             "construction_path": "TEMPLATE",
             "final_program": {
                 "days": (
-                    {"estimated_duration_minutes": 35},
-                    {"estimated_duration_minutes": 50},
+                    {
+                        "estimated_duration_minutes": 35,
+                        "exercises": ({"exercise_type": "compound", "estimated_minutes": 30},),
+                    },
+                    {
+                        "estimated_duration_minutes": 50,
+                        "exercises": ({"exercise_type": "compound", "estimated_minutes": 45},),
+                    },
                 ),
                 "validation": {"warnings": ("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",)},
                 "trace": (
@@ -102,7 +108,7 @@ def test_phase11_9_duration_diagnostics_use_workout_minutes_and_repair_trace() -
     assert diagnostics["legacy_over_target_count"] == 1
     assert diagnostics["legacy_average_absolute_deviation_minutes"] == 7.5
     assert diagnostics["budget_fit_percentage"] == 50.0
-    assert diagnostics["average_overrun_minutes"] == 7.5
+    assert diagnostics["average_overrun_minutes"] == 2.5
     assert diagnostics["late_duration_repair_percentage"] == 100.0
     assert diagnostics["major_late_repair_percentage"] == 0.0
     assert diagnostics["proven_duration_template_rejections"] == 1

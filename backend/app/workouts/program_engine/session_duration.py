@@ -12,8 +12,13 @@ from app.workouts.program_engine.duration_capacity import (
 )
 from app.workouts.program_engine.duration_policy import (
     SessionDurationPolicy,
+    calculate_cardio_addon_minutes,
+    calculate_main_training_minutes,
+    calculate_main_training_minutes_from_exercises,
+    calculate_total_session_minutes_from_exercises,
     effective_main_exercise_floor,
     get_session_duration_policy,
+    is_main_training_exercise,
 )
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
 from app.workouts.program_engine.enums import Goal
@@ -61,6 +66,9 @@ class SessionDurationRepairEvidence:
 
     day_index: int
     post_repair_exercise_count: int
+    post_repair_main_training_minutes: int
+    post_repair_total_session_minutes: int
+    # Compatibility alias; it now has main-training semantics.
     post_repair_duration_minutes: int
     post_repair_exercise_fingerprint: str
     reason_codes: tuple[str, ...]
@@ -74,16 +82,28 @@ class SessionDurationRepairEvidence:
         return cls(
             day_index=day.day_index,
             post_repair_exercise_count=len(day.exercises),
-            post_repair_duration_minutes=max(
-                0,
-                day.estimated_duration_minutes - (day.cardio.duration_minutes if day.cardio else 0),
-            ),
+            post_repair_main_training_minutes=calculate_main_training_minutes(day),
+            post_repair_total_session_minutes=day.estimated_duration_minutes,
+            post_repair_duration_minutes=calculate_main_training_minutes(day),
             post_repair_exercise_fingerprint=_resistance_session_fingerprint(day),
             reason_codes=tuple(dict.fromkeys(reason_codes)),
         )
 
     def matches(self, day: WorkoutDay) -> bool:
-        return self == SessionDurationRepairEvidence.from_day(day, self.reason_codes)
+        current = SessionDurationRepairEvidence.from_day(day, self.reason_codes)
+        current_cardio = calculate_cardio_addon_minutes(day) or 0
+        total_matches = self.post_repair_total_session_minutes in {
+            current.post_repair_total_session_minutes,
+            current.post_repair_total_session_minutes - current_cardio,
+        }
+        return (
+            self.day_index == current.day_index
+            and self.post_repair_exercise_count == current.post_repair_exercise_count
+            and self.post_repair_main_training_minutes == current.post_repair_main_training_minutes
+            and total_matches
+            and self.post_repair_exercise_fingerprint == current.post_repair_exercise_fingerprint
+            and self.reason_codes == current.reason_codes
+        )
 
     @classmethod
     def from_trace(cls, value: object) -> "SessionDurationRepairEvidence | None":
@@ -91,16 +111,23 @@ class SessionDurationRepairEvidence:
             return None
         day_index = value.get("day_index")
         exercise_count = value.get("post_repair_exercise_count")
+        main_training = value.get("post_repair_main_training_minutes")
         duration = value.get("post_repair_duration_minutes")
+        total_session = value.get("post_repair_total_session_minutes")
         raw_fingerprint = value.get("post_repair_exercise_fingerprint")
         raw_reasons = value.get("reason_codes")
+        main_value = main_training if main_training is not None else duration
         if not (
             type(day_index) is int
             and day_index >= 0
             and type(exercise_count) is int
             and exercise_count >= 0
-            and type(duration) is int
-            and duration >= 0
+            and type(main_value) is int
+            and main_value >= 0
+            and (
+                total_session is None
+                or (type(total_session) is int and total_session >= 0)
+            )
             and isinstance(raw_fingerprint, str)
             and _is_session_fingerprint(raw_fingerprint)
             and isinstance(raw_reasons, (tuple, list))
@@ -111,7 +138,11 @@ class SessionDurationRepairEvidence:
         evidence = cls(
             day_index=day_index,
             post_repair_exercise_count=exercise_count,
-            post_repair_duration_minutes=duration,
+            post_repair_main_training_minutes=main_value,
+            post_repair_total_session_minutes=(
+                total_session if total_session is not None else main_value
+            ),
+            post_repair_duration_minutes=main_value,
             post_repair_exercise_fingerprint=raw_fingerprint,
             reason_codes=tuple(raw_reasons),
         )
@@ -121,6 +152,8 @@ class SessionDurationRepairEvidence:
         return {
             "day_index": self.day_index,
             "post_repair_exercise_count": self.post_repair_exercise_count,
+            "post_repair_main_training_minutes": self.post_repair_main_training_minutes,
+            "post_repair_total_session_minutes": self.post_repair_total_session_minutes,
             "post_repair_duration_minutes": self.post_repair_duration_minutes,
             "post_repair_exercise_fingerprint": self.post_repair_exercise_fingerprint,
             "reason_codes": self.reason_codes,
@@ -267,11 +300,11 @@ def repair_session_durations(
         reasons.extend(capacity_trim_reasons)
         other_days = tuple(repaired) + days[day_index + 1 :]
 
-        # ------------------------------------------------------------------
-        # Underfill = exercise count below floor ONLY.
-        # Being below the time budget is NOT a defect by itself.
-        # ------------------------------------------------------------------
-        if main_exercise_count(current.exercises) < planned_minimum_exercises:
+        # Main training must meet the duration policy independently of add-ons.
+        if (
+            calculate_main_training_minutes(current) < policy.minimum_minutes
+            or main_exercise_count(current.exercises) < planned_minimum_exercises
+        ):
             reasons.append("SESSION_DURATION_UNDERFILLED")
             hard_volume_status: list[bool] = []
             current = _repair_underfill(
@@ -293,13 +326,9 @@ def repair_session_durations(
             elif main_exercise_count(current.exercises) < planned_minimum_exercises:
                 reasons.append("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD")
 
-        # ------------------------------------------------------------------
-        # Overfill = resistance-only portion exceeds budget + tolerance.
-        # (estimated_duration_minutes = warmup + resistance sets;
-        #  cardio is added later by add_cardio and is not counted here)
-        # ------------------------------------------------------------------
-        resistance_minutes = current.estimated_duration_minutes - ruleset.general_warmup_minutes
-        if resistance_minutes > policy.maximum_minutes:
+        # Overfill is measured from main-training exercises only.  General
+        # warm-up, anatomical core, and attached cardio are add-ons.
+        if calculate_main_training_minutes(current) > policy.maximum_minutes:
             reasons.append("SESSION_DURATION_OVERFILLED")
             current, overfill_reasons = _repair_overfill(
                 current,
@@ -310,45 +339,19 @@ def repair_session_durations(
             )
             reasons.extend(overfill_reasons)
 
-        # ------------------------------------------------------------------
-        # Core-extension allowance
-        # ------------------------------------------------------------------
-        resistance_after = current.estimated_duration_minutes - ruleset.general_warmup_minutes
-        extended_for_core = (
-            resistance_after > policy.maximum_minutes
-            and resistance_after <= policy.core_preservation_maximum_minutes
-            and any(template_removal_rank(item) == 3 for item in current.exercises)
-        )
-
-        # ------------------------------------------------------------------
-        # Classify outcome
-        # ------------------------------------------------------------------
-        if resistance_after <= policy.maximum_minutes:
+        main_training_after = calculate_main_training_minutes(current)
+        # Classify outcome using the hard main-training invariant.
+        if policy.contains(main_training_after):
             if current.estimated_duration_minutes != day.estimated_duration_minutes:
                 reasons.append("SESSION_DURATION_REPAIR_APPLIED")
-            if resistance_after >= policy.minimum_minutes:
-                reasons.append("SESSION_DURATION_TARGET_SATISFIED")
-            else:
-                # Under budget — only a quality issue if program is actually incomplete.
-                # Complete programs finishing under budget are acceptable.
-                if main_exercise_count(current.exercises) < planned_minimum_exercises:
-                    reasons.append("SESSION_DURATION_TARGET_UNSATISFIED")
-                    if volume is not None and _duration_shortfall_is_hard_constrained(
-                        request, volume
-                    ):
-                        reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
-                    else:
-                        reasons.append("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD")
-                else:
-                    # Enough exercises; program just finishes under budget.
-                    # This is fine — duration is a budget, not a fill target.
-                    reasons.append("SESSION_DURATION_TARGET_SATISFIED")
-        elif extended_for_core:
-            if current.estimated_duration_minutes != day.estimated_duration_minutes:
-                reasons.append("SESSION_DURATION_REPAIR_APPLIED")
-            reasons.append("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE")
+            reasons.append("SESSION_DURATION_TARGET_SATISFIED")
         else:
             reasons.append("SESSION_DURATION_TARGET_UNSATISFIED")
+            if main_training_after < policy.minimum_minutes:
+                if volume is not None and _duration_shortfall_is_hard_constrained(request, volume):
+                    reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
+                else:
+                    reasons.append("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD")
 
         repaired.append(current)
         day_reason_codes.append(tuple(dict.fromkeys(reasons[day_reason_start:])))
@@ -412,13 +415,27 @@ def _repair_underfill(
     minimum_exercises: int,
     hard_volume_status: list[bool] | None = None,
 ) -> WorkoutDay:
-    """Add exercises (or sets) until exercise-count floor is satisfied.
-
-    Rest is NEVER inflated merely to fill unused time — duration is a budget,
-    not a fill target.  We stop as soon as the exercise-count floor is met.
-    """
+    """Add safe main-training work until duration and structure are satisfied."""
     exercises = list(day.exercises)
-    while main_exercise_count(exercises) < minimum_exercises:
+    while (
+        calculate_main_training_minutes_from_exercises(exercises) < policy.minimum_minutes
+        or main_exercise_count(exercises) < minimum_exercises
+    ):
+        if calculate_main_training_minutes_from_exercises(exercises) < policy.minimum_minutes:
+            set_addition = _select_set_addition(
+                day,
+                exercises,
+                request,
+                policy,
+                ruleset,
+                other_days=other_days,
+                volume=volume,
+            )
+            if set_addition is not None:
+                index, updated = set_addition
+                exercises[index] = updated
+                day = _rebuild_day(day, tuple(exercises), ruleset)
+                continue
         addition = _select_exercise_addition(
             day,
             exercises,
@@ -458,6 +475,71 @@ def _repair_underfill(
     return day
 
 
+def _select_set_addition(
+    day: WorkoutDay,
+    exercises: list[ProgrammedExercise],
+    request: NormalizedProgramRequest,
+    policy: SessionDurationPolicy,
+    ruleset: ProgramRuleset,
+    *,
+    other_days: tuple[WorkoutDay, ...],
+    volume: WeeklyVolumePlan | None,
+) -> tuple[int, ProgrammedExercise] | None:
+    """Select one useful set without exceeding main-duration or hard limits."""
+    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
+    options: list[tuple[tuple[object, ...], int, ProgrammedExercise]] = []
+    for index, exercise in enumerate(exercises):
+        if not is_main_training_exercise(exercise) or exercise.primary_muscle is None:
+            continue
+        set_cap = ruleset.max_working_sets_for_exercise(
+            training_status=request.training_status,
+            goal=request.primary_goal,
+            exercise_type=exercise.exercise_type,
+            is_priority=exercise.primary_muscle in priority_policy.priorities,
+            weekly_exposure_count=1,
+            is_primary_strength=(
+                request.primary_goal is Goal.STRENGTH
+                and _programmed_strength_role(exercise) is StrengthExerciseRole.PRIMARY_STRENGTH
+            ),
+        )
+        if (
+            exercise.sets >= set_cap
+            or exercise.sets >= ruleset.max_working_sets_per_exercise_absolute
+        ):
+            continue
+        direct_sets = sum(
+            item.sets
+            for item in exercises
+            if item.primary_muscle is exercise.primary_muscle
+        )
+        if direct_sets + 1 > ruleset.max_sets_per_muscle_per_session:
+            continue
+        updated = _with_additional_set(exercise, ruleset)
+        simulated = [*exercises]
+        simulated[index] = updated
+        if calculate_main_training_minutes_from_exercises(simulated) > policy.maximum_minutes:
+            continue
+        weekly = [item for other_day in other_days for item in other_day.exercises] + simulated
+        if not _within_weekly_hard_volume(weekly, ruleset, request, volume):
+            continue
+        options.append(
+            (
+                (
+                    priority_policy.precedence_key(exercise.primary_muscle),
+                    adaptation_preservation_rank(exercise, priority_policy),
+                    -exercise.estimated_minutes,
+                    str(exercise.exercise_id),
+                ),
+                index,
+                updated,
+            )
+        )
+    if not options:
+        return None
+    selected = min(options, key=lambda item: item[0])
+    return selected[1], selected[2]
+
+
 # _select_rest_extension_for_underfill intentionally removed.
 # Inflating rest merely to fill unused session time is prohibited:
 # session_duration_minutes is a BUDGET, not a fill target.
@@ -494,6 +576,7 @@ def _select_exercise_addition(
             else exercise_fits_focus(item, day.focus)
         )
         and _candidate_is_safe(item, request)
+        and is_main_training_exercise(item)
         and ExerciseLabel.CARDIO not in item.labels
         and not has_near_equivalent(item, exercises)
     )
@@ -549,15 +632,6 @@ def _select_exercise_addition(
             fatigue_cost=candidate.fatigue_cost,
         )
         estimated = estimate_exercise_minutes(sets, prescription.rest_seconds, 0, ruleset)
-        if (
-            ruleset.general_warmup_minutes
-            + sum(item.estimated_minutes for item in exercises)
-            + estimated
-            + (day.cardio.duration_minutes if day.cardio else 0)
-            > policy.maximum_total_minutes(ruleset.general_warmup_minutes)
-            and main_exercise_count(exercises) >= minimum_exercises
-        ):
-            continue
         repeated = any(
             item.exercise_id == candidate.id
             for other_day in other_days
@@ -573,6 +647,8 @@ def _select_exercise_addition(
             repeated=repeated,
         )
         simulated = [*exercises, programmed]
+        if calculate_main_training_minutes_from_exercises(simulated) > policy.maximum_minutes:
+            continue
         other_frequency = sum(
             any(item.primary_muscle is candidate.primary_muscle for item in day.exercises)
             for day in other_days
@@ -589,6 +665,11 @@ def _select_exercise_addition(
         within_hard_volume = _within_weekly_hard_volume(weekly_exercises, ruleset, request, volume)
         if not within_hard_volume:
             hard_volume_rejected = True
+        if (
+            calculate_main_training_minutes_from_exercises(exercises) < policy.minimum_minutes
+            and within_hard_volume
+        ):
+            return simulated[-1]
         if (
             not prefer_acceptable_volume_for_minimum_fill
             and main_exercise_count(exercises) < minimum_exercises
@@ -655,13 +736,13 @@ def _repair_overfill(
     exercises = list(day.exercises)
     reasons: list[str] = []
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
-    while day.estimated_duration_minutes > policy.maximum_total_minutes(
-        ruleset.general_warmup_minutes
-    ):
+    while calculate_main_training_minutes(day) > policy.maximum_minutes:
         low_value_removable = [
             (index, item)
             for index, item in enumerate(exercises)
-            if is_supplemental_muscle(item.primary_muscle)
+            if is_main_training_exercise(item)
+            and (
+                is_supplemental_muscle(item.primary_muscle)
             or (
                 _can_remove_for_floor(item, exercises, minimum_exercises)
                 and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
@@ -672,7 +753,7 @@ def _repair_overfill(
                     or "SESSION_SIZE_ACCESSORY" in item.reason_codes
                     or "OPTIONAL_SUPPLEMENTAL_WORK" in item.reason_codes
                 )
-            )
+            ))
         ]
         if low_value_removable:
             index, removed = min(
@@ -692,7 +773,8 @@ def _repair_overfill(
         options = [
             (index, item)
             for index, item in enumerate(exercises)
-            if item.sets > ruleset.minimum_working_sets
+            if is_main_training_exercise(item)
+            and item.sets > ruleset.minimum_working_sets
             and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
             and template_removal_rank(item) < 3
             and priority_policy.preservation_rank(item.primary_muscle) == 0
@@ -714,7 +796,8 @@ def _repair_overfill(
         removable = [
             (index, item)
             for index, item in enumerate(exercises)
-            if _can_remove_for_floor(item, exercises, minimum_exercises)
+            if is_main_training_exercise(item)
+            and _can_remove_for_floor(item, exercises, minimum_exercises)
             and not any(code.startswith("REQUIRED_") for code in item.reason_codes)
             and template_removal_rank(item) < 3
             and priority_policy.preservation_rank(item.primary_muscle) == 0
@@ -723,7 +806,9 @@ def _repair_overfill(
             supersetted, superset_reasons = apply_duration_pressure_superset(
                 tuple(exercises), request, ruleset
             )
-            if superset_reasons:
+            if superset_reasons and _non_main_shape(supersetted) == _non_main_shape(
+                tuple(exercises)
+            ):
                 exercises = list(supersetted)
                 reasons.extend(superset_reasons)
                 day = _rebuild_day(day, tuple(exercises), ruleset)
@@ -754,6 +839,22 @@ def _repair_overfill(
     return day, tuple(dict.fromkeys(reasons))
 
 
+def _non_main_shape(
+    exercises: tuple[ProgrammedExercise, ...],
+) -> tuple[tuple[object, ...], ...]:
+    return tuple(
+        (
+            item.exercise_id,
+            item.exercise_type,
+            item.sets,
+            item.rest_seconds,
+            item.estimated_minutes,
+        )
+        for item in exercises
+        if not is_main_training_exercise(item)
+    )
+
+
 def _can_remove_for_floor(
     exercise: ProgrammedExercise,
     exercises: list[ProgrammedExercise],
@@ -772,6 +873,8 @@ def _select_rest_reduction_for_overfill(
 ) -> tuple[int, ProgrammedExercise] | None:
     options: list[tuple[int, int, int, str, int, ProgrammedExercise]] = []
     for index, exercise in enumerate(exercises):
+        if not is_main_training_exercise(exercise):
+            continue
         minimum_rest = _duration_repair_minimum_rest(exercise, request, ruleset)
         if exercise.rest_seconds <= minimum_rest:
             continue
@@ -1090,9 +1193,9 @@ def _rebuild_day(
         original,
         exercises=ordered,
         title=english_session_title(original.day_index, ordered),
-        estimated_duration_minutes=(
-            ruleset.general_warmup_minutes
-            + sum(item.estimated_minutes for item in ordered)
-            + (original.cardio.duration_minutes if original.cardio else 0)
+        estimated_duration_minutes=calculate_total_session_minutes_from_exercises(
+            ordered,
+            ruleset.general_warmup_minutes,
+            calculate_cardio_addon_minutes(original) or 0,
         ),
     )

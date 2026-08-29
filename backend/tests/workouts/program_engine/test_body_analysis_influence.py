@@ -293,7 +293,7 @@ def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> Non
             training_experience="intermediate",
             training_age_months=24,
             available_training_days=4,
-            session_duration_minutes=90,
+            session_duration_minutes=30,
             available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
         ),
         full_catalog(),
@@ -326,7 +326,7 @@ def test_program_trace_preserves_provisional_analysis_version() -> None:
         request(
             primary_goal="build_muscle",
             body_analysis_influence=body_influence,
-            session_duration_minutes=60,
+            session_duration_minutes=45,
         ),
         full_catalog(),
         RULESET,

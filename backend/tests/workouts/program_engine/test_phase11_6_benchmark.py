@@ -75,8 +75,14 @@ def test_phase11_6_duration_diagnostics_use_workout_minutes_and_repair_trace() -
             "construction_path": "TEMPLATE",
             "final_program": {
                 "days": (
-                    {"estimated_duration_minutes": 35},
-                    {"estimated_duration_minutes": 50},
+                    {
+                        "estimated_duration_minutes": 35,
+                        "exercises": ({"exercise_type": "compound", "estimated_minutes": 30},),
+                    },
+                    {
+                        "estimated_duration_minutes": 50,
+                        "exercises": ({"exercise_type": "compound", "estimated_minutes": 45},),
+                    },
                 ),
                 "validation": {"warnings": ("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",)},
                 "trace": (

@@ -1,6 +1,9 @@
 from collections.abc import Mapping, Sequence
 
-from app.workouts.program_engine.duration_policy import calculate_resistance_minutes
+from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.recovery import recovery_spacing_is_valid
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -83,14 +86,10 @@ def _duration_fit(
     report: ValidationReport,
     ruleset: ProgramRuleset,
 ) -> dict[str, object]:
-    budget = request.session_duration_minutes
+    policy = get_session_duration_policy(request.session_duration_minutes)
     satisfied = 0.0
     for day in program.weekly_schedule:
-        workout_minutes = calculate_resistance_minutes(
-            day,
-            ruleset.general_warmup_minutes,
-        )
-        if workout_minutes <= budget:
+        if policy.contains(calculate_main_training_minutes(day)):
             satisfied += 1
     return _ratio(satisfied, float(len(program.weekly_schedule)))
 

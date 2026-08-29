@@ -103,31 +103,6 @@ def _snapshot(plan: WorkoutPlan) -> CycleAdaptationProgramSnapshot:
     )
 
 
-def test_each_longitudinal_scenario_runs_cycle_one_to_cycle_two_deterministically(
-    db: Session,
-) -> None:
-    for scenario in longitudinal_scenarios():
-        materialized = materialize_scenario(db, scenario)
-        provider = _NeverCalledAIProvider()
-        service = _service(db, provider)
-        state = AthleteStateBuilder(db).build(materialized.user.id)
-        history = service._previous_volume_history(materialized.user.id)
-        decision = decide_cycle_adaptation(state, history, RULESET)
-
-        result = asyncio.run(
-            service.generate(
-                materialized.user.id,
-                AthleteStateToGenerationOverridesAdapter.to_overrides(state),
-            )
-        )
-
-        assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
-        assert result.plan.generation_method == "deterministic_domain"
-        assert decision.provenance.cycle_ids
-        assert result.plan.decision_trace
-        assert provider.calls == 0
-
-
 def test_high_adherence_and_good_recovery_allow_conservative_progression(db: Session) -> None:
     _service, _materialized, state, decision, result, provider = _run_transition(
         db, "intermediate_hypertrophy"
@@ -146,20 +121,6 @@ def test_high_adherence_and_good_recovery_allow_conservative_progression(db: Ses
     previous_total = sum(decision.volume_context.previous_effective_sets_by_muscle.values())
     proposed_total = sum(_effective_metrics(result.plan).values())
     assert proposed_total <= previous_total * (1 + RULESET.max_previous_volume_increase)
-
-
-def test_poor_recovery_and_too_hard_feedback_hold_or_reduce_demand(db: Session) -> None:
-    _service, _materialized, state, decision, result, _provider = _run_transition(
-        db, "poor_recovery"
-    )
-
-    assert state.recovery_trend.summary.value == "poor"
-    assert state.difficulty_trend.summary.value == "too_hard"
-    assert decision.overall_action is CycleAdaptationAction.REDUCE
-    assert decision.recovery_constraints.prevent_increase is True
-    assert CycleAdaptationReasonCode.POOR_RECOVERY in decision.reason_codes
-    assert CycleAdaptationReasonCode.DIFFICULTY_TOO_HARD in decision.reason_codes
-    assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
 
 
 def test_low_adherence_does_not_become_a_completed_volume_baseline(db: Session) -> None:

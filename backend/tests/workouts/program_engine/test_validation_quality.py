@@ -45,7 +45,7 @@ def test_safe_priority_soft_shortfall_remains_a_usable_program() -> None:
 
     assert result.program is not None, result.errors
     assert result.program.validation_report.status is ValidationStatus.VALID_WITH_CONSTRAINTS
-    assert "PRIORITY_TARGET_PARTIALLY_SATISFIED" in result.program.validation_report.warnings
+    assert "DIRECT_VOLUME_BELOW_SOFT_TARGET" in result.program.validation_report.warnings
 
 
 def test_coach_quality_metrics_are_deterministic_and_decomposed() -> None:

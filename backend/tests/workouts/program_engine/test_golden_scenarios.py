@@ -3,7 +3,10 @@ from dataclasses import replace
 import pytest
 
 from app.exercises.enums import Equipment, ExerciseCautionTag, MovementPattern, MuscleGroup
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus, SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -60,21 +63,11 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
     assert result.program.validation_report.is_valid
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.workout_minutes(
-            day.estimated_duration_minutes
-            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0),
-            RULESET.general_warmup_minutes,
-        )
-        <= policy.maximum_minutes
+        policy.contains(calculate_main_training_minutes(day))
         for day in result.program.weekly_schedule
     )
     if any(
-        policy.workout_minutes(
-            day.estimated_duration_minutes
-            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0),
-            RULESET.general_warmup_minutes,
-        )
-        < policy.minimum_minutes
+        calculate_main_training_minutes(day) < policy.minimum_minutes
         for day in result.program.weekly_schedule
     ):
         duration_trace = next(
@@ -112,6 +105,7 @@ def test_successful_generation_preserves_requested_training_days(requested_days:
 def test_six_day_generation_succeeds_with_scaled_frequency_caps() -> None:
     source = request(
         available_training_days=6,
+        session_duration_minutes=30,
         training_experience="intermediate",
         training_age_months=24,
     )
@@ -168,6 +162,8 @@ def test_exact_day_construction_failure_does_not_return_shorter_success() -> Non
 )
 def test_golden_constraints_and_recovery(name: str) -> None:
     source = golden_scenarios()[name]
+    if name == "high_job_poor_recovery":
+        source = source.model_copy(update={"session_duration_minutes": 30})
     result = generate_program(source, full_catalog(), RULESET)
 
     assert result.program is not None, result.errors
@@ -440,7 +436,7 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
         training_experience="intermediate",
         training_age_months=30,
         available_training_days=4,
-        session_duration_minutes=60,
+        session_duration_minutes=30,
         available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
         priority_muscles=[MuscleGroup.GLUTES],
     )
@@ -460,8 +456,7 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
     )
     duration_policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        day.estimated_duration_minutes
-        <= duration_policy.maximum_total_minutes(RULESET.general_warmup_minutes)
+        duration_policy.contains(calculate_main_training_minutes(day))
         for day in first.program.weekly_schedule
     )
     selected = [item for day in first.program.weekly_schedule for item in day.exercises]
@@ -512,7 +507,7 @@ def test_priority_selection_prefers_a_fillable_split_with_distributed_exposure()
         training_experience="intermediate",
         training_age_months=30,
         available_training_days=4,
-        session_duration_minutes=60,
+        session_duration_minutes=30,
         priority_muscles=[MuscleGroup.GLUTES],
     )
     catalog = [

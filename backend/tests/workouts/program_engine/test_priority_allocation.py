@@ -3,6 +3,10 @@ import pytest
 from app.exercises.enums import Equipment, MuscleGroup
 from app.profile.enums import TrainingLocation
 from app.training_templates.tags import TemplateFocusTag, priority_tags_for_muscles
+from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, SplitType, TrainingExperience
 from app.workouts.program_engine.focus_topology import FocusAffinity
@@ -210,7 +214,7 @@ def _six_day_priority_request(*, priorities: frozenset[MuscleGroup]) -> ProgramG
         training_experience=TrainingExperience.ADVANCED,
         training_age_months=72,
         available_training_days=6,
-        session_duration_minutes=45,
+        session_duration_minutes=30,
         available_equipment=frozenset(
             {
                 Equipment.BODYWEIGHT,
@@ -252,16 +256,14 @@ def test_priority_program_reports_measurable_emphasis_and_frequency_for_each_pri
     assert baseline.program is not None, baseline.errors
     assert priority.program is not None, priority.errors
     assert len(priority.program.weekly_schedule) == 6
-    workout_durations = tuple(
-        (
-            day.estimated_duration_minutes
-            - RULESET.general_warmup_minutes
-            - (day.cardio.duration_minutes if getattr(day, "cardio", None) else 0)
-        )
-        for day in priority.program.weekly_schedule
+    policy = get_session_duration_policy(
+        _six_day_priority_request(priorities=frozenset()).session_duration_minutes
     )
-    assert all(duration <= 55 for duration in workout_durations)
-    if any(duration < 35 for duration in workout_durations):
+    workout_durations = tuple(
+        calculate_main_training_minutes(day) for day in priority.program.weekly_schedule
+    )
+    assert all(policy.contains(duration) for duration in workout_durations)
+    if any(duration < policy.minimum_minutes for duration in workout_durations):
         assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in (
             priority.program.validation_report.warnings
         )

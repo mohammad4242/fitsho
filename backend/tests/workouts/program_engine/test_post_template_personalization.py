@@ -24,7 +24,6 @@ from app.workouts.program_engine.template_sessions import build_template_session
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
 from tests.workouts.program_engine.test_template_reference import (
-    _four_day_reference,
     _upper_lower_reference,
     template_request,
 )
@@ -325,7 +324,7 @@ def test_same_template_strength_and_hypertrophy_have_role_specific_prescriptions
         "available_training_days": 4,
         "training_experience": "intermediate",
         "training_age_months": 30,
-        "session_duration_minutes": 60,
+        "session_duration_minutes": 30,
     }
 
     hypertrophy = generate_program(
@@ -365,23 +364,23 @@ def test_same_template_strength_and_hypertrophy_have_role_specific_prescriptions
 
 
 def test_same_template_gives_explicit_chest_priority_more_final_direct_volume() -> None:
-    template = _four_day_reference()
+    template, catalog = _upper_lower_reference()
     common = {
         "available_training_days": 4,
         "primary_goal": "build_muscle",
         "training_experience": "intermediate",
         "training_age_months": 24,
-        "session_duration_minutes": 60,
+        "session_duration_minutes": 30,
     }
     balanced = generate_program(
         template_request(**common),
-        full_catalog(),
+        catalog,
         RULESET,
         reference_templates=(template,),
     )
     prioritized = generate_program(
         template_request(**common, priority_muscles=[MuscleGroup.CHEST]),
-        full_catalog(),
+        catalog,
         RULESET,
         reference_templates=(template,),
     )

@@ -67,6 +67,7 @@ def test_required_muscle_without_any_safe_coverage_is_structured_unsatisfied() -
 def test_bodyweight_wrist_caution_relaxes_unavailable_push_without_unsafe_selection() -> None:
     source = request(
         available_training_days=3,
+        session_duration_minutes=30,
         available_equipment=[Equipment.BODYWEIGHT],
         blocked_caution_tags=[ExerciseCautionTag.WRIST_LOADING],
         priority_muscles=[MuscleGroup.QUADRICEPS],
@@ -224,7 +225,7 @@ def test_exact_valid_knee_caution_profile_recovers_without_unsafe_exercises() ->
         training_experience=TrainingExperience.BEGINNER,
         training_age_months=3,
         available_training_days=4,
-        session_duration_minutes=75,
+        session_duration_minutes=30,
         blocked_caution_tags=[ExerciseCautionTag.DEEP_KNEE_FLEXION],
     )
 
@@ -293,8 +294,8 @@ def test_dynamic_sessions_use_actual_direct_muscles_for_recovery_spacing() -> No
             primary_goal="body_recomposition",
             training_experience=TrainingExperience.INTERMEDIATE,
             training_age_months=24,
-            available_training_days=5,
-            session_duration_minutes=60,
+            available_training_days=4,
+            session_duration_minutes=45,
             priority_muscles=[MuscleGroup.GLUTES],
         ),
         full_catalog(),

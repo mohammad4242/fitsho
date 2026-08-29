@@ -1,6 +1,10 @@
 from dataclasses import dataclass, replace
 
 from app.exercises.enums import Difficulty, ExerciseType, MuscleFocus, MuscleGroup
+from app.workouts.program_engine.duration_policy import (
+    calculate_cardio_addon_minutes,
+    calculate_total_session_minutes_from_exercises,
+)
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.exercise_semantics import (
@@ -123,10 +127,10 @@ def finalize_session_structure(
                 recalculated.append(replace(item, order=index))
 
         exercises = tuple(recalculated)
-        estimated_duration = (
-            ruleset.general_warmup_minutes
-            + sum(item.estimated_minutes for item in exercises)
-            + (day.cardio.duration_minutes if day.cardio else 0)
+        estimated_duration = calculate_total_session_minutes_from_exercises(
+            exercises,
+            ruleset.general_warmup_minutes,
+            calculate_cardio_addon_minutes(day) or 0,
         )
 
         finalized.append(

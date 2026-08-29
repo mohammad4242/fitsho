@@ -3,7 +3,13 @@ from collections import Counter
 from dataclasses import replace
 
 from app.exercises.enums import MovementPattern, MuscleGroup
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    calculate_cardio_addon_minutes,
+    calculate_main_training_minutes_from_exercises,
+    calculate_total_session_minutes_from_exercises,
+    get_session_duration_policy,
+    is_main_training_exercise,
+)
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
 from app.workouts.program_engine.enums import Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
@@ -47,8 +53,6 @@ _HARD_MOVEMENT_PATTERN_GROUPS = (
         }
     ),
 )
-
-
 def repair_weekly_volume(
     days: tuple[WorkoutDay, ...],
     request: NormalizedProgramRequest,
@@ -418,10 +422,10 @@ def _select_set_redistribution(
                     for muscle, target in targets.items()
                 ):
                     continue
-                duration = ruleset.general_warmup_minutes + sum(
-                    item.estimated_minutes for item in simulated[day_index]
+                main_minutes = calculate_main_training_minutes_from_exercises(
+                    simulated[day_index]
                 )
-                if duration > duration_policy.maximum_total_minutes(ruleset.general_warmup_minutes):
+                if main_minutes > duration_policy.maximum_minutes:
                     continue
                 options.append(
                     (
@@ -562,12 +566,10 @@ def _select_exercise_addition(
                 frequency_cap = _direct_frequency_cap(len(days), ruleset)
                 if current_frequency + int(adds_exposure) > frequency_cap:
                     continue
-                duration = (
-                    ruleset.general_warmup_minutes
-                    + sum(item.estimated_minutes for item in day)
-                    + estimated
-                )
-                if duration > duration_policy.maximum_total_minutes(ruleset.general_warmup_minutes):
+                main_minutes = calculate_main_training_minutes_from_exercises(day)
+                if is_main_training_exercise(candidate):
+                    main_minutes += estimated
+                if main_minutes > duration_policy.maximum_minutes:
                     continue
                 role_repeated = any(
                     item.primary_muscle is muscle
@@ -931,12 +933,12 @@ def _select_addition_candidate(
                     ruleset,
                 ),
             )
-            if _day_duration(
-                exercises,
-                exercise,
-                updated,
-                ruleset,
-            ) > duration_policy.maximum_total_minutes(ruleset.general_warmup_minutes):
+            simulated_day = [*exercises]
+            simulated_day[exercise_index] = updated
+            if (
+                calculate_main_training_minutes_from_exercises(simulated_day)
+                > duration_policy.maximum_minutes
+            ):
                 continue
             simulated = [list(day_exercises) for day_exercises in days]
             simulated[day_index][exercise_index] = updated
@@ -1095,22 +1097,11 @@ def _rebuild_days(
                 original,
                 exercises=reordered,
                 title=english_session_title(original.day_index, reordered),
-                estimated_duration_minutes=(
-                    ruleset.general_warmup_minutes
-                    + sum(item.estimated_minutes for item in reordered)
-                    + (original.cardio.duration_minutes if original.cardio else 0)
+                estimated_duration_minutes=calculate_total_session_minutes_from_exercises(
+                    reordered,
+                    ruleset.general_warmup_minutes,
+                    calculate_cardio_addon_minutes(original) or 0,
                 ),
             )
         )
     return tuple(repaired_days)
-
-
-def _day_duration(
-    original_exercises: list[ProgrammedExercise],
-    original: ProgrammedExercise,
-    updated: ProgrammedExercise,
-    ruleset: ProgramRuleset,
-) -> int:
-    total = sum(item.estimated_minutes for item in original_exercises)
-    total += updated.estimated_minutes - original.estimated_minutes
-    return ruleset.general_warmup_minutes + total

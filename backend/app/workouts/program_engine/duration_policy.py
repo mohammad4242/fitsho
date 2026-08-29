@@ -1,20 +1,123 @@
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, get_args
+from typing import cast, get_args
 
+from app.exercises.enums import ExerciseLabel, ExerciseType
 from app.profile.schemas import SessionDurationMinutes
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 
-if TYPE_CHECKING:
-    pass
+
+def _value(item: object, field: str, default: object = None) -> object:
+    if isinstance(item, Mapping):
+        return item.get(field, default)
+    return getattr(item, field, default)
 
 
-def calculate_resistance_minutes(day: "Any", general_warmup_minutes: int) -> int:
-    cardio_minutes = day.cardio.duration_minutes if day.cardio else 0
-    return int(max(0, day.estimated_duration_minutes - general_warmup_minutes - cardio_minutes))
+def _minutes(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int | float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return 0
+    return 0
+
+
+def _exercise_items(value: object) -> Iterable[object]:
+    exercises = _value(value, "exercises", value)
+    if isinstance(exercises, Iterable) and not isinstance(exercises, (str, bytes)):
+        return exercises
+    return ()
+
+
+def _enum_value(value: object) -> object:
+    return getattr(value, "value", value)
+
+
+def _is_cardio_exercise(exercise: object) -> bool:
+    if _enum_value(_value(exercise, "exercise_type")) == "cardio":
+        return True
+    labels = _value(exercise, "labels", ())
+    if not isinstance(labels, Iterable) or isinstance(labels, (str, bytes)):
+        return False
+    return any(
+        _enum_value(label) == ExerciseLabel.CARDIO.value
+        for label in cast(Iterable[object], labels)
+    )
+
+
+def is_main_training_exercise(exercise: object) -> bool:
+    """Return whether an exercise contributes to the requested main-training time."""
+    exercise_type = _enum_value(_value(exercise, "exercise_type"))
+    if exercise_type == ExerciseType.CORE.value or _is_cardio_exercise(exercise):
+        return False
+    return True
+
+
+def calculate_main_training_minutes_from_exercises(exercises: Iterable[object]) -> int:
+    """Sum programmed exercise time, excluding only anatomical core and cardio."""
+    return sum(
+        max(0, _minutes(_value(exercise, "estimated_minutes", 0)))
+        for exercise in exercises
+        if is_main_training_exercise(exercise)
+    )
+
+
+def calculate_main_training_minutes(day: object) -> int:
+    """Return a day's main-training minutes without warm-up, core, or cardio add-ons."""
+    return calculate_main_training_minutes_from_exercises(_exercise_items(day))
+
+
+def calculate_core_addon_minutes(value: object) -> int:
+    """Return anatomical core exercise minutes that sit outside main training."""
+    return sum(
+        max(0, _minutes(_value(exercise, "estimated_minutes", 0)))
+        for exercise in _exercise_items(value)
+        if _enum_value(_value(exercise, "exercise_type")) == ExerciseType.CORE.value
+    )
+
+
+def calculate_cardio_addon_minutes(day: object) -> int | None:
+    """Return attached or embedded cardio minutes, or ``None`` before attachment."""
+    cardio = _value(day, "cardio")
+    embedded_minutes = sum(
+        max(0, _minutes(_value(exercise, "estimated_minutes", 0)))
+        for exercise in _exercise_items(day)
+        if _is_cardio_exercise(exercise)
+    )
+    if cardio is None and embedded_minutes == 0:
+        return None
+    attached_minutes = (
+        0
+        if cardio is None
+        else max(0, _minutes(_value(cardio, "duration_minutes", 0)))
+    )
+    return attached_minutes + embedded_minutes
+
+
+def calculate_total_session_minutes(day: object) -> int:
+    """Return the stored total session estimate, including all attached add-ons."""
+    return max(0, _minutes(_value(day, "estimated_duration_minutes", 0)))
+
+
+def calculate_total_session_minutes_from_exercises(
+    exercises: Iterable[object],
+    general_warmup_minutes: int,
+    cardio_minutes: int = 0,
+) -> int:
+    """Build a total session estimate from all programmed work and external add-ons."""
+    return max(
+        0,
+        general_warmup_minutes
+        + sum(max(0, _minutes(_value(exercise, "estimated_minutes", 0))) for exercise in exercises)
+        + cardio_minutes,
+    )
 
 
 SESSION_DURATION_TOLERANCE_MINUTES = 10
-CORE_PRESERVATION_EXTENSION_MINUTES = 20
 SHORT_SESSION_MINIMUM_MAIN_EXERCISES = 3
 
 # Official supported resistance-session durations.
@@ -59,25 +162,6 @@ class SessionDurationPolicy:
 
     def contains(self, estimated_minutes: int) -> bool:
         return self.minimum_minutes <= estimated_minutes <= self.maximum_minutes
-
-    @property
-    def core_preservation_maximum_minutes(self) -> int:
-        return self.requested_minutes + CORE_PRESERVATION_EXTENSION_MINUTES
-
-    def workout_minutes(self, estimated_total_minutes: int, general_warmup_minutes: int) -> int:
-        return max(0, estimated_total_minutes - general_warmup_minutes)
-
-    def contains_total(self, estimated_total_minutes: int, general_warmup_minutes: int) -> bool:
-        return self.contains(self.workout_minutes(estimated_total_minutes, general_warmup_minutes))
-
-    def minimum_total_minutes(self, general_warmup_minutes: int) -> int:
-        return self.minimum_minutes + general_warmup_minutes
-
-    def maximum_total_minutes(self, general_warmup_minutes: int) -> int:
-        return self.maximum_minutes + general_warmup_minutes
-
-    def core_preservation_maximum_total_minutes(self, general_warmup_minutes: int) -> int:
-        return self.core_preservation_maximum_minutes + general_warmup_minutes
 
 
 def get_session_duration_policy(

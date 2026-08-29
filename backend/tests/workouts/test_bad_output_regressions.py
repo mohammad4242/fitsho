@@ -1,5 +1,8 @@
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
-from app.workouts.program_engine.duration_policy import get_session_duration_policy
+from app.workouts.program_engine.duration_policy import (
+    calculate_main_training_minutes,
+    get_session_duration_policy,
+)
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
     Goal,
@@ -21,6 +24,7 @@ def test_regression_novice_poor_recovery_keeps_exact_days_with_valid_spacing() -
         sleep_quality=RecoveryRating.POOR,
         stress_level=RecoveryRating.POOR,
         physical_job_demand=PhysicalJobDemand.HIGH,
+        session_duration_minutes=30,
     )
 
     result = generate_program(source, full_catalog(), RULESET)
@@ -59,14 +63,7 @@ def test_regression_thirty_minute_session_reports_traceable_constrained_workload
     assert "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in result.program.warnings
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.contains(
-            max(
-                0,
-                day.estimated_duration_minutes
-                - RULESET.general_warmup_minutes
-                - (day.cardio.duration_minutes if day.cardio else 0),
-            )
-        )
+        policy.contains(calculate_main_training_minutes(day))
         for day in result.program.weekly_schedule
     )
 
@@ -146,9 +143,8 @@ def test_regression_short_upper_lower_keeps_main_work_with_additive_cardio() -> 
         day.cardio is None or "CARDIO_SCHEDULED_AFTER_RESISTANCE" in day.cardio.reason_codes
         for day in result.program.weekly_schedule
     )
+    policy = get_session_duration_policy(30)
     assert all(
-        day.estimated_duration_minutes
-        <= get_session_duration_policy(30).maximum_total_minutes(RULESET.general_warmup_minutes)
-        + (day.cardio.duration_minutes if day.cardio else 0)
+        policy.contains(calculate_main_training_minutes(day))
         for day in result.program.weekly_schedule
     )

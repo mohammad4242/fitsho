@@ -632,7 +632,12 @@ def test_validator_rejects_duration_overrun() -> None:
     result = generate_program(source, catalog(), RULESET)
     assert result.program is not None
     day = result.program.weekly_schedule[0]
-    invalid_day = replace(day, estimated_duration_minutes=99)
+    overlong_exercise = replace(day.exercises[0], estimated_minutes=99)
+    invalid_day = replace(
+        day,
+        exercises=(overlong_exercise, *day.exercises[1:]),
+        estimated_duration_minutes=99 + RULESET.general_warmup_minutes,
+    )
     invalid = replace(result.program, weekly_schedule=(invalid_day,))
 
     report = validate_program(invalid, source, RULESET)
@@ -663,7 +668,7 @@ def test_validator_rejects_session_exercise_counts_outside_the_ruleset(
 
 
 def test_validator_rejects_adjacent_full_body_sessions() -> None:
-    source = request(available_training_days=3)
+    source = request(available_training_days=3, session_duration_minutes=30)
     result = generate_program(source, catalog(), RULESET)
     assert result.program is not None
     adjacent_days = tuple(

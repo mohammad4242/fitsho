@@ -76,6 +76,12 @@ def test_new_goals_use_template_path(
         assert template_stage["reason_codes"] in {
             ("MUSCLE_DIRECT_FREQUENCY_EXCEEDED",),
             ("RECOVERY_SPACING_INVALID",),
+            (
+                "SESSION_DURATION_UNDER_TARGET",
+                "SESSION_DURATION_TARGET_UNSATISFIED",
+                "SESSION_EXERCISE_COUNT_OUT_OF_RANGE",
+                "SESSION_DURATION_CONSTRAINT_UNEXPLAINED",
+            ),
         }
     assert template_stage["hard_eligibility"] == (
         "days",

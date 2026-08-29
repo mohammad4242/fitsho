@@ -254,6 +254,7 @@ def test_legacy_physical_limitations_do_not_become_uncomputable_generation_const
     profile.training_caution_items.append(
         UserProfileTrainingCaution(caution=TrainingCaution.LOWER_BACK)
     )
+    profile.session_duration_minutes = 30
     db.flush()
 
     request = _service(db)._to_program_request(get_profile(db, user.id), None)

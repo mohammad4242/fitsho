@@ -66,7 +66,7 @@ def _generate(
     days: int = 4,
     experience: str = "intermediate",
     age_months: int = 24,
-    session_minutes: int = 60,
+    session_minutes: int = 45,
     priority_muscles: list[MuscleGroup] | None = None,
     body_analysis: BodyAnalysisInfluence | None = None,
     blocked_caution_tags: list[ExerciseCautionTag] | None = None,

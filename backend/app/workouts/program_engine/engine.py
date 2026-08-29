@@ -20,6 +20,12 @@ from app.workouts.program_engine.duration_capacity import (
     SessionCapacity,
     build_session_capacity,
 )
+from app.workouts.program_engine.duration_policy import (
+    calculate_cardio_addon_minutes,
+    calculate_core_addon_minutes,
+    calculate_main_training_minutes,
+    calculate_total_session_minutes,
+)
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
     complete_tracked_metrics,
@@ -490,6 +496,20 @@ def _rejected_split_recovery_reasons(
     return tuple(dict.fromkeys(reasons))
 
 
+def _rejected_split_summaries(
+    rejected_splits: tuple[dict[str, object], ...],
+) -> tuple[dict[str, object], ...]:
+    """Keep prior split evidence bounded when building the next attempt trace."""
+    return tuple(
+        {
+            key: rejected_split[key]
+            for key in ("split", "day_focuses", "status", "reason_codes")
+            if key in rejected_split
+        }
+        for rejected_split in rejected_splits
+    )
+
+
 def _program_for_split(
     request: ProgramGenerationRequest,
     normalized: NormalizedProgramRequest,
@@ -705,7 +725,7 @@ def _program_for_split(
             "stage": "construction_recovery",
             "status": "recovered" if recovery_reasons else "not_required",
             "selected_split": split.split_type.value,
-            "rejected_splits": rejected_splits,
+            "rejected_splits": _rejected_split_summaries(rejected_splits),
             "reason_codes": recovery_reasons,
             "session_reasons": tuple(
                 {
@@ -1234,6 +1254,9 @@ def _finalize_program(
 def _duration_capacity_trace(capacity: SessionCapacity) -> dict[str, object]:
     return {
         "stage": "duration_capacity",
+        "requested_main_training_minutes": capacity.requested_workout_minutes,
+        "minimum_main_training_minutes": capacity.minimum_workout_minutes,
+        "maximum_main_training_minutes": capacity.maximum_workout_minutes,
         "requested_workout_minutes": capacity.requested_workout_minutes,
         "target_total_minutes": capacity.target_total_minutes,
         "minimum_workout_minutes": capacity.minimum_workout_minutes,
@@ -1270,7 +1293,27 @@ def _duration_repair_trace(
     else:
         classification = "major"
     unavoidable_constraints = tuple(
-        sorted(code for code in reason_codes if "CONSTRAINED" in code or "EXTENDED" in code)
+        sorted(code for code in reason_codes if "CONSTRAINED" in code)
+    )
+    session_metrics = tuple(
+        {
+            "day_index": updated.day_index,
+            "requested_main_training_minutes": capacity.requested_workout_minutes,
+            "minimum_main_training_minutes": capacity.minimum_workout_minutes,
+            "maximum_main_training_minutes": capacity.maximum_workout_minutes,
+            **_duration_session_metrics(updated),
+        }
+        for updated in after
+    )
+    session_metrics_before = tuple(
+        {
+            "day_index": original.day_index,
+            "requested_main_training_minutes": capacity.requested_workout_minutes,
+            "minimum_main_training_minutes": capacity.minimum_workout_minutes,
+            "maximum_main_training_minutes": capacity.maximum_workout_minutes,
+            **_duration_session_metrics(original),
+        }
+        for original in before
     )
     return {
         "stage": "session_duration",
@@ -1278,6 +1321,11 @@ def _duration_repair_trace(
         "planned_resistance_work_budget_minutes": capacity.resistance_work_budget_minutes,
         "planned_exercise_capacity": capacity.expected_exercise_count_capacity,
         "planned_set_capacity": capacity.expected_working_set_capacity,
+        "requested_main_training_minutes": capacity.requested_workout_minutes,
+        "minimum_main_training_minutes": capacity.minimum_workout_minutes,
+        "maximum_main_training_minutes": capacity.maximum_workout_minutes,
+        "per_session_duration_metrics_before": session_metrics_before,
+        "per_session_duration_metrics": session_metrics,
         "estimated_duration_before_late_repair": tuple(
             day.estimated_duration_minutes for day in before
         ),
@@ -1288,6 +1336,23 @@ def _duration_repair_trace(
         "unavoidable_duration_constraints": unavoidable_constraints,
         "reason_codes": reason_codes,
         "per_session_evidence": tuple(item.as_trace() for item in evidence),
+    }
+
+
+def _duration_session_metrics(day: WorkoutDay) -> dict[str, object]:
+    cardio_minutes = calculate_cardio_addon_minutes(day)
+    return {
+        "main_training_minutes": calculate_main_training_minutes(day),
+        "core_addon_minutes": calculate_core_addon_minutes(day),
+        "general_warmup_minutes": max(
+            0,
+            calculate_total_session_minutes(day)
+            - calculate_main_training_minutes(day)
+            - calculate_core_addon_minutes(day)
+            - (cardio_minutes or 0),
+        ),
+        "cardio_minutes": cardio_minutes,
+        "total_session_minutes": calculate_total_session_minutes(day),
     }
 
 

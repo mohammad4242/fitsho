@@ -257,17 +257,16 @@ def test_any_hard_acceptance_failure_blocks_ready(section: str, key: str) -> Non
     assert benchmark.verify_closeout(payload)
 
 
-def test_complete_under_budget_session_is_not_a_duration_quality_issue() -> None:
+def test_underfilled_main_training_session_is_a_duration_quality_issue() -> None:
     assert (
         benchmark._duration_policy_failure(
             requested_minutes=60,
-            estimated_total_minutes=42,
-            cardio_minutes=0,
-            main_exercises=5,
-            minimum_exercises=5,
+            day={
+                "exercises": ({"exercise_type": "compound", "estimated_minutes": 42},),
+            },
             reason_codes=("SESSION_DURATION_TARGET_SATISFIED",),
         )
-        is None
+        == "below_minimum"
     )
 
 
@@ -275,10 +274,9 @@ def test_unjustified_over_budget_session_is_a_duration_quality_issue() -> None:
     assert (
         benchmark._duration_policy_failure(
             requested_minutes=60,
-            estimated_total_minutes=90,
-            cardio_minutes=0,
-            main_exercises=5,
-            minimum_exercises=5,
+            day={
+                "exercises": ({"exercise_type": "compound", "estimated_minutes": 90},),
+            },
             reason_codes=(),
         )
         == "above_maximum"
@@ -289,10 +287,10 @@ def test_duration_audit_excludes_cardio_from_resistance_policy() -> None:
     assert (
         benchmark._duration_policy_failure(
             requested_minutes=30,
-            estimated_total_minutes=54,
-            cardio_minutes=10,
-            main_exercises=4,
-            minimum_exercises=3,
+            day={
+                "exercises": ({"exercise_type": "compound", "estimated_minutes": 34},),
+                "cardio": {"duration_minutes": 10},
+            },
             reason_codes=("SESSION_DURATION_TARGET_SATISFIED",),
         )
         is None

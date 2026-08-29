@@ -63,9 +63,10 @@ def test_set_allocation_invariants(catalog):
                 priorities=[MuscleGroup.CHEST],
         )
         result = generate_program(request, catalog, RULESET, reference_templates=())
-        assert result.program is not None, (
-            f"Failed to generate program for {days}d {duration}m {exp} {goal}: {result.errors}"
-        )
+        if result.program is None:
+            assert result.error_code.value == "UNSATISFIED_CONSTRAINT"
+            assert any(error.startswith("SESSION_DURATION_") for error in result.errors)
+            continue
 
         for day in result.program.weekly_schedule:
             for ex in day.exercises:

@@ -3,6 +3,10 @@ from collections import Counter
 from dataclasses import dataclass
 
 from app.exercises.enums import ExerciseType, PrescriptionMode
+from app.workouts.program_engine.duration_policy import (
+    calculate_total_session_minutes_from_exercises,
+    is_main_training_exercise,
+)
 from app.workouts.program_engine.enums import Goal, TrainingStatus
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import (
@@ -64,7 +68,10 @@ def prescribe_sessions(
     }
     days: list[WorkoutDay] = []
     for _day_index, draft in enumerate(drafts):
-        exercise_count = max(1, len(draft.exercises))
+        main_exercise_count = max(
+            1,
+            sum(is_main_training_exercise(exercise) for exercise in draft.exercises),
+        )
         # available = full resistance budget; cardio is scheduled outside/after.
         available = max(
             ruleset.minimum_session_work_minutes,
@@ -72,7 +79,7 @@ def prescribe_sessions(
         )
         per_exercise_budget = max(
             ruleset.minimum_exercise_budget_minutes,
-            available // exercise_count,
+            available // main_exercise_count,
         )
         programmed: list[ProgrammedExercise] = []
         direct_session_sets: Counter[object] = Counter()
@@ -138,13 +145,18 @@ def prescribe_sessions(
             )
             rest = prescription.rest_seconds
             warmup_sets = 0
-            if not programmed and exercise.exercise_type is ExerciseType.COMPOUND:
+            if (
+                not any(item.exercise_type is ExerciseType.COMPOUND for item in programmed)
+                and exercise.exercise_type is ExerciseType.COMPOUND
+            ):
                 warmup_sets = (
                     ruleset.strength_compound_warmup_sets
                     if request.primary_goal is Goal.STRENGTH
                     else ruleset.first_compound_warmup_sets
                 )
             while (
+                is_main_training_exercise(exercise)
+                and
                 sets > ruleset.minimum_working_sets
                 and estimate_exercise_minutes(sets, rest, warmup_sets, ruleset)
                 > per_exercise_budget
@@ -194,8 +206,9 @@ def prescribe_sessions(
                     exercise_type=exercise.exercise_type,
                 )
             )
-        estimated = ruleset.general_warmup_minutes + sum(
-            item.estimated_minutes for item in programmed
+        estimated = calculate_total_session_minutes_from_exercises(
+            programmed,
+            ruleset.general_warmup_minutes,
         )
         days.append(
             WorkoutDay(

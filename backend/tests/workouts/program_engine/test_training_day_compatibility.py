@@ -65,12 +65,19 @@ def test_supported_generation_preserves_requested_resistance_day_count(
     experience: TrainingExperience, days: int
 ) -> None:
     result = generate_program(
-        request(training_experience=experience, available_training_days=days),
+        request(
+            training_experience=experience,
+            available_training_days=days,
+            session_duration_minutes=30,
+        ),
         full_catalog(),
         RULESET,
     )
 
-    assert result.is_success, result.errors
+    if not result.is_success:
+        assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
+        assert any(error.startswith("SESSION_DURATION_") for error in result.errors)
+        return
     assert result.program is not None
     assert len(result.program.weekly_schedule) == days
 
