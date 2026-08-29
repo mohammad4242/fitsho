@@ -20,8 +20,12 @@ class PrescriptionRule:
 
 @dataclass(frozen=True)
 class ProgramRuleset:
-    version: str = "resistance_training_v3"
+    version: str = "resistance_training_v4"
     engine_version: str = "program_engine_v1"
+    professional_hybrid_bonus: int = 30
+    professional_ppl_bonus: int = 40
+    professional_body_part_bonus: int = 50
+    professional_matching_specialization_bonus: int = 60
     max_resistance_days: int = 6
     days_per_week: int = 7
     minimum_recovery_gap_days: int = 2
