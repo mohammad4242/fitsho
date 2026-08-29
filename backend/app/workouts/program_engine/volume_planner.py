@@ -24,6 +24,8 @@ from app.workouts.program_engine.volume_history import (
 from app.workouts.program_engine.volume_policy import (
     VOLUME_POLICY,
     recovery_burden_for_request,
+    session_hard_volume_cap,
+    weekly_direct_volume_range,
 )
 
 MAJOR_MUSCLES = (
@@ -88,8 +90,13 @@ def plan_weekly_volume(
     baseline_sets: dict[MuscleGroup, int] = {}
     for muscle in PLANNED_MUSCLES:
         is_secondary = muscle in SECONDARY_MUSCLES
-        muscle_minimum = secondary_minimum if is_secondary else minimum
-        muscle_maximum = secondary_maximum if is_secondary else maximum
+        range_limit = weekly_direct_volume_range(muscle, request.source.training_age_months)
+        if range_limit:
+            muscle_minimum = range_limit.minimum
+            muscle_maximum = range_limit.maximum
+        else:
+            muscle_minimum = secondary_minimum if is_secondary else minimum
+            muscle_maximum = secondary_maximum if is_secondary else maximum
         target = VOLUME_POLICY.preferred_target(
             muscle,
             request.training_status,
@@ -102,21 +109,28 @@ def plan_weekly_volume(
             target -= ruleset.contextual_volume_reduction_sets
         baseline_sets[muscle] = min(max(target, muscle_minimum), muscle_maximum)
     if explicit_priorities:
+
+        def _get_min(m: MuscleGroup) -> int:
+            r = weekly_direct_volume_range(m, request.source.training_age_months)
+            return r.minimum if r else (secondary_minimum if m in SECONDARY_MUSCLES else minimum)
+
         baseline_sets = {
             muscle: (
                 sets
                 if muscle in explicit_priorities
                 else max(
-                    secondary_minimum if muscle in SECONDARY_MUSCLES else minimum,
+                    _get_min(muscle),
                     sets - ruleset.contextual_volume_reduction_sets,
                 )
             )
             for muscle, sets in baseline_sets.items()
         }
-    hard_maximums = {
-        muscle: secondary_maximum if muscle in SECONDARY_MUSCLES else maximum
-        for muscle in PLANNED_MUSCLES
-    }
+
+    def _get_max(m: MuscleGroup) -> int:
+        r = weekly_direct_volume_range(m, request.source.training_age_months)
+        return r.maximum if r else (secondary_maximum if m in SECONDARY_MUSCLES else maximum)
+
+    hard_maximums = {muscle: _get_max(muscle) for muscle in PLANNED_MUSCLES}
     priority_bonuses = priority_policy.volume_bonuses(
         baseline_sets,
         hard_maximums,
@@ -143,8 +157,13 @@ def plan_weekly_volume(
     for muscle in PLANNED_MUSCLES:
         constraint_reasons = list(common_constraint_reasons)
         is_secondary = muscle in SECONDARY_MUSCLES
-        muscle_minimum = secondary_minimum if is_secondary else minimum
-        muscle_maximum = secondary_maximum if is_secondary else maximum
+        range_limit = weekly_direct_volume_range(muscle, request.source.training_age_months)
+        if range_limit:
+            muscle_minimum = range_limit.minimum
+            muscle_maximum = range_limit.maximum
+        else:
+            muscle_minimum = secondary_minimum if is_secondary else minimum
+            muscle_maximum = secondary_maximum if is_secondary else maximum
         safe_maximum = muscle_maximum
         acceptable_ceiling = muscle_maximum
         sets = baseline_sets[muscle]
@@ -198,7 +217,8 @@ def plan_weekly_volume(
                 direct_exposures[muscle],
                 (priority_policy.preferred_frequency if muscle in effective_priorities else 0),
             )
-            split_maximum = ruleset.max_sets_per_muscle_per_session * feasible_exposures
+            session_cap = session_hard_volume_cap(request.source.training_age_months)
+            split_maximum = session_cap * feasible_exposures
             if sets > split_maximum:
                 sets = split_maximum
             if split_maximum < muscle_maximum:

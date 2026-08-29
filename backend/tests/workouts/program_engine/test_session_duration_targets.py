@@ -25,6 +25,7 @@ from app.workouts.program_engine.session_duration import (
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
+from app.workouts.program_engine.volume_policy import session_hard_volume_cap
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
@@ -391,7 +392,10 @@ def test_duration_repair_cannot_add_hidden_or_per_session_volume() -> None:
     repaired_chest = tuple(
         item for item in repaired[0].exercises if item.primary_muscle is chest.primary_muscle
     )
-    assert sum(item.sets for item in repaired_chest) <= RULESET.max_sets_per_muscle_per_session
+    assert (
+        sum(item.sets for item in repaired_chest)
+        <= session_hard_volume_cap(source.training_age_months)
+    )
     assert all(item.counts_toward_volume for item in repaired[0].exercises)
 
 
@@ -644,9 +648,10 @@ def test_capacity_trim_preserves_optional_core_when_main_capacity_is_full() -> N
 
     assert len(repaired[0].exercises) == RULESET.max_exercises_per_session + 1
     assert main_exercise_count(repaired[0].exercises) == main_exercise_count(main)
-    assert calculate_main_training_minutes(repaired[0]) <= get_session_duration_policy(
-        60
-    ).maximum_minutes
+    assert (
+        calculate_main_training_minutes(repaired[0])
+        <= get_session_duration_policy(60).maximum_minutes
+    )
     assert "SUPPLEMENTAL_WORK_TRIMMED_FOR_DURATION" not in reasons
     assert optional.exercise_id in {item.exercise_id for item in repaired[0].exercises}
 

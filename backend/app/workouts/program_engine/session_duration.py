@@ -60,7 +60,7 @@ from app.workouts.program_engine.template_sessions import (
     adaptation_preservation_rank,
     template_removal_rank,
 )
-from app.workouts.program_engine.volume_policy import session_direct_volume_range
+from app.workouts.program_engine.volume_policy import session_hard_volume_cap
 
 
 @dataclass(frozen=True)
@@ -498,10 +498,7 @@ def _select_set_addition(
         direct_sets = sum(
             item.sets for item in exercises if item.primary_muscle is exercise.primary_muscle
         )
-        sess_range = session_direct_volume_range(
-            exercise.primary_muscle, request.source.training_age_months
-        )
-        sess_max = sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
+        sess_max = session_hard_volume_cap(request.source.training_age_months)
         if direct_sets + 1 > sess_max:
             continue
         updated = _with_additional_set(exercise, ruleset)
@@ -617,10 +614,7 @@ def _select_exercise_addition(
         direct_sets_for_muscle = sum(
             item.sets for item in exercises if item.primary_muscle is candidate.primary_muscle
         )
-        sess_range = session_direct_volume_range(
-            candidate.primary_muscle, request.source.training_age_months
-        )
-        sess_max = sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
+        sess_max = session_hard_volume_cap(request.source.training_age_months)
         sets = min(
             ruleset.minimum_working_sets,
             sess_max,

@@ -9,6 +9,7 @@ from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, RecoveryRating, TrainingExperience
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.validation import validate_program
+from app.workouts.program_engine.volume_policy import session_hard_volume_cap
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
@@ -113,7 +114,10 @@ def test_successful_programs_use_honest_flexible_volume(overrides: dict[str, obj
         for item in day.exercises:
             if item.primary_muscle is not None:
                 per_session[item.primary_muscle] += item.sets
-        assert all(sets <= RULESET.max_sets_per_muscle_per_session for sets in per_session.values())
+        assert all(
+            sets <= session_hard_volume_cap(source.training_age_months)
+            for sets in per_session.values()
+        )
 
     for muscle, values in metrics["volume_ranges_by_muscle"].items():
         assert values["preferred_weekly_target"] == values["target_sets"]

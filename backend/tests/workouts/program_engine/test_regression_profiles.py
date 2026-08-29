@@ -33,6 +33,7 @@ from app.workouts.program_engine.split_selector import (
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_planner import plan_weekly_volume
+from app.workouts.program_engine.volume_policy import session_hard_volume_cap
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
 
 
@@ -332,7 +333,7 @@ def test_regression_profiles() -> None:
                 if item.primary_muscle is not None
             )
             assert all(
-                sets <= RULESET.max_sets_per_muscle_per_session
+                sets <= session_hard_volume_cap(req.training_age_months)
                 for sets in per_session_sets.values()
             )
 

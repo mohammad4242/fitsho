@@ -101,19 +101,24 @@ def prescribe_sessions(
             )
             primary_muscle = exercise.primary_muscle
             session_size_accessory = False
+            if primary_muscle is not None:
+                from app.workouts.program_engine.volume_policy import session_hard_volume_cap
+
+                sess_max = session_hard_volume_cap(request.source.training_age_months)
+            else:
+                sess_max = ruleset.max_sets_per_muscle_per_session
+
             if primary_muscle in allocations:
                 allocated_sets = next(allocations[primary_muscle])
                 sets = max(ruleset.minimum_working_sets, allocated_sets)
                 session_size_accessory = allocated_sets < ruleset.minimum_working_sets
             else:
                 sets = min(
-                    ruleset.max_sets_per_muscle_per_session,
+                    sess_max,
                     ruleset.default_untracked_muscle_sets,
                 )
             if primary_muscle is not None:
-                remaining_direct_sets = (
-                    ruleset.max_sets_per_muscle_per_session - direct_session_sets[primary_muscle]
-                )
+                remaining_direct_sets = sess_max - direct_session_sets[primary_muscle]
                 if remaining_direct_sets >= ruleset.minimum_working_sets:
                     sets = min(sets, remaining_direct_sets)
                 direct_session_sets[primary_muscle] += sets
@@ -156,8 +161,7 @@ def prescribe_sessions(
                 )
             while (
                 is_main_training_exercise(exercise)
-                and
-                sets > ruleset.minimum_working_sets
+                and sets > ruleset.minimum_working_sets
                 and estimate_exercise_minutes(sets, rest, warmup_sets, ruleset)
                 > per_exercise_budget
             ):

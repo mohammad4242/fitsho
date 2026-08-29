@@ -44,7 +44,7 @@ from app.workouts.program_engine.supplemental_policy import (
     main_exercise_count,
 )
 from app.workouts.program_engine.template_sessions import adaptation_preservation_rank
-from app.workouts.program_engine.volume_policy import session_direct_volume_range
+from app.workouts.program_engine.volume_policy import session_hard_volume_cap
 
 _HARD_MOVEMENT_PATTERN_GROUPS = (
     frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH}),
@@ -376,10 +376,7 @@ def _select_set_redistribution(
             recipient_muscle = recipient.primary_muscle
             if recipient_muscle is None:
                 continue
-            sess_range = session_direct_volume_range(
-                recipient_muscle, request.source.training_age_months
-            )
-            sess_max = sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
+            sess_max = session_hard_volume_cap(request.source.training_age_months)
             if (
                 recipient_muscle not in hard_direct_under
                 or direct_by_session[recipient_muscle] >= sess_max
@@ -527,8 +524,7 @@ def _select_exercise_addition(
                 - current_effective_sets.get(muscle.value, 0)
             )
             sets = max(ruleset.minimum_working_sets, math.ceil(required_sets))
-            sess_range = session_direct_volume_range(muscle, request.source.training_age_months)
-            sess_max = sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
+            sess_max = session_hard_volume_cap(request.source.training_age_months)
             sets = min(sets, sess_max)
             sets = min(sets, _candidate_set_cap(candidate, days, request, targets, ruleset))
             prescription = prescription_for(
@@ -955,8 +951,7 @@ def _select_addition_candidate(
                 and weekly_direct[primary.value] >= primary_target.direct_sets
             ):
                 continue
-            sess_range = session_direct_volume_range(primary, request.source.training_age_months)
-            sess_max = sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
+            sess_max = session_hard_volume_cap(request.source.training_age_months)
             if direct_by_session[primary] >= sess_max:
                 continue
             if exercise.sets >= _exercise_set_cap(exercise, days, request, targets, ruleset):
@@ -1050,11 +1045,10 @@ def _per_session_excessive(
     days: list[list[ProgrammedExercise]], request: NormalizedProgramRequest, ruleset: ProgramRuleset
 ) -> set[tuple[int, MuscleGroup]]:
     excessive: set[tuple[int, MuscleGroup]] = set()
+    sess_max = session_hard_volume_cap(request.source.training_age_months)
     for day_index, exercises in enumerate(days):
         direct = _direct_sets([exercises])
         for muscle, sets in direct.items():
-            sess_range = session_direct_volume_range(muscle, request.source.training_age_months)
-            sess_max = sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
             if sets > sess_max:
                 excessive.add((day_index, muscle))
     return excessive

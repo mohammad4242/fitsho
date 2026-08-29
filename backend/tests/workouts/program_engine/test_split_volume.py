@@ -30,7 +30,10 @@ from app.workouts.program_engine.volume_planner import (
     TRACKED_MUSCLES,
     plan_weekly_volume,
 )
-from app.workouts.program_engine.volume_policy import VOLUME_POLICY
+from app.workouts.program_engine.volume_policy import (
+    VOLUME_POLICY,
+    session_hard_volume_cap,
+)
 
 
 def normalized(**overrides: object) -> NormalizedProgramRequest:
@@ -679,8 +682,12 @@ def test_specialized_four_day_split_respects_session_volume_cap() -> None:
     )
     plan = plan_weekly_volume(request, select_split(request, RULESET), RULESET)
 
-    assert plan.direct_sets_for(MuscleGroup.CHEST) <= RULESET.max_sets_per_muscle_per_session
-    assert plan.direct_sets_for(MuscleGroup.SHOULDERS) <= RULESET.max_sets_per_muscle_per_session
+    assert plan.direct_sets_for(MuscleGroup.CHEST) <= session_hard_volume_cap(
+        request.source.training_age_months
+    )
+    assert plan.direct_sets_for(MuscleGroup.SHOULDERS) <= session_hard_volume_cap(
+        request.source.training_age_months
+    )
     assert "VOLUME_CAPPED_FOR_SPLIT_FREQUENCY" not in plan.reason_codes
 
 

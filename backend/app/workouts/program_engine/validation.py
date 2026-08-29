@@ -30,7 +30,7 @@ from app.workouts.program_engine.slot_compatibility import (
 from app.workouts.program_engine.supersets import superset_structure_errors
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
 from app.workouts.program_engine.volume_policy import (
-    session_direct_volume_range,
+    session_hard_volume_cap,
 )
 
 
@@ -194,16 +194,8 @@ def validate_program(
                 per_session[key] += item.sets
         for muscle in per_session:
             direct_session_frequency[muscle] += 1
-        for muscle_str, value in per_session.items():
-            muscle_enum = next((m for m in MuscleGroup if m.value == muscle_str), None)
-            if muscle_enum is not None:
-                sess_range = session_direct_volume_range(muscle_enum, request.training_age_months)
-                dynamic_user_max = (
-                    sess_range.maximum if sess_range else ruleset.max_sets_per_muscle_per_session
-                )
-            else:
-                dynamic_user_max = ruleset.max_sets_per_muscle_per_session
-
+        for value in per_session.values():
+            dynamic_user_max = session_hard_volume_cap(request.training_age_months)
             configured_limit = program.aggregate_metrics.get(
                 "reference_max_sets_per_muscle_per_session"
             )

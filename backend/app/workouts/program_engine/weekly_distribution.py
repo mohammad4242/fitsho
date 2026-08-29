@@ -213,13 +213,19 @@ def _invariants_hold(
         != tuple((day.day_index, day.weekday) for day in after)
         or _exercise_signatures(before) != _exercise_signatures(after)
         or _volume(before, ruleset) != _volume(after, ruleset)
-        or any(
-            sum(item.sets for item in day.exercises if item.primary_muscle is muscle)
-            > ruleset.max_sets_per_muscle_per_session
-            for day in after
-            for muscle in {item.primary_muscle for item in day.exercises if item.primary_muscle}
-        )
-        or not recovery_spacing_is_valid(after, ruleset)
+    ):
+        return False
+
+    from app.workouts.program_engine.volume_policy import session_hard_volume_cap
+
+    sess_max = session_hard_volume_cap(request.source.training_age_months)
+    for day in after:
+        for muscle in {item.primary_muscle for item in day.exercises if item.primary_muscle}:
+            if sum(item.sets for item in day.exercises if item.primary_muscle is muscle) > sess_max:
+                return False
+
+    if (
+        not recovery_spacing_is_valid(after, ruleset)
         or not _duration_is_safe(before, after, request, ruleset)
         or any(session_structure_errors(day, request.primary_goal, request) for day in after)
         or any(
@@ -228,8 +234,7 @@ def _invariants_hold(
             for index, item in enumerate(day.exercises)
         )
         or any(
-            (candidate < prior and candidate < floor)
-            or (candidate > prior and candidate > ceiling)
+            (candidate < prior and candidate < floor) or (candidate > prior and candidate > ceiling)
             for prior, candidate in zip(before_counts, after_counts, strict=True)
         )
     ):
@@ -247,11 +252,16 @@ def _duration_is_safe(
     for prior, candidate in zip(before, after, strict=True):
         prior_minutes = calculate_main_training_minutes(prior)
         candidate_minutes = calculate_main_training_minutes(candidate)
-        if candidate_minutes > policy.maximum_minutes or (
-            prior_minutes <= policy.maximum_minutes and candidate_minutes > policy.maximum_minutes
-        ) or (
-            prior_minutes >= policy.minimum_minutes
-            and candidate_minutes < policy.minimum_minutes
+        if (
+            candidate_minutes > policy.maximum_minutes
+            or (
+                prior_minutes <= policy.maximum_minutes
+                and candidate_minutes > policy.maximum_minutes
+            )
+            or (
+                prior_minutes >= policy.minimum_minutes
+                and candidate_minutes < policy.minimum_minutes
+            )
         ):
             return False
     return True

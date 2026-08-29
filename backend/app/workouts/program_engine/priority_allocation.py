@@ -174,10 +174,19 @@ class PriorityAllocationPolicy:
             remaining -= 1
         return bonuses
 
-    def useful_frequency(self, target_sets: int, ruleset: ProgramRuleset) -> int:
+    def useful_frequency(
+        self,
+        target_sets: int,
+        ruleset: ProgramRuleset,
+        muscle: MuscleGroup,
+        request: NormalizedProgramRequest,
+    ) -> int:
         if self.preferred_frequency <= 1:
             return self.preferred_frequency
-        required = max(1, math.ceil(target_sets / ruleset.max_sets_per_muscle_per_session))
+        from app.workouts.program_engine.volume_policy import session_hard_volume_cap
+
+        sess_max = session_hard_volume_cap(request.source.training_age_months)
+        required = max(1, math.ceil(target_sets / sess_max))
         return min(self.preferred_frequency, required)
 
     def split_adjustment(
