@@ -280,6 +280,53 @@ def test_recovery_repair_uses_dynamic_focus_when_template_targets_are_empty() ->
     assert "RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTED" in reasons
 
 
+def test_recovery_repair_prefers_dedicated_recipient_over_earlier_grouped_day() -> None:
+    day_zero = _day(
+        0,
+        _exercise(sets=5, high=True),
+        *(_exercise(sets=3, primary=MuscleGroup.CHEST) for _ in range(6)),
+    )
+    movable = _exercise(sets=3)
+    source = _day(
+        1,
+        movable,
+        *(_exercise(sets=3, primary=MuscleGroup.BACK) for _ in range(6)),
+        focus="back_biceps",
+    )
+    grouped_recipient = _day(
+        3,
+        *(_exercise(sets=3, primary=MuscleGroup.BACK) for _ in range(6)),
+        focus="back_biceps",
+    )
+    dedicated_recipient = _day(
+        5,
+        *(_exercise(sets=3, primary=MuscleGroup.TRICEPS) for _ in range(6)),
+        focus="arms",
+    )
+    normalized = normalize_request(
+        request(
+            available_training_days=4,
+            session_duration_minutes=45,
+            training_age_months=30,
+        ),
+        RULESET,
+    )
+
+    repaired, reasons = repair_recovery_accessory_distribution(
+        (day_zero, source, grouped_recipient, dedicated_recipient), normalized, RULESET
+    )
+
+    assert movable.exercise_id not in {item.exercise_id for item in repaired[1].exercises}
+    assert movable.exercise_id not in {item.exercise_id for item in repaired[2].exercises}
+    assert movable.exercise_id in {item.exercise_id for item in repaired[3].exercises}
+    assert sum(
+        movable.exercise_id in {item.exercise_id for item in day.exercises}
+        for day in repaired
+    ) == 1
+    assert recovery_spacing_is_valid(repaired, RULESET)
+    assert "RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTED" in reasons
+
+
 def test_recovery_repair_does_not_exceed_session_hard_volume() -> None:
     day_zero = _day(
         0,
