@@ -71,9 +71,10 @@ def test_back_priority_is_muscle_specific_in_real_generation() -> None:
     assert result.program is not None
     assert any(day.focus == "back_biceps" for day in result.program.weekly_schedule)
     assert set(result.program.aggregate_metrics["priority_metrics"]) == {MuscleGroup.BACK.value}
-    assert result.program.aggregate_metrics["priority_metrics"][MuscleGroup.BACK.value][
-        "direct_sets"
-    ] > 0
+    assert (
+        result.program.aggregate_metrics["priority_metrics"][MuscleGroup.BACK.value]["direct_sets"]
+        > 0
+    )
     assert not any(
         marker in token.lower()
         for token in _trace_tokens(result.program)
@@ -107,9 +108,12 @@ def test_biceps_priority_uses_duration_valid_ppl_without_unnecessary_split_fallb
     assert recovery["selected_split"] == SplitType.PUSH_PULL_LEGS_X2.value
     assert recovery["rejected_splits"] == ()
     assert set(result.program.aggregate_metrics["priority_metrics"]) == {MuscleGroup.BICEPS.value}
-    assert result.program.aggregate_metrics["priority_metrics"][MuscleGroup.BICEPS.value][
-        "direct_sets"
-    ] > 0
+    assert (
+        result.program.aggregate_metrics["priority_metrics"][MuscleGroup.BICEPS.value][
+            "direct_sets"
+        ]
+        > 0
+    )
     assert not any(
         marker in token.lower()
         for token in _trace_tokens(result.program)

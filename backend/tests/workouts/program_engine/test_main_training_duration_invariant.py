@@ -108,10 +108,7 @@ def test_duration_policy_contains_main_training_bounds() -> None:
             ("hypertrophy", "intermediate"),
         )
     )
-    + tuple(
-        (duration, "strength", "advanced")
-        for duration in (45, 60, 75, 90, 120)
-    ),
+    + tuple((duration, "strength", "advanced") for duration in (45, 60, 75, 90, 120)),
 )
 def test_official_duration_matrix_never_returns_an_invalid_success(
     duration: int,
@@ -162,8 +159,7 @@ def test_anatomical_core_does_not_create_or_reduce_main_capacity() -> None:
     with_core = build_session_capacity(normalized, (*main_candidates, core), RULESET)
 
     assert (
-        with_core.expected_exercise_count_capacity
-        == without_core.expected_exercise_count_capacity
+        with_core.expected_exercise_count_capacity == without_core.expected_exercise_count_capacity
     )
     assert with_core.expected_working_set_capacity == without_core.expected_working_set_capacity
     assert with_core.representative_exercise_minutes == without_core.representative_exercise_minutes
@@ -189,11 +185,7 @@ def test_prescription_budget_counts_main_exercises_not_anatomical_core() -> None
         ),
         RULESET,
     )
-    main = tuple(
-        item
-        for item in full_catalog()
-        if item.exercise_type is not ExerciseType.CORE
-    )[:5]
+    main = tuple(item for item in full_catalog() if item.exercise_type is not ExerciseType.CORE)[:5]
     core = next(item for item in full_catalog() if item.exercise_type is ExerciseType.CORE)
     volume = WeeklyVolumePlan(
         targets=tuple(

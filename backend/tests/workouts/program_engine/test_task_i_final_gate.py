@@ -248,10 +248,7 @@ def test_final_gate_rejects_semantics_recovery_day_count_and_coverage() -> None:
 
     recovery_decision = _gate(recovery, source)
     assert recovery_decision.status == "accepted_with_constraints"
-    assert (
-        "RECOVERY_REPAIRABLE_OVERLAP_REMAINS"
-        in recovery_decision.constraint_reason_codes
-    )
+    assert "RECOVERY_REPAIRABLE_OVERLAP_REMAINS" in recovery_decision.constraint_reason_codes
 
 
 def test_final_gate_rejects_any_unsatisfied_weekly_coverage_status() -> None:
@@ -439,8 +436,9 @@ def test_final_gate_accepts_valid_dynamic_template_fallback_and_repaired_outputs
     )
 
 
-def test_final_gate_rejects_four_main_at_sixty_minutes_even_with_exact_constraint_evidence(
-) -> None:
+def test_final_gate_rejects_four_main_at_sixty_minutes_even_with_exact_constraint_evidence() -> (
+    None
+):
     source = request(available_training_days=1, session_duration_minutes=60)
     base = _program(source)
     day = base.weekly_schedule[0]

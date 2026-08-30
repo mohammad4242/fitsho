@@ -145,8 +145,7 @@ def test_batch2_profile_8_preserves_volume_when_no_safe_redistribution_exists(mo
     )
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.contains(calculate_main_training_minutes(day))
-        for day in program.weekly_schedule
+        policy.contains(calculate_main_training_minutes(day)) for day in program.weekly_schedule
     )
     assert all(
         item.is_active
@@ -202,8 +201,7 @@ def test_batch2_constrained_controls_preserve_volume_and_day_count(
     )
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.contains(calculate_main_training_minutes(day))
-        for day in program.weekly_schedule
+        policy.contains(calculate_main_training_minutes(day)) for day in program.weekly_schedule
     )
     assert all(
         item.is_active
@@ -309,8 +307,7 @@ def test_distribution_exercise_counts_are_canonical_main_counts_with_core_presen
         for index in (1, 2)
     )
     assert all(
-        any(item.exercise_type is ExerciseType.CORE for item in day.exercises)
-        for day in base_days
+        any(item.exercise_type is ExerciseType.CORE for item in day.exercises) for day in base_days
     )
 
     result = redistribute_weekly_exercises(

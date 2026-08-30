@@ -61,7 +61,7 @@ def test_set_allocation_invariants(catalog):
             duration,
             exp,
             goal,
-                priorities=[MuscleGroup.CHEST],
+            priorities=[MuscleGroup.CHEST],
         )
         result = generate_program(request, catalog, RULESET, reference_templates=())
         if result.program is None:

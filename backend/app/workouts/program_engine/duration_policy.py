@@ -44,8 +44,7 @@ def _is_cardio_exercise(exercise: object) -> bool:
     if not isinstance(labels, Iterable) or isinstance(labels, (str, bytes)):
         return False
     return any(
-        _enum_value(label) == ExerciseLabel.CARDIO.value
-        for label in cast(Iterable[object], labels)
+        _enum_value(label) == ExerciseLabel.CARDIO.value for label in cast(Iterable[object], labels)
     )
 
 
@@ -91,9 +90,7 @@ def calculate_cardio_addon_minutes(day: object) -> int | None:
     if cardio is None and embedded_minutes == 0:
         return None
     attached_minutes = (
-        0
-        if cardio is None
-        else max(0, _minutes(_value(cardio, "duration_minutes", 0)))
+        0 if cardio is None else max(0, _minutes(_value(cardio, "duration_minutes", 0)))
     )
     return attached_minutes + embedded_minutes
 

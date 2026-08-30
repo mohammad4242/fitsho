@@ -151,9 +151,7 @@ def test_direct_priority_request_rejects_multiple_user_priorities() -> None:
 
 
 def test_upper_muscle_uses_exact_template_priority_tag_only() -> None:
-    assert priority_tags_for_muscles((MuscleGroup.CHEST,)) == {
-        TemplateFocusTag.CHEST_PRIORITY
-    }
+    assert priority_tags_for_muscles((MuscleGroup.CHEST,)) == {TemplateFocusTag.CHEST_PRIORITY}
 
 
 def test_same_muscle_priority_and_body_analysis_do_not_double_stack() -> None:
@@ -232,9 +230,7 @@ def _six_day_priority_request(*, priorities: frozenset[MuscleGroup]) -> ProgramG
 
 
 def test_six_day_priority_prefers_a_split_with_twice_weekly_priority_exposure() -> None:
-    source = _six_day_priority_request(
-        priorities=frozenset({MuscleGroup.HAMSTRINGS})
-    )
+    source = _six_day_priority_request(priorities=frozenset({MuscleGroup.HAMSTRINGS}))
     normalized = normalize_request(source, RULESET)
 
     ranked = rank_split_candidates(normalized, RULESET)
@@ -300,9 +296,7 @@ def test_priority_program_reports_measurable_emphasis_and_frequency_for_each_pri
 
 
 def test_single_priority_receives_deterministic_emphasis() -> None:
-    source = _six_day_priority_request(
-        priorities=frozenset({MuscleGroup.BICEPS})
-    )
+    source = _six_day_priority_request(priorities=frozenset({MuscleGroup.BICEPS}))
 
     first = generate_program(source, full_catalog(), RULESET)
     second = generate_program(source, list(reversed(full_catalog())), RULESET)
@@ -370,9 +364,9 @@ def test_priority_is_satisfied_when_catalog_can_provide_frequency_capacity() -> 
 
 
 def test_priority_does_not_override_existing_hard_constraints() -> None:
-    source = _six_day_priority_request(
-        priorities=frozenset({MuscleGroup.HAMSTRINGS})
-    ).model_copy(update={"available_training_days": 4})
+    source = _six_day_priority_request(priorities=frozenset({MuscleGroup.HAMSTRINGS})).model_copy(
+        update={"available_training_days": 4}
+    )
     result = generate_program(
         source,
         [item for item in full_catalog() if Equipment.DUMBBELL not in item.equipment],

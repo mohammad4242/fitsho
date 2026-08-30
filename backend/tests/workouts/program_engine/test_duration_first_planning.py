@@ -82,8 +82,7 @@ def test_final_program_duration_matrix_is_valid(goal: Goal, duration: int) -> No
     assert program.validation_report.is_valid
     assert len(program.weekly_schedule) == 3
     assert all(
-        policy.contains(calculate_main_training_minutes(day))
-        for day in program.weekly_schedule
+        policy.contains(calculate_main_training_minutes(day)) for day in program.weekly_schedule
     )
     assert all(
         item.sets <= RULESET.max_working_sets_per_exercise_absolute

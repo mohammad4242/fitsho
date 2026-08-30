@@ -49,11 +49,7 @@ def test_duration_repair_keeps_core_and_adds_fifth_main_when_safe_capacity_exist
     baseline_result = generate_program(source, full_catalog(), RULESET, reference_templates=())
     assert baseline_result.program is not None, baseline_result.errors
     baseline = baseline_result.program.weekly_schedule[0]
-    main = tuple(
-        item
-        for item in baseline.exercises
-        if is_main_resistance_exercise(item)
-    )[:4]
+    main = tuple(item for item in baseline.exercises if is_main_resistance_exercise(item))[:4]
     core = tuple(
         replace(
             main[0],

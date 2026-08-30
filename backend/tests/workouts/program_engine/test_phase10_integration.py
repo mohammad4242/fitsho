@@ -291,8 +291,8 @@ def test_phase10_template_scoring_is_goal_agnostic_for_hard_eligibility() -> Non
     traces = []
     for goal in (Goal.STRENGTH, Goal.HYPERTROPHY, Goal.GENERAL_FITNESS, Goal.FAT_LOSS):
         program = _assert_success(
-                generate_program(
-                    _template_request(primary_goal=goal, session_duration_minutes=30),
+            generate_program(
+                _template_request(primary_goal=goal, session_duration_minutes=30),
                 full_catalog(),
                 RULESET,
                 reference_templates=templates,
@@ -423,10 +423,10 @@ def test_phase10_body_analysis_only_changes_downstream_priority(classification: 
     )
     program = _assert_success(
         generate_program(
-                _template_request(
-                    body_analysis_influence=_body_analysis(MuscleGroup.GLUTES, classification),
-                    session_duration_minutes=30,
-                ),
+            _template_request(
+                body_analysis_influence=_body_analysis(MuscleGroup.GLUTES, classification),
+                session_duration_minutes=30,
+            ),
             catalog,
             RULESET,
             reference_templates=templates,

@@ -350,8 +350,7 @@ def build_template_sessions(
                     build_reasons.append("DELIBERATE_REDUNDANCY_FOR_TEMPLATE_STRUCTURE")
             if (
                 is_main_resistance_exercise(candidate)
-                and main_exercise_count(candidate for candidate, _slot in selected)
-                >= main_capacity
+                and main_exercise_count(candidate for candidate, _slot in selected) >= main_capacity
             ):
                 if slot.adaptation_priority == "core":
                     raise TemplateConstructionError(
@@ -391,8 +390,7 @@ def build_template_sessions(
         if accessory_fill_constrained:
             build_reasons.append("TEMPLATE_SESSION_COUNT_CONSTRAINED_BY_SAFE_CAPACITY")
         while (
-            sum(is_core_or_supplemental_exercise(candidate) for candidate, _slot in selected)
-            > 2
+            sum(is_core_or_supplemental_exercise(candidate) for candidate, _slot in selected) > 2
             or main_exercise_count(candidate for candidate, _slot in selected) > main_capacity
         ):
             removable = next(
@@ -434,8 +432,7 @@ def build_template_sessions(
         if (
             not planned_minimum <= main_exercise_count(candidate for candidate, _slot in selected)
             and not accessory_fill_constrained
-            or main_exercise_count(candidate for candidate, _slot in selected)
-            > main_capacity
+            or main_exercise_count(candidate for candidate, _slot in selected) > main_capacity
         ):
             raise TemplateConstructionError(
                 "TEMPLATE_SESSION_EXERCISE_COUNT_UNSATISFIED",

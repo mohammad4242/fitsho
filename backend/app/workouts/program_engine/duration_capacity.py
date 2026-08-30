@@ -250,9 +250,7 @@ def _representative_candidate(
     ruleset: ProgramRuleset,
 ) -> ExerciseCandidate | None:
     resistance_candidates = tuple(
-        candidate
-        for candidate in candidates
-        if is_main_training_exercise(candidate)
+        candidate for candidate in candidates if is_main_training_exercise(candidate)
     )
     compounds = tuple(
         candidate

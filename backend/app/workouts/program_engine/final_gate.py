@@ -74,8 +74,7 @@ def evaluate_final_program(
     constraints = [
         code
         for code in report.warnings
-        if code not in _DURATION_OUTCOME_CODES
-        and code != _COUNT_OUT_OF_RANGE_CODE
+        if code not in _DURATION_OUTCOME_CODES and code != _COUNT_OUT_OF_RANGE_CODE
     ]
     checks: dict[str, object] = {
         "validation": {
@@ -174,11 +173,7 @@ def evaluate_final_program(
             or not duration_evidence_complete
         ):
             reasons.extend(duration_codes)
-            if (
-                not duration_evidence
-                or not duration_evidence_complete
-                or invariant_duration_codes
-            ):
+            if not duration_evidence or not duration_evidence_complete or invariant_duration_codes:
                 reasons.append("SESSION_DURATION_CONSTRAINT_UNEXPLAINED")
         else:
             constraints.extend(duration_evidence)
@@ -384,15 +379,9 @@ def _evidence_proves_duration_code(
         "SESSION_DURATION_UNDER_TARGET",
         "SESSION_DURATION_TARGET_UNSATISFIED",
     }:
-        return (
-            duration_code in reasons
-            and main_minutes < policy.minimum_minutes
-        )
+        return duration_code in reasons and main_minutes < policy.minimum_minutes
     if duration_code in {"SESSION_DURATION_EXCEEDED", "SESSION_DURATION_OVER_TARGET"}:
-        return (
-            duration_code in reasons
-            and main_minutes > policy.maximum_minutes
-        )
+        return duration_code in reasons and main_minutes > policy.maximum_minutes
     return False
 
 

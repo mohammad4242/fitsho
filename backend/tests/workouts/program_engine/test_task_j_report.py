@@ -295,8 +295,7 @@ def test_real_batch2_run_is_rollback_isolated_and_evidence_reconciles(monkeypatc
                 and day["supplemental_exercise_count"]
                 == day["total_exercise_count"] - day["main_exercise_count"]
                 and plan_day.main_exercise_count == day["main_exercise_count"]
-                and plan_day.supplemental_exercise_count
-                == day["supplemental_exercise_count"]
+                and plan_day.supplemental_exercise_count == day["supplemental_exercise_count"]
                 and plan_day.total_exercise_count == day["total_exercise_count"]
                 and day["duration_minutes"] == plan_day.estimated_duration_minutes
                 for day, plan_day in zip(raw["per_day"], raw["plan"].days, strict=True)

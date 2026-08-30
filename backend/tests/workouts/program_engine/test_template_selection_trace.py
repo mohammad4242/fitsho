@@ -116,7 +116,7 @@ def test_exact_priority_is_traceable_without_regional_upper_credit() -> None:
         tuple(full_catalog()),
         (
             _template("exact", TemplateFocusTag.CHEST_PRIORITY),
-        _template("regional", "upper_priority"),
+            _template("regional", "upper_priority"),
         ),
         RULESET,
     )
@@ -127,9 +127,7 @@ def test_exact_priority_is_traceable_without_regional_upper_credit() -> None:
         "EXPLICIT_PRIORITY_EXACT_MATCH",
         "SEX_PRIOR_DISABLED_BY_EXPLICIT_PRIORITY",
     )
-    assert reasons["regional"] == (
-        "SEX_PRIOR_DISABLED_BY_EXPLICIT_PRIORITY",
-    )
+    assert reasons["regional"] == ("SEX_PRIOR_DISABLED_BY_EXPLICIT_PRIORITY",)
     assert all(item.score.sex_score == 0 for item in selection.candidates)
 
 
@@ -194,8 +192,8 @@ def test_hard_rejections_never_receive_template_scores() -> None:
                         adaptation_priority="core",
                         superset_group=None,
                         superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+                        superset_exercise_slug_hint=None,
+                        sets=3,
                         rep_min=8,
                         rep_max=12,
                         target_rir=2,
@@ -245,8 +243,8 @@ def test_unresolvable_core_has_a_concrete_rejection_category() -> None:
                         adaptation_priority="core",
                         superset_group=None,
                         superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+                        superset_exercise_slug_hint=None,
+                        sets=3,
                         rep_min=8,
                         rep_max=12,
                         target_rir=2,

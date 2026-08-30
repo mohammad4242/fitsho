@@ -8,9 +8,7 @@ def test_explicit_inventory_is_canonical() -> None:
         TrainingLocation.HOME,
         HomeTrainingSetup.DUMBBELLS_AVAILABLE,
         (Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND, Equipment.BENCH),
-    ) == frozenset(
-        {Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND, Equipment.BENCH}
-    )
+    ) == frozenset({Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND, Equipment.BENCH})
 
 
 def test_legacy_home_inventory_remains_backward_compatible() -> None:

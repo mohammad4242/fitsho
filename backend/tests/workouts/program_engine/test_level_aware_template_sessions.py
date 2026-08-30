@@ -25,9 +25,7 @@ def _exercise(slug: str, equipment: Equipment) -> ExerciseCandidate:
         movement_pattern=MovementPattern.HORIZONTAL_PUSH,
         exercise_type=ExerciseType.COMPOUND,
         equipment=frozenset({equipment}),
-        difficulty=(
-            Difficulty.BEGINNER if equipment is Equipment.MACHINE else Difficulty.ADVANCED
-        ),
+        difficulty=(Difficulty.BEGINNER if equipment is Equipment.MACHINE else Difficulty.ADVANCED),
         substitution_group="horizontal-push",
     )
 
@@ -55,8 +53,8 @@ def _template(anchor: ExerciseCandidate) -> TemplateReference:
                         adaptation_priority="core",
                         superset_group=None,
                         superset_exercise_id=None,
-        superset_exercise_slug_hint=None,
-        sets=3,
+                        superset_exercise_slug_hint=None,
+                        sets=3,
                         rep_min=8,
                         rep_max=12,
                         target_rir=2,
