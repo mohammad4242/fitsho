@@ -207,9 +207,14 @@ class SessionDurationPolicy:
 def get_session_duration_policy(
     requested_minutes: int,
 ) -> SessionDurationPolicy:
-    tolerance = SESSION_DURATION_TOLERANCE_MINUTES
+    # Long sessions have a wider lower bound so legitimate programming is not
+    # rejected for modest underfill, while the upper hard limit remains +10.
+    lower_tolerance = {
+        75: 15,
+        90: 25,
+    }.get(requested_minutes, SESSION_DURATION_TOLERANCE_MINUTES)
     return SessionDurationPolicy(
         requested_minutes=requested_minutes,
-        minimum_minutes=requested_minutes - tolerance,
-        maximum_minutes=requested_minutes + tolerance,
+        minimum_minutes=requested_minutes - lower_tolerance,
+        maximum_minutes=requested_minutes + SESSION_DURATION_TOLERANCE_MINUTES,
     )

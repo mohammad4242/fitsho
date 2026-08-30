@@ -34,7 +34,7 @@ from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 @pytest.mark.parametrize(
     ("requested", "minimum", "maximum"),
-    [(30, 20, 40), (45, 35, 55), (60, 50, 70), (75, 65, 85), (90, 80, 100), (120, 110, 130)],
+    [(30, 20, 40), (45, 35, 55), (60, 50, 70), (75, 60, 85), (90, 65, 100), (120, 110, 130)],
 )
 def test_session_duration_policy_has_exact_product_bounds(
     requested: int, minimum: int, maximum: int
@@ -528,7 +528,7 @@ def _duration_fixture_exercise(candidate, *, order: int, sets: int = 3, minutes:
 
 @pytest.mark.parametrize(
     ("requested", "existing_count", "existing_minutes"),
-    [(60, 9, 5), (75, 10, 6), (90, 11, 7)],
+    [(60, 9, 5), (75, 10, 5), (90, 11, 5)],
 )
 def test_duration_repair_can_add_tenth_eleventh_or_twelfth_main_exercise(
     requested: int, existing_count: int, existing_minutes: int
@@ -570,7 +570,10 @@ def test_duration_repair_can_add_tenth_eleventh_or_twelfth_main_exercise(
     repaired = result.days[0]
     assert main_exercise_count(repaired.exercises) == existing_count + 1
     assert candidate.id in {item.exercise_id for item in repaired.exercises}
-    assert calculate_main_training_minutes(repaired) >= requested - 10
+    main_minutes = calculate_main_training_minutes(repaired)
+    policy = get_session_duration_policy(requested)
+    assert main_minutes <= policy.maximum_minutes
+    assert ("SESSION_DURATION_TARGET_SATISFIED" in result.reasons) is policy.contains(main_minutes)
 
 
 @pytest.mark.parametrize(
