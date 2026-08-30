@@ -56,13 +56,13 @@ def assess_candidate_survival(
     """Classify a candidate after it has run through the real engine pipeline."""
 
     unique_reasons = tuple(dict.fromkeys(reason_codes))
-    unique_repairs = tuple(dict.fromkeys(repair_events))
+    recorded_repairs = tuple(repair_events)
     hard_reasons = tuple(
         reason
         for reason in unique_reasons
         if classify_constraint(reason, repair_exhausted=not is_success) is ConstraintClass.HARD
     )
-    repair_cost = len(unique_repairs)
+    repair_cost = len(recorded_repairs)
     if not is_success:
         status = CandidateSurvivalStatus.PROVABLY_INFEASIBLE
     elif repair_cost == 0:
@@ -74,7 +74,7 @@ def assess_candidate_survival(
     return CandidateSurvival(
         status=status,
         repair_cost=repair_cost,
-        repair_events=unique_repairs,
+        repair_events=recorded_repairs,
         reason_codes=unique_reasons,
         hard_reason_codes=hard_reasons,
         is_success=is_success,

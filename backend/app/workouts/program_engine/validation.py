@@ -2,8 +2,6 @@ from collections import Counter
 
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup, PrescriptionMode
 from app.workouts.program_engine.duration_policy import (
-    SessionDurationPolicy,
-    SessionExerciseCountPolicy,
     calculate_main_training_minutes,
     get_session_duration_policy,
     get_session_exercise_count_policy,
@@ -76,7 +74,6 @@ def validate_program(
             {item.primary_muscle for item in day.exercises if item.primary_muscle is not None}
         )
     count_policy = get_session_exercise_count_policy(request.session_duration_minutes, ruleset)
-    priority_metrics = program.aggregate_metrics.get("priority_metrics", {})
     for day in program.weekly_schedule:
         exercise_count = main_exercise_count(day.exercises)
         main_minutes = calculate_main_training_minutes(day)
@@ -88,19 +85,8 @@ def validate_program(
         # 30-min: floor = 3 (allowed 3-4 when 5 doesn't fit)
         # 45+min: floor = 5; any out-of-range count is a hard error
         # ------------------------------------------------------------------
-        narrow_priority_exception = narrow_priority_count_exception(
-            day,
-            exercise_count=exercise_count,
-            main_minutes=main_minutes,
-            request=request,
-            priority_metrics=priority_metrics,
-            count_policy=count_policy,
-            duration_policy=duration_policy,
-        )
-        if not count_policy.contains(exercise_count) and not narrow_priority_exception:
+        if not count_policy.contains(exercise_count):
             errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-        elif narrow_priority_exception:
-            warnings.append("NARROW_PRIORITY_SESSION_COUNT_REPAIRED_BY_EVIDENCE")
         elif (
             count_policy.requested_minutes <= ruleset.short_session_minutes
             and exercise_count < ruleset.minimum_exercises_per_session
@@ -487,35 +473,6 @@ def validate_program(
             },
         },
         decision_trace=program.decision_trace,
-    )
-
-
-def narrow_priority_count_exception(
-    day: object,
-    *,
-    exercise_count: int,
-    main_minutes: int,
-    request: object,
-    priority_metrics: object,
-    count_policy: SessionExerciseCountPolicy,
-    duration_policy: SessionDurationPolicy,
-) -> bool:
-    """Permit one fewer MAIN exercise only for a proven, narrow priority session."""
-    targets = frozenset(getattr(day, "template_target_muscles", ()))
-    requested_priorities = frozenset(getattr(request, "priority_muscles", ()))
-    if (
-        count_policy.requested_minutes <= 30
-        or exercise_count != count_policy.minimum_main_exercises - 1
-        or not duration_policy.contains(main_minutes)
-        or not 1 <= len(targets) <= 2
-        or not targets.issubset(requested_priorities)
-        or not isinstance(priority_metrics, dict)
-    ):
-        return False
-    return all(
-        isinstance(metric := priority_metrics.get(muscle.value), dict)
-        and metric.get("status") == "satisfied"
-        for muscle in targets
     )
 
 

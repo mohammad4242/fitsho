@@ -19,10 +19,12 @@ from app.workouts.program_engine.schemas import (
     SplitPlan,
     WorkoutDay,
 )
+from app.workouts.program_engine.slot_compatibility import focus_scope
 from app.workouts.program_engine.supplemental_policy import (
     is_supplemental_muscle,
     main_exercise_count,
 )
+from app.workouts.program_engine.volume_policy import session_hard_volume_cap
 
 
 class ExposureLoad(StrEnum):
@@ -380,11 +382,19 @@ def repair_recovery_accessory_distribution(
         for item_index, item in enumerate(source.exercises):
             if not _is_movable_recovery_accessory(item):
                 continue
+            muscle = item.primary_muscle
+            if muscle is None:
+                continue
             source_exercises = source.exercises[:item_index] + source.exercises[item_index + 1 :]
             for recipient_index, recipient in enumerate(days):
-                if recipient_index == source_index or item.primary_muscle not in (
-                    recipient.template_target_muscles
+                if recipient_index == source_index or not _recipient_supports_muscle(
+                    recipient, muscle
                 ):
+                    continue
+                recipient_exposure = classify_muscle_exposure_details(recipient, ruleset).get(
+                    muscle
+                )
+                if recipient_exposure is not None and recipient_exposure.load is ExposureLoad.HIGH:
                     continue
                 if has_near_equivalent(item, recipient.exercises):
                     continue
@@ -400,12 +410,34 @@ def repair_recovery_accessory_distribution(
                 if not all(
                     count_policy.contains(main_exercise_count(day.exercises))
                     and duration_policy.contains(calculate_main_training_minutes(day))
+                    and _within_session_hard_volume(day, request)
                     for day in scheduled
                 ):
                     continue
                 if assess_recovery_spacing(scheduled, ruleset).is_valid:
                     return scheduled, ("RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTED",)
     return days, ("RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTION_UNAVAILABLE",)
+
+
+def _recipient_supports_muscle(day: WorkoutDay, muscle: MuscleGroup) -> bool:
+    if day.template_target_muscles:
+        return muscle in day.template_target_muscles
+    _, semantic_muscles = focus_scope(day.focus)
+    if semantic_muscles is not None:
+        return muscle in semantic_muscles
+    return any(item.primary_muscle is muscle for item in day.exercises)
+
+
+def _within_session_hard_volume(
+    day: WorkoutDay,
+    request: NormalizedProgramRequest,
+) -> bool:
+    direct_sets: Counter[MuscleGroup] = Counter()
+    for item in day.exercises:
+        if item.primary_muscle is not None:
+            direct_sets[item.primary_muscle] += item.sets
+    maximum = session_hard_volume_cap(request.source.training_age_months)
+    return all(sets <= maximum for sets in direct_sets.values())
 
 
 def _is_movable_recovery_accessory(item: ProgrammedExercise) -> bool:

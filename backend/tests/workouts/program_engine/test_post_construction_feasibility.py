@@ -32,6 +32,20 @@ def test_legitimate_adaptation_is_repairable_with_bounded_cost() -> None:
     assert assessment.repair_cost == 3
 
 
+def test_repair_cost_preserves_repeated_operation_instances() -> None:
+    assessment = assess_candidate_survival(
+        is_success=True,
+        reason_codes=(),
+        repair_events=(
+            "TEMPLATE_SAFE_SUBSTITUTION_APPLIED@day:1:operation:0",
+            "TEMPLATE_SAFE_SUBSTITUTION_APPLIED@day:1:operation:1",
+        ),
+    )
+
+    assert assessment.repair_cost == 2
+    assert len(assessment.repair_events) == 2
+
+
 def test_failed_hard_candidate_is_provably_infeasible() -> None:
     assessment = assess_candidate_survival(
         is_success=False,

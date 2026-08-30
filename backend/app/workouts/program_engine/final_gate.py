@@ -17,7 +17,6 @@ from app.workouts.program_engine.schemas import (
 )
 from app.workouts.program_engine.session_duration import SessionDurationRepairEvidence
 from app.workouts.program_engine.supplemental_policy import main_exercise_count
-from app.workouts.program_engine.validation import narrow_priority_count_exception
 
 FINAL_GATE_SCHEMA_VERSION = "final_quality_gate_v1"
 _COUNT_OUT_OF_RANGE_CODE = "SESSION_EXERCISE_COUNT_OUT_OF_RANGE"
@@ -95,20 +94,10 @@ def evaluate_final_program(
 
     duration_policy = get_session_duration_policy(request.session_duration_minutes)
     count_policy = get_session_exercise_count_policy(request.session_duration_minutes, ruleset)
-    priority_metrics = program.aggregate_metrics.get("priority_metrics", {})
     count_invariant_reasons = tuple(
         _COUNT_OUT_OF_RANGE_CODE
         for day in program.weekly_schedule
         if not count_policy.contains(main_exercise_count(day.exercises))
-        and not narrow_priority_count_exception(
-            day,
-            exercise_count=main_exercise_count(day.exercises),
-            main_minutes=calculate_main_training_minutes(day),
-            request=request,
-            priority_metrics=priority_metrics,
-            count_policy=count_policy,
-            duration_policy=duration_policy,
-        )
     )
     if count_invariant_reasons:
         reasons.extend(count_invariant_reasons)

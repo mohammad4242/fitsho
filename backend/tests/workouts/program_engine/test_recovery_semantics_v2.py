@@ -15,6 +15,7 @@ from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.recovery import (
     ExposureLoad,
     ExposureSource,
+    _within_session_hard_volume,
     assess_recovery_spacing,
     classify_muscle_exposure_details,
     recovery_spacing_is_valid,
@@ -58,12 +59,13 @@ def _day(
     weekday: int,
     *exercises: ProgrammedExercise,
     target_muscles: tuple[MuscleGroup, ...] = (),
+    focus: str = "test",
 ) -> WorkoutDay:
     return WorkoutDay(
         day_index=weekday + 1,
         weekday=weekday,
         title="Test day",
-        focus="test",
+        focus=focus,
         estimated_duration_minutes=30,
         exercises=exercises,
         template_target_muscles=target_muscles,
@@ -220,7 +222,11 @@ def test_recovery_repair_moves_optional_isolation_without_changing_topology() ->
         *(_exercise(sets=3, primary=MuscleGroup.BACK) for _ in range(7)),
         target_muscles=(MuscleGroup.BICEPS, MuscleGroup.BACK),
     )
-    source = request(available_training_days=3, session_duration_minutes=45)
+    source = request(
+        available_training_days=3,
+        session_duration_minutes=45,
+        training_age_months=30,
+    )
     normalized = normalize_request(source, RULESET)
 
     repaired, reasons = repair_recovery_accessory_distribution(
@@ -235,6 +241,83 @@ def test_recovery_repair_moves_optional_isolation_without_changing_topology() ->
     ) == 1
     assert tuple(day.focus for day in repaired) == ("test", "test", "test")
     assert "RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTED" in reasons
+
+
+def test_recovery_repair_uses_dynamic_focus_when_template_targets_are_empty() -> None:
+    day_zero = _day(
+        0,
+        _exercise(sets=5, high=True),
+        *(_exercise(sets=3, primary=MuscleGroup.CHEST) for _ in range(6)),
+    )
+    movable = _exercise(sets=3)
+    day_one = _day(
+        1,
+        movable,
+        *(_exercise(sets=3, primary=MuscleGroup.BACK) for _ in range(7)),
+        focus="pull",
+    )
+    recipient = _day(
+        4,
+        *(_exercise(sets=3, primary=MuscleGroup.BACK) for _ in range(7)),
+        focus="pull",
+    )
+    normalized = normalize_request(
+        request(
+            available_training_days=3,
+            session_duration_minutes=45,
+            training_age_months=30,
+        ),
+        RULESET,
+    )
+
+    repaired, reasons = repair_recovery_accessory_distribution(
+        (day_zero, day_one, recipient), normalized, RULESET
+    )
+
+    assert recovery_spacing_is_valid(repaired, RULESET)
+    assert movable.exercise_id in {item.exercise_id for item in repaired[2].exercises}
+    assert "RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTED" in reasons
+
+
+def test_recovery_repair_does_not_exceed_session_hard_volume() -> None:
+    day_zero = _day(
+        0,
+        _exercise(sets=5, high=True),
+        *(_exercise(sets=3, primary=MuscleGroup.CHEST) for _ in range(6)),
+    )
+    movable = _exercise(sets=3)
+    day_one = _day(
+        1,
+        movable,
+        *(_exercise(sets=3, primary=MuscleGroup.BACK) for _ in range(7)),
+        focus="pull",
+    )
+    recipient = _day(
+        4,
+        _exercise(sets=29, high=True),
+        *(_exercise(sets=3, primary=MuscleGroup.BACK) for _ in range(6)),
+        focus="pull",
+    )
+    normalized = normalize_request(
+        request(
+            available_training_days=3,
+            session_duration_minutes=45,
+            training_age_months=30,
+        ),
+        RULESET,
+    )
+
+    repaired, reasons = repair_recovery_accessory_distribution(
+        (day_zero, day_one, recipient), normalized, RULESET
+    )
+
+    assert repaired == (day_zero, day_one, recipient)
+    assert reasons == ("RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTION_UNAVAILABLE",)
+    overloaded = replace(
+        recipient,
+        exercises=(*recipient.exercises, movable),
+    )
+    assert not _within_session_hard_volume(overloaded, normalized)
 
 
 def test_four_day_professional_body_part_rotation_is_recovery_feasible() -> None:

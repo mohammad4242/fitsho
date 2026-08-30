@@ -64,3 +64,27 @@ def test_constraint_trace_preserves_reason_and_metadata() -> None:
         "constraint_class": "repairable",
         "metadata": {"muscle": "shoulders"},
     }
+
+
+def test_validation_and_construction_reason_inventory_is_classified() -> None:
+    hard = (
+        "INVALID_EXERCISE_PRESCRIPTION",
+        "SEMANTIC_NEAR_DUPLICATE_EXERCISE",
+        "UNJUSTIFIED_DUPLICATE_EXERCISE",
+        "REQUIRED_SLOT_HARD_IMPOSSIBILITY:horizontal_push",
+        "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED",
+    )
+    repairable = (
+        "INITIAL_TEMPLATE_REJECTED_UNFILLABLE",
+        "TEMPLATE_MAIN_COUNT_OUT_OF_RANGE",
+        "RECOVERY_WEEKDAY_REPAIR_UNAVAILABLE",
+        "RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTION_UNAVAILABLE",
+        "UNSAFE_SUPERSET_PAIR",
+    )
+
+    assert all(classify_constraint(code) is ConstraintClass.HARD for code in hard)
+    assert all(classify_constraint(code) is ConstraintClass.REPAIRABLE for code in repairable)
+    assert (
+        classify_constraint("INITIAL_TEMPLATE_REJECTED_UNFILLABLE", repair_exhausted=True)
+        is ConstraintClass.HARD
+    )

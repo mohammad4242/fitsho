@@ -14,6 +14,7 @@ from app.database.session import get_engine
 from app.exercises.enums import MuscleGroup
 from app.training_templates.engine_reference import load_template_references
 from app.training_templates.tags import TemplateFocusTag
+from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from scripts.audit_template_survival import (
     DURATIONS,
     LEVELS,
@@ -103,7 +104,7 @@ def run_specialization_audit(output_path: Path) -> dict[str, object]:
         )
         payload = {
             "generated_at_utc": datetime.now(UTC).isoformat(),
-            "ruleset_version": "resistance_training_v5",
+            "ruleset_version": RULESET.version,
             "specialization_template_count": len(specialization),
             "forced_cases": forced_cases,
             "competition_cases": competition_cases,

@@ -510,6 +510,8 @@ def _template_attempt_trace(
 def _post_construction_repair_events(
     result: ProgramGenerationResult,
 ) -> tuple[str, ...]:
+    """Return one stable event per observed repair operation."""
+
     events: list[str] = []
     trace = result.program.decision_trace if result.program is not None else result.decision_trace
     repair_markers = (
@@ -529,26 +531,87 @@ def _post_construction_repair_events(
         "SESSION_DURATION_TARGET_SATISFIED",
         "WEEKLY_REDISTRIBUTION_ALREADY_BALANCED",
     }
-    for entry in trace:
+    for trace_index, entry in enumerate(trace):
+        stage = str(entry.get("stage", "unknown"))
+        substitutions = entry.get("substitutions", ())
+        prescription_changes = entry.get("prescription_changes", ())
+        if stage == "template_adaptation":
+            if isinstance(substitutions, (tuple, list)):
+                for operation_index, substitution in enumerate(substitutions):
+                    events.append(
+                        _repair_event_token(
+                            "TEMPLATE_SAFE_SUBSTITUTION_APPLIED",
+                            stage,
+                            trace_index,
+                            operation_index,
+                            substitution,
+                        )
+                    )
+            if isinstance(prescription_changes, (tuple, list)):
+                for operation_index, change in enumerate(prescription_changes):
+                    events.append(
+                        _repair_event_token(
+                            "TEMPLATE_PRESCRIPTION_ADAPTED",
+                            stage,
+                            trace_index,
+                            operation_index,
+                            change,
+                        )
+                    )
+
+        per_session_evidence = entry.get("per_session_evidence", ())
+        has_session_evidence = stage == "session_duration" and isinstance(
+            per_session_evidence, (tuple, list)
+        )
+        session_evidence_items: tuple[object, ...] = ()
+        if isinstance(per_session_evidence, (tuple, list)):
+            session_evidence_items = tuple(per_session_evidence)
+        if session_evidence_items:
+            for evidence_index, evidence in enumerate(session_evidence_items):
+                if not isinstance(evidence, dict):
+                    continue
+                values = evidence.get("reason_codes", ())
+                if not isinstance(values, (tuple, list)):
+                    continue
+                for value_index, value in enumerate(values):
+                    if (
+                        isinstance(value, str)
+                        and value not in ignored
+                        and any(marker in value for marker in repair_markers)
+                    ):
+                        events.append(
+                            f"{value}@{stage}:{trace_index}:session:{evidence_index}:"
+                            f"operation:{value_index}"
+                        )
+
         for field in ("reason_codes", "reasons"):
+            if has_session_evidence:
+                continue
             values = entry.get(field, ())
             if not isinstance(values, (tuple, list)):
                 continue
-            events.extend(
-                value
-                for value in values
-                if isinstance(value, str)
-                and value not in ignored
-                and any(marker in value for marker in repair_markers)
-            )
-        if entry.get("stage") == "template_adaptation":
-            substitutions = entry.get("substitutions", ())
-            prescription_changes = entry.get("prescription_changes", ())
-            if isinstance(substitutions, (tuple, list)) and substitutions:
-                events.append("TEMPLATE_SAFE_SUBSTITUTION_APPLIED")
-            if isinstance(prescription_changes, (tuple, list)) and prescription_changes:
-                events.append("TEMPLATE_PRESCRIPTION_ADAPTED")
-    return tuple(dict.fromkeys(events))
+            for value_index, value in enumerate(values):
+                if (
+                    isinstance(value, str)
+                    and value not in ignored
+                    and any(marker in value for marker in repair_markers)
+                ):
+                    events.append(
+                        f"{value}@{stage}:{trace_index}:{field}:operation:{value_index}"
+                    )
+    return tuple(events)
+
+
+def _repair_event_token(
+    code: str,
+    stage: str,
+    trace_index: int,
+    operation_index: int,
+    operation: object,
+) -> str:
+    day = operation.get("day_index") if isinstance(operation, dict) else None
+    day_suffix = f":day:{day}" if isinstance(day, int) else ""
+    return f"{code}@{stage}:{trace_index}:operation:{operation_index}{day_suffix}"
 
 
 def _append_successful_template_attempt(

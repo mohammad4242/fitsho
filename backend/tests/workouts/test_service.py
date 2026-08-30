@@ -72,7 +72,6 @@ from app.workouts.program_engine.enums import (
     TrainingExperience,
 )
 from app.workouts.program_engine.normalization import normalize_request
-from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
     BodyAnalysisInfluence,
     ProgramGenerationResult,
@@ -246,7 +245,7 @@ def test_generation_overrides_do_not_erase_profile_caution_constraints(db: Sessi
     )
 
 
-def test_legacy_physical_limitations_do_not_become_uncomputable_generation_constraints(
+def test_structured_lower_back_caution_fails_closed_without_safe_required_patterns(
     db: Session,
 ) -> None:
     user = _user_with_profile(db)
@@ -264,24 +263,12 @@ def test_legacy_physical_limitations_do_not_become_uncomputable_generation_const
     assert ExerciseCautionTag.LOWER_BACK_LOADING in request.blocked_caution_tags
     _seed_candidates(db)
     service = _service(db)
-    catalog = service._load_catalog()
-    result = asyncio.run(service.generate(user.id))
+    assert service._load_catalog()
+    with pytest.raises(WorkoutConstructionUnsatisfiedError):
+        asyncio.run(service.generate(user.id))
 
-    assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
-    assert len(result.plan.days) == profile.training_days_per_week
-    catalog_by_id = {item.id: item for item in catalog}
-    assert all(
-        ExerciseCautionTag.LOWER_BACK_LOADING
-        not in effective_caution_tags(catalog_by_id[item.exercise_id])
-        for day in result.plan.days
-        for item in day.exercises
-    )
-    safety_trace = next(
-        trace for trace in result.plan.decision_trace if trace.get("stage") == "safety"
-    )
-    assert "EXPLICIT_LIMITATIONS_APPLIED" in safety_trace["reasons"]
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0
     assert "old lower-back note from the legacy form" not in request.model_dump_json()
-    assert "old lower-back note from the legacy form" not in str(result.plan.decision_trace)
 
 
 def test_service_generation_rejects_home_wrist_caution_without_five_safe_main_exercises(
@@ -997,7 +984,7 @@ def test_generation_persists_valid_snapshot_for_pending_review(db: Session) -> N
     assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
     assert result.plan.activated_at is None
     assert result.plan.engine_version == "program_engine_v1"
-    assert result.plan.ruleset_version == "resistance_training_v4"
+    assert result.plan.ruleset_version == "resistance_training_v5"
     assert result.plan.validation_report["errors"] == []
     assert result.plan.exercise_catalog_snapshot["hash"] == result.plan.candidate_set_hash
     assert result.plan.generation_records[0].status is WorkoutGenerationStatus.SUCCEEDED
