@@ -85,7 +85,6 @@ def evaluate_final_program(
         "duration": {"status": "passed", "reason_codes": ()},
         "exercise_count": {"status": "passed", "reason_codes": ()},
         "coverage": {"status": "not_applicable", "reason_codes": ()},
-        "distribution": {"status": "missing", "reason_codes": ()},
         "recovery": {"status": "passed", "reason_codes": ()},
         "safety": {"status": "passed", "reason_codes": ()},
         "day_count": {"status": "passed", "reason_codes": ()},
@@ -213,42 +212,6 @@ def evaluate_final_program(
                     reasons.append("FULL_BODY_COVERAGE_CONSTRAINT_UNEXPLAINED")
             elif coverage_status != "satisfied":
                 reasons.append("WEEKLY_COVERAGE_STATUS_UNEXPLAINED")
-
-    distribution = _mapping(program.aggregate_metrics.get("weekly_distribution"))
-    distribution_reasons = _string_values(distribution.get("reason_codes"))
-    checks["distribution"] = {
-        "status": distribution.get("status", "missing"),
-        "reason_codes": distribution_reasons,
-    }
-    actual_counts = tuple(main_exercise_count(day.exercises) for day in program.weekly_schedule)
-    raw_after_counts = distribution.get("after_exercise_counts")
-    after_counts = (
-        tuple(raw_after_counts)
-        if isinstance(raw_after_counts, (tuple, list))
-        and all(isinstance(item, int) for item in raw_after_counts)
-        else ()
-    )
-    if not distribution:
-        reasons.append("WEEKLY_DISTRIBUTION_EVIDENCE_MISSING")
-    elif not after_counts:
-        reasons.append("WEEKLY_DISTRIBUTION_EVIDENCE_INCOMPLETE")
-    elif after_counts != actual_counts:
-        reasons.append("WEEKLY_DISTRIBUTION_METRICS_STALE")
-    elif distribution.get("status") == "constrained":
-        if distribution_reasons == ("WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE",):
-            constraints.extend(distribution_reasons)
-        else:
-            reasons.append("WEEKLY_DISTRIBUTION_CONSTRAINT_UNEXPLAINED")
-    elif distribution.get("status") == "unsatisfied":
-        reasons.append("WEEKLY_DISTRIBUTION_UNSATISFIED")
-    elif distribution.get("status") == "applied":
-        if "WEEKLY_REDISTRIBUTION_APPLIED" not in distribution_reasons:
-            reasons.append("WEEKLY_DISTRIBUTION_STATUS_UNEXPLAINED")
-    elif distribution.get("status") == "not_needed":
-        if "WEEKLY_REDISTRIBUTION_ALREADY_BALANCED" not in distribution_reasons:
-            reasons.append("WEEKLY_DISTRIBUTION_STATUS_UNEXPLAINED")
-    else:
-        reasons.append("WEEKLY_DISTRIBUTION_STATUS_UNEXPLAINED")
 
     expected_days = min(request.available_training_days, ruleset.max_resistance_days)
     if (

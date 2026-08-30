@@ -286,10 +286,6 @@ def test_final_gate_cannot_cross_excuse_duration_constraint_between_days() -> No
         weekly_schedule=(short_first, short_second),
         aggregate_metrics={
             **program.aggregate_metrics,
-            "weekly_distribution": {
-                **program.aggregate_metrics["weekly_distribution"],
-                "after_exercise_counts": (1, 1),
-            },
         },
         decision_trace=_duration_trace(program, (first_evidence.as_trace(),)),
     )

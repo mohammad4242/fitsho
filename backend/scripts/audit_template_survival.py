@@ -522,25 +522,6 @@ class DiagnosticRecorder(AbstractContextManager["DiagnosticRecorder"]):
 
         self._patch(engine, "repair_recovery_weekdays", recovery_wrapper)
 
-        original_distribution = cast(
-            Callable[..., Any], getattr(engine, "redistribute_weekly_exercises")
-        )
-
-        def distribution_wrapper(*args: object, **kwargs: object) -> object:
-            before = _snapshot_days(cast(Sequence[WorkoutDay], args[0]))
-            result = original_distribution(*args, **kwargs)
-            self._append_stage(
-                "weekly_redistribution",
-                status="completed",
-                before=before,
-                after=_snapshot_days(result.days),
-                metrics=result.metrics,
-                reason_codes=result.reason_codes,
-            )
-            return result
-
-        self._patch(engine, "redistribute_weekly_exercises", distribution_wrapper)
-
         original_validation = cast(Callable[..., Any], getattr(engine, "validate_program"))
 
         def validation_wrapper(*args: object, **kwargs: object) -> object:

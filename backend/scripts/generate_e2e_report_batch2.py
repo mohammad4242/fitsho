@@ -84,7 +84,6 @@ def project_batch2_results(results: list[tuple[dict, dict]]) -> dict[str, object
         success = bool(raw.get("success"))
         final_gate = _evidence_mapping(raw.get("final_gate"))
         coverage = _evidence_mapping(raw.get("weekly_coverage"))
-        distribution = _evidence_mapping(raw.get("weekly_distribution"))
         gate_status = final_gate.get("status")
         status = (
             "failure"
@@ -104,7 +103,6 @@ def project_batch2_results(results: list[tuple[dict, dict]]) -> dict[str, object
                 "safety_status": _json_ready(raw.get("safety_status")),
                 "final_gate": final_gate,
                 "weekly_coverage": coverage,
-                "weekly_distribution": distribution,
                 "requested_day_count": _json_ready(raw.get("requested_day_count")),
                 "actual_day_count": _json_ready(raw.get("actual_day_count")),
                 "per_day": list(_json_ready(raw.get("per_day") or ())),
@@ -434,13 +432,10 @@ def _successful_result_evidence(program, requested_day_count: int) -> dict[str, 
     aggregate_metrics = program.aggregate_metrics
     final_gate = _evidence_mapping(aggregate_metrics.get("final_quality_gate"))
     weekly_coverage = _evidence_mapping(aggregate_metrics.get("weekly_coverage"))
-    weekly_distribution = _evidence_mapping(aggregate_metrics.get("weekly_distribution"))
     if not final_gate.get("status"):
         raise RuntimeError("Successful Batch2 generation is missing final gate evidence")
     if not weekly_coverage:
         raise RuntimeError("Successful Batch2 generation is missing weekly coverage evidence")
-    if not weekly_distribution:
-        raise RuntimeError("Successful Batch2 generation is missing weekly distribution evidence")
 
     per_day = tuple(
         {
@@ -457,7 +452,6 @@ def _successful_result_evidence(program, requested_day_count: int) -> dict[str, 
     return {
         "final_gate": final_gate,
         "weekly_coverage": weekly_coverage,
-        "weekly_distribution": weekly_distribution,
         "requested_day_count": requested_day_count,
         "actual_day_count": len(program.weekly_schedule),
         "per_day": per_day,
@@ -994,20 +988,16 @@ def _evidence_values(evidence: dict[str, object], key: str) -> tuple[str, ...]:
 def _render_engine_evidence(detail: dict[str, object]) -> str:
     final_gate = detail["final_gate"]
     coverage = detail["weekly_coverage"]
-    distribution = detail["weekly_distribution"]
     if not isinstance(final_gate, dict):
         final_gate = {}
     if not isinstance(coverage, dict):
         coverage = {}
-    if not isinstance(distribution, dict):
-        distribution = {}
 
     gate_reasons = _evidence_values(final_gate, "reason_codes")
     gate_constraints = _evidence_values(final_gate, "constraint_reason_codes")
     coverage_reasons = _evidence_values(coverage, "reason_codes")
     coverage_missing_patterns = _evidence_values(coverage, "missing_patterns")
     coverage_missing_muscles = _evidence_values(coverage, "missing_major_muscles")
-    distribution_reasons = _evidence_values(distribution, "reason_codes")
     day_rows = "".join(
         f"<li>روز {fa_num(day.get('day_number'))}: حرکات اصلی: "
         f"{fa_num(day.get('main_exercise_count', day.get('exercise_count')))} · "
@@ -1030,8 +1020,6 @@ def _render_engine_evidence(detail: dict[str, object]) -> str:
           دلایل: {codes(coverage_reasons)} · الگوهای پوشش‌داده‌نشده:
           {codes(coverage_missing_patterns)} · عضلات پوشش‌داده‌نشده:
           {codes(coverage_missing_muscles)}</div>
-          <div>توزیع هفتگی: <code>{escape(str(distribution.get("status", "—")))}</code> ·
-          دلایل: {codes(distribution_reasons)}</div>
           <div>روزهای درخواستی/واقعی: <code>{fa_num(detail.get("requested_day_count"))}</code> /
           <code>{fa_num(detail.get("actual_day_count"))}</code></div>
           <ul class="evidence-days">{day_rows}</ul>

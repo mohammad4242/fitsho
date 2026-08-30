@@ -340,36 +340,11 @@ def test_final_coach_quality_projection_matches_trace_and_aggregate() -> None:
         assert result.program.validation_report.metrics["coach_quality"] == quality
 
 
-def test_final_gate_rejects_unexplained_distribution_and_accepts_proven_constraints() -> None:
+def test_final_gate_accepts_valid_program_without_distribution_evidence() -> None:
     source = request(available_training_days=1)
     base = _program(source)
-    distribution = base.aggregate_metrics["weekly_distribution"]
-    unexplained_metrics = {
-        **base.aggregate_metrics,
-        "weekly_distribution": {
-            **distribution,
-            "status": "constrained",
-            "reason_codes": (),
-        },
-    }
-    unexplained = replace(base, aggregate_metrics=unexplained_metrics)
-    rejected = _gate(unexplained, source)
-    assert rejected.status == "rejected"
-    assert "WEEKLY_DISTRIBUTION_CONSTRAINT_UNEXPLAINED" in rejected.reason_codes
-
-    constrained_metrics = {
-        **base.aggregate_metrics,
-        "weekly_distribution": {
-            **distribution,
-            "status": "constrained",
-            "reason_codes": ("WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE",),
-        },
-    }
-    constrained = replace(base, aggregate_metrics=constrained_metrics)
-    accepted = _gate(constrained, source)
-    assert accepted.status == "accepted_with_constraints"
-    assert accepted.reason_codes == ()
-    assert "WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE" in accepted.constraint_reason_codes
+    accepted = _gate(base, source)
+    assert accepted.status in {"accepted", "accepted_with_constraints"}
 
 
 def test_final_gate_rejects_unexplained_duration_constraint() -> None:
@@ -427,13 +402,6 @@ def test_final_gate_accepts_valid_dynamic_template_fallback_and_repaired_outputs
 
     repaired = generate_program(scenarios[-1][0], full_catalog(), RULESET)
     assert repaired.program is not None, repaired.errors
-    distribution = repaired.program.aggregate_metrics["weekly_distribution"]
-    assert distribution["status"] == "not_needed"
-    assert "WEEKLY_REDISTRIBUTION_ALREADY_BALANCED" in distribution["reason_codes"]
-    assert (
-        "WEEKLY_REDISTRIBUTION_NO_SAFE_IMPROVING_MOVE"
-        not in repaired.program.aggregate_metrics["final_quality_gate"]["constraint_reason_codes"]
-    )
 
 
 def test_final_gate_rejects_four_main_at_sixty_minutes_even_with_exact_constraint_evidence() -> (
@@ -463,16 +431,11 @@ def test_final_gate_rejects_four_main_at_sixty_minutes_even_with_exact_constrain
             "per_session_evidence": (evidence.as_trace(),),
         },
     )
-    distribution = base.aggregate_metrics["weekly_distribution"]
     candidate = replace(
         base,
         weekly_schedule=(four_main,),
         aggregate_metrics={
             **base.aggregate_metrics,
-            "weekly_distribution": {
-                **distribution,
-                "after_exercise_counts": (main_exercise_count(four_main.exercises),),
-            },
         },
         decision_trace=trace,
     )
@@ -489,52 +452,3 @@ def test_final_gate_rejects_four_main_at_sixty_minutes_even_with_exact_constrain
     assert decision.status == "rejected"
     assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in decision.reason_codes
     assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" not in decision.constraint_reason_codes
-
-
-def test_engine_rejects_invalid_main_count_after_weekly_redistribution(monkeypatch) -> None:
-    source = request(available_training_days=1, session_duration_minutes=60)
-    original_redistribute = engine.redistribute_weekly_exercises
-    calls = 0
-
-    def inject_invalid_count(days, normalized, ruleset, **kwargs):
-        nonlocal calls
-        calls += 1
-        distributed = original_redistribute(days, normalized, ruleset, **kwargs)
-        day = distributed.days[0]
-        non_main_ids = {
-            item.exercise_id for item in day.exercises if not is_main_resistance_exercise(item)
-        }
-        invalid_day = _four_main_with_non_main(day)
-        assert main_exercise_count(invalid_day.exercises) == 4
-        assert {
-            item.exercise_id
-            for item in invalid_day.exercises
-            if not is_main_resistance_exercise(item)
-        } == non_main_ids
-        return replace(
-            distributed,
-            days=(invalid_day,),
-            after_exercise_counts=(main_exercise_count(invalid_day.exercises),),
-        )
-
-    monkeypatch.setattr(engine, "redistribute_weekly_exercises", inject_invalid_count)
-
-    result = generate_program(source, full_catalog(), RULESET)
-
-    assert calls > 0
-    assert result.program is None
-    assert result.error_code is GenerationErrorCode.UNSATISFIED_CONSTRAINT
-    gates = [
-        entry
-        for attempt in result.decision_trace[0]["attempts"]
-        for entry in attempt.get("decision_trace", ())
-        if entry.get("stage") == "final_quality_gate"
-    ]
-    assert gates
-    assert all(entry["status"] == "rejected" for entry in gates)
-    assert any("SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in entry["reason_codes"] for entry in gates)
-    assert all(
-        "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in entry["reason_codes"]
-        or "WEEKLY_DISTRIBUTION_METRICS_STALE" in entry["reason_codes"]
-        for entry in gates
-    )

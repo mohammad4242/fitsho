@@ -65,10 +65,6 @@ def _success_result(
             "missing_patterns": ("pull",) if coverage_status == "constrained" else (),
             "missing_major_muscles": ("back",) if coverage_status == "constrained" else (),
         },
-        "weekly_distribution": {
-            "status": "not_needed",
-            "reason_codes": ("WEEKLY_REDISTRIBUTION_ALREADY_BALANCED",),
-        },
         "requested_day_count": 2,
         "actual_day_count": 2,
         "per_day": (
@@ -107,7 +103,6 @@ def test_batch2_evidence_uses_canonical_main_and_supplemental_counts() -> None:
         aggregate_metrics={
             "final_quality_gate": {"status": "accepted"},
             "weekly_coverage": {"status": "satisfied"},
-            "weekly_distribution": {"status": "not_needed"},
         },
         weekly_schedule=(
             SimpleNamespace(
@@ -286,7 +281,6 @@ def test_real_batch2_run_is_rollback_isolated_and_evidence_reconciles(monkeypatc
             }
             assert raw["final_gate"]["reason_codes"] is not None
             assert raw["weekly_coverage"] is not None
-            assert raw["weekly_distribution"] is not None
             assert raw["actual_day_count"] == len(raw["per_day"])
             assert raw["actual_day_count"] == len(raw["plan"].days)
             assert all(
