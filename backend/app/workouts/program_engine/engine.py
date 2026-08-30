@@ -521,6 +521,7 @@ def _post_construction_repair_events(
         "REARRANGED",
         "RECOVERED",
         "REDUCED",
+        "REDISTRIBUTED",
         "REMOVED",
         "REPLACED",
         "SUBSTITUT",
@@ -1612,9 +1613,11 @@ def _recovery_repair_trace(
     has_recovery_conflict = bool(
         before_assessment.repairable_conflicts or before_assessment.hard_conflicts
     )
-    repair_attempts = (
-        ("reorder_weekdays", "move_optional_isolation") if has_recovery_conflict else ()
+    repair_attempts: tuple[str, ...] = (
+        ("reorder_weekdays",) if has_recovery_conflict else ()
     )
+    if any(code.startswith("RECOVERY_OPTIONAL_ISOLATION_") for code in reason_codes):
+        repair_attempts += ("move_optional_isolation",)
     if before_assessment.hard_conflicts:
         constraint_class = "hard"
     elif before_assessment.repairable_conflicts:

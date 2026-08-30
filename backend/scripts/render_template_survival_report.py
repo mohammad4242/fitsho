@@ -719,42 +719,34 @@ def _render(payload: Mapping[str, object], raw_path: Path) -> str:
         )
     )
 
-    parts.append("<h2>9. Architectural Diagnosis — بدون پیشنهاد Fix</h2>")
+    parts.append("<h2>9. Architectural Reading — snapshot فعلی</h2>")
     body_part = by_topology.get("Body-Part", {})
     specialization = by_topology.get("Specialization", {})
     pplx2 = by_topology.get("PPLx2", {})
     parts.extend(
         [
-            "<h3>1) Professional preference یک ordering preference است، نه survival contract</h3>",
-            "<p><b>رفتار منطقی؟</b> بله؛ preference نباید hard safety/quality gates را دور بزند. "
-            "<b>False negative؟</b> خود score نه، اما feasibility آن فقط slot/capacity اولیه را می‌سنجد و نتیجه‌ی "
-            "post-prescription recovery/volume/validation را پیش‌بینی نمی‌کند. <b>Topology impact:</b> "
-            "Template حرفه‌ای rank بالا می‌گیرد، fail می‌شود و Upper/Lower کم‌امتیاز بعدی زنده می‌ماند. "
-            f"شاهد: {len(upper_output_cases)} Competition output از 30.</p>",
-            "<h3>2) Recovery spacing بزرگ‌ترین survival filter است</h3>",
-            "<p><b>رفتار منطقی؟</b> حفاظت از دو exposure متوسط/سنگین مجاور منطقی است. "
-            "<b>False negative risk:</b> بالا؛ validator تمام secondary setها را با ضریب ثابت 0.5 در exposure load "
-            "حساب می‌کند و برای 5/6 روز، تعداد weekday arrangement ممکن محدود است. "
-            "<b>Topology impact:</b> Body-Part و PPL/Arnold روزهای هم‌پوشان push/pull/arms را جدا می‌کنند؛ "
-            "Upper/Lower هم‌پوشانی را داخل همان session جمع می‌کند و از pairهای مجاور کمتری عبور می‌کند. "
+            "<h3>1) انتخاب نهایی از survival واقعی استفاده می‌کند</h3>",
+            "<p>Preference حرفه‌ای همچنان safety bypass نیست. نامزدهای نزدیک پس از construction، prescription، "
+            "volume، duration، recovery و validation با هزینه‌ی repair مقایسه می‌شوند. "
+            f"شاهد: Upper/Lower در {len(upper_output_cases)} خروجی Competition از 30 انتخاب شد.</p>",
+            "<h3>2) Recovery به direct و secondary تفکیک شده است</h3>",
+            "<p>Direct HIGH مجاور همچنان hard است؛ overlapهای متوسط یا secondary ابتدا repair می‌شوند. "
+            "Weekday reorder و isolation redistribution فقط با حفظ count، duration، topology و hard volume پذیرفته می‌شوند. "
             f"شاهد: Body-Part recovery failures={body_part.get('recovery_failures', 0)} و Upper/Lower recovery failures={by_topology.get('Upper/Lower', {}).get('recovery_failures', 0)}.</p>",
-            "<h3>3) Duration underfill با افزایش duration تشدید می‌شود</h3>",
-            "<p><b>رفتار منطقی؟</b> قرارداد requested±10 و count حداقل 5 برای 45+ سخت و صریح است. "
-            "<b>False negative risk:</b> متوسط تا بالا برای body-part/specialization؛ یک روز عضله‌ای باریک ممکن است "
-            "Candidate مفید و غیرتکراری کافی برای 80 دقیقه main training نداشته باشد. "
-            "<b>Structural advantage:</b> Upper/Lower target-muscle pool بزرگ‌تری دارد و repair گزینه‌های بیشتری می‌بیند. "
+            "<h3>3) Duration همچنان hard است</h3>",
+            "<p>پنجره‌های hard برابر 20–40، 35–55، 50–70، 60–85 و 65–100 هستند. "
+            "در جلسات باریک 75/90 دقیقه، نبود کار مفید و غیرتکراری می‌تواند همچنان underfill واقعی ایجاد کند. "
             f"شاهد: 90min duration failures={by_duration['90']['duration_failures']}.</p>",
             "<h3>4) 30-minute count/construction failures محدود اما قطعی‌اند</h3>",
             "<p><b>رفتار منطقی؟</b> بله، سقف 3–4 MAIN برای 30 دقیقه hard invariant است. "
-            "<b>False negative risk:</b> وقتی core template slots پس از trim هنوز از سقف عبور کنند. "
-            "این failure قبل از volume/duration repair رخ می‌دهد و در چهار case دیده شد.</p>",
-            "<h3>5) برخی topologyها عملاً survival بسیار پایین دارند</h3>",
+            "اگر repair نتواند exercise مفید، safe و non-redundant اضافه کند، failure حفظ می‌شود.</p>",
+            "<h3>5) specialization باید با profile متناظر جداگانه سنجیده شود</h3>",
             f"<p>Specialization survival={specialization.get('success_rate', 0)}% و PPL×2 survival={pplx2.get('success_rate', 0)}%. "
             "این نتیجه از Baseline بدون priority است؛ بنابراین specialization bonus تطبیقی فعال نبود. این Audit "
-            "ثابت نمی‌کند Templateها برای profile اولویت‌دار نیز همین نرخ را دارند، اما mechanics پایه را نشان می‌دهد.</p>",
-            "<div class='callout warning'><b>Diagnosis نهایی:</b> Upper/Lower به‌خاطر score برنده نمی‌شود؛ "
-            "به‌خاطر survival advantage پس از fail شدن topologyهای حرفه‌ای برنده می‌شود. در این snapshot، "
-            "عامل غالب recovery spacing و سپس duration underfill است. این گزارش هیچ Implementation change پیشنهاد یا اعمال نمی‌کند.</div>",
+            "به‌تنهایی کیفیت profile اولویت‌دار را اثبات نمی‌کند؛ audit تخصصی priority باید کنار آن خوانده شود.</p>",
+            "<div class='callout'><b>نتیجه snapshot:</b> survival topologyهای حرفه‌ای و Upper/Lower هر دو مستقیماً "
+            "از pipeline یکسان و hard gateهای یکسان عبور کرده‌اند. failureهای باقی‌مانده باید از root-cause table "
+            "و trace همان case خوانده شوند.</div>",
             "<h3>محدودیت Audit</h3>",
             "<p>این ماتریس mechanics را با دو Baseline کنترل‌شده می‌سنجد، نه distribution واقعی کاربران. "
             "Equipment و injury عمداً حذف شدند. Candidate rejection categoryهای duration از wrapper تشخیصی همان run "

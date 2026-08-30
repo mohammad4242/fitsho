@@ -2,6 +2,7 @@ from dataclasses import replace
 from uuid import uuid4
 
 from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
+from app.workouts.program_engine import engine
 from app.workouts.program_engine.constraint_classification import ConstraintClass
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
@@ -470,6 +471,32 @@ def test_recovery_diagnostics_include_source_dose_gap_and_repair_outcome() -> No
             "required_gap_days": 2,
             "constraint_class": "repairable",
         },
+    )
+
+
+def test_recovery_trace_lists_only_operations_that_were_attempted() -> None:
+    before = (_day(0, _exercise(sets=5, high=True)), _day(1, _exercise(sets=3)))
+
+    weekday_only = engine._recovery_repair_trace(
+        before,
+        before,
+        ("RECOVERY_WEEKDAY_REPAIR_UNAVAILABLE",),
+        RULESET,
+    )
+    with_accessory = engine._recovery_repair_trace(
+        before,
+        before,
+        (
+            "RECOVERY_WEEKDAY_REPAIR_UNAVAILABLE",
+            "RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTION_UNAVAILABLE",
+        ),
+        RULESET,
+    )
+
+    assert weekday_only["repair_attempts"] == ("reorder_weekdays",)
+    assert with_accessory["repair_attempts"] == (
+        "reorder_weekdays",
+        "move_optional_isolation",
     )
 
 

@@ -336,6 +336,34 @@ def test_generate_program_compares_close_successes_by_real_repair_cost(monkeypat
     assert selection["candidates"][1]["slug"] == generic.slug
 
 
+def test_recovery_redistribution_counts_as_a_post_construction_repair() -> None:
+    result = generate_program(
+        request(
+            primary_goal=Goal.HYPERTROPHY,
+            training_experience=TrainingExperience.INTERMEDIATE,
+            training_age_months=24,
+            available_training_days=4,
+            session_duration_minutes=45,
+        ),
+        full_catalog(),
+        RULESET,
+    )
+    assert result.program is not None, result.errors
+    repair_trace = {
+        "stage": "recovery_repair",
+        "reason_codes": ("RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTED",),
+    }
+    traced_result = replace(
+        result,
+        program=replace(result.program, decision_trace=(repair_trace,)),
+    )
+
+    assert any(
+        event.startswith("RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTED@")
+        for event in engine._post_construction_repair_events(traced_result)
+    )
+
+
 def test_generate_program_keeps_upper_lower_when_professional_reference_is_ineligible() -> None:
     source = request(
         primary_goal=Goal.HYPERTROPHY,
