@@ -283,6 +283,12 @@ def test_generate_program_ranks_and_attempts_feasible_professional_reference_fir
     assert attempt["slug"] == professional.slug
     assert attempt["rank"] == 1
     assert attempt["status"] == "succeeded"
+    assert attempt["post_construction_feasibility"]["status"] in {
+        "comfortably_feasible",
+        "repairable",
+        "tight",
+    }
+    assert attempt["post_construction_feasibility"]["hard_reason_codes"] == ()
     assert result.program.aggregate_metrics["reference_template"] == professional.slug
 
 
@@ -348,6 +354,10 @@ def test_generate_program_falls_back_to_generic_after_professional_construction_
     ]
     assert attempts[0]["slug"] == professional.slug
     assert attempts[0]["status"] == "rejected"
+    assert (
+        attempts[0]["post_construction_feasibility"]["status"]
+        == "provably_infeasible"
+    )
     assert attempts[1]["slug"] == generic.slug
     assert attempts[1]["status"] == "succeeded"
     assert result.program.aggregate_metrics["reference_template"] == generic.slug

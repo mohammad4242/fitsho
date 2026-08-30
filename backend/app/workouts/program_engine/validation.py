@@ -13,7 +13,7 @@ from app.workouts.program_engine.effective_volume import (
 from app.workouts.program_engine.enums import SafetyStatus, SplitType
 from app.workouts.program_engine.equipment import effective_required_equipment
 from app.workouts.program_engine.exercise_semantics import has_near_equivalent
-from app.workouts.program_engine.recovery import recovery_spacing_is_valid
+from app.workouts.program_engine.recovery import assess_recovery_spacing
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.schemas import (
@@ -265,8 +265,11 @@ def validate_program(
         frequency > effective_frequency_cap for frequency in direct_session_frequency.values()
     ):
         warnings.append("MUSCLE_DIRECT_FREQUENCY_EXCEEDED")
-    if not recovery_spacing_is_valid(program.weekly_schedule, ruleset):
+    recovery_assessment = assess_recovery_spacing(program.weekly_schedule, ruleset)
+    if not recovery_assessment.is_safe:
         errors.append("RECOVERY_SPACING_INVALID")
+    elif recovery_assessment.repairable_conflicts:
+        warnings.append("RECOVERY_REPAIRABLE_OVERLAP_REMAINS")
     if program.safety_status not in {
         SafetyStatus.CLEAR,
         SafetyStatus.CLEAR_WITH_MODIFICATIONS,

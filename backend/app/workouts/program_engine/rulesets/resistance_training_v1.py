@@ -20,7 +20,7 @@ class PrescriptionRule:
 
 @dataclass(frozen=True)
 class ProgramRuleset:
-    version: str = "resistance_training_v4"
+    version: str = "resistance_training_v5"
     engine_version: str = "program_engine_v1"
     professional_hybrid_bonus: int = 30
     professional_ppl_bonus: int = 40

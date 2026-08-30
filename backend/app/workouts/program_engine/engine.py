@@ -37,7 +37,11 @@ from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import prescribe_sessions
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
 from app.workouts.program_engine.progression import deload_policy, double_progression_policy
-from app.workouts.program_engine.recovery import repair_recovery_weekdays
+from app.workouts.program_engine.recovery import (
+    assess_recovery_spacing,
+    repair_recovery_accessory_distribution,
+    repair_recovery_weekdays,
+)
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.safety import screen_safety
 from app.workouts.program_engine.schemas import (
@@ -81,6 +85,10 @@ from app.workouts.program_engine.template_sessions import (
     apply_template_intent,
     build_template_sessions,
     template_resolution_trace,
+)
+from app.workouts.program_engine.template_survival import (
+    assess_candidate_survival,
+    candidate_survival_sort_key,
 )
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_history import (
@@ -200,7 +208,11 @@ def generate_program(
             if reference_result.is_success:
                 return _append_successful_template_attempt(
                     reference_result,
-                    _template_attempt_trace(ranking, status="succeeded"),
+                    _template_attempt_trace(
+                        ranking,
+                        status="succeeded",
+                        repair_events=_post_construction_repair_events(reference_result),
+                    ),
                 )
             rejection_category = _template_rejection_category(reference_result.errors)
             rejection = {
@@ -227,6 +239,7 @@ def generate_program(
                     status="rejected",
                     rejection_category=rejection_category,
                     reason_codes=reference_result.errors,
+                    repair_events=_post_construction_repair_events(reference_result),
                 ),
             )
         except TemplateConstructionError as exc:
@@ -418,7 +431,13 @@ def _template_attempt_trace(
     status: str,
     rejection_category: str | None = None,
     reason_codes: tuple[str, ...] = ("TEMPLATE_ATTEMPT_SUCCEEDED",),
+    repair_events: tuple[str, ...] = (),
 ) -> dict[str, object]:
+    survival = assess_candidate_survival(
+        is_success=status == "succeeded",
+        reason_codes=reason_codes,
+        repair_events=repair_events,
+    )
     return {
         "stage": "template_attempt",
         "rank": ranking.rank,
@@ -429,7 +448,56 @@ def _template_attempt_trace(
         "status": status,
         "rejection_category": rejection_category,
         "reason_codes": reason_codes,
+        "post_construction_feasibility": survival.decision_trace(),
+        "selection_key": candidate_survival_sort_key(
+            survival,
+            product_score=ranking.score.total,
+        ),
     }
+
+
+def _post_construction_repair_events(
+    result: ProgramGenerationResult,
+) -> tuple[str, ...]:
+    events: list[str] = []
+    trace = result.program.decision_trace if result.program is not None else result.decision_trace
+    repair_markers = (
+        "ADDED",
+        "APPLIED",
+        "PERSONALIZED",
+        "REARRANGED",
+        "RECOVERED",
+        "REDUCED",
+        "REMOVED",
+        "REPLACED",
+        "SUBSTITUT",
+        "TRIMMED",
+    )
+    ignored = {
+        "FINAL_SESSION_SEQUENCE_APPLIED",
+        "SESSION_DURATION_TARGET_SATISFIED",
+        "WEEKLY_REDISTRIBUTION_ALREADY_BALANCED",
+    }
+    for entry in trace:
+        for field in ("reason_codes", "reasons"):
+            values = entry.get(field, ())
+            if not isinstance(values, (tuple, list)):
+                continue
+            events.extend(
+                value
+                for value in values
+                if isinstance(value, str)
+                and value not in ignored
+                and any(marker in value for marker in repair_markers)
+            )
+        if entry.get("stage") == "template_adaptation":
+            substitutions = entry.get("substitutions", ())
+            prescription_changes = entry.get("prescription_changes", ())
+            if isinstance(substitutions, (tuple, list)) and substitutions:
+                events.append("TEMPLATE_SAFE_SUBSTITUTION_APPLIED")
+            if isinstance(prescription_changes, (tuple, list)) and prescription_changes:
+                events.append("TEMPLATE_PRESCRIPTION_ADAPTED")
+    return tuple(dict.fromkeys(events))
 
 
 def _append_successful_template_attempt(
@@ -596,10 +664,18 @@ def _program_for_split(
     )
     days = duration_repair.days
     duration_repair_reasons = duration_repair.reasons
+    days_before_recovery_repair = days
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
+    days, accessory_recovery_reasons = repair_recovery_accessory_distribution(
+        days, normalized, ruleset
+    )
+    recovery_repair_reasons = tuple(
+        dict.fromkeys((*recovery_repair_reasons, *accessory_recovery_reasons))
+    )
     days = finalize_session_structure(days, normalized, ruleset)
     weekly_distribution = redistribute_weekly_exercises(days, normalized, ruleset)
     days = weekly_distribution.days
+    days_before_duration_certification = days
     duration_repair = _certify_duration_repair(
         duration_repair,
         days,
@@ -609,7 +685,37 @@ def _program_for_split(
         volume=volume,
         session_capacity=session_capacity,
     )
+    days = duration_repair.days
+    if days != days_before_duration_certification:
+        split, days, late_recovery_reasons = repair_recovery_weekdays(split, days, ruleset)
+        days, late_accessory_recovery_reasons = repair_recovery_accessory_distribution(
+            days, normalized, ruleset
+        )
+        late_recovery_reasons = tuple(
+            dict.fromkeys((*late_recovery_reasons, *late_accessory_recovery_reasons))
+        )
+        recovery_repair_reasons = tuple(
+            dict.fromkeys((*recovery_repair_reasons, *late_recovery_reasons))
+        )
+        days = finalize_session_structure(days, normalized, ruleset)
+        if late_recovery_reasons:
+            duration_repair = _certify_duration_repair(
+                duration_repair,
+                days,
+                normalized,
+                eligible,
+                ruleset,
+                volume=volume,
+                session_capacity=session_capacity,
+            )
+            days = duration_repair.days
     duration_repair_reasons = duration_repair.reasons
+    recovery_trace = _recovery_repair_trace(
+        days_before_recovery_repair,
+        days,
+        recovery_repair_reasons,
+        ruleset,
+    )
     day_count_errors = _day_count_errors(
         len(days), normalized.resistance_training_days, stage="dynamic_construction"
     )
@@ -760,6 +866,7 @@ def _program_for_split(
             duration_repair_reasons,
             duration_repair.evidence,
         ),
+        recovery_trace,
         {
             "stage": "session_structure",
             "status": "finalized",
@@ -884,7 +991,14 @@ def _reference_program(
     )
     days = duration_repair.days
     duration_repair_reasons = duration_repair.reasons
+    days_before_recovery_repair = days
     split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
+    days, accessory_recovery_reasons = repair_recovery_accessory_distribution(
+        days, normalized, ruleset
+    )
+    recovery_repair_reasons = tuple(
+        dict.fromkeys((*recovery_repair_reasons, *accessory_recovery_reasons))
+    )
     days = finalize_session_structure(days, normalized, ruleset)
     weekly_distribution = redistribute_weekly_exercises(
         days,
@@ -893,6 +1007,7 @@ def _reference_program(
         preserve_template_core_structure=True,
     )
     days = weekly_distribution.days
+    days_before_duration_certification = days
     duration_repair = _certify_duration_repair(
         duration_repair,
         days,
@@ -903,7 +1018,38 @@ def _reference_program(
         prefer_acceptable_volume_for_minimum_fill=True,
         session_capacity=session_capacity,
     )
+    days = duration_repair.days
+    if days != days_before_duration_certification:
+        split, days, late_recovery_reasons = repair_recovery_weekdays(split, days, ruleset)
+        days, late_accessory_recovery_reasons = repair_recovery_accessory_distribution(
+            days, normalized, ruleset
+        )
+        late_recovery_reasons = tuple(
+            dict.fromkeys((*late_recovery_reasons, *late_accessory_recovery_reasons))
+        )
+        recovery_repair_reasons = tuple(
+            dict.fromkeys((*recovery_repair_reasons, *late_recovery_reasons))
+        )
+        days = finalize_session_structure(days, normalized, ruleset)
+        if late_recovery_reasons:
+            duration_repair = _certify_duration_repair(
+                duration_repair,
+                days,
+                normalized,
+                eligible,
+                ruleset,
+                volume=volume,
+                prefer_acceptable_volume_for_minimum_fill=True,
+                session_capacity=session_capacity,
+            )
+            days = duration_repair.days
     duration_repair_reasons = duration_repair.reasons
+    recovery_trace = _recovery_repair_trace(
+        days_before_recovery_repair,
+        days,
+        recovery_repair_reasons,
+        ruleset,
+    )
     substitution_metrics = aggregate_substitution_observability(substitution_decisions)
     metrics = {
         **_volume_metrics(
@@ -981,6 +1127,7 @@ def _reference_program(
             duration_repair_reasons,
             duration_repair.evidence,
         ),
+        recovery_trace,
         {
             "stage": "session_structure",
             "status": "finalized",
@@ -1340,6 +1487,49 @@ def _duration_repair_trace(
     }
 
 
+def _recovery_repair_trace(
+    before: tuple[WorkoutDay, ...],
+    after: tuple[WorkoutDay, ...],
+    reason_codes: tuple[str, ...],
+    ruleset: ProgramRuleset,
+) -> dict[str, object]:
+    before_assessment = assess_recovery_spacing(before, ruleset)
+    after_assessment = assess_recovery_spacing(after, ruleset)
+    has_recovery_conflict = bool(
+        before_assessment.repairable_conflicts or before_assessment.hard_conflicts
+    )
+    repair_attempts = (
+        ("reorder_weekdays", "move_optional_isolation") if has_recovery_conflict else ()
+    )
+    if before_assessment.hard_conflicts:
+        constraint_class = "hard"
+    elif before_assessment.repairable_conflicts:
+        constraint_class = "repairable"
+    elif before_assessment.soft_conflicts:
+        constraint_class = "soft"
+    else:
+        constraint_class = None
+    final_result = (
+        "repaired"
+        if after_assessment.is_valid
+        else "accepted_with_warning"
+        if after_assessment.is_safe
+        else "rejected"
+    )
+    return {
+        "stage": "recovery_repair",
+        "status": final_result,
+        "constraint_class": constraint_class,
+        "repair_attempts": repair_attempts,
+        "reason_codes": reason_codes,
+        "before": before_assessment.decision_trace(),
+        "after": after_assessment.decision_trace(
+            repair_attempts=repair_attempts,
+            final_result=final_result,
+        ),
+    }
+
+
 def _duration_session_metrics(day: WorkoutDay) -> dict[str, object]:
     cardio_minutes = calculate_cardio_addon_minutes(day)
     return {
@@ -1379,10 +1569,8 @@ def _certify_duration_repair(
         session_capacity=session_capacity,
         _certification=True,
     )
-    if certified.days != days:
-        return DurationRepairResult(days=days, reasons=original.reasons, evidence=())
     return DurationRepairResult(
-        days=days,
+        days=certified.days,
         reasons=tuple(dict.fromkeys((*original.reasons, *certified.reasons))),
         evidence=certified.evidence,
     )
