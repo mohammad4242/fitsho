@@ -290,17 +290,17 @@ def test_recovery_repair_prefers_dedicated_recipient_over_earlier_grouped_day() 
     source = _day(
         1,
         movable,
-        *(_exercise(sets=3, primary=MuscleGroup.BACK) for _ in range(6)),
+        *(_exercise(sets=3, primary=MuscleGroup.BACK) for _ in range(7)),
         focus="back_biceps",
     )
     grouped_recipient = _day(
         3,
-        *(_exercise(sets=3, primary=MuscleGroup.BACK) for _ in range(6)),
+        *(_exercise(sets=3, primary=MuscleGroup.BACK) for _ in range(7)),
         focus="back_biceps",
     )
     dedicated_recipient = _day(
         5,
-        *(_exercise(sets=3, primary=MuscleGroup.TRICEPS) for _ in range(6)),
+        *(_exercise(sets=3, primary=MuscleGroup.TRICEPS) for _ in range(7)),
         focus="arms",
     )
     normalized = normalize_request(
